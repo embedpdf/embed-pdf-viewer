@@ -1,17 +1,11 @@
 'use client';
 
+import { RocketIcon } from '@hugeicons/core-free-icons';
+import { HugeiconsIcon } from '@hugeicons/react';
 import { useState, type ReactNode } from 'react';
 
 import { Eyebrow } from './eyebrow';
-import {
-  AngularIcon,
-  BoltBadgeIcon,
-  CheckIcon,
-  JsMark,
-  ReactIcon,
-  SvelteIcon,
-  VueIcon,
-} from './icons';
+import { AngularIcon, CheckIcon, JsMark, ReactIcon, SvelteIcon, VueIcon } from './icons';
 
 type Token = [text: string, type: string];
 
@@ -584,7 +578,12 @@ export function QuickStart() {
 
       <div className="relative z-[1] mx-auto flex w-full max-w-[980px] flex-col items-center px-[clamp(20px,4vw,40px)]">
         <div className="mb-6">
-          <Eyebrow tone="dark" icon={<BoltBadgeIcon size={14} className="text-ep-blue" />}>
+          <Eyebrow
+            tone="dark"
+            icon={
+              <HugeiconsIcon icon={RocketIcon} size={14} strokeWidth={2} className="text-ep-blue" />
+            }
+          >
             Quick Start
           </Eyebrow>
         </div>

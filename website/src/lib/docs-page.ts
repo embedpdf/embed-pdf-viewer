@@ -95,6 +95,22 @@ export function createDocsPagePresentation({
   };
 }
 
+/**
+ * The docs overview (`/docs`) is a dedicated landing route, not an MDX page,
+ * so its presentation is declared here explicitly instead of being derived
+ * from front matter. Its route and its social image both import this value.
+ */
+export const DOCS_OVERVIEW_PRESENTATION = createDocsPagePresentation({
+  mdxPath: ['docs'],
+  metadata: {
+    title: 'Documentation',
+    description:
+      'Choose the ready-made viewer, headless components, or the EmbedPDF Engine directly.',
+  },
+  resolved: { contentPath: ['docs'] },
+});
+
+/** Resolves an MDX-backed documentation URL to its presentation. */
 export async function getDocsPagePresentation(
   mdxPath: string[],
 ): Promise<DocsPagePresentation | null> {
@@ -107,4 +123,44 @@ export async function getDocsPagePresentation(
     metadata: (metadata ?? {}) as DocsFrontmatter,
     resolved,
   });
+}
+
+/** Assembles the Next.js `Metadata` shared by every docs surface. */
+export function buildDocsPageMetadata(
+  page: DocsPagePresentation,
+  { ogType = 'article' }: { ogType?: 'article' | 'website' } = {},
+): Metadata {
+  const socialImage = {
+    url: page.socialImagePath,
+    alt: `${page.title} | EmbedPDF documentation`,
+    width: 1200,
+    height: 630,
+    type: 'image/png',
+  };
+
+  return {
+    ...page.metadata,
+    title: page.title,
+    description: page.description,
+    alternates: {
+      ...(page.metadata.alternates ?? {}),
+      canonical: page.canonicalUrl,
+    },
+    openGraph: {
+      ...(page.metadata.openGraph ?? {}),
+      title: page.title,
+      description: page.socialDescription,
+      siteName: 'EmbedPDF',
+      type: ogType,
+      url: page.canonicalPath,
+      images: [socialImage],
+    },
+    twitter: {
+      ...(page.metadata.twitter ?? {}),
+      card: 'summary_large_image',
+      title: page.title,
+      description: page.socialDescription,
+      images: [socialImage],
+    },
+  };
 }

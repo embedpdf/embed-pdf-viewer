@@ -1,11 +1,21 @@
+import {
+  Book02Icon,
+  CpuIcon,
+  FileImportIcon,
+  Image02Icon,
+  Search01Icon,
+  TaskEdit01Icon,
+} from '@hugeicons/core-free-icons';
+import { HugeiconsIcon } from '@hugeicons/react';
 import Image from 'next/image';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 
+import { Eyebrow } from '@/components/site/eyebrow';
 import {
   AngularIcon,
   ArrowRightIcon,
-  EngineIcon,
+  ExtLinkIcon,
   JsMark,
   ReactIcon,
   SvelteIcon,
@@ -103,14 +113,14 @@ function PathCard({ path }: { path: (typeof DOCS_OVERVIEW_PATHS)[number] }) {
         {path.eyebrow}
       </span>
 
-      <div className="mt-5 grid flex-1 items-center gap-6 min-[980px]:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-        <div className="flex items-center justify-center rounded-[18px] bg-white/55 px-3 py-4">
+      <div className="mb-7 mt-5 grid items-start gap-6 min-[980px]:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+        <div className="flex h-[180px] items-center justify-center rounded-[18px] bg-white/55 px-3">
           <Image
             src={path.illustration}
             alt=""
             width={360}
             height={280}
-            className="h-auto w-full max-w-[310px]"
+            className="h-full w-auto max-w-full object-contain"
           />
         </div>
         <div>
@@ -134,7 +144,7 @@ function PathCard({ path }: { path: (typeof DOCS_OVERVIEW_PATHS)[number] }) {
         </div>
       </div>
 
-      <div className="mt-6 grid grid-cols-2 gap-2 border-t border-[rgba(7,32,76,0.08)] pt-5 sm:grid-cols-4 min-[980px]:grid-cols-2">
+      <div className="mt-auto grid grid-cols-2 gap-2 border-t border-[rgba(7,32,76,0.08)] pt-5 sm:grid-cols-3">
         {path.integrations.map((integration) => (
           <IntegrationLink key={integration} integration={integration} product={path.id} />
         ))}
@@ -143,59 +153,91 @@ function PathCard({ path }: { path: (typeof DOCS_OVERVIEW_PATHS)[number] }) {
   );
 }
 
+const ENGINE_FEATURE_ICONS: ReactNode[] = [
+  <HugeiconsIcon key="io" icon={FileImportIcon} size={17} strokeWidth={2} />,
+  <HugeiconsIcon key="render" icon={Image02Icon} size={17} strokeWidth={2} />,
+  <HugeiconsIcon key="search" icon={Search01Icon} size={17} strokeWidth={2} />,
+  <HugeiconsIcon key="forms" icon={TaskEdit01Icon} size={17} strokeWidth={2} />,
+];
+
 function EngineFoundation() {
+  const titleWords = DOCS_ENGINE_FOUNDATION.title.split(' ');
+
   return (
-    <section className="relative mt-7 overflow-hidden rounded-[24px] border border-[#B9E4DE] bg-[linear-gradient(135deg,#ECFAF8_0%,#F5FBFF_58%,#F2F0FF_100%)] p-[clamp(22px,3vw,36px)]">
-      <div className="absolute -right-24 -top-28 h-72 w-72 rounded-full bg-[#20B8A5]/10" />
-      <div className="relative grid items-center gap-8 min-[900px]:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
-        <div>
-          <span className="font-display inline-flex items-center gap-2 rounded-full bg-[#DDF5F1] px-3 py-1.5 text-[12px] font-extrabold text-[#087F73]">
-            <EngineIcon size={16} />
-            {DOCS_ENGINE_FOUNDATION.eyebrow}
-          </span>
-          <h2 className="font-display text-ep-navy mb-0 mt-5 text-[clamp(26px,3vw,36px)] font-extrabold leading-[1.1] tracking-[-0.025em]">
-            {DOCS_ENGINE_FOUNDATION.title}
-          </h2>
-          <p className="text-ep-slate mt-4 max-w-[62ch] font-sans text-[16px] leading-[1.65]">
-            {DOCS_ENGINE_FOUNDATION.description}
-          </p>
-          <div className="mt-5 flex flex-wrap gap-2">
-            {DOCS_ENGINE_FOUNDATION.features.map((feature) => (
-              <span
-                key={feature}
-                className="border-ep-border rounded-full border bg-white/80 px-3 py-1.5 font-sans text-[13px] font-bold text-[#31516B]"
-              >
-                {feature}
-              </span>
+    <section className="relative mt-[clamp(52px,8vw,96px)]">
+      <div className="flex justify-center">
+        <Eyebrow
+          icon={<HugeiconsIcon icon={CpuIcon} size={14} strokeWidth={2} className="text-ep-blue" />}
+        >
+          {DOCS_ENGINE_FOUNDATION.eyebrow}
+        </Eyebrow>
+      </div>
+      <div className="relative mt-[clamp(24px,3.5vw,44px)] grid items-center gap-[clamp(20px,4vw,56px)] min-[900px]:grid-cols-[minmax(0,0.82fr)_minmax(340px,1.18fr)]">
+        {/* Illustration */}
+        <div className="relative flex items-center justify-center">
+          <div
+            className="pointer-events-none absolute left-1 top-2 grid grid-cols-6 gap-1.5 opacity-50"
+            aria-hidden
+          >
+            {Array.from({ length: 18 }).map((_, i) => (
+              <span key={i} className="h-1 w-1 rounded-full bg-[#B7D2F8]" />
             ))}
           </div>
-          <Link
-            href={DOCS_ENGINE_FOUNDATION.href}
-            className="font-display group mt-6 inline-flex items-center gap-2 rounded-[11px] bg-[#087F73] px-4 py-3 text-[14px] font-extrabold text-white no-underline transition hover:bg-[#066A61]"
-          >
-            {DOCS_ENGINE_FOUNDATION.cta}
-            <ArrowRightIcon
-              size={16}
-              className="transition-transform group-hover:translate-x-0.5"
-            />
-          </Link>
+          <Image
+            src={DOCS_ENGINE_FOUNDATION.illustration}
+            alt="EmbedPDF Engine — PDFium powered"
+            width={520}
+            height={572}
+            className="relative h-auto w-full max-w-[260px] drop-shadow-[0_24px_44px_-32px_rgba(8,118,253,0.35)]"
+          />
         </div>
 
-        <div className="flex flex-col items-center rounded-[20px] border border-white/90 bg-white/70 p-5 shadow-[0_20px_40px_-30px_rgba(7,32,76,0.28)]">
-          <div className="grid w-full grid-cols-2 gap-3">
-            {DOCS_OVERVIEW_PATHS.map((path) => (
-              <div
-                key={path.id}
-                className="border-ep-border font-display text-ep-navy flex min-h-[72px] items-center justify-center rounded-[13px] border bg-white px-3 text-center text-[14px] font-extrabold"
-              >
-                {path.title}
-              </div>
+        {/* Content */}
+        <div>
+          <h2 className="font-display text-ep-navy mb-0 mt-0 text-[clamp(22px,2.2vw,28px)] font-extrabold leading-[1.15] tracking-[-0.02em]">
+            {titleWords.map((word, i) => (
+              <span key={word} className={i === titleWords.length - 1 ? 'text-ep-blue' : undefined}>
+                {i > 0 ? ' ' : ''}
+                {word}
+              </span>
             ))}
-          </div>
-          <div className="h-7 w-px bg-[#8ECFC6]" />
-          <div className="flex w-full items-center justify-center gap-3 rounded-[15px] border border-[#A9DED7] bg-[#E5F7F4] px-4 py-4 text-[#087F73]">
-            <EngineIcon size={28} />
-            <span className="font-display text-[17px] font-extrabold">Shared Engine contract</span>
+          </h2>
+          <p className="text-ep-slate mt-2.5 max-w-[52ch] font-sans text-[15px] leading-[1.55]">
+            {DOCS_ENGINE_FOUNDATION.description}
+          </p>
+
+          <ul className="mt-4 flex list-none flex-col gap-2.5 p-0">
+            {DOCS_ENGINE_FOUNDATION.features.map((feature, i) => (
+              <li
+                key={feature}
+                className="text-ep-navy flex items-center gap-2.5 font-sans text-[14px] font-semibold"
+              >
+                <span className="inline-flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-[8px] bg-[#EDF3FC] text-[#3E7BD6]">
+                  {ENGINE_FEATURE_ICONS[i]}
+                </span>
+                {feature}
+              </li>
+            ))}
+          </ul>
+
+          <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-3">
+            <Link
+              href={DOCS_ENGINE_FOUNDATION.href}
+              className="font-display bg-ep-blue group inline-flex items-center gap-2 rounded-[11px] px-4 py-2.5 text-[14px] font-extrabold text-white no-underline transition hover:bg-[#0665D8] hover:shadow-[0_14px_26px_-18px_rgba(8,118,253,0.7)]"
+            >
+              {DOCS_ENGINE_FOUNDATION.cta}
+              <ArrowRightIcon
+                size={15}
+                className="transition-transform group-hover:translate-x-0.5"
+              />
+            </Link>
+            <Link
+              href={DOCS_ENGINE_FOUNDATION.apiHref}
+              className="font-display text-ep-blue group inline-flex items-center gap-1.5 text-[14px] font-extrabold no-underline transition hover:text-[#0665D8]"
+            >
+              {DOCS_ENGINE_FOUNDATION.apiCta}
+              <ExtLinkIcon size={12} className="transition-transform group-hover:translate-x-0.5" />
+            </Link>
           </div>
         </div>
       </div>
@@ -205,15 +247,21 @@ function EngineFoundation() {
 
 export function DocsOverview() {
   return (
-    <div className="not-prose pb-8 pt-7">
-      <header className="mx-auto max-w-[820px] text-center">
-        <span className="font-display text-ep-blue text-[12px] font-extrabold uppercase tracking-[0.14em]">
-          EmbedPDF Documentation
-        </span>
-        <h1 className="font-display text-ep-navy mb-0 mt-5 text-[clamp(38px,5vw,60px)] font-extrabold leading-[1.04] tracking-[-0.035em]">
+    <div className="not-prose pb-8 pt-[clamp(28px,5vw,72px)]">
+      <header className="mx-auto max-w-[760px] text-center">
+        <div className="flex justify-center">
+          <Eyebrow
+            icon={
+              <HugeiconsIcon icon={Book02Icon} size={14} strokeWidth={2} className="text-ep-blue" />
+            }
+          >
+            EmbedPDF Documentation
+          </Eyebrow>
+        </div>
+        <h1 className="font-display text-ep-navy mx-auto mb-0 mt-5 max-w-[16ch] text-balance text-[clamp(34px,4.4vw,50px)] font-extrabold leading-[1.06] tracking-[-0.03em]">
           Build PDF experiences <span className="ep-grad">your way.</span>
         </h1>
-        <p className="text-ep-body mx-auto mt-5 max-w-[650px] font-sans text-[18px] leading-[1.65]">
+        <p className="text-ep-body mx-auto mt-5 max-w-[620px] font-sans text-[18px] leading-[1.65]">
           Start with a complete viewer, compose your own interface, or work directly with the engine
           underneath.
         </p>

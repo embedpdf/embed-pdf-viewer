@@ -1,3 +1,5 @@
+import { SecurityCheckIcon } from '@hugeicons/core-free-icons';
+import { HugeiconsIcon } from '@hugeicons/react';
 import Image from 'next/image';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
@@ -5,7 +7,7 @@ import type { ReactNode } from 'react';
 import { EpButton } from './button';
 import { DotGrid } from './dot-grid';
 import { Eyebrow } from './eyebrow';
-import { ArrowRightIcon, ExtLinkIcon, GitHubIcon, ShieldCheckIcon } from './icons';
+import { ArrowRightIcon, ExtLinkIcon, GitHubIcon } from './icons';
 
 function NpmMark({ size = 52 }: { size?: number }) {
   return (
@@ -157,7 +159,16 @@ export function Trust() {
       <div className="relative z-10 mx-auto grid w-full max-w-[1440px] items-start gap-[clamp(40px,5vw,88px)] px-[clamp(20px,4vw,80px)] min-[961px]:grid-cols-[minmax(280px,380px)_minmax(0,1fr)]">
         <header className="flex flex-col items-start">
           <div className="mb-[22px]">
-            <Eyebrow icon={<ShieldCheckIcon size={13} className="text-ep-blue" />}>
+            <Eyebrow
+              icon={
+                <HugeiconsIcon
+                  icon={SecurityCheckIcon}
+                  size={14}
+                  strokeWidth={2}
+                  className="text-ep-blue"
+                />
+              }
+            >
               Open source proof
             </Eyebrow>
           </div>

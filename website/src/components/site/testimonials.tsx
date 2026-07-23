@@ -1,9 +1,11 @@
+import { StarIcon } from '@hugeicons/core-free-icons';
+import { HugeiconsIcon } from '@hugeicons/react';
 import Image from 'next/image';
 import Link from 'next/link';
 import type { CSSProperties } from 'react';
 
 import { DotGrid } from './dot-grid';
-import { ArrowRightIcon, StarIcon } from './icons';
+import { ArrowRightIcon } from './icons';
 
 type Testimonial = {
   step: string;
@@ -228,7 +230,7 @@ export function Testimonials() {
       <div className="relative z-[1] mx-auto w-full max-w-[1180px] px-[clamp(20px,4vw,60px)]">
         <header className="mx-auto mb-[72px] flex max-w-[720px] flex-col items-center gap-[22px] text-center">
           <div className="font-display text-ep-blue700 inline-flex items-center gap-2 rounded-full border border-[#C7DEFF] bg-[#E8F0FE] py-2 pl-3 pr-4 text-xs font-bold uppercase tracking-[0.10em]">
-            <StarIcon size={14} className="text-ep-blue" />
+            <HugeiconsIcon icon={StarIcon} size={14} strokeWidth={2} className="text-ep-blue" />
             <span>Developer stories</span>
           </div>
           <h2 className="font-display text-ep-navy m-0 text-[clamp(36px,4.6vw,56px)] font-extrabold leading-[1.1] tracking-[-0.02em]">

@@ -17,6 +17,8 @@
     "@embedpdf/angular": "workspace:*",
     "@embedpdf/engine": "workspace:*",
     "@embedpdf/react": "workspace:*",
+    "@hugeicons/core-free-icons": "^4.2.0",
+    "@hugeicons/react": "^1.1.7",
     "@neondatabase/serverless": "^1.1.0",
     "@theguild/remark-npm2yarn": "^0.3.3",
     "next": "^15.4.10",

@@ -4,7 +4,7 @@ import { Fragment } from 'react';
 
 import { useMDXComponents as getMDXComponents } from '../../../../mdx-components';
 
-import { getDocsPagePresentation } from '@/lib/docs-page';
+import { buildDocsPageMetadata, getDocsPagePresentation } from '@/lib/docs-page';
 import { expandDocsStaticParams, resolveDocsPath } from '@/lib/docs-route';
 
 const nextraParams = generateStaticParamsFor('mdxPath');
@@ -27,39 +27,7 @@ export async function generateMetadata(props: PageProps) {
   const { mdxPath } = await props.params;
   const page = await getDocsPagePresentation(mdxPath);
   if (!page) return {};
-  const socialImage = {
-    url: page.socialImagePath,
-    alt: `${page.title} | EmbedPDF documentation`,
-    width: 1200,
-    height: 630,
-    type: 'image/png',
-  };
-
-  return {
-    ...page.metadata,
-    title: page.title,
-    description: page.description,
-    alternates: {
-      ...(page.metadata.alternates ?? {}),
-      canonical: page.canonicalUrl,
-    },
-    openGraph: {
-      ...(page.metadata.openGraph ?? {}),
-      title: page.title,
-      description: page.socialDescription,
-      siteName: 'EmbedPDF',
-      type: 'article',
-      url: page.canonicalPath,
-      images: [socialImage],
-    },
-    twitter: {
-      ...(page.metadata.twitter ?? {}),
-      card: 'summary_large_image',
-      title: page.title,
-      description: page.socialDescription,
-      images: [socialImage],
-    },
-  };
+  return buildDocsPageMetadata(page);
 }
 
 const Wrapper = getMDXComponents().wrapper ?? Fragment;

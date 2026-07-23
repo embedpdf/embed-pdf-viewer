@@ -2,7 +2,6 @@ import type { MDXComponents } from 'mdx/types';
 import Link from 'next/link';
 import type { AnchorHTMLAttributes, HTMLAttributes, ReactNode } from 'react';
 
-import { DocsOverview } from './docs-overview';
 import { DocsPage } from './docs-page';
 import { Example } from './example';
 import { Fw } from './framework';
@@ -113,7 +112,6 @@ export function useMDXComponents(components?: MDXComponents): MDXComponents {
     ),
     pre: Pre,
     CodeExample,
-    DocsOverview,
     Example,
     Fw,
     ...components,

@@ -402,12 +402,18 @@ function SocialCard({ page }: { page: DocsPagePresentation }) {
   );
 }
 
-export async function createDocsSocialImage(mdxPath: string[]) {
-  const page = await getDocsPagePresentation(mdxPath);
-  if (!page) throw new Error(`Cannot create a social image for /${mdxPath.join('/')}.`);
-
+/** Renders the social card for an already-resolved presentation. */
+export function createSocialImageResponse(page: DocsPagePresentation) {
   return new ImageResponse(<SocialCard page={page} />, {
     height: 630,
     width: 1200,
   });
+}
+
+/** Renders the social card for an MDX-backed documentation URL. */
+export async function createDocsSocialImage(mdxPath: string[]) {
+  const page = await getDocsPagePresentation(mdxPath);
+  if (!page) throw new Error(`Cannot create a social image for /${mdxPath.join('/')}.`);
+
+  return createSocialImageResponse(page);
 }

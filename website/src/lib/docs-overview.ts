@@ -1,4 +1,4 @@
-import { DOCS_INTEGRATION_LABELS, type DocsIntegration } from './docs-integrations';
+import type { DocsIntegration } from './docs-integrations';
 
 export type DocsOverviewPath = {
   id: 'viewer' | 'headless';
@@ -44,37 +44,8 @@ export const DOCS_ENGINE_FOUNDATION = {
     'Open, inspect, render, edit, and save PDF documents without adopting a UI layer. The local engine runs PDFium through WebAssembly in a Web Worker.',
   href: '/docs/engine/getting-started',
   cta: 'Use the Engine directly',
+  apiHref: '/docs/engine',
+  apiCta: 'Engine API reference',
+  illustration: '/pdfium.svg',
   features: ['Document I/O', 'Page rendering', 'Text and search', 'Forms and annotations'],
 } as const;
-
-export function renderDocsOverviewMarkdown() {
-  const paths = DOCS_OVERVIEW_PATHS.map((path) => {
-    const integrations = `\n\nIntegrations: ${path.integrations
-      .map(
-        (integration) =>
-          `[${DOCS_INTEGRATION_LABELS[integration]}](/docs/${path.id}/${integration}/getting-started)`,
-      )
-      .join(', ')}.`;
-
-    return `### ${path.title}\n\n${path.description}\n\n${path.features
-      .map((feature) => `- ${feature}`)
-      .join('\n')}${integrations}\n\n[${path.cta}](${path.href})`;
-  }).join('\n\n');
-
-  return `# EmbedPDF Documentation
-
-Choose the UI approach that fits your product. Both paths are powered by the same EmbedPDF Engine.
-
-## Choose your UI approach
-
-${paths}
-
-## ${DOCS_ENGINE_FOUNDATION.title}
-
-**${DOCS_ENGINE_FOUNDATION.eyebrow}.** ${DOCS_ENGINE_FOUNDATION.description}
-
-${DOCS_ENGINE_FOUNDATION.features.map((feature) => `- ${feature}`).join('\n')}
-
-[${DOCS_ENGINE_FOUNDATION.cta}](${DOCS_ENGINE_FOUNDATION.href})
-`;
-}

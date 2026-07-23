@@ -1,3 +1,5 @@
+import { FlashIcon, PuzzleIcon } from '@hugeicons/core-free-icons';
+import { HugeiconsIcon } from '@hugeicons/react';
 import Image from 'next/image';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
@@ -6,10 +8,8 @@ import { Eyebrow } from './eyebrow';
 import {
   AngularIcon,
   ArrowRightIcon,
-  BoltBadgeIcon,
   BookIcon,
   JsMark,
-  PuzzleBadgeIcon,
   ReactIcon,
   SvelteIcon,
   VueIcon,
@@ -172,7 +172,9 @@ export function TwoWays() {
 
           <IntegrationCard
             tone="blue"
-            badgeIcon={<BoltBadgeIcon size={16} className="text-ep-blue" />}
+            badgeIcon={
+              <HugeiconsIcon icon={FlashIcon} size={16} strokeWidth={2} className="text-ep-blue" />
+            }
             badgeLabel="Recommended for speed"
             illustration="/illustration-readymade.svg"
             title="Ready-made Viewer"
@@ -216,7 +218,14 @@ export function TwoWays() {
 
           <IntegrationCard
             tone="purple"
-            badgeIcon={<PuzzleBadgeIcon size={16} className="text-ep-purple" />}
+            badgeIcon={
+              <HugeiconsIcon
+                icon={PuzzleIcon}
+                size={16}
+                strokeWidth={2}
+                className="text-ep-purple"
+              />
+            }
             badgeLabel="Recommended for customization"
             illustration="/illustration-headless.svg"
             title="Headless Components"

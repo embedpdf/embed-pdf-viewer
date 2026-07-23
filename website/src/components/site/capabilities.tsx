@@ -1,17 +1,11 @@
+import { SparklesIcon } from '@hugeicons/core-free-icons';
+import { HugeiconsIcon } from '@hugeicons/react';
 import Image from 'next/image';
 import Link from 'next/link';
 
 import { EpButton } from './button';
 import { Eyebrow } from './eyebrow';
-import {
-  AngularIcon,
-  ArrowRightIcon,
-  BoltBadgeIcon,
-  JsMark,
-  ReactIcon,
-  SvelteIcon,
-  VueIcon,
-} from './icons';
+import { AngularIcon, ArrowRightIcon, JsMark, ReactIcon, SvelteIcon, VueIcon } from './icons';
 
 const CAPABILITIES = [
   {
@@ -44,7 +38,16 @@ export function Capabilities() {
       <div className="relative z-[2] mx-auto grid w-full max-w-[1440px] items-start gap-[clamp(40px,6vw,96px)] px-[clamp(20px,4vw,80px)] min-[1101px]:grid-cols-[minmax(280px,380px)_1fr]">
         <div className="flex flex-col items-start">
           <div className="mb-6">
-            <Eyebrow icon={<BoltBadgeIcon size={14} className="text-ep-blue" />}>
+            <Eyebrow
+              icon={
+                <HugeiconsIcon
+                  icon={SparklesIcon}
+                  size={14}
+                  strokeWidth={2}
+                  className="text-ep-blue"
+                />
+              }
+            >
               Capabilities
             </Eyebrow>
           </div>

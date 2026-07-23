@@ -1,8 +1,4 @@
 export default {
-  index: {
-    title: 'Overview',
-    type: 'page',
-  },
   viewer: {
     title: 'Viewer',
     type: 'page',

@@ -45,25 +45,23 @@ export function Hero() {
                 Live demo
               </EpButton>
             </div>
-            <div className="mt-4 inline-flex flex-wrap items-center gap-3.5 self-start rounded-full border border-[#E9EEFF] bg-white px-3.5 py-2 max-[480px]:gap-x-3 max-[480px]:gap-y-2">
+            <div className="mt-4 inline-flex flex-wrap items-center gap-x-5 gap-y-1.5 self-start rounded-2xl border border-[#E9EEFF] bg-white px-4 py-2.5">
               <a
                 href="https://github.com/embedpdf/embed-pdf-viewer"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="hover:text-ep-navy inline-flex items-center gap-1.5 font-sans text-[13px] font-medium text-[#3D4E75]"
+                className="hover:text-ep-navy inline-flex items-center gap-1.5 whitespace-nowrap font-sans text-[13px] font-medium text-[#3D4E75]"
               >
                 <StarIcon size={14} className="text-ep-blue" />
                 <b className="text-ep-navy font-bold">4K+</b>
                 <span>stars</span>
               </a>
-              <span className="h-3.5 w-px bg-[#E9EEFF] max-[480px]:hidden" />
-              <span className="inline-flex items-center gap-1.5 font-sans text-[13px] font-medium text-[#3D4E75]">
+              <span className="inline-flex items-center gap-1.5 whitespace-nowrap font-sans text-[13px] font-medium text-[#3D4E75]">
                 <DownloadIcon size={14} className="text-ep-blue" />
                 <b className="text-ep-navy font-bold">1M+</b>
                 <span>downloads</span>
               </span>
-              <span className="h-3.5 w-px bg-[#E9EEFF] max-[480px]:hidden" />
-              <span className="inline-flex items-center gap-1.5 font-sans text-[13px] font-medium text-[#3D4E75]">
+              <span className="inline-flex items-center gap-1.5 whitespace-nowrap font-sans text-[13px] font-medium text-[#3D4E75]">
                 <ShieldCheckIcon size={14} className="text-[#22C55E]" />
                 <span>Apache-2.0 licensed</span>
               </span>

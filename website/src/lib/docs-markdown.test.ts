@@ -69,21 +69,6 @@ describe('renderDocsMarkdown', () => {
     expect(markdown).not.toContain('<Example');
   });
 
-  it('projects the visual documentation overview into complete portable Markdown', () => {
-    const markdown = renderDocsMarkdown({
-      sourceCode: '<DocsOverview />',
-      canonicalPath: '/docs',
-      metadata: { title: 'Documentation' },
-    });
-
-    expect(markdown).toContain('# EmbedPDF Documentation');
-    expect(markdown).toContain('### Ready-made Viewer');
-    expect(markdown).toContain('### Headless Components');
-    expect(markdown).toContain('## EmbedPDF Engine');
-    expect(markdown).toContain('(https://www.embedpdf.com/docs/engine/getting-started)');
-    expect(markdown).not.toContain('<DocsOverview');
-  });
-
   it('fails when a custom component has no explicit Markdown projection', () => {
     expect(() =>
       renderDocsMarkdown({

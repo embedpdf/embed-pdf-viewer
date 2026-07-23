@@ -14,7 +14,6 @@ import {
   type HeadlessIntegration,
   type IntegrationDocsProduct,
 } from './docs-integrations';
-import { renderDocsOverviewMarkdown } from './docs-overview';
 import { docsProductFromPath } from './docs-products';
 import { collectSampleFiles, readDocsCodeFile, type DocsCodeFile } from './docs-samples';
 import { SITE_ORIGIN } from './site';
@@ -170,11 +169,6 @@ function resolveNodes(
     if (node.type === 'yaml' || node.type === 'mdxjsEsm') return [];
 
     if (node.type === 'mdxJsxFlowElement' || node.type === 'mdxJsxTextElement') {
-      if (node.name === 'DocsOverview') {
-        const overview = markdownProcessor.parse(renderDocsOverviewMarkdown()) as AstNode;
-        return resolveNodes(overview.children ?? [], integration, product);
-      }
-
       if (node.name === 'Fw') {
         if (product !== 'headless' || !integration || !isHeadlessIntegration(integration)) {
           throw new Error('<Fw> can only be exported from a framework-specific route.');
