@@ -27,6 +27,12 @@ export type {
   Variant,
 } from './schema';
 
+export { addItem, removeItems, replaceItem } from './transforms';
+export type { AddItemSpec } from './transforms';
+
+export { chromeHelpers } from './helpers';
+export type { ChromeHelpers } from './helpers';
+
 export { solve } from './solver';
 export type { FitMetrics, FitResult, GroupAssignment, UnitAssignment } from './solver';
 

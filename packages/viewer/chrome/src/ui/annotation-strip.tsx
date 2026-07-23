@@ -16,7 +16,7 @@ import { AnnotationMenu } from '@embedpdf/react/annotation-menu';
 import { useStripView } from '@embedpdf/react/toolbar';
 import type { ResolvedCommand } from '@embedpdf/react/commands';
 import { useT } from '@embedpdf/react/i18n';
-import { getStrip } from '../config/chrome';
+import { useStripSchema } from '../config-context';
 import { buttonClass } from './toolbar';
 import { Icon } from './icons';
 
@@ -38,7 +38,7 @@ function StripButton({ cmd, run }: { cmd: ResolvedCommand; run: () => void }) {
 
 export function AnnotationStrip() {
   const t = useT();
-  const view = useStripView(getStrip('annotation'));
+  const view = useStripView(useStripSchema('annotation'));
   if (!view) return null;
   return (
     <AnnotationMenu placement="bottom" gap={15}>

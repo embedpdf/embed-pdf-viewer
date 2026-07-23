@@ -12,6 +12,7 @@ import {
   item,
   custom,
   type BarSchema,
+  type ChromeSchema,
   type MenuSchema,
 } from '@embedpdf/react/toolbar';
 
@@ -203,7 +204,12 @@ const annotationStrip: BarSchema = {
   },
 };
 
-export const chrome = defineChrome({
+/**
+ * The DEFAULT chrome — exported as a VALUE, which is the whole customization
+ * model: consumers pass nothing and track this, transform it, or write their
+ * own. It is never merged with anything.
+ */
+export const defaultChrome = defineChrome({
   bars: { main: mainBar },
   modeBars: {
     'mode:annotate': annotateBar,
@@ -216,18 +222,20 @@ export const chrome = defineChrome({
   strips: { annotation: annotationStrip },
 });
 
-/** Menu lookup by id (arbitrary string) — the schema object is a typed literal,
- *  so this is where the string→schema widening happens, once. */
-export function getMenu(id: string): MenuSchema | undefined {
-  return (chrome.menus as Record<string, MenuSchema> | undefined)?.[id];
+// Lookups take the RESOLVED schema (the host may have replaced the default) —
+// the typed literal widens to arbitrary string keys here, once.
+
+/** Menu lookup by id (arbitrary string). */
+export function getMenu(schema: ChromeSchema, id: string): MenuSchema | undefined {
+  return (schema.menus as Record<string, MenuSchema> | undefined)?.[id];
 }
 
 /** Secondary band lookup by mode-surface id. */
-export function getModeBar(id: string): BarSchema | undefined {
-  return (chrome.modeBars as Record<string, BarSchema> | undefined)?.[id];
+export function getModeBar(schema: ChromeSchema, id: string): BarSchema | undefined {
+  return (schema.modeBars as Record<string, BarSchema> | undefined)?.[id];
 }
 
 /** Contextual strip lookup by context id ('annotation', …). */
-export function getStrip(id: string): BarSchema | undefined {
-  return (chrome.strips as Record<string, BarSchema> | undefined)?.[id];
+export function getStrip(schema: ChromeSchema, id: string): BarSchema | undefined {
+  return (schema.strips as Record<string, BarSchema> | undefined)?.[id];
 }

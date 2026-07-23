@@ -18,7 +18,7 @@
  * plugin-shell's exclusive 'mode' surface, read null-safely so the band simply
  * doesn't exist without a document.
  */
-import type { ReactNode } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import {
   DocumentGate,
   useDocumentId,
@@ -37,8 +37,8 @@ import { SearchLayer } from '@embedpdf/react/search';
 import { useCommandShortcuts } from '@embedpdf/react/commands';
 import { ShellToken } from '@embedpdf/react/shell';
 import { useT } from '@embedpdf/react/i18n';
-import { chrome, getModeBar } from './config/chrome';
-import { MODE_SURFACES } from './config/commands';
+import { getModeBar } from './config/chrome';
+import { useChromeSchema } from './config-context';
 import { AppToolbar } from './ui/toolbar';
 import { AnnotationStrip } from './ui/annotation-strip';
 import { TabBar } from './ui/tab-bar';
@@ -53,13 +53,17 @@ import { DocumentError, PasswordPrompt } from './ui/document-boot';
 const ANNOTATION_RENDERERS: AnnotationRenderer[] = [formWidgetRenderer];
 
 function ModeBand() {
+  const schema = useChromeSchema();
+  // The mode list is DERIVED from the chrome's modeBars keys — adding a custom
+  // mode is one command + one bar schema in config, not a shell change.
+  const modeSurfaces = useMemo(() => Object.keys(schema.modeBars ?? {}), [schema]);
   const activeMode = useOptionalSelector(
     ShellToken,
-    (s) => MODE_SURFACES.find((m) => s.isOpen(m)) ?? null,
+    (s) => modeSurfaces.find((m) => s.isOpen(m)) ?? null,
     null,
   );
   if (!activeMode) return null;
-  const bar = getModeBar(activeMode);
+  const bar = getModeBar(schema, activeMode);
   if (!bar) return null;
   return (
     <div className="border-border bg-surface-alt flex shrink-0 items-center border-b px-4 py-2">
@@ -106,6 +110,7 @@ export function Shell() {
   // Form scripts stay inside the isolated form pipeline; this hook fulfils the
   // resulting alert, page-navigation, and print UI requests in the React shell.
   useFormScriptingProvider();
+  const schema = useChromeSchema();
   return (
     <div className="bg-app text-fg flex h-full flex-col">
       <Header />
@@ -114,10 +119,14 @@ export function Shell() {
       <TabBar visibility="always" />
 
       {/* main toolbar — measured; degrades + overflows with zero config.
-          Deliberately OUTSIDE the gate: chrome renders before any document. */}
-      <div className="border-border bg-surface flex shrink-0 items-center border-b px-4 py-2">
-        <AppToolbar bar={chrome.bars.main} className="w-full" />
-      </div>
+          Deliberately OUTSIDE the gate: chrome renders before any document.
+          Bar id 'main' is the shell's one structural expectation — an owned
+          chrome without it simply has no main toolbar. */}
+      {schema.bars.main && (
+        <div className="border-border bg-surface flex shrink-0 items-center border-b px-4 py-2">
+          <AppToolbar bar={schema.bars.main} className="w-full" />
+        </div>
+      )}
 
       <ModeBand />
 

@@ -477,7 +477,11 @@ export function Toolbar({
   // Structure → visible structure → fit. Cheap enough to run per render; all
   // heavy lifting is O(items), and items is ~dozens.
   const normalized = useMemo(() => normalizeBar(bar), [bar]);
-  const visibleBar = filterBar(normalized, (u) => resolveCmd(commandOf(u))?.visible !== false);
+  // `=== true` and not `!== false`: an UNREGISTERED command resolves to null,
+  // and a unit the registry can't name must not render or consume budget —
+  // the schema validator's dev warning is the feedback channel, not raw text
+  // in the toolbar.
+  const visibleBar = filterBar(normalized, (u) => resolveCmd(commandOf(u))?.visible === true);
   const metrics: FitMetrics = {
     unit: (key, variant) => widthsRef.current.get(`u:${key}@${variant}`),
     groupCollapsed: (id) => widthsRef.current.get(groupKey(id)),

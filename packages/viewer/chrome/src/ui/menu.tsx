@@ -10,7 +10,7 @@ import { useCommand, useCommands } from '@embedpdf/react/commands';
 import { useT } from '@embedpdf/react/i18n';
 import type { MenuSchema } from '@embedpdf/react/toolbar';
 import { Icon } from './icons';
-import { getMenu } from '../config/chrome';
+import { useMenuSchema } from '../config-context';
 
 export function MenuRow({ commandId, onRun }: { commandId: string; onRun?: () => void }) {
   const cmd = useCommand(commandId);
@@ -49,7 +49,7 @@ export function MenuRow({ commandId, onRun }: { commandId: string; onRun?: () =>
 /** One section-separated menu, by schema id. */
 export function MenuBody({ menuId, onRun }: { menuId: string; onRun?: () => void }) {
   const t = useT();
-  const menu: MenuSchema | undefined = getMenu(menuId);
+  const menu: MenuSchema | undefined = useMenuSchema(menuId);
   if (!menu) return null;
   return (
     <div className="min-w-52 p-1">

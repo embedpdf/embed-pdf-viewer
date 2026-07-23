@@ -1,14 +1,24 @@
 /**
- * The full viewer, as a component. Builds the plugin set (plain pure values)
- * and mounts the shell; the ENGINE stays a prop — choosing local-wasm vs cloud
- * is the host's decision (ADAPTERS.md), and each delivery (the example app,
- * the @embedpdf/viewer custom element, the framework wrappers) wires its own.
- * The chrome — toolbars, translations, theme — renders at t≈0; only the pages
- * wait on the engine.
+ * The full viewer, as a component — and the customization CONTRACT. The
+ * `ViewerCustomization` surface here is the exact shape that later powers
+ * `EmbedPDF.init({...})` and every framework wrapper, because all of it is
+ * plain data (see README.md).
+ *
+ * Two semantics, on purpose:
+ *  - REGISTRIES (commands / icons / strings) merge ADDITIVELY over the
+ *    defaults by id; a colliding id overrides.
+ *  - STRUCTURE (chrome) is an owned VALUE: the default, a transform of it,
+ *    or the host's own schema — never merged.
+ *
+ * The engine stays a prop — choosing local-wasm vs cloud is the host's
+ * decision (ADAPTERS.md), and each delivery wires its own. The chrome —
+ * toolbars, translations, theme — renders at t≈0; only the pages wait on
+ * the engine. Customization is mount-time (exactly like v2's init config);
+ * changing these props on a mounted viewer does not rebuild the workspace.
  */
 // One import line per feature (ADAPTERS.md): each subpath carries the
 // plugin AND its UI; delete a line and the feature leaves the bundle.
-import type { ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Viewer } from '@embedpdf/react/runtime';
 import type { Engine, EngineFactory, InitialDocument } from '@embedpdf/react/runtime';
 import { stagePlugin } from '@embedpdf/react/stage';
@@ -22,70 +32,88 @@ import { formPlugin } from '@embedpdf/react/form';
 import { linkPlugin } from '@embedpdf/react/link';
 import { searchPlugin } from '@embedpdf/react/search';
 import { i18nPlugin, negotiateLocale, useT } from '@embedpdf/react/i18n';
+import type { Locale, TranslationDictionary } from '@embedpdf/react/i18n';
 import { commandsPlugin } from '@embedpdf/react/commands';
+import type { CommandDef } from '@embedpdf/react/commands';
 import { shellPlugin } from '@embedpdf/react/shell';
+import { chromeHelpers, validateChrome } from '@embedpdf/react/toolbar';
+import type { ChromeHelpers, ChromeSchema } from '@embedpdf/react/toolbar';
 import { ThumbsStageToken } from './config/stage';
-import { commands } from './config/commands';
+import { defaultChrome } from './config/chrome';
+import { defaultCommands } from './config/commands';
 import { demoToolsPlugin } from './config/demo-tools.plugin';
 import { en } from './locales/en';
+import { ViewerConfigProvider, type ResolvedViewerConfig } from './config-context';
+import { ICON_PATHS, type IconDef } from './ui/icons';
 import { ThemeProvider } from './ui/theme';
 import { Shell } from './Shell';
 
-const plugins = [
-  stagePlugin({ layout: 'vertical', interaction: true }), // main lens; drives the interaction hub
-  // Thumbnail lens over the SAME document: a single-column grid at a fixed small
-  // zoom, its own camera. Click a thumb to navigate the main lens; the sidebar
-  // follows the main view (see ui/panels ThumbnailList).
-  stagePlugin({
-    id: 'stage-thumbs',
-    token: ThumbsStageToken,
-    layout: 'grid',
-    columns: 1, // single column, like the v2 snippet's thumbnail rail
-    sizing: 'uniform', // equalize pages so the pixel target hits every thumb
-    zoom: { pageWidth: 150 }, // thumbs are 150 SCREEN px wide — for ANY document
-    padding: 12,
-    gap: { px: 16 }, // UI-stable spacing between thumbs
-    pageFrame: { top: 0, right: 0, bottom: 20, left: 0 }, // reserved label band (screen px)
-    fitAlign: { x: 'center', y: 'start' }, // few pages? thumbs hug the TOP
-    scrollBehavior: 'instant',
-  }),
-  renderPlugin(),
-  pageEditPlugin(),
-  interactionPlugin({ defaultTool: 'pointer' }),
-  selectionPlugin(),
-  // The arrow tool is a `line` preset — same subtype, an arrowhead default. This is
-  // the whole integration for a new tool: one `tools` entry + a command/toolbar
-  // slot (see config/commands.ts + config/chrome.ts).
-  annotationPlugin({
-    tools: [
-      {
-        id: 'arrow',
-        extends: 'line',
-        defaults: { lineEndings: { start: 'none', end: 'open-arrow' } },
-      },
-    ],
-  }),
-  // Forms: fillable under the default pointer/pan (widgets render as fill
-  // controls), editable under the Form tab's 'form-edit' + palette tools.
-  formPlugin({ scripting: { enabled: true } }),
-  // Links: navigable under the default pointer/pan ('link-nav'), editable
-  // under the link tool — the annotation plane then owns them (select, move,
-  // retarget via the style panel's Link control).
-  linkPlugin(),
-  // Redaction: marking is the annotation plane's composed `redact` tool; this
-  // plugin adds the pending-queue view + the destructive apply.
-  redactionPlugin(),
-  searchPlugin(),
-  demoToolsPlugin(),
-  i18nPlugin({
-    locale: negotiateLocale(['en', 'es'], navigator.languages) ?? 'en',
-    fallbackLocale: 'en',
-    locales: [en],
-    loaders: { es: () => import('./locales/es').then((m) => m.es) },
-  }),
-  commandsPlugin({ commands }),
-  shellPlugin(),
-];
+/** Lazy built-in packs — a strings override for one of these wraps its loader. */
+const BUILTIN_LOADERS: Record<string, () => Promise<Locale>> = {
+  es: () => import('./locales/es').then((m) => m.es),
+};
+
+const isDict = (v: unknown): v is TranslationDictionary => typeof v === 'object' && v !== null;
+
+/**
+ * Deep-merge `over` into `base` (immutably), expanding dotted keys —
+ * `{ 'acme.send': 'X' }` and `{ acme: { send: 'X' } }` are the same override.
+ */
+function mergeTranslations(
+  base: TranslationDictionary,
+  over: TranslationDictionary,
+): TranslationDictionary {
+  const out: Record<string, string | TranslationDictionary> = { ...base };
+  for (const [key, value] of Object.entries(over)) {
+    const path = key.split('.');
+    let node = out;
+    for (let i = 0; i < path.length - 1; i++) {
+      const prev = node[path[i]];
+      node = (node[path[i]] = isDict(prev) ? { ...prev } : {}) as Record<
+        string,
+        string | TranslationDictionary
+      >;
+    }
+    const leaf = path[path.length - 1];
+    const prev = node[leaf];
+    node[leaf] =
+      typeof value === 'string' ? value : mergeTranslations(isDict(prev) ? prev : {}, value);
+  }
+  return out;
+}
+
+const mergeLocale = (pack: Locale, over?: TranslationDictionary): Locale =>
+  over ? { ...pack, translations: mergeTranslations(pack.translations, over) } : pack;
+
+/**
+ * The customization surface — identical in the vanilla snippet and every
+ * framework wrapper. See README.md for the ladder this implements.
+ */
+export interface ViewerCustomization {
+  /** ADDITIVE over the default vocabulary; a colliding id overrides. */
+  commands?: readonly CommandDef[];
+  /** ADDITIVE 24×24 stroke icons by name; a colliding name overrides. */
+  icons?: Readonly<Record<string, IconDef>>;
+  /** Per-locale translation overrides/additions; dotted keys expand. A code
+   *  with no built-in pack becomes a new locale (falls back to English). */
+  strings?: Readonly<Record<string, TranslationDictionary>>;
+  /** 'auto' (default) negotiates from the browser languages. */
+  locale?: 'auto' | (string & {});
+  /** Feature gating: a disabled category vanishes from every surface. */
+  disabledCategories?: readonly string[];
+  /** The structure — a value you OWN: the default (pass nothing), a transform
+   *  of it, or your own schema. Never merged. */
+  chrome?: ChromeSchema | ((base: ChromeSchema, helpers: ChromeHelpers) => ChromeSchema);
+}
+
+export interface FullViewerProps extends ViewerCustomization {
+  /** Instance (borrowed) or thunk (viewer-owned) — the Viewer's own contract. */
+  engine: Engine | EngineFactory;
+  /** Documents to open at mount; more arrive via the tab bar's open button. */
+  initialDocuments?: InitialDocument[];
+  /** Shown while the workspace boots. Default: a translated pulse line. */
+  fallback?: ReactNode;
+}
 
 function Booting() {
   const t = useT();
@@ -96,16 +124,138 @@ function Booting() {
   );
 }
 
-export interface FullViewerProps {
-  /** Instance (borrowed) or thunk (viewer-owned) — the Viewer's own contract. */
-  engine: Engine | EngineFactory;
-  /** Documents to open at mount; more arrive via the tab bar's open button. */
-  initialDocuments?: InitialDocument[];
-  /** Shown while the workspace boots. Default: a translated pulse line. */
-  fallback?: ReactNode;
-}
+export function FullViewer({
+  engine,
+  initialDocuments,
+  fallback,
+  commands,
+  icons,
+  strings,
+  locale = 'auto',
+  disabledCategories,
+  chrome,
+}: FullViewerProps) {
+  // Customization is INIT-ONLY, exactly like v2's `EmbedPDF.init` (and like
+  // the Viewer's own engine/plugins contract): the whole config resolves ONCE
+  // from the mount-time props, so inline literals — the idiomatic way to pass
+  // it — never churn plugin identities. Later prop changes are ignored.
+  const [resolved] = useState(() => {
+    // ── registries: additive, user wins by id ───────────────────────────────
+    const byId = new Map(defaultCommands.map((c) => [c.id, c]));
+    for (const c of commands ?? []) byId.set(c.id, c);
+    const resolvedCommands = [...byId.values()];
 
-export function FullViewer({ engine, initialDocuments, fallback }: FullViewerProps) {
+    // ── structure: an owned value (default | transform | replacement) ───────
+    const resolvedChrome =
+      typeof chrome === 'function'
+        ? chrome(defaultChrome, chromeHelpers)
+        : (chrome ?? defaultChrome);
+
+    // ── locale packs: overrides merge into built-ins; unknown codes become
+    //    new locales that fall back to English ──────────────────────────────
+    const overrides = strings ?? {};
+    const locales: Locale[] = [mergeLocale(en, overrides.en)];
+    const loaders: Record<string, () => Promise<Locale>> = {};
+    for (const [code, load] of Object.entries(BUILTIN_LOADERS)) {
+      const over = overrides[code];
+      loaders[code] = over ? () => load().then((pack) => mergeLocale(pack, over)) : load;
+    }
+    for (const [code, over] of Object.entries(overrides)) {
+      if (code === 'en' || code in BUILTIN_LOADERS) continue;
+      locales.push({ code, name: code, translations: mergeTranslations({}, over) });
+    }
+    const codes = [...new Set(['en', ...Object.keys(BUILTIN_LOADERS), ...Object.keys(overrides)])];
+    const initial =
+      locale === 'auto'
+        ? (negotiateLocale(codes, typeof navigator !== 'undefined' ? navigator.languages : []) ??
+          'en')
+        : locale;
+
+    return {
+      commands: resolvedCommands,
+      chrome: resolvedChrome,
+      icons: icons ?? {},
+      i18n: { locales, loaders, initial },
+    };
+  });
+
+  // Dev guardrail: every id the chrome references must exist; every icon a
+  // command names must resolve. Warnings name the exact id (README promise).
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'production') return;
+    const ids = new Set(resolved.commands.map((c) => c.id));
+    for (const problem of validateChrome(resolved.chrome, ids)) {
+      console.warn(`[embedpdf] chrome: ${problem}`);
+    }
+    for (const c of resolved.commands) {
+      if (c.icon && !(c.icon in ICON_PATHS) && !(c.icon in resolved.icons)) {
+        console.warn(`[embedpdf] command "${c.id}": unknown icon "${c.icon}"`);
+      }
+    }
+  }, [resolved]);
+
+  const [plugins] = useState(() => [
+    stagePlugin({ layout: 'vertical', interaction: true }), // main lens; drives the interaction hub
+    // Thumbnail lens over the SAME document: a single-column grid at a fixed small
+    // zoom, its own camera. Click a thumb to navigate the main lens; the sidebar
+    // follows the main view (see ui/panels ThumbnailList).
+    stagePlugin({
+      id: 'stage-thumbs',
+      token: ThumbsStageToken,
+      layout: 'grid',
+      columns: 1, // single column, like the v2 snippet's thumbnail rail
+      sizing: 'uniform', // equalize pages so the pixel target hits every thumb
+      zoom: { pageWidth: 150 }, // thumbs are 150 SCREEN px wide — for ANY document
+      padding: 12,
+      gap: { px: 16 }, // UI-stable spacing between thumbs
+      pageFrame: { top: 0, right: 0, bottom: 20, left: 0 }, // reserved label band (screen px)
+      fitAlign: { x: 'center', y: 'start' }, // few pages? thumbs hug the TOP
+      scrollBehavior: 'instant',
+    }),
+    renderPlugin(),
+    pageEditPlugin(),
+    interactionPlugin({ defaultTool: 'pointer' }),
+    selectionPlugin(),
+    // The arrow tool is a `line` preset — same subtype, an arrowhead default. This is
+    // the whole integration for a new tool: one `tools` entry + a command/toolbar
+    // slot (see config/commands.ts + config/chrome.ts).
+    annotationPlugin({
+      tools: [
+        {
+          id: 'arrow',
+          extends: 'line',
+          defaults: { lineEndings: { start: 'none', end: 'open-arrow' } },
+        },
+      ],
+    }),
+    // Forms: fillable under the default pointer/pan (widgets render as fill
+    // controls), editable under the Form tab's 'form-edit' + palette tools.
+    formPlugin({ scripting: { enabled: true } }),
+    // Links: navigable under the default pointer/pan ('link-nav'), editable
+    // under the link tool — the annotation plane then owns them (select, move,
+    // retarget via the style panel's Link control).
+    linkPlugin(),
+    // Redaction: marking is the annotation plane's composed `redact` tool; this
+    // plugin adds the pending-queue view + the destructive apply.
+    redactionPlugin(),
+    searchPlugin(),
+    demoToolsPlugin(),
+    i18nPlugin({
+      locale: resolved.i18n.initial,
+      fallbackLocale: 'en',
+      locales: resolved.i18n.locales,
+      loaders: resolved.i18n.loaders,
+    }),
+    commandsPlugin({
+      commands: resolved.commands,
+      disabledCategories: disabledCategories ? [...disabledCategories] : undefined,
+    }),
+    shellPlugin(),
+  ]);
+
+  // Structural subset of `resolved`, identity-stable across renders.
+  const config: ResolvedViewerConfig = resolved;
+
   return (
     <ThemeProvider>
       <Viewer
@@ -114,7 +264,9 @@ export function FullViewer({ engine, initialDocuments, fallback }: FullViewerPro
         initialDocuments={initialDocuments}
         fallback={fallback ?? <Booting />}
       >
-        <Shell />
+        <ViewerConfigProvider value={config}>
+          <Shell />
+        </ViewerConfigProvider>
       </Viewer>
     </ThemeProvider>
   );

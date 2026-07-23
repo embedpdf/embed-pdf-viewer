@@ -122,7 +122,7 @@ const spread = (id: string, mode: SpreadMode, labelKey: string, icon: string): C
   enabled: (c) => stage(c) != null,
 });
 
-export const commands: CommandDef[] = [
+export const defaultCommands: CommandDef[] = [
   // ── zoom ───────────────────────────────────────────────────────────────
   {
     id: 'zoom:in',
