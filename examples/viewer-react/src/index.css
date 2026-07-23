@@ -1,0 +1,36 @@
+/* PAGE CSS — this styles the slotted widget. That it works is the point:
+   the child lives in the light DOM (the app's world), so ordinary app
+   stylesheets reach it even though it displays inside the viewer's shadow
+   toolbar. */
+body {
+  margin: 0;
+}
+
+.doc-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font:
+    500 12px/1 system-ui,
+    sans-serif;
+}
+
+.doc-status select {
+  appearance: none;
+  border: 1px solid #d1d5db;
+  border-radius: 9999px;
+  padding: 4px 22px 4px 10px;
+  font: inherit;
+  color: #1f2937;
+  background:
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='3'><path d='M6 9l6 6 6-6'/></svg>")
+      right 8px center no-repeat,
+    #fff;
+  cursor: pointer;
+}
+
+.doc-status .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+}

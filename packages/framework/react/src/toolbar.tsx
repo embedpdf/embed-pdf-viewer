@@ -140,8 +140,16 @@ export interface ToolbarProps {
   style?: React.CSSProperties;
   /** A command button at a given variant. Default: a plain <button>. */
   renderCommand?: (cmd: ResolvedCommand, variant: string, run: () => void) => React.ReactNode;
-  /** Renderers for custom slots, per named variant. */
-  renderCustom?: Record<string, (variant: string) => React.ReactNode>;
+  /**
+   * Renderers for custom slots, per named variant. A custom unit with NO
+   * entry here renders as a native `<slot name={slot}>` socket with its
+   * terminal command as fallback content: in light DOM that displays the
+   * fallback (today's behavior); inside a shadow root the host's light-DOM
+   * children project into it — the children-as-slots contract. Sockets are
+   * measured LIVE (they can't be duplicated into the measurement layer:
+   * only the first same-named slot in tree order gets the projected nodes).
+   */
+  renderCustom?: Record<string, (variant: string, ctx: CustomSlotCtx) => React.ReactNode>;
   /** A group in its collapsed form. Default: <select> for 'select', menu button for 'menu'. */
   renderCollapsed?: (view: CollapsedGroupView) => React.ReactNode;
   /** A shed group's disclosure trigger (+ its popover — the renderer owns the
@@ -152,6 +160,16 @@ export interface ToolbarProps {
   renderOverflowTrigger?: (isOpen: boolean, toggle: () => void) => React.ReactNode;
   /** The derived overflow menu. Default: a minimal popover. */
   renderOverflowMenu?: (view: OverflowMenuView) => React.ReactNode;
+}
+
+/** Passed to custom-slot renderers alongside the variant. */
+export interface CustomSlotCtx {
+  /** 'live' = the visible row; 'measure' = the hidden measurement layer. */
+  layer: 'live' | 'measure';
+  /** Report this unit's width to the solver — for content the measurement
+   *  layer can't duplicate. Identity is NOT stable across renders; capture
+   *  via ref if used in an effect. */
+  measure: (width: number) => void;
 }
 
 // ── measurement ───────────────────────────────────────────────────────────────
@@ -180,6 +198,47 @@ function Measured({
     <span ref={ref} style={{ display: 'inline-flex', flexShrink: 0 }}>
       {children}
     </span>
+  );
+}
+
+/**
+ * The socket for an unregistered custom unit: a real `<slot>` element. Inside
+ * the <embedpdf-viewer> shadow root the browser projects same-named light-DOM
+ * children into it; anywhere else it just displays its fallback (the terminal
+ * command). Measured live — the projected content lives in the HOST's world,
+ * so its width can only be observed where it actually renders.
+ */
+function NativeSlotSocket({
+  name,
+  k,
+  onWidth,
+  children,
+}: {
+  name: string;
+  k: string;
+  onWidth: (key: string, width: number) => void;
+  children: React.ReactNode;
+}) {
+  const ref = useRef<HTMLSlotElement>(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const report = () => onWidth(k, el.getBoundingClientRect().width);
+    report();
+    // Projection changes (a child slotted in/out) resize the socket's
+    // inline-flex box, so one observer covers both content and assignment.
+    const observer = new ResizeObserver(report);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [k, onWidth]);
+  return (
+    <slot
+      ref={ref}
+      name={name}
+      style={{ display: 'inline-flex', alignItems: 'center', flexShrink: 0 }}
+    >
+      {children}
+    </slot>
   );
 }
 
@@ -499,11 +558,36 @@ export function Toolbar({
     if (!fit.hasOverflow) setOverflowOpen(false);
   }, [fit.hasOverflow]);
 
+  /** External = custom unit with no registered renderer → native socket,
+   *  live-measured (it must NOT appear in the measurement layer: only the
+   *  first same-named <slot> in tree order receives the projected nodes). */
+  const isExternalSlot = (u: NormalizedUnit): boolean =>
+    u.kind === 'custom' && !renderCustom?.[u.slot];
+
   // ── unit / group rendering (shared by live row and measure layer) ──────────
-  const renderUnitAt = (u: NormalizedUnit, variant: string): React.ReactNode => {
+  const renderUnitAt = (
+    u: NormalizedUnit,
+    variant: string,
+    layer: 'live' | 'measure',
+  ): React.ReactNode => {
     if (u.kind === 'custom') {
-      const custom = renderCustom?.[u.slot]?.(variant);
-      if (custom !== undefined) return custom;
+      const registered = renderCustom?.[u.slot];
+      if (registered) {
+        const custom = registered(variant, {
+          layer,
+          measure: (width) => onWidth(unitKey(u, variant), width),
+        });
+        if (custom !== undefined) return custom;
+      } else if (layer === 'live') {
+        const cmd = resolveCmd(u.terminal);
+        return (
+          <NativeSlotSocket name={u.slot} k={unitKey(u, variant)} onWidth={onWidth}>
+            {cmd ? renderCommand(cmd, 'icon', () => executeCmd(u.terminal)) : null}
+          </NativeSlotSocket>
+        );
+      } else {
+        return null;
+      }
       const cmd = resolveCmd(u.terminal);
       return cmd ? renderCommand(cmd, 'icon', () => executeCmd(u.terminal)) : null;
     }
@@ -572,7 +656,7 @@ export function Toolbar({
     for (const u of g.units) {
       const a = fit.units.get(u.key);
       if (a?.kind !== 'variant') continue;
-      nodes.push(<React.Fragment key={u.key}>{renderUnitAt(u, a.variant)}</React.Fragment>);
+      nodes.push(<React.Fragment key={u.key}>{renderUnitAt(u, a.variant, 'live')}</React.Fragment>);
     }
     // The derived group-local disclosure (v2's overflow-tabs-button).
     if (assignment.shedCount > 0) {
@@ -654,13 +738,17 @@ export function Toolbar({
       <div aria-hidden style={measureLayerStyle}>
         {visibleBar.sections.flatMap((s) =>
           s.groups.flatMap((g) => [
-            ...g.units.flatMap((u) =>
-              u.variants.map((variant) => (
-                <Measured key={unitKey(u, variant)} k={unitKey(u, variant)} onWidth={onWidth}>
-                  {renderUnitAt(u, variant)}
-                </Measured>
-              )),
-            ),
+            // External sockets are excluded: they are live-measured, and a
+            // duplicate <slot> here would steal the projection from the row.
+            ...g.units
+              .filter((u) => !isExternalSlot(u))
+              .flatMap((u) =>
+                u.variants.map((variant) => (
+                  <Measured key={unitKey(u, variant)} k={unitKey(u, variant)} onWidth={onWidth}>
+                    {renderUnitAt(u, variant, 'measure')}
+                  </Measured>
+                )),
+              ),
             ...(g.collapse
               ? [
                   <Measured key={groupKey(g.id)} k={groupKey(g.id)} onWidth={onWidth}>

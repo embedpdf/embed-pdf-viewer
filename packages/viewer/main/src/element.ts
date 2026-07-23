@@ -83,7 +83,14 @@ export class EmbedPdfViewerElement extends HTMLElement {
   }
 
   connectedCallback(): void {
-    this.#mount();
+    // Deferred one microtask: a framework wrapper inserts the element and
+    // sets `.config` via ref/layout-effect in the SAME task — mounting eagerly
+    // here would boot the whole viewer once with attribute config and again
+    // with the real one. The config setter mounts synchronously; this only
+    // covers the purely-declarative path.
+    queueMicrotask(() => {
+      if (this.isConnected && !this.#root) this.#mount();
+    });
   }
 
   disconnectedCallback(): void {

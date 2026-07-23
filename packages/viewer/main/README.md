@@ -54,5 +54,7 @@ the viewer; changing them re-creates it from scratch.
 - `process.env.NODE_ENV` compiles to `'production'`; the element therefore
   runs config validation UNCONDITIONALLY (element.ts) — a CDN user's typo'd
   command id warns with the exact id instead of failing silently.
-- Light-DOM children are reserved for the slot system (children-as-slots),
-  which lands with the framework wrappers.
+- Light-DOM children with a `slot` attribute project into the chrome's
+  matching `custom()` sockets (children-as-slots — see the viewer-chrome
+  README). They stay in the page's world: page CSS and the host framework's
+  state keep working, and the toolbar live-measures the projected box.

@@ -170,10 +170,46 @@ EmbedPDF features arrive as new command ids you opt into by adding a line.
 expanding into the pack. A code with no built-in pack becomes a new locale that
 falls back to English for everything you didn't provide.
 
+### Slots — your component inside the measured toolbar
+
+Reserve a socket in the chrome (`custom()` with a `terminal` command), then —
+through `<embedpdf-viewer>` or any wrapper — supply a child with the matching
+`slot` attribute:
+
+```tsx
+// @embedpdf/viewer-react
+<PDFViewer
+  src="/report.pdf"
+  commands={[{ id: 'acme:status', labelKey: 'acme.status', run: () => {} }]}
+  chrome={(base, h) =>
+    h.addItem(base, {
+      bar: 'main',
+      section: 'start',
+      group: 'workspace',
+      item: h.custom('doc-status', { terminal: 'acme:status' }),
+    })
+  }
+>
+  <DocStatus slot="doc-status" />
+</PDFViewer>
+```
+
+The child stays in YOUR world — light DOM, your framework's tree, your page
+CSS — while the browser projects it into the toolbar. The socket is measured
+live, so the solver budgets its true width; when it no longer fits, the
+`terminal` command represents it in the derived overflow menu. An unfilled
+socket displays its terminal command as native slot fallback, so the same
+chrome works with and without the child (and outside shadow DOM entirely —
+this package's own React consumers see the fallback).
+
+Slot names must be unique across the chrome (one `<slot name>` per shadow
+tree wins projection).
+
 ## What's deliberately NOT here (yet)
 
-- **Slots** (your component inside the measured toolbar) — land with the
-  `<embedpdf-viewer>` element: a slot is a light-DOM child with a `slot`
-  attribute; this package only reserves and measures the box.
-- **Theme prop** — the `--ep-*` token set in `styles.css` is the styling
-  contract; a `theme` config object maps onto it when the element lands.
+- **Theme prop beyond preference** — the `--ep-*` token set in `styles.css`
+  is the styling contract; a token-override config (`theme: { tokens }`)
+  maps onto it later.
+- **A slot-side viewer facade** (`ctx.execute/resolve/subscribe` for slotted
+  widgets) — slotted children currently talk to the viewer only through
+  their own app code.
