@@ -654,7 +654,7 @@ export function QuickStart() {
             </button>
           </div>
 
-          <div className="flex max-h-[420px] overflow-auto bg-[#0B1220]">
+          <div className="ep-dark-scroll flex max-h-[420px] overflow-auto bg-[#0B1220]">
             <div
               aria-hidden
               className="flex-shrink-0 select-none border-r border-[#131C32] bg-[#080E1B] py-[22px] pl-[22px] pr-3.5 text-right font-mono text-[13px] leading-[1.65] text-[#3B4768] max-[720px]:py-[18px] max-[720px]:pl-3.5 max-[720px]:pr-2.5 max-[720px]:text-xs"
@@ -663,7 +663,7 @@ export function QuickStart() {
                 <div key={i}>{i + 1}</div>
               ))}
             </div>
-            <pre className="ep-code m-0 flex-1 overflow-x-auto whitespace-pre px-6 py-[22px] font-mono text-[13px] leading-[1.65] text-[#C8D3EA] [tab-size:2] max-[720px]:px-3.5 max-[720px]:py-[18px] max-[720px]:text-xs">
+            <pre className="ep-code ep-dark-scroll m-0 flex-1 overflow-x-auto whitespace-pre px-6 py-[22px] font-mono text-[13px] leading-[1.65] text-[#C8D3EA] [tab-size:2] max-[720px]:px-3.5 max-[720px]:py-[18px] max-[720px]:text-xs">
               <code>
                 {current.lines.map(([text, type], i) =>
                   text === '\n' ? (
