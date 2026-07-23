@@ -43,6 +43,7 @@ export function TabBar({
               key={doc.id}
               onClick={() => setActive(doc.id)}
               role="tab"
+              part={isActive ? 'tab tab-active' : 'tab'}
               tabIndex={0}
               aria-selected={isActive}
               onKeyDown={(e) => {

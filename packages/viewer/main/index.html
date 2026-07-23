@@ -24,6 +24,20 @@
       #viewer {
         height: calc(100vh - 36px);
       }
+      /* RESTYLE door: page CSS reshaping shadow internals via ::part. */
+      embedpdf-viewer::part(toolbar-button) {
+        border-radius: 2px;
+      }
+      embedpdf-viewer::part(tab) {
+        border-radius: 0;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        font-size: 11px;
+      }
+      embedpdf-viewer::part(mode-tab-active) {
+        text-decoration: underline;
+        text-underline-offset: 6px;
+      }
     </style>
   </head>
   <body>

@@ -19,72 +19,72 @@
    apps to <html>), so one selector serves both worlds. */
 :root,
 :host {
-  --app: #f3f4f6;
-  --surface: #ffffff;
-  --surface-alt: #f1f3f5;
-  --elevated: #ffffff;
-  --fg: #111827;
-  --fg-secondary: #374151;
-  --fg-muted: #6b7280;
-  --fg-disabled: #9ca3af;
-  --on-accent: #ffffff;
-  --border: #d1d5db;
-  --border-subtle: #e5e7eb;
-  --border-strong: #9ca3af;
-  --accent: #3b82f6;
-  --accent-hover: #2563eb;
-  --accent-active: #1d4ed8;
-  --accent-light: #eff6ff;
-  --hover: #f3f4f6;
-  --active: #e5e7eb;
-  --selected: #eff6ff;
-  --canvas: #f3f4f6;
+  --ep-app: #f3f4f6;
+  --ep-surface: #ffffff;
+  --ep-surface-alt: #f1f3f5;
+  --ep-elevated: #ffffff;
+  --ep-fg: #111827;
+  --ep-fg-secondary: #374151;
+  --ep-fg-muted: #6b7280;
+  --ep-fg-disabled: #9ca3af;
+  --ep-on-accent: #ffffff;
+  --ep-border: #d1d5db;
+  --ep-border-subtle: #e5e7eb;
+  --ep-border-strong: #9ca3af;
+  --ep-accent: #3b82f6;
+  --ep-accent-hover: #2563eb;
+  --ep-accent-active: #1d4ed8;
+  --ep-accent-light: #eff6ff;
+  --ep-hover: #f3f4f6;
+  --ep-active: #e5e7eb;
+  --ep-selected: #eff6ff;
+  --ep-canvas: #f3f4f6;
 }
 
 .dark {
-  --app: #111827;
-  --surface: #1f2937;
-  --surface-alt: #374151;
-  --elevated: #1f2937;
-  --fg: #f9fafb;
-  --fg-secondary: #e5e7eb;
-  --fg-muted: #9ca3af;
-  --fg-disabled: #6b7280;
-  --on-accent: #111827;
-  --border: #4b5563;
-  --border-subtle: #374151;
-  --border-strong: #6b7280;
-  --accent: #60a5fa;
-  --accent-hover: #3b82f6;
-  --accent-active: #2563eb;
-  --accent-light: #1e3a5f;
-  --hover: #374151;
-  --active: #4b5563;
-  --selected: #1e3a5f;
-  --canvas: #0d1117;
+  --ep-app: #111827;
+  --ep-surface: #1f2937;
+  --ep-surface-alt: #374151;
+  --ep-elevated: #1f2937;
+  --ep-fg: #f9fafb;
+  --ep-fg-secondary: #e5e7eb;
+  --ep-fg-muted: #9ca3af;
+  --ep-fg-disabled: #6b7280;
+  --ep-on-accent: #111827;
+  --ep-border: #4b5563;
+  --ep-border-subtle: #374151;
+  --ep-border-strong: #6b7280;
+  --ep-accent: #60a5fa;
+  --ep-accent-hover: #3b82f6;
+  --ep-accent-active: #2563eb;
+  --ep-accent-light: #1e3a5f;
+  --ep-hover: #374151;
+  --ep-active: #4b5563;
+  --ep-selected: #1e3a5f;
+  --ep-canvas: #0d1117;
 }
 
 @theme inline {
-  --color-app: var(--app);
-  --color-surface: var(--surface);
-  --color-surface-alt: var(--surface-alt);
-  --color-elevated: var(--elevated);
-  --color-fg: var(--fg);
-  --color-fg-secondary: var(--fg-secondary);
-  --color-fg-muted: var(--fg-muted);
-  --color-fg-disabled: var(--fg-disabled);
-  --color-on-accent: var(--on-accent);
-  --color-border: var(--border);
-  --color-border-subtle: var(--border-subtle);
-  --color-border-strong: var(--border-strong);
-  --color-accent: var(--accent);
-  --color-accent-hover: var(--accent-hover);
-  --color-accent-active: var(--accent-active);
-  --color-accent-light: var(--accent-light);
-  --color-hover: var(--hover);
-  --color-active: var(--active);
-  --color-selected: var(--selected);
-  --color-canvas: var(--canvas);
+  --color-app: var(--ep-app);
+  --color-surface: var(--ep-surface);
+  --color-surface-alt: var(--ep-surface-alt);
+  --color-elevated: var(--ep-elevated);
+  --color-fg: var(--ep-fg);
+  --color-fg-secondary: var(--ep-fg-secondary);
+  --color-fg-muted: var(--ep-fg-muted);
+  --color-fg-disabled: var(--ep-fg-disabled);
+  --color-on-accent: var(--ep-on-accent);
+  --color-border: var(--ep-border);
+  --color-border-subtle: var(--ep-border-subtle);
+  --color-border-strong: var(--ep-border-strong);
+  --color-accent: var(--ep-accent);
+  --color-accent-hover: var(--ep-accent-hover);
+  --color-accent-active: var(--ep-accent-active);
+  --color-accent-light: var(--ep-accent-light);
+  --color-hover: var(--ep-hover);
+  --color-active: var(--ep-active);
+  --color-selected: var(--ep-selected);
+  --color-canvas: var(--ep-canvas);
 }
 
 html,
@@ -104,8 +104,8 @@ body {
     Helvetica,
     Arial,
     sans-serif;
-  color: var(--fg);
-  background: var(--app);
+  color: var(--ep-fg);
+  background: var(--ep-app);
 }
 
 /* The measurement layer in <Toolbar> is aria-hidden + visibility:hidden; make
@@ -128,5 +128,5 @@ body {
 }
 [data-embedpdf-scrollbar-thumb]:hover,
 [data-embedpdf-scrollbar][data-dragging] [data-embedpdf-scrollbar-thumb] {
-  background: var(--fg-muted);
+  background: var(--ep-fg-muted);
 }

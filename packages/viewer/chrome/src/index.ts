@@ -7,8 +7,8 @@
  * Schema sugar and transforms are re-exported so a consumer needs exactly
  * one import line to go from "pass nothing" to "own the structure".
  */
-export { FullViewer } from './viewer';
-export type { FullViewerProps, ViewerCustomization } from './viewer';
+export { FullViewer, themeConfigOf } from './viewer';
+export type { FullViewerProps, ThemeConfig, ThemeTokens, ViewerCustomization } from './viewer';
 // The prop types a delivery needs to speak FullViewer's contract.
 export type { Engine, EngineFactory, InitialDocument } from '@embedpdf/react/runtime';
 

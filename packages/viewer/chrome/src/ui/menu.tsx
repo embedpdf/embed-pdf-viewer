@@ -20,6 +20,7 @@ export function MenuRow({ commandId, onRun }: { commandId: string; onRun?: () =>
     <button
       type="button"
       role={cmd.active ? 'menuitemradio' : 'menuitem'}
+      part={cmd.active ? 'menu-item menu-item-active' : 'menu-item'}
       aria-checked={cmd.active || undefined}
       disabled={!cmd.enabled}
       onClick={() => {
@@ -84,6 +85,7 @@ export function Popover({
     <>
       <div className="fixed inset-0 z-40" onClick={onClose} />
       <div
+        part="menu"
         className={`border-border-subtle bg-elevated absolute top-full z-50 mt-1 rounded-lg border shadow-xl ${
           align === 'end' ? 'right-0' : 'left-0'
         }`}

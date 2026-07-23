@@ -127,9 +127,10 @@ function ThumbnailList() {
               borderRadius: 4,
               border:
                 page.pageIndex === currentPage
-                  ? '2px solid var(--accent)'
-                  : '1px solid var(--border-subtle)',
-              boxShadow: page.pageIndex === currentPage ? '0 0 0 2px var(--accent-light)' : 'none',
+                  ? '2px solid var(--ep-accent)'
+                  : '1px solid var(--ep-border-subtle)',
+              boxShadow:
+                page.pageIndex === currentPage ? '0 0 0 2px var(--ep-accent-light)' : 'none',
             }}
           />
           <div
@@ -143,7 +144,7 @@ function ThumbnailList() {
               alignItems: 'center',
               justifyContent: 'center',
               fontSize: 11,
-              color: 'var(--fg-muted)',
+              color: 'var(--ep-fg-muted)',
               pointerEvents: 'none',
             }}
           >

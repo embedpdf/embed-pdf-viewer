@@ -68,6 +68,14 @@ function CommandButton({
       aria-haspopup={cmd.menu ? 'menu' : undefined}
       aria-label={cmd.label}
       title={cmd.label}
+      // Shadow parts — the RESTYLE door: page CSS reaches these via
+      // `embedpdf-viewer::part(toolbar-button)` etc. Part names are public
+      // API; the vocabulary is deliberately small (see README).
+      part={
+        isTab
+          ? `mode-tab${cmd.active ? ' mode-tab-active' : ''}`
+          : `toolbar-button${cmd.active ? ' toolbar-button-active' : ''}`
+      }
       className={isTab ? tabClass(cmd.active, cmd.enabled) : buttonClass(cmd.active, cmd.enabled)}
     >
       {isTab ? (

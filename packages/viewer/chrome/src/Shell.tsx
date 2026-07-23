@@ -132,6 +132,7 @@ export function Shell() {
   // CONTENT side, whichever edge the frame picked.
   const toolbarBand = schema.bars.main && (
     <div
+      part="toolbar"
       className={`border-border bg-surface flex shrink-0 items-center px-4 py-2 ${
         toolbarEdge === 'top' ? 'border-b' : 'border-t'
       }`}
@@ -181,7 +182,7 @@ export function Shell() {
                 </>
               }
               className="h-full w-full"
-              style={{ background: 'var(--canvas)' }}
+              style={{ background: 'var(--ep-canvas)' }}
             >
               {() => (
                 <>

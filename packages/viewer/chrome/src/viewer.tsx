@@ -105,9 +105,28 @@ export interface ViewerCustomization {
   /** The structure — a value you OWN: the default (pass nothing), a transform
    *  of it, or your own schema. Never merged. */
   chrome?: ChromeSchema | ((base: ChromeSchema, helpers: ChromeHelpers) => ChromeSchema);
-  /** Initial light/dark preference; 'system' (default) follows the OS. */
-  theme?: ThemePreference;
+  /** Light/dark preference (string shorthand), or the full theme config with
+   *  `--ep-*` token overrides. Tokens are applied by the DELIVERY (the custom
+   *  element adopts them into its shadow root); direct consumers of this
+   *  package set the `--ep-*` variables in their own CSS instead. */
+  theme?: ThemePreference | ThemeConfig;
 }
+
+/** Token overrides — names WITHOUT the `--ep-` prefix ('accent', 'surface'…). */
+export type ThemeTokens = Readonly<Record<string, string>>;
+
+export interface ThemeConfig {
+  /** 'system' (default) follows the OS. */
+  preference?: ThemePreference;
+  /** Applied in BOTH modes (a later sheet: wins over the defaults). */
+  tokens?: ThemeTokens;
+  /** Dark-mode-only overrides, applied over `tokens`. */
+  dark?: ThemeTokens;
+}
+
+/** Normalize the shorthand — deliveries use this to read one shape. */
+export const themeConfigOf = (theme: ThemePreference | ThemeConfig | undefined): ThemeConfig =>
+  typeof theme === 'string' ? { preference: theme } : (theme ?? {});
 
 export interface FullViewerProps extends ViewerCustomization {
   /** Instance (borrowed) or thunk (viewer-owned) — the Viewer's own contract. */
@@ -284,7 +303,7 @@ export function FullViewer({
   const config: ResolvedViewerConfig = resolved;
 
   return (
-    <ThemeProvider preference={theme} target={themeTarget}>
+    <ThemeProvider preference={themeConfigOf(theme).preference} target={themeTarget}>
       <Viewer
         engine={engine}
         plugins={plugins}

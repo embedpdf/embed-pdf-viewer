@@ -18,7 +18,9 @@ import {
   defaultChrome,
   defaultCommands,
   defaultIcons,
+  themeConfigOf,
   validateChrome,
+  type ThemeTokens,
   type Unsubscribe,
   type ViewerHandle,
 } from '@embedpdf/viewer-chrome';
@@ -40,6 +42,33 @@ const adoptSheets = (): CSSStyleSheet[] => {
   }
   return sheets;
 };
+
+/**
+ * The theme-token sheet: `--ep-*` overrides from `theme.tokens`/`theme.dark`,
+ * adopted AFTER the chrome sheet so same-specificity declarations win by
+ * order. Base tokens are re-stated inside `.dark` (then dark overrides on
+ * top), because the chrome's own `.dark` block would otherwise out-cascade a
+ * host-level base token for every variable it defines.
+ */
+function buildTokenSheet(tokens?: ThemeTokens, dark?: ThemeTokens): CSSStyleSheet | null {
+  const decl = (map: ThemeTokens): string =>
+    Object.entries(map)
+      .filter(([name, value]) => {
+        const ok = /^[a-z][a-z0-9-]*$/.test(name) && !/[{};]/.test(value);
+        if (!ok) console.warn(`[embedpdf] theme: ignoring invalid token "${name}"`);
+        return ok;
+      })
+      .map(([name, value]) => `--ep-${name}:${value};`)
+      .join('');
+
+  const base = tokens ? decl(tokens) : '';
+  const darkDecl = tokens || dark ? decl({ ...tokens, ...dark }) : '';
+  const css = `${base ? `:host{${base}}` : ''}${darkDecl ? `.dark{${darkDecl}}` : ''}`;
+  if (!css) return null;
+  const sheet = new CSSStyleSheet();
+  sheet.replaceSync(css);
+  return sheet;
+}
 
 /**
  * The CDN artifact compiles with NODE_ENV=production (no consumer bundler
@@ -142,7 +171,6 @@ export class EmbedPdfViewerElement extends HTMLElement {
   #mount(): void {
     if (!this.shadowRoot) {
       const shadow = this.attachShadow({ mode: 'open' });
-      shadow.adoptedStyleSheets = adoptSheets();
       this.#wrapper = document.createElement('div');
       this.#wrapper.style.height = '100%';
       shadow.appendChild(this.#wrapper);
@@ -152,6 +180,11 @@ export class EmbedPdfViewerElement extends HTMLElement {
     const config = this.config;
     warnInvalidConfig(config);
     const { src: _src, documents: _documents, theme, ...customization } = config;
+
+    // Sheets are per-mount: a config re-set may change the theme tokens.
+    const { tokens, dark } = themeConfigOf(theme);
+    const tokenSheet = buildTokenSheet(tokens, dark);
+    this.shadowRoot!.adoptedStyleSheets = [...adoptSheets(), ...(tokenSheet ? [tokenSheet] : [])];
 
     this.#root = createRoot(this.#wrapper!);
     this.#root.render(

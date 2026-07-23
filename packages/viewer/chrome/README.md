@@ -259,13 +259,44 @@ token re-export list in `index.ts` is the public-API act — internal lenses
 (`/internal` entries) are structurally absent from delivery bundles. Coarse
 DOM events (`epdf:ready`, `epdf:documentchange`) are sugar over `watch`.
 
+### Theme — match your brand
+
+```tsx
+theme={{
+  preference: 'system',
+  tokens: { accent: '#7c3aed', 'accent-hover': '#6d28d9' },  // both modes
+  dark: { accent: '#a78bfa' },                               // dark overrides
+}}
+```
+
+Token names are the `--ep-*` variables in `styles.css` without the prefix —
+the prefix exists because custom properties inherit through shadow boundaries,
+so unprefixed names could collide with the host page. The custom element
+adopts the overrides into its shadow root; direct consumers of this package
+just set the `--ep-*` variables in their own CSS.
+
+### Restyle — reshape built-ins with page CSS
+
+Key elements carry shadow `part` attributes, so plain page CSS reaches them:
+
+```css
+embedpdf-viewer::part(toolbar-button) {
+  border-radius: 2px;
+}
+embedpdf-viewer::part(tab-active) {
+  font-weight: 700;
+}
+```
+
+The v1 part vocabulary — public API, grown by demand, never speculatively:
+`toolbar`, `toolbar-button(-active)`, `mode-tab(-active)`, `tab(-active)`,
+`menu`, `menu-item(-active)`.
+
 ## What's deliberately NOT here (yet)
 
-- **Theme prop beyond preference** — the `--ep-*` token set in `styles.css`
-  is the styling contract; a token-override config (`theme: { tokens }`)
-  maps onto it later.
-- **Theme tokens config + `::part`** and the **element registry**
-  (`elements: { button: 'tag' }`) — the remaining moves of the six-move
-  model.
-- **More regions** — `header` and `tabs` are the v1 socket vocabulary;
-  sidebars/panels join by demand (region names are public API).
+- **The element registry** (`elements: { button: 'tag' }` + exported base
+  classes) — the last move of the six-move model.
+- **More regions & parts** — `header`/`tabs` sockets and the part list above
+  are the v1 vocabulary; grow by demand (names are public API).
+- **Radius/density/font tokens** — the token set is the color vocabulary
+  today; spacing/shape tokens need a component sweep and land separately.

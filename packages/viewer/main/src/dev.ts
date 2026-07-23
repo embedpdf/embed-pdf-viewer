@@ -9,6 +9,17 @@ import EmbedPDF, { AnnotationToken } from './index';
 const el = EmbedPDF.init({
   target: '#viewer',
   src: '/ebook.pdf',
+  // THEME door: --ep-* token overrides, both modes + dark-specific.
+  theme: {
+    tokens: {
+      accent: '#7c3aed',
+      'accent-hover': '#6d28d9',
+      'accent-active': '#5b21b6',
+      'accent-light': '#f5f3ff',
+      selected: '#f5f3ff',
+    },
+    dark: { accent: '#a78bfa', 'accent-light': '#2e1065', selected: '#2e1065' },
+  },
   icons: {
     send: ['M10 14L21 3', 'M21 3l-6.5 18a.5.5 0 0 1-1 0L10 14l-7-3.5a.5.5 0 0 1 0-1L21 3z'],
   },
