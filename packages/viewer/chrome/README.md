@@ -205,6 +205,31 @@ this package's own React consumers see the fallback).
 Slot names must be unique across the chrome (one `<slot name>` per shadow
 tree wins projection).
 
+### The frame — regions: arrangement, visibility, replacement
+
+Regions are a FIXED vocabulary (`header`, `tabs`, the toolbar band — each
+carries semantics the shell owns: measurement physics, the document gate,
+aria). Three independent knobs on each:
+
+```tsx
+// 1. ARRANGE + HIDE — part of the chrome value, because it is structure:
+chrome={(base) => ({
+  ...base,
+  frame: { toolbar: 'bottom', tabs: 'multiple', header: false },
+})}
+
+// 2. REPLACE — regions are sockets; the built-in is the slot fallback:
+<PDFViewer documents={docs} onReady={setViewer}>
+  <AcmeTabBar slot="tabs" viewer={viewer} />
+</PDFViewer>
+```
+
+A replacement region is fully functional through the handle — the kernel's
+document registry IS the tab model (`viewer.documents.list()/activeId()/
+setActive()/close()` + `viewer.watch`). A region hidden by the frame hides
+its socket too: visibility outranks slotted content. The mode band rides the
+main toolbar's content side (below a top bar, above a bottom bar).
+
 ### Drive — control the viewer from code
 
 The handle (`el.viewer` on the custom element, `onReady` on the wrappers) is a
@@ -239,6 +264,8 @@ DOM events (`epdf:ready`, `epdf:documentchange`) are sugar over `watch`.
 - **Theme prop beyond preference** — the `--ep-*` token set in `styles.css`
   is the styling contract; a token-override config (`theme: { tokens }`)
   maps onto it later.
-- **`frame` in the chrome value** (toolbar top/bottom, tab-bar visibility,
-  region sockets) and the **element registry** (`elements: { button: 'tag' }`)
-  — the next two moves of the six-move model.
+- **Theme tokens config + `::part`** and the **element registry**
+  (`elements: { button: 'tag' }`) — the remaining moves of the six-move
+  model.
+- **More regions** — `header` and `tabs` are the v1 socket vocabulary;
+  sidebars/panels join by demand (region names are public API).

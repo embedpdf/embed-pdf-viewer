@@ -20,7 +20,12 @@ export type { Engine, EngineFactory, InitialDocument } from '@embedpdf/react/run
 // removals are breaking — grow this list by demand, never speculatively.
 export { createViewerHandle } from './handle';
 export type { ScopedViewerHandle, ViewerHandle } from './handle';
-export type { CapabilityToken, DocumentsCapability, Unsubscribe } from '@embedpdf/react/runtime';
+export type {
+  CapabilityToken,
+  DocInfo,
+  DocumentsCapability,
+  Unsubscribe,
+} from '@embedpdf/react/runtime';
 export type { ResolvedCommand } from '@embedpdf/react/commands';
 export { DocumentsToken } from '@embedpdf/react/runtime';
 export { CommandsToken } from '@embedpdf/react/commands';

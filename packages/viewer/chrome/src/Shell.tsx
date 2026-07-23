@@ -52,7 +52,7 @@ import { DocumentError, PasswordPrompt } from './ui/document-boot';
 // plugin's Behavior is engaged.
 const ANNOTATION_RENDERERS: AnnotationRenderer[] = [formWidgetRenderer];
 
-function ModeBand() {
+function ModeBand({ edge }: { edge: 'top' | 'bottom' }) {
   const schema = useChromeSchema();
   // The mode list is DERIVED from the chrome's modeBars keys — adding a custom
   // mode is one command + one bar schema in config, not a shell change.
@@ -66,7 +66,11 @@ function ModeBand() {
   const bar = getModeBar(schema, activeMode);
   if (!bar) return null;
   return (
-    <div className="border-border bg-surface-alt flex shrink-0 items-center border-b px-4 py-2">
+    <div
+      className={`border-border bg-surface-alt flex shrink-0 items-center px-4 py-2 ${
+        edge === 'top' ? 'border-b' : 'border-t'
+      }`}
+    >
       <AppToolbar bar={bar} className="w-full" />
     </div>
   );
@@ -111,24 +115,52 @@ export function Shell() {
   // resulting alert, page-navigation, and print UI requests in the React shell.
   useFormScriptingProvider();
   const schema = useChromeSchema();
+
+  // The FRAME: region arrangement & visibility from the chrome value (see
+  // FrameSchema). Regions render as named <slot> sockets with the built-ins
+  // as fallback — light-DOM children of <embedpdf-viewer> replace them; in
+  // plain light DOM a slot just displays its fallback (UA display:contents),
+  // so this package's direct React consumers see no difference. A region
+  // hidden by the frame hides its socket too: visibility outranks content.
+  const frame = schema.frame ?? {};
+  const toolbarEdge = frame.toolbar ?? 'top';
+
+  // main toolbar — measured; degrades + overflows with zero config.
+  // Deliberately OUTSIDE the gate: chrome renders before any document.
+  // Bar id 'main' is the shell's one structural expectation — an owned
+  // chrome without it simply has no main toolbar. Its mode band rides the
+  // CONTENT side, whichever edge the frame picked.
+  const toolbarBand = schema.bars.main && (
+    <div
+      className={`border-border bg-surface flex shrink-0 items-center px-4 py-2 ${
+        toolbarEdge === 'top' ? 'border-b' : 'border-t'
+      }`}
+    >
+      <AppToolbar bar={schema.bars.main} className="w-full" />
+    </div>
+  );
+
   return (
     <div className="bg-app text-fg flex h-full flex-col">
-      <Header />
-
-      {/* the v2 document tab bar — the kernel's document registry IS the tab model */}
-      <TabBar visibility="always" />
-
-      {/* main toolbar — measured; degrades + overflows with zero config.
-          Deliberately OUTSIDE the gate: chrome renders before any document.
-          Bar id 'main' is the shell's one structural expectation — an owned
-          chrome without it simply has no main toolbar. */}
-      {schema.bars.main && (
-        <div className="border-border bg-surface flex shrink-0 items-center border-b px-4 py-2">
-          <AppToolbar bar={schema.bars.main} className="w-full" />
-        </div>
+      {(frame.header ?? true) && (
+        <slot name="header">
+          <Header />
+        </slot>
       )}
 
-      <ModeBand />
+      {/* the v2 document tab bar — the kernel's document registry IS the tab model */}
+      {(frame.tabs ?? 'always') !== 'never' && (
+        <slot name="tabs">
+          <TabBar visibility={frame.tabs ?? 'always'} />
+        </slot>
+      )}
+
+      {toolbarEdge === 'top' && (
+        <>
+          {toolbarBand}
+          <ModeBand edge="top" />
+        </>
+      )}
 
       <div className="relative flex min-h-0 flex-1">
         <DocumentArea>
@@ -178,6 +210,13 @@ export function Shell() {
           <RedactConfirmModal />
         </DocumentArea>
       </div>
+
+      {toolbarEdge === 'bottom' && (
+        <>
+          <ModeBand edge="bottom" />
+          {toolbarBand}
+        </>
+      )}
     </div>
   );
 }

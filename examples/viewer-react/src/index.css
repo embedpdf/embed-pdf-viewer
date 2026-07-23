@@ -34,3 +34,50 @@ body {
   height: 8px;
   border-radius: 9999px;
 }
+
+/* The REGION-slotted tab bar — deliberately nothing like the built-in one,
+   so "that's really ours" is visible at a glance. */
+.acme-tabs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: linear-gradient(90deg, #0f172a, #1e293b);
+}
+
+.acme-tabs .brand {
+  color: #38bdf8;
+  font:
+    700 11px/1 system-ui,
+    sans-serif;
+  letter-spacing: 0.1em;
+  margin-right: 8px;
+}
+
+.acme-tabs .tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid transparent;
+  border-radius: 9999px;
+  padding: 5px 12px;
+  font:
+    500 12px/1 system-ui,
+    sans-serif;
+  color: #cbd5e1;
+  background: rgba(255, 255, 255, 0.06);
+  cursor: pointer;
+}
+
+.acme-tabs .tab.active {
+  color: #0f172a;
+  background: #38bdf8;
+  border-color: #7dd3fc;
+}
+
+.acme-tabs .close {
+  opacity: 0.6;
+}
+.acme-tabs .close:hover {
+  opacity: 1;
+}

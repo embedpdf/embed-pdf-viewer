@@ -107,6 +107,27 @@ export interface MenuSchema {
   readonly sections: readonly MenuSection[];
 }
 
+/**
+ * The shell FRAME — region arrangement and visibility. Regions are a FIXED
+ * vocabulary (each carries semantics the shell must own: the toolbar's
+ * measurement physics, the document gate, aria landmarks); what's YOURS is
+ * where they sit, whether they show, and — through the region slots — what
+ * fills them. Part of the chrome value because it is structure: owned, never
+ * merged. Free-form layout is deliberately not offered — wanting a different
+ * frame architecture is what headless is for.
+ */
+export interface FrameSchema {
+  /** Where the main bar lives. Its mode band rides the CONTENT side (below a
+   *  top bar, above a bottom bar). Default: 'top'. */
+  readonly toolbar?: 'top' | 'bottom';
+  /** Document tab strip: 'multiple' shows it only with >1 tab. A hidden
+   *  region hides its SLOT too — visibility outranks slotted content.
+   *  Default: 'always'. */
+  readonly tabs?: 'always' | 'multiple' | 'never';
+  /** The brand/header row. Default: true. */
+  readonly header?: boolean;
+}
+
 export interface ChromeSchema {
   /** Standalone bars (e.g. the main toolbar). */
   readonly bars: Readonly<Record<string, BarSchema>>;
@@ -117,6 +138,8 @@ export interface ChromeSchema {
   readonly menus?: Readonly<Record<string, MenuSchema>>;
   /** Contextual strips (selection menus) — same BarSchema, same fit engine. */
   readonly strips?: Readonly<Record<string, BarSchema>>;
+  /** Region arrangement & visibility. Omitted = the default frame. */
+  readonly frame?: FrameSchema;
 }
 
 // ── authoring sugar ───────────────────────────────────────────────────────────

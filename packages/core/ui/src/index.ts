@@ -17,6 +17,7 @@ export type {
   BarSections,
   ChromeSchema,
   CustomItem,
+  FrameSchema,
   Importance,
   MenuSchema,
   MenuSection,
