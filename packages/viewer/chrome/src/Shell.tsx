@@ -2,7 +2,7 @@
  * The viewer shell — the snippet's layout, driven entirely by the v3 commands
  * + measured-toolbar system.
  *
- *   Header
+ *   ── header socket (empty unless a child fills it) ─────────
  *   ── main toolbar (measured; auto-overflows) ───────────────
  *   ── mode band (DERIVED from the shell's open mode surface) ─
  *   left sidebar │        Stage (pages)        │ right sidebar
@@ -43,7 +43,7 @@ import { AppToolbar } from './ui/toolbar';
 import { AnnotationStrip } from './ui/annotation-strip';
 import { TabBar } from './ui/tab-bar';
 import { ArmedToolCursor } from './ui/tool-cursor';
-import { Header, LeftSidebar, RightSidebar, PageControls } from './ui/panels';
+import { LeftSidebar, RightSidebar, PageControls } from './ui/panels';
 import { RedactConfirmModal } from './ui/redact-confirm';
 import { DocumentError, PasswordPrompt } from './ui/document-boot';
 
@@ -143,11 +143,10 @@ export function Shell() {
 
   return (
     <div className="bg-app text-fg flex h-full flex-col">
-      {(frame.header ?? true) && (
-        <slot name="header">
-          <Header />
-        </slot>
-      )}
+      {/* The header socket. The chrome ships NO header of its own — branding,
+          locale pickers and theme switches are the embedder's chrome, not the
+          viewer's — so this renders nothing until a child fills the slot. */}
+      {(frame.header ?? true) && <slot name="header" />}
 
       {/* the v2 document tab bar — the kernel's document registry IS the tab model */}
       {(frame.tabs ?? 'always') !== 'never' && (

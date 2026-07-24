@@ -1,10 +1,11 @@
 /**
- * Light/dark theme — a class toggled from the header; the CSS variables in
- * styles.css do the rest (both toolbars, sidebars, popovers, and the canvas
- * re-theme from one class). The class lands on <html> by default; a delivery
- * that must not touch the page (the <embedpdf-viewer> shadow root) passes
- * `target` and the class stays inside its own subtree. Authoritative over the
- * OS setting, matching the snippet's explicit theme switch.
+ * Light/dark theme — one class, and the CSS variables in styles.css do the
+ * rest (both toolbars, sidebars, popovers, and the canvas re-theme from it).
+ * The mode comes from the embedder's `theme` preference; the chrome ships no
+ * switch of its own, so a host that wants one drives this through `set`. The
+ * class lands on <html> by default; a delivery that must not touch the page
+ * (the <embedpdf-viewer> shadow root) passes `target` and the class stays
+ * inside its own subtree. An explicit preference outranks the OS setting.
  */
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 

@@ -224,6 +224,21 @@ chrome={(base) => ({
 </PDFViewer>
 ```
 
+`header` is the one region with **no** built-in: the viewer ships no brand
+row, locale picker or theme switch, because that chrome belongs to your app,
+not to the PDF. The socket is there so yours can sit inside the frame:
+
+```tsx
+<PDFViewer documents={docs}>
+  <AcmeHeader slot="header" />
+</PDFViewer>
+```
+
+Left unfilled it renders nothing, and `frame: { header: false }` drops the
+socket entirely. Theme and locale stay under your control as props —
+`theme={{ preference, tokens }}` and `locale` (`'auto'` negotiates from the
+browser) — so a switch in your own header is a state change on your side.
+
 A replacement region is fully functional through the handle — the kernel's
 document registry IS the tab model (`viewer.documents.list()/activeId()/
 setActive()/close()` + `viewer.watch`). A region hidden by the frame hides

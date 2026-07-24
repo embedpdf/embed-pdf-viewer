@@ -1,68 +1,24 @@
 /**
- * The static chrome around the toolbars: header (brand + locale + theme),
- * the left/right sidebars (shell surfaces), and the bottom page-controls
- * overlay. Deliberately minimal — chrome-parity scope. Panels read their
- * open state from plugin-shell; the app owns their DOM.
+ * The static chrome around the toolbars: the left/right sidebars (shell
+ * surfaces) and the bottom page-controls overlay. Deliberately minimal —
+ * chrome-parity scope. Panels read their open state from plugin-shell; the
+ * app owns their DOM.
+ *
+ * There is no built-in header: branding, a locale picker and a theme switch
+ * are the EMBEDDER's chrome, not the viewer's. The frame keeps a `header`
+ * socket for a slotted one (see Shell).
  */
 import { useEffect } from 'react';
 import { useSelector, useDocumentId } from '@embedpdf/react/runtime';
 import { Stage, StageToken, usePages } from '@embedpdf/react/stage';
 import { RenderLayer } from '@embedpdf/react/render';
 import { useSurface } from '@embedpdf/react/shell';
-import { useLocale, useT } from '@embedpdf/react/i18n';
+import { useT } from '@embedpdf/react/i18n';
 import { ThumbsStageToken } from '../config/stage';
 import { Icon } from './icons';
-import { useTheme } from './theme';
 import { AnnotationStylePanel } from './annotation-style';
 import { RedactionPanel } from './redaction-panel';
 import { SearchPanel } from './search-panel';
-
-// ── header ───────────────────────────────────────────────────────────────────
-export function Header() {
-  const t = useT();
-  const { locale, locales, loading, setLocale } = useLocale();
-  const { mode, toggle } = useTheme();
-  return (
-    <header className="border-border-subtle bg-surface flex h-12 shrink-0 items-center gap-3 border-b px-3">
-      <div className="flex items-center gap-2">
-        <div className="bg-accent text-on-accent grid h-7 w-7 place-items-center rounded-md">
-          <Icon name="book2" size={18} />
-        </div>
-        <div className="leading-tight">
-          <div className="text-fg text-sm font-bold">{t('demo.title')}</div>
-          <div className="text-fg-muted text-[11px]">{t('demo.subtitle')}</div>
-        </div>
-      </div>
-
-      <div className="flex-1" />
-
-      <label className="text-fg-muted flex items-center gap-1.5 text-xs">
-        {t('demo.language')}
-        <select
-          value={locale}
-          onChange={(e) => setLocale(e.target.value)}
-          className="border-border-subtle bg-surface text-fg-secondary h-8 rounded-md border px-2"
-        >
-          {locales.map((l) => (
-            <option key={l.code} value={l.code}>
-              {l.name}
-              {loading === l.code ? ' …' : ''}
-            </option>
-          ))}
-        </select>
-      </label>
-
-      <button
-        type="button"
-        onClick={toggle}
-        title={t('demo.theme')}
-        className="border-border-subtle text-fg-secondary hover:bg-hover grid h-8 w-8 place-items-center rounded-md border"
-      >
-        <Icon name={mode === 'dark' ? 'eye' : 'eyeOff'} size={18} />
-      </button>
-    </header>
-  );
-}
 
 // ── left sidebar (thumbnails / outline tabs) ─────────────────────────────────
 export function LeftSidebar() {

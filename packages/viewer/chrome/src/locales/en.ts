@@ -118,12 +118,6 @@ export const en: Locale = {
       close: 'Close document',
     },
     demo: {
-      title: 'EmbedPDF v3',
-      subtitle: 'measured toolbar',
-      language: 'Language',
-      theme: 'Theme',
-      themeLight: 'Light',
-      themeDark: 'Dark',
       starting: 'Starting viewer…',
       opening: 'Opening document…',
       more: 'More',

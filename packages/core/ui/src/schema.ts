@@ -124,7 +124,9 @@ export interface FrameSchema {
    *  region hides its SLOT too — visibility outranks slotted content.
    *  Default: 'always'. */
   readonly tabs?: 'always' | 'multiple' | 'never';
-  /** The brand/header row. Default: true. */
+  /** The header row — a socket only: the chrome ships no header of its own,
+   *  so it renders nothing until a `slot="header"` child fills it. `false`
+   *  removes the socket, keeping a slotted header out. Default: true. */
   readonly header?: boolean;
 }
 

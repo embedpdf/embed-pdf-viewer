@@ -121,12 +121,6 @@ export const es: Locale = {
       close: 'Cerrar documento',
     },
     demo: {
-      title: 'EmbedPDF v3',
-      subtitle: 'barra medida',
-      language: 'Idioma',
-      theme: 'Tema',
-      themeLight: 'Claro',
-      themeDark: 'Oscuro',
       starting: 'Iniciando el visor…',
       opening: 'Abriendo el documento…',
       more: 'Más',

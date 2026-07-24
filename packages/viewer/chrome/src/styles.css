@@ -6,7 +6,7 @@
 @source './';
 
 /* Dark mode is class-driven (we toggle `.dark` on <html>), not media-driven,
-   so the header's theme switch is authoritative. */
+   so the `theme` preference is authoritative over the OS setting. */
 @custom-variant dark (&:where(.dark, .dark *));
 
 /* Semantic theme tokens — ported 1:1 from the snippet's light/dark themes
