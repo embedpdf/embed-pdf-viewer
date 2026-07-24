@@ -2,8 +2,6 @@ import type { Metadata } from 'next';
 import { Inter, Manrope } from 'next/font/google';
 import type { ReactNode } from 'react';
 
-import { Footer } from '@/components/site/footer';
-import { Header } from '@/components/site/header';
 import { getMetadataBase } from '@/lib/site';
 
 import './globals.css';
@@ -30,14 +28,23 @@ export const metadata: Metadata = {
   icons: { icon: '/embedpdf-icon.svg' },
 };
 
+/**
+ * The DOCUMENT only — html, body, fonts, metadata. No chrome.
+ *
+ * Chrome belongs to the shells one level down, one route group each:
+ *   (site)  marketing — header + footer
+ *   (docs)  reference — header + sidebar container + footer
+ *   (app)   the product itself — header, nothing below the fold
+ *
+ * Layouts compose downward only: whatever the root renders, no page can
+ * remove. Keeping it empty is what lets a shell differ — an app page drop
+ * the footer, a future lead-gen shell swap the header for a stripped one —
+ * without any page-aware conditionals in here.
+ */
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning className={`${inter.variable} ${manrope.variable}`}>
-      <body className="bg-ep-bg text-ep-ink min-h-screen font-sans antialiased">
-        <Header />
-        {children}
-        <Footer />
-      </body>
+      <body className="bg-ep-bg text-ep-ink min-h-screen font-sans antialiased">{children}</body>
     </html>
   );
 }
