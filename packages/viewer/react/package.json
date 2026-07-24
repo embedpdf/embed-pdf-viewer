@@ -1,7 +1,7 @@
 {
   "name": "@embedpdf/viewer-react",
   "version": "0.0.0",
-  "private": true,
+  "private": false,
   "description": "React wrapper for the full viewer: <PDFViewer> around the <embedpdf-viewer> custom element. Children are light-DOM slots — a child with slot=\"name\" projects into the chrome's matching custom() unit while staying in YOUR React tree (your context, your CSS). No peer constraints beyond react>=18; the viewer inside is the Preact-compiled artifact.",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -12,7 +12,9 @@
     "./package.json": "./package.json"
   },
   "files": [
-    "dist"
+    "dist",
+    "README.md",
+    "LICENSE"
   ],
   "scripts": {
     "build": "epdf-build",
@@ -33,6 +35,7 @@
   "license": "Apache-2.0",
   "sideEffects": false,
   "publishConfig": {
+    "access": "public",
     "exports": {
       ".": {
         "import": "./dist/index.js",

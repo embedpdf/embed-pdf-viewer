@@ -1,16 +1,44 @@
 /**
  * The snippet's config = the chrome's customization contract + document
- * sourcing. `ViewerCustomization` is shared verbatim (README of
- * @embedpdf/viewer-chrome is the law for it); this file only adds what a
- * DELIVERY needs: where the PDFs come from.
+ * sourcing + the engine seam. `ViewerCustomization` is shared verbatim
+ * (README of @embedpdf/viewer-chrome is the law for it); this file only adds
+ * what a DELIVERY needs: where the PDFs come from and which engine renders
+ * them.
  */
 import type { InitialDocument, ViewerCustomization } from '@embedpdf/viewer-chrome';
+import type { Engine, EngineFactory } from '@embedpdf/engine-core/runtime';
+import type { LocalEngineRecipeOptions } from '@embedpdf/engine';
+
+/**
+ * Configuration for the built-in local engine (PDFium wasm in a worker) —
+ * the `localEngine()` options, verbatim. The common fields are plain data
+ * (`wasmUrl`, `assetsUrl`, `worker`/`encoderWorker` as URLs), so a
+ * self-hosting or strict-CSP setup stays declarative:
+ *
+ * ```ts
+ * EmbedPDF.init({
+ *   target: '#viewer',
+ *   src: '/report.pdf',
+ *   engine: { assetsUrl: '/embedpdf/', worker: '/embedpdf/pdfium-worker.js' },
+ * });
+ * ```
+ */
+export type LocalEngineConfig = LocalEngineRecipeOptions;
 
 export interface ViewerConfig extends ViewerCustomization {
   /** URL of a PDF to open at startup — the one-liner path. */
   src?: string;
   /** Full control: several documents, names, passwords, the active tab. */
   documents?: InitialDocument[];
+  /**
+   * The engine seam. Omit for the built-in local engine with its defaults;
+   * pass a {@link LocalEngineConfig} to configure it (self-hosted wasm,
+   * strict-CSP workers, fallback fonts, ...); or inject a different
+   * implementation entirely — an `Engine` instance (borrowed: you own its
+   * lifetime) or an `EngineFactory` thunk (viewer-owned: created on mount,
+   * destroyed on unmount), e.g. a cloud engine.
+   */
+  engine?: Engine | EngineFactory | LocalEngineConfig;
 }
 
 const fetchBytes = async (url: string): Promise<Uint8Array> => {

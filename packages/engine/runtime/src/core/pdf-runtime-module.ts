@@ -76,7 +76,21 @@ export interface CreatePdfRuntimeOptions {
    */
   prefer?: 'auto' | 'native' | 'wasm';
   /**
-   * Emscripten module overrides for the wasm runtime.
+   * Exact URL of `pdfium.wasm`. When set, the wasm runtime fetches the binary
+   * from here instead of resolving it relative to the Emscripten glue
+   * (`import.meta.url`). Must be an absolute URL when the runtime boots inside
+   * a `blob:` worker, where relative resolution is meaningless.
+   */
+  wasmUrl?: string;
+  /**
+   * The `pdfium.wasm` bytes, pre-fetched by the caller. Takes precedence over
+   * `wasmUrl`; no network request is made (the air-gapped path).
+   */
+  wasmBinary?: ArrayBuffer | Uint8Array;
+  /**
+   * Emscripten module overrides for the wasm runtime (escape hatch). An
+   * explicit `locateFile` / `wasmBinary` here wins over the first-class
+   * options above.
    */
   wasm?: Record<string, unknown>;
 }

@@ -268,6 +268,34 @@ importers:
         specifier: ^7.18.0
         version: 7.19.0(encoding@0.1.13)
 
+  ee/viewer:
+    dependencies:
+      '@cloudpdf/engine':
+        specifier: workspace:*
+        version: link:../engine
+      '@embedpdf/viewer':
+        specifier: workspace:*
+        version: link:../../packages/viewer/main
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.11
+      '@types/react':
+        specifier: ^18.3.0
+        version: 18.3.28
+      '@types/react-dom':
+        specifier: ^18.3.0
+        version: 18.3.7(@types/react@18.3.28)
+      rimraf:
+        specifier: ^5.0.0
+        version: 5.0.10
+      typescript:
+        specifier: ^5.0.0
+        version: 5.9.3
+      vite:
+        specifier: ^6.0.0
+        version: 6.4.1(@types/node@22.19.11)(jiti@2.6.1)(less@4.6.7)(lightningcss@1.30.2)(sass-embedded@1.97.3)(sass@1.97.3)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2)
+
   ee/website:
     dependencies:
       '@hugeicons/core-free-icons':
@@ -755,6 +783,9 @@ importers:
       '@embedpdf/engine-runtime':
         specifier: workspace:*
         version: link:../runtime
+      '@embedpdf/engine-runtime-wasm32':
+        specifier: workspace:*
+        version: link:../runtime/npm/wasm32
       '@embedpdf/engine-services':
         specifier: workspace:*
         version: link:../services
@@ -762,6 +793,9 @@ importers:
       '@embedpdf/tooling-build':
         specifier: workspace:*
         version: link:../../../tooling/build
+      esbuild:
+        specifier: ^0.28.1
+        version: 0.28.1
       rimraf:
         specifier: ^5.0.0
         version: 5.0.10
@@ -1463,6 +1497,9 @@ importers:
       '@embedpdf/engine':
         specifier: workspace:*
         version: link:../../engine/main
+      '@embedpdf/engine-core':
+        specifier: workspace:*
+        version: link:../../engine/core
       '@embedpdf/viewer-chrome':
         specifier: workspace:*
         version: link:../chrome
@@ -1470,6 +1507,9 @@ importers:
         specifier: ^10.25.0
         version: 10.29.7
     devDependencies:
+      '@embedpdf/engine-runtime-wasm32':
+        specifier: workspace:*
+        version: link:../../engine/runtime/npm/wasm32
       '@tailwindcss/vite':
         specifier: ^4.1.18
         version: 4.1.18(vite@6.4.1(@types/node@22.19.11)(jiti@2.6.1)(less@4.6.7)(lightningcss@1.30.2)(sass-embedded@1.97.3)(sass@1.97.3)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2))
@@ -1542,6 +1582,9 @@ importers:
       '@embedpdf/react':
         specifier: workspace:*
         version: link:../packages/framework/react
+      '@embedpdf/viewer-react':
+        specifier: workspace:*
+        version: link:../packages/viewer/react
       '@hugeicons/core-free-icons':
         specifier: ^4.2.0
         version: 4.2.0

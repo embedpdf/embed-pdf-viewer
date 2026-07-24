@@ -6,9 +6,17 @@
       "dependsOn": ["^build"],
       "outputs": ["dist/**"]
     },
-    "@embedpdf/website#build": {
+    "@embedpdf/engine#build": {
       "dependsOn": ["^build"],
-      "outputs": [".next/**", "!.next/cache/**", "public/demos/**"]
+      "outputs": ["dist/**", "workers/**", "src/generated/**"]
+    },
+    "@embedpdf/website#build:demos": {
+      "dependsOn": ["^build"],
+      "outputs": ["public/demos/**"]
+    },
+    "@embedpdf/website#build": {
+      "dependsOn": ["build:demos", "^build"],
+      "outputs": [".next/**", "!.next/cache/**"]
     },
     "check-types": {
       "dependsOn": ["^check-types"]

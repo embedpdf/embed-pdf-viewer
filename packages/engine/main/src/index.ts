@@ -27,10 +27,23 @@ import { InlineTransport } from './transport/InlineTransport';
 import { LazyTransport, type LazyTransportOptions } from './transport/LazyTransport';
 import type { Transport } from './transport/Transport';
 import { nextJobId } from './worker/jobIds';
+import type { EngineWorkerInit } from './worker/bootstrap';
 import type { JobId } from './worker/protocol';
-import type { LocalImageEncoder } from './render/BrowserImageEncoder';
+import {
+  BrowserImageEncoder,
+  type EncoderWorkerSource,
+  type LocalImageEncoder,
+} from './render/BrowserImageEncoder';
+import {
+  resolveInlineWasmSource,
+  resolveWasmSource,
+  toAbsoluteUrl,
+  type ResolvedWasmSource,
+  type WasmSourceOptions,
+  type WorkerSource,
+} from './wasm-source';
 
-export type { EngineFactory } from '@embedpdf/engine-core/runtime';
+export type { Engine, EngineFactory } from '@embedpdf/engine-core/runtime';
 export { LocalEngine } from './LocalEngine';
 export type { LocalEngineOptions } from './LocalEngine';
 export type { Transport } from './transport/Transport';
@@ -39,6 +52,7 @@ export { BrowserWorkerTransport } from './transport/BrowserWorkerTransport';
 export { LazyTransport } from './transport/LazyTransport';
 export { Priority } from './worker/Priority';
 export type { WorkerRequest, WorkerResponse } from './worker/protocol';
+export type { EngineWorkerInit } from './worker/bootstrap';
 export { LocalDocumentHandle } from './document/LocalDocumentHandle';
 export { LocalDocumentAnnotationsService } from './document/LocalDocumentAnnotationsService';
 export { LocalDocumentPagesService } from './document/LocalDocumentPagesService';
@@ -47,8 +61,14 @@ export { LocalPageAnnotationsService } from './document/LocalPageAnnotationsServ
 export { LocalPageGeometryService } from './document/LocalPageGeometryService';
 export { LocalPageRenderService } from './document/LocalPageRenderService';
 export { BrowserImageEncoder } from './render/BrowserImageEncoder';
-export type { LocalImageEncoder } from './render/BrowserImageEncoder';
+export type {
+  BrowserImageEncoderOptions,
+  EncoderWorkerSource,
+  LocalImageEncoder,
+} from './render/BrowserImageEncoder';
 export { LocalFontService } from './fonts/LocalFontService';
+export { DEFAULT_WASM_URL, resolveWasmSource, resolveInlineWasmSource } from './wasm-source';
+export type { ResolvedWasmSource, WasmSourceOptions, WorkerSource } from './wasm-source';
 
 export interface CreateLocalEngineOptions extends Omit<LocalEngineOptions, 'transport'> {
   /** Forwarded to @embedpdf/engine-runtime when the runtime is created. */
@@ -73,7 +93,8 @@ export function createLocalEngine(opts: CreateLocalEngineOptions = {}): LocalEng
   });
 }
 
-export interface CreateLocalEngineWithWorkerOptions extends Omit<LocalEngineOptions, 'transport'> {
+export interface CreateLocalEngineWithWorkerOptions
+  extends Omit<LocalEngineOptions, 'transport'>, WasmSourceOptions {
   worker: Worker | (() => Worker);
 }
 
@@ -88,7 +109,7 @@ export interface CreateLocalEngineWithWorkerOptions extends Omit<LocalEngineOpti
  * engine operation cannot hang the lazy boot.
  */
 export function createLocalEngineWithWorker(opts: CreateLocalEngineWithWorkerOptions): LocalEngine {
-  const boot = workerBoot(opts.worker);
+  const boot = workerBoot(opts.worker, opts);
   const transport = new LazyTransport(boot.spawn, boot.lazyOptions);
   return LocalEngine.fromTransport({
     transport,
@@ -99,49 +120,121 @@ export function createLocalEngineWithWorker(opts: CreateLocalEngineWithWorkerOpt
 
 /**
  * Resolve a `worker` option into a boot-time transport factory plus
- * LazyTransport options — the one place the live-Worker vs thunk asymmetry is
- * handled:
+ * LazyTransport options — the one place the delivery asymmetries are handled:
  *
  *   - LIVE `Worker`: it began initializing at `new Worker()`, and its
  *     `ready`/`init-error` message is dropped if nothing is listening when it
- *     fires. So the handshake is latched HERE, synchronously at engine
- *     construction, and the latch is what the deferred spawn awaits. The
- *     abandon hook terminates the worker if the engine is destroyed without
- *     ever booting (the boot factory never ran, so nobody else would).
- *   - Thunk / default: nothing exists until boot, so nothing can race and
- *     nothing needs reclaiming.
+ *     fires. So the init message is posted and the handshake latched HERE,
+ *     synchronously at engine construction, and the latch is what the
+ *     deferred spawn awaits. The abandon hook terminates the worker if the
+ *     engine is destroyed without ever booting (the boot factory never ran,
+ *     so nobody else would).
+ *   - Thunk / URL / default inline: nothing exists until boot, so nothing can
+ *     race and nothing needs reclaiming.
+ *
+ * The wasm source rides the same decision: only the inline blob worker (which
+ * has no meaningful location of its own) receives the sibling-first default —
+ * the bundler-resolved asset URL with the version-pinned CDN as a
+ * fetch-failure-only fallback (see resolveInlineWasmSource); every other
+ * delivery self-resolves `pdfium.wasm` as a sibling of the worker script when
+ * no explicit source is configured.
  */
-function workerBoot(worker: Worker | (() => Worker) | undefined): {
+function workerBoot(
+  source: WorkerSource | undefined,
+  wasmOptions: WasmSourceOptions,
+): {
   spawn: () => Promise<Transport>;
   lazyOptions: LazyTransportOptions;
 } {
-  if (worker !== undefined && typeof worker !== 'function') {
-    const ready = watchWorkerReady(worker);
+  const delivery = source ?? 'inline';
+
+  // A live Worker is the only object-typed delivery (duck-typed rather than
+  // `instanceof Worker` so non-DOM environments and test doubles work).
+  if (typeof delivery === 'object' && delivery !== null) {
+    postWorkerInit(delivery, resolveWasmSource(wasmOptions));
+    const ready = watchWorkerReady(delivery);
     // A dormant engine must not surface an unhandled rejection if the worker
     // init-errors before anything boots; spawn() re-awaits the original.
     void ready.catch(() => {});
     return {
-      spawn: () => BrowserWorkerTransport.spawn(worker, ready),
-      lazyOptions: { onAbandon: () => worker.terminate() },
+      spawn: () => BrowserWorkerTransport.spawn(delivery, ready),
+      lazyOptions: { onAbandon: () => delivery.terminate() },
     };
   }
+
   return {
-    spawn: () => BrowserWorkerTransport.spawn(worker ? worker() : spawnDefaultWorker()),
+    spawn: async () => {
+      // Resolve BEFORE spawning: if the sibling-url module can't load, no
+      // worker is left orphaned. Only the inline blob worker gets the default.
+      const wasm =
+        delivery === 'inline'
+          ? await resolveInlineWasmSource(wasmOptions)
+          : resolveWasmSource(wasmOptions);
+      const spawned = await createEngineWorker(delivery as Exclude<WorkerSource, Worker>);
+      postWorkerInit(spawned.worker, wasm);
+      try {
+        const transport = await BrowserWorkerTransport.spawn(spawned.worker);
+        spawned.dispose();
+        return transport;
+      } catch (error) {
+        spawned.dispose();
+        spawned.worker.terminate();
+        throw error;
+      }
+    },
     lazyOptions: {},
   };
 }
 
+function postWorkerInit(worker: Worker, wasm: ResolvedWasmSource): void {
+  const init: EngineWorkerInit = { kind: 'init', wasmUrl: wasm.wasmUrl };
+  if (wasm.fallbackWasmUrl) init.fallbackWasmUrl = wasm.fallbackWasmUrl;
+  if (wasm.wasmBinary) init.wasmBinary = wasm.wasmBinary;
+  worker.postMessage(init, wasm.wasmBinary ? [wasm.wasmBinary] : []);
+}
+
 /**
- * Spawn the default engine worker (`dist/default-worker.js`) with the
- * web-standard, bundler-portable pattern. Vite, webpack 5 / Next, Rollup, and
- * Parcel all statically discover this form and emit the worker with zero
- * consumer configuration.
- *
- * Exported for the rare case of composing your own worker lifecycle; most apps
- * never call it — `localEngine()` does it for them.
+ * Create the worker for a non-live delivery. The default (`'inline'`) path
+ * lazily imports the worker source string — its own module, so bundlers emit
+ * it as a separate chunk that is only ever downloaded when this line runs —
+ * and spawns it from a blob URL (revoked once the handshake settles).
  */
-export function spawnDefaultWorker(): Worker {
-  return new Worker(new URL('./default-worker.js', import.meta.url), { type: 'module' });
+async function createEngineWorker(
+  delivery: Exclude<WorkerSource, Worker>,
+): Promise<{ worker: Worker; dispose: () => void }> {
+  if (typeof delivery === 'function') {
+    return { worker: delivery(), dispose: () => {} };
+  }
+  if (typeof delivery === 'string' && delivery !== 'inline') {
+    return { worker: new Worker(toAbsoluteUrl(delivery), { type: 'module' }), dispose: () => {} };
+  }
+
+  let source: string;
+  try {
+    source = (await import('@embedpdf/engine/worker-source')).default;
+  } catch (cause) {
+    throw new Error(
+      '[embedpdf] could not load the inline engine worker module ' +
+        '(@embedpdf/engine/worker-source). If your bundler cannot resolve it, pass a ' +
+        'worker explicitly: `localEngine({ worker: () => new Worker(...) })`.',
+      { cause },
+    );
+  }
+  const blobUrl = URL.createObjectURL(new Blob([source], { type: 'text/javascript' }));
+  try {
+    const worker = new Worker(blobUrl, { type: 'module' });
+    return { worker, dispose: () => URL.revokeObjectURL(blobUrl) };
+  } catch (cause) {
+    URL.revokeObjectURL(blobUrl);
+    throw new Error(
+      '[embedpdf] could not create the engine worker from a blob: URL — most likely your ' +
+        'Content-Security-Policy omits `worker-src blob:`. Self-host the worker instead: copy ' +
+        "@embedpdf/engine's workers/pdfium-worker.js and pdfium.wasm into one served directory " +
+        "and pass `worker: '/that/directory/pdfium-worker.js'` to localEngine(). " +
+        'See https://www.embedpdf.com/docs/self-hosting',
+      { cause },
+    );
+  }
 }
 
 /**
@@ -163,15 +256,26 @@ export interface RecipeFontSpec {
   url?: string;
 }
 
-export interface LocalEngineRecipeOptions {
+export interface LocalEngineRecipeOptions extends WasmSourceOptions {
   /**
-   * The worker backing the engine. Omit for the default portable worker
-   * ({@link spawnDefaultWorker}). Pass a `() => Worker` thunk (called once at
-   * boot) for a custom setup — CSP nonces, a bundler without `new URL` worker
-   * support, a shared worker, ... A live `Worker` also works, but the thunk
-   * form keeps construction fully allocation-free.
+   * The worker backing the engine — see {@link WorkerSource}. Omit (or pass
+   * `'inline'`) for the zero-config default: the worker source shipped inside
+   * this package, spawned from a blob URL (requires `worker-src blob:` under
+   * a strict CSP). Pass a same-origin URL string to a copied
+   * `workers/pdfium-worker.js` for strict-CSP setups, or a `() => Worker`
+   * thunk (called once at boot) for full control — CSP nonces, a custom
+   * worker build, a shared lifecycle, ... A live `Worker` also works, but the
+   * thunk form keeps construction fully allocation-free.
    */
-  worker?: Worker | (() => Worker);
+  worker?: WorkerSource;
+  /**
+   * The image-encoder worker pool's delivery — see
+   * {@link EncoderWorkerSource}. Omit for the inline default (with automatic
+   * main-thread fallback if a strict CSP blocks blob workers); pass a
+   * same-origin URL to a copied `workers/encoder-worker.js`, or `false` to
+   * always encode on the main thread. Ignored when `imageEncoder` is set.
+   */
+  encoderWorker?: EncoderWorkerSource;
   /**
    * Fonts registered AND appended to the ordered glyph-fallback chain, in
    * order — the ones used to substitute missing glyphs during rendering and
@@ -218,7 +322,7 @@ export interface LocalEngineRecipeOptions {
  * ```
  */
 export function localEngine(options: LocalEngineRecipeOptions = {}): LocalEngine {
-  const boot = workerBoot(options.worker);
+  const boot = workerBoot(options.worker, options);
   const transport = new LazyTransport(async () => {
     // Spawn and font fetches run in parallel; nothing queued by the caller can
     // reach the worker until this factory resolves.
@@ -244,7 +348,11 @@ export function localEngine(options: LocalEngineRecipeOptions = {}): LocalEngine
   const engine: LocalEngine = LocalEngine.fromTransport({
     transport,
     concurrency: options.concurrency,
-    imageEncoder: options.imageEncoder,
+    imageEncoder:
+      options.imageEncoder ??
+      (options.encoderWorker !== undefined
+        ? new BrowserImageEncoder({ worker: options.encoderWorker })
+        : undefined),
   });
   return engine;
 }

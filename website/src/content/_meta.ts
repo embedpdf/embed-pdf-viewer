@@ -6,4 +6,8 @@ export default {
     title: 'Documentation',
     type: 'page',
   },
+  demo: {
+    title: 'Demo',
+    type: 'page',
+  },
 };

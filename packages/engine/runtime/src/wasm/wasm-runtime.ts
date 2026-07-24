@@ -258,6 +258,34 @@ function createWasmFunctions(module: EmscriptenModule): PdfFunctions {
   return out as unknown as PdfFunctions;
 }
 
+/**
+ * Fold the first-class wasm source options into the Emscripten module
+ * options. An explicit `locateFile` / `wasmBinary` in `opts.wasm` wins —
+ * the raw escape hatch stays authoritative.
+ */
+function buildEmscriptenOptions(opts: CreatePdfRuntimeOptions): Record<string, unknown> {
+  const moduleOptions: Record<string, unknown> = { ...(opts.wasm ?? {}) };
+  if (opts.wasmBinary !== undefined && moduleOptions.wasmBinary === undefined) {
+    moduleOptions.wasmBinary =
+      opts.wasmBinary instanceof Uint8Array ? opts.wasmBinary : new Uint8Array(opts.wasmBinary);
+  }
+  const wasmUrl = opts.wasmUrl;
+  if (wasmUrl !== undefined && moduleOptions.locateFile === undefined) {
+    moduleOptions.locateFile = (path: string, prefix: string) =>
+      path.endsWith('.wasm') ? wasmUrl : prefix + path;
+  }
+  // Bytes in hand must mean NO location is ever needed: without a locateFile,
+  // Emscripten still computes the wasm's URL via `new URL('pdfium.wasm',
+  // import.meta.url)`, which THROWS inside a blob: worker (blob URLs can't be
+  // a base). The name is only used as a lookup key against wasmBinary — the
+  // glue never fetches it.
+  if (moduleOptions.wasmBinary !== undefined && moduleOptions.locateFile === undefined) {
+    moduleOptions.locateFile = (path: string, prefix: string) =>
+      path.endsWith('.wasm') ? path : prefix + path;
+  }
+  return moduleOptions;
+}
+
 export async function createWasmRuntime(
   opts: CreatePdfRuntimeOptions = {},
 ): Promise<PdfRuntimeModule> {
@@ -265,7 +293,7 @@ export async function createWasmRuntime(
   const createModule = (wasmPackage.default ?? wasmPackage) as (
     opts?: Record<string, unknown>,
   ) => Promise<EmscriptenModule>;
-  const module = await createModule(opts.wasm);
+  const module = await createModule(buildEmscriptenOptions(opts));
   const mem = createWasmMemory(module);
   const cb = createWasmCallbacks(module);
 

@@ -23,18 +23,45 @@ interface InitErrorMsg {
  */
 export function watchWorkerReady(worker: Worker): Promise<void> {
   return new Promise<void>((resolve, reject) => {
+    // The handshake can end three ways, and only one is a message: a worker
+    // whose SCRIPT never runs (bad URL, CSP-rejected, syntax error, module
+    // resolution failure) fires `error` instead — without these listeners the
+    // promise would hang forever. Deliberately no timeout: a slow wasm fetch
+    // + compile on a weak device is legitimate, and `error`/`messageerror`
+    // already cover every worker-never-starts case.
+    const settle = (done: () => void) => {
+      worker.removeEventListener('message', onReady);
+      worker.removeEventListener('error', onError);
+      worker.removeEventListener('messageerror', onMessageError);
+      done();
+    };
     const onReady = (e: MessageEvent) => {
       const data = e.data as InitReadyMsg | InitErrorMsg;
       if (!data || typeof data !== 'object' || !('kind' in data)) return;
       if (data.kind === 'ready') {
-        worker.removeEventListener('message', onReady);
-        resolve();
+        settle(resolve);
       } else if (data.kind === 'init-error') {
-        worker.removeEventListener('message', onReady);
-        reject(new Error(`worker failed to initialize: ${data.error}`));
+        settle(() => reject(new Error(`worker failed to initialize: ${data.error}`)));
       }
     };
+    const onError = (e: ErrorEvent) => {
+      settle(() =>
+        reject(
+          new Error(
+            `worker failed to start: ${
+              e.message ||
+              'script error — bad worker URL, a Content-Security-Policy that blocks it, or a syntax error in the worker script'
+            }`,
+          ),
+        ),
+      );
+    };
+    const onMessageError = () => {
+      settle(() => reject(new Error('worker handshake message could not be deserialized')));
+    };
     worker.addEventListener('message', onReady);
+    worker.addEventListener('error', onError);
+    worker.addEventListener('messageerror', onMessageError);
   });
 }
 

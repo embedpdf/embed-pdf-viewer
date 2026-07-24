@@ -36,6 +36,12 @@ import '@embedpdf/viewer';
 export * from '@embedpdf/viewer';
 
 export interface PDFViewerProps extends ViewerConfig {
+  // Note `engine` (inherited from ViewerConfig): omit it for the built-in
+  // local engine — zero bundler config; your bundler ships `pdfium.wasm`
+  // inside your own build (sibling-first, with a pinned-CDN fetch-failure
+  // fallback). Pass `{ wasmUrl }` / `{ assetsUrl }` to self-host, worker
+  // URLs for strict-CSP setups, or inject another implementation entirely:
+  // `engine={() => cloudEngine({ baseUrl, token })}`.
   className?: string;
   style?: CSSProperties;
   /** Light-DOM slot children: `<Anything slot="socket-name" />`. */

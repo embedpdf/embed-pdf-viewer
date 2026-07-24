@@ -9,96 +9,20 @@
  * </script>
  * ```
  *
- * Everything the customization ladder needs — the defaults as values, the
- * schema sugar, the transforms — re-exports from here, so one import line
- * serves "pass nothing" through "own the structure".
+ * The engine-agnostic `./core` plus ONE side effect: the built-in local
+ * PDFium engine registered as the default, so `init()` needs no `engine:`.
+ * Builds that always inject their own engine import `@embedpdf/viewer/core`
+ * instead and never pull the local engine into their graph.
  */
-import { EmbedPdfViewerElement } from './element';
-import type { ViewerConfig } from './config';
+import './local-default';
+import EmbedPDF from './core';
 
-export { EmbedPdfViewerElement } from './element';
-export type { ViewerConfig } from './config';
+export * from './core';
 
-// The customization vocabulary, verbatim from the chrome (see its README).
-export {
-  addItem,
-  chromeHelpers,
-  custom,
-  defaultChrome,
-  defaultCommands,
-  defaultIcons,
-  defineChrome,
-  group,
-  item,
-  removeItems,
-  replaceItem,
-  validateChrome,
-} from '@embedpdf/viewer-chrome';
+// The LOCAL engine's vocabulary lives on this entry (not ./core): the type
+// for the `engine:` options bag, so a self-hosting or strict-CSP config can
+// be typed without importing the engine package.
+export type { LocalEngineConfig } from './config';
+export type { LocalEngineRecipeOptions } from '@embedpdf/engine';
 
-// The DRIVE door: `el.viewer` speaks these tokens (the public capability
-// lenses). This re-export list is the CDN's public-API act — see the chrome's
-// index for the curation rule.
-export {
-  AnnotationToken,
-  CommandsToken,
-  DocumentsToken,
-  FormToken,
-  I18nToken,
-  InteractionToken,
-  MetadataToken,
-  RedactionToken,
-  SearchToken,
-  SelectionToken,
-  ShellToken,
-  StageToken,
-} from '@embedpdf/viewer-chrome';
-export type {
-  CapabilityToken,
-  DocInfo,
-  DocumentsCapability,
-  ResolvedCommand,
-  ScopedViewerHandle,
-  Unsubscribe,
-  ViewerHandle,
-} from '@embedpdf/viewer-chrome';
-export type {
-  AddItemSpec,
-  BarChild,
-  BarGroup,
-  BarItem,
-  BarSchema,
-  BarSections,
-  ChromeHelpers,
-  ChromeSchema,
-  CommandDef,
-  CustomItem,
-  IconDef,
-  Importance,
-  InitialDocument,
-  MenuSchema,
-  MenuSection,
-  PathSpec,
-  ThemeMode,
-  ThemePreference,
-  Variant,
-  ViewerCustomization,
-} from '@embedpdf/viewer-chrome';
-
-export interface InitOptions extends ViewerConfig {
-  /** Where the viewer mounts: an element or a selector. */
-  target: HTMLElement | string;
-}
-
-/** Create an <embedpdf-viewer>, configure it, append it to `target`. */
-function init(options: InitOptions): EmbedPdfViewerElement {
-  const { target, ...config } = options;
-  const host = typeof target === 'string' ? document.querySelector<HTMLElement>(target) : target;
-  if (!host) throw new Error(`[embedpdf] init: target not found: ${String(target)}`);
-  const element = document.createElement('embedpdf-viewer') as EmbedPdfViewerElement;
-  element.config = config;
-  host.appendChild(element);
-  return element;
-}
-
-const EmbedPDF = { init };
 export default EmbedPDF;

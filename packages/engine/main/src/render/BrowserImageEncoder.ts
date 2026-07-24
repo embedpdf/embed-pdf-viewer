@@ -7,7 +7,9 @@ import {
   type PageRenderEncodedFormat,
 } from '@embedpdf/engine-core/runtime';
 
+import { toAbsoluteUrl } from '../wasm-source';
 import { encodeBmp } from './bmp';
+import { encoderWorkerSource } from './encoder-worker-source';
 
 export interface LocalImageEncoder {
   encode(
@@ -16,6 +18,25 @@ export interface LocalImageEncoder {
     signal: AbortSignal,
   ): Promise<PageImageResult>;
   destroy?(): void;
+}
+
+/**
+ * How the encoder pool's workers are delivered:
+ * - `'inline'` (default): blob URL from {@link encoderWorkerSource} — zero
+ *   config, needs `worker-src blob:` under a strict CSP. If the CSP blocks
+ *   it, encoding degrades gracefully to the main thread (same call).
+ * - a URL string: same-origin static `encoder-worker.js` (strict CSP; copy it
+ *   from this package's `workers/` directory).
+ * - a factory: full control over Worker creation.
+ * - `false`: no pool — always encode on the main thread.
+ */
+export type EncoderWorkerSource = 'inline' | string | (() => Worker) | false;
+
+export interface BrowserImageEncoderOptions {
+  /** Number of workers in the pool (default 2). */
+  workerCount?: number;
+  /** Worker delivery — see {@link EncoderWorkerSource}. Default `'inline'`. */
+  worker?: EncoderWorkerSource;
 }
 
 interface PendingEncode {
@@ -27,28 +48,6 @@ type EncodeWorkerMessage =
   | { id: string; ok: true; bytes: ArrayBuffer }
   | { id: string; ok: false; error: string };
 
-const WORKER_SOURCE = `
-self.onmessage = async (event) => {
-  const { id, raster, format, quality } = event.data;
-  try {
-    if (typeof OffscreenCanvas === 'undefined') {
-      throw new Error('OffscreenCanvas is not available in this worker');
-    }
-    const bytes = raster.data;
-    const image = new ImageData(new Uint8ClampedArray(bytes), raster.width, raster.height);
-    const canvas = new OffscreenCanvas(raster.width, raster.height);
-    const ctx = canvas.getContext('2d');
-    if (!ctx) throw new Error('2D canvas context is unavailable');
-    ctx.putImageData(image, 0, 0);
-    const blob = await canvas.convertToBlob({ type: 'image/' + format, quality });
-    const encoded = await blob.arrayBuffer();
-    self.postMessage({ id, ok: true, bytes: encoded }, [encoded]);
-  } catch (err) {
-    self.postMessage({ id, ok: false, error: err && err.message ? err.message : String(err) });
-  }
-};
-`;
-
 export class BrowserImageEncoder implements LocalImageEncoder {
   private readonly pending = new Map<string, PendingEncode>();
   private workers: Worker[] = [];
@@ -56,8 +55,13 @@ export class BrowserImageEncoder implements LocalImageEncoder {
   private nextWorker = 0;
   private nextId = 1;
   private disabledWorkerPath = false;
+  /** True once the pool has completed one round-trip. Until then every post
+   *  COPIES the raster (no transfer) so a CSP-blocked or broken pool can fall
+   *  back to main-thread encoding within the same call — the caller's buffer
+   *  is still intact. */
+  private poolVerified = false;
 
-  constructor(private readonly opts: { workerCount?: number } = {}) {}
+  constructor(private readonly opts: BrowserImageEncoderOptions = {}) {}
 
   async encode(
     raster: PageRaster,
@@ -109,22 +113,38 @@ export class BrowserImageEncoder implements LocalImageEncoder {
       try {
         return await this.encodeInWorker(raster, format, quality, signal);
       } catch (error) {
+        if (signal.aborted) throw error;
+        if (this.poolVerified) {
+          // A previously working pool broke: keep the historical semantics
+          // (surface the failure; later calls use the main thread).
+          this.disabledWorkerPath = true;
+          this.destroy();
+          throw error;
+        }
+        // The pool never worked (e.g. a CSP without `worker-src blob:`
+        // rejected the blob worker). The raster was sent as a COPY, so the
+        // buffer is intact — degrade to main-thread encoding in this call.
         this.disabledWorkerPath = true;
         this.destroy();
-        throw error;
+        warnWorkerFallback(error);
+        return await encodeOnMainThread(raster, format, quality, signal);
       }
     }
     return await encodeOnMainThread(raster, format, quality, signal);
   }
 
   private canUseWorkerPath(): boolean {
-    return (
-      typeof Worker !== 'undefined' &&
-      typeof Blob !== 'undefined' &&
-      typeof OffscreenCanvas !== 'undefined' &&
-      typeof URL !== 'undefined' &&
-      typeof URL.createObjectURL === 'function'
-    );
+    const source = this.opts.worker ?? 'inline';
+    if (source === false) return false;
+    if (typeof Worker === 'undefined' || typeof OffscreenCanvas === 'undefined') return false;
+    if (source === 'inline') {
+      return (
+        typeof Blob !== 'undefined' &&
+        typeof URL !== 'undefined' &&
+        typeof URL.createObjectURL === 'function'
+      );
+    }
+    return true;
   }
 
   private encodeInWorker(
@@ -148,6 +168,7 @@ export class BrowserImageEncoder implements LocalImageEncoder {
       };
       this.pending.set(id, {
         resolve: (bytes) => {
+          this.poolVerified = true;
           cleanup();
           resolve(bytes);
         },
@@ -161,24 +182,26 @@ export class BrowserImageEncoder implements LocalImageEncoder {
         return;
       }
       signal.addEventListener('abort', onAbort, { once: true });
+      // Transfer only once the pool is proven: before that, a copy crosses
+      // the boundary so a failed pool can retry on the main thread.
+      const data = this.poolVerified ? raster.data : raster.data.slice(0);
       worker.postMessage(
         {
           id,
-          raster: { width: raster.width, height: raster.height, data: raster.data },
+          raster: { width: raster.width, height: raster.height, data },
           format,
           quality,
         },
-        [raster.data],
+        [data],
       );
     });
   }
 
   private ensureWorkers(): void {
     if (this.workers.length > 0) return;
-    this.workerUrl = URL.createObjectURL(new Blob([WORKER_SOURCE], { type: 'text/javascript' }));
     const count = Math.max(1, this.opts.workerCount ?? 2);
     for (let i = 0; i < count; i++) {
-      const worker = new Worker(this.workerUrl);
+      const worker = this.createWorker();
       worker.onmessage = (event: MessageEvent<EncodeWorkerMessage>) => {
         const msg = event.data;
         const task = this.pending.get(msg.id);
@@ -195,6 +218,32 @@ export class BrowserImageEncoder implements LocalImageEncoder {
       this.workers.push(worker);
     }
   }
+
+  private createWorker(): Worker {
+    const source = this.opts.worker ?? 'inline';
+    if (typeof source === 'function') return source();
+    if (typeof source === 'string') return new Worker(toAbsoluteUrl(source));
+    if (!this.workerUrl) {
+      this.workerUrl = URL.createObjectURL(
+        new Blob([encoderWorkerSource], { type: 'text/javascript' }),
+      );
+    }
+    return new Worker(this.workerUrl);
+  }
+}
+
+let warnedWorkerFallback = false;
+function warnWorkerFallback(error: unknown): void {
+  if (warnedWorkerFallback) return;
+  warnedWorkerFallback = true;
+  console.warn(
+    '[embedpdf] image encoder workers are unavailable — falling back to main-thread ' +
+      'encoding (slower under load). If your Content-Security-Policy blocks blob: ' +
+      "workers, self-host @embedpdf/engine's workers/encoder-worker.js and pass " +
+      "`encoderWorker: '/path/encoder-worker.js'` to localEngine(). " +
+      'See https://www.embedpdf.com/docs/self-hosting —',
+    error,
+  );
 }
 
 async function encodeOnMainThread(

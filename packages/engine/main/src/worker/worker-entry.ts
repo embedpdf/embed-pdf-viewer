@@ -1,16 +1,18 @@
 /**
- * Web Worker bootstrap for engine-local, shipped as raw TS source.
+ * Web Worker bootstrap for engine-local, shipped as raw TS source AND used as
+ * the entry for the built `workers/pdfium-worker.js` artifact (see
+ * scripts/build-workers.mjs).
  *
- * This file is not part of the package's main bundle. Consumers wire it up via
- * Vite's `?worker` import (`@embedpdf/engine/worker-entry?worker`) or a similar
- * bundler primitive / manual `new Worker`. Most apps don't need it directly:
- * `localEngine()` spawns the equivalent BUILT worker (`../default-worker.ts`)
- * for them. Reach for this only for a custom worker setup (CSP, a bundler
- * without `new URL` worker support, a shared worker, ...).
+ * Consumers can wire it up via Vite's `?worker` import
+ * (`@embedpdf/engine/worker-entry?worker`) or a similar bundler primitive /
+ * manual `new Worker`. Most apps don't need it directly: `localEngine()`
+ * spawns the equivalent inline worker (the same bundle, stringified) for
+ * them. Reach for this only for a custom worker setup (CSP nonces, a shared
+ * worker, a custom bundler pipeline, ...).
  *
  * Lives in src/ so consumers can import it as a worker source. It is NOT
- * exported by index.ts. The actual bootstrap lives in `./bootstrap` so the raw
- * and built entries can never drift.
+ * exported by index.ts. The actual bootstrap lives in `./bootstrap` so the
+ * raw, built, and inline deliveries can never drift.
  */
 import { startEngineWorker } from './bootstrap';
 

@@ -21,9 +21,11 @@ beforeAll(async () => {
 /**
  * An in-process Web Worker: bridges the small `Worker` surface
  * `BrowserWorkerTransport` needs to a real {@link WorkerHost}, so `localEngine()`
- * boots end-to-end in node without a browser Worker. `spawned` counts how many
- * were created (boot laziness); `terminated` proves teardown; `received`
- * records the request kinds in host arrival order (boot-font ordering).
+ * boots end-to-end in node without a browser Worker. Like the real bootstrap,
+ * it is INIT-DRIVEN: nothing boots until the engine posts `{ kind: 'init' }`.
+ * `spawned` counts how many were created (boot laziness); `terminated` proves
+ * teardown; `received` records the request kinds in host arrival order
+ * (boot-font ordering).
  */
 class FakeWorker {
   static spawned = 0;
@@ -31,16 +33,24 @@ class FakeWorker {
   /** True once `ready` has been emitted — i.e. the handshake already fired. */
   ready = false;
   readonly received: WorkerRequest[] = [];
-  private readonly listeners = new Set<(e: MessageEvent) => void>();
+  /** The init message the engine posted, if any (the new worker protocol). */
+  init: {
+    kind: 'init';
+    wasmUrl?: string;
+    fallbackWasmUrl?: string;
+    wasmBinary?: ArrayBuffer;
+  } | null = null;
+  /** Listeners keyed by event type — watchWorkerReady also attaches `error`
+   *  and `messageerror`, which must never receive `message` events. */
+  private readonly listeners = new Map<string, Set<(e: MessageEvent) => void>>();
   private host: WorkerHost | null = null;
   private readonly queue: WorkerRequest[] = [];
 
   constructor() {
     FakeWorker.spawned += 1;
-    void this.init();
   }
 
-  private async init(): Promise<void> {
+  private async boot(): Promise<void> {
     const runtime = await createPdfRuntime({ prefer: 'wasm' });
     this.host = new WorkerHost(runtime, (pack: WirePack<WorkerResponse>) =>
       this.emit(pack.payload),
@@ -51,19 +61,27 @@ class FakeWorker {
   }
 
   private emit(data: unknown): void {
-    for (const fn of this.listeners) fn({ data } as MessageEvent);
+    for (const fn of this.listeners.get('message') ?? []) fn({ data } as MessageEvent);
   }
 
-  addEventListener(_type: 'message', fn: (e: MessageEvent) => void): void {
-    this.listeners.add(fn);
+  addEventListener(type: string, fn: (e: MessageEvent) => void): void {
+    let set = this.listeners.get(type);
+    if (!set) this.listeners.set(type, (set = new Set()));
+    set.add(fn);
   }
-  removeEventListener(_type: 'message', fn: (e: MessageEvent) => void): void {
-    this.listeners.delete(fn);
+  removeEventListener(type: string, fn: (e: MessageEvent) => void): void {
+    this.listeners.get(type)?.delete(fn);
   }
   postMessage(payload: unknown): void {
-    this.received.push(payload as WorkerRequest);
-    if (this.host) this.host.receive(payload as WorkerRequest);
-    else this.queue.push(payload as WorkerRequest);
+    const msg = payload as WorkerRequest | { kind: 'init' };
+    if (msg.kind === 'init') {
+      this.init = msg as FakeWorker['init'];
+      void this.boot();
+      return;
+    }
+    this.received.push(msg as WorkerRequest);
+    if (this.host) this.host.receive(msg as WorkerRequest);
+    else this.queue.push(msg as WorkerRequest);
   }
   terminate(): void {
     this.terminated = true;

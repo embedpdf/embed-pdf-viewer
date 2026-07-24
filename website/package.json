@@ -3,8 +3,8 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "dev": "pnpm run build:demos && next dev --port 3100",
-    "build": "pnpm run build:demos && next build",
+    "dev": "turbo run build:demos && next dev --port 3100",
+    "build": "next build",
     "start": "next start",
     "db:migrate": "node scripts/migrate-feedback.mjs",
     "db:migrate:build": "node scripts/migrate-feedback.mjs --if-configured",
@@ -17,6 +17,7 @@
     "@embedpdf/angular": "workspace:*",
     "@embedpdf/engine": "workspace:*",
     "@embedpdf/react": "workspace:*",
+    "@embedpdf/viewer-react": "workspace:*",
     "@hugeicons/core-free-icons": "^4.2.0",
     "@hugeicons/react": "^1.1.7",
     "@neondatabase/serverless": "^1.1.0",

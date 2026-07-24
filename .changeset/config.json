@@ -48,6 +48,8 @@
       "@embedpdf/plugin-stamp",
       "@embedpdf/plugin-view-manager",
       "@embedpdf/react",
+      "@embedpdf/viewer",
+      "@embedpdf/viewer-react",
       "@embedpdf/web"
     ]
   ],

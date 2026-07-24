@@ -2,6 +2,7 @@
 node_modules
 **/node_modules/
 **/dist
+packages/engine/main/workers/
 **/.turbo
 **/.angular/
 config/tsup.config.bundled*

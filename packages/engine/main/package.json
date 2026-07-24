@@ -13,17 +13,16 @@
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
     },
-    "./default-worker": {
-      "development": "./src/default-worker.ts",
-      "import": "./dist/default-worker.js",
-      "require": "./dist/default-worker.cjs"
-    },
     "./package.json": "./package.json",
-    "./worker-entry": "./src/worker/worker-entry.ts"
+    "./worker-entry": "./src/worker/worker-entry.ts",
+    "./worker-source": {
+      "types": "./workers/pdfium-worker.source.d.ts",
+      "default": "./workers/pdfium-worker.source.js"
+    }
   },
   "scripts": {
-    "build": "epdf-build",
-    "clean": "rimraf dist",
+    "build": "node scripts/build-workers.mjs && epdf-build",
+    "clean": "rimraf dist workers",
     "lint": "eslint src --color",
     "lint:fix": "eslint src --color --fix",
     "test": "vitest run",
@@ -31,6 +30,7 @@
   },
   "files": [
     "dist",
+    "workers",
     "src/worker/worker-entry.ts",
     "src/worker/bootstrap.ts",
     "src/worker/protocol.ts",
@@ -56,13 +56,15 @@
   "dependencies": {
     "@embedpdf/engine-core": "workspace:*",
     "@embedpdf/engine-services": "workspace:*",
-    "@embedpdf/engine-runtime": "workspace:*"
+    "@embedpdf/engine-runtime": "workspace:*",
+    "@embedpdf/engine-runtime-wasm32": "workspace:*"
   },
   "devDependencies": {
+    "@embedpdf/tooling-build": "workspace:*",
+    "esbuild": "^0.28.1",
     "rimraf": "^5.0.0",
     "typescript": "^5.0.0",
-    "vitest": "^2.1.0",
-    "@embedpdf/tooling-build": "workspace:*"
+    "vitest": "^2.1.0"
   },
   "publishConfig": {
     "access": "public",
@@ -71,24 +73,24 @@
         "import": "./dist/index.js",
         "require": "./dist/index.cjs"
       },
-      "./default-worker": {
-        "import": "./dist/default-worker.js",
-        "require": "./dist/default-worker.cjs"
-      },
       "./package.json": "./package.json",
-      "./worker-entry": "./src/worker/worker-entry.ts"
+      "./worker-entry": "./src/worker/worker-entry.ts",
+      "./worker-source": {
+        "types": "./workers/pdfium-worker.source.d.ts",
+        "default": "./workers/pdfium-worker.source.js"
+      }
     }
   },
   "epdf": {
     "rawExports": [
-      "./worker-entry"
+      "./worker-entry",
+      "./worker-source"
     ],
     "devExports": "development"
   },
   "sideEffects": [
     "./src/worker/worker-entry.ts",
-    "./src/default-worker.ts",
-    "./dist/default-worker.js",
-    "./dist/default-worker.cjs"
+    "./workers/pdfium-worker.js",
+    "./workers/encoder-worker.js"
   ]
 }

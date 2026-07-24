@@ -16,10 +16,16 @@
       },
       "default": "./lib/pdfium.browser.js"
     },
-    "./pdfium.wasm": "./lib/pdfium.wasm"
+    "./pdfium.wasm": "./lib/pdfium.wasm",
+    "./wasm-url": {
+      "types": "./wasm-url.d.ts",
+      "default": "./wasm-url.js"
+    }
   },
   "files": [
     "lib",
+    "wasm-url.js",
+    "wasm-url.d.ts",
     "README.md",
     "LICENSE"
   ]

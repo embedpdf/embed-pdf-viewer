@@ -1,34 +1,46 @@
 {
   "name": "@embedpdf/viewer",
   "version": "0.0.0",
-  "private": true,
+  "private": false,
   "description": "The full viewer, delivered: the <embedpdf-viewer> custom element + EmbedPDF.init(). One Preact-compiled artifact of @embedpdf/viewer-chrome with the local wasm engine wired in — the thing the CDN serves and every framework wrapper wraps. Ships DIST only (the preact aliasing happens in THIS package's build), so consumers never compile the chrome.",
   "type": "module",
-  "main": "./dist/embedpdf.js",
-  "module": "./dist/embedpdf.js",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./core": {
+      "types": "./dist/core.d.ts",
+      "default": "./dist/core.js"
+    },
+    "./snippet": {
+      "types": "./dist/snippet.d.ts",
       "default": "./dist/embedpdf.js"
     },
     "./package.json": "./package.json"
   },
   "files": [
-    "dist"
+    "dist",
+    "README.md",
+    "LICENSE"
   ],
   "scripts": {
     "dev": "vite",
-    "build": "vite build && tsc -p tsconfig.decl.json",
+    "build": "rimraf dist && vite build && vite build --mode snippet && tsc -p tsconfig.decl.json",
     "clean": "rimraf dist",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
     "@embedpdf/engine": "workspace:*",
+    "@embedpdf/engine-core": "workspace:*",
     "@embedpdf/viewer-chrome": "workspace:*",
     "preact": "^10.25.0"
   },
   "devDependencies": {
+    "@embedpdf/engine-runtime-wasm32": "workspace:*",
     "@tailwindcss/vite": "^4.1.18",
     "@types/node": "^22.0.0",
     "@types/react": "^18.3.0",
@@ -38,8 +50,15 @@
     "vite": "^6.0.0"
   },
   "license": "Apache-2.0",
+  "publishConfig": {
+    "access": "public"
+  },
   "sideEffects": [
     "./src/element.ts",
-    "./dist/*.js"
+    "./src/snippet.ts",
+    "./src/local-default.ts",
+    "./src/index.ts",
+    "./dist/*.js",
+    "./dist/**/*.js"
   ]
 }

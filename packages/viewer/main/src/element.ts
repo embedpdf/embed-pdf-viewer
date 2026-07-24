@@ -24,10 +24,10 @@ import {
   type Unsubscribe,
   type ViewerHandle,
 } from '@embedpdf/viewer-chrome';
-import { localEngine } from '@embedpdf/engine';
-import EngineWorker from '@embedpdf/engine/worker-entry?worker';
+import type { Engine, EngineFactory } from '@embedpdf/engine-core/runtime';
 import chromeCss from '@embedpdf/viewer-chrome/styles.css?inline';
 import { configFromAttributes, initialDocumentsOf, type ViewerConfig } from './config';
+import { getDefaultEngineProvider } from './runtime-defaults';
 
 const HOST_CSS = `:host{display:block;height:100%;}`;
 
@@ -68,6 +68,32 @@ function buildTokenSheet(tokens?: ThemeTokens, dark?: ThemeTokens): CSSStyleShee
   const sheet = new CSSStyleSheet();
   sheet.replaceSync(css);
   return sheet;
+}
+
+/**
+ * Resolve the config's `engine` field into what FullViewer takes.
+ *
+ * - a function → an EngineFactory, passed through (viewer-owned lifetime);
+ * - an object with `open` → a live Engine instance, passed through (borrowed);
+ * - anything else (engine OPTIONS or nothing) → the delivery's registered
+ *   default (see runtime-defaults.ts). The npm/snippet entries register the
+ *   built-in local engine; the `core` entry registers nothing, so an
+ *   engine-less config there is a configuration error, taught here.
+ */
+function engineOf(config: ViewerConfig): Engine | EngineFactory {
+  const option = config.engine;
+  if (typeof option === 'function') return option;
+  if (option && typeof (option as Engine).open === 'function') return option as Engine;
+
+  const provider = getDefaultEngineProvider();
+  if (!provider) {
+    throw new Error(
+      '[embedpdf] no engine: this build has no default engine. Pass one in the config ' +
+        "(`engine: () => yourEngine()`), or import '@embedpdf/viewer' (which bundles the " +
+        "local PDFium engine) instead of '@embedpdf/viewer/core'.",
+    );
+  }
+  return provider(option);
 }
 
 /**
@@ -179,7 +205,7 @@ export class EmbedPdfViewerElement extends HTMLElement {
 
     const config = this.config;
     warnInvalidConfig(config);
-    const { src: _src, documents: _documents, theme, ...customization } = config;
+    const { src: _src, documents: _documents, engine: _engine, theme, ...customization } = config;
 
     // Sheets are per-mount: a config re-set may change the theme tokens.
     const { tokens, dark } = themeConfigOf(theme);
@@ -189,9 +215,7 @@ export class EmbedPdfViewerElement extends HTMLElement {
     this.#root = createRoot(this.#wrapper!);
     this.#root.render(
       createElement(FullViewer, {
-        // The snippet's one bundled decision: the local wasm engine, its
-        // worker emitted by THIS package's build. Thunk = viewer-owned.
-        engine: () => localEngine({ worker: () => new EngineWorker() }),
+        engine: engineOf(config),
         initialDocuments: initialDocumentsOf(config),
         theme,
         themeTarget: this.#wrapper,
