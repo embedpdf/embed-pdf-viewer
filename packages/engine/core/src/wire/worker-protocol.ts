@@ -703,6 +703,23 @@ export interface CloseWorkerRequest {
   docId: string;
 }
 
+/**
+ * Close exactly ONE layer session, leaving the base document, sibling
+ * layer sessions, and the caller's doc↔worker binding intact. Idempotent:
+ * closing an absent session is a no-op ack.
+ *
+ * This is the reload seam for layer-session freshness (the server closes
+ * a stale layer session and re-opens it from the current durable
+ * artifact) — `close` is the whole-document teardown, this is the
+ * layer-scoped sibling.
+ */
+export interface LayerCloseWorkerRequest {
+  kind: 'layer.close';
+  jobId: WorkerJobId;
+  docId: string;
+  layerName: string;
+}
+
 export interface AbortWorkerRequest {
   kind: 'abort';
   jobId: WorkerJobId;
@@ -792,6 +809,7 @@ export type WorkerRequest =
   | FontsClearFallbacksWorkerRequest
   | FontsClearWorkerRequest
   | CloseWorkerRequest
+  | LayerCloseWorkerRequest
   | AbortWorkerRequest
   | ShutdownWorkerRequest;
 

@@ -239,21 +239,35 @@ export class LayerPagesRepo {
     });
   }
 
+  /**
+   * First materialization of a layer's page rows from the immutable base.
+   * MUST be concurrency-safe across replicas: two replicas whose first-ever
+   * writes race both observe "no rows yet" and both snapshot — the values
+   * are identical (derived from `document_pages`), so the loser's inserts
+   * are simply ignored. A delete-then-insert here turns that benign race
+   * into a unique violation that fails one replica's first write.
+   */
   async snapshotImmutableBaseForLayer(layerId: string, pages: DurablePageRow[]): Promise<void> {
-    await this.replaceForLayer(
-      layerId,
-      pages.map((page) => ({
-        pageObjectNumber: page.pageObjectNumber,
-        // `document_pages` describes the immutable base view, so these
-        // counters are the initial CDN/revision epoch. After snapshotting,
-        // only `layer_pages` advance.
-        contentVersion: page.contentVersion,
-        annotationVersion: page.annotationVersion,
-        annotationGeneration: page.annotationGeneration,
-        hasWeakAnnotations: page.hasWeakAnnotations,
-        updatedAt: page.updatedAt,
-      })),
-    );
+    if (pages.length === 0) return;
+    const now = Date.now();
+    await this.db
+      .insertInto('layer_pages')
+      .values(
+        pages.map((page) => ({
+          layer_id: layerId,
+          page_object_number: page.pageObjectNumber,
+          // `document_pages` describes the immutable base view, so these
+          // counters are the initial CDN/revision epoch. After snapshotting,
+          // only `layer_pages` advance.
+          content_version: page.contentVersion,
+          annotation_version: page.annotationVersion,
+          annotation_generation: page.annotationGeneration,
+          has_weak_annotations: page.hasWeakAnnotations ? 1 : 0,
+          updated_at: page.updatedAt ?? now,
+        })),
+      )
+      .onConflict((oc) => oc.columns(['layer_id', 'page_object_number']).doNothing())
+      .execute();
   }
 }
 

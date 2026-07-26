@@ -36,6 +36,31 @@ export const StorageKeys = {
   layerArtifact(tenantId: string, docId: string, layerName: string, version: number): string {
     return layerArtifactKey(tenantId, docId, layerName, version);
   },
+  /**
+   * Per-ATTEMPT layer artifact key: `v{version}-{attempt}.layer`.
+   *
+   * Mutations upload their artifact BEFORE the commit transaction decides
+   * whether they won the version CAS. Two replicas racing the same
+   * `nextVersion` must therefore never share a key — the loser's upload
+   * would overwrite the winner's committed bytes and the layer would fail
+   * its sha check on the next open. The attempt nonce makes every upload
+   * target unique; readers never reconstruct this key (they follow the
+   * `current_artifact_key` column), and the `v{version}-` prefix keeps
+   * per-layer listings/GC grammar intact.
+   */
+  layerArtifactAttempt(
+    tenantId: string,
+    docId: string,
+    layerName: string,
+    version: number,
+    attempt: string,
+  ): string {
+    if (!/^[a-z0-9]{1,32}$/.test(attempt)) {
+      throw new Error(`layerArtifactAttempt: bad attempt nonce "${attempt}"`);
+    }
+    const base = layerArtifactKey(tenantId, docId, layerName, version);
+    return `${base.slice(0, -'.layer'.length)}-${attempt}.layer`;
+  },
   /** @deprecated Use `layerArtifact()`. */
   layerPdf(tenantId: string, docId: string, layerName: string, version: number): string {
     return layerArtifactKey(tenantId, docId, layerName, version);

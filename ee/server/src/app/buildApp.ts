@@ -539,6 +539,7 @@ function mapToHttp(code: string): number {
     case EngineErrorCode.Forbidden:
       return 403;
     case EngineErrorCode.WeakAnnotationSessionConflict:
+    case EngineErrorCode.LayerVersionConflict:
       return 409;
     case EngineErrorCode.NotFound:
     case EngineErrorCode.DocNotOpen:

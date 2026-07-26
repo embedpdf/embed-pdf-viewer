@@ -96,13 +96,17 @@ describe('Phase 5 layer mutation pipeline', () => {
       .executeTakeFirstOrThrow();
     expect(layer.current_version).toBe(1);
     expect(layer.doc_version).toBe(2);
-    expect(layer.current_artifact_key).toBe(
+    expectAttemptKey(
+      layer.current_artifact_key,
       StorageKeys.layerArtifact(tenantId, docId, layerName, 1),
     );
-    expect(layer.current_artifact_size).toBe(4);
-
     const storage = new FsObjectStore({ root: fx.storageRoot });
     expect(await storage.exists(layer.current_artifact_key!)).toBe(true);
+    // The stub serializes session state into the artifact (the real
+    // engine's contract): one create -> an artifact holding one annotation.
+    const artifactBytes = await storage.get(layer.current_artifact_key!);
+    expect(layer.current_artifact_size).toBe(artifactBytes!.byteLength);
+    expect(parseStubArtifact(artifactBytes!)).toHaveLength(1);
 
     const auditRows = await fx.db
       .selectFrom('audit_log')
@@ -122,7 +126,7 @@ describe('Phase 5 layer mutation pipeline', () => {
       artifact_version: 1,
       artifact_key: layer.current_artifact_key,
       artifact_sha: layer.current_artifact_sha,
-      artifact_size: 4,
+      artifact_size: layer.current_artifact_size,
     });
 
     const day = new Date(Number(auditRows[0]!.ts)).toISOString().slice(0, 10);
@@ -167,7 +171,7 @@ describe('Phase 5 layer mutation pipeline', () => {
       artifactVersion: 1,
       artifactKey: layer.current_artifact_key,
       artifactSha: layer.current_artifact_sha,
-      artifactSize: 4,
+      artifactSize: layer.current_artifact_size,
     });
 
     const pages = await fx.db
@@ -246,7 +250,8 @@ describe('Phase 5 layer mutation pipeline', () => {
       .executeTakeFirstOrThrow();
     expect(layer.current_version).toBe(2);
     expect(layer.doc_version).toBe(3);
-    expect(layer.current_artifact_key).toBe(
+    expectAttemptKey(
+      layer.current_artifact_key,
       StorageKeys.layerArtifact(tenantId, docId, layerName, 2),
     );
 
@@ -545,7 +550,8 @@ describe('Phase 5 layer mutation pipeline', () => {
     expect(layer.current_version).toBe(1);
     expect(layer.doc_version).toBe(2);
     expect(Number(layer.layout_version)).toBe(2);
-    expect(layer.current_artifact_key).toBe(
+    expectAttemptKey(
+      layer.current_artifact_key,
       StorageKeys.layerArtifact(tenantId, docId, layerName, 1),
     );
 
@@ -1087,6 +1093,28 @@ function tinyPng(): Uint8Array {
     offset += p.length;
   }
   return png;
+}
+
+/**
+ * Assert an artifact key is a per-ATTEMPT variant of the expected
+ * versioned key: `v{version}-{nonce}.layer` (see LayerService.nextArtifactKey
+ * — racing replicas must never share an upload target).
+ */
+function expectAttemptKey(actual: string | null, versionedKey: string): void {
+  const prefix = versionedKey.slice(0, -'.layer'.length);
+  expect(actual).toMatch(
+    new RegExp(`^${prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}-[a-z0-9]{8}\\.layer$`),
+  );
+}
+
+/** Parse the stub worker's v2 layer artifact ([0x4c, 0x02, ...JSON]). */
+function parseStubArtifact(bytes: Uint8Array): Array<Record<string, unknown>> {
+  const buf = Buffer.from(bytes);
+  if (buf.byteLength < 2 || buf[0] !== 0x4c || buf[1] !== 0x02) return [];
+  const parsed = JSON.parse(buf.subarray(2).toString('utf8')) as {
+    annots: Array<Record<string, unknown>>;
+  };
+  return parsed.annots;
 }
 
 function highlightDraft(): unknown {

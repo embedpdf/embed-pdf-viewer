@@ -32,6 +32,14 @@ export const EngineErrorCode = {
    */
   WeakAnnotationSessionConflict: 'WeakAnnotationSessionConflict',
   /**
+   * A layer write lost its optimistic-concurrency check: the layer's
+   * durable version advanced (another writer — typically another server
+   * replica — committed) between the operation's prepare and its commit,
+   * and the server exhausted its rebase-and-retry budget. Retryable: the
+   * operation was NOT applied; re-issue it against the new state.
+   */
+  LayerVersionConflict: 'LayerVersionConflict',
+  /**
    * The requested operation is typed but not yet wired in this engine
    * version. The wire shape stays valid; clients can detect this with
    * `EngineError.is(err, EngineErrorCode.NotImplemented)` and degrade

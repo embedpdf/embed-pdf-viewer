@@ -76,6 +76,23 @@ import type { ObjectStore } from '../storage/ObjectStore';
 
 type LayerArtifactInput = { bytes: ArrayBuffer; size: number } | { path: string };
 
+/**
+ * The commit-time version CAS lost: `layers.current_version` moved between
+ * this op's prepare (which aligned the worker session to the row it read)
+ * and its commit transaction. Under the per-process write queue that can
+ * only mean a REMOTE replica committed in the window — the signal for
+ * {@link LayerService.runWithRebase} to reload the session from the new
+ * durable head and re-apply. A distinct class and a distinct code — never
+ * a bare `Aborted` — so neither the rebase path nor a client SDK can
+ * confuse a fence loss with a caller-initiated cancellation: it surfaces
+ * as HTTP 409 (retryable), not 499.
+ */
+export class LayerFenceConflict extends EngineError {
+  constructor(message: string) {
+    super(EngineErrorCode.LayerVersionConflict, message);
+  }
+}
+
 /** The durable state an annotation commit produced inside its transaction —
  *  the input `finalizePayload` turns into the wire result. */
 interface CommittedAnnotationMutation {
@@ -155,6 +172,15 @@ export class LayerService {
   private readonly storage?: ObjectStore;
   private readonly realtime?: RealtimeBus;
   private readonly layerWriteQueues = new Map<string, Promise<unknown>>();
+  /**
+   * Attempt artifact keys uploaded by the CURRENT write op that no commit
+   * has claimed yet (layerWriteKey → keys). Registered by
+   * {@link nextArtifactKey}, claimed by {@link finishLayerCommit}, and
+   * whatever remains is deleted by the write wrapper's cleanup — a lost
+   * CAS or a failed commit must not leak its upload into the object store
+   * forever.
+   */
+  private readonly pendingAttemptKeys = new Map<string, Set<string>>();
 
   constructor(opts: LayerServiceOptions) {
     this.db = opts.db;
@@ -1292,7 +1318,7 @@ export class LayerService {
     },
   ): Promise<TResult> {
     const nextVersion = layer.currentVersion + 1;
-    const artifactKey = StorageKeys.layerArtifact(ctx.tenantId, docId, layerName, nextVersion);
+    const artifactKey = this.nextArtifactKey(ctx, docId, layerName, nextVersion);
     const uploaded = await this.uploadLayerArtifact(artifactKey, input.artifact);
     const committed = await this.commitFormMutation({
       ctx,
@@ -1308,7 +1334,7 @@ export class LayerService {
       finalizePayload: (durable) =>
         this.finalizeFormResult(docId, layerName, input.result, durable),
     });
-    this.publishMutation(ctx, docId, committed.auditId);
+    this.finishLayerCommit(ctx, docId, layerName, nextVersion, artifactKey, committed.auditId);
     // The response IS the audited payload — one fact for caller and history.
     return committed.payload as TResult;
   }
@@ -1367,7 +1393,7 @@ export class LayerService {
       .transaction()
       .execute(async (trx) => {
         const now = Date.now();
-        const currentLayer = await this.requireUnchangedLayer(trx, input.layer);
+        const currentLayer = await this.readLayerForCommit(trx, input.layer);
 
         const nextPages: DurablePageRow[] = [];
         for (const impact of input.impacts) {
@@ -1457,7 +1483,19 @@ export class LayerService {
     const documentService = this.requireDocumentService();
     await documentService.getLayerManifest(ctx, docId, layerName);
     const materialized = await this.materializeLayerForWrite(ctx, docId, layerName);
-    await documentService.ensureLayerOnPool(ctx, docId, layerName);
+    // THE FENCE ALIGNMENT: the worker session must embody exactly the layer
+    // row we just read before it may apply this mutation. A session left
+    // behind by an earlier open is a stale materialization whenever another
+    // replica advanced the layer — applying onto it and saving would emit
+    // an artifact that silently drops the remote writes. After alignment,
+    // the commit-time version CAS is a true fence: it can only fail on a
+    // remote commit inside the prepare→commit window (→ rebase & retry).
+    await documentService.ensureLayerFreshOnPool(
+      ctx,
+      docId,
+      layerName,
+      materialized.layer.currentVersion,
+    );
     return materialized;
   }
 
@@ -1479,7 +1517,7 @@ export class LayerService {
     },
   ): Promise<TResult> {
     const nextVersion = layer.currentVersion + 1;
-    const artifactKey = StorageKeys.layerArtifact(ctx.tenantId, docId, layerName, nextVersion);
+    const artifactKey = this.nextArtifactKey(ctx, docId, layerName, nextVersion);
     const uploaded = await this.uploadLayerArtifact(artifactKey, input.artifact);
     const committed = await this.commitAnnotationMutation({
       ctx,
@@ -1498,7 +1536,7 @@ export class LayerService {
       finalizePayload: (durable) =>
         this.finalizeAnnotationResult(docId, layerName, input.result, durable),
     });
-    this.publishMutation(ctx, docId, committed.auditId);
+    this.finishLayerCommit(ctx, docId, layerName, nextVersion, artifactKey, committed.auditId);
     // The response IS the audited payload — one fact for caller and history.
     return committed.payload as TResult;
   }
@@ -1551,7 +1589,7 @@ export class LayerService {
     },
   ): Promise<PageMoveResult> {
     const nextVersion = layer.currentVersion + 1;
-    const artifactKey = StorageKeys.layerArtifact(ctx.tenantId, docId, layerName, nextVersion);
+    const artifactKey = this.nextArtifactKey(ctx, docId, layerName, nextVersion);
     const uploaded = await this.uploadLayerArtifact(artifactKey, input.artifact);
     // The commit assembles, audits, and returns the finalized result (the
     // worker's layout + the coherence pins it just computed) — the response
@@ -1570,7 +1608,7 @@ export class LayerService {
       artifactSize: uploaded.size,
       nextVersion,
     });
-    this.publishMutation(ctx, docId, committed.auditId);
+    this.finishLayerCommit(ctx, docId, layerName, nextVersion, artifactKey, committed.auditId);
     return committed.result;
   }
 
@@ -1592,7 +1630,7 @@ export class LayerService {
     },
   ): Promise<PageRotateResult> {
     const nextVersion = layer.currentVersion + 1;
-    const artifactKey = StorageKeys.layerArtifact(ctx.tenantId, docId, layerName, nextVersion);
+    const artifactKey = this.nextArtifactKey(ctx, docId, layerName, nextVersion);
     const uploaded = await this.uploadLayerArtifact(artifactKey, input.artifact);
     const committed = await this.commitPageStructure({
       ctx,
@@ -1607,7 +1645,7 @@ export class LayerService {
       artifactSize: uploaded.size,
       nextVersion,
     });
-    this.publishMutation(ctx, docId, committed.auditId);
+    this.finishLayerCommit(ctx, docId, layerName, nextVersion, artifactKey, committed.auditId);
     return committed.result;
   }
 
@@ -1622,7 +1660,7 @@ export class LayerService {
     },
   ): Promise<PageFlattenResult> {
     const nextVersion = layer.currentVersion + 1;
-    const artifactKey = StorageKeys.layerArtifact(ctx.tenantId, docId, layerName, nextVersion);
+    const artifactKey = this.nextArtifactKey(ctx, docId, layerName, nextVersion);
     const uploaded = await this.uploadLayerArtifact(artifactKey, input.artifact);
     const committed = await this.commitPageFlatten({
       ctx,
@@ -1635,7 +1673,7 @@ export class LayerService {
       artifactSize: uploaded.size,
       nextVersion,
     });
-    this.publishMutation(ctx, docId, committed.auditId);
+    this.finishLayerCommit(ctx, docId, layerName, nextVersion, artifactKey, committed.auditId);
     return committed.result;
   }
 
@@ -1650,7 +1688,7 @@ export class LayerService {
     },
   ): Promise<RedactionApplyResult> {
     const nextVersion = layer.currentVersion + 1;
-    const artifactKey = StorageKeys.layerArtifact(ctx.tenantId, docId, layerName, nextVersion);
+    const artifactKey = this.nextArtifactKey(ctx, docId, layerName, nextVersion);
     const uploaded = await this.uploadLayerArtifact(artifactKey, input.artifact);
     const committed = await this.commitRedactionApply({
       ctx,
@@ -1663,7 +1701,7 @@ export class LayerService {
       artifactSize: uploaded.size,
       nextVersion,
     });
-    this.publishMutation(ctx, docId, committed.auditId);
+    this.finishLayerCommit(ctx, docId, layerName, nextVersion, artifactKey, committed.auditId);
     return committed.result;
   }
 
@@ -1679,7 +1717,7 @@ export class LayerService {
     },
   ): Promise<PageDeleteResult> {
     const nextVersion = layer.currentVersion + 1;
-    const artifactKey = StorageKeys.layerArtifact(ctx.tenantId, docId, layerName, nextVersion);
+    const artifactKey = this.nextArtifactKey(ctx, docId, layerName, nextVersion);
     const uploaded = await this.uploadLayerArtifact(artifactKey, input.artifact);
     const committed = await this.commitPageDelete({
       ctx,
@@ -1693,7 +1731,7 @@ export class LayerService {
       artifactSize: uploaded.size,
       nextVersion,
     });
-    this.publishMutation(ctx, docId, committed.auditId);
+    this.finishLayerCommit(ctx, docId, layerName, nextVersion, artifactKey, committed.auditId);
     return committed.result;
   }
 
@@ -1708,7 +1746,7 @@ export class LayerService {
     },
   ): Promise<MetadataUpdateResult> {
     const nextVersion = layer.currentVersion + 1;
-    const artifactKey = StorageKeys.layerArtifact(ctx.tenantId, docId, layerName, nextVersion);
+    const artifactKey = this.nextArtifactKey(ctx, docId, layerName, nextVersion);
     const uploaded = await this.uploadLayerArtifact(artifactKey, input.artifact);
     // The commit assembles, audits, and returns the finalized result (the
     // worker's re-read metadata + the coherence pins it just computed) — the
@@ -1724,7 +1762,7 @@ export class LayerService {
       artifactSize: uploaded.size,
       nextVersion,
     });
-    this.publishMutation(ctx, docId, committed.auditId);
+    this.finishLayerCommit(ctx, docId, layerName, nextVersion, artifactKey, committed.auditId);
     return committed.result;
   }
 
@@ -1891,6 +1929,10 @@ export class LayerService {
       .transaction()
       .execute(async (trx) => {
         const now = Date.now();
+        // Plain read — values feed the next-version computation. The FENCE
+        // is not here: it is the guarded UPDATE below, the only check that
+        // is atomic with the write (a SELECT takes no lock; two overlapping
+        // transactions can both pass a read-then-check).
         const currentLayer = await trx
           .selectFrom('layers')
           .select(['current_version', 'doc_version'])
@@ -1898,12 +1940,6 @@ export class LayerService {
           .executeTakeFirst();
         if (!currentLayer) {
           throw new EngineError(EngineErrorCode.NotFound, `layer not found: ${input.layer.id}`);
-        }
-        if (Number(currentLayer.current_version) !== input.layer.currentVersion) {
-          throw new EngineError(
-            EngineErrorCode.Aborted,
-            `layer version changed while saving artifact for ${input.layer.id}`,
-          );
         }
 
         const page = await trx
@@ -1964,19 +2000,15 @@ export class LayerService {
         });
         const auditId = (await this.eventLog?.appendDb(trx, auditEvent)) ?? 0;
 
-        await trx
-          .updateTable('layers')
-          .set({
-            doc_version: layerDocVersion,
-            current_version: input.nextVersion,
-            current_artifact_key: input.artifactKey,
-            current_artifact_sha: input.artifactSha,
-            current_artifact_size: input.artifactSize,
-            ...(auditId > 0 ? { last_audit_id: auditId } : {}),
-            updated_at: now,
-          })
-          .where('id', '=', input.layer.id)
-          .execute();
+        await this.guardedVersionBump(trx, input.layer, {
+          doc_version: layerDocVersion,
+          current_version: input.nextVersion,
+          current_artifact_key: input.artifactKey,
+          current_artifact_sha: input.artifactSha,
+          current_artifact_size: input.artifactSize,
+          ...(auditId > 0 ? { last_audit_id: auditId } : {}),
+          updated_at: now,
+        });
 
         await trx
           .updateTable('layer_pages')
@@ -2023,7 +2055,7 @@ export class LayerService {
       .transaction()
       .execute(async (trx) => {
         const now = Date.now();
-        const currentLayer = await this.requireUnchangedLayer(trx, input.layer);
+        const currentLayer = await this.readLayerForCommit(trx, input.layer);
 
         // The worker's layout IS the new order; validate its page set against
         // the durable rows before trusting it.
@@ -2116,7 +2148,7 @@ export class LayerService {
       .transaction()
       .execute(async (trx) => {
         const now = Date.now();
-        const currentLayer = await this.requireUnchangedLayer(trx, input.layer);
+        const currentLayer = await this.readLayerForCommit(trx, input.layer);
 
         const rows = await trx
           .selectFrom('layer_pages')
@@ -2237,7 +2269,7 @@ export class LayerService {
       .transaction()
       .execute(async (trx) => {
         const now = Date.now();
-        const currentLayer = await this.requireUnchangedLayer(trx, input.layer);
+        const currentLayer = await this.readLayerForCommit(trx, input.layer);
         const weakStateByPage = new Map(
           input.raw.meta.affectedPages.map((page) => [
             page.pageObjectNumber,
@@ -2361,7 +2393,7 @@ export class LayerService {
       .transaction()
       .execute(async (trx) => {
         const now = Date.now();
-        const currentLayer = await this.requireUnchangedLayer(trx, input.layer);
+        const currentLayer = await this.readLayerForCommit(trx, input.layer);
         const weakStateByPage = new Map(
           input.raw.meta.affectedPages.map((page) => [
             page.pageObjectNumber,
@@ -2465,10 +2497,12 @@ export class LayerService {
   /** Re-read the layer inside the commit transaction and reject if another
    *  write advanced it since `prepareLayerMutation` (the optimistic check
    *  every structure commit shares). */
-  private async requireUnchangedLayer(
+  private async readLayerForCommit(
     trx: Transaction<Schema>,
     layer: LayerRow,
   ): Promise<{ doc_version: number | bigint; layout_version: number | bigint }> {
+    // Plain read — values feed the next-version computation. The FENCE is
+    // the guarded UPDATE (see guardedVersionBump), never a SELECT check.
     const currentLayer = await trx
       .selectFrom('layers')
       .select(['current_version', 'doc_version', 'layout_version'])
@@ -2477,13 +2511,44 @@ export class LayerService {
     if (!currentLayer) {
       throw new EngineError(EngineErrorCode.NotFound, `layer not found: ${layer.id}`);
     }
-    if (Number(currentLayer.current_version) !== layer.currentVersion) {
-      throw new EngineError(
-        EngineErrorCode.Aborted,
-        `layer version changed while saving artifact for ${layer.id}`,
+    return currentLayer;
+  }
+
+  /**
+   * THE commit-time fence: advance the layer row if and only if
+   * `current_version` is still exactly what this operation prepared
+   * against — one conditional UPDATE, atomic on every engine.
+   *
+   * Why this is the only sound shape: a SELECT-then-check takes no lock,
+   * so on Postgres (READ COMMITTED) two overlapping transactions can both
+   * pass the check at version N; the second UPDATE then blocks on the
+   * first's row lock and — with only `id` in the predicate — re-evaluates
+   * against the NEW row and applies anyway, silently overwriting the
+   * winner's artifact pointer. Putting the expected version IN the UPDATE
+   * predicate makes that re-evaluation itself the fence: the loser matches
+   * zero rows and surfaces a {@link LayerFenceConflict} (→ rebase).
+   *
+   * `current_version` is the layer's write-serial — every commit path
+   * advances it through this method — so a successful guarded bump also
+   * certifies every earlier read in this transaction: had any competing
+   * commit landed since those reads, the predicate could not have matched.
+   */
+  private async guardedVersionBump(
+    trx: Transaction<Schema>,
+    layer: Pick<LayerRow, 'id' | 'currentVersion'>,
+    set: Record<string, number | string | bigint | null>,
+  ): Promise<void> {
+    const result = await trx
+      .updateTable('layers')
+      .set(set)
+      .where('id', '=', layer.id)
+      .where('current_version', '=', layer.currentVersion)
+      .executeTakeFirst();
+    if (Number(result?.numUpdatedRows ?? 0) !== 1) {
+      throw new LayerFenceConflict(
+        `layer version moved while committing ${layer.id} (prepared=${layer.currentVersion})`,
       );
     }
-    return currentLayer;
   }
 
   /** Advance the layer row: version pointers, artifact epoch, and the
@@ -2507,19 +2572,15 @@ export class LayerService {
     lastAuditId: number,
     now: number,
   ): Promise<void> {
-    await trx
-      .updateTable('layers')
-      .set({
-        ...versions,
-        current_version: input.nextVersion,
-        current_artifact_key: input.artifactKey,
-        current_artifact_sha: input.artifactSha,
-        current_artifact_size: input.artifactSize,
-        ...(lastAuditId > 0 ? { last_audit_id: lastAuditId } : {}),
-        updated_at: now,
-      })
-      .where('id', '=', input.layer.id)
-      .execute();
+    await this.guardedVersionBump(trx, input.layer, {
+      ...versions,
+      current_version: input.nextVersion,
+      current_artifact_key: input.artifactKey,
+      current_artifact_sha: input.artifactSha,
+      current_artifact_size: input.artifactSize,
+      ...(lastAuditId > 0 ? { last_audit_id: lastAuditId } : {}),
+      updated_at: now,
+    });
   }
 
   /** Ring the cross-replica doorbell — strictly AFTER the commit resolved,
@@ -2529,6 +2590,58 @@ export class LayerService {
     void this.realtime
       .publishMutation({ tenantId: ctx.tenantId, docId }, auditId)
       .catch(() => undefined);
+  }
+
+  /**
+   * Post-commit bookkeeping shared by every layer write: advance the
+   * worker session's fence entry to the version the commit just won (the
+   * worker applied the mutation, so its in-memory state IS `nextVersion`),
+   * then ring the realtime doorbell. Ordering matters — advance first, so
+   * a subscriber reacting to the doorbell can never observe a session
+   * whose fence entry is behind its own state.
+   */
+  private finishLayerCommit(
+    ctx: LayerWriteContext,
+    docId: string,
+    layerName: string,
+    nextVersion: number,
+    artifactKey: string,
+    auditId: number,
+  ): void {
+    // The commit won: its artifact is now referenced by the layer row —
+    // claim it so the write wrapper's attempt cleanup leaves it alone.
+    this.pendingAttemptKeys.get(layerWriteKey(ctx, docId, layerName))?.delete(artifactKey);
+    this.requireDocumentService().advanceLayerSession(docId, layerName, nextVersion);
+    this.publishMutation(ctx, docId, auditId);
+  }
+
+  /**
+   * Per-ATTEMPT upload key for the artifact a mutation is about to save.
+   * Never a bare version key: uploads happen BEFORE the commit CAS, and
+   * two replicas racing the same `nextVersion` must not share an upload
+   * target — the loser would overwrite the winner's committed bytes and
+   * the layer would fail its sha check on the next open. Readers follow
+   * `layers.current_artifact_key`, so the nonce is invisible to them.
+   */
+  private nextArtifactKey(
+    ctx: LayerWriteContext,
+    docId: string,
+    layerName: string,
+    nextVersion: number,
+  ): string {
+    const attempt = randomUUID().replace(/-/g, '').slice(0, 8);
+    const key = StorageKeys.layerArtifactAttempt(
+      ctx.tenantId,
+      docId,
+      layerName,
+      nextVersion,
+      attempt,
+    );
+    const writeKey = layerWriteKey(ctx, docId, layerName);
+    const pending = this.pendingAttemptKeys.get(writeKey) ?? new Set<string>();
+    pending.add(key);
+    this.pendingAttemptKeys.set(writeKey, pending);
+    return key;
   }
 
   private async commitMetadataUpdate(input: {
@@ -2555,12 +2668,8 @@ export class LayerService {
         if (!currentLayer) {
           throw new EngineError(EngineErrorCode.NotFound, `layer not found: ${input.layer.id}`);
         }
-        if (Number(currentLayer.current_version) !== input.layer.currentVersion) {
-          throw new EngineError(
-            EngineErrorCode.Aborted,
-            `layer version changed while saving artifact for ${input.layer.id}`,
-          );
-        }
+        // No SELECT-check here — the fence is writeLayerAdvance's guarded
+        // UPDATE (atomic with the write; see guardedVersionBump).
 
         // A metadata write touches only the document Info dict — no page set,
         // no per-page versions, no display order. So `layer_pages` rows are
@@ -2626,7 +2735,7 @@ export class LayerService {
     },
   ): Promise<R> {
     const nextVersion = layer.currentVersion + 1;
-    const artifactKey = StorageKeys.layerArtifact(ctx.tenantId, docId, layerName, nextVersion);
+    const artifactKey = this.nextArtifactKey(ctx, docId, layerName, nextVersion);
     const uploaded = await this.uploadLayerArtifact(artifactKey, input.artifact);
     const committed = await this.requireDb()
       .transaction()
@@ -2640,12 +2749,8 @@ export class LayerService {
         if (!currentLayer) {
           throw new EngineError(EngineErrorCode.NotFound, `layer not found: ${layer.id}`);
         }
-        if (Number(currentLayer.current_version) !== layer.currentVersion) {
-          throw new EngineError(
-            EngineErrorCode.Aborted,
-            `layer version changed while saving artifact for ${layer.id}`,
-          );
-        }
+        // No SELECT-check here — the fence is writeLayerAdvance's guarded
+        // UPDATE (atomic with the write; see guardedVersionBump).
 
         // Attachment writes touch only the catalog's name tree — no page
         // rows, no per-page versions. Advance the layer doc version plus
@@ -2694,7 +2799,7 @@ export class LayerService {
 
         return { result, auditId };
       });
-    this.publishMutation(ctx, docId, committed.auditId);
+    this.finishLayerCommit(ctx, docId, layerName, nextVersion, artifactKey, committed.auditId);
     return committed.result;
   }
 
@@ -2704,9 +2809,11 @@ export class LayerService {
     layerName: string,
     op: () => Promise<T>,
   ): Promise<T> {
-    const key = `${ctx.tenantId}::${docId}::${layerName}`;
+    const key = layerWriteKey(ctx, docId, layerName);
     const previous = this.layerWriteQueues.get(key) ?? Promise.resolve();
-    const operation = previous.catch(() => undefined).then(op);
+    const operation = previous
+      .catch(() => undefined)
+      .then(() => this.runWithRebase(ctx, docId, layerName, op));
 
     const queueEntry = operation
       .catch(() => undefined)
@@ -2718,6 +2825,76 @@ export class LayerService {
 
     this.layerWriteQueues.set(key, queueEntry);
     return operation;
+  }
+
+  /**
+   * Rebase-and-retry around one queued layer write. A {@link
+   * LayerFenceConflict} means a REMOTE replica committed between this op's
+   * prepare and commit — the local worker session now holds dirty state
+   * derived from a superseded version, and the op's own artifact lost the
+   * CAS. Recovery is mechanical because wire ops are semantic: drop the
+   * stale session (invalidate → the re-run's prepare reloads from the new
+   * durable head), re-apply, re-commit. One retry: two consecutive fence
+   * losses under the per-process queue means pathological external write
+   * pressure — surface the conflict to the client (it is retryable).
+   *
+   * Two guarantees beyond the retry itself:
+   *
+   * - **No ghost writes.** ANY escaping failure invalidates the session:
+   *   the worker may have applied a mutation whose commit never landed,
+   *   and a later successful write would otherwise serialize that ghost
+   *   into its artifact. Invalidation is cheap (one reload on next touch)
+   *   and unconditional — cheaper than proving which failures are safe.
+   * - **A visible dirty window.** The whole op runs under the document
+   *   service's write marker, so reads park instead of serving
+   *   uncommitted worker state as a clean materialization.
+   */
+  private async runWithRebase<T>(
+    ctx: LayerWriteContext,
+    docId: string,
+    layerName: string,
+    op: () => Promise<T>,
+  ): Promise<T> {
+    const documentService = this.requireDocumentService();
+    const settle = documentService.beginLayerWrite(docId, layerName);
+    try {
+      try {
+        return await op();
+      } catch (err) {
+        if (!(err instanceof LayerFenceConflict)) throw err;
+        documentService.invalidateLayerSession(docId, layerName);
+        return await op();
+      }
+    } catch (err) {
+      documentService.invalidateLayerSession(docId, layerName);
+      throw err;
+    } finally {
+      settle();
+      // Attempt-artifact hygiene: any upload whose commit did not win is
+      // unreachable garbage (unique per-attempt keys). Best-effort, awaited
+      // so a caller observing the response never sees the orphan; crash
+      // windows are the orphan sweeper's job (SCALE-OUT.md).
+      await this.cleanupPendingAttempts(ctx, docId, layerName);
+    }
+  }
+
+  /** Delete every registered attempt key that no commit claimed. */
+  private async cleanupPendingAttempts(
+    ctx: LayerWriteContext,
+    docId: string,
+    layerName: string,
+  ): Promise<void> {
+    const pending = this.pendingAttemptKeys.get(layerWriteKey(ctx, docId, layerName));
+    if (!pending || pending.size === 0) return;
+    const keys = [...pending];
+    pending.clear();
+    await Promise.all(
+      keys.map((key) =>
+        this.requireStorage()
+          .delete(key)
+          .catch(() => undefined),
+      ),
+    );
   }
 
   private requireDb(): Kysely<Schema> {
@@ -2835,6 +3012,11 @@ function widgetImpacts(
 }
 
 /** Conservative impact for document-wide form ops (import, repair). */
+/** One key grammar for everything scoped to a layer's write pipeline. */
+function layerWriteKey(ctx: LayerWriteContext, docId: string, layerName: string): string {
+  return `${ctx.tenantId}::${docId}::${layerName}`;
+}
+
 function allPageImpacts(materialized: MaterializedLayer): FormPageImpact[] {
   return materialized.pages.map((page) => ({
     pageObjectNumber: page.pageObjectNumber,

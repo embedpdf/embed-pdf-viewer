@@ -188,8 +188,27 @@ export class DocumentService {
   private readonly opens = new Map<string, Promise<DocumentHead>>();
   private readonly baseHandles = new Map<string, LocalFileHandle>();
   private readonly layerArtifactHandles = new Map<string, LocalFileHandle>();
-  private readonly openedLayerSessions = new Set<string>();
+  /**
+   * The layer-session FENCE: sessionKey → the `layers.current_version` the
+   * worker materialization embodies (0 = opened fresh, before any row).
+   *
+   * A worker layer session is a write-through cache of the durable layer
+   * artifact. This map is what makes that cache honest: a session may only
+   * serve a mutation when its entry equals the row's `current_version` —
+   * otherwise it is a stale materialization from another replica's past
+   * and must reload (close + reopen from the current artifact) first.
+   * Absent entry = no live session (never opened, invalidated, or evicted).
+   */
+  private readonly layerSessionVersions = new Map<string, number>();
   private readonly layerOpens = new Map<string, Promise<void>>();
+  /**
+   * One marker per layer while a write op is in flight (worker mutation
+   * dispatched, durable commit pending). During that window the worker
+   * session holds UNCOMMITTED state — reads must not treat it as a clean
+   * materialization of the current version. Never rejects; settles when
+   * the write finishes either way.
+   */
+  private readonly layerWritesInFlight = new Map<string, Promise<void>>();
 
   constructor(opts: DocumentServiceOptions) {
     this.documents = opts.documents;
@@ -476,27 +495,159 @@ export class DocumentService {
     return result.snapshot;
   }
 
+  /**
+   * Ensure a FRESH layer session before dispatching worker ops — the READ
+   * path door. Freshness is judged per request against the layer row (one
+   * PK SELECT — noise next to any PDF op): a session left behind at an
+   * older version is a stale materialization from this replica's past and
+   * reloads before it may serve. This request-time check is what keeps
+   * multi-replica reads truthful without any bus coordination — the
+   * client's manifest is DB-fresh, so the worker must be too, or a stale
+   * replica would serve wrong bytes under a current, immutable,
+   * CDN-cacheable version pin.
+   *
+   * (The write path calls {@link ensureLayerFreshOnPool} directly with the
+   * row it ALREADY read — alignment must target the exact row the commit
+   * CAS will compare against, never a second read.)
+   */
   async ensureLayerOnPool(
     ctx: OpenContext,
     docId: string,
     layerName: string,
     password: string | null = null,
   ): Promise<void> {
-    const key = `${docId}::${layerName}`;
+    // Park behind any in-flight write FIRST: its uncommitted worker state
+    // must never be served as a clean materialization, and the layer row
+    // must be read AFTER the write settles or the freshness compare would
+    // force a pointless reload on every awaited commit.
+    await this.awaitLayerWriteSettled(layerSessionKey(docId, layerName));
+    const layer = await this.layerState.repos.layers.findByDocAndName(docId, layerName);
+    await this.ensureLayerFreshOnPool(ctx, docId, layerName, layer?.currentVersion ?? 0, password);
+  }
+
+  /**
+   * Version-fenced sibling of {@link ensureLayerOnPool} — the WRITE-path
+   * door. `currentVersion` is the `layers.current_version` the caller just
+   * read from durable truth. If the live session's materialized version
+   * differs, the session is a stale replica-local cache (another replica
+   * advanced the layer) and is reloaded — close + reopen from the current
+   * artifact — BEFORE the caller may dispatch worker mutations. This
+   * alignment is what makes the commit-time version CAS a real fence: after
+   * it, the only way the CAS can fail is a remote commit inside the
+   * prepare→commit window.
+   */
+  async ensureLayerFreshOnPool(
+    ctx: OpenContext,
+    docId: string,
+    layerName: string,
+    currentVersion: number,
+    password: string | null = null,
+  ): Promise<void> {
+    const key = layerSessionKey(docId, layerName);
     if (!password) await this.assertPasswordSession(ctx, docId, layerName);
-    if (this.openedLayerSessions.has(key)) return;
+    // Let any in-flight open/reload settle before judging freshness.
+    const existing = this.layerOpens.get(key);
+    if (existing) await existing.catch(() => undefined);
+    if (this.layerSessionVersions.get(key) === currentVersion) return;
+    await this.reloadLayerOnPool(ctx, docId, layerName, password);
+  }
+
+  /** Mark a layer session stale: the next fresh-ensure reloads it. */
+  invalidateLayerSession(docId: string, layerName: string): void {
+    this.layerSessionVersions.delete(layerSessionKey(docId, layerName));
+  }
+
+  /**
+   * Mark a layer write in flight. The write pipeline calls this around the
+   * WHOLE mutation op (worker apply → upload → commit); reads use the
+   * marker to park until the dirty window closes. Returns the settle
+   * function; idempotent and never throws.
+   */
+  beginLayerWrite(docId: string, layerName: string): () => void {
+    const key = layerSessionKey(docId, layerName);
+    let settle!: () => void;
+    const marker = new Promise<void>((resolve) => (settle = resolve));
+    this.layerWritesInFlight.set(key, marker);
+    return () => {
+      if (this.layerWritesInFlight.get(key) === marker) {
+        this.layerWritesInFlight.delete(key);
+      }
+      settle();
+    };
+  }
+
+  /**
+   * Park until no layer write is in flight — bounded to two rounds so a
+   * continuous write stream cannot starve reads: after the bound, the
+   * request-time freshness check plus the routes' pinned-read
+   * re-validation still guarantee no uncommitted content is served under
+   * a version pin; the barrier exists to make that the rare path, not the
+   * only defense.
+   */
+  private async awaitLayerWriteSettled(key: string): Promise<void> {
+    for (let round = 0; round < 2; round++) {
+      const marker = this.layerWritesInFlight.get(key);
+      if (!marker) return;
+      await marker;
+    }
+  }
+
+  /**
+   * Record that the live session now embodies `version` — called by the
+   * layer write pipeline after its commit transaction wins the CAS (the
+   * worker applied the mutation, so its state IS the new version). Guarded
+   * on the entry still existing: if the pool evicted the doc mid-commit,
+   * the worker session is gone and must not be resurrected as "fresh".
+   */
+  advanceLayerSession(docId: string, layerName: string, version: number): void {
+    const key = layerSessionKey(docId, layerName);
+    if (this.layerSessionVersions.has(key)) {
+      this.layerSessionVersions.set(key, version);
+    }
+  }
+
+  /** Close-then-reopen a layer session at the current durable artifact. */
+  private reloadLayerOnPool(
+    ctx: OpenContext,
+    docId: string,
+    layerName: string,
+    password: string | null,
+  ): Promise<void> {
+    const key = layerSessionKey(docId, layerName);
     const existing = this.layerOpens.get(key);
     if (existing) return existing;
-
-    const promise = this.openLayerOnPool(ctx, docId, layerName, password)
-      .then(() => {
-        this.openedLayerSessions.add(key);
-      })
-      .finally(() => {
-        this.layerOpens.delete(key);
-      });
+    const promise = (async () => {
+      await this.closeLayerOnPool(docId, layerName);
+      await this.openLayerOnPool(ctx, docId, layerName, password);
+    })().finally(() => {
+      this.layerOpens.delete(key);
+    });
     this.layerOpens.set(key, promise);
     return promise;
+  }
+
+  /**
+   * Drop one layer session: forget its fence entry, tell the worker to
+   * close the session (`layer.close` is idempotent and layer-scoped — the
+   * base document, sibling layers, and the pool binding stay intact), and
+   * release the pinned artifact file handle.
+   */
+  private async closeLayerOnPool(docId: string, layerName: string): Promise<void> {
+    const key = layerSessionKey(docId, layerName);
+    this.layerSessionVersions.delete(key);
+    try {
+      await this.pool.run(docId, (jobId) =>
+        wirePack({ kind: 'layer.close' as const, jobId, docId, layerName }),
+      );
+    } catch (err) {
+      // DocNotOpen = the pool evicted the doc (or it was never opened on
+      // this replica): there is no worker session to close. Anything else
+      // is a real failure.
+      if (!(err instanceof EngineError && err.code === EngineErrorCode.DocNotOpen)) {
+        throw err;
+      }
+    }
+    this.releaseLayerArtifactHandle(key);
   }
 
   async readLayerMetadata(
@@ -1205,6 +1356,9 @@ export class DocumentService {
       }
       this.replaceLayerArtifactHandle(sessionKey, layerHandle);
       layerHandle = null;
+      // The fence entry: this session is a materialization of exactly the
+      // layer version whose artifact was just opened (0 = fresh, no row).
+      this.layerSessionVersions.set(sessionKey, layer?.currentVersion ?? 0);
     } finally {
       layerHandle?.release();
     }
@@ -1251,8 +1405,8 @@ export class DocumentService {
   }
 
   private forgetLayerSessions(docId: string): void {
-    for (const key of Array.from(this.openedLayerSessions)) {
-      if (key.startsWith(`${docId}::`)) this.openedLayerSessions.delete(key);
+    for (const key of Array.from(this.layerSessionVersions.keys())) {
+      if (key.startsWith(`${docId}::`)) this.layerSessionVersions.delete(key);
     }
     for (const key of Array.from(this.layerArtifactHandles.keys())) {
       if (key.startsWith(`${docId}::`)) this.releaseLayerArtifactHandle(key);

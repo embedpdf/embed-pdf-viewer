@@ -858,6 +858,27 @@ async function readAnnotations(input: {
     );
   }
 
+  if (input.requestedVersion !== undefined) {
+    // RE-validate the pin AFTER the worker read. The pre-check ran before
+    // parking behind any in-flight write; if that write (or any remote
+    // commit) landed while we read, the snapshot in hand belongs to a
+    // NEWER version and must not go out under this pin — the response
+    // carries `immutable`, so one slip poisons the CDN for every future
+    // reader. Refusing costs the client one manifest refetch.
+    const fresh = await resolvePageForRead(input);
+    if (input.requestedVersion !== fresh.cache.annotationVersion) {
+      setNoStore(input.reply);
+      throw new EngineError(
+        EngineErrorCode.NotFound,
+        `${input.scope.kind === 'layer' ? 'layer ' : ''}annotation version ${
+          input.requestedVersion
+        } no longer current (current=${fresh.cache.annotationVersion}) for page ${
+          input.pageObjectNumber
+        }`,
+      );
+    }
+  }
+
   input.requestedVersion === undefined ? setNoStore(input.reply) : setImmutableCache(input.reply);
   return input.revisionBridge.decorateAnnotationSnapshot(toPageState(page), result.snapshot);
 }

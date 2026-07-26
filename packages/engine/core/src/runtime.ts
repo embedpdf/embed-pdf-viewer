@@ -133,6 +133,7 @@ export type {
   FontsClearFallbacksWorkerRequest,
   FontsClearWorkerRequest,
   CloseWorkerRequest,
+  LayerCloseWorkerRequest,
   AbortWorkerRequest,
   ShutdownWorkerRequest,
   AttachmentsListWorkerRequest,

@@ -33,6 +33,7 @@ import {
   type AnnotationsMoveWorkerRequest,
   type AnnotationsUpdateWorkerRequest,
   type CloseWorkerRequest,
+  type LayerCloseWorkerRequest,
   type MetadataReadWorkerRequest,
   type MetadataUpdateWorkerRequest,
   type ActionsReadWorkerRequest,
@@ -336,6 +337,9 @@ export class WorkerHost {
           break;
         case 'fonts.clear':
           resultPack = this.handleFontsClear(msg);
+          break;
+        case 'layer.close':
+          resultPack = this.handleLayerClose(msg);
           break;
         case 'close':
           resultPack = this.handleClose(msg);
@@ -867,6 +871,25 @@ export class WorkerHost {
   private handleFontsClear(_req: FontsClearWorkerRequest): WirePack<WorkerResultPayload> {
     this.fonts.clear();
     return wirePack({ tag: 'fonts.clear' });
+  }
+
+  /**
+   * Close exactly ONE layer session — the reload seam for layer-session
+   * freshness. The base document's refcount releases through the session's
+   * close stack, so sibling layer sessions (and the base session) are
+   * untouched. Idempotent: closing an absent session is a no-op ack,
+   * because the caller may be reloading a layer this worker never held
+   * (e.g. after a pool eviction).
+   */
+  private handleLayerClose(req: LayerCloseWorkerRequest): WirePack<WorkerResultPayload> {
+    const key = sessionKey(req.docId, req.layerName);
+    const session = this.sessions.get(key);
+    if (session) {
+      disposeFormModel(this.runtime, session);
+      session.close();
+      this.sessions.delete(key);
+    }
+    return wirePack({ tag: 'close' });
   }
 
   private handleClose(req: CloseWorkerRequest): WirePack<WorkerResultPayload> {
