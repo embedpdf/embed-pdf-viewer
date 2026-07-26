@@ -5,8 +5,8 @@ on:
     branches: [main]
     paths:
       - "packages/**"
-      - "viewers/**"
       - "ee/**"
+      - "tooling/**"
       - ".changeset/**"
       - "pnpm-lock.yaml"
   workflow_dispatch: {}
@@ -134,29 +134,32 @@ jobs:
           PUBLISHED_JSON: ${{ steps.published.outputs.published }}
         run: |
           mkdir -p release-assets
-          echo "$PUBLISHED_JSON" | jq -r '.[].name' | while read name; do
-            short=$(echo "$name" | sed 's!.*/!!')
-            # Enterprise packages live in ee/, not packages/.
-            if [[ "$name" == @cloudpdf/* ]]; then
-              dir="ee/$short"
-            # Handle viewers (snippet, react, vue, svelte) which are in viewers/
-            elif [ "$short" = "snippet" ] || [ "$short" = "react-pdf-viewer" ] || [ "$short" = "vue-pdf-viewer" ] || [ "$short" = "svelte-pdf-viewer" ]; then
-              # Map package name to directory name
-              case "$short" in
-                "react-pdf-viewer") dir="viewers/react" ;;
-                "vue-pdf-viewer") dir="viewers/vue" ;;
-                "svelte-pdf-viewer") dir="viewers/svelte" ;;
-                *) dir="viewers/$short" ;;
-              esac
-            else
-              dir="packages/$short"
+          # Where a package lives is asked of the workspace ONCE, never
+          # reconstructed from its npm name: the tree is grouped
+          # (packages/<group>/<member>, ee/viewer/<framework>), so NAMING.md's
+          # name↔path rule cannot be inverted without hardcoding the group list
+          # here — which is exactly how this step went stale before.
+          pnpm ls -r --depth -1 --json \
+            | jq --arg root "$GITHUB_WORKSPACE/" \
+                'map(select(.name and .path))
+                 | map({ key: .name, value: (.path | ltrimstr($root)) })
+                 | from_entries' > "$RUNNER_TEMP/workspace-dirs.json"
+          echo "$PUBLISHED_JSON" | jq -r '.[].name' | while read -r name; do
+            # Asset names keep the scope: @embedpdf/viewer-react and
+            # @cloudpdf/viewer-react are different packages that can publish in
+            # the same run, and a bare "viewer-react" would collide.
+            slug="${name#@}"; slug="${slug//\//-}"
+            dir="$(jq -r --arg name "$name" '.[$name] // ""' "$RUNNER_TEMP/workspace-dirs.json")"
+            if [ -z "$dir" ]; then
+              echo "::warning::no workspace directory for $name — skipping"
+              continue
             fi
             if [ -d "$dir/dist" ]; then
-              echo "Packaging $short from $dir"
-              (cd "$dir" && zip -r "$GITHUB_WORKSPACE/release-assets/${short}-dist.zip" dist >/dev/null)
-              tar -czf "release-assets/${short}-dist.tar.gz" -C "$dir" dist
+              echo "Packaging $name from $dir"
+              (cd "$dir" && zip -r "$GITHUB_WORKSPACE/release-assets/${slug}-dist.zip" dist >/dev/null)
+              tar -czf "release-assets/${slug}-dist.tar.gz" -C "$dir" dist
             else
-              echo "No dist for $short"
+              echo "No dist for $name"
             fi
           done
           ls -lh release-assets || true

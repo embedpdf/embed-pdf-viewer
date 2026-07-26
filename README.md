@@ -15,7 +15,7 @@
 
 # Open‑Source JavaScript PDF Viewer
 
-**EmbedPDF** is a framework‑agnostic, MIT‑licensed PDF viewer that drops into _any_ JavaScript project. Whether you build with **React, Vue, Svelte, Preact,** or vanilla JS, EmbedPDF delivers a smooth, modern reading experience and a clean developer API.
+**EmbedPDF** is a framework‑agnostic, Apache‑2.0‑licensed PDF viewer that drops into _any_ JavaScript project. Whether you build with **React, Vue, Svelte, Preact,** or vanilla JS, EmbedPDF delivers a smooth, modern reading experience and a clean developer API.
 
 ---
 
@@ -68,10 +68,10 @@ We love contributions! To get started, read our [contributing guide](CONTRIBUTIN
 
 ## 📄 License
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+This project is licensed under the Apache License, Version 2.0. See the [LICENSE](LICENSE) file for details.
 
-The one exception is the `ee/` directory: all content under [ee/](ee) is proprietary and governed by [ee/LICENSE](ee/LICENSE), not the MIT License.
+The `ee/` directory holds the CloudPDF packages, and there the line runs by **where the code runs**: everything shipped to a browser is open source, everything that runs on a server is commercial. So [`@cloudpdf/engine`](ee/engine) and [`@cloudpdf/viewer`](ee/viewer) are Apache-2.0 like the rest of this repository, while the server-side packages (`ee/server`, `ee/admin`, `ee/admin-api`) are proprietary and governed by [ee/LICENSE](ee/LICENSE).
 
 ## Third-Party Licenses
 
-This project includes PDFium, licensed under the [Apache License, Version 2.0](packages/pdfium/LICENSE.pdfium).
+This project includes PDFium, licensed under the [Apache License, Version 2.0](https://pdfium.googlesource.com/pdfium/+/refs/heads/main/LICENSE).

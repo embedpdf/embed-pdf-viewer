@@ -1,7 +1,9 @@
 packages:
   - 'packages/**'
   - 'examples/**'
-  - 'ee/*'
+  # Recursive, like packages/: the ee tree groups a product line into a
+  # directory once it has siblings (ee/viewer/{main,react,vue,...}).
+  - 'ee/**'
   - 'tooling/*'
   - 'website'
   # exclude generated outputs that can contain nested package.json copies

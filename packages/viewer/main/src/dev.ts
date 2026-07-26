@@ -4,7 +4,7 @@
  * init → element → preact chrome → engine worker, the config pass-through,
  * and the DRIVE door (el.viewer from plain page script).
  */
-import EmbedPDF, { AnnotationToken } from './index';
+import EmbedPDF, { AnnotationToken } from './doors/local';
 
 const el = EmbedPDF.init({
   target: '#viewer',

@@ -1,15 +1,14 @@
 {
-  "name": "@embedpdf/viewer-react",
+  "name": "@cloudpdf/viewer-react",
   "version": "0.0.0",
   "private": false,
-  "description": "React wrapper for the full viewer: <PDFViewer> around the <embedpdf-viewer> custom element. Children are light-DOM slots — a child with slot=\"name\" projects into the chrome's matching custom() unit while staying in YOUR React tree (your context, your CSS). No peer constraints beyond react>=18; the viewer inside is the Preact-compiled artifact.",
+  "description": "React wrapper for the full viewer wired to CloudPDF: <CloudPDFViewer docToken=\"…\" />. A thin cloud DOOR over @embedpdf/viewer-react/core — no wasm, no workers, rendering happens on a @cloudpdf/server deployment (or CloudPDF SaaS) over HTTPS.",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.cts",
   "exports": {
     ".": "./src/index.ts",
-    "./core": "./src/core.ts",
     "./package.json": "./package.json"
   },
   "files": [
@@ -22,8 +21,26 @@
     "clean": "rimraf dist",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/embedpdf/embed-pdf-viewer",
+    "directory": "ee/viewer/react"
+  },
+  "homepage": "https://www.cloudpdf.com",
+  "bugs": {
+    "url": "https://github.com/embedpdf/embed-pdf-viewer/issues"
+  },
+  "keywords": [
+    "pdf",
+    "cloudpdf",
+    "viewer",
+    "react",
+    "cloud"
+  ],
+  "license": "Apache-2.0",
   "dependencies": {
-    "@embedpdf/viewer": "workspace:*"
+    "@cloudpdf/viewer": "workspace:*",
+    "@embedpdf/viewer-react": "workspace:*"
   },
   "peerDependencies": {
     "react": ">=18"
@@ -31,27 +48,16 @@
   "devDependencies": {
     "@embedpdf/tooling-build": "workspace:*",
     "@types/react": "^18.3.0",
+    "rimraf": "^5.0.0",
     "typescript": "^5.0.0"
   },
-  "license": "Apache-2.0",
-  "sideEffects": [
-    "./src/index.ts",
-    "./src/core.ts",
-    "./dist/index.js",
-    "./dist/index.cjs",
-    "./dist/core.js",
-    "./dist/core.cjs"
-  ],
+  "sideEffects": false,
   "publishConfig": {
     "access": "public",
     "exports": {
       ".": {
         "import": "./dist/index.js",
         "require": "./dist/index.cjs"
-      },
-      "./core": {
-        "import": "./dist/core.js",
-        "require": "./dist/core.cjs"
       },
       "./package.json": "./package.json"
     }

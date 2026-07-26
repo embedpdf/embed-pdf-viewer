@@ -39,6 +39,12 @@ import CloudPDF from '@cloudpdf/viewer';
 
 ## License
 
-Commercial — see [LICENSE](./LICENSE). The underlying viewer chrome and
-engine interfaces are the Apache-2.0 [EmbedPDF](https://www.embedpdf.com)
-open-source project.
+Apache-2.0 — see [LICENSE](./LICENSE).
+
+Everything CloudPDF ships to a browser is open source; everything that runs on a
+server is commercial. This artifact is browser-side, so it is Apache-2.0 — as
+are the viewer chrome and engine interfaces it is built on, from the
+[EmbedPDF](https://www.embedpdf.com) open-source project. Rendering happens on a
+CloudPDF deployment (the SaaS, or a self-hosted
+[`@cloudpdf/server`](https://www.npmjs.com/package/@cloudpdf/server) under a
+separate written agreement), which is the commercial part.

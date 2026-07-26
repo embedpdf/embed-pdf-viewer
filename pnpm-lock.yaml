@@ -268,14 +268,14 @@ importers:
         specifier: ^7.18.0
         version: 7.19.0(encoding@0.1.13)
 
-  ee/viewer:
+  ee/viewer/main:
     dependencies:
       '@cloudpdf/engine':
         specifier: workspace:*
-        version: link:../engine
+        version: link:../../engine
       '@embedpdf/viewer':
         specifier: workspace:*
-        version: link:../../packages/viewer/main
+        version: link:../../../packages/viewer/main
     devDependencies:
       '@types/node':
         specifier: ^22.0.0
@@ -295,6 +295,31 @@ importers:
       vite:
         specifier: ^6.0.0
         version: 6.4.1(@types/node@22.19.11)(jiti@2.6.1)(less@4.6.7)(lightningcss@1.30.2)(sass-embedded@1.97.3)(sass@1.97.3)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2)
+
+  ee/viewer/react:
+    dependencies:
+      '@cloudpdf/viewer':
+        specifier: workspace:*
+        version: link:../main
+      '@embedpdf/viewer-react':
+        specifier: workspace:*
+        version: link:../../../packages/viewer/react
+      react:
+        specifier: '>=18'
+        version: 18.3.1
+    devDependencies:
+      '@embedpdf/tooling-build':
+        specifier: workspace:*
+        version: link:../../../tooling/build
+      '@types/react':
+        specifier: ^18.3.0
+        version: 18.3.28
+      rimraf:
+        specifier: ^5.0.0
+        version: 5.0.10
+      typescript:
+        specifier: ^5.0.0
+        version: 5.9.3
 
   ee/website:
     dependencies:

@@ -26,8 +26,15 @@ import {
 } from '@embedpdf/viewer-chrome';
 import type { Engine, EngineFactory } from '@embedpdf/engine-core/runtime';
 import chromeCss from '@embedpdf/viewer-chrome/styles.css?inline';
-import { configFromAttributes, initialDocumentsOf, type ViewerConfig } from './config';
-import { getDefaultEngineProvider } from './runtime-defaults';
+import { configFromAttributes, initialDocumentsOf, type ElementConfig } from './config';
+
+/**
+ * Turns a config's `engine` field — that door's options bag, or nothing — into
+ * the delivery's default engine. A DOOR registers one (see ../local/register);
+ * the engine-agnostic door registers none, which is precisely what makes its
+ * `engine` field required.
+ */
+export type DefaultEngineProvider = (engineOption: unknown) => Engine | EngineFactory;
 
 const HOST_CSS = `:host{display:block;height:100%;}`;
 
@@ -75,17 +82,21 @@ function buildTokenSheet(tokens?: ThemeTokens, dark?: ThemeTokens): CSSStyleShee
  *
  * - a function → an EngineFactory, passed through (viewer-owned lifetime);
  * - an object with `open` → a live Engine instance, passed through (borrowed);
- * - anything else (engine OPTIONS or nothing) → the delivery's registered
- *   default (see runtime-defaults.ts). The npm/snippet entries register the
- *   built-in local engine; the `core` entry registers nothing, so an
- *   engine-less config there is a configuration error, taught here.
+ * - anything else (that door's engine OPTIONS, or nothing) → the door's
+ *   registered default. The local/snippet doors register the built-in engine;
+ *   the `core` door registers nothing, so an engine-less config there is a
+ *   configuration error, taught here.
+ *
+ * This is the whole reason `ElementConfig['engine']` is `unknown`: the element
+ * recognises an engine, and otherwise forwards a sealed envelope to the only
+ * code that can open it.
  */
-function engineOf(config: ViewerConfig): Engine | EngineFactory {
+function engineOf(config: ElementConfig): Engine | EngineFactory {
   const option = config.engine;
-  if (typeof option === 'function') return option;
+  if (typeof option === 'function') return option as EngineFactory;
   if (option && typeof (option as Engine).open === 'function') return option as Engine;
 
-  const provider = getDefaultEngineProvider();
+  const provider = EmbedPdfViewerElement.defaultEngineProvider;
   if (!provider) {
     throw new Error(
       '[embedpdf] no engine: this build has no default engine. Pass one in the config ' +
@@ -102,7 +113,7 @@ function engineOf(config: ViewerConfig): Engine | EngineFactory {
  * ELEMENT validates unconditionally. A config typo eating a button silently
  * is worse for a snippet user than a console.warn is for anyone.
  */
-function warnInvalidConfig(config: ViewerConfig): void {
+function warnInvalidConfig(config: ElementConfig): void {
   try {
     const ids = new Set(defaultCommands.map((c) => c.id));
     for (const c of config.commands ?? []) ids.add(c.id);
@@ -123,21 +134,41 @@ function warnInvalidConfig(config: ViewerConfig): void {
   }
 }
 
-export class EmbedPdfViewerElement extends HTMLElement {
+/**
+ * The base class, resolved defensively so THIS MODULE IS IMPORT-SAFE IN NODE.
+ * `class … extends HTMLElement` evaluates `HTMLElement` at module scope, which
+ * is a ReferenceError under SSR — the reason a Next/Nuxt/SvelteKit consumer
+ * otherwise has to hide the entire viewer import behind a client-only dynamic
+ * import. With this, importing is safe anywhere and the element simply upgrades
+ * once it reaches a real DOM; deferring the *render* stays an optimization
+ * (you rarely want to boot an engine server-side), not a requirement.
+ */
+const ElementBase: typeof HTMLElement =
+  typeof HTMLElement === 'undefined' ? (class {} as unknown as typeof HTMLElement) : HTMLElement;
+
+export class EmbedPdfViewerElement extends ElementBase {
   static observedAttributes = ['src', 'locale', 'theme'];
 
-  #config: ViewerConfig | null = null;
+  /**
+   * The door's default engine, registered by importing a door that has one
+   * (`../local/register`). A static rather than a module-level registry so the
+   * mechanism is discoverable exactly where it is consumed — `engineOf` below.
+   * `null` on the engine-agnostic door, on purpose.
+   */
+  static defaultEngineProvider: DefaultEngineProvider | null = null;
+
+  #config: ElementConfig | null = null;
   #wrapper: HTMLDivElement | null = null;
   #root: Root | null = null;
   #viewer: ViewerHandle | null = null;
   #disposers: Unsubscribe[] = [];
 
   /** Full config — takes precedence over the declarative attributes. */
-  set config(config: ViewerConfig) {
+  set config(config: ElementConfig) {
     this.#config = config;
     if (this.isConnected) this.#mount();
   }
-  get config(): ViewerConfig {
+  get config(): ElementConfig {
     return this.#config ?? configFromAttributes(this);
   }
 
@@ -226,6 +257,7 @@ export class EmbedPdfViewerElement extends HTMLElement {
   }
 }
 
-if (!customElements.get('embedpdf-viewer')) {
+// Guarded for the same reason as ElementBase: no registry outside a browser.
+if (typeof customElements !== 'undefined' && !customElements.get('embedpdf-viewer')) {
   customElements.define('embedpdf-viewer', EmbedPdfViewerElement);
 }

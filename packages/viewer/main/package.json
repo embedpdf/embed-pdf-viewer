@@ -6,18 +6,18 @@
   "type": "module",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "types": "./dist/doors/local.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
+      "types": "./dist/doors/local.d.ts",
       "default": "./dist/index.js"
     },
     "./core": {
-      "types": "./dist/core.d.ts",
+      "types": "./dist/doors/core.d.ts",
       "default": "./dist/core.js"
     },
     "./snippet": {
-      "types": "./dist/snippet.d.ts",
+      "types": "./dist/doors/snippet.d.ts",
       "default": "./dist/embedpdf.js"
     },
     "./package.json": "./package.json"
@@ -54,10 +54,8 @@
     "access": "public"
   },
   "sideEffects": [
-    "./src/element.ts",
-    "./src/snippet.ts",
-    "./src/local-default.ts",
-    "./src/index.ts",
+    "./src/kernel/element.ts",
+    "./src/doors/*.ts",
     "./dist/*.js",
     "./dist/**/*.js"
   ]

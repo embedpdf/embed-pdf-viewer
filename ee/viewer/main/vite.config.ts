@@ -19,9 +19,11 @@ export default defineConfig({
     target: 'es2020',
     sourcemap: true,
     lib: {
-      entry: 'src/index.ts',
+      // Two entries: the CDN artifact, and the framework-free cloud vocabulary
+      // that every @cloudpdf/viewer-<framework> wrapper imports (./config).
+      entry: { cloudpdf: 'src/index.ts', config: 'src/config.ts' },
       formats: ['es'],
-      fileName: () => 'cloudpdf.js',
+      fileName: (_format: string, entryName: string) => `${entryName}.js`,
     },
     rollupOptions: {
       output: { chunkFileNames: 'chunks/[name]-[hash].js' },

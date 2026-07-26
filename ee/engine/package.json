@@ -42,7 +42,7 @@
     "engine",
     "cloud"
   ],
-  "license": "SEE LICENSE IN LICENSE",
+  "license": "Apache-2.0",
   "dependencies": {
     "@embedpdf/engine-core": "workspace:*",
     "@embedpdf/engine-services": "workspace:^"

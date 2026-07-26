@@ -33,6 +33,47 @@ Examples (`examples/*`) and internal tooling (`tooling/*`) are not part of the
 law's namespace: examples are `@embedpdf/example-<dir>` and private; tooling is
 `@embedpdf/tooling-<dir>` and private.
 
+## `ee/` — the same law, the other scope
+
+`ee/` holds the CloudPDF (`@cloudpdf/*`) tree. The three clauses apply verbatim
+with the scope swapped: `ee/viewer/react` → `@cloudpdf/viewer-react`, and
+`ee/viewer/main` is the group's namesake `@cloudpdf/viewer`. One law, two
+scopes — a CloudPDF package is never named by a separate rule.
+
+`ee/` is a SCOPE boundary, not a license boundary. The license line runs
+somewhere else entirely — where the code runs: browser-side CloudPDF packages
+(`ee/engine`, `ee/viewer/*`) are Apache-2.0 like the rest of the repo, while the
+server-side ones (`ee/server`, `ee/admin`, `ee/admin-api`) are commercial. See
+`ee/LICENSE`. Do not infer a package's license from its directory; read its own
+`LICENSE`.
+
+What decides whether a path gets a group level is one line:
+
+> **A directory level exists to hold siblings.**
+
+That is why every `packages/` group is grouped (each has siblings) and why
+`ee/engine`, `ee/server`, `ee/admin`, `ee/admin-api` sit flat: a group level
+over a lone package carries no information. `ee/viewer/` is grouped because the
+viewer product line has five members (`main` plus one wrapper per framework).
+When a flat EE package gains a sibling it regroups then — repo paths are
+internal, so unlike npm names a move costs nothing but the churn.
+
+Two consequences worth stating, because both have already caught us:
+
+- **Nothing may reconstruct a package's directory from its npm name.** Clause 1
+  maps path → name, and that is not invertible without knowing the group list.
+  Ask the workspace instead (`pnpm ls -r --depth -1 --json` yields name + path);
+  the release workflows do.
+- **Cross-scope names collide on their last segment.** `@embedpdf/viewer-react`
+  and `@cloudpdf/viewer-react` are the two doors of one product — deliberately
+  parallel — so anything keyed on the short name (release assets, cache keys,
+  directories) must carry the scope.
+
+Viewer wrappers keep the `viewer-` prefix in BOTH scopes; clause 3's bare
+naming is for `framework/` adapters only. `@cloudpdf/react` is free on npm but
+would read as the cloud twin of `@embedpdf/react` — a composition adapter —
+when it is in fact a finished viewer.
+
 ## Corollaries
 
 - Adding a package = choosing its group; the name falls out. A package that

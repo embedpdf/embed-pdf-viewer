@@ -39,4 +39,15 @@ https://www.cloudpdf.com
 
 ## License
 
-Commercial — see LICENSE.
+Apache-2.0 — see [LICENSE](./LICENSE).
+
+Everything CloudPDF ships to a browser is open source; everything that runs on a
+server is commercial. This package is the browser client, so it is Apache-2.0 —
+free to read, vendor, and fork. It talks to a
+[`@cloudpdf/server`](https://www.npmjs.com/package/@cloudpdf/server) deployment,
+which is the commercial part: the CloudPDF SaaS, or a server you self-host under
+a separate written agreement.
+
+(Contributors: this package's integration tests boot a real server, so `pnpm
+test` here needs `@cloudpdf/server` — a dev dependency that is not Apache-2.0.
+The client source and its published `dist` are.)

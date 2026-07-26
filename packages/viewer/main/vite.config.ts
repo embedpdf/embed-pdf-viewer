@@ -54,11 +54,11 @@ const copyPdfiumWasm = (): PluginOption => ({
 
 export default defineConfig(({ mode }) => {
   const snippet = mode === 'snippet';
+  // One entry per DOOR (src/doors/*), keeping the historical output names:
+  // the local door ships as index.js, the engine-agnostic one as core.js.
   const entry: Record<string, string> = snippet
-    ? { embedpdf: 'src/snippet.ts' }
-    : // `core` is the engine-agnostic entry (no local-engine default) that
-      // engine-injecting builds (the cloud snippet) bundle instead of `index`.
-      { index: 'src/index.ts', core: 'src/core.ts' };
+    ? { embedpdf: 'src/doors/snippet.ts' }
+    : { index: 'src/doors/local.ts', core: 'src/doors/core.ts' };
   return {
     plugins: [tailwindcss(), ...(snippet ? [copyPdfiumWasm()] : [])],
     resolve: {

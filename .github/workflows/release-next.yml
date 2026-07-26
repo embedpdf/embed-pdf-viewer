@@ -144,22 +144,31 @@ jobs:
           PUBLISHED_JSON: ${{ steps.published.outputs.published }}
         run: |
           mkdir -p release-assets
-          echo "$PUBLISHED_JSON" | jq -r '.[].name' | while read name; do
-            short=$(echo "$name" | sed 's!.*/!!')
-            # Resolve the package directory from the workspace itself — the
-            # layered tree (packages/<group>/<member>) makes name→path
-            # mapping non-trivial, and pnpm already knows it.
-            dir=$(pnpm --filter "$name" exec pwd 2>/dev/null | tail -1)
-            if [ -z "$dir" ] || [ ! -d "$dir" ]; then
-              echo "No workspace dir for $name"; continue
+          # Where a package lives is asked of the workspace ONCE, never
+          # reconstructed from its npm name: the tree is grouped
+          # (packages/<group>/<member>, ee/viewer/<framework>), so NAMING.md's
+          # name↔path rule cannot be inverted without hardcoding the group list.
+          pnpm ls -r --depth -1 --json \
+            | jq --arg root "$GITHUB_WORKSPACE/" \
+                'map(select(.name and .path))
+                 | map({ key: .name, value: (.path | ltrimstr($root)) })
+                 | from_entries' > "$RUNNER_TEMP/workspace-dirs.json"
+          echo "$PUBLISHED_JSON" | jq -r '.[].name' | while read -r name; do
+            # Asset names keep the scope: @embedpdf/viewer-react and
+            # @cloudpdf/viewer-react are different packages that can publish in
+            # the same run, and a bare "viewer-react" would collide.
+            slug="${name#@}"; slug="${slug//\//-}"
+            dir="$(jq -r --arg name "$name" '.[$name] // ""' "$RUNNER_TEMP/workspace-dirs.json")"
+            if [ -z "$dir" ]; then
+              echo "::warning::no workspace directory for $name — skipping"
+              continue
             fi
-            dir=$(python3 -c "import os,sys; print(os.path.relpath(sys.argv[1], os.getcwd()))" "$dir")
             if [ -d "$dir/dist" ]; then
-              echo "Packaging $short from $dir"
-              (cd "$dir" && zip -r "$GITHUB_WORKSPACE/release-assets/${short}-dist.zip" dist >/dev/null)
-              tar -czf "release-assets/${short}-dist.tar.gz" -C "$dir" dist
+              echo "Packaging $name from $dir"
+              (cd "$dir" && zip -r "$GITHUB_WORKSPACE/release-assets/${slug}-dist.zip" dist >/dev/null)
+              tar -czf "release-assets/${slug}-dist.tar.gz" -C "$dir" dist
             else
-              echo "No dist for $short"
+              echo "No dist for $name"
             fi
           done
           ls -lh release-assets || true
