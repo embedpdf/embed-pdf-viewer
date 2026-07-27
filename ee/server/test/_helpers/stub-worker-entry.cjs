@@ -741,6 +741,67 @@ parentPort.on('message', (msg) => {
       );
       return;
     }
+    case 'annotations.renderAppearances': {
+      const meta = openDocs.get(sessionKey(msg));
+      if (!meta) {
+        rejectNotOpen(msg);
+        return;
+      }
+      const pon = msg.pageObjectNumber;
+      if (pon < 1 || pon > meta.pageCount) {
+        parentPort.postMessage({
+          kind: 'reject',
+          jobId: msg.jobId,
+          error: {
+            name: 'EngineError',
+            message: `no page with object number ${pon}`,
+            code: 'NotFound',
+          },
+        });
+        return;
+      }
+      // One synthetic appearance sized 8×scale — enough for the multipart
+      // path and the budget guard to be observable from tests.
+      const options = msg.options || {};
+      const scale = typeof options.scale === 'number' && options.scale > 0 ? options.scale : 1;
+      const side = Math.max(1, Math.round(8 * scale));
+      // Mirror deviceRaster's PRE-ALLOCATION budget guard.
+      if (options.maxOutputPixels !== undefined && side * side > options.maxOutputPixels) {
+        parentPort.postMessage({
+          kind: 'reject',
+          jobId: msg.jobId,
+          error: {
+            name: 'EngineError',
+            message: `render output ${side}x${side} exceeds the ${options.maxOutputPixels}-pixel budget — request a smaller scale`,
+            code: 'InvalidArg',
+          },
+        });
+        return;
+      }
+      const data = new Uint8Array(side * side * 4).fill(0x77);
+      parentPort.postMessage(
+        {
+          kind: 'resolve',
+          jobId: msg.jobId,
+          result: {
+            tag: 'annotations.renderAppearances',
+            result: {
+              pageState: pageState(pon),
+              appearances: [
+                {
+                  ref: { kind: 'objectNumber', pageObjectNumber: pon, annotObjectNumber: 9001 },
+                  mode: 'normal',
+                  rect: { left: 0, bottom: 0, right: 8, top: 8 },
+                  raster: { width: side, height: side, data: data.buffer },
+                },
+              ],
+            },
+          },
+        },
+        [data.buffer],
+      );
+      return;
+    }
     case 'document.renderPageFile': {
       // Ad-hoc file render (the warm path): no session involved. Byte0 of
       // the file encodes the page count, mirroring the open stubs.

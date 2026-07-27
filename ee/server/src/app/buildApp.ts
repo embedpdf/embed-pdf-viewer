@@ -175,11 +175,19 @@ export interface BuildAppOptions {
    * the bounded quantity is output pixels, never zoom. `maxRenderPixels`
    * is the worker-side allocation budget every server render carries.
    * `enforce: true` rejects off-lattice versioned FULL-PAGE tokens with
-   * 400 (flip on once clients ship `snapViewportToPolicy`); rect targets
+   * 400 (flip on once clients ship `snapFullPageViewport`); rect targets
    * are exempt (the future tile policy's jurisdiction). Default false =
    * off-lattice renders are computed but never persisted.
+   * `appearanceScales` is the annotation-appearance scale lattice
+   * (default `[1, 2, 4]`) — enforced the same way on versioned
+   * appearance tokens.
    */
-  renderLattice?: { widths?: number[]; maxRenderPixels?: number; enforce?: boolean };
+  renderLattice?: {
+    widths?: number[];
+    appearanceScales?: number[];
+    maxRenderPixels?: number;
+    enforce?: boolean;
+  };
 }
 
 export interface AppBundle {
@@ -354,6 +362,9 @@ export async function buildApp(opts: BuildAppOptions): Promise<AppBundle> {
       derivedRenders = new DerivedRenderService({
         storage: opts.objectStore,
         ...(opts.renderLattice?.widths ? { widths: opts.renderLattice.widths } : {}),
+        ...(opts.renderLattice?.appearanceScales
+          ? { appearanceScales: opts.renderLattice.appearanceScales }
+          : {}),
         ...(opts.renderLattice?.maxRenderPixels !== undefined
           ? { maxRenderPixels: opts.renderLattice.maxRenderPixels }
           : {}),
@@ -479,6 +490,7 @@ export async function buildApp(opts: BuildAppOptions): Promise<AppBundle> {
         revisionBridge: cloudRevisionBridge,
         imageEncoder: new SharpImageEncoder(),
         weakAnnotationSessions,
+        ...(derivedRenders ? { derivedRenders } : {}),
       });
       await registerFormRoutes(app, {
         documentService,

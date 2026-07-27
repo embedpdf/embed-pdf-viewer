@@ -1,11 +1,13 @@
 import {
   AbortablePromise,
+  CONTINUOUS_RENDER_POLICY,
   EngineError,
   EngineErrorCode,
   createPageImageHandle,
   normalizeAnnotationDraft,
   normalizeAnnotationPatch,
   wirePack,
+  type EngineRenderPolicy,
   type AnnotationAppearanceImage,
   type AnnotationAppearanceImageOptions,
   type AnnotationAppearanceImagesResult,
@@ -27,6 +29,7 @@ import {
 import type { SessionEventPublisher } from '@embedpdf/engine-services';
 
 import type { LocalImageEncoder } from '../render/BrowserImageEncoder';
+import { assertAppearanceOnLattice, withAppearanceBudget } from '../render/renderPolicyGuard';
 import type { ScopeGuard } from '../scope';
 import { Priority } from '../worker/Priority';
 import type { JobId, WorkerResultPayload } from '../worker/protocol';
@@ -55,6 +58,7 @@ export class LocalPageAnnotationsService implements PageAnnotationsService {
     private readonly encoder: LocalImageEncoder,
     private readonly guard: ScopeGuard,
     private readonly publisher: SessionEventPublisher,
+    private readonly policy: EngineRenderPolicy = CONTINUOUS_RENDER_POLICY,
   ) {}
 
   list(): AbortablePromise<AnnotationListPageSnapshot> {
@@ -159,11 +163,16 @@ export class LocalPageAnnotationsService implements PageAnnotationsService {
     // Rendering an appearance reveals the annotation's `/AP` stream, so it
     // gates on the same `doc.annotate.read` capability as `list()` — reading
     // an annotation implies you may see how it draws.
+    // The deployment policy applies the same way it does to full pages:
+    // appearances are sized by `rect × scale`, so an enforced appearance
+    // lattice bounds the scale and the pixel budget rides into the worker.
     try {
       this.guard.assertCapability('doc.annotate.read');
+      assertAppearanceOnLattice(this.policy, options);
     } catch (err) {
       return AbortablePromise.rejectReason(err);
     }
+    const effectiveOptions = withAppearanceBudget(this.policy, options);
     const docId = this.docId;
     const pon = this.pageObjectNumber;
     const submission = this.queue.enqueue<WorkerResultPayload>(
@@ -174,7 +183,7 @@ export class LocalPageAnnotationsService implements PageAnnotationsService {
             jobId,
             docId,
             pageObjectNumber: pon,
-            ...(options ? { options } : {}),
+            ...(effectiveOptions ? { options: effectiveOptions } : {}),
           }),
       },
       { priority: Priority.MEDIUM },

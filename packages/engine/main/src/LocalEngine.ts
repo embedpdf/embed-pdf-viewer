@@ -1,10 +1,12 @@
 import {
   AbortablePromise,
+  CONTINUOUS_RENDER_POLICY,
   EngineError,
   EngineErrorCode,
   wirePack,
   type DocumentHandle,
   type Engine,
+  type EngineRenderPolicy,
   type OpenInput,
   type OpenOptions,
 } from '@embedpdf/engine-core/runtime';
@@ -23,6 +25,17 @@ export interface LocalEngineOptions {
   transport: Transport;
   concurrency?: number;
   imageEncoder?: LocalImageEncoder;
+  /**
+   * Deployment render policy for THIS engine instance — the local
+   * counterpart of the lattice a cloud deployment advertises over
+   * `/v1/access`, configured the same way permissions are overridden:
+   * by the embedder, at construction. Advertised verbatim via
+   * `doc.render.policy()`; a lattice's `maxRenderPixels` budget rides
+   * into every worker render, and `enforced: true` rejects off-lattice
+   * requests exactly like the enforcing server does. Default:
+   * `continuous` (render anything — v2 parity).
+   */
+  renderPolicy?: EngineRenderPolicy;
 }
 
 /**
@@ -32,11 +45,17 @@ export interface LocalEngineOptions {
  */
 export class LocalEngine implements Engine {
   static fromTransport(opts: LocalEngineOptions): LocalEngine {
-    return new LocalEngine(opts.transport, opts.concurrency ?? 1, opts.imageEncoder);
+    return new LocalEngine(
+      opts.transport,
+      opts.concurrency ?? 1,
+      opts.imageEncoder,
+      opts.renderPolicy,
+    );
   }
 
   private readonly queue: WorkerQueue;
   private readonly imageEncoder: LocalImageEncoder;
+  private readonly renderPolicy: EngineRenderPolicy;
   /** This engine instance's identity on every event's `origin.sessionId`. */
   private readonly sessionId = `local:${generateUuid()}`;
   private destroyed = false;
@@ -55,9 +74,11 @@ export class LocalEngine implements Engine {
     private readonly transport: Transport,
     concurrency: number,
     imageEncoder: LocalImageEncoder | undefined,
+    renderPolicy: EngineRenderPolicy | undefined,
   ) {
     this.queue = new WorkerQueue(transport, { concurrency });
     this.imageEncoder = imageEncoder ?? new BrowserImageEncoder();
+    this.renderPolicy = renderPolicy ?? CONTINUOUS_RENDER_POLICY;
     this.fonts = new LocalFontService(this.queue);
   }
 
@@ -192,6 +213,7 @@ export class LocalEngine implements Engine {
         payload.security,
         guard,
         this.sessionId,
+        this.renderPolicy,
       );
     });
   }

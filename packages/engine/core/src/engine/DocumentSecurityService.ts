@@ -146,7 +146,7 @@ export interface DocumentAccessInfo {
    * `viewport.width` points whose renders are durable, CDN-shared
    * artifacts, plus the reserved tile-pyramid block. Local engines report
    * nothing here (continuous rendering); cloud engines surface it so
-   * `snapViewportToPolicy` can conform requests EXPLICITLY — the SDK
+   * `snapFullPageViewport` can conform requests EXPLICITLY — the SDK
    * never snaps implicitly (engine parity).
    */
   readonly renderPolicy?: {
@@ -155,6 +155,7 @@ export interface DocumentAccessInfo {
       readonly tileSizes: readonly number[];
       readonly scales: readonly number[];
     };
+    readonly appearances?: { readonly scales: readonly number[] };
     readonly maxRenderPixels?: number;
     readonly formats: readonly ('webp' | 'png')[];
     readonly background: 'white';

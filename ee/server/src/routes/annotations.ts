@@ -55,6 +55,7 @@ import {
 import { SharpImageEncoder } from '../render/SharpImageEncoder';
 import type { WorkerThreadPool } from '../runtime/WorkerThreadPool';
 import type { CloudRevisionBridge } from '../services/CloudRevisionBridge';
+import type { DerivedRenderService } from '../services/DerivedRenderService';
 import type { DocumentService, OpenContext } from '../services/DocumentService';
 import type { LayerService } from '../services/LayerService';
 import type { WeakAnnotationSessionService } from '../services/WeakAnnotationSessionService';
@@ -66,6 +67,8 @@ interface AnnotationRouteDeps {
   revisionBridge: CloudRevisionBridge;
   imageEncoder: SharpImageEncoder;
   weakAnnotationSessions?: WeakAnnotationSessionService;
+  /** Render-lattice policy plane (absent = legacy compute-only). */
+  derivedRenders?: DerivedRenderService;
 }
 
 type ReadScope =
@@ -83,6 +86,7 @@ export async function registerAnnotationRoutes(
     revisionBridge,
     imageEncoder,
     weakAnnotationSessions,
+    derivedRenders,
   } = deps;
 
   // Annotations are layer-scoped only in paths v2. The doc-level
@@ -161,6 +165,7 @@ export async function registerAnnotationRoutes(
         documentService,
         pool,
         imageEncoder,
+        ...(derivedRenders ? { derivedRenders } : {}),
         reply,
         signal: abortSignalFromRequest(req),
         scope: { kind: 'layer', ctx, docId, layerName },
@@ -191,6 +196,7 @@ export async function registerAnnotationRoutes(
         documentService,
         pool,
         imageEncoder,
+        ...(derivedRenders ? { derivedRenders } : {}),
         reply,
         signal: abortSignalFromRequest(req),
         scope: { kind: 'layer', ctx, docId, layerName },
@@ -628,6 +634,7 @@ async function renderAnnotationAppearances(input: {
   documentService: DocumentService;
   pool: WorkerThreadPool;
   imageEncoder: SharpImageEncoder;
+  derivedRenders?: DerivedRenderService;
   reply: FastifyReply;
   signal: AbortSignal;
   scope: ReadScope;
@@ -668,6 +675,23 @@ async function renderAnnotationAppearances(input: {
     );
   }
 
+  // Appearance-scale enforcement (SCALE-OUT §2.1b): the appearance lattice
+  // bounds SCALE — appearances are sized by `rect × scale`, so a page-sized
+  // stamp at a high scale is a full-page memory bomb wearing a different
+  // token. Same scoping as pages: only VERSIONED (token) requests are
+  // enforced; the unversioned alias stays compute-only (no-store), which is
+  // the escape hatch for off-canonical needs (rollover/down modes, quality).
+  const derived = input.derivedRenders;
+  if (
+    derived !== undefined &&
+    derived.enforced &&
+    input.tokenQuery !== undefined &&
+    !derived.classifyAppearance({ imageOptions, format }).onLattice
+  ) {
+    setNoStore(input.reply);
+    derived.rejectOffLattice('use snapAppearanceScale(policy, scale)');
+  }
+
   if (input.scope.kind === 'layer') {
     await input.documentService.ensureLayerOnPool(
       input.scope.ctx,
@@ -676,7 +700,12 @@ async function renderAnnotationAppearances(input: {
     );
   }
 
-  const renderOptions = annotationRenderOptionsFromImageOptions(imageOptions);
+  // Every server render carries the deployment's output-pixel budget —
+  // the worker rejects before allocating (degenerate-geometry guard).
+  const renderOptions = {
+    ...annotationRenderOptionsFromImageOptions(imageOptions),
+    ...(derived !== undefined ? { maxOutputPixels: derived.maxRenderPixels } : {}),
+  };
   const build = (jobId: WorkerJobId) =>
     wirePack({
       kind: 'annotations.renderAppearances' as const,

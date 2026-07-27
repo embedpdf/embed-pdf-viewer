@@ -13,6 +13,7 @@
 import {
   deserializeError,
   wirePack,
+  type EngineRenderPolicy,
   type FontSpec,
   type WirePack,
   type WorkerRequest,
@@ -90,6 +91,7 @@ export function createLocalEngine(opts: CreateLocalEngineOptions = {}): LocalEng
     transport,
     concurrency: opts.concurrency,
     imageEncoder: opts.imageEncoder,
+    renderPolicy: opts.renderPolicy,
   });
 }
 
@@ -115,6 +117,7 @@ export function createLocalEngineWithWorker(opts: CreateLocalEngineWithWorkerOpt
     transport,
     concurrency: opts.concurrency,
     imageEncoder: opts.imageEncoder,
+    renderPolicy: opts.renderPolicy,
   });
 }
 
@@ -292,6 +295,13 @@ export interface LocalEngineRecipeOptions extends WasmSourceOptions {
   concurrency?: number;
   /** Custom raster encoder (thumbnails / image export). */
   imageEncoder?: LocalImageEncoder;
+  /**
+   * Deployment render policy — the local counterpart of the lattice a
+   * cloud deployment advertises, configured the way permissions are
+   * overridden: by the embedder, at construction. See
+   * {@link LocalEngineOptions.renderPolicy}. Default: `continuous`.
+   */
+  renderPolicy?: EngineRenderPolicy;
 }
 
 /**
@@ -353,6 +363,7 @@ export function localEngine(options: LocalEngineRecipeOptions = {}): LocalEngine
       (options.encoderWorker !== undefined
         ? new BrowserImageEncoder({ worker: options.encoderWorker })
         : undefined),
+    renderPolicy: options.renderPolicy,
   });
   return engine;
 }

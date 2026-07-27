@@ -13,6 +13,7 @@ import {
   CONTINUOUS_RENDER_POLICY,
   type DocumentRenderService,
   type DocumentSecurityProbeInfo,
+  type EngineRenderPolicy,
   type DocumentSecurityService,
   type MetadataService,
   type PageHandle,
@@ -54,16 +55,18 @@ export class LocalDocumentHandle implements DocumentHandle {
   readonly redaction: DocumentRedactionService;
   readonly security: DocumentSecurityService;
   /**
-   * Local rendering is in-process and exact — every viewport renders as
-   * requested, so the policy is `continuous` forever. This is the
-   * engine-parity anchor: plugin code calls the same `policy()` on both
-   * engines and `snapViewportToPolicy` is the identity here.
+   * The engine's configured render policy, advertised through the same
+   * `policy()` every engine exposes (engine parity: plugin code never
+   * branches on engine kind). Local DEFAULTS to `continuous` — rendering
+   * is in-process and exact — but an embedder can configure a lattice at
+   * `localEngine({ renderPolicy })`, the same way permissions are
+   * overridden, and the local engine then budgets/enforces exactly like
+   * the cloud deployment would (see renderPolicyGuard.ts).
    */
-  readonly render: DocumentRenderService = {
-    policy: () => Promise.resolve(CONTINUOUS_RENDER_POLICY),
-  };
+  readonly render: DocumentRenderService;
   readonly events: DocumentEventStream;
   private readonly publisher: SessionEventPublisher;
+  private readonly renderPolicy: EngineRenderPolicy;
   private closed = false;
 
   constructor(
@@ -73,8 +76,11 @@ export class LocalDocumentHandle implements DocumentHandle {
     initialSecurity: DocumentSecurityProbeInfo,
     private readonly guard: ScopeGuard,
     sessionId: string,
+    renderPolicy: EngineRenderPolicy = CONTINUOUS_RENDER_POLICY,
   ) {
     const view = { isClosed: () => this.closed };
+    this.renderPolicy = renderPolicy;
+    this.render = { policy: () => Promise.resolve(this.renderPolicy) };
     const hub = new EventHub();
     this.events = hub;
     // A single instance, so every event is `kind: 'local'` — the same
@@ -115,6 +121,7 @@ export class LocalDocumentHandle implements DocumentHandle {
       this.imageEncoder,
       this.guard,
       this.publisher,
+      this.renderPolicy,
     );
   }
 

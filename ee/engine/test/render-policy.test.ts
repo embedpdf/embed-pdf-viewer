@@ -1,7 +1,7 @@
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
-import { snapViewportToPolicy } from '@embedpdf/engine-core/runtime';
+import { snapAppearanceScale, snapFullPageViewport } from '@embedpdf/engine-core/runtime';
 import { createCloudEngine } from '../src/index';
 import {
   buildDbSeededFixture,
@@ -48,12 +48,15 @@ describe('doc.render.policy (cloud)', () => {
       expect(doc.render).toBeDefined();
       const policy = await doc.render!.policy();
       // The deployment default (SCALE-OUT §2.1b): a full-page WIDTH ladder
-      // — the bounded quantity is output pixels, never zoom — with the
-      // tiles block reserved-absent until WS2c, unenforced until the
-      // client stack ships snap everywhere.
+      // — the bounded quantity is output pixels, never zoom — plus the
+      // appearance SCALE lattice (appearances must track the page's
+      // effective render scale to composite crisply), with the tiles
+      // block reserved-absent until WS2c, unenforced until the client
+      // stack ships snap everywhere.
       expect(policy).toEqual({
         kind: 'lattice',
         fullPage: { widths: [320, 640, 1280, 2560] },
+        appearances: { scales: [1, 2, 4] },
         maxRenderPixels: 32_000_000,
         formats: ['webp'],
         background: 'white',
@@ -63,8 +66,11 @@ describe('doc.render.policy (cloud)', () => {
       // The ONE snap implementation conforms a scale-shaped request to
       // the canonical width axis using the page's width: 2x on a 612pt
       // page needs 1224px -> ladder 1280.
-      const snapped = snapViewportToPolicy(policy, { kind: 'scale', scale: 2 }, { pageWidth: 612 });
+      const snapped = snapFullPageViewport(policy, { kind: 'scale', scale: 2 }, { pageWidth: 612 });
       expect(snapped).toEqual({ kind: 'width', width: 1280 });
+
+      // Appearance conformance is its own axis: 1.5 rides up to 2.
+      expect(snapAppearanceScale(policy, 1.5)).toBe(2);
 
       // Policy reads are cached-access reads after the first call — no
       // extra handshake shape; calling again is cheap and identical.

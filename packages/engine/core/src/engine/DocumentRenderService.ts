@@ -25,7 +25,7 @@ import type { PageRenderViewport } from '../dto/PageRender';
  *
  * The SDK never conforms a request implicitly — the same `render.image`
  * call must not return different pixels on local vs cloud. Conformance is
- * the caller's visible choice via {@link snapViewportToPolicy}.
+ * the caller's visible choice via {@link snapFullPageViewport}.
  */
 export type EngineRenderPolicy =
   | { readonly kind: 'continuous' }
@@ -36,6 +36,15 @@ export type EngineRenderPolicy =
         readonly tileSizes: readonly number[];
         readonly scales: readonly number[];
       };
+      /**
+       * Annotation-appearance lattice — SCALE-based, unlike full pages:
+       * an appearance is sized by `annotation.rect × scale`, rects span
+       * orders of magnitude (a 4pt caret vs a page-sized stamp), and the
+       * composite must track the PAGE's effective render scale or
+       * annotations sit blurry on a crisp raster. Small images → the
+       * ladder affords finer, taller steps than pages ever could.
+       */
+      readonly appearances?: { readonly scales: readonly number[] };
       readonly maxRenderPixels?: number;
       readonly formats: readonly ('webp' | 'png')[];
       readonly background: 'white';
@@ -71,7 +80,7 @@ export interface DocumentRenderService {
  *   omitting it for a scale viewport under a lattice policy is a
  *   programmer error and throws `InvalidArg`.
  */
-export function snapViewportToPolicy(
+export function snapFullPageViewport(
   policy: EngineRenderPolicy,
   viewport: PageRenderViewport,
   opts?: { pageWidth?: number },
@@ -98,4 +107,24 @@ export function snapViewportToPolicy(
 
   const snapped = widths.find((width) => width >= requested) ?? widths[widths.length - 1]!;
   return { kind: 'width', width: snapped };
+}
+
+/**
+ * Conform an annotation-appearance scale to the policy's appearance
+ * lattice. Same discipline as {@link snapFullPageViewport}: identity on
+ * continuous (and when the policy carries no appearance block), snap UP,
+ * cap at the largest point. Callers derive `scale` from the page's
+ * effective render scale (`snappedWidth / pageWidth`, × devicePixelRatio
+ * as needed) so composites stay crisp against the page raster.
+ */
+export function snapAppearanceScale(policy: EngineRenderPolicy, scale: number): number {
+  if (policy.kind === 'continuous' || policy.appearances === undefined) return scale;
+  if (policy.appearances.scales.length === 0) {
+    throw new EngineError(
+      EngineErrorCode.InvalidArg,
+      'render policy has an empty appearance-scale lattice',
+    );
+  }
+  const scales = [...policy.appearances.scales].sort((a, b) => a - b);
+  return scales.find((s) => s >= scale) ?? scales[scales.length - 1]!;
 }

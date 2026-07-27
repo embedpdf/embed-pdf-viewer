@@ -157,6 +157,7 @@ export class CloudDocumentHandle implements DocumentHandle {
           kind: 'lattice',
           fullPage: { widths: advertised.fullPage.widths },
           ...(advertised.tiles ? { tiles: advertised.tiles } : {}),
+          ...(advertised.appearances ? { appearances: advertised.appearances } : {}),
           ...(advertised.maxRenderPixels !== undefined
             ? { maxRenderPixels: advertised.maxRenderPixels }
             : {}),

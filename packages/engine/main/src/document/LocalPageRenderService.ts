@@ -1,9 +1,11 @@
 import {
   AbortablePromise,
+  CONTINUOUS_RENDER_POLICY,
   EngineError,
   EngineErrorCode,
   createPageImageHandle,
   wirePack,
+  type EngineRenderPolicy,
   type PageImageHandle,
   type PageImageOptions,
   type PageObjectNumber,
@@ -13,6 +15,7 @@ import {
 } from '@embedpdf/engine-core/runtime';
 
 import type { LocalImageEncoder } from '../render/BrowserImageEncoder';
+import { assertFullPageOnLattice, withRenderBudget } from '../render/renderPolicyGuard';
 import type { ScopeGuard } from '../scope';
 import { Priority } from '../worker/Priority';
 import type { JobId, WorkerResultPayload } from '../worker/protocol';
@@ -30,6 +33,7 @@ export class LocalPageRenderService implements PageRenderService {
     private readonly view: DocClosedView,
     private readonly encoder: LocalImageEncoder,
     private readonly guard: ScopeGuard,
+    private readonly policy: EngineRenderPolicy = CONTINUOUS_RENDER_POLICY,
   ) {}
 
   raw(options?: PageRenderOptions): AbortablePromise<PageRaster> {
@@ -41,11 +45,18 @@ export class LocalPageRenderService implements PageRenderService {
     // Cloud parity: /render gates on `doc.render` (the session-level
     // rendering capability). image() flows through raw() so a single
     // assertion here covers both.
+    // Deployment render policy (localEngine({ renderPolicy })): an
+    // enforced lattice rejects off-lattice full-page renders exactly like
+    // the enforcing server, and the policy's pixel budget rides into the
+    // worker either way. Both are the identity under the default
+    // `continuous` policy.
     try {
       this.guard.assertCapability('doc.render');
+      assertFullPageOnLattice(this.policy, options);
     } catch (err) {
       return AbortablePromise.rejectReason(err);
     }
+    const effectiveOptions = withRenderBudget(this.policy, options);
     const docId = this.docId;
     const pon = this.pageObjectNumber;
     const submission = this.queue.enqueue<WorkerResultPayload>(
@@ -56,7 +67,7 @@ export class LocalPageRenderService implements PageRenderService {
             jobId,
             docId,
             pageObjectNumber: pon,
-            options,
+            options: effectiveOptions,
           }),
       },
       { priority: Priority.HIGH },

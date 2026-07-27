@@ -55,8 +55,10 @@ export interface PageRenderOptions {
    * lattice bounds width but not height — a 1×14,400pt page still
    * explodes vertically — so the guard lives where the allocation
    * happens (the decode-bomb-guard pattern). SERVER requests carry it
-   * from the deployment's render policy; LOCAL callers omit it —
-   * exactness is the local product promise.
+   * from the deployment's render policy; LOCAL engines inject it only
+   * when `localEngine({ renderPolicy })` configured a budget — the
+   * default local policy stays continuous and unbudgeted (exactness is
+   * the local product promise).
    */
   maxOutputPixels?: number;
 }

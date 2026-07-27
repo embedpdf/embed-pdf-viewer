@@ -140,6 +140,7 @@ export class AnnotationAppearanceReader {
               rotation,
               scale,
               unrotatedRect !== undefined,
+              options.maxOutputPixels,
             );
             if (!raster) continue;
             appearances.push({
@@ -174,6 +175,7 @@ export class AnnotationAppearanceReader {
     rotation: PdfRotation,
     scale: number,
     stripRotation: boolean,
+    maxOutputPixels?: number,
   ): PageRaster | null {
     const { fn } = this.runtime;
 
@@ -198,6 +200,7 @@ export class AnnotationAppearanceReader {
       page,
       rotation,
       viewport: { kind: 'scale', scale },
+      ...(maxOutputPixels !== undefined ? { maxOutputPixels } : {}),
       background: 'transparent',
       // `stripRotation` (EmbedPDF box-kind rotation only): render the AP form
       // content WITHOUT its rotation Matrix, MatchRect-mapped to the unrotated

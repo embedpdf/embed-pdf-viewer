@@ -168,6 +168,7 @@ describe('WS2 derived renders', () => {
     const body = (await res.json()) as {
       renderPolicy?: {
         fullPage: { widths: number[] };
+        appearances: { scales: number[] };
         maxRenderPixels: number;
         formats: string[];
         enforced: boolean;
@@ -175,11 +176,93 @@ describe('WS2 derived renders', () => {
     };
     expect(body.renderPolicy).toEqual({
       fullPage: { widths: [320, 640, 1280, 2560] },
+      appearances: { scales: [1, 2, 4] },
       maxRenderPixels: 32_000_000,
       formats: ['webp'],
       background: 'white',
       enforced: false,
     });
+  });
+
+  test('appearance renders: scale lattice enforced on versioned tokens only', async () => {
+    const tenantId = 'tenant-appear';
+    const docId = 'docappear0001';
+    await seedDocument(fx, tenantId, docId, { pageCount: 1 });
+    const headers = { Authorization: `Bearer ${docToken(tenantId, docId)}` };
+    const appearancesUrl = (base: string, doc: string, token: string) =>
+      `${base}/v1/docs/${doc}/layers/default/annotations/pages/1/appearances@${token}`;
+
+    // Default fixture (enforce=false): an off-lattice scale still computes.
+    const lax = await fetch(
+      appearancesUrl(fx.baseUrl, docId, 'annotationVersion=1,format=webp,scale=3'),
+      { headers },
+    );
+    expect(lax.status).toBe(200);
+    expect(lax.headers.get('content-type')).toContain('multipart/form-data');
+
+    const strict = await buildFixture({ renderLattice: { enforce: true } });
+    try {
+      const strictDoc = 'docappear0002';
+      await seedDocument(strict, tenantId, strictDoc, { pageCount: 1 });
+      const strictHeaders = { Authorization: `Bearer ${docToken(tenantId, strictDoc)}` };
+
+      // Versioned off-lattice scale → 400, policy attached.
+      const rejected = await fetch(
+        appearancesUrl(strict.baseUrl, strictDoc, 'annotationVersion=1,format=webp,scale=3'),
+        { headers: strictHeaders },
+      );
+      expect(rejected.status).toBe(400);
+      const body = (await rejected.json()) as {
+        error: { details?: { renderPolicy?: { appearances?: { scales: number[] } } } };
+      };
+      expect(body.error.details?.renderPolicy?.appearances?.scales).toEqual([1, 2, 4]);
+
+      // Versioned on-lattice scale → 200.
+      const accepted = await fetch(
+        appearancesUrl(strict.baseUrl, strictDoc, 'annotationVersion=1,format=webp,scale=2'),
+        { headers: strictHeaders },
+      );
+      expect(accepted.status).toBe(200);
+
+      // The UNVERSIONED alias is the escape hatch: never enforced (no-store).
+      const unversioned = await fetch(
+        `${strict.baseUrl}/v1/docs/${strictDoc}/layers/default/annotations/pages/1/appearances?scale=3`,
+        { headers: strictHeaders },
+      );
+      expect(unversioned.status).toBe(200);
+      expect(unversioned.headers.get('cache-control')).toContain('no-store');
+    } finally {
+      await tearDown(strict);
+    }
+  });
+
+  test('appearance renders carry the output-pixel budget into the worker', async () => {
+    // Tiny budget: the stub raster is (8×scale)² px, so scale=4 → 1024 px
+    // blows a 100 px budget even though 4 is ON the lattice — the budget is
+    // the memory guard, the lattice is the canonical-point guard.
+    const tiny = await buildFixture({ renderLattice: { maxRenderPixels: 100 } });
+    try {
+      const tenantId = 'tenant-appbudget';
+      const docId = 'docappbud0001';
+      await seedDocument(tiny, tenantId, docId, { pageCount: 1 });
+      const headers = { Authorization: `Bearer ${docToken(tenantId, docId)}` };
+
+      const blown = await fetch(
+        `${tiny.baseUrl}/v1/docs/${docId}/layers/default/annotations/pages/1/appearances@annotationVersion=1,format=webp,scale=4`,
+        { headers },
+      );
+      expect(blown.status).toBe(400);
+      const body = (await blown.json()) as { error: { message: string } };
+      expect(body.error.message).toContain('budget');
+
+      const fits = await fetch(
+        `${tiny.baseUrl}/v1/docs/${docId}/layers/default/annotations/pages/1/appearances@annotationVersion=1,format=webp,scale=1`,
+        { headers },
+      );
+      expect(fits.status).toBe(200);
+    } finally {
+      await tearDown(tiny);
+    }
   });
 
   test('warm on upload: commit renders page 1, records key + ready, admin routes serve it', async () => {
@@ -292,7 +375,12 @@ describe('WS2 derived renders', () => {
 /* ------------------------------------------------------------------ */
 
 async function buildFixture(opts?: {
-  renderLattice?: { scales?: number[]; enforce?: boolean };
+  renderLattice?: {
+    widths?: number[];
+    appearanceScales?: number[];
+    maxRenderPixels?: number;
+    enforce?: boolean;
+  };
 }): Promise<Fixture> {
   const storageRoot = await mkdtemp(join(tmpdir(), 'derived-renders-store-'));
   const cacheRoot = await mkdtemp(join(tmpdir(), 'derived-renders-cache-'));

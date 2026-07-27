@@ -318,6 +318,16 @@ export const AccessResponseSchema = z.object({
           scales: z.array(z.number().positive()),
         })
         .optional(),
+      /**
+       * Annotation-appearance lattice — SCALE-based (appearances are sized
+       * by `rect × scale` and must track the page's effective render scale
+       * for crisp composites).
+       */
+      appearances: z
+        .object({
+          scales: z.array(z.number().positive()),
+        })
+        .optional(),
       /** Worker-side output budget for degenerate page geometry. */
       maxRenderPixels: z.number().int().positive().optional(),
       formats: z.array(z.enum(['webp', 'png'])),

@@ -3,6 +3,7 @@ import {
   EngineError,
   EngineErrorCode,
   wirePack,
+  type AnnotationAppearanceImageOptions,
   type PageImageOptions,
   type PageNetworkRenderFormat,
 } from '@embedpdf/engine-core/runtime';
@@ -28,6 +29,14 @@ export interface DerivedRenderServiceOptions {
    */
   widths?: number[];
   /**
+   * Annotation-appearance scale lattice. Appearances are sized by
+   * `rect × scale`, and — unlike full pages — they must track the page's
+   * EFFECTIVE render scale to composite crisply, so their canonical axis
+   * is scale, not width. Default `[1, 2, 4]` (couples with the width
+   * ladder's ~2× steps). Advertised as `policy().appearances`.
+   */
+  appearanceScales?: number[];
+  /**
    * Worker-side output-pixel budget for EVERY server render (width bounds
    * width, not height — degenerate geometry still explodes vertically).
    * Default 32,000,000 (~32MP). Advertised in the policy.
@@ -38,7 +47,7 @@ export interface DerivedRenderServiceOptions {
    * with 400 (`renderPolicy` echoed). Rect-target requests are exempt —
    * they belong to the tile policy once it exists (WS2c) and stay
    * compute-only until then. When false (default until the client stack
-   * ships `snapViewportToPolicy` everywhere), off-lattice renders are
+   * ships `snapFullPageViewport` everywhere), off-lattice renders are
    * computed but never persisted — no breakage, no storage-DoS surface.
    */
   enforce?: boolean;
@@ -86,6 +95,7 @@ export interface DerivedRenderResult {
 export class DerivedRenderService {
   private readonly storage: ObjectStore;
   private readonly widths: number[];
+  private readonly appearanceScales: number[];
   private readonly enforce: boolean;
   private readonly maxPixels: number;
   private readonly cache?: BaseFileCache;
@@ -97,6 +107,7 @@ export class DerivedRenderService {
   constructor(opts: DerivedRenderServiceOptions) {
     this.storage = opts.storage;
     this.widths = opts.widths ?? [320, 640, 1280, 2560];
+    this.appearanceScales = opts.appearanceScales ?? [1, 2, 4];
     this.maxPixels = opts.maxRenderPixels ?? 32_000_000;
     this.enforce = opts.enforce ?? false;
     this.cache = opts.cache;
@@ -111,6 +122,7 @@ export class DerivedRenderService {
       fullPage: { widths: [...this.widths] },
       // `tiles` is deliberately ABSENT until the deep-zoom vertical ships
       // (WS2c) — the schema reserves its shape so the contract never churns.
+      appearances: { scales: [...this.appearanceScales] },
       maxRenderPixels: this.maxPixels,
       formats: ['webp'],
       background: 'white',
@@ -172,11 +184,41 @@ export class DerivedRenderService {
     return { onLattice, fullPage, canonicalToken };
   }
 
-  /** Throw the 400 the enforcement contract promises, policy attached. */
-  rejectOffLattice(): never {
+  /**
+   * Classify an appearance-batch render against the appearance scale
+   * lattice. Same conservative construction as `classify`: any option
+   * outside the canonical set — off-lattice scale, rotation, quality,
+   * non-normal modes, png — is off-lattice. `scale` defaults to 1 (the
+   * DTO's documented default), so an unspecified scale is canonical when
+   * the lattice contains 1. Durable appearance batches are a fast-follow;
+   * until then this feeds enforcement only.
+   */
+  classifyAppearance(input: {
+    imageOptions: AnnotationAppearanceImageOptions;
+    format: PageNetworkRenderFormat;
+  }): { onLattice: boolean } {
+    const o = input.imageOptions;
+    const scale = o.scale ?? 1;
+    const normalOnly = o.modes === undefined || (o.modes.length === 1 && o.modes[0] === 'normal');
+    const onLattice =
+      this.appearanceScales.includes(scale) &&
+      input.format === 'webp' &&
+      (o.rotation === undefined || o.rotation === 0) &&
+      o.quality === undefined &&
+      normalOnly;
+    return { onLattice };
+  }
+
+  /**
+   * Throw the 400 the enforcement contract promises, policy attached.
+   * `hint` names the conformance helper for the rejected surface —
+   * identical wording to the local engine's renderPolicyGuard, so the
+   * error reads the same whichever engine rejected it.
+   */
+  rejectOffLattice(hint = 'use snapFullPageViewport(policy, viewport, { pageWidth })'): never {
     throw new EngineError(
       EngineErrorCode.InvalidArg,
-      'render request is off the deployment lattice (see renderPolicy; use policy.snap())',
+      `render request is off the deployment lattice (see renderPolicy; ${hint})`,
       { details: { renderPolicy: this.policy() } },
     );
   }

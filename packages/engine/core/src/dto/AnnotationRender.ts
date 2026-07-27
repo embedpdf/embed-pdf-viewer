@@ -29,6 +29,14 @@ export interface AnnotationAppearanceRenderOptions {
    * exist on the annotation's `/AP` are emitted. Default `['normal']`.
    */
   modes?: AnnotationAppearanceMode[];
+  /**
+   * Output-pixel budget PER APPEARANCE — same semantics as
+   * `PageRenderOptions.maxOutputPixels`: appearances are sized by
+   * `rect × scale`, and a page-sized stamp at a high scale is the same
+   * memory bomb a full-page render is. Server requests carry the
+   * deployment policy's budget; local callers omit it unless configured.
+   */
+  maxOutputPixels?: number;
 }
 
 /**

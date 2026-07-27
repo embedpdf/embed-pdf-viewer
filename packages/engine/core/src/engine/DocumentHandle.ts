@@ -51,7 +51,7 @@ export interface DocumentHandle {
    * Render POLICY surface (`doc.render.policy()`): the engine's render
    * lattice, or `continuous` on engines that render any viewport exactly
    * (the local engine). Pixels stay on `page(pon).render` — this carries
-   * policy only. Conformance is explicit via `snapViewportToPolicy`; no
+   * policy only. Conformance is explicit via `snapFullPageViewport`; no
    * engine ever snaps a render call implicitly. Optional while engines
    * ship it — feature-detect with `doc.render !== undefined`.
    */
