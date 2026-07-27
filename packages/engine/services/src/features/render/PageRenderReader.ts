@@ -42,6 +42,9 @@ export class PageRenderReader {
         page: { width: pageWidth, height: pageHeight },
         rotation,
         viewport,
+        ...(options.maxOutputPixels !== undefined
+          ? { maxOutputPixels: options.maxOutputPixels }
+          : {}),
         background: options.background === 'transparent' ? 'transparent' : 'white',
         draw: (bitmapPtr, matrixPtr, clipPtr) => {
           throwIfAborted(signal);

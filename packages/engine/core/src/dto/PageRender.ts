@@ -49,6 +49,16 @@ export interface PageRenderOptions {
   rotation?: PdfRotation;
   background?: PageRenderBackground;
   includeAnnotations?: boolean;
+  /**
+   * Output-pixel budget: the renderer rejects (InvalidArg) instead of
+   * allocating when `outputWidth × outputHeight` exceeds it. A WIDTH
+   * lattice bounds width but not height — a 1×14,400pt page still
+   * explodes vertically — so the guard lives where the allocation
+   * happens (the decode-bomb-guard pattern). SERVER requests carry it
+   * from the deployment's render policy; LOCAL callers omit it —
+   * exactness is the local product promise.
+   */
+  maxOutputPixels?: number;
 }
 
 export interface PageImageOptions extends PageRenderOptions {

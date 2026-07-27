@@ -142,14 +142,20 @@ export interface DocumentAccessInfo {
   };
   readonly expiresAt: number;
   /**
-   * The deployment's render lattice (SCALE-OUT WS2): canonical
-   * `viewport.scale` points whose renders are durable, CDN-shared
-   * artifacts. Local engines report nothing here (continuous rendering);
-   * cloud engines surface it so `policy.snap()` can conform requests
-   * EXPLICITLY — the SDK never snaps implicitly (engine parity).
+   * The deployment's render lattice (SCALE-OUT WS2): canonical full-page
+   * `viewport.width` points whose renders are durable, CDN-shared
+   * artifacts, plus the reserved tile-pyramid block. Local engines report
+   * nothing here (continuous rendering); cloud engines surface it so
+   * `snapViewportToPolicy` can conform requests EXPLICITLY — the SDK
+   * never snaps implicitly (engine parity).
    */
   readonly renderPolicy?: {
-    readonly viewport: { readonly kind: 'scale'; readonly scales: readonly number[] };
+    readonly fullPage: { readonly widths: readonly number[] };
+    readonly tiles?: {
+      readonly tileSizes: readonly number[];
+      readonly scales: readonly number[];
+    };
+    readonly maxRenderPixels?: number;
     readonly formats: readonly ('webp' | 'png')[];
     readonly background: 'white';
     readonly enforced: boolean;

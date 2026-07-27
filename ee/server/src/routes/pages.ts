@@ -484,11 +484,15 @@ async function renderPageImage(input: {
       ? { annotationVersion: requestedAnnotationVersion }
       : {}),
   });
+  // Enforcement is scoped to FULL-PAGE requests: rect targets belong to
+  // the tile policy once it exists (WS2c) and stay compute-only until
+  // then — otherwise flipping `enforce` would 400 every region render.
   if (
     derived !== undefined &&
     derived.enforced &&
     input.tokenQuery !== undefined &&
     classification !== undefined &&
+    classification.fullPage &&
     !classification.onLattice
   ) {
     setNoStore(input.reply);
@@ -503,7 +507,12 @@ async function renderPageImage(input: {
         input.scope.layerName,
       );
     }
-    const renderOptions = pageRenderOptionsFromImageOptions(imageOptions, includeAnnotations);
+    // Every server render carries the deployment's output-pixel budget —
+    // the worker rejects before allocating (degenerate-geometry guard).
+    const renderOptions = {
+      ...pageRenderOptionsFromImageOptions(imageOptions, includeAnnotations),
+      ...(derived !== undefined ? { maxOutputPixels: derived.maxRenderPixels } : {}),
+    };
     const build = (jobId: WorkerJobId) =>
       wirePack({
         kind: 'pages.render' as const,

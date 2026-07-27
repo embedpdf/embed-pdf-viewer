@@ -23,12 +23,16 @@ const SECRET = 'derived-renders-secret';
 
 /** Canonical lattice tokens (SCALE-OUT §2.1): alphabetical, codec-exact. */
 const THUMB_TOKEN =
-  'background=white,contentVersion=1,format=webp,includeAnnotations=false,viewport.kind=scale,viewport.scale=1';
-const SCALE2_TOKEN =
-  'background=white,contentVersion=1,format=webp,includeAnnotations=false,viewport.kind=scale,viewport.scale=2';
-/** Off-lattice: width-kind viewport (today's viewer shape). */
-const WIDTH_TOKEN =
+  'background=white,contentVersion=1,format=webp,includeAnnotations=false,viewport.kind=width,viewport.width=320';
+const W640_TOKEN =
+  'background=white,contentVersion=1,format=webp,includeAnnotations=false,viewport.kind=width,viewport.width=640';
+/** Off-lattice: a width outside the ladder (the old viewer default). */
+const OFFLATTICE_TOKEN =
   'annotationVersion=1,background=white,contentVersion=1,format=webp,includeAnnotations=true,viewport.kind=width,viewport.width=720';
+/** Rect-target region render: the (future) tile policy's jurisdiction —
+ *  exempt from full-page enforcement, compute-only until WS2c. */
+const RECT_TOKEN =
+  'background=white,contentVersion=1,format=webp,includeAnnotations=false,target.kind=rect,target.rect.bottom=0,target.rect.left=0,target.rect.right=100,target.rect.top=100,viewport.kind=width,viewport.width=64';
 
 interface Fixture {
   bundle: AppBundle;
@@ -100,9 +104,12 @@ describe('WS2 derived renders', () => {
     const headers = { Authorization: `Bearer ${docToken(tenantId, docId)}` };
 
     // Default fixture: enforce=false → width-kind renders still work…
-    const res = await fetch(`${fx.baseUrl}/v1/docs/${docId}/render/pages/1/data@${WIDTH_TOKEN}`, {
-      headers,
-    });
+    const res = await fetch(
+      `${fx.baseUrl}/v1/docs/${docId}/render/pages/1/data@${OFFLATTICE_TOKEN}`,
+      {
+        headers,
+      },
+    );
     expect(res.status).toBe(200);
     // …but leave nothing durable behind (only the on-lattice tier persists).
     const derivedPrefix = `${tenantId}/derived/`;
@@ -116,17 +123,26 @@ describe('WS2 derived renders', () => {
       await seedDocument(strict, tenantId, strictDoc, { pageCount: 1 });
       const strictHeaders = { Authorization: `Bearer ${docToken(tenantId, strictDoc)}` };
       const rejected = await fetch(
-        `${strict.baseUrl}/v1/docs/${strictDoc}/render/pages/1/data@${WIDTH_TOKEN}`,
+        `${strict.baseUrl}/v1/docs/${strictDoc}/render/pages/1/data@${OFFLATTICE_TOKEN}`,
         { headers: strictHeaders },
       );
       expect(rejected.status).toBe(400);
       const body = (await rejected.json()) as {
-        error: { details?: { renderPolicy?: { viewport: { scales: number[] } } } };
+        error: { details?: { renderPolicy?: { fullPage: { widths: number[] } } } };
       };
-      expect(body.error.details?.renderPolicy?.viewport.scales).toEqual([1, 2]);
+      expect(body.error.details?.renderPolicy?.fullPage.widths).toEqual([320, 640, 1280, 2560]);
+
+      // Rect-target region renders are EXEMPT from full-page enforcement:
+      // they belong to the (future) tile policy, and rejecting them here
+      // would kill tiling before it exists.
+      const rectRender = await fetch(
+        `${strict.baseUrl}/v1/docs/${strictDoc}/render/pages/1/data@${RECT_TOKEN}`,
+        { headers: strictHeaders },
+      );
+      expect(rectRender.status).toBe(200);
 
       const accepted = await fetch(
-        `${strict.baseUrl}/v1/docs/${strictDoc}/render/pages/1/data@${SCALE2_TOKEN}`,
+        `${strict.baseUrl}/v1/docs/${strictDoc}/render/pages/1/data@${W640_TOKEN}`,
         { headers: strictHeaders },
       );
       expect(accepted.status).toBe(200);
@@ -151,13 +167,15 @@ describe('WS2 derived renders', () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
       renderPolicy?: {
-        viewport: { kind: string; scales: number[] };
+        fullPage: { widths: number[] };
+        maxRenderPixels: number;
         formats: string[];
         enforced: boolean;
       };
     };
     expect(body.renderPolicy).toEqual({
-      viewport: { kind: 'scale', scales: [1, 2] },
+      fullPage: { widths: [320, 640, 1280, 2560] },
+      maxRenderPixels: 32_000_000,
       formats: ['webp'],
       background: 'white',
       enforced: false,
@@ -259,7 +277,7 @@ describe('WS2 derived renders', () => {
 
     // Layer view at the base epoch: annotations-on renders pin BOTH counters.
     const token =
-      'annotationVersion=1,background=white,contentVersion=1,format=webp,includeAnnotations=true,viewport.kind=scale,viewport.scale=1';
+      'annotationVersion=1,background=white,contentVersion=1,format=webp,includeAnnotations=true,viewport.kind=width,viewport.width=320';
     const res = await fetch(
       `${fx.baseUrl}/v1/docs/${docId}/layers/alice/render/pages/1/data@${token}`,
       { headers },

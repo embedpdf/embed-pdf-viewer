@@ -170,13 +170,16 @@ export interface BuildAppOptions {
   /** Treat pending migrations as drift at boot. Defaults to false. */
   failOnPending?: boolean;
   /**
-   * The render lattice (SCALE-OUT.md §2.1b): canonical `viewport.scale`
-   * points whose renders are DURABLE derived artifacts. `enforce: true`
-   * rejects off-lattice versioned render tokens with 400 (flip on once
-   * clients ship `policy.snap()`); default false = off-lattice renders are
-   * computed but never persisted.
+   * The render lattice (SCALE-OUT.md §2.1b): canonical FULL-PAGE
+   * `viewport.width` points whose renders are DURABLE derived artifacts —
+   * the bounded quantity is output pixels, never zoom. `maxRenderPixels`
+   * is the worker-side allocation budget every server render carries.
+   * `enforce: true` rejects off-lattice versioned FULL-PAGE tokens with
+   * 400 (flip on once clients ship `snapViewportToPolicy`); rect targets
+   * are exempt (the future tile policy's jurisdiction). Default false =
+   * off-lattice renders are computed but never persisted.
    */
-  renderLattice?: { scales?: number[]; enforce?: boolean };
+  renderLattice?: { widths?: number[]; maxRenderPixels?: number; enforce?: boolean };
 }
 
 export interface AppBundle {
@@ -350,7 +353,10 @@ export async function buildApp(opts: BuildAppOptions): Promise<AppBundle> {
     if (baseFileCache && pool) {
       derivedRenders = new DerivedRenderService({
         storage: opts.objectStore,
-        ...(opts.renderLattice?.scales ? { scales: opts.renderLattice.scales } : {}),
+        ...(opts.renderLattice?.widths ? { widths: opts.renderLattice.widths } : {}),
+        ...(opts.renderLattice?.maxRenderPixels !== undefined
+          ? { maxRenderPixels: opts.renderLattice.maxRenderPixels }
+          : {}),
         ...(opts.renderLattice?.enforce !== undefined
           ? { enforce: opts.renderLattice.enforce }
           : {}),

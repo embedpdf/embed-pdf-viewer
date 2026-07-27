@@ -298,10 +298,28 @@ export const AccessResponseSchema = z.object({
    */
   renderPolicy: z
     .object({
-      viewport: z.object({
-        kind: z.literal('scale'),
-        scales: z.array(z.number().positive()),
+      /**
+       * Full-page renders quantize on `viewport.width` — the bounded
+       * quantity is OUTPUT PIXELS, never zoom (PDF page space is
+       * effectively unbounded, so a scale lattice bounds artifact count
+       * but not size).
+       */
+      fullPage: z.object({
+        widths: z.array(z.number().int().positive()),
       }),
+      /**
+       * RESERVED for the deep-zoom vertical (WS2c): scale-based pyramid ×
+       * fixed tile size, constant per-job cost. Absent until the tiling
+       * plugin ships.
+       */
+      tiles: z
+        .object({
+          tileSizes: z.array(z.number().int().positive()),
+          scales: z.array(z.number().positive()),
+        })
+        .optional(),
+      /** Worker-side output budget for degenerate page geometry. */
+      maxRenderPixels: z.number().int().positive().optional(),
       formats: z.array(z.enum(['webp', 'png'])),
       background: z.enum(['white']),
       enforced: z.boolean(),

@@ -22,13 +22,24 @@ import type { ObjectStore } from '../storage/ObjectStore';
 
 export interface DerivedRenderServiceOptions {
   storage: ObjectStore;
-  /** Allowed `viewport.scale` lattice points. Default `[1, 2]`. */
-  scales?: number[];
   /**
-   * When true, off-lattice VERSIONED render tokens are rejected with 400
-   * (`renderPolicy` echoed). When false (default until the SDK ships its
-   * `snap` helper), off-lattice renders are computed but never persisted —
-   * no breakage, no storage-DoS surface.
+   * Full-page width ladder (SCALE-OUT §2.1b: the bounded quantity is
+   * OUTPUT PIXELS, never zoom). Default `[320, 640, 1280, 2560]`.
+   */
+  widths?: number[];
+  /**
+   * Worker-side output-pixel budget for EVERY server render (width bounds
+   * width, not height — degenerate geometry still explodes vertically).
+   * Default 32,000,000 (~32MP). Advertised in the policy.
+   */
+  maxRenderPixels?: number;
+  /**
+   * When true, off-lattice VERSIONED FULL-PAGE render tokens are rejected
+   * with 400 (`renderPolicy` echoed). Rect-target requests are exempt —
+   * they belong to the tile policy once it exists (WS2c) and stay
+   * compute-only until then. When false (default until the client stack
+   * ships `snapViewportToPolicy` everywhere), off-lattice renders are
+   * computed but never persisted — no breakage, no storage-DoS surface.
    */
   enforce?: boolean;
   /** Warm-path deps; optional so route-only tests can skip them. */
@@ -40,6 +51,12 @@ export interface DerivedRenderServiceOptions {
 
 export interface LatticeClassification {
   onLattice: boolean;
+  /**
+   * Whether this is a FULL-PAGE request (`target` absent or `{kind:
+   * 'page'}`). Enforcement applies only to these; rect targets are the
+   * (future) tile policy's jurisdiction.
+   */
+  fullPage: boolean;
   /**
    * The CANONICAL token re-encoded from the validated values — never the
    * client's raw string, so value spelling差 (`320` vs `320.0`) cannot mint
@@ -68,8 +85,9 @@ export interface DerivedRenderResult {
  */
 export class DerivedRenderService {
   private readonly storage: ObjectStore;
-  private readonly scales: number[];
+  private readonly widths: number[];
   private readonly enforce: boolean;
+  private readonly maxPixels: number;
   private readonly cache?: BaseFileCache;
   private readonly pool?: WorkerThreadPool;
   private readonly encoder?: SharpImageEncoder;
@@ -78,7 +96,8 @@ export class DerivedRenderService {
 
   constructor(opts: DerivedRenderServiceOptions) {
     this.storage = opts.storage;
-    this.scales = opts.scales ?? [1, 2];
+    this.widths = opts.widths ?? [320, 640, 1280, 2560];
+    this.maxPixels = opts.maxRenderPixels ?? 32_000_000;
     this.enforce = opts.enforce ?? false;
     this.cache = opts.cache;
     this.pool = opts.pool;
@@ -89,7 +108,10 @@ export class DerivedRenderService {
   /** The advertised deployment policy — rides `/v1/access`, never manifests. */
   policy(): RenderPolicy {
     return {
-      viewport: { kind: 'scale', scales: [...this.scales] },
+      fullPage: { widths: [...this.widths] },
+      // `tiles` is deliberately ABSENT until the deep-zoom vertical ships
+      // (WS2c) — the schema reserves its shape so the contract never churns.
+      maxRenderPixels: this.maxPixels,
       formats: ['webp'],
       background: 'white',
       enforced: this.enforce,
@@ -100,11 +122,16 @@ export class DerivedRenderService {
     return this.enforce;
   }
 
+  /** The output-pixel budget every server render carries into the worker. */
+  get maxRenderPixels(): number {
+    return this.maxPixels;
+  }
+
   /**
    * Classify a validated render request against the lattice. Conservative
    * by construction: any option outside the enumerated canonical set —
-   * target rects, rotations, quality overrides, png — is off-lattice
-   * (computed, never persisted).
+   * rect targets, rotations, quality overrides, png, scale viewports — is
+   * off-lattice (computed, never persisted).
    */
   classify(input: {
     imageOptions: PageImageOptions;
@@ -114,19 +141,19 @@ export class DerivedRenderService {
   }): LatticeClassification {
     const o = input.imageOptions;
     const viewport = o.viewport;
-    const scale = viewport?.kind === 'scale' ? viewport.scale : undefined;
+    const fullPage = o.target === undefined || o.target.kind === 'page';
+    const width = viewport?.kind === 'width' ? viewport.width : undefined;
     const onLattice =
-      viewport?.kind === 'scale' &&
-      scale !== undefined &&
-      this.scales.includes(scale) &&
+      fullPage &&
+      width !== undefined &&
+      this.widths.includes(width) &&
       input.format === 'webp' &&
       (o.background === undefined || o.background === 'white') &&
-      (o.target === undefined || o.target.kind === 'page') &&
       (o.rotation === undefined || o.rotation === 0) &&
       o.quality === undefined;
 
     if (!onLattice || input.contentVersion === undefined) {
-      return { onLattice };
+      return { onLattice, fullPage };
     }
 
     const includeAnnotations = o.includeAnnotations ?? true;
@@ -139,10 +166,10 @@ export class DerivedRenderService {
         background: 'white',
         format: 'webp',
         includeAnnotations,
-        viewport: { kind: 'scale', scale },
+        viewport: { kind: 'width', width },
       }),
     );
-    return { onLattice, canonicalToken };
+    return { onLattice, fullPage, canonicalToken };
   }
 
   /** Throw the 400 the enforcement contract promises, policy attached. */
@@ -222,7 +249,7 @@ export class DerivedRenderService {
 
     try {
       const imageOptions: PageImageOptions = {
-        viewport: { kind: 'scale', scale: this.thumbnailScale() },
+        viewport: { kind: 'width', width: this.thumbnailWidth() },
         format: 'webp',
         background: 'white',
         includeAnnotations: false,
@@ -250,7 +277,10 @@ export class DerivedRenderService {
             path: handle.path,
             password: null,
             pageIndex: 0,
-            options: pageRenderOptionsFromImageOptions(imageOptions, false),
+            options: {
+              ...pageRenderOptionsFromImageOptions(imageOptions, false),
+              maxOutputPixels: this.maxPixels,
+            },
           }),
         );
         if (payload.tag !== 'document.renderPageFile') {
@@ -281,9 +311,9 @@ export class DerivedRenderService {
     }
   }
 
-  /** Smallest lattice scale — the dashboard tile's point. */
-  thumbnailScale(): number {
-    return Math.min(...this.scales);
+  /** Smallest ladder width — the dashboard tile's point. */
+  thumbnailWidth(): number {
+    return Math.min(...this.widths);
   }
 }
 

@@ -103,6 +103,15 @@ export interface RasterizeOptions {
   viewport: PageRenderViewport;
   background: PageRenderBackground;
   /**
+   * Output-pixel budget: reject BEFORE allocating when the computed device
+   * size exceeds it (the decode-bomb-guard pattern — the check lives where
+   * the allocation happens). PDF page space is effectively unbounded, so a
+   * width-bounded request can still explode vertically on degenerate
+   * geometry. Optional: LOCAL renders omit it (exactness is the local
+   * product promise); server renders carry the deployment policy's budget.
+   */
+  maxOutputPixels?: number;
+  /**
    * Perform the PDFium draw into `bitmapPtr` with the prepared user `matrixPtr`
    * (and `clipPtr`, the full-bitmap clip — annotation renders ignore it). Return
    * false to abort the raster (e.g. the PDFium call failed).
@@ -126,6 +135,13 @@ export function rasterize(runtime: PdfRuntimeModule, opts: RasterizeOptions): Pa
 
   const displayRect = pdfRectToDisplayRect(rect, page.height);
   const { width, height } = deviceSize(displayRect, rotation, viewport);
+  if (opts.maxOutputPixels !== undefined && width * height > opts.maxOutputPixels) {
+    throw new EngineError(
+      EngineErrorCode.InvalidArg,
+      `render output ${width}x${height} exceeds the ${opts.maxOutputPixels}-pixel budget — ` +
+        'request a smaller width (or tiles, once available)',
+    );
+  }
   const stride = width * 4;
   const bytes = stride * height;
 

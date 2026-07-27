@@ -7,7 +7,7 @@ import {
 
 const LATTICE: EngineRenderPolicy = {
   kind: 'lattice',
-  scales: [1, 2],
+  fullPage: { widths: [320, 640, 1280, 2560] },
   formats: ['webp'],
   background: 'white',
   enforced: false,
@@ -21,52 +21,65 @@ describe('snapViewportToPolicy', () => {
     expect(snapViewportToPolicy(CONTINUOUS_RENDER_POLICY, width)).toBe(width);
   });
 
-  test('scale requests snap UP to the smallest lattice point that covers them', () => {
-    expect(snapViewportToPolicy(LATTICE, { kind: 'scale', scale: 0.8 })).toEqual({
-      kind: 'scale',
-      scale: 1,
+  test('width requests snap UP to the smallest ladder width that covers them', () => {
+    expect(snapViewportToPolicy(LATTICE, { kind: 'width', width: 300 })).toEqual({
+      kind: 'width',
+      width: 320,
     });
-    expect(snapViewportToPolicy(LATTICE, { kind: 'scale', scale: 1 })).toEqual({
-      kind: 'scale',
-      scale: 1,
+    expect(snapViewportToPolicy(LATTICE, { kind: 'width', width: 640 })).toEqual({
+      kind: 'width',
+      width: 640,
     });
-    expect(snapViewportToPolicy(LATTICE, { kind: 'scale', scale: 1.5 })).toEqual({
-      kind: 'scale',
-      scale: 2,
+    expect(snapViewportToPolicy(LATTICE, { kind: 'width', width: 720 })).toEqual({
+      kind: 'width',
+      width: 1280,
     });
   });
 
-  test('beyond the largest point caps at the largest (never rejects here)', () => {
-    expect(snapViewportToPolicy(LATTICE, { kind: 'scale', scale: 7 })).toEqual({
-      kind: 'scale',
-      scale: 2,
+  test('beyond the largest width caps at the largest — deeper detail is the tile pyramid, by design', () => {
+    expect(snapViewportToPolicy(LATTICE, { kind: 'width', width: 100_000 })).toEqual({
+      kind: 'width',
+      width: 2560,
     });
+  });
+
+  test('scale requests convert through pageWidth and return the CANONICAL width axis', () => {
+    // 612pt page at 1× → 612px needed → snaps to 640.
+    expect(snapViewportToPolicy(LATTICE, { kind: 'scale', scale: 1 }, { pageWidth: 612 })).toEqual({
+      kind: 'width',
+      width: 640,
+    });
+    // 2× on the same page → 1224px → snaps to 1280.
+    expect(snapViewportToPolicy(LATTICE, { kind: 'scale', scale: 2 }, { pageWidth: 612 })).toEqual({
+      kind: 'width',
+      width: 1280,
+    });
+    // The memory-bomb case the width lattice exists for: scale 1 of a
+    // giant page caps at the ladder top instead of minting a monster.
+    expect(
+      snapViewportToPolicy(LATTICE, { kind: 'scale', scale: 1 }, { pageWidth: 1_000_000 }),
+    ).toEqual({ kind: 'width', width: 2560 });
   });
 
   test('a scale viewport with no scale defaults to 1', () => {
-    expect(snapViewportToPolicy(LATTICE, { kind: 'scale' })).toEqual({ kind: 'scale', scale: 1 });
+    expect(snapViewportToPolicy(LATTICE, { kind: 'scale' }, { pageWidth: 612 })).toEqual({
+      kind: 'width',
+      width: 640,
+    });
   });
 
-  test('width requests convert through pageWidth and return the CANONICAL axis', () => {
-    // 612pt page, 720px requested → 1.176× → snaps to 2.
-    expect(
-      snapViewportToPolicy(LATTICE, { kind: 'width', width: 720 }, { pageWidth: 612 }),
-    ).toEqual({ kind: 'scale', scale: 2 });
-    // 306px on a 612pt page → 0.5× → snaps to 1.
-    expect(
-      snapViewportToPolicy(LATTICE, { kind: 'width', width: 306 }, { pageWidth: 612 }),
-    ).toEqual({ kind: 'scale', scale: 1 });
+  test('scale without pageWidth under a lattice is a programmer error', () => {
+    expect(() => snapViewportToPolicy(LATTICE, { kind: 'scale', scale: 1 })).toThrow(/pageWidth/);
   });
 
-  test('width without pageWidth under a lattice is a programmer error', () => {
-    expect(() => snapViewportToPolicy(LATTICE, { kind: 'width', width: 720 })).toThrow(/pageWidth/);
-  });
-
-  test('unsorted lattice scales still snap correctly', () => {
-    const unsorted: EngineRenderPolicy = { ...LATTICE, scales: [2, 1] };
-    expect(snapViewportToPolicy(unsorted, { kind: 'scale', scale: 0.4 })).toEqual({
-      kind: 'scale',
-      scale: 1,
+  test('unsorted ladder widths still snap correctly', () => {
+    const unsorted: EngineRenderPolicy = {
+      ...LATTICE,
+      fullPage: { widths: [2560, 320, 1280, 640] },
+    };
+    expect(snapViewportToPolicy(unsorted, { kind: 'width', width: 400 })).toEqual({
+      kind: 'width',
+      width: 640,
     });
   });
 });

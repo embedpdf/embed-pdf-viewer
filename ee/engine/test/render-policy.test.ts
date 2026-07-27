@@ -47,24 +47,24 @@ describe('doc.render.policy (cloud)', () => {
     try {
       expect(doc.render).toBeDefined();
       const policy = await doc.render!.policy();
-      // The deployment default (SCALE-OUT §2.1b): scales [1,2], webp,
-      // white, unenforced until the client stack ships snap everywhere.
+      // The deployment default (SCALE-OUT §2.1b): a full-page WIDTH ladder
+      // — the bounded quantity is output pixels, never zoom — with the
+      // tiles block reserved-absent until WS2c, unenforced until the
+      // client stack ships snap everywhere.
       expect(policy).toEqual({
         kind: 'lattice',
-        scales: [1, 2],
+        fullPage: { widths: [320, 640, 1280, 2560] },
+        maxRenderPixels: 32_000_000,
         formats: ['webp'],
         background: 'white',
         enforced: false,
       });
 
-      // The ONE snap implementation conforms a viewer-shaped request
-      // (width-kind) to the canonical axis using the page's width.
-      const snapped = snapViewportToPolicy(
-        policy,
-        { kind: 'width', width: 720 },
-        { pageWidth: 612 },
-      );
-      expect(snapped).toEqual({ kind: 'scale', scale: 2 });
+      // The ONE snap implementation conforms a scale-shaped request to
+      // the canonical width axis using the page's width: 2x on a 612pt
+      // page needs 1224px -> ladder 1280.
+      const snapped = snapViewportToPolicy(policy, { kind: 'scale', scale: 2 }, { pageWidth: 612 });
+      expect(snapped).toEqual({ kind: 'width', width: 1280 });
 
       // Policy reads are cached-access reads after the first call — no
       // extra handshake shape; calling again is cheap and identical.

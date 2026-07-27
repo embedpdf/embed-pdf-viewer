@@ -155,7 +155,11 @@ export class CloudDocumentHandle implements DocumentHandle {
         if (!advertised) return CONTINUOUS_RENDER_POLICY;
         return {
           kind: 'lattice',
-          scales: advertised.viewport.scales,
+          fullPage: { widths: advertised.fullPage.widths },
+          ...(advertised.tiles ? { tiles: advertised.tiles } : {}),
+          ...(advertised.maxRenderPixels !== undefined
+            ? { maxRenderPixels: advertised.maxRenderPixels }
+            : {}),
           formats: advertised.formats,
           background: advertised.background,
           enforced: advertised.enforced,
