@@ -518,6 +518,16 @@ export interface AnnotationHostCapability extends AnnotationCapability {
    *  committed create/geometry-edit, so the render layer refetches rasters then —
    *  and only then (a stamp resize re-fits its AP engine-side, for example). */
   appearanceEpoch(pon: PageObjectNumber): string;
+  /**
+   * The scale a baked appearance should render at for a desired device
+   * scale — `snapAppearanceScale` over the document's `renderPolicy` (the
+   * kernel-materialized fact; identity under `continuous`). THE identity a
+   * render layer keys its bake effect on: inside an appearance-lattice rung,
+   * zoom ticks produce the same value → no re-bake; crossing a rung re-bakes
+   * once. This plugin owns its raster product end to end — the policy is a
+   * document fact, not another plugin's possession.
+   */
+  bakeScale(renderScale: number): number;
   /** The engine's rendered /AP appearance images for a page — the `baked` visual. */
   appearances(
     pon: PageObjectNumber,

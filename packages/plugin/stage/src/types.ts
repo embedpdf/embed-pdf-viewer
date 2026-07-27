@@ -193,6 +193,15 @@ export interface VisiblePage extends PageBox {
   screenX: number;
   screenY: number;
   transform: PageTransform;
+  /**
+   * The page region actually ON SCREEN, in UN-rotated page points (y-down) —
+   * viewport ∩ footprint inverted through the transform (exact for
+   * quarter-turns). Zero-sized when the page sits outside the viewport.
+   * Visibility is the STAGE's data (it already intersects viewport × pages to
+   * virtualize); adapters and demand consumers (tiling's `PageViewDemand`)
+   * read it instead of re-deriving camera math per framework.
+   */
+  visibleRect: Rect;
 }
 
 export interface StageState extends StageSettings {

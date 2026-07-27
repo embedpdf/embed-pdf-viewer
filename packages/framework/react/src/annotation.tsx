@@ -736,21 +736,25 @@ export function AnnotationLayer({ renderers }: AnnotationLayerProps = {}) {
 
   // Baked annotations render from engine rasters — refetch when the page's
   // baked set or an /AP content version changes (a freshly placed stamp, a
-  // resize whose re-bake RESOLVED), plus on zoom via renderScale. A move or a
-  // rotate leaves the epoch untouched (the blit repositions the same pixels),
-  // and live gesture previews don't touch it either — so no mid-drag spam.
+  // resize whose re-bake RESOLVED), plus at APPEARANCE-SCALE crossings. A move
+  // or a rotate leaves the epoch untouched (the blit repositions the same
+  // pixels), and live gesture previews don't touch it either — so no mid-drag
+  // spam.
   const bakedKey = useSelector(AnnotationHostToken, (c) => c.appearanceEpoch(page.pon));
+  // The bake scale conforms to the document's render policy — the plugin's
+  // OWN capability over the kernel-materialized fact (no foreign tokens):
+  // zoom ticks inside an appearance-lattice rung re-bake NOTHING; crossing
+  // 1→2 re-bakes once; continuous is the identity.
+  const bakeScale = useSelector(AnnotationHostToken, (c) =>
+    c.bakeScale(page.transform.renderScale),
+  );
 
   useEffect(() => {
     const controller = new AbortController();
     const revokers: Array<() => void> = [];
     (async () => {
       try {
-        const imgs = await anno.appearances(
-          page.pon,
-          page.transform.renderScale,
-          controller.signal,
-        );
+        const imgs = await anno.appearances(page.pon, bakeScale, controller.signal);
         const map: Record<string, { url: string; box: Rect }> = {};
         for (const ap of imgs) {
           // Place the baked bitmap by its OWN /Rect (the box it was rendered into),
@@ -774,7 +778,7 @@ export function AnnotationLayer({ renderers }: AnnotationLayerProps = {}) {
       controller.abort();
       revokers.forEach((r) => r());
     };
-  }, [anno, page.pon, page.transform.renderScale, bakedKey]);
+  }, [anno, page.pon, bakeScale, bakedKey]);
 
   return (
     <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>

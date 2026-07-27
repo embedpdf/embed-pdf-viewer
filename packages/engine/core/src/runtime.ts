@@ -48,6 +48,7 @@ export {
   CONTINUOUS_RENDER_POLICY,
   snapAppearanceScale,
   snapFullPageViewport,
+  snapTileScale,
 } from './engine/DocumentRenderService';
 export type { DocumentRenderService, EngineRenderPolicy } from './engine/DocumentRenderService';
 export { passwordPromptFromState } from './engine/passwordPrompt';

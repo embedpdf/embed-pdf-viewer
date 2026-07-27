@@ -36,6 +36,7 @@ function PageSurface({
   documentId,
   page,
   frame,
+  stage,
   render,
   chrome,
 }: {
@@ -44,6 +45,8 @@ function PageSurface({
   /** Reserved chrome bands around the page (screen px); the layout reserved the
    *  matching space, so the outer box tiles into it. */
   frame: PageFrame;
+  /** The stage capability — the demand getter reads visibility LIVE off it. */
+  stage: StageCapability;
   render: (page: PageContextValue) => React.ReactNode;
   chrome?: (page: PageContextValue) => React.ReactNode;
 }) {
@@ -64,12 +67,32 @@ function PageSurface({
   // like the axis-aligned shadow behind it (no hairline seam).
   const contentLeft = frame.left + (t.viewWidth - t.contentWidth) / 2;
   const contentTop = frame.top + (t.viewHeight - t.contentHeight) / 2;
+  // The page-view DEMAND (SCALE-OUT §2.1e) is a PULL: the getter closes over
+  // stable references (capability + pon) and reads the stage's live state at
+  // call time — visibility is the STAGE's data (`VisiblePage.visibleRect`),
+  // not something an adapter re-derives or caches. Absent from the visible
+  // set = zero rect ("want nothing"), distinct from PageView's undefined
+  // getter ("whole page").
   const ctx = useMemo(
     () =>
-      makePageContext(documentId, page.pon, page.pageIndex, frame, t, () =>
-        ref.current!.getBoundingClientRect(),
+      makePageContext(
+        documentId,
+        page.pon,
+        page.pageIndex,
+        frame,
+        t,
+        () => ref.current!.getBoundingClientRect(),
+        () => {
+          const live = stage.visiblePages().find((p) => p.pon === page.pon);
+          return live
+            ? { desiredDeviceWidth: live.transform.deviceWidth, visibleRect: live.visibleRect }
+            : {
+                desiredDeviceWidth: t.deviceWidth,
+                visibleRect: { x: 0, y: 0, width: 0, height: 0 },
+              };
+        },
       ),
-    [documentId, page.pon, page.pageIndex, frame, t],
+    [documentId, page.pon, page.pageIndex, frame, t, stage],
   );
   return (
     <div style={{ position: 'absolute', left, top, width: outerW, height: outerH }}>
@@ -361,6 +384,7 @@ export function Stage({
           documentId={docId ?? ''}
           page={p}
           frame={frame}
+          stage={stage}
           render={children}
           chrome={pageChrome}
         />

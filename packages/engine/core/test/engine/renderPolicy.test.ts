@@ -3,6 +3,7 @@ import {
   CONTINUOUS_RENDER_POLICY,
   snapAppearanceScale,
   snapFullPageViewport,
+  snapTileScale,
   type EngineRenderPolicy,
 } from '../../src/runtime';
 
@@ -123,5 +124,31 @@ describe('snapAppearanceScale', () => {
   test('an empty appearance lattice is a policy-construction error', () => {
     const empty: EngineRenderPolicy = { ...LATTICE, appearances: { scales: [] } };
     expect(() => snapAppearanceScale(empty, 1)).toThrow(/appearance/i);
+  });
+});
+
+describe('snapTileScale', () => {
+  const WITH_TILES: EngineRenderPolicy = {
+    ...LATTICE,
+    tiles: { tileSizes: [512], scales: [1, 2, 4, 8, 16] },
+  };
+
+  test('continuous and tiles-less lattices are the identity — the reserved-block contract', () => {
+    // Until WS2c ships the server never advertises `tiles`; the tiling
+    // client falls back to its own default pyramid, and this helper must
+    // not invent one.
+    expect(snapTileScale(CONTINUOUS_RENDER_POLICY, 4.5)).toBe(4.5);
+    expect(snapTileScale(LATTICE, 4.5)).toBe(4.5);
+  });
+
+  test('scales snap UP through the pyramid and cap at the top', () => {
+    expect(snapTileScale(WITH_TILES, 4.5)).toBe(8);
+    expect(snapTileScale(WITH_TILES, 8)).toBe(8);
+    expect(snapTileScale(WITH_TILES, 100)).toBe(16);
+  });
+
+  test('an empty tile lattice is a policy-construction error', () => {
+    const empty: EngineRenderPolicy = { ...LATTICE, tiles: { tileSizes: [512], scales: [] } };
+    expect(() => snapTileScale(empty, 1)).toThrow(/tile/i);
   });
 });

@@ -1,4 +1,9 @@
-import type { DocCapability, PluginContext } from '@embedpdf/core';
+import {
+  CONTINUOUS_RENDER_POLICY,
+  snapAppearanceScale,
+  type DocCapability,
+  type PluginContext,
+} from '@embedpdf/core';
 import type { PageRotation } from '@embedpdf/core-geometry';
 import {
   resolveBinarySource,
@@ -1231,6 +1236,11 @@ export function createAnnotationCapability(
       }
       return parts.sort().join('|');
     },
+    bakeScale: (renderScale) =>
+      // The render policy is a document FACT off the kernel registry (like
+      // `pages`), interpreted by the pure engine-core helper — one lifecycle,
+      // one interpretation, no plugin dependency. Identity under continuous.
+      snapAppearanceScale(ctx.document()?.renderPolicy ?? CONTINUOUS_RENDER_POLICY, renderScale),
     appearances: (pon, scale, signal) => {
       const doc = ctx.doc;
       if (!doc) return Promise.resolve([]);

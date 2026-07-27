@@ -128,3 +128,25 @@ export function snapAppearanceScale(policy: EngineRenderPolicy, scale: number): 
   const scales = [...policy.appearances.scales].sort((a, b) => a - b);
   return scales.find((s) => s >= scale) ?? scales[scales.length - 1]!;
 }
+
+/**
+ * Conform a tile-pyramid scale to the policy's tile lattice — the third
+ * member of the `snap<PolicyBlock><Quantity>` family. Identity on
+ * continuous and while the deployment doesn't advertise a `tiles` block
+ * (the block is reserved until the deep-zoom vertical ships server-side;
+ * the tiling client uses its own default pyramid then — see
+ * plugin-render). Snap UP, cap at the largest scale: per-tile cost is
+ * constant by construction (`tileSize²` pixels regardless of level), so
+ * the cap bounds artifact COUNT, not memory.
+ */
+export function snapTileScale(policy: EngineRenderPolicy, scale: number): number {
+  if (policy.kind === 'continuous' || policy.tiles === undefined) return scale;
+  if (policy.tiles.scales.length === 0) {
+    throw new EngineError(
+      EngineErrorCode.InvalidArg,
+      'render policy has an empty tile-scale lattice',
+    );
+  }
+  const scales = [...policy.tiles.scales].sort((a, b) => a - b);
+  return scales.find((s) => s >= scale) ?? scales[scales.length - 1]!;
+}

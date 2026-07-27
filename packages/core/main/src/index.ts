@@ -3,14 +3,24 @@ export * from './kernel';
 export { CancelledError, isCancelled } from './scope';
 
 // Re-export the engine contracts so plugins/adapters import them from @embedpdf/core.
-export { AbortablePromise } from '@embedpdf/engine-core/runtime';
+export {
+  AbortablePromise,
+  CONTINUOUS_RENDER_POLICY,
+  snapAppearanceScale,
+  snapFullPageViewport,
+  snapTileScale,
+} from '@embedpdf/engine-core/runtime';
 export type {
+  EngineRenderPolicy,
   PageHandle,
   PageRaster,
   PageRenderOptions,
+  PageRenderTarget,
+  PageRenderViewport,
   PageImageHandle,
   PageImageOptions,
   PageImageObjectUrl,
+  PdfRect,
 } from '@embedpdf/engine-core/runtime';
 
 import type { Action, CapabilityToken, PluginDef } from './types';

@@ -295,3 +295,43 @@ describe('kernel: locked documents (password)', () => {
     expect(kernel.documents.activeId()).toBeNull();
   });
 });
+
+describe('render policy is a document FACT (Pattern A, like the page registry)', () => {
+  const LATTICE = {
+    kind: 'lattice',
+    fullPage: { widths: [320, 640] },
+    formats: ['webp'],
+    background: 'white',
+    enforced: false,
+  };
+
+  it('materializes the advertised policy on DocumentMeta before publish', async () => {
+    const { engine, resolve } = controllableEngine();
+    const kernel = createKernel({ engine, plugins: [] });
+    const opened = kernel.documents.open(bytesInput('a'));
+    resolve('a', {
+      ...(makeHandle('a') as object),
+      render: { policy: () => Promise.resolve(LATTICE) },
+    } as unknown as DocumentHandle);
+    await opened;
+    expect(kernel.getState().core.documents['a']!.renderPolicy).toEqual(LATTICE);
+  });
+
+  it('no render service — and a failing one — resolve to continuous, never blocking open', async () => {
+    const { engine, resolve } = controllableEngine();
+    const kernel = createKernel({ engine, plugins: [] });
+
+    const openedA = kernel.documents.open(bytesInput('a'));
+    resolve('a'); // makeHandle carries no render service at all
+    await openedA;
+    expect(kernel.getState().core.documents['a']!.renderPolicy).toEqual({ kind: 'continuous' });
+
+    const openedB = kernel.documents.open(bytesInput('b'), { activate: false });
+    resolve('b', {
+      ...(makeHandle('b') as object),
+      render: { policy: () => Promise.reject(new Error('offline')) },
+    } as unknown as DocumentHandle);
+    await openedB;
+    expect(kernel.getState().core.documents['b']!.renderPolicy).toEqual({ kind: 'continuous' });
+  });
+});

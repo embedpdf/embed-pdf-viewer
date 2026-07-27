@@ -48,6 +48,23 @@ export function boundsOfRects(rects: readonly Rect[]): Rect | null {
 }
 
 /**
+ * Intersection of two y-down rects — zero-sized (width/height 0, origin at
+ * the would-be corner) when disjoint, so callers can test `width > 0`
+ * without a null branch. Space-agnostic like {@link boundsOfRects}: view-px
+ * viewport ∩ footprint, page-point visibility ∩ tile footprints, ….
+ */
+export function intersectRects(a: Rect, b: Rect): Rect {
+  const x = Math.max(a.x, b.x);
+  const y = Math.max(a.y, b.y);
+  return {
+    x,
+    y,
+    width: Math.max(0, Math.min(a.x + a.width, b.x + b.width) - x),
+    height: Math.max(0, Math.min(a.y + a.height, b.y + b.height) - y),
+  };
+}
+
+/**
  * Quarter-turn display rotation, degrees clockwise. The viewer-side notion of a
  * page's on-screen rotation — the TOTAL = (document /Rotate + any view
  * rotation), resolved by the shell. Structurally identical to the engine's
@@ -184,6 +201,10 @@ export interface PageTransform {
   pageToViewRect(r: Rect): Rect;
   /** Inverse — display-box view px (box-local) → content point. Hit-testing. */
   viewToPage(p: Point): Point;
+  /** Inverse of {@link pageToViewRect}: display-box view-px rect → its content
+   *  AABB (exact for quarter-turns). The visibility primitive — projecting a
+   *  viewport rect into page points is THIS, never per-adapter corner math. */
+  viewToPageRect(r: Rect): Rect;
   /** CSS `matrix()` mapping content space → this page's display box. Drop it on
    *  a footprint-space layer (`transform`, `transform-origin: 0 0`) and place
    *  children in content points — rotation + scale handled for free. */
@@ -245,6 +266,7 @@ export function pageTransform(input: {
   const pageToView = (p: Point): Point => applyPoint(viewMat, p);
   const viewToPage = (p: Point): Point => applyPoint(invMat, p);
   const pageToViewRect = (r: Rect): Rect => applyRect(viewMat, r);
+  const viewToPageRect = (r: Rect): Rect => applyRect(invMat, r);
   const cssMatrix = matrixToCss(viewMat);
 
   return {
@@ -263,6 +285,7 @@ export function pageTransform(input: {
     pageToView,
     pageToViewRect,
     viewToPage,
+    viewToPageRect,
     cssMatrix,
   };
 }

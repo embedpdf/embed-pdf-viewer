@@ -30,6 +30,7 @@ import type {
 // Pure coordinate math from the geometry base — NOT from stage-core. The
 // PageContext seam stays stage-agnostic (it must also serve standalone PageView).
 import type { PageFrame, PageTransform, Point, Rect } from '@embedpdf/core-geometry';
+import type { PageViewDemand } from '@embedpdf/plugin-render';
 
 const KernelCtx = createContext<Kernel | null>(null);
 /** The document a subtree is bound to. null => use the active document. */
@@ -391,6 +392,18 @@ export interface PageContextValue {
   /** PDF/content rect → client (screen) px AABB. Rect analog of `toClientPoint`
    *  for upright viewport-space UI that frames a selected page region. */
   toClientRect(rect: Rect): Rect;
+  /**
+   * The page-view DEMAND for raster planning (SCALE-OUT §2.1e dependency
+   * inversion): plugin-render defines the shape; the host that CREATED this
+   * context fills it — as a PULL. The Stage host's getter closes over the
+   * stage capability and reads `VisiblePage.visibleRect` live at call time
+   * (visibility is the STAGE's data; adapters never re-derive camera math or
+   * cache a copy). Three states, three meanings: a real sub-rect (visible),
+   * a ZERO rect (stage host, page currently off-screen — want nothing), and
+   * an undefined getter (stage-less `<PageView>` — whole page visible, which
+   * a thumbnail-sized demand turns into "never engages" by arithmetic).
+   */
+  getViewDemand?: () => PageViewDemand;
 }
 
 const PageCtx = createContext<PageContextValue | null>(null);
@@ -409,6 +422,7 @@ export function makePageContext(
   frame: PageFrame,
   transform: PageTransform,
   getRect: () => DOMRect,
+  getViewDemand?: () => PageViewDemand,
 ): PageContextValue {
   return {
     documentId,
@@ -416,6 +430,7 @@ export function makePageContext(
     pageIndex,
     frame,
     transform,
+    ...(getViewDemand ? { getViewDemand } : {}),
     toPagePoint: (cx, cy) => {
       // `getRect()` is the rotated content wrapper's axis-aligned bounding box =
       // the page's DISPLAY box on screen. Convert client → box-local view px,

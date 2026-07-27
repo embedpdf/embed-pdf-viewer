@@ -35,7 +35,11 @@ import {
   type PluginScope,
   type Unsubscribe,
 } from './types';
-import type { DocumentEvent } from '@embedpdf/engine-core/runtime';
+import {
+  CONTINUOUS_RENDER_POLICY,
+  type DocumentEvent,
+  type EngineRenderPolicy,
+} from '@embedpdf/engine-core/runtime';
 
 /** The new page registry a document mutation carries, or null for events that
  *  don't change page structure (annotations, metadata). The snapshot is the
@@ -495,12 +499,26 @@ export function createKernel(opts: {
     snapshot: { pageCount: number; pages: DocumentMeta['pages'] },
   ): Promise<void> {
     session.phase = 'bringup';
+    // The render policy is a document FACT (Pattern A, like the page
+    // registry): async on the engine contract, materialized ONCE here —
+    // pre-publish — so every consumer reads it synchronously off the meta
+    // and no "policy still resolving" state exists anywhere downstream.
+    // Best-effort by design: no render service, or a failed read, means
+    // `continuous` — a policy hiccup must never block a document open.
+    let renderPolicy: EngineRenderPolicy = CONTINUOUS_RENDER_POLICY;
+    try {
+      renderPolicy = (await session.handle!.render?.policy()) ?? CONTINUOUS_RENDER_POLICY;
+    } catch {
+      /* unreachable policy = continuous */
+    }
+    checkpoint(session);
     session.stagedMeta = {
       id: session.id,
       name: session.name,
       pageCount: snapshot.pageCount,
       pages: snapshot.pages,
       revision: 0,
+      renderPolicy,
     };
 
     // Document mutation events (rotate/move/delete) replace the page

@@ -43,22 +43,32 @@ export class EpdfRenderLayer {
 
   private readonly page = injectPage();
   private readonly render = injectCapability(RenderToken);
-  // Refetch when a CONFIRMED mutation (own or a collaborator's) changes what
-  // this render would paint — an annotation moved, a checkbox ticked. Bumps at
-  // commit, never mid-gesture; annotation-free renders subscribe to nothing.
-  private readonly epoch = injectSelector(RenderToken, (c) =>
-    c.renderEpoch(this.page.pon, this.annotations()),
+  // ONE tracked dependency: the raster's canonical identity — conformed
+  // viewport + annotations flag + epoch (SCALE-OUT §2.1e identity law).
+  // Inside a lattice rung, zoom changes don't move it: no refetch, no DOM
+  // churn — the stage's CSS transform does the scaling. It changes exactly at
+  // rung crossings and on CONFIRMED mutations (epoch bumps at commit, never
+  // mid-gesture). Under `continuous` it embeds the exact scale — v2 behavior
+  // byte-for-byte. The policy behind it is a document fact the kernel
+  // materialized before publish, so the key is always computable.
+  private readonly sourceKey = injectSelector(RenderToken, (c) =>
+    c.renderSourceKey(this.page.pon, {
+      scale: this.page.transform().renderScale,
+      includeAnnotations: this.annotations(),
+    }),
   );
   protected readonly src = signal<string | null>(null);
 
   constructor() {
     if (!isPlatformBrowser(inject(PLATFORM_ID))) return;
     effect((onCleanup) => {
-      // Tracked reads — the effect's dependency set, exactly React's deps array.
+      // Tracked reads — the effect's dependency set. `sourceKey` folds scale,
+      // annotations, and the epoch into one identity; a stale scale read
+      // inside the untracked body is harmless by construction (any scale in
+      // this rung produces this key's canonical request).
       const render = this.render();
-      const scale = this.page.transform().renderScale;
+      this.sourceKey();
       const includeAnnotations = this.annotations();
-      this.epoch();
 
       const controller = new AbortController();
       let revoke: (() => void) | undefined;
@@ -68,11 +78,12 @@ export class EpdfRenderLayer {
       });
 
       untracked(() => {
+        const scale = this.page.transform().renderScale;
         void (async () => {
           try {
-            // Render at the transform's exact device scale — width pinned,
-            // height the engine's derived value — so the bitmap matches its box
-            // 1:1 (no blur), with dpr already folded in. No `* dpr` guesswork.
+            // The capability conforms this to the policy (lattice → ladder
+            // width, continuous → this exact scale) and collapses same-key
+            // asks in its raster store.
             const image = await render.renderPage(this.page.pon, {
               scale,
               includeAnnotations,

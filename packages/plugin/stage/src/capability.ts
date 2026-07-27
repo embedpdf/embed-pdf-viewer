@@ -4,6 +4,7 @@ import {
   applyRect,
   applyPoint,
   displaySize,
+  intersectRects,
   pageTransform,
   rotateScaleMatrix,
   snapToDevice,
@@ -610,23 +611,41 @@ export function createStageCapability(
       : unrotatedPoints(box);
     const c = cam();
     const ratio = dpr();
+    // device-snapped footprint top-left (camera-resolved) — keeps a rotated page
+    // on the device grid; the adapter just consumes it.
+    const screenX = snapToDevice((box.x - c.x) * c.zoom, ratio);
+    const screenY = snapToDevice((box.y - c.y) * c.zoom, ratio);
+    const transform = pageTransform({
+      pageSize,
+      rotation: box.rotation,
+      scale: box.contentScale * c.zoom,
+      // The page's PHYSICAL 100%: platform unit factor × its /UserUnit — so
+      // `transform.zoom` reads as "percent of Acrobat's 100%" per page,
+      // independent of sizing mode or camera state.
+      baseScale: ctx.getState().viewUnitsPerPoint * (reg?.userUnit ?? 1),
+      dpr: ratio,
+    });
+    // The on-screen page region in points: viewport ∩ footprint in VIEW space
+    // (both axis-aligned), inverted through the transform (exact for
+    // quarter-turns). The same intersection the virtualizer's query already
+    // decided coarsely — refined per page, once, HERE, so no adapter ever
+    // re-derives camera math (tiling's demand reads this field).
+    const v = vp();
+    const onScreen = intersectRects(
+      { x: -screenX, y: -screenY, width: v.width, height: v.height },
+      { x: 0, y: 0, width: transform.viewWidth, height: transform.viewHeight },
+    );
+    const visibleRect =
+      onScreen.width > 0 && onScreen.height > 0
+        ? transform.viewToPageRect(onScreen)
+        : { x: 0, y: 0, width: 0, height: 0 };
     return {
       ...box,
       pon: ponForIndex(box.pageIndex),
-      // device-snapped footprint top-left (camera-resolved) — keeps a rotated page
-      // on the device grid; the adapter just consumes it.
-      screenX: snapToDevice((box.x - c.x) * c.zoom, ratio),
-      screenY: snapToDevice((box.y - c.y) * c.zoom, ratio),
-      transform: pageTransform({
-        pageSize,
-        rotation: box.rotation,
-        scale: box.contentScale * c.zoom,
-        // The page's PHYSICAL 100%: platform unit factor × its /UserUnit — so
-        // `transform.zoom` reads as "percent of Acrobat's 100%" per page,
-        // independent of sizing mode or camera state.
-        baseScale: ctx.getState().viewUnitsPerPoint * (reg?.userUnit ?? 1),
-        dpr: ratio,
-      }),
+      screenX,
+      screenY,
+      transform,
+      visibleRect,
     };
   };
 

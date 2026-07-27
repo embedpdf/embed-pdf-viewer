@@ -1527,3 +1527,41 @@ describe('viewRotation: the NON-persistent view rotation (Adobe "Rotate View")',
     expect(hit.point.y).toBeCloseTo(content.y, 1);
   });
 });
+
+describe("VisiblePage.visibleRect — visibility is the stage's data (SCALE-OUT §2.1e)", () => {
+  it('initial view (zoom 1, 1000×700 viewport): full width, 676pt of height', () => {
+    const { stage } = harness(PORTRAIT);
+    const p = stage.visiblePages()[0]!;
+    // Page top sits a padding (24) below the viewport top at zoom 1 → the
+    // visible page window is the full 600pt width × (700−24)pt of height.
+    expect(p.visibleRect.x).toBeCloseTo(0, 0);
+    expect(p.visibleRect.y).toBeCloseTo(0, 0);
+    expect(p.visibleRect.width).toBeCloseTo(600, 0);
+    expect(p.visibleRect.height).toBeCloseTo(676, 0);
+  });
+
+  it('zoomed in: a proper sub-rect that tracks the pan', () => {
+    const { stage } = harness(PORTRAIT);
+    stage.zoomTo({ level: 4 });
+    const before = stage.visiblePages()[0]!.visibleRect;
+    // Deep zoom: far less than the page is visible (1000/4 = 250pt window).
+    expect(before.width).toBeLessThan(600);
+    expect(before.width).toBeGreaterThan(0);
+    expect(before.height).toBeLessThan(800);
+    // panBy is grab-and-drag: dragging content RIGHT slides the visible
+    // window LEFT in page space. Half a window's worth of drag.
+    stage.panBy(before.width * stage.camera().zoom * 0.5, 0);
+    const after = stage.visiblePages()[0]!.visibleRect;
+    expect(after.x).toBeLessThan(before.x);
+    expect(after.width).toBeCloseTo(before.width, 0);
+  });
+
+  it('rotated page: the sub-rect is expressed in UN-rotated page points', () => {
+    const { stage } = harness([{ width: 600, height: 800, rotation: 90 }]);
+    const p = stage.visiblePages()[0]!;
+    // Whole page visible at fit — the rect is the page's own point space,
+    // not the rotated footprint's.
+    expect(p.visibleRect.width).toBeCloseTo(600, 0);
+    expect(p.visibleRect.height).toBeCloseTo(800, 0);
+  });
+});

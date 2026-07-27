@@ -32,6 +32,21 @@ export function createEngine(): Engine {
     // the engine's lazy boot.
     worker: () => new EngineWorker(),
     fallbackFonts: [DROID_FALLBACK_FONT],
+    // Deployment render policy (SCALE-OUT §2.1e) — the same lattice a cloud
+    // deployment advertises, configured locally the way permissions are
+    // overridden. Quantizes zoom to ladder rungs (renders reuse across zoom
+    // levels), budgets worker memory, and engages TILING past the ladder top
+    // instead of minting monster bitmaps. Drop this option to return to
+    // continuous (exact, v2-style) rendering.
+    renderPolicy: {
+      kind: 'lattice',
+      fullPage: { widths: [320, 640, 1280, 2560] },
+      appearances: { scales: [1, 2, 4] },
+      maxRenderPixels: 32_000_000,
+      formats: ['webp'],
+      background: 'white',
+      enforced: false,
+    },
   });
 }
 

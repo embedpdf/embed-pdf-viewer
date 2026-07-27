@@ -186,3 +186,151 @@ describe('effects + capability wired together', () => {
     expect(h.capability.renderEpoch(11, false)).toBe(1); // content only
   });
 });
+
+// ── d1: policy conformance (SCALE-OUT §2.1e — the three-layer law) ──────────
+
+const LATTICE = {
+  kind: 'lattice',
+  fullPage: { widths: [320, 640, 1280, 2560] },
+  appearances: { scales: [1, 2, 4] },
+  formats: ['webp'],
+  background: 'white',
+  enforced: false,
+} as const;
+
+describe('policy conformance', () => {
+  /** A controllable AbortablePromise-shaped render task. */
+  function makeTask() {
+    let resolveFn!: (v: unknown) => void;
+    let rejectFn!: (e: unknown) => void;
+    const promise = new Promise((res, rej) => {
+      resolveFn = res;
+      rejectFn = rej;
+    });
+    const task = Object.assign(promise, {
+      aborted: undefined as unknown,
+      abort(reason?: unknown) {
+        task.aborted = reason ?? new Error('aborted');
+        rejectFn(task.aborted);
+      },
+    });
+    return { task, resolve: (v: unknown) => resolveFn(v) };
+  }
+
+  function harness(opts: { policy?: unknown } = {}) {
+    let state = initialRenderState();
+    const imageCalls: Array<{ pon: number; options: Record<string, unknown> }> = [];
+    const tasks: Array<ReturnType<typeof makeTask>> = [];
+    const ctx = {
+      getState: () => state,
+      dispatch: (a: RenderAction) => {
+        state = renderReducer(state, a);
+      },
+      // The policy is a DOCUMENT FACT on the kernel registry — the harness
+      // supplies it exactly like the kernel does: on the meta, pre-publish.
+      document: () => ({
+        pages: PONS.map((pageObjectNumber) => ({
+          pageObjectNumber,
+          size: { width: 612, height: 792 },
+        })),
+        renderPolicy: opts.policy ?? { kind: 'continuous' },
+      }),
+      doc: {
+        events: { subscribe: () => () => {} },
+        page: (pon: number) => ({
+          render: {
+            image: (options: Record<string, unknown>) => {
+              imageCalls.push({ pon, options });
+              const t = makeTask();
+              tasks.push(t);
+              return t.task;
+            },
+          },
+        }),
+      },
+      cleanup: () => {},
+    } as unknown as EffectContext<RenderState, RenderAction>;
+    registerRenderEffects(ctx);
+    return { capability: createRenderCapability(ctx), imageCalls, tasks };
+  }
+
+  it('keys are computable the moment the capability exists — the kernel materialized the fact', () => {
+    const h = harness({ policy: LATTICE });
+    expect(h.capability.renderSourceKey(11, { scale: 1 })).toBe('11|w640|a1|e0');
+  });
+
+  it('a continuous document keeps exact-scale keys — v2 behavior byte-for-byte', () => {
+    const h = harness();
+    expect(h.capability.renderPolicy()).toEqual({ kind: 'continuous' });
+    expect(h.capability.renderSourceKey(11, { scale: 1.53 })).toBe('11|s1.53|a1|e0');
+  });
+
+  it('lattice: scale converts through the page width and snaps UP to the rung', () => {
+    const h = harness({ policy: LATTICE });
+    // 612pt page at 1× → 612px → w640; at 2× → 1224px → w1280.
+    expect(h.capability.conformViewport(11, 1)).toEqual({ kind: 'width', width: 640 });
+    expect(h.capability.conformViewport(11, 2)).toEqual({ kind: 'width', width: 1280 });
+  });
+
+  it('THE identity law: zoom inside a rung produces the SAME key (1.2 → 1.5 = no-op)', () => {
+    const h = harness({ policy: LATTICE });
+    const at12 = h.capability.renderSourceKey(11, { scale: 1.2 });
+    const at15 = h.capability.renderSourceKey(11, { scale: 1.5 });
+    expect(at12).toBe('11|w1280|a1|e0');
+    expect(at15).toBe(at12);
+    // …and crossing the rung changes it.
+    expect(h.capability.renderSourceKey(11, { scale: 2.2 })).toBe('11|w2560|a1|e0');
+  });
+
+  it('epoch bumps mint new keys (staleness is a key change, never a flush)', () => {
+    const h = harness({ policy: LATTICE });
+    const before = h.capability.renderSourceKey(11, { scale: 1 });
+    h.capability.invalidate({ pons: [11], scope: 'content' });
+    const after = h.capability.renderSourceKey(11, { scale: 1 });
+    expect(after).not.toBe(before);
+  });
+
+  it('renderPage sends the CONFORMED viewport to the engine', () => {
+    const h = harness({ policy: LATTICE });
+    void h.capability.renderPage(11, { scale: 1.2 }).catch(() => {});
+    expect(h.imageCalls).toHaveLength(1);
+    expect(h.imageCalls[0]!.options.viewport).toEqual({ kind: 'width', width: 1280 });
+  });
+
+  it('same-rung asks collapse in the store: two renderPage calls, ONE engine call', async () => {
+    const h = harness({ policy: LATTICE });
+    const a = h.capability.renderPage(11, { scale: 1.2 });
+    const b = h.capability.renderPage(11, { scale: 1.5 });
+    expect(h.imageCalls).toHaveLength(1);
+    h.tasks[0]!.resolve({ fake: 'handle' });
+    expect(await a).toEqual({ fake: 'handle' });
+    expect(await b).toEqual({ fake: 'handle' });
+    // A rung re-ask AFTER resolution serves from the LRU — still one call.
+    expect(await h.capability.renderPage(11, { scale: 1.3 })).toEqual({ fake: 'handle' });
+    expect(h.imageCalls).toHaveLength(1);
+  });
+
+  it('one consumer aborting a shared in-flight fetch does not kill it for the other', async () => {
+    const h = harness({ policy: LATTICE });
+    const ac = new AbortController();
+    const doomed = h.capability.renderPage(11, { scale: 1.2, signal: ac.signal });
+    const survivor = h.capability.renderPage(11, { scale: 1.5 });
+    ac.abort();
+    await expect(doomed).rejects.toBeTruthy();
+    expect(h.tasks[0]!.task.aborted).toBeUndefined(); // engine call still alive
+    h.tasks[0]!.resolve({ fake: 'handle' });
+    expect(await survivor).toEqual({ fake: 'handle' });
+  });
+
+  it('the LAST consumer aborting an unresolved fetch aborts the engine call', async () => {
+    const h = harness({ policy: LATTICE });
+    const ac = new AbortController();
+    const only = h.capability.renderPage(11, { scale: 1.2, signal: ac.signal });
+    ac.abort();
+    await expect(only).rejects.toBeTruthy();
+    expect(h.tasks[0]!.task.aborted).toBeTruthy();
+    // The dead entry is not sticky: the next ask fetches fresh.
+    void h.capability.renderPage(11, { scale: 1.2 }).catch(() => {});
+    expect(h.imageCalls).toHaveLength(2);
+  });
+});

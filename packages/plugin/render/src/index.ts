@@ -1,8 +1,11 @@
 /**
  * @embedpdf/plugin-render — document-scoped render capability over the engine
- * handle, plus per-page raster versioning fed by the document event stream.
- * Standard layout: types.ts · reducer.ts · capability.ts · effects.ts · render.plugin.ts.
+ * handle: policy conformance (the one consumer of the deployment render
+ * lattice), per-page raster versioning fed by the document event stream, and
+ * the tile paint-plan machinery (tiling is a strategy here, not a sibling
+ * plugin — SCALE-OUT §2.1e).
  */
 export { renderPlugin } from './render.plugin';
 export { RenderToken } from './types';
-export type { InvalidateScope, RenderCapability, RenderState } from './types';
+export type { InvalidateScope, RenderCapability, RenderPluginOptions, RenderState } from './types';
+export type { PageViewDemand, TilePaintPlan, TilePaintSource, TilingConfig } from './paint-plan';

@@ -25,6 +25,7 @@ import type {
   MetadataPatch,
   MetadataUpdateResult,
   DocumentEvent,
+  EngineRenderPolicy,
   PdfDestination,
 } from '@embedpdf/engine-core/runtime';
 
@@ -96,6 +97,17 @@ export interface DocumentMeta {
    * on it so a same-`pageCount` change — like a rotation — still invalidates.
    */
   readonly revision: number;
+  /**
+   * The deployment render policy the document's engine advertises — a
+   * document FACT like `pages`, materialized by the kernel at open (before
+   * publish), NOT plugin state. One lifecycle (here), one interpretation
+   * (engine-core's pure `snap*` helpers); any plugin reads it. Engines
+   * without a render service — and failed policy reads — resolve to
+   * `continuous`, so consumers never branch on absence. Naming rule: the
+   * domain appears exactly once — bare `policy()` on the render SERVICE,
+   * `renderPolicy` on flat envelopes like this one and `/v1/access`.
+   */
+  readonly renderPolicy: EngineRenderPolicy;
 }
 
 /**

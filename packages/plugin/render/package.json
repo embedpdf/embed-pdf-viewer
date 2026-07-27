@@ -33,7 +33,8 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@embedpdf/core": "workspace:*"
+    "@embedpdf/core": "workspace:*",
+    "@embedpdf/core-geometry": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.0.0",

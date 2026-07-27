@@ -126,6 +126,33 @@ describe('pageTransform', () => {
         height: 100,
       });
     });
+
+    it('viewToPageRect is the exact inverse (the visibility primitive)', () => {
+      const rotations: PageRotation[] = [0, 90, 180, 270];
+      for (const rotation of rotations) {
+        const t = pageTransform({
+          pageSize: { width: 100, height: 200 },
+          rotation,
+          scale: 2,
+          dpr: 1,
+        });
+        // Whole footprint inverts to the whole page…
+        const whole = t.viewToPageRect({ x: 0, y: 0, width: t.viewWidth, height: t.viewHeight });
+        expect(whole.x).toBeCloseTo(0);
+        expect(whole.y).toBeCloseTo(0);
+        expect(whole.width).toBeCloseTo(100);
+        expect(whole.height).toBeCloseTo(200);
+        // …and a round trip through pageToViewRect is the identity — the
+        // guarantee that lets the stage's visibleRect and toPagePoint hit
+        // the same coordinates for every quarter-turn.
+        const r = { x: 10, y: 20, width: 30, height: 40 };
+        const back = t.viewToPageRect(t.pageToViewRect(r));
+        expect(back.x).toBeCloseTo(r.x);
+        expect(back.y).toBeCloseTo(r.y);
+        expect(back.width).toBeCloseTo(r.width);
+        expect(back.height).toBeCloseTo(r.height);
+      }
+    });
   });
 
   describe('pageToView ∘ viewToPage is identity (every rotation × scale × dpr)', () => {

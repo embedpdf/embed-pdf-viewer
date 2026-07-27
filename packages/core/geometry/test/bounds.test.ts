@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { boundsOfRects } from '../src/index';
+import { boundsOfRects, intersectRects } from '../src/index';
 
 describe('boundsOfRects', () => {
   it('returns null for the empty set', () => {
@@ -36,5 +36,19 @@ describe('boundsOfRects', () => {
         { x: 40, y: 114, width: 90, height: 12 }, // line 2 head
       ]),
     ).toEqual({ x: 40, y: 100, width: 310, height: 26 });
+  });
+});
+
+describe('intersectRects', () => {
+  it('returns the overlap, zero-sized when disjoint', () => {
+    const a = { x: 0, y: 0, width: 10, height: 10 };
+    expect(intersectRects(a, { x: 5, y: 5, width: 10, height: 10 })).toEqual({
+      x: 5,
+      y: 5,
+      width: 5,
+      height: 5,
+    });
+    expect(intersectRects(a, { x: 20, y: 20, width: 5, height: 5 }).width).toBe(0);
+    expect(intersectRects(a, { x: -5, y: -5, width: 30, height: 30 })).toEqual(a);
   });
 });
