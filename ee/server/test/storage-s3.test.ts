@@ -229,7 +229,8 @@ describe('S3ObjectStore', () => {
   test('keys derived from StorageKeys make round-trip plausible', async () => {
     const store = newStore();
     const key = StorageKeys.basePdf('tnt', 'abxxxxx');
-    expect(key).toBe('tnt/docs/ab/abxxxxx/base.pdf');
+    // Shard = first 2 hex chars of sha256(docId) — id-format-blind fan-out.
+    expect(key).toMatch(/^tnt\/docs\/[0-9a-f]{2}\/abxxxxx\/base\.pdf$/);
     s3Mock.on(HeadObjectCommand).resolves({
       ContentLength: 0,
       ETag: '""',

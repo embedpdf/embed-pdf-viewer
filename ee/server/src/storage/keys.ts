@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+
 /**
  * Single source of truth for storage key construction.
  *
@@ -15,9 +17,11 @@
  * directories. The 2-char shard prevents `ls <tenant>/docs/` from
  * blowing up at tens of millions of docs.
  *
- * `<cd>` is the first 2 hex chars of `docId`. We trust callers to
- * generate `docId`s with a uniform-ish prefix (UUID v4, ULID, our
- * own `doc_<base36>` helper all qualify).
+ * `<cd>` is the first 2 hex chars of `sha256(docId)` — NEVER a slice of
+ * the id itself. Sharding must not depend on id format: prefixed ids
+ * (`doc_…`) have a constant head, and time-ordered ids (ULID/UUIDv7)
+ * have a timestamp head — both collapse slice-sharding into one bucket.
+ * The hash gives 256 uniform buckets for every id format, forever.
  */
 
 export const StorageKeys = {
@@ -88,7 +92,10 @@ function shard(docId: string): string {
   if (docId.length < 2) {
     throw new Error(`shard: docId too short (${docId})`);
   }
-  return docId.slice(0, 2).toLowerCase();
+  // Hash, never slice: `doc_…` prefixes and time-ordered ids both make
+  // leading characters non-uniform (see the header comment). ~1µs per
+  // call — noise against any storage I/O this key is about to name.
+  return createHash('sha256').update(docId).digest('hex').slice(0, 2);
 }
 
 function layerArtifactKey(

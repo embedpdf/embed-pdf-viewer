@@ -14,35 +14,58 @@ runObjectStoreConformance('fs', async () => {
   return new FsObjectStore({ root });
 });
 
+/** The shard contract: first 2 hex chars of sha256(docId) — id-format-blind. */
+function expectedShard(docId: string): string {
+  return createHash('sha256').update(docId).digest('hex').slice(0, 2);
+}
+
 describe('StorageKeys', () => {
+  const SH = expectedShard('ab123');
+
   test('basePdf composes per-doc 2-char shard layout', () => {
-    expect(StorageKeys.basePdf('tnt-1', 'ab123')).toBe('tnt-1/docs/ab/ab123/base.pdf');
+    expect(StorageKeys.basePdf('tnt-1', 'ab123')).toBe(`tnt-1/docs/${SH}/ab123/base.pdf`);
   });
   test('docRoot ends with /', () => {
-    expect(StorageKeys.docRoot('t', 'ab123')).toBe('t/docs/ab/ab123/');
+    expect(StorageKeys.docRoot('t', 'ab123')).toBe(`t/docs/${SH}/ab123/`);
   });
   test('layerArtifact zero-pads version', () => {
     expect(StorageKeys.layerArtifact('t', 'ab123', 'main', 7)).toBe(
-      't/docs/ab/ab123/layers/main/v00000007.layer',
+      `t/docs/${SH}/ab123/layers/main/v00000007.layer`,
     );
   });
   test('eventsMonth validates YYYY-MM', () => {
     expect(StorageKeys.eventsMonth('t', 'ab123', '2026-05')).toBe(
-      't/docs/ab/ab123/events/2026-05.jsonl',
+      `t/docs/${SH}/ab123/events/2026-05.jsonl`,
     );
     expect(() => StorageKeys.eventsMonth('t', 'ab123', '2026-5')).toThrow();
   });
   test('eventsDay validates YYYY-MM-DD', () => {
     expect(StorageKeys.eventsDay('t', 'ab123', '2026-05-17')).toBe(
-      't/docs/ab/ab123/events/2026-05-17.jsonl',
+      `t/docs/${SH}/ab123/events/2026-05-17.jsonl`,
     );
     expect(() => StorageKeys.eventsDay('t', 'ab123', '2026-5-17')).toThrow();
   });
   test('rejects too-short docIds', () => {
     expect(() => StorageKeys.basePdf('t', 'a')).toThrow();
   });
-  test('uses lowercase shard so case-folded filesystems behave', () => {
-    expect(StorageKeys.basePdf('t', 'AB123')).toBe('t/docs/ab/AB123/base.pdf');
+  test('shard is hash-derived: prefixed ids fan out instead of collapsing', () => {
+    // THE bug this grammar fixes: every production id starts with `doc_`,
+    // so slice-sharding put the entire fleet in `docs/do/`. Hash sharding
+    // must spread same-prefix ids across many buckets.
+    const shards = new Set(
+      Array.from(
+        { length: 64 },
+        (_, i) => StorageKeys.docRoot('t', `doc_${i.toString(16).padStart(24, '0')}`).split('/')[2],
+      ),
+    );
+    expect(shards.size).toBeGreaterThan(16);
+  });
+  test('shard chars are lowercase hex so case-folded filesystems behave', () => {
+    // Hex digests are lowercase by construction; the docId's own casing
+    // stays intact in the key (ids are case-sensitive identifiers).
+    const key = StorageKeys.basePdf('t', 'AB123');
+    expect(key).toBe(`t/docs/${expectedShard('AB123')}/AB123/base.pdf`);
+    expect(key.split('/')[2]).toMatch(/^[0-9a-f]{2}$/);
   });
 });
 

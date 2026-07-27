@@ -14,3 +14,8 @@ packages:
   - '!**/.vercel/**'
   # exclude the git submodule (and everything inside it)
   - '!packages/engine/runtime/runtime-src/**'
+  # exclude agent scratch trees: a git worktree created while cwd was a
+  # subdirectory (e.g. ee/server) lands inside a glob'd path and re-adds a
+  # whole second copy of every workspace package under a stale layout.
+  - '!**/.claude/**'
+  - '!**/.cursor/**'

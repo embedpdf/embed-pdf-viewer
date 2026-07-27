@@ -266,12 +266,11 @@ export async function listLayerArtifactObjects(
   docId: string,
   layerName: string,
 ): Promise<string[]> {
+  // StorageKeys owns the key grammar (incl. the hash shard) — never
+  // hand-build storage paths in tests.
   const dir = join(
     cluster.storageRoot,
-    tenantId,
-    'docs',
-    docId.slice(0, 2).toLowerCase(),
-    docId,
+    StorageKeys.docRoot(tenantId, docId),
     'layers',
     encodeURIComponent(layerName),
   );
