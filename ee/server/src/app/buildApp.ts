@@ -21,6 +21,7 @@ import { PdfPasswordVerificationsRepo } from '../db/repos/pdf_password_verificat
 import { TenantsRepo } from '../db/repos/tenants.repo';
 import { DocumentPagesRepo, LayerPagesRepo, LayersRepo } from '../db/repos/page_state.repo';
 import { WeakAnnotationSessionsRepo } from '../db/repos/weak_annotation_sessions.repo';
+import { DerivedRenderService } from '../services/DerivedRenderService';
 import { DocumentLifecycleService } from '../services/DocumentLifecycleService';
 import { DocumentService } from '../services/DocumentService';
 import { DocumentSecurityProbe } from '../services/DocumentSecurityProbe';
@@ -168,6 +169,14 @@ export interface BuildAppOptions {
   expectedMigrations?: ReadonlyArray<MigrationSource>;
   /** Treat pending migrations as drift at boot. Defaults to false. */
   failOnPending?: boolean;
+  /**
+   * The render lattice (SCALE-OUT.md §2.1b): canonical `viewport.scale`
+   * points whose renders are DURABLE derived artifacts. `enforce: true`
+   * rejects off-lattice versioned render tokens with 400 (flip on once
+   * clients ship `policy.snap()`); default false = off-lattice renders are
+   * computed but never persisted.
+   */
+  renderLattice?: { scales?: number[]; enforce?: boolean };
 }
 
 export interface AppBundle {
@@ -176,6 +185,8 @@ export interface AppBundle {
   pool?: WorkerThreadPool;
   /** Present only when `db` + `objectStore` were configured. */
   lifecycle?: DocumentLifecycleService;
+  /** WS2 — the derived-artifact plane for renders (cacheRoot + pool + db). */
+  derivedRenders?: DerivedRenderService;
   /** Present only when `enableRevocation: true` with a `db`. */
   revokedJtisGuard?: RevokedJtisGuard;
   /** Phase 3 — present only when `cacheRoot` is set (+ pool + db). */
@@ -318,6 +329,7 @@ export async function buildApp(opts: BuildAppOptions): Promise<AppBundle> {
 
   let lifecycle: DocumentLifecycleService | undefined;
   let layerService: LayerService | undefined;
+  let derivedRenders: DerivedRenderService | undefined;
   let sweeperTimer: NodeJS.Timeout | undefined;
   let baseFileCache: BaseFileCache | undefined;
   if (opts.db && opts.objectStore) {
@@ -333,14 +345,34 @@ export async function buildApp(opts: BuildAppOptions): Promise<AppBundle> {
       await baseFileCache.sweepPartials();
     }
 
+    // WS2 (SCALE-OUT §2.1b/§2.1c): the derived-artifact plane for renders.
+    // Needs a worker + the base-file cache — admin-only deploys skip it.
+    if (baseFileCache && pool) {
+      derivedRenders = new DerivedRenderService({
+        storage: opts.objectStore,
+        ...(opts.renderLattice?.scales ? { scales: opts.renderLattice.scales } : {}),
+        ...(opts.renderLattice?.enforce !== undefined
+          ? { enforce: opts.renderLattice.enforce }
+          : {}),
+        cache: baseFileCache,
+        pool,
+        encoder: new SharpImageEncoder(),
+        documents: new DocumentsRepo(opts.db),
+      });
+    }
+
     lifecycle = new DocumentLifecycleService({
       documents: new DocumentsRepo(opts.db),
       tenants: new TenantsRepo(opts.db),
       storage: opts.objectStore,
       autoProvisionTenant: opts.autoProvisionTenant ?? false,
       securityProbe: new DocumentSecurityProbe({ cache: baseFileCache, pool }),
+      ...(derivedRenders ? { derivedRenders } : {}),
     });
-    await registerAdminDocumentsRoutes(app, { lifecycle });
+    await registerAdminDocumentsRoutes(app, {
+      lifecycle,
+      storage: opts.objectStore,
+    });
     if (revokedJtisGuard) {
       await registerAdminTokensRoutes(app, { guard: revokedJtisGuard });
     }
@@ -416,6 +448,7 @@ export async function buildApp(opts: BuildAppOptions): Promise<AppBundle> {
       await registerAccessRoutes(app, {
         service: documentService,
         cdnSigner: opts.cdnSigner ?? new NoneCdnSigner(),
+        ...(derivedRenders ? { derivedRenders } : {}),
       });
       await registerDocsRoutes(app, { service: documentService });
       await registerMetadataRoutes(app, { service: documentService, layerService });
@@ -424,6 +457,7 @@ export async function buildApp(opts: BuildAppOptions): Promise<AppBundle> {
         layerService,
         pool,
         imageEncoder: new SharpImageEncoder(),
+        ...(derivedRenders ? { derivedRenders } : {}),
       });
       await registerRedactionRoutes(app, { documentService, layerService });
       await registerEventsRoutes(app, {
@@ -522,6 +556,7 @@ export async function buildApp(opts: BuildAppOptions): Promise<AppBundle> {
     revokedJtisGuard,
     documentService,
     layerService,
+    derivedRenders,
     baseFileCache,
     kms: opts.kms,
     shutdown,

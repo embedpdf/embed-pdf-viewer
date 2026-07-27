@@ -285,8 +285,31 @@ export const AccessResponseSchema = z.object({
     mode: z.enum(['not-needed', 'client-retry', 'server-session']),
   }),
   expiresAt: z.number().int().positive(),
+  /**
+   * The deployment's render lattice — the canonical parameter points the
+   * server treats as durable, CDN-shared artifacts. Lives HERE and never in
+   * the manifest: manifests are version-pinned immutable objects; the
+   * lattice is mutable deployment policy. The SDK exposes it (and a pure
+   * `snap` helper) but NEVER conforms requests implicitly — the same render
+   * call must not return different pixels on local vs cloud. When
+   * `enforced` is true the server rejects off-lattice render tokens with
+   * 400; when false, off-lattice renders are computed but not persisted.
+   * Absent on older servers → treat as unenforced/unknown.
+   */
+  renderPolicy: z
+    .object({
+      viewport: z.object({
+        kind: z.literal('scale'),
+        scales: z.array(z.number().positive()),
+      }),
+      formats: z.array(z.enum(['webp', 'png'])),
+      background: z.enum(['white']),
+      enforced: z.boolean(),
+    })
+    .optional(),
 });
 export type AccessResponse = z.infer<typeof AccessResponseSchema>;
+export type RenderPolicy = NonNullable<AccessResponse['renderPolicy']>;
 
 export const PdfSaveModeSchema: z.ZodType<PdfSaveMode> = z.enum(['incremental', 'rewrite']);
 

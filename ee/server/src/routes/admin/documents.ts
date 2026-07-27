@@ -1,4 +1,3 @@
-import type { FastifyInstance, FastifyRequest } from 'fastify';
 import {
   AdminDocumentCommitRequestSchema,
   AdminDocumentInitRequestSchema,
@@ -6,11 +5,16 @@ import {
   type AdminDocumentCommitRequest,
   type AdminDocumentInitRequest,
 } from '@cloudpdf/admin-api';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
+
 import { requireScope } from '../../app/jwt-plugin';
 import type { DocumentLifecycleService } from '../../services/DocumentLifecycleService';
+import type { ObjectStore } from '../../storage/ObjectStore';
 
 export interface AdminDocumentsRouteDeps {
   lifecycle: DocumentLifecycleService;
+  /** Serves warmed thumbnail artifacts (WS2). Absent = 404 on the route. */
+  storage?: ObjectStore;
 }
 
 /**
@@ -35,7 +39,7 @@ export async function registerAdminDocumentsRoutes(
   app: FastifyInstance,
   deps: AdminDocumentsRouteDeps,
 ): Promise<void> {
-  const { lifecycle } = deps;
+  const { lifecycle, storage } = deps;
 
   /**
    * Stable direct-upload URL builder. The @cloudpdf/admin SDK uses this
@@ -175,6 +179,33 @@ export async function registerAdminDocumentsRoutes(
     await lifecycle.delete(ctx.tenantId, id);
     return reply.code(204).send();
   });
+
+  /**
+   * The dashboard-tile artifact (WS2): serves the WARMED base-tier render
+   * by its stored key — no token grammar, no page knowledge needed by the
+   * dashboard. 404 with the state while `pending`/`locked`/`failed` (the
+   * doc-plane render routes remain the read-through repair path).
+   */
+  app.get(`${adminWirePaths.documents}/:id/thumbnail`, async (req, reply) => {
+    const ctx = requireScope(req, ['docs.read']);
+    const { id } = req.params as { id: string };
+    const doc = await lifecycle.get(ctx.tenantId, id);
+    if (!storage || doc.thumbnailState !== 'ready' || !doc.thumbnailKey) {
+      return reply.code(404).send({
+        error: { code: 'ThumbnailNotReady', state: doc.thumbnailState },
+      });
+    }
+    const bytes = await storage.get(doc.thumbnailKey);
+    if (!bytes) {
+      return reply.code(404).send({
+        error: { code: 'ThumbnailNotReady', state: 'pending' },
+      });
+    }
+    return reply
+      .type(doc.thumbnailKey.endsWith('.png') ? 'image/png' : 'image/webp')
+      .header('Cache-Control', 'private, max-age=60')
+      .send(Buffer.from(bytes));
+  });
 }
 
 function parseInitBody(req: FastifyRequest): AdminDocumentInitRequest {
@@ -219,6 +250,8 @@ function docPublic(d: {
   metadata: Record<string, unknown> | null;
   idempotencyKey: string | null;
   failureReason: string | null;
+  thumbnailState: string;
+  thumbnailKey: string | null;
   createdAt: number;
   updatedAt: number;
   createdBy: string | null;
@@ -232,6 +265,10 @@ function docPublic(d: {
     metadata: d.metadata,
     idempotencyKey: d.idempotencyKey,
     failureReason: d.failureReason,
+    // Dashboard tile contract (SCALE-OUT §2.1c): the URL is valid the
+    // whole time — `pending` just means a fetch pays the read-through.
+    thumbnailState: d.thumbnailState,
+    thumbnailUrl: d.thumbnailState === 'ready' ? adminWirePaths.documentThumbnail(d.id) : null,
     createdAt: d.createdAt,
     updatedAt: d.updatedAt,
     createdBy: d.createdBy,

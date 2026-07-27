@@ -29,10 +29,14 @@ export interface DocumentRow {
   metadata: Record<string, unknown> | null;
   idempotencyKey: string | null;
   failureReason: string | null;
+  thumbnailState: DocumentThumbnailState;
+  thumbnailKey: string | null;
   createdAt: number;
   updatedAt: number;
   createdBy: string | null;
 }
+
+export type DocumentThumbnailState = 'pending' | 'ready' | 'locked' | 'failed';
 
 export interface CreatePendingInput {
   id: string;
@@ -235,6 +239,26 @@ export class DocumentsRepo {
   }
 
   /**
+   * Advance the thumbnail lifecycle. `key` is the warmed base-tier
+   * artifact's storage key (only meaningful with `ready`). Best-effort
+   * bookkeeping: the read-through render path is the correctness path,
+   * this column only drives dashboard tiles.
+   */
+  async setThumbnail(
+    id: string,
+    tenantId: string,
+    state: DocumentThumbnailState,
+    key: string | null = null,
+  ): Promise<void> {
+    await this.db
+      .updateTable('documents')
+      .set({ thumbnail_state: state, thumbnail_key: key, updated_at: Date.now() })
+      .where('id', '=', id)
+      .where('tenant_id', '=', tenantId)
+      .execute();
+  }
+
+  /**
    * Two-phase cascade delete: flip to `deleting`, then row removal.
    * Caller is responsible for clearing storage between the two phases.
    * Returns true on the first-phase update; false if the row was
@@ -294,6 +318,8 @@ function mapRow(r: {
   metadata_json: string | null;
   idempotency_key: string | null;
   failure_reason: string | null;
+  thumbnail_state?: string | null;
+  thumbnail_key?: string | null;
   created_at: number;
   updated_at: number;
   created_by: string | null;
@@ -317,6 +343,8 @@ function mapRow(r: {
     metadata: r.metadata_json ? (JSON.parse(r.metadata_json) as Record<string, unknown>) : null,
     idempotencyKey: r.idempotency_key,
     failureReason: r.failure_reason,
+    thumbnailState: (r.thumbnail_state ?? 'pending') as DocumentThumbnailState,
+    thumbnailKey: r.thumbnail_key ?? null,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
     createdBy: r.created_by,

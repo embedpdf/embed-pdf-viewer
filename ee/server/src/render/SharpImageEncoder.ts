@@ -31,4 +31,17 @@ export class SharpImageEncoder {
       contentType: 'image/png',
     };
   }
+
+  /**
+   * Encode to a materialized buffer — the derived-artifact store persists
+   * bytes, not streams (the same bytes are sent AND stored).
+   */
+  async encodeToBuffer(
+    raster: PageRaster,
+    opts: { format: PageNetworkRenderFormat; quality?: number },
+  ): Promise<{ bytes: Uint8Array; contentType: string }> {
+    const encoded = this.encode(raster, opts);
+    const bytes = new Uint8Array(await encoded.stream.toBuffer());
+    return { bytes, contentType: encoded.contentType };
+  }
 }

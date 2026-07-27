@@ -21,11 +21,13 @@ import sql011 from './011_drop_page_index.sql';
 import sql012 from './012_layer_metadata_version.sql';
 import sql013 from './013_realtime_events.sql';
 import sql014 from './014_layer_attachments_version.sql';
+import sql015 from './015_document_thumbnail.sql';
 import down010 from './010_layer_layout_version.down.sql';
 import down011 from './011_drop_page_index.down.sql';
 import down012 from './012_layer_metadata_version.down.sql';
 import down013 from './013_realtime_events.down.sql';
 import down014 from './014_layer_attachments_version.down.sql';
+import down015 from './015_document_thumbnail.down.sql';
 import type { MigrationSource } from '../../migrator/runner';
 
 /**
@@ -54,4 +56,5 @@ export const sqliteMigrations: ReadonlyArray<MigrationSource> = [
   { version: '012', name: '012_layer_metadata_version.sql', sql: sql012, down: down012 },
   { version: '013', name: '013_realtime_events.sql', sql: sql013, down: down013 },
   { version: '014', name: '014_layer_attachments_version.sql', sql: sql014, down: down014 },
+  { version: '015', name: '015_document_thumbnail.sql', sql: sql015, down: down015 },
 ];

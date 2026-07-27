@@ -422,6 +422,24 @@ export interface PagesRenderWorkerRequest {
   options?: PageRenderOptions;
 }
 
+/**
+ * One-shot file render — open the base document from a file path, render
+ * ONE page by display index, close. No session is bound (the ingestion
+ * `runAdHoc` pattern, like `document.probeSecurityFile`): this is the
+ * derived-artifact warmer's producer, used when no live document session
+ * exists yet. The payload reports the page's durable object number so the
+ * caller can key the artifact it persists.
+ */
+export interface DocumentRenderPageFileWorkerRequest {
+  kind: 'document.renderPageFile';
+  jobId: WorkerJobId;
+  path: string;
+  password: string | null;
+  /** Display index (0-based) — ingest knows "first page", not object numbers. */
+  pageIndex: number;
+  options?: PageRenderOptions;
+}
+
 export interface PagesMoveWorkerRequest {
   kind: 'pages.move';
   jobId: WorkerJobId;
@@ -803,6 +821,7 @@ export type WorkerRequest =
   | DocumentSaveFileWorkerRequest
   | DocumentSaveLayerBufferWorkerRequest
   | DocumentProbeSecurityFileWorkerRequest
+  | DocumentRenderPageFileWorkerRequest
   | DocumentCheckPasswordPermissionsWorkerRequest
   | FontsRegisterWorkerRequest
   | FontsAddFallbackWorkerRequest
@@ -986,6 +1005,13 @@ export type WorkerResultPayload =
   | { tag: 'document.saveLayerBuffer'; bytes: ArrayBuffer; size: number }
   | { tag: 'document.saveFile'; path: string }
   | { tag: 'document.probeSecurityFile'; security: DocumentSecurityProbeInfo }
+  | {
+      tag: 'document.renderPageFile';
+      /** Durable page identity of the rendered index — the artifact key's pon. */
+      pageObjectNumber: PageObjectNumber;
+      pageCount: number;
+      raster: PageRaster;
+    }
   | { tag: 'document.checkPasswordPermissions'; security: DocumentSecurityProbeInfo }
   | { tag: 'fonts.register'; fontKey: string }
   | { tag: 'fonts.addFallback' }

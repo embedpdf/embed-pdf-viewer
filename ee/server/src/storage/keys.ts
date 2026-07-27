@@ -41,6 +41,36 @@ export const StorageKeys = {
     return layerArtifactKey(tenantId, docId, layerName, version);
   },
   /**
+   * Base-tier derived render (SCALE-OUT.md §2.1): sha-addressed WITHIN the
+   * tenant (cross-tenant sha-sharing would leak document existence), the
+   * canonical render token IS the filename — the key is the request. The
+   * token charset ([A-Za-z0-9.=,-]) is object-key-safe on fs/S3/GCS/Azure.
+   */
+  derivedRenderBase(
+    tenantId: string,
+    baseSha: string,
+    pageObjectNumber: number,
+    token: string,
+  ): string {
+    return `${tenantId}/derived/render/${baseSha}/pages/${pageObjectNumber}/${token}.webp`;
+  },
+  /**
+   * Layer-tier derived render: under the DOC prefix so the
+   * `documents.delete` prefix cascade reaps it for free. Version pins ride
+   * inside the token (contentVersion / annotationVersion).
+   */
+  derivedRenderLayer(
+    tenantId: string,
+    docId: string,
+    layerName: string,
+    pageObjectNumber: number,
+    token: string,
+  ): string {
+    return `${tenantId}/docs/${shard(docId)}/${docId}/layers/${encodeURIComponent(
+      layerName,
+    )}/derived/render/pages/${pageObjectNumber}/${token}.webp`;
+  },
+  /**
    * Per-ATTEMPT layer artifact key: `v{version}-{attempt}.layer`.
    *
    * Mutations upload their artifact BEFORE the commit transaction decides

@@ -99,6 +99,7 @@ export type {
   DocumentSaveFileWorkerRequest,
   DocumentCheckPasswordPermissionsWorkerRequest,
   DocumentProbeSecurityFileWorkerRequest,
+  DocumentRenderPageFileWorkerRequest,
   DocumentSecurityProbeInfo,
   PagesListWorkerRequest,
   PagesMoveWorkerRequest,

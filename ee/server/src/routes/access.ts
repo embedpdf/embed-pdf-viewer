@@ -8,22 +8,30 @@ import {
   type DocumentAccessInfo,
   type PdfBits,
 } from '@embedpdf/engine-core/runtime';
-import { AccessRequestSchema, cdnCoverageForScope, wirePaths } from '@embedpdf/engine-core/wire';
+import {
+  AccessRequestSchema,
+  cdnCoverageForScope,
+  wirePaths,
+  type RenderPolicy,
+} from '@embedpdf/engine-core/wire';
 import { requireLayerDocAccessOnly, type RequestJwtContext } from '../app/jwt-plugin';
 import type { CdnSigner } from '../cdn/CdnSigner';
+import type { DerivedRenderService } from '../services/DerivedRenderService';
 import type { DocumentService } from '../services/DocumentService';
 import { setNoStore } from './_helpers';
 
 export interface AccessRouteDeps {
   service: DocumentService;
   cdnSigner: CdnSigner;
+  /** When present, /access advertises the deployment's render lattice. */
+  derivedRenders?: DerivedRenderService;
 }
 
 export async function registerAccessRoutes(
   app: FastifyInstance,
   deps: AccessRouteDeps,
 ): Promise<void> {
-  const { service, cdnSigner } = deps;
+  const { service, cdnSigner, derivedRenders } = deps;
 
   app.post(wirePaths.access, async (req, reply) => {
     const parsed = AccessRequestSchema.safeParse(req.body ?? {});
@@ -58,6 +66,7 @@ export async function registerAccessRoutes(
       body.docId,
       layerName,
       `${req.protocol}://${req.hostname}`,
+      derivedRenders?.policy(),
     );
     setNoStore(reply);
     return {
@@ -76,6 +85,7 @@ function buildAccessResponse(
   docId: string,
   layerName: string,
   originUrl: string,
+  renderPolicy?: RenderPolicy,
 ): DocumentAccessInfo {
   if (!jwt.exp || jwt.exp <= 0) {
     throw new EngineError(EngineErrorCode.InvalidArg, 'doc token exp is required for access');
@@ -116,6 +126,10 @@ function buildAccessResponse(
       mode: unlocked.probe.encryptionState === 'encrypted' ? 'server-session' : 'not-needed',
     },
     expiresAt,
+    // The render lattice rides /access, NEVER the manifest: manifests are
+    // version-pinned immutable objects; the lattice is mutable deployment
+    // policy (SCALE-OUT.md §2.1b).
+    ...(renderPolicy ? { renderPolicy } : {}),
   };
 }
 

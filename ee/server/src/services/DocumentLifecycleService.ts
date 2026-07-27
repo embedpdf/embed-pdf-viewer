@@ -4,6 +4,7 @@ import { TenantsRepo } from '../db/repos/tenants.repo';
 import { StorageKeys } from '../storage/keys';
 import type { ObjectBody, ObjectStoreWithInfo, PresignedUpload } from '../storage/ObjectStore';
 import { DocumentSecurityProbe } from './DocumentSecurityProbe';
+import type { DerivedRenderService } from './DerivedRenderService';
 
 export type DedupMode = 'always-create' | 'reuse-existing';
 
@@ -78,6 +79,8 @@ export interface DocumentLifecycleOptions {
    */
   autoProvisionTenant?: boolean;
   securityProbe?: DocumentSecurityProbe;
+  /** When present, commit warms the document's thumbnail (fire-and-forget). */
+  derivedRenders?: DerivedRenderService;
 }
 
 /**
@@ -104,6 +107,7 @@ export class DocumentLifecycleService {
   private readonly storage: ObjectStoreWithInfo;
   private readonly autoProvisionTenant: boolean;
   private readonly securityProbe: DocumentSecurityProbe;
+  private readonly derivedRenders?: DerivedRenderService;
 
   constructor(opts: DocumentLifecycleOptions) {
     this.documents = opts.documents;
@@ -111,6 +115,7 @@ export class DocumentLifecycleService {
     this.storage = opts.storage;
     this.autoProvisionTenant = opts.autoProvisionTenant ?? false;
     this.securityProbe = opts.securityProbe ?? new DocumentSecurityProbe();
+    this.derivedRenders = opts.derivedRenders;
   }
 
   async init(input: InitInput): Promise<InitResult> {
@@ -246,6 +251,24 @@ export class DocumentLifecycleService {
     if (!updated) {
       throw conflict(`document ${doc.id} state changed during commit`);
     }
+
+    // Thumbnail lifecycle (SCALE-OUT §2.2). User-password documents get NO
+    // derived artifact — a thumbnail is content disclosure, and the lock
+    // tile IS the correct render. Everything else warms fire-and-forget:
+    // the read-through path is the correctness path, warming is latency.
+    if (probe.security.encryptionRequiresPassword === true) {
+      await this.documents.setThumbnail(doc.id, doc.tenantId, 'locked');
+    } else if (this.derivedRenders) {
+      void this.derivedRenders
+        .warmDocumentThumbnail({
+          tenantId: doc.tenantId,
+          docId: doc.id,
+          baseSha: observedSha,
+          baseKey: key,
+        })
+        .catch(() => undefined); // warm records `failed` itself
+    }
+
     return { doc: updated };
   }
 

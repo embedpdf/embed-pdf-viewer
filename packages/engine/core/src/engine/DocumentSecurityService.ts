@@ -141,6 +141,19 @@ export interface DocumentAccessInfo {
     readonly mode: 'not-needed' | 'client-retry' | 'server-session';
   };
   readonly expiresAt: number;
+  /**
+   * The deployment's render lattice (SCALE-OUT WS2): canonical
+   * `viewport.scale` points whose renders are durable, CDN-shared
+   * artifacts. Local engines report nothing here (continuous rendering);
+   * cloud engines surface it so `policy.snap()` can conform requests
+   * EXPLICITLY — the SDK never snaps implicitly (engine parity).
+   */
+  readonly renderPolicy?: {
+    readonly viewport: { readonly kind: 'scale'; readonly scales: readonly number[] };
+    readonly formats: readonly ('webp' | 'png')[];
+    readonly background: 'white';
+    readonly enforced: boolean;
+  };
 }
 
 export interface DocumentUnlockInput {

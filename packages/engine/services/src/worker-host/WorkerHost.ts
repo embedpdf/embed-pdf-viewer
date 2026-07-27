@@ -8,6 +8,7 @@ import {
   type AnnotationsDeleteWorkerRequest,
   type DocumentCheckPasswordPermissionsWorkerRequest,
   type DocumentProbeSecurityFileWorkerRequest,
+  type DocumentRenderPageFileWorkerRequest,
   type DocumentSaveBufferWorkerRequest,
   type DocumentSaveFileWorkerRequest,
   type DocumentSaveLayerBufferWorkerRequest,
@@ -322,6 +323,9 @@ export class WorkerHost {
           break;
         case 'document.probeSecurityFile':
           resultPack = this.handleDocumentProbeSecurityFile(msg);
+          break;
+        case 'document.renderPageFile':
+          resultPack = this.handleDocumentRenderPageFile(msg, ctrl.signal);
           break;
         case 'document.checkPasswordPermissions':
           resultPack = this.handleDocumentCheckPasswordPermissions(msg);
@@ -816,6 +820,57 @@ export class WorkerHost {
     const reader = new SecurityReader(this.runtime);
     const security = reader.probeFile(req.path, req.password);
     return wirePack({ tag: 'document.probeSecurityFile', security });
+  }
+
+  /**
+   * One-shot file render (the derived-artifact warmer's producer): open the
+   * base from a file path into a TRANSIENT session — never stored in
+   * `this.sessions`, so it can't collide with (or leak into) live document
+   * sessions — resolve the display index to its durable page object number,
+   * render, close. Shares the base parse with concurrent ad-hoc opens of
+   * the same file via the registry refcount.
+   */
+  private handleDocumentRenderPageFile(
+    req: DocumentRenderPageFileWorkerRequest,
+    signal: AbortSignal,
+  ): WirePack<WorkerResultPayload> {
+    const session = new DocumentSession(this.runtime);
+    const base = this.baseDocuments.acquireFileBase({
+      key: `adhoc-file:${req.path}`,
+      path: req.path,
+      password: req.password,
+    });
+    try {
+      session.openFromHandle(
+        openLayerDocument(this.runtime, base, { kind: 'fresh' }, req.password),
+      );
+      const layout = new PagesReader(this.runtime, session).read(signal);
+      const page = layout.pages[req.pageIndex];
+      if (!page) {
+        throw new EngineError(
+          EngineErrorCode.NotFound,
+          `renderPageFile: no page at index ${req.pageIndex} (pageCount=${layout.pageCount})`,
+        );
+      }
+      const raster = new PageRenderReader(this.runtime, session).render(
+        page.pageObjectNumber,
+        req.options ?? {},
+        signal,
+      );
+      return wirePack(
+        {
+          tag: 'document.renderPageFile',
+          pageObjectNumber: page.pageObjectNumber,
+          pageCount: layout.pageCount,
+          raster,
+        },
+        [raster.data],
+      );
+    } finally {
+      // Closing the session releases the base acquisition through the
+      // open handle's close stack (same lifecycle as live sessions).
+      session.close();
+    }
   }
 
   private handleDocumentCheckPasswordPermissions(

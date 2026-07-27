@@ -81,6 +81,7 @@ export type {
   OpenDocumentResponse,
   AccessRequest,
   AccessResponse,
+  RenderPolicy,
   DocumentHead,
   DocumentManifest,
   ManifestPage,

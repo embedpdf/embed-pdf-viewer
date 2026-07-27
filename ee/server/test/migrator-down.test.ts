@@ -92,7 +92,7 @@ describe('migrateDown [sqlite]', () => {
     }
   });
 
-  test('--to 010 reverts 011..014 in descending order, leaves 001-010', async () => {
+  test('--to 010 reverts 011..015 in descending order, leaves 001-010', async () => {
     const db = createSqliteDb({ path: ':memory:' });
     try {
       await migrate(db, { source: { kind: 'inline', migrations: sqliteMigrations } });
@@ -102,8 +102,8 @@ describe('migrateDown [sqlite]', () => {
         to: '010',
         onRevert: (m) => order.push(m.version),
       });
-      expect(reverted.map((m) => m.version)).toEqual(['014', '013', '012', '011']);
-      expect(order).toEqual(['014', '013', '012', '011']); // descending
+      expect(reverted.map((m) => m.version)).toEqual(['015', '014', '013', '012', '011']);
+      expect(order).toEqual(['015', '014', '013', '012', '011']); // descending
       expect(await appliedVersions(db)).toEqual([
         '001',
         '002',
@@ -273,7 +273,7 @@ describe.runIf(RUN_PG)('migrateDown [postgres]', () => {
     }
   });
 
-  test('--to 010 reverts 011..014 descending', async () => {
+  test('--to 010 reverts 011..015 descending', async () => {
     const db = await makeDb();
     try {
       await migrate(db, { source: { kind: 'inline', migrations: postgresMigrations } });
@@ -281,7 +281,7 @@ describe.runIf(RUN_PG)('migrateDown [postgres]', () => {
         source: { kind: 'inline', migrations: postgresMigrations },
         to: '010',
       });
-      expect(reverted.map((m) => m.version)).toEqual(['014', '013', '012', '011']);
+      expect(reverted.map((m) => m.version)).toEqual(['015', '014', '013', '012', '011']);
       const applied = await appliedVersions(db);
       expect(applied[applied.length - 1]).toBe('010');
       expect(applied).not.toContain('011');

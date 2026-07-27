@@ -254,6 +254,28 @@ function layerArtifact(msg, sessionMeta) {
   return { bytes: view.buffer, size: view.byteLength };
 }
 
+/**
+ * Deterministic RGBA raster sized by the requested scale (8px per unit),
+ * so lattice points produce distinguishable — and genuinely sharp-encodable
+ * — bitmaps. Shape mirrors `PageRaster`: { width, height, data }.
+ */
+function stubRaster(options) {
+  const scale =
+    options && options.viewport && options.viewport.kind === 'scale' && options.viewport.scale
+      ? options.viewport.scale
+      : 1;
+  const width = Math.max(1, Math.round(8 * scale));
+  const height = Math.max(1, Math.round(8 * scale));
+  const data = new Uint8Array(width * height * 4);
+  for (let i = 0; i < data.length; i += 4) {
+    data[i] = 0x88;
+    data[i + 1] = 0xaa;
+    data[i + 2] = 0xcc;
+    data[i + 3] = 0xff;
+  }
+  return { width, height, data: data.buffer };
+}
+
 function resolveMutation(msg, payload) {
   parentPort.postMessage(
     {
@@ -352,20 +374,34 @@ parentPort.on('message', (msg) => {
       return;
     }
     case 'document.probeSecurityFile': {
+      // Byte1 of the file steers the probe: 0x01 = user-password required
+      // (the thumbnail `locked` path); anything else = open document.
+      const probeBytes = msg.path ? readFileSync(msg.path) : Buffer.alloc(0);
+      const requiresPassword = probeBytes.byteLength > 1 && probeBytes[1] === 0x01;
       parentPort.postMessage({
         kind: 'resolve',
         jobId: msg.jobId,
         result: {
           tag: 'document.probeSecurityFile',
-          security: {
-            encryptionState: 'none',
-            encryptionRequiresPassword: false,
-            securityHandlerRevision: null,
-            pdfPermissionsBits: 0xffffffff,
-            pdfPermissionsAllAllowed: true,
-            pdfOpenedAs: 'none',
-            securityProbedAt: Date.now(),
-          },
+          security: requiresPassword
+            ? {
+                encryptionState: 'encrypted',
+                encryptionRequiresPassword: true,
+                securityHandlerRevision: 6,
+                pdfPermissionsBits: null,
+                pdfPermissionsAllAllowed: null,
+                pdfOpenedAs: null,
+                securityProbedAt: Date.now(),
+              }
+            : {
+                encryptionState: 'none',
+                encryptionRequiresPassword: false,
+                securityHandlerRevision: null,
+                pdfPermissionsBits: 0xffffffff,
+                pdfPermissionsAllAllowed: true,
+                pdfOpenedAs: 'none',
+                securityProbedAt: Date.now(),
+              },
         },
       });
       return;
@@ -690,6 +726,52 @@ parentPort.on('message', (msg) => {
         result: { layout: layoutSnapshot(meta), cache: null },
         artifact: layerArtifact(msg, meta),
       });
+      return;
+    }
+    case 'pages.render': {
+      const meta = openDocs.get(sessionKey(msg));
+      if (!meta) {
+        rejectNotOpen(msg);
+        return;
+      }
+      const raster = stubRaster(msg.options);
+      parentPort.postMessage(
+        { kind: 'resolve', jobId: msg.jobId, result: { tag: 'pages.render', raster } },
+        [raster.data],
+      );
+      return;
+    }
+    case 'document.renderPageFile': {
+      // Ad-hoc file render (the warm path): no session involved. Byte0 of
+      // the file encodes the page count, mirroring the open stubs.
+      const bytes = msg.path ? readFileSync(msg.path) : Buffer.alloc(0);
+      const pageCount = bytes.byteLength > 0 ? bytes[0] : 0;
+      if (msg.pageIndex >= pageCount) {
+        parentPort.postMessage({
+          kind: 'reject',
+          jobId: msg.jobId,
+          error: {
+            name: 'EngineError',
+            message: `no page at index ${msg.pageIndex}`,
+            code: 'NotFound',
+          },
+        });
+        return;
+      }
+      const raster = stubRaster(msg.options);
+      parentPort.postMessage(
+        {
+          kind: 'resolve',
+          jobId: msg.jobId,
+          result: {
+            tag: 'document.renderPageFile',
+            pageObjectNumber: msg.pageIndex + 1,
+            pageCount,
+            raster,
+          },
+        },
+        [raster.data],
+      );
       return;
     }
     case 'layer.close':

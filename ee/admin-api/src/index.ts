@@ -11,6 +11,9 @@ export const adminWirePaths = {
   documentUploadDirect: (docId: string) =>
     `/v1/admin/documents/${encodeURIComponent(docId)}/upload-direct`,
   documentDownload: (docId: string) => `/v1/admin/documents/${encodeURIComponent(docId)}/download`,
+  /** The warmed dashboard-tile artifact (WS2). 404 while `pending`/`locked`. */
+  documentThumbnail: (docId: string) =>
+    `/v1/admin/documents/${encodeURIComponent(docId)}/thumbnail`,
 } as const;
 
 export const DedupModeSchema = z.enum(['always-create', 'reuse-existing']);
@@ -28,6 +31,9 @@ export const AdminDocumentRecordSchema = z.object({
   metadata: z.record(z.string(), z.unknown()).nullable(),
   idempotencyKey: z.string().nullable(),
   failureReason: z.string().nullable(),
+  /** Dashboard tile lifecycle (WS2). Optional: pre-WS2 servers omit them. */
+  thumbnailState: z.enum(['pending', 'ready', 'locked', 'failed']).optional(),
+  thumbnailUrl: z.string().nullable().optional(),
   createdAt: z.number(),
   updatedAt: z.number(),
   createdBy: z.string().nullable(),

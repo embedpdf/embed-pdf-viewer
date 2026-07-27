@@ -55,6 +55,15 @@ export interface DocumentsTable {
    * (`sha_mismatch`, `upload_timeout`, `aborted`).
    */
   failure_reason: string | null;
+  /**
+   * Thumbnail lifecycle for dashboards: `pending` (not warmed yet — the
+   * read-through still works), `ready`, `locked` (user-password doc: NO
+   * derived artifact by design), `failed` (warm errored; read-through is
+   * the repair path). Defaults `pending` via migration 015.
+   */
+  thumbnail_state: Generated<string>;
+  /** Storage key of the warmed base-tier artifact (null until warmed). */
+  thumbnail_key: string | null;
   created_at: number;
   updated_at: number;
   created_by: string | null;
