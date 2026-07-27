@@ -4,6 +4,7 @@ import type { DocumentAttachmentsService } from './DocumentAttachmentsService';
 import type { DocumentFormsService } from './DocumentFormsService';
 import type { DocumentPagesService } from './DocumentPagesService';
 import type { DocumentRedactionService } from './DocumentRedactionService';
+import type { DocumentRenderService } from './DocumentRenderService';
 import type { DocumentSearchService } from './DocumentSearchService';
 import type { DocumentSecurityService } from './DocumentSecurityService';
 import type { MetadataService } from './MetadataService';
@@ -46,6 +47,15 @@ export interface DocumentHandle {
   readonly pieceInfo?: PieceInfoService;
   /** Document text search: budgeted, cursor-resumable slices. */
   readonly search: DocumentSearchService;
+  /**
+   * Render POLICY surface (`doc.render.policy()`): the engine's render
+   * lattice, or `continuous` on engines that render any viewport exactly
+   * (the local engine). Pixels stay on `page(pon).render` — this carries
+   * policy only. Conformance is explicit via `snapViewportToPolicy`; no
+   * engine ever snaps a render call implicitly. Optional while engines
+   * ship it — feature-detect with `doc.render !== undefined`.
+   */
+  readonly render?: DocumentRenderService;
   /**
    * Document-scoped page service. Use for cross-page operations:
    *   - `pages.list()` for the current display order.

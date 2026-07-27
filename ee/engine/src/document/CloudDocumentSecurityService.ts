@@ -17,12 +17,14 @@ import {
   type PasswordPrompt,
 } from '@embedpdf/engine-core/runtime';
 import { AccessResponseSchema, wirePaths, type DocumentHead } from '@embedpdf/engine-core/wire';
-import type { HttpClient } from '../transport/HttpClient';
+
 import { decodeUnverifiedClaims } from '../transport/decodeUnverifiedClaims';
+import type { HttpClient } from '../transport/HttpClient';
 
 export class CloudDocumentSecurityService implements DocumentSecurityService {
   private state: DocumentSecurityState;
   private access: DocumentAccessInfo | null = null;
+
   /**
    * Parsed JWT identity + scope, decoded once at construction. Used by
    * the local-fallback path for `effectiveScope` and `identity` when
@@ -172,6 +174,8 @@ export class CloudDocumentSecurityService implements DocumentSecurityService {
       identity: response.identity,
       originPasswordPolicy: response.originPasswordPolicy,
       expiresAt: response.expiresAt,
+      // Deployment render lattice (WS2). Absent on pre-lattice servers.
+      ...(response.renderPolicy ? { renderPolicy: response.renderPolicy } : {}),
     };
     this.http.setCdnAccess({
       cdn: response.cdn,

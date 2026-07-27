@@ -10,6 +10,8 @@ import {
   type DocumentHandle,
   type DocumentPagesService,
   type DocumentRedactionService,
+  CONTINUOUS_RENDER_POLICY,
+  type DocumentRenderService,
   type DocumentSecurityProbeInfo,
   type DocumentSecurityService,
   type MetadataService,
@@ -51,6 +53,15 @@ export class LocalDocumentHandle implements DocumentHandle {
   readonly pages: DocumentPagesService;
   readonly redaction: DocumentRedactionService;
   readonly security: DocumentSecurityService;
+  /**
+   * Local rendering is in-process and exact — every viewport renders as
+   * requested, so the policy is `continuous` forever. This is the
+   * engine-parity anchor: plugin code calls the same `policy()` on both
+   * engines and `snapViewportToPolicy` is the identity here.
+   */
+  readonly render: DocumentRenderService = {
+    policy: () => Promise.resolve(CONTINUOUS_RENDER_POLICY),
+  };
   readonly events: DocumentEventStream;
   private readonly publisher: SessionEventPublisher;
   private closed = false;

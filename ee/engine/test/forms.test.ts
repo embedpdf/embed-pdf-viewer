@@ -7,8 +7,8 @@ import {
   javaScriptProgramFromActionTree,
   scriptFieldsFromSnapshot,
   type ScriptInput,
-} from '../../../packages/acrojs-core/src';
-import { createQuickJsSandbox } from '../../../packages/js-sandbox/src';
+} from '../../../packages/core/acrojs/src';
+import { createQuickJsSandbox } from '../../../packages/core/js-sandbox/src';
 import { createCloudEngine } from '../src/index';
 import {
   buildDbSeededFixture,
@@ -25,7 +25,8 @@ const resources = resolve(
   '..',
   '..',
   'packages',
-  'pdf-runtime',
+  'engine',
+  'runtime',
   'runtime-src',
   'testing',
   'resources',
@@ -63,7 +64,18 @@ beforeAll(async () => {
   for (const doc of Object.values(DOCS)) {
     const path =
       doc === DOCS.dynamicStamp
-        ? resolve(here, '..', '..', '..', doc.file)
+        ? resolve(
+            here,
+            '..',
+            '..',
+            '..',
+            'packages',
+            'core',
+            'js-sandbox',
+            'test',
+            'fixtures',
+            doc.file,
+          )
         : resolve(resources, doc.file);
     await seedDocumentFromBytes(fx, TENANT_ID, doc.id, path, doc.pages);
   }

@@ -1,6 +1,7 @@
 import { EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
-import type { HttpClient } from '../transport/HttpClient';
+
 import type { AuditEventRow } from './auditRowToEvent';
+import type { HttpClient } from '../transport/HttpClient';
 
 export interface SseClientOptions {
   http: HttpClient;

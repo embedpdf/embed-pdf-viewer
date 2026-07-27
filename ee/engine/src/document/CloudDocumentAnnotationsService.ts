@@ -14,8 +14,9 @@ import {
   wirePaths,
   type WeakAnnotationSessionResponse,
 } from '@embedpdf/engine-core/wire';
-import type { HttpClient } from '../transport/HttpClient';
+
 import type { ManifestAccessor } from './CloudDocumentHandle';
+import type { HttpClient } from '../transport/HttpClient';
 
 export class CloudDocumentAnnotationsService implements DocumentAnnotationsService {
   constructor(

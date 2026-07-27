@@ -40,8 +40,9 @@ import {
   wirePaths,
 } from '@embedpdf/engine-core/wire';
 import type { SessionEventPublisher } from '@embedpdf/engine-services';
-import type { HttpClient } from '../transport/HttpClient';
+
 import type { ManifestAccessor } from './CloudDocumentHandle';
+import type { HttpClient } from '../transport/HttpClient';
 
 /** Content types the import POST body may carry; the server sniffs the
  *  actual format from the bytes, so this is advisory only. */

@@ -24,6 +24,7 @@ const fixturePath = resolve(
   '..',
   'packages',
   'engine',
+  'main',
   'test',
   'fixtures',
   'embedded_attachments.pdf',

@@ -7,8 +7,9 @@ import {
   type PageTextSnapshot,
 } from '@embedpdf/engine-core/runtime';
 import { PageTextSnapshotSchema, wirePaths } from '@embedpdf/engine-core/wire';
-import type { HttpClient } from '../transport/HttpClient';
+
 import type { ManifestAccessor } from './CloudDocumentHandle';
+import type { HttpClient } from '../transport/HttpClient';
 
 /**
  * Cloud-side per-page text service. `read()` fetches the

@@ -8,8 +8,9 @@ import {
 } from '@embedpdf/engine-core/runtime';
 import { RedactionApplyResultSchema, wirePaths } from '@embedpdf/engine-core/wire';
 import type { SessionEventPublisher } from '@embedpdf/engine-services';
-import type { HttpClient } from '../transport/HttpClient';
+
 import type { ManifestAccessor } from './CloudDocumentHandle';
+import type { HttpClient } from '../transport/HttpClient';
 
 /**
  * Cloud-side redaction apply. Mirrors `LocalDocumentRedactionService` over

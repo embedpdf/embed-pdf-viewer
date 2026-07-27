@@ -7,8 +7,8 @@ import {
 } from '@embedpdf/engine-core/runtime';
 import { DocumentActionsSnapshotSchema, wirePaths } from '@embedpdf/engine-core/wire';
 
-import type { HttpClient } from '../transport/HttpClient';
 import type { ManifestAccessor } from './CloudDocumentHandle';
+import type { HttpClient } from '../transport/HttpClient';
 
 export class CloudDocumentActionsService implements DocumentActionsService {
   constructor(

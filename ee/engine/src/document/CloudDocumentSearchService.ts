@@ -16,8 +16,9 @@ import {
   wirePaths,
   type SearchToken,
 } from '@embedpdf/engine-core/wire';
-import type { HttpClient } from '../transport/HttpClient';
+
 import type { ManifestAccessor } from './CloudDocumentHandle';
+import type { HttpClient } from '../transport/HttpClient';
 
 /**
  * Cloud search transport: versioned GETs, one per budgeted slice.

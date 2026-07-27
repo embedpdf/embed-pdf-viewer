@@ -18,7 +18,7 @@ const fixturePath = resolve(
   '..',
   '..',
   'examples',
-  'pdf-runtime-demo',
+  'engine-runtime-demo',
   'public',
   'sample.pdf',
 );

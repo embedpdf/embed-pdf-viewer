@@ -14,6 +14,8 @@ import {
   type DocumentHandle,
   type DocumentPagesService,
   type DocumentRedactionService,
+  CONTINUOUS_RENDER_POLICY,
+  type DocumentRenderService,
   type DocumentSecurityService,
   type MetadataCache,
   type MutationMeta,
@@ -87,6 +89,7 @@ export class CloudDocumentHandle implements DocumentHandle {
   readonly pages: DocumentPagesService;
   readonly redaction: DocumentRedactionService;
   readonly security: DocumentSecurityService;
+  readonly render: DocumentRenderService;
   readonly events: DocumentEventStream;
   private readonly publisher: SessionEventPublisher;
   private readonly hub: EventHub;
@@ -130,7 +133,7 @@ export class CloudDocumentHandle implements DocumentHandle {
   ) {
     this.id = id;
     this.pendingInitialHead = initialHead ?? null;
-    this.security = new CloudDocumentSecurityService(
+    const security = new CloudDocumentSecurityService(
       http,
       id,
       layerName,
@@ -138,6 +141,27 @@ export class CloudDocumentHandle implements DocumentHandle {
       { isClosed: () => this.closed },
       initialToken,
     );
+    this.security = security;
+    // The deployment's render lattice rides /v1/access (mutable policy
+    // never lives in immutable manifests). Reuse the cached access block
+    // when present; otherwise establish access on demand — the same call
+    // the CDN path uses, so this can never add a second handshake shape.
+    // A pre-lattice server (no renderPolicy field) enforces nothing:
+    // `continuous` is the honest answer.
+    this.render = {
+      policy: async () => {
+        const cached = security.currentAccess ?? (await security.establishAccess()).access ?? null;
+        const advertised = cached?.renderPolicy;
+        if (!advertised) return CONTINUOUS_RENDER_POLICY;
+        return {
+          kind: 'lattice',
+          scales: advertised.viewport.scales,
+          formats: advertised.formats,
+          background: advertised.background,
+          enforced: advertised.enforced,
+        };
+      },
+    };
     const hub = new EventHub();
     this.hub = hub;
     this.sessionId = sessionId;

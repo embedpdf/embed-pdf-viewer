@@ -7,8 +7,9 @@ import {
   type PageObjectNumber,
 } from '@embedpdf/engine-core/runtime';
 import { PageGeometrySnapshotSchema, wirePaths } from '@embedpdf/engine-core/wire';
-import type { HttpClient } from '../transport/HttpClient';
+
 import type { ManifestAccessor } from './CloudDocumentHandle';
+import type { HttpClient } from '../transport/HttpClient';
 
 export class CloudPageGeometryService implements PageGeometryService {
   constructor(

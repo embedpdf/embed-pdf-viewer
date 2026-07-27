@@ -44,6 +44,8 @@ export type {
   PdfPermissionAdvisory,
   PdfPermissionInfo,
 } from './engine/DocumentSecurityService';
+export { CONTINUOUS_RENDER_POLICY, snapViewportToPolicy } from './engine/DocumentRenderService';
+export type { DocumentRenderService, EngineRenderPolicy } from './engine/DocumentRenderService';
 export { passwordPromptFromState } from './engine/passwordPrompt';
 export type { PasswordPrompt } from './engine/passwordPrompt';
 export type { DocumentCapabilities } from './engine/DocumentHandle';

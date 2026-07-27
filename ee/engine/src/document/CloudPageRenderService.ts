@@ -13,8 +13,9 @@ import {
   type PageRenderService,
 } from '@embedpdf/engine-core/runtime';
 import { renderImageOptionsToWire, wirePaths } from '@embedpdf/engine-core/wire';
-import type { HttpClient } from '../transport/HttpClient';
+
 import type { ManifestAccessor } from './CloudDocumentHandle';
+import type { HttpClient } from '../transport/HttpClient';
 
 export class CloudPageRenderService implements PageRenderService {
   constructor(
