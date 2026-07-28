@@ -42,6 +42,7 @@ import type { SessionEventPublisher } from '@embedpdf/engine-services';
 
 import { buildMutationForm, hasResources } from './buildMutationForm';
 import type { ManifestAccessor } from './CloudDocumentHandle';
+import { planesInherited } from './planes';
 import { parseAttachmentContent } from './parseAttachmentContent';
 import type { HttpClient } from '../transport/HttpClient';
 
@@ -81,12 +82,22 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
             `no page with object number ${this.pageObjectNumber} in document ${this.docId}`,
           );
         }
-        return wirePaths.layerPageAnnotations(
-          this.docId,
-          this.layerName,
-          this.pageObjectNumber,
-          page.cache.annotationVersion,
-        );
+        // WS2b plane rule: the list depends on the `annotations` plane. A
+        // base's own annotations (weak-identity ones included) are simply
+        // VISIBLE through an inheriting layer, so every visitor reads ONE
+        // doc-level URL served from the base session.
+        return planesInherited(manifest, ['annotations'])
+          ? wirePaths.docPageAnnotations(
+              this.docId,
+              this.pageObjectNumber,
+              page.cache.annotationVersion,
+            )
+          : wirePaths.layerPageAnnotations(
+              this.docId,
+              this.layerName,
+              this.pageObjectNumber,
+              page.cache.annotationVersion,
+            );
       };
       return this.http.getJsonWithRefresh(
         buildPath,
@@ -132,15 +143,20 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
             `no page with object number ${this.pageObjectNumber} in document ${this.docId}`,
           );
         }
-        return wirePaths.layerPageAnnotationAppearances(
-          this.docId,
-          this.layerName,
-          this.pageObjectNumber,
-          annotationAppearancesImageOptionsToWire(
-            { ...options, format },
-            { annotationVersion: page.cache.annotationVersion },
-          ),
+        const wireToken = annotationAppearancesImageOptionsToWire(
+          { ...options, format },
+          { annotationVersion: page.cache.annotationVersion },
         );
+        // WS2b: same `annotations` plane switch as list() — the appearance
+        // batch shares too.
+        return planesInherited(manifest, ['annotations'])
+          ? wirePaths.docPageAnnotationAppearances(this.docId, this.pageObjectNumber, wireToken)
+          : wirePaths.layerPageAnnotationAppearances(
+              this.docId,
+              this.layerName,
+              this.pageObjectNumber,
+              wireToken,
+            );
       };
       const form = await this.http.getFormDataWithRefresh(
         buildPath,
@@ -188,13 +204,23 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
     return AbortablePromise.run<AttachmentContent>(async (signal) => {
       const buildPath = async (s: AbortSignal): Promise<string> => {
         const manifest = await this.manifest.get(s);
-        return wirePaths.layerAnnotationFile(
-          this.docId,
-          this.layerName,
-          this.pageObjectNumber,
-          annotKey,
-          manifest.attachmentsVersion,
-        );
+        // WS2b: a FileAttachment annotation's bytes depend on BOTH planes —
+        // the annotation must exist in this view (`annotations`) and the
+        // byte pin is `attachmentsVersion` (`attachments`).
+        return planesInherited(manifest, ['annotations', 'attachments'])
+          ? wirePaths.docAnnotationFile(
+              this.docId,
+              this.pageObjectNumber,
+              annotKey,
+              manifest.attachmentsVersion,
+            )
+          : wirePaths.layerAnnotationFile(
+              this.docId,
+              this.layerName,
+              this.pageObjectNumber,
+              annotKey,
+              manifest.attachmentsVersion,
+            );
       };
       const file = await this.http.getFileWithRefresh(
         buildPath,
@@ -387,7 +413,7 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
     result: T,
     type: 'annotation.created' | 'annotation.updated' | 'annotation.deleted' | 'annotation.moved',
   ): T {
-    this.manifest.apply(result.meta);
+    this.manifest.apply(result.meta, ['annotations']);
     this.publisher.publishLocal({
       type,
       pageObjectNumber: this.pageObjectNumber,

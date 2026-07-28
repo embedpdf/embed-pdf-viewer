@@ -39,6 +39,13 @@ export const DownloadTokenSchema = {
  * generic over this list — adding a new render option means adding its
  * dotted path here and a matching branch in `PageImageOptionsWireSchema`.
  * No encoder/decoder code changes.
+ *
+ * `includeAnnotations` is deliberately NOT a token field (token/path law,
+ * SCALE-OUT §2b.2): annotatedness changes the artifact's plane-dependency
+ * set, so it is expressed by the path FAMILY (`…/render/pages/` vs
+ * `…/render/annotated/pages/`), never inside the token. `annotationVersion`
+ * belongs to the annotated family's tokens only — each family's query
+ * schema enforces its own pin grammar.
  */
 export const RenderTokenSchema = {
   fields: [
@@ -46,7 +53,6 @@ export const RenderTokenSchema = {
     'background',
     'contentVersion',
     'format',
-    'includeAnnotations',
     'quality',
     'rotation',
     'target.kind',

@@ -23,16 +23,16 @@ const SECRET = 'derived-renders-secret';
 
 /** Canonical lattice tokens (SCALE-OUT §2.1): alphabetical, codec-exact. */
 const THUMB_TOKEN =
-  'background=white,contentVersion=1,format=webp,includeAnnotations=false,viewport.kind=width,viewport.width=320';
+  'background=white,contentVersion=1,format=webp,viewport.kind=width,viewport.width=320';
 const W640_TOKEN =
-  'background=white,contentVersion=1,format=webp,includeAnnotations=false,viewport.kind=width,viewport.width=640';
+  'background=white,contentVersion=1,format=webp,viewport.kind=width,viewport.width=640';
 /** Off-lattice: a width outside the ladder (the old viewer default). */
 const OFFLATTICE_TOKEN =
-  'annotationVersion=1,background=white,contentVersion=1,format=webp,includeAnnotations=true,viewport.kind=width,viewport.width=720';
+  'annotationVersion=1,background=white,contentVersion=1,format=webp,viewport.kind=width,viewport.width=720';
 /** Rect-target region render: the (future) tile policy's jurisdiction —
  *  exempt from full-page enforcement, compute-only until WS2c. */
 const RECT_TOKEN =
-  'background=white,contentVersion=1,format=webp,includeAnnotations=false,target.kind=rect,target.rect.bottom=0,target.rect.left=0,target.rect.right=100,target.rect.top=100,viewport.kind=width,viewport.width=64';
+  'background=white,contentVersion=1,format=webp,target.kind=rect,target.rect.bottom=0,target.rect.left=0,target.rect.right=100,target.rect.top=100,viewport.kind=width,viewport.width=64';
 
 interface Fixture {
   bundle: AppBundle;
@@ -103,9 +103,11 @@ describe('WS2 derived renders', () => {
     await seedDocument(fx, tenantId, docId, { pageCount: 1 });
     const headers = { Authorization: `Bearer ${docToken(tenantId, docId)}` };
 
-    // Default fixture: enforce=false → width-kind renders still work…
+    // Default fixture: enforce=false → width-kind renders still work. The
+    // token is ANNOTATED, so it lives under the annotated family (WS2b
+    // prefix law: `/render/pages/` serves annotation-free tokens only).
     const res = await fetch(
-      `${fx.baseUrl}/v1/docs/${docId}/render/pages/1/data@${OFFLATTICE_TOKEN}`,
+      `${fx.baseUrl}/v1/docs/${docId}/render/annotated/pages/1/data@${OFFLATTICE_TOKEN}`,
       {
         headers,
       },
@@ -123,7 +125,7 @@ describe('WS2 derived renders', () => {
       await seedDocument(strict, tenantId, strictDoc, { pageCount: 1 });
       const strictHeaders = { Authorization: `Bearer ${docToken(tenantId, strictDoc)}` };
       const rejected = await fetch(
-        `${strict.baseUrl}/v1/docs/${strictDoc}/render/pages/1/data@${OFFLATTICE_TOKEN}`,
+        `${strict.baseUrl}/v1/docs/${strictDoc}/render/annotated/pages/1/data@${OFFLATTICE_TOKEN}`,
         { headers: strictHeaders },
       );
       expect(rejected.status).toBe(400);
@@ -352,22 +354,26 @@ describe('WS2 derived renders', () => {
     ).toBe(true);
   });
 
-  test('layer tier: annotation-pinned layer render persists under the doc prefix', async () => {
+  test('layer tier: annotated-family layer render persists under the doc prefix', async () => {
     const tenantId = 'tenant-layer-tier';
     const docId = 'doclayertier01';
     await seedDocument(fx, tenantId, docId, { pageCount: 1 });
     const headers = { Authorization: `Bearer ${docToken(tenantId, docId, 'alice')}` };
 
-    // Layer view at the base epoch: annotations-on renders pin BOTH counters.
+    // Layer view at the base epoch. Annotatedness is PATH-only (token/path
+    // law): the annotated FAMILY pins both counters, its token carrying the
+    // annotationVersion pin — never an includeAnnotations key.
     const token =
-      'annotationVersion=1,background=white,contentVersion=1,format=webp,includeAnnotations=true,viewport.kind=width,viewport.width=320';
+      'annotationVersion=1,background=white,contentVersion=1,format=webp,viewport.kind=width,viewport.width=320';
     const res = await fetch(
-      `${fx.baseUrl}/v1/docs/${docId}/layers/alice/render/pages/1/data@${token}`,
+      `${fx.baseUrl}/v1/docs/${docId}/layers/alice/render/annotated/pages/1/data@${token}`,
       { headers },
     );
     expect(res.status).toBe(200);
     expect(
-      await fx.storage.exists(StorageKeys.derivedRenderLayer(tenantId, docId, 'alice', 1, token)),
+      await fx.storage.exists(
+        StorageKeys.derivedRenderLayer(tenantId, docId, 'alice', 1, token, true),
+      ),
     ).toBe(true);
   });
 });

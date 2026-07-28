@@ -137,7 +137,7 @@ export class CloudDocumentFormsService implements DocumentFormsService {
       // An all-no-op/all-preflight-rejected batch deliberately has no
       // artifact, cache advance, or event.
       if (result.meta === null) return result;
-      this.manifest.apply(result.meta);
+      this.manifest.apply(result.meta, ['annotations']);
       this.publisher.publishLocal({ type: 'form.effectsApplied', ...result });
       return result;
     });
@@ -288,7 +288,7 @@ export class CloudDocumentFormsService implements DocumentFormsService {
       | 'form.widgetAttached'
       | 'form.widgetDetached',
   ): T {
-    this.manifest.apply(result.meta);
+    this.manifest.apply(result.meta, ['annotations']);
     this.publisher.publishLocal({ type, ...result } as unknown as DocumentEventInit);
     return result;
   }

@@ -18,6 +18,7 @@ import type {
 import { EmbeddedFileItemSchema, EmbeddedFileRefSchema } from '../dto/Attachment.schema';
 import type { CachePins } from '../dto/CachePins';
 import type { DocumentManifest, ManifestPage } from '../dto/DocumentManifest';
+import type { LayerScopes } from '../dto/LayerScopes';
 import type { DocumentMetadata } from '../dto/DocumentMetadata';
 import type { MetadataPatch } from '../dto/MetadataPatch';
 import type { PageGeometrySnapshot } from '../dto/PageGeometrySnapshot';
@@ -376,6 +377,23 @@ export const CachePinsSchema: z.ZodType<CachePins> = z.object({
 });
 
 /**
+ * WS2b plane scopes — DERIVED from the version counters at every emission
+ * point (layer manifests, mutation cache envelopes, SSE rows), never stored.
+ * Additive/optional both ways: old clients ignore it, old servers omit it
+ * (consumers treat absence as all-'layer' — never wrong, only unshared).
+ */
+const LayerScopeValueSchema = z.enum(['base', 'layer']);
+export const LayerScopesSchema: z.ZodType<LayerScopes> = z.object({
+  content: LayerScopeValueSchema,
+  annotations: LayerScopeValueSchema,
+  layout: LayerScopeValueSchema,
+  attachments: LayerScopeValueSchema,
+  metadata: LayerScopeValueSchema,
+  actions: LayerScopeValueSchema,
+});
+export type { LayerScopes, LayerScopePlane } from '../dto/LayerScopes';
+
+/**
  * Per-page envelope inside `DocumentManifest`. Carries the full
  * `PageState` plus the cache-busting integers the SDK embeds in
  * leaf URLs (`/pages/:pon/text@contentVersion=N`, `/pages/:pon/annotations@annotationVersion=N`).
@@ -419,6 +437,8 @@ export const DocumentManifestSchema = z.object({
   attachmentsVersion: z.number().int().positive().default(1),
   auditHead: z.number().int().nonnegative(),
   baseSha: z.string(),
+  // WS2b plane scopes — layer manifests only; absent = all-'layer'.
+  scopes: LayerScopesSchema.optional(),
   pages: z.array(ManifestPageSchema),
 }) as unknown as z.ZodType<DocumentManifest>;
 export type { DocumentManifest } from '../dto/DocumentManifest';
@@ -577,84 +597,89 @@ const RenderBackgroundSchema = z.enum(['white', 'transparent']);
 
 const RenderQualitySchema = z.coerce.number().int().min(1).max(100);
 
-// z.coerce.boolean() uses Boolean(value) which turns the string "false" into
-// true. Explicit string→boolean handling is the only safe way to read this
-// from a query string or token value.
-const RenderIncludeAnnotationsSchema = z.preprocess((raw) => {
-  if (raw === undefined) return undefined;
-  if (typeof raw === 'boolean') return raw;
-  if (raw === 'true' || raw === '1') return true;
-  if (raw === 'false' || raw === '0') return false;
-  return raw;
-}, z.boolean());
+/**
+ * The token/path law (SCALE-OUT §2b.2): annotatedness is PATH-expressed —
+ * the render FAMILY the route belongs to — never token/query-expressed.
+ * Each family therefore gets its own query schema, built from one shared
+ * base:
+ *
+ *   - the annotation-free family (`…/render/pages/`) has NO
+ *     `annotationVersion` field at all — `.strict()` rejects it as an
+ *     unrecognized key, so the illegal combination is unrepresentable;
+ *   - the annotated family (`…/render/annotated/pages/`) REQUIRES
+ *     `annotationVersion` on versioned requests — its artifact depends on
+ *     the `annotations` plane, so the pin must be in the cache key.
+ *
+ * Both transforms stamp `includeAnnotations` onto the parsed SDK options
+ * from the family, so downstream consumers (worker options, classify) are
+ * family-blind.
+ */
+function buildPageRenderQuerySchema(annotated: boolean): z.ZodType<PageRenderQuery> {
+  return z
+    .object({
+      contentVersion: z.coerce.number().int().positive().optional(),
+      ...(annotated ? { annotationVersion: z.coerce.number().int().positive().optional() } : {}),
+      format: PageNetworkRenderFormatSchema.optional(),
+      viewport: RenderViewportSchema.optional(),
+      target: RenderTargetSchema.optional(),
+      rotation: RenderRotationSchema.optional(),
+      background: RenderBackgroundSchema.optional(),
+      quality: RenderQualitySchema.optional(),
+    })
+    .strict()
+    .superRefine((v, ctx) => {
+      // The object shape is family-dependent (the free family has no
+      // `annotationVersion` key at all), so read the pins through one
+      // explicit view instead of letting the conditional spread's union
+      // type leak into the refinement.
+      const pins = v as { contentVersion?: number; annotationVersion?: number };
+      if (pins.contentVersion !== undefined && v.format === undefined) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['format'],
+          message: 'versioned render requires format',
+        });
+      }
+      if (annotated && pins.annotationVersion !== undefined && pins.contentVersion === undefined) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['annotationVersion'],
+          message: 'annotationVersion requires contentVersion',
+        });
+      }
+      if (annotated && pins.contentVersion !== undefined && pins.annotationVersion === undefined) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['annotationVersion'],
+          message: 'versioned annotated render requires annotationVersion',
+        });
+      }
+    })
+    .transform((v) => {
+      const pins = v as { contentVersion?: number; annotationVersion?: number };
+      const options: PageImageOptions = {
+        ...(v.target ? { target: v.target } : {}),
+        ...(v.viewport ? { viewport: v.viewport } : {}),
+        ...(v.rotation !== undefined ? { rotation: v.rotation } : {}),
+        ...(v.background !== undefined ? { background: v.background } : {}),
+        ...(v.quality !== undefined ? { quality: v.quality } : {}),
+        ...(v.format !== undefined ? { format: v.format } : {}),
+        includeAnnotations: annotated,
+      };
+      return {
+        options,
+        ...(pins.contentVersion !== undefined ? { contentVersion: pins.contentVersion } : {}),
+        ...(pins.annotationVersion !== undefined
+          ? { annotationVersion: pins.annotationVersion }
+          : {}),
+      };
+    }) as unknown as z.ZodType<PageRenderQuery>;
+}
 
-export const PageRenderQuerySchema = z
-  .object({
-    contentVersion: z.coerce.number().int().positive().optional(),
-    annotationVersion: z.coerce.number().int().positive().optional(),
-    format: PageNetworkRenderFormatSchema.optional(),
-    includeAnnotations: RenderIncludeAnnotationsSchema.optional(),
-    viewport: RenderViewportSchema.optional(),
-    target: RenderTargetSchema.optional(),
-    rotation: RenderRotationSchema.optional(),
-    background: RenderBackgroundSchema.optional(),
-    quality: RenderQualitySchema.optional(),
-  })
-  .strict()
-  .superRefine((v, ctx) => {
-    if (v.contentVersion !== undefined && v.includeAnnotations === undefined) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['includeAnnotations'],
-        message: 'versioned render requires includeAnnotations',
-      });
-    }
-    if (v.contentVersion !== undefined && v.format === undefined) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['format'],
-        message: 'versioned render requires format',
-      });
-    }
-    if (v.annotationVersion !== undefined && v.contentVersion === undefined) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['annotationVersion'],
-        message: 'annotationVersion requires contentVersion',
-      });
-    }
-    const includeAnnotations = v.includeAnnotations ?? true;
-    if (v.contentVersion !== undefined && includeAnnotations && v.annotationVersion === undefined) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['annotationVersion'],
-        message: 'versioned render requires annotationVersion when includeAnnotations is true',
-      });
-    }
-    if (!includeAnnotations && v.annotationVersion !== undefined) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['annotationVersion'],
-        message: 'annotationVersion is invalid when includeAnnotations is false',
-      });
-    }
-  })
-  .transform((v) => {
-    const options: PageImageOptions = {
-      ...(v.target ? { target: v.target } : {}),
-      ...(v.viewport ? { viewport: v.viewport } : {}),
-      ...(v.rotation !== undefined ? { rotation: v.rotation } : {}),
-      ...(v.background !== undefined ? { background: v.background } : {}),
-      ...(v.quality !== undefined ? { quality: v.quality } : {}),
-      ...(v.format !== undefined ? { format: v.format } : {}),
-      includeAnnotations: v.includeAnnotations ?? true,
-    };
-    return {
-      options,
-      ...(v.contentVersion !== undefined ? { contentVersion: v.contentVersion } : {}),
-      ...(v.annotationVersion !== undefined ? { annotationVersion: v.annotationVersion } : {}),
-    };
-  }) as unknown as z.ZodType<PageRenderQuery>;
+/** Query/token schema for the annotation-free render family (`page-render`). */
+export const PageRenderQuerySchema = buildPageRenderQuerySchema(false);
+/** Query/token schema for the annotated render family (`page-render-annotated`). */
+export const PageRenderAnnotatedQuerySchema = buildPageRenderQuerySchema(true);
 
 /**
  * Query/token schema for the batch annotation-appearance render endpoint.

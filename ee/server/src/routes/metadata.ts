@@ -16,6 +16,7 @@ import {
   setNoStore,
   type SchemaLike,
 } from './_helpers';
+import { requireSharedDocRead } from './_planeGuard';
 
 interface MetadataRouteDeps {
   service: DocumentService;
@@ -27,6 +28,30 @@ export async function registerMetadataRoutes(
   deps: MetadataRouteDeps,
 ): Promise<void> {
   const { service, layerService } = deps;
+
+  // WS2b doc-level (shared) read: served from the BASE worker session while
+  // the caller's layer inherits the metadata plane.
+  app.get('/v1/docs/:docId/metadata@:token', async (req, reply) => {
+    const { docId, token } = req.params as { docId: string; token: string };
+    const ctx = await requireSharedDocRead(req, service, docId, 'metadata', ['metadata']);
+    const requested = parseTokenOrInvalidArg(decodeMetadataToken, token, 'metadataVersion token');
+    const manifest = await service.getManifest(ctx, docId);
+    if (requested !== manifest.metadataVersion) {
+      setNoStore(reply);
+      throw new EngineError(
+        EngineErrorCode.NotFound,
+        `metadata version ${requested} no longer current (current=${manifest.metadataVersion})`,
+      );
+    }
+    const metadata = await service.readLayerMetadata(
+      ctx,
+      docId,
+      undefined,
+      abortSignalFromRequest(req),
+    );
+    setImmutableCache(reply);
+    return metadata;
+  });
 
   app.get('/v1/docs/:docId/layers/:layerName/metadata@:token', async (req, reply) => {
     const { docId, layerName, token } = req.params as {

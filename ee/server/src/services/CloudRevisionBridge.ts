@@ -82,12 +82,32 @@ export class CloudRevisionBridge {
     return base as T;
   }
 
-  validateClientIndexRef(pageState: PageState, ref: AnnotationRef): void {
+  validateClientIndexRef(
+    pageState: PageState,
+    ref: AnnotationRef,
+    opts?: {
+      /**
+       * WS2b: additional `docSessionId`s to accept as equivalent to
+       * `pageState`'s own — in practice the doc's BASE revision scope. A
+       * weak/index ref minted by a SHARED base read carries the base scope
+       * (the response is one CDN object for every inheriting layer, so it
+       * cannot carry per-layer scopes). Accepting it is sound because the
+       * GENERATION check still runs: layer pages snapshot the base rows and
+       * generations only move forward on layer writes, so an equal
+       * generation proves the two views are identical — the alias never
+       * widens staleness acceptance.
+       */
+      aliasDocSessionIds?: readonly string[];
+    },
+  ): void {
     if (ref.kind !== 'index') {
       return;
     }
+    const scopeMatches =
+      ref.revision.docSessionId === pageState.revision.docSessionId ||
+      (opts?.aliasDocSessionIds?.includes(ref.revision.docSessionId) ?? false);
     if (
-      ref.revision.docSessionId !== pageState.revision.docSessionId ||
+      !scopeMatches ||
       ref.revision.pageObjectNumber !== ref.pageObjectNumber ||
       ref.revision.generation !== pageState.revision.generation
     ) {

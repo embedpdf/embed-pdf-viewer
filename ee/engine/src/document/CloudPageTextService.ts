@@ -9,6 +9,7 @@ import {
 import { PageTextSnapshotSchema, wirePaths } from '@embedpdf/engine-core/wire';
 
 import type { ManifestAccessor } from './CloudDocumentHandle';
+import { planesInherited } from './planes';
 import type { HttpClient } from '../transport/HttpClient';
 
 /**
@@ -45,12 +46,17 @@ export class CloudPageTextService implements PageTextService {
             `no page with object number ${this.pageObjectNumber} in document ${this.docId}`,
           );
         }
-        return wirePaths.layerPageText(
-          this.docId,
-          this.layerName,
-          this.pageObjectNumber,
-          page.cache.contentVersion,
-        );
+        // WS2b plane rule: text depends on the `content` plane — while it
+        // is inherited, every visitor's layer reads ONE doc-level URL (and
+        // the base worker session at the origin).
+        return planesInherited(manifest, ['content'])
+          ? wirePaths.docPageText(this.docId, this.pageObjectNumber, page.cache.contentVersion)
+          : wirePaths.layerPageText(
+              this.docId,
+              this.layerName,
+              this.pageObjectNumber,
+              page.cache.contentVersion,
+            );
       };
       return this.http.getJsonWithRefresh(
         buildPath,

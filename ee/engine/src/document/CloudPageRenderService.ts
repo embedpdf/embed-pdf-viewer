@@ -15,6 +15,7 @@ import {
 import { renderImageOptionsToWire, wirePaths } from '@embedpdf/engine-core/wire';
 
 import type { ManifestAccessor } from './CloudDocumentHandle';
+import { planesInherited } from './planes';
 import type { HttpClient } from '../transport/HttpClient';
 
 export class CloudPageRenderService implements PageRenderService {
@@ -35,31 +36,56 @@ export class CloudPageRenderService implements PageRenderService {
     }
     return AbortablePromise.run<PageImageHandle>(async (signal) => {
       const format = normalizeFormat(options.format);
-      const manifest = await this.manifest.get(signal);
-      const page = manifest.pages.find((p) => p.state.pageObjectNumber === this.pageObjectNumber);
-      if (!page) {
-        throw new EngineError(
-          EngineErrorCode.NotFound,
-          `no page with object number ${this.pageObjectNumber} in document ${this.docId}`,
-        );
-      }
       const includeAnnotations = options.includeAnnotations ?? true;
-      // `format` flows through `options` and ends up in the token like every
-      // other render option — the wire format treats it uniformly. Normalize
-      // here first so the URL always carries an explicit, network-supported
-      // format (PNG or WebP), defaulting to WebP when the caller omits it.
-      const requestPath = wirePaths.layerPageRender(
-        this.docId,
-        this.layerName,
-        this.pageObjectNumber,
-        renderImageOptionsToWire(
+      const buildPath = async (s: AbortSignal): Promise<string> => {
+        const manifest = await this.manifest.get(s);
+        const page = manifest.pages.find((p) => p.state.pageObjectNumber === this.pageObjectNumber);
+        if (!page) {
+          throw new EngineError(
+            EngineErrorCode.NotFound,
+            `no page with object number ${this.pageObjectNumber} in document ${this.docId}`,
+          );
+        }
+        // `format` flows through `options` and ends up in the token like
+        // every other render option — the wire format treats it uniformly.
+        // Normalized above so the URL always carries an explicit,
+        // network-supported format (PNG or WebP; default WebP).
+        // Annotatedness itself is PATH-expressed (the token/path law): the
+        // token never carries it; the annotated family's token carries the
+        // `annotationVersion` pin instead.
+        const wireToken = renderImageOptionsToWire(
           { ...options, format },
           {
             contentVersion: page.cache.contentVersion,
-            annotationVersion: includeAnnotations ? page.cache.annotationVersion : undefined,
+            ...(includeAnnotations ? { annotationVersion: page.cache.annotationVersion } : {}),
           },
-        ),
-      );
+        );
+        // WS2b plane rule: a render resolves at the DOC-LEVEL (shared base)
+        // path iff every plane it depends on is inherited — annotation-free
+        // renders (full pages AND tiles; the rect target rides the same
+        // token) depend on `content`, annotated ones on
+        // `content + annotations`. Each is its OWN family at BOTH tiers
+        // (prefix law: edge grants see only prefixes). 1,000 inheriting
+        // visitors → one URL set, one origin render, no layer session.
+        if (includeAnnotations) {
+          return planesInherited(manifest, ['content', 'annotations'])
+            ? wirePaths.docPageRenderAnnotated(this.docId, this.pageObjectNumber, wireToken)
+            : wirePaths.layerPageRenderAnnotated(
+                this.docId,
+                this.layerName,
+                this.pageObjectNumber,
+                wireToken,
+              );
+        }
+        return planesInherited(manifest, ['content'])
+          ? wirePaths.docPageRender(this.docId, this.pageObjectNumber, wireToken)
+          : wirePaths.layerPageRender(this.docId, this.layerName, this.pageObjectNumber, wireToken);
+      };
+      // The advertised URL reflects the CURRENT manifest; the blob loader
+      // re-resolves per fetch through the 404 → manifest-refresh rail, so a
+      // scope flip (e.g. this layer's first annotation write) self-heals
+      // instead of failing on a stale path family.
+      const requestPath = await buildPath(signal);
       return createCloudPageImageHandle(
         {
           format,
@@ -67,7 +93,10 @@ export class CloudPageRenderService implements PageRenderService {
           source: { kind: 'url', url: this.http.absoluteUrl(requestPath) },
         },
         this.http,
-        requestPath,
+        buildPath,
+        async (s) => {
+          await this.manifest.refresh(s);
+        },
       );
     });
   }
@@ -85,10 +114,12 @@ export class CloudPageRenderService implements PageRenderService {
 function createCloudPageImageHandle(
   result: PageImageResult,
   http: HttpClient,
-  requestPath: string,
+  buildPath: (signal: AbortSignal) => Promise<string>,
+  onStaleVersion: (signal: AbortSignal) => Promise<void>,
 ): PageImageHandle {
   return createPageImageHandle(result, {
-    blob: (signal) => http.getBlob(requestPath, signal ?? new AbortController().signal),
+    blob: (signal) =>
+      http.getBlobWithRefresh(buildPath, onStaleVersion, signal ?? new AbortController().signal),
   });
 }
 

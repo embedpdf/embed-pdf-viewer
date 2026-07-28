@@ -21,17 +21,17 @@ import {
   PageMoveInputSchema,
   PageNetworkRenderFormatSchema,
   PageRotateInputSchema,
+  PageRenderAnnotatedQuerySchema,
   PageRenderQuerySchema,
   unflatten,
   type ManifestPage,
 } from '@embedpdf/engine-core/wire';
 import {
-  requireDocAccessOnly,
   requireLayerCapability,
   requireLayerDocAccessOnly,
   requireLayerResource,
-  requireResource,
 } from '../app/jwt-plugin';
+import { requireSharedDocRead } from './_planeGuard';
 import type { WorkerThreadPool } from '../runtime/WorkerThreadPool';
 import type { DerivedRenderService } from '../services/DerivedRenderService';
 import type { DocumentService, OpenContext } from '../services/DocumentService';
@@ -63,11 +63,14 @@ type ReadScope =
 export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDeps): Promise<void> {
   const { documentService, layerService, pool, imageEncoder, derivedRenders } = deps;
 
+  // Doc-level SHARED routes (WS2b plane model): served from the BASE worker
+  // session; visible through a layer-pinned token only while every plane the
+  // resource depends on is inherited (`requireSharedDocRead` is the one
+  // door — auth chain + origin plane guard).
+
   app.get('/v1/docs/:docId/text/pages/:pon/data@:token', async (req, reply) => {
     const { docId, pon, token } = req.params as { docId: string; pon: string; token: string };
-    const accessCtx = requireDocAccessOnly(req, docId);
-    const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId);
-    const ctx = requireResource(req, docId, 'page-text', pdfBits);
+    const ctx = await requireSharedDocRead(req, documentService, docId, 'page-text', ['content']);
     return readPageText({
       documentService,
       pool,
@@ -81,9 +84,7 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
 
   app.get('/v1/docs/:docId/text/pages/:pon/data', async (req, reply) => {
     const { docId, pon } = req.params as { docId: string; pon: string };
-    const accessCtx = requireDocAccessOnly(req, docId);
-    const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId);
-    const ctx = requireResource(req, docId, 'page-text', pdfBits);
+    const ctx = await requireSharedDocRead(req, documentService, docId, 'page-text', ['content']);
     return readPageText({
       documentService,
       pool,
@@ -96,9 +97,9 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
 
   app.get('/v1/docs/:docId/geometry/pages/:pon/data@:token', async (req, reply) => {
     const { docId, pon, token } = req.params as { docId: string; pon: string; token: string };
-    const accessCtx = requireDocAccessOnly(req, docId);
-    const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId);
-    const ctx = requireResource(req, docId, 'page-geometry', pdfBits);
+    const ctx = await requireSharedDocRead(req, documentService, docId, 'page-geometry', [
+      'content',
+    ]);
     return readPageGeometry({
       documentService,
       pool,
@@ -112,9 +113,9 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
 
   app.get('/v1/docs/:docId/geometry/pages/:pon/data', async (req, reply) => {
     const { docId, pon } = req.params as { docId: string; pon: string };
-    const accessCtx = requireDocAccessOnly(req, docId);
-    const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId);
-    const ctx = requireResource(req, docId, 'page-geometry', pdfBits);
+    const ctx = await requireSharedDocRead(req, documentService, docId, 'page-geometry', [
+      'content',
+    ]);
     return readPageGeometry({
       documentService,
       pool,
@@ -127,9 +128,7 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
 
   app.get('/v1/docs/:docId/render/pages/:pon/data@:token', async (req, reply) => {
     const { docId, pon, token } = req.params as { docId: string; pon: string; token: string };
-    const accessCtx = requireDocAccessOnly(req, docId);
-    const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId);
-    const ctx = requireResource(req, docId, 'page-render', pdfBits);
+    const ctx = await requireSharedDocRead(req, documentService, docId, 'page-render', ['content']);
     return renderPageImage({
       documentService,
       pool,
@@ -138,6 +137,7 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
       reply,
       signal: abortSignalFromRequest(req),
       scope: { kind: 'base', ctx, docId },
+      annotated: false,
       pageObjectNumber: parsePageObjectNumber(pon),
       tokenQuery: parseTokenOrInvalidArg(decodeRenderToken, token, 'render token'),
       query: req.query,
@@ -146,9 +146,7 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
 
   app.get('/v1/docs/:docId/render/pages/:pon/data', async (req, reply) => {
     const { docId, pon } = req.params as { docId: string; pon: string };
-    const accessCtx = requireDocAccessOnly(req, docId);
-    const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId);
-    const ctx = requireResource(req, docId, 'page-render', pdfBits);
+    const ctx = await requireSharedDocRead(req, documentService, docId, 'page-render', ['content']);
     return renderPageImage({
       documentService,
       pool,
@@ -157,6 +155,48 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
       reply,
       signal: abortSignalFromRequest(req),
       scope: { kind: 'base', ctx, docId },
+      annotated: false,
+      pageObjectNumber: parsePageObjectNumber(pon),
+      query: req.query,
+    });
+  });
+
+  app.get('/v1/docs/:docId/render/annotated/pages/:pon/data@:token', async (req, reply) => {
+    const { docId, pon, token } = req.params as { docId: string; pon: string; token: string };
+    const ctx = await requireSharedDocRead(req, documentService, docId, 'page-render-annotated', [
+      'content',
+      'annotations',
+    ]);
+    return renderPageImage({
+      documentService,
+      pool,
+      imageEncoder,
+      ...(derivedRenders ? { derivedRenders } : {}),
+      reply,
+      signal: abortSignalFromRequest(req),
+      scope: { kind: 'base', ctx, docId },
+      annotated: true,
+      pageObjectNumber: parsePageObjectNumber(pon),
+      tokenQuery: parseTokenOrInvalidArg(decodeRenderToken, token, 'render token'),
+      query: req.query,
+    });
+  });
+
+  app.get('/v1/docs/:docId/render/annotated/pages/:pon/data', async (req, reply) => {
+    const { docId, pon } = req.params as { docId: string; pon: string };
+    const ctx = await requireSharedDocRead(req, documentService, docId, 'page-render-annotated', [
+      'content',
+      'annotations',
+    ]);
+    return renderPageImage({
+      documentService,
+      pool,
+      imageEncoder,
+      ...(derivedRenders ? { derivedRenders } : {}),
+      reply,
+      signal: abortSignalFromRequest(req),
+      scope: { kind: 'base', ctx, docId },
+      annotated: true,
       pageObjectNumber: parsePageObjectNumber(pon),
       query: req.query,
     });
@@ -263,6 +303,7 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
       reply,
       signal: abortSignalFromRequest(req),
       scope: { kind: 'layer', ctx, docId, layerName },
+      annotated: false,
       pageObjectNumber: parsePageObjectNumber(pon),
       tokenQuery: parseTokenOrInvalidArg(decodeRenderToken, token, 'render token'),
       query: req.query,
@@ -286,10 +327,77 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
       reply,
       signal: abortSignalFromRequest(req),
       scope: { kind: 'layer', ctx, docId, layerName },
+      annotated: false,
       pageObjectNumber: parsePageObjectNumber(pon),
       query: req.query,
     });
   });
+
+  app.get(
+    '/v1/docs/:docId/layers/:layerName/render/annotated/pages/:pon/data@:token',
+    async (req, reply) => {
+      const { docId, layerName, pon, token } = req.params as {
+        docId: string;
+        layerName: string;
+        pon: string;
+        token: string;
+      };
+      const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
+      const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
+      const ctx = requireLayerResource(
+        req,
+        docId,
+        layerName,
+        'layer-page-render-annotated',
+        pdfBits,
+      );
+      return renderPageImage({
+        documentService,
+        pool,
+        imageEncoder,
+        ...(derivedRenders ? { derivedRenders } : {}),
+        reply,
+        signal: abortSignalFromRequest(req),
+        scope: { kind: 'layer', ctx, docId, layerName },
+        annotated: true,
+        pageObjectNumber: parsePageObjectNumber(pon),
+        tokenQuery: parseTokenOrInvalidArg(decodeRenderToken, token, 'render token'),
+        query: req.query,
+      });
+    },
+  );
+
+  app.get(
+    '/v1/docs/:docId/layers/:layerName/render/annotated/pages/:pon/data',
+    async (req, reply) => {
+      const { docId, layerName, pon } = req.params as {
+        docId: string;
+        layerName: string;
+        pon: string;
+      };
+      const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
+      const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
+      const ctx = requireLayerResource(
+        req,
+        docId,
+        layerName,
+        'layer-page-render-annotated',
+        pdfBits,
+      );
+      return renderPageImage({
+        documentService,
+        pool,
+        imageEncoder,
+        ...(derivedRenders ? { derivedRenders } : {}),
+        reply,
+        signal: abortSignalFromRequest(req),
+        scope: { kind: 'layer', ctx, docId, layerName },
+        annotated: true,
+        pageObjectNumber: parsePageObjectNumber(pon),
+        query: req.query,
+      });
+    },
+  );
 
   app.post('/v1/docs/:docId/layers/:layerName/pages/move', async (req, reply) => {
     const { docId, layerName } = req.params as {
@@ -418,6 +526,16 @@ async function renderPageImage(input: {
   reply: FastifyReply;
   signal: AbortSignal;
   scope: ReadScope;
+  /**
+   * The render FAMILY this route belongs to (token/path law, SCALE-OUT
+   * §2b.2): `…/render/pages/` is annotation-free, `…/render/annotated/pages/`
+   * annotated — at BOTH the doc and layer tiers. The token carries no
+   * annotatedness at all; each family's query schema enforces its own pin
+   * grammar (`annotationVersion` required on versioned annotated requests,
+   * unrepresentable on free ones), so contradictory requests fail schema
+   * parse instead of needing a guard.
+   */
+  annotated: boolean;
   pageObjectNumber: number;
   tokenQuery?: Record<string, string>;
   query: unknown;
@@ -426,19 +544,20 @@ async function renderPageImage(input: {
   if (input.tokenQuery !== undefined) rejectQueryParamsOnTokenUrl(input.query);
   // Both token and query strings arrive as flat string maps. Generic
   // `unflatten` turns dotted keys (`viewport.kind`, `target.rect.left`) into
-  // the nested object `PageRenderQuerySchema` expects. The schema then
-  // coerces, validates, and shapes the result into `PageRenderQuery`.
+  // the nested object the family's schema expects. The schema then coerces,
+  // validates, and shapes the result into `PageRenderQuery` (stamping
+  // `includeAnnotations` from the family).
   const flatInput = (input.tokenQuery ?? input.query) as Record<string, unknown>;
   const nested = unflatten(flatInput);
   const parsedQuery = parseOrInvalidArg(
-    PageRenderQuerySchema,
+    input.annotated ? PageRenderAnnotatedQuerySchema : PageRenderQuerySchema,
     nested,
     input.tokenQuery === undefined ? 'render query' : 'render token',
   );
   const imageOptions: PageImageOptions = parsedQuery.options;
   const requestedContentVersion = parsedQuery.contentVersion;
   const requestedAnnotationVersion = parsedQuery.annotationVersion;
-  const includeAnnotations = imageOptions.includeAnnotations ?? true;
+  const includeAnnotations = input.annotated;
   // Format lives in the token (versioned) or query (unversioned). The Zod
   // schema enforces "format required when versioned", so the unversioned
   // fallback is the only place a default applies.
@@ -479,6 +598,7 @@ async function renderPageImage(input: {
   const classification = derived?.classify({
     imageOptions,
     format,
+    annotated: input.annotated,
     ...(requestedContentVersion !== undefined ? { contentVersion: requestedContentVersion } : {}),
     ...(requestedAnnotationVersion !== undefined
       ? { annotationVersion: requestedAnnotationVersion }
@@ -543,6 +663,7 @@ async function renderPageImage(input: {
             baseSha,
             input.pageObjectNumber,
             classification.canonicalToken,
+            input.annotated,
           )
         : derived.layerKey(
             input.scope.ctx.tenantId,
@@ -550,6 +671,7 @@ async function renderPageImage(input: {
             input.scope.layerName,
             input.pageObjectNumber,
             classification.canonicalToken,
+            input.annotated,
           );
     const artifact = await derived.getOrRender(key, async () =>
       input.imageEncoder.encodeToBuffer(await renderRaster(), {

@@ -2,6 +2,7 @@ import type {
   AnnotationMutationKind,
   CacheDelta,
   DocumentManifest,
+  LayerScopes,
   ManifestPage,
   PageState,
 } from '@embedpdf/engine-core/runtime';
@@ -39,6 +40,38 @@ const BASE_LAYOUT_VERSION = 1;
  * never edited (metadata writes always target a layer), so it stays at 1.
  */
 const BASE_METADATA_VERSION = 1;
+
+/** The immutable base /EmbeddedFiles tree's epoch — a layer whose
+ *  `attachmentsVersion` still sits here has never written an attachment. */
+const BASE_ATTACHMENTS_VERSION = 1;
+
+/** Every plane inherited — the scopes of a never-written layer. */
+const ALL_BASE_SCOPES: LayerScopes = {
+  content: 'base',
+  annotations: 'base',
+  layout: 'base',
+  attachments: 'base',
+  metadata: 'base',
+  actions: 'base',
+};
+
+/**
+ * Per-page plane comparison: inherited iff the page SET matches the base
+ * exactly AND every page's pin equals its base counterpart's. Set inequality
+ * (insert/delete) reads as owned for BOTH per-page planes at the call sites.
+ */
+function pagePlaneScope(
+  layerPages: DurablePageRow[],
+  basePages: DurablePageRow[],
+  pin: 'contentVersion' | 'annotationVersion',
+): 'base' | 'layer' {
+  if (layerPages.length !== basePages.length) return 'layer';
+  const baseByPon = new Map(basePages.map((p) => [p.pageObjectNumber, p[pin]]));
+  for (const page of layerPages) {
+    if (baseByPon.get(page.pageObjectNumber) !== page[pin]) return 'layer';
+  }
+  return 'base';
+}
 
 /**
  * Durable authority for cloud/CDN page state.
@@ -87,6 +120,61 @@ export class LayerStateService {
     return this.layerPages.findByLayer(input.layerId);
   }
 
+  /**
+   * WS2b plane scopes, the PURE half. A layer is a set of per-plane DELTAS
+   * over the immutable base; each plane is `'base'` (inherited — no delta,
+   * the layer's view of that plane IS the base's view) or `'layer'` (owned —
+   * the first write to that plane transferred ownership).
+   *
+   * Per-page planes (content, annotations) compare against the base
+   * counterpart AND require page-SET equality: insert/delete own both — a
+   * view that removed content must never resolve base artifacts. Structural
+   * ops that PRESERVE the set (move, rotate) own only `layout`:
+   * render/text/geometry artifacts are normalized (rotation is presentation
+   * metadata applied client-side — see `PageRotateResult`), so content and
+   * annotation sharing survive them. Doc-level planes compare their pin
+   * against the base epoch. `actions` is constant `'base'` until action
+   * writing exists (`actionsVersion` is frozen at 1 — no op can change
+   * catalog actions).
+   *
+   * Conservative by design: an unmatched page reads as owned.
+   */
+  computeLayerScopes(
+    layer: Pick<LayerRow, 'layoutVersion' | 'metadataVersion' | 'attachmentsVersion'> | null,
+    layerPages: DurablePageRow[],
+    basePages: DurablePageRow[],
+  ): LayerScopes {
+    if (!layer) return { ...ALL_BASE_SCOPES };
+    // A layer row without page rows means no page-level write ever
+    // committed — content and annotations are trivially inherited.
+    const pagesKnown = layerPages.length > 0;
+    return {
+      content: pagesKnown ? pagePlaneScope(layerPages, basePages, 'contentVersion') : 'base',
+      annotations: pagesKnown ? pagePlaneScope(layerPages, basePages, 'annotationVersion') : 'base',
+      layout: layer.layoutVersion === BASE_LAYOUT_VERSION ? 'base' : 'layer',
+      attachments: layer.attachmentsVersion === BASE_ATTACHMENTS_VERSION ? 'base' : 'layer',
+      metadata: layer.metadataVersion === BASE_METADATA_VERSION ? 'base' : 'layer',
+      actions: 'base',
+    };
+  }
+
+  /**
+   * WS2b plane scopes, the DURABLE half — the ONE condition behind the
+   * manifest `scopes` block, the `/v1/access` edge grant, and every origin
+   * guard on the doc-level shared routes (the guard is the truth; the grant
+   * is the TTL-bounded optimization). A layer with no row has never been
+   * written: trivially all-inherited.
+   */
+  async computeLayerScopesFromDb(docId: string, layerName: string): Promise<LayerScopes> {
+    const layer = await this.layers.findByDocAndName(docId, layerName);
+    if (!layer) return { ...ALL_BASE_SCOPES };
+    const [layerPages, basePages] = await Promise.all([
+      this.layerPages.findByLayer(layer.id),
+      this.documentPages.findByDocument(docId),
+    ]);
+    return this.computeLayerScopes(layer, layerPages, basePages);
+  }
+
   buildBaseManifest(head: DocumentHead, pages: DurablePageRow[]): DocumentManifest {
     return {
       docVersion: head.docVersion,
@@ -117,6 +205,12 @@ export class LayerStateService {
       'docVersion' | 'layoutVersion' | 'metadataVersion' | 'attachmentsVersion' | 'lastAuditId'
     >,
     pages: DurablePageRow[],
+    /**
+     * WS2b plane scopes for this layer (see {@link computeLayerScopes}) —
+     * whole-layer by design (edge grants are prefix-level): one owned page
+     * flips the whole plane.
+     */
+    scopes: LayerScopes,
   ): DocumentManifest {
     return {
       docVersion: layer.docVersion,
@@ -128,6 +222,7 @@ export class LayerStateService {
       // subscribing from this manifest can never miss a row (gapless cursor).
       auditHead: layer.lastAuditId,
       baseSha,
+      scopes,
       pages: pages.map((page) =>
         this.toManifestPage(this.layerRevisionScopeId(docId, layerName), page),
       ),
@@ -165,6 +260,12 @@ export class LayerStateService {
 
   layerRevisionScopeId(docId: string, layerName: string): string {
     return `cloud:layer:${docId}:${layerName}`;
+  }
+
+  /** The BASE view's revision scope — the `docSessionId` every SHARED
+   *  (doc-level) annotation read stamps on its tokens (WS2b). */
+  baseRevisionScopeId(docId: string): string {
+    return `cloud:base:${docId}`;
   }
 
   mutationBumps(

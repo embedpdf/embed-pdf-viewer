@@ -24,6 +24,7 @@ import {
   requireLayerDocAccessOnly,
   requireLayerResource,
 } from '../app/jwt-plugin';
+import { requireSharedDocRead } from './_planeGuard';
 import type { DocumentService, SavedAttachmentFile } from '../services/DocumentService';
 import type { LayerService } from '../services/LayerService';
 
@@ -60,6 +61,106 @@ export async function registerAttachmentRoutes(
   deps: AttachmentRouteDeps,
 ): Promise<void> {
   const { documentService, layerService } = deps;
+
+  // ── WS2b doc-level (shared) reads: served from the BASE worker session —
+  //    no layer session is created for plane-inheriting visitors. The plane
+  //    guard + auth chain live in `requireSharedDocRead` (one door). ──────
+
+  app.get('/v1/docs/:docId/attachments@:token', async (req, reply) => {
+    const { docId, token } = req.params as { docId: string; token: string };
+    const ctx = await requireSharedDocRead(req, documentService, docId, 'attachments', [
+      'attachments',
+    ]);
+    const requested = parseTokenOrInvalidArg(decodeAttachmentsToken, token, 'attachments token');
+    const manifest = await documentService.getManifest(ctx, docId);
+    if (requested !== manifest.attachmentsVersion) {
+      setNoStore(reply);
+      throw new EngineError(
+        EngineErrorCode.NotFound,
+        `attachments version ${requested} no longer current (current=${manifest.attachmentsVersion})`,
+      );
+    }
+    const items = await documentService.listAttachments(
+      ctx,
+      docId,
+      undefined,
+      abortSignalFromRequest(req),
+    );
+    setImmutableCache(reply);
+    return items;
+  });
+
+  app.get('/v1/docs/:docId/attachment-files/:fileKey/data@:token', async (req, reply) => {
+    const { docId, fileKey, token } = req.params as {
+      docId: string;
+      fileKey: string;
+      token: string;
+    };
+    const ctx = await requireSharedDocRead(req, documentService, docId, 'attachment-files', [
+      'attachments',
+    ]);
+    const requested = parseTokenOrInvalidArg(decodeAttachmentsToken, token, 'attachments token');
+    const manifest = await documentService.getManifest(ctx, docId);
+    if (requested !== manifest.attachmentsVersion) {
+      setNoStore(reply);
+      throw new EngineError(
+        EngineErrorCode.NotFound,
+        `attachments version ${requested} no longer current (current=${manifest.attachmentsVersion})`,
+      );
+    }
+    const ref = attachmentRefFromPath(fileKey);
+    const file = await documentService.readAttachmentFileToTemp(
+      ctx,
+      docId,
+      undefined,
+      ref,
+      abortSignalFromRequest(req),
+    );
+    return sendAttachmentFile(reply, file, 'immutable');
+  });
+
+  app.get(
+    '/v1/docs/:docId/attachment-files/pages/:pon/items/:annotKey/data@:token',
+    async (req, reply) => {
+      const { docId, pon, annotKey, token } = req.params as {
+        docId: string;
+        pon: string;
+        annotKey: string;
+        token: string;
+      };
+      // A FileAttachment annotation's bytes depend on BOTH planes: the
+      // annotation must exist in this view (`annotations`) and the byte pin
+      // is `attachmentsVersion` (`attachments`). The edge grant only gates
+      // the `attachments` plane (see RESOURCE_PLANES) — this origin check
+      // is the stricter truth.
+      const ctx = await requireSharedDocRead(req, documentService, docId, 'attachment-files', [
+        'annotations',
+        'attachments',
+      ]);
+      const requested = parseTokenOrInvalidArg(decodeAttachmentsToken, token, 'attachments token');
+      const manifest = await documentService.getManifest(ctx, docId);
+      if (requested !== manifest.attachmentsVersion) {
+        setNoStore(reply);
+        throw new EngineError(
+          EngineErrorCode.NotFound,
+          `attachments version ${requested} no longer current (current=${manifest.attachmentsVersion})`,
+        );
+      }
+      const pageObjectNumber = parsePageObjectNumber(pon);
+      // Durable keys only, mirroring the layer route: weak index refs need
+      // a revision-validated body, which a cacheable GET does not have.
+      const ref = refFromKey(annotKey, pageObjectNumber);
+      const file = await documentService.readAnnotationFileToTemp(
+        ctx,
+        docId,
+        undefined,
+        pageObjectNumber,
+        ref,
+        abortSignalFromRequest(req),
+      );
+      return sendAttachmentFile(reply, file, 'immutable');
+    },
+  );
 
   app.get('/v1/docs/:docId/layers/:layerName/attachments@:token', async (req, reply) => {
     const { docId, layerName, token } = req.params as {

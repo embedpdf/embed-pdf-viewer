@@ -422,6 +422,51 @@ parentPort.on('message', (msg) => {
       });
       return;
     }
+    case 'actions.read': {
+      const meta = openDocs.get(sessionKey(msg));
+      if (!meta) {
+        rejectNotOpen(msg);
+        return;
+      }
+      // Deterministic catalog-actions snapshot: byte-identical for the base
+      // session and every pristine layer session (the WS2b sharing claim).
+      parentPort.postMessage({
+        kind: 'resolve',
+        jobId: msg.jobId,
+        result: {
+          tag: 'actions.read',
+          snapshot: { nameTreeScripts: [], openAction: null },
+        },
+      });
+      return;
+    }
+    case 'metadata.read': {
+      const meta = openDocs.get(sessionKey(msg));
+      if (!meta) {
+        rejectNotOpen(msg);
+        return;
+      }
+      parentPort.postMessage({
+        kind: 'resolve',
+        jobId: msg.jobId,
+        result: {
+          tag: 'metadata.read',
+          metadata: {
+            title: `stub-doc-${msg.docId}`,
+            author: null,
+            subject: null,
+            keywords: null,
+            producer: 'stub-worker',
+            creator: null,
+            created: null,
+            modified: null,
+            trapped: 'unknown',
+            custom: {},
+          },
+        },
+      });
+      return;
+    }
     case 'annotations.listRawAll': {
       const meta = openDocs.get(sessionKey(msg));
       if (!meta) {
@@ -833,6 +878,21 @@ parentPort.on('message', (msg) => {
         },
         [raster.data],
       );
+      return;
+    }
+    case 'attachments.list': {
+      // Base-session capable (WS2b shared reads): no layerName resolves the
+      // doc's base session, mirroring the real WorkerHost.
+      const meta = openDocs.get(sessionKey(msg));
+      if (!meta) {
+        rejectNotOpen(msg);
+        return;
+      }
+      parentPort.postMessage({
+        kind: 'resolve',
+        jobId: msg.jobId,
+        result: { tag: 'attachments.list', items: [] },
+      });
       return;
     }
     case 'layer.close':

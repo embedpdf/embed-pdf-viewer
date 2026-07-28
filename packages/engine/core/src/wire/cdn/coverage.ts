@@ -15,6 +15,7 @@
  */
 
 import type { PdfBits } from '../../auth/scope';
+import type { LayerScopePlane, LayerScopes } from '../../dto/LayerScopes';
 import { checkResourceAccess, DOC_RESOURCES, type DocResourceId } from '../resources';
 
 /**
@@ -52,15 +53,57 @@ export interface CdnCoverageEntry {
  * at `/v1/docs/{id}/render/pages/` can only authorize render bytes,
  * never text or annotations.
  */
+/**
+ * WS2b plane map: the planes each DOC-LEVEL shared resource depends on. A
+ * layer token's edge credential covers a resource's prefix iff EVERY listed
+ * plane is inherited (`'base'`) in the caller's scopes — the same condition
+ * the origin guard enforces (origin is the truth; this grant is the
+ * TTL-bounded optimization). Resources absent from this map (head, manifest,
+ * every layer-scoped resource) are not plane-gated.
+ *
+ * `attachment-files` deliberately lists only `attachments` even though its
+ * prefix also serves FileAttachment-annotation bytes (an `annotations`-plane
+ * read): the origin guard on that route additionally requires `annotations`
+ * inherited, and withholding the whole prefix on annotation divergence would
+ * break plain attachment-file sharing for the most common divergence. The
+ * residual is a warm-edge window bounded by the grant TTL — the same class
+ * as every edge grant.
+ */
+const RESOURCE_PLANES: Partial<Record<DocResourceId, readonly LayerScopePlane[]>> = {
+  'page-render': ['content'],
+  'page-text': ['content'],
+  'page-geometry': ['content'],
+  'page-render-annotated': ['content', 'annotations'],
+  'page-annotations': ['annotations'],
+  layout: ['layout'],
+  metadata: ['metadata'],
+  actions: ['actions'],
+  attachments: ['attachments'],
+  'attachment-files': ['attachments'],
+};
+
 export function cdnCoverageForScope(
   rawScope: ReadonlyArray<string>,
   pdfBits: PdfBits,
-  context: { docId: string; layerName?: string },
+  context: {
+    docId: string;
+    layerName?: string;
+    /**
+     * WS2b plane scopes of the caller's pinned layer. A doc-level shared
+     * resource's prefix is covered iff every plane it depends on is
+     * inherited (`'base'`). Omitted = no layer in play (tenant tokens) —
+     * everything the capability scope allows is granted.
+     */
+    scopes?: LayerScopes;
+  },
 ): ReadonlyArray<CdnCoverageEntry> {
   const out: CdnCoverageEntry[] = [];
+  const scopes = context.scopes;
   for (const id of Object.keys(DOC_RESOURCES) as DocResourceId[]) {
     const r = DOC_RESOURCES[id];
     if (!r.cdnCacheable) continue;
+    const planes = RESOURCE_PLANES[id];
+    if (planes && scopes && planes.some((plane) => scopes[plane] === 'layer')) continue;
     if (!checkResourceAccess(id, rawScope, pdfBits)) continue;
     out.push({
       resourceId: id,

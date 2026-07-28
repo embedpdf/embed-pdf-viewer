@@ -31,6 +31,7 @@ import {
   wirePaths,
   type DocumentHead,
   type DocumentManifest,
+  type LayerScopePlane,
 } from '@embedpdf/engine-core/wire';
 import { EventHub, SessionEventPublisher } from '@embedpdf/engine-services';
 
@@ -59,8 +60,15 @@ export interface ManifestAccessor {
   get(signal: AbortSignal): Promise<DocumentManifest>;
   /** Force re-fetch of `/head` + `/manifest@docVersion=N`; replaces the cache. */
   refresh(signal: AbortSignal): Promise<DocumentManifest>;
-  /** Absorb mutation-returned state/cache deltas when safe. */
-  apply(meta: MutationMeta): void;
+  /**
+   * Absorb mutation-returned state/cache deltas when safe. `owns` names the
+   * WS2b planes this mutation kind takes ownership of (the monotone-flip
+   * rule): annotation/form writes own `annotations`; flatten and
+   * redaction-apply own `content + annotations`. The flip runs even when
+   * the version-gated delta merge is skipped — scopes only ever move
+   * base → layer, so any observed mutation proves the plane diverged.
+   */
+  apply(meta: MutationMeta, owns: readonly LayerScopePlane[]): void;
   /** Advance the cached manifest's docVersion + layoutVersion after a page
    *  STRUCTURE op that keeps the page set intact (move, rotate). */
   applyPageStructure(cache: PageStructureCache): void;
@@ -195,7 +203,7 @@ export class CloudDocumentHandle implements DocumentHandle {
     this.manifestAccessor = {
       get: (signal) => this.getManifest(signal),
       refresh: (signal) => this.refreshManifest(signal),
-      apply: (meta) => this.absorbMutation(meta),
+      apply: (meta, owns) => this.absorbMutation(meta, owns),
       applyPageStructure: (cache) => this.absorbPageStructure(cache),
       applyPageDelete: (cache, deletedPages) => this.absorbPageDelete(cache, deletedPages),
       applyMetadata: (cache) => this.absorbMetadata(cache),
@@ -333,7 +341,27 @@ export class CloudDocumentHandle implements DocumentHandle {
     return awaitSignal(promise, signal);
   }
 
-  absorbMutation(meta: MutationMeta): void {
+  /**
+   * WS2b monotone flip: mark the planes a mutation OWNS as layer-scoped in
+   * the cached manifest. Scopes only ever move base → layer (no revert op
+   * exists), so flipping is safe under ANY event ordering — a duplicate or
+   * out-of-order event still proves the plane diverged at some point — and
+   * the manifest fetch stays the authoritative source (the 404 → refresh
+   * rail heals any miss, e.g. a future mutation kind this client doesn't
+   * know about).
+   */
+  private flipScopes(owns: readonly LayerScopePlane[]): void {
+    const cache = this.manifestCache;
+    const scopes = cache?.scopes;
+    if (!cache || !scopes) return;
+    if (owns.every((plane) => scopes[plane] === 'layer')) return;
+    const next = { ...scopes };
+    for (const plane of owns) next[plane] = 'layer';
+    this.manifestCache = { ...cache, scopes: next };
+  }
+
+  absorbMutation(meta: MutationMeta, owns: readonly LayerScopePlane[]): void {
+    this.flipScopes(owns);
     const delta = meta.cacheDelta;
     if (delta) {
       this.manifestFloorVersion = Math.max(this.manifestFloorVersion, delta.docVersion);
@@ -395,6 +423,9 @@ export class CloudDocumentHandle implements DocumentHandle {
    * advance it in place; otherwise we drop it and refetch lazily.
    */
   private absorbPageStructure(cache: PageStructureCache): void {
+    // Move/rotate own the LAYOUT plane only: normalized render/text/
+    // geometry artifacts survive structural ops, so content keeps sharing.
+    this.flipScopes(['layout']);
     this.manifestFloorVersion = Math.max(this.manifestFloorVersion, cache.docVersion);
     this.inflightManifest = null;
 
@@ -418,6 +449,10 @@ export class CloudDocumentHandle implements DocumentHandle {
    * 404 anyway — this keeps the failure local and instant).
    */
   private absorbPageDelete(cache: PageStructureCache, deletedPages: PageObjectNumber[]): void {
+    // Delete changes the page SET: a view that removed content must never
+    // resolve base artifacts again, so content AND annotations flip with
+    // layout (§2.5's rule).
+    this.flipScopes(['layout', 'content', 'annotations']);
     this.manifestFloorVersion = Math.max(this.manifestFloorVersion, cache.docVersion);
     this.inflightManifest = null;
 
@@ -445,6 +480,7 @@ export class CloudDocumentHandle implements DocumentHandle {
    * advance it in place; otherwise drop it and refetch lazily.
    */
   private absorbMetadata(cache: MetadataCache): void {
+    this.flipScopes(['metadata']);
     this.manifestFloorVersion = Math.max(this.manifestFloorVersion, cache.docVersion);
     this.inflightManifest = null;
 
@@ -471,6 +507,7 @@ export class CloudDocumentHandle implements DocumentHandle {
    * advance it in place; otherwise drop it and refetch lazily.
    */
   private absorbAttachments(cache: AttachmentsCache): void {
+    this.flipScopes(['attachments']);
     this.manifestFloorVersion = Math.max(this.manifestFloorVersion, cache.docVersion);
     this.inflightManifest = null;
 
@@ -616,7 +653,7 @@ export class CloudDocumentHandle implements DocumentHandle {
       case 'annotation.updated':
       case 'annotation.deleted':
       case 'annotation.moved':
-        this.absorbMutation(event.meta);
+        this.absorbMutation(event.meta, ['annotations']);
         return;
       case 'pages.moved':
       case 'pages.rotated':
@@ -642,13 +679,23 @@ export class CloudDocumentHandle implements DocumentHandle {
       case 'form.widgetDetached':
         // Form mutations ship the same MutationMeta rails as annotations:
         // affected pages are the ones whose widget appearances changed.
-        this.absorbMutation(event.meta);
+        // Widgets ARE annotations, so they own the same plane.
+        this.absorbMutation(event.meta, ['annotations']);
         return;
       case 'form.effectsApplied':
-      case 'pages.flattened':
         // No-op batches are never audited, but keep the nullable guard at
         // the consumer boundary for forward/backward wire compatibility.
-        if (event.meta) this.absorbMutation(event.meta);
+        if (event.meta) this.absorbMutation(event.meta, ['annotations']);
+        return;
+      case 'pages.flattened':
+        // Flatten bakes annotations into page content: both planes flip.
+        if (event.meta) this.absorbMutation(event.meta, ['content', 'annotations']);
+        return;
+      case 'redaction.applied':
+        // Redaction-apply rewrites content and consumes the marks: both
+        // planes flip — and this is the security-relevant divergence, so a
+        // remote apply must stop this client's base reads immediately.
+        if (event.meta) this.absorbMutation(event.meta, ['content', 'annotations']);
         return;
     }
   }

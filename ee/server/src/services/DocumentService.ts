@@ -23,10 +23,10 @@ import {
   type WirePack,
   type WorkerRequest,
 } from '@embedpdf/engine-core/runtime';
-import type { DocumentManifest } from '@embedpdf/engine-core/wire';
+import type { DocumentManifest, LayerScopes } from '@embedpdf/engine-core/wire';
 
 import type { LayerStateService } from './LayerStateService';
-import type { RequestJwtContext } from '../app/jwt-plugin';
+import { pinnedLayerName, type RequestJwtContext } from '../app/jwt-plugin';
 import type { DocumentsRepo, DocumentRow } from '../db/repos/documents.repo';
 import type {
   PasswordSessionFacts,
@@ -243,7 +243,11 @@ export class DocumentService {
         cached.encryption.state === 'encrypted' &&
         cached.encryption.requiresPassword === true
       ) {
-        await this.assertPasswordSession(ctx, docId, 'default');
+        // Bind to the token's PINNED layer, not 'default': a session
+        // unlocked for layer "alice" must authorize alice's shared base
+        // reads (WS2b — execution targets the base session, authorization
+        // follows the claimed layer).
+        await this.assertPasswordSession(ctx, docId, pinnedLayerName(ctx));
       }
       return cached;
     }
@@ -308,7 +312,9 @@ export class DocumentService {
   async getEffectivePdfBits(
     ctx: OpenContext,
     docId: string,
-    layerName: string = 'default',
+    // Default to the token's pinned layer (WS2b): doc-level shared routes
+    // must evaluate the CLAIMED layer's post-unlock bits, not 'default''s.
+    layerName: string = pinnedLayerName(ctx),
   ): Promise<PdfBits> {
     const row = await this.requireReadyRow(ctx, docId);
     const fromRow = decodePdfBits(row.security.pdfPermissionsBits ?? null);
@@ -355,7 +361,10 @@ export class DocumentService {
   ): Promise<DocumentHead> {
     const row = await this.requireReadyRow(ctx, docId);
     const baseSha = requireBaseSha(row);
-    const openPassword = password ?? (await this.passwordForOpen(ctx, row, 'default'));
+    // Password-session lookup follows the token's pinned layer (WS2b):
+    // the base session is one shared materialization, but the credential
+    // that authorizes opening it belongs to the CLAIMED layer.
+    const openPassword = password ?? (await this.passwordForOpen(ctx, row, pinnedLayerName(ctx)));
 
     let handle: LocalFileHandle | null = await this.cache.acquire({
       sha: baseSha,
@@ -401,9 +410,26 @@ export class DocumentService {
 
   async getLayerHead(ctx: OpenContext, docId: string, layerName: string): Promise<DocumentHead> {
     const head = await this.getHead(ctx, docId);
-    void this.ensureLayerOnPool(ctx, docId, layerName).catch(() => undefined);
     const layer = await this.layerState.repos.layers.findByDocAndName(docId, layerName);
+    // WS2b warming policy: the BASE is always warmed (getHead above fires
+    // the doc warm); the LAYER session is warmed iff the layer OWNS at
+    // least one plane — a pristine layer's reads all execute on the base
+    // session, so eagerly warming it would resurrect the
+    // session-per-visitor bomb this workstream exists to kill.
+    if (layer) void this.warmLayerIfOwned(ctx, docId, layerName).catch(() => undefined);
     return layer ? { ...head, docVersion: layer.docVersion } : head;
+  }
+
+  /** Fire-and-forget half of the WS2b warming policy (see getLayerHead). */
+  private async warmLayerIfOwned(
+    ctx: OpenContext,
+    docId: string,
+    layerName: string,
+  ): Promise<void> {
+    const scopes = await this.layerState.computeLayerScopesFromDb(docId, layerName);
+    if (Object.values(scopes).some((scope) => scope === 'layer')) {
+      await this.ensureLayerOnPool(ctx, docId, layerName);
+    }
   }
 
   /**
@@ -425,9 +451,10 @@ export class DocumentService {
       const pages = await this.layerState.ensureBasePages(docId, () =>
         this.loadDurableBasePageStates(docId),
       );
-      // No layer row yet -> immutable base view: docVersion from head, and
-      // the geometry pointer at its initial epoch (1), matching the base
-      // manifest.
+      // No layer row yet -> immutable base view: docVersion from head, the
+      // geometry pointer at its initial epoch (1) — and every plane
+      // trivially INHERITED, so every visitor's never-written layer
+      // resolves all reads at the shared base URLs (WS2b).
       return this.layerState.buildLayerManifest(
         docId,
         head.baseSha,
@@ -440,12 +467,36 @@ export class DocumentService {
           lastAuditId: 0,
         },
         pages,
+        this.layerState.computeLayerScopes(null, [], []),
       );
     }
 
-    await this.layerState.ensureBasePages(docId, () => this.loadDurableBasePageStates(docId));
+    const basePages = await this.layerState.ensureBasePages(docId, () =>
+      this.loadDurableBasePageStates(docId),
+    );
     const pages = await this.layerState.ensureLayerPagesFromBase({ layerId: layer.id, docId });
-    return this.layerState.buildLayerManifest(docId, head.baseSha, layerName, layer, pages);
+    // WS2b plane scopes: annotation writes own `annotations` only (renders/
+    // text/geometry keep sharing); move/rotate own `layout` only (normalized
+    // artifacts survive); flatten/redaction/page-set changes own `content`.
+    return this.layerState.buildLayerManifest(
+      docId,
+      head.baseSha,
+      layerName,
+      layer,
+      pages,
+      this.layerState.computeLayerScopes(layer, pages, basePages),
+    );
+  }
+
+  /**
+   * WS2b plane scopes — see
+   * {@link LayerStateService.computeLayerScopesFromDb}. Exposed here so the
+   * origin guards on the doc-level shared routes and `/v1/access` (the edge
+   * grant) consume the exact condition the manifest `scopes` block
+   * advertises.
+   */
+  getLayerScopes(docId: string, layerName: string): Promise<LayerScopes> {
+    return this.layerState.computeLayerScopesFromDb(docId, layerName);
   }
 
   /**
@@ -458,12 +509,19 @@ export class DocumentService {
   async getLayerLayout(
     ctx: OpenContext,
     docId: string,
-    layerName: string,
+    /** Omit for the BASE view (WS2b shared reads: no layer session). */
+    layerName?: string,
     signal?: AbortSignal,
   ): Promise<PageListSnapshot> {
-    await this.ensureLayerOnPool(ctx, docId, layerName);
+    if (layerName !== undefined) await this.ensureLayerOnPool(ctx, docId, layerName);
+    else await this.openOnPool(ctx, docId);
     const build = (jobId: WorkerJobId) =>
-      wirePack({ kind: 'pages.list' as const, jobId, docId, layerName });
+      wirePack({
+        kind: 'pages.list' as const,
+        jobId,
+        docId,
+        ...(layerName !== undefined ? { layerName } : {}),
+      });
     const result = await this.pool.run(docId, build, signal);
     if (result.tag !== 'pages.list') {
       throw new EngineError(
@@ -477,13 +535,21 @@ export class DocumentService {
   async getLayerActions(
     ctx: OpenContext,
     docId: string,
-    layerName: string,
+    /** Omit for the BASE view (WS2b shared reads: no layer session). */
+    layerName?: string,
     signal?: AbortSignal,
   ): Promise<DocumentActionsSnapshot> {
-    await this.ensureLayerOnPool(ctx, docId, layerName);
+    if (layerName !== undefined) await this.ensureLayerOnPool(ctx, docId, layerName);
+    else await this.openOnPool(ctx, docId);
     const result = await this.pool.run(
       docId,
-      (jobId) => wirePack({ kind: 'actions.read' as const, jobId, docId, layerName }),
+      (jobId) =>
+        wirePack({
+          kind: 'actions.read' as const,
+          jobId,
+          docId,
+          ...(layerName !== undefined ? { layerName } : {}),
+        }),
       signal,
     );
     if (result.tag !== 'actions.read') {
@@ -653,12 +719,19 @@ export class DocumentService {
   async readLayerMetadata(
     ctx: OpenContext,
     docId: string,
-    layerName: string,
+    /** Omit for the BASE view (WS2b shared reads: no layer session). */
+    layerName?: string,
     signal?: AbortSignal,
   ): Promise<DocumentMetadata> {
-    await this.ensureLayerOnPool(ctx, docId, layerName);
+    if (layerName !== undefined) await this.ensureLayerOnPool(ctx, docId, layerName);
+    else await this.openOnPool(ctx, docId);
     const build = (jobId: WorkerJobId) =>
-      wirePack({ kind: 'metadata.read' as const, jobId, docId, layerName });
+      wirePack({
+        kind: 'metadata.read' as const,
+        jobId,
+        docId,
+        ...(layerName !== undefined ? { layerName } : {}),
+      });
     const result = await this.pool.run(docId, build, signal);
     if (result.tag !== 'metadata.read') {
       throw new EngineError(
@@ -1150,12 +1223,19 @@ export class DocumentService {
   async listAttachments(
     ctx: OpenContext,
     docId: string,
-    layerName: string,
+    /** Omit for the BASE view (WS2b shared reads: no layer session). */
+    layerName?: string,
     signal?: AbortSignal,
   ): Promise<EmbeddedFileItem[]> {
-    await this.ensureLayerOnPool(ctx, docId, layerName);
+    if (layerName !== undefined) await this.ensureLayerOnPool(ctx, docId, layerName);
+    else await this.openOnPool(ctx, docId);
     const build = (jobId: WorkerJobId) =>
-      wirePack({ kind: 'attachments.list' as const, jobId, docId, layerName });
+      wirePack({
+        kind: 'attachments.list' as const,
+        jobId,
+        docId,
+        ...(layerName !== undefined ? { layerName } : {}),
+      });
     const payload = await this.pool.run(docId, build, signal);
     if (payload.tag !== 'attachments.list') {
       throw new EngineError(
@@ -1166,11 +1246,12 @@ export class DocumentService {
     return payload.items;
   }
 
-  /** Decode one document-level embedded file (by key) to a temp path. */
+  /** Decode one document-level embedded file (by key) to a temp path.
+   *  Omit `layerName` for the BASE view (WS2b shared reads). */
   async readAttachmentFileToTemp(
     ctx: OpenContext,
     docId: string,
-    layerName: string,
+    layerName: string | undefined,
     ref: EmbeddedFileRef,
     signal?: AbortSignal,
   ): Promise<SavedAttachmentFile> {
@@ -1179,7 +1260,7 @@ export class DocumentService {
         kind: 'attachments.readFile' as const,
         jobId,
         docId,
-        layerName,
+        ...(layerName !== undefined ? { layerName } : {}),
         ref,
         path,
         maxDecodedBytes: DocumentService.MAX_DECODED_ATTACHMENT_BYTES,
@@ -1187,11 +1268,12 @@ export class DocumentService {
     );
   }
 
-  /** Decode a FileAttachment annotation's embedded file to a temp path. */
+  /** Decode a FileAttachment annotation's embedded file to a temp path.
+   *  Omit `layerName` for the BASE view (WS2b shared reads). */
   async readAnnotationFileToTemp(
     ctx: OpenContext,
     docId: string,
-    layerName: string,
+    layerName: string | undefined,
     pageObjectNumber: number,
     ref: AnnotationRef,
     signal?: AbortSignal,
@@ -1201,7 +1283,7 @@ export class DocumentService {
         kind: 'annotations.readFile' as const,
         jobId,
         docId,
-        layerName,
+        ...(layerName !== undefined ? { layerName } : {}),
         pageObjectNumber,
         ref,
         path,
@@ -1213,11 +1295,12 @@ export class DocumentService {
   private async readFileToTemp(
     ctx: OpenContext,
     docId: string,
-    layerName: string,
+    layerName: string | undefined,
     signal: AbortSignal | undefined,
     buildFor: (jobId: WorkerJobId, path: string) => WirePack<WorkerRequest>,
   ): Promise<SavedAttachmentFile> {
-    await this.ensureLayerOnPool(ctx, docId, layerName);
+    if (layerName !== undefined) await this.ensureLayerOnPool(ctx, docId, layerName);
+    else await this.openOnPool(ctx, docId);
     const dir = await mkdtemp(join(tmpdir(), 'embedpdf-attachment-'));
     const path = join(dir, 'attachment.bin');
     try {

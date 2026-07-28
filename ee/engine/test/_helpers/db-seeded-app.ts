@@ -123,12 +123,14 @@ export function docScopedToken(
   tenantId: string,
   docId: string,
   scope: ReadonlyArray<string> = ['*'],
+  layerName?: string,
 ): string {
   return signDevToken(fx.secret, {
-    sub: 'cloud-test',
+    sub: layerName ? `cloud-test-${layerName}` : 'cloud-test',
     tenant_id: tenantId,
     doc_id: docId,
     scope,
+    ...(layerName ? { layer_name: layerName } : {}),
   });
 }
 

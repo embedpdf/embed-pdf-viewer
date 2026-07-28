@@ -33,8 +33,22 @@ export type DocResourceId =
   | 'head'
   | 'manifest'
   | 'page-render'
+  // WS2b prefix law: annotated renders are their OWN family — they depend
+  // on content+annotations while `/render/pages/` depends on content alone,
+  // and edge grants see only prefixes, so the dependency set must be
+  // visible in the path.
+  | 'page-render-annotated'
   | 'page-text'
   | 'page-geometry'
+  // WS2b plane model: doc-level shared variants, one per plane-dependent
+  // read family. Each resolves at the base view while the planes it depends
+  // on are inherited — see the RESOURCE_PLANES map in wire/cdn/coverage.ts.
+  | 'page-annotations'
+  | 'layout'
+  | 'metadata'
+  | 'actions'
+  | 'attachments'
+  | 'attachment-files'
   // Layer-scoped variants of the page resources. Same capability
   // gates as their doc-level cousins (the layer just provides a
   // possibly-divergent VIEW of the underlying page content — e.g.
@@ -47,6 +61,10 @@ export type DocResourceId =
   | 'layer-metadata'
   | 'layer-actions'
   | 'layer-page-render'
+  // Layer twin of `page-render-annotated`: annotatedness is path-only at
+  // BOTH tiers (uniform grammar), even though layer grants don't need the
+  // distinction — see the token/path law in wire/paths.ts.
+  | 'layer-page-render-annotated'
   | 'layer-page-text'
   | 'layer-page-geometry'
   // Search slices, one resource per PERMISSION TIER: rects-only results
@@ -187,6 +205,61 @@ export const DOC_RESOURCES: Readonly<Record<DocResourceId, DocResourceDescriptor
     routeKind: 'versioned-read',
     cdnCacheable: true,
   },
+  'page-render-annotated': {
+    id: 'page-render-annotated',
+    pathPattern: '/v1/docs/{docId}/render/annotated/pages/*/data@*',
+    resolvePathPattern: (docId) => `/v1/docs/${docId}/render/annotated/pages/*/data@*`,
+    pathPrefix: '/v1/docs/{docId}/render/annotated/pages/',
+    resolvePathPrefix: (docId) => `/v1/docs/${docId}/render/annotated/pages/`,
+    // Same capability tier as `page-render` — the split is about PLANE
+    // dependencies (content+annotations vs content), not permissions.
+    requirement: { kind: 'single', capability: 'doc.render' },
+    routeKind: 'versioned-read',
+    cdnCacheable: true,
+  },
+  'page-annotations': {
+    id: 'page-annotations',
+    pathPattern: '/v1/docs/{docId}/annotations/pages/*/items@*',
+    resolvePathPattern: (docId) => `/v1/docs/${docId}/annotations/pages/*/items@*`,
+    // Prefix deliberately covers the `appearances@` sibling too, mirroring
+    // the layer-scoped `annotations-read` rule: reading an annotation lets
+    // you see its rendered appearance.
+    pathPrefix: '/v1/docs/{docId}/annotations/pages/',
+    resolvePathPrefix: (docId) => `/v1/docs/${docId}/annotations/pages/`,
+    requirement: { kind: 'single', capability: 'doc.annotate.read' },
+    routeKind: 'versioned-read',
+    cdnCacheable: true,
+  },
+  layout: {
+    id: 'layout',
+    pathPattern: '/v1/docs/{docId}/layout@*',
+    resolvePathPattern: (docId) => `/v1/docs/${docId}/layout@*`,
+    pathPrefix: '/v1/docs/{docId}/layout@',
+    resolvePathPrefix: (docId) => `/v1/docs/${docId}/layout@`,
+    requirement: { kind: 'single', capability: 'doc.open' },
+    routeKind: 'versioned-read',
+    cdnCacheable: true,
+  },
+  metadata: {
+    id: 'metadata',
+    pathPattern: '/v1/docs/{docId}/metadata@*',
+    resolvePathPattern: (docId) => `/v1/docs/${docId}/metadata@*`,
+    pathPrefix: '/v1/docs/{docId}/metadata@',
+    resolvePathPrefix: (docId) => `/v1/docs/${docId}/metadata@`,
+    requirement: { kind: 'single', capability: 'doc.open' },
+    routeKind: 'versioned-read',
+    cdnCacheable: true,
+  },
+  actions: {
+    id: 'actions',
+    pathPattern: '/v1/docs/{docId}/actions@*',
+    resolvePathPattern: (docId) => `/v1/docs/${docId}/actions@*`,
+    pathPrefix: '/v1/docs/{docId}/actions@',
+    resolvePathPrefix: (docId) => `/v1/docs/${docId}/actions@`,
+    requirement: { kind: 'single', capability: 'doc.open' },
+    routeKind: 'versioned-read',
+    cdnCacheable: true,
+  },
   'layer-layout': {
     id: 'layer-layout',
     pathPattern: '/v1/docs/{docId}/layers/{layerName}/layout@*',
@@ -227,6 +300,28 @@ export const DOC_RESOURCES: Readonly<Record<DocResourceId, DocResourceDescriptor
     routeKind: 'versioned-read',
     cdnCacheable: true,
   },
+  attachments: {
+    id: 'attachments',
+    pathPattern: '/v1/docs/{docId}/attachments@*',
+    resolvePathPattern: (docId) => `/v1/docs/${docId}/attachments@*`,
+    pathPrefix: '/v1/docs/{docId}/attachments@',
+    resolvePathPrefix: (docId) => `/v1/docs/${docId}/attachments@`,
+    requirement: { kind: 'single', capability: 'doc.open' },
+    routeKind: 'versioned-read',
+    cdnCacheable: true,
+  },
+  'attachment-files': {
+    id: 'attachment-files',
+    pathPattern: '/v1/docs/{docId}/attachment-files/*',
+    resolvePathPattern: (docId) => `/v1/docs/${docId}/attachment-files/*`,
+    pathPrefix: '/v1/docs/{docId}/attachment-files/',
+    resolvePathPrefix: (docId) => `/v1/docs/${docId}/attachment-files/`,
+    // Same tier split as the layer variants: the byte leaf is a stronger
+    // capability than the metadata listing.
+    requirement: { kind: 'single', capability: 'doc.download' },
+    routeKind: 'versioned-read',
+    cdnCacheable: true,
+  },
   'layer-attachments': {
     id: 'layer-attachments',
     pathPattern: '/v1/docs/{docId}/layers/{layerName}/attachments@*',
@@ -259,6 +354,18 @@ export const DOC_RESOURCES: Readonly<Record<DocResourceId, DocResourceDescriptor
     pathPrefix: '/v1/docs/{docId}/layers/{layerName}/render/pages/',
     resolvePathPrefix: (docId, layerName = 'default') =>
       `/v1/docs/${docId}/layers/${layerName}/render/pages/`,
+    requirement: { kind: 'single', capability: 'doc.render' },
+    routeKind: 'versioned-read',
+    cdnCacheable: true,
+  },
+  'layer-page-render-annotated': {
+    id: 'layer-page-render-annotated',
+    pathPattern: '/v1/docs/{docId}/layers/{layerName}/render/annotated/pages/*/data@*',
+    resolvePathPattern: (docId, layerName = 'default') =>
+      `/v1/docs/${docId}/layers/${layerName}/render/annotated/pages/*/data@*`,
+    pathPrefix: '/v1/docs/{docId}/layers/{layerName}/render/annotated/pages/',
+    resolvePathPrefix: (docId, layerName = 'default') =>
+      `/v1/docs/${docId}/layers/${layerName}/render/annotated/pages/`,
     requirement: { kind: 'single', capability: 'doc.render' },
     routeKind: 'versioned-read',
     cdnCacheable: true,

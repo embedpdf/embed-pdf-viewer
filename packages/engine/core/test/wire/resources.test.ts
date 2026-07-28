@@ -219,6 +219,126 @@ describe('cdnCoverageForScope', () => {
     expect(coverage.some((e) => e.resourceId === 'download-current')).toBe(false);
   });
 
+  const ALL_BASE = {
+    content: 'base',
+    annotations: 'base',
+    layout: 'base',
+    attachments: 'base',
+    metadata: 'base',
+    actions: 'base',
+  } as const;
+
+  it('scopes: an owned plane withholds exactly the doc-level resources depending on it (WS2b)', () => {
+    const ids = (c: ReturnType<typeof cdnCoverageForScope>) => new Set(c.map((e) => e.resourceId));
+    const shared = ids(
+      cdnCoverageForScope(['*'], NO_BITS, {
+        docId: 'doc_1',
+        layerName: 'L1',
+        scopes: { ...ALL_BASE },
+      }),
+    );
+    for (const id of [
+      'page-render',
+      'page-render-annotated',
+      'page-annotations',
+      'layout',
+      'metadata',
+      'actions',
+      'attachments',
+      'attachment-files',
+    ] as const) {
+      expect(shared.has(id)).toBe(true);
+    }
+    // Content owned (redaction apply / page surgery): the content trio AND
+    // the annotated family (content+annotations) go; annotation-plane and
+    // attachments-plane resources stay — a redacted layer still shares the
+    // base annotations and attachments it never touched.
+    const contentOwned = ids(
+      cdnCoverageForScope(['*'], NO_BITS, {
+        docId: 'doc_1',
+        layerName: 'L1',
+        scopes: { ...ALL_BASE, content: 'layer' },
+      }),
+    );
+    for (const id of [
+      'page-render',
+      'page-text',
+      'page-geometry',
+      'page-render-annotated',
+    ] as const) {
+      expect(contentOwned.has(id)).toBe(false);
+    }
+    expect(contentOwned.has('page-annotations')).toBe(true);
+    expect(contentOwned.has('attachments')).toBe(true);
+    expect(contentOwned.has('layout')).toBe(true);
+    // Layer-scoped variants are never plane-gated — a diverged layer still
+    // reads ITS OWN view.
+    expect(contentOwned.has('layer-page-render')).toBe(true);
+    expect(contentOwned.has('layer-page-text')).toBe(true);
+    // Omitted scopes = tenant token / no layer in play: capability rules only.
+    expect(ids(cdnCoverageForScope(['*'], NO_BITS, { docId: 'doc_1' })).has('page-render')).toBe(
+      true,
+    );
+  });
+
+  it('scopes: every plane is an independent axis (WS2b)', () => {
+    const ids = (c: ReturnType<typeof cdnCoverageForScope>) => new Set(c.map((e) => e.resourceId));
+    // Annotations owned: annotation lists + the annotated render family go;
+    // the annotation-free content trio survives — this is the most common
+    // divergence and it must not cost raster sharing.
+    const annotationsOwned = ids(
+      cdnCoverageForScope(['*'], NO_BITS, {
+        docId: 'doc_1',
+        layerName: 'L1',
+        scopes: { ...ALL_BASE, annotations: 'layer' },
+      }),
+    );
+    expect(annotationsOwned.has('page-annotations')).toBe(false);
+    expect(annotationsOwned.has('page-render-annotated')).toBe(false);
+    expect(annotationsOwned.has('page-render')).toBe(true);
+    expect(annotationsOwned.has('attachments')).toBe(true);
+    // attachment-files stays granted on annotation divergence BY DESIGN: the
+    // FileAttachment-annotation byte route carries its own origin-side
+    // annotations check; withholding the whole prefix would break plain
+    // attachment-file sharing (see RESOURCE_PLANES in coverage.ts).
+    expect(annotationsOwned.has('attachment-files')).toBe(true);
+
+    const attachmentsOwned = ids(
+      cdnCoverageForScope(['*'], NO_BITS, {
+        docId: 'doc_1',
+        layerName: 'L1',
+        scopes: { ...ALL_BASE, attachments: 'layer' },
+      }),
+    );
+    expect(attachmentsOwned.has('attachments')).toBe(false);
+    expect(attachmentsOwned.has('attachment-files')).toBe(false);
+    expect(attachmentsOwned.has('page-render')).toBe(true);
+    expect(attachmentsOwned.has('layer-attachments')).toBe(true);
+
+    // Layout owned (move/rotate): ONLY the layout leaf goes — normalized
+    // render/text/geometry artifacts survive structural ops.
+    const layoutOwned = ids(
+      cdnCoverageForScope(['*'], NO_BITS, {
+        docId: 'doc_1',
+        layerName: 'L1',
+        scopes: { ...ALL_BASE, layout: 'layer' },
+      }),
+    );
+    expect(layoutOwned.has('layout')).toBe(false);
+    expect(layoutOwned.has('page-render')).toBe(true);
+    expect(layoutOwned.has('page-annotations')).toBe(true);
+
+    const metadataOwned = ids(
+      cdnCoverageForScope(['*'], NO_BITS, {
+        docId: 'doc_1',
+        layerName: 'L1',
+        scopes: { ...ALL_BASE, metadata: 'layer' },
+      }),
+    );
+    expect(metadataOwned.has('metadata')).toBe(false);
+    expect(metadataOwned.has('page-render')).toBe(true);
+  });
+
   it('a single capability scope covers both doc-level and layer-scoped variants gated by that capability', () => {
     // doc.render → page-render (doc-level) AND layer-page-render (layer-scoped).
     // Both share the same capability gate; both get signed so the CDN
@@ -231,9 +351,19 @@ describe('cdnCoverageForScope', () => {
         pathPrefix: '/v1/docs/doc_1/render/pages/',
       },
       {
+        resourceId: 'page-render-annotated',
+        pathPattern: '/v1/docs/doc_1/render/annotated/pages/*/data@*',
+        pathPrefix: '/v1/docs/doc_1/render/annotated/pages/',
+      },
+      {
         resourceId: 'layer-page-render',
         pathPattern: '/v1/docs/doc_1/layers/default/render/pages/*/data@*',
         pathPrefix: '/v1/docs/doc_1/layers/default/render/pages/',
+      },
+      {
+        resourceId: 'layer-page-render-annotated',
+        pathPattern: '/v1/docs/doc_1/layers/default/render/annotated/pages/*/data@*',
+        pathPrefix: '/v1/docs/doc_1/layers/default/render/annotated/pages/',
       },
     ]);
   });
@@ -245,6 +375,11 @@ describe('cdnCoverageForScope', () => {
     });
     expect(coverage).toEqual([
       {
+        resourceId: 'page-annotations',
+        pathPattern: '/v1/docs/doc_1/annotations/pages/*/items@*',
+        pathPrefix: '/v1/docs/doc_1/annotations/pages/',
+      },
+      {
         resourceId: 'annotations-read',
         pathPattern: '/v1/docs/doc_1/layers/myLayer/annotations/pages/*/items@*',
         pathPrefix: '/v1/docs/doc_1/layers/myLayer/annotations/pages/',
@@ -255,6 +390,11 @@ describe('cdnCoverageForScope', () => {
   it('layer-bearing entries default to "default" when layerName is omitted', () => {
     const coverage = cdnCoverageForScope(['doc.annotate.read'], NO_BITS, { docId: 'doc_1' });
     expect(coverage).toEqual([
+      {
+        resourceId: 'page-annotations',
+        pathPattern: '/v1/docs/doc_1/annotations/pages/*/items@*',
+        pathPrefix: '/v1/docs/doc_1/annotations/pages/',
+      },
       {
         resourceId: 'annotations-read',
         pathPattern: '/v1/docs/doc_1/layers/default/annotations/pages/*/items@*',
@@ -277,7 +417,9 @@ describe('cdnCoverageForScope', () => {
         'layer-metadata',
         'layer-actions',
         'page-render',
+        'page-render-annotated',
         'layer-page-render',
+        'layer-page-render-annotated',
         'page-text',
         'layer-page-text',
         'page-geometry',
@@ -285,9 +427,15 @@ describe('cdnCoverageForScope', () => {
         // bit 5 grants doc.text.{search,copy} → both search tiers.
         'layer-search-rects',
         'layer-search-full',
+        'page-annotations',
         'annotations-read',
-        // doc.open (session establishment) also covers the attachments
-        // METADATA listing; attachment BYTES stay behind doc.download.
+        // doc.open (session establishment) also covers the doc-level shared
+        // families (WS2b plane model); attachment BYTES stay behind
+        // doc.download.
+        'layout',
+        'metadata',
+        'actions',
+        'attachments',
         'layer-attachments',
       ]),
     );

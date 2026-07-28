@@ -16,25 +16,35 @@ export interface RenderVersions {
  * the render token encoder consumes. The output is a generic dotted-key map
  * (`viewport.kind`, `target.rect.left`, …) — the schema and codec never need
  * to know about specific option fields. Adding a new render option means
- * extending `PageImageOptions`, `PageRenderQuerySchema`, and
+ * extending `PageImageOptions`, the render query schemas, and
  * `RenderTokenSchema.fields`; this function does not change.
  *
- * Semantic validation (viewport-kind invariants, includeAnnotations /
- * annotationVersion consistency, rect coherence) lives in
- * `PageRenderQuerySchema` and runs when the resulting URL is decoded server-
- * side. Round-tripping (flatten → encode → decode → unflatten →
- * `PageRenderQuerySchema.parse`) recovers the original SDK options.
+ * The token/path law (SCALE-OUT §2b.2): tokens carry VERSION PINS and RENDER
+ * PARAMETERS; anything that changes the artifact's plane-dependency set is
+ * PATH-expressed. Annotatedness changes the planes (`content` vs
+ * `content + annotations`), so the wire map never carries
+ * `includeAnnotations` — the caller picks the path FAMILY
+ * (`…/render/pages/` vs `…/render/annotated/pages/`) and passes
+ * `annotationVersion` iff it chose the annotated one. Contradictory states
+ * are unrepresentable; each family's query schema enforces its own pin
+ * grammar structurally.
+ *
+ * Semantic validation (viewport-kind invariants, per-family pin presence,
+ * rect coherence) lives in `PageRenderQuerySchema` /
+ * `PageRenderAnnotatedQuerySchema` and runs when the resulting URL is
+ * decoded server-side. Round-tripping (flatten → encode → decode →
+ * unflatten → schema parse) recovers the original SDK options.
  */
 export function renderImageOptionsToWire(
   options: PageImageOptions,
   versions: RenderVersions,
 ): WireFlat {
-  const includeAnnotations = options.includeAnnotations ?? true;
+  // Path-expressed, never token-expressed (see above).
+  const { includeAnnotations: _pathExpressed, ...wireOptions } = options;
   return flatten({
-    ...options,
-    includeAnnotations,
+    ...wireOptions,
     contentVersion: versions.contentVersion,
-    ...(includeAnnotations && versions.annotationVersion !== undefined
+    ...(versions.annotationVersion !== undefined
       ? { annotationVersion: versions.annotationVersion }
       : {}),
   });

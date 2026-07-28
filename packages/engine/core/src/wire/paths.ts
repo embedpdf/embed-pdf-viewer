@@ -112,6 +112,14 @@ export const wirePaths = {
   layerLayout: (docId: string, layerName: string, layoutVersion: number) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/layout@${encodeLayoutToken(layoutVersion)}`,
 
+  /**
+   * Immutable BASE page-geometry list (WS2b plane model): the shared-URL
+   * variant a layout-inheriting layer resolves at — every visitor's page
+   * list is ONE CDN object served from the base worker session.
+   */
+  docLayout: (docId: string, layoutVersion: number) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layout@${encodeLayoutToken(layoutVersion)}`,
+
   layerLayoutCurrent: (docId: string, layerName: string) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/layout`,
 
@@ -129,13 +137,36 @@ export const wirePaths = {
   layerMetadataCurrent: (docId: string, layerName: string) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/metadata`,
 
+  /** Immutable BASE metadata (WS2b plane model): the shared-URL variant a
+   *  metadata-inheriting layer resolves at. */
+  docMetadata: (docId: string, metadataVersion: number) =>
+    `/v1/docs/${encodeURIComponent(docId)}/metadata@${encodeMetadataToken(metadataVersion)}`,
+
   /** Immutable catalog-owned actions, independently pinned in the manifest. */
   layerActions: (docId: string, layerName: string, actionsVersion: number) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/actions@${encodeActionsToken(actionsVersion)}`,
 
+  /** Immutable BASE catalog actions (WS2b plane model): the shared-URL
+   *  variant an actions-inheriting layer resolves at. */
+  docActions: (docId: string, actionsVersion: number) =>
+    `/v1/docs/${encodeURIComponent(docId)}/actions@${encodeActionsToken(actionsVersion)}`,
+
   /** POST: rewrite the document Info dict for the layer (metadata edit). */
   layerMetadataUpdate: (docId: string, layerName: string) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/metadata`,
+
+  /**
+   * Immutable BASE /EmbeddedFiles listing (WS2b): the shared-URL variant an
+   * attachments-undiverged layer resolves at — every visitor's sidebar list
+   * is ONE CDN object served from the base worker session.
+   */
+  docAttachments: (docId: string, attachmentsVersion: number) =>
+    `/v1/docs/${encodeURIComponent(docId)}/attachments@${encodeAttachmentsToken(attachmentsVersion)}`,
+
+  /** Immutable BASE decoded bytes of one embedded file (WS2b twin of
+   *  `layerAttachmentFile` — same capability tier split). */
+  docAttachmentFile: (docId: string, key: string, attachmentsVersion: number) =>
+    `/v1/docs/${encodeURIComponent(docId)}/attachment-files/${encodeTokenText(key)}/data@${encodeAttachmentsToken(attachmentsVersion)}`,
 
   /** Immutable /EmbeddedFiles listing, pinned by `attachmentsVersion`. */
   layerAttachments: (docId: string, layerName: string, attachmentsVersion: number) =>
@@ -174,6 +205,20 @@ export const wirePaths = {
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/attachment-files/pages/${pageObjectNumber}/items/${encodeURIComponent(annotKey)}/data@${encodeAttachmentsToken(attachmentsVersion)}`,
 
   /**
+   * Immutable BASE bytes of a FileAttachment annotation's embedded file
+   * (WS2b plane model). Depends on the `annotations` plane (the annotation
+   * exists in this view) AND the `attachments` plane (the pin); the origin
+   * guard requires both inherited.
+   */
+  docAnnotationFile: (
+    docId: string,
+    pageObjectNumber: number,
+    annotKey: string,
+    attachmentsVersion: number,
+  ) =>
+    `/v1/docs/${encodeURIComponent(docId)}/attachment-files/pages/${pageObjectNumber}/items/${encodeURIComponent(annotKey)}/data@${encodeAttachmentsToken(attachmentsVersion)}`,
+
+  /**
    * GET: full plain-text extraction for a single page at a specific
    * `contentVersion`. Content-addressed; CDN may cache forever.
    * Stale-version requests return 404 and the SDK's transparent
@@ -206,6 +251,19 @@ export const wirePaths = {
   docPageRenderCurrent: (docId: string, pageObjectNumber: number) =>
     `/v1/docs/${encodeURIComponent(docId)}/render/pages/${pageObjectNumber}/data`,
 
+  /**
+   * Immutable BASE annotated render (WS2b plane model). Its OWN path family,
+   * not a token flag under `/render/pages/`: an annotated render depends on
+   * `content + annotations`, an annotation-free one on `content` alone, and
+   * edge grants are prefix-scoped — the prefix law says a path's prefix must
+   * identify its full plane-dependency set. Annotatedness is therefore
+   * PATH-ONLY (the token/path law): the wire token has no
+   * `includeAnnotations` key at all; the annotated family's token carries
+   * `annotationVersion`, the free family's cannot.
+   */
+  docPageRenderAnnotated: (docId: string, pageObjectNumber: number, token: TokenInput) =>
+    `/v1/docs/${encodeURIComponent(docId)}/render/annotated/pages/${pageObjectNumber}/data@${encodeRenderToken(token)}`,
+
   layerPageGeometry: (
     docId: string,
     layerName: string,
@@ -228,15 +286,39 @@ export const wirePaths = {
   layerPageRenderCurrent: (docId: string, layerName: string, pageObjectNumber: number) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/render/pages/${pageObjectNumber}/data`,
 
+  /** Layer twin of `docPageRenderAnnotated` — the grammar is uniform:
+   *  annotatedness is path-only at BOTH tiers. */
+  layerPageRenderAnnotated: (
+    docId: string,
+    layerName: string,
+    pageObjectNumber: number,
+    token: TokenInput,
+  ) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/render/annotated/pages/${pageObjectNumber}/data@${encodeRenderToken(token)}`,
+
+  layerPageRenderAnnotatedCurrent: (docId: string, layerName: string, pageObjectNumber: number) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/render/annotated/pages/${pageObjectNumber}/data`,
+
+  /**
+   * Immutable BASE annotation list for a single page (WS2b plane model):
+   * the shared-URL variant an annotations-inheriting layer resolves at — a
+   * base's own annotations (weak-identity ones included) are simply visible
+   * through every pristine layer, so 1,000 visitors' sidebars are ONE CDN
+   * object served from the base worker session.
+   */
+  docPageAnnotations: (docId: string, pageObjectNumber: number, annotationVersion: number) =>
+    `/v1/docs/${encodeURIComponent(docId)}/annotations/pages/${pageObjectNumber}/items@${encodeAnnotationToken(annotationVersion)}`,
+
+  /** Immutable BASE appearance batch (WS2b twin of
+   *  `layerPageAnnotationAppearances` — same `annotations` plane gate). */
+  docPageAnnotationAppearances: (docId: string, pageObjectNumber: number, token: TokenInput) =>
+    `/v1/docs/${encodeURIComponent(docId)}/annotations/pages/${pageObjectNumber}/appearances@${encodeAnnotationAppearancesRenderToken(token)}`,
+
   /**
    * GET: full annotation list for a single page at a specific
    * `annotationVersion`. Same cache-control rules and 404-retry
    * semantics as `docPageText`. The `items` suffix is the
    * collection name — see file-level docstring.
-   *
-   * Note: there is no doc-level (no-layer) variant in v2. Annotations
-   * are always layer-scoped on the wire; if a caller needs a "default
-   * layer" view, they use `layerName='default'` explicitly.
    */
   layerPageAnnotations: (
     docId: string,

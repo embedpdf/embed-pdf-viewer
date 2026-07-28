@@ -76,10 +76,10 @@ export const decodeDownloadToken = (raw: string): DownloadToken => {
 /**
  * Encode a render token from a flat wire-shape input. The input is the
  * output of `flatten(...)` over an SDK `PageImageOptions`-shaped object plus
- * cache versions. Semantic invariants (viewport-kind XOR fields,
- * includeAnnotations/annotationVersion consistency, target rect coherence)
- * live in `PageImageOptionsWireSchema` — running them here would duplicate
- * the spec.
+ * cache versions. Semantic invariants (viewport-kind XOR fields, per-family
+ * pin grammar — annotatedness itself is PATH-expressed, never a token key —
+ * target rect coherence) live in the per-family render query schemas —
+ * running them here would duplicate the spec.
  */
 export const encodeRenderToken = (input: TokenInput): string =>
   encodeToken(RenderTokenSchema, input);

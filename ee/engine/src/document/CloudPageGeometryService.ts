@@ -9,6 +9,7 @@ import {
 import { PageGeometrySnapshotSchema, wirePaths } from '@embedpdf/engine-core/wire';
 
 import type { ManifestAccessor } from './CloudDocumentHandle';
+import { planesInherited } from './planes';
 import type { HttpClient } from '../transport/HttpClient';
 
 export class CloudPageGeometryService implements PageGeometryService {
@@ -37,12 +38,16 @@ export class CloudPageGeometryService implements PageGeometryService {
             `no page with object number ${this.pageObjectNumber} in document ${this.docId}`,
           );
         }
-        return wirePaths.layerPageGeometry(
-          this.docId,
-          this.layerName,
-          this.pageObjectNumber,
-          page.cache.contentVersion,
-        );
+        // WS2b plane rule: geometry depends on the `content` plane (see
+        // CloudPageTextService for the full rationale).
+        return planesInherited(manifest, ['content'])
+          ? wirePaths.docPageGeometry(this.docId, this.pageObjectNumber, page.cache.contentVersion)
+          : wirePaths.layerPageGeometry(
+              this.docId,
+              this.layerName,
+              this.pageObjectNumber,
+              page.cache.contentVersion,
+            );
       };
       return this.http.getJsonWithRefresh(
         buildPath,

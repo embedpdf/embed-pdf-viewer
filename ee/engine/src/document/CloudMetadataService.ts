@@ -15,6 +15,7 @@ import {
 import type { SessionEventPublisher } from '@embedpdf/engine-services';
 
 import type { ManifestAccessor } from './CloudDocumentHandle';
+import { planesInherited } from './planes';
 import type { HttpClient } from '../transport/HttpClient';
 
 export class CloudMetadataService implements MetadataService {
@@ -45,7 +46,11 @@ export class CloudMetadataService implements MetadataService {
     return AbortablePromise.run<DocumentMetadata>(async (signal) => {
       const buildPath = async (s: AbortSignal): Promise<string> => {
         const manifest = await this.manifest.get(s);
-        return wirePaths.layerMetadata(this.docId, this.layerName, manifest.metadataVersion);
+        // WS2b plane rule: the metadata leaf depends on the `metadata`
+        // plane — while inherited, one doc-level URL serves every visitor.
+        return planesInherited(manifest, ['metadata'])
+          ? wirePaths.docMetadata(this.docId, manifest.metadataVersion)
+          : wirePaths.layerMetadata(this.docId, this.layerName, manifest.metadataVersion);
       };
       return this.http.getJsonWithRefresh(
         buildPath,

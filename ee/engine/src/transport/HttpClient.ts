@@ -242,6 +242,29 @@ export class HttpClient {
     }
   }
 
+  /**
+   * `getBlob` with the same single-retry stale-version recovery as
+   * {@link getJsonWithRefresh}: a 404 on a versioned URL triggers
+   * `onStaleVersion` (a manifest refresh) and one re-resolve + retry.
+   * Render blobs ride this rail (WS2b): a scope flip re-resolves the
+   * doc-vs-layer path family instead of failing on a stale URL.
+   */
+  async getBlobWithRefresh(
+    buildPath: (signal: AbortSignal) => Promise<string>,
+    onStaleVersion: (signal: AbortSignal) => Promise<void>,
+    signal: AbortSignal,
+  ): Promise<Blob> {
+    const initialPath = await buildPath(signal);
+    try {
+      return await this.getBlob(initialPath, signal);
+    } catch (err) {
+      if (!EngineError.is(err, EngineErrorCode.NotFound)) throw err;
+      await onStaleVersion(signal);
+      const retryPath = await buildPath(signal);
+      return await this.getBlob(retryPath, signal);
+    }
+  }
+
   /** GET raw bytes plus the response headers (attachment-file leaves). */
   async getFile(path: string, signal: AbortSignal): Promise<HttpFileResponse> {
     const res = await this.request(path, { method: 'GET', signal });

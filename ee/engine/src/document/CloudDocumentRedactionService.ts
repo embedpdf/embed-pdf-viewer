@@ -45,7 +45,9 @@ export class CloudDocumentRedactionService implements DocumentRedactionService {
       );
       // Nothing applied means no artifact and therefore no coherence bump.
       if (result.meta === null) return result;
-      this.manifest.apply(result.meta);
+      // Redaction-apply rewrites content and consumes the marks (WS2b:
+      // both planes flip).
+      this.manifest.apply(result.meta, ['content', 'annotations']);
       this.publisher.publishLocal({
         type: 'redaction.applied',
         ...result,

@@ -12,6 +12,7 @@ import {
   AccessRequestSchema,
   cdnCoverageForScope,
   wirePaths,
+  type LayerScopes,
   type RenderPolicy,
 } from '@embedpdf/engine-core/wire';
 import { requireLayerDocAccessOnly, type RequestJwtContext } from '../app/jwt-plugin';
@@ -57,6 +58,12 @@ export async function registerAccessRoutes(
     // `effectiveScope` expansion from the same source keeps the
     // response internally consistent.
     const pdfBits = decodePdfBits(unlocked.probe.pdfPermissionsBits);
+    // WS2b edge grant: each doc-level shared prefix rides this caller's CDN
+    // credential only while every plane it depends on is inherited by the
+    // pinned layer — the SAME scopes the manifest advertises and the origin
+    // guards enforce (the origin is the truth; this grant is the
+    // optimization, TTL-bounded by `expiresAt` after a divergence flip).
+    const layerScopes = await service.getLayerScopes(body.docId, layerName);
     const access = buildAccessResponse(
       unlocked,
       ctx.jwt,
@@ -67,6 +74,7 @@ export async function registerAccessRoutes(
       layerName,
       `${req.protocol}://${req.hostname}`,
       derivedRenders?.policy(),
+      layerScopes,
     );
     setNoStore(reply);
     return {
@@ -86,6 +94,7 @@ function buildAccessResponse(
   layerName: string,
   originUrl: string,
   renderPolicy?: RenderPolicy,
+  layerScopes?: LayerScopes,
 ): DocumentAccessInfo {
   if (!jwt.exp || jwt.exp <= 0) {
     throw new EngineError(EngineErrorCode.InvalidArg, 'doc token exp is required for access');
@@ -99,7 +108,11 @@ function buildAccessResponse(
   // imply doc.annotate.read).
   const effectiveScope = [...expandRawScope(jwt.scope, pdfBits)].sort();
 
-  const coverage = cdnCoverageForScope(jwt.scope, pdfBits, { docId, layerName });
+  const coverage = cdnCoverageForScope(jwt.scope, pdfBits, {
+    docId,
+    layerName,
+    ...(layerScopes ? { scopes: layerScopes } : {}),
+  });
   const cdn = cdnSigner.buildAccess({
     tenantId,
     docId,

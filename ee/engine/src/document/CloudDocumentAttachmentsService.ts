@@ -21,6 +21,7 @@ import type { SessionEventPublisher } from '@embedpdf/engine-services';
 
 import { buildMutationForm } from './buildMutationForm';
 import type { ManifestAccessor } from './CloudDocumentHandle';
+import { planesInherited } from './planes';
 import { parseAttachmentContent } from './parseAttachmentContent';
 import type { HttpClient } from '../transport/HttpClient';
 
@@ -62,7 +63,12 @@ export class CloudDocumentAttachmentsService implements DocumentAttachmentsServi
     return AbortablePromise.run<EmbeddedFileItem[]>(async (signal) => {
       const buildPath = async (s: AbortSignal): Promise<string> => {
         const manifest = await this.manifest.get(s);
-        return wirePaths.layerAttachments(this.docId, this.layerName, manifest.attachmentsVersion);
+        // WS2b plane rule: the listing depends on the `attachments` plane —
+        // while inherited, one CDN object serves every visitor's sidebar
+        // from the base worker session.
+        return planesInherited(manifest, ['attachments'])
+          ? wirePaths.docAttachments(this.docId, manifest.attachmentsVersion)
+          : wirePaths.layerAttachments(this.docId, this.layerName, manifest.attachmentsVersion);
       };
       return this.http.getJsonWithRefresh(
         buildPath,
@@ -90,12 +96,15 @@ export class CloudDocumentAttachmentsService implements DocumentAttachmentsServi
     return AbortablePromise.run<AttachmentContent>(async (signal) => {
       const buildPath = async (s: AbortSignal): Promise<string> => {
         const manifest = await this.manifest.get(s);
-        return wirePaths.layerAttachmentFile(
-          this.docId,
-          this.layerName,
-          ref.key,
-          manifest.attachmentsVersion,
-        );
+        // WS2b: same plane switch as list() — the byte leaf shares too.
+        return planesInherited(manifest, ['attachments'])
+          ? wirePaths.docAttachmentFile(this.docId, ref.key, manifest.attachmentsVersion)
+          : wirePaths.layerAttachmentFile(
+              this.docId,
+              this.layerName,
+              ref.key,
+              manifest.attachmentsVersion,
+            );
       };
       const file = await this.http.getFileWithRefresh(
         buildPath,

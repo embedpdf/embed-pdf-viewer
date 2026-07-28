@@ -470,6 +470,19 @@ export function requireLayerCollabAction(
   return { ...ctx, originSessionId: originSessionIdFromRequest(req) };
 }
 
+/**
+ * The layer a doc-user token is pinned to (`layer_name`, default
+ * `'default'`). THE one reader of the claim: origin plane guards, password
+ * bindings, and the `/v1/access` scope computation all route through here so
+ * "which layer does this caller claim to be" has exactly one answer.
+ * Tenant/admin contexts are not layer-pinned — callers branch on `mode`
+ * before asking; for them this returns `'default'`, matching the historic
+ * fallback.
+ */
+export function pinnedLayerName(ctx: { jwt?: RequestJwtContext }): string {
+  return (ctx.jwt?.claims as { layer_name?: string } | undefined)?.layer_name ?? 'default';
+}
+
 // ----------------------------------------------------------------------
 // internal helpers
 // ----------------------------------------------------------------------

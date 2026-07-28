@@ -27,6 +27,7 @@ import {
   setImmutableCache,
   setNoStore,
 } from './_helpers';
+import { requireSharedDocRead } from './_planeGuard';
 
 export interface DocsRouteDeps {
   service: DocumentService;
@@ -91,6 +92,55 @@ export async function registerDocsRoutes(app: FastifyInstance, deps: DocsRouteDe
     const manifest = await service.getManifest(ctx, docId);
     setNoStore(reply);
     return manifest;
+  });
+
+  // ── WS2b doc-level (shared) reads: served from the BASE worker session,
+  //    visible through a layer-pinned token only while the plane each
+  //    depends on is inherited (`requireSharedDocRead` = auth chain +
+  //    origin plane guard). ────────────────────────────────────────────────
+
+  app.get('/v1/docs/:docId/layout@:token', async (req, reply) => {
+    const { docId, token } = req.params as { docId: string; token: string };
+    const ctx = await requireSharedDocRead(req, service, docId, 'layout', ['layout']);
+    const requested = parseTokenOrInvalidArg(decodeLayoutToken, token, 'layoutVersion token');
+    const manifest = await service.getManifest(ctx, docId);
+    if (requested !== manifest.layoutVersion) {
+      setNoStore(reply);
+      throw new EngineError(
+        EngineErrorCode.NotFound,
+        `layout version ${requested} no longer current (current=${manifest.layoutVersion})`,
+      );
+    }
+    const snapshot = await service.getLayerLayout(
+      ctx,
+      docId,
+      undefined,
+      abortSignalFromRequest(req),
+    );
+    setImmutableCache(reply);
+    return snapshot;
+  });
+
+  app.get('/v1/docs/:docId/actions@:token', async (req, reply) => {
+    const { docId, token } = req.params as { docId: string; token: string };
+    const ctx = await requireSharedDocRead(req, service, docId, 'actions', ['actions']);
+    const requested = parseTokenOrInvalidArg(decodeActionsToken, token, 'actionsVersion token');
+    const manifest = await service.getManifest(ctx, docId);
+    if (requested !== manifest.actionsVersion) {
+      setNoStore(reply);
+      throw new EngineError(
+        EngineErrorCode.NotFound,
+        `actions version ${requested} no longer current (current=${manifest.actionsVersion})`,
+      );
+    }
+    const snapshot = await service.getLayerActions(
+      ctx,
+      docId,
+      undefined,
+      abortSignalFromRequest(req),
+    );
+    setImmutableCache(reply);
+    return snapshot;
   });
 
   app.get('/v1/docs/:docId/layers/:layerName/head', async (req, reply) => {

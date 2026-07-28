@@ -51,13 +51,19 @@ export const StorageKeys = {
     baseSha: string,
     pageObjectNumber: number,
     token: string,
+    /** Render FAMILY (token/path law): annotatedness lives in the key path
+     *  like it lives in the URL path, never inside the token. The sha
+     *  subtree still covers both families, so per-sha GC sweeps stay one
+     *  prefix. */
+    annotated = false,
   ): string {
-    return `${tenantId}/derived/render/${baseSha}/pages/${pageObjectNumber}/${token}.webp`;
+    return `${tenantId}/derived/render/${baseSha}/${annotated ? 'annotated/' : ''}pages/${pageObjectNumber}/${token}.webp`;
   },
   /**
    * Layer-tier derived render: under the DOC prefix so the
    * `documents.delete` prefix cascade reaps it for free. Version pins ride
-   * inside the token (contentVersion / annotationVersion).
+   * inside the token (contentVersion / annotationVersion); the render
+   * FAMILY rides the path, mirroring the URL grammar.
    */
   derivedRenderLayer(
     tenantId: string,
@@ -65,10 +71,11 @@ export const StorageKeys = {
     layerName: string,
     pageObjectNumber: number,
     token: string,
+    annotated = false,
   ): string {
     return `${tenantId}/docs/${shard(docId)}/${docId}/layers/${encodeURIComponent(
       layerName,
-    )}/derived/render/pages/${pageObjectNumber}/${token}.webp`;
+    )}/derived/render/${annotated ? 'annotated/' : ''}pages/${pageObjectNumber}/${token}.webp`;
   },
   /**
    * Per-ATTEMPT layer artifact key: `v{version}-{attempt}.layer`.

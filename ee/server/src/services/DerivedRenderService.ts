@@ -148,6 +148,14 @@ export class DerivedRenderService {
   classify(input: {
     imageOptions: PageImageOptions;
     format: PageNetworkRenderFormat;
+    /**
+     * The render FAMILY the request arrived on (token/path law):
+     * annotatedness is path-expressed, so the route supplies it — the
+     * token cannot. Drives whether `annotationVersion` belongs in the
+     * canonical token (annotation churn stays out of the free family's
+     * keys by construction).
+     */
+    annotated: boolean;
     contentVersion?: number;
     annotationVersion?: number;
   }): LatticeClassification {
@@ -168,16 +176,12 @@ export class DerivedRenderService {
       return { onLattice, fullPage };
     }
 
-    const includeAnnotations = o.includeAnnotations ?? true;
     const canonicalToken = encodeRenderToken(
       flatten({
         contentVersion: input.contentVersion,
-        // The codec FORBIDS annotationVersion when annotations are off —
-        // which is exactly what keeps annotation churn out of these keys.
-        ...(includeAnnotations ? { annotationVersion: input.annotationVersion } : {}),
+        ...(input.annotated ? { annotationVersion: input.annotationVersion } : {}),
         background: 'white',
         format: 'webp',
-        includeAnnotations,
         viewport: { kind: 'width', width },
       }),
     );
@@ -223,8 +227,14 @@ export class DerivedRenderService {
     );
   }
 
-  baseKey(tenantId: string, baseSha: string, pageObjectNumber: number, token: string): string {
-    return StorageKeys.derivedRenderBase(tenantId, baseSha, pageObjectNumber, token);
+  baseKey(
+    tenantId: string,
+    baseSha: string,
+    pageObjectNumber: number,
+    token: string,
+    annotated = false,
+  ): string {
+    return StorageKeys.derivedRenderBase(tenantId, baseSha, pageObjectNumber, token, annotated);
   }
 
   layerKey(
@@ -233,8 +243,16 @@ export class DerivedRenderService {
     layerName: string,
     pageObjectNumber: number,
     token: string,
+    annotated = false,
   ): string {
-    return StorageKeys.derivedRenderLayer(tenantId, docId, layerName, pageObjectNumber, token);
+    return StorageKeys.derivedRenderLayer(
+      tenantId,
+      docId,
+      layerName,
+      pageObjectNumber,
+      token,
+      annotated,
+    );
   }
 
   /**
@@ -294,12 +312,13 @@ export class DerivedRenderService {
         viewport: { kind: 'width', width: this.thumbnailWidth() },
         format: 'webp',
         background: 'white',
-        includeAnnotations: false,
       };
-      // Base view: content pins are the immutable base epoch.
+      // Base view, annotation-free family: content pins are the immutable
+      // base epoch.
       const classification = this.classify({
         imageOptions,
         format: 'webp',
+        annotated: false,
         contentVersion: 1,
       });
       if (!classification.canonicalToken) return;

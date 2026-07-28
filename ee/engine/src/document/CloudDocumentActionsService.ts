@@ -8,6 +8,7 @@ import {
 import { DocumentActionsSnapshotSchema, wirePaths } from '@embedpdf/engine-core/wire';
 
 import type { ManifestAccessor } from './CloudDocumentHandle';
+import { planesInherited } from './planes';
 import type { HttpClient } from '../transport/HttpClient';
 
 export class CloudDocumentActionsService implements DocumentActionsService {
@@ -29,7 +30,12 @@ export class CloudDocumentActionsService implements DocumentActionsService {
       this.http.getJsonWithRefresh(
         async (currentSignal) => {
           const manifest = await this.manifest.get(currentSignal);
-          return wirePaths.layerActions(this.docId, this.layerName, manifest.actionsVersion);
+          // WS2b plane rule: catalog actions depend on the `actions` plane
+          // (constant-inherited until action writing exists) — one
+          // doc-level URL, base session, no layer warm-up on open.
+          return planesInherited(manifest, ['actions'])
+            ? wirePaths.docActions(this.docId, manifest.actionsVersion)
+            : wirePaths.layerActions(this.docId, this.layerName, manifest.actionsVersion);
         },
         (raw) => DocumentActionsSnapshotSchema.parse(raw),
         async (currentSignal) => {

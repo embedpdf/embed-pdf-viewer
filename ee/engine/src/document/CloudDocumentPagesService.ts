@@ -23,6 +23,7 @@ import {
 import type { SessionEventPublisher } from '@embedpdf/engine-services';
 
 import type { ManifestAccessor } from './CloudDocumentHandle';
+import { planesInherited } from './planes';
 import type { HttpClient } from '../transport/HttpClient';
 
 /**
@@ -68,7 +69,13 @@ export class CloudDocumentPagesService implements DocumentPagesService {
     return AbortablePromise.run<PageListSnapshot>(async (signal) => {
       const buildPath = async (s: AbortSignal): Promise<string> => {
         const manifest = await this.manifest.get(s);
-        return wirePaths.layerLayout(this.docId, this.layerName, manifest.layoutVersion);
+        // WS2b plane rule: the layout leaf depends on the `layout` plane —
+        // while inherited (no move/rotate/insert/delete ever ran), every
+        // visitor's page list is ONE doc-level URL served from the base
+        // session; the SDK open sequence creates no layer session.
+        return planesInherited(manifest, ['layout'])
+          ? wirePaths.docLayout(this.docId, manifest.layoutVersion)
+          : wirePaths.layerLayout(this.docId, this.layerName, manifest.layoutVersion);
       };
       return this.http.getJsonWithRefresh(
         buildPath,
@@ -172,7 +179,9 @@ export class CloudDocumentPagesService implements DocumentPagesService {
       );
       // Nothing flattened means no artifact and therefore no coherence bump.
       if (result.meta === null) return result;
-      this.manifest.apply(result.meta);
+      // Flatten bakes annotations into page content (WS2b: both planes
+      // flip).
+      this.manifest.apply(result.meta, ['content', 'annotations']);
       this.publisher.publishLocal({
         type: 'pages.flattened',
         ...result,

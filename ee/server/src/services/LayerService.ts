@@ -1826,7 +1826,11 @@ export class LayerService {
 
     const page = await this.requireLayerPage(layer.id, ref.pageObjectNumber);
     const durablePageState = this.layerState.decorateLayerPageState(docId, layerName, page);
-    this.requireRevisionBridge().validateClientIndexRef(durablePageState, ref);
+    // WS2b: refs minted by SHARED base reads carry the base revision scope;
+    // the generation check still gates staleness (see the bridge's doc).
+    this.requireRevisionBridge().validateClientIndexRef(durablePageState, ref, {
+      aliasDocSessionIds: [this.layerState.baseRevisionScopeId(docId)],
+    });
     const workerPageState = await this.loadWorkerPageState(
       docId,
       layerName,

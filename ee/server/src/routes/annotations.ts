@@ -44,6 +44,7 @@ import {
   type SchemaLike,
 } from './_helpers';
 import { readMutationEnvelope } from './_mutationEnvelope';
+import { requireSharedDocRead } from './_planeGuard';
 import { assertRefMatchesPage, refFromKey } from './annotation-route-helpers';
 import {
   requireLayerCapability,
@@ -89,9 +90,61 @@ export async function registerAnnotationRoutes(
     derivedRenders,
   } = deps;
 
-  // Annotations are layer-scoped only in paths v2. The doc-level
-  // (no-layer) variant from v1 is removed; callers use layerName
-  // 'default' explicitly when they want layer-default behavior.
+  // ── WS2b doc-level (shared) reads: a base's own annotations —
+  //    weak-identity ones included — are simply VISIBLE through every
+  //    annotations-inheriting layer, so the list and appearance batches are
+  //    ONE CDN object served from the BASE worker session. Guarded by the
+  //    `annotations` plane (`requireSharedDocRead`); an annotation-writing
+  //    layer 404s here into the SDK's manifest-refresh rail and reads its
+  //    own layer-scoped view. ─────────────────────────────────────────────
+
+  app.get('/v1/docs/:docId/annotations/pages/:pon/items@:token', async (req, reply) => {
+    const { docId, pon, token } = req.params as { docId: string; pon: string; token: string };
+    const ctx = await requireSharedDocRead(req, documentService, docId, 'page-annotations', [
+      'annotations',
+    ]);
+    return readAnnotations({
+      documentService,
+      pool,
+      revisionBridge,
+      reply,
+      signal: abortSignalFromRequest(req),
+      scope: { kind: 'base', ctx, docId },
+      pageObjectNumber: parsePageObjectNumber(pon),
+      requestedVersion: parseTokenOrInvalidArg(
+        decodeAnnotationToken,
+        token,
+        'annotationVersion token',
+      ),
+    });
+  });
+
+  app.get(
+    '/v1/docs/:docId/annotations/pages/:pon/appearances@:token',
+    { config: { compress: false } },
+    async (req, reply) => {
+      const { docId, pon, token } = req.params as { docId: string; pon: string; token: string };
+      const ctx = await requireSharedDocRead(req, documentService, docId, 'page-annotations', [
+        'annotations',
+      ]);
+      return renderAnnotationAppearances({
+        documentService,
+        pool,
+        imageEncoder,
+        ...(derivedRenders ? { derivedRenders } : {}),
+        reply,
+        signal: abortSignalFromRequest(req),
+        scope: { kind: 'base', ctx, docId },
+        pageObjectNumber: parsePageObjectNumber(pon),
+        tokenQuery: parseTokenOrInvalidArg(
+          decodeAnnotationAppearancesRenderToken,
+          token,
+          'appearance render token',
+        ),
+        query: req.query,
+      });
+    },
+  );
 
   app.get(
     '/v1/docs/:docId/layers/:layerName/annotations/pages/:pon/items@:token',
