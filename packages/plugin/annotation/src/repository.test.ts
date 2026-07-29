@@ -550,11 +550,11 @@ describe('repository — polygon cloudy border', () => {
     expect(patch).not.toHaveProperty('rectDifferences');
   });
 
-  it('toPatch clears the effect with cloudyIntensity 0 when the border is solid again', () => {
+  it('toPatch clears the effect with cloudyIntensity null when the border is solid again', () => {
     const a = fromDTO(polygonDTO(2), CROP);
     const solid = { ...a, style: { ...a.style, border: { kind: 'solid' as const } } };
     const patch = toPatch(solid, CROP) as Extract<AnnotationPatch, { subtype: 'polygon' }>;
-    expect(patch.cloudyIntensity).toBe(0);
+    expect(patch.cloudyIntensity).toBe(null); // tri-state remove of /BE
     // and the /Rect shrinks back to the stroke-only bounds
     expect(patch.rect!.left).toBeGreaterThanOrEqual(118);
   });
@@ -567,6 +567,40 @@ describe('repository — polygon cloudy border', () => {
     };
     const patch = toPatch(cloudyStyled, CROP) as Extract<AnnotationPatch, { subtype: 'polyline' }>;
     expect(patch).not.toHaveProperty('cloudyIntensity');
+  });
+});
+
+describe('repository — shape cloudy border tri-state', () => {
+  const cloudySquare = (annotObjectNumber = 45): AnnotationDTO =>
+    ({
+      ...squareDTO(annotObjectNumber),
+      cloudyIntensity: 2,
+      rectDifferences: { left: 9, top: 9, right: 9, bottom: 9 },
+    }) as AnnotationDTO;
+
+  it('fromDTO reads /BE intensity into a cloudy border', () => {
+    expect(fromDTO(cloudySquare(), CROP).style.border).toEqual({ kind: 'cloudy', intensity: 2 });
+  });
+
+  it('toPatch on a cloudy square carries /BE + a derived /RD inset', () => {
+    const patch = toPatch(fromDTO(cloudySquare(), CROP), CROP) as Extract<
+      AnnotationPatch,
+      { subtype: 'square' }
+    >;
+    expect(patch.cloudyIntensity).toBe(2);
+    expect(patch.rectDifferences).toBeDefined();
+    expect(patch.rectDifferences!.left).toBeGreaterThan(0);
+  });
+
+  it('toPatch states BOTH clears when the border is solid again (no stale /RD)', () => {
+    const a = fromDTO(cloudySquare(), CROP);
+    const solid = { ...a, style: { ...a.style, border: { kind: 'solid' as const } } };
+    const patch = toPatch(solid, CROP) as Extract<AnnotationPatch, { subtype: 'square' }>;
+    // Tri-state removes: /BE and /RD are stated as null, never omitted — an
+    // omitted rectDifferences preserves the stale inset (the Adobe phantom
+    // padding this projection used to leave behind).
+    expect(patch.cloudyIntensity).toBe(null);
+    expect(patch.rectDifferences).toBe(null);
   });
 });
 

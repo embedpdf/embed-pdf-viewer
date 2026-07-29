@@ -331,7 +331,11 @@ export function runAnnotationMutationConformance(
         const page = doc.page(fix.pageObjectNumber);
 
         // A plain shape reads BOTH optional entries as explicit null — absence
-        // is stated, so a read DTO compares structurally against a clearing patch.
+        // is stated, so a read DTO compares structurally against a clearing
+        // patch. The draft ALSO states them as null (exactly what the plugin's
+        // total projection emits for a fresh solid shape): a draft writer must
+        // skip null, never dereference it — the stale-worker regression where
+        // solid creates vanished while cloudy ones survived.
         const plainDraft: SquareDraft = {
           subtype: 'square',
           contents: 'mutation conformance: cloudy tri-state',
@@ -340,6 +344,8 @@ export function runAnnotationMutationConformance(
           strokeWidth: 2,
           borderStyle: 'solid',
           opacity: 1,
+          cloudyIntensity: null,
+          rectDifferences: null,
         };
         const plain = await page.annotations.create(plainDraft);
         expect(plain.created.subtype).toBe('square');
@@ -374,20 +380,6 @@ export function runAnnotationMutationConformance(
           expect(solid.updated.rectDifferences).toBe(null);
         }
 
-        // Deprecated alias: 0 still clears /BE (until every emitter patches null).
-        await page.annotations.update(plain.created.ref, {
-          subtype: 'square',
-          cloudyIntensity: 1,
-        });
-        const zeroed = await page.annotations.update(plain.created.ref, {
-          subtype: 'square',
-          cloudyIntensity: 0,
-        });
-        expect(zeroed.updated.subtype).toBe('square');
-        if (zeroed.updated.subtype === 'square') {
-          expect(zeroed.updated.cloudyIntensity).toBe(null);
-        }
-
         // Polygon carries /BE too (but never /RD, per ISO 32000) — same tri-state,
         // including the draft path.
         const polyDraft: PolygonDraft = {
@@ -414,6 +406,69 @@ export function runAnnotationMutationConformance(
         if (polySolid.updated.subtype === 'polygon') {
           expect(polySolid.updated.cloudyIntensity).toBe(null);
         }
+      } finally {
+        await doc.close();
+      }
+    });
+
+    test('update echoes the appearance verdict: moves preserve /AP, restyles re-bake', async () => {
+      const doc = await openFixture(engine, opts);
+      try {
+        const page = doc.page(fix.pageObjectNumber);
+        const draft: SquareDraft = {
+          subtype: 'square',
+          contents: 'mutation conformance: appearance echo',
+          rect: shapeRect,
+          color: { r: 200, g: 0, b: 0 },
+          strokeWidth: 2,
+          borderStyle: 'solid',
+          opacity: 1,
+        };
+        const created = await page.annotations.create(draft);
+
+        // A full-projection patch whose only real change is a same-size /Rect
+        // move: the engine value-diffs away the unchanged style keys, verifies
+        // the rigid translation, and preserves the baked /AP — the raster
+        // invalidation signal stays off.
+        const moved = await page.annotations.update(created.created.ref, {
+          subtype: 'square',
+          rect: {
+            left: shapeRect.left + 12,
+            bottom: shapeRect.bottom - 8,
+            right: shapeRect.right + 12,
+            top: shapeRect.top - 8,
+          },
+          color: { r: 200, g: 0, b: 0 },
+          strokeWidth: 2,
+          opacity: 1,
+        });
+        expect(moved.appearance).toEqual({ action: 'preserved', changed: false });
+
+        // Metadata-only patches never touch /AP.
+        const flagged = await page.annotations.update(created.created.ref, {
+          subtype: 'square',
+          flags: { print: true },
+        });
+        expect(flagged.appearance).toEqual({ action: 'preserved', changed: false });
+
+        // A real style edit re-bakes and says so.
+        const restyled = await page.annotations.update(created.created.ref, {
+          subtype: 'square',
+          interiorColor: { r: 255, g: 214, b: 0 },
+        });
+        expect(restyled.appearance).toEqual({ action: 'regenerated', changed: true });
+
+        // A resize is not a translation — it re-bakes too.
+        const resized = await page.annotations.update(created.created.ref, {
+          subtype: 'square',
+          rect: {
+            left: shapeRect.left,
+            bottom: shapeRect.bottom,
+            right: shapeRect.right + 40,
+            top: shapeRect.top,
+          },
+        });
+        expect(resized.appearance).toEqual({ action: 'regenerated', changed: true });
       } finally {
         await doc.close();
       }

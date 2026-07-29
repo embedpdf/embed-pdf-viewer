@@ -65,7 +65,7 @@ export interface ShapePatchFields extends FilledStylePatchFields {
 export const ShapeDTOShape = {
   ...AnnotationBaseShape,
   ...FilledStyleDTOShape,
-  cloudyIntensity: z.number().nonnegative().nullable(),
+  cloudyIntensity: z.number().positive().nullable(),
   rectDifferences: PdfRectDifferencesSchema.nullable(),
   rotation: z.number().optional(),
   unrotatedRect: PdfRectSchema.optional(),
@@ -74,7 +74,7 @@ export const ShapeDTOShape = {
 export const ShapeDraftShape = {
   ...FilledStyleDraftShape,
   rect: PdfRectSchema,
-  cloudyIntensity: z.number().nonnegative().nullable().optional(),
+  cloudyIntensity: z.number().positive().nullable().optional(),
   rectDifferences: PdfRectDifferencesSchema.nullable().optional(),
   rotation: z.number().optional(),
   unrotatedRect: PdfRectSchema.optional(),
@@ -83,7 +83,7 @@ export const ShapeDraftShape = {
 export const ShapePatchShape = {
   ...FilledStylePatchShape,
   rect: PdfRectSchema.optional(),
-  cloudyIntensity: z.number().nonnegative().nullable().optional(),
+  cloudyIntensity: z.number().positive().nullable().optional(),
   rectDifferences: PdfRectDifferencesSchema.nullable().optional(),
   rotation: z.number().optional(),
   unrotatedRect: PdfRectSchema.optional(),

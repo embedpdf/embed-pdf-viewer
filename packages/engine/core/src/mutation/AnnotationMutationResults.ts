@@ -1,4 +1,5 @@
 import type { AnnotationListMutationMeta } from './AnnotationListMutationMeta';
+import type { AppearanceOutcome } from '../annotation/appearance';
 import type { AnnotationDTO } from '../annotation/kinds';
 import type { AnnotationStableId } from '../identity/AnnotationStableId';
 
@@ -38,6 +39,14 @@ export interface AnnotationUpdateResult {
    * mid-session is not stable.
    */
   updated: AnnotationDTO;
+  /**
+   * The engine's appearance verdict for this update (see
+   * {@link AppearanceOutcome}). Clients drive raster invalidation off
+   * `appearance.changed` — never off the shape of the patch they sent: the
+   * engine value-diffs and verifies, so a full-object patch that only moved
+   * the annotation still reports `preserved`.
+   */
+  appearance: AppearanceOutcome;
   meta: AnnotationListMutationMeta;
 }
 

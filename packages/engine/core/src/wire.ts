@@ -35,6 +35,7 @@ export {
   RefetchReasonSchema,
   AnnotationListMutationMetaSchema,
   AnnotationCreateResultSchema,
+  AppearanceOutcomeSchema,
   AnnotationUpdateResultSchema,
   AnnotationDeleteResultSchema,
   AnnotationMoveResultSchema,

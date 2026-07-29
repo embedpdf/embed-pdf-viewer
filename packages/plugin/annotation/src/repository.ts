@@ -667,10 +667,14 @@ const caretStyle = (style: Style) => ({
  * Cloudy-border fields for a shape (/BE intensity + /RD inset). The /Rect we send
  * is the OUTER box, and /RD tells the engine how far to inset the drawn geometry
  * so the scallops bulge back out to that box — derived, never stored on the model.
- * For a non-cloudy shape we explicitly clear both, so toggling cloudy OFF in a
- * patch removes the effect rather than leaving stale entries.
+ * The projection is TOTAL: a non-cloudy shape states both entries as `null`
+ * (the tri-state "remove"), so toggling cloudy OFF removes /BE AND /RD instead
+ * of leaving a stale inset behind (the Adobe phantom-padding bug).
  */
-function shapeExtras(a: Annot): { cloudyIntensity?: number; rectDifferences?: PdfRectDifferences } {
+function shapeExtras(a: Annot): {
+  cloudyIntensity?: number | null;
+  rectDifferences?: PdfRectDifferences | null;
+} {
   if (a.geom.t === 'rect') {
     if (a.style.border.kind === 'cloudy') {
       const inset = cloudyBorderExtent(
@@ -683,13 +687,13 @@ function shapeExtras(a: Annot): { cloudyIntensity?: number; rectDifferences?: Pd
         rectDifferences: { left: inset, top: inset, right: inset, bottom: inset },
       };
     }
-    return { cloudyIntensity: 0, rectDifferences: undefined };
+    return { cloudyIntensity: null, rectDifferences: null };
   }
   // A closed poly (polygon): the curls are generated from /Vertices + /BE alone —
   // per ISO 32000 no /RD applies — and the /Rect (geomPdfBounds with the border)
-  // already includes the outward cloud extent. 0 clears the effect on a patch.
+  // already includes the outward cloud extent. `null` clears the effect on a patch.
   if (a.geom.t === 'poly' && a.geom.closed) {
-    return { cloudyIntensity: a.style.border.kind === 'cloudy' ? a.style.border.intensity : 0 };
+    return { cloudyIntensity: a.style.border.kind === 'cloudy' ? a.style.border.intensity : null };
   }
   return {};
 }

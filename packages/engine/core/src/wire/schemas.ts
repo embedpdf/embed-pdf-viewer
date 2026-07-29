@@ -35,6 +35,7 @@ import type { FormEffectsResult, FormEffect } from '../forms/effects';
 import { FormFieldDTOSchema, FormSnapshotSchema, FormWidgetRefSchema } from '../forms/schema';
 import { FormFieldRefSchema, FormFieldValueSchema } from '../forms/schema';
 import { PdfRectSchema, PdfRotationSchema, PdfSizeSchema } from '../geometry/schemas';
+import type { AppearanceOutcome } from '../annotation/appearance';
 import type { AnnotationListMutationMeta } from '../mutation/AnnotationListMutationMeta';
 import type {
   AnnotationCreateResult,
@@ -790,8 +791,16 @@ export const AnnotationCreateResultSchema: z.ZodType<AnnotationCreateResult> = z
   meta: AnnotationListMutationMetaSchema,
 });
 
+/** The engine's `/AP` verdict riding every update result (see engine-core
+ *  `annotation/appearance.ts`). `changed` drives client raster invalidation. */
+export const AppearanceOutcomeSchema: z.ZodType<AppearanceOutcome> = z.object({
+  action: z.enum(['preserved', 'regenerated', 'generation-unavailable']),
+  changed: z.boolean(),
+});
+
 export const AnnotationUpdateResultSchema: z.ZodType<AnnotationUpdateResult> = z.object({
   updated: AnnotationDTOSchema,
+  appearance: AppearanceOutcomeSchema,
   meta: AnnotationListMutationMetaSchema,
 });
 

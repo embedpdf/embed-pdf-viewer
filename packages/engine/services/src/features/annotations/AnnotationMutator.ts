@@ -1,8 +1,10 @@
 import {
+  appearanceImpactOf,
   EngineError,
   EngineErrorCode,
   PDF_SUBTYPE_TO_CODE,
   type AnnotationActor,
+  type AppearanceOutcome,
   type BlendMode,
   type AnnotationCreateResult,
   type AnnotationDeleteResult,
@@ -51,29 +53,8 @@ import {
   applyEmbedMetadataOnUpdate,
 } from './internal/write/writeEmbedMetadata';
 
-/**
- * Does this patch touch anything the `/AP` appearance stream depends on?
- *
- * The metadata-only keys — the `/F` flags, the `/IRT`+`/RT` relationship,
- * `/EMBD_Metadata/GroupID` — change how an annotation BEHAVES, never how it
- * PAINTS, so a patch carrying only those (plus the `subtype` discriminator
- * every patch has) must not trigger a re-bake. Everything else — geometry,
- * style, contents, blend mode, subtype-specific fields — is treated as
- * appearance-affecting, conservatively: an unknown key re-bakes.
- */
-const APPEARANCE_INERT_PATCH_KEYS: ReadonlySet<string> = new Set([
-  'subtype',
-  'flags',
-  'inReplyTo',
-  'replyType',
-  'groupId',
-]);
-
-function patchAffectsAppearance(patch: WireAnnotationPatch): boolean {
-  return Object.entries(patch).some(
-    ([key, value]) => value !== undefined && !APPEARANCE_INERT_PATCH_KEYS.has(key),
-  );
-}
+/** `FPDF_ANNOT_APPEARANCEMODE_NORMAL` — the `/AP /N` stream. */
+const APPEARANCE_MODE_NORMAL = 0;
 
 /**
  * Synchronous orchestrator for `create` / `update` / `delete` annotation
@@ -284,6 +265,26 @@ export class AnnotationMutator {
       // patch (colour, geometry, contents...) cannot silently reset it.
       const previousBlendMode = blendModeFromCode(fn.EPDFAnnot_GetBlendMode(annotPtr));
 
+      // Pre-patch DTO for the appearance classifier: it value-diffs the patch
+      // against this, so no-op keys (full-projection clients) drop away and a
+      // pure move is recognized no matter how verbose the patch is.
+      const preIndex = fn.FPDFPage_GetAnnotIndex(pagePtr, annotPtr);
+      if (preIndex < 0) {
+        throw new EngineError(
+          EngineErrorCode.Unknown,
+          `FPDFPage_GetAnnotIndex returned ${preIndex} before update`,
+        );
+      }
+      const currentDto = readAnnotationFromPtr(
+        fn,
+        mem,
+        annotPtr,
+        ref.pageObjectNumber,
+        preIndex,
+        pageStateBefore.revision,
+        readContextFor(this.session),
+      );
+
       // Apply caller-supplied subtype-specific writes.
       applyPatch(fn, mem, annotPtr, patch, writeCtx);
       // Apply /IRT + /RT changes (set/relink/clear, or RT-only). Setting a
@@ -306,18 +307,39 @@ export class AnnotationMutator {
       // UserID/GroupID/CreatedBy are preserved across updates.
       writeAnnotationModified(fn, mem, annotPtr);
       applyEmbedMetadataOnUpdate(fn, mem, annotPtr, actor);
-      // Re-bake the /AP appearance stream from the patched properties so the
-      // rendered appearance stays in sync with the dictionary — but ONLY when
-      // the patch touched something the appearance depends on. A
-      // metadata-only patch (`/F` flags, `/IRT`+`/RT` relationships, group
-      // reassignment) must NOT re-bake: the stream could only come out
-      // byte-identical, and regenerating would REPLACE a foreign-authored
-      // appearance (Acrobat's rich /AP) with PDFium's cruder synthesis —
-      // visual data loss from toggling a flag. This also makes the engine
-      // honor what the client already promises ("grouping never re-bakes an
-      // appearance").
-      if (patchAffectsAppearance(patch)) {
-        this.regenerateAppearance(annotPtr, pagePtr, patch.blendMode ?? previousBlendMode);
+      // The appearance decision (engine-core `appearanceImpactOf`): an /AP is
+      // content, not cache — a foreign-authored stream (Acrobat's rich /AP, an
+      // image stamp) is destroyed only as the explicit consequence of a
+      // semantic edit, never as a side effect of writing back values nobody
+      // changed. `inert` patches (metadata-only, or all values no-ops) never
+      // touch /AP; a VERIFIED rigid translation preserves an existing /AP
+      // byte-for-byte (ISO 32000: BBox→/Rect fitting translates the pixels);
+      // everything else re-bakes. With no existing normal /AP there is
+      // nothing to preserve, so any appearance-relevant write bakes one (v2
+      // parity — otherwise the annotation renders as nothing). The verdict is
+      // echoed on the result: clients drive raster invalidation off
+      // `appearance.changed` instead of guessing from the patch they sent.
+      const impact = appearanceImpactOf(currentDto, patch);
+      let appearance: AppearanceOutcome;
+      if (
+        impact === 'inert' ||
+        (impact === 'translation' &&
+          fn.EPDFAnnot_HasAppearanceStream(annotPtr, APPEARANCE_MODE_NORMAL))
+      ) {
+        appearance = { action: 'preserved', changed: false };
+      } else {
+        const ok = this.regenerateAppearance(
+          annotPtr,
+          pagePtr,
+          patch.blendMode ?? previousBlendMode,
+        );
+        appearance = ok
+          ? { action: 'regenerated', changed: true }
+          : // No generic generator for this subtype (e.g. widgets). The
+            // dictionary still changed when the patch was appearance-relevant,
+            // so `changed` stays true in that case — form-layer renderers may
+            // paint differently even though no /AP was written.
+            { action: 'generation-unavailable', changed: impact === 'regenerate' };
       }
 
       // PDFium caches the parsed appearance form on an annotation context. A
@@ -356,7 +378,7 @@ export class AnnotationMutator {
         pageStateAfter,
         changed: linkedParentId ? [stableId, linkedParentId] : [stableId],
       });
-      return { updated: dto, meta };
+      return { updated: dto, appearance, meta };
     } finally {
       if (annotPtr !== null) fn.FPDFPage_CloseAnnot(annotPtr);
       pool.release(ref.pageObjectNumber);
@@ -701,14 +723,18 @@ export class AnnotationMutator {
    * Best-effort: `EPDFAnnot_GenerateAppearance` returns false for subtypes
    * PDFium has no generator for (e.g. widgets), in which case the
    * annotation simply ships without a baked `/AP` and viewers synthesize
-   * one — so a false return is not a hard error. This step is
+   * one — so a false return is not a hard error; it is surfaced to `update`
+   * callers as the `generation-unavailable` appearance outcome. This step is
    * non-structural: it never shifts annotation indices or bumps revisions.
    */
-  private regenerateAppearance(annotPtr: Ptr, pagePtr: Ptr, blendMode?: BlendMode): void {
+  private regenerateAppearance(annotPtr: Ptr, pagePtr: Ptr, blendMode?: BlendMode): boolean {
     const { fn } = this.runtime;
-    if (blendMode === undefined) fn.EPDFAnnot_GenerateAppearance(annotPtr);
-    else fn.EPDFAnnot_GenerateAppearanceWithBlend(annotPtr, blendModeToCode(blendMode));
+    const ok =
+      blendMode === undefined
+        ? fn.EPDFAnnot_GenerateAppearance(annotPtr)
+        : fn.EPDFAnnot_GenerateAppearanceWithBlend(annotPtr, blendModeToCode(blendMode));
     fn.FPDFPage_GenerateContent(pagePtr);
+    return ok;
   }
 
   private captureOrStampStableId(annotPtr: Ptr): AnnotationStableId {

@@ -309,6 +309,12 @@ export type {
   AnnotationDeleteResult,
   AnnotationMoveResult,
 } from './mutation/AnnotationMutationResults';
+export type {
+  AppearanceAction,
+  AppearanceImpact,
+  AppearanceOutcome,
+} from './annotation/appearance';
+export { appearanceImpactOf, semanticEqual } from './annotation/appearance';
 export type { FormFieldRef, FormWidgetRef } from './identity/FormFieldRef';
 export { encodeFieldRefKey, decodeFieldRefKey } from './identity/FormFieldRef';
 export type {

@@ -82,8 +82,9 @@ export function applyShapePatch(
     if (patch.cloudyIntensity !== null && patch.cloudyIntensity > 0) {
       setBorderEffect(fn, annotPtr, patch.cloudyIntensity);
     } else {
-      // `null` is the canonical "remove /BE"; `0` stays a deprecated alias
-      // until every emitter (plugin-annotation) patches null instead.
+      // `null` removes /BE (tri-state). The schema forbids 0, but treat any
+      // non-positive value defensively as a clear — never write a degenerate
+      // /BE the read side would normalize away.
       clearBorderEffect(fn, annotPtr);
     }
   }

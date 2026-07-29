@@ -151,7 +151,10 @@ export function readBorderDashPattern(
 
 /**
  * Read the `/BE` cloudy border intensity. Returns `null` when the
- * annotation has no cloudy border effect.
+ * annotation has no cloudy border effect. The DTO domain is positive-or-null,
+ * so a degenerate foreign `/BE /I 0` (no visible clouds) normalizes to `null`
+ * rather than leaking an out-of-schema zero; a `/BE` without `/I` reads as 1
+ * (the runtime's default).
  */
 export function readBorderEffect(
   fn: PdfFunctions,
@@ -160,7 +163,8 @@ export function readBorderEffect(
 ): number | null {
   return withScratch(mem, F32_BYTES, (buf) => {
     if (!fn.EPDFAnnot_GetBorderEffect(annotPtr, buf)) return null;
-    return readF32(mem, buf);
+    const intensity = readF32(mem, buf);
+    return intensity > 0 ? intensity : null;
   });
 }
 

@@ -1015,23 +1015,22 @@ export function createAnnotationCapability(
       // Re-sync from the authoritative DTO, PRESERVING the source the gesture
       // chose: a move kept it baked (raster rides along), a resize flipped it to
       // vector. So the round-trip can't silently re-bake an edited annotation.
-      // `apChanged` is the core's verdict that this patch invalidated a baked
-      // raster (still baked + frame resized — a stamp resize): the resolved
-      // re-bake holds NEW content, so the re-sync bumps `apVersion` — one fresh
-      // fetch, exactly when the engine is done. Never one-behind, never on a
-      // move, never for kinds that just flipped to vector.
       //
-      // WIDGET kinds are the exception to "size changes only": they have no
-      // vector render — the baked /AP is their ONLY visual, and the engine
-      // re-bakes it on every style write (/MK, /DA…), so any patch must bump
-      // or fill mode keeps blitting the stale raster.
-      const bakedOnly = a.subtype.startsWith('widget');
+      // `apVersion` is driven by the ENGINE'S echo (`res.appearance.changed`),
+      // not by guessing from the patch we sent: the engine value-diffs the
+      // patch, verifies rigid translations, and reports whether the document's
+      // appearance definition actually changed. Preserved moves (including
+      // widget/stamp drags — their /AP survives now) cost zero re-fetches;
+      // regenerated appearances re-fetch exactly once, when the engine is
+      // done — never one-behind. The core's `fx.apChanged` prediction stays
+      // advisory (a future pre-commit "this will replace an imported
+      // appearance" affordance); the echo is the authority.
       doc
         .page(a.pon)
         .annotations.update(a.ref, patch)
         .then(
           (res) => {
-            syncDTO(res.updated, a.source, fx.apChanged === true || bakedOnly);
+            syncDTO(res.updated, a.source, res.appearance.changed);
             // Attached link children follow their parent's COMMITTED geometry
             // — scheduled after the parent's own write resolves, from ONE
             // place, so no gesture ever has to know the children exist.

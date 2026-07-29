@@ -10,7 +10,7 @@ import type { PolygonPatch } from './patch';
 export const PolygonDTOSchema: z.ZodType<PolygonAnnotationDTO> = z.object({
   ...VertexDTOShape,
   vertices: z.array(PdfPointSchema).min(3),
-  cloudyIntensity: z.number().nonnegative().nullable(),
+  cloudyIntensity: z.number().positive().nullable(),
   subtype: z.literal('polygon'),
 }) as unknown as z.ZodType<PolygonAnnotationDTO>;
 
@@ -18,7 +18,7 @@ export const PolygonDraftSchema: z.ZodType<PolygonDraft> = z.object({
   ...VertexDraftShape,
   ...AnnotationDraftBaseShape,
   vertices: z.array(PdfPointSchema).min(3),
-  cloudyIntensity: z.number().nonnegative().nullable().optional(),
+  cloudyIntensity: z.number().positive().nullable().optional(),
   subtype: z.literal('polygon'),
 });
 
@@ -26,6 +26,6 @@ export const PolygonPatchSchema: z.ZodType<PolygonPatch> = z.object({
   ...VertexPatchShape,
   ...AnnotationPatchBaseShape,
   vertices: z.array(PdfPointSchema).min(3).optional(),
-  cloudyIntensity: z.number().nonnegative().nullable().optional(),
+  cloudyIntensity: z.number().positive().nullable().optional(),
   subtype: z.literal('polygon'),
 });

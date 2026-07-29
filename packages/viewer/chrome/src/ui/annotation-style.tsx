@@ -222,6 +222,10 @@ function useOutsideClose(open: boolean, close: () => void) {
   useEffect(() => {
     if (!open) return;
     const onDoc = (e: MouseEvent) => {
+      // composedPath, NOT contains(e.target): at the document level an event
+      // from inside the viewer's shadow root retargets to the host element, so
+      // contains() reads every inside click as outside and unmounts the panel
+      // on mousedown — before the option's click can fire.
       if (rootRef.current && !e.composedPath().includes(rootRef.current)) close();
     };
     document.addEventListener('mousedown', onDoc);
