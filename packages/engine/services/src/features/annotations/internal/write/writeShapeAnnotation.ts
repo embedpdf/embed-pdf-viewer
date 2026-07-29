@@ -69,13 +69,14 @@ export function applyShapePatch(
 
   if (patch.rect !== undefined) {
     setAnnotRect(fn, mem, annotPtr, patch.rect);
-    // Reconcile rotation only when geometry was (re)written, so a pure
-    // style/colour patch never disturbs an existing rotation.
-    writeBoxTransformMetadata(fn, mem, annotPtr, {
-      rotation: patch.rotation,
-      unrotatedRect: patch.unrotatedRect,
-    });
   }
+  // Transform metadata is tri-state per field (undefined preserves, null
+  // clears, value sets) — independent of whether /Rect was rewritten. A
+  // rect-only patch on a rotated box keeps its rotation.
+  writeBoxTransformMetadata(fn, mem, annotPtr, {
+    rotation: patch.rotation,
+    unrotatedRect: patch.unrotatedRect,
+  });
   applyFilledStylePatch(fn, mem, annotPtr, patch);
 
   if (patch.cloudyIntensity !== undefined) {

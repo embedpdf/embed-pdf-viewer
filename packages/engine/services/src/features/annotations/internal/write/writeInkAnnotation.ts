@@ -45,9 +45,9 @@ export function applyInkPatch(
   applyGeometryStylePatch(fn, mem, annotPtr, patch);
   if (patch.inkList !== undefined) {
     setInkList(fn, mem, annotPtr, patch.inkList);
-    // Reconcile advisory rotation only when the geometry was (re)written.
-    writeVertexTransformMetadata(fn, annotPtr, { rotation: patch.rotation });
   }
+  // Advisory rotation is tri-state (undefined preserves, null/0 clears).
+  writeVertexTransformMetadata(fn, annotPtr, { rotation: patch.rotation });
 }
 
 /**

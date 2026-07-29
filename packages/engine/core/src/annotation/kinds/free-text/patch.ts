@@ -35,6 +35,8 @@ export interface FreeTextPatch extends AnnotationPatchBase {
   calloutLine?: CalloutLine;
   lineEnding?: LineEnding;
 
-  rotation?: number;
-  unrotatedRect?: PdfRect;
+  /** Tri-state: omitted preserves, `null`/`0` flattens, a value sets (needs the box). */
+  rotation?: number | null;
+  /** Tri-state: omitted preserves, `null` removes, a value sets. */
+  unrotatedRect?: PdfRect | null;
 }

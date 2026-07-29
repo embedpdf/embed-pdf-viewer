@@ -77,11 +77,12 @@ const CONTENTS_PAINTED: ReadonlySet<string> = new Set(['free-text', 'redact']);
 const ADVISORY_ROTATION: ReadonlySet<string> = new Set(['line', 'polyline', 'polygon', 'ink']);
 
 /**
- * The box kinds couple `rect` to the `/EMBD_Metadata` transform pair: any
- * rect-bearing patch reconciles `rotation` + `unrotatedRect` (absent clears
- * them), so translation verification must check the whole group.
+ * The box kinds carry the `/EMBD_Metadata` transform pair (`rotation` +
+ * `unrotatedRect`), tri-state on writes: omitted fields are PRESERVED, `null`
+ * (or `0` for rotation) clears. Translation verification therefore compares
+ * the after-state — `patch.rotation ?? current.rotation` — not the patch keys.
  */
-const BOX_TRANSFORM: ReadonlySet<string> = new Set(['square', 'circle', 'free-text']);
+const BOX_TRANSFORM: ReadonlySet<string> = new Set(['square', 'circle', 'free-text', 'stamp']);
 
 /**
  * Per-kind absolute-geometry fields (PDF user space) that a rigid translation
@@ -103,7 +104,7 @@ const TRANSLATABLE_GEOMETRY: Record<string, readonly string[]> = {
   redact: ['rect', 'quadPoints'],
   caret: ['rect'],
   text: ['rect'],
-  stamp: ['rect'],
+  stamp: ['rect', 'unrotatedRect'],
   'file-attachment': ['rect'],
   link: ['rect'],
 };
@@ -181,8 +182,10 @@ function shiftedBy(cur: unknown, next: unknown, dx: number, dy: number): boolean
  * height preserved; every other geometry field present on the annotation must
  * ride along shifted by the same delta — a rect move that leaves `vertices`
  * behind is NOT a translation (the dictionary would desync from the pixels).
- * For box kinds the `/EMBD_Metadata` transform group is checked too, because
- * the writer reconciles it on every rect write (absent fields clear).
+ * For box kinds the `/EMBD_Metadata` transform group is checked as an
+ * after-state: writes are tri-state (omitted preserves, null/0 clears), so an
+ * omitted rotation keeps the current one — but a preserved-yet-unshifted
+ * `unrotatedRect` still fails the congruence check via the field loop.
  */
 function isRigidTranslation(
   cur: Record<string, unknown>,
@@ -199,10 +202,10 @@ function isRigidTranslation(
   if (!numEq(patRect.top - patRect.bottom, curRect.top - curRect.bottom)) return false;
 
   if (BOX_TRANSFORM.has(subtype)) {
-    // The rect write reconciles the transform pair: what the patch omits gets
-    // CLEARED. Compare the after-state, not the patch keys.
-    if (!numEq(normDeg(cur.rotation), normDeg(pat.rotation))) return false;
-    if (normDeg(pat.rotation) !== 0 && pat.unrotatedRect == null) return false;
+    // Tri-state writes: an omitted rotation PRESERVES the current one; `null`
+    // clears (≡ 0). Compare the resulting after-state.
+    const rotAfter = pat.rotation === undefined ? cur.rotation : pat.rotation;
+    if (!numEq(normDeg(cur.rotation), normDeg(rotAfter))) return false;
   }
 
   for (const key of geometryKeys) {

@@ -47,7 +47,7 @@ export interface FreeTextDraft extends AnnotationDraftBase {
   calloutLine?: CalloutLine;
   lineEnding?: LineEnding;
 
-  // rotation (box kind).
-  rotation?: number;
-  unrotatedRect?: PdfRect;
+  // rotation (box kind). Tri-state on writes: omitted preserves, null clears.
+  rotation?: number | null;
+  unrotatedRect?: PdfRect | null;
 }

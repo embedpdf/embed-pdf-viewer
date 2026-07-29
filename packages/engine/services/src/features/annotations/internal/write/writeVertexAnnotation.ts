@@ -66,9 +66,9 @@ export function applyPolygonPatch(
   applyFilledStylePatch(fn, mem, annotPtr, patch);
   if (patch.vertices !== undefined) {
     setVertices(fn, mem, annotPtr, patch.vertices);
-    // Reconcile advisory rotation only when the geometry was (re)written.
-    writeVertexTransformMetadata(fn, annotPtr, { rotation: patch.rotation });
   }
+  // Advisory rotation is tri-state (undefined preserves, null/0 clears).
+  writeVertexTransformMetadata(fn, annotPtr, { rotation: patch.rotation });
   if (patch.cloudyIntensity !== undefined) {
     if (patch.cloudyIntensity !== null && patch.cloudyIntensity > 0) {
       setBorderEffect(fn, annotPtr, patch.cloudyIntensity);
@@ -117,9 +117,9 @@ export function applyPolylinePatch(
   applyFilledStylePatch(fn, mem, annotPtr, patch);
   if (patch.vertices !== undefined) {
     setVertices(fn, mem, annotPtr, patch.vertices);
-    // Reconcile advisory rotation only when the geometry was (re)written.
-    writeVertexTransformMetadata(fn, annotPtr, { rotation: patch.rotation });
   }
+  // Advisory rotation is tri-state (undefined preserves, null/0 clears).
+  writeVertexTransformMetadata(fn, annotPtr, { rotation: patch.rotation });
   if (patch.lineEndings !== undefined) {
     setLineEndings(fn, annotPtr, patch.lineEndings);
   }

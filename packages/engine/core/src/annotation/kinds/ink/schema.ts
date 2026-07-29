@@ -31,7 +31,7 @@ export const InkDraftSchema: z.ZodType<InkDraft> = z.object({
   intent: InkIntentSchema.optional(),
   inkList: InkListSchema,
   rect: PdfRectSchema,
-  rotation: z.number().optional(),
+  rotation: z.number().nullable().optional(),
   subtype: z.literal('ink'),
 });
 
@@ -41,6 +41,6 @@ export const InkPatchSchema: z.ZodType<InkPatch> = z.object({
   intent: InkIntentSchema.optional(),
   inkList: InkListSchema.optional(),
   rect: PdfRectSchema.optional(),
-  rotation: z.number().optional(),
+  rotation: z.number().nullable().optional(),
   subtype: z.literal('ink'),
 });

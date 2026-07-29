@@ -283,12 +283,11 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
     expect(redCol / height).toBeGreaterThan(0.9);
   });
 
-  test('rotate a stamp back to 0° clears the rotation — no spring-back', async () => {
-    // Regression: the stamp writer reconciled rotation metadata ONLY when the
-    // patch carried rotation fields. A plain re-position patch (rect only, no
-    // rotation — what the viewer emits when it drops the tilt) left the stale
-    // /EMBD_Metadata in place, so the DTO read back at the OLD angle and the
-    // viewer's re-sync sprang it back.
+  test('stamp rotation is tri-state: rect-only re-position preserves, null clears', async () => {
+    // Transform metadata follows the tri-state law: a patch touches what it
+    // states and preserves what it omits. A plain re-position (rect only)
+    // KEEPS the rotation; dropping the tilt is stated explicitly with
+    // `rotation: null` (the viewer's total projection emits exactly that).
     const page = handle.page(PAGE_OBJECT_NUMBER);
     const png = makePng(4, 4, [0, 0, 255, 255]);
     const unrotated = { left: 200, bottom: 200, right: 250, top: 250 };
@@ -303,8 +302,21 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
     });
     expect((created as StampAnnotationDTO).rotation).toBe(90);
 
+    // A rect-only re-position preserves the omitted rotation…
+    const moved = await page.annotations.update(created.ref, {
+      subtype: 'stamp',
+      rect: { left: 205, bottom: 205, right: 255, top: 255 },
+    });
+    expect((moved.updated as StampAnnotationDTO).rotation).toBe(90);
+
+    // …and dropping the tilt is an explicit tri-state clear.
     const flat = { left: 210, bottom: 210, right: 270, top: 260 };
-    const updated = await page.annotations.update(created.ref, { subtype: 'stamp', rect: flat });
+    const updated = await page.annotations.update(created.ref, {
+      subtype: 'stamp',
+      rect: flat,
+      rotation: null,
+      unrotatedRect: null,
+    });
     expect((updated.updated as StampAnnotationDTO).rotation ?? 0).toBe(0);
 
     // Re-read from the annot dict (not just the patch echo) to prove it persists.

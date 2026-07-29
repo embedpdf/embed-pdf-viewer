@@ -62,8 +62,8 @@ export const FreeTextDraftSchema: z.ZodType<FreeTextDraft> = z.object({
   rectDifferences: PdfRectDifferencesSchema.nullable().optional(),
   calloutLine: CalloutLineSchema.optional(),
   lineEnding: LineEndingSchema.optional(),
-  rotation: z.number().optional(),
-  unrotatedRect: PdfRectSchema.optional(),
+  rotation: z.number().nullable().optional(),
+  unrotatedRect: PdfRectSchema.nullable().optional(),
   subtype: z.literal('free-text'),
 });
 
@@ -84,7 +84,7 @@ export const FreeTextPatchSchema: z.ZodType<FreeTextPatch> = z.object({
   rectDifferences: PdfRectDifferencesSchema.nullable().optional(),
   calloutLine: CalloutLineSchema.optional(),
   lineEnding: LineEndingSchema.optional(),
-  rotation: z.number().optional(),
-  unrotatedRect: PdfRectSchema.optional(),
+  rotation: z.number().nullable().optional(),
+  unrotatedRect: PdfRectSchema.nullable().optional(),
   subtype: z.literal('free-text'),
 });

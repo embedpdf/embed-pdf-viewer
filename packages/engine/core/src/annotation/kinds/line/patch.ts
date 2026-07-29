@@ -8,5 +8,5 @@ export interface LinePatch extends AnnotationPatchBase, FilledStylePatchFields {
   linePoints?: LinePoints;
   rect?: PdfRect;
   lineEndings?: LineEndings;
-  rotation?: number;
+  rotation?: number | null;
 }

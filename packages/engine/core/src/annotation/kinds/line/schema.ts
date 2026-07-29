@@ -27,7 +27,7 @@ export const LineDraftSchema: z.ZodType<LineDraft> = z.object({
   linePoints: LinePointsSchema,
   rect: PdfRectSchema,
   lineEndings: LineEndingsSchema.optional(),
-  rotation: z.number().optional(),
+  rotation: z.number().nullable().optional(),
   subtype: z.literal('line'),
 });
 
@@ -37,6 +37,6 @@ export const LinePatchSchema: z.ZodType<LinePatch> = z.object({
   linePoints: LinePointsSchema.optional(),
   rect: PdfRectSchema.optional(),
   lineEndings: LineEndingsSchema.optional(),
-  rotation: z.number().optional(),
+  rotation: z.number().nullable().optional(),
   subtype: z.literal('line'),
 });

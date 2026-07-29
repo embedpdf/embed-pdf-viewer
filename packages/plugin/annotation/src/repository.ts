@@ -126,8 +126,11 @@ export function boxGeomFields(
   rect: Rect,
   rot: number,
   crop: PdfRect,
-): { rect: PdfRect; unrotatedRect?: PdfRect; rotation?: number } {
-  if (!rot) return { rect: contentToPdfRect(rect, crop) };
+): { rect: PdfRect; unrotatedRect: PdfRect | null; rotation: number | null } {
+  // TOTAL projection: rotation 0 states the clears explicitly (`null`) — the
+  // engine's transform writes are tri-state, so an OMITTED field would
+  // preserve a stale rotation instead of flattening it.
+  if (!rot) return { rect: contentToPdfRect(rect, crop), rotation: null, unrotatedRect: null };
   return {
     rect: contentToPdfRect(rotatedAabb(rect, rot), crop),
     unrotatedRect: contentToPdfRect(rect, crop),
@@ -138,9 +141,11 @@ export function boxGeomFields(
 /** Advisory rotation for a VERTEX kind (line/poly/ink): the points are already
  *  rotated, so this scalar is inert for AP — it just records the applied angle so
  *  EmbedPDF can show an oriented box + offer reset. Absent when not rotated. */
-const advisoryRotation = (g: Geom): { rotation?: number } => {
+const advisoryRotation = (g: Geom): { rotation: number | null } => {
+  // Total: rotation 0 states `null` (tri-state clear) — omission would
+  // preserve a stale advisory angle now that the engine writes are tri-state.
   const rot = geomRotation(g);
-  return rot ? { rotation: toPdfRotation(rot) } : {};
+  return { rotation: rot ? toPdfRotation(rot) : null };
 };
 
 /**
@@ -732,8 +737,8 @@ function calloutFields(
   rectDifferences: PdfRectDifferences;
   calloutLine: CalloutLine;
   lineEnding: LineEnding;
-  rotation?: number;
-  unrotatedRect?: PdfRect;
+  rotation?: number | null;
+  unrotatedRect?: PdfRect | null;
 } | null {
   const g = a.geom;
   if (g.t !== 'text' || !g.callout) return null;
@@ -755,7 +760,9 @@ function calloutFields(
     },
     calloutLine,
     lineEnding: g.callout.ending,
-    ...(rot ? { rotation: toPdfRotation(rot), unrotatedRect: contentToPdfRect(g.rect, crop) } : {}),
+    ...(rot
+      ? { rotation: toPdfRotation(rot), unrotatedRect: contentToPdfRect(g.rect, crop) }
+      : { rotation: null, unrotatedRect: null }),
   };
 }
 

@@ -339,14 +339,16 @@ describe('repository — rotation round-trip', () => {
     expect(patch.rect.right).toBeCloseTo(200);
   });
 
-  it('box: an unrotated DTO carries no rotation metadata back out', () => {
+  it('box: an unrotated DTO states the transform clears explicitly (total projection)', () => {
     const patch = toPatch(fromDTO(squareDTO(32), CROP), CROP) as Extract<
       AnnotationPatch,
       { subtype: 'square' }
-    > & { rotation?: number; unrotatedRect?: PdfRect };
+    > & { rotation?: number | null; unrotatedRect?: PdfRect | null };
     if (!patch) throw new Error('expected a patch');
-    expect(patch.rotation).toBeUndefined();
-    expect(patch.unrotatedRect).toBeUndefined();
+    // Tri-state writes preserve omitted fields, so rotation 0 must be STATED
+    // as null — omission would keep a stale rotation on the document.
+    expect(patch.rotation).toBe(null);
+    expect(patch.unrotatedRect).toBe(null);
   });
 
   it('vertex: advisory rotation round-trips and the points stay authoritative', () => {
@@ -366,13 +368,13 @@ describe('repository — rotation round-trip', () => {
     expect(patch.vertices?.[0]).toMatchObject({ x: 120, y: 120 });
   });
 
-  it('vertex: an unrotated polyline carries no rotation back out', () => {
+  it('vertex: an unrotated polyline states the advisory clear explicitly', () => {
     const a = fromDTO(rotatedPolylineDTO(0, 33), CROP);
     expect(a.geom.t === 'poly' && a.geom.rot).toBeFalsy();
     const patch = toPatch(a, CROP) as Extract<AnnotationPatch, { subtype: 'polyline' }> & {
-      rotation?: number;
+      rotation?: number | null;
     };
-    expect(patch?.rotation).toBeUndefined();
+    expect(patch?.rotation).toBe(null);
   });
 });
 

@@ -45,9 +45,9 @@ export function applyLinePatch(
   applyFilledStylePatch(fn, mem, annotPtr, patch);
   if (patch.linePoints !== undefined) {
     setLine(fn, mem, annotPtr, patch.linePoints);
-    // Reconcile advisory rotation only when the geometry was (re)written.
-    writeVertexTransformMetadata(fn, annotPtr, { rotation: patch.rotation });
   }
+  // Advisory rotation is tri-state (undefined preserves, null/0 clears).
+  writeVertexTransformMetadata(fn, annotPtr, { rotation: patch.rotation });
   if (patch.lineEndings !== undefined) {
     setLineEndings(fn, annotPtr, patch.lineEndings);
   }

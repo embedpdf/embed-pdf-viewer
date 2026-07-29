@@ -1,7 +1,8 @@
-import type { PdfRect } from '@embedpdf/engine-core/runtime';
+import { EngineError, EngineErrorCode, type PdfRect } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
 import { RECTF_BYTES } from '../../../../runtime/memory/structs';
+import { readAnnotationUnrotatedRect } from '../read/readAnnotationTransformMetadata';
 import { EMBD_METADATA_SCHEMA_VERSION } from './writeEmbedMetadata';
 
 /**
@@ -24,11 +25,16 @@ import { EMBD_METADATA_SCHEMA_VERSION } from './writeEmbedMetadata';
  *     `/UnrotatedRect`) — it just records the applied angle so EmbedPDF can
  *     reconstruct an oriented selection box + offer reset.
  *
- * Reconciliation rules (so reset-to-0 and un-rotate round-trip cleanly):
- *   - a value present (rotation != 0 / a rect) → SET the key.
- *   - a value absent/zero                      → CLEAR just that key via
- *     `EPDFAnnot_ClearEmbedMetadataKey` (never the whole dict — identity
- *     fields UserID/GroupID/CreatedBy/UpdatedBy must survive).
+ * Both fields follow the engine-wide tri-state law ("a patch touches what it
+ * states, preserves what it omits"):
+ *   - `undefined` → the key is UNTOUCHED (a rect-only move keeps its rotation).
+ *   - `null` or `0` → CLEAR just that key via `EPDFAnnot_ClearEmbedMetadataKey`
+ *     (0 ≡ no rotation is the canonical identity, not a sentinel; never clear
+ *     the whole dict — identity fields UserID/GroupID/CreatedBy/UpdatedBy must
+ *     survive).
+ *   - a value → SET the key. Setting a nonzero rotation with no
+ *     `/UnrotatedRect` (neither in the patch nor already on the annotation)
+ *     is an unsatisfiable state for the AP generator and throws `InvalidArg`.
  *
  * MUST run BEFORE `EPDFAnnot_GenerateAppearance` so the bake sees the rotation.
  * `/SchemaVersion` is seeded (stays 1) if this is the first key in the dict.
@@ -37,12 +43,13 @@ import { EMBD_METADATA_SCHEMA_VERSION } from './writeEmbedMetadata';
 const KEY_ROTATION = 'Rotation';
 const KEY_UNROTATED_RECT = 'UnrotatedRect';
 
-/** Transform fields a rotatable draft/patch can carry (off the engine DTO). */
+/** Transform fields a rotatable draft/patch can carry (off the engine DTO).
+ *  Tri-state: `undefined` preserves, `null` clears, a value sets. */
 export interface AnnotationTransform {
-  /** `/EMBD_Metadata/Rotation` — degrees, PDF convention. 0/absent = none. */
-  rotation?: number;
+  /** `/EMBD_Metadata/Rotation` — degrees, PDF convention. 0 ≡ none. */
+  rotation?: number | null;
   /** `/EMBD_Metadata/UnrotatedRect` — the logical box (BOX kinds only). */
-  unrotatedRect?: PdfRect;
+  unrotatedRect?: PdfRect | null;
 }
 
 /** Seed `/SchemaVersion` when we are about to create the dict by writing the
@@ -79,9 +86,11 @@ function setUnrotatedRect(
 }
 
 /**
- * Reconcile transform metadata for a BOX kind (square/circle/free-text). Call
- * only when the geometry was (re)written, so a pure style/colour patch never
- * disturbs an existing rotation.
+ * Write transform metadata for a BOX kind (square/circle/free-text/stamp),
+ * tri-state per field: `undefined` never touches the document (safe to call on
+ * every patch), `null`/`0` clears, a value sets. A nonzero rotation with no
+ * unrotated box anywhere (patch or annotation) is unsatisfiable — the AP
+ * generator needs the pair — and throws instead of writing a broken state.
  */
 export function writeBoxTransformMetadata(
   fn: PdfFunctions,
@@ -89,25 +98,42 @@ export function writeBoxTransformMetadata(
   annotPtr: Ptr,
   t: AnnotationTransform,
 ): void {
-  if (t.rotation) setRotation(fn, annotPtr, t.rotation);
-  else fn.EPDFAnnot_ClearEmbedMetadataKey(annotPtr, KEY_ROTATION);
-
-  if (t.rotation && t.unrotatedRect) setUnrotatedRect(fn, mem, annotPtr, t.unrotatedRect);
-  else fn.EPDFAnnot_ClearEmbedMetadataKey(annotPtr, KEY_UNROTATED_RECT);
+  if (t.rotation !== undefined) {
+    if (t.rotation !== null && t.rotation !== 0) {
+      const hasBox =
+        t.unrotatedRect != null ||
+        (t.unrotatedRect === undefined && readAnnotationUnrotatedRect(fn, mem, annotPtr) != null);
+      if (!hasBox) {
+        throw new EngineError(
+          EngineErrorCode.InvalidArg,
+          'rotation requires unrotatedRect: supply the pair together (or rely on an existing /EMBD_Metadata/UnrotatedRect)',
+        );
+      }
+      setRotation(fn, annotPtr, t.rotation);
+    } else {
+      fn.EPDFAnnot_ClearEmbedMetadataKey(annotPtr, KEY_ROTATION);
+    }
+  }
+  if (t.unrotatedRect !== undefined) {
+    if (t.unrotatedRect !== null) setUnrotatedRect(fn, mem, annotPtr, t.unrotatedRect);
+    else fn.EPDFAnnot_ClearEmbedMetadataKey(annotPtr, KEY_UNROTATED_RECT);
+  }
 }
 
 /**
- * Reconcile transform metadata for a VERTEX kind (line/polyline/polygon/ink).
- * Only the advisory `/Rotation` scalar is meaningful; any stale
- * `/UnrotatedRect` is cleared so the scalar can never accidentally drive the AP
- * generator. Call only when the geometry was (re)written.
+ * Write the advisory `/Rotation` scalar for a VERTEX kind
+ * (line/polyline/polygon/ink), tri-state: `undefined` never touches the
+ * document, `null`/`0` clears, a value sets. Whenever it does write, any
+ * `/UnrotatedRect` is defensively cleared — that key is an impossible state on
+ * a vertex kind and must never accidentally drive the AP generator.
  */
 export function writeVertexTransformMetadata(
   fn: PdfFunctions,
   annotPtr: Ptr,
   t: AnnotationTransform,
 ): void {
-  if (t.rotation) setRotation(fn, annotPtr, t.rotation);
+  if (t.rotation === undefined) return;
+  if (t.rotation !== null && t.rotation !== 0) setRotation(fn, annotPtr, t.rotation);
   else fn.EPDFAnnot_ClearEmbedMetadataKey(annotPtr, KEY_ROTATION);
   fn.EPDFAnnot_ClearEmbedMetadataKey(annotPtr, KEY_UNROTATED_RECT);
 }

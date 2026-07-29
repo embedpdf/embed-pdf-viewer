@@ -13,8 +13,8 @@ export interface StampPatch extends AnnotationPatchBase {
   source?: BinarySource;
   name?: string;
   fit?: StampFit;
-  rotation?: number;
-  unrotatedRect?: PdfRect;
+  rotation?: number | null;
+  unrotatedRect?: PdfRect | null;
 }
 
 /** Wire form of {@link StampPatch} — see {@link StampWireDraft} for the rules. */
@@ -24,6 +24,6 @@ export interface StampWirePatch extends AnnotationPatchBase {
   source?: ResourceRef;
   name?: string;
   fit?: StampFit;
-  rotation?: number;
-  unrotatedRect?: PdfRect;
+  rotation?: number | null;
+  unrotatedRect?: PdfRect | null;
 }

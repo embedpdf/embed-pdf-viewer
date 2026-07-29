@@ -39,7 +39,7 @@ export const isIconPlaceKind = (subtype: Subtype): subtype is IconPlaceKind =>
  */
 export function iconPlacementDraft(
   subtype: IconPlaceKind,
-  geom: { rect: PdfRect; rotation?: number; unrotatedRect?: PdfRect },
+  geom: { rect: PdfRect; rotation?: number | null; unrotatedRect?: PdfRect | null },
   defaults: AnnotationProps,
   flags: Partial<AnnotationFlags> | undefined,
   file: AttachmentFileSource | null,

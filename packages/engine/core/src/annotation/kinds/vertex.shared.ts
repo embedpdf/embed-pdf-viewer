@@ -47,13 +47,14 @@ export interface VertexDraftFields extends FilledStyleDraftFields {
   /** `/Rect` bounding box — required (computed by the caller/plugin). */
   rect: PdfRect;
   /** Advisory rotation (deg). See {@link VertexAnnotationFields.rotation}. */
-  rotation?: number;
+  rotation?: number | null;
 }
 
 export interface VertexPatchFields extends FilledStylePatchFields {
   vertices?: PdfPoint[];
   rect?: PdfRect;
-  rotation?: number;
+  /** Tri-state: omitted preserves, `null`/`0` clears the advisory scalar. */
+  rotation?: number | null;
 }
 
 export const VertexDTOShape = {
@@ -67,14 +68,14 @@ export const VertexDraftShape = {
   ...FilledStyleDraftShape,
   vertices: z.array(PdfPointSchema),
   rect: PdfRectSchema,
-  rotation: z.number().optional(),
+  rotation: z.number().nullable().optional(),
 } as const;
 
 export const VertexPatchShape = {
   ...FilledStylePatchShape,
   vertices: z.array(PdfPointSchema).optional(),
   rect: PdfRectSchema.optional(),
-  rotation: z.number().optional(),
+  rotation: z.number().nullable().optional(),
 } as const;
 
 /** Glue type used by each vertex kind file to construct its concrete DTO. */

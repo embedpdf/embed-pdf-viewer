@@ -72,7 +72,13 @@ export function applyStampDraft(
     annotPtr,
     draft.source,
     draft.fit ?? 'contain',
-    { rect: draft.rect, unrotatedRect: draft.unrotatedRect, rotation: draft.rotation },
+    {
+      rect: draft.rect,
+      // The appearance author wants values-or-absent; a tri-state `null`
+      // (no rotation) authors the same as an omitted field.
+      unrotatedRect: draft.unrotatedRect ?? undefined,
+      rotation: draft.rotation ?? undefined,
+    },
     ctx,
   );
 }
@@ -99,7 +105,11 @@ export function applyStampPatch(
       annotPtr,
       patch.source,
       patch.fit ?? 'contain',
-      { rect, unrotatedRect: patch.unrotatedRect, rotation: patch.rotation },
+      {
+        rect,
+        unrotatedRect: patch.unrotatedRect ?? undefined,
+        rotation: patch.rotation ?? undefined,
+      },
       ctx,
     );
     return;
@@ -108,21 +118,14 @@ export function applyStampPatch(
   if (patch.rect !== undefined) {
     setAnnotRect(fn, mem, annotPtr, patch.rect);
   }
-  // Reconcile rotation whenever the geometry OR the rotation fields changed —
-  // matching the shape/free-text writers. This is what makes rotate-back-to-0
-  // CLEAR the stale /EMBD_Metadata: a plain re-position patch (rect only, no
-  // rotation) would otherwise leave `/Rotation` + `/UnrotatedRect` in place, so
-  // the appearance would spring back to the old angle on the next read.
-  if (
-    patch.rect !== undefined ||
-    patch.rotation !== undefined ||
-    patch.unrotatedRect !== undefined
-  ) {
-    writeBoxTransformMetadata(fn, mem, annotPtr, {
-      rotation: patch.rotation,
-      unrotatedRect: patch.unrotatedRect,
-    });
-  }
+  // Transform metadata is tri-state per field (undefined preserves, null/0
+  // clears, value sets) — a rect-only re-position keeps the rotation, and
+  // rotate-back-to-0 is stated explicitly (`rotation: null`/`0`) by the
+  // emitter rather than implied by omission.
+  writeBoxTransformMetadata(fn, mem, annotPtr, {
+    rotation: patch.rotation,
+    unrotatedRect: patch.unrotatedRect,
+  });
   if (
     patch.rect !== undefined ||
     patch.fit !== undefined ||

@@ -48,8 +48,8 @@ export interface ShapeDraftFields extends FilledStyleDraftFields {
   rect: PdfRect;
   cloudyIntensity?: number | null;
   rectDifferences?: PdfRectDifferences | null;
-  rotation?: number;
-  unrotatedRect?: PdfRect;
+  rotation?: number | null;
+  unrotatedRect?: PdfRect | null;
 }
 
 export interface ShapePatchFields extends FilledStylePatchFields {
@@ -58,8 +58,10 @@ export interface ShapePatchFields extends FilledStylePatchFields {
   cloudyIntensity?: number | null;
   /** Tri-state: omitted preserves, a value sets, `null` removes `/RD`. */
   rectDifferences?: PdfRectDifferences | null;
-  rotation?: number;
-  unrotatedRect?: PdfRect;
+  /** Tri-state: omitted preserves, `null`/`0` flattens, a value sets (needs the box). */
+  rotation?: number | null;
+  /** Tri-state: omitted preserves, `null` removes, a value sets. */
+  unrotatedRect?: PdfRect | null;
 }
 
 export const ShapeDTOShape = {
@@ -76,8 +78,8 @@ export const ShapeDraftShape = {
   rect: PdfRectSchema,
   cloudyIntensity: z.number().positive().nullable().optional(),
   rectDifferences: PdfRectDifferencesSchema.nullable().optional(),
-  rotation: z.number().optional(),
-  unrotatedRect: PdfRectSchema.optional(),
+  rotation: z.number().nullable().optional(),
+  unrotatedRect: PdfRectSchema.nullable().optional(),
 } as const;
 
 export const ShapePatchShape = {
@@ -85,8 +87,8 @@ export const ShapePatchShape = {
   rect: PdfRectSchema.optional(),
   cloudyIntensity: z.number().positive().nullable().optional(),
   rectDifferences: PdfRectDifferencesSchema.nullable().optional(),
-  rotation: z.number().optional(),
-  unrotatedRect: PdfRectSchema.optional(),
+  rotation: z.number().nullable().optional(),
+  unrotatedRect: PdfRectSchema.nullable().optional(),
 } as const;
 
 /** Glue type used by each shape kind file to construct its concrete DTO. */

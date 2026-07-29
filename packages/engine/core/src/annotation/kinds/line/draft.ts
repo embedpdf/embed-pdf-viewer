@@ -11,5 +11,5 @@ export interface LineDraft extends AnnotationDraftBase, FilledStyleDraftFields {
   rect: PdfRect;
   lineEndings?: LineEndings;
   /** Advisory rotation (deg). */
-  rotation?: number;
+  rotation?: number | null;
 }

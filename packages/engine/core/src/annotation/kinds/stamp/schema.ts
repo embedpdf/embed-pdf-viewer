@@ -37,8 +37,8 @@ export const StampWireDraftSchema: z.ZodType<StampWireDraft> = z.object({
   source: ResourceRefSchema,
   name: z.string().optional(),
   fit: StampFitSchema.optional(),
-  rotation: z.number().optional(),
-  unrotatedRect: PdfRectSchema.optional(),
+  rotation: z.number().nullable().optional(),
+  unrotatedRect: PdfRectSchema.nullable().optional(),
   subtype: z.literal('stamp'),
 });
 
@@ -48,7 +48,7 @@ export const StampWirePatchSchema: z.ZodType<StampWirePatch> = z.object({
   source: ResourceRefSchema.optional(),
   name: z.string().optional(),
   fit: StampFitSchema.optional(),
-  rotation: z.number().optional(),
-  unrotatedRect: PdfRectSchema.optional(),
+  rotation: z.number().nullable().optional(),
+  unrotatedRect: PdfRectSchema.nullable().optional(),
   subtype: z.literal('stamp'),
 });

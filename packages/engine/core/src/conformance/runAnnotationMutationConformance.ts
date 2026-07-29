@@ -474,6 +474,119 @@ export function runAnnotationMutationConformance(
       }
     });
 
+    test('a partial /DA patch preserves the unpatched font members', async () => {
+      const doc = await openFixture(engine, opts);
+      try {
+        const page = doc.page(fix.pageObjectNumber);
+        const draft: FreeTextDraft = {
+          subtype: 'free-text',
+          intent: 'free-text',
+          contents: 'DA read-modify-write',
+          rect: shapeRect,
+          fontFamily: 'times-roman',
+          fontSize: 14,
+          textAlign: 'left',
+          color: { r: 200, g: 0, b: 0 },
+        };
+        const created = await page.annotations.create(draft);
+        // `/DA` packs font+size+colour into one string; the writer must
+        // read-modify-write, so a partial patch cannot reset the others (the
+        // old constant fallbacks turned a size-only patch into 12pt black).
+        expect(created.created.subtype).toBe('free-text');
+        if (created.created.subtype === 'free-text') {
+          expect(created.created.fontFamily).toBe('times-roman');
+        }
+        const sized = await page.annotations.update(created.created.ref, {
+          subtype: 'free-text',
+          fontSize: 18,
+        });
+        expect(sized.updated.subtype).toBe('free-text');
+        if (sized.updated.subtype === 'free-text') {
+          expect(sized.updated.fontFamily).toBe('times-roman');
+          expect(sized.updated.fontSize).toBe(18);
+          expect(sized.updated.color).toMatchObject({ r: 200, g: 0, b: 0 });
+        }
+        const recolored = await page.annotations.update(created.created.ref, {
+          subtype: 'free-text',
+          color: { r: 0, g: 0, b: 200 },
+        });
+        if (recolored.updated.subtype === 'free-text') {
+          expect(recolored.updated.fontFamily).toBe('times-roman');
+          expect(recolored.updated.fontSize).toBe(18);
+          expect(recolored.updated.color).toMatchObject({ r: 0, g: 0, b: 200 });
+        }
+      } finally {
+        await doc.close();
+      }
+    });
+
+    test('box transform is tri-state: rect-only moves keep rotation, null flattens', async () => {
+      const doc = await openFixture(engine, opts);
+      try {
+        const page = doc.page(fix.pageObjectNumber);
+        const draft: SquareDraft = {
+          subtype: 'square',
+          contents: 'transform tri-state',
+          rect: shapeRect,
+          color: { r: 0, g: 0, b: 255 },
+          strokeWidth: 2,
+          borderStyle: 'solid',
+          opacity: 1,
+          // A 90° rotation whose AABB equals the box (square) — valid pair.
+          rotation: 90,
+          unrotatedRect: shapeRect,
+        };
+        const created = await page.annotations.create(draft);
+        expect(created.created.subtype).toBe('square');
+        if (created.created.subtype === 'square') {
+          expect(created.created.rotation).toBe(90);
+        }
+
+        // The whole group riding one delta is a verified translation: the
+        // rotation survives AND the baked /AP is preserved.
+        const d = { x: 15, y: -10 };
+        const shift = (r: typeof shapeRect) => ({
+          left: r.left + d.x,
+          bottom: r.bottom + d.y,
+          right: r.right + d.x,
+          top: r.top + d.y,
+        });
+        const trioMoved = await page.annotations.update(created.created.ref, {
+          subtype: 'square',
+          rect: shift(shapeRect),
+          rotation: 90,
+          unrotatedRect: shift(shapeRect),
+        });
+        expect(trioMoved.appearance).toEqual({ action: 'preserved', changed: false });
+        if (trioMoved.updated.subtype === 'square') {
+          expect(trioMoved.updated.rotation).toBe(90);
+        }
+
+        // A rect-only move PRESERVES the omitted rotation (tri-state law: a
+        // patch touches what it states) — the old writer cleared it.
+        const rectOnly = await page.annotations.update(created.created.ref, {
+          subtype: 'square',
+          rect: shapeRect,
+        });
+        if (rectOnly.updated.subtype === 'square') {
+          expect(rectOnly.updated.rotation).toBe(90);
+        }
+
+        // Explicit null flattens — the ONLY way to remove the rotation.
+        const flattened = await page.annotations.update(created.created.ref, {
+          subtype: 'square',
+          rotation: null,
+          unrotatedRect: null,
+        });
+        if (flattened.updated.subtype === 'square') {
+          expect(flattened.updated.rotation).toBe(undefined);
+          expect(flattened.updated.unrotatedRect).toBe(undefined);
+        }
+      } finally {
+        await doc.close();
+      }
+    });
+
     test('create vertex + line annotations (polygon/polyline/line) round-trip geometry', async () => {
       const doc = await openFixture(engine, opts);
       try {

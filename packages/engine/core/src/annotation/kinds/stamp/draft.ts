@@ -28,9 +28,9 @@ export interface StampDraft extends AnnotationDraftBase {
   /** Scaling of the content into `rect`. Default `'contain'` (preserves aspect). */
   fit?: StampFit;
   /** Rotation (deg). Drives the `/AP` matrix via `/EMBD_Metadata`. */
-  rotation?: number;
+  rotation?: number | null;
   /** Pre-rotation `/Rect` — supply together with `rotation` (FreeText pattern). */
-  unrotatedRect?: PdfRect;
+  unrotatedRect?: PdfRect | null;
 }
 
 /**
@@ -44,6 +44,6 @@ export interface StampWireDraft extends AnnotationDraftBase {
   source: ResourceRef;
   name?: string;
   fit?: StampFit;
-  rotation?: number;
-  unrotatedRect?: PdfRect;
+  rotation?: number | null;
+  unrotatedRect?: PdfRect | null;
 }

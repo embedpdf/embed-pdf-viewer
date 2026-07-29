@@ -8,5 +8,5 @@ export interface InkPatch extends AnnotationPatchBase, GeometryStylePatchFields 
   intent?: InkIntent;
   inkList?: InkList;
   rect?: PdfRect;
-  rotation?: number;
+  rotation?: number | null;
 }

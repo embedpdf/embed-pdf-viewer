@@ -3,6 +3,8 @@ import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runti
 
 import { FPDFANNOT_COLORTYPE } from '../colorType';
 import { freeTextIntentToName } from '../freeTextIntent';
+import { readDefaultAppearance } from '../read/annotationReadPrimitives';
+import { DEFAULT_STANDARD_FONT, standardFontFromCode } from '../standardFont';
 import { textAlignmentToCode } from '../textAlignment';
 import type { AnnotationWriteContext } from './annotationWriteContext';
 import {
@@ -99,11 +101,14 @@ export function applyFreeTextDraft(
 
 /**
  * Apply a free-text patch to an existing annotation. Only present fields are
- * touched. Because `/DA` packs the font, size, and `color` into one string,
- * any of those three being patched re-reads the others isn't supported by
- * the binding, so we require the caller to send the full `/DA` triple
- * (`fontFamily` + `fontSize` + `color`) together when changing any of them;
- * partial `/DA` patches fall back to the values already on the patch.
+ * touched. `/DA` packs the font, size, and `color` into ONE string, so a
+ * partial patch preserves the unpatched members by READING the current triple
+ * first (the same read-modify-write as {@link applyBorderPatch}'s shared
+ * `/BS` call) — a `{fontSize}` patch must never reset the font or colour.
+ * Registered (embedded) fonts are the one caveat: the current `/DA` reads
+ * back as a font CODE, so preserving a registered family requires the patch
+ * to restate `fontFamily` (an unknown code falls back to the standard-font
+ * default).
  *
  * `fontColor` here only sets an override; clearing it back to "follow
  * `color`" is out of scope this iteration.
@@ -119,11 +124,14 @@ export function applyFreeTextPatch(
 
   if (patch.rect !== undefined) {
     setAnnotRect(fn, mem, annotPtr, patch.rect);
-    writeBoxTransformMetadata(fn, mem, annotPtr, {
-      rotation: patch.rotation,
-      unrotatedRect: patch.unrotatedRect,
-    });
   }
+  // Transform metadata is tri-state per field (undefined preserves, null
+  // clears, value sets) — independent of whether /Rect was rewritten. A
+  // rect-only patch on a rotated box keeps its rotation.
+  writeBoxTransformMetadata(fn, mem, annotPtr, {
+    rotation: patch.rotation,
+    unrotatedRect: patch.unrotatedRect,
+  });
 
   if (patch.interiorColor !== undefined) {
     if (patch.interiorColor === null) {
@@ -139,12 +147,13 @@ export function applyFreeTextPatch(
   applyBorderPatch(fn, mem, annotPtr, patch);
 
   if (patch.fontFamily !== undefined || patch.fontSize !== undefined || patch.color !== undefined) {
+    const cur = readDefaultAppearance(fn, mem, annotPtr);
     applyDefaultAppearance(
       fn,
       annotPtr,
-      patch.fontFamily ?? 'helvetica',
-      patch.fontSize ?? 12,
-      patch.color ?? DEFAULT_FREETEXT_COLOR,
+      patch.fontFamily ?? (cur ? standardFontFromCode(cur.fontCode) : DEFAULT_STANDARD_FONT),
+      patch.fontSize ?? (cur && cur.fontSize > 0 ? cur.fontSize : 12),
+      patch.color ?? cur?.color ?? DEFAULT_FREETEXT_COLOR,
       ctx,
     );
   }

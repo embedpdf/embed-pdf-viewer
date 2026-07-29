@@ -244,8 +244,9 @@ describe('appearanceImpactOf — verified rigid translation', () => {
 
   it('rotated box: translation must carry the transform group unchanged + shifted', () => {
     const rotated = squareDto({ rotation: 90, unrotatedRect: rect(100, 100, 200, 200) });
-    // rect moved but rotation omitted -> the writer would CLEAR the rotation
-    // metadata; that is an appearance change even though no key "changed".
+    // rect moved with rotation omitted: the tri-state writer PRESERVES the
+    // rotation, but the (also preserved) unrotatedRect did not ride the delta
+    // — an unproven translation, so the safe path re-bakes.
     expect(
       appearanceImpactOf(rotated, patch({ subtype: 'square', rect: rect(110, 100, 210, 200) })),
     ).toBe('regenerate');
@@ -294,6 +295,29 @@ describe('appearanceImpactOf — verified rigid translation', () => {
         patch({ subtype: 'square', cloudyIntensity: null, rectDifferences: null }),
       ),
     ).toBe('regenerate');
+  });
+
+  it('the plugin total trio (rotation: null on an unrotated shape) diffs away on a move', () => {
+    // Unrotated shapes emit { rotation: null, unrotatedRect: null } — null on
+    // an absent entry is a no-op, so a pure move still verifies as a
+    // translation and preserves /AP.
+    const p = fullSquarePatch({
+      rect: rect(130, 80, 230, 180),
+      rotation: null,
+      unrotatedRect: null,
+    });
+    expect(appearanceImpactOf(squareDto(), p)).toBe('translation');
+  });
+
+  it('clearing a REAL rotation during a move regenerates', () => {
+    const rotated = squareDto({ rotation: 90, unrotatedRect: rect(100, 100, 200, 200) });
+    const p = patch({
+      subtype: 'square',
+      rect: rect(110, 100, 210, 200),
+      rotation: null,
+      unrotatedRect: null,
+    });
+    expect(appearanceImpactOf(rotated, p)).toBe('regenerate');
   });
 
   it('an epsilon-scale move is inert, a sub-visible-but-real move is a translation', () => {

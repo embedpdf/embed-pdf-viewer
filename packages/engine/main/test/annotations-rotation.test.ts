@@ -112,11 +112,13 @@ describe('annotation rotation (local engine) — save + reopen', () => {
         borderStyle: 'solid',
         opacity: 1,
       });
-      // Reset: send the box back with no rotation. The writer must CLEAR the
-      // EMBD keys, not leave them stale.
+      // Reset: state the clear explicitly (tri-state — omission would
+      // PRESERVE the rotation; `null` removes the EMBD keys).
       await doc.page(PAGE).annotations.update(created.created.ref, {
         subtype: 'square',
         rect: SQUARE_RECT,
+        rotation: null,
+        unrotatedRect: null,
       });
       bytes = await doc.download({ mode: 'rewrite' });
       await doc.close();
