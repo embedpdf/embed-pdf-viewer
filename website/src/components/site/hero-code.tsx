@@ -133,7 +133,7 @@ export function HeroCode() {
         </button>
       </div>
       <pre
-        className="m-0 overflow-x-auto whitespace-pre p-[16px_18px] font-mono text-[11px] leading-[1.7] [tab-size:2]"
+        className="ep-dark-scroll m-0 overflow-x-auto whitespace-pre p-[16px_18px] font-mono text-[11px] leading-[1.7] [tab-size:2]"
         dangerouslySetInnerHTML={{ __html: highlight(SNIPPETS[tab]) }}
       />
     </div>
