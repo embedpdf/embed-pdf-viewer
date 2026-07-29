@@ -50,8 +50,8 @@ export type FreeTextAnnotationDTO = AnnotationBase & {
   borderStyle: AnnotationBorderStyle;
   /** `/BS /D` dash pattern. Only meaningful when `borderStyle === 'dashed'`. */
   dashArray?: number[];
-  /** `/RD` inset of the drawn box from `/Rect`. */
-  rectDifferences?: PdfRectDifferences;
+  /** `/RD` inset of the drawn box from `/Rect`; `null` when absent. */
+  rectDifferences: PdfRectDifferences | null;
 
   // callout (only when `intent === 'free-text-callout'`)
   /** `/CL` leader line (2 or 3 points). */

@@ -46,7 +46,7 @@ export function applyPolygonDraft(
   applyFilledStyleDraft(fn, mem, annotPtr, draft);
   setVertices(fn, mem, annotPtr, draft.vertices);
 
-  if (draft.cloudyIntensity !== undefined && draft.cloudyIntensity > 0) {
+  if (draft.cloudyIntensity != null && draft.cloudyIntensity > 0) {
     setBorderEffect(fn, annotPtr, draft.cloudyIntensity);
   }
   // Advisory rotation: the vertices are already rotated; this just records θ.
@@ -70,9 +70,11 @@ export function applyPolygonPatch(
     writeVertexTransformMetadata(fn, annotPtr, { rotation: patch.rotation });
   }
   if (patch.cloudyIntensity !== undefined) {
-    if (patch.cloudyIntensity > 0) {
+    if (patch.cloudyIntensity !== null && patch.cloudyIntensity > 0) {
       setBorderEffect(fn, annotPtr, patch.cloudyIntensity);
     } else {
+      // `null` is the canonical "remove /BE"; `0` stays a deprecated alias
+      // until every emitter (plugin-annotation) patches null instead.
       clearBorderEffect(fn, annotPtr);
     }
   }

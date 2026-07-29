@@ -111,11 +111,12 @@ export function readAnnotOpacity(
 }
 
 /**
- * Read the `/BS /S` border style code and `/BS /W` border width via
- * `EPDFAnnot_GetBorderStyle`. The return value is the raw
- * `FPDF_ANNOT_BORDER_STYLE` enum code; the width is written into the
- * scratch out-parameter. Style/width string mapping lives in the shape
- * reader (engine-core stays PDFium-free).
+ * Read the effective border style and width via
+ * `EPDFAnnot_GetBorderStyle`, which resolves `/BS`, legacy `/Border`, and
+ * the ISO defaults. The return value is the raw `FPDF_ANNOT_BORDER_STYLE`
+ * enum code; the width is written into the scratch out-parameter.
+ * Style/width string mapping lives in the shape reader (engine-core stays
+ * PDFium-free).
  */
 export function readBorderStyle(
   fn: PdfFunctions,
@@ -129,8 +130,9 @@ export function readBorderStyle(
 }
 
 /**
- * Read the dash pattern of a dashed border. Returns an empty array when
- * the border is not dashed or has no `/BS /D` entry.
+ * Read the dash pattern of a dashed border. Resolves modern `/BS /D` first,
+ * then the fourth element of the legacy `/Border` array. Returns an empty
+ * array when the effective border is not dashed or has no explicit pattern.
  */
 export function readBorderDashPattern(
   fn: PdfFunctions,

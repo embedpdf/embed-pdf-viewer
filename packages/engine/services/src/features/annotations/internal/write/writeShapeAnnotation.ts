@@ -8,6 +8,7 @@ import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runti
 
 import {
   clearBorderEffect,
+  clearRectangleDifferences,
   setAnnotRect,
   setBorderEffect,
   setRectangleDifferences,
@@ -39,10 +40,10 @@ export function applyShapeDraft(
   setAnnotRect(fn, mem, annotPtr, draft.rect);
   applyFilledStyleDraft(fn, mem, annotPtr, draft);
 
-  if (draft.cloudyIntensity !== undefined && draft.cloudyIntensity > 0) {
+  if (draft.cloudyIntensity != null && draft.cloudyIntensity > 0) {
     setBorderEffect(fn, annotPtr, draft.cloudyIntensity);
   }
-  if (draft.rectDifferences !== undefined) {
+  if (draft.rectDifferences != null) {
     setRectangleDifferences(fn, annotPtr, draft.rectDifferences);
   }
   // /Rect above is the rotated visual AABB; the rotation metadata tells the AP
@@ -55,7 +56,8 @@ export function applyShapeDraft(
 
 /**
  * Apply a shape patch to an existing annotation. Only fields present on
- * the patch are touched.
+ * the patch are touched; `cloudyIntensity` and `rectDifferences` are
+ * tri-state (as `interiorColor`): a value sets the entry, `null` removes it.
  */
 export function applyShapePatch(
   fn: PdfFunctions,
@@ -77,13 +79,17 @@ export function applyShapePatch(
   applyFilledStylePatch(fn, mem, annotPtr, patch);
 
   if (patch.cloudyIntensity !== undefined) {
-    if (patch.cloudyIntensity > 0) {
+    if (patch.cloudyIntensity !== null && patch.cloudyIntensity > 0) {
       setBorderEffect(fn, annotPtr, patch.cloudyIntensity);
     } else {
+      // `null` is the canonical "remove /BE"; `0` stays a deprecated alias
+      // until every emitter (plugin-annotation) patches null instead.
       clearBorderEffect(fn, annotPtr);
     }
   }
-  if (patch.rectDifferences !== undefined) {
+  if (patch.rectDifferences === null) {
+    clearRectangleDifferences(fn, annotPtr);
+  } else if (patch.rectDifferences !== undefined) {
     setRectangleDifferences(fn, annotPtr, patch.rectDifferences);
   }
 }

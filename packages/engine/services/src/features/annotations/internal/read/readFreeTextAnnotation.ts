@@ -86,7 +86,7 @@ export function readFreeText(
     interiorColor: background ?? null,
     opacity,
     ...readBorderFields(fn, mem, annotPtr),
-    ...(rd !== null ? { rectDifferences: rd } : {}),
+    rectDifferences: rd,
     ...(calloutLine !== undefined ? { calloutLine } : {}),
     ...(calloutLine !== undefined && leaderEnd !== 'none' ? { lineEnding: leaderEnd } : {}),
     ...(rotation != null ? { rotation } : {}),

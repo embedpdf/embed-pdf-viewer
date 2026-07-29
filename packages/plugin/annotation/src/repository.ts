@@ -395,7 +395,7 @@ function boxGeomFromDTO(
 function borderFromDTO(d: {
   borderStyle?: string;
   dashArray?: number[];
-  cloudyIntensity?: number;
+  cloudyIntensity?: number | null;
 }): Border {
   if ((d.cloudyIntensity ?? 0) > 0) return { kind: 'cloudy', intensity: d.cloudyIntensity! };
   if (d.borderStyle === 'dashed')
@@ -696,7 +696,7 @@ function shapeExtras(a: Annot): { cloudyIntensity?: number; rectDifferences?: Pd
 
 /** Inset a PdfRect by a `/RD` (PDF user space, y-up: all four are non-negative
  *  insets from the matching `/Rect` edge). Used to recover the callout text box. */
-const insetPdfRectByRD = (r: PdfRect, rd?: PdfRectDifferences): PdfRect =>
+const insetPdfRectByRD = (r: PdfRect, rd?: PdfRectDifferences | null): PdfRect =>
   rd
     ? {
         left: r.left + rd.left,

@@ -33,10 +33,10 @@ import {
  * AP rotation (`/Matrix` + `/BBox`); `/Rect` stays the rotated visual AABB.
  */
 export interface ShapeAnnotationFields extends FilledStyleFields {
-  /** `/BE` cloudy border intensity. Absent/0 means a plain (non-cloudy) border. */
-  cloudyIntensity?: number;
-  /** `/RD` rectangle differences (inset of drawn geometry from `/Rect`). */
-  rectDifferences?: PdfRectDifferences;
+  /** `/BE` cloudy border intensity; `null` when the border carries no effect. */
+  cloudyIntensity: number | null;
+  /** `/RD` rectangle differences (inset of drawn geometry from `/Rect`); `null` when absent. */
+  rectDifferences: PdfRectDifferences | null;
   /** `/EMBD_Metadata/Rotation` — degrees, normalized `[0,360)`. */
   rotation?: number;
   /** `/EMBD_Metadata/UnrotatedRect` — the logical box (required when rotation != 0). */
@@ -46,16 +46,18 @@ export interface ShapeAnnotationFields extends FilledStyleFields {
 export interface ShapeDraftFields extends FilledStyleDraftFields {
   /** `/Rect` geometry — required for shapes (they are not derived from quads). */
   rect: PdfRect;
-  cloudyIntensity?: number;
-  rectDifferences?: PdfRectDifferences;
+  cloudyIntensity?: number | null;
+  rectDifferences?: PdfRectDifferences | null;
   rotation?: number;
   unrotatedRect?: PdfRect;
 }
 
 export interface ShapePatchFields extends FilledStylePatchFields {
   rect?: PdfRect;
-  cloudyIntensity?: number;
-  rectDifferences?: PdfRectDifferences;
+  /** Tri-state (as `interiorColor`): omitted preserves, a value sets, `null` removes `/BE`. */
+  cloudyIntensity?: number | null;
+  /** Tri-state: omitted preserves, a value sets, `null` removes `/RD`. */
+  rectDifferences?: PdfRectDifferences | null;
   rotation?: number;
   unrotatedRect?: PdfRect;
 }
@@ -63,8 +65,8 @@ export interface ShapePatchFields extends FilledStylePatchFields {
 export const ShapeDTOShape = {
   ...AnnotationBaseShape,
   ...FilledStyleDTOShape,
-  cloudyIntensity: z.number().nonnegative().optional(),
-  rectDifferences: PdfRectDifferencesSchema.optional(),
+  cloudyIntensity: z.number().nonnegative().nullable(),
+  rectDifferences: PdfRectDifferencesSchema.nullable(),
   rotation: z.number().optional(),
   unrotatedRect: PdfRectSchema.optional(),
 } as const;
@@ -72,8 +74,8 @@ export const ShapeDTOShape = {
 export const ShapeDraftShape = {
   ...FilledStyleDraftShape,
   rect: PdfRectSchema,
-  cloudyIntensity: z.number().nonnegative().optional(),
-  rectDifferences: PdfRectDifferencesSchema.optional(),
+  cloudyIntensity: z.number().nonnegative().nullable().optional(),
+  rectDifferences: PdfRectDifferencesSchema.nullable().optional(),
   rotation: z.number().optional(),
   unrotatedRect: PdfRectSchema.optional(),
 } as const;
@@ -81,8 +83,8 @@ export const ShapeDraftShape = {
 export const ShapePatchShape = {
   ...FilledStylePatchShape,
   rect: PdfRectSchema.optional(),
-  cloudyIntensity: z.number().nonnegative().optional(),
-  rectDifferences: PdfRectDifferencesSchema.optional(),
+  cloudyIntensity: z.number().nonnegative().nullable().optional(),
+  rectDifferences: PdfRectDifferencesSchema.nullable().optional(),
   rotation: z.number().optional(),
   unrotatedRect: PdfRectSchema.optional(),
 } as const;

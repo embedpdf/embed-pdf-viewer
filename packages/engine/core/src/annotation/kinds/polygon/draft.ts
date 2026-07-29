@@ -3,5 +3,5 @@ import type { VertexDraftFields } from '../vertex.shared';
 
 export interface PolygonDraft extends AnnotationDraftBase, VertexDraftFields {
   subtype: 'polygon';
-  cloudyIntensity?: number;
+  cloudyIntensity?: number | null;
 }

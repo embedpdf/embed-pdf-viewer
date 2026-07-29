@@ -325,6 +325,100 @@ export function runAnnotationMutationConformance(
       }
     });
 
+    test('cloudy border (/BE) + rect differences (/RD) are tri-state', async () => {
+      const doc = await openFixture(engine, opts);
+      try {
+        const page = doc.page(fix.pageObjectNumber);
+
+        // A plain shape reads BOTH optional entries as explicit null — absence
+        // is stated, so a read DTO compares structurally against a clearing patch.
+        const plainDraft: SquareDraft = {
+          subtype: 'square',
+          contents: 'mutation conformance: cloudy tri-state',
+          rect: shapeRect,
+          color: { r: 0, g: 128, b: 0 },
+          strokeWidth: 2,
+          borderStyle: 'solid',
+          opacity: 1,
+        };
+        const plain = await page.annotations.create(plainDraft);
+        expect(plain.created.subtype).toBe('square');
+        if (plain.created.subtype === 'square') {
+          expect(plain.created.cloudyIntensity).toBe(null);
+          expect(plain.created.rectDifferences).toBe(null);
+        }
+
+        // A value sets /BE + /RD…
+        const rd = { left: 5, top: 5, right: 5, bottom: 5 };
+        const cloudy = await page.annotations.update(plain.created.ref, {
+          subtype: 'square',
+          cloudyIntensity: 2,
+          rectDifferences: rd,
+        });
+        expect(cloudy.updated.subtype).toBe('square');
+        if (cloudy.updated.subtype === 'square') {
+          expect(cloudy.updated.cloudyIntensity).toBe(2);
+          expect(cloudy.updated.rectDifferences).toMatchObject(rd);
+        }
+
+        // …and null removes them: the cloudy -> solid transition leaves no
+        // stale /RD behind (the Adobe "phantom padding" regression).
+        const solid = await page.annotations.update(plain.created.ref, {
+          subtype: 'square',
+          cloudyIntensity: null,
+          rectDifferences: null,
+        });
+        expect(solid.updated.subtype).toBe('square');
+        if (solid.updated.subtype === 'square') {
+          expect(solid.updated.cloudyIntensity).toBe(null);
+          expect(solid.updated.rectDifferences).toBe(null);
+        }
+
+        // Deprecated alias: 0 still clears /BE (until every emitter patches null).
+        await page.annotations.update(plain.created.ref, {
+          subtype: 'square',
+          cloudyIntensity: 1,
+        });
+        const zeroed = await page.annotations.update(plain.created.ref, {
+          subtype: 'square',
+          cloudyIntensity: 0,
+        });
+        expect(zeroed.updated.subtype).toBe('square');
+        if (zeroed.updated.subtype === 'square') {
+          expect(zeroed.updated.cloudyIntensity).toBe(null);
+        }
+
+        // Polygon carries /BE too (but never /RD, per ISO 32000) — same tri-state,
+        // including the draft path.
+        const polyDraft: PolygonDraft = {
+          subtype: 'polygon',
+          contents: 'mutation conformance: polygon cloudy tri-state',
+          rect: shapeRect,
+          vertices,
+          color: { r: 0, g: 0, b: 255 },
+          strokeWidth: 2,
+          borderStyle: 'solid',
+          opacity: 1,
+          cloudyIntensity: 1,
+        };
+        const poly = await page.annotations.create(polyDraft);
+        expect(poly.created.subtype).toBe('polygon');
+        if (poly.created.subtype === 'polygon') {
+          expect(poly.created.cloudyIntensity).toBe(1);
+        }
+        const polySolid = await page.annotations.update(poly.created.ref, {
+          subtype: 'polygon',
+          cloudyIntensity: null,
+        });
+        expect(polySolid.updated.subtype).toBe('polygon');
+        if (polySolid.updated.subtype === 'polygon') {
+          expect(polySolid.updated.cloudyIntensity).toBe(null);
+        }
+      } finally {
+        await doc.close();
+      }
+    });
+
     test('create vertex + line annotations (polygon/polyline/line) round-trip geometry', async () => {
       const doc = await openFixture(engine, opts);
       try {
@@ -696,7 +790,12 @@ export function runAnnotationMutationConformance(
           // Caret carries no border or quads.
           expect('strokeWidth' in caret.created).toBe(false);
           expect('quadPoints' in caret.created).toBe(false);
-          expect(caret.created.rectDifferences !== undefined).toBe(true);
+          expect(caret.created.rectDifferences).toMatchObject({
+            left: 2,
+            top: 2,
+            right: 2,
+            bottom: 2,
+          });
         }
 
         const before = await page.annotations.list();
@@ -715,6 +814,16 @@ export function runAnnotationMutationConformance(
           before.pageState.revision.generation,
         );
         expect(result.meta.weakRefsInvalidated).toBe(false);
+
+        // Tri-state: `null` removes /RD entirely (a read then states the absence).
+        const rdCleared = await page.annotations.update(caret.created.ref, {
+          subtype: 'caret',
+          rectDifferences: null,
+        });
+        expect(rdCleared.updated.subtype).toBe('caret');
+        if (rdCleared.updated.subtype === 'caret') {
+          expect(rdCleared.updated.rectDifferences).toBe(null);
+        }
 
         const after = await page.annotations.list();
         expect(after.annotations.some((a) => a.subtype === 'caret')).toBe(true);

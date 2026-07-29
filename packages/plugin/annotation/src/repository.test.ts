@@ -259,7 +259,7 @@ function plainFreeTextDTO(annotObjectNumber = 21): AnnotationDTO {
     ...calloutDTO(annotObjectNumber),
     intent: 'free-text',
     rect: BOX_PDF,
-    rectDifferences: undefined,
+    rectDifferences: null,
     calloutLine: undefined,
     lineEnding: undefined,
   } as AnnotationDTO;

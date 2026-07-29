@@ -12,6 +12,6 @@ export type CaretAnnotationDTO = AnnotationBase &
     subtype: 'caret';
     /** Normalized `/IT`; null for an ordinary caret without a text-edit intent. */
     intent: CaretIntent | null;
-    /** `/RD` inset of the drawn caret from `/Rect`. */
-    rectDifferences?: PdfRectDifferences;
+    /** `/RD` inset of the drawn caret from `/Rect`; `null` when absent. */
+    rectDifferences: PdfRectDifferences | null;
   };

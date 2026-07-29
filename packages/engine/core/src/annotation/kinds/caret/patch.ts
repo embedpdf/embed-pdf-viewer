@@ -7,5 +7,6 @@ export interface CaretPatch extends AnnotationPatchBase, ColorStylePatchFields {
   subtype: 'caret';
   intent?: CaretIntent;
   rect?: PdfRect;
-  rectDifferences?: PdfRectDifferences;
+  /** Tri-state: omitted preserves, a value sets, `null` removes `/RD`. */
+  rectDifferences?: PdfRectDifferences | null;
 }

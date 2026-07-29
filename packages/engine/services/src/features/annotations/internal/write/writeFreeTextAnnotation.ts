@@ -7,6 +7,7 @@ import { textAlignmentToCode } from '../textAlignment';
 import type { AnnotationWriteContext } from './annotationWriteContext';
 import {
   clearAnnotColor,
+  clearRectangleDifferences,
   setAnnotColor,
   setAnnotOpacity,
   setAnnotRect,
@@ -76,7 +77,7 @@ export function applyFreeTextDraft(
   setTextAlignment(fn, annotPtr, textAlignmentToCode(draft.textAlign));
   setIntent(fn, annotPtr, freeTextIntentToName(draft.intent));
 
-  if (draft.rectDifferences !== undefined) {
+  if (draft.rectDifferences != null) {
     setRectangleDifferences(fn, annotPtr, draft.rectDifferences);
   }
 
@@ -158,7 +159,9 @@ export function applyFreeTextPatch(
     setIntent(fn, annotPtr, freeTextIntentToName(patch.intent));
   }
 
-  if (patch.rectDifferences !== undefined) {
+  if (patch.rectDifferences === null) {
+    clearRectangleDifferences(fn, annotPtr);
+  } else if (patch.rectDifferences !== undefined) {
     setRectangleDifferences(fn, annotPtr, patch.rectDifferences);
   }
 

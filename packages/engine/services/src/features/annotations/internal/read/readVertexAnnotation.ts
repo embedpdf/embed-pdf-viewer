@@ -35,12 +35,13 @@ export function readPolygon(
   annotPtr: Ptr,
   base: AnnotationBase,
 ): PolygonAnnotationDTO {
-  const cloudyIntensity = readBorderEffect(fn, mem, annotPtr);
   return {
     ...base,
     subtype: 'polygon',
     ...readVertexExtras(fn, mem, annotPtr),
-    ...(cloudyIntensity != null ? { cloudyIntensity } : {}),
+    // Absent /BE reads as explicit `null` (never omission), so a read DTO
+    // compares structurally against a clearing patch.
+    cloudyIntensity: readBorderEffect(fn, mem, annotPtr),
   };
 }
 

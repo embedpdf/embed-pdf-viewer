@@ -41,7 +41,7 @@ export interface FreeTextDraft extends AnnotationDraftBase {
   strokeWidth?: number;
   borderStyle?: AnnotationBorderStyle;
   dashArray?: number[];
-  rectDifferences?: PdfRectDifferences;
+  rectDifferences?: PdfRectDifferences | null;
 
   // callout — optional (used when `intent === 'free-text-callout'`).
   calloutLine?: CalloutLine;

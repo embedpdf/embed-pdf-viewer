@@ -21,7 +21,7 @@ import {
  */
 const DEFAULT_COLOR: Color = { r: 255, g: 0, b: 0 };
 
-/** The `/BS` border fields shared by every kind that draws a border. */
+/** Effective `/BS` or legacy `/Border` fields shared by bordered kinds. */
 export interface BorderFields {
   strokeWidth: number;
   borderStyle: AnnotationBorderStyle;
@@ -29,9 +29,10 @@ export interface BorderFields {
 }
 
 /**
- * Shared reader for the `/BS` border (style + width + dash). The border-only
- * slice of {@link readGeometryStyleExtras}, reused by the free-text box
- * border (which reads `/C` and `/DA` itself).
+ * Shared reader for the effective border (style + width + dash), resolving
+ * `/BS`, legacy `/Border`, and the ISO defaults. The border-only slice of
+ * {@link readGeometryStyleExtras}, reused by the free-text box border (which
+ * reads `/C` and `/DA` itself).
  */
 export function readBorderFields(
   fn: PdfFunctions,
@@ -48,7 +49,7 @@ export function readBorderFields(
 }
 
 /**
- * Shared reader for the geometry styling (`/C`, `/CA`, `/BS`, dash) — the
+ * Shared reader for the geometry styling (`/C`, `/CA`, border, dash) — the
  * no-fill layer shared by ink and the filled families. Family readers layer
  * their own geometry + extras on top; filled families add `/IC` via
  * {@link readFilledStyleExtras}.

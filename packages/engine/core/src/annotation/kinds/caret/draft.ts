@@ -10,5 +10,5 @@ export interface CaretDraft extends AnnotationDraftBase, ColorStyleDraftFields {
   /** `/Rect` bounding box — required (computed by the caller/plugin). */
   rect: PdfRect;
   /** `/RD` inset of the drawn caret from `/Rect`. */
-  rectDifferences?: PdfRectDifferences;
+  rectDifferences?: PdfRectDifferences | null;
 }

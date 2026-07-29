@@ -29,7 +29,8 @@ export interface FreeTextPatch extends AnnotationPatchBase {
   strokeWidth?: number;
   borderStyle?: AnnotationBorderStyle;
   dashArray?: number[];
-  rectDifferences?: PdfRectDifferences;
+  /** Tri-state: omitted preserves, a value sets, `null` removes `/RD`. */
+  rectDifferences?: PdfRectDifferences | null;
 
   calloutLine?: CalloutLine;
   lineEnding?: LineEnding;

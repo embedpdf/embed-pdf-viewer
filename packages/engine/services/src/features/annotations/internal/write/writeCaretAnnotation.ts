@@ -2,6 +2,7 @@ import type { CaretDraft, CaretPatch, Color } from '@embedpdf/engine-core/runtim
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
 import {
+  clearRectangleDifferences,
   setAnnotColor,
   setAnnotOpacity,
   setAnnotRect,
@@ -36,7 +37,7 @@ export function applyCaretDraft(
   setAnnotColor(fn, annotPtr, draft.color ?? DEFAULT_CARET_COLOR);
   setAnnotOpacity(fn, annotPtr, draft.opacity ?? DEFAULT_OPACITY);
   if (draft.intent !== undefined) setIntent(fn, annotPtr, caretIntentToName(draft.intent));
-  if (draft.rectDifferences !== undefined) {
+  if (draft.rectDifferences != null) {
     setRectangleDifferences(fn, annotPtr, draft.rectDifferences);
   }
 }
@@ -64,7 +65,9 @@ export function applyCaretPatch(
   if (patch.intent !== undefined) {
     setIntent(fn, annotPtr, caretIntentToName(patch.intent));
   }
-  if (patch.rectDifferences !== undefined) {
+  if (patch.rectDifferences === null) {
+    clearRectangleDifferences(fn, annotPtr);
+  } else if (patch.rectDifferences !== undefined) {
     setRectangleDifferences(fn, annotPtr, patch.rectDifferences);
   }
 }

@@ -30,6 +30,6 @@ export function readCaret(
     intent,
     color,
     opacity,
-    ...(rd !== null ? { rectDifferences: rd } : {}),
+    rectDifferences: rd,
   };
 }

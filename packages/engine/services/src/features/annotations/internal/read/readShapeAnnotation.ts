@@ -16,7 +16,9 @@ import {
 /**
  * Shared reader for the two shape subtypes. Materialises the common
  * stroke/fill styling plus the shape-only cloudy (`/BE`) and rect-diff
- * (`/RD`) fields; the caller fills in the `subtype` literal.
+ * (`/RD`) fields; the caller fills in the `subtype` literal. Absent `/BE`
+ * and `/RD` read as explicit `null` (never omission), so a read DTO
+ * compares structurally against a clearing patch.
  */
 export function readShapeExtras(
   fn: PdfFunctions,
@@ -30,8 +32,8 @@ export function readShapeExtras(
 
   return {
     ...readFilledStyleExtras(fn, mem, annotPtr),
-    ...(cloudyIntensity != null ? { cloudyIntensity } : {}),
-    ...(rectDifferences ? { rectDifferences } : {}),
+    cloudyIntensity,
+    rectDifferences,
     ...(rotation != null ? { rotation } : {}),
     ...(unrotatedRect ? { unrotatedRect } : {}),
   };

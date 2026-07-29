@@ -222,7 +222,7 @@ function useOutsideClose(open: boolean, close: () => void) {
   useEffect(() => {
     if (!open) return;
     const onDoc = (e: MouseEvent) => {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) close();
+      if (rootRef.current && !e.composedPath().includes(rootRef.current)) close();
     };
     document.addEventListener('mousedown', onDoc);
     return () => document.removeEventListener('mousedown', onDoc);
