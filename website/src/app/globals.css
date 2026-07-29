@@ -12,7 +12,12 @@ html {
   color: #0a1a4d;
 }
 
-:where(button, a, input, select, textarea):focus-visible {
+/* Site-wide focus ring. This rule is UNLAYERED, so it outranks every Tailwind
+   utility (those live in `@layer utilities`, and unlayered always wins over
+   layered regardless of specificity) — `focus-visible:outline-none` on an
+   element cannot turn it off. Components that own their own focus treatment
+   opt out with `data-ring="none"` rather than fighting the cascade. */
+:where(button, a, input, select, textarea):not([data-ring='none']):focus-visible {
   outline: 2px solid #0876fd;
   outline-offset: 2px;
   border-radius: 8px;

@@ -18,7 +18,7 @@ import { docsProductFromPath } from './docs-products';
 import { collectSampleFiles, readDocsCodeFile, type DocsCodeFile } from './docs-samples';
 import { SITE_ORIGIN } from './site';
 
-type AstNode = {
+export type AstNode = {
   type: string;
   name?: string | null;
   value?: unknown;
@@ -260,6 +260,30 @@ function markdownFrontmatter(
   ].join('\n');
 }
 
+/**
+ * Resolves raw MDX down to the plain Markdown AST that one concrete route
+ * actually shows: `<Fw>` branches taken, `<Example>`/`<CodeExample>` inlined
+ * from real sample files, links absolutised.
+ *
+ * The public `.md` projection and the search index both build on this single
+ * pass, so an indexed section can never claim something the page does not say.
+ */
+export function resolveDocsTree({
+  sourceCode,
+  canonicalPath,
+  integration,
+}: Omit<RenderDocsMarkdownOptions, 'metadata'>) {
+  const product = docsProductFromPath(canonicalPath);
+  const tree = markdownProcessor.parse(sourceCode) as AstNode;
+  tree.children = resolveNodes(tree.children ?? [], integration, product);
+  return { tree, product };
+}
+
+/** Serialises a resolved tree back to Markdown. */
+export function stringifyDocsTree(tree: AstNode) {
+  return markdownProcessor.stringify(tree as never).trimStart();
+}
+
 /** Produces plain, route-specific Markdown from Nextra's raw MDX source. */
 export function renderDocsMarkdown({
   sourceCode,
@@ -267,9 +291,7 @@ export function renderDocsMarkdown({
   integration,
   metadata,
 }: RenderDocsMarkdownOptions) {
-  const product = docsProductFromPath(canonicalPath);
-  const tree = markdownProcessor.parse(sourceCode) as AstNode;
-  tree.children = resolveNodes(tree.children ?? [], integration, product);
-  const body = markdownProcessor.stringify(tree as never).trimStart();
+  const { tree, product } = resolveDocsTree({ sourceCode, canonicalPath, integration });
+  const body = stringifyDocsTree(tree);
   return `${markdownFrontmatter(metadata, canonicalPath, integration, product)}${body}`;
 }

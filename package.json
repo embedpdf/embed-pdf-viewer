@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "turbo run dev --parallel",
     "build": "turbo run build",
-    "build:website": "pnpm --filter @embedpdf/website run db:migrate:build && turbo run build --filter=@embedpdf/website...",
+    "build:website": "pnpm --filter @embedpdf/website run db:migrate:build && pnpm --filter @embedpdf/website run search:index:build && turbo run build --filter=@embedpdf/website...",
     "build:fresh": "pnpm clean && turbo run build",
     "clean": "turbo run clean && rimraf .turbo/cache",
     "typecheck": "turbo run typecheck",
