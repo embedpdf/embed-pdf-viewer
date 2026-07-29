@@ -15,7 +15,7 @@
  * directly or via re-export. The `shared.ts` / root entry of
  * engine-core does not re-export this module — only `wire.ts` does.
  *
- * Diagnostic tooling (the cloud-platform-smoke inspector, future test
+ * Diagnostic tooling (the cloud-dashboard inspector, future test
  * fixtures) is welcome to import — that's by design, since the same
  * function powers both real fetches and previews.
  */

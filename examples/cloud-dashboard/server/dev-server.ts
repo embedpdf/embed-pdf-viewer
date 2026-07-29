@@ -28,6 +28,7 @@ import {
   type SecretsConfig,
   type TenantScope,
 } from '@cloudpdf/server';
+import { SharesStore } from './shares-store';
 
 const root = resolve(import.meta.dirname, '..');
 const dataRoot = resolve(process.env['CLOUDPDF_SMOKE_DATA_ROOT'] ?? `${root}/.data`);
@@ -83,8 +84,10 @@ let embedpdf: AppBundle;
 let storage: FsObjectStore;
 let jwtSigningSecret: string;
 let cdnSigner: CdnSigner;
+let shares: SharesStore;
 
 await startEmbedPdfServer();
+shares = await SharesStore.open(`${dataRoot}/shares.json`);
 await startApiServer();
 
 async function startEmbedPdfServer(): Promise<void> {
@@ -115,7 +118,9 @@ async function startEmbedPdfServer(): Promise<void> {
   jwtSigningSecret = resolvedSecrets.jwtSecret;
 
   cdnSigner = buildSmokeCdnSigner(cdnKind);
-  console.log(`[cloud-smoke] CDN signer: ${cdnSigner.info.kind} ${JSON.stringify(cdnSigner.info)}`);
+  console.log(
+    `[cloud-dashboard] CDN signer: ${cdnSigner.info.kind} ${JSON.stringify(cdnSigner.info)}`,
+  );
 
   embedpdf = await buildApp({
     verifier: { mode: 'hs256', secret: jwtSigningSecret },
@@ -131,7 +136,7 @@ async function startEmbedPdfServer(): Promise<void> {
     //cdnSigner,
   });
   await embedpdf.app.listen({ host, port: enginePort });
-  console.log(`[cloud-smoke] EmbedPDF server: ${engineBaseUrl}`);
+  console.log(`[cloud-dashboard] EmbedPDF server: ${engineBaseUrl}`);
 }
 
 /**
@@ -220,7 +225,7 @@ async function startApiServer(): Promise<void> {
     }
   });
   server.listen(apiPort, host, () => {
-    console.log(`[cloud-smoke] Admin helper: http://${host}:${apiPort}`);
+    console.log(`[cloud-dashboard] Admin helper: http://${host}:${apiPort}`);
   });
 
   const shutdown = async () => {
@@ -238,7 +243,8 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
   if (req.method === 'GET' && url.pathname === '/api/config') {
     sendJson(res, 200, {
       tenantId: defaultTenant,
-      engineBaseUrl: '',
+      // Displayed only. The browser reaches the engine same-origin through the
+      // vite proxy, so the SDK runs with `baseUrl: ''`.
       originBaseUrl: engineBaseUrl,
       dataRoot,
       cdn: { kind: cdnKind, info: cdnSigner.info },
@@ -279,20 +285,23 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     return;
   }
 
-  if (req.method === 'GET' && url.pathname === '/api/admin/documents') {
+  // ── Documents ────────────────────────────────────────────────────────────
+
+  if (req.method === 'GET' && url.pathname === '/api/documents') {
     const tenantId = url.searchParams.get('tenantId') || defaultTenant;
-    const docs = await adminForTenant(tenantId).documents.list({ limit: 50 });
-    sendJson(res, 200, { documents: docs });
+    const [docs, counts] = [
+      await adminForTenant(tenantId).documents.list({ limit: 100 }),
+      shares.countByDoc(tenantId),
+    ];
+    sendJson(res, 200, {
+      documents: docs.map((doc) => toDemoDocument(doc, counts.get(doc.id) ?? 0)),
+    });
     return;
   }
 
-  if (req.method === 'POST' && url.pathname === '/api/admin/upload') {
+  if (req.method === 'POST' && url.pathname === '/api/documents') {
     const tenantId = url.searchParams.get('tenantId') || defaultTenant;
-    const layerName = url.searchParams.get('layerName') || 'default';
-    const sub = url.searchParams.get('sub') || 'demo-user';
-    const scope = readScopeFromSearch(url);
-    const identity = readIdentityFromSearch(url);
-    const fileName = req.headers['x-file-name']?.toString() || 'upload.pdf';
+    const fileName = decodeURIComponent(req.headers['x-file-name']?.toString() || 'upload.pdf');
     const bytes = await readBody(req);
     if (bytes.byteLength === 0) {
       sendJson(res, 400, { error: { message: 'empty upload body' } });
@@ -300,29 +309,96 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     }
     const created = await adminForTenant(tenantId).documents.create({
       bytes,
-      metadata: {
-        name: fileName,
-        source: 'cloud-platform-smoke',
-      },
-      idempotencyKey: `smoke-${tenantId}-${fileName}-${bytes.byteLength}-${Date.now()}`,
-    });
-    const token = mintDocToken({
-      tenantId,
-      docId: created.document.id,
-      layerName,
-      sub,
-      scope,
-      identity,
+      metadata: { name: fileName, source: 'cloud-dashboard' },
+      idempotencyKey: `demo-${tenantId}-${fileName}-${bytes.byteLength}-${Date.now()}`,
     });
     sendJson(res, 200, {
-      ...created,
-      token,
-      layerName,
+      document: toDemoDocument(created.document, 0),
+      tag: created.tag,
+    });
+    return;
+  }
+
+  const docMatch = matchPath(url.pathname, '/api/documents/:id');
+  if (docMatch && req.method === 'DELETE') {
+    const tenantId = url.searchParams.get('tenantId') || defaultTenant;
+    await adminForTenant(tenantId).documents.delete(docMatch.id!);
+    await shares.removeForDocument(tenantId, docMatch.id!);
+    sendJson(res, 200, { ok: true });
+    return;
+  }
+
+  // The warmed page-1 tile (WS2) and the original bytes both live behind
+  // TENANT-scoped admin routes, so the browser cannot fetch them directly —
+  // it holds doc-scoped tokens only. Proxying here is what a real dashboard
+  // backend does too.
+  const thumbMatch = matchPath(url.pathname, '/api/documents/:id/thumbnail');
+  if (thumbMatch && req.method === 'GET') {
+    const tenantId = url.searchParams.get('tenantId') || defaultTenant;
+    await proxyAdminBinary(res, tenantId, `/v1/admin/documents/${thumbMatch.id}/thumbnail`);
+    return;
+  }
+
+  const downloadMatch = matchPath(url.pathname, '/api/documents/:id/download');
+  if (downloadMatch && req.method === 'GET') {
+    const tenantId = url.searchParams.get('tenantId') || defaultTenant;
+    await proxyAdminBinary(res, tenantId, `/v1/admin/documents/${downloadMatch.id}/download`, {
+      'content-disposition': `attachment; filename="${downloadMatch.id}.pdf"`,
+    });
+    return;
+  }
+
+  // ── Shares (the demo's stand-in for the integrator's sharing table) ───────
+
+  if (req.method === 'GET' && url.pathname === '/api/shares') {
+    const tenantId = url.searchParams.get('tenantId') || defaultTenant;
+    const docId = url.searchParams.get('docId') ?? undefined;
+    sendJson(res, 200, { shares: shares.list(tenantId, docId) });
+    return;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/shares') {
+    const tenantId = url.searchParams.get('tenantId') || defaultTenant;
+    const body = (await readJson(req)) as Record<string, unknown>;
+    const docId = readString(body, 'docId');
+    const name = readString(body, 'name', 'Guest');
+    const role = readString(body, 'role', 'custom');
+    const layerName = readString(body, 'layerName', 'default');
+    const ttlSeconds = readNumber(body, 'ttlSeconds', 3600);
+    const scope = readStringArray(body, 'scope', [...DEFAULT_DOC_SCOPE]);
+    const identity = readIdentityFromBody(body);
+    const idempotencyKey =
+      typeof body['idempotencyKey'] === 'string' ? (body['idempotencyKey'] as string) : undefined;
+    const token = mintDocToken({
       tenantId,
-      sub,
+      docId,
+      layerName,
+      sub: identity.user_id ?? name.toLowerCase().replace(/\s+/g, '-'),
+      ttlSeconds,
       scope,
       identity,
     });
+    const share = await shares.create({
+      tenantId,
+      docId,
+      name,
+      role,
+      layerName,
+      scope,
+      identity,
+      token,
+      expiresAt: Date.now() + ttlSeconds * 1000,
+      ...(idempotencyKey ? { idempotencyKey } : {}),
+    });
+    sendJson(res, 200, { share });
+    return;
+  }
+
+  const shareMatch = matchPath(url.pathname, '/api/shares/:id');
+  if (shareMatch && req.method === 'DELETE') {
+    const tenantId = url.searchParams.get('tenantId') || defaultTenant;
+    await shares.remove(tenantId, shareMatch.id!);
+    sendJson(res, 200, { ok: true });
     return;
   }
 
@@ -363,13 +439,86 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
 function adminForTenant(tenantId: string) {
   return createCloudAdmin({
     baseUrl: engineBaseUrl,
-    tenantToken: signDevToken(jwtSigningSecret, {
-      sub: 'cloud-smoke-admin',
-      tenant_id: tenantId,
-      scope: ['*'] satisfies TenantScope[],
-      ttlSeconds: 60 * 60,
-    }),
+    tenantToken: tenantTokenFor(tenantId),
   });
+}
+
+function tenantTokenFor(tenantId: string): string {
+  return signDevToken(jwtSigningSecret, {
+    sub: 'cloud-dashboard-admin',
+    tenant_id: tenantId,
+    scope: ['*'] satisfies TenantScope[],
+    ttlSeconds: 60 * 60,
+  });
+}
+
+/**
+ * Match `/api/documents/:id/thumbnail`-style patterns. Tiny by design — this
+ * demo's router is a chain of ifs, and a regex builder would be more machinery
+ * than the six routes justify.
+ */
+function matchPath(pathname: string, pattern: string): Record<string, string> | null {
+  const actual = pathname.split('/').filter(Boolean);
+  const expected = pattern.split('/').filter(Boolean);
+  if (actual.length !== expected.length) return null;
+  const params: Record<string, string> = {};
+  for (const [i, segment] of expected.entries()) {
+    const value = actual[i]!;
+    if (segment.startsWith(':')) params[segment.slice(1)] = decodeURIComponent(value);
+    else if (segment !== value) return null;
+  }
+  return params;
+}
+
+/** Stream an admin-scoped binary (thumbnail, original bytes) to the browser. */
+async function proxyAdminBinary(
+  res: ServerResponse,
+  tenantId: string,
+  path: string,
+  extraHeaders: Record<string, string> = {},
+): Promise<void> {
+  const upstream = await fetch(`${engineBaseUrl}${path}`, {
+    headers: { Authorization: `Bearer ${tenantTokenFor(tenantId)}` },
+  });
+  if (!upstream.ok) {
+    // A `pending` thumbnail 404s until the ingest warm finishes — the
+    // dashboard polls on that, so pass the status through untouched.
+    sendJson(res, upstream.status, { error: { message: await upstream.text() } });
+    return;
+  }
+  const body = Buffer.from(await upstream.arrayBuffer());
+  res.writeHead(200, {
+    'content-type': upstream.headers.get('content-type') ?? 'application/octet-stream',
+    'content-length': body.byteLength,
+    'cache-control': 'private, max-age=60',
+    ...extraHeaders,
+  });
+  res.end(body);
+}
+
+/** Project an admin document record into the dashboard's own shape. */
+function toDemoDocument(
+  doc: {
+    id: string;
+    state: string;
+    storageSizeBytes: number | null;
+    metadata: Record<string, unknown> | null;
+    createdAt: number;
+    thumbnailState?: string;
+  },
+  shareCount: number,
+) {
+  const name = typeof doc.metadata?.['name'] === 'string' ? doc.metadata['name'] : doc.id;
+  return {
+    id: doc.id,
+    state: doc.state,
+    name,
+    sizeBytes: doc.storageSizeBytes,
+    createdAt: doc.createdAt,
+    // Pre-WS2 servers omit the field; treat that as "no tile coming".
+    thumbnailState: doc.thumbnailState ?? 'failed',
+    shareCount,
+  };
 }
 
 function mintDocToken(input: {
@@ -401,35 +550,6 @@ function mintDocToken(input: {
       },
     },
   });
-}
-
-function readScopeFromSearch(url: URL): string[] {
-  const repeated = url.searchParams
-    .getAll('scope')
-    .map((value) => value.trim())
-    .filter(Boolean);
-  if (repeated.length > 0) return repeated;
-  const packed = url.searchParams.get('scopes');
-  if (!packed) return [...DEFAULT_DOC_SCOPE];
-  return splitScopeList(packed);
-}
-
-function readIdentityFromSearch(url: URL): {
-  user_id?: string;
-  group_id?: string;
-  groups?: string[];
-  display_name?: string;
-} {
-  const userId = url.searchParams.get('user_id')?.trim();
-  const groupId = url.searchParams.get('group_id')?.trim();
-  const displayName = url.searchParams.get('display_name')?.trim();
-  const groups = splitScopeList(url.searchParams.get('groups') ?? '');
-  return {
-    ...(userId ? { user_id: userId } : {}),
-    ...(groupId ? { group_id: groupId } : {}),
-    ...(displayName ? { display_name: displayName } : {}),
-    ...(groups.length > 0 ? { groups } : {}),
-  };
 }
 
 async function readBody(req: IncomingMessage): Promise<Uint8Array> {
