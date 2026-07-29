@@ -1,8 +1,10 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { useRouter } from 'next/navigation';
+
+import { ChevronRightIcon, SearchIcon } from './icons';
 
 import {
   HIGHLIGHT_CLOSE,
@@ -10,7 +12,6 @@ import {
   type DocsSearchHit,
   type DocsSearchResponse,
 } from '@/lib/search/types';
-import { ChevronRightIcon, SearchIcon } from './icons';
 
 /** Long enough that a stalled keystroke does not fire a query of its own. */
 const DEBOUNCE_MS = 140;
@@ -217,11 +218,13 @@ export function SearchModal({ onClose }: { onClose: () => void }) {
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose, hits, active, open]);
 
-  // Keyboard navigation has to drag the viewport with it.
+  // Keyboard navigation has to drag the viewport with it. The lookup is held in
+  // a local rather than chained: Prettier breaks a chained `[active]` onto its
+  // own line, which trips `no-unexpected-multiline` (ASI ambiguity) and fails
+  // the build.
   useEffect(() => {
-    listRef.current
-      ?.querySelectorAll('[role="option"]')
-      [active]?.scrollIntoView({ block: 'nearest' });
+    const options = listRef.current?.querySelectorAll('[role="option"]');
+    options?.[active]?.scrollIntoView({ block: 'nearest' });
   }, [active]);
 
   // The header this modal is mounted under carries a `backdrop-filter`, which
