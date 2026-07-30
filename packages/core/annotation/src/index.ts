@@ -155,6 +155,7 @@ export type {
   Msg,
   ClickCreate,
   PointerInput,
+  PatchScope,
   PropKey,
   Quad,
   Rect,

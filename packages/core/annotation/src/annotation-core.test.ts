@@ -1188,8 +1188,8 @@ describe('annotation-core', () => {
     const lnGeom = next.byId[ln].geom;
     expect(lnGeom.t === 'line' && lnGeom.ends?.end).toBe('closed-arrow');
     expect(fx).toEqual([
-      { fx: 'patch', id: sq },
-      { fx: 'patch', id: ln },
+      { fx: 'patch', id: sq, scope: { kind: 'props', keys: ['strokeWidth', 'lineEndings'] } },
+      { fx: 'patch', id: ln, scope: { kind: 'props', keys: ['strokeWidth', 'lineEndings'] } },
     ]);
   });
 
@@ -1918,7 +1918,7 @@ describe('annotation-core — rotation', () => {
       annots: [seededSquare('s1', { x: 100, y: 100, width: 100, height: 50 })],
     })[0];
     const [m, fx] = update({ ...base, selected: ['s1'] }, { t: 'rotate90' });
-    expect(fx).toEqual([{ fx: 'patch', id: 's1' }]);
+    expect(fx).toEqual([{ fx: 'patch', id: 's1', scope: { kind: 'geometry' } }]);
     const g = m.byId['s1'].geom;
     expect(geomRotation(g)).toBe(90);
     expect(centroidOf(g)).toMatchObject({ x: 150, y: 125 });
@@ -1947,7 +1947,7 @@ describe('annotation-core — rotation', () => {
     })[0];
     const rotated = update({ ...base, selected: ['s1'] }, { t: 'rotate90' })[0];
     const [m, fx] = update(rotated, { t: 'resetRotation' });
-    expect(fx).toEqual([{ fx: 'patch', id: 's1' }]);
+    expect(fx).toEqual([{ fx: 'patch', id: 's1', scope: { kind: 'geometry' } }]);
     expect(geomRotation(m.byId['s1'].geom)).toBe(0);
   });
 });
@@ -2518,7 +2518,7 @@ describe('page-bound gestures', () => {
     expect(d.delta.y).toBeGreaterThan(0);
     expect(d.delta.y).toBeLessThan(40); // pinned at the edge, not 190
     const [done, fx] = update(m, edit('up', 320, 900));
-    expect(fx).toEqual([{ fx: 'patch', id: done.selected[0] }]);
+    expect(fx).toEqual([{ fx: 'patch', id: done.selected[0], scope: { kind: 'geometry' } }]);
     const r = rectGeom(done.byId[done.selected[0]].geom)!;
     expect(r.x).toBe(300); // slid right by the full 50
     // Bottom rests ON the page edge (± the stroke's visual inflation).
@@ -2534,7 +2534,7 @@ describe('page-bound gestures', () => {
       edit('up', 270, 900),
     );
     expect(done.draft).toBeNull();
-    expect(fx).toEqual([{ fx: 'patch', id: done.selected[0] }]);
+    expect(fx).toEqual([{ fx: 'patch', id: done.selected[0], scope: { kind: 'geometry' } }]);
     const r = rectGeom(done.byId[done.selected[0]].geom)!;
     expect(r.y).toBeGreaterThan(700); // it moved…
     expect(r.y + r.height).toBeLessThanOrEqual(792); // …but stayed on the page
@@ -2763,7 +2763,7 @@ describe('annotation-core — snapping', () => {
     const chip = chrome(live, PON).find((n) => n.kind === 'angle-chip');
     expect(chip).toMatchObject({ kind: 'angle-chip', angle: 90 });
     const [m, fx] = update(live, editPtr('up', 0, 0));
-    expect(fx).toEqual([{ fx: 'patch', id: 's1' }]);
+    expect(fx).toEqual([{ fx: 'patch', id: 's1', scope: { kind: 'geometry' } }]);
     expect(geomRotation(m.byId['s1'].geom)).toBeCloseTo(90);
     expect(chrome(m, PON).some((n) => n.kind === 'angle-chip')).toBe(false);
   });
@@ -3527,7 +3527,7 @@ describe('apVersion: baked /AP content versioning (what re-fetches a raster)', (
     [m] = update(m, editPtr('down', 150, 130)); // grab the body
     [m] = update(m, editPtr('move', 190, 160));
     const [next, fx] = update(m, editPtr('up', 190, 160));
-    expect(fx).toEqual([{ fx: 'patch', id: 'A1' }]); // no apChanged flag
+    expect(fx).toEqual([{ fx: 'patch', id: 'A1', scope: { kind: 'geometry' } }]); // no apChanged flag
     const g = next.byId['A1'].geom;
     expect(g.t === 'rect' && g.rect.x).toBe(140); // moved…
     expect(next.byId['A1'].source).toBe('baked'); // …and still baked
@@ -3538,13 +3538,13 @@ describe('apVersion: baked /AP content versioning (what re-fetches a raster)', (
     [m] = update(m, editPtr('down', 200, 160)); // grab the SE handle
     [m] = update(m, editPtr('move', 240, 190));
     const [next, fx] = update(m, editPtr('up', 240, 190));
-    expect(fx).toEqual([{ fx: 'patch', id: 'A1', apChanged: true }]);
+    expect(fx).toEqual([{ fx: 'patch', id: 'A1', scope: { kind: 'geometry' }, apChanged: true }]);
     expect(next.byId['A1'].source).toBe('baked'); // opaque-body: no vector render
   });
 
   it('a stamp rotate90 commits a bare patch — rotation is stripped at the blit', () => {
     const [next, fx] = update(committed('stamp'), { t: 'rotate90' });
-    expect(fx).toEqual([{ fx: 'patch', id: 'A1' }]);
+    expect(fx).toEqual([{ fx: 'patch', id: 'A1', scope: { kind: 'geometry' } }]);
     expect(next.byId['A1'].source).toBe('baked');
   });
 
@@ -3553,10 +3553,10 @@ describe('apVersion: baked /AP content versioning (what re-fetches a raster)', (
     [m] = update(m, editPtr('down', 200, 160)); // SE handle
     [m] = update(m, editPtr('move', 260, 200));
     const [afterResize, fx1] = update(m, editPtr('up', 260, 200));
-    expect(fx1).toEqual([{ fx: 'patch', id: 'A1' }]);
+    expect(fx1).toEqual([{ fx: 'patch', id: 'A1', scope: { kind: 'geometry' } }]);
     expect(afterResize.byId['A1'].source).toBe('vector');
     const [afterRotate, fx2] = update(committed('square'), { t: 'rotate90' });
-    expect(fx2).toEqual([{ fx: 'patch', id: 'A1' }]);
+    expect(fx2).toEqual([{ fx: 'patch', id: 'A1', scope: { kind: 'geometry' } }]);
     expect(afterRotate.byId['A1'].source).toBe('vector');
   });
 
@@ -3603,7 +3603,9 @@ describe('apVersion: baked /AP content versioning (what re-fetches a raster)', (
     };
     const m: Model = { ...initialModel, byId: { W1: w }, order: ['W1'], selected: ['W1'] };
     const [next, fx] = update(m, { t: 'setProps', patch: { interiorColor: '#ffd500' } });
-    expect(fx).toEqual([{ fx: 'patch', id: 'W1' }]);
+    expect(fx).toEqual([
+      { fx: 'patch', id: 'W1', scope: { kind: 'props', keys: ['interiorColor'] } },
+    ]);
     // Baked stays baked: the widget has no vector render, and leaving `baked`
     // would drop it from appearanceEpoch — its raster would freeze forever.
     expect(next.byId['W1'].source).toBe('baked');
@@ -3683,7 +3685,7 @@ describe('link prop (attached links folded onto their parent)', () => {
     const [next, fx] = update(m, { t: 'setProps', patch: { link: URI, color: '#00ff00' } });
     expect(next.byId['S1'].style.color).toBe('#00ff00');
     expect(fx).toEqual([
-      { fx: 'patch', id: 'S1' },
+      { fx: 'patch', id: 'S1', scope: { kind: 'props', keys: ['link', 'color'] } },
       { fx: 'syncLink', id: 'S1' },
     ]);
   });
@@ -3693,7 +3695,7 @@ describe('link prop (attached links folded onto their parent)', () => {
     const m = withSelected(link);
     const [next, fx] = update(m, { t: 'setProps', patch: { link: URI } });
     expect(next.byId['L1'].link).toEqual(URI);
-    expect(fx).toEqual([{ fx: 'patch', id: 'L1' }]);
+    expect(fx).toEqual([{ fx: 'patch', id: 'L1', scope: { kind: 'props', keys: ['link'] } }]);
   });
 
   it('widgets do not take the link key: no change, no effect', () => {

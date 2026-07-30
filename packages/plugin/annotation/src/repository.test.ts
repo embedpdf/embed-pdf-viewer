@@ -16,6 +16,7 @@ import {
   refKey,
   toCreateDraft,
   toPatch,
+  toScopedPatch,
 } from './repository';
 
 const CROP: PdfRect = { left: 0, bottom: 0, right: 600, top: 800 };
@@ -132,11 +133,11 @@ describe('repository — Ink Highlight intent and blend', () => {
       intent: 'ink-highlight',
       blendMode: 'multiply',
     });
-    expect(toPatch(annotation, CROP)).toMatchObject({
-      subtype: 'ink',
-      intent: 'ink-highlight',
-      blendMode: 'multiply',
-    });
+    // `/IT` is a create-only statement: patches don't restate it (the engine's
+    // tri-state law preserves what a patch omits), so only the draft carries it.
+    const patch = toPatch(annotation, CROP) as Record<string, unknown> | null;
+    expect(patch).toMatchObject({ subtype: 'ink', blendMode: 'multiply' });
+    expect(patch).not.toHaveProperty('intent');
   });
 });
 
@@ -569,6 +570,100 @@ describe('repository — polygon cloudy border', () => {
     };
     const patch = toPatch(cloudyStyled, CROP) as Extract<AnnotationPatch, { subtype: 'polyline' }>;
     expect(patch).not.toHaveProperty('cloudyIntensity');
+  });
+});
+
+describe('repository — toScopedPatch (sparse emission)', () => {
+  it('geometry scope on a square emits ONLY the box group (no style biography)', () => {
+    const a = fromDTO(squareDTO(60), CROP);
+    const patch = toScopedPatch(a, { kind: 'geometry' }, CROP) as unknown as Record<
+      string,
+      unknown
+    >;
+    // rect + the total transform trio — and nothing else.
+    expect(Object.keys(patch).sort()).toEqual(['rect', 'rotation', 'subtype', 'unrotatedRect']);
+    expect(patch.rotation).toBe(null);
+    expect(patch).not.toHaveProperty('color');
+    expect(patch).not.toHaveProperty('strokeWidth');
+    expect(patch).not.toHaveProperty('cloudyIntensity');
+  });
+
+  it('geometry scope on a link omits target — a foreign /A survives the move', () => {
+    const a = fromDTO({ ...squareDTO(61), subtype: 'link' } as AnnotationDTO, CROP);
+    const patch = toScopedPatch(a, { kind: 'geometry' }, CROP) as unknown as Record<
+      string,
+      unknown
+    >;
+    expect(patch.subtype).toBe('link');
+    expect(patch).not.toHaveProperty('target');
+  });
+
+  it('props scope lowers single keys 1:1 (fontSize alone, engine RMW makes it safe)', () => {
+    const a = fromDTO(calloutDTO(21), CROP);
+    const patch = toScopedPatch(
+      a,
+      { kind: 'props', keys: ['fontSize'] },
+      CROP,
+    ) as unknown as Record<string, unknown>;
+    expect(Object.keys(patch).sort()).toEqual(['fontSize', 'subtype']);
+  });
+
+  it('props strokeWidth on a CLOUDY square carries the derived /RD (client policy)', () => {
+    const cloudy = fromDTO(
+      {
+        ...squareDTO(62),
+        cloudyIntensity: 2,
+        rectDifferences: { left: 9, top: 9, right: 9, bottom: 9 },
+      } as AnnotationDTO,
+      CROP,
+    );
+    const patch = toScopedPatch(
+      cloudy,
+      { kind: 'props', keys: ['strokeWidth'] },
+      CROP,
+    ) as unknown as Record<string, unknown>;
+    expect(patch.strokeWidth).toBe(2);
+    expect(patch.rectDifferences).toBeDefined(); // inset derives from stroke width
+  });
+
+  it('props strokeWidth on a polygon re-emits the VISUAL-bounds /Rect', () => {
+    const a = fromDTO(polygonDTO(undefined), CROP);
+    const patch = toScopedPatch(
+      a,
+      { kind: 'props', keys: ['strokeWidth'] },
+      CROP,
+    ) as unknown as Record<string, unknown>;
+    expect(patch.strokeWidth).toBeDefined();
+    expect(patch.rect).toBeDefined(); // rect includes the stroke radius
+  });
+
+  it('props border on a plain square states the tri-state clears', () => {
+    const a = fromDTO(squareDTO(63), CROP);
+    const patch = toScopedPatch(a, { kind: 'props', keys: ['border'] }, CROP) as unknown as Record<
+      string,
+      unknown
+    >;
+    expect(patch.borderStyle).toBe('solid');
+    expect(patch.cloudyIntensity).toBe(null);
+    expect(patch.rectDifferences).toBe(null);
+    expect(patch).not.toHaveProperty('color');
+  });
+
+  it('an unlowerable key degrades to the FULL projection, never a dropped write', () => {
+    const a = fromDTO(squareDTO(64), CROP);
+    const sparse = toScopedPatch(a, { kind: 'props', keys: ['color'] }, CROP) as unknown as Record<
+      string,
+      unknown
+    >;
+    expect(Object.keys(sparse).sort()).toEqual(['color', 'subtype']);
+    // `lineEndings` is not lowerable for a rect geom — full fallback kicks in.
+    const fallback = toScopedPatch(
+      a,
+      { kind: 'props', keys: ['color', 'lineEndings'] },
+      CROP,
+    ) as unknown as Record<string, unknown>;
+    expect(fallback.strokeWidth).toBeDefined(); // the full projection's signature
+    expect(fallback.opacity).toBeDefined();
   });
 });
 
