@@ -29,6 +29,12 @@ const silverSponsors: Sponsor[] = [
     url: 'https://www.withloveinternet.com?utm_source=embedpdf&utm_campaign=oss',
     description: 'The digital agency for growth-oriented companies.',
   },
+  {
+    name: 'Align',
+    logo: '/sponsors/sponsor-align.jpeg',
+    url: 'https://align.lawyer?utm_source=embedpdf&utm_campaign=oss',
+    description: 'Tools for litigators, built by litigators.',
+  },
 ]
 
 const bronzeSponsors: Sponsor[] = [
