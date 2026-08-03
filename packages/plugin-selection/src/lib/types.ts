@@ -242,6 +242,7 @@ export interface SelectionScope {
   getBoundingRectForPage(page: number): Rect | null;
   getBoundingRects(): { page: number; rect: Rect }[];
   getSelectedText(): PdfTask<string[]>;
+  setSelection(range: SelectionRangeX | null): PdfTask<void>;
   clear(): void;
   copyToClipboard(): void;
   getState(): SelectionDocumentState;
@@ -273,6 +274,7 @@ export interface SelectionCapability {
   getBoundingRectForPage(page: number, documentId?: string): Rect | null;
   getBoundingRects(documentId?: string): { page: number; rect: Rect }[];
   getSelectedText(documentId?: string): PdfTask<string[]>;
+  setSelection(range: SelectionRangeX | null, documentId?: string): PdfTask<void>;
   clear(documentId?: string): void;
   copyToClipboard(documentId?: string): void;
   getState(documentId?: string): SelectionDocumentState;
