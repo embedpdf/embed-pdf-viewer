@@ -337,7 +337,7 @@ export function PricingView() {
                 </div>
               </div>
               <a
-                href="mailto:hello@cloudpdf.io"
+                href="mailto:hello@cloudpdf.com"
                 className="border-cp-violet text-cp-violet hover:border-cp-violetDeep hover:text-cp-violetDeep flex h-[50px] flex-shrink-0 items-center justify-center gap-2.5 rounded-[10px] border-2 px-[22px] font-sans text-base font-bold no-underline transition-all hover:bg-[rgba(124,92,252,0.08)] max-[720px]:w-full"
               >
                 <span>Contact sales</span>

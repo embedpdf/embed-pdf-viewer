@@ -8,7 +8,7 @@ import { CpButton } from './button';
 import { ArrowRight, SearchIcon } from './icons';
 import { SearchModal } from './search-modal';
 
-const CONTACT_EMAIL = 'hello@cloudpdf.io';
+const CONTACT_EMAIL = 'hello@cloudpdf.com';
 
 const NAV = [
   { label: 'Docs', href: '/docs' },
