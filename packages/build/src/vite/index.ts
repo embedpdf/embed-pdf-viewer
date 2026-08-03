@@ -5,6 +5,7 @@ import vue from '@vitejs/plugin-vue';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 import dts from 'unplugin-dts/vite';
 import { SvelteDtsResolver } from './svelte-dts-resolver.js';
+import { svelteRestPropsCompat } from './svelte-rest-props-compat.js';
 
 const sharedExternal = [/^@embedpdf\/(?!.*\/@framework$)/];
 
@@ -175,7 +176,7 @@ export function defineLibrary() {
           entryPath: 'svelte/index.ts',
           outputPrefix: 'svelte',
           external: [/^svelte($|\/)/],
-          additionalPlugins: [svelte()]
+          additionalPlugins: [svelte(), svelteRestPropsCompat()]
         });
 
       default: // base

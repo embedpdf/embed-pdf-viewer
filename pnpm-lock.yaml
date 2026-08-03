@@ -819,6 +819,9 @@ importers:
       glob:
         specifier: ^13.0.0
         version: 13.0.2
+      magic-string:
+        specifier: ^0.30.21
+        version: 0.30.21
       svelte:
         specifier: ^5.39.5
         version: 5.50.1
