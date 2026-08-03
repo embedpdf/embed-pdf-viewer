@@ -183,6 +183,16 @@ export interface AnnotationProps extends Style, TextStyle {
 
 export type PropKey = keyof AnnotationProps;
 
+/**
+ * What a committed edit CHANGED — carried on the `patch` effect so the shell
+ * emits exactly that intent (repository `toScopedPatch`) instead of
+ * reconstructing a full projection. `geometry` covers every gesture commit
+ * (move/resize/rotate/vertex edit); `props` forwards the user's patch keys
+ * verbatim. Text content never rides this effect (the debounced text-edit
+ * write owns `contents`).
+ */
+export type PatchScope = { kind: 'geometry' } | { kind: 'props'; keys: PropKey[] };
+
 /** A partial property write. `lineEndings` merges per side (set just `end`
  *  without knowing `start`); every other key overwrites. */
 export type AnnotationPropsPatch = {
@@ -682,7 +692,7 @@ export type Effect =
    *  (the blit repositions the same pixels) and any kind that flipped to
    *  `vector` (it renders live; the raster stops mattering) — so those keep the
    *  bare `{ fx, id }` shape and trigger no appearance re-fetch. */
-  | { fx: 'patch'; id: Id; apChanged?: true }
+  | { fx: 'patch'; id: Id; scope: PatchScope; apChanged?: true }
   /** A `/F`-only engine write for one committed annotation: the shell emits a
    *  flags-only patch (the model already holds the merged flags) and re-syncs
    *  PRESERVING the render source — flags never re-bake an appearance. */

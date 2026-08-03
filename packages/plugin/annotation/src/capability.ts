@@ -65,6 +65,7 @@ import {
   refKey,
   toCreateDraft,
   toPatch,
+  toScopedPatch,
   writableTarget,
 } from './repository';
 import { buildTextItems } from './text-item';
@@ -1010,7 +1011,7 @@ export function createAnnotationCapability(
     } else if (fx.fx === 'patch') {
       const a = m.byId[fx.id];
       const crop = a && cropOf(a.pon);
-      const patch = a && a.ref && crop ? toPatch(a, crop) : null;
+      const patch = a && a.ref && crop ? toScopedPatch(a, fx.scope, crop) : null;
       if (!a || !a.ref || !patch) return;
       // Re-sync from the authoritative DTO, PRESERVING the source the gesture
       // chose: a move kept it baked (raster rides along), a resize flipped it to

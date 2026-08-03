@@ -59,6 +59,7 @@ import type {
   Model,
   Msg,
   PointerInput,
+  PropKey,
   Quad,
   Rect,
   Style,
@@ -152,7 +153,9 @@ const apInvalidated = (next: Annot, before: Geom): boolean =>
  *  edit keeps the bare `{ fx, id }` shape and never triggers an appearance
  *  re-fetch. `next` is the post-{@link ownGeometry} annot, `before` its old geom. */
 const patchFx = (id: Id, next: Annot, before: Geom): Effect =>
-  apInvalidated(next, before) ? { fx: 'patch', id, apChanged: true } : { fx: 'patch', id };
+  apInvalidated(next, before)
+    ? { fx: 'patch', id, scope: { kind: 'geometry' }, apChanged: true }
+    : { fx: 'patch', id, scope: { kind: 'geometry' } };
 const sub = (a: Vec, b: Vec): Vec => ({ x: a.x - b.x, y: a.y - b.y });
 const translateRect = (r: Rect, d: Vec): Rect => ({ ...r, x: r.x + d.x, y: r.y + d.y });
 
@@ -589,7 +592,7 @@ function editUp(m: Model): [Model, Effect[]] {
         geom: geomTranslate(a.geom, d.delta),
         apBox: a.apBox ? translateRect(a.apBox, d.delta) : undefined,
       };
-      fx.push({ fx: 'patch', id }); // a move never invalidates the raster
+      fx.push({ fx: 'patch', id, scope: { kind: 'geometry' } }); // a move never invalidates the raster
     }
     return [{ ...m, byId, draft: null }, fx];
   }
@@ -1236,6 +1239,9 @@ function setProps(m: Model, patch: AnnotationPropsPatch): [Model, Effect[]] {
   if (!m.selected.length) return [m, []];
   const byId = { ...m.byId };
   const fx: Effect[] = [];
+  // The effect carries the user's keys VERBATIM — the shell lowers exactly
+  // this intent to wire fields; the changed-prop set IS the artifact.
+  const keys = (Object.keys(patch) as PropKey[]).filter((k) => patch[k] !== undefined);
   for (const id of m.selected) {
     const a = byId[id];
     if (!a) continue;
@@ -1260,7 +1266,8 @@ function setProps(m: Model, patch: AnnotationPropsPatch): [Model, Effect[]] {
     // their raster forever.
     byId[id] = capsFor(a.subtype).opaqueBody || !otherChanged ? next : toVector(next);
     // The link KIND's target lives on its own DTO — a plain engine patch.
-    if (otherChanged || (linkChanged && a.subtype === 'link')) fx.push({ fx: 'patch', id });
+    if (otherChanged || (linkChanged && a.subtype === 'link'))
+      fx.push({ fx: 'patch', id, scope: { kind: 'props', keys } });
     if (linkChanged && a.subtype !== 'link') fx.push({ fx: 'syncLink', id });
   }
   return fx.length ? [{ ...m, byId }, fx] : [m, []];

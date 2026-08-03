@@ -4,11 +4,11 @@
   "artifacts": {
     "wasm32": {
       "url": "file:///Users/bobsingor/GitHub/pdf-viewer/packages/engine/runtime/runtime-src/out/embedpdf-runtime-artifacts/libembedpdf-pdf-runtime-wasm32-58c48b47f.tar.gz",
-      "sha256": "1674471d100027ed9f08cf9f2a19024e3655590366a5f093662fee045b41c9d8"
+      "sha256": "43c8d47c547ddcab328a4d79e4747f9dd8eb45b20b64e51cf5c7e836776305f6"
     },
     "darwin-arm64": {
       "url": "file:///Users/bobsingor/GitHub/pdf-viewer/packages/engine/runtime/runtime-src/out/embedpdf-runtime-artifacts/libembedpdf-pdf-runtime-darwin-arm64-58c48b47f.tar.gz",
-      "sha256": "b153562d559688002847b24951fec1517ae8d878814ff59033fc7818f6854fdb"
+      "sha256": "f0dfbbc2df4bb658a87d0080a5fa3dec51174729a638f6242163d921c534b218"
     }
   }
 }
