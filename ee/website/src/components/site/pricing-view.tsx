@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { useState } from 'react';
 
 import { ArrowRight, CheckIcon } from './icons';
+import { useSalesDialog } from './sales-dialog';
 
 type Billing = 'monthly' | 'annual';
 
@@ -167,6 +168,7 @@ function Plan({
 }
 
 export function PricingView() {
+  const { openSalesDialog } = useSalesDialog();
   const [billing, setBilling] = useState<Billing>('monthly');
 
   return (
@@ -261,9 +263,9 @@ export function PricingView() {
                 name="Managed SaaS"
                 tagline="We host and manage everything."
                 monthly="$199"
-                annual="$159"
+                annual="$165"
                 includesMonthly="Includes 10,000 documents / month"
-                includesAnnual="Billed annually · 10,000 documents / month"
+                includesAnnual="Billed $1,980 annually · 10,000 documents / month"
                 icon={
                   <svg
                     width={28}
@@ -336,13 +338,20 @@ export function PricingView() {
                   Contact our team for custom pricing and solutions.
                 </div>
               </div>
-              <a
-                href="mailto:hello@cloudpdf.io"
-                className="border-cp-violet text-cp-violet hover:border-cp-violetDeep hover:text-cp-violetDeep flex h-[50px] flex-shrink-0 items-center justify-center gap-2.5 rounded-[10px] border-2 px-[22px] font-sans text-base font-bold no-underline transition-all hover:bg-[rgba(124,92,252,0.08)] max-[720px]:w-full"
+              <button
+                className="border-cp-violet text-cp-violet hover:border-cp-violetDeep hover:text-cp-violetDeep flex h-[50px] flex-shrink-0 cursor-pointer items-center justify-center gap-2.5 rounded-[10px] border-2 px-[22px] font-sans text-base font-bold transition-all hover:bg-[rgba(124,92,252,0.08)] max-[720px]:w-full"
+                data-testid="pricing-enterprise-contact-sales"
+                onClick={() =>
+                  openSalesDialog({
+                    placement: 'pricing-enterprise',
+                    productInterest: 'not-sure',
+                  })
+                }
+                type="button"
               >
                 <span>Contact sales</span>
                 <ArrowRight width={20} height={20} />
-              </a>
+              </button>
             </div>
           </div>
         </div>

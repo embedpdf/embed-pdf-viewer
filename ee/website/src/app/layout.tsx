@@ -2,7 +2,9 @@ import type { Metadata } from 'next';
 import { Inter, Manrope } from 'next/font/google';
 import type { ReactNode } from 'react';
 
+import { Footer } from '@/components/site/footer';
 import { Header } from '@/components/site/header';
+import { SalesDialogProvider } from '@/components/site/sales-dialog';
 
 import './globals.css';
 
@@ -42,8 +44,11 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning className={`${inter.variable} ${manrope.variable}`}>
       <body className="bg-cp-bg text-cp-ink min-h-screen font-sans antialiased">
-        <Header />
-        {children}
+        <SalesDialogProvider>
+          <Header />
+          {children}
+          <Footer />
+        </SalesDialogProvider>
       </body>
     </html>
   );

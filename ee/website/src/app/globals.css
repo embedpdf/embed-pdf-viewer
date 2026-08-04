@@ -7,6 +7,11 @@ html {
   scroll-behavior: smooth;
 }
 
+.sales-dialog::backdrop {
+  background: rgba(7, 32, 76, 0.52);
+  backdrop-filter: blur(6px);
+}
+
 /* Decorative dotted grid used across hero / docs / pricing */
 .cp-dots {
   background-image: radial-gradient(circle, currentColor 3px, transparent 3.5px);

@@ -12,4 +12,12 @@ export default {
     title: 'Pricing',
     type: 'page',
   },
+  terms: {
+    title: 'Terms',
+    type: 'page',
+  },
+  privacy: {
+    title: 'Privacy',
+    type: 'page',
+  },
 };
