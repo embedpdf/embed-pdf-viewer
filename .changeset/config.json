@@ -46,7 +46,7 @@
   ],
   "linked": [],
   "access": "public",
-  "baseBranch": "main",
+  "baseBranch": "v2",
   "updateInternalDependencies": "patch",
   "ignore": [
     "@embedpdf/website",
