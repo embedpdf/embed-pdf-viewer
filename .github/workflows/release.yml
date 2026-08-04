@@ -1,4 +1,17 @@
-name: Release
+# Canonical release workflow for `main`.
+#
+# GA promotion checklist (perform in the stable version PR):
+#   1. Run `pnpm changeset pre exit` so Changesets prepares stable versions.
+#   2. In package.json's `ci:publish`, remove `--tag next`; keep
+#      `--publish-branch main --report-summary`.
+#   3. Change the workflow/release labels, Changesets PR labels, and fallback
+#      release notes below from "next" to stable; then set `prerelease: false`
+#      and `make_latest: true`.
+#   4. Expand "Read server version" to capture `v`, emit both `version=$v` and
+#      `minor=${v%.*}`, then replace the GHCR `next` and `sha-*` tags with
+#      `${{ steps.ver.outputs.minor }}` and `latest`.
+# Keep the consume gate for stable releases.
+name: Release (next)
 
 on:
   push:
@@ -12,7 +25,7 @@ on:
   workflow_dispatch: {}
 
 concurrency:
-  group: release
+  group: release-next
   cancel-in-progress: false
 
 permissions:
@@ -82,17 +95,23 @@ jobs:
       - name: Build packages
         run: pnpm run build:release
 
-      # Changesets will either open a version PR or publish if already versioned
+      # The consume gate: packs every publishable into real tarballs and runs
+      # them through four consumer fixtures (node-esm, node-cjs, vite-app,
+      # tsc-nodenext). A broken artifact can never reach a dist-tag.
+      # (build:release above already built ./packages/**.)
+      - name: Consume gate
+        run: pnpm run verify:consume
+
       - name: Version / Publish via Changesets
         id: changesets
         uses: changesets/action@v1
         with:
-          commit: "chore: version packages"
-          title:  "chore: version packages"
+          # GA: remove the "(next)" suffixes; the publish command stays the same.
+          commit: "chore: version packages (next)"
+          title:  "chore: version packages (next)"
           publish: pnpm ci:publish
           createGithubReleases: false
 
-      # Robust publish detection via the file your ci:publish writes
       - name: Detect publish summary
         id: published
         run: |
@@ -122,9 +141,15 @@ jobs:
           PR_BODY: ${{ steps.merged_pr.outputs.body }}
         run: |
           echo "$PR_BODY" | sed -n '/# Releases/,$p' | tail -n +2 > release-notes.md || true
+
           if [ ! -s release-notes.md ]; then
-            echo "Automated release." > release-notes.md
+            # GA: replace this fallback with "Automated release."
+            echo "Pre-release from main." > release-notes.md
+            echo "" >> release-notes.md
+            echo "Packages published:" >> release-notes.md
+            echo "${{ steps.published.outputs.published }}" >> release-notes.md
           fi
+
           echo "Release notes:"
           cat release-notes.md
 
@@ -137,8 +162,7 @@ jobs:
           # Where a package lives is asked of the workspace ONCE, never
           # reconstructed from its npm name: the tree is grouped
           # (packages/<group>/<member>, ee/viewer/<framework>), so NAMING.md's
-          # name↔path rule cannot be inverted without hardcoding the group list
-          # here — which is exactly how this step went stale before.
+          # name↔path rule cannot be inverted without hardcoding the group list.
           pnpm ls -r --depth -1 --json \
             | jq --arg root "$GITHUB_WORKSPACE/" \
                 'map(select(.name and .path))
@@ -164,22 +188,22 @@ jobs:
           done
           ls -lh release-assets || true
 
-      - name: Create GitHub Release (draft)
+      - name: Create GitHub pre-release
         if: steps.published.outputs.did_publish == 'true'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.published.outputs.version }}
-          name: Release v${{ steps.published.outputs.version }}
+          # GA: rename to "Release v...", then flip the two flags below.
+          name: "Release Next v${{ steps.published.outputs.version }}"
           body_path: release-notes.md
           files: release-assets/*
           draft: false
-          prerelease: false
-          make_latest: true
+          prerelease: true
+          make_latest: false
 
-  # Publish the @cloudpdf/server container image to GHCR, in sync with the
-  # npm release. Only runs when @cloudpdf/server was actually published.
-  # The native runtime is the pinned linux-x64 artifact from build-runtime
-  # (NATIVE_SRC=prebuilt), so the image ships the exact released binary.
+  # Preview container image for the `next` channel. Pushes pre-release tags
+  # (the prerelease version, `next`, and `sha-<short>`) so candidates can be
+  # pulled + smoke/soak tested before promotion. Never moves `latest`.
   publish-image:
     needs: [build-runtime, release]
     if: needs.release.outputs.did_publish == 'true' && contains(needs.release.outputs.published, '@cloudpdf/server')
@@ -193,10 +217,9 @@ jobs:
 
       - name: Read server version
         id: ver
-        run: |
-          v="$(jq -r .version ee/server/package.json)"
-          echo "version=$v" >> "$GITHUB_OUTPUT"
-          echo "minor=${v%.*}" >> "$GITHUB_OUTPUT"
+        # GA: expand this step as described in the promotion checklist to emit
+        # the stable minor tag as well as the full version.
+        run: echo "version=$(jq -r .version ee/server/package.json)" >> "$GITHUB_OUTPUT"
 
       - name: Download linux-x64 native runtime
         uses: actions/download-artifact@v7
@@ -216,10 +239,12 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ghcr.io/embedpdf/cloudpdf-server
+          # GA: after adding the `minor` output described above, replace the
+          # `next` and `sha-*` entries with the minor tag and `latest`.
           tags: |
             type=raw,value=${{ steps.ver.outputs.version }}
-            type=raw,value=${{ steps.ver.outputs.minor }}
-            type=raw,value=latest
+            type=raw,value=next
+            type=sha,prefix=sha-,format=short
 
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v3

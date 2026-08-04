@@ -19,8 +19,7 @@
     "verify:consume": "pnpm --filter @embedpdf/tooling-consume-fixtures run verify",
     "verify:engine-runtime-packages": "pnpm --filter @embedpdf/engine-runtime run verify:packages",
     "changeset": "changeset",
-    "ci:publish": "pnpm publish -r --access public --report-summary $GITHUB_WORKSPACE/pnpm-publish-summary.json",
-    "ci:publish:next": "pnpm publish -r --access public --tag next --publish-branch next --report-summary $GITHUB_WORKSPACE/pnpm-publish-summary.json"
+    "ci:publish": "pnpm publish -r --access public --tag next --publish-branch main --report-summary"
   },
   "devDependencies": {
     "@changesets/cli": "^2.29.6",
