@@ -92,6 +92,9 @@ jobs:
       - name: Verify engine-runtime packages
         run: pnpm run verify:engine-runtime-packages
 
+      - name: Verify license security
+        run: pnpm --filter @cloudpdf/server exec vitest run test/licensing.test.ts
+
       - name: Build packages
         run: pnpm run build:release
 

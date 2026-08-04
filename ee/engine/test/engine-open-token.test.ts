@@ -6,7 +6,6 @@ import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import type { Kysely } from 'kysely';
 import {
-  buildApp,
   createSqliteDb,
   migrate,
   sqliteMigrations,
@@ -16,6 +15,8 @@ import {
   type AppBundle,
   type DbSchema,
 } from '@cloudpdf/server';
+import { buildAppForTesting } from '../../server/src/app/buildApp';
+import { createValidTestLicenseGate } from '../../server/src/licensing/testing';
 import { EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
 import { createCloudEngine } from '../src/index';
 import { decodeUnverifiedClaims } from '../src/transport/decodeUnverifiedClaims';
@@ -58,7 +59,8 @@ async function buildFixture(): Promise<Fixture> {
   const db = createSqliteDb({ path: ':memory:' });
   await migrate(db, { source: { kind: 'inline', migrations: sqliteMigrations } });
   const store = new FsObjectStore({ root: storageRoot });
-  const bundle = await buildApp({
+  const bundle = await buildAppForTesting({
+    licenseGate: createValidTestLicenseGate(),
     verifier: { mode: 'hs256', secret: SECRET },
     workerEntry: STUB_ENTRY,
     poolSize: 1,

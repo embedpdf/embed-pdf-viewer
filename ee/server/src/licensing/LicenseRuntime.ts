@@ -1,15 +1,23 @@
-import { createHash, randomBytes, randomUUID } from 'node:crypto';
+import { createCipheriv, createDecipheriv, createHash, randomBytes, randomUUID } from 'node:crypto';
 import { hostname, platform, arch } from 'node:os';
+
 import type { Kysely } from 'kysely';
 
-import type { Database } from '../db/schema';
-import { parseSecretRefUri } from '../config/secrets/parseSecretRefUri';
-import type { SecretResolver } from '../security/secrets/SecretResolver';
-import { ConnectedLicenseError, validateConnectedLicense } from './connected-client';
+import {
+  ConnectedLicenseError,
+  validateConnectedLicense,
+  verifyCachedConnectedValidation,
+  type ConnectedValidation,
+} from './connected-client';
 import { deploymentFingerprint } from './fingerprint';
+import type { KeygenResponseProof } from './keygen-response';
 import { LicenseStateRepository } from './LicenseStateRepository';
 import { verifyMachineCertificate, type VerifiedMachineCertificate } from './offline-certificate';
 import { resolveCloudPdfLicenseIdentity, type CloudPdfLicenseIdentity } from './product';
+import { markLicenseGateTrusted } from './trusted-license-gates';
+import { parseSecretRefUri } from '../config/secrets/parseSecretRefUri';
+import type { Database } from '../db/schema';
+import type { SecretResolver } from '../security/secrets/SecretResolver';
 
 export type LicenseMode = 'connected' | 'air-gapped';
 export type LicenseAccess = 'full' | 'restricted' | 'none';
@@ -62,6 +70,7 @@ interface RuntimeSnapshot extends LicenseGateStatus {
 
 export class LicenseRuntime implements LicenseGate {
   private readonly ownerId = randomUUID();
+  private connectedReportingLicenseId: string | null = null;
   private snapshot: RuntimeSnapshot = {
     access: 'none',
     code: 'LICENSE_NOT_CONFIGURED',
@@ -86,6 +95,8 @@ export class LicenseRuntime implements LicenseGate {
   static async create(input: {
     db: Kysely<Database>;
     env?: NodeJS.ProcessEnv;
+    /** Internal test seam. Production callers use the compiled identity. */
+    identity?: CloudPdfLicenseIdentity;
     secretResolver?: SecretResolver;
     startTimer?: boolean;
   }): Promise<LicenseRuntime> {
@@ -97,11 +108,12 @@ export class LicenseRuntime implements LicenseGate {
     }
     const runtime = new LicenseRuntime(
       new LicenseStateRepository(input.db),
-      resolveCloudPdfLicenseIdentity(env),
+      input.identity ?? resolveCloudPdfLicenseIdentity(env),
       rawMode,
       key,
     );
     await runtime.refresh();
+    markLicenseGateTrusted(runtime);
     if (input.startTimer !== false) runtime.start();
     return runtime;
   }
@@ -116,13 +128,19 @@ export class LicenseRuntime implements LicenseGate {
       return publicStatus({
         ...this.snapshot,
         code: this.mode === 'connected' ? 'LICENSE_OFFLINE_GRACE_EXPIRED' : 'LICENSE_EXPIRED',
-        message: this.mode === 'connected'
-          ? 'CloudPDF could not revalidate the license before the offline grace period expired'
-          : 'The installed air-gapped certificate has expired',
+        message:
+          this.mode === 'connected'
+            ? 'CloudPDF could not revalidate the license before the offline grace period expired'
+            : 'The installed air-gapped certificate has expired',
         access: 'restricted',
       });
     }
     return publicStatus(this.snapshot);
+  }
+
+  /** Internal server bootstrap value sourced only from verified license metadata. */
+  getConnectedReportingLicenseId(): string | null {
+    return this.connectedReportingLicenseId;
   }
 
   async close(): Promise<void> {
@@ -161,24 +179,38 @@ export class LicenseRuntime implements LicenseGate {
     const state = await this.repository.getOrCreate();
     const now = Date.now();
     if (now + 5 * 60 * 1_000 < state.last_observed_time) {
+      const prior =
+        this.mode === 'connected'
+          ? this.cachedConnectedValidation(state.validation_data_json, state.deployment_id)
+          : this.priorAirGapValidation(state);
+      this.connectedReportingLicenseId =
+        this.mode === 'connected' ? optionalString(prior?.metadata['cloudpdfLicenseId']) : null;
       this.snapshot = {
-        access: hasPriorValidation(state) ? 'restricted' : 'none',
+        access: prior ? 'restricted' : 'none',
         code: 'SYSTEM_CLOCK_ROLLBACK',
-        expiresAt: null,
-        graceExpiresAt: null,
-        lastValidatedAt: state.last_validated_at
-          ? new Date(state.last_validated_at).toISOString()
+        expiresAt: prior
+          ? 'expiresAt' in prior
+            ? prior.expiresAt
+            : prior.artifactExpiresAt
           : null,
-        licenseKind: cachedLicenseKind(state.validation_data_json),
+        graceExpiresAt: null,
+        lastValidatedAt: prior
+          ? new Date(
+              'validatedAt' in prior ? prior.validatedAt : prior.artifactIssuedAt,
+            ).toISOString()
+          : null,
+        licenseKind: optionalString(prior?.metadata['purpose']),
         message: 'The system clock moved backwards; license validation is blocked',
-        meters: cachedMeters(state.validation_data_json),
+        meters: parseMeters(prior?.metadata ?? {}),
         mode: this.mode,
-        telemetryProfile: cachedTelemetryProfile(state.validation_data_json),
+        telemetryProfile:
+          this.mode === 'connected' ? optionalString(prior?.metadata['telemetryProfile']) : 'none',
       };
       return;
     }
 
     if (this.mode === 'air-gapped') {
+      this.connectedReportingLicenseId = null;
       await this.refreshAirGapped(state);
       return;
     }
@@ -187,9 +219,12 @@ export class LicenseRuntime implements LicenseGate {
   }
 
   private start(): void {
-    this.timer = setInterval(() => {
-      void this.refresh();
-    }, 5 * 60 * 1_000);
+    this.timer = setInterval(
+      () => {
+        void this.refresh();
+      },
+      5 * 60 * 1_000,
+    );
     this.timer.unref();
   }
 
@@ -234,21 +269,19 @@ export class LicenseRuntime implements LicenseGate {
         telemetryProfile: 'none',
       };
     } catch (error) {
-      const cached = parseCachedAirGap(state.validation_data_json);
+      const prior = this.priorAirGapValidation(state);
       const message = error instanceof Error ? error.message : 'Air-gapped certificate is invalid';
       this.snapshot = {
-        access: hasPriorValidation(state) ? 'restricted' : 'none',
+        access: prior ? 'restricted' : 'none',
         code: /expired/i.test(message)
           ? 'AIR_GAP_CERTIFICATE_EXPIRED'
           : 'AIR_GAP_CERTIFICATE_INVALID',
-        expiresAt: cached?.artifactExpiresAt ?? null,
+        expiresAt: prior?.artifactExpiresAt ?? null,
         graceExpiresAt: null,
-        lastValidatedAt: state.last_validated_at
-          ? new Date(state.last_validated_at).toISOString()
-          : null,
-        licenseKind: optionalString(cached?.metadata['purpose']),
+        lastValidatedAt: prior ? new Date(prior.artifactIssuedAt).toISOString() : null,
+        licenseKind: optionalString(prior?.metadata['purpose']),
         message,
-        meters: parseMeters(cached?.metadata ?? {}),
+        meters: parseMeters(prior?.metadata ?? {}),
         mode: 'air-gapped',
         telemetryProfile: 'none',
       };
@@ -259,6 +292,7 @@ export class LicenseRuntime implements LicenseGate {
     state: Awaited<ReturnType<LicenseStateRepository['load']>>,
   ): Promise<void> {
     if (!this.key) {
+      this.connectedReportingLicenseId = null;
       this.snapshot = {
         access: 'none',
         code: 'LICENSE_KEY_REQUIRED',
@@ -275,15 +309,18 @@ export class LicenseRuntime implements LicenseGate {
     }
 
     const keyFingerprint = createHash('sha256').update(this.key).digest('hex');
-    const cachedAtStart = parseCachedValidation(state.validation_data_json);
-    if (this.useConnectedCache({
-      cached: cachedAtStart,
-      code: 'VALID_CACHED',
-      keyFingerprint,
-      message: 'Connected license is valid; using the latest scheduled validation',
-      requireCheckInFreshness: true,
-      state,
-    })) {
+    const cachedAtStart = this.cachedConnectedValidation(
+      state.validation_data_json,
+      state.deployment_id,
+    );
+    if (
+      this.useConnectedCache({
+        cached: cachedAtStart,
+        code: 'VALID_CACHED',
+        message: 'Connected license is valid; using the latest scheduled validation',
+        requireCheckInFreshness: true,
+      })
+    ) {
       return;
     }
 
@@ -297,24 +334,30 @@ export class LicenseRuntime implements LicenseGate {
         this.repository,
         state.last_validated_at,
       );
-      const coordinatedCache = parseCachedValidation(coordinatedState.validation_data_json);
-      if (this.useConnectedCache({
-        cached: coordinatedCache,
-        code: 'VALID_COORDINATED',
-        keyFingerprint,
-        message: 'Another replica is validating the connected license',
-        requireCheckInFreshness: false,
-        state: coordinatedState,
-      })) {
+      const coordinatedCache = this.cachedConnectedValidation(
+        coordinatedState.validation_data_json,
+        coordinatedState.deployment_id,
+      );
+      if (
+        this.useConnectedCache({
+          cached: coordinatedCache,
+          code: 'VALID_COORDINATED',
+          message: 'Another replica is validating the connected license',
+          requireCheckInFreshness: false,
+        })
+      ) {
         return;
       }
+      this.connectedReportingLicenseId = optionalString(
+        coordinatedCache?.metadata['cloudpdfLicenseId'],
+      );
       this.snapshot = {
-        access: hasPriorValidation(coordinatedState) ? 'restricted' : 'none',
+        access: coordinatedCache ? 'restricted' : 'none',
         code: 'LICENSE_VALIDATION_IN_PROGRESS',
         expiresAt: coordinatedCache?.expiresAt ?? null,
         graceExpiresAt: null,
-        lastValidatedAt: coordinatedState.last_validated_at
-          ? new Date(coordinatedState.last_validated_at).toISOString()
+        lastValidatedAt: coordinatedCache
+          ? new Date(coordinatedCache.validatedAt).toISOString()
           : null,
         licenseKind: optionalString(coordinatedCache?.metadata['purpose']),
         message: 'Another replica is validating the license; no usable cached decision exists',
@@ -332,12 +375,17 @@ export class LicenseRuntime implements LicenseGate {
         key: this.key,
       });
       const offlineGraceHours = positiveNumber(validation.metadata['offlineGraceHours']) ?? 72;
+      this.connectedReportingLicenseId = optionalString(validation.metadata['cloudpdfLicenseId']);
       await this.repository.saveConnectedValidation({
         keyFingerprint,
         keygenLicenseId: validation.licenseId,
-        validationData: validation,
+        validationData: encryptConnectedProof({
+          fingerprint: deploymentFingerprint(state.deployment_id),
+          key: this.key,
+          proof: validation.proof,
+        }),
       });
-      const validatedAt = Date.now();
+      const validatedAt = validation.validatedAt;
       const licenseExpiry = validation.expiresAt
         ? new Date(validation.expiresAt).getTime()
         : Number.POSITIVE_INFINITY;
@@ -345,10 +393,7 @@ export class LicenseRuntime implements LicenseGate {
         access: 'full',
         code: 'VALID',
         expiresAt: validation.expiresAt,
-        graceExpiresAt: Math.min(
-          validatedAt + offlineGraceHours * 60 * 60 * 1_000,
-          licenseExpiry,
-        ),
+        graceExpiresAt: Math.min(validatedAt + offlineGraceHours * 60 * 60 * 1_000, licenseExpiry),
         lastValidatedAt: new Date(validatedAt).toISOString(),
         licenseKind: optionalString(validation.metadata['purpose']),
         message: 'Connected license is valid',
@@ -357,33 +402,27 @@ export class LicenseRuntime implements LicenseGate {
         telemetryProfile: optionalString(validation.metadata['telemetryProfile']),
       };
     } catch (error) {
-      const cached = parseCachedValidation(state.validation_data_json);
+      const cached = this.cachedConnectedValidation(
+        state.validation_data_json,
+        state.deployment_id,
+      );
       const graceHours = positiveNumber(cached?.metadata['offlineGraceHours']) ?? 72;
-      const cacheMatches = state.license_key_fingerprint === keyFingerprint;
       const cachedLicenseExpiry = cached?.expiresAt
         ? new Date(cached.expiresAt).getTime()
         : Number.POSITIVE_INFINITY;
-      const graceExpiresAt = state.last_validated_at
-        ? Math.min(
-            state.last_validated_at + graceHours * 60 * 60 * 1_000,
-            cachedLicenseExpiry,
-          )
+      const graceExpiresAt = cached
+        ? Math.min(cached.validatedAt + graceHours * 60 * 60 * 1_000, cachedLicenseExpiry)
         : 0;
-      const mayUseOfflineGrace =
-        error instanceof ConnectedLicenseError && error.retryable;
-      if (
-        mayUseOfflineGrace &&
-        cacheMatches &&
-        state.last_validated_at &&
-        Date.now() <= graceExpiresAt
-      ) {
+      const mayUseOfflineGrace = error instanceof ConnectedLicenseError && error.retryable;
+      this.connectedReportingLicenseId = optionalString(cached?.metadata['cloudpdfLicenseId']);
+      if (mayUseOfflineGrace && cached && Date.now() <= graceExpiresAt) {
         await this.repository.touchObservedTime();
         this.snapshot = {
           access: 'full',
           code: 'VALID_OFFLINE_GRACE',
           expiresAt: cached?.expiresAt ?? null,
           graceExpiresAt,
-          lastValidatedAt: new Date(state.last_validated_at).toISOString(),
+          lastValidatedAt: new Date(cached.validatedAt).toISOString(),
           licenseKind: optionalString(cached?.metadata['purpose']),
           message: 'Keygen is unavailable; using the connected license offline grace period',
           meters: parseMeters(cached?.metadata ?? {}),
@@ -393,15 +432,11 @@ export class LicenseRuntime implements LicenseGate {
         return;
       }
       this.snapshot = {
-        access: hasPriorValidation(state) ? 'restricted' : 'none',
-        code: error instanceof ConnectedLicenseError
-          ? error.code
-          : 'CONNECTED_LICENSE_INVALID',
+        access: cached ? 'restricted' : 'none',
+        code: error instanceof ConnectedLicenseError ? error.code : 'CONNECTED_LICENSE_INVALID',
         expiresAt: null,
         graceExpiresAt: null,
-        lastValidatedAt: state.last_validated_at
-          ? new Date(state.last_validated_at).toISOString()
-          : null,
+        lastValidatedAt: cached ? new Date(cached.validatedAt).toISOString() : null,
         licenseKind: optionalString(cached?.metadata['purpose']),
         message: error instanceof Error ? error.message : 'Connected license validation failed',
         meters: parseMeters(cached?.metadata ?? {}),
@@ -414,19 +449,13 @@ export class LicenseRuntime implements LicenseGate {
   }
 
   private useConnectedCache(input: {
-    cached: ReturnType<typeof parseCachedValidation>;
+    cached: ConnectedValidation | null;
     code: string;
-    keyFingerprint: string;
     message: string;
     requireCheckInFreshness: boolean;
-    state: Awaited<ReturnType<LicenseStateRepository['load']>>;
   }): boolean {
-    const { cached, state } = input;
-    if (
-      !cached ||
-      !state.last_validated_at ||
-      state.license_key_fingerprint !== input.keyFingerprint
-    ) return false;
+    const { cached } = input;
+    if (!cached) return false;
     const now = Date.now();
     const checkInHours = positiveNumber(cached.metadata['checkInIntervalHours']) ?? 24;
     const graceHours = positiveNumber(cached.metadata['offlineGraceHours']) ?? 72;
@@ -434,21 +463,18 @@ export class LicenseRuntime implements LicenseGate {
       ? new Date(cached.expiresAt).getTime()
       : Number.POSITIVE_INFINITY;
     const usableUntil = Math.min(
-      state.last_validated_at + (
-        input.requireCheckInFreshness ? checkInHours : graceHours
-      ) * 60 * 60 * 1_000,
+      cached.validatedAt +
+        (input.requireCheckInFreshness ? checkInHours : graceHours) * 60 * 60 * 1_000,
       licenseExpiry,
     );
     if (now > usableUntil) return false;
+    this.connectedReportingLicenseId = optionalString(cached.metadata['cloudpdfLicenseId']);
     this.snapshot = {
       access: 'full',
       code: input.code,
       expiresAt: cached.expiresAt,
-      graceExpiresAt: Math.min(
-        state.last_validated_at + graceHours * 60 * 60 * 1_000,
-        licenseExpiry,
-      ),
-      lastValidatedAt: new Date(state.last_validated_at).toISOString(),
+      graceExpiresAt: Math.min(cached.validatedAt + graceHours * 60 * 60 * 1_000, licenseExpiry),
+      lastValidatedAt: new Date(cached.validatedAt).toISOString(),
       licenseKind: optionalString(cached.metadata['purpose']),
       message: input.message,
       meters: parseMeters(cached.metadata),
@@ -456,6 +482,45 @@ export class LicenseRuntime implements LicenseGate {
       telemetryProfile: optionalString(cached.metadata['telemetryProfile']),
     };
     return true;
+  }
+
+  private cachedConnectedValidation(
+    value: string | null,
+    deploymentId: string,
+  ): ConnectedValidation | null {
+    if (!this.key) return null;
+    const proof = decryptConnectedProof({
+      fingerprint: deploymentFingerprint(deploymentId),
+      key: this.key,
+      value,
+    });
+    if (!proof) return null;
+    try {
+      return verifyCachedConnectedValidation({
+        fingerprint: deploymentFingerprint(deploymentId),
+        identity: this.identity,
+        key: this.key,
+        proof,
+      });
+    } catch {
+      return null;
+    }
+  }
+
+  private priorAirGapValidation(
+    state: Awaited<ReturnType<LicenseStateRepository['load']>>,
+  ): VerifiedMachineCertificate | null {
+    if (!state.installed_certificate) return null;
+    try {
+      return verifyMachineCertificate({
+        allowExpired: true,
+        certificate: state.installed_certificate,
+        expectedFingerprint: deploymentFingerprint(state.deployment_id),
+        identity: this.identity,
+      });
+    } catch {
+      return null;
+    }
   }
 }
 
@@ -505,25 +570,6 @@ async function resolveLicenseKey(
   const key = resolved.licenseKey.trim();
   if (!key) throw new Error('CLOUDPDF_LICENSE_KEY resolved to an empty secret');
   return key;
-}
-
-function hasPriorValidation(state: {
-  last_validated_at: number | null;
-  validation_data_json: string | null;
-}): boolean {
-  return state.last_validated_at !== null && state.validation_data_json !== null;
-}
-
-function cachedMeters(value: string | null): RuntimeMeterPolicy[] {
-  return parseMeters(parseCachedValidation(value)?.metadata ?? {});
-}
-
-function cachedTelemetryProfile(value: string | null): string | null {
-  return optionalString(parseCachedValidation(value)?.metadata['telemetryProfile']);
-}
-
-function cachedLicenseKind(value: string | null): string | null {
-  return optionalString(parseCachedValidation(value)?.metadata['purpose']);
 }
 
 function parseMeters(metadata: Record<string, unknown>): RuntimeMeterPolicy[] {
@@ -576,45 +622,94 @@ function positiveNumber(value: unknown): number | undefined {
   return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : undefined;
 }
 
-function parseCachedValidation(value: string | null): {
-  expiresAt: string | null;
-  metadata: Record<string, unknown>;
-} | null {
-  if (!value) return null;
+interface EncryptedConnectedProof {
+  ciphertext: string;
+  iv: string;
+  kind: 'keygen-signed-validation-encrypted-v1';
+  tag: string;
+}
+
+function decryptConnectedProof(input: {
+  fingerprint: string;
+  key: string;
+  value: string | null;
+}): KeygenResponseProof | null {
+  const encrypted = parseEncryptedConnectedProof(input.value);
+  if (!encrypted) return null;
   try {
-    const parsed = JSON.parse(value) as unknown;
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
-    const record = parsed as Record<string, unknown>;
-    return {
-      expiresAt: typeof record['expiresAt'] === 'string' ? record['expiresAt'] : null,
-      metadata:
-        record['metadata'] && typeof record['metadata'] === 'object' && !Array.isArray(record['metadata'])
-          ? record['metadata'] as Record<string, unknown>
-          : {},
-    };
+    const decipher = createDecipheriv(
+      'aes-256-gcm',
+      connectedProofEncryptionKey(input.key),
+      Buffer.from(encrypted.iv, 'base64'),
+    );
+    decipher.setAAD(Buffer.from(input.fingerprint));
+    decipher.setAuthTag(Buffer.from(encrypted.tag, 'base64'));
+    const plaintext = Buffer.concat([
+      decipher.update(Buffer.from(encrypted.ciphertext, 'base64')),
+      decipher.final(),
+    ]);
+    return parseKeygenResponseProof(JSON.parse(plaintext.toString('utf8')));
   } catch {
     return null;
   }
 }
 
-function parseCachedAirGap(value: string | null): {
-  artifactExpiresAt: string | null;
-  metadata: Record<string, unknown>;
-} | null {
+function parseEncryptedConnectedProof(value: string | null): EncryptedConnectedProof | null {
   if (!value) return null;
   try {
     const parsed = JSON.parse(value) as unknown;
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
     const record = parsed as Record<string, unknown>;
-    return {
-      artifactExpiresAt:
-        typeof record['artifactExpiresAt'] === 'string' ? record['artifactExpiresAt'] : null,
-      metadata:
-        record['metadata'] && typeof record['metadata'] === 'object' && !Array.isArray(record['metadata'])
-          ? record['metadata'] as Record<string, unknown>
-          : {},
-    };
+    if (
+      record['kind'] !== 'keygen-signed-validation-encrypted-v1' ||
+      typeof record['ciphertext'] !== 'string' ||
+      typeof record['iv'] !== 'string' ||
+      typeof record['tag'] !== 'string'
+    )
+      return null;
+    return record as unknown as EncryptedConnectedProof;
   } catch {
     return null;
   }
+}
+
+function parseKeygenResponseProof(value: unknown): KeygenResponseProof | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const candidate = value as Record<string, unknown>;
+  if (
+    candidate['version'] !== 1 ||
+    typeof candidate['bodyBase64'] !== 'string' ||
+    typeof candidate['date'] !== 'string' ||
+    typeof candidate['digest'] !== 'string' ||
+    typeof candidate['keygenSignature'] !== 'string'
+  )
+    return null;
+  return candidate as unknown as KeygenResponseProof;
+}
+
+function encryptConnectedProof(input: {
+  fingerprint: string;
+  key: string;
+  proof: KeygenResponseProof;
+}): EncryptedConnectedProof {
+  const iv = randomBytes(12);
+  const cipher = createCipheriv('aes-256-gcm', connectedProofEncryptionKey(input.key), iv);
+  cipher.setAAD(Buffer.from(input.fingerprint));
+  const ciphertext = Buffer.concat([
+    cipher.update(Buffer.from(JSON.stringify(input.proof))),
+    cipher.final(),
+  ]);
+  return {
+    ciphertext: ciphertext.toString('base64'),
+    iv: iv.toString('base64'),
+    kind: 'keygen-signed-validation-encrypted-v1',
+    tag: cipher.getAuthTag().toString('base64'),
+  };
+}
+
+function connectedProofEncryptionKey(licenseKey: string): Buffer {
+  return createHash('sha256')
+    .update('cloudpdf/connected-license-proof/v1\0')
+    .update(licenseKey)
+    .digest();
 }

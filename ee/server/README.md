@@ -18,6 +18,37 @@ Clients speak to it through:
 
 Deployment and configuration guides: https://www.cloudpdf.com
 
+## License configuration
+
+The server fails closed when no valid CloudPDF license is available. For a
+connected development or production license, configure:
+
+```sh
+export CLOUDPDF_LICENSE_MODE=connected
+export CLOUDPDF_LICENSE_KEY='your-key-or-secret://-reference'
+cloudpdf-server license status
+```
+
+Do not commit a license key or paste it into CI logs. `secret://` references
+can be resolved through the server's configured secrets provider.
+
+The production licensing identity is compiled into the package. Connected
+validation goes to `https://api.keygen.sh`, and aggregated usage reporting,
+when required by the signed license metadata, goes to
+`https://api.cloudpdf.com`. These hosts, the CloudPDF product ID, and the
+Ed25519 verification key cannot be replaced with environment variables.
+
+Every successful connected decision must have a fresh Keygen response
+signature bound to the request nonce, deployment fingerprint, CloudPDF
+product, account, and license key. The exact signed proof is encrypted in the
+license-state database and its signature is verified again before cache or
+offline-grace access is granted. Unsigned, stale, replayed, modified, or
+operator-authored database values never grant full access.
+
+Air-gapped deployments use `cloudpdf-server license request` and
+`cloudpdf-server license install`; the installed machine certificate is
+verified against the same compiled CloudPDF identity on every refresh.
+
 ## License
 
 Commercial — see LICENSE.

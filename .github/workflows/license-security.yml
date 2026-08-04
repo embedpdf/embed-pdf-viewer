@@ -1,0 +1,67 @@
+name: License security
+
+on:
+  pull_request:
+    paths:
+      - 'ee/server/src/app/buildApp.ts'
+      - 'ee/server/src/index.ts'
+      - 'ee/server/src/licensing/**'
+      - 'ee/server/src/bin/cloudpdf-server.ts'
+      - 'ee/server/test/licensing.test.ts'
+      - 'ee/server/package.json'
+      - '.github/workflows/license-security.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'ee/server/src/app/buildApp.ts'
+      - 'ee/server/src/index.ts'
+      - 'ee/server/src/licensing/**'
+      - 'ee/server/src/bin/cloudpdf-server.ts'
+      - 'ee/server/test/licensing.test.ts'
+      - 'ee/server/package.json'
+      - '.github/workflows/license-security.yml'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: license-security-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: true
+
+jobs:
+  verify:
+    name: signed proofs and fail-closed gates
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v5
+        with:
+          version: 10.4.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Adversarial licensing tests
+        run: pnpm --filter @cloudpdf/server exec vitest run test/licensing.test.ts
+
+      - name: Build published server artifact
+        run: pnpm --filter @cloudpdf/server build
+
+      - name: Verify published license API boundary
+        run: >-
+          node --input-type=module -e "const m=await import('./ee/server/dist/index.js');
+          const forbidden=['LicenseRuntime','buildAppForTesting','ConnectedUsageReporter'];
+          const leaked=forbidden.filter((name)=>name in m);
+          if(leaked.length) throw new Error('internal exports leaked: '+leaked.join(','));
+          if(typeof m.createLicenseRuntime!=='function'||typeof m.buildApp!=='function')
+          throw new Error('public license API missing');"

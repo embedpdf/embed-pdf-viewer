@@ -6,7 +6,6 @@ import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import type { Kysely } from 'kysely';
 import {
-  buildApp,
   createSqliteDb,
   migrate,
   sqliteMigrations,
@@ -16,6 +15,7 @@ import {
   type AppBundle,
   type DbSchema,
 } from '../src/index';
+import { buildAppForTesting } from '../src/app/buildApp';
 import { createValidTestLicenseGate } from '../src/licensing/testing';
 
 const STUB_ENTRY = new URL('./_helpers/stub-worker-entry.cjs', import.meta.url);
@@ -38,7 +38,7 @@ async function buildFixture(): Promise<Fixture> {
   const db = createSqliteDb({ path: ':memory:' });
   await migrate(db, { source: { kind: 'inline', migrations: sqliteMigrations } });
   const store = new FsObjectStore({ root: storageRoot });
-  const bundle = await buildApp({
+  const bundle = await buildAppForTesting({
     licenseGate: createValidTestLicenseGate(),
     verifier: { mode: 'hs256', secret: SECRET },
     workerEntry: STUB_ENTRY,

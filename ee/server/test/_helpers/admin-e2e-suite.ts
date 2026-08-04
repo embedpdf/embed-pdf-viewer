@@ -6,13 +6,13 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import type { Kysely } from 'kysely';
 import {
-  buildApp,
   FsObjectStore,
   signDevToken,
   StorageKeys,
   type AppBundle,
   type DbSchema,
 } from '../../src/index';
+import { buildAppForTesting } from '../../src/app/buildApp';
 import { createCloudAdmin, AdminError } from '@cloudpdf/admin';
 import { createValidTestLicenseGate } from '../../src/licensing/testing';
 
@@ -53,7 +53,7 @@ export function runAdminE2e(dialect: AdminE2eDialectFixture): void {
     const db = await dialect.makeDb();
     const store = new FsObjectStore({ root: storageRoot });
 
-    const bundle = await buildApp({
+    const bundle = await buildAppForTesting({
       licenseGate: createValidTestLicenseGate(),
       verifier: { mode: 'hs256', secret: SECRET },
       workerEntry: null,

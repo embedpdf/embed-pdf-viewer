@@ -1,14 +1,14 @@
 import { randomUUID } from 'node:crypto';
+
 import type { Kysely, Selectable } from 'kysely';
 
-import { parseSecretRefUri } from '../config/secrets/parseSecretRefUri';
-import type {
-  Database,
-  LicenseReportingStateTable,
-} from '../db/schema';
-import type { SecretResolver } from '../security/secrets/SecretResolver';
 import type { LicenseUsageSnapshot } from './UsageMeters';
 import { UsageMeters } from './UsageMeters';
+import { parseSecretRefUri } from '../config/secrets/parseSecretRefUri';
+import type { Database, LicenseReportingStateTable } from '../db/schema';
+import type { SecretResolver } from '../security/secrets/SecretResolver';
+
+const productionControlPlaneUrl = 'https://api.cloudpdf.com';
 
 interface UsageReportPayload extends LicenseUsageSnapshot {
   installationId: string;
@@ -43,29 +43,59 @@ export class ConnectedUsageReporter {
   private constructor(
     private readonly db: Kysely<Database>,
     private readonly meters: UsageMeters,
+    private readonly cloudPdfLicenseId: string,
     private readonly controlPlaneUrl: string,
     private readonly reportingToken: string,
   ) {}
 
   static async create(input: {
-    controlPlaneUrl?: string;
+    cloudPdfLicenseId: string;
     db: Kysely<Database>;
     meters: UsageMeters;
     reportingToken?: string;
     secretResolver?: SecretResolver;
   }): Promise<ConnectedUsageReporter> {
-    const controlPlaneUrl = requireHttpUrl(
-      input.controlPlaneUrl?.trim(),
-      'CLOUDPDF_CONTROL_PLANE_URL',
+    return this.createWithControlPlane(input, productionControlPlaneUrl);
+  }
+
+  /** Internal test seam. Not exported by the npm package. */
+  static async createForTesting(input: {
+    cloudPdfLicenseId: string;
+    controlPlaneUrl: string;
+    db: Kysely<Database>;
+    meters: UsageMeters;
+    reportingToken?: string;
+    secretResolver?: SecretResolver;
+  }): Promise<ConnectedUsageReporter> {
+    return this.createWithControlPlane(
+      input,
+      requireHttpsUrl(input.controlPlaneUrl.trim(), 'controlPlaneUrl'),
     );
+  }
+
+  private static async createWithControlPlane(
+    input: {
+      cloudPdfLicenseId: string;
+      db: Kysely<Database>;
+      meters: UsageMeters;
+      reportingToken?: string;
+      secretResolver?: SecretResolver;
+    },
+    controlPlaneUrl: string,
+  ): Promise<ConnectedUsageReporter> {
     const reportingToken = await resolveSecret(
       input.reportingToken,
       input.secretResolver,
       'CLOUDPDF_LICENSE_REPORTING_TOKEN',
     );
+    const cloudPdfLicenseId = input.cloudPdfLicenseId.trim();
+    if (!cloudPdfLicenseId) {
+      throw new Error('A signed CloudPDF reporting license ID is required');
+    }
     return new ConnectedUsageReporter(
       input.db,
       input.meters,
+      cloudPdfLicenseId,
       controlPlaneUrl,
       reportingToken,
     );
@@ -84,7 +114,7 @@ export class ConnectedUsageReporter {
   }
 
   async reportNow(): Promise<boolean> {
-    if (!await this.acquireLease('usage-report', 60_000)) return false;
+    if (!(await this.acquireLease('usage-report', 60_000))) return false;
     try {
       const pending = await this.pendingReport();
       await this.markAttempt();
@@ -124,22 +154,30 @@ export class ConnectedUsageReporter {
   private async pendingReport(): Promise<PendingReport> {
     const state = await this.getOrCreateReportingState();
     const existing = parsePending(state.pending_payload_json);
-    if (existing) return existing;
+    if (existing) {
+      if (existing.licenseId === this.cloudPdfLicenseId) return existing;
+      const corrected = { ...existing, licenseId: this.cloudPdfLicenseId };
+      await this.db
+        .updateTable('license_reporting_state')
+        .set({ pending_payload_json: JSON.stringify(corrected), updated_at: Date.now() })
+        .where('singleton_id', '=', 1)
+        .executeTakeFirstOrThrow();
+      return corrected;
+    }
 
     const runtime = await this.db
       .selectFrom('license_runtime_state')
-      .select(['deployment_id', 'validation_data_json'])
+      .select('deployment_id')
       .where('singleton_id', '=', 1)
       .executeTakeFirstOrThrow();
-    const licenseId = cloudPdfLicenseId(runtime.validation_data_json);
     const sequence = Number(state.sequence) + 1;
     if (!Number.isSafeInteger(sequence)) {
       throw new Error('License usage sequence exceeded JavaScript safe integer range');
     }
     const pending: PendingReport = {
-      licenseId,
+      licenseId: this.cloudPdfLicenseId,
       payload: {
-        ...await this.meters.snapshot(),
+        ...(await this.meters.snapshot()),
         installationId: runtime.deployment_id,
         sequence,
       },
@@ -211,7 +249,8 @@ export class ConnectedUsageReporter {
     await this.db
       .updateTable('license_reporting_state')
       .set({
-        last_error: error instanceof Error ? error.message.slice(0, 1_000) : String(error).slice(0, 1_000),
+        last_error:
+          error instanceof Error ? error.message.slice(0, 1_000) : String(error).slice(0, 1_000),
         last_status: 'failed',
         updated_at: now,
       })
@@ -239,10 +278,12 @@ export class ConnectedUsageReporter {
         updated_at: now,
       })
       .where('name', '=', name)
-      .where((expression) => expression.or([
-        expression('owner_id', '=', this.ownerId),
-        expression('expires_at', '<=', now),
-      ]))
+      .where((expression) =>
+        expression.or([
+          expression('owner_id', '=', this.ownerId),
+          expression('expires_at', '<=', now),
+        ]),
+      )
       .executeTakeFirst();
     return Number(result.numUpdatedRows) === 1;
   }
@@ -284,28 +325,6 @@ async function postWithRetry(
   throw lastError;
 }
 
-function cloudPdfLicenseId(validationJson: string | null): string {
-  if (!validationJson) throw new Error('Connected license metadata is unavailable');
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(validationJson);
-  } catch {
-    throw new Error('Connected license metadata is invalid');
-  }
-  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-    throw new Error('Connected license metadata is invalid');
-  }
-  const metadata = (parsed as Record<string, unknown>)['metadata'];
-  if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) {
-    throw new Error('Connected license metadata is missing');
-  }
-  const id = (metadata as Record<string, unknown>)['cloudpdfLicenseId'];
-  if (typeof id !== 'string' || !id) {
-    throw new Error('Connected license metadata is missing cloudpdfLicenseId');
-  }
-  return id;
-}
-
 async function resolveSecret(
   raw: string | undefined,
   resolver: SecretResolver | undefined,
@@ -322,11 +341,11 @@ async function resolveSecret(
   return resolved.reportingToken.trim();
 }
 
-function requireHttpUrl(value: string | undefined, name: string): string {
+function requireHttpsUrl(value: string | undefined, name: string): string {
   if (!value) throw new Error(`${name} is required for connected usage reporting`);
   const url = new URL(value);
-  if (url.protocol !== 'https:' && url.protocol !== 'http:') {
-    throw new Error(`${name} must use http or https`);
+  if (url.protocol !== 'https:') {
+    throw new Error(`${name} must use https`);
   }
   return url.toString().replace(/\/$/, '');
 }
@@ -340,7 +359,8 @@ function parsePending(value: string | null): PendingReport | null {
       typeof parsed.licenseId !== 'string' ||
       !parsed.payload ||
       !Number.isSafeInteger(parsed.payload.sequence)
-    ) return null;
+    )
+      return null;
     return parsed;
   } catch {
     return null;

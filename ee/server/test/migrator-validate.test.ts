@@ -150,7 +150,7 @@ describe('buildApp drift guard', () => {
       m.version === '001' ? { ...m, sql: `${m.sql}\n-- evil\n` } : m,
     );
     // Mirror how buildApp does it.
-    const { buildApp } = await import('../src/app/buildApp');
+    const { buildAppForTesting } = await import('../src/app/buildApp');
     const { createValidTestLicenseGate } = await import('../src/licensing/testing');
     const { FsObjectStore } = await import('../src/storage/adapters/FsObjectStore');
     const { mkdtemp, rm } = await import('node:fs/promises');
@@ -159,7 +159,7 @@ describe('buildApp drift guard', () => {
     const dir = await mkdtemp(join(tmpdir(), 'drift-'));
     try {
       await expect(
-        buildApp({
+        buildAppForTesting({
           licenseGate: createValidTestLicenseGate(),
           verifier: { mode: 'hs256', secret: 'x' },
           workerEntry: null,

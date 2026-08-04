@@ -3,7 +3,9 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createLocalEngine } from '@embedpdf/engine';
 import { createCloudEngine } from '@cloudpdf/engine';
-import { buildApp, signDevToken, defaultWorkerEntryUrl, type AppBundle } from '@cloudpdf/server';
+import { signDevToken, defaultWorkerEntryUrl, type AppBundle } from '@cloudpdf/server';
+import { buildAppForTesting } from '../../../ee/server/src/app/buildApp.ts';
+import { createValidTestLicenseGate } from '../../../ee/server/src/licensing/testing.ts';
 import { runEngineDemo, diffMetadata } from './engine-demo.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -14,7 +16,8 @@ const SECRET = 'engine-demo-secret';
 
 let bundle: AppBundle | undefined;
 try {
-  bundle = await buildApp({
+  bundle = await buildAppForTesting({
+    licenseGate: createValidTestLicenseGate(),
     verifier: { mode: 'hs256', secret: SECRET },
     poolSize: 1,
     workerEntry: defaultWorkerEntryUrl,

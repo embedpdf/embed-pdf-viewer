@@ -75,7 +75,6 @@ import { UsageMeters } from '../licensing/UsageMeters';
  *   CLOUDPDF_FALLBACK_FONTS  JSON [{key,path,familyName?,...}]  (default: none)
  *   CLOUDPDF_LICENSE_MODE     connected|air-gapped
  *   CLOUDPDF_LICENSE_KEY      required for connected mode
- *   CLOUDPDF_CONTROL_PLANE_URL           required for connected usage reporting
  *   CLOUDPDF_LICENSE_REPORTING_TOKEN     required for connected usage reporting
  *
  * Exit codes:
@@ -565,7 +564,8 @@ async function assertLicenseSchemaCurrent(dbCtx: DbContext): Promise<void> {
 }
 
 function requireAirGappedMode(): void {
-  const mode = process.env['CLOUDPDF_LICENSE_MODE'] ??
+  const mode =
+    process.env['CLOUDPDF_LICENSE_MODE'] ??
     (process.env['CLOUDPDF_LICENSE_KEY'] ? 'connected' : 'air-gapped');
   if (mode !== 'air-gapped') {
     fail(2, 'this command requires CLOUDPDF_LICENSE_MODE=air-gapped');
@@ -641,8 +641,14 @@ async function cmdServe(): Promise<void> {
     initialLicense.telemetryProfile === 'aggregated-usage'
   ) {
     try {
+      const cloudPdfLicenseId = licenseRuntime.getConnectedReportingLicenseId();
+      if (!cloudPdfLicenseId) {
+        throw new Error(
+          'Connected license requires usage reporting but its signed metadata is missing cloudpdfLicenseId',
+        );
+      }
       usageReporter = await ConnectedUsageReporter.create({
-        controlPlaneUrl: process.env['CLOUDPDF_CONTROL_PLANE_URL'],
+        cloudPdfLicenseId,
         db: dbCtx.db,
         meters: new UsageMeters(dbCtx.db, licenseRuntime),
         reportingToken: process.env['CLOUDPDF_LICENSE_REPORTING_TOKEN'],

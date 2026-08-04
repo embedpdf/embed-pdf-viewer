@@ -6,6 +6,8 @@
  */
 export { buildApp } from './app/buildApp';
 export type { BuildAppOptions, AppBundle } from './app/buildApp';
+export { createLicenseRuntime } from './licensing/public';
+export type { CloudPdfLicenseRuntime } from './licensing/public';
 export {
   createJwtVerifier,
   Hs256Verifier,

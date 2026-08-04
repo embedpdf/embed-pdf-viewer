@@ -4,7 +4,6 @@ import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { InProcessRealtimeBus } from '../src/realtime/RealtimeBus';
 import {
-  buildApp,
   createSqliteDb,
   FsObjectStore,
   migrate,
@@ -13,6 +12,7 @@ import {
   sqliteMigrations,
   type AppBundle,
 } from '../src/index';
+import { buildAppForTesting } from '../src/app/buildApp';
 import { createValidTestLicenseGate } from '../src/licensing/testing';
 
 /**
@@ -119,7 +119,7 @@ describe('POST /v1/admin/tokens/:jti/revoke (E2E)', () => {
     storageRoot = await mkdtemp(join(tmpdir(), 'embedpdf-rev-'));
     const db = createSqliteDb({ path: ':memory:' });
     await migrate(db, { source: { kind: 'inline', migrations: sqliteMigrations } });
-    bundle = await buildApp({
+    bundle = await buildAppForTesting({
       licenseGate: createValidTestLicenseGate(),
       verifier: { mode: 'hs256', secret: SECRET },
       workerEntry: null,

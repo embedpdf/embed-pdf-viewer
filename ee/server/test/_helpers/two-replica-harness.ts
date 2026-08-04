@@ -6,7 +6,6 @@ import { join } from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import type { Kysely } from 'kysely';
 import {
-  buildApp,
   createSqliteDb,
   migrate,
   sqliteMigrations,
@@ -16,6 +15,7 @@ import {
   type AppBundle,
   type DbSchema,
 } from '../../src/index';
+import { buildAppForTesting } from '../../src/app/buildApp';
 import { createValidTestLicenseGate } from '../../src/licensing/testing';
 
 const STUB_ENTRY = new URL('./stub-worker-entry.cjs', import.meta.url);
@@ -107,7 +107,7 @@ export async function makeReplicaCluster(
 
   const addReplica = async (name: string): Promise<Replica> => {
     const db = await dbEnv.connect();
-    const bundle = await buildApp({
+    const bundle = await buildAppForTesting({
       licenseGate: createValidTestLicenseGate(),
       verifier: { mode: 'hs256', secret: REPLICA_SECRET },
       workerEntry: STUB_ENTRY,

@@ -90,5 +90,8 @@ jobs:
       - name: cloud engine conformance (HTTP -> @cloudpdf/server, native)
         run: pnpm --filter @cloudpdf/engine test
 
+      - name: CloudPDF license security
+        run: pnpm --filter @cloudpdf/server exec vitest run test/licensing.test.ts
+
       - name: Engine v3 parity demo (local vs cloud)
         run: pnpm --filter @embedpdf/example-engine-runtime-demo run engine:node

@@ -17,6 +17,7 @@ export interface VerifiedMachineCertificate {
 }
 
 export function verifyMachineCertificate(input: {
+  allowExpired?: boolean;
   certificate: string;
   expectedFingerprint: string;
   identity: CloudPdfLicenseIdentity;
@@ -41,10 +42,7 @@ export function verifyMachineCertificate(input: {
   const validSignature = verificationKeys.some((publicKeyHex) => {
     const publicKey = createPublicKey({
       format: 'der',
-      key: Buffer.concat([
-        ed25519SpkiPrefix,
-        Buffer.from(publicKeyHex, 'hex'),
-      ]),
+      key: Buffer.concat([ed25519SpkiPrefix, Buffer.from(publicKeyHex, 'hex')]),
       type: 'spki',
     });
     return verify(null, signedPayload, publicKey, signatureBytes);
@@ -60,7 +58,7 @@ export function verifyMachineCertificate(input: {
   const issued = stringValue(meta, 'issued');
   const expiry = stringValue(meta, 'expiry');
   const now = input.now ?? new Date();
-  assertTimeWindow(issued, expiry, now);
+  assertTimeWindow(issued, expiry, now, input.allowExpired === true);
 
   if (stringValue(data, 'type') !== 'machines') {
     throw new Error('Certificate does not contain a machine resource');
@@ -102,8 +100,15 @@ export function verifyMachineCertificate(input: {
   }
 
   const licenseExpiry = optionalString(licenseAttributes['expiry']);
-  if (licenseExpiry && new Date(licenseExpiry).getTime() < now.getTime()) {
-    throw new Error('The license embedded in the machine certificate has expired');
+  if (licenseExpiry) {
+    const licenseExpiresAt = new Date(licenseExpiry).getTime();
+    const issuedAt = new Date(issued).getTime();
+    if (!Number.isFinite(licenseExpiresAt) || licenseExpiresAt < issuedAt) {
+      throw new Error('The license embedded in the machine certificate has invalid expiry');
+    }
+    if (!input.allowExpired && licenseExpiresAt < now.getTime()) {
+      throw new Error('The license embedded in the machine certificate has expired');
+    }
   }
 
   return {
@@ -112,9 +117,7 @@ export function verifyMachineCertificate(input: {
     fingerprint,
     licenseExpiresAt: licenseExpiry ?? null,
     licenseId,
-    metadata: isObject(licenseAttributes['metadata'])
-      ? licenseAttributes['metadata']
-      : {},
+    metadata: isObject(licenseAttributes['metadata']) ? licenseAttributes['metadata'] : {},
     rawPayload: payload,
   };
 }
@@ -127,16 +130,17 @@ function stripCertificate(certificate: string): string {
   return trimmed.slice(begin.length, -end.length).replace(/\s+/g, '');
 }
 
-function assertTimeWindow(issued: string, expiry: string, now: Date): void {
+function assertTimeWindow(issued: string, expiry: string, now: Date, allowExpired: boolean): void {
   const issuedAt = new Date(issued).getTime();
   const expiresAt = new Date(expiry).getTime();
   if (!Number.isFinite(issuedAt) || !Number.isFinite(expiresAt)) {
     throw new Error('Machine certificate has invalid timestamps');
   }
+  if (expiresAt < issuedAt) throw new Error('Machine certificate has an invalid time window');
   if (issuedAt > now.getTime() + 5 * 60 * 1_000) {
     throw new Error('Machine certificate was issued in the future');
   }
-  if (expiresAt < now.getTime()) {
+  if (!allowExpired && expiresAt < now.getTime()) {
     throw new Error('Machine certificate has expired');
   }
 }

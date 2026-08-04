@@ -48,6 +48,7 @@ import { registerEventsRoutes } from '../routes/events';
 import type { LicenseGate } from '../licensing/LicenseRuntime';
 import { UsageMeters } from '../licensing/UsageMeters';
 import type { ConnectedUsageReporter } from '../licensing/ConnectedUsageReporter';
+import { isLicenseGateTrusted } from '../licensing/trusted-license-gates';
 
 export interface BuildAppOptions {
   /** Required commercial gate for every server construction. */
@@ -224,6 +225,20 @@ export interface AppBundle {
  * responsible for `app.listen()`.
  */
 export async function buildApp(opts: BuildAppOptions): Promise<AppBundle> {
+  if (!isLicenseGateTrusted(opts.licenseGate)) {
+    throw new Error(
+      'buildApp: licenseGate must be created by createLicenseRuntime from @cloudpdf/server',
+    );
+  }
+  return buildAppUnchecked(opts);
+}
+
+/** Internal test-only construction seam. Not exported by the npm package. */
+export async function buildAppForTesting(opts: BuildAppOptions): Promise<AppBundle> {
+  return buildAppUnchecked(opts);
+}
+
+async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
   // The cross-replica doorbell exists for the whole app lifetime: mutation
   // signals for SSE, revocation pushes for the auth guard + open streams.
   const realtimeBus = opts.realtimeBus ?? new InProcessRealtimeBus();
@@ -250,11 +265,7 @@ export async function buildApp(opts: BuildAppOptions): Promise<AppBundle> {
   const usageMeters = opts.db ? new UsageMeters(opts.db, opts.licenseGate) : undefined;
   app.addHook('onRequest', async (request, reply) => {
     const pathname = request.url.split('?', 1)[0] ?? request.url;
-    if (
-      pathname === '/healthz' ||
-      pathname === '/readyz' ||
-      pathname === '/v1/license/status'
-    ) {
+    if (pathname === '/healthz' || pathname === '/readyz' || pathname === '/v1/license/status') {
       return;
     }
 

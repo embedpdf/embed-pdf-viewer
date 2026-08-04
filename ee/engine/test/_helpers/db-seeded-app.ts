@@ -4,7 +4,6 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { Kysely } from 'kysely';
 import {
-  buildApp,
   createSqliteDb,
   defaultWorkerEntryUrl,
   FsObjectStore,
@@ -15,6 +14,8 @@ import {
   type AppBundle,
   type DbSchema,
 } from '@cloudpdf/server';
+import { buildAppForTesting } from '../../../server/src/app/buildApp';
+import { createValidTestLicenseGate } from '../../../server/src/licensing/testing';
 
 /**
  * Shared cloud-test scaffolding for the Phase 4 versioned read
@@ -45,7 +46,8 @@ export async function buildDbSeededFixture(
   const db = createSqliteDb({ path: ':memory:' });
   await migrate(db, { source: { kind: 'inline', migrations: sqliteMigrations } });
   const store = new FsObjectStore({ root: storageRoot });
-  const bundle = await buildApp({
+  const bundle = await buildAppForTesting({
+    licenseGate: createValidTestLicenseGate(),
     verifier: { mode: 'hs256', secret: opts.secret },
     workerEntry: defaultWorkerEntryUrl,
     poolSize: 1,

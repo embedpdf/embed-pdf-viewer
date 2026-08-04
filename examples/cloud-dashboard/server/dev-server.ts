@@ -12,6 +12,7 @@ import {
   CustomHmacCdnSigner,
   NoneCdnSigner,
   buildApp,
+  createLicenseRuntime,
   createKmsKeyring,
   createSecretResolver,
   createSecretsProviderRegistry,
@@ -23,6 +24,7 @@ import {
   signDevToken,
   sqliteMigrations,
   type AppBundle,
+  type CloudPdfLicenseRuntime,
   type CdnSigner,
   type KmsConfig,
   type SecretsConfig,
@@ -81,6 +83,7 @@ const DEFAULT_DOC_SCOPE = [
 
 let db: ReturnType<typeof createSqliteDb>;
 let embedpdf: AppBundle;
+let licenseRuntime: CloudPdfLicenseRuntime;
 let storage: FsObjectStore;
 let jwtSigningSecret: string;
 let cdnSigner: CdnSigner;
@@ -97,6 +100,13 @@ async function startEmbedPdfServer(): Promise<void> {
 
   db = createSqliteDb({ path: `${dataRoot}/cloudpdf.db` });
   await migrate(db, { source: { kind: 'inline', migrations: sqliteMigrations } });
+  licenseRuntime = await createLicenseRuntime({ db });
+  const license = licenseRuntime.getStatus();
+  if (license.access === 'none') {
+    await licenseRuntime.close();
+    await db.destroy();
+    throw new Error(`${license.message} (${license.code})`);
+  }
   storage = new FsObjectStore({ root: `${dataRoot}/objects` });
   const securityEnv = {
     ...process.env,
@@ -123,6 +133,7 @@ async function startEmbedPdfServer(): Promise<void> {
   );
 
   embedpdf = await buildApp({
+    licenseGate: licenseRuntime,
     verifier: { mode: 'hs256', secret: jwtSigningSecret },
     kms,
     workerEntry: defaultWorkerEntryUrl,
@@ -231,6 +242,7 @@ async function startApiServer(): Promise<void> {
   const shutdown = async () => {
     server.close();
     await embedpdf.shutdown();
+    await licenseRuntime.close();
     await db.destroy();
     process.exit(0);
   };

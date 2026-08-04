@@ -6,7 +6,6 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import type { Kysely } from 'kysely';
 import {
-  buildApp,
   createSqliteDb,
   migrate,
   sqliteMigrations,
@@ -17,6 +16,7 @@ import {
   type AppBundle,
   type DbSchema,
 } from '../src/index';
+import { buildAppForTesting } from '../src/app/buildApp';
 import type { CdnSigner, SignInput } from '../src/cdn/CdnSigner';
 import { createValidTestLicenseGate } from '../src/licensing/testing';
 
@@ -559,7 +559,7 @@ async function buildFixture(): Promise<Fixture> {
     },
     purge: () => Promise.resolve({ kind: 'no-op' as const }),
   } as unknown as CdnSigner;
-  const bundle = await buildApp({
+  const bundle = await buildAppForTesting({
     licenseGate: createValidTestLicenseGate(),
     verifier: { mode: 'hs256', secret: SECRET },
     workerEntry: STUB_ENTRY,

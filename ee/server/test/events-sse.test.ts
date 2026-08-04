@@ -6,7 +6,6 @@ import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import type { Kysely } from 'kysely';
 import {
-  buildApp,
   createSqliteDb,
   migrate,
   sqliteMigrations,
@@ -16,6 +15,7 @@ import {
   type AppBundle,
   type DbSchema,
 } from '../src/index';
+import { buildAppForTesting } from '../src/app/buildApp';
 import { InProcessRealtimeBus } from '../src/realtime/RealtimeBus';
 import { createValidTestLicenseGate } from '../src/licensing/testing';
 
@@ -329,7 +329,7 @@ async function buildFixture(): Promise<Fixture> {
   await migrate(db, { source: { kind: 'inline', migrations: sqliteMigrations } });
   const store = new FsObjectStore({ root: storageRoot });
   const bus = new InProcessRealtimeBus();
-  const bundle = await buildApp({
+  const bundle = await buildAppForTesting({
     licenseGate: createValidTestLicenseGate(),
     verifier: { mode: 'hs256', secret: SECRET },
     workerEntry: STUB_ENTRY,
