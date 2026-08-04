@@ -1,5 +1,7 @@
 # @embedpdf/plugin-spread
 
+## 2.15.0
+
 ## 2.14.4
 
 ## 2.14.3

@@ -1,5 +1,7 @@
 # @embedpdf/snippet
 
+## 2.15.0
+
 ## 2.14.4
 
 ### Patch Changes
