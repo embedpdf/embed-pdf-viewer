@@ -32,8 +32,13 @@ export function registerAnnotationEffects(
     ctx.dispatch({ type: 'SET_MODEL', model: next });
   };
 
-  const upsert = (dtos: ReadonlyArray<Parameters<typeof fromDTO>[0]>): void => {
-    const annots: Annot[] = [];
+  const upsert = (dtos: ReadonlyArray<Parameters<typeof fromDTO>[0]>, bumpAp: boolean): void => {
+    // `bump` re-fetches rasters, `keep` doesn't. The split is driven by the
+    // ENGINE'S appearance echo riding the event (`appearance.changed`) — the
+    // same verdict local edits use — so a remote MOVE costs peers zero
+    // appearance re-renders while a remote restyle refreshes exactly once.
+    const bump: Annot[] = [];
+    const keep: Annot[] = [];
     for (const dto of dtos) {
       const crop = cropOf(dto.pageObjectNumber);
       if (!crop) continue;
@@ -41,7 +46,8 @@ export function registerAnnotationEffects(
       const a = fromDTO(dto, crop, 'baked');
       // A remote ATTACHED-link child (grouped /Link under a linkable local
       // parent) folds onto the parent instead of entering the model — the
-      // same rule the page-load fold applies (see foldAttachedLinks).
+      // same rule the page-load fold applies (see foldAttachedLinks). A child
+      // retarget never repaints the PARENT, so the fold never bumps.
       if (a.subtype === 'link' && a.data?.subtype === 'link' && a.data.replyType === 'group') {
         const parentId = a.data.inReplyTo ? refKey(a.data.inReplyTo) : null;
         const parent = parentId ? ctx.getState().model.byId[parentId] : null;
@@ -53,7 +59,7 @@ export function registerAnnotationEffects(
         ) {
           const refs = parent.linkRefs ?? [];
           const known = refs.some((r) => refKey(r) === a.id);
-          annots.push({
+          keep.push({
             ...parent,
             link: a.data.target,
             linkRefs: known ? refs : [...refs, a.ref],
@@ -61,12 +67,10 @@ export function registerAnnotationEffects(
           continue;
         }
       }
-      annots.push(a);
+      (bumpAp ? bump : keep).push(a);
     }
-    // A remote edit may have re-baked the /AP (only the resulting DTO is
-    // visible here, not what changed) — advance `apVersion` so the raster
-    // refreshes rather than trusting a stale local render.
-    if (annots.length) apply({ t: 'upsert', annots, bumpAp: true });
+    if (bump.length) apply({ t: 'upsert', annots: bump, bumpAp: true });
+    if (keep.length) apply({ t: 'upsert', annots: keep });
   };
 
   const unsubscribe = doc.events.subscribe((event: DocumentEvent) => {
@@ -104,13 +108,17 @@ export function registerAnnotationEffects(
     if (!('origin' in event) || event.origin.kind !== 'remote') return;
     switch (event.type) {
       case 'annotation.created':
-        upsert([event.created]);
+        // A create ships with a freshly baked /AP — fetch it.
+        upsert([event.created], true);
         break;
       case 'annotation.updated':
-        upsert([event.updated]);
+        // The engine's verdict rides the event: preserved moves keep the
+        // cached raster, regenerated appearances re-fetch exactly once.
+        upsert([event.updated], event.appearance.changed);
         break;
       case 'annotation.moved':
-        upsert(event.moved);
+        // A z-order move never touches /AP.
+        upsert(event.moved, false);
         break;
       case 'annotation.deleted':
         if (event.deleted) {
