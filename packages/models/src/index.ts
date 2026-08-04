@@ -10,6 +10,7 @@
 export * from './geometry';
 export * from './logger';
 export * from './pdf';
+export * from './measurement';
 export * from './task';
 export * from './color';
 export * from './date';

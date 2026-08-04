@@ -133,6 +133,8 @@ import { SnippetConfigProvider } from '@/components/snippet-config-context';
 import { SchemaSelectionMenu } from '@/ui/schema-selection-menu';
 import { SchemaOverlay } from '@/ui/schema-overlay';
 import { PrintModal } from '@/components/print-modal';
+import { CalibrationModal } from '@/components/calibration-modal';
+import { CalibrationController } from '@/components/calibration-controller';
 import { LinkModal } from '@/components/link-modal';
 import { PageControls } from '@/components/page-controls';
 
@@ -379,6 +381,7 @@ const DEFAULTS = {
   commands: { commands: defaultCommands } as CommandsPluginConfig,
   i18n: {
     defaultLocale: 'en',
+    fallbackLocale: 'en',
     locales: [
       englishTranslations,
       dutchTranslations,
@@ -551,6 +554,8 @@ function ViewerLayout({ documentId, tabBarVisibility = 'multiple' }: ViewerLayou
                     </GlobalPointerProvider>
                     {/* Overlays (floating components like page controls) */}
                     {renderOverlays()}
+                    {/* Headless: opens the calibration dialog after a draw-to-calibrate line */}
+                    <CalibrationController documentId={documentId} />
                   </div>
                 )}
               </>
@@ -591,6 +596,7 @@ export function PDFViewer({ config, onRegistryReady }: PDFViewerProps) {
       'comment-sidebar': CommentSidebar,
       'widget-edit-sidebar': WidgetEditSidebar,
       'print-modal': PrintModal,
+      'calibration-modal': CalibrationModal,
       'link-modal': LinkModal,
       'signature-create-modal': SignatureCreateModal,
       'protect-modal': ProtectModal,

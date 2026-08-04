@@ -1,6 +1,15 @@
 import { useMemo, MouseEvent } from '@framework';
-import { PdfAnnotationBorderStyle, PdfRectDifferences, Rect } from '@embedpdf/models';
+import {
+  PdfAnnotationBorderStyle,
+  PdfRectDifferences,
+  Rect,
+  PdfMeasurementInfo,
+  formatMeasurement,
+  rectArea,
+} from '@embedpdf/models';
 import { generateCloudyRectanglePath } from '@embedpdf/plugin-annotation';
+import { MeasurementLabel } from './measurement-label';
+import { AreaHatch } from './area-hatch';
 
 const MIN_HIT_AREA_SCREEN_PX = 20;
 
@@ -31,6 +40,8 @@ interface SquareProps {
   cloudyBorderIntensity?: number;
   /** Rectangle differences – inset from Rect to drawn area */
   rectangleDifferences?: PdfRectDifferences;
+  /** Measurement metadata; when present a rectangle-area label is drawn. */
+  measurement?: PdfMeasurementInfo;
 }
 
 /**
@@ -50,6 +61,7 @@ export function Square({
   appearanceActive = false,
   cloudyBorderIntensity,
   rectangleDifferences,
+  measurement,
 }: SquareProps): JSX.Element {
   const isCloudy = (cloudyBorderIntensity ?? 0) > 0;
 
@@ -76,6 +88,17 @@ export function Square({
       strokeWidth,
     );
   }, [isCloudy, rect, rectangleDifferences, cloudyBorderIntensity, strokeWidth]);
+
+  const measureText = useMemo(
+    () => (measurement ? formatMeasurement(rectArea(rect), measurement) : null),
+    [measurement, rect],
+  );
+
+  // Area measurements get a light diagonal-hatch fill to mark the region.
+  const isAreaMeasure = measurement?.mode === 'area';
+  const hatchId = useMemo(() => 'mhatch-' + Math.random().toString(36).slice(2, 9), []);
+  const fillValue = isAreaMeasure ? `url(#${hatchId})` : color;
+  const hatchColor = strokeColor ?? '#2962FF';
 
   const svgWidth = rect.size.width * scale;
   const svgHeight = rect.size.height * scale;
@@ -137,37 +160,50 @@ export function Square({
         />
       )}
       {/* Visual -- hidden when AP active, never interactive */}
-      {!appearanceActive &&
-        (isCloudy && cloudyPath ? (
-          <path
-            d={cloudyPath.path}
-            fill={color}
-            opacity={opacity}
-            style={{
-              pointerEvents: 'none',
-              stroke: strokeColor ?? color,
-              strokeWidth,
-              strokeLinejoin: 'round',
-            }}
-          />
-        ) : (
-          <rect
-            x={x}
-            y={y}
-            width={width}
-            height={height}
-            fill={color}
-            opacity={opacity}
-            style={{
-              pointerEvents: 'none',
-              stroke: strokeColor ?? color,
-              strokeWidth,
-              ...(strokeStyle === PdfAnnotationBorderStyle.DASHED && {
-                strokeDasharray: strokeDashArray?.join(','),
-              }),
-            }}
-          />
-        ))}
+      {!appearanceActive && (
+        <>
+          {isAreaMeasure && <AreaHatch id={hatchId} color={hatchColor} scale={scale} />}
+          {isCloudy && cloudyPath ? (
+            <path
+              d={cloudyPath.path}
+              fill={fillValue}
+              opacity={opacity}
+              style={{
+                pointerEvents: 'none',
+                stroke: strokeColor ?? color,
+                strokeWidth,
+                strokeLinejoin: 'round',
+              }}
+            />
+          ) : (
+            <rect
+              x={x}
+              y={y}
+              width={width}
+              height={height}
+              fill={fillValue}
+              opacity={opacity}
+              style={{
+                pointerEvents: 'none',
+                stroke: strokeColor ?? color,
+                strokeWidth,
+                ...(strokeStyle === PdfAnnotationBorderStyle.DASHED && {
+                  strokeDasharray: strokeDashArray?.join(','),
+                }),
+              }}
+            />
+          )}
+        </>
+      )}
+
+      {measureText && (
+        <MeasurementLabel
+          text={measureText}
+          center={{ x: rect.size.width / 2, y: rect.size.height / 2 }}
+          scale={scale}
+          background={strokeColor ?? '#2962FF'}
+        />
+      )}
     </svg>
   );
 }

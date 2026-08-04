@@ -27,6 +27,8 @@ import {
   PdfActionType,
   PdfZoomMode,
   PdfDestinationObject,
+  PdfMeasurementScale,
+  PdfMeasurementInfo,
 } from '@embedpdf/models';
 import {
   AnnotationCapability,
@@ -63,6 +65,7 @@ import {
   LockMode,
   NavigateTargetResult,
   NavigateEvent,
+  CalibrationDrawEvent,
 } from './types';
 import {
   setAnnotations,
@@ -86,6 +89,7 @@ import {
   cleanupAnnotationState,
   setLockedAction,
   syncAnnotationObject as syncAnnotationObjectAction,
+  setMeasurementScaleAction,
 } from './actions';
 import {
   InteractionManagerCapability,
@@ -105,6 +109,7 @@ import {
   getGroupMembers,
   isInGroup,
   getSelectionGroupingAction,
+  getMeasurementScale,
 } from './selectors';
 import { initialDocumentState } from './reducer';
 import { AnnotationTool, AnnotationToolMap, ToolById, ToolId } from './tools/types';
@@ -221,6 +226,11 @@ export class AnnotationPlugin extends BasePlugin<
     (_, event) => event,
     { cache: false },
   );
+  private readonly calibrationDraw$ = createScopedEmitter<
+    CalibrationDrawEvent,
+    CalibrationDrawEvent,
+    string
+  >((_, event) => event, { cache: false });
 
   constructor(id: string, registry: PluginRegistry, config: AnnotationPluginConfig) {
     super(id, registry);
@@ -289,6 +299,7 @@ export class AnnotationPlugin extends BasePlugin<
     this.activeTool$.clearScope(documentId);
     this.events$.clearScope(documentId);
     this.navigate$.clearScope(documentId);
+    this.calibrationDraw$.clearScope(documentId);
 
     this.logger.debug(
       'AnnotationPlugin',
@@ -491,6 +502,26 @@ export class AnnotationPlugin extends BasePlugin<
         toolId: string,
         patch: Partial<PdfAnnotationObject> & Record<string, unknown>,
       ) => this.dispatch(setToolDefaults(toolId, patch)),
+      setMeasurementScale: (scale: PdfMeasurementScale) => {
+        // 1) Canonical write — the single source of truth for the active scale.
+        this.dispatch(setMeasurementScaleAction(scale));
+        // 2) Project into every measurement tool's defaults so the pointer
+        //    handlers (which read `getTool().defaults.measurement`) keep working
+        //    unchanged. The display unit defaults to the calibration unit —
+        //    calibrating "72pt = 10ft" implies measurements should read in feet;
+        //    consumers can still override the unit afterwards.
+        for (const tool of this.state.tools) {
+          const measurement = (tool.defaults as { measurement?: PdfMeasurementInfo }).measurement;
+          if (measurement) {
+            this.dispatch(
+              setToolDefaults(tool.id, {
+                measurement: { ...measurement, scale, unit: scale.unit },
+              }),
+            );
+          }
+        }
+      },
+      getMeasurementScale: (): PdfMeasurementScale => getMeasurementScale(this.state),
       getColorPresets: () => [...this.state.colorPresets],
       addColorPreset: (color) => this.dispatch(addColorPreset(color)),
       transformAnnotation: (annotation, options) => this.transformAnnotation(annotation, options),
@@ -501,6 +532,7 @@ export class AnnotationPlugin extends BasePlugin<
       onAnnotationEvent: this.events$.onGlobal,
       onToolsChange: this.toolsChange$.on,
       onNavigate: this.navigate$.onGlobal,
+      onCalibrationDraw: this.calibrationDraw$.onGlobal,
     };
   }
 
@@ -570,6 +602,7 @@ export class AnnotationPlugin extends BasePlugin<
       onAnnotationEvent: this.events$.forScope(documentId),
       onActiveToolChange: this.activeTool$.forScope(documentId),
       onNavigate: this.navigate$.forScope(documentId),
+      onCalibrationDraw: this.calibrationDraw$.forScope(documentId),
     };
   }
 
@@ -672,6 +705,8 @@ export class AnnotationPlugin extends BasePlugin<
         },
         getTool: () => this.state.tools.find((t) => t.id === tool.id),
         getToolContext: () => this.state.documents[documentId]?.activeToolContext,
+        onCalibrate: (start, end) =>
+          this.calibrationDraw$.emit(documentId, { documentId, pageIndex, start, end }),
       };
 
       const unregister = this.interactionManager.registerHandlers({

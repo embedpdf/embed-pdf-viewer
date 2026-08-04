@@ -1,7 +1,8 @@
 <script lang="ts">
-  import type { Rect, LinePoints, LineEndings } from '@embedpdf/models';
-  import { PdfAnnotationBorderStyle } from '@embedpdf/models';
+  import type { Rect, LinePoints, LineEndings, PdfMeasurementInfo } from '@embedpdf/models';
+  import { PdfAnnotationBorderStyle, formatMeasurement, pointDistance } from '@embedpdf/models';
   import { patching } from '@embedpdf/plugin-annotation';
+  import MeasurementLabel from './MeasurementLabel.svelte';
 
   const MIN_HIT_AREA_SCREEN_PX = 20;
 
@@ -19,6 +20,7 @@
     onClick?: (e: MouseEvent) => void;
     isSelected: boolean;
     appearanceActive?: boolean;
+    measurement?: PdfMeasurementInfo;
   }
 
   let {
@@ -35,7 +37,14 @@
     onClick,
     isSelected,
     appearanceActive = false,
+    measurement,
   }: LineProps = $props();
+
+  const measureText = $derived(
+    measurement
+      ? formatMeasurement(pointDistance(linePoints.start, linePoints.end), measurement, false)
+      : null,
+  );
 
   const x1 = $derived(linePoints.start.x - rect.origin.x);
   const y1 = $derived(linePoints.start.y - rect.origin.y);
@@ -160,5 +169,14 @@
         style:stroke-dasharray={dash}
       />
     {/if}
+  {/if}
+
+  {#if measureText}
+    <MeasurementLabel
+      text={measureText}
+      center={{ x: (x1 + x2) / 2, y: (y1 + y2) / 2 }}
+      {scale}
+      background={strokeColor}
+    />
   {/if}
 </svg>

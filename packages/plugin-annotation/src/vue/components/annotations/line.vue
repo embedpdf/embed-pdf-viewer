@@ -117,6 +117,14 @@
         }"
       />
     </template>
+
+    <MeasurementLabel
+      v-if="measureText"
+      :text="measureText"
+      :center="{ x: (localLine.x1 + localLine.x2) / 2, y: (localLine.y1 + localLine.y2) / 2 }"
+      :scale="scale"
+      :background="strokeColor"
+    />
   </svg>
 </template>
 
@@ -126,8 +134,17 @@ export default { inheritAttrs: false };
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { Rect, LinePoints, LineEndings, PdfAnnotationBorderStyle } from '@embedpdf/models';
+import {
+  Rect,
+  LinePoints,
+  LineEndings,
+  PdfAnnotationBorderStyle,
+  PdfMeasurementInfo,
+  formatMeasurement,
+  pointDistance,
+} from '@embedpdf/models';
 import { patching } from '@embedpdf/plugin-annotation';
+import MeasurementLabel from './measurement-label.vue';
 
 const MIN_HIT_AREA_SCREEN_PX = 20;
 
@@ -146,6 +163,7 @@ const props = withDefaults(
     onClick?: (e: PointerEvent) => void;
     isSelected: boolean;
     appearanceActive?: boolean;
+    measurement?: PdfMeasurementInfo;
   }>(),
   {
     color: 'transparent',
@@ -154,6 +172,16 @@ const props = withDefaults(
     strokeStyle: PdfAnnotationBorderStyle.SOLID,
     appearanceActive: false,
   },
+);
+
+const measureText = computed(() =>
+  props.measurement
+    ? formatMeasurement(
+        pointDistance(props.linePoints.start, props.linePoints.end),
+        props.measurement,
+        false,
+      )
+    : null,
 );
 
 const localLine = computed(() => ({

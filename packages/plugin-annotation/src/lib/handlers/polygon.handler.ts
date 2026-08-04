@@ -5,11 +5,13 @@ import {
   expandRect,
   uuidV4,
   PdfAnnotationBorderStyle,
+  polygonArea,
+  polygonPerimeter,
 } from '@embedpdf/models';
 import { HandlerFactory, PreviewState } from './types';
 import { useState } from '../utils/use-state';
 import { clamp } from '@embedpdf/core';
-import { getCloudyBorderExtent } from '../geometry';
+import { getCloudyBorderExtent, snapAngle } from '../geometry';
 
 const HANDLE_SIZE_PX = 14;
 
@@ -76,6 +78,15 @@ export const polygonHandlerFactory: HandlerFactory<PdfPolygonAnnoObject> = {
         ...(intensity > 0 && {
           rectangleDifferences: { left: pad, top: pad, right: pad, bottom: pad },
         }),
+        ...(defaults.measurement && {
+          measurement: {
+            ...defaults.measurement,
+            computedValue:
+              defaults.measurement.mode === 'perimeter'
+                ? polygonPerimeter(vertices)
+                : polygonArea(vertices),
+          },
+        }),
       };
       onCommit(anno);
 
@@ -119,7 +130,7 @@ export const polygonHandlerFactory: HandlerFactory<PdfPolygonAnnoObject> = {
           return;
         }
 
-        const clampedPos = clampToPage(pos);
+        let clampedPos = clampToPage(pos);
 
         if (isInsideStartHandle(clampedPos) && getVertices().length >= 3) {
           commitPolygon();
@@ -128,6 +139,9 @@ export const polygonHandlerFactory: HandlerFactory<PdfPolygonAnnoObject> = {
 
         const vertices = getVertices();
         const lastVertex = vertices[vertices.length - 1];
+
+        // Hold Shift to constrain the new edge to 15° angle increments.
+        if (evt.shiftKey && lastVertex) clampedPos = clampToPage(snapAngle(lastVertex, clampedPos));
 
         // Don't add duplicate points (prevents double-click issue)
         if (
@@ -145,9 +159,12 @@ export const polygonHandlerFactory: HandlerFactory<PdfPolygonAnnoObject> = {
       onDoubleClick: (_) => {
         commitPolygon();
       },
-      onPointerMove: (pos) => {
-        if (getVertices().length > 0) {
-          const clampedPos = clampToPage(pos);
+      onPointerMove: (pos, evt) => {
+        const vertices = getVertices();
+        if (vertices.length > 0) {
+          let clampedPos = clampToPage(pos);
+          const lastVertex = vertices[vertices.length - 1];
+          if (evt?.shiftKey && lastVertex) clampedPos = clampToPage(snapAngle(lastVertex, clampedPos));
           setCurrent(clampedPos);
           onPreview(getPreview());
         }

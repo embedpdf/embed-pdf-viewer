@@ -1,6 +1,15 @@
 import { useMemo, MouseEvent } from '@framework';
-import { PdfAnnotationBorderStyle, PdfRectDifferences, Rect } from '@embedpdf/models';
+import {
+  PdfAnnotationBorderStyle,
+  PdfRectDifferences,
+  Rect,
+  PdfMeasurementInfo,
+  formatMeasurement,
+  ellipseArea,
+} from '@embedpdf/models';
 import { generateCloudyEllipsePath } from '@embedpdf/plugin-annotation';
+import { MeasurementLabel } from './measurement-label';
+import { AreaHatch } from './area-hatch';
 
 const MIN_HIT_AREA_SCREEN_PX = 20;
 
@@ -31,6 +40,8 @@ interface CircleProps {
   cloudyBorderIntensity?: number;
   /** Rectangle differences – inset from Rect to drawn area */
   rectangleDifferences?: PdfRectDifferences;
+  /** Measurement metadata; when present an ellipse-area label is drawn. */
+  measurement?: PdfMeasurementInfo;
 }
 
 /**
@@ -50,6 +61,7 @@ export function Circle({
   appearanceActive = false,
   cloudyBorderIntensity,
   rectangleDifferences,
+  measurement,
 }: CircleProps): JSX.Element {
   const isCloudy = (cloudyBorderIntensity ?? 0) > 0;
 
@@ -78,6 +90,17 @@ export function Circle({
       strokeWidth,
     );
   }, [isCloudy, rect, rectangleDifferences, cloudyBorderIntensity, strokeWidth]);
+
+  const measureText = useMemo(
+    () => (measurement ? formatMeasurement(ellipseArea(rect), measurement) : null),
+    [measurement, rect],
+  );
+
+  // Area measurements get a light diagonal-hatch fill to mark the region.
+  const isAreaMeasure = measurement?.mode === 'area';
+  const hatchId = useMemo(() => 'mhatch-' + Math.random().toString(36).slice(2, 9), []);
+  const fillValue = isAreaMeasure ? `url(#${hatchId})` : color;
+  const hatchColor = strokeColor ?? '#2962FF';
 
   const svgWidth = width * scale;
   const svgHeight = height * scale;
@@ -139,11 +162,14 @@ export function Circle({
         />
       )}
       {/* Visual -- hidden when AP active, never interactive */}
+      {!appearanceActive && isAreaMeasure && (
+        <AreaHatch id={hatchId} color={hatchColor} scale={scale} />
+      )}
       {!appearanceActive &&
         (isCloudy && cloudyPath ? (
           <path
             d={cloudyPath.path}
-            fill={color}
+            fill={fillValue}
             opacity={opacity}
             style={{
               pointerEvents: 'none',
@@ -158,7 +184,7 @@ export function Circle({
             cy={cy}
             rx={rx}
             ry={ry}
-            fill={color}
+            fill={fillValue}
             opacity={opacity}
             style={{
               pointerEvents: 'none',
@@ -170,6 +196,15 @@ export function Circle({
             }}
           />
         ))}
+
+      {measureText && (
+        <MeasurementLabel
+          text={measureText}
+          center={{ x: width / 2, y: height / 2 }}
+          scale={scale}
+          background={strokeColor ?? '#2962FF'}
+        />
+      )}
     </svg>
   );
 }

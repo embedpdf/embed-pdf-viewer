@@ -17,6 +17,7 @@ import {
   AnnotationAction,
   SET_TOOL_DEFAULTS,
   ADD_TOOL,
+  SET_MEASUREMENT_SCALE,
   INIT_ANNOTATION_STATE,
   CLEANUP_ANNOTATION_STATE,
   SET_ACTIVE_DOCUMENT,
@@ -540,6 +541,9 @@ export const reducer: Reducer<AnnotationState, AnnotationAction> = (state, actio
       return state.colorPresets.includes(action.payload)
         ? state
         : { ...state, colorPresets: [...state.colorPresets, action.payload] };
+
+    case SET_MEASUREMENT_SCALE:
+      return { ...state, measurementScale: action.payload.scale };
 
     default:
       return state;

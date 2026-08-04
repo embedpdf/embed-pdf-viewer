@@ -1,7 +1,14 @@
 <script lang="ts">
-  import type { Rect, Position } from '@embedpdf/models';
-  import { PdfAnnotationBorderStyle } from '@embedpdf/models';
+  import type { Rect, Position, PdfMeasurementInfo } from '@embedpdf/models';
+  import {
+    PdfAnnotationBorderStyle,
+    formatMeasurement,
+    polygonArea,
+    polygonPerimeter,
+  } from '@embedpdf/models';
   import { generateCloudyPolygonPath } from '@embedpdf/plugin-annotation';
+  import MeasurementLabel from './MeasurementLabel.svelte';
+  import AreaHatch from './AreaHatch.svelte';
 
   const MIN_HIT_AREA_SCREEN_PX = 20;
 
@@ -21,6 +28,7 @@
     handleSize?: number;
     appearanceActive?: boolean;
     cloudyBorderIntensity?: number;
+    measurement?: PdfMeasurementInfo;
   }
 
   let {
@@ -39,6 +47,7 @@
     handleSize = 14,
     appearanceActive = false,
     cloudyBorderIntensity,
+    measurement,
   }: PolygonProps = $props();
 
   const isCloudy = $derived((cloudyBorderIntensity ?? 0) > 0);
@@ -74,6 +83,21 @@
   const dash = $derived(
     strokeStyle === PdfAnnotationBorderStyle.DASHED ? strokeDashArray?.join(',') : undefined,
   );
+
+  const measure = $derived.by(() => {
+    if (!measurement || localPts.length === 0 || (currentVertex && allPoints.length < 3))
+      return null;
+    const value =
+      measurement.mode === 'perimeter' ? polygonPerimeter(allPoints) : polygonArea(allPoints);
+    const center = localPts.reduce(
+      (acc, p) => ({ x: acc.x + p.x / localPts.length, y: acc.y + p.y / localPts.length }),
+      { x: 0, y: 0 },
+    );
+    return { text: formatMeasurement(value, measurement), center };
+  });
+
+  const isAreaMeasure = $derived(measurement?.mode === 'area');
+  const hatchId = 'mhatch-' + Math.random().toString(36).slice(2, 9);
 </script>
 
 <svg
@@ -106,11 +130,14 @@
 
   <!-- Visual -- hidden when AP active, never interactive -->
   {#if !appearanceActive}
+    {#if isAreaMeasure}
+      <AreaHatch id={hatchId} color={strokeColor ?? '#2962FF'} {scale} />
+    {/if}
     {#if isCloudy && cloudyPath}
       <path
         d={cloudyPath.path}
         {opacity}
-        style:fill={color}
+        style:fill={isAreaMeasure ? `url(#${hatchId})` : color}
         style:stroke={strokeColor ?? color}
         style:stroke-width={strokeWidth}
         style:pointer-events="none"
@@ -120,7 +147,7 @@
       <path
         d={pathData}
         {opacity}
-        style:fill={currentVertex ? 'none' : color}
+        style:fill={currentVertex ? 'none' : isAreaMeasure ? `url(#${hatchId})` : color}
         style:stroke={strokeColor ?? color}
         style:stroke-width={strokeWidth}
         style:pointer-events="none"
@@ -155,5 +182,9 @@
         />
       {/if}
     {/if}
+  {/if}
+
+  {#if measure}
+    <MeasurementLabel text={measure.text} center={measure.center} {scale} background={strokeColor} />
   {/if}
 </svg>

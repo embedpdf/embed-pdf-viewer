@@ -1,7 +1,9 @@
 <script lang="ts">
-  import type { Rect, PdfRectDifferences } from '@embedpdf/models';
-  import { PdfAnnotationBorderStyle } from '@embedpdf/models';
+  import type { Rect, PdfRectDifferences, PdfMeasurementInfo } from '@embedpdf/models';
+  import { PdfAnnotationBorderStyle, formatMeasurement, rectArea } from '@embedpdf/models';
   import { generateCloudyRectanglePath } from '@embedpdf/plugin-annotation';
+  import MeasurementLabel from './MeasurementLabel.svelte';
+  import AreaHatch from './AreaHatch.svelte';
 
   const MIN_HIT_AREA_SCREEN_PX = 20;
 
@@ -19,6 +21,7 @@
     appearanceActive?: boolean;
     cloudyBorderIntensity?: number;
     rectangleDifferences?: PdfRectDifferences;
+    measurement?: PdfMeasurementInfo;
   }
 
   let {
@@ -35,6 +38,7 @@
     appearanceActive = false,
     cloudyBorderIntensity,
     rectangleDifferences,
+    measurement,
   }: SquareProps = $props();
 
   const isCloudy = $derived((cloudyBorderIntensity ?? 0) > 0);
@@ -69,6 +73,11 @@
   const dash = $derived(
     strokeStyle === PdfAnnotationBorderStyle.DASHED ? strokeDashArray?.join(',') : undefined,
   );
+
+  const measureText = $derived(measurement ? formatMeasurement(rectArea(rect), measurement) : null);
+  const isAreaMeasure = $derived(measurement?.mode === 'area');
+  const hatchId = 'mhatch-' + Math.random().toString(36).slice(2, 9);
+  const fillValue = $derived(isAreaMeasure ? `url(#${hatchId})` : color);
 </script>
 
 <svg
@@ -120,10 +129,13 @@
   {/if}
   <!-- Visual -- hidden when AP active, never interactive -->
   {#if !appearanceActive}
+    {#if isAreaMeasure}
+      <AreaHatch id={hatchId} color={strokeColor ?? '#2962FF'} {scale} />
+    {/if}
     {#if isCloudy && cloudyPath}
       <path
         d={cloudyPath.path}
-        fill={color}
+        fill={fillValue}
         {opacity}
         style:pointer-events="none"
         style:stroke={strokeColor ?? color}
@@ -136,7 +148,7 @@
         {y}
         {width}
         {height}
-        fill={color}
+        fill={fillValue}
         {opacity}
         style:pointer-events="none"
         style:stroke={strokeColor ?? color}
@@ -144,5 +156,14 @@
         style:stroke-dasharray={dash}
       />
     {/if}
+  {/if}
+
+  {#if measureText}
+    <MeasurementLabel
+      text={measureText}
+      center={{ x: rect.size.width / 2, y: rect.size.height / 2 }}
+      {scale}
+      background={strokeColor ?? '#2962FF'}
+    />
   {/if}
 </svg>

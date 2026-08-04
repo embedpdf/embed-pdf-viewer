@@ -1,7 +1,13 @@
 <script lang="ts">
-  import type { Rect, Position, LineEndings } from '@embedpdf/models';
-  import { PdfAnnotationBorderStyle } from '@embedpdf/models';
+  import type { Rect, Position, LineEndings, PdfMeasurementInfo } from '@embedpdf/models';
+  import {
+    PdfAnnotationBorderStyle,
+    formatMeasurement,
+    polygonArea,
+    polylineLength,
+  } from '@embedpdf/models';
   import { patching } from '@embedpdf/plugin-annotation';
+  import MeasurementLabel from './MeasurementLabel.svelte';
 
   const MIN_HIT_AREA_SCREEN_PX = 20;
 
@@ -19,6 +25,7 @@
     onClick?: (e: MouseEvent) => void;
     lineEndings?: LineEndings;
     appearanceActive?: boolean;
+    measurement?: PdfMeasurementInfo;
   }
 
   let {
@@ -35,6 +42,7 @@
     onClick,
     lineEndings,
     appearanceActive = false,
+    measurement,
   }: PolylineProps = $props();
 
   const localPts = $derived(
@@ -83,6 +91,16 @@
   const dash = $derived(
     strokeStyle === PdfAnnotationBorderStyle.DASHED ? strokeDashArray?.join(',') : undefined,
   );
+
+  const measure = $derived.by(() => {
+    if (!measurement || localPts.length === 0) return null;
+    const value = measurement.mode === 'area' ? polygonArea(vertices) : polylineLength(vertices);
+    const center = localPts.reduce(
+      (acc, p) => ({ x: acc.x + p.x / localPts.length, y: acc.y + p.y / localPts.length }),
+      { x: 0, y: 0 },
+    );
+    return { text: formatMeasurement(value, measurement), center };
+  });
 </script>
 
 <svg
@@ -184,5 +202,9 @@
         style:stroke-dasharray={dash}
       />
     {/if}
+  {/if}
+
+  {#if measure}
+    <MeasurementLabel text={measure.text} center={measure.center} {scale} background={strokeColor} />
   {/if}
 </svg>

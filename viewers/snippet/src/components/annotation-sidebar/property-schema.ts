@@ -19,7 +19,11 @@ export interface PropertyConfig {
     | 'verticalAlign'
     | 'blendMode'
     | 'text'
-    | 'rotation';
+    | 'rotation'
+    | 'unitSelect'
+    | 'precisionControl'
+    | 'scaleDisplay'
+    | 'secondaryUnit';
   /** Translation key for the label */
   labelKey: string;
   /** Translation key for the placeholder (optional, for text inputs) */
@@ -147,6 +151,30 @@ export const PROPERTY_CONFIGS: Record<string, PropertyConfig> = {
     labelKey: 'annotation.overlayText',
     placeholderKey: 'annotation.overlayTextPlaceholder',
   },
+
+  // Measurement properties (all read/write the top-level `measurement` field;
+  // the section components read/merge the relevant sub-field).
+  measurementUnit: {
+    key: 'measurement',
+    type: 'unitSelect',
+    labelKey: 'annotation.measurementUnit',
+  },
+  measurementPrecision: {
+    key: 'measurement',
+    type: 'precisionControl',
+    labelKey: 'annotation.precision',
+  },
+  measurementSecondary: {
+    key: 'measurement',
+    type: 'secondaryUnit',
+    labelKey: 'annotation.secondaryUnit',
+  },
+  measurementScale: {
+    key: 'measurement',
+    type: 'scaleDisplay',
+    labelKey: 'annotation.scaleLabel',
+    editOnly: true,
+  },
 };
 
 /**
@@ -199,6 +227,57 @@ export const TOOL_PROPERTIES: Record<string, string[]> = {
     'lineEndings',
     'color',
     'rotation',
+  ],
+
+  // Measurement tools (geometry shares the shape controls; measurement adds
+  // unit/precision/secondary/scale).
+  measureDistance: [
+    'strokeColor',
+    'opacity',
+    'strokeWidth',
+    'measurementUnit',
+    'measurementPrecision',
+    'measurementSecondary',
+    'measurementScale',
+  ],
+  measurePerimeter: [
+    'strokeColor',
+    'opacity',
+    'strokeWidth',
+    'measurementUnit',
+    'measurementPrecision',
+    'measurementSecondary',
+    'measurementScale',
+  ],
+  measureAreaPolygon: [
+    'strokeColor',
+    'opacity',
+    'strokeWidth',
+    'color',
+    'measurementUnit',
+    'measurementPrecision',
+    'measurementSecondary',
+    'measurementScale',
+  ],
+  measureAreaRect: [
+    'color',
+    'opacity',
+    'strokeColor',
+    'strokeWidth',
+    'measurementUnit',
+    'measurementPrecision',
+    'measurementSecondary',
+    'measurementScale',
+  ],
+  measureAreaEllipse: [
+    'color',
+    'opacity',
+    'strokeColor',
+    'strokeWidth',
+    'measurementUnit',
+    'measurementPrecision',
+    'measurementSecondary',
+    'measurementScale',
   ],
 
   // Text annotations

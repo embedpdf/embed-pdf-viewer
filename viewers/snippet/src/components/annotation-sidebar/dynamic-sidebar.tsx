@@ -116,6 +116,13 @@ export function DynamicSidebar({
       };
     }
 
+    // Measurement controls read their sub-field of the `measurement` object.
+    const measurement = (source as any).measurement;
+    if (config.type === 'unitSelect') return measurement?.unit;
+    if (config.type === 'precisionControl') return measurement?.precision;
+    if (config.type === 'scaleDisplay') return measurement?.scale;
+    if (config.type === 'secondaryUnit') return measurement?.secondary;
+
     return (source as any)[config.key];
   };
 
@@ -142,6 +149,21 @@ export function DynamicSidebar({
     // Special case: lineEndings returns the full object
     if (config.type === 'lineEndings') {
       applyPatch({ lineEndings: value });
+      return;
+    }
+
+    // Measurement controls merge their sub-field into the existing measurement
+    // object so mode/scale/computedValue are preserved.
+    const measurementField: Record<string, 'unit' | 'precision' | 'scale' | 'secondary'> = {
+      unitSelect: 'unit',
+      precisionControl: 'precision',
+      scaleDisplay: 'scale',
+      secondaryUnit: 'secondary',
+    };
+    const field = measurementField[config.type];
+    if (field) {
+      const existing = (source as any)?.measurement ?? {};
+      applyPatch({ measurement: { ...existing, [field]: value } } as Partial<PdfAnnotationObject>);
       return;
     }
 

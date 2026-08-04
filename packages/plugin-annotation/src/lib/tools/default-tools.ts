@@ -6,6 +6,10 @@ import {
   PdfStandardFont,
   PdfTextAlignment,
   PdfVerticalAlignment,
+  PdfMeasurementInfo,
+  PdfMeasurementMode,
+  PdfMeasurementUnit,
+  DEFAULT_MEASUREMENT_SCALE,
 } from '@embedpdf/models';
 import { AnnoOf } from '../helpers';
 import { AnnotationTool, ToolMapFromList } from './types';
@@ -16,6 +20,7 @@ import {
   circleHandlerFactory,
   squareHandlerFactory,
   lineHandlerFactory,
+  calibrateHandlerFactory,
   polylineHandlerFactory,
   polygonHandlerFactory,
   textHandlerFactory,
@@ -467,6 +472,219 @@ const polygonTools = [
   },
 ] satisfies readonly AnnotationTool<AnnoOf<PdfAnnotationSubtype.POLYGON>>[];
 
+/**
+ * Default measurement metadata for a freshly-created measurement annotation.
+ * The scale starts at 1:1 (page points); use the annotation plugin's
+ * measurement scale/calibration API or `setToolDefaults` to recalibrate.
+ */
+const makeMeasurement = (
+  mode: PdfMeasurementMode,
+  unit: PdfMeasurementUnit = PdfMeasurementUnit.PT,
+): PdfMeasurementInfo => ({
+  mode,
+  scale: DEFAULT_MEASUREMENT_SCALE,
+  unit,
+  precision: { type: 'decimal', places: 2 },
+});
+
+const MEASURE_STROKE = '#2962FF';
+
+/** Lock aspect ratio when group rotation is not near an orthogonal angle. */
+const lockGroupAspectNearAngle = (a: { rotation?: number }) => {
+  const r = (((a.rotation ?? 0) % 90) + 90) % 90;
+  return r >= 6 && r <= 84;
+};
+
+const measureDistanceTools = [
+  {
+    id: 'measureDistance' as const,
+    name: 'Measure Distance',
+    labelKey: 'measurement.distance',
+    categories: ['annotation', 'measurement'],
+    matchScore: (a) =>
+      a.type === PdfAnnotationSubtype.LINE && a.measurement?.mode === 'distance' ? 20 : 0,
+    interaction: {
+      exclusive: false,
+      cursor: 'crosshair',
+      isDraggable: true,
+      isResizable: false, // Uses vertex editing when selected individually
+      lockAspectRatio: false,
+      isGroupResizable: true,
+      lockGroupAspectRatio: lockGroupAspectNearAngle,
+    },
+    defaults: {
+      type: PdfAnnotationSubtype.LINE,
+      intent: 'LineDimension',
+      color: 'transparent',
+      opacity: 1,
+      strokeWidth: 2,
+      strokeColor: MEASURE_STROKE,
+      measurement: makeMeasurement('distance'),
+    },
+    // No clickBehavior: a measurement must be drawn (a fixed-length line from a
+    // single click would be a meaningless measurement).
+    transform: patchLine,
+    pointerHandler: lineHandlerFactory,
+  },
+] satisfies readonly AnnotationTool<AnnoOf<PdfAnnotationSubtype.LINE>>[];
+
+const measurePerimeterTools = [
+  {
+    id: 'measurePerimeter' as const,
+    name: 'Measure Perimeter',
+    labelKey: 'measurement.perimeter',
+    categories: ['annotation', 'measurement'],
+    matchScore: (a) =>
+      a.type === PdfAnnotationSubtype.POLYLINE && a.measurement?.mode === 'perimeter' ? 20 : 0,
+    interaction: {
+      exclusive: false,
+      cursor: 'crosshair',
+      isDraggable: true,
+      isResizable: false,
+      lockAspectRatio: false,
+      isGroupResizable: true,
+      lockGroupAspectRatio: lockGroupAspectNearAngle,
+    },
+    defaults: {
+      type: PdfAnnotationSubtype.POLYLINE,
+      intent: 'PolyLineDimension',
+      color: 'transparent',
+      opacity: 1,
+      strokeWidth: 2,
+      strokeColor: MEASURE_STROKE,
+      measurement: makeMeasurement('perimeter'),
+    },
+    transform: patchPolyline,
+    pointerHandler: polylineHandlerFactory,
+  },
+] satisfies readonly AnnotationTool<AnnoOf<PdfAnnotationSubtype.POLYLINE>>[];
+
+const measureAreaPolygonTools = [
+  {
+    id: 'measureAreaPolygon' as const,
+    name: 'Measure Area',
+    labelKey: 'measurement.areaPolygon',
+    categories: ['annotation', 'measurement'],
+    matchScore: (a) =>
+      a.type === PdfAnnotationSubtype.POLYGON && a.measurement?.mode === 'area' ? 20 : 0,
+    interaction: {
+      exclusive: false,
+      cursor: 'crosshair',
+      isDraggable: true,
+      isResizable: false,
+      lockAspectRatio: false,
+      isGroupResizable: true,
+      lockGroupAspectRatio: lockGroupAspectNearAngle,
+    },
+    defaults: {
+      type: PdfAnnotationSubtype.POLYGON,
+      intent: 'PolygonDimension',
+      color: 'transparent',
+      opacity: 1,
+      strokeWidth: 2,
+      strokeColor: MEASURE_STROKE,
+      measurement: makeMeasurement('area'),
+    },
+    transform: patchPolygon,
+    pointerHandler: polygonHandlerFactory,
+  },
+] satisfies readonly AnnotationTool<AnnoOf<PdfAnnotationSubtype.POLYGON>>[];
+
+const measureAreaRectTools = [
+  {
+    id: 'measureAreaRect' as const,
+    name: 'Measure Rectangle Area',
+    labelKey: 'measurement.areaRect',
+    categories: ['annotation', 'measurement'],
+    matchScore: (a) =>
+      a.type === PdfAnnotationSubtype.SQUARE && a.measurement?.mode === 'area' ? 20 : 0,
+    interaction: {
+      exclusive: false,
+      cursor: 'crosshair',
+      isDraggable: true,
+      isResizable: true,
+      lockAspectRatio: false,
+      lockGroupAspectRatio: lockGroupAspectNearAngle,
+    },
+    defaults: {
+      type: PdfAnnotationSubtype.SQUARE,
+      // No /IT intent: ISO 32000 defines no measurement intent for Square
+      // (rectangle) annotations. This is an EmbedPDF-only area measurement,
+      // recognised via the `measurement` metadata rather than a spec intent.
+      color: 'transparent',
+      opacity: 1,
+      strokeWidth: 2,
+      strokeColor: MEASURE_STROKE,
+      strokeStyle: PdfAnnotationBorderStyle.SOLID,
+      measurement: makeMeasurement('area'),
+    },
+    // No clickBehavior: an area measurement must be drawn, not placed at a
+    // fixed default size from a single click.
+    transform: patchSquare,
+    pointerHandler: squareHandlerFactory,
+  },
+] satisfies readonly AnnotationTool<AnnoOf<PdfAnnotationSubtype.SQUARE>>[];
+
+const measureAreaEllipseTools = [
+  {
+    id: 'measureAreaEllipse' as const,
+    name: 'Measure Ellipse Area',
+    labelKey: 'measurement.areaEllipse',
+    categories: ['annotation', 'measurement'],
+    matchScore: (a) =>
+      a.type === PdfAnnotationSubtype.CIRCLE && a.measurement?.mode === 'area' ? 20 : 0,
+    interaction: {
+      exclusive: false,
+      cursor: 'crosshair',
+      isDraggable: true,
+      isResizable: true,
+      lockAspectRatio: false,
+      lockGroupAspectRatio: lockGroupAspectNearAngle,
+    },
+    defaults: {
+      type: PdfAnnotationSubtype.CIRCLE,
+      // No /IT intent: ISO 32000 defines no measurement intent for Circle
+      // (ellipse) annotations. This is an EmbedPDF-only area measurement,
+      // recognised via the `measurement` metadata rather than a spec intent.
+      color: 'transparent',
+      opacity: 1,
+      strokeWidth: 2,
+      strokeColor: MEASURE_STROKE,
+      strokeStyle: PdfAnnotationBorderStyle.SOLID,
+      measurement: makeMeasurement('area'),
+    },
+    // No clickBehavior: an area measurement must be drawn, not placed at a
+    // fixed default size from a single click.
+    transform: patchCircle,
+    pointerHandler: circleHandlerFactory,
+  },
+] satisfies readonly AnnotationTool<AnnoOf<PdfAnnotationSubtype.CIRCLE>>[];
+
+const calibrateTools = [
+  {
+    id: 'calibrate' as const,
+    name: 'Calibrate',
+    labelKey: 'measurement.calibrate',
+    categories: ['annotation', 'measurement'],
+    // Transient tool: never matches an existing annotation.
+    matchScore: () => 0,
+    interaction: {
+      exclusive: false,
+      cursor: 'crosshair',
+    },
+    defaults: {
+      type: PdfAnnotationSubtype.LINE,
+      color: 'transparent',
+      opacity: 1,
+      strokeWidth: 2,
+      strokeColor: MEASURE_STROKE,
+      // Drives the live length label shown while drawing the calibration line.
+      measurement: makeMeasurement('distance'),
+    },
+    pointerHandler: calibrateHandlerFactory,
+  },
+] satisfies readonly AnnotationTool<AnnoOf<PdfAnnotationSubtype.LINE>>[];
+
 const textCommentTools = [
   {
     id: 'textComment' as const,
@@ -646,6 +864,12 @@ export const defaultTools = [
   ...lineTools,
   ...polylineTools,
   ...polygonTools,
+  ...measureDistanceTools,
+  ...measurePerimeterTools,
+  ...measureAreaPolygonTools,
+  ...measureAreaRectTools,
+  ...measureAreaEllipseTools,
+  ...calibrateTools,
   ...textCommentTools,
   ...freeTextTools,
   ...calloutFreeTextTools,

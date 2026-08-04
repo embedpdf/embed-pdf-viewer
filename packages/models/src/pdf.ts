@@ -1044,9 +1044,14 @@ export interface PdfAnnotationObjectBase {
   blendMode?: PdfBlendMode;
 
   /**
-   * intent of annotation
+   * intent of annotation (PDF `/IT` entry).
+   *
+   * Known values include the measurement intents ({@link PdfMeasurementIntent})
+   * and `'FreeTextCallout'`. The type is kept open via `(string & {})` so any
+   * other PDF `/IT` value still type-checks while the known values provide
+   * autocomplete.
    */
-  intent?: string;
+  intent?: PdfMeasurementIntent | 'FreeTextCallout' | (string & {});
 
   /**
    * Sub type of annotation
@@ -1772,6 +1777,132 @@ export interface PdfInkAnnoObject extends PdfAnnotationObjectBase {
   strokeWidth: number;
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+ * Measurement annotations
+ *
+ * A measurement annotation is an ordinary geometry annotation (Line, Polyline,
+ * Polygon, Circle or Square) that additionally carries calibration metadata
+ * describing how to convert its on-page geometry into a real-world value
+ * (distance, perimeter or area). The metadata lives on the annotation's
+ * optional `measurement` field and is persisted through the engine's custom
+ * data channel; the spec `/IT` intent is also written so other viewers can at
+ * least recognise the annotation as a dimension.
+ *
+ * See `@embedpdf/models`'s `measurement.ts` for the calculation/formatting
+ * helpers that operate on these types.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * Units a measurement can be expressed in.
+ *
+ * `PT` is the PDF default user-space unit (1/72 inch). All other units convert
+ * relative to it. These string values double as the labels used when a unit is
+ * appended to a formatted measurement.
+ *
+ * @public
+ */
+export enum PdfMeasurementUnit {
+  PT = 'pt',
+  MM = 'mm',
+  CM = 'cm',
+  M = 'm',
+  IN = 'in',
+  FT = 'ft',
+  YD = 'yd',
+}
+
+/**
+ * How a measurement value is rounded and rendered.
+ *
+ * - `decimal` rounds to a fixed number of decimal places (e.g. `12.50`).
+ * - `fraction` rounds to the nearest `1 / denominator` and renders as a
+ *   whole-plus-fraction string (e.g. `3 1/2`). Only meaningful for linear
+ *   measurements; area measurements always use decimal formatting.
+ *
+ * @public
+ */
+export type PdfMeasurementPrecision =
+  | { type: 'decimal'; places: number }
+  | { type: 'fraction'; denominator: number };
+
+/**
+ * Page-unit ⇄ real-world calibration.
+ *
+ * Reads as: `pagePoints` PDF points on the page represent `value` `unit` in the
+ * real world. For example `{ pagePoints: 72, value: 10, unit: FT }` means
+ * "1 inch on the page = 10 feet".
+ *
+ * @public
+ */
+export interface PdfMeasurementScale {
+  /** Real-world magnitude that `pagePoints` page points map to. */
+  value: number;
+  /** Real-world unit `value` is expressed in. */
+  unit: PdfMeasurementUnit;
+  /** Number of PDF page points (1/72 inch) that map to `value` `unit`. */
+  pagePoints: number;
+}
+
+/**
+ * Optional secondary read-out rendered alongside the primary value
+ * (e.g. show metres and feet together).
+ *
+ * @public
+ */
+export interface PdfMeasurementSecondaryUnit {
+  unit: PdfMeasurementUnit;
+  precision: PdfMeasurementPrecision;
+}
+
+/**
+ * The kind of quantity a measurement annotation reports.
+ *
+ * @public
+ */
+export type PdfMeasurementMode = 'distance' | 'perimeter' | 'area';
+
+/**
+ * Calibration + formatting metadata attached to a measurement annotation.
+ *
+ * @public
+ */
+export interface PdfMeasurementInfo {
+  /** What this annotation measures. Determines the geometry formula used. */
+  mode: PdfMeasurementMode;
+  /** Page-unit ⇄ real-world calibration used to convert the geometry. */
+  scale: PdfMeasurementScale;
+  /** Unit the primary value is displayed in. */
+  unit: PdfMeasurementUnit;
+  /** Rounding/formatting of the primary value. */
+  precision: PdfMeasurementPrecision;
+  /** Optional secondary read-out shown in parentheses after the primary. */
+  secondary?: PdfMeasurementSecondaryUnit;
+  /**
+   * Cached computed value in the primary `unit`. Recomputed whenever the
+   * geometry or calibration changes; primarily a convenience for consumers
+   * that want the number without re-running the geometry math.
+   */
+  computedValue?: number;
+  /**
+   * Optional explicit label anchor in page coordinates. When omitted the label
+   * is positioned at the geometry's natural anchor (segment midpoint for a
+   * line, centroid for area, etc.).
+   */
+  labelPosition?: Position;
+}
+
+/**
+ * PDF `/IT` (intent) values that mark a geometry annotation as a measurement.
+ *
+ * - `LineDimension` — a Line annotation measuring a distance.
+ * - `PolyLineDimension` — a Polyline annotation measuring a perimeter/path.
+ * - `PolygonDimension` — a Polygon annotation measuring an area (also used for
+ *   rectangle/ellipse area via Square/Circle).
+ *
+ * @public
+ */
+export type PdfMeasurementIntent = 'LineDimension' | 'PolyLineDimension' | 'PolygonDimension';
+
 /**
  * Pdf polygon annotation
  *
@@ -1780,6 +1911,12 @@ export interface PdfInkAnnoObject extends PdfAnnotationObjectBase {
 export interface PdfPolygonAnnoObject extends PdfAnnotationObjectBase {
   /** {@inheritDoc PdfAnnotationObjectBase.type} */
   type: PdfAnnotationSubtype.POLYGON;
+
+  /**
+   * Measurement calibration/formatting metadata. When present this Polygon is
+   * an area measurement (intent `PolygonDimension`).
+   */
+  measurement?: PdfMeasurementInfo;
 
   /**
    * contents of polygon annotation
@@ -1840,6 +1977,12 @@ export interface PdfPolylineAnnoObject extends PdfAnnotationObjectBase {
   type: PdfAnnotationSubtype.POLYLINE;
 
   /**
+   * Measurement calibration/formatting metadata. When present this Polyline is
+   * a perimeter/path measurement (intent `PolyLineDimension`).
+   */
+  measurement?: PdfMeasurementInfo;
+
+  /**
    * contents of polyline annotation
    */
   contents?: string;
@@ -1893,6 +2036,12 @@ export interface PdfPolylineAnnoObject extends PdfAnnotationObjectBase {
 export interface PdfLineAnnoObject extends PdfAnnotationObjectBase {
   /** {@inheritDoc PdfAnnotationObjectBase.type} */
   type: PdfAnnotationSubtype.LINE;
+
+  /**
+   * Measurement calibration/formatting metadata. When present this Line is a
+   * distance measurement (intent `LineDimension`).
+   */
+  measurement?: PdfMeasurementInfo;
 
   /**
    * contents of line annotation
@@ -2109,6 +2258,12 @@ export interface PdfStampAnnoObject extends PdfAnnotationObjectBase {
 export interface PdfCircleAnnoObject extends PdfAnnotationObjectBase {
   /** {@inheritDoc PdfAnnotationObjectBase.type} */
   type: PdfAnnotationSubtype.CIRCLE;
+
+  /**
+   * Measurement calibration/formatting metadata. When present this Circle is an
+   * ellipse-area measurement (intent `PolygonDimension`).
+   */
+  measurement?: PdfMeasurementInfo;
   /**
    * flags of circle annotation
    */
@@ -2159,6 +2314,12 @@ export interface PdfCircleAnnoObject extends PdfAnnotationObjectBase {
 export interface PdfSquareAnnoObject extends PdfAnnotationObjectBase {
   /** {@inheritDoc PdfAnnotationObjectBase.type} */
   type: PdfAnnotationSubtype.SQUARE;
+
+  /**
+   * Measurement calibration/formatting metadata. When present this Square is a
+   * rectangle-area measurement (intent `PolygonDimension`).
+   */
+  measurement?: PdfMeasurementInfo;
   /**
    * Text contents of the square annotation
    */
