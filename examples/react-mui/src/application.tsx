@@ -39,7 +39,7 @@ import {
 } from '@embedpdf/plugin-annotation/react';
 import { CircularProgress, Box, Alert } from '@mui/material';
 import SearchOutlinedIcon from '@mui/icons-material/SearchOutlined';
-import { useMemo, useRef } from 'react';
+import { useMemo, useRef, useState } from 'react';
 
 import { PageControls } from './components/page-controls';
 import { Search } from './components/search';
@@ -49,6 +49,7 @@ import { Toolbar } from './components/toolbar';
 import { ViewSidebarReverseIcon } from './icons';
 import { AnnotationSelectionMenu } from './components/annotation-selection-menu';
 import { RedactionSelectionMenu } from './components/redaction-selection-menu';
+import { SearchRedactionModal } from './components/search-redaction-modal';
 
 const consoleLogger = new ConsoleLogger();
 
@@ -60,6 +61,7 @@ function App() {
 
   const { engine, isLoading, error } = usePdfiumEngine(isDev ? { logger: consoleLogger } : {});
   const popperContainerRef = useRef<HTMLDivElement>(null);
+  const [isSearchRedactionModalOpen, setIsSearchRedactionModalOpen] = useState(false);
 
   const plugins = useMemo(
     () => [
@@ -203,7 +205,7 @@ function App() {
                         userSelect: 'none',
                       }}
                     >
-                      {activeDocumentId && <Toolbar documentId={activeDocumentId} />}
+                      {activeDocumentId && <Toolbar documentId={activeDocumentId} onOpenSearchRedactionModal={() => setIsSearchRedactionModalOpen(true)} />}
 
                       {/* Main content area with sidebars */}
                       <Box sx={{ display: 'flex', flexGrow: 1, overflow: 'hidden' }}>
@@ -328,6 +330,13 @@ function App() {
                         {/* Right Sidebar */}
                         <Drawer position="right" />
                       </Box>
+
+                      {/* Search Redaction Modal */}
+                      <SearchRedactionModal
+                        open={isSearchRedactionModalOpen}
+                        onClose={() => setIsSearchRedactionModalOpen(false)}
+                        documentId={activeDocumentId}
+                      />
                     </Box>
                   </DrawerProvider>
                 );
