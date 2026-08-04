@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 /* eslint-disable no-console */
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { dirname, resolve } from 'node:path';
 import { buildApp } from '../app/buildApp';
 import { loadFallbackFontsFromEnv } from '../runtime/loadFallbackFontsFromEnv';
 import { createSqliteDb, type CreateSqliteDbOptions } from '../db/drivers/sqlite';
@@ -28,6 +30,9 @@ import { createSecretsProviderRegistry } from '../security/secrets/createSecrets
 import { createSecretResolver, type SecretResolver } from '../security/secrets/SecretResolver';
 import { loadSecretsConfigFromEnv } from '../security/secrets/config/loadSecretsConfigFromEnv';
 import type { Kysely } from 'kysely';
+import { LicenseRuntime } from '../licensing/LicenseRuntime';
+import { ConnectedUsageReporter } from '../licensing/ConnectedUsageReporter';
+import { UsageMeters } from '../licensing/UsageMeters';
 
 /**
  * Multi-command CLI:
@@ -40,6 +45,9 @@ import type { Kysely } from 'kysely';
  *   cloudpdf-server migrate validate [--strict]
  *   cloudpdf-server db doctor
  *   cloudpdf-server audit export --day yesterday
+ *   cloudpdf-server license request [--output cloudpdf-license-request.json]
+ *   cloudpdf-server license install --file cloudpdf-license.lic
+ *   cloudpdf-server license status
  *   cloudpdf-server --help
  *
  * Config is read from env (12-factor friendly). `serve` runs the full
@@ -65,6 +73,10 @@ import type { Kysely } from 'kysely';
  *   HOST                   (default: 0.0.0.0)
  *   CLOUDPDF_WORKER_POOL_SIZE  int|max  (default: min(2, cpus))
  *   CLOUDPDF_FALLBACK_FONTS  JSON [{key,path,familyName?,...}]  (default: none)
+ *   CLOUDPDF_LICENSE_MODE     connected|air-gapped
+ *   CLOUDPDF_LICENSE_KEY      required for connected mode
+ *   CLOUDPDF_CONTROL_PLANE_URL           required for connected usage reporting
+ *   CLOUDPDF_LICENSE_REPORTING_TOKEN     required for connected usage reporting
  *
  * Exit codes:
  *   0  success
@@ -193,6 +205,11 @@ function printHelp(): void {
       '  db doctor              Connect, run validate, print version info',
       '  audit export --day yesterday',
       '                          Export closed-day audit_log rows to JSONL storage',
+      '  license request [--output FILE] [--force]',
+      '                          Create a machine-bound air-gap activation request',
+      '  license install --file FILE',
+      '                          Verify and install a signed air-gap certificate',
+      '  license status         Validate and print the current license decision',
       '',
       'Environment:',
       '  Database',
@@ -205,6 +222,9 @@ function printHelp(): void {
       '    CLOUDPDF_STORAGE_S3_BUCKET, CLOUDPDF_STORAGE_S3_REGION, CLOUDPDF_STORAGE_S3_ENDPOINT',
       '  Auth',
       '    CLOUDPDF_JWT_SECRET    HS256 secret      (required in production)',
+      '  Commercial license',
+      '    CLOUDPDF_LICENSE_MODE   connected|air-gapped (explicit in production)',
+      '    CLOUDPDF_LICENSE_KEY    required for connected mode',
       '  Engine cache (enables /v1/docs/* read+render routes)',
       '    CLOUDPDF_CACHE_ROOT                      (default: ./data/cache)',
       '    CLOUDPDF_CACHE_MAX_BYTES                 (default: 4 GiB)',
@@ -454,6 +474,104 @@ async function cmdAuditExport(args: string[]): Promise<void> {
   }
 }
 
+async function cmdLicenseRequest(args: string[]): Promise<void> {
+  requireAirGappedMode();
+  const outputPath = resolve(readFlagValue(args, '--output') ?? 'cloudpdf-license-request.json');
+  const dbCtx = openDb();
+  try {
+    await assertLicenseSchemaCurrent(dbCtx);
+    const runtime = await LicenseRuntime.create({
+      db: dbCtx.db,
+      env: process.env,
+      secretResolver: buildSecretResolver(),
+      startTimer: false,
+    });
+    try {
+      const request = await runtime.createActivationRequest();
+      await mkdir(dirname(outputPath), { recursive: true });
+      await writeFile(outputPath, `${JSON.stringify(request, null, 2)}\n`, {
+        encoding: 'utf8',
+        flag: args.includes('--force') ? 'w' : 'wx',
+        mode: 0o600,
+      });
+      console.log(`air-gap activation request written: ${outputPath}`);
+    } finally {
+      await runtime.close();
+    }
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'EEXIST') {
+      fail(1, `${outputPath} already exists; pass --force to replace it`);
+    }
+    throw error;
+  } finally {
+    await dbCtx.db.destroy();
+  }
+}
+
+async function cmdLicenseInstall(args: string[]): Promise<void> {
+  requireAirGappedMode();
+  const file = readFlagValue(args, '--file');
+  if (!file) fail(2, 'license install requires --file FILE');
+  const filePath = resolve(file);
+  const certificate = await readFile(filePath, 'utf8');
+  const dbCtx = openDb();
+  try {
+    await assertLicenseSchemaCurrent(dbCtx);
+    const runtime = await LicenseRuntime.create({
+      db: dbCtx.db,
+      env: process.env,
+      secretResolver: buildSecretResolver(),
+      startTimer: false,
+    });
+    try {
+      const verified = await runtime.installCertificate(certificate);
+      console.log(`air-gap certificate installed: ${filePath}`);
+      console.log(`  license: ${verified.licenseId}`);
+      console.log(`  certificate expires: ${verified.artifactExpiresAt}`);
+    } finally {
+      await runtime.close();
+    }
+  } finally {
+    await dbCtx.db.destroy();
+  }
+}
+
+async function cmdLicenseStatus(): Promise<void> {
+  const dbCtx = openDb();
+  try {
+    await assertLicenseSchemaCurrent(dbCtx);
+    const runtime = await LicenseRuntime.create({
+      db: dbCtx.db,
+      env: process.env,
+      secretResolver: buildSecretResolver(),
+      startTimer: false,
+    });
+    try {
+      console.log(JSON.stringify(runtime.getStatus(), null, 2));
+    } finally {
+      await runtime.close();
+    }
+  } finally {
+    await dbCtx.db.destroy();
+  }
+}
+
+async function assertLicenseSchemaCurrent(dbCtx: DbContext): Promise<void> {
+  const rows = await status(dbCtx.db, dbCtx.migrations);
+  const licenseMigration = rows.find((row) => row.version === '016');
+  if (!licenseMigration || licenseMigration.state !== 'applied') {
+    fail(2, 'licensing requires migration 016; run: cloudpdf-server migrate up');
+  }
+}
+
+function requireAirGappedMode(): void {
+  const mode = process.env['CLOUDPDF_LICENSE_MODE'] ??
+    (process.env['CLOUDPDF_LICENSE_KEY'] ? 'connected' : 'air-gapped');
+  if (mode !== 'air-gapped') {
+    fail(2, 'this command requires CLOUDPDF_LICENSE_MODE=air-gapped');
+  }
+}
+
 async function cmdServe(): Promise<void> {
   const PORT = Number(process.env['PORT'] ?? 3000);
   const HOST = process.env['HOST'] ?? '0.0.0.0';
@@ -490,10 +608,56 @@ async function cmdServe(): Promise<void> {
     if (applied.length > 0) console.log(`auto-migrate: applied ${applied.length} migration(s)`);
   }
 
+  // One resolver instance is shared by the license and infrastructure
+  // adapters. This keeps secret:// license keys out of environment values
+  // while preserving the same provider/cache behavior as every other secret.
+  const resolver = buildSecretResolver();
+  const licenseRuntime = await LicenseRuntime.create({
+    db: dbCtx.db,
+    secretResolver: resolver,
+  });
+  const initialLicense = licenseRuntime.getStatus();
+  if (initialLicense.access === 'none') {
+    await licenseRuntime.close();
+    await dbCtx.db.destroy();
+    fail(2, `${initialLicense.message} (${initialLicense.code})`);
+  }
+  if (initialLicense.access === 'restricted') {
+    console.warn(
+      `[cloudpdf-server] LICENSE RESTRICTED: ${initialLicense.message} (${initialLicense.code})`,
+    );
+  }
+  if (initialLicense.licenseKind === 'development') {
+    console.warn(
+      '[cloudpdf-server] DEVELOPMENT LICENSE: this deployment runs on a ' +
+        'development key with development-scale usage limits. Use your ' +
+        'subscription license key for production and staging.',
+    );
+  }
+
+  let usageReporter: ConnectedUsageReporter | undefined;
+  if (
+    initialLicense.mode === 'connected' &&
+    initialLicense.telemetryProfile === 'aggregated-usage'
+  ) {
+    try {
+      usageReporter = await ConnectedUsageReporter.create({
+        controlPlaneUrl: process.env['CLOUDPDF_CONTROL_PLANE_URL'],
+        db: dbCtx.db,
+        meters: new UsageMeters(dbCtx.db, licenseRuntime),
+        reportingToken: process.env['CLOUDPDF_LICENSE_REPORTING_TOKEN'],
+        secretResolver: resolver,
+      });
+    } catch (error) {
+      await licenseRuntime.close();
+      await dbCtx.db.destroy();
+      fail(2, error instanceof Error ? error.message : String(error));
+    }
+  }
+
   // Adapter bootstrap (see ADAPTERS.md): secrets registry -> resolver,
   // then storage / CDN / KMS. Storage defaults to filesystem and CDN to
   // `none`, so this works with no extra env. KMS is opt-in.
-  const resolver = buildSecretResolver();
   const objectStore = await createObjectStoreOrExit(resolver);
   const cdnSigner = await createCdnSigner(loadCdnConfigFromEnv(process.env), { resolver });
   const kms = await buildKms(resolver);
@@ -512,6 +676,8 @@ async function cmdServe(): Promise<void> {
       : undefined;
 
   const bundle = await buildApp({
+    licenseGate: licenseRuntime,
+    ...(usageReporter ? { usageReporter } : {}),
     verifier: { mode: 'hs256', secret: JWT_SECRET },
     workerEntry: WORKER_ENTRY_URL,
     fallbackFonts: loadFallbackFontsFromEnv(),
@@ -531,15 +697,24 @@ async function cmdServe(): Promise<void> {
     bundle.app.log.info({ sig }, 'received signal, shutting down');
     try {
       await bundle.shutdown();
-      await dbCtx.db.destroy();
     } finally {
-      process.exit(0);
+      usageReporter?.stop();
+      try {
+        await licenseRuntime.close();
+      } finally {
+        try {
+          await dbCtx.db.destroy();
+        } finally {
+          process.exit(0);
+        }
+      }
     }
   };
   process.on('SIGINT', () => void onSignal('SIGINT'));
   process.on('SIGTERM', () => void onSignal('SIGTERM'));
 
   await bundle.app.listen({ port: PORT, host: HOST });
+  usageReporter?.start();
   bundle.app.log.info(
     {
       port: PORT,
@@ -597,6 +772,14 @@ async function main(): Promise<void> {
     const rest = args.slice(2);
     if (sub === 'export') return cmdAuditExport(rest);
     fail(2, `unknown subcommand: audit ${sub ?? '(missing)'}\nrun: cloudpdf-server --help`);
+  }
+  if (args[0] === 'license') {
+    const sub = args[1];
+    const rest = args.slice(2);
+    if (sub === 'request') return cmdLicenseRequest(rest);
+    if (sub === 'install') return cmdLicenseInstall(rest);
+    if (sub === 'status') return cmdLicenseStatus();
+    fail(2, `unknown subcommand: license ${sub ?? '(missing)'}\nrun: cloudpdf-server --help`);
   }
   fail(2, `unknown command: ${args[0]!}\nrun: cloudpdf-server --help`);
 }

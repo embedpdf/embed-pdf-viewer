@@ -268,6 +268,53 @@ export interface JwksCacheTable {
   expires_at: number;
 }
 
+export interface LicenseRuntimeStateTable {
+  singleton_id: 1;
+  deployment_id: string;
+  license_mode: 'connected' | 'air-gapped' | null;
+  license_key_fingerprint: string | null;
+  keygen_license_id: string | null;
+  installed_certificate: string | null;
+  certificate_installed_at: number | null;
+  last_validated_at: number | null;
+  last_observed_time: number;
+  validation_data_json: string | null;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface LicenseUsageCounterTable {
+  metric: 'pdf.uploads' | 'pdf.views';
+  period_start: string;
+  value: number;
+  updated_at: number;
+}
+
+export interface LicenseUsageEventTable {
+  metric: 'pdf.uploads';
+  event_id: string;
+  period_start: string;
+  created_at: number;
+}
+
+export interface LicenseReportingStateTable {
+  singleton_id: 1;
+  sequence: number;
+  pending_payload_json: string | null;
+  last_attempt_at: number | null;
+  last_success_at: number | null;
+  last_status: 'never' | 'success' | 'failed';
+  last_error: string | null;
+  updated_at: number;
+}
+
+export interface LicenseOperationLeaseTable {
+  name: string;
+  owner_id: string;
+  expires_at: number;
+  updated_at: number;
+}
+
 /**
  * The Kysely `Database` interface that the rest of the server typechecks
  * against. Each table maps to a single TypeScript shape; Kysely handles
@@ -291,4 +338,9 @@ export interface Database {
   schema_migrations: SchemaMigrationsTable;
   revoked_jtis: RevokedJtisTable;
   jwks_cache: JwksCacheTable;
+  license_runtime_state: LicenseRuntimeStateTable;
+  license_usage_counter: LicenseUsageCounterTable;
+  license_usage_event: LicenseUsageEventTable;
+  license_reporting_state: LicenseReportingStateTable;
+  license_operation_lease: LicenseOperationLeaseTable;
 }

@@ -4,7 +4,7 @@ import multipart from '@fastify/multipart';
 import Fastify, { type FastifyInstance } from 'fastify';
 import type { Kysely } from 'kysely';
 
-import { registerJwtAuth } from './jwt-plugin';
+import { registerJwtAuth, requireScope } from './jwt-plugin';
 import { DbJwksCacheStore } from '../auth/JwksCacheStore';
 import type { JwtVerifierConfig, RevocationCheck, JwksCacheStore } from '../auth/JwtVerifier';
 import { RevokedJtisGuard } from '../auth/RevokedJtisGuard';
@@ -45,8 +45,15 @@ import { SharpImageEncoder } from '../render/SharpImageEncoder';
 import type { KmsKeyring } from '../security';
 import { InProcessRealtimeBus, type RealtimeBus } from '../realtime/RealtimeBus';
 import { registerEventsRoutes } from '../routes/events';
+import type { LicenseGate } from '../licensing/LicenseRuntime';
+import { UsageMeters } from '../licensing/UsageMeters';
+import type { ConnectedUsageReporter } from '../licensing/ConnectedUsageReporter';
 
 export interface BuildAppOptions {
+  /** Required commercial gate for every server construction. */
+  licenseGate: LicenseGate;
+  /** Connected-only reporting diagnostics; never constructed in air-gap mode. */
+  usageReporter?: Pick<ConnectedUsageReporter, 'status'>;
   /**
    * Cross-replica mutation doorbell. Defaults to in-process delivery —
    * complete for single-replica deployments (the SQLite profile) and tests.
@@ -240,6 +247,34 @@ export async function buildApp(opts: BuildAppOptions): Promise<AppBundle> {
     // codec separately enforces a 512-char limit, so this stays bounded.
     maxParamLength: 512,
   });
+  const usageMeters = opts.db ? new UsageMeters(opts.db, opts.licenseGate) : undefined;
+  app.addHook('onRequest', async (request, reply) => {
+    const pathname = request.url.split('?', 1)[0] ?? request.url;
+    if (
+      pathname === '/healthz' ||
+      pathname === '/readyz' ||
+      pathname === '/v1/license/status'
+    ) {
+      return;
+    }
+
+    const license = opts.licenseGate.getStatus();
+    if (license.code !== 'VALID' && license.code !== 'VALID_TEST_LICENSE') {
+      reply.header('X-CloudPDF-License-Status', license.code);
+    }
+    if (
+      license.access === 'none' ||
+      (license.access === 'restricted' && !isReadOnlyLicenseRequest(request.method, pathname))
+    ) {
+      return reply.code(403).send({
+        error: {
+          code: license.code,
+          message: license.message,
+          name: 'LicenseError',
+        },
+      });
+    }
+  });
   app.addHook('onClose', async () => {
     await realtimeBus.close();
   });
@@ -321,7 +356,19 @@ export async function buildApp(opts: BuildAppOptions): Promise<AppBundle> {
       })
     : undefined;
   app.get('/healthz', async () => ({ status: 'ok' }));
-  app.get('/readyz', async () => ({ status: 'ok' }));
+  app.get('/readyz', async () => {
+    const license = opts.licenseGate.getStatus();
+    return { license, status: 'ok' };
+  });
+  app.get('/v1/license/status', async () => opts.licenseGate.getStatus());
+  app.get('/v1/admin/license/status', async (request) => {
+    requireScope(request, ['docs.read']);
+    return {
+      license: opts.licenseGate.getStatus(),
+      reporting: opts.usageReporter ? await opts.usageReporter.status() : null,
+      usage: usageMeters ? await usageMeters.snapshot() : null,
+    };
+  });
 
   // Drift detection at boot. Production deployments should supply
   // `expectedMigrations` — if the DB has a checksum mismatch or an
@@ -385,6 +432,7 @@ export async function buildApp(opts: BuildAppOptions): Promise<AppBundle> {
       autoProvisionTenant: opts.autoProvisionTenant ?? false,
       securityProbe: new DocumentSecurityProbe({ cache: baseFileCache, pool }),
       ...(derivedRenders ? { derivedRenders } : {}),
+      ...(usageMeters ? { usageMeters } : {}),
     });
     await registerAdminDocumentsRoutes(app, {
       lifecycle,
@@ -466,6 +514,7 @@ export async function buildApp(opts: BuildAppOptions): Promise<AppBundle> {
         service: documentService,
         cdnSigner: opts.cdnSigner ?? new NoneCdnSigner(),
         ...(derivedRenders ? { derivedRenders } : {}),
+        ...(usageMeters ? { usageMeters } : {}),
       });
       await registerDocsRoutes(app, { service: documentService });
       await registerMetadataRoutes(app, { service: documentService, layerService });
@@ -579,6 +628,15 @@ export async function buildApp(opts: BuildAppOptions): Promise<AppBundle> {
     kms: opts.kms,
     shutdown,
   };
+}
+
+function isReadOnlyLicenseRequest(method: string, pathname: string): boolean {
+  if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') return true;
+
+  // These POST endpoints calculate or mint read access, but do not change the
+  // customer's document contents. They remain available so an expired or
+  // suspended license can never hold existing data hostage.
+  return method === 'POST' && (pathname === '/v1/access' || pathname === '/v1/warm');
 }
 
 function mapToHttp(code: string): number {

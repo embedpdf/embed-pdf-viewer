@@ -151,6 +151,7 @@ describe('buildApp drift guard', () => {
     );
     // Mirror how buildApp does it.
     const { buildApp } = await import('../src/app/buildApp');
+    const { createValidTestLicenseGate } = await import('../src/licensing/testing');
     const { FsObjectStore } = await import('../src/storage/adapters/FsObjectStore');
     const { mkdtemp, rm } = await import('node:fs/promises');
     const { tmpdir } = await import('node:os');
@@ -159,6 +160,7 @@ describe('buildApp drift guard', () => {
     try {
       await expect(
         buildApp({
+          licenseGate: createValidTestLicenseGate(),
           verifier: { mode: 'hs256', secret: 'x' },
           workerEntry: null,
           db,

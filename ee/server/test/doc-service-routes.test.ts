@@ -17,6 +17,7 @@ import {
   type AppBundle,
   type DbSchema,
 } from '../src/index';
+import { createValidTestLicenseGate } from '../src/licensing/testing';
 
 const STUB_ENTRY = new URL('./_helpers/stub-worker-entry.cjs', import.meta.url);
 const SECRET = 'doc-routes-secret';
@@ -39,6 +40,7 @@ async function buildFixture(
   await migrate(db, { source: { kind: 'inline', migrations: sqliteMigrations } });
   const store = new FsObjectStore({ root: storageRoot });
   const bundle = await buildApp({
+    licenseGate: createValidTestLicenseGate(),
     verifier: { mode: 'hs256', secret: SECRET },
     workerEntry: STUB_ENTRY,
     poolSize: opts.poolSize ?? 2,

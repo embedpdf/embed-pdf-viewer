@@ -17,6 +17,7 @@ import {
   type DbSchema,
 } from '../src/index';
 import { InProcessRealtimeBus } from '../src/realtime/RealtimeBus';
+import { createValidTestLicenseGate } from '../src/licensing/testing';
 
 const STUB_ENTRY = new URL('./_helpers/stub-worker-entry.cjs', import.meta.url);
 const SECRET = 'events-sse-secret';
@@ -329,6 +330,7 @@ async function buildFixture(): Promise<Fixture> {
   const store = new FsObjectStore({ root: storageRoot });
   const bus = new InProcessRealtimeBus();
   const bundle = await buildApp({
+    licenseGate: createValidTestLicenseGate(),
     verifier: { mode: 'hs256', secret: SECRET },
     workerEntry: STUB_ENTRY,
     poolSize: 1,

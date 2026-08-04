@@ -20,19 +20,21 @@ import type { CdnSigner } from '../cdn/CdnSigner';
 import type { DerivedRenderService } from '../services/DerivedRenderService';
 import type { DocumentService } from '../services/DocumentService';
 import { setNoStore } from './_helpers';
+import type { UsageMeters } from '../licensing/UsageMeters';
 
 export interface AccessRouteDeps {
   service: DocumentService;
   cdnSigner: CdnSigner;
   /** When present, /access advertises the deployment's render lattice. */
   derivedRenders?: DerivedRenderService;
+  usageMeters?: UsageMeters;
 }
 
 export async function registerAccessRoutes(
   app: FastifyInstance,
   deps: AccessRouteDeps,
 ): Promise<void> {
-  const { service, cdnSigner, derivedRenders } = deps;
+  const { service, cdnSigner, derivedRenders, usageMeters } = deps;
 
   app.post(wirePaths.access, async (req, reply) => {
     const parsed = AccessRequestSchema.safeParse(req.body ?? {});
@@ -76,6 +78,9 @@ export async function registerAccessRoutes(
       derivedRenders?.policy(),
       layerScopes,
     );
+    // A view is a successfully authorized viewer access grant. Counting at
+    // this choke point avoids charging internal render/cache operations.
+    await usageMeters?.recordView();
     setNoStore(reply);
     return {
       security: unlocked.security,

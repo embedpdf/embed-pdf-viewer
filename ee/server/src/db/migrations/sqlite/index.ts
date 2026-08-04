@@ -28,6 +28,10 @@ import down012 from './012_layer_metadata_version.down.sql';
 import down013 from './013_realtime_events.down.sql';
 import down014 from './014_layer_attachments_version.down.sql';
 import down015 from './015_document_thumbnail.down.sql';
+import sql016 from './016_license_runtime.sql';
+import down016 from './016_license_runtime.down.sql';
+import sql017 from './017_license_usage.sql';
+import down017 from './017_license_usage.down.sql';
 import type { MigrationSource } from '../../migrator/runner';
 
 /**
@@ -57,4 +61,6 @@ export const sqliteMigrations: ReadonlyArray<MigrationSource> = [
   { version: '013', name: '013_realtime_events.sql', sql: sql013, down: down013 },
   { version: '014', name: '014_layer_attachments_version.sql', sql: sql014, down: down014 },
   { version: '015', name: '015_document_thumbnail.sql', sql: sql015, down: down015 },
+  { version: '016', name: '016_license_runtime.sql', sql: sql016, down: down016 },
+  { version: '017', name: '017_license_usage.sql', sql: sql017, down: down017 },
 ];

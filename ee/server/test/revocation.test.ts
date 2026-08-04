@@ -13,6 +13,7 @@ import {
   sqliteMigrations,
   type AppBundle,
 } from '../src/index';
+import { createValidTestLicenseGate } from '../src/licensing/testing';
 
 /**
  * Phase 2 — RevokedJtisGuard + `/v1/admin/tokens/:jti/revoke`
@@ -119,6 +120,7 @@ describe('POST /v1/admin/tokens/:jti/revoke (E2E)', () => {
     const db = createSqliteDb({ path: ':memory:' });
     await migrate(db, { source: { kind: 'inline', migrations: sqliteMigrations } });
     bundle = await buildApp({
+      licenseGate: createValidTestLicenseGate(),
       verifier: { mode: 'hs256', secret: SECRET },
       workerEntry: null,
       db,

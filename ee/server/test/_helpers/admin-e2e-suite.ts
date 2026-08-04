@@ -14,6 +14,7 @@ import {
   type DbSchema,
 } from '../../src/index';
 import { createCloudAdmin, AdminError } from '@cloudpdf/admin';
+import { createValidTestLicenseGate } from '../../src/licensing/testing';
 
 const SECRET = 'admin-e2e-secret';
 
@@ -53,6 +54,7 @@ export function runAdminE2e(dialect: AdminE2eDialectFixture): void {
     const store = new FsObjectStore({ root: storageRoot });
 
     const bundle = await buildApp({
+      licenseGate: createValidTestLicenseGate(),
       verifier: { mode: 'hs256', secret: SECRET },
       workerEntry: null,
       db,

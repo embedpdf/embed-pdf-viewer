@@ -5,6 +5,7 @@ import { StorageKeys } from '../storage/keys';
 import type { ObjectBody, ObjectStoreWithInfo, PresignedUpload } from '../storage/ObjectStore';
 import { DocumentSecurityProbe } from './DocumentSecurityProbe';
 import type { DerivedRenderService } from './DerivedRenderService';
+import type { UsageMeters } from '../licensing/UsageMeters';
 
 export type DedupMode = 'always-create' | 'reuse-existing';
 
@@ -81,6 +82,7 @@ export interface DocumentLifecycleOptions {
   securityProbe?: DocumentSecurityProbe;
   /** When present, commit warms the document's thumbnail (fire-and-forget). */
   derivedRenders?: DerivedRenderService;
+  usageMeters?: UsageMeters;
 }
 
 /**
@@ -108,6 +110,7 @@ export class DocumentLifecycleService {
   private readonly autoProvisionTenant: boolean;
   private readonly securityProbe: DocumentSecurityProbe;
   private readonly derivedRenders?: DerivedRenderService;
+  private readonly usageMeters?: UsageMeters;
 
   constructor(opts: DocumentLifecycleOptions) {
     this.documents = opts.documents;
@@ -116,6 +119,7 @@ export class DocumentLifecycleService {
     this.autoProvisionTenant = opts.autoProvisionTenant ?? false;
     this.securityProbe = opts.securityProbe ?? new DocumentSecurityProbe();
     this.derivedRenders = opts.derivedRenders;
+    this.usageMeters = opts.usageMeters;
   }
 
   async init(input: InitInput): Promise<InitResult> {
@@ -208,7 +212,10 @@ export class DocumentLifecycleService {
     if (doc.state === 'ready') {
       // Idempotent commit: if the existing base_sha matches, return
       // the doc unchanged; otherwise this is a programmer error.
-      if (doc.baseSha === input.sha256) return { doc };
+      if (doc.baseSha === input.sha256) {
+        await this.usageMeters?.recordUpload(doc.id, doc.createdAt);
+        return { doc };
+      }
       throw conflict(`document ${doc.id} already committed with different base_sha`);
     }
     if (doc.state !== 'pending') {
@@ -241,6 +248,11 @@ export class DocumentLifecycleService {
       expectedSha: observedSha,
     });
 
+    // Meter only a newly committed document. The ready/idempotent return at
+    // the top of this method never reaches this path.
+    await this.usageMeters?.assertUploadAllowed();
+    await this.usageMeters?.assertStorageAllowed(stat.size);
+
     const updated = await this.documents.commit({
       id: doc.id,
       tenantId: doc.tenantId,
@@ -251,6 +263,7 @@ export class DocumentLifecycleService {
     if (!updated) {
       throw conflict(`document ${doc.id} state changed during commit`);
     }
+    await this.usageMeters?.recordUpload(updated.id, updated.createdAt);
 
     // Thumbnail lifecycle (SCALE-OUT §2.2). User-password documents get NO
     // derived artifact — a thumbnail is content disclosure, and the lock

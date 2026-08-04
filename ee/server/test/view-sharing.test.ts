@@ -18,6 +18,7 @@ import {
   type DbSchema,
 } from '../src/index';
 import type { CdnSigner, SignInput } from '../src/cdn/CdnSigner';
+import { createValidTestLicenseGate } from '../src/licensing/testing';
 
 /**
  * WS2b — plane-scoped view sharing. The law under test: a layer is a set of
@@ -559,6 +560,7 @@ async function buildFixture(): Promise<Fixture> {
     purge: () => Promise.resolve({ kind: 'no-op' as const }),
   } as unknown as CdnSigner;
   const bundle = await buildApp({
+    licenseGate: createValidTestLicenseGate(),
     verifier: { mode: 'hs256', secret: SECRET },
     workerEntry: STUB_ENTRY,
     poolSize: 1,
