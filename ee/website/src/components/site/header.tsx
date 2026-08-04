@@ -7,16 +7,16 @@ import { useEffect, useState } from 'react';
 import { CpButton } from './button';
 import { ArrowRight, SearchIcon } from './icons';
 import { SearchModal } from './search-modal';
-
-const CONTACT_EMAIL = 'hello@cloudpdf.com';
+import { useSalesDialog } from './sales-dialog';
 
 const NAV = [
   { label: 'Docs', href: '/docs' },
   { label: 'Pricing', href: '/pricing' },
-  { label: 'Enterprise', href: '#' },
-];
+  { label: 'Enterprise', salesDialog: true },
+] as const;
 
 export function Header() {
+  const { openSalesDialog } = useSalesDialog();
   const pathname = usePathname();
   const [searchOpen, setSearchOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -41,8 +41,7 @@ export function Header() {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
-  const isActive = (href: string) =>
-    href !== '#' && (pathname === href || pathname.startsWith(`${href}/`));
+  const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-[#EEF2FA] bg-white/[0.86] backdrop-blur-[10px]">
@@ -70,21 +69,40 @@ export function Header() {
         </button>
 
         <nav className="hidden gap-1 max-[1179px]:ml-auto min-[860px]:flex">
-          {NAV.map((item) => (
-            <Link
-              key={item.label}
-              href={item.href}
-              className={`font-display hover:bg-cp-surface hover:text-cp-blue rounded-lg px-4 py-2.5 text-base font-bold no-underline transition-colors ${
-                isActive(item.href) ? 'bg-cp-surface text-cp-blue' : 'text-cp-navy'
-              }`}
-            >
-              {item.label}
-            </Link>
-          ))}
+          {NAV.map((item) =>
+            'href' in item ? (
+              <Link
+                key={item.label}
+                href={item.href}
+                className={`font-display hover:bg-cp-surface hover:text-cp-blue rounded-lg px-4 py-2.5 text-base font-bold no-underline transition-colors ${
+                  isActive(item.href) ? 'bg-cp-surface text-cp-blue' : 'text-cp-navy'
+                }`}
+              >
+                {item.label}
+              </Link>
+            ) : (
+              <button
+                className="font-display text-cp-navy hover:bg-cp-surface hover:text-cp-blue cursor-pointer rounded-lg px-4 py-2.5 text-base font-bold transition-colors"
+                key={item.label}
+                onClick={() =>
+                  openSalesDialog({ placement: 'enterprise-nav', productInterest: 'not-sure' })
+                }
+                type="button"
+              >
+                {item.label}
+              </button>
+            ),
+          )}
         </nav>
 
         <div className="hidden flex-shrink-0 items-center gap-3.5 min-[860px]:flex">
-          <CpButton href={`mailto:${CONTACT_EMAIL}`} variant="outline" size="sm">
+          <CpButton
+            onClick={() =>
+              openSalesDialog({ placement: 'header-contact-sales', productInterest: 'not-sure' })
+            }
+            variant="outline"
+            size="sm"
+          >
             Contact sales
           </CpButton>
           <CpButton href="#" variant="primary" size="sm">
@@ -130,20 +148,48 @@ export function Header() {
             : 'flex max-h-0 border-t border-transparent opacity-0'
         }`}
       >
-        {NAV.map((item) => (
-          <Link
-            key={item.label}
-            href={item.href}
-            onClick={() => setMobileOpen(false)}
-            className={`font-display hover:bg-cp-surface hover:text-cp-blue flex items-center gap-2.5 rounded-[10px] px-3.5 py-[15px] text-[17px] font-bold no-underline transition-colors ${
-              isActive(item.href) ? 'bg-cp-surface text-cp-blue' : 'text-cp-navy'
-            }`}
-          >
-            {item.label}
-          </Link>
-        ))}
+        {NAV.map((item) =>
+          'href' in item ? (
+            <Link
+              key={item.label}
+              href={item.href}
+              onClick={() => setMobileOpen(false)}
+              className={`font-display hover:bg-cp-surface hover:text-cp-blue flex items-center gap-2.5 rounded-[10px] px-3.5 py-[15px] text-[17px] font-bold no-underline transition-colors ${
+                isActive(item.href) ? 'bg-cp-surface text-cp-blue' : 'text-cp-navy'
+              }`}
+            >
+              {item.label}
+            </Link>
+          ) : (
+            <button
+              className="font-display text-cp-navy hover:bg-cp-surface hover:text-cp-blue flex cursor-pointer items-center gap-2.5 rounded-[10px] px-3.5 py-[15px] text-left text-[17px] font-bold transition-colors"
+              key={item.label}
+              onClick={() => {
+                setMobileOpen(false);
+                openSalesDialog({
+                  placement: 'mobile-enterprise-nav',
+                  productInterest: 'not-sure',
+                });
+              }}
+              type="button"
+            >
+              {item.label}
+            </button>
+          ),
+        )}
         <div className="mx-1 my-2.5 h-px bg-[#EEF2FA]" />
-        <CpButton href={`mailto:${CONTACT_EMAIL}`} variant="outline" size="sm" className="w-full">
+        <CpButton
+          className="w-full"
+          onClick={() => {
+            setMobileOpen(false);
+            openSalesDialog({
+              placement: 'mobile-contact-sales',
+              productInterest: 'not-sure',
+            });
+          }}
+          variant="outline"
+          size="sm"
+        >
           Contact sales
         </CpButton>
         <CpButton href="#" variant="primary" size="sm" className="mt-2.5 w-full">

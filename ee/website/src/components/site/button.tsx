@@ -21,22 +21,34 @@ const variants: Record<Variant, string> = {
     'bg-cp-violet text-white hover:bg-cp-violet600 hover:shadow-[0_8px_20px_rgba(124,92,252,0.30)] active:bg-cp-violetDeep',
 };
 
-export type CpButtonProps = {
-  href: string;
+type CommonButtonProps = {
   children: ReactNode;
   variant?: Variant;
   size?: Size;
   className?: string;
 };
 
+export type CpButtonProps = CommonButtonProps &
+  ({ href: string; onClick?: never } | { href?: never; onClick: () => void });
+
 export function CpButton({
   href,
+  onClick,
   children,
   variant = 'primary',
   size = 'md',
   className = '',
 }: CpButtonProps) {
   const classes = `${base} ${sizes[size]} ${variants[variant]} ${className}`;
+
+  if (!href) {
+    return (
+      <button className={`${classes} cursor-pointer`} onClick={onClick} type="button">
+        {children}
+      </button>
+    );
+  }
+
   const isExternal = /^(https?:|mailto:|tel:|#)/.test(href);
 
   if (isExternal) {

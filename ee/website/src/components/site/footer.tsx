@@ -6,6 +6,7 @@ const FOOTER_GROUPS = [
     links: [
       { label: 'Documentation', href: '/docs' },
       { label: 'Pricing', href: '/pricing' },
+      { label: 'Contact', href: '/contact' },
       { label: 'EmbedPDF', href: 'https://www.embedpdf.com' },
     ],
   },
@@ -31,12 +32,12 @@ export function Footer() {
             Production-grade PDF infrastructure for modern applications, available as a managed
             service or self-hosted software.
           </p>
-          <a
-            href="mailto:hello@cloudpdf.com"
+          <Link
+            href="/contact"
             className="mt-5 inline-block font-semibold text-[#8FC3FF] underline decoration-[#3F6CA6] underline-offset-4 transition-colors hover:text-white"
           >
-            hello@cloudpdf.com
-          </a>
+            Contact our team
+          </Link>
         </div>
 
         {FOOTER_GROUPS.map((group) => (
