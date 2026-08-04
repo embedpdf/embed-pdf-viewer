@@ -1,7 +1,7 @@
 {
   "name": "@embedpdf/plugin-shell",
-  "version": "0.0.0",
-  "private": true,
+  "version": "2.15.0",
+  "private": false,
   "description": "Document-scoped workbench surface state: named surfaces (panels, modals, overlays) with exclusivity groups, plus the open-menu stack. Pure serializable state — commands drive it, plugin-persist can restore it. The app owns the DOM.",
   "type": "module",
   "main": "./dist/index.cjs",

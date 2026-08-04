@@ -1,8 +1,8 @@
 {
   "name": "@embedpdf/viewer-chrome",
-  "version": "0.0.0",
-  "private": true,
-  "description": "The full viewer's chrome — the ONE React implementation of the snippet UI (structure-only chrome schema, measured toolbar, Tailwind pixels). Consumed by @embedpdf/viewer (Preact-compiled custom element) and every framework wrapper; never published on its own for now (eject source for React users is a later call).",
+  "version": "2.15.0",
+  "private": false,
+  "description": "The full viewer's chrome — the ONE React implementation of the snippet UI (structure-only chrome schema, measured toolbar, Tailwind pixels). Published as an implementation dependency of @embedpdf/viewer; it is not a documented user-facing entry point for now.",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",

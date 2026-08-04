@@ -1,7 +1,7 @@
 {
   "name": "@embedpdf/react",
-  "version": "0.0.0",
-  "private": true,
+  "version": "2.15.0",
+  "private": false,
   "description": "React adapter for EmbedPDF v3: one generic reactive binding + structural components (Viewer, Stage, PageView) + headless layers & hooks. The whole framework surface.",
   "type": "module",
   "sideEffects": false,

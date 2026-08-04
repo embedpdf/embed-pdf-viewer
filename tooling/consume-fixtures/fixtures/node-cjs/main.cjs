@@ -16,6 +16,8 @@ const pluginAnnotation = require('@embedpdf/plugin-annotation');
 
 const reactAdapter = require('@embedpdf/react');
 const reactRuntime = require('@embedpdf/react/runtime');
+const cloudAdmin = require('@cloudpdf/admin');
+const cloudEngine = require('@cloudpdf/engine');
 
 ok(typeof engineCoreRuntime.AbortablePromise === 'function', 'AbortablePromise via require');
 ok(typeof reactRuntime.Viewer === 'function', 'Viewer via require');
@@ -30,6 +32,8 @@ for (const [label, ns] of Object.entries({
   pluginStage,
   pluginAnnotation,
   reactAdapter,
+  cloudAdmin,
+  cloudEngine,
 })) {
   ok(Object.keys(ns).length > 0, `${label} exports something`);
 }

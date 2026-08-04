@@ -1,7 +1,7 @@
 {
   "name": "@embedpdf/plugin-annotation",
-  "version": "0.0.0",
-  "private": true,
+  "version": "2.15.0",
+  "private": false,
   "description": "Annotation feature plugin: the pure annotation-core wired to the engine repository (optimistic create/patch/delete) + the interaction hub (ambient edit + draw tools). Behaviors (forms) plug in here.",
   "type": "module",
   "main": "./dist/index.cjs",

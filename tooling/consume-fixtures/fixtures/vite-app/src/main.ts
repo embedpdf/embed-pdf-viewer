@@ -7,6 +7,10 @@ import { Viewer } from '@embedpdf/react/runtime';
 import type { Engine } from '@embedpdf/react/runtime';
 import { stagePlugin } from '@embedpdf/react/stage';
 import { renderPlugin } from '@embedpdf/react/render';
+import EmbedPDF from '@embedpdf/viewer';
+import { PDFViewer } from '@embedpdf/viewer-react';
+import CloudPDF from '@cloudpdf/viewer';
+import { CloudPDFViewer } from '@cloudpdf/viewer-react';
 
 async function createEngine(): Promise<Engine> {
   const { createLocalEngineWithWorker } = await import('@embedpdf/engine');
@@ -17,6 +21,10 @@ async function createEngine(): Promise<Engine> {
 // Reference everything so nothing tree-shakes away; the check is `vite build`.
 (globalThis as Record<string, unknown>).__epdfFixture = {
   createEngine,
+  EmbedPDF,
+  PDFViewer,
+  CloudPDF,
+  CloudPDFViewer,
   mount: () =>
     createRoot(document.getElementById('root')!).render(
       createElement('div', null, typeof Viewer, typeof stagePlugin, typeof renderPlugin),

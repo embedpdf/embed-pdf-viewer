@@ -21,6 +21,8 @@ import * as web from '@embedpdf/web';
 import * as reactAdapter from '@embedpdf/react';
 import { Viewer } from '@embedpdf/react/runtime';
 import * as reactAnnotation from '@embedpdf/react/annotation';
+import * as cloudAdmin from '@cloudpdf/admin';
+import * as cloudEngine from '@cloudpdf/engine';
 
 ok(typeof AbortablePromise === 'function', 'engine-core/runtime AbortablePromise');
 ok(typeof engine.localEngine === 'function', 'engine localEngine');
@@ -40,6 +42,8 @@ for (const [label, ns] of Object.entries({
   web,
   reactAdapter,
   reactAnnotation,
+  cloudAdmin,
+  cloudEngine,
 })) {
   ok(Object.keys(ns).length > 0, `${label} exports something`);
 }

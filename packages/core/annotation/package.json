@@ -1,7 +1,7 @@
 {
   "name": "@embedpdf/core-annotation",
-  "version": "0.0.0",
-  "private": true,
+  "version": "2.15.0",
+  "private": false,
   "description": "The pure annotation brain: model · update(msg)→[model,effects] · view. Content-space geometry per family, hit-testing, tools. No DOM, no engine, no framework — ports to Rust/Crux.",
   "type": "module",
   "main": "./dist/index.cjs",

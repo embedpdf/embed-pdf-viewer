@@ -1,7 +1,7 @@
 {
   "name": "@embedpdf/plugin-form",
-  "version": "0.0.0",
-  "private": true,
+  "version": "2.15.0",
+  "private": false,
   "description": "Document-scoped interactive forms: reactive field state over doc.forms, fill-mode controls (FillItem projection), and form-data interchange. Widgets stay annotations; this plugin owns the field plane.",
   "type": "module",
   "main": "./dist/index.cjs",

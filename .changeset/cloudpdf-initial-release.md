@@ -1,14 +1,16 @@
 ---
-'@cloudpdf/server': minor
-'@cloudpdf/admin-api': minor
-'@cloudpdf/admin': minor
-'@cloudpdf/engine': minor
-'@cloudpdf/viewer': minor
-'@embedpdf/engine-core': minor
-'@embedpdf/engine-services': minor
-'@embedpdf/engine': minor
-'@embedpdf/viewer': minor
-'@embedpdf/viewer-react': minor
+'@cloudpdf/server': major
+'@cloudpdf/admin-api': major
+'@cloudpdf/admin': major
+'@cloudpdf/engine': major
+'@cloudpdf/viewer': major
+'@cloudpdf/viewer-react': major
+'@embedpdf/engine-core': major
+'@embedpdf/engine-services': major
+'@embedpdf/engine': major
+'@embedpdf/viewer': major
+'@embedpdf/viewer-chrome': major
+'@embedpdf/viewer-react': major
 ---
 
 Initial public release of the CloudPDF server stack, the Engine v3 packages, and the full viewer.

@@ -19,65 +19,133 @@ import { fileURLToPath } from 'node:url';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, '..', '..', '..');
 
-/** Everything that ships to npm at 3.0: every member of the layered groups
- * (packages/<group>/<member>, per the naming law). Angular is validated by
- * ng-packagr + its parity script; engine-runtime's wasm build has its own
- * verify script — both are still PACKED here (they're in the dependency
- * closure), just not imported by fixtures directly (angular needs an Angular
- * toolchain). */
-const GROUPS = ['core', 'engine', 'plugin', 'framework'];
-const PACK_DIRS = [
-  ...GROUPS.flatMap((g) =>
-    fs
-      .readdirSync(path.join(repoRoot, 'packages', g))
-      .filter((d) => d !== 'angular')
-      .filter((d) => fs.existsSync(path.join(repoRoot, 'packages', g, d, 'package.json')))
-      .map((d) => path.join('packages', g, d)),
-  ),
-  // per-target sidecars (optionalDependencies of engine-runtime): wasm32 and
-  // the current platform's napi target are REQUIRED (bundlers resolve the
-  // wasm32 import statically; node loads the local napi binary). The other
-  // targets are CI cross-compiles — packed when present, skipped with a log
-  // otherwise (missing ones resolve as failed OPTIONAL deps in fixtures,
-  // which is exactly what a real single-platform consumer install looks like).
-  ...sidecarDirs(),
-];
-
-function sidecarDirs(): string[] {
-  const npmDir = path.join(repoRoot, 'packages', 'engine', 'runtime', 'npm');
-  const platformTarget = `${process.platform}-${process.arch}`;
-  const required = new Set(['wasm32', platformTarget]);
-  const dirs: string[] = [];
-  for (const d of fs.readdirSync(npmDir)) {
-    if (!fs.existsSync(path.join(npmDir, d, 'package.json'))) continue;
-    const pkg = JSON.parse(fs.readFileSync(path.join(npmDir, d, 'package.json'), 'utf8'));
-    const built = fs.existsSync(path.join(npmDir, d, pkg.files?.[0] ?? 'lib'));
-    if (built) dirs.push(path.join('packages', 'engine', 'runtime', 'npm', d));
-    else if (required.has(d)) {
-      console.error(`✖ required engine-runtime target not built: npm/${d}`);
-      process.exit(1);
-    } else console.log(`  (skipping unbuilt cross-target npm/${d})`);
-  }
-  return dirs;
+function sh(cmd: string, args: string[], cwd: string): string {
+  return execFileSync(cmd, args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
 }
+
+function readJson(p: string): any {
+  return JSON.parse(fs.readFileSync(p, 'utf8'));
+}
+
+interface WorkspacePackage {
+  name: string;
+  path: string;
+  version: string;
+  private?: boolean;
+}
+
+/**
+ * `private !== true` is the publication source of truth. Deriving this list
+ * from pnpm's workspace view keeps the gate aligned with `pnpm publish -r`
+ * and covers packages/, ee/, Angular, and the full-viewer packages without a
+ * second hand-maintained release list.
+ */
+const WORKSPACE_PACKAGES = JSON.parse(
+  sh('pnpm', ['list', '-r', '--depth', '-1', '--json'], repoRoot),
+) as WorkspacePackage[];
+const WORKSPACE_BY_NAME = new Map(WORKSPACE_PACKAGES.map((pkg) => [pkg.name, pkg]));
+const PUBLISHABLE_PACKAGES = WORKSPACE_PACKAGES.filter((pkg) => pkg.private !== true);
+const RUNTIME_SIDECAR_PREFIX = path.join('packages', 'engine', 'runtime', 'npm') + path.sep;
+const REQUIRED_RUNTIME_TARGETS = new Set(['wasm32', `${process.platform}-${process.arch}`]);
+
+const PACK_DIRS = PUBLISHABLE_PACKAGES.flatMap((workspacePkg) => {
+  const dir = path.relative(repoRoot, workspacePkg.path);
+  if (!dir || dir.startsWith(`..${path.sep}`) || path.isAbsolute(dir)) {
+    console.error(`✖ ${workspacePkg.name}: workspace path is outside the repository`);
+    process.exit(1);
+  }
+
+  const pkg = readJson(path.join(workspacePkg.path, 'package.json'));
+  const artifact: string = pkg.files?.[0] ?? 'dist';
+  if (fs.existsSync(path.join(workspacePkg.path, artifact))) return [dir];
+
+  // A local developer normally has only wasm32 and the current native target.
+  // Release CI downloads every cross-compiled target, so all sidecars are
+  // packed there. Missing non-current targets remain legitimate optional deps
+  // for a local consume run.
+  if (dir.startsWith(RUNTIME_SIDECAR_PREFIX)) {
+    const target = path.basename(dir);
+    if (!REQUIRED_RUNTIME_TARGETS.has(target)) {
+      console.log(`  (skipping unbuilt optional runtime target npm/${target})`);
+      return [];
+    }
+  }
+
+  return [dir];
+});
 
 interface Fixture {
   name: string;
+  /** Packed packages installed as the fixture's direct consumer surface. */
+  packages: string[];
   /** extra registry deps beyond the packed tarballs */
   deps: Record<string, string>;
   check: string;
 }
 
 const FIXTURES: Fixture[] = [
-  { name: 'node-esm', deps: { react: '^18.3.1', 'react-dom': '^18.3.1' }, check: 'node main.mjs' },
-  { name: 'node-cjs', deps: { react: '^18.3.1', 'react-dom': '^18.3.1' }, check: 'node main.cjs' },
+  {
+    name: 'node-esm',
+    packages: [
+      '@cloudpdf/admin',
+      '@cloudpdf/engine',
+      '@embedpdf/core-annotation',
+      '@embedpdf/core-geometry',
+      '@embedpdf/core-stage',
+      '@embedpdf/core-ui',
+      '@embedpdf/core',
+      '@embedpdf/engine-core',
+      '@embedpdf/engine-services',
+      '@embedpdf/engine',
+      '@embedpdf/plugin-annotation',
+      '@embedpdf/plugin-search',
+      '@embedpdf/plugin-stage',
+      '@embedpdf/react',
+      '@embedpdf/web',
+    ],
+    deps: { react: '^18.3.1', 'react-dom': '^18.3.1' },
+    check: 'node main.mjs',
+  },
+  {
+    name: 'node-cjs',
+    packages: [
+      '@cloudpdf/admin',
+      '@cloudpdf/engine',
+      '@embedpdf/core-annotation',
+      '@embedpdf/core-geometry',
+      '@embedpdf/core-ui',
+      '@embedpdf/core',
+      '@embedpdf/engine-core',
+      '@embedpdf/engine-services',
+      '@embedpdf/engine',
+      '@embedpdf/plugin-annotation',
+      '@embedpdf/plugin-stage',
+      '@embedpdf/react',
+    ],
+    deps: { react: '^18.3.1', 'react-dom': '^18.3.1' },
+    check: 'node main.cjs',
+  },
   {
     name: 'vite-app',
+    packages: [
+      '@cloudpdf/viewer-react',
+      '@cloudpdf/viewer',
+      '@embedpdf/engine',
+      '@embedpdf/react',
+      '@embedpdf/viewer-react',
+      '@embedpdf/viewer',
+    ],
     deps: { react: '^18.3.1', 'react-dom': '^18.3.1', vite: '^6.0.0' },
     check: 'vite build',
   },
   {
     name: 'tsc-nodenext',
+    packages: [
+      '@embedpdf/core-geometry',
+      '@embedpdf/engine-core',
+      '@embedpdf/engine',
+      '@embedpdf/react',
+    ],
     deps: {
       react: '^18.3.1',
       'react-dom': '^18.3.1',
@@ -89,14 +157,6 @@ const FIXTURES: Fixture[] = [
   },
 ];
 
-function sh(cmd: string, args: string[], cwd: string): string {
-  return execFileSync(cmd, args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
-}
-
-function readJson(p: string): any {
-  return JSON.parse(fs.readFileSync(p, 'utf8'));
-}
-
 // ── 1. preflight: built artifacts must exist (first `files` entry) ──────────
 const missing = PACK_DIRS.filter((d) => {
   const pkg = readJson(path.join(repoRoot, d, 'package.json'));
@@ -105,9 +165,7 @@ const missing = PACK_DIRS.filter((d) => {
 });
 if (missing.length) {
   console.error(`✖ built artifacts missing for: ${missing.join(', ')}`);
-  console.error(
-    '  Run: pnpm turbo run build --filter="./packages/*" --filter="./packages/engine*" --filter="./packages/engine/runtime"',
-  );
+  console.error('  Run: pnpm run build:release');
   process.exit(1);
 }
 
@@ -115,10 +173,13 @@ if (missing.length) {
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'epdf-consume-'));
 const tarballDir = path.join(tmp, 'tarballs');
 fs.mkdirSync(tarballDir);
-console.log(`▸ packing ${PACK_DIRS.length} packages → ${tarballDir}`);
+console.log(
+  `▸ packing ${PACK_DIRS.length}/${PUBLISHABLE_PACKAGES.length} publishable packages → ${tarballDir}`,
+);
 
 /** npm name → absolute tarball path */
 const tarballs: Record<string, string> = {};
+const packedManifests: Record<string, any> = {};
 for (const dir of PACK_DIRS) {
   const abs = path.join(repoRoot, dir);
   const pkg = readJson(path.join(abs, 'package.json'));
@@ -135,6 +196,11 @@ for (const dir of PACK_DIRS) {
   // packed exports except declared epdf.rawExports.
   const packedManifest = sh('tar', ['-xOf', tgz, 'package/package.json'], tmp);
   const packed = JSON.parse(packedManifest);
+  packedManifests[pkg.name] = packed;
+  if (packed.private === true) {
+    console.error(`✖ ${pkg.name}: packed manifest is still private`);
+    process.exit(1);
+  }
   const raw: string[] = pkg.epdf?.rawExports ?? [];
   for (const [subpath, value] of Object.entries(packed.exports ?? {})) {
     if (raw.includes(subpath)) continue;
@@ -147,6 +213,39 @@ for (const dir of PACK_DIRS) {
   }
 }
 
+// Every scoped dependency in a published manifest must resolve to another
+// publishable workspace tarball. This catches the exact failure mode where a
+// public package depends on a workspace package that npm publication skips.
+let closureFailed = false;
+for (const [owner, packed] of Object.entries(packedManifests)) {
+  for (const section of ['dependencies', 'optionalDependencies', 'peerDependencies']) {
+    for (const [dependency, range] of Object.entries(packed[section] ?? {})) {
+      if (!dependency.startsWith('@embedpdf/') && !dependency.startsWith('@cloudpdf/')) continue;
+
+      const workspaceDependency = WORKSPACE_BY_NAME.get(dependency);
+      if (!workspaceDependency) {
+        console.error(`✖ ${owner}: ${section} references unknown workspace package ${dependency}`);
+        closureFailed = true;
+        continue;
+      }
+      if (workspaceDependency.private === true) {
+        console.error(`✖ ${owner}: ${section} references private package ${dependency}`);
+        closureFailed = true;
+      }
+      if (String(range).startsWith('workspace:')) {
+        console.error(`✖ ${owner}: packed ${section}.${dependency} still uses ${range}`);
+        closureFailed = true;
+      }
+      if (!tarballs[dependency] && section !== 'optionalDependencies') {
+        console.error(`✖ ${owner}: no packed tarball for required dependency ${dependency}`);
+        closureFailed = true;
+      }
+    }
+  }
+}
+if (closureFailed) process.exit(1);
+console.log('✔ packed publication graph is closed over public workspace packages');
+
 // ── 3. run fixtures ─────────────────────────────────────────────────────────
 const results: Record<string, { ok: boolean; detail?: string }> = {};
 for (const fixture of FIXTURES) {
@@ -154,7 +253,14 @@ for (const fixture of FIXTURES) {
   fs.cpSync(path.join(here, '..', 'fixtures', fixture.name), dir, { recursive: true });
 
   const deps: Record<string, string> = { ...fixture.deps };
-  for (const [name, tgz] of Object.entries(tarballs)) deps[name] = `file:${tgz}`;
+  for (const name of fixture.packages) {
+    const tgz = tarballs[name];
+    if (!tgz) {
+      console.error(`✖ ${fixture.name}: requested package was not packed: ${name}`);
+      process.exit(1);
+    }
+    deps[name] = `file:${tgz}`;
+  }
   fs.writeFileSync(
     path.join(dir, 'package.json'),
     JSON.stringify(

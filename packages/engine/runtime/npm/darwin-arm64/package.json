@@ -1,5 +1,5 @@
 {
-  "version": "0.0.0",
+  "version": "2.15.0",
   "license": "Apache-2.0",
   "publishConfig": {
     "access": "public"

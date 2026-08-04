@@ -1,7 +1,7 @@
 {
   "name": "@embedpdf/plugin-render",
-  "version": "0.0.0",
-  "private": true,
+  "version": "2.15.0",
+  "private": false,
   "description": "Document-scoped render capability: turns the engine DocumentHandle into an abortable renderPage(pageIndex, scale) → RGBA. The home for tiling.",
   "type": "module",
   "main": "./dist/index.cjs",

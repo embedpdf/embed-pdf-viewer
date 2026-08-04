@@ -1,7 +1,7 @@
 {
   "name": "@embedpdf/plugin-interaction",
-  "version": "0.0.0",
-  "private": true,
+  "version": "2.15.0",
+  "private": false,
   "description": "The interaction hub: the active tool, the cursor, and pointer routing. Pure mechanism — knows nothing about selection/annotations/forms; they contribute tools + handlers.",
   "type": "module",
   "main": "./dist/index.cjs",

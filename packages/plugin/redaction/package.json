@@ -1,7 +1,7 @@
 {
   "name": "@embedpdf/plugin-redaction",
-  "version": "0.0.0",
-  "private": true,
+  "version": "2.15.0",
+  "private": false,
   "description": "Document-scoped redaction: the destructive apply stage over redact annotation marks — pending queue view, collateral estimation, and the doc.redaction.apply wrapper. Marking itself rides the annotation plane.",
   "type": "module",
   "main": "./dist/index.cjs",

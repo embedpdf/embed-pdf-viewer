@@ -9,6 +9,12 @@
   "commit": false,
   "fixed": [
     [
+      "@cloudpdf/admin",
+      "@cloudpdf/admin-api",
+      "@cloudpdf/engine",
+      "@cloudpdf/server",
+      "@cloudpdf/viewer",
+      "@cloudpdf/viewer-react",
       "@embedpdf/angular",
       "@embedpdf/core",
       "@embedpdf/core-acrojs",
@@ -49,11 +55,13 @@
       "@embedpdf/plugin-view-manager",
       "@embedpdf/react",
       "@embedpdf/viewer",
+      "@embedpdf/viewer-chrome",
       "@embedpdf/viewer-react",
       "@embedpdf/web"
     ]
   ],
   "linked": [],
+  "privatePackages": false,
   "access": "public",
   "baseBranch": "main",
   "updateInternalDependencies": "patch",
