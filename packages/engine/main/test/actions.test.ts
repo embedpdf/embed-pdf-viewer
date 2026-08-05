@@ -9,8 +9,9 @@ import {
 import { createLocalEngine } from '../src/index';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const resources = resolve(here, '..', '..', 'runtime', 'runtime-src', 'testing', 'resources');
-const localFixtures = resolve(here, 'fixtures');
+// Corpus fixtures are vendored (see fixtures/README.md) so the suite runs
+// without the multi-GB runtime-src submodule.
+const resources = resolve(here, 'fixtures');
 const runner: ConformanceTestRunner = {
   describe,
   test,
@@ -18,9 +19,9 @@ const runner: ConformanceTestRunner = {
   afterAll,
   expect: expect as unknown as ConformanceTestRunner['expect'],
 };
-const fixture = (id: string, file: string, dir = resources) => ({
+const fixture = (id: string, file: string) => ({
   id,
-  bytes: async () => new Uint8Array(await readFile(resolve(dir, file))),
+  bytes: async () => new Uint8Array(await readFile(resolve(resources, file))),
   expected: {},
 });
 
@@ -32,7 +33,7 @@ runActionsConformance(runner, {
     page: fixture('actions-page-local', 'get_page_aaction.pdf'),
     annotation: fixture('actions-annotation-local', 'annots_action_handling.pdf'),
     field: fixture('actions-field-local', 'annot_javascript.pdf'),
-    javascriptLink: fixture('actions-js-link-local', 'link_javascript.pdf', localFixtures),
+    javascriptLink: fixture('actions-js-link-local', 'link_javascript.pdf'),
   },
   makeEngine: () => createLocalEngine({ runtime: { prefer: 'wasm' } }),
 });

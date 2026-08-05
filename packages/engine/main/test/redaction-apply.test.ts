@@ -9,16 +9,8 @@ import {
 import { createLocalEngine } from '../src/index';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const fixturePath = resolve(
-  here,
-  '..',
-  '..',
-  'runtime',
-  'runtime-src',
-  'testing',
-  'resources',
-  'hello_world.pdf',
-);
+// Vendored corpus fixture (see fixtures/README.md) — no submodule needed.
+const fixturePath = resolve(here, 'fixtures', 'hello_world.pdf');
 
 const runner: ConformanceTestRunner = {
   describe,

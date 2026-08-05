@@ -1,0 +1,125 @@
+%PDF-1.7
+% ò¤ô
+1 0 obj <<
+  /Type /Catalog
+  /Pages 2 0 R
+  /AcroForm <<
+    /Fields [4 0 R]
+    /DR << /Font << /F1 7 0 R >> >>
+    /DA (0 g /F1 12 Tf)
+  >>
+>>
+endobj
+2 0 obj <<
+  /Type /Pages
+  /Count 1
+  /Kids [3 0 R]
+>>
+endobj
+3 0 obj <<
+  /Type /Page
+  /Parent 2 0 R
+  /MediaBox [0 0 300 300]
+  /Annots [4 0 R 5 0 R 8 0 R 9 0 R]
+>>
+endobj
+% A merged text field that is properly linked into /AcroForm /Fields.
+4 0 obj <<
+  /Type /Annot
+  /Subtype /Widget
+  /FT /Tx
+  /T (linked_text)
+  /V (hello)
+  /DA (0 g /F1 12 Tf)
+  /Rect [20 250 280 280]
+>>
+endobj
+% A merged checkbox that only exists in the page's /Annots array. It is not
+% referenced from /AcroForm /Fields: recovered by the reconciliation sweep.
+5 0 obj <<
+  /Type /Annot
+  /Subtype /Widget
+  /FT /Btn
+  /T (orphan_check)
+  /V /Yes
+  /AS /Yes
+  /Rect [20 200 40 220]
+  /AP << /N << /Yes 10 0 R /Off 11 0 R >> >>
+>>
+endobj
+% A radio group whose parent field dictionary is not in /AcroForm /Fields.
+% Only its widget kids appear in /Annots; the sweep must climb /Parent and
+% reconcile both widgets onto one logical field.
+6 0 obj <<
+  /FT /Btn
+  /T (orphan_radio)
+  /Ff 32768
+  /V /a
+  /Kids [8 0 R 9 0 R]
+>>
+endobj
+7 0 obj <<
+  /Type /Font
+  /Subtype /Type1
+  /BaseFont /Helvetica
+>>
+endobj
+8 0 obj <<
+  /Type /Annot
+  /Subtype /Widget
+  /Parent 6 0 R
+  /AS /a
+  /Rect [20 150 40 170]
+  /AP << /N << /a 10 0 R /Off 11 0 R >> >>
+>>
+endobj
+9 0 obj <<
+  /Type /Annot
+  /Subtype /Widget
+  /Parent 6 0 R
+  /AS /Off
+  /Rect [60 150 80 170]
+  /AP << /N << /b 10 0 R /Off 11 0 R >> >>
+>>
+endobj
+10 0 obj <<
+  /Type /XObject
+  /Subtype /Form
+  /BBox [0 0 20 20]
+  /Length 3
+>>
+stream
+q Q
+endstream
+endobj
+11 0 obj <<
+  /Type /XObject
+  /Subtype /Form
+  /BBox [0 0 20 20]
+  /Length 3
+>>
+stream
+q Q
+endstream
+endobj
+xref
+0 12
+0000000000 65535 f 
+0000000015 00000 n 
+0000000168 00000 n 
+0000000231 00000 n 
+0000000414 00000 n 
+0000000710 00000 n 
+0000001085 00000 n 
+0000001179 00000 n 
+0000001255 00000 n 
+0000001402 00000 n 
+0000001551 00000 n 
+0000001660 00000 n 
+trailer <<
+  /Root 1 0 R
+  /Size 12
+>>
+startxref
+1769
+%%EOF

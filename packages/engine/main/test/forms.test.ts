@@ -6,7 +6,10 @@ import { runFormConformance, type ConformanceTestRunner } from '@embedpdf/engine
 import { createLocalEngine } from '../src/index';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const resources = resolve(here, '..', '..', 'runtime', 'runtime-src', 'testing', 'resources');
+// Vendored from the engine-runtime fork's testing/resources so the suite runs
+// without the multi-GB runtime-src submodule — see fixtures/README.md for
+// provenance and the re-sync command.
+const resources = resolve(here, 'fixtures');
 
 const runner: ConformanceTestRunner = {
   describe,
