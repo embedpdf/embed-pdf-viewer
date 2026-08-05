@@ -33,7 +33,9 @@ export function FormListbox({ annotation, isSelected, scale, onClick, style }: F
       style={{
         position: 'absolute',
         inset: 0,
-        background: object.color ?? '#FFFFFF',
+        // The overlay redraws the option list itself, so it must fully cover the
+        // appearance-stream image behind it — treat 'transparent' as opaque white.
+        background: !object.color || object.color === 'transparent' ? '#FFFFFF' : object.color,
         border: `${borderWidth}px solid ${object.strokeColor ?? '#000000'}`,
         outline: isHovered || isSelected ? '1px solid rgba(66, 133, 244, 0.5)' : 'none',
         outlineOffset: -1,
@@ -50,6 +52,7 @@ export function FormListbox({ annotation, isSelected, scale, onClick, style }: F
         <div
           key={i}
           style={{
+            flexShrink: 0,
             padding: `0 ${4 * scale}px`,
             fontSize,
             lineHeight: `${lineHeight}px`,
