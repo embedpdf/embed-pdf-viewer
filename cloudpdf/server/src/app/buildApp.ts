@@ -5,6 +5,8 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import type { Kysely } from 'kysely';
 
 import { registerJwtAuth, requireScope } from './jwt-plugin';
+import type { AuthFailureLimiterOptions } from './auth-failure-limiter';
+import { assertProductionSecret, requiresProductionSecrets, resolveSecret } from './secret-policy';
 import { DbJwksCacheStore } from '../auth/JwksCacheStore';
 import type { JwtVerifierConfig, RevocationCheck, JwksCacheStore } from '../auth/JwtVerifier';
 import { RevokedJtisGuard } from '../auth/RevokedJtisGuard';
@@ -105,6 +107,21 @@ export interface BuildAppOptions {
   /** Override Fastify body limit. Defaults to 50 MiB. */
   bodyLimit?: number;
   /**
+   * Fastify `trustProxy` passthrough. REQUIRED for `request.ip` (and thus
+   * the auth-failure limiter) to see real client addresses when the server
+   * runs behind a load balancer / reverse proxy: `true` trusts
+   * `X-Forwarded-For` from the direct peer, a number trusts that many hops,
+   * a string/array trusts specific proxy addresses or CIDRs. Leave unset
+   * when clients connect directly.
+   */
+  trustProxy?: boolean | number | string | string[];
+  /**
+   * Per-IP throttle on authentication FAILURES (never successful traffic).
+   * Defaults to 30 failures / 60s per IP; pass `false` to disable when an
+   * edge layer (WAF / ingress) already rate-limits. See `JwtPluginOptions`.
+   */
+  authFailureLimit?: Partial<AuthFailureLimiterOptions> | false;
+  /**
    * Optional Kysely DB handle. When supplied together with `objectStore`,
    * the admin routes under `/v1/admin/*` are registered. Engine-only
    * deployments can omit both.
@@ -126,12 +143,21 @@ export interface BuildAppOptions {
    */
   cdnSigner?: CdnSigner;
   /**
-   * HMAC secret for password verification cache rows. The cache stores a
-   * non-reversible proof, not the password; deployments should set this
-   * explicitly. Dev falls back to a local-only constant.
+   * HMAC secret for password verification cache rows. The cache stores an
+   * HMAC proof of the document password — non-reversible only while this
+   * secret stays secret and strong, so production-license deployments must
+   * set it (>= 32 random bytes; env `CLOUDPDF_PASSWORD_VERIFICATION_HMAC_SECRET`)
+   * and buildApp refuses to boot otherwise. Development licenses fall back
+   * to a local-only constant.
    */
   pdfPasswordVerificationHmacSecret?: string;
   pdfPasswordVerificationTtlMs?: number;
+  /**
+   * Server-side key material for encrypted password sessions: signs renewal
+   * grants and feeds the final-key derivation. Same production rule as the
+   * verification secret (>= 32 random bytes; env
+   * `CLOUDPDF_PASSWORD_SESSION_SERVER_SECRET`, id via `..._SECRET_ID`).
+   */
   pdfPasswordSessionServerSecret?: string | Buffer;
   pdfPasswordSessionServerSecretId?: string;
   pdfPasswordSessionTtlMs?: number;
@@ -251,10 +277,15 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
   // The cross-replica doorbell exists for the whole app lifetime: mutation
   // signals for SSE, revocation pushes for the auth guard + open streams.
   const realtimeBus = opts.realtimeBus ?? new InProcessRealtimeBus();
+  // Secret hygiene is license-keyed: development keys + the test gate keep
+  // zero-config dev fallbacks; every other license refuses to boot on
+  // missing / publicly-known / short secrets (fail closed).
+  const enforceProductionSecrets = requiresProductionSecrets(opts.licenseGate.getStatus());
   const app = Fastify({
     logger: {
       level: process.env['LOG_LEVEL'] ?? 'info',
     },
+    ...(opts.trustProxy !== undefined ? { trustProxy: opts.trustProxy } : {}),
     bodyLimit: opts.bodyLimit ?? 50 * 1024 * 1024,
     // Use Fastify's default (`fast-querystring`) which yields a FLAT
     // Record<string, string> — `?viewport.kind=width` parses as
@@ -354,7 +385,17 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
       ? { cacheStore: jwksCacheStore }
       : {}),
   } as JwtVerifierConfig;
-  await registerJwtAuth(app, { verifier: verifierConfig });
+  if (enforceProductionSecrets && verifierConfig.mode === 'hs256') {
+    assertProductionSecret(verifierConfig.secret, {
+      name: 'JWT HS256 secret',
+      envVar: 'CLOUDPDF_JWT_SECRET',
+      option: 'verifier.secret',
+    });
+  }
+  await registerJwtAuth(app, {
+    verifier: verifierConfig,
+    ...(opts.authFailureLimit !== undefined ? { authFailureLimit: opts.authFailureLimit } : {}),
+  });
 
   // `documentService` is allocated below, but the pool's onEvict
   // hook needs to reference it. Use a forward-binding closure:
@@ -482,10 +523,19 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
           opts.pdfPasswordSessionServerSecretId ??
           process.env['CLOUDPDF_PASSWORD_SESSION_SERVER_SECRET_ID'] ??
           'dev-v1',
-        secret:
-          opts.pdfPasswordSessionServerSecret ??
-          process.env['CLOUDPDF_PASSWORD_SESSION_SERVER_SECRET'] ??
-          'cloudpdf-dev-password-session-secret',
+        // Only enforced when KMS (and thus password-session persistence)
+        // is actually enabled — the secret is unused otherwise.
+        secret: resolveSecret({
+          explicit: opts.pdfPasswordSessionServerSecret,
+          env: process.env,
+          requirement: {
+            name: 'PDF password-session server secret',
+            envVar: 'CLOUDPDF_PASSWORD_SESSION_SERVER_SECRET',
+            option: 'pdfPasswordSessionServerSecret',
+          },
+          devFallback: 'cloudpdf-dev-password-session-secret',
+          enforce: enforceProductionSecrets && opts.kms !== undefined,
+        }),
       };
       // CDN-signaling rule for /head: non-`none` adapters need /access
       // to be called before the first cacheable read so the SDK has
@@ -500,10 +550,20 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
         layerState: layerStateService,
         cdnAccessRequired,
         passwordVerifications: new PdfPasswordVerificationsRepo(opts.db, {
-          hmacSecret:
-            opts.pdfPasswordVerificationHmacSecret ??
-            process.env['CLOUDPDF_PASSWORD_VERIFICATION_HMAC_SECRET'] ??
-            'cloudpdf-dev-password-verification-secret',
+          // The proof rows are HMACs over real document passwords: on a
+          // production license a strong secret is mandatory, or a leaked DB
+          // becomes an offline dictionary attack on customer PDFs.
+          hmacSecret: resolveSecret({
+            explicit: opts.pdfPasswordVerificationHmacSecret,
+            env: process.env,
+            requirement: {
+              name: 'PDF password verification HMAC secret',
+              envVar: 'CLOUDPDF_PASSWORD_VERIFICATION_HMAC_SECRET',
+              option: 'pdfPasswordVerificationHmacSecret',
+            },
+            devFallback: 'cloudpdf-dev-password-verification-secret',
+            enforce: enforceProductionSecrets,
+          }) as string,
           ttlMs: opts.pdfPasswordVerificationTtlMs,
         }),
         ...(opts.kms

@@ -30,7 +30,15 @@ export interface SvgCursorOptions {
 
 /** Build the CSS cursor value: `url("data:image/svg+xml,…") x y, fallback`. */
 export function svgCursor({ svg, hotspot, fallback = 'crosshair' }: SvgCursorOptions): string {
-  if (!/<svg[^>]*\swidth\s*=/.test(svg) || !/<svg[^>]*\sheight\s*=/.test(svg)) {
+  // Scan only the opening `<svg …>` tag (bounded slice) rather than running
+  // `/<svg[^>]*\swidth\s*=/` over the whole string — the unbounded form is
+  // quadratic on pathological inputs (many `<svg` fragments with no `>`),
+  // while accepting exactly the same markup: `[^>]*` could never cross a
+  // `>` either.
+  const tagStart = svg.indexOf('<svg');
+  const tagEnd = tagStart >= 0 ? svg.indexOf('>', tagStart) : -1;
+  const openTag = tagEnd >= 0 ? svg.slice(tagStart, tagEnd + 1) : '';
+  if (!/\swidth\s*=/.test(openTag) || !/\sheight\s*=/.test(openTag)) {
     throw new Error(
       '[web] svgCursor: the <svg> needs explicit width/height attributes — ' +
         'browsers ignore cursor images without an intrinsic size',

@@ -754,7 +754,10 @@ test('restricted licensing keeps reads and readiness available while blocking mu
   };
   const bundle = await buildAppForTesting({
     licenseGate: gate,
-    verifier: { mode: 'hs256', secret: 'test-secret' },
+    // Production-shaped gate (licenseKind null): the secret policy applies,
+    // so this must be a >= 32-byte secret. Restriction semantics under test
+    // are unaffected.
+    verifier: { mode: 'hs256', secret: 'test-secret-that-is-32-bytes-long!!' },
     workerEntry: null,
   });
   try {

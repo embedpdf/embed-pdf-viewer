@@ -11,7 +11,9 @@
  */
 
 export function base64url(bytes: Buffer): string {
-  return bytes.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  // Node's native encoding: URL-safe alphabet, no padding — same output the
+  // manual replace-chain produced, matching grant.ts / JwtVerifier usage.
+  return bytes.toString('base64url');
 }
 
 export function cloudfrontBase64(bytes: Buffer | string): string {

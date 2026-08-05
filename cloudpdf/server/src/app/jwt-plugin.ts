@@ -25,6 +25,7 @@ import {
   type JwtVerifierConfig,
   type TenantScope,
 } from '../auth/JwtVerifier';
+import { AuthFailureLimiter, type AuthFailureLimiterOptions } from './auth-failure-limiter';
 
 declare module 'fastify' {
   interface FastifyRequest {
@@ -42,6 +43,18 @@ export interface JwtPluginOptions {
   verifier: JwtVerifierConfig | { secret: string };
   /** Routes that should bypass authentication (e.g. health checks). */
   publicPaths?: ReadonlyArray<string>;
+  /**
+   * Throttle on authentication FAILURES per client IP (never on
+   * successful traffic — valid tokens are not counted). A source over
+   * budget gets `429` + `Retry-After` until its window expires; note this
+   * covers every request from that IP for the remainder of the window,
+   * so clients sharing a NAT with an attacker are throttled too — the
+   * price of not spending verify CPU on a known-hostile source. Deploys
+   * behind a proxy/LB must set Fastify's `trustProxy` for `request.ip`
+   * to be the real client. Defaults to 30 failures / 60s; `false`
+   * disables (e.g. when the edge already rate-limits).
+   */
+  authFailureLimit?: Partial<AuthFailureLimiterOptions> | false;
 }
 
 function asConfig(input: JwtPluginOptions['verifier']): JwtVerifierConfig {
@@ -57,13 +70,32 @@ function asConfig(input: JwtPluginOptions['verifier']): JwtVerifierConfig {
 export async function registerJwtAuth(app: FastifyInstance, opts: JwtPluginOptions): Promise<void> {
   const verifier: JwtVerifier = createJwtVerifier(asConfig(opts.verifier));
   const publics = new Set(opts.publicPaths ?? []);
+  const limiter =
+    opts.authFailureLimit === false
+      ? null
+      : new AuthFailureLimiter({ maxFailures: 30, windowMs: 60_000, ...opts.authFailureLimit });
 
   app.addHook('onRequest', async (req, reply) => {
-    if (publics.has(req.url)) return;
-    if (req.url === '/healthz' || req.url === '/readyz') return;
+    // Compare on the pathname: `req.url` carries the querystring, which
+    // must not defeat a public-path or health-check match.
+    const pathname = req.url.split('?', 1)[0] ?? req.url;
+    if (publics.has(pathname)) return;
+    if (pathname === '/healthz' || pathname === '/readyz') return;
+
+    if (limiter) {
+      const retryAfterMs = limiter.retryAfterMs(req.ip);
+      if (retryAfterMs > 0) {
+        reply
+          .code(429)
+          .header('retry-after', String(Math.ceil(retryAfterMs / 1000)))
+          .send({ error: 'too many failed authentication attempts' });
+        return;
+      }
+    }
 
     const auth = req.headers['authorization'];
     if (!auth || typeof auth !== 'string' || !auth.startsWith('Bearer ')) {
+      limiter?.recordFailure(req.ip);
       reply.code(401).send({ error: 'missing bearer token' });
       return;
     }
@@ -72,7 +104,11 @@ export async function registerJwtAuth(app: FastifyInstance, opts: JwtPluginOptio
       const claims = await verifier.verify(token);
       req.tenant = { id: claims.tenant_id, sub: claims.sub, claims };
     } catch (err) {
-      reply.code(401).send({ error: `invalid token: ${(err as Error).message}` });
+      limiter?.recordFailure(req.ip);
+      // The reason (bad signature vs expired vs rejected scope) is for the
+      // operator's logs, not the anonymous caller.
+      req.log.info({ err }, 'jwt verification rejected');
+      reply.code(401).send({ error: 'invalid token' });
       return;
     }
   });

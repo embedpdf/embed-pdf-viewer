@@ -375,13 +375,15 @@ export class JwksVerifier implements JwtVerifier {
         clockTolerance: (this.profile.clockSkewSeconds ?? 30) + 's',
       });
     } catch (err) {
-      // Key rotation: if the JWT references an unknown kid, jose's
-      // remote JWKS already retries via the standard cache. Our local
-      // cache might be stale though; invalidate and try the remote
-      // fetcher directly exactly once.
+      // Key rotation: if the JWT references an unknown kid, retry via the
+      // remote fetcher exactly once (jose's cooldown bounds actual network
+      // fetches). Do NOT clear the local cache here: a kid miss is exactly
+      // what an unauthenticated attacker can produce at will, and evicting
+      // known-good keys on every miss would turn each garbage token into a
+      // cache-store round-trip for the next legitimate request. On a real
+      // rotation the successful fetch below swaps both tiers via
+      // `persistJwks` — replace-on-success, never invalidate-on-failure.
       if (isKidMiss(err)) {
-        this.inMemory = null;
-        this.localGetKey = null;
         const fresh = this.remoteFetcher();
         result = await jwtVerify(token, fresh, {
           algorithms: [...this.algorithms],

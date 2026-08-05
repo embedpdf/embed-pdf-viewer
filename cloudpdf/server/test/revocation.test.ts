@@ -169,11 +169,13 @@ describe('POST /v1/admin/tokens/:jti/revoke (E2E)', () => {
     // cache reset by hitting the guard directly.
     bundle.revokedJtisGuard!.clearCache();
 
-    // After revoke: same token is rejected.
+    // After revoke: same token is rejected. The body is deliberately
+    // generic — why a token failed (revoked vs expired vs bad signature)
+    // is for the server logs, not the anonymous caller.
     res = await fetch(`${baseUrl}/v1/admin/documents`, { headers: authHeader(tok) });
     expect(res.status).toBe(401);
     const body = (await res.json()) as { error: string };
-    expect(body.error).toMatch(/revoked/);
+    expect(body.error).toBe('invalid token');
   });
 
   test('revoke requires admin scope', async () => {

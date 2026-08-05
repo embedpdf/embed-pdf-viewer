@@ -382,4 +382,44 @@ describe('JwksVerifier', () => {
     });
     await expect(v.verify(tok)).rejects.toThrow();
   });
+
+  test('unknown-kid spam does not evict cached keys (no per-request amplification)', async () => {
+    jwksFetchCount = 0;
+    let storeGets = 0;
+    const store: JwksCacheStore = {
+      get: async () => {
+        storeGets += 1;
+        return { jwks: { keys: [publicJwk] }, expiresAt: Date.now() + 60_000 };
+      },
+      set: async () => {},
+    };
+    const v = createJwtVerifier({
+      mode: 'jwks',
+      jwksUri: `${baseUrl}/jwks.json`,
+      cacheStore: store,
+    });
+
+    await v.verify(await signJwks({ sub: 'warm', tenant_id: TENANT }));
+    expect(storeGets).toBe(1);
+
+    const other = await generateKeyPair('RS256', { extractable: true });
+    const bogus = await new SignJWT({ sub: 'mallory', tenant_id: TENANT })
+      .setProtectedHeader({ alg: 'RS256', kid: 'no-such-kid' })
+      .setExpirationTime('1h')
+      .setIssuedAt()
+      .sign(other.privateKey);
+
+    // Interleave garbage-kid tokens (an unauthenticated attacker's input)
+    // with legitimate verifies. A kid miss must not clear the in-memory
+    // key set: the persistent cache is read once at warm-up, never once
+    // per attack request, and network fetches stay inside jose's cooldown.
+    for (let i = 0; i < 5; i++) {
+      await expect(v.verify(bogus)).rejects.toThrow();
+      await expect(
+        v.verify(await signJwks({ sub: `legit-${i}`, tenant_id: TENANT })),
+      ).resolves.toBeDefined();
+    }
+    expect(storeGets).toBe(1);
+    expect(jwksFetchCount).toBeLessThanOrEqual(2);
+  });
 });

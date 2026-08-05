@@ -104,10 +104,11 @@ export function HeroScene() {
   }, []);
 
   function copy() {
-    const text = SNIPPETS[tab]
-      .replace(/<[^>]+>/g, '')
-      .replace(/&lt;/g, '<')
-      .replace(/&gt;/g, '>');
+    // Derive the plain text from the same trusted highlight markup the card
+    // renders: textContent drops the token <span>s and decodes every entity
+    // (not just &lt;/&gt;), so the clipboard can never drift from the display.
+    const text =
+      new DOMParser().parseFromString(SNIPPETS[tab], 'text/html').documentElement.textContent ?? '';
     navigator.clipboard?.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);

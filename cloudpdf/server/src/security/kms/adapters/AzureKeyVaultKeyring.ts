@@ -211,10 +211,65 @@ async function unwrapStandardKeyVaultRsa(
   return plaintext;
 }
 
+/**
+ * Build the key identifier URL from validated config parts.
+ *
+ * COMPAT: the returned string is stored inside every wrapped-key envelope
+ * (`wrapped.keyId`) and strictly compared on decrypt — changing how it is
+ * computed for an already-valid config would make existing envelopes
+ * undecryptable. So the URL API is used for VALIDATION ONLY (https,
+ * origin-only, sane key name/version); the root itself stays the operator's
+ * exact string minus trailing slashes, byte-identical to what this function
+ * always produced. Malformed configs now fail at construction with a clear
+ * error instead of producing a corrupt durable identifier.
+ */
 function keyUrl(opts: AzureKeyVaultKeyringOptions): string {
-  const root = opts.vaultUrl.replace(/\/+$/, '');
-  const key = `${root}/keys/${opts.keyName}`;
-  return opts.keyVersion ? `${key}/${opts.keyVersion}` : key;
+  const root = validateVaultRoot(opts.vaultUrl);
+  const key = `${root}/keys/${validateKeyName(opts.keyName)}`;
+  return opts.keyVersion ? `${key}/${validateKeyVersion(opts.keyVersion)}` : key;
+}
+
+function validateVaultRoot(vaultUrl: string): string {
+  let url: URL;
+  try {
+    url = new URL(vaultUrl);
+  } catch {
+    throw new Error(`AzureKeyVaultKeyring: vaultUrl is not a valid URL: ${vaultUrl}`);
+  }
+  if (url.protocol !== 'https:') {
+    throw new Error(`AzureKeyVaultKeyring: vaultUrl must use https (got ${url.protocol}//)`);
+  }
+  if (!/^\/*$/.test(url.pathname) || url.search !== '' || url.hash !== '' || url.username !== '') {
+    throw new Error(
+      `AzureKeyVaultKeyring: vaultUrl must be an origin-only URL like ` +
+        `https://<name>.vault.azure.net (got ${vaultUrl})`,
+    );
+  }
+  // Trim trailing slashes without regex (linear, and identical output to
+  // the historical `replace(/\/+$/, '')`).
+  let end = vaultUrl.length;
+  while (end > 0 && vaultUrl.charCodeAt(end - 1) === 0x2f /* '/' */) end -= 1;
+  return vaultUrl.slice(0, end);
+}
+
+/** Azure key names: 1-127 chars, alphanumerics and dashes. */
+function validateKeyName(keyName: string): string {
+  if (!/^[0-9a-zA-Z-]{1,127}$/.test(keyName)) {
+    throw new Error(
+      `AzureKeyVaultKeyring: keyName must match [0-9a-zA-Z-]{1,127} (got ${JSON.stringify(keyName)})`,
+    );
+  }
+  return keyName;
+}
+
+/** Azure key versions are opaque hex identifiers. */
+function validateKeyVersion(keyVersion: string): string {
+  if (!/^[0-9a-fA-F]{1,64}$/.test(keyVersion)) {
+    throw new Error(
+      `AzureKeyVaultKeyring: keyVersion must be a hex identifier (got ${JSON.stringify(keyVersion)})`,
+    );
+  }
+  return keyVersion;
 }
 
 function aadMac(dataKey: Buffer, aad: Record<string, string> | undefined): Buffer {

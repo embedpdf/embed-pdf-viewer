@@ -307,6 +307,54 @@ describe('AzureKeyVaultKeyring', () => {
       keyring.decryptDataKey(dataKey.wrapped, { tenantId: 'tenant-b' }),
     ).rejects.toBeInstanceOf(KmsAadMismatch);
   });
+
+  test('rejects malformed vault config at construction with actionable errors', () => {
+    const base = { keyName: 'embedpdf', mode: 'key-vault-rsa-oaep-256' as const };
+    expect(() => new AzureKeyVaultKeyring({ ...base, vaultUrl: 'not a url' })).toThrow(
+      /not a valid URL/,
+    );
+    expect(
+      () => new AzureKeyVaultKeyring({ ...base, vaultUrl: 'http://vault.vault.azure.net' }),
+    ).toThrow(/must use https/);
+    expect(
+      () => new AzureKeyVaultKeyring({ ...base, vaultUrl: 'https://vault.vault.azure.net/extra' }),
+    ).toThrow(/origin-only/);
+    expect(
+      () => new AzureKeyVaultKeyring({ ...base, vaultUrl: 'https://vault.vault.azure.net/?q=1' }),
+    ).toThrow(/origin-only/);
+    expect(
+      () =>
+        new AzureKeyVaultKeyring({
+          vaultUrl: 'https://vault.vault.azure.net',
+          keyName: 'bad/name',
+        }),
+    ).toThrow(/keyName/);
+    expect(
+      () =>
+        new AzureKeyVaultKeyring({
+          vaultUrl: 'https://vault.vault.azure.net',
+          keyName: 'embedpdf',
+          keyVersion: '../escape',
+        }),
+    ).toThrow(/keyVersion/);
+  });
+
+  test('keeps the durable keyId byte-identical for previously-valid configs', () => {
+    // `keyId` is stored inside every wrapped envelope and compared on
+    // decrypt — trailing-slash handling must keep producing the exact
+    // historical string.
+    const plain = new AzureKeyVaultKeyring({
+      vaultUrl: 'https://vault.vault.azure.net',
+      keyName: 'embedpdf',
+    });
+    expect(plain.info.keyId).toBe('https://vault.vault.azure.net/keys/embedpdf');
+    const slashed = new AzureKeyVaultKeyring({
+      vaultUrl: 'https://vault.vault.azure.net/',
+      keyName: 'embedpdf',
+      keyVersion: 'abc123',
+    });
+    expect(slashed.info.keyId).toBe('https://vault.vault.azure.net/keys/embedpdf/abc123');
+  });
 });
 
 function resetCloudMocks(): void {

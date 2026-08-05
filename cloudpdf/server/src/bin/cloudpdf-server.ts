@@ -1,12 +1,17 @@
 #!/usr/bin/env node
-/* eslint-disable no-console */
+
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
+
+import type { Kysely } from 'kysely';
+
 import { buildApp } from '../app/buildApp';
-import { loadFallbackFontsFromEnv } from '../runtime/loadFallbackFontsFromEnv';
-import { createSqliteDb, type CreateSqliteDbOptions } from '../db/drivers/sqlite';
+import { loadCdnConfigFromEnv } from '../cdn/config/loadCdnConfigFromEnv';
+import { createCdnSigner } from '../cdn/createCdnSigner';
 import { createPostgresDb, type CreatePostgresDbOptions } from '../db/drivers/postgres';
-import { PostgresRealtimeBus } from '../realtime/PostgresRealtimeBus';
+import { createSqliteDb, type CreateSqliteDbOptions } from '../db/drivers/sqlite';
+import { postgresMigrations } from '../db/migrations/postgres/index';
+import { sqliteMigrations } from '../db/migrations/sqlite/index';
 import {
   migrate,
   migrateDown,
@@ -14,22 +19,19 @@ import {
   validate,
   type MigrationSource,
 } from '../db/migrator/runner';
-import { sqliteMigrations } from '../db/migrations/sqlite/index';
-import { postgresMigrations } from '../db/migrations/postgres/index';
 import type { Database as Schema } from '../db/schema';
-import { EventLogService } from '../services/EventLogService';
-import type { ObjectStore } from '../storage/ObjectStore';
-import { createObjectStore } from '../storage/createObjectStore';
-import { loadObjectStoreConfigFromEnv } from '../storage/config/loadObjectStoreConfigFromEnv';
-import { createCdnSigner } from '../cdn/createCdnSigner';
-import { loadCdnConfigFromEnv } from '../cdn/config/loadCdnConfigFromEnv';
-import { createKmsKeyring } from '../security/kms/createKmsKeyring';
+import { PostgresRealtimeBus } from '../realtime/PostgresRealtimeBus';
+import { loadFallbackFontsFromEnv } from '../runtime/loadFallbackFontsFromEnv';
 import { loadKmsConfigFromEnv } from '../security/kms/config/loadKmsConfigFromEnv';
+import { createKmsKeyring } from '../security/kms/createKmsKeyring';
 import type { KmsKeyring } from '../security/kms/KmsKeyring';
+import { loadSecretsConfigFromEnv } from '../security/secrets/config/loadSecretsConfigFromEnv';
 import { createSecretsProviderRegistry } from '../security/secrets/createSecretsProvider';
 import { createSecretResolver, type SecretResolver } from '../security/secrets/SecretResolver';
-import { loadSecretsConfigFromEnv } from '../security/secrets/config/loadSecretsConfigFromEnv';
-import type { Kysely } from 'kysely';
+import { EventLogService } from '../services/EventLogService';
+import { createObjectStore } from '../storage/createObjectStore';
+import type { ObjectStore } from '../storage/ObjectStore';
+import { loadObjectStoreConfigFromEnv } from '../storage/config/loadObjectStoreConfigFromEnv';
 
 /**
  * @license FCL-1.0-ALv2
@@ -69,7 +71,11 @@ import { UsageMeters } from '../licensing/UsageMeters';
  *   CLOUDPDF_DB_URL         postgres://...    (required for postgres)
  *   CLOUDPDF_REALTIME       in-process        (opt OUT of LISTEN/NOTIFY; postgres
  *                                              defaults to cross-replica delivery)
- *   CLOUDPDF_JWT_SECRET    (default: dev secret; warn at startup)
+ *   CLOUDPDF_JWT_SECRET    (default: dev secret — allowed only on development licenses)
+ *   CLOUDPDF_PASSWORD_VERIFICATION_HMAC_SECRET / CLOUDPDF_PASSWORD_SESSION_SERVER_SECRET
+ *                          (>= 32 bytes; required with a production license)
+ *   CLOUDPDF_TRUST_PROXY   1|hops|CSV of proxy IPs (real client IPs behind a LB)
+ *   CLOUDPDF_AUTH_FAILURE_LIMIT  failed auths/IP/window, 'off' to disable (default 30)
  *   CLOUDPDF_STORAGE_KIND  fs|s3|gcs|azure-blob   (default: fs)
  *   CLOUDPDF_STORAGE_FS_ROOT                (default: ./data/objects)
  *   CLOUDPDF_CACHE_ROOT                      (default: ./data/cache; enables /v1/docs/*)
@@ -187,6 +193,41 @@ function redact(url: string): string {
   return url.replace(/(:\/\/[^:]+:)[^@]+(@)/, '$1***$2');
 }
 
+/**
+ * CLOUDPDF_TRUST_PROXY → Fastify `trustProxy`: `1`/`true` trusts the direct
+ * peer's X-Forwarded-For, an integer trusts that many hops, anything else is
+ * a comma-separated list of proxy addresses / CIDRs.
+ */
+function readTrustProxyEnv(): boolean | number | string[] | undefined {
+  const raw = process.env['CLOUDPDF_TRUST_PROXY']?.trim();
+  if (!raw) return undefined;
+  const lower = raw.toLowerCase();
+  if (lower === '1' || lower === 'true') return true;
+  if (lower === '0' || lower === 'false') return false;
+  if (/^\d+$/.test(raw)) return Number(raw);
+  return raw
+    .split(',')
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+}
+
+function readAuthFailureLimitEnv(): { maxFailures: number; windowMs?: number } | false | undefined {
+  const raw = process.env['CLOUDPDF_AUTH_FAILURE_LIMIT']?.trim();
+  const windowRaw = process.env['CLOUDPDF_AUTH_FAILURE_WINDOW_MS']?.trim();
+  if (raw !== undefined && raw.toLowerCase() === 'off') return false;
+  if (raw === undefined && windowRaw === undefined) return undefined;
+  const maxFailures = raw !== undefined ? Number(raw) : 30;
+  if (!Number.isInteger(maxFailures) || maxFailures <= 0) {
+    fail(2, `CLOUDPDF_AUTH_FAILURE_LIMIT must be a positive integer or 'off' (got ${raw!})`);
+  }
+  if (windowRaw === undefined) return { maxFailures };
+  const windowMs = Number(windowRaw);
+  if (!Number.isInteger(windowMs) || windowMs <= 0) {
+    fail(2, `CLOUDPDF_AUTH_FAILURE_WINDOW_MS must be a positive integer (got ${windowRaw})`);
+  }
+  return { maxFailures, windowMs };
+}
+
 function fail(code: number, msg: string): never {
   console.error(`cloudpdf-server: ${msg}`);
   process.exit(code);
@@ -230,7 +271,14 @@ function printHelp(): void {
       '    CLOUDPDF_STORAGE_FS_ROOT                 (default: ./data/objects)',
       '    CLOUDPDF_STORAGE_S3_BUCKET, CLOUDPDF_STORAGE_S3_REGION, CLOUDPDF_STORAGE_S3_ENDPOINT',
       '  Auth',
-      '    CLOUDPDF_JWT_SECRET    HS256 secret      (required in production)',
+      '    CLOUDPDF_JWT_SECRET    HS256 secret, >= 32 bytes (required with a production license)',
+      '    CLOUDPDF_PASSWORD_VERIFICATION_HMAC_SECRET   >= 32 bytes (required with a production license)',
+      '    CLOUDPDF_PASSWORD_SESSION_SERVER_SECRET      >= 32 bytes (required with a production license + KMS)',
+      '    CLOUDPDF_PASSWORD_SESSION_SERVER_SECRET_ID   secret rotation id (default: dev-v1)',
+      '    CLOUDPDF_TRUST_PROXY   1|true, hop count, or CSV of proxy IPs/CIDRs',
+      '                           (set behind a LB so rate limits see real client IPs)',
+      '    CLOUDPDF_AUTH_FAILURE_LIMIT      failed auths per IP per window; off to disable (default: 30)',
+      '    CLOUDPDF_AUTH_FAILURE_WINDOW_MS  window for the failure limit (default: 60000)',
       '  Commercial license',
       '    CLOUDPDF_LICENSE_MODE   connected|air-gapped (explicit in production)',
       '    CLOUDPDF_LICENSE_KEY    required for connected mode',
@@ -691,23 +739,39 @@ async function cmdServe(): Promise<void> {
         })
       : undefined;
 
-  const bundle = await buildApp({
-    licenseGate: licenseRuntime,
-    ...(usageReporter ? { usageReporter } : {}),
-    verifier: { mode: 'hs256', secret: JWT_SECRET },
-    workerEntry: WORKER_ENTRY_URL,
-    fallbackFonts: loadFallbackFontsFromEnv(),
-    db: dbCtx.db,
-    objectStore,
-    cdnSigner,
-    ...(kms ? { kms } : {}),
-    cacheRoot: CACHE_ROOT,
-    ...(CACHE_MAX_BYTES !== undefined ? { cacheMaxBytes: CACHE_MAX_BYTES } : {}),
-    ...(AUTO_PROVISION_TENANT ? { autoProvisionTenant: true } : {}),
-    expectedMigrations: dbCtx.migrations,
-    failOnPending: FAIL_ON_PENDING,
-    ...(realtimeBus ? { realtimeBus } : {}),
-  });
+  const trustProxy = readTrustProxyEnv();
+  const authFailureLimit = readAuthFailureLimitEnv();
+
+  let bundle: Awaited<ReturnType<typeof buildApp>>;
+  try {
+    bundle = await buildApp({
+      licenseGate: licenseRuntime,
+      ...(usageReporter ? { usageReporter } : {}),
+      verifier: { mode: 'hs256', secret: JWT_SECRET },
+      workerEntry: WORKER_ENTRY_URL,
+      fallbackFonts: loadFallbackFontsFromEnv(),
+      db: dbCtx.db,
+      objectStore,
+      cdnSigner,
+      ...(kms ? { kms } : {}),
+      cacheRoot: CACHE_ROOT,
+      ...(CACHE_MAX_BYTES !== undefined ? { cacheMaxBytes: CACHE_MAX_BYTES } : {}),
+      ...(AUTO_PROVISION_TENANT ? { autoProvisionTenant: true } : {}),
+      expectedMigrations: dbCtx.migrations,
+      failOnPending: FAIL_ON_PENDING,
+      ...(realtimeBus ? { realtimeBus } : {}),
+      ...(trustProxy !== undefined ? { trustProxy } : {}),
+      ...(authFailureLimit !== undefined ? { authFailureLimit } : {}),
+    });
+  } catch (err) {
+    // Config-shaped boot refusals (secret policy, migration drift) exit
+    // with the documented "missing required config" code instead of a
+    // stack trace.
+    usageReporter?.stop();
+    await licenseRuntime.close();
+    await dbCtx.db.destroy();
+    fail(2, err instanceof Error ? err.message : String(err));
+  }
 
   const onSignal = async (sig: string) => {
     bundle.app.log.info({ sig }, 'received signal, shutting down');

@@ -340,8 +340,15 @@ export class DocumentSession {
   }
 }
 
+// Monotonic per-realm counter: the docSessionId exists only for the local
+// bleed-over check (a revision token minted by one session must not validate
+// against another), so uniqueness is the whole requirement — a counter makes
+// collisions structurally impossible within a realm, and the timestamp
+// distinguishes ids across realm restarts. Deliberately not random: there is
+// no adversary to hide the id from (anyone in-process can call the engine
+// directly), and pulling in crypto would add runtime constraints for nothing.
+let sessionCounter = 0;
+
 function generateSessionId(): string {
-  // Lightweight id; no crypto dependency. Sufficient for the docSessionId
-  // bleed-over check (which is local-process anyway).
-  return `sess_${Math.random().toString(36).slice(2, 10)}_${Date.now().toString(36)}`;
+  return `sess_${(++sessionCounter).toString(36)}_${Date.now().toString(36)}`;
 }
