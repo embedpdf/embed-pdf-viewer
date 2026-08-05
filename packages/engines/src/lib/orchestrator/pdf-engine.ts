@@ -1023,6 +1023,38 @@ export class PdfEngine<T = Blob> implements IPdfEngine<T> {
     );
   }
 
+  flattenAnnotationBehind(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotation: PdfAnnotationObject,
+  ): PdfTask<boolean> {
+    return this.workerQueue.enqueue(
+      {
+        execute: () => this.executor.flattenAnnotationBehind(doc, page, annotation),
+        meta: { docId: doc.id, pageIndex: page.index, operation: 'flattenAnnotationBehind' },
+      },
+      { priority: Priority.MEDIUM },
+    );
+  }
+
+  tileAppearanceXObjectBehind(
+    doc: PdfDocumentObject,
+    placements: Array<{ pageIndex: number; rect: Rect }>,
+    appearancePdf: ArrayBuffer,
+  ): PdfTask<boolean> {
+    return this.workerQueue.enqueue(
+      {
+        execute: () => this.executor.tileAppearanceXObjectBehind(doc, placements, appearancePdf),
+        meta: {
+          docId: doc.id,
+          pageIndex: placements[0]?.pageIndex,
+          operation: 'tileAppearanceXObjectBehind',
+        },
+      },
+      { priority: Priority.MEDIUM },
+    );
+  }
+
   exportAnnotationAppearanceAsPdf(
     doc: PdfDocumentObject,
     page: PdfPageObject,

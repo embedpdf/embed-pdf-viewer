@@ -3841,6 +3841,28 @@ export interface PdfEngine<T = Blob> {
     annotation: PdfAnnotationObject,
   ) => PdfTask<boolean>;
   /**
+   * Flatten an annotation's appearance behind existing page content (at z-index 0).
+   * The annotation is removed after flattening.
+   * @param doc - pdf document
+   * @param page - pdf page
+   * @param annotation - the annotation to flatten behind content
+   * @returns task contains the result
+   */
+  flattenAnnotationBehind: (
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotation: PdfAnnotationObject,
+  ) => PdfTask<boolean>;
+  /**
+   * Place a single appearance PDF many times using XObject form references.
+   * This reuses one source object across all placements to minimise output size.
+   */
+  tileAppearanceXObjectBehind: (
+    doc: PdfDocumentObject,
+    placements: Array<{ pageIndex: number; rect: Rect }>,
+    appearancePdf: ArrayBuffer,
+  ) => PdfTask<boolean>;
+  /**
    * Export an annotation's appearance as a standalone PDF document
    * @param doc - pdf document
    * @param page - pdf page
@@ -4170,6 +4192,16 @@ export interface IPdfiumExecutor {
     doc: PdfDocumentObject,
     page: PdfPageObject,
     annotation: PdfAnnotationObject,
+  ): PdfTask<boolean>;
+  flattenAnnotationBehind(
+    doc: PdfDocumentObject,
+    page: PdfPageObject,
+    annotation: PdfAnnotationObject,
+  ): PdfTask<boolean>;
+  tileAppearanceXObjectBehind(
+    doc: PdfDocumentObject,
+    placements: Array<{ pageIndex: number; rect: Rect }>,
+    appearancePdf: ArrayBuffer,
   ): PdfTask<boolean>;
   exportAnnotationAppearanceAsPdf(
     doc: PdfDocumentObject,
