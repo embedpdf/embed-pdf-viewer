@@ -13,6 +13,8 @@ export interface UseZoomGestureOptions {
   enablePinch?: MaybeRefOrGetter<boolean>;
   /** Enable wheel zoom with ctrl/cmd key (default: true) */
   enableWheel?: MaybeRefOrGetter<boolean>;
+  /** Override wheel zoom step; 0.1 = 10% (default: 0.1) */
+  zoomStep?: number;
 }
 
 /**
@@ -39,14 +41,16 @@ export function useZoomGesture(
       () => toValue(documentId),
       () => toValue(options.enablePinch ?? true),
       () => toValue(options.enableWheel ?? true),
+      () => toValue(options.zoomStep ?? 0.1),
     ],
-    ([element, viewport, zoom, docId, enablePinch, enableWheel]: [
+    ([element, viewport, zoom, docId, enablePinch, enableWheel, zoomStep]: [
       HTMLDivElement | null,
       ViewportCapability | null,
       ZoomCapability | null,
       string,
       boolean,
       boolean,
+      number,
     ]) => {
       // Clean up previous setup
       if (cleanup) {
@@ -67,7 +71,7 @@ export function useZoomGesture(
         documentId: docId,
         viewportProvides: viewport,
         zoomProvides: zoom,
-        options: { enablePinch, enableWheel },
+        options: { enablePinch, enableWheel, zoomStep },
       });
     },
     { immediate: true },

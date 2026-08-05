@@ -5,6 +5,8 @@ export interface ZoomGestureOptions {
   enablePinch?: boolean;
   /** Enable wheel zoom with ctrl/cmd key (default: true) */
   enableWheel?: boolean;
+  /** Override wheel zoom step; 0.1 = 10% (default: 0.1) */
+  zoomStep?: number;
 }
 
 export interface ZoomGestureDeps {
@@ -41,7 +43,7 @@ export function setupZoomGestures({
   viewportGap = 0,
   options = {},
 }: ZoomGestureDeps) {
-  const { enablePinch = true, enableWheel = true } = options;
+  const { enablePinch = true, enableWheel = true, zoomStep = 0.1 } = options;
   if (typeof window === 'undefined') {
     return () => {};
   }
@@ -228,9 +230,10 @@ export function setupZoomGestures({
       clearTimeout(wheelZoomTimeout);
     }
 
-    const zoomFactor = 1 - e.deltaY * 0.01;
+    // Utilizing deltaY sign instead of raw value to eliminate discrepancies between browsers
+    const zoomFactor = 1 - Math.sign(e.deltaY) * zoomStep; // Should this use zoomStep configured by the plugin config?
     accumulatedWheelScale *= zoomFactor;
-    accumulatedWheelScale = Math.max(0.1, Math.min(10, accumulatedWheelScale));
+    accumulatedWheelScale = clamp(accumulatedWheelScale, 0.1, 10);
     updateTransform(accumulatedWheelScale);
 
     wheelZoomTimeout = setTimeout(() => {

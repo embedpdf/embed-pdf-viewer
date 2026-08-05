@@ -36,6 +36,7 @@ export function useZoomGesture(documentId: string, options: ZoomGestureOptions =
     viewportElementRef,
     options.enablePinch,
     options.enableWheel,
+    options.zoomStep,
   ]);
 
   return { elementRef };

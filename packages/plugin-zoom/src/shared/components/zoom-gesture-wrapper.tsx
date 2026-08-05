@@ -9,6 +9,8 @@ type ZoomGestureWrapperProps = Omit<HTMLAttributes<HTMLDivElement>, 'style'> & {
   enablePinch?: boolean;
   /** Enable wheel zoom with ctrl/cmd key (default: true) */
   enableWheel?: boolean;
+  /** Override wheel zoom step; 0.1 = 10% (default: 0.1) */
+  zoomStep?: number;
 };
 
 export function ZoomGestureWrapper({
@@ -17,11 +19,12 @@ export function ZoomGestureWrapper({
   style,
   enablePinch = true,
   enableWheel = true,
+  zoomStep = 0.1,
   ...props
 }: ZoomGestureWrapperProps) {
   const options = useMemo<ZoomGestureOptions>(
-    () => ({ enablePinch, enableWheel }),
-    [enablePinch, enableWheel],
+    () => ({ enablePinch, enableWheel, zoomStep }),
+    [enablePinch, enableWheel, zoomStep],
   );
   const { elementRef } = useZoomGesture(documentId, options);
 

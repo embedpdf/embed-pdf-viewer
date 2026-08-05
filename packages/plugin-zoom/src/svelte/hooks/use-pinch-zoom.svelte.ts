@@ -14,6 +14,8 @@ export interface UseZoomGestureOptions {
   enablePinch?: () => boolean;
   /** Enable wheel zoom with ctrl/cmd key (default: true) */
   enableWheel?: () => boolean;
+  /** Override wheel zoom step; 0.1 = 10% (default: 0.1) */
+  zoomStep?: () => number;
 }
 
 /**
@@ -36,6 +38,7 @@ export function useZoomGesture(
   const documentId = $derived(getDocumentId());
   const enablePinch = $derived(options.enablePinch?.() ?? true);
   const enableWheel = $derived(options.enableWheel?.() ?? true);
+  const zoomStep = $derived(options.zoomStep?.() ?? 0.1);
 
   $effect(() => {
     const element = elementRef;
@@ -63,7 +66,7 @@ export function useZoomGesture(
       documentId: docId,
       viewportProvides: viewport,
       zoomProvides: zoom,
-      options: { enablePinch: pinchEnabled, enableWheel: wheelEnabled },
+      options: { enablePinch: pinchEnabled, enableWheel: wheelEnabled, zoomStep },
     });
 
     return () => {

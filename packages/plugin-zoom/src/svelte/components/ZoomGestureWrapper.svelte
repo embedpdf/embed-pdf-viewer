@@ -11,6 +11,8 @@
     enablePinch?: boolean;
     /** Enable wheel zoom with ctrl/cmd key (default: true) */
     enableWheel?: boolean;
+    /** Override wheel zoom step; 0.1 = 10% (default: 0.1) */
+    zoomStep?: number;
   };
 
   let {
@@ -19,12 +21,14 @@
     class: propsClass,
     enablePinch = true,
     enableWheel = true,
+    zoomStep = 0.1,
     ...restProps
   }: ZoomGestureWrapperProps = $props();
 
   const zoomGesture = useZoomGesture(() => documentId, {
     enablePinch: () => enablePinch,
     enableWheel: () => enableWheel,
+    zoomStep: () => zoomStep,
   });
 </script>
 
