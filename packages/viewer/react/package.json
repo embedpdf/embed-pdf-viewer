@@ -55,5 +55,10 @@
       },
       "./package.json": "./package.json"
     }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/embedpdf/embed-pdf-viewer.git",
+    "directory": "packages/viewer/react"
   }
 }

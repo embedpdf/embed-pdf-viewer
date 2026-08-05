@@ -44,5 +44,10 @@
     "@embedpdf/tooling-build": "workspace:*"
   },
   "license": "Apache-2.0",
-  "sideEffects": false
+  "sideEffects": false,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/embedpdf/embed-pdf-viewer.git",
+    "directory": "packages/plugin/stage"
+  }
 }

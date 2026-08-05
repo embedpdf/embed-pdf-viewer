@@ -179,5 +179,10 @@
   "license": "Apache-2.0",
   "inlinedDependencies": {
     "zod": "3.25.76"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/embedpdf/embed-pdf-viewer.git",
+    "directory": "packages/framework/react"
   }
 }

@@ -56,5 +56,10 @@
   "sideEffects": false,
   "inlinedDependencies": {
     "@jitl/quickjs-wasmfile-release-sync": "0.32.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/embedpdf/embed-pdf-viewer.git",
+    "directory": "packages/core/js-sandbox"
   }
 }
