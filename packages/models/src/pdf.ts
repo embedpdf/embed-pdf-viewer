@@ -3341,6 +3341,25 @@ export interface PdfAddAttachmentParams {
 }
 
 /**
+ * Options for {@link PdfEngine.sanitizeDocument}. Each flag selects a hidden
+ * vector to scrub; all default to true when omitted.
+ *
+ * @public
+ */
+export interface SanitizeOptions {
+  /** Remove the catalog /Metadata XMP stream. Default true. */
+  xmp?: boolean;
+  /** Remove document JavaScript (/Names /JavaScript, JS /OpenAction, /AA). Default true. */
+  javascript?: boolean;
+  /** Remove every page's embedded /Thumb. Default true. */
+  embeddedThumbnails?: boolean;
+  /** Remove all embedded-file attachments. Default true. */
+  attachments?: boolean;
+  /** Remove content governed by hidden optional-content groups (layers). Default true. */
+  optionalContentGroups?: boolean;
+}
+
+/**
  * Pdf engine
  *
  * @public
@@ -3919,6 +3938,16 @@ export interface PdfEngine<T = Blob> {
    */
   saveAsCopy: (doc: PdfDocumentObject) => PdfTask<ArrayBuffer>;
   /**
+   * Destructively scrub non-content hidden vectors (XMP metadata, document
+   * JavaScript, embedded thumbnails, attachments) and return a clean,
+   * non-incremental copy of the document. Does NOT verify removal — the
+   * redaction verification gate is a separate product-layer concern.
+   * @param doc - pdf document
+   * @param options - which vectors to scrub (all default true)
+   * @returns task containing the sanitized pdf file content
+   */
+  sanitizeDocument: (doc: PdfDocumentObject, options?: SanitizeOptions) => PdfTask<ArrayBuffer>;
+  /**
    * Close pdf document
    * @param doc - pdf document
    * @returns task that file is closed or not
@@ -4190,6 +4219,7 @@ export interface IPdfiumExecutor {
   preparePrintDocument(doc: PdfDocumentObject, options?: PdfPrintOptions): PdfTask<ArrayBuffer>;
   deletePage(doc: PdfDocumentObject, pageIndex: number): PdfTask<boolean>;
   saveAsCopy(doc: PdfDocumentObject): PdfTask<ArrayBuffer>;
+  sanitizeDocument(doc: PdfDocumentObject, options?: SanitizeOptions): PdfTask<ArrayBuffer>;
   closeDocument(doc: PdfDocumentObject): PdfTask<boolean>;
   closeAllDocuments(): PdfTask<boolean>;
 

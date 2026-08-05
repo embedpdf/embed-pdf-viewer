@@ -4,6 +4,7 @@ import {
   NoopLogger,
   PdfEngine as IPdfEngine,
   PdfDocumentObject,
+  SanitizeOptions,
   PdfPageObject,
   PdfTask,
   PdfErrorReason,
@@ -1139,6 +1140,16 @@ export class PdfEngine<T = Blob> implements IPdfEngine<T> {
       {
         execute: () => this.executor.saveAsCopy(doc),
         meta: { docId: doc.id, operation: 'saveAsCopy' },
+      },
+      { priority: Priority.MEDIUM },
+    );
+  }
+
+  sanitizeDocument(doc: PdfDocumentObject, options?: SanitizeOptions): PdfTask<ArrayBuffer> {
+    return this.workerQueue.enqueue(
+      {
+        execute: () => this.executor.sanitizeDocument(doc, options),
+        meta: { docId: doc.id, operation: 'sanitizeDocument' },
       },
       { priority: Priority.MEDIUM },
     );

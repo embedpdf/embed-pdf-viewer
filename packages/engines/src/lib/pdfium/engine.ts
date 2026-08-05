@@ -16,6 +16,7 @@ import {
   PdfDestinationObject,
   PdfBookmarkObject,
   PdfDocumentObject,
+  SanitizeOptions,
   PdfPageObject,
   PdfPageBoxes,
   Box,
@@ -3234,6 +3235,62 @@ export class PdfiumNative implements IPdfiumExecutor {
     const buffer = this.saveDocument(ctx.docPtr);
 
     this.logger.perf(LOG_SOURCE, LOG_CATEGORY, `SaveAsCopy`, 'End', doc.id);
+    return PdfTaskHelper.resolve(buffer);
+  }
+
+  /**
+   * {@inheritDoc @embedpdf/models!PdfEngine.sanitizeDocument}
+   *
+   * @public
+   */
+  sanitizeDocument(doc: PdfDocumentObject, options: SanitizeOptions = {}) {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'sanitizeDocument', doc, options);
+    this.logger.perf(LOG_SOURCE, LOG_CATEGORY, `SanitizeDocument`, 'Begin', doc.id);
+
+    const ctx = this.cache.getContext(doc.id);
+
+    if (!ctx) {
+      this.logger.perf(LOG_SOURCE, LOG_CATEGORY, `SanitizeDocument`, 'End', doc.id);
+      return PdfTaskHelper.reject({
+        code: PdfErrorCode.DocNotOpen,
+        message: 'document does not open',
+      });
+    }
+
+    const opts = {
+      xmp: true,
+      javascript: true,
+      embeddedThumbnails: true,
+      attachments: true,
+      optionalContentGroups: true,
+      ...options,
+    };
+
+    if (opts.xmp) {
+      this.pdfiumModule.EPDF_RemoveXMPMetadata(ctx.docPtr);
+    }
+    if (opts.javascript) {
+      this.pdfiumModule.EPDF_RemoveAllJavaScript(ctx.docPtr);
+    }
+    if (opts.embeddedThumbnails) {
+      this.pdfiumModule.EPDF_RemoveEmbeddedThumbnails(ctx.docPtr);
+    }
+    if (opts.optionalContentGroups) {
+      this.pdfiumModule.EPDF_RemoveOptionalContentGroups(ctx.docPtr);
+    }
+    if (opts.attachments) {
+      // Delete from the end so earlier indices stay valid as entries are removed.
+      const count = this.pdfiumModule.FPDFDoc_GetAttachmentCount(ctx.docPtr);
+      for (let i = count - 1; i >= 0; i--) {
+        this.pdfiumModule.FPDFDoc_DeleteAttachment(ctx.docPtr, i);
+      }
+    }
+
+    // Full, non-incremental rewrite (saveDocument -> PDFiumExt_SaveAsCopy with no
+    // incremental flag), so prior-revision content cannot survive in the output.
+    const buffer = this.saveDocument(ctx.docPtr);
+
+    this.logger.perf(LOG_SOURCE, LOG_CATEGORY, `SanitizeDocument`, 'End', doc.id);
     return PdfTaskHelper.resolve(buffer);
   }
 
