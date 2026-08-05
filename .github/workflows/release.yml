@@ -26,7 +26,12 @@ on:
       - 'tooling/**'
       - '.changeset/**'
       - 'pnpm-lock.yaml'
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      release_pr_number:
+        description: 'Merged Changesets PR to reuse for release notes on a publish retry'
+        required: false
+        type: string
 
 concurrency:
   group: release-next
@@ -87,8 +92,12 @@ jobs:
           shopt -s nullglob
           for dir in packages/engine/runtime/_artifacts/engine-runtime-*; do
             target="${dir##*/engine-runtime-}"
-            mkdir -p "packages/engine/runtime/npm/$target"
-            cp -R "$dir/." "packages/engine/runtime/npm/$target/"
+            mkdir -p "packages/engine/runtime/npm/$target/lib"
+            cp -R "$dir/lib/." "packages/engine/runtime/npm/$target/lib/"
+            # Runtime binaries are generated release payloads, not source. Ignore
+            # only the exact downloaded lib directory in this runner's Git view,
+            # so pnpm can retain its branch, remote, and clean-tree checks.
+            printf '/packages/engine/runtime/npm/%s/lib/\n' "$target" >> .git/info/exclude
           done
           rm -rf packages/engine/runtime/_artifacts
 
@@ -101,12 +110,55 @@ jobs:
       - name: Build packages
         run: pnpm run build:release
 
+      # build-workers.mjs regenerates this tracked source pin before compiling
+      # it into dist. The generated source itself is not part of the package,
+      # so restore it after the build and keep the publish worktree clean.
+      - name: Restore build-time WASM version source
+        run: git restore --source=HEAD -- packages/engine/main/src/generated/wasm32-version.ts
+
       # The consume gate: packs every publishable into real tarballs and runs
       # them through four consumer fixtures (node-esm, node-cjs, vite-app,
       # tsc-nodenext). A broken artifact can never reach a dist-tag.
       # (build:release above already built ./packages/**.)
       - name: Consume gate
         run: pnpm run verify:consume
+
+      - name: Verify publish worktree
+        run: |
+          status="$(git status --short --untracked-files=all)"
+          if [ -n "$status" ]; then
+            echo "::error::Unexpected repository changes before publish:"
+            printf '%s\n' "$status"
+            exit 1
+          fi
+
+      # A failed publish leaves the Changesets PR merged even though no GitHub
+      # release was created. A manual retry can point back to that merged PR so
+      # its original Changesets summary is preserved verbatim.
+      - name: Load retry release PR
+        if: inputs.release_pr_number != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_PR_NUMBER: ${{ inputs.release_pr_number }}
+        run: |
+          if ! [[ "$RELEASE_PR_NUMBER" =~ ^[0-9]+$ ]]; then
+            echo "::error::release_pr_number must be a positive PR number"
+            exit 1
+          fi
+          gh pr view "$RELEASE_PR_NUMBER" \
+            --repo "$GITHUB_REPOSITORY" \
+            --json body,state \
+            > "$RUNNER_TEMP/release-pr.json"
+          if [ "$(jq -r '.state' "$RUNNER_TEMP/release-pr.json")" != "MERGED" ]; then
+            echo "::error::PR #$RELEASE_PR_NUMBER is not merged"
+            exit 1
+          fi
+          jq -r '.body // ""' "$RUNNER_TEMP/release-pr.json" > "$RUNNER_TEMP/release-pr-body.md"
+          if ! grep -qx '# Releases' "$RUNNER_TEMP/release-pr-body.md"; then
+            echo "::error::PR #$RELEASE_PR_NUMBER has no Changesets # Releases summary"
+            exit 1
+          fi
+          echo "Using release notes from merged PR #$RELEASE_PR_NUMBER"
 
       - name: Version / Publish via Changesets
         id: changesets
@@ -135,7 +187,7 @@ jobs:
           fi
 
       - name: Get merged PR info
-        if: steps.published.outputs.did_publish == 'true'
+        if: steps.published.outputs.did_publish == 'true' && inputs.release_pr_number == ''
         id: merged_pr
         uses: actions-ecosystem/action-get-merged-pull-request@v1
         with:
@@ -145,8 +197,15 @@ jobs:
         if: steps.published.outputs.did_publish == 'true'
         env:
           PR_BODY: ${{ steps.merged_pr.outputs.body }}
+          RELEASE_PR_NUMBER: ${{ inputs.release_pr_number }}
         run: |
-          echo "$PR_BODY" | sed -n '/# Releases/,$p' | tail -n +2 > release-notes.md || true
+          if [ -n "$RELEASE_PR_NUMBER" ]; then
+            notes_source="$RUNNER_TEMP/release-pr-body.md"
+          else
+            notes_source="$RUNNER_TEMP/merged-pr-body.md"
+            printf '%s\n' "$PR_BODY" > "$notes_source"
+          fi
+          sed -n '/# Releases/,$p' "$notes_source" | tail -n +2 > release-notes.md || true
 
           if [ ! -s release-notes.md ]; then
             # GA: replace this fallback with "Automated release."
