@@ -9,7 +9,7 @@ interface RemarkCodeExampleOptions {
   /**
    * Base GitHub URL for the repository. When omitted, no "View on GitHub"
    * links are generated.
-   * Example: 'https://github.com/cloudpdf/cloudpdf/blob/main/ee/website/'
+   * Example: 'https://github.com/cloudpdf/cloudpdf/blob/main/cloudpdf/website/'
    */
   githubBaseUrl?: string;
 }

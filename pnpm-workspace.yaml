@@ -1,9 +1,9 @@
 packages:
   - 'packages/**'
   - 'examples/**'
-  # Recursive, like packages/: the ee tree groups a product line into a
-  # directory once it has siblings (ee/viewer/{main,react,vue,...}).
-  - 'ee/**'
+  # Recursive, like packages/: the cloudpdf tree groups a product line into a
+  # directory once it has siblings (cloudpdf/viewer/{main,react,vue,...}).
+  - 'cloudpdf/**'
   - 'tooling/*'
   - 'website'
   # exclude generated outputs that can contain nested package.json copies
@@ -15,7 +15,7 @@ packages:
   # exclude the git submodule (and everything inside it)
   - '!packages/engine/runtime/runtime-src/**'
   # exclude agent scratch trees: a git worktree created while cwd was a
-  # subdirectory (e.g. ee/server) lands inside a glob'd path and re-adds a
+  # subdirectory (e.g. cloudpdf/server) lands inside a glob'd path and re-adds a
   # whole second copy of every workspace package under a stale layout.
   - '!**/.claude/**'
   - '!**/.cursor/**'

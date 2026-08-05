@@ -15,7 +15,7 @@ nothing) contract under which N workers run safely in parallel.
 2. No document, page, bitmap, annotation, text page, content parser, or font
    object may cross workers.
 3. The pool enforces this: a doc is pinned to one worker via sticky-by-docId
-   routing in `ee/server/src/runtime/WorkerThreadPool.ts`.
+   routing in `cloudpdf/server/src/runtime/WorkerThreadPool.ts`.
 
 Two things are private-per-thread, which together make parallel rendering safe:
 the **handles** we create (pinned per worker) and PDFium's internal **globals**

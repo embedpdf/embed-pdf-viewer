@@ -10,8 +10,8 @@ on:
       - 'packages/engine-core/**'
       - 'packages/engine-services/**'
       - 'packages/engine/**'
-      - 'ee/engine/**'
-      - 'ee/server/**'
+      - 'cloudpdf/engine/**'
+      - 'cloudpdf/server/**'
       - '.github/workflows/engine-conformance.yml'
   push:
     branches: [main]
@@ -19,8 +19,8 @@ on:
       - 'packages/engine-core/**'
       - 'packages/engine-services/**'
       - 'packages/engine/**'
-      - 'ee/engine/**'
-      - 'ee/server/**'
+      - 'cloudpdf/engine/**'
+      - 'cloudpdf/server/**'
       - '.github/workflows/engine-conformance.yml'
   workflow_dispatch: {}
 

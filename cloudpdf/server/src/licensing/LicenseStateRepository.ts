@@ -103,10 +103,9 @@ export class LicenseStateRepository {
       .updateTable('license_operation_lease')
       .set({ owner_id: ownerId, expires_at: now + durationMs, updated_at: now })
       .where('name', '=', name)
-      .where((expression) => expression.or([
-        expression('owner_id', '=', ownerId),
-        expression('expires_at', '<=', now),
-      ]))
+      .where((expression) =>
+        expression.or([expression('owner_id', '=', ownerId), expression('expires_at', '<=', now)]),
+      )
       .executeTakeFirst();
     return Number(result.numUpdatedRows) === 1;
   }

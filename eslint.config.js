@@ -96,7 +96,7 @@ module.exports = [
     // door. `@embedpdf/viewer` and `@embedpdf/viewer-<fw>` bundle PDFium;
     // their `/core` subpaths do not. (A bare `*` glob does not cross `/`, so
     // the `/core` doors stay allowed.)
-    files: ['ee/**/*.{ts,tsx}'],
+    files: ['cloudpdf/**/*.{ts,tsx}'],
     rules: {
       '@typescript-eslint/no-restricted-imports': [
         'error',

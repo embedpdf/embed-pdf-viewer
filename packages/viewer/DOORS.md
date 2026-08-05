@@ -103,7 +103,7 @@ Read one wrapper and you have read them all.
 ## Enforcement
 
 `eslint.config.js` carries the import-boundary rules for laws 2 and 3
-(`component.*` is `import type` only; `ee/**` may not import the local doors).
+(`component.*` is `import type` only; `cloudpdf/**` may not import the local doors).
 They are **latent until lint is wired up in CI** — there is no root
 `tsconfig.json` and no `lint` script today, so treat the tree and the type
 system as the real guardrails until that lands.

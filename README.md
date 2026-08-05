@@ -68,9 +68,7 @@ We love contributions! To get started, read our [contributing guide](CONTRIBUTIN
 
 ## 📄 License
 
-This project is licensed under the Apache License, Version 2.0. See the [LICENSE](LICENSE) file for details.
-
-The `ee/` directory holds the CloudPDF packages, and there the line runs by **where the code runs**: everything shipped to a browser is open source, everything that runs on a server is commercial. So [`@cloudpdf/engine`](ee/engine) and [`@cloudpdf/viewer`](ee/viewer) are Apache-2.0 like the rest of this repository, while the server-side packages (`ee/server`, `ee/admin`, `ee/admin-api`) are proprietary and governed by [ee/LICENSE](ee/LICENSE).
+Everything in this repository is licensed under the [Apache License, Version 2.0](LICENSE), with one exception: [`cloudpdf/server`](cloudpdf/server) — the self-hostable CloudPDF server — is **Fair Source**, under the [Fair Core License, FCL-1.0-ALv2](cloudpdf/server/LICENSE.md). In short: free to use, modify, and self-host; not to be offered as a competing service; and every release automatically becomes Apache-2.0 two years after publication. The full map, including website content licensing, is in [LICENSING.md](LICENSING.md).
 
 ## Third-Party Licenses
 

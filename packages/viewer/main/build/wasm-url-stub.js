@@ -1,6 +1,6 @@
 /**
  * Aliased in place of `@embedpdf/engine-runtime-wasm32/wasm-url` in BUNDLED
- * artifacts (the snippet pass here, the cloud snippet in ee/viewer/main).
+ * artifacts (the snippet pass here, the cloud snippet in cloudpdf/viewer/main).
  *
  * Vite's library mode inlines `new URL(..., import.meta.url)` assets as
  * base64 — 6 MB of wasm inside a JS chunk. These artifacts provide their own

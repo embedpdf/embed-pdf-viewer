@@ -3,22 +3,22 @@ name: License security
 on:
   pull_request:
     paths:
-      - 'ee/server/src/app/buildApp.ts'
-      - 'ee/server/src/index.ts'
-      - 'ee/server/src/licensing/**'
-      - 'ee/server/src/bin/cloudpdf-server.ts'
-      - 'ee/server/test/licensing.test.ts'
-      - 'ee/server/package.json'
+      - 'cloudpdf/server/src/app/buildApp.ts'
+      - 'cloudpdf/server/src/index.ts'
+      - 'cloudpdf/server/src/licensing/**'
+      - 'cloudpdf/server/src/bin/cloudpdf-server.ts'
+      - 'cloudpdf/server/test/licensing.test.ts'
+      - 'cloudpdf/server/package.json'
       - '.github/workflows/license-security.yml'
   push:
     branches: [main]
     paths:
-      - 'ee/server/src/app/buildApp.ts'
-      - 'ee/server/src/index.ts'
-      - 'ee/server/src/licensing/**'
-      - 'ee/server/src/bin/cloudpdf-server.ts'
-      - 'ee/server/test/licensing.test.ts'
-      - 'ee/server/package.json'
+      - 'cloudpdf/server/src/app/buildApp.ts'
+      - 'cloudpdf/server/src/index.ts'
+      - 'cloudpdf/server/src/licensing/**'
+      - 'cloudpdf/server/src/bin/cloudpdf-server.ts'
+      - 'cloudpdf/server/test/licensing.test.ts'
+      - 'cloudpdf/server/package.json'
       - '.github/workflows/license-security.yml'
   workflow_dispatch: {}
 
@@ -59,7 +59,7 @@ jobs:
 
       - name: Verify published license API boundary
         run: >-
-          node --input-type=module -e "const m=await import('./ee/server/dist/index.js');
+          node --input-type=module -e "const m=await import('./cloudpdf/server/dist/index.js');
           const forbidden=['LicenseRuntime','buildAppForTesting','ConnectedUsageReporter'];
           const leaked=forbidden.filter((name)=>name in m);
           if(leaked.length) throw new Error('internal exports leaked: '+leaked.join(','));

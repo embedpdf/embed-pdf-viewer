@@ -13,26 +13,26 @@ as the build context:
 
 ```bash
 # from the repo root
-docker build -f ee/server/Dockerfile -t cloudpdf-server:dev .
+docker build -f cloudpdf/server/Dockerfile -t cloudpdf-server:dev .
 ```
 
 On Apple Silicon / non-amd64 hosts, cross-build for the release platform:
 
 ```bash
 docker buildx build --platform linux/amd64 \
-  -f ee/server/Dockerfile -t cloudpdf-server:dev --load .
+  -f cloudpdf/server/Dockerfile -t cloudpdf-server:dev --load .
 ```
 
 ### How the context is trimmed
 
-`ee/server/Dockerfile.dockerignore` (a BuildKit per-Dockerfile ignore that
+`cloudpdf/server/Dockerfile.dockerignore` (a BuildKit per-Dockerfile ignore that
 applies to the repo-root context) drops `node_modules`, build outputs,
 `.git`, the giant `pdfium-src` / `runtime-src` submodules, and framework
 build dirs that contain stray nested `package.json` files. All workspace
 `package.json` files are kept so the workspace graph still resolves.
 
-> A plain `ee/server/.dockerignore` would be ignored here, because it only
-> applies when the build context itself is `ee/server`. We build from the
+> A plain `cloudpdf/server/.dockerignore` would be ignored here, because it only
+> applies when the build context itself is `cloudpdf/server`. We build from the
 > repo root, so the ignore lives next to the Dockerfile as
 > `Dockerfile.dockerignore`.
 
@@ -59,7 +59,7 @@ For `prebuilt`, stage the artifact into the build context first:
 ```bash
 # CI downloads the build-runtime job's pdf-runtime-linux-x64 artifact into:
 #   packages/engine/runtime/npm/linux-x64/
-docker build -f ee/server/Dockerfile \
+docker build -f cloudpdf/server/Dockerfile \
   --build-arg NATIVE_SRC=prebuilt -t cloudpdf-server:1.2.3 .
 ```
 

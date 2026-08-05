@@ -37,7 +37,7 @@ interface WorkspacePackage {
 /**
  * `private !== true` is the publication source of truth. Deriving this list
  * from pnpm's workspace view keeps the gate aligned with `pnpm publish -r`
- * and covers packages/, ee/, Angular, and the full-viewer packages without a
+ * and covers packages/, cloudpdf/, Angular, and the full-viewer packages without a
  * second hand-maintained release list.
  */
 const WORKSPACE_PACKAGES = JSON.parse(

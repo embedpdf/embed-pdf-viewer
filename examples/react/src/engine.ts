@@ -39,7 +39,7 @@ const DROID_FALLBACK_FONT = {
  */
 export function selectedEngine(): Engine {
   if (engineMode === 'cloud') {
-    // Same Engine contract, served over HTTP. Requires ee/server + a token.
+    // Same Engine contract, served over HTTP. Requires cloudpdf/server + a token.
     return cloudEngine({
       baseUrl: import.meta.env.VITE_CLOUDPDF_URL ?? 'http://127.0.0.1:3000',
       token: import.meta.env.VITE_CLOUDPDF_TOKEN,

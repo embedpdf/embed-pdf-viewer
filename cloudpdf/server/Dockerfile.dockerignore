@@ -1,11 +1,11 @@
 # Ignore file for the @cloudpdf/server image build.
 #
 # The image is built with the repo root as the build context
-# (`docker build -f ee/server/Dockerfile .`). BuildKit honours the
+# (`docker build -f cloudpdf/server/Dockerfile .`). BuildKit honours the
 # `<dockerfile>.dockerignore` that sits next to the Dockerfile, so this
 # file scopes the context for the server image without affecting any
-# other build. (A plain `ee/server/.dockerignore` would only apply when
-# the build context itself is `ee/server`, which it is not here.)
+# other build. (A plain `cloudpdf/server/.dockerignore` would only apply when
+# the build context itself is `cloudpdf/server`, which it is not here.)
 #
 # Goal: keep the context small + deterministic. We deliberately keep all
 # workspace `package.json` files (turbo prune needs the full workspace
@@ -53,8 +53,8 @@ packages/engine/runtime/build/local-staging
 # weight - their package.json still ships so the workspace graph resolves).
 website/.next
 website/out
-ee/website/.next
-ee/website/out
+cloudpdf/website/.next
+cloudpdf/website/out
 
 # Test/coverage noise
 **/coverage

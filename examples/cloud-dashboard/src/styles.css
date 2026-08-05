@@ -3,7 +3,7 @@
 /**
  * The CloudPDF brand surface, as Tailwind v4 theme tokens.
  *
- * Values are the ones `ee/website/tailwind.config.ts` ships (design system
+ * Values are the ones `cloudpdf/website/tailwind.config.ts` ships (design system
  * colors_and_type.css) — the marketing site and this dashboard are the same
  * product, so they must not drift into two palettes.
  */

@@ -55,9 +55,7 @@ export class UsageMeters {
           period_start: periodStart,
           created_at: Date.now(),
         })
-        .onConflict((conflict) => conflict
-          .columns(['metric', 'event_id'])
-          .doNothing())
+        .onConflict((conflict) => conflict.columns(['metric', 'event_id']).doNothing())
         .returning('event_id')
         .executeTakeFirst();
       if (!inserted) {
@@ -130,8 +128,9 @@ export class UsageMeters {
     const policy = this.policyFor(metric);
     const { periodStart } = monthPeriod(new Date());
 
-    return this.db.transaction().execute((tx) =>
-      this.incrementCounter(tx, metric, periodStart, increment, policy));
+    return this.db
+      .transaction()
+      .execute((tx) => this.incrementCounter(tx, metric, periodStart, increment, policy));
   }
 
   private async incrementCounter(
@@ -145,19 +144,16 @@ export class UsageMeters {
     const row = await executor
       .insertInto('license_usage_counter')
       .values({ metric, period_start: periodStart, value: increment, updated_at: now })
-      .onConflict((conflict) => conflict
-        .columns(['metric', 'period_start'])
-        .doUpdateSet({
+      .onConflict((conflict) =>
+        conflict.columns(['metric', 'period_start']).doUpdateSet({
           value: sql`license_usage_counter.value + excluded.value`,
           updated_at: now,
-        }))
+        }),
+      )
       .returning('value')
       .executeTakeFirstOrThrow();
     const value = safeNumber(row.value, metric);
-    if (
-      policy?.enforcement === 'hard-limit' &&
-      BigInt(value) > BigInt(policy.limit)
-    ) {
+    if (policy?.enforcement === 'hard-limit' && BigInt(value) > BigInt(policy.limit)) {
       // Throwing from the transaction rolls the increment back, making
       // concurrent replicas enforce the counter limit atomically.
       throw new UsageLimitError(metric, policy.limit);

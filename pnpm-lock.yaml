@@ -89,7 +89,7 @@ importers:
         specifier: ^6.3.5
         version: 6.4.1(@types/node@22.19.11)(jiti@2.6.1)(less@4.6.7)(lightningcss@1.30.2)(sass-embedded@1.97.3)(sass@1.97.3)(terser@5.46.0)(tsx@4.21.0)(yaml@2.9.0)
 
-  ee/admin:
+  cloudpdf/admin:
     dependencies:
       '@cloudpdf/admin-api':
         specifier: workspace:*
@@ -111,7 +111,7 @@ importers:
         specifier: ^2.1.0
         version: 2.1.9(@types/node@22.19.11)(happy-dom@20.11.0)(less@4.6.7)(lightningcss@1.30.2)(sass-embedded@1.97.3)(sass@1.97.3)(terser@5.46.0)
 
-  ee/admin-api:
+  cloudpdf/admin-api:
     dependencies:
       zod:
         specifier: ^3.23.8
@@ -130,7 +130,7 @@ importers:
         specifier: ^5.0.0
         version: 5.9.3
 
-  ee/engine:
+  cloudpdf/engine:
     dependencies:
       '@embedpdf/engine-core':
         specifier: workspace:*
@@ -155,7 +155,7 @@ importers:
         specifier: ^2.1.0
         version: 2.1.9(@types/node@22.19.11)(happy-dom@20.11.0)(less@4.6.7)(lightningcss@1.30.2)(sass-embedded@1.97.3)(sass@1.97.3)(terser@5.46.0)
 
-  ee/server:
+  cloudpdf/server:
     dependencies:
       '@cloudpdf/admin-api':
         specifier: workspace:*
@@ -268,7 +268,7 @@ importers:
         specifier: ^7.18.0
         version: 7.19.0(encoding@0.1.13)
 
-  ee/viewer/main:
+  cloudpdf/viewer/main:
     dependencies:
       '@cloudpdf/engine':
         specifier: workspace:*
@@ -296,7 +296,7 @@ importers:
         specifier: ^6.0.0
         version: 6.4.1(@types/node@22.19.11)(jiti@2.6.1)(less@4.6.7)(lightningcss@1.30.2)(sass-embedded@1.97.3)(sass@1.97.3)(terser@5.46.0)(tsx@4.21.0)(yaml@2.9.0)
 
-  ee/viewer/react:
+  cloudpdf/viewer/react:
     dependencies:
       '@cloudpdf/viewer':
         specifier: workspace:*
@@ -321,7 +321,7 @@ importers:
         specifier: ^5.0.0
         version: 5.9.3
 
-  ee/website:
+  cloudpdf/website:
     dependencies:
       '@hugeicons/core-free-icons':
         specifier: ^4.2.0
@@ -334,7 +334,7 @@ importers:
         version: 0.3.3
       next:
         specifier: ^15.4.10
-        version: 15.5.12(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(sass@1.97.3)
+        version: 15.5.12(@babel/core@7.29.7)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(sass@1.97.3)
       nextra:
         specifier: ^4.6.1
         version: 4.6.1(next@15.5.12(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(sass@1.97.3))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.9.3)
@@ -371,7 +371,7 @@ importers:
         version: 15.5.12(eslint@9.39.2(jiti@2.6.1))(typescript@5.9.3)
       postcss:
         specifier: ^8.4.32
-        version: 8.5.6
+        version: 8.5.20
       tailwindcss:
         specifier: ^4.0.6
         version: 4.1.18
@@ -448,16 +448,16 @@ importers:
     dependencies:
       '@cloudpdf/admin':
         specifier: workspace:*
-        version: link:../../ee/admin
+        version: link:../../cloudpdf/admin
       '@cloudpdf/engine':
         specifier: workspace:*
-        version: link:../../ee/engine
+        version: link:../../cloudpdf/engine
       '@cloudpdf/server':
         specifier: workspace:*
-        version: link:../../ee/server
+        version: link:../../cloudpdf/server
       '@cloudpdf/viewer-react':
         specifier: workspace:*
-        version: link:../../ee/viewer/react
+        version: link:../../cloudpdf/viewer/react
       '@embedpdf/engine-core':
         specifier: workspace:*
         version: link:../../packages/engine/core
@@ -499,45 +499,14 @@ importers:
         specifier: ^6.3.5
         version: 6.4.1(@types/node@22.19.11)(jiti@2.6.1)(less@4.6.7)(lightningcss@1.30.2)(sass-embedded@1.97.3)(sass@1.97.3)(terser@5.46.0)(tsx@4.21.0)(yaml@2.9.0)
 
-  examples/cloud-platform-smoke:
-    dependencies:
-      '@cloudpdf/admin':
-        specifier: workspace:*
-        version: link:../../ee/admin
-      '@cloudpdf/engine':
-        specifier: workspace:*
-        version: link:../../ee/engine
-      '@cloudpdf/server':
-        specifier: workspace:*
-        version: link:../../ee/server
-      '@embedpdf/engine-core':
-        specifier: workspace:*
-        version: link:../../packages/engine/core
-    devDependencies:
-      '@types/node':
-        specifier: ^22.0.0
-        version: 22.19.11
-      concurrently:
-        specifier: ^9.2.0
-        version: 9.2.1
-      tsx:
-        specifier: ^4.19.0
-        version: 4.21.0
-      typescript:
-        specifier: latest
-        version: 7.0.2
-      vite:
-        specifier: ^6.3.5
-        version: 6.4.1(@types/node@22.19.11)(jiti@2.6.1)(less@4.6.7)(lightningcss@1.30.2)(sass-embedded@1.97.3)(sass@1.97.3)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2)
-
   examples/engine-runtime-demo:
     dependencies:
       '@cloudpdf/engine':
         specifier: workspace:*
-        version: link:../../ee/engine
+        version: link:../../cloudpdf/engine
       '@cloudpdf/server':
         specifier: workspace:*
-        version: link:../../ee/server
+        version: link:../../cloudpdf/server
       '@embedpdf/engine':
         specifier: workspace:*
         version: link:../../packages/engine/main
@@ -562,7 +531,7 @@ importers:
     dependencies:
       '@cloudpdf/engine':
         specifier: workspace:*
-        version: link:../../ee/engine
+        version: link:../../cloudpdf/engine
       '@embedpdf/core':
         specifier: workspace:*
         version: link:../../packages/core/main
@@ -1688,10 +1657,10 @@ importers:
         version: 2.0.0
       next:
         specifier: ^15.4.10
-        version: 15.5.12(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(sass@1.97.3)
+        version: 15.5.12(@babel/core@7.29.7)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(sass@1.97.3)
       nextra:
         specifier: ^4.6.1
-        version: 4.6.1(next@15.5.12(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(sass@1.97.3))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.8.3)
+        version: 4.6.1(next@15.5.12(@babel/core@7.29.7)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(sass@1.97.3))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.8.3)
       npm-to-yarn:
         specifier: ^3.0.1
         version: 3.0.1
@@ -2533,9 +2502,6 @@ packages:
 
   '@emnapi/runtime@1.11.2':
     resolution: {integrity: sha512-kyOl3X0DuTiT1h2ft8r2fYO8JYtU9a9Xis/zBSiGArNaagCOWx90N1k2wxp18czFDH+OgcWGb5ZP/XMt3dcyPA==}
-
-  '@emnapi/runtime@1.8.1':
-    resolution: {integrity: sha512-mehfKSMWjjNol8659Z8KxEMrdSJDDot5SXMq00dM8BN4o+CLNXQ0xH2V7EchNHV4RmbZLmmPdEaXZc5H2FXmDg==}
 
   '@emnapi/wasi-threads@1.2.1':
     resolution: {integrity: sha512-uTII7OYF+/Mes/MrcIOYp5yOtSMLBWSIoLPpcgwipoiKbli6k322tcoFsxoIIxPDqW01SQGAgko4EzZi2BNv2w==}
@@ -4360,9 +4326,6 @@ packages:
 
   '@protobufjs/float@1.0.2':
     resolution: {integrity: sha512-Ddb+kVXlXst9d+R9PfTIxh1EdNkgoRe5tOX6t01f1lYWOvJnSPDBlG241QLzcyPdoNTsblLUdujGSE4RzrTZGQ==}
-
-  '@protobufjs/inquire@1.1.0':
-    resolution: {integrity: sha512-kdSefcPdruJiFMVSbn801t4vFK7KB/5gd2fYvrxhuJYg8ILrmn9SKSX2tZdV6V+ksulWqS7aXjBcRXl3wHoD9Q==}
 
   '@protobufjs/inquire@1.1.1':
     resolution: {integrity: sha512-mnzgDV26ueAvk7rsbt9L7bE0SuAoqyuys/sMMrmVcN5x9VsxpcG3rqAUSgDyLp0UZlmNfIbQ4fHfCtreVBk8Ew==}
@@ -13288,11 +13251,6 @@ snapshots:
       tslib: 2.8.1
     optional: true
 
-  '@emnapi/runtime@1.8.1':
-    dependencies:
-      tslib: 2.8.1
-    optional: true
-
   '@emnapi/wasi-threads@1.2.1':
     dependencies:
       tslib: 2.8.1
@@ -13744,7 +13702,7 @@ snapshots:
     dependencies:
       '@fastify/accept-negotiator': 2.0.1
       fastify-plugin: 5.1.0
-      mime-db: 1.52.0
+      mime-db: 1.54.0
       minipass: 7.1.2
       peek-stream: 1.1.3
       pump: 3.0.4
@@ -13993,7 +13951,7 @@ snapshots:
 
   '@img/sharp-wasm32@0.34.5':
     dependencies:
-      '@emnapi/runtime': 1.8.1
+      '@emnapi/runtime': 1.11.2
     optional: true
 
   '@img/sharp-win32-arm64@0.34.5':
@@ -14707,11 +14665,9 @@ snapshots:
   '@protobufjs/fetch@1.1.0':
     dependencies:
       '@protobufjs/aspromise': 1.1.2
-      '@protobufjs/inquire': 1.1.0
+      '@protobufjs/inquire': 1.1.1
 
   '@protobufjs/float@1.0.2': {}
-
-  '@protobufjs/inquire@1.1.0': {}
 
   '@protobufjs/inquire@1.1.1': {}
 
@@ -15544,7 +15500,7 @@ snapshots:
       '@alloc/quick-lru': 5.2.0
       '@tailwindcss/node': 4.1.18
       '@tailwindcss/oxide': 4.1.18
-      postcss: 8.5.6
+      postcss: 8.5.20
       tailwindcss: 4.1.18
 
   '@tailwindcss/vite@4.1.18(vite@6.4.1(@types/node@22.19.11)(jiti@2.6.1)(less@4.6.7)(lightningcss@1.30.2)(sass-embedded@1.97.3)(sass@1.97.3)(terser@5.46.0)(tsx@4.21.0)(yaml@2.9.0))':
@@ -16643,9 +16599,9 @@ snapshots:
 
   array.prototype.findlast@1.2.5:
     dependencies:
-      call-bind: 1.0.8
+      call-bind: 1.0.9
       define-properties: 1.2.1
-      es-abstract: 1.24.1
+      es-abstract: 1.24.2
       es-errors: 1.3.0
       es-object-atoms: 1.1.1
       es-shim-unscopables: 1.1.0
@@ -16676,9 +16632,9 @@ snapshots:
 
   array.prototype.tosorted@1.1.4:
     dependencies:
-      call-bind: 1.0.8
+      call-bind: 1.0.9
       define-properties: 1.2.1
-      es-abstract: 1.24.1
+      es-abstract: 1.24.2
       es-errors: 1.3.0
       es-shim-unscopables: 1.1.0
 
@@ -16805,7 +16761,7 @@ snapshots:
       domhandler: 5.0.3
       htmlparser2: 10.1.0
       picocolors: 1.1.1
-      postcss: 8.5.6
+      postcss: 8.5.20
       postcss-media-query-parser: 0.2.3
 
   better-path-resolve@1.0.0:
@@ -17573,7 +17529,7 @@ snapshots:
 
   docker-compose@1.4.2:
     dependencies:
-      yaml: 2.8.2
+      yaml: 2.9.0
 
   docker-modem@5.0.7:
     dependencies:
@@ -17812,7 +17768,7 @@ snapshots:
       has-property-descriptors: 1.0.2
       has-proto: 1.2.0
       has-symbols: 1.1.0
-      hasown: 2.0.2
+      hasown: 2.0.4
       internal-slot: 1.1.0
       is-array-buffer: 3.0.5
       is-callable: 1.2.7
@@ -18157,7 +18113,7 @@ snapshots:
       damerau-levenshtein: 1.0.8
       emoji-regex: 9.2.2
       eslint: 9.39.2(jiti@2.6.1)
-      hasown: 2.0.2
+      hasown: 2.0.4
       jsx-ast-utils: 3.3.5
       language-tags: 1.0.9
       minimatch: 3.1.2
@@ -18189,7 +18145,7 @@ snapshots:
       es-iterator-helpers: 1.4.0
       eslint: 9.39.2(jiti@2.6.1)
       estraverse: 5.3.0
-      hasown: 2.0.2
+      hasown: 2.0.4
       jsx-ast-utils: 3.3.5
       minimatch: 3.1.2
       object.entries: 1.1.9
@@ -18596,7 +18552,7 @@ snapshots:
       asynckit: 0.4.0
       combined-stream: 1.0.8
       es-set-tostringtag: 2.1.0
-      hasown: 2.0.2
+      hasown: 2.0.4
       mime-types: 2.1.35
       safe-buffer: 5.2.1
     optional: true
@@ -20548,7 +20504,7 @@ snapshots:
 
   negotiator@1.0.0: {}
 
-  next@15.5.12(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(sass@1.97.3):
+  next@15.5.12(@babel/core@7.29.7)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(sass@1.97.3):
     dependencies:
       '@next/env': 15.5.12
       '@swc/helpers': 0.5.15
@@ -20556,7 +20512,7 @@ snapshots:
       postcss: 8.4.31
       react: 18.3.1
       react-dom: 18.3.1(react@18.3.1)
-      styled-jsx: 5.1.6(react@18.3.1)
+      styled-jsx: 5.1.6(@babel/core@7.29.7)(react@18.3.1)
     optionalDependencies:
       '@next/swc-darwin-arm64': 15.5.12
       '@next/swc-darwin-x64': 15.5.12
@@ -20572,7 +20528,7 @@ snapshots:
       - '@babel/core'
       - babel-plugin-macros
 
-  nextra@4.6.1(next@15.5.12(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(sass@1.97.3))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.8.3):
+  nextra@4.6.1(next@15.5.12(@babel/core@7.29.7)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(sass@1.97.3))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.8.3):
     dependencies:
       '@formatjs/intl-localematcher': 0.6.2
       '@headlessui/react': 2.2.9(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -20593,7 +20549,7 @@ snapshots:
       mdast-util-gfm: 3.1.0
       mdast-util-to-hast: 13.2.1
       negotiator: 1.0.0
-      next: 15.5.12(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(sass@1.97.3)
+      next: 15.5.12(@babel/core@7.29.7)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(sass@1.97.3)
       react: 18.3.1
       react-compiler-runtime: 19.1.0-rc.3(react@18.3.1)
       react-dom: 18.3.1(react@18.3.1)
@@ -20641,7 +20597,7 @@ snapshots:
       mdast-util-gfm: 3.1.0
       mdast-util-to-hast: 13.2.1
       negotiator: 1.0.0
-      next: 15.5.12(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(sass@1.97.3)
+      next: 15.5.12(@babel/core@7.29.7)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(sass@1.97.3)
       react: 18.3.1
       react-compiler-runtime: 19.1.0-rc.3(react@18.3.1)
       react-dom: 18.3.1(react@18.3.1)
@@ -20687,7 +20643,7 @@ snapshots:
       less: 4.6.7
       ora: 8.2.0
       piscina: 5.2.0
-      postcss: 8.5.6
+      postcss: 8.5.20
       rollup-plugin-dts: 6.3.0(rollup@4.57.1)(typescript@5.8.3)
       rxjs: 7.8.2
       sass: 1.97.3
@@ -20717,7 +20673,7 @@ snapshots:
       less: 4.6.7
       ora: 8.2.0
       piscina: 5.2.0
-      postcss: 8.5.6
+      postcss: 8.5.20
       rollup-plugin-dts: 6.3.0(rollup@4.57.1)(typescript@5.8.3)
       rxjs: 7.8.2
       sass: 1.97.3
@@ -20894,7 +20850,7 @@ snapshots:
 
   object.entries@1.1.9:
     dependencies:
-      call-bind: 1.0.8
+      call-bind: 1.0.9
       call-bound: 1.0.4
       define-properties: 1.2.1
       es-object-atoms: 1.1.1
@@ -21262,7 +21218,7 @@ snapshots:
 
   postcss@8.4.31:
     dependencies:
-      nanoid: 3.3.11
+      nanoid: 3.3.16
       picocolors: 1.1.1
       source-map-js: 1.2.1
 
@@ -22513,16 +22469,16 @@ snapshots:
 
   string.prototype.includes@2.0.1:
     dependencies:
-      call-bind: 1.0.8
+      call-bind: 1.0.9
       define-properties: 1.2.1
-      es-abstract: 1.24.1
+      es-abstract: 1.24.2
 
   string.prototype.matchall@4.0.12:
     dependencies:
-      call-bind: 1.0.8
+      call-bind: 1.0.9
       call-bound: 1.0.4
       define-properties: 1.2.1
-      es-abstract: 1.24.1
+      es-abstract: 1.24.2
       es-errors: 1.3.0
       es-object-atoms: 1.1.1
       get-intrinsic: 1.3.0
@@ -22536,7 +22492,7 @@ snapshots:
   string.prototype.repeat@1.0.0:
     dependencies:
       define-properties: 1.2.1
-      es-abstract: 1.24.1
+      es-abstract: 1.24.2
 
   string.prototype.trim@1.2.10:
     dependencies:
@@ -22608,10 +22564,12 @@ snapshots:
     dependencies:
       inline-style-parser: 0.2.7
 
-  styled-jsx@5.1.6(react@18.3.1):
+  styled-jsx@5.1.6(@babel/core@7.29.7)(react@18.3.1):
     dependencies:
       client-only: 0.0.1
       react: 18.3.1
+    optionalDependencies:
+      '@babel/core': 7.29.7
 
   stylis@4.3.6: {}
 
@@ -22622,7 +22580,7 @@ snapshots:
       lines-and-columns: 1.2.4
       mz: 2.7.0
       pirates: 4.0.7
-      tinyglobby: 0.2.15
+      tinyglobby: 0.2.17
       ts-interface-checker: 0.1.13
 
   supports-color@7.2.0:
@@ -22946,7 +22904,7 @@ snapshots:
       source-map: 0.7.6
       sucrase: 3.35.1
       tinyexec: 0.3.2
-      tinyglobby: 0.2.15
+      tinyglobby: 0.2.17
       tree-kill: 1.2.2
     optionalDependencies:
       '@microsoft/api-extractor': 7.56.3(@types/node@22.19.11)
@@ -23323,7 +23281,7 @@ snapshots:
   vite@5.4.21(@types/node@22.19.11)(less@4.6.7)(lightningcss@1.30.2)(sass-embedded@1.97.3)(sass@1.97.3)(terser@5.46.0):
     dependencies:
       esbuild: 0.21.5
-      postcss: 8.5.6
+      postcss: 8.5.20
       rollup: 4.57.1
     optionalDependencies:
       '@types/node': 22.19.11
@@ -23333,33 +23291,13 @@ snapshots:
       sass: 1.97.3
       sass-embedded: 1.97.3
       terser: 5.46.0
-
-  vite@6.4.1(@types/node@22.19.11)(jiti@2.6.1)(less@4.6.7)(lightningcss@1.30.2)(sass-embedded@1.97.3)(sass@1.97.3)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2):
-    dependencies:
-      esbuild: 0.25.12
-      fdir: 6.5.0(picomatch@4.0.3)
-      picomatch: 4.0.3
-      postcss: 8.5.6
-      rollup: 4.57.1
-      tinyglobby: 0.2.15
-    optionalDependencies:
-      '@types/node': 22.19.11
-      fsevents: 2.3.3
-      jiti: 2.6.1
-      less: 4.6.7
-      lightningcss: 1.30.2
-      sass: 1.97.3
-      sass-embedded: 1.97.3
-      terser: 5.46.0
-      tsx: 4.21.0
-      yaml: 2.8.2
 
   vite@6.4.1(@types/node@22.19.11)(jiti@2.6.1)(less@4.6.7)(lightningcss@1.30.2)(sass-embedded@1.97.3)(sass@1.97.3)(terser@5.46.0)(tsx@4.21.0)(yaml@2.9.0):
     dependencies:
       esbuild: 0.25.12
       fdir: 6.5.0(picomatch@4.0.3)
       picomatch: 4.0.3
-      postcss: 8.5.6
+      postcss: 8.5.20
       rollup: 4.57.1
       tinyglobby: 0.2.15
     optionalDependencies:
@@ -23379,7 +23317,7 @@ snapshots:
       esbuild: 0.25.12
       fdir: 6.5.0(picomatch@4.0.5)
       picomatch: 4.0.5
-      postcss: 8.5.6
+      postcss: 8.5.20
       rollup: 4.57.1
       tinyglobby: 0.2.17
     optionalDependencies:

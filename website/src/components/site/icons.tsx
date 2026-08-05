@@ -376,7 +376,7 @@ export function JsMark({ small = false }: { small?: boolean }) {
   );
 }
 
-/* ---- Aliases for the docs components ported from ee/website (their icon
+/* ---- Aliases for the docs components ported from cloudpdf/website (their icon
    vocabulary). Converge the names during the docs polish pass. ---- */
 export const ArrowRight = ArrowRightIcon;
 export const ExternalLink = ExtLinkIcon;

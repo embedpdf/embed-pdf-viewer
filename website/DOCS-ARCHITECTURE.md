@@ -91,7 +91,7 @@ website/src/samples/
 - `pnpm --filter @embedpdf/website-samples typecheck` runs in CI: an API
   change fails the build until the docs move with it. This is the docs
   equivalent of the consume gate.
-- The MDX pipeline (extend ee/website's remark/rehype code-example plugins)
+- The MDX pipeline (extend cloudpdf/website's remark/rehype code-example plugins)
   inlines the file at build time with shiki highlighting.
 - A missing sample for a framework renders an honest "not yet ported for
   {framework}" callout — driven by file presence, not hand-maintained flags.

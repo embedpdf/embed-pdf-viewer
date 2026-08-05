@@ -5,14 +5,14 @@
 # Build it ALWAYS from monorepo source (npm is a parallel SDK channel,
 # never a build input). Build context is the repo root:
 #
-#   docker build -f ee/server/Dockerfile -t cloudpdf-server:dev .
+#   docker build -f cloudpdf/server/Dockerfile -t cloudpdf-server:dev .
 #
 # The image is multi-arch (linux/amd64 + linux/arm64); a plain build targets
 # the host arch. Cross-build the other one explicitly, e.g. amd64 from
 # Apple Silicon:
 #
 #   docker buildx build --platform linux/amd64 \
-#     -f ee/server/Dockerfile -t cloudpdf-server:dev --load .
+#     -f cloudpdf/server/Dockerfile -t cloudpdf-server:dev --load .
 #
 # Native PDFium acquisition is selected with --build-arg NATIVE_SRC=...
 #   build    (default) fetch the pinned thread-local libembedpdf + compile

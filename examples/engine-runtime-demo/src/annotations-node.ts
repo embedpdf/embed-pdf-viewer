@@ -5,8 +5,8 @@ import { createLocalEngine } from '@embedpdf/engine';
 import { createCloudEngine } from '@cloudpdf/engine';
 import { diffAnnotationListSnapshotAll } from '@embedpdf/engine-core/conformance';
 import { signDevToken, defaultWorkerEntryUrl, type AppBundle } from '@cloudpdf/server';
-import { buildAppForTesting } from '../../../ee/server/src/app/buildApp.ts';
-import { createValidTestLicenseGate } from '../../../ee/server/src/licensing/testing.ts';
+import { buildAppForTesting } from '../../../cloudpdf/server/src/app/buildApp.ts';
+import { createValidTestLicenseGate } from '../../../cloudpdf/server/src/licensing/testing.ts';
 import { runAnnotationsDemo, summarizeRawAll } from './annotations-demo.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));

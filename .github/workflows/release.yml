@@ -22,7 +22,7 @@ on:
     branches: [main]
     paths:
       - 'packages/**'
-      - 'ee/**'
+      - 'cloudpdf/**'
       - 'tooling/**'
       - '.changeset/**'
       - 'pnpm-lock.yaml'
@@ -168,7 +168,7 @@ jobs:
           mkdir -p release-assets
           # Where a package lives is asked of the workspace ONCE, never
           # reconstructed from its npm name: the tree is grouped
-          # (packages/<group>/<member>, ee/viewer/<framework>), so NAMING.md's
+          # (packages/<group>/<member>, cloudpdf/viewer/<framework>), so NAMING.md's
           # name↔path rule cannot be inverted without hardcoding the group list.
           pnpm ls -r --depth -1 --json \
             | jq --arg root "$GITHUB_WORKSPACE/" \
@@ -213,7 +213,7 @@ jobs:
   # ubuntu-24.04-arm — the same runner family build-engine-runtime already
   # uses). QEMU is avoided on purpose: the in-image monorepo build is far too
   # heavy to emulate, and turbo's Rust binary is already known to break under
-  # it (see ee/server/Dockerfile). Each build pushes by digest only;
+  # it (see cloudpdf/server/Dockerfile). Each build pushes by digest only;
   # merge-image below assembles the manifest and owns every tag.
   publish-image:
     needs: [build-runtime, release]
@@ -265,7 +265,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: ee/server/Dockerfile
+          file: cloudpdf/server/Dockerfile
           platforms: ${{ matrix.platform }}
           build-args: |
             NATIVE_SRC=prebuilt
@@ -308,7 +308,7 @@ jobs:
         id: ver
         # GA: expand this step as described in the promotion checklist to emit
         # the stable minor tag as well as the full version.
-        run: echo "version=$(jq -r .version ee/server/package.json)" >> "$GITHUB_OUTPUT"
+        run: echo "version=$(jq -r .version cloudpdf/server/package.json)" >> "$GITHUB_OUTPUT"
 
       - name: Download digests
         uses: actions/download-artifact@v7
