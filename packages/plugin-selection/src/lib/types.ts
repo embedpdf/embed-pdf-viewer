@@ -1,5 +1,11 @@
 import { BasePluginConfig, EventHook } from '@embedpdf/core';
-import { PdfPageGeometry, PdfTask, Rect, Size } from '@embedpdf/models';
+import {
+  PdfPageGeometry,
+  PdfTask,
+  Quad,
+  Rect,
+  Size,
+} from '@embedpdf/models';
 
 export interface MarqueeSelectionConfig {
   /** Minimum drag distance in pixels before considering it a marquee */
@@ -64,6 +70,8 @@ export interface SelectionDocumentState {
   geometry: Record<number, PdfPageGeometry>;
   /** current selection or null */
   rects: Record<number, Rect[]>;
+  /** oriented segment quads per page (authoritative when present) */
+  quads: Record<number, Quad[]>;
   selection: SelectionRangeX | null;
   slices: Record<number, { start: number; count: number }>;
   active: boolean;
@@ -78,6 +86,7 @@ export interface FormattedSelection {
   pageIndex: number;
   rect: Rect;
   segmentRects: Rect[];
+  segmentQuads?: Quad[];
 }
 
 export interface SelectionRectsCallback {
@@ -238,6 +247,7 @@ export interface SelectionScope {
   getFormattedSelection(): FormattedSelection[];
   getFormattedSelectionForPage(page: number): FormattedSelection | null;
   getHighlightRectsForPage(page: number): Rect[];
+  getHighlightQuadsForPage(page: number): Quad[];
   getHighlightRects(): Record<number, Rect[]>;
   getBoundingRectForPage(page: number): Rect | null;
   getBoundingRects(): { page: number; rect: Rect }[];
@@ -270,6 +280,7 @@ export interface SelectionCapability {
   getFormattedSelection(documentId?: string): FormattedSelection[];
   getFormattedSelectionForPage(page: number, documentId?: string): FormattedSelection | null;
   getHighlightRectsForPage(page: number, documentId?: string): Rect[];
+  getHighlightQuadsForPage(page: number, documentId?: string): Quad[];
   getHighlightRects(documentId?: string): Record<number, Rect[]>;
   getBoundingRectForPage(page: number, documentId?: string): Rect | null;
   getBoundingRects(documentId?: string): { page: number; rect: Rect }[];

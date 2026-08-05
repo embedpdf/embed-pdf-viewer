@@ -1,16 +1,17 @@
 <template>
   <div
-    v-for="(b, i) in segmentRects"
+    v-for="(segment, i) in segments"
     :key="i"
     @pointerdown="onClick"
     :style="{
       position: 'absolute',
-      left: `${(rect ? b.origin.x - rect.origin.x : b.origin.x) * scale}px`,
-      top: `${(rect ? b.origin.y - rect.origin.y : b.origin.y) * scale}px`,
-      width: `${b.size.width * scale}px`,
-      height: `${b.size.height * scale}px`,
+      left: `${quadBoundsRelativeToContainer(segment, rect, scale).left}px`,
+      top: `${quadBoundsRelativeToContainer(segment, rect, scale).top}px`,
+      width: `${quadBoundsRelativeToContainer(segment, rect, scale).width}px`,
+      height: `${quadBoundsRelativeToContainer(segment, rect, scale).height}px`,
       background: appearanceActive ? 'transparent' : resolvedColor,
       opacity: appearanceActive ? undefined : opacity,
+      clipPath: appearanceActive ? undefined : quadClipPath(segment, rect, scale),
       pointerEvents: onClick ? 'auto' : 'none',
       cursor: onClick ? 'pointer' : 'default',
       zIndex: onClick ? 1 : undefined,
@@ -24,18 +25,22 @@ export default { inheritAttrs: false };
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { Rect } from '@embedpdf/models';
+import { Quad, Rect } from '@embedpdf/models';
+import {
+  quadBoundsRelativeToContainer,
+  quadClipPath,
+  resolveTextMarkupSegments,
+} from '../../../shared/components/text-markup/quad-geometry';
 
 const props = withDefaults(
   defineProps<{
-    /** Stroke/markup color */
     strokeColor?: string;
     opacity?: number;
     segmentRects: Rect[];
+    segmentQuads?: Quad[];
     rect?: Rect;
     scale: number;
     onClick?: (e: PointerEvent) => void;
-    /** When true, AP image provides the visual; only render hit area */
     appearanceActive?: boolean;
   }>(),
   {
@@ -45,4 +50,7 @@ const props = withDefaults(
 );
 
 const resolvedColor = computed(() => props.strokeColor ?? '#FFFF00');
+const segments = computed(() =>
+  resolveTextMarkupSegments(props.segmentRects, props.segmentQuads),
+);
 </script>

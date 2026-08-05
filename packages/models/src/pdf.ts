@@ -1,4 +1,4 @@
-import { Size, Rect, Position, Rotation, Box } from './geometry';
+import { Size, Rect, Position, Rotation, Box, Quad } from './geometry';
 import { Task, TaskError } from './task';
 
 /**
@@ -1972,6 +1972,12 @@ export interface PdfHighlightAnnoObject extends PdfAnnotationObjectBase {
    * quads of highlight area
    */
   segmentRects: Rect[];
+
+  /**
+   * Authoritative oriented quads for highlight segments. When present, used for
+   * persistence and rendering; {@link segmentRects} are derived for compatibility.
+   */
+  segmentQuads?: Quad[];
 }
 
 /**
@@ -2230,6 +2236,11 @@ export interface PdfSquigglyAnnoObject extends PdfAnnotationObjectBase {
    * quads of squiggly area
    */
   segmentRects: Rect[];
+
+  /**
+   * Authoritative oriented quads for squiggly segments.
+   */
+  segmentQuads?: Quad[];
 }
 
 /**
@@ -2261,6 +2272,11 @@ export interface PdfUnderlineAnnoObject extends PdfAnnotationObjectBase {
    * quads of underline area
    */
   segmentRects: Rect[];
+
+  /**
+   * Authoritative oriented quads for underline segments.
+   */
+  segmentQuads?: Quad[];
 }
 
 /**
@@ -2294,6 +2310,11 @@ export interface PdfStrikeOutAnnoObject extends PdfAnnotationObjectBase {
    * quads of strikeout area
    */
   segmentRects: Rect[];
+
+  /**
+   * Authoritative oriented quads for strikeout segments.
+   */
+  segmentQuads?: Quad[];
 }
 
 /**
@@ -2739,6 +2760,18 @@ export interface PdfGlyphObject {
    */
   size: { width: number; height: number };
   /**
+   * Effective glyph transform matrix in page space (from FPDFText_GetMatrix)
+   */
+  matrix?: PdfTransformMatrix;
+  /**
+   * Character origin in page space (from FPDFText_GetCharOrigin)
+   */
+  pageOrigin?: { x: number; y: number };
+  /**
+   * Oriented device-space quad for the glyph (p1→p2 top, p4→p3 bottom)
+   */
+  quad?: Quad;
+  /**
    * Tight bounds origin (from FPDFText_GetCharBox, closely surrounds the actual glyph shape).
    * Used for hit-testing to match Chrome's FPDFText_GetCharIndexAtPos behaviour.
    */
@@ -2800,6 +2833,18 @@ export interface PdfGlyphSlim {
    * Tight height (from FPDFText_GetCharBox)
    */
   tightHeight?: number;
+  /**
+   * Effective glyph transform matrix in page space (from FPDFText_GetMatrix)
+   */
+  matrix?: PdfTransformMatrix;
+  /**
+   * Character origin in page space (from FPDFText_GetCharOrigin)
+   */
+  pageOrigin?: { x: number; y: number };
+  /**
+   * Oriented device-space quad for the glyph (p1→p2 top, p4→p3 bottom)
+   */
+  quad?: Quad;
 }
 
 /**

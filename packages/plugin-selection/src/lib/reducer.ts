@@ -9,6 +9,7 @@ import {
   RESET,
   SET_SLICES,
   SET_RECTS,
+  SET_QUADS,
   INIT_SELECTION_STATE,
   CLEANUP_SELECTION_STATE,
   EVICT_PAGE_GEOMETRY,
@@ -17,6 +18,7 @@ import {
 export const initialSelectionDocumentState: SelectionDocumentState = {
   geometry: {},
   rects: {},
+  quads: {},
   slices: {},
   selection: null,
   active: false,
@@ -85,6 +87,7 @@ export const selectionReducer = (state = initialState, action: SelectionAction):
         selecting: true,
         selection: null,
         rects: {},
+        quads: {},
       });
     }
 
@@ -104,6 +107,7 @@ export const selectionReducer = (state = initialState, action: SelectionAction):
         selecting: false,
         selection: null,
         rects: {},
+        quads: {},
         active: false,
       });
     }
@@ -113,6 +117,13 @@ export const selectionReducer = (state = initialState, action: SelectionAction):
       const docState = state.documents[documentId];
       if (!docState) return state;
       return updateDocState(state, documentId, { ...docState, rects });
+    }
+
+    case SET_QUADS: {
+      const { documentId, quads } = action.payload;
+      const docState = state.documents[documentId];
+      if (!docState) return state;
+      return updateDocState(state, documentId, { ...docState, quads });
     }
 
     case SET_SLICES: {
@@ -128,13 +139,15 @@ export const selectionReducer = (state = initialState, action: SelectionAction):
       if (!docState) return state;
       const geometry = { ...docState.geometry };
       const rects = { ...docState.rects };
+      const quads = { ...docState.quads };
       const slices = { ...docState.slices };
       for (const p of pages) {
         delete geometry[p];
         delete rects[p];
+        delete quads[p];
         delete slices[p];
       }
-      return updateDocState(state, documentId, { ...docState, geometry, rects, slices });
+      return updateDocState(state, documentId, { ...docState, geometry, rects, quads, slices });
     }
 
     case RESET: {

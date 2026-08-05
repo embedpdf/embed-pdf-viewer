@@ -1,11 +1,14 @@
 import { CSSProperties, MouseEvent } from '@framework';
-import { Rect } from '@embedpdf/models';
+import { Quad, Rect } from '@embedpdf/models';
+
+import { quadBoundsRelativeToContainer, quadClipPath, resolveTextMarkupSegments } from './quad-geometry';
 
 type HighlightProps = {
   /** Stroke/markup color */
   strokeColor?: string;
   opacity?: number;
   segmentRects: Rect[];
+  segmentQuads?: Quad[];
   rect?: Rect;
   scale: number;
   onClick?: (e: MouseEvent<HTMLDivElement>) => void;
@@ -18,6 +21,7 @@ export function Highlight({
   strokeColor,
   opacity = 0.5,
   segmentRects,
+  segmentQuads,
   rect,
   scale,
   onClick,
@@ -25,28 +29,33 @@ export function Highlight({
   appearanceActive = false,
 }: HighlightProps) {
   const resolvedColor = strokeColor ?? '#FFFF00';
+  const segments = resolveTextMarkupSegments(segmentRects, segmentQuads);
 
   return (
     <>
-      {segmentRects.map((b, i) => (
-        <div
-          key={i}
-          onPointerDown={onClick}
-          style={{
-            position: 'absolute',
-            left: (rect ? b.origin.x - rect.origin.x : b.origin.x) * scale,
-            top: (rect ? b.origin.y - rect.origin.y : b.origin.y) * scale,
-            width: b.size.width * scale,
-            height: b.size.height * scale,
-            background: appearanceActive ? 'transparent' : resolvedColor,
-            opacity: appearanceActive ? undefined : opacity,
-            pointerEvents: onClick ? 'auto' : 'none',
-            cursor: onClick ? 'pointer' : 'default',
-            zIndex: onClick ? 1 : undefined,
-            ...style,
-          }}
-        />
-      ))}
+      {segments.map((segment, i) => {
+        const bounds = quadBoundsRelativeToContainer(segment, rect, scale);
+        return (
+          <div
+            key={i}
+            onPointerDown={onClick}
+            style={{
+              position: 'absolute',
+              left: bounds.left,
+              top: bounds.top,
+              width: bounds.width,
+              height: bounds.height,
+              background: appearanceActive ? 'transparent' : resolvedColor,
+              opacity: appearanceActive ? undefined : opacity,
+              clipPath: appearanceActive ? undefined : quadClipPath(segment, rect, scale),
+              pointerEvents: onClick ? 'auto' : 'none',
+              cursor: onClick ? 'pointer' : 'default',
+              zIndex: onClick ? 1 : undefined,
+              ...style,
+            }}
+          />
+        );
+      })}
     </>
   );
 }

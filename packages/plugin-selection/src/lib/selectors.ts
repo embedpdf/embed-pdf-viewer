@@ -1,5 +1,9 @@
-import { Rect, boundingRect } from '@embedpdf/models';
+import { Rect, Quad, boundingRect } from '@embedpdf/models';
 import { FormattedSelection, SelectionDocumentState } from './types';
+
+export function selectQuadsForPage(state: SelectionDocumentState, page: number) {
+  return state.quads[page] ?? [];
+}
 
 export function selectRectsForPage(state: SelectionDocumentState, page: number) {
   return state.rects[page] ?? [];
@@ -33,10 +37,16 @@ export function getFormattedSelectionForPage(
   page: number,
 ): FormattedSelection | null {
   const segmentRects = state.rects[page] || [];
+  const segmentQuads = state.quads[page] || [];
   if (segmentRects.length === 0) return null;
   const boundingRect = selectBoundingRectForPage(state, page);
   if (!boundingRect) return null;
-  return { pageIndex: page, rect: boundingRect, segmentRects };
+  return {
+    pageIndex: page,
+    rect: boundingRect,
+    segmentRects,
+    ...(segmentQuads.length > 0 && { segmentQuads }),
+  };
 }
 
 export function getFormattedSelection(state: SelectionDocumentState) {
@@ -47,6 +57,7 @@ export function getFormattedSelection(state: SelectionDocumentState) {
 
   for (const pageIndex of pages) {
     const segmentRects = state.rects[pageIndex] || [];
+    const segmentQuads = state.quads[pageIndex] || [];
 
     if (segmentRects.length === 0) continue;
 
@@ -58,6 +69,7 @@ export function getFormattedSelection(state: SelectionDocumentState) {
         pageIndex,
         rect: boundingRect,
         segmentRects,
+        ...(segmentQuads.length > 0 && { segmentQuads }),
       });
     }
   }

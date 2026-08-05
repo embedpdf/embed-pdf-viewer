@@ -1,11 +1,18 @@
 import { CSSProperties, MouseEvent } from '@framework';
-import { Rect } from '@embedpdf/models';
+import { Quad, Rect } from '@embedpdf/models';
+
+import {
+  quadBoundsRelativeToContainer,
+  resolveTextMarkupSegments,
+  underlineSegmentPath,
+} from './quad-geometry';
 
 type UnderlineProps = {
   /** Stroke/markup color */
   strokeColor?: string;
   opacity?: number;
   segmentRects: Rect[];
+  segmentQuads?: Quad[];
   rect?: Rect;
   scale: number;
   onClick?: (e: MouseEvent<HTMLDivElement>) => void;
@@ -18,6 +25,7 @@ export function Underline({
   strokeColor,
   opacity = 0.5,
   segmentRects,
+  segmentQuads,
   rect,
   scale,
   onClick,
@@ -25,44 +33,54 @@ export function Underline({
   appearanceActive = false,
 }: UnderlineProps) {
   const resolvedColor = strokeColor ?? '#FFFF00';
-  const thickness = 2 * scale; // 2 CSS px at 100 % zoom
+  const thickness = 2 * scale;
+  const segments = resolveTextMarkupSegments(segmentRects, segmentQuads);
 
   return (
     <>
-      {segmentRects.map((r, i) => (
-        <div
-          key={i}
-          onPointerDown={onClick}
-          style={{
-            position: 'absolute',
-            left: (rect ? r.origin.x - rect.origin.x : r.origin.x) * scale,
-            top: (rect ? r.origin.y - rect.origin.y : r.origin.y) * scale,
-            width: r.size.width * scale,
-            height: r.size.height * scale,
-            background: 'transparent',
-            pointerEvents: onClick ? 'auto' : 'none',
-            cursor: onClick ? 'pointer' : 'default',
-            zIndex: onClick ? 1 : 0,
-            ...style,
-          }}
-        >
-          {/* Visual -- hidden when AP active, never interactive */}
-          {!appearanceActive && (
-            <div
-              style={{
-                position: 'absolute',
-                left: 0,
-                bottom: 0,
-                width: '100%',
-                height: thickness,
-                background: resolvedColor,
-                opacity: opacity,
-                pointerEvents: 'none',
-              }}
-            />
-          )}
-        </div>
-      ))}
+      {segments.map((segment, i) => {
+        const bounds = quadBoundsRelativeToContainer(segment, rect, scale);
+        return (
+          <div
+            key={i}
+            onPointerDown={onClick}
+            style={{
+              position: 'absolute',
+              left: bounds.left,
+              top: bounds.top,
+              width: bounds.width,
+              height: bounds.height,
+              background: 'transparent',
+              pointerEvents: onClick ? 'auto' : 'none',
+              cursor: onClick ? 'pointer' : 'default',
+              zIndex: onClick ? 1 : 0,
+              ...style,
+            }}
+          >
+            {!appearanceActive && (
+              <svg
+                style={{
+                  position: 'absolute',
+                  left: 0,
+                  top: 0,
+                  width: '100%',
+                  height: '100%',
+                  overflow: 'visible',
+                  pointerEvents: 'none',
+                }}
+              >
+                <path
+                  d={underlineSegmentPath(segment, rect, scale)}
+                  stroke={resolvedColor}
+                  strokeWidth={thickness}
+                  fill="none"
+                  opacity={opacity}
+                />
+              </svg>
+            )}
+          </div>
+        );
+      })}
     </>
   );
 }

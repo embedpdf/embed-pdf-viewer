@@ -806,3 +806,224 @@ export function fitSizeWithin(size: Size, bounds: Size): Size {
   const scale = Math.min(bounds.width / size.width, bounds.height / size.height, 1);
   return { width: size.width * scale, height: size.height * scale };
 }
+
+/**
+ * Apply a PDF transformation matrix to a point.
+ *
+ * @public
+ */
+export function transformPointByMatrix(m: Matrix, p: Position): Position {
+  return {
+    x: m.a * p.x + m.c * p.y + m.e,
+    y: m.b * p.x + m.d * p.y + m.f,
+  };
+}
+
+/**
+ * Invert a PDF transformation matrix.
+ *
+ * @public
+ */
+export function invertMatrix(m: Matrix): Matrix {
+  const det = m.a * m.d - m.b * m.c;
+  if (Math.abs(det) < 1e-10) {
+    return { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 };
+  }
+  const invDet = 1 / det;
+  return {
+    a: m.d * invDet,
+    b: -m.b * invDet,
+    c: -m.c * invDet,
+    d: m.a * invDet,
+    e: (m.c * m.f - m.d * m.e) * invDet,
+    f: (m.b * m.e - m.a * m.f) * invDet,
+  };
+}
+
+/**
+ * Build an oriented quadrilateral in page space from a loose char box and glyph matrix.
+ * Internal convention: p1→p2 is the top edge and p4→p3 is the bottom edge in reading order.
+ *
+ * @public
+ */
+export function orientedQuadFromPageBoxAndMatrix(
+  left: number,
+  top: number,
+  right: number,
+  bottom: number,
+  matrix: Matrix,
+): Quad {
+  const inv = invertMatrix(matrix);
+  const pageCorners = [
+    { x: left, y: bottom },
+    { x: right, y: bottom },
+    { x: right, y: top },
+    { x: left, y: top },
+  ];
+  const local = pageCorners.map((p) => transformPointByMatrix(inv, p));
+  const xs = local.map((p) => p.x);
+  const ys = local.map((p) => p.y);
+  const l = Math.min(...xs);
+  const r = Math.max(...xs);
+  const b = Math.min(...ys);
+  const t = Math.max(...ys);
+
+  const localQuad = [
+    { x: l, y: t },
+    { x: r, y: t },
+    { x: r, y: b },
+    { x: l, y: b },
+  ];
+
+  const [p1, p2, p3, p4] = localQuad.map((p) => transformPointByMatrix(matrix, p));
+  return { p1, p2, p3, p4 };
+}
+
+/**
+ * Convert an internal quad to PDF attachment-point order: BL, BR, TL, TR.
+ *
+ * @public
+ */
+export function quadToPdfAttachmentPoints(q: Quad): [Position, Position, Position, Position] {
+  return [q.p4, q.p3, q.p1, q.p2];
+}
+
+/**
+ * Convert PDF attachment points to the internal quad convention.
+ *
+ * @public
+ */
+export function pdfAttachmentPointsToQuad(
+  bl: Position,
+  br: Position,
+  tl: Position,
+  tr: Position,
+): Quad {
+  return { p1: tl, p2: tr, p3: br, p4: bl };
+}
+
+/**
+ * Merge the first and last glyph quads into a single text segment quad.
+ *
+ * @public
+ */
+export function buildSegmentQuadFromGlyphQuads(first: Quad, last: Quad): Quad {
+  return { p1: first.p1, p2: last.p2, p3: last.p3, p4: first.p4 };
+}
+
+/**
+ * Unit vector along the glyph baseline in the matrix's local +x direction.
+ *
+ * @public
+ */
+export function matrixBaselineDirection(m: Matrix): Position {
+  const len = Math.hypot(m.a, m.b);
+  if (len < 1e-10) return { x: 1, y: 0 };
+  return { x: m.a / len, y: m.b / len };
+}
+
+/**
+ * Whether two glyph matrices share the same baseline direction.
+ *
+ * @public
+ */
+export function matricesCompatible(m1: Matrix, m2: Matrix, tolerance = 0.01): boolean {
+  const d1 = matrixBaselineDirection(m1);
+  const d2 = matrixBaselineDirection(m2);
+  const dot = d1.x * d2.x + d1.y * d2.y;
+  return Math.abs(dot) > 1 - tolerance;
+}
+
+/**
+ * Project a point onto a direction vector from an origin.
+ *
+ * @public
+ */
+export function projectOnDirection(p: Position, origin: Position, dir: Position): number {
+  return (p.x - origin.x) * dir.x + (p.y - origin.y) * dir.y;
+}
+
+/**
+ * CSS/SVG polygon string for a quad (`p1 p2 p3 p4`).
+ *
+ * @public
+ */
+export function quadPolygonPoints(q: Quad): string {
+  return `${q.p1.x},${q.p1.y} ${q.p2.x},${q.p2.y} ${q.p3.x},${q.p3.y} ${q.p4.x},${q.p4.y}`;
+}
+
+/**
+ * Bottom edge of a quad in reading order.
+ *
+ * @public
+ */
+export function getQuadBottomEdge(q: Quad): { start: Position; end: Position } {
+  return { start: q.p4, end: q.p3 };
+}
+
+/**
+ * Midline between the top and bottom edges of a quad.
+ *
+ * @public
+ */
+export function getQuadMidline(q: Quad): { start: Position; end: Position } {
+  return {
+    start: { x: (q.p1.x + q.p4.x) / 2, y: (q.p1.y + q.p4.y) / 2 },
+    end: { x: (q.p2.x + q.p3.x) / 2, y: (q.p2.y + q.p3.y) / 2 },
+  };
+}
+
+/**
+ * Trailing baseline corner of a segment quad (end of the bottom edge in reading order).
+ *
+ * @public
+ */
+export function getQuadBaselineEnd(q: Quad): Position {
+  return q.p3;
+}
+
+/**
+ * Perpendicular ink height of a quad (distance between top and bottom edges).
+ *
+ * @public
+ */
+export function getQuadInkExtent(q: Quad): number {
+  const midTop = { x: (q.p1.x + q.p2.x) / 2, y: (q.p1.y + q.p2.y) / 2 };
+  const midBottom = { x: (q.p4.x + q.p3.x) / 2, y: (q.p4.y + q.p3.y) / 2 };
+  return Math.hypot(midTop.x - midBottom.x, midTop.y - midBottom.y);
+}
+
+/**
+ * Baseline direction angle in degrees, measured counter-clockwise from +X.
+ * Matches the rotation convention used by {@link calculateRotatedRectAABBAroundPoint}.
+ *
+ * @public
+ */
+export function getQuadBaselineAngleDegrees(q: Quad): number {
+  const { start, end } = getQuadBottomEdge(q);
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  if (Math.hypot(dx, dy) < 1e-10) return 0;
+  return (Math.atan2(dy, dx) * 180) / Math.PI;
+}
+
+/**
+ * Bottom-center point of a rectangle (baseline attachment for carets).
+ *
+ * @public
+ */
+export function getRectBottomCenter(rect: Rect): Position {
+  return {
+    x: rect.origin.x + rect.size.width / 2,
+    y: rect.origin.y + rect.size.height,
+  };
+}
+
+/**
+ * Derive axis-aligned rectangles from quads.
+ *
+ * @public
+ */
+export function quadsToRects(quads: Quad[]): Rect[] {
+  return quads.map(quadToRect);
+}
