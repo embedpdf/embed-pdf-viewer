@@ -15,6 +15,7 @@ import {
 } from './_helpers/db-seeded-app';
 
 const here = dirname(fileURLToPath(import.meta.url));
+// Vendored corpus fixture — see packages/engine/main/test/fixtures/README.md.
 const fixturePath = resolve(
   here,
   '..',
@@ -22,10 +23,9 @@ const fixturePath = resolve(
   '..',
   'packages',
   'engine',
-  'runtime',
-  'runtime-src',
-  'testing',
-  'resources',
+  'main',
+  'test',
+  'fixtures',
   'flatten_selective.pdf',
 );
 const runner: ConformanceTestRunner = {

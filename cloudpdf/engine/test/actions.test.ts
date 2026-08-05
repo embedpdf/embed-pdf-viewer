@@ -16,18 +16,9 @@ import {
 } from './_helpers/db-seeded-app';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const resources = resolve(
-  here,
-  '..',
-  '..',
-  '..',
-  'packages',
-  'engine',
-  'runtime',
-  'runtime-src',
-  'testing',
-  'resources',
-);
+// Vendored engine-runtime corpus fixtures — canonical copy + provenance in
+// packages/engine/main/test/fixtures/README.md (no submodule checkout needed).
+const resources = resolve(here, '..', '..', '..', 'packages', 'engine', 'main', 'test', 'fixtures');
 const runner: ConformanceTestRunner = {
   describe,
   test,
