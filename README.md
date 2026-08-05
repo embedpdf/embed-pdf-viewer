@@ -44,6 +44,7 @@ We are grateful for the support of our sponsors!
 
 <div align="left">
   <a href="https://www.withloveinternet.com?utm_source=embedpdf&utm_campaign=oss" target="_blank"><img src=".github/assets/sponsor-wli.png" alt="With Love Internet" height="80"></a>
+  &nbsp;&nbsp;<a href="https://align.lawyer?utm_source=embedpdf&utm_campaign=oss" target="_blank"><img src=".github/assets/sponsor-align.jpeg" alt="Align" height="80"></a>
 </div>
 
 ### Bronze Sponsors
