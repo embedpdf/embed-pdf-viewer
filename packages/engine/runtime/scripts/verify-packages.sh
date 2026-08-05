@@ -15,11 +15,36 @@ reject() {
 # Require the dynamic libembedpdf to ship beside pdf-runtime.node whenever the
 # addon links it dynamically (rpath $ORIGIN / @loader_path). Musl targets are
 # statically linked and therefore have no shared-library dependency.
+#
+# Dependency checks must run wherever verification happens: each target's
+# builder verifies on its native runner, but the release job re-verifies the
+# FULL payload set on Linux (no otool there). Prefer the real toolchain when
+# it can read the binary; otherwise fall back to scanning the load commands
+# as raw strings — install names are embedded verbatim in the binary, and the
+# paired `reject` of the legacy filename keeps the fallback honest.
+links_dep() {
+  local node="$1" want="$2" format="$3"
+  case "$format" in
+    macho)
+      if command -v otool >/dev/null 2>&1; then
+        otool -L "$node" 2>/dev/null | grep -q "$want" && return 0
+      fi
+      ;;
+    elf)
+      if command -v objdump >/dev/null 2>&1 || command -v readelf >/dev/null 2>&1; then
+        { objdump -p "$node" 2>/dev/null || readelf -d "$node" 2>/dev/null; } |
+          grep -q "$want" && return 0
+      fi
+      ;;
+  esac
+  grep -aq "$want" "$node"
+}
+
 check_native_deps() {
   local node="$root/npm/$1/lib/pdf-runtime.node"
   case "$1" in
     darwin-*)
-      otool -L "$node" 2>/dev/null | grep -q '@rpath/libembedpdf\.dylib' || {
+      links_dep "$node" '@rpath/libembedpdf\.dylib' macho || {
         echo "missing @rpath/libembedpdf.dylib dependency: npm/$1/lib/pdf-runtime.node" >&2
         exit 1
       }
@@ -27,11 +52,10 @@ check_native_deps() {
       reject "npm/$1/lib/libpdfium.dylib"
       ;;
     linux-*)
-      { objdump -p "$node" 2>/dev/null || readelf -d "$node" 2>/dev/null; } |
-        grep -q 'libembedpdf\.so' || {
-          echo "missing libembedpdf.so dependency: npm/$1/lib/pdf-runtime.node" >&2
-          exit 1
-        }
+      links_dep "$node" 'libembedpdf\.so' elf || {
+        echo "missing libembedpdf.so dependency: npm/$1/lib/pdf-runtime.node" >&2
+        exit 1
+      }
       check "npm/$1/lib/libembedpdf.so"
       reject "npm/$1/lib/libpdfium.so"
       ;;
