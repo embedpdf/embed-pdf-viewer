@@ -1194,23 +1194,38 @@ export const commands: Record<string, Command<State>> = {
     id: 'annotation:delete-selected',
     labelKey: 'annotation.deleteSelected',
     icon: 'trash',
+    shortcuts: ['Backspace', 'Delete'],
     categories: ['annotation'],
     action: ({ registry, documentId }) => {
-      const annotation = registry.getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)?.provides();
-
-      const annotationScope = annotation?.forDocument(documentId);
-      if (!annotationScope) return;
-
-      const selectedAnnotation = annotationScope.getSelectedAnnotation();
-      if (!selectedAnnotation) return;
-
-      annotationScope.deleteAnnotation(
-        selectedAnnotation.object.pageIndex,
-        selectedAnnotation.object.id,
-      );
+      // Delete the active selection. Annotations (shapes, free text, ink,
+      // stamps, form widgets, ...) take priority; if none are selected, fall
+      // back to a selected pending redaction (redaction has its own selection).
+      const annotationScope = registry
+        .getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)
+        ?.provides()
+        ?.forDocument(documentId);
+      if (annotationScope && annotationScope.getSelectedAnnotations().length > 0) {
+        annotationScope.deleteSelectedAnnotations();
+        return;
+      }
+      const redactionScope = registry
+        .getPlugin<RedactionPlugin>(REDACTION_PLUGIN_ID)
+        ?.provides()
+        ?.forDocument(documentId);
+      const selectedRedaction = redactionScope?.getSelectedPending();
+      if (selectedRedaction) {
+        redactionScope?.removePending(selectedRedaction.page, selectedRedaction.id);
+      }
     },
     disabled: ({ state, documentId }) => {
-      return lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations);
+      const annotationSelected =
+        (state.plugins[ANNOTATION_PLUGIN_ID]?.documents[documentId]?.selectedUids?.length ?? 0) > 0;
+      if (annotationSelected) {
+        return lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations);
+      }
+      const redactionSelected =
+        !!state.plugins[REDACTION_PLUGIN_ID]?.documents[documentId]?.selected;
+      return !redactionSelected;
     },
   },
 
