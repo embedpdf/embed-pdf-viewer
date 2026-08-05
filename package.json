@@ -19,7 +19,7 @@
     "verify:consume": "pnpm --filter @embedpdf/tooling-consume-fixtures run verify",
     "verify:engine-runtime-packages": "pnpm --filter @embedpdf/engine-runtime run verify:packages",
     "changeset": "changeset",
-    "ci:publish": "pnpm publish -r --access public --tag next --publish-branch main --report-summary"
+    "ci:publish": "node scripts/assert-publish-phase.mjs && pnpm publish -r --access public --tag next --publish-branch main --report-summary"
   },
   "devDependencies": {
     "@changesets/cli": "^2.29.6",

@@ -2,8 +2,12 @@
 #
 # GA promotion checklist (perform in the stable version PR):
 #   1. Run `pnpm changeset pre exit` so Changesets prepares stable versions.
-#   2. In package.json's `ci:publish`, remove `--tag next`; keep
-#      `--publish-branch main --report-summary`.
+#   2. In package.json's `ci:publish`, remove `--tag next`; keep the
+#      `node scripts/assert-publish-phase.mjs &&` prefix and
+#      `--publish-branch main --report-summary`. The assert script reads
+#      .changeset/pre.json and flips its own assertions at GA — it hard-fails
+#      a forgotten `--tag`, a straggler version, or a package that dodged
+#      versioning, in either phase.
 #   3. Change the workflow/release labels, Changesets PR labels, and fallback
 #      release notes below from "next" to stable; then set `prerelease: false`
 #      and `make_latest: true`.
@@ -17,11 +21,11 @@ on:
   push:
     branches: [main]
     paths:
-      - "packages/**"
-      - "ee/**"
-      - "tooling/**"
-      - ".changeset/**"
-      - "pnpm-lock.yaml"
+      - 'packages/**'
+      - 'ee/**'
+      - 'tooling/**'
+      - '.changeset/**'
+      - 'pnpm-lock.yaml'
   workflow_dispatch: {}
 
 concurrency:
@@ -49,7 +53,7 @@ jobs:
       published: ${{ steps.published.outputs.published }}
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      NPM_TOKEN:    ${{ secrets.NPM_TOKEN }}
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
 
     steps:
       - name: Checkout
@@ -68,7 +72,7 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
-          registry-url: "https://registry.npmjs.org"
+          registry-url: 'https://registry.npmjs.org'
 
       - name: Install deps
         run: pnpm install --frozen-lockfile
@@ -110,8 +114,8 @@ jobs:
         uses: changesets/action@v1
         with:
           # GA: remove the "(next)" suffixes; the publish command stays the same.
-          commit: "chore: version packages (next)"
-          title:  "chore: version packages (next)"
+          commit: 'chore: version packages (next)'
+          title: 'chore: version packages (next)'
           publish: pnpm ci:publish
           createGithubReleases: false
 
@@ -197,7 +201,7 @@ jobs:
         with:
           tag_name: v${{ steps.published.outputs.version }}
           # GA: rename to "Release v...", then flip the two flags below.
-          name: "Release Next v${{ steps.published.outputs.version }}"
+          name: 'Release Next v${{ steps.published.outputs.version }}'
           body_path: release-notes.md
           files: release-assets/*
           draft: false
