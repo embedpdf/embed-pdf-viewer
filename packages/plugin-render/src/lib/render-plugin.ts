@@ -160,6 +160,7 @@ export class RenderPlugin extends BasePlugin<RenderPluginConfig, RenderCapabilit
   // ─────────────────────────────────────────────────────────
 
   async initialize(_config: RenderPluginConfig): Promise<void> {
+    void _config;
     this.logger.info('RenderPlugin', 'Initialize', 'Render plugin initialized');
   }
 

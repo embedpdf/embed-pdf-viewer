@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
-import { ignore, PdfErrorCode } from '@embedpdf/models';
+import { ignore, PdfErrorCode, Rotation } from '@embedpdf/models';
 import { useDocumentState } from '@embedpdf/core/vue';
 import { useRenderCapability } from '../hooks';
 
@@ -21,6 +21,10 @@ interface RenderLayerProps {
    * Optional device pixel ratio override. If not provided, uses window.devicePixelRatio.
    */
   dpr?: number;
+  /**
+   * Optional rotation override. If not provided, uses page rotation plus document rotation.
+   */
+  rotation?: Rotation;
 }
 
 const props = defineProps<RenderLayerProps>();
@@ -49,17 +53,27 @@ const actualDpr = computed(() => {
   return window.devicePixelRatio;
 });
 
+const actualRotation = computed(() => {
+  if (props.rotation !== undefined) return props.rotation;
+  const pageRotation =
+    documentState.value?.document?.pages.find((page) => page.index === props.pageIndex)?.rotation ??
+    Rotation.Degree0;
+  const documentRotation = documentState.value?.rotation ?? Rotation.Degree0;
+  return ((pageRotation + documentRotation) % 4) as Rotation;
+});
+
 // Render page when dependencies change
 watch(
   [
     () => props.documentId,
     () => props.pageIndex,
+    actualRotation,
     actualScale,
     actualDpr,
     renderProvides,
     refreshVersion,
   ],
-  ([docId, pageIdx, scale, dpr, capability], [prevDocId], onCleanup) => {
+  ([docId, pageIdx, rotation, scale, dpr, capability], [prevDocId], onCleanup) => {
     if (!capability) {
       imageUrl.value = null;
       return;
@@ -87,6 +101,7 @@ watch(
       options: {
         scaleFactor: scale,
         dpr,
+        rotation,
       },
     });
 
