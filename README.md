@@ -13,6 +13,9 @@
 
 </div>
 
+> [!WARNING]
+> **EmbedPDF v3 is under active development and is not yet recommended for production use.** For the current stable release, use the [`v2` branch](https://github.com/embedpdf/embed-pdf-viewer/tree/v2).
+
 # Open‑Source JavaScript PDF Viewer
 
 **EmbedPDF** is a framework‑agnostic, Apache‑2.0‑licensed PDF viewer that drops into _any_ JavaScript project. Whether you build with **React, Vue, Svelte, Preact,** or vanilla JS, EmbedPDF delivers a smooth, modern reading experience and a clean developer API.
