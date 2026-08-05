@@ -31,6 +31,21 @@ import { PDFViewer, ZoomMode } from '@embedpdf/vue-pdf-viewer';
 </template>
 ```
 
+To render pages at their true physical size — where 100 % zoom makes an A4 page roughly its real-world width on screen — enable `usePhysicalScaling`:
+
+```vue
+<template>
+  <PDFViewer
+    :config="{
+      zoom: {
+        defaultZoomLevel: ZoomMode.FitPage,
+        usePhysicalScaling: true
+      }
+    }"
+  />
+</template>
+```
+
 ### Available Zoom Modes
 
 The `ZoomMode` enum provides standard presets:
@@ -103,7 +118,7 @@ const handleReady = (registry: PluginRegistry) => {
   const docZoom = zoomPlugin?.forDocument('my-document-id');
 
   docZoom?.onStateChange((state) => {
-    console.log('Current Zoom:', state.currentZoomLevel);
+    console.log('Current Zoom:', state.currentUserZoomLevel);
   });
 };
 </script>

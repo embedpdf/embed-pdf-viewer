@@ -153,7 +153,11 @@ export function setupZoomGestures({
 
   const commitZoom = () => {
     const { tx, finalWidth } = calculateTransform(currentScale);
-    const delta = (currentScale - 1) * initialZoom;
+    // initialZoom is the effective scale; convert to user-space so requestZoomBy
+    // receives a user-space delta (matches requestZoomBy's contract).
+    const dpr = zoomScope.getDpr();
+    const initialUser = initialZoom / dpr;
+    const delta = (currentScale - 1) * initialUser;
 
     let anchorX: number;
     let anchorY: number = pointerContainerY;

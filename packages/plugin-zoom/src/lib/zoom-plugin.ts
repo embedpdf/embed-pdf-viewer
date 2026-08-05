@@ -64,6 +64,14 @@ export class ZoomPlugin extends BasePlugin<
   private readonly minZoom: number;
   private readonly maxZoom: number;
   private readonly zoomStep: number;
+  private readonly usePhysicalScaling: boolean;
+  // 1 CSS inch = 96 px, 1 PDF point = 1/72 inch → 1 pt = 96/72 CSS px.
+  private static readonly PT_TO_CSS_PX = 96 / 72;
+
+  // Active matchMedia query + listener — stored so destroy() can tear them down.
+  private dprMql: MediaQueryList | null = null;
+  private dprMqlListener: (() => void) | null = null;
+  private dprDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(id: string, registry: PluginRegistry, cfg: ZoomPluginConfig) {
     super(id, registry);
@@ -82,6 +90,38 @@ export class ZoomPlugin extends BasePlugin<
     this.defaultZoomLevel = cfg.defaultZoomLevel;
     this.presets = cfg.presets ?? [];
     this.zoomRanges = this.normalizeRanges(cfg.zoomRanges ?? []);
+    this.usePhysicalScaling = cfg.usePhysicalScaling ?? false;
+
+    // Set up DPR change listener when usePhysicalScaling is enabled.
+    // matchMedia fires once per threshold, so we re-subscribe after each change.
+    // The fan-out is debounced (150 ms, matching viewport-resize) to avoid burst
+    // recalculations during display-scaling animations.
+    if (this.usePhysicalScaling && typeof window !== 'undefined') {
+      const onDprChange = () => {
+        if (this.dprDebounceTimer !== null) clearTimeout(this.dprDebounceTimer);
+        this.dprDebounceTimer = setTimeout(() => {
+          this.dprDebounceTimer = null;
+          for (const id of Object.keys(this.state.documents)) {
+            this.handleRequest({ level: this.state.documents[id].zoomLevel }, id);
+          }
+        }, 150);
+      };
+      const subscribe = () => {
+        // Explicitly remove the previous listener before overwriting the stored
+        // references — safe even if it already auto-removed via { once: true }.
+        const prevMql = this.dprMql;
+        const prevListener = this.dprMqlListener;
+        this.dprMql = window.matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`);
+        const listener = () => {
+          onDprChange();
+          subscribe();
+        };
+        this.dprMqlListener = listener;
+        this.dprMql.addEventListener('change', listener, { once: true });
+        prevMql?.removeEventListener('change', prevListener!);
+      };
+      subscribe();
+    }
 
     // Keep automatic modes up to date per document
     this.viewport.onViewportResize(
@@ -182,6 +222,7 @@ export class ZoomPlugin extends BasePlugin<
       toggleMarqueeZoom: () => this.toggleMarqueeZoom(),
       isMarqueeZoomActive: () => this.isMarqueeZoomActive(),
       getState: () => this.getDocumentStateOrThrow(),
+      getDpr: () => this.getDpr(),
 
       // Document-scoped operations
       forDocument: (documentId: string) => this.createZoomScope(documentId),
@@ -212,6 +253,7 @@ export class ZoomPlugin extends BasePlugin<
       toggleMarqueeZoom: () => this.toggleMarqueeZoom(documentId),
       isMarqueeZoomActive: () => this.isMarqueeZoomActive(documentId),
       getState: () => this.getDocumentStateOrThrow(documentId),
+      getDpr: () => this.getDpr(),
       onZoomChange: (listener: Listener<ZoomChangeEvent>) =>
         this.zoom$.on((event) => {
           if (event.documentId === documentId) listener(event);
@@ -241,6 +283,16 @@ export class ZoomPlugin extends BasePlugin<
   }
 
   // ─────────────────────────────────────────────────────────
+  // DPR Helper
+  // ─────────────────────────────────────────────────────────
+
+  private getDpr(): number {
+    if (!this.usePhysicalScaling) return 1;
+    if (typeof window === 'undefined') return 1;
+    return ZoomPlugin.PT_TO_CSS_PX * (window.devicePixelRatio || 1);
+  }
+
+  // ─────────────────────────────────────────────────────────
   // Core Operations
   // ─────────────────────────────────────────────────────────
 
@@ -251,23 +303,23 @@ export class ZoomPlugin extends BasePlugin<
   private requestZoomBy(delta: number, center?: Point, documentId?: string): void {
     const id = documentId ?? this.getActiveDocumentId();
     const docState = this.getDocumentStateOrThrow(id);
-    const cur = docState.currentZoomLevel;
-    const target = this.toZoom(cur + delta);
+    const curUser = docState.currentUserZoomLevel;
+    const target = this.toZoom(curUser + delta);
     this.handleRequest({ level: target, center }, id);
   }
 
   private zoomIn(documentId?: string): void {
     const id = documentId ?? this.getActiveDocumentId();
     const docState = this.getDocumentStateOrThrow(id);
-    const cur = docState.currentZoomLevel;
-    this.handleRequest({ level: cur, delta: this.stepFor(cur) }, id);
+    const curUser = docState.currentUserZoomLevel;
+    this.handleRequest({ level: curUser, delta: this.stepFor(curUser) }, id);
   }
 
   private zoomOut(documentId?: string): void {
     const id = documentId ?? this.getActiveDocumentId();
     const docState = this.getDocumentStateOrThrow(id);
-    const cur = docState.currentZoomLevel;
-    this.handleRequest({ level: cur, delta: -this.stepFor(cur) }, id);
+    const curUser = docState.currentUserZoomLevel;
+    this.handleRequest({ level: curUser, delta: -this.stepFor(curUser) }, id);
   }
 
   private zoomToArea(pageIndex: number, rect: Rect, documentId?: string): void {
@@ -321,13 +373,30 @@ export class ZoomPlugin extends BasePlugin<
       return;
     }
 
-    // Step 1: Resolve target numeric zoom
-    const base = typeof level === 'number' ? level : this.computeZoomForMode(id, level, metrics);
+    // Step 1: Resolve target numeric zoom, splitting user-space from effective scale.
+    const dpr = this.getDpr();
+    let newEffective: number;
+    let newUser: number;
 
-    if (base === false) return;
-
-    const exactZoom = clamp(base + delta, this.minZoom, this.maxZoom);
-    const newZoom = Math.floor(exactZoom * 1000) / 1000;
+    if (typeof level === 'number') {
+      // Numeric path: input is user-space, clamped in user-space, then scaled by DPR for effective.
+      // Quantise user first, then derive effective from the already-quantised value so that
+      // newEffective === newUser * dpr exactly (within the 0.001 precision floor).
+      const userBase = clamp(level + delta, this.minZoom, this.maxZoom);
+      newUser = Math.floor(userBase * 1000) / 1000;
+      newEffective = Math.floor(newUser * dpr * 1000) / 1000;
+    } else {
+      // Mode path: computeZoomForMode returns effective scale directly (fits viewport).
+      // delta on the mode path is unused in current callers (always 0) but we handle
+      // it symmetrically: treat delta as user-space, scale by dpr.
+      const modeBase = this.computeZoomForMode(id, level, metrics);
+      if (modeBase === false) return;
+      const effectiveBase = modeBase + delta * dpr;
+      newEffective = Math.floor(
+        clamp(effectiveBase, this.minZoom * dpr, this.maxZoom * dpr) * 1000,
+      ) / 1000;
+      newUser = Math.floor((newEffective / dpr) * 1000) / 1000;
+    }
 
     // Step 2: Figure out viewport point to keep under focus
     const focusPoint: Point = center ?? {
@@ -335,12 +404,12 @@ export class ZoomPlugin extends BasePlugin<
       vy: focus === VerticalZoomFocus.Top ? 0 : metrics.clientHeight / 2,
     };
 
-    // Step 3: Compute desired scroll offsets
+    // Step 3: Compute desired scroll offsets (uses effective scale throughout)
     const { desiredScrollLeft, desiredScrollTop } = this.computeScrollForZoomChange(
       id,
       metrics,
       oldZoom,
-      newZoom,
+      newEffective,
       focusPoint,
       align,
     );
@@ -353,8 +422,18 @@ export class ZoomPlugin extends BasePlugin<
       });
     }
 
-    this.dispatch(setZoomLevel(id, typeof level === 'number' ? newZoom : level, newZoom));
-    this.dispatchCoreAction(setScale(newZoom, id));
+    // zoomLevel stores:
+    //   - numeric requests: user-space value (so preset "100%" comparisons work on Retina)
+    //   - mode requests: the mode string (unchanged)
+    this.dispatch(
+      setZoomLevel(
+        id,
+        typeof level === 'number' ? newUser : level,
+        newEffective,
+        newUser,
+      ),
+    );
+    this.dispatchCoreAction(setScale(newEffective, id));
     if (this.viewport.isGated(id)) {
       this.viewport.releaseGate('zoom', id);
     }
@@ -368,7 +447,7 @@ export class ZoomPlugin extends BasePlugin<
     const evt: ZoomChangeEvent = {
       documentId: id,
       oldZoom,
-      newZoom,
+      newZoom: newEffective,
       level,
       center: focusPoint,
       desiredScrollLeft,
@@ -497,9 +576,17 @@ export class ZoomPlugin extends BasePlugin<
       rotation,
     );
 
-    const targetZoom = this.toZoom(
-      Math.min(availableW / rotatedRect.size.width, availableH / rotatedRect.size.height),
+    // The viewport-fit ratio is an effective scale. Clamp it in effective space
+    // (against minZoom*dpr / maxZoom*dpr) so that the full user-space range is
+    // reachable, then convert to user-space for handleRequest.
+    const dpr = this.getDpr();
+    const rawFit = Math.min(
+      availableW / rotatedRect.size.width,
+      availableH / rotatedRect.size.height,
     );
+    const targetUser = Math.floor(
+      clamp(rawFit, this.minZoom * dpr, this.maxZoom * dpr) / dpr * 1000,
+    ) / 1000;
 
     const pageAbsX = vItem.x + pageRel.x;
     const pageAbsY = vItem.y + pageRel.y;
@@ -518,7 +605,7 @@ export class ZoomPlugin extends BasePlugin<
 
     this.handleRequest(
       {
-        level: targetZoom,
+        level: targetUser,
         center: { vx: centerVX, vy: centerVY },
         align: 'center',
       },
@@ -620,6 +707,7 @@ export class ZoomPlugin extends BasePlugin<
         prevDoc &&
         newDoc &&
         (prevDoc.currentZoomLevel !== newDoc.currentZoomLevel ||
+          prevDoc.currentUserZoomLevel !== newDoc.currentUserZoomLevel ||
           prevDoc.zoomLevel !== newDoc.zoomLevel ||
           prevDoc.isMarqueeZoomActive !== newDoc.isMarqueeZoomActive)
       ) {
@@ -640,6 +728,17 @@ export class ZoomPlugin extends BasePlugin<
   }
 
   async destroy() {
+    // Remove the DPR change listener to avoid orphaned listeners on hot-reload.
+    if (this.dprMql && this.dprMqlListener) {
+      this.dprMql.removeEventListener('change', this.dprMqlListener);
+      this.dprMql = null;
+      this.dprMqlListener = null;
+    }
+    // Clear the debounce timer so no post-destroy dispatches occur.
+    if (this.dprDebounceTimer !== null) {
+      clearTimeout(this.dprDebounceTimer);
+      this.dprDebounceTimer = null;
+    }
     this.zoom$.clear();
     this.state$.clear();
     super.destroy();

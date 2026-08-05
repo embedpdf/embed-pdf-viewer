@@ -29,6 +29,19 @@ You can set the default zoom level and limits in the `config` prop.
 />
 ```
 
+To render pages at their true physical size — where 100 % zoom makes an A4 page roughly its real-world width on screen — enable `usePhysicalScaling`:
+
+```svelte
+<PDFViewer
+  config={{
+    zoom: {
+      defaultZoomLevel: ZoomMode.FitPage,
+      usePhysicalScaling: true
+    }
+  }}
+/>
+```
+
 ### Available Zoom Modes
 
 The `ZoomMode` enum provides standard presets:
@@ -99,7 +112,7 @@ You can listen for zoom changes using the event system.
 
     // Subscribe to state changes
     docZoom?.onStateChange((state) => {
-      console.log('Current Zoom:', state.currentZoomLevel);
+      console.log('Current Zoom:', state.currentUserZoomLevel);
     });
   };
 </script>

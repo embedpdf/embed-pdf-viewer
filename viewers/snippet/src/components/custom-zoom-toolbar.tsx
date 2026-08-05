@@ -30,7 +30,7 @@ export function CustomZoomToolbar({ documentId }: CustomZoomToolbarProps) {
 
   if (!provides) return null;
 
-  const zoomPercentage = Math.round(state.currentZoomLevel * 100);
+  const zoomPercentage = Math.round(state.currentUserZoomLevel * 100);
 
   // Sync input value with zoom state when it changes externally
   useEffect(() => {

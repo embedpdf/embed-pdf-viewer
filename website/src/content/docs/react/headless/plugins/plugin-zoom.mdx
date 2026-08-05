@@ -75,7 +75,7 @@ export const ZoomToolbar = ({ documentId }) => {
   return (
     <div className="toolbar">
       {/* Display current zoom */}
-      <span>{Math.round(state.currentZoomLevel * 100)}%</span>
+      <span>{Math.round(state.currentUserZoomLevel * 100)}%</span>
 
       {/* Buttons to control zoom */}
       <button onClick={zoom.zoomOut}>-</button>
@@ -184,6 +184,7 @@ You can pass these options when registering the plugin with `createPluginRegistr
 | **`minZoom`** | `number` | The minimum allowed numeric zoom level. <br />**Default**: `0.2` |
 | **`maxZoom`** | `number` | The maximum allowed numeric zoom level. <br />**Default**: `60` |
 | **`presets`** | `ZoomPreset[]` | An array of objects `{ name: string, value: ZoomMode \| number }` to define options for a zoom dropdown menu in your UI. Use `provides.getPresets()` to retrieve this list. |
+| **`usePhysicalScaling`** | `boolean` | When `true`, numeric zoom values are treated as logical percentages and pages render at their true physical size — 100 % on a standard display makes an A4 page approximately its real-world width. See `currentUserZoomLevel` in the state reference below. <br />**Default**: `false` |
 
 ### Hook: `useZoom(documentId)`
 
@@ -200,7 +201,8 @@ This hook connects your component to the zoom plugin's state and functions for a
 
 | Property | Type | Description |
 | :--- | :--- | :--- |
-| **`currentZoomLevel`** | `number` | The actual, calculated zoom factor applied to the document. |
+| **`currentZoomLevel`** | `number` | The actual scale factor applied to the document. When `usePhysicalScaling` is enabled this is larger than `currentUserZoomLevel`. |
+| **`currentUserZoomLevel`** | `number` | The zoom percentage as shown in the UI. Always matches `currentZoomLevel` unless `usePhysicalScaling` is enabled. Use this value to display the zoom level to users. |
 | **`zoomLevel`** | `ZoomMode \| number` | The last *requested* zoom level, which might be a mode like `'fit-page'`. |
 | **`isMarqueeZoomActive`** | `boolean` | `true` if area zoom is currently active. |
 
@@ -213,6 +215,7 @@ This hook connects your component to the zoom plugin's state and functions for a
 | **`requestZoom(level)`** | Sets the zoom to a specific level (e.g., `1.0` or `ZoomMode.FitWidth`). |
 | **`toggleMarqueeZoom()`** | Enables or disables the area zoom mode. |
 | **`getPresets()`** | Returns the array of presets from the configuration. |
+| **`getDpr()`** | Returns the internal scale multiplier used to convert user-space zoom values to the effective render scale. Returns `1` when `usePhysicalScaling` is disabled. |
 
 ### Component: `<MarqueeZoom />`
 
