@@ -1,18 +1,14 @@
 import { h } from 'preact';
-import { useState, useEffect } from 'preact/hooks';
-import { useBookmarkCapability } from '@embedpdf/plugin-bookmark/preact';
-import { useScrollCapability } from '@embedpdf/plugin-scroll/preact';
-import { useTranslations } from '@embedpdf/plugin-i18n/preact';
+import { useState, useEffect, useMemo, useRef } from 'preact/hooks';
 import {
-  PdfBookmarkObject,
-  PdfZoomMode,
-  PdfErrorCode,
-  ignore,
-  PdfActionType,
-  PdfDestinationObject,
-} from '@embedpdf/models';
+  useBookmarkCapability,
+  getActiveBookmarkPath,
+  resolveBookmarkDestination,
+} from '@embedpdf/plugin-bookmark/preact';
+import { useScroll } from '@embedpdf/plugin-scroll/preact';
+import { useTranslations } from '@embedpdf/plugin-i18n/preact';
+import { PdfBookmarkObject, PdfZoomMode, PdfErrorCode, PdfActionType } from '@embedpdf/models';
 import { useDocumentState } from '@embedpdf/core/preact';
-import { Icon } from './ui/icon';
 import { ChevronDownIcon } from './icons/chevron-down';
 import { ChevronRightIcon } from './icons/chevron-right';
 
@@ -22,12 +18,13 @@ type OutlineSidebarProps = {
 
 export function OutlineSidebar({ documentId }: OutlineSidebarProps) {
   const { provides: bookmark } = useBookmarkCapability();
-  const { provides: scroll } = useScrollCapability();
+  const { provides: scroll, state: scrollState } = useScroll(documentId);
   const { translate } = useTranslations(documentId);
   const documentState = useDocumentState(documentId);
   const [bookmarks, setBookmarks] = useState<PdfBookmarkObject[]>([]);
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
+  const activeRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!bookmark || !documentState?.document) return;
@@ -37,8 +34,8 @@ export function OutlineSidebar({ documentId }: OutlineSidebarProps) {
     task.wait(
       ({ bookmarks }) => {
         setBookmarks(bookmarks);
-        // Auto-expand first level items
-        const firstLevelIds = bookmarks.map((_, index) => `bookmark-${index}`);
+        // Auto-expand first level items (ids are path-based: "0", "1", ...).
+        const firstLevelIds = bookmarks.map((_, index) => `${index}`);
         setExpandedItems(new Set(firstLevelIds));
         setIsLoading(false);
       },
@@ -55,26 +52,49 @@ export function OutlineSidebar({ documentId }: OutlineSidebarProps) {
     };
   }, [bookmark, documentState?.document]);
 
+  // Path of the bookmark that corresponds to the current reading page.
+  const activePath = useMemo(
+    () => getActiveBookmarkPath(bookmarks, scrollState.currentPage - 1),
+    [bookmarks, scrollState.currentPage],
+  );
+  const activeId = activePath ? activePath.join('.') : null;
+
+  // Auto-expand the active entry's ancestors so it is always revealed.
+  useEffect(() => {
+    if (!activePath || activePath.length <= 1) return;
+    setExpandedItems((prev) => {
+      const next = new Set(prev);
+      let changed = false;
+      for (let i = 1; i < activePath.length; i++) {
+        const ancestorId = activePath.slice(0, i).join('.');
+        if (!next.has(ancestorId)) {
+          next.add(ancestorId);
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+    // Depend on the serialized active id; activePath is a fresh array each render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeId]);
+
+  // Bring the active entry into view when it changes (or after ancestors expand).
+  // `block: 'nearest'` is a no-op when the entry is already visible.
+  useEffect(() => {
+    if (!activeId) return;
+    activeRef.current?.scrollIntoView({ block: 'nearest' });
+  }, [activeId, expandedItems]);
+
   const handleBookmarkClick = (bookmark: PdfBookmarkObject) => {
     if (!scroll || !bookmark.target) return;
 
-    // Extract destination from either action or direct destination target
-    let destination: PdfDestinationObject | undefined;
-
-    if (bookmark.target.type === 'action') {
-      const action = bookmark.target.action;
-      if (action.type === PdfActionType.Goto || action.type === PdfActionType.RemoteGoto) {
-        destination = action.destination;
-      } else if (action.type === PdfActionType.URI) {
-        // Open URI in new tab
-        window.open(action.uri, '_blank');
-        return;
-      }
-      // Other action types (Unsupported, LaunchAppOrOpenFile) are not handled
-    } else if (bookmark.target.type === 'destination') {
-      destination = bookmark.target.destination;
+    // URI actions open in a new tab.
+    if (bookmark.target.type === 'action' && bookmark.target.action.type === PdfActionType.URI) {
+      window.open(bookmark.target.action.uri, '_blank');
+      return;
     }
 
+    const destination = resolveBookmarkDestination(bookmark);
     if (!destination) return;
 
     if (destination.zoom.mode === PdfZoomMode.XYZ) {
@@ -92,7 +112,6 @@ export function OutlineSidebar({ documentId }: OutlineSidebarProps) {
         behavior: 'smooth',
       });
     } else {
-      // Handle FitPage, FitH, FitV, FitR, FitB, FitBH, FitBV, etc.
       scroll.scrollToPage({
         pageNumber: destination.pageIndex + 1,
         behavior: 'smooth',
@@ -114,17 +133,22 @@ export function OutlineSidebar({ documentId }: OutlineSidebarProps) {
 
   const renderBookmark = (
     bookmark: PdfBookmarkObject,
-    index: number,
+    path: number[],
     level: number = 0,
   ): h.JSX.Element => {
-    const id = `bookmark-${index}`;
+    const id = path.join('.');
     const hasChildren = bookmark.children && bookmark.children.length > 0;
     const isExpanded = expandedItems.has(id);
+    const isActive = id === activeId;
 
     return (
       <div key={id} className="select-none">
         <div
-          className="hover:bg-interactive-hover flex cursor-pointer items-center gap-1 px-2 py-1"
+          ref={isActive ? activeRef : undefined}
+          aria-current={isActive ? 'true' : undefined}
+          className={`flex cursor-pointer items-center gap-1 px-2 py-1 ${
+            isActive ? 'bg-interactive-selected' : 'hover:bg-interactive-hover'
+          }`}
           style={{ paddingLeft: `${level * 16 + 8}px` }}
           onClick={() => handleBookmarkClick(bookmark)}
         >
@@ -144,12 +168,18 @@ export function OutlineSidebar({ documentId }: OutlineSidebarProps) {
             </button>
           )}
           {!hasChildren && <div className="w-4" />}
-          <span className="text-fg-secondary text-sm">{bookmark.title}</span>
+          <span
+            className={`text-sm ${
+              isActive ? 'text-accent-primary font-medium' : 'text-fg-secondary'
+            }`}
+          >
+            {bookmark.title}
+          </span>
         </div>
         {hasChildren && isExpanded && (
           <div>
             {bookmark.children?.map((child, childIndex) =>
-              renderBookmark(child, childIndex, level + 1),
+              renderBookmark(child, [...path, childIndex], level + 1),
             )}
           </div>
         )}
@@ -181,7 +211,7 @@ export function OutlineSidebar({ documentId }: OutlineSidebarProps) {
     <div className="bg-bg-surface flex h-full flex-col">
       <div className="flex-1 overflow-y-auto">
         <div className="outline-tree">
-          {bookmarks.map((bookmark, index) => renderBookmark(bookmark, index))}
+          {bookmarks.map((bookmark, index) => renderBookmark(bookmark, [index]))}
         </div>
       </div>
     </div>

@@ -13,3 +13,4 @@ export const BookmarkPluginPackage: PluginPackage<BookmarkPlugin, BookmarkPlugin
 export * from './bookmark-plugin';
 export * from './types';
 export * from './manifest';
+export * from './active-bookmark';
