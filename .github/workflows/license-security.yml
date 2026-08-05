@@ -59,7 +59,13 @@ jobs:
         run: pnpm --filter @cloudpdf/server exec vitest run test/licensing.test.ts
 
       - name: Build published server artifact
-        run: pnpm --filter @cloudpdf/server build
+        # `...` builds the server's workspace dependency closure first
+        # (admin-api, engine-core, engine-services, engine-runtime) in
+        # topological order — the server bundle inlines engine-core/services
+        # from their dist and the dts build needs the runtime's types. The
+        # native runtime payloads are NOT needed: engine-runtime's own build
+        # is JS-only (payload packages are externalized / have no build).
+        run: pnpm --filter "@cloudpdf/server..." build
 
       - name: Verify published license API boundary
         run: >-
