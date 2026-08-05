@@ -15,3 +15,8 @@ config/tsup.frameworks.config.bundled*
 publish-summary.json
 **/.svelte-kit
 **/*/*.tgz
+.env
+
+# Generated data files
+packages/cli/src/data/manifest.json
+website/src/data/embeddings.json
