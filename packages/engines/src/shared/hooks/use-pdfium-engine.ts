@@ -16,6 +16,12 @@ interface UsePdfiumEngineProps {
   fontFallback?: FontFallbackConfig | null;
 }
 
+function disposeEngine(engine: PdfEngine | null) {
+  engine?.closeAllDocuments?.().wait(() => {
+    engine?.destroy?.();
+  }, ignore);
+}
+
 export function usePdfiumEngine(config?: UsePdfiumEngineProps) {
   const {
     wasmUrl = defaultWasmUrl,
@@ -44,6 +50,14 @@ export function usePdfiumEngine(config?: UsePdfiumEngineProps) {
           encoderPoolSize,
           fontFallback,
         });
+
+        // Effect torn down before we resolved (e.g. Strict Mode's dev
+        // remount): discard this engine instead of committing it.
+        if (cancelled) {
+          disposeEngine(pdfEngine);
+          return;
+        }
+
         engineRef.current = pdfEngine;
         setEngine(pdfEngine);
         setLoading(false);
@@ -57,10 +71,8 @@ export function usePdfiumEngine(config?: UsePdfiumEngineProps) {
 
     return () => {
       cancelled = true;
-      engineRef.current?.closeAllDocuments?.().wait(() => {
-        engineRef.current?.destroy?.();
-        engineRef.current = null;
-      }, ignore);
+      disposeEngine(engineRef.current);
+      engineRef.current = null;
     };
   }, [wasmUrl, worker, logger, fontFallback]);
 
