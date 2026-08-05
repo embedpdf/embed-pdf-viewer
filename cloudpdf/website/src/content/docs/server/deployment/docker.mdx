@@ -1,0 +1,152 @@
+---
+title: Docker
+description: Run the CloudPDF server as a self-contained Docker image from GitHub Container Registry.
+---
+
+import { Callout } from '@/components/docs/callout';
+import { Cards, Card } from '@/components/docs/cards';
+
+# Run with Docker
+
+The server ships as a single, self-contained image. A consumer only needs
+`docker pull` and `docker run` — no repository, Node, or PDF toolchain. The Node
+22 runtime, native PDFium, image processing, SQLite, and fonts are all baked in.
+
+Images are published to GitHub Container Registry:
+
+```
+ghcr.io/embedpdf/cloudpdf-server
+```
+
+## Run it
+
+The zero-config profile uses SQLite, the local filesystem, and a local cache,
+all under the `/data` volume:
+
+```sh
+docker run --rm --init -p 3000:3000 \
+  -v cloudpdf-data:/data \
+  -e CLOUDPDF_JWT_SECRET=dev-secret-change-me \
+  ghcr.io/embedpdf/cloudpdf-server:latest
+```
+
+- `--init` gives the container correct signal and zombie handling. The server
+  already handles `SIGTERM`/`SIGINT`, so it stops cleanly.
+- `-v cloudpdf-data:/data` persists your data across restarts. **Everything
+  mutable lives under `/data`** — the SQLite file, stored objects, and the cache.
+
+Confirm it's up:
+
+```sh
+curl localhost:3000/healthz   # {"status":"ok"}
+curl localhost:3000/readyz    # {"status":"ok"}
+```
+
+## The built-in defaults
+
+The image sets production-friendly defaults so the zero-config run just works:
+
+| Variable | Default in the image |
+| --- | --- |
+| `NODE_ENV` | `production` |
+| `PORT` / `HOST` | `3000` / `0.0.0.0` |
+| `CLOUDPDF_DB_SQLITE_PATH` | `/data/cloudpdf.db` |
+| `CLOUDPDF_STORAGE_FS_ROOT` | `/data/objects` |
+| `CLOUDPDF_CACHE_ROOT` | `/data/cache` |
+| `CLOUDPDF_AUTO_MIGRATE` | `1` (migrate on boot) |
+
+Override any of them with `-e`. The full list is in the
+[configuration reference](/docs/server/configuration).
+
+## The entrypoint is the CLI
+
+The image's entrypoint is the `cloudpdf-server` binary and the default command is
+`serve`, so you can run any subcommand by appending it:
+
+```sh
+docker run --rm -v cloudpdf-data:/data \
+  ghcr.io/embedpdf/cloudpdf-server:latest migrate status
+
+docker run --rm -v cloudpdf-data:/data \
+  ghcr.io/embedpdf/cloudpdf-server:latest db doctor
+```
+
+See the [CLI reference](/docs/server/operations/cli) for all commands.
+
+## Production: external database and storage
+
+For production, point the container at Postgres and a cloud bucket, take
+migrations out of the boot path, and let the pool use your cores:
+
+```sh
+docker run -d --init -p 3000:3000 \
+  -e CLOUDPDF_JWT_SECRET="$(openssl rand -hex 32)" \
+  -e CLOUDPDF_DB_DRIVER=postgres \
+  -e CLOUDPDF_DB_URL="postgres://user:pass@db:5432/cloudpdf" \
+  -e CLOUDPDF_STORAGE_KIND=s3 \
+  -e CLOUDPDF_STORAGE_S3_BUCKET=my-cloudpdf-bucket \
+  -e CLOUDPDF_STORAGE_S3_REGION=eu-west-1 \
+  -e CLOUDPDF_AUTO_MIGRATE=0 \
+  -e CLOUDPDF_FAIL_ON_PENDING=1 \
+  -e CLOUDPDF_WORKER_POOL_SIZE=max \
+  ghcr.io/embedpdf/cloudpdf-server:1.0.0
+```
+
+Run migrations as a separate, one-shot step before rolling out new containers —
+so replicas never race each other to migrate:
+
+```sh
+docker run --rm \
+  -e CLOUDPDF_DB_DRIVER=postgres \
+  -e CLOUDPDF_DB_URL="postgres://user:pass@db:5432/cloudpdf" \
+  ghcr.io/embedpdf/cloudpdf-server:1.0.0 migrate up
+```
+
+<Callout type="info">
+  Managing more than the server itself — Postgres, object storage, a migration
+  step — is exactly what <a href="/docs/server/deployment/docker-compose">Docker
+  Compose</a> wires up for you.
+</Callout>
+
+## Health checks
+
+The image includes a built-in `HEALTHCHECK` that polls `/healthz`, so
+`docker ps` and your orchestrator can see container health without extra
+configuration.
+
+## Image tags & versioning
+
+| Tag | Meaning |
+| --- | --- |
+| `:1.2.3` | An exact, immutable release. |
+| `:1.2` | The latest patch in a minor line. |
+| `:latest` | The newest release. Convenient, but moves. |
+| `:1.2.3-next.N`, `:next` | Pre-release candidates from the preview channel. |
+
+<Callout type="warn">
+  In production, pin a <strong>specific version</strong> — ideally by digest
+  (<code>@sha256:…</code>) — so every replica runs identical bytes. Never run
+  <code>:latest</code> in production.
+</Callout>
+
+Pin by digest:
+
+```sh
+docker pull ghcr.io/embedpdf/cloudpdf-server:1.0.0
+docker run ... ghcr.io/embedpdf/cloudpdf-server@sha256:<digest>
+```
+
+## Next steps
+
+<Cards>
+  <Card
+    title="Docker Compose"
+    description="Add Postgres and object storage in one file."
+    href="/docs/server/deployment/docker-compose"
+  />
+  <Card
+    title="Configuration reference"
+    description="Every CLOUDPDF_* setting."
+    href="/docs/server/configuration"
+  />
+</Cards>

@@ -1,0 +1,10 @@
+{
+  "fork": "embedpdf/runtime",
+  "sha": "local",
+  "artifacts": {
+    "wasm32": {
+      "url": "file:///absolute/path/to/packages/engine/runtime/build/local-artifacts/libembedpdf-runtime-wasm32-local.tar.gz",
+      "sha256": "<sha256>"
+    }
+  }
+}

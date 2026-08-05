@@ -1,0 +1,97 @@
+{
+  "name": "@embedpdf/engine-core",
+  "version": "2.15.0",
+  "private": false,
+  "description": "Engine v3 core: AbortablePromise, Engine/DocumentHandle interfaces, DTOs, wire schemas, error codes, and a transport-agnostic conformance harness shared by every Engine implementation.",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.cts",
+  "exports": {
+    ".": {
+      "development": "./src/index.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./conformance": {
+      "development": "./src/conformance.ts",
+      "import": "./dist/conformance.js",
+      "require": "./dist/conformance.cjs"
+    },
+    "./runtime": {
+      "development": "./src/runtime.ts",
+      "import": "./dist/runtime.js",
+      "require": "./dist/runtime.cjs"
+    },
+    "./wire": {
+      "development": "./src/wire.ts",
+      "import": "./dist/wire.js",
+      "require": "./dist/wire.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "epdf-build",
+    "clean": "rimraf dist",
+    "lint": "eslint src --color",
+    "lint:fix": "eslint src --color --fix",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/embedpdf/embed-pdf-viewer",
+    "directory": "packages/engine-core"
+  },
+  "homepage": "https://www.embedpdf.com",
+  "bugs": {
+    "url": "https://github.com/embedpdf/embed-pdf-viewer/issues"
+  },
+  "keywords": [
+    "pdf",
+    "embedpdf",
+    "engine",
+    "engine-core"
+  ],
+  "license": "Apache-2.0",
+  "dependencies": {
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "rimraf": "^5.0.0",
+    "typescript": "^5.0.0",
+    "vitest": "^2.1.9",
+    "@embedpdf/tooling-build": "workspace:*"
+  },
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": {
+        "import": "./dist/index.js",
+        "require": "./dist/index.cjs"
+      },
+      "./conformance": {
+        "import": "./dist/conformance.js",
+        "require": "./dist/conformance.cjs"
+      },
+      "./runtime": {
+        "import": "./dist/runtime.js",
+        "require": "./dist/runtime.cjs"
+      },
+      "./wire": {
+        "import": "./dist/wire.js",
+        "require": "./dist/wire.cjs"
+      },
+      "./package.json": "./package.json"
+    }
+  },
+  "sideEffects": false,
+  "epdf": {
+    "devExports": "development"
+  }
+}

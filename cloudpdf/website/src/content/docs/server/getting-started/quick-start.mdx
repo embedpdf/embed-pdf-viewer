@@ -1,0 +1,122 @@
+---
+title: Quick start
+description: Run a CloudPDF server locally in about a minute, verify it's healthy, and make your first authenticated request.
+---
+
+import { Callout } from '@/components/docs/callout';
+import { Cards, Card } from '@/components/docs/cards';
+
+# Quick start
+
+This gets a server running on your machine with **zero external services** —
+SQLite, the local disk, and a local cache, all under one volume. It's the
+fastest way to see the server work end to end.
+
+<Callout type="info">
+  Prefer the npm package or a production-grade install? Jump to
+  <a href="/docs/server/deployment">Deployment</a> — the steps below use Docker
+  because it needs nothing installed but Docker itself.
+</Callout>
+
+## 1. Run the server
+
+```sh
+docker run --rm --init -p 3000:3000 \
+  -v cloudpdf-data:/data \
+  -e CLOUDPDF_JWT_SECRET=dev-secret-change-me \
+  ghcr.io/embedpdf/cloudpdf-server:latest
+```
+
+That's the whole install. The image bakes in everything the server needs —
+the Node runtime, native PDFium, image processing, and fonts — so there is no
+toolchain to set up.
+
+- `-p 3000:3000` exposes the API on `localhost:3000`.
+- `-v cloudpdf-data:/data` keeps your documents across restarts.
+- `--init` gives the container clean signal handling.
+- `CLOUDPDF_JWT_SECRET` signs and verifies tokens. **Required.**
+
+<Callout type="warn">
+  <code>dev-secret-change-me</code> is fine for your laptop. In production, set a
+  long random secret and keep it out of source control — see
+  <a href="/docs/server/configuration/authentication">Authentication</a>.
+</Callout>
+
+## 2. Confirm it's healthy
+
+```sh
+curl localhost:3000/healthz
+# {"status":"ok"}
+
+curl localhost:3000/readyz
+# {"status":"ok"}
+```
+
+`/healthz` means the process is alive; `/readyz` means it's ready to serve
+traffic. Both are public — everything else requires a token:
+
+```sh
+curl -i localhost:3000/v1/admin/documents
+# HTTP/1.1 401 Unauthorized
+```
+
+A `401` here is the server working correctly: it refuses unauthenticated
+requests.
+
+## 3. Talk to it from your app
+
+Your frontend uses [`@cloudpdf/engine`](/docs/engine), pointed at the server you
+just started:
+
+```ts
+import { createCloudEngine } from '@cloudpdf/engine';
+
+const engine = createCloudEngine({
+  baseUrl: 'http://localhost:3000',
+  token: () => getDocToken(), // doc-scoped JWT minted by your backend
+});
+
+const doc = await engine.open({ kind: 'id', id: 'doc_welcome' });
+const page = doc.page(1);
+const image = await page.render.image({ viewport: { kind: 'width', width: 1200 } });
+```
+
+Your backend mints the `getDocToken()` JWT with the same
+`CLOUDPDF_JWT_SECRET`. See [Authentication](/docs/server/configuration/authentication)
+for the token shape, and the [engine docs](/docs/engine/getting-started/quick-start)
+for rendering a page into the DOM.
+
+## 4. Stop it
+
+```sh
+docker stop $(docker ps -q --filter ancestor=ghcr.io/embedpdf/cloudpdf-server:latest)
+```
+
+Your data stays in the `cloudpdf-data` volume, ready for the next run.
+
+## Where to go next
+
+You ran the simplest possible configuration. To take it further:
+
+<Cards>
+  <Card
+    title="Choose a deployment"
+    description="npm, Docker, Compose, or Helm — and the trade-offs of each."
+    href="/docs/server/deployment"
+  />
+  <Card
+    title="Move to Postgres + S3"
+    description="Swap SQLite and local disk for production-grade storage."
+    href="/docs/server/configuration/database"
+  />
+  <Card
+    title="Authentication"
+    description="Mint document-scoped tokens from your backend."
+    href="/docs/server/configuration/authentication"
+  />
+  <Card
+    title="Full configuration"
+    description="Every setting the server understands."
+    href="/docs/server/configuration"
+  />
+</Cards>

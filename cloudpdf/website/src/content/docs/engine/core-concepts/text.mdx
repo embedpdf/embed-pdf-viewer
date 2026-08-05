@@ -1,0 +1,70 @@
+---
+title: Text extraction
+description: Extract a page's plain text with the per-page text service.
+---
+
+import { Callout } from '@/components/docs/callout';
+
+# Text extraction
+
+Each page handle exposes a `text` service that returns the page's full plain-text
+extraction.
+
+```ts
+interface PageTextService {
+  read(): AbortablePromise<PageTextSnapshot>;
+}
+```
+
+## Reading text
+
+```ts
+const page = doc.page(pageObjectNumber);
+const { text, charCount } = await page.text.read();
+
+console.log(text);      // full page text in display order
+console.log(charCount); // PDFium-reported character count
+```
+
+The result is a `PageTextSnapshot`:
+
+```ts
+interface PageTextSnapshot {
+  text: string;
+  charCount: number;
+}
+```
+
+- `text` is the page's text in display order, decoded from UTF-16 to a JS
+  string.
+- `charCount` is PDFium's character count. It can differ from `text.length`
+  when the page contains astral-plane characters: PDFium counts UTF-16 code
+  units, and JS strings keep them as surrogate pairs.
+
+<Callout type="info">
+  The text snapshot is pure content — it's addressed and cached by the page's
+  content version on the server, so repeat reads of an unchanged page are fast
+  and CDN-friendly. It deliberately carries no annotation liveness; that lives
+  on <a href="/docs/engine/core-concepts/annotations">annotation reads</a>.
+</Callout>
+
+## Extracting a whole document
+
+There's no document-level text call — iterate the page list and read each page:
+
+```ts
+const { pages } = await doc.pages.list();
+
+const fullText = (
+  await Promise.all(pages.map((p) => doc.page(p.pageObjectNumber).text.read()))
+)
+  .map((snapshot) => snapshot.text)
+  .join('\n\n');
+```
+
+<Callout type="warn">
+  Reading text requires the <code>doc.text.copy</code> capability on the cloud.
+  If the caller's scope doesn't grant it, <code>read()</code> rejects with a
+  <code>Forbidden</code> <code>EngineError</code>. Check
+  <code>doc.security.effectiveScope</code> before exposing a "copy text" action.
+</Callout>

@@ -1,0 +1,164 @@
+%PDF-1.7
+% ò¤ô
+1 0 obj <<
+  /Type /Catalog
+  /Pages 2 0 R
+  /AcroForm 3 0 R
+  /AA 11 0 R
+>>
+endobj
+2 0 obj <<
+  /Type /Pages
+  /Count 3
+  /Kids [4 0 R]
+>>
+endobj
+3 0 obj <<
+  /CO [9 0 R]
+  /Fields [
+    9 0 R
+    7 0 R
+  ]
+>>
+endobj
+4 0 obj <<
+  /Type /Page
+  /Parent 2 0 R
+  /MediaBox [0 0 612 792]
+>>
+endobj
+7 0 obj <<
+  /FT /Tx
+  /Type /Annot
+  /Subtype /Widget
+  /T (txtName2)
+  /F 4
+  /AP <</N 8 0 R>>
+  /Rect [20 20 400 60]
+>>
+endobj
+8 0 obj <<
+  /Type /XObject
+  /Subtype /Form
+  /FormType 1
+>>
+endobj
+9 0 obj <<
+  /FT /Tx
+  /Type /Annot
+  /Subtype /Widget
+  /T (txtName1)
+  /F 4
+  /AP <</N 10 0 R>>
+  /Rect [200 200 400 260]
+>>
+endobj
+10 0 obj <<
+  /Type /XObject
+  /Subtype /Form
+  /FormType 1
+>>
+endobj
+11 0 obj <<
+  /WP 14 0 R
+  /DP 16 0 R
+  /WS 18 0 R
+  /DS 20 0 R
+>>
+endobj
+12 0 obj <<
+  /Type /Action
+  /S /JavaScript
+  /JS 13 0 R
+>>
+endobj
+13 0 obj <<
+  /Length 25
+>>
+stream
+app.alert('Will Close');
+endstream
+endobj
+14 0 obj <<
+  /Type /Action
+  /S /JavaScript
+  /JS 15 0 R
+>>
+endobj
+15 0 obj <<
+  /Length 25
+>>
+stream
+app.alert('Will Print');
+endstream
+endobj
+16 0 obj <<
+  /Type /Action
+  /S /JavaScript
+  /JS 17 0 R
+>>
+endobj
+17 0 obj <<
+  /Length 24
+>>
+stream
+app.alert('Did Print');
+endstream
+endobj
+18 0 obj <<
+  /Type /Action
+  /S /JavaScript
+  /JS 19 0 R
+>>
+endobj
+19 0 obj <<
+  /Length 24
+>>
+stream
+app.alert('Will Save');
+endstream
+endobj
+20 0 obj <<
+  /Type /Action
+  /S /JavaScript
+  /JS 21 0 R
+>>
+endobj
+21 0 obj <<
+  /Length 23
+>>
+stream
+app.alert('Did Save');
+endstream
+endobj
+xref
+0 22
+0000000000 65535 f 
+0000000015 00000 n 
+0000000099 00000 n 
+0000000162 00000 n 
+0000000233 00000 n 
+0000000000 65535 f 
+0000000000 65535 f 
+0000000310 00000 n 
+0000000440 00000 n 
+0000000509 00000 n 
+0000000643 00000 n 
+0000000713 00000 n 
+0000000787 00000 n 
+0000000855 00000 n 
+0000000932 00000 n 
+0000001000 00000 n 
+0000001077 00000 n 
+0000001145 00000 n 
+0000001221 00000 n 
+0000001289 00000 n 
+0000001365 00000 n 
+0000001433 00000 n 
+trailer <<
+  /Size 14
+  /Root 1 0 R
+>>
+startxref
+1508
+%%EOF

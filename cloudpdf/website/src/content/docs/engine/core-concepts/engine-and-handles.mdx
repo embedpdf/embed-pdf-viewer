@@ -1,0 +1,123 @@
+---
+title: Engine & handles
+description: The Engine, DocumentHandle, and PageHandle objects and how they relate.
+---
+
+import { Callout } from '@/components/docs/callout';
+
+# Engine & handles
+
+The engine exposes three layers of objects: the **engine** itself, a
+**document handle** for each open document, and a **page handle** for per-page
+work. Each layer narrows the scope of what you operate on.
+
+## The engine
+
+`createCloudEngine(options)` returns an object implementing the `Engine`
+interface:
+
+```ts
+interface Engine {
+  open(input: OpenInput, options?: OpenOptions): AbortablePromise<DocumentHandle>;
+  destroy(): AbortablePromise<void>;
+}
+```
+
+`open()` is the only entry point. The cloud engine accepts two input kinds —
+`{ kind: 'token' }` and `{ kind: 'id' }` (see
+[Authentication](/docs/engine/getting-started/authentication)). Call
+`destroy()` when your app is shutting the engine down; existing handles should
+be `close()`d first.
+
+<Callout type="info">
+  One engine can hold many open documents at once. When you open by token, each
+  handle carries its own per-document bearer, so a single engine can serve
+  several independently-authorized documents concurrently.
+</Callout>
+
+## The document handle
+
+`open()` resolves to a `DocumentHandle` — your entry point to everything about
+one open document:
+
+```ts
+interface DocumentHandle {
+  readonly id: string;
+  readonly capabilities: DocumentCapabilities;
+  readonly security: DocumentSecurityService;
+  readonly metadata: MetadataService;
+  readonly annotations: DocumentAnnotationsService;
+  readonly pages: DocumentPagesService;
+
+  page(pageObjectNumber: PageObjectNumber): PageHandle;
+  download(opts?: { mode?: PdfSaveMode }): AbortablePromise<Uint8Array>;
+  close(): AbortablePromise<void>;
+}
+```
+
+- `metadata`, `annotations`, `pages`, and `security` are **document-scoped
+  services** (covered in their own pages).
+- `page(pon)` returns a page handle (below).
+- `download()` returns the full PDF bytes — see [Downloading](/docs/engine/core-concepts/downloading).
+- `close()` releases the handle. It's idempotent and safe to call more than
+  once.
+
+### Capabilities
+
+`capabilities` advertises engine-specific behavior so portable code can adapt:
+
+```ts
+interface DocumentCapabilities {
+  readonly weakAnnotationEditSessions: 'not-needed' | 'required';
+  readonly pageEditSessions: 'unsupported' | 'supported';
+}
+```
+
+On the cloud engine, `weakAnnotationEditSessions` is `'required'` (index-based
+annotation edits need an active edit session) and `pageEditSessions` is
+`'unsupported'`.
+
+## The page handle
+
+`doc.page(pon)` returns a `PageHandle` keyed on the page's **indirect object
+number**, never its display index — so the handle stays valid across page
+reorders.
+
+```ts
+interface PageHandle {
+  readonly pageObjectNumber: PageObjectNumber;
+  readonly pageIndex: number; // advisory display index at mint time
+  readonly annotations: PageAnnotationsService;
+  readonly text: PageTextService;
+  readonly geometry: PageGeometryService;
+  readonly render: PageRenderService;
+}
+```
+
+`page()` is synchronous — page records are already known to the handle. To
+discover page object numbers, call `doc.pages.list()`:
+
+```ts
+const { pageCount, pages } = await doc.pages.list();
+const firstPon = pages[0].pageObjectNumber;
+const page = doc.page(firstPon);
+```
+
+<Callout type="warn">
+  Treat <code>pageIndex</code> as advisory metadata. It reflects display order
+  at the time the handle was minted; the durable key is always
+  <code>pageObjectNumber</code>.
+</Callout>
+
+## Lifecycle at a glance
+
+```ts
+const engine = createCloudEngine({ baseUrl, token });
+
+const doc = await engine.open({ kind: 'id', id: 'doc_123' }); // open
+const page = doc.page((await doc.pages.list()).pages[0].pageObjectNumber); // work
+await page.render.image();
+
+await doc.close();    // release the document
+await engine.destroy(); // tear down the engine
+```

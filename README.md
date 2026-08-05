@@ -7,15 +7,18 @@
 
   <!-- Badges -->
 
-<a href="https://github.com/embedpdf/embed-pdf-viewer/blob/main/LICENSE"><img alt="License" src="https://img.shields.io/npm/l/@embedpdf/pdfium.svg?style=for-the-badge&labelColor=000000"></a>
+<a href="https://github.com/embedpdf/embed-pdf-viewer/blob/main/LICENSE"><img alt="License" src="https://img.shields.io/github/license/embedpdf/embed-pdf-viewer.svg?style=for-the-badge&labelColor=000000"></a>
 <a href="https://snippet.embedpdf.com/"><img alt="Live demo" src="https://img.shields.io/badge/Try%20the%20Live%20Demo-ff1493.svg?style=for-the-badge&labelColor=000000"></a>
 <a href="https://discord.gg/mHHABmmuVU"><img alt="Join our Discord" src="https://img.shields.io/discord/1351694551047475313?logo=discord&style=for-the-badge&labelColor=000000"></a>
 
 </div>
 
+> [!WARNING]
+> **EmbedPDF v3 is under active development and is not yet recommended for production use.** For the current stable release, use the [`v2` branch](https://github.com/embedpdf/embed-pdf-viewer/tree/v2).
+
 # Open‑Source JavaScript PDF Viewer
 
-**EmbedPDF** is a framework‑agnostic, MIT‑licensed PDF viewer that drops into _any_ JavaScript project. Whether you build with **React, Vue, Svelte, Preact,** or vanilla JS, EmbedPDF delivers a smooth, modern reading experience and a clean developer API.
+**EmbedPDF** is a framework‑agnostic, Apache‑2.0‑licensed PDF viewer that drops into _any_ JavaScript project. Whether you build with **React, Vue, Svelte, Preact,** or vanilla JS, EmbedPDF delivers a smooth, modern reading experience and a clean developer API.
 
 ---
 
@@ -69,8 +72,8 @@ We love contributions! To get started, read our [contributing guide](CONTRIBUTIN
 
 ## 📄 License
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+Everything in this repository is licensed under the [Apache License, Version 2.0](LICENSE), with one exception: [`cloudpdf/server`](cloudpdf/server) — the self-hostable CloudPDF server — is **Fair Source**, under the [Fair Core License, FCL-1.0-ALv2](cloudpdf/server/LICENSE). Its source may be inspected, copied, and modified for purposes permitted by the FCL. **That does not make the server free to run:** while a release remains under the FCL, running or self-hosting it requires a valid CloudPDF license (a license key for a connected deployment or a signed certificate for an air-gapped deployment). You may not move, change, disable, or circumvent the license-key functionality; enable protected functionality without a valid license; or remove protected functionality. Competing Uses, as defined in the FCL, are also prohibited. Each release automatically becomes Apache-2.0 two years after publication. See [LICENSING.md](LICENSING.md) for the full licensing map, including website content.
 
 ## Third-Party Licenses
 
-This project includes PDFium, licensed under the [Apache License, Version 2.0](packages/pdfium/LICENSE.pdfium).
+The engine is powered by [EmbedPDF Runtime](https://github.com/embedpdf/runtime), our fork of [PDFium](https://pdfium.googlesource.com/pdfium/), which is licensed under the [Apache License, Version 2.0](https://pdfium.googlesource.com/pdfium/+/refs/heads/main/LICENSE). PDFium is a Google project; EmbedPDF is not affiliated with or endorsed by Google.

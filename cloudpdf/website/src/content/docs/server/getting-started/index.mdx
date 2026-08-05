@@ -1,0 +1,98 @@
+---
+title: Introduction
+description: The CloudPDF server — a self-hostable PDF engine that renders pages, extracts text, manages annotations, and serves documents over a secure HTTP API.
+---
+
+import { Cards, Card } from '@/components/docs/cards';
+import { Callout } from '@/components/docs/callout';
+
+# The server
+
+`@cloudpdf/server` is the backend that powers CloudPDF. It runs native PDFium on
+your own infrastructure and exposes it as a clean, document-scoped HTTP API:
+open a document, render pages, extract text, read and write annotations, inspect
+metadata, and enforce access — all behind short-lived JWTs.
+
+It is the same engine that runs locally in the browser with EmbedPDF, lifted
+onto the server. Your frontend keeps talking to one [`Engine`
+interface](/docs/engine); the server does the heavy PDF work, holds your
+documents, and never hands storage credentials to the client.
+
+<Callout type="info">
+  In a hurry? The <a href="/docs/server/getting-started/quick-start">Quick start</a>
+  gets a server answering requests in about a minute with a single
+  <code>docker run</code>.
+</Callout>
+
+## Why run your own server
+
+- **Your data stays yours.** Documents live in your database and object store —
+  SQLite and the local disk to start, Postgres and S3/GCS/Azure when you grow.
+- **Real PDF rendering.** Native PDFium renders pages to PNG/WebP and extracts
+  text and geometry — the same fidelity as the desktop, on the server.
+- **Secure by construction.** Every document route requires a short-lived,
+  document-scoped JWT minted by your backend. The browser never sees your
+  tenant secret or storage keys.
+- **Runs anywhere.** A single Node process, a Docker container, or a
+  Kubernetes deployment that scales from a side project to enterprise traffic.
+
+## Three ways to run it
+
+The server is a single, self-contained application. Pick the packaging that fits
+your team — they all run the exact same binary and read the exact same
+[configuration](/docs/server/configuration).
+
+<Cards>
+  <Card
+    title="Node / npm"
+    description="Install the package and run the CLI. Best for local dev and existing Node platforms."
+    href="/docs/server/deployment/npm"
+  />
+  <Card
+    title="Docker"
+    description="One self-contained image. Best for single-host self-hosting and CI."
+    href="/docs/server/deployment/docker"
+  />
+  <Card
+    title="Docker Compose"
+    description="The server plus Postgres and S3-compatible storage, on one host."
+    href="/docs/server/deployment/docker-compose"
+  />
+  <Card
+    title="Helm / Kubernetes"
+    description="Production-grade: replicas, autoscaling, and managed migrations."
+    href="/docs/server/deployment/helm"
+  />
+</Cards>
+
+<Callout type="info">
+  Don't want to host anything? <strong>CloudPDF Cloud</strong> runs this same
+  server for you as a managed SaaS. The API is identical, so you can start on the
+  cloud and move to self-hosted later — or the other way around — without
+  changing a line of frontend code.
+</Callout>
+
+## Next steps
+
+<Cards>
+  <Card
+    title="How it works"
+    description="The request flow, the worker pool, and the storage model."
+    href="/docs/server/getting-started/how-it-works"
+  />
+  <Card
+    title="Quick start"
+    description="Run a server and make your first authenticated request."
+    href="/docs/server/getting-started/quick-start"
+  />
+  <Card
+    title="Configuration reference"
+    description="Every CLOUDPDF_* setting, with defaults."
+    href="/docs/server/configuration"
+  />
+  <Card
+    title="The engine client"
+    description="Drive the server from your frontend with @cloudpdf/engine."
+    href="/docs/engine"
+  />
+</Cards>

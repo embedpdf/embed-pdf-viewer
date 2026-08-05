@@ -1,0 +1,48 @@
+{
+  "name": "@embedpdf/plugin-commands",
+  "version": "2.15.0",
+  "private": false,
+  "description": "The command registry: the single vocabulary of verbs. Definitions are app content (mechanism/content split); state (label · icon · enabled · active · visible) derives purely from other capabilities, so every consumer is reactive through the kernel's one change stream — no events, no diffing.",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.cts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "main": "./dist/index.js",
+    "module": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+      ".": {
+        "import": "./dist/index.js",
+        "require": "./dist/index.cjs"
+      },
+      "./package.json": "./package.json"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "epdf-build",
+    "clean": "rimraf dist",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@embedpdf/core": "workspace:*",
+    "@embedpdf/plugin-i18n": "workspace:*",
+    "@embedpdf/plugin-shell": "workspace:*",
+    "@embedpdf/core-ui": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "vitest": "^2.1.9",
+    "@embedpdf/tooling-build": "workspace:*"
+  },
+  "license": "Apache-2.0",
+  "sideEffects": false
+}

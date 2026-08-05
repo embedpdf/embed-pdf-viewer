@@ -1,0 +1,23 @@
+{
+  "version": "2.15.0",
+  "license": "Apache-2.0",
+  "publishConfig": {
+    "access": "public"
+  },
+  "name": "@embedpdf/engine-runtime-linux-x64",
+  "os": [
+    "linux"
+  ],
+  "cpu": [
+    "x64"
+  ],
+  "libc": [
+    "glibc"
+  ],
+  "main": "./lib/pdf-runtime.node",
+  "files": [
+    "lib",
+    "README.md",
+    "LICENSE"
+  ]
+}

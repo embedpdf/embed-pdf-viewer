@@ -1,0 +1,65 @@
+{
+  "name": "@cloudpdf/viewer-react",
+  "version": "2.15.0",
+  "private": false,
+  "description": "React wrapper for the full viewer wired to CloudPDF: <CloudPDFViewer docToken=\"…\" />. A thin cloud DOOR over @embedpdf/viewer-react/core — no wasm, no workers, rendering happens on a @cloudpdf/server deployment (or CloudPDF SaaS) over HTTPS.",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.cts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "epdf-build",
+    "clean": "rimraf dist",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/embedpdf/embed-pdf-viewer",
+    "directory": "cloudpdf/viewer/react"
+  },
+  "homepage": "https://www.cloudpdf.com",
+  "bugs": {
+    "url": "https://github.com/embedpdf/embed-pdf-viewer/issues"
+  },
+  "keywords": [
+    "pdf",
+    "cloudpdf",
+    "viewer",
+    "react",
+    "cloud"
+  ],
+  "license": "Apache-2.0",
+  "dependencies": {
+    "@cloudpdf/viewer": "workspace:*",
+    "@embedpdf/viewer-react": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": ">=18"
+  },
+  "devDependencies": {
+    "@embedpdf/tooling-build": "workspace:*",
+    "@types/react": "^18.3.0",
+    "rimraf": "^5.0.0",
+    "typescript": "^5.0.0"
+  },
+  "sideEffects": false,
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": {
+        "import": "./dist/index.js",
+        "require": "./dist/index.cjs"
+      },
+      "./package.json": "./package.json"
+    }
+  }
+}

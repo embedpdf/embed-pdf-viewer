@@ -1,0 +1,62 @@
+{
+  "name": "@embedpdf/viewer",
+  "version": "2.15.0",
+  "private": false,
+  "description": "The full viewer, delivered: the <embedpdf-viewer> custom element + EmbedPDF.init(). One Preact-compiled artifact of @embedpdf/viewer-chrome with the local wasm engine wired in — the thing the CDN serves and every framework wrapper wraps. Ships DIST only (the preact aliasing happens in THIS package's build), so consumers never compile the chrome.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/doors/local.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/doors/local.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./core": {
+      "types": "./dist/doors/core.d.ts",
+      "default": "./dist/core.js"
+    },
+    "./snippet": {
+      "types": "./dist/doors/snippet.d.ts",
+      "default": "./dist/embedpdf.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "dev": "vite",
+    "build": "rimraf dist && vite build && vite build --mode snippet && tsc -p tsconfig.decl.json",
+    "clean": "rimraf dist",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@embedpdf/engine": "workspace:*",
+    "@embedpdf/engine-core": "workspace:*",
+    "@embedpdf/viewer-chrome": "workspace:*",
+    "preact": "^10.25.0"
+  },
+  "devDependencies": {
+    "@embedpdf/engine-runtime-wasm32": "workspace:*",
+    "@tailwindcss/vite": "^4.1.18",
+    "@types/node": "^22.0.0",
+    "@types/react": "^18.3.0",
+    "@types/react-dom": "^18.3.0",
+    "tailwindcss": "^4.1.18",
+    "typescript": "^5.0.0",
+    "vite": "^6.0.0"
+  },
+  "license": "Apache-2.0",
+  "publishConfig": {
+    "access": "public"
+  },
+  "sideEffects": [
+    "./src/kernel/element.ts",
+    "./src/doors/*.ts",
+    "./dist/*.js",
+    "./dist/**/*.js"
+  ]
+}

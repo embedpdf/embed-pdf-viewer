@@ -1,0 +1,112 @@
+---
+title: Storage
+description: Configure where the CloudPDF server keeps PDF bytes — the local filesystem, or S3, GCS, or Azure Blob.
+---
+
+import { Callout } from '@/components/docs/callout';
+import { Cards, Card } from '@/components/docs/cards';
+
+# Storage
+
+The object store holds the actual document bytes and rendered artifacts. It's
+separate from the [database](/docs/server/configuration/database), which holds the
+records *about* those documents. That separation is what lets you scale: many
+stateless server replicas can share one durable bucket.
+
+Set the backend with `CLOUDPDF_STORAGE_KIND`:
+
+| Kind | Use when |
+| --- | --- |
+| `fs` (default) | Single host — files on a local or mounted disk. |
+| `s3` | AWS S3, or any S3-compatible store (MinIO, Cloudflare R2, Wasabi…). |
+| `gcs` | Google Cloud Storage. |
+| `azure-blob` | Azure Blob Storage. |
+
+## Filesystem (default)
+
+Stores objects under a directory. Simple and fast for a single host; put the
+directory on a persistent, backed-up volume.
+
+```sh
+CLOUDPDF_STORAGE_KIND=fs
+CLOUDPDF_STORAGE_FS_ROOT=/data/objects
+```
+
+<Callout type="warn">
+  Filesystem storage is local to one machine. To run multiple replicas, use a
+  shared cloud bucket (<code>s3</code>, <code>gcs</code>, or
+  <code>azure-blob</code>) so every replica sees the same objects.
+</Callout>
+
+## S3 and S3-compatible
+
+```sh
+CLOUDPDF_STORAGE_KIND=s3
+CLOUDPDF_STORAGE_S3_BUCKET=my-cloudpdf-bucket
+CLOUDPDF_STORAGE_S3_REGION=eu-west-1
+
+# Credentials via the standard AWS environment (or an instance role / IRSA):
+AWS_ACCESS_KEY_ID=...
+AWS_SECRET_ACCESS_KEY=...
+```
+
+For an S3-compatible store such as MinIO or R2, add the endpoint:
+
+```sh
+CLOUDPDF_STORAGE_S3_ENDPOINT=https://minio.internal:9000
+```
+
+<Callout type="info">
+  Credentials follow the standard AWS provider chain, so on AWS you can skip
+  static keys entirely and use an instance role or — on EKS — IRSA. That keeps
+  long-lived secrets out of your configuration.
+</Callout>
+
+## Google Cloud Storage & Azure Blob
+
+```sh
+CLOUDPDF_STORAGE_KIND=gcs
+# Authenticates via Application Default Credentials (workload identity or a
+# service-account key file referenced by GOOGLE_APPLICATION_CREDENTIALS).
+```
+
+```sh
+CLOUDPDF_STORAGE_KIND=azure-blob
+# Authenticates via the standard Azure identity chain (managed identity or
+# connection string).
+```
+
+<Callout type="info">
+  The cloud storage SDKs are optional dependencies — they install automatically
+  with the npm package and are baked into the Docker image. You only pay for the
+  one whose <code>CLOUDPDF_STORAGE_KIND</code> you select.
+</Callout>
+
+## The local cache
+
+Independent of the object store, the server keeps a **local cache** of recently
+used documents and renders so repeat requests are fast:
+
+```sh
+CLOUDPDF_CACHE_ROOT=/data/cache
+CLOUDPDF_CACHE_MAX_BYTES=4294967296   # 4 GiB
+```
+
+The cache is disposable: it's safe to clear, and the server rebuilds it from the
+object store on demand. Give it a fast local disk (not a network mount) and size
+it for your working set.
+
+## Next steps
+
+<Cards>
+  <Card
+    title="Database"
+    description="SQLite vs Postgres for document records."
+    href="/docs/server/configuration/database"
+  />
+  <Card
+    title="CDN, KMS & secrets"
+    description="Signed delivery URLs and encrypted documents."
+    href="/docs/server/configuration/adapters"
+  />
+</Cards>

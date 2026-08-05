@@ -1,0 +1,121 @@
+---
+title: How it works
+description: The CloudPDF server architecture — the HTTP API, the native worker pool, the storage and database layers, and how a request flows through them.
+---
+
+import { Callout } from '@/components/docs/callout';
+import { Cards, Card } from '@/components/docs/cards';
+
+# How it works
+
+The server is a single Node process with three responsibilities: speak HTTP,
+render PDFs, and persist documents. Understanding the pieces makes every
+configuration choice obvious.
+
+## The big picture
+
+```
+        ┌──────────────┐        Bearer JWT        ┌───────────────────────────┐
+        │ Your frontend│ ───────────────────────▶ │     @cloudpdf/server      │
+        │ @cloudpdf/   │                           │                           │
+        │   engine     │ ◀─────────────────────── │  Fastify HTTP API         │
+        └──────────────┘   pages, text, metadata   │      │                    │
+                                                    │      ▼                    │
+        ┌──────────────┐   mints doc-scoped JWT     │  Worker pool (PDFium)     │
+        │ Your backend │ ─────────────────────────▶│      │                    │
+        └──────────────┘                            │      ▼                    │
+                                                    │  Database   Object store  │
+                                                    └───────┼──────────┼────────┘
+                                                            ▼          ▼
+                                                   SQLite/Postgres  disk / S3 /
+                                                                    GCS / Azure
+```
+
+1. **Your backend mints a token.** When a user needs a document, your backend
+   issues a short-lived, document-scoped JWT signed with the shared
+   `CLOUDPDF_JWT_SECRET`.
+2. **The frontend calls the server** with that token via
+   [`@cloudpdf/engine`](/docs/engine). The token says *which* document and
+   *what* the caller may do.
+3. **The server verifies the token, loads the document** from the object store
+   (caching it locally), and hands the work to a native PDFium worker.
+4. **Results come back as JSON or images** — rendered pages, extracted text,
+   annotations, metadata.
+
+## The HTTP API
+
+A [Fastify](https://fastify.dev) server exposes two route families:
+
+| Routes | Auth | Purpose |
+| --- | --- | --- |
+| `/v1/docs/*` | Document-scoped JWT | Render pages, extract text, read/write annotations and metadata, unlock encrypted PDFs. This is what `@cloudpdf/engine` calls. |
+| `/v1/admin/*` | Admin JWT | Create documents, upload files, mint and revoke tokens. This is what your backend calls. |
+| `/healthz`, `/readyz` | None | Liveness and readiness probes. |
+
+Every document and admin route requires a valid token; an unauthenticated call
+returns `401`. See [Authentication](/docs/server/configuration/authentication)
+for how tokens are scoped.
+
+## The native worker pool
+
+PDFium is a native C++ library. The server runs it inside a pool of Node
+`worker_thread`s so that CPU-heavy rendering never blocks the HTTP event loop and
+several requests can render in parallel.
+
+The pool size is controlled by
+[`CLOUDPDF_WORKER_POOL_SIZE`](/docs/server/operations/health-and-scaling). The
+default is conservative — `min(2, cpu count)` — and you raise it as you give the
+process more cores and memory.
+
+<Callout type="warn">
+  The native runtime is <strong>thread-confined</strong>: a hard native crash
+  takes down the whole process, not just one request. You get resilience by
+  running <strong>multiple replicas</strong> (Compose or Kubernetes) and keeping
+  the pool size sensible, so one bad document can't take your service offline.
+  See <a href="/docs/server/operations/health-and-scaling">Health &amp; scaling</a>.
+</Callout>
+
+## Storage: database + object store
+
+The server separates **metadata** from **bytes**:
+
+- **Database** — document records, annotations, tokens, and the audit log. Use
+  **SQLite** (a single file, zero setup) to start, or **Postgres** for
+  multi-replica production. See [Database](/docs/server/configuration/database).
+- **Object store** — the actual PDF bytes and rendered artifacts. Use the
+  **local filesystem** for a single host, or **S3 / GCS / Azure Blob** for
+  durable, shared storage. See [Storage](/docs/server/configuration/storage).
+- **Cache** — a local directory of recently used documents and renders so repeat
+  requests are fast. It is disposable; the server rebuilds it from the object
+  store.
+
+This split is what lets the same binary run as a zero-config single file *and* as
+a horizontally-scaled cluster — you only change configuration.
+
+<Callout type="info">
+  The smallest possible setup — SQLite + local disk + local cache — needs
+  <strong>no external services at all</strong>. That is exactly what the
+  <a href="/docs/server/getting-started/quick-start">Quick start</a> uses.
+</Callout>
+
+## Twelve-factor by design
+
+Everything is configured through `CLOUDPDF_*` environment variables, the
+process logs to stdout, and state lives in the database, object store, and
+cache — never in the container. That is what makes the same image safe to run as
+one container or fifty pods.
+
+## Next steps
+
+<Cards>
+  <Card
+    title="Quick start"
+    description="Get a server running and make your first request."
+    href="/docs/server/getting-started/quick-start"
+  />
+  <Card
+    title="Choosing a deployment"
+    description="npm, Docker, Compose, or Helm — and when to use each."
+    href="/docs/server/deployment"
+  />
+</Cards>

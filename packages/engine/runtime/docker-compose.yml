@@ -1,0 +1,31 @@
+services:
+  pdf-runtime-wasm-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    working_dir: /workspace
+    volumes:
+      - ../..:/workspace
+      - pdf-runtime-gclient:/root/.cache
+    command: bash -lc "PDF_RUNTIME_DEV_TARGETS=wasm32 pnpm --filter @embedpdf/engine-runtime dev"
+
+  pdf-runtime-linux-test:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    platform: linux/amd64
+    working_dir: /workspace
+    volumes:
+      - ../..:/workspace
+      - pdf-runtime-gclient:/root/.cache
+    environment:
+      PDF_RUNTIME_SYNC: ${PDF_RUNTIME_SYNC:-local}
+      PDF_RUNTIME_TARGET_OS_LIST: linux
+      PDFIUM_TEST_SUITE: ${PDFIUM_TEST_SUITE:-embedder}
+      PDFIUM_UNIT_FILTER: ${PDFIUM_UNIT_FILTER:-}
+      PDFIUM_EMBEDDER_FILTER: ${PDFIUM_EMBEDDER_FILTER:-}
+      PDFIUM_GTEST_ARGS: ${PDFIUM_GTEST_ARGS:-}
+    command: bash -lc "cd /workspace/packages/engine/runtime && bash ./scripts/test-pdfium.sh"
+
+volumes:
+  pdf-runtime-gclient:

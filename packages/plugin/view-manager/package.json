@@ -1,0 +1,43 @@
+{
+  "name": "@embedpdf/plugin-view-manager",
+  "version": "2.15.0",
+  "private": false,
+  "description": "Workspace-scoped plugin: arranges open documents into reorderable panes (views). Each view points at a document; the framework adapter renders one <DocumentScope> per view. Ships zero framework code.",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.cts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "main": "./dist/index.js",
+    "module": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+      ".": {
+        "import": "./dist/index.js",
+        "require": "./dist/index.cjs"
+      },
+      "./package.json": "./package.json"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "epdf-build",
+    "clean": "rimraf dist",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@embedpdf/core": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "@embedpdf/tooling-build": "workspace:*"
+  },
+  "license": "Apache-2.0",
+  "sideEffects": false
+}

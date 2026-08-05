@@ -1,0 +1,30 @@
+{
+  "$comment": "Azure Front Door rules-engine template for AzureFrontDoorCdnSigner verification. Import this into your AFD profile's rules engine and set the CLOUDPDF_CDN_SECRET environment variable on the rule. The rule reads ?token= and ?expires= query params, recomputes HMAC-SHA256(secret + path + expires), and rejects on mismatch or expiry. Server-side signer must use the same algorithm — see AzureFrontDoorCdnSigner.ts.",
+  "name": "cloudpdf-cdn-token-verify",
+  "order": 1,
+  "match_processing_behavior": "Stop",
+  "conditions": [
+    {
+      "name": "request_uri",
+      "operator": "BeginsWith",
+      "match_values": ["/v1/docs/"]
+    }
+  ],
+  "actions": [
+    {
+      "name": "rules_engine_action",
+      "$comment": "Pseudocode — AFD's rules-engine syntax varies. Concrete implementation depends on whether you use AFD Standard, Premium, or Classic. See README in this directory for vendor-specific config snippets.",
+      "verify": {
+        "algorithm": "HMAC-SHA256",
+        "secret_env_var": "CLOUDPDF_CDN_SECRET",
+        "token_param": "token",
+        "expires_param": "expires",
+        "message_template": "${secret}${request.path}${query.expires}"
+      },
+      "on_failure": {
+        "status": 403,
+        "body": "invalid or expired CDN token"
+      }
+    }
+  ]
+}

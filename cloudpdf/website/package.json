@@ -1,0 +1,34 @@
+{
+  "name": "@cloudpdf/website",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "dev:clean": "rm -rf .next && next dev",
+    "build": "next build",
+    "start": "next start",
+    "clean": "rm -rf .next node_modules/.cache",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@hugeicons/core-free-icons": "^4.2.0",
+    "@hugeicons/react": "^1.1.7",
+    "@theguild/remark-npm2yarn": "^0.3.3",
+    "next": "^15.4.10",
+    "nextra": "^4.6.1",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "shiki": "3.14.0",
+    "unist-util-visit": "^5.0.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.0.6",
+    "@types/mdx": "^2.0.13",
+    "@types/node": "^20.0.0",
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "eslint-config-next": "15.5.12",
+    "postcss": "^8.4.32",
+    "tailwindcss": "^4.0.6",
+    "typescript": "^5.0.0"
+  }
+}

@@ -1,0 +1,129 @@
+---
+title: Configuration reference
+description: Every CLOUDPDF_* environment variable the CloudPDF server reads, with defaults and where each one matters.
+---
+
+import { Callout } from '@/components/docs/callout';
+import { Cards, Card } from '@/components/docs/cards';
+
+# Configuration reference
+
+The server is configured entirely through environment variables. The same
+variables work whether you run it via [npm](/docs/server/deployment/npm),
+[Docker](/docs/server/deployment/docker),
+[Compose](/docs/server/deployment/docker-compose), or
+[Helm](/docs/server/deployment/helm) — only *how* you set them differs.
+
+<Callout type="info">
+  Only one variable is strictly required:
+  <strong><code>CLOUDPDF_JWT_SECRET</code></strong>. Everything else has a
+  sensible default, so a minimal server runs with just that.
+</Callout>
+
+## Process
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `PORT` | `3000` | Port the HTTP server listens on. |
+| `HOST` | `0.0.0.0` | Interface to bind. |
+| `CLOUDPDF_WORKER_POOL_SIZE` | `min(2, cpus)` | Native PDFium worker threads. Integer, or `max` to use all cores. See [Health & scaling](/docs/server/operations/health-and-scaling). |
+
+## Authentication
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `CLOUDPDF_JWT_SECRET` | — | **Required in production.** HS256 secret used to verify document and admin tokens. Must match the secret your backend signs with. |
+
+See [Authentication](/docs/server/configuration/authentication).
+
+## Database
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `CLOUDPDF_DB_DRIVER` | `sqlite` | `sqlite` or `postgres`. |
+| `CLOUDPDF_DB_SQLITE_PATH` | `./data/cloudpdf.db` | SQLite file path (when driver is `sqlite`). |
+| `CLOUDPDF_DB_URL` | — | Postgres connection string (required when driver is `postgres`). |
+
+See [Database](/docs/server/configuration/database).
+
+## Storage (object store)
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `CLOUDPDF_STORAGE_KIND` | `fs` | `fs`, `s3`, `gcs`, or `azure-blob`. |
+| `CLOUDPDF_STORAGE_FS_ROOT` | `./data/objects` | Directory for stored objects (when kind is `fs`). |
+| `CLOUDPDF_STORAGE_S3_BUCKET` | — | Bucket name (S3). |
+| `CLOUDPDF_STORAGE_S3_REGION` | — | Bucket region (S3). |
+| `CLOUDPDF_STORAGE_S3_ENDPOINT` | — | Custom endpoint for S3-compatible stores (e.g. MinIO). |
+
+See [Storage](/docs/server/configuration/storage).
+
+## Engine cache
+
+The cache holds recently used documents and renders so repeat requests are fast.
+It is disposable — the server rebuilds it from the object store.
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `CLOUDPDF_CACHE_ROOT` | `./data/cache` | Cache directory. |
+| `CLOUDPDF_CACHE_MAX_BYTES` | `4 GiB` | Maximum cache size before eviction. |
+
+## Fonts
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `CLOUDPDF_FALLBACK_FONTS` | — | JSON array of fallback fonts (`{ key, path, … }`) for glyphs a document's own fonts are missing. |
+
+See [Fallback fonts](/docs/server/configuration/fonts).
+
+## Lifecycle & migrations
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `CLOUDPDF_AUTO_MIGRATE` | on for SQLite, off for Postgres | Apply pending migrations on boot. |
+| `CLOUDPDF_FAIL_ON_PENDING` | off | Refuse to start if migrations are pending. Recommended for multi-replica deploys. |
+| `CLOUDPDF_AUTO_PROVISION_TENANT` | off | Lazily create tenant rows. Dev convenience — leave off in production. |
+
+See [Migrations](/docs/server/operations/migrations).
+
+## Optional adapters
+
+These are opt-in. You only need them for the corresponding feature.
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `CLOUDPDF_CDN_KIND` | `none` | Sign delivery URLs via a CDN: `bunny`, `cloud-cdn`, `cloudfront`, `azure-fd`, `custom-hmac`. |
+| `CLOUDPDF_KMS_KIND` | `static` | Key management for encrypted-PDF sessions: `aws-kms`, `gcp-kms`, `azure-kv`. |
+| `CLOUDPDF_SECRETS_PROVIDERS` | `env` | Comma-separated registry of secret sources. |
+
+See [CDN, KMS & secrets](/docs/server/configuration/adapters).
+
+<Callout type="info">
+  The CLI prints this whole surface at any time:
+  <code>cloudpdf-server --help</code>.
+</Callout>
+
+## Where to set these
+
+<Cards>
+  <Card
+    title="npm"
+    description="Shell environment or a process-manager unit file."
+    href="/docs/server/deployment/npm"
+  />
+  <Card
+    title="Docker"
+    description="-e flags, or an --env-file."
+    href="/docs/server/deployment/docker"
+  />
+  <Card
+    title="Docker Compose"
+    description="The environment: block and a .env file."
+    href="/docs/server/deployment/docker-compose"
+  />
+  <Card
+    title="Helm"
+    description="config: (ConfigMap) and existingSecret (Secret)."
+    href="/docs/server/deployment/helm"
+  />
+</Cards>

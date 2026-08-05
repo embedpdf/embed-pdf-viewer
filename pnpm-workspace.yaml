@@ -1,8 +1,21 @@
 packages:
-  # include packages in subfolders (change as required)
   - 'packages/**'
   - 'examples/**'
-  - 'viewers/*'
+  # Recursive, like packages/: the cloudpdf tree groups a product line into a
+  # directory once it has siblings (cloudpdf/viewer/{main,react,vue,...}).
+  - 'cloudpdf/**'
+  - 'tooling/*'
   - 'website'
-    # exclude the git submodule (and everything inside it)
-  - '!packages/pdfium/pdfium-src/**'
+  # exclude generated outputs that can contain nested package.json copies
+  # (ng-packagr always emits one into dist) and confuse workspace discovery.
+  - '!**/dist/**'
+  - '!**/.next/**'
+  - '!**/.svelte-kit/**'
+  - '!**/.vercel/**'
+  # exclude the git submodule (and everything inside it)
+  - '!packages/engine/runtime/runtime-src/**'
+  # exclude agent scratch trees: a git worktree created while cwd was a
+  # subdirectory (e.g. cloudpdf/server) lands inside a glob'd path and re-adds a
+  # whole second copy of every workspace package under a stale layout.
+  - '!**/.claude/**'
+  - '!**/.cursor/**'

@@ -1,0 +1,107 @@
+{
+  "name": "@embedpdf/engine-runtime",
+  "version": "2.15.0",
+  "private": false,
+  "description": "Low-level PDF execution runtime for EmbedPDF, backed by EmbedPDF's fork of PDFium and distributed as WASM and native platform packages.",
+  "type": "module",
+  "license": "Apache-2.0",
+  "main": "./dist/index.node.cjs",
+  "module": "./dist/index.browser.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "node": {
+        "import": {
+          "types": "./dist/index.d.ts",
+          "default": "./dist/index.node.js"
+        },
+        "require": {
+          "types": "./dist/index.d.cts",
+          "default": "./dist/index.node.cjs"
+        }
+      },
+      "default": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.browser.js"
+      }
+    }
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/embedpdf/embed-pdf-viewer",
+    "directory": "packages/engine/runtime"
+  },
+  "homepage": "https://www.embedpdf.com",
+  "bugs": {
+    "url": "https://github.com/embedpdf/embed-pdf-viewer/issues"
+  },
+  "keywords": [
+    "pdf",
+    "runtime",
+    "wasm",
+    "native",
+    "embedpdf"
+  ],
+  "scripts": {
+    "build": "rollup -c",
+    "build:target": "bash ./scripts/build-target.sh",
+    "build:local": "bash ./scripts/build-all-local.sh",
+    "clean": "rimraf dist build/libpdfium build/generated npm/*/lib",
+    "fetch": "bash ./scripts/fetch-libpdfium.sh",
+    "generate:functions": "node ./build/generate-functions.mjs",
+    "generate:napi": "node ./build/generate-napi-binding.mjs",
+    "generate:runtime-methods": "node ./build/generate-runtime-methods.mjs",
+    "lint": "eslint src --color",
+    "lint:fix": "eslint src --color --fix",
+    "runtime:use-local": "bash ./scripts/runtime-use-local.sh",
+    "test:pdfium": "bash ./scripts/test-pdfium.sh",
+    "test:pdfium:unit": "PDFIUM_TEST_SUITE=unit bash ./scripts/test-pdfium.sh",
+    "test:pdfium:embedder": "PDFIUM_TEST_SUITE=embedder bash ./scripts/test-pdfium.sh",
+    "test:pdfium:docker": "bash ./scripts/test-pdfium-docker.sh",
+    "test:pdfium:unit:docker": "PDFIUM_TEST_SUITE=unit bash ./scripts/test-pdfium-docker.sh",
+    "test:pdfium:embedder:docker": "PDFIUM_TEST_SUITE=embedder bash ./scripts/test-pdfium-docker.sh",
+    "test:pdfium:goldens:linux": "PDFIUM_TEST_SUITE=embedder bash ./scripts/test-pdfium-docker.sh --write-pngs",
+    "test:parity": "node --test ./test/*.test.mjs",
+    "verify:packages": "bash ./scripts/verify-packages.sh",
+    "verify:browser-purity": "node ./scripts/verify-browser-purity.mjs",
+    "dev": "bash ./scripts/dev.sh",
+    "fetch:payload": "bash scripts/fetch-payload.sh"
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md"
+  ],
+  "dependencies": {
+    "detect-libc": "^2.1.2"
+  },
+  "optionalDependencies": {
+    "@embedpdf/engine-runtime-darwin-arm64": "workspace:*",
+    "@embedpdf/engine-runtime-darwin-x64": "workspace:*",
+    "@embedpdf/engine-runtime-linux-arm64": "workspace:*",
+    "@embedpdf/engine-runtime-linux-x64": "workspace:*",
+    "@embedpdf/engine-runtime-linuxmusl-arm64": "workspace:*",
+    "@embedpdf/engine-runtime-linuxmusl-x64": "workspace:*",
+    "@embedpdf/engine-runtime-wasm32": "workspace:*",
+    "@embedpdf/engine-runtime-win32-arm64": "workspace:*",
+    "@embedpdf/engine-runtime-win32-x64": "workspace:*"
+  },
+  "devDependencies": {
+    "@rollup/plugin-commonjs": "^25.0.8",
+    "@rollup/plugin-node-resolve": "^15.2.1",
+    "@rollup/plugin-replace": "^5.0.2",
+    "@rollup/plugin-typescript": "^12.3.0",
+    "@types/emscripten": "^1.39.13",
+    "@types/node": "latest",
+    "chokidar-cli": "^3.0.0",
+    "cmake-js": "^7.3.1",
+    "esbuild": "^0.28.1",
+    "magic-string": "^0.30.17",
+    "rollup": "^4.53.5",
+    "rollup-plugin-dts": "^6.3.0",
+    "typescript": "^5.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

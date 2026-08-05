@@ -1,0 +1,51 @@
+import type { DocsIntegration } from './docs-integrations';
+
+export type DocsOverviewPath = {
+  id: 'viewer' | 'headless';
+  title: string;
+  eyebrow: string;
+  description: string;
+  href: string;
+  cta: string;
+  illustration: string;
+  features: readonly string[];
+  integrations: readonly DocsIntegration[];
+};
+
+export const DOCS_OVERVIEW_PATHS: readonly DocsOverviewPath[] = [
+  {
+    id: 'viewer',
+    title: 'Ready-made Viewer',
+    eyebrow: 'Recommended for speed',
+    description: 'Embed a polished, production-ready PDF viewer in minutes.',
+    href: '/docs/viewer/vanilla/getting-started',
+    cta: 'Start with the Viewer',
+    illustration: '/illustration-readymade.svg',
+    features: ['Drop-in integration', 'Prebuilt toolbar and layout', 'Framework-neutral API'],
+    integrations: ['vanilla', 'react', 'vue', 'svelte', 'angular'],
+  },
+  {
+    id: 'headless',
+    title: 'Headless Components',
+    eyebrow: 'Recommended for customization',
+    description: 'Compose your own viewer UI from plugins, components, and reactive bindings.',
+    href: '/docs/headless/react/getting-started',
+    cta: 'Start with Headless',
+    illustration: '/illustration-headless.svg',
+    features: ['Own every pixel', 'Composable feature plugins', 'One API across frameworks'],
+    integrations: ['react', 'vue', 'svelte', 'angular'],
+  },
+];
+
+export const DOCS_ENGINE_FOUNDATION = {
+  title: 'EmbedPDF Engine',
+  eyebrow: 'The foundation underneath both paths',
+  description:
+    'Open, inspect, render, edit, and save PDF documents without adopting a UI layer. The local engine runs PDFium through WebAssembly in a Web Worker.',
+  href: '/docs/engine/getting-started',
+  cta: 'Use the Engine directly',
+  apiHref: '/docs/engine',
+  apiCta: 'Engine API reference',
+  illustration: '/pdfium.svg',
+  features: ['Document I/O', 'Page rendering', 'Text and search', 'Forms and annotations'],
+} as const;

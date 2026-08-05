@@ -1,0 +1,32 @@
+{
+  "version": "2.15.0",
+  "license": "Apache-2.0",
+  "publishConfig": {
+    "access": "public"
+  },
+  "name": "@embedpdf/engine-runtime-wasm32",
+  "type": "module",
+  "main": "./lib/embedpdf.node.cjs",
+  "module": "./lib/embedpdf.browser.js",
+  "exports": {
+    ".": {
+      "node": {
+        "import": "./lib/embedpdf.node.js",
+        "require": "./lib/embedpdf.node.cjs"
+      },
+      "default": "./lib/embedpdf.browser.js"
+    },
+    "./embedpdf.wasm": "./lib/embedpdf.wasm",
+    "./wasm-url": {
+      "types": "./wasm-url.d.ts",
+      "default": "./wasm-url.js"
+    }
+  },
+  "files": [
+    "lib",
+    "wasm-url.js",
+    "wasm-url.d.ts",
+    "README.md",
+    "LICENSE"
+  ]
+}

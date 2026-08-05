@@ -1,0 +1,11 @@
+pdf-runtime-build.local.json
+
+build/build/
+build/cache/
+build/generated/
+build/libpdfium/
+build/local-artifacts/
+build/local-staging/
+.cache/
+
+npm/*/lib/

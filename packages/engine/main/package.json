@@ -1,0 +1,96 @@
+{
+  "name": "@embedpdf/engine",
+  "version": "2.15.0",
+  "private": false,
+  "description": "Engine v3 local implementation: the EmbedPDF Runtime (our PDFium fork) as WASM inside a Web Worker (or inline for Node), driven by an O(log n) abort-aware WorkerQueue. Speaks the same Engine interface as the cloud engine.",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.cts",
+  "exports": {
+    ".": {
+      "development": "./src/index.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./package.json": "./package.json",
+    "./worker-entry": "./src/worker/worker-entry.ts",
+    "./worker-source": {
+      "types": "./workers/embedpdf-worker.source.d.ts",
+      "default": "./workers/embedpdf-worker.source.js"
+    }
+  },
+  "scripts": {
+    "build": "node scripts/build-workers.mjs && epdf-build",
+    "clean": "rimraf dist workers",
+    "lint": "eslint src --color",
+    "lint:fix": "eslint src --color --fix",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "files": [
+    "dist",
+    "workers",
+    "src/worker/worker-entry.ts",
+    "src/worker/bootstrap.ts",
+    "src/worker/protocol.ts",
+    "LICENSE",
+    "README.md"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/embedpdf/embed-pdf-viewer",
+    "directory": "packages/engine"
+  },
+  "homepage": "https://www.embedpdf.com",
+  "bugs": {
+    "url": "https://github.com/embedpdf/embed-pdf-viewer/issues"
+  },
+  "keywords": [
+    "pdf",
+    "embedpdf",
+    "engine",
+    "wasm"
+  ],
+  "license": "Apache-2.0",
+  "dependencies": {
+    "@embedpdf/engine-core": "workspace:*",
+    "@embedpdf/engine-services": "workspace:*",
+    "@embedpdf/engine-runtime": "workspace:*",
+    "@embedpdf/engine-runtime-wasm32": "workspace:*"
+  },
+  "devDependencies": {
+    "@embedpdf/tooling-build": "workspace:*",
+    "esbuild": "^0.28.1",
+    "rimraf": "^5.0.0",
+    "typescript": "^5.0.0",
+    "vitest": "^2.1.0"
+  },
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": {
+        "import": "./dist/index.js",
+        "require": "./dist/index.cjs"
+      },
+      "./package.json": "./package.json",
+      "./worker-entry": "./src/worker/worker-entry.ts",
+      "./worker-source": {
+        "types": "./workers/embedpdf-worker.source.d.ts",
+        "default": "./workers/embedpdf-worker.source.js"
+      }
+    }
+  },
+  "epdf": {
+    "rawExports": [
+      "./worker-entry",
+      "./worker-source"
+    ],
+    "devExports": "development"
+  },
+  "sideEffects": [
+    "./src/worker/worker-entry.ts",
+    "./workers/embedpdf-worker.js",
+    "./workers/encoder-worker.js"
+  ]
+}

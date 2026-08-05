@@ -1,0 +1,166 @@
+@import 'tailwindcss';
+@config '../../tailwind.config.ts';
+
+html {
+  @apply text-base antialiased;
+  -webkit-tap-highlight-color: transparent;
+  scroll-behavior: smooth;
+}
+
+::selection {
+  background: #e6f0ff;
+  color: #0a1a4d;
+}
+
+/* Site-wide focus ring. This rule is UNLAYERED, so it outranks every Tailwind
+   utility (those live in `@layer utilities`, and unlayered always wins over
+   layered regardless of specificity) — `focus-visible:outline-none` on an
+   element cannot turn it off. Components that own their own focus treatment
+   opt out with `data-ring="none"` rather than fighting the cascade. */
+:where(button, a, input, select, textarea):not([data-ring='none']):focus-visible {
+  outline: 2px solid #0876fd;
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+/* ---- Brand gradient text (blue → purple), the kit's <em> treatment ---- */
+.ep-grad {
+  background: linear-gradient(90deg, #0876fd 0%, #9747ff 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+.ep-grad-blue {
+  background: linear-gradient(90deg, #0876fd 0%, #4aa3ff 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+/* ---- Search modal entrances ---- */
+@keyframes epFade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes epSlide {
+  from {
+    transform: translateY(-12px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+.ep-anim-fade {
+  animation: epFade 0.15s ease-out;
+}
+.ep-anim-slide {
+  animation: epSlide 0.2s ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ep-anim-fade,
+  .ep-anim-slide {
+    animation: none;
+  }
+}
+
+/* ---- Quick Start section: dark background + arched wave transitions ---- */
+.ep-qs-bg {
+  background:
+    radial-gradient(ellipse 70% 80% at 50% 0%, #0e1a36 0%, transparent 65%),
+    linear-gradient(180deg, #050a18 0%, #07112a 60%, #050a18 100%);
+}
+.ep-qs-glare {
+  position: absolute;
+  right: -180px;
+  bottom: -180px;
+  width: 560px;
+  height: 560px;
+  background: radial-gradient(
+    ellipse 55% 55% at 55% 50%,
+    rgba(151, 71, 255, 0.45) 0%,
+    rgba(151, 71, 255, 0.16) 38%,
+    rgba(151, 71, 255, 0.05) 60%,
+    transparent 75%
+  );
+  filter: blur(30px);
+  z-index: 6;
+  pointer-events: none;
+}
+
+/* ---- Quick Start code tokens (kit palette) ---- */
+.ep-code .tk-tag {
+  color: #6fb3ff;
+}
+.ep-code .tk-attr {
+  color: #c792ea;
+}
+.ep-code .tk-str {
+  color: #95e1a8;
+}
+.ep-code .tk-key {
+  color: #ff8ac2;
+}
+.ep-code .tk-fn {
+  color: #82aaff;
+}
+.ep-code .tk-kw {
+  color: #c792ea;
+  font-style: italic;
+}
+.ep-code .tk-com {
+  color: #4a5980;
+  font-style: italic;
+}
+.ep-code .tk-pun {
+  color: #6b7a99;
+}
+.ep-code .tk-num {
+  color: #f78c6c;
+}
+
+/* ---- Dark code-surface scrollbar (browser defaults are built for white
+   pages and glow on the navy cards; MUI-style inset pill instead). Apply to
+   every scroll container whose background is the dark code palette. ---- */
+.ep-dark-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #2e3f6e transparent;
+}
+.ep-dark-scroll::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+.ep-dark-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.ep-dark-scroll::-webkit-scrollbar-thumb {
+  background: #2e3f6e;
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+.ep-dark-scroll::-webkit-scrollbar-thumb:hover {
+  background-color: #3d538f;
+}
+.ep-dark-scroll::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* ---- Docs prose (ported from the ee docs theme, EmbedPDF tokens) ---- */
+.prose-embedpdf :not(pre) > code {
+  border-radius: 6px;
+  background-color: #eef3fc;
+  border: 1px solid #e0e8f6;
+  padding: 0.125rem 0.4rem;
+  font-family: var(--font-mono, ui-monospace, Menlo, monospace);
+  font-size: 0.875em;
+  color: #0758b8;
+  white-space: nowrap;
+}

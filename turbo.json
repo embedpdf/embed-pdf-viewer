@@ -6,9 +6,23 @@
       "dependsOn": ["^build"],
       "outputs": ["dist/**"]
     },
+    "@embedpdf/engine#build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**", "workers/**", "src/generated/**"]
+    },
+    "@embedpdf/website#build:demos": {
+      "dependsOn": ["^build"],
+      "outputs": ["public/demos/**"]
+    },
+    "@embedpdf/website#build": {
+      "dependsOn": ["build:demos", "^build"],
+      "outputs": [".next/**", "!.next/cache/**"]
+    },
     "check-types": {
       "dependsOn": ["^check-types"]
     },
+    "typecheck": {},
+    "test": {},
     "dev": {
       "persistent": true,
       "cache": false

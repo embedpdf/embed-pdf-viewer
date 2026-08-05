@@ -1,0 +1,3 @@
+/* The chrome's sheet is self-contained (tailwind import + @source over the
+   chrome's own sources + theme tokens). The example adds nothing on top. */
+@import '@embedpdf/viewer-chrome/styles.css';

@@ -1,0 +1,264 @@
+---
+title: Forms
+description: Read, fill, import/export, repair, and author AcroForm fields and their widgets.
+---
+
+import { Callout } from '@/components/docs/callout';
+import { Cards, Card } from '@/components/docs/cards';
+
+# Forms
+
+A PDF form lives on two planes. **Fields** are document-scoped records — a field has a
+name, a family (text, checkbox, radio…), flags, and a value. **Widgets** are page-scoped
+annotations — the boxes you actually see and click. One field can have many widgets (a
+radio group is *one* field with one widget per button), and a widget is just an
+annotation until a field adopts it.
+
+The engine mirrors that split: everything field-shaped lives on `doc.forms`, everything
+visual stays on the annotation plane you already know. The examples below assume you
+already opened a document (see [Quick start](/docs/engine/getting-started/quick-start)).
+
+## Reading the form
+
+`list()` returns the whole form as one snapshot — the field tree, each field's value and
+options, and where its widgets sit:
+
+```ts
+const snapshot = await doc.forms.list();
+
+snapshot.formKind; // 'acroform' | 'xfa' | 'none'
+for (const field of snapshot.fields) {
+  // field.name    — fully qualified ("billing.name")
+  // field.family  — 'text' | 'checkbox' | 'radio' | 'combobox' | 'listbox' | …
+  // field.widgets — the page-placed widgets that render it
+}
+```
+
+Each family has its own DTO, so the value is always correctly typed: a text field has
+`value: string`, a checkbox has `checked: boolean`, a multi-select list box has
+`selectedValues: string[]`. Narrow on `family` and TypeScript does the rest:
+
+```ts
+const field = await doc.forms.get({ kind: 'fqn', name: 'billing.name' });
+if (field.family === 'text') {
+  field.value;     // string
+  field.maxLength; // number | null
+}
+```
+
+### Addressing a field
+
+Every field carries a `ref` — reuse it, the same way you reuse annotation refs. When you
+need to build one by hand there are two forms:
+
+```ts
+// Durable: the field dictionary's PDF object number (preferred).
+await doc.forms.get({ kind: 'objectNumber', fieldObjectNumber: 12 });
+
+// Portable: the fully qualified name — what FDF/XFDF and analytics use.
+await doc.forms.get({ kind: 'fqn', name: 'billing.name' });
+```
+
+<Callout type="info">
+  Some PDFs ship broken forms: widgets that render but whose fields were never linked
+  into the document's field tree. The snapshot *recovers* those and marks them
+  <code>origin: 'recovered'</code> — they read and fill like any other field. Use
+  [repair](#repairing-a-broken-form) to make the recovery durable in the file.
+</Callout>
+
+## Filling fields
+
+`setValue()` takes a value shaped by family — text for text fields, a toggle state for
+checkboxes and radios, export values for choice fields. Validation happens before
+anything is written: a rejected write changes nothing.
+
+```ts
+// Text (enforces /MaxLen, comb, etc.).
+await doc.forms.setValue(field.ref, { type: 'text', value: 'Ada Lovelace' });
+
+// Checkbox / radio: pass the widget on-state to check, null to clear.
+await doc.forms.setValue(radio.ref, { type: 'toggle', state: 'yes' });
+await doc.forms.setValue(check.ref, { type: 'toggle', state: null });
+
+// Choice (combo/list box): export values; multi-select takes several.
+await doc.forms.setValue(listbox.ref, { type: 'choice', values: ['Apple', 'Cherry'] });
+
+// Back to the default value (/DV), or empty when there is none.
+await doc.forms.reset(field.ref);
+```
+
+The result tells you what changed on screen:
+
+```ts
+const result = await doc.forms.setValue(radio.ref, { type: 'toggle', state: 'yes' });
+result.field;          // the field, read back after the write
+result.changedWidgets; // every widget whose appearance changed — across ALL pages
+```
+
+`changedWidgets` is your render-invalidation list: a radio group flips two widgets at
+once (the old choice off, the new one on), and they may live on different pages.
+
+<Callout type="info">
+  Radio edge cases are honored, not approximated: <code>NoToggleToOff</code> groups
+  reject <code>state: null</code>, radios-in-unison check every widget sharing the
+  on-state, and a checkbox with an export value (<code>/Opt</code>) reads back that
+  export value as the field value.
+</Callout>
+
+## Import and export (FDF/XFDF)
+
+Form data travels between documents as FDF or XFDF — the interchange formats every PDF
+tool understands. Export produces bytes; import replays them field by field:
+
+```ts
+// XFDF is the default (XML, Unicode-safe). FDF is also available.
+const { bytes } = await doc.forms.exportData('xfdf');
+
+// …later, into another copy of the same form:
+const result = await other.forms.importData(bytes);
+result.fieldsApplied;  // entries that matched and validated
+result.fieldsSkipped;  // unknown names / family mismatches — never poison the rest
+result.snapshot;       // the full form state after import, no second round trip
+```
+
+Import is per-field: one bad entry is counted and skipped, everything else still lands.
+
+## Repairing a broken form
+
+`repair()` is the form doctor. It makes read-time recovery durable: it bootstraps a
+missing `/AcroForm`, links recovered fields into the field tree, re-attaches stray
+widgets, and (optionally) bakes missing appearance streams so every viewer renders the
+same pixels:
+
+```ts
+const report = await doc.forms.repair({ bakeAppearances: true });
+report.fieldsLinked;      // recovered field roots now in /AcroForm /Fields
+report.widgetsLinked;     // stray widgets re-attached to their field
+report.appearancesBaked;  // widgets that got a fresh appearance stream
+```
+
+Repair is validate-then-apply and idempotent — running it twice reports zeros the second
+time.
+
+## Authoring fields
+
+Creating a form element is one call. Give `createField` the family, a name, and where
+its widgets go — placement and styling included:
+
+```ts
+const { field } = await doc.forms.createField({
+  family: 'radio',
+  name: 'subscription',
+  noToggleToOff: true,
+  widgets: [
+    {
+      pageObjectNumber,
+      rect: { left: 72, bottom: 640, right: 92, top: 660 },
+      onState: 'monthly',
+      appearance: { color: { r: 0, g: 0, b: 0 }, strokeWidth: 1 },
+    },
+    {
+      pageObjectNumber,
+      rect: { left: 72, bottom: 610, right: 92, top: 630 },
+      onState: 'yearly',
+    },
+  ],
+});
+
+// The newborn group fills through the normal value path.
+await doc.forms.setValue(field.ref, { type: 'toggle', state: 'monthly' });
+```
+
+`updateField` patches field-plane properties (rename, flags, options, default value) —
+pass the family so the valid fields are typed. `deleteField` removes the field *and*
+cascades to its widgets:
+
+```ts
+await doc.forms.updateField(field.ref, { family: 'radio', name: 'billing_cycle' });
+
+const removed = await doc.forms.deleteField(field.ref);
+removed.removedWidgets; // widget annotations deleted from their pages
+```
+
+### Widgets are annotations
+
+A widget's styling vocabulary is the annotation vocabulary — same names, same writer.
+You can create an unattached widget through the annotation plane and have a field adopt
+it later, which is exactly what `createField`'s `widgets` array does for you:
+
+```ts
+// Born as an annotation: inert until a field adopts it.
+const { created } = await page.annotations.create({
+  subtype: 'widget',
+  rect: { left: 72, bottom: 560, right: 260, top: 584 },
+  color: { r: 31, g: 111, b: 235 },          // border
+  interiorColor: { r: 246, g: 248, b: 250 }, // background
+  fontSize: 10,
+});
+
+// Adoption wires it to the field plane…
+await doc.forms.attachWidget(field.ref, {
+  annotObjectNumber: created.ref.annotObjectNumber,
+  pageObjectNumber,
+});
+
+// …and release returns it to the annotation plane.
+await doc.forms.detachWidget(field.ref, {
+  annotObjectNumber: created.ref.annotObjectNumber,
+  pageObjectNumber,
+});
+```
+
+Attached widgets show up in `page.annotations.list()` like any annotation, carry
+`fieldObjectNumber` as the join key back to their field (`0` means unattached), and are
+restyled/moved through the ordinary `page.annotations.update()` path.
+
+<Callout type="info">
+  Deleting an <em>attached</em> widget through <code>page.annotations.delete()</code> is
+  refused — the field tree owns it. Detach it first, or use
+  <code>doc.forms.deleteField()</code> to remove field and widgets together.
+</Callout>
+
+## Events
+
+Every form mutation publishes a document event — your own writes and, on the cloud,
+everyone else's:
+
+```ts
+doc.events.subscribe((event) => {
+  if (event.type === 'form.valueChanged') {
+    event.field;          // the field after the write
+    event.changedWidgets; // what to re-render
+  }
+});
+```
+
+| Event | Fired by |
+| :--- | :--- |
+| `form.valueChanged` | `setValue`, `reset` |
+| `form.imported` | `importData` |
+| `form.repaired` | `repair` |
+| `form.fieldCreated` / `form.fieldUpdated` / `form.fieldDeleted` | field lifecycle |
+| `form.widgetAttached` / `form.widgetDetached` | widget adoption |
+
+<Callout type="warn">
+  Form access is gated by the caller's scope on the cloud: <code>doc.forms.read</code>
+  for snapshots and export, <code>doc.forms.fill</code> for value writes and import,
+  <code>doc.forms.modify</code> for field lifecycle, widget adoption, and repair. Each
+  scope implies the ones below it; insufficient scope fails with <code>Forbidden</code>.
+</Callout>
+
+## Next
+
+<Cards>
+  <Card
+    title="Annotations"
+    description="The annotation plane widgets live on — reading, styling, rendering."
+    href="/docs/engine/core-concepts/annotations"
+  />
+  <Card
+    title="Security & access"
+    description="How scopes and document permissions gate every engine call."
+    href="/docs/engine/core-concepts/security-and-access"
+  />
+</Cards>

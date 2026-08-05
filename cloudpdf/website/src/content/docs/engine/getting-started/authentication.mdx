@@ -1,0 +1,103 @@
+---
+title: Authentication
+description: How the cloud engine authenticates — doc-scoped JWTs, opening by token vs. by id, and why scope lives server-side.
+---
+
+import { Callout } from '@/components/docs/callout';
+
+# Authentication
+
+The cloud engine authenticates every request with a **bearer JWT**. Your backend
+mints these tokens; the engine never holds your tenant secret and never signs
+anything itself. The CloudPDF server is the verifier of record — the SDK only
+*decodes* a token (unverified) to learn which document to route to.
+
+## Where the token comes from
+
+Set a token on the engine, on an individual `open()`, or both. A token may be a
+string or a function that returns a fresh one — the engine calls it on every
+request, so rotation is transparent.
+
+```ts
+const engine = createCloudEngine({
+  baseUrl: 'https://pdf.your-app.com',
+  token: () => getTenantToken(), // engine-level default bearer
+});
+```
+
+<Callout type="warn">
+  Mint tokens on your server, never in the browser, and keep them short-lived.
+  A doc-scoped token is pinned to a single document, so an exfiltrated token
+  can't be replayed against other documents.
+</Callout>
+
+## Two ways to open
+
+The cloud engine accepts exactly two `OpenInput` shapes.
+
+### Open by token
+
+Use this for share-link / embed UX, where the bearer is authorized for exactly
+one document. Pass a **doc-scoped JWT** whose `doc_id` claim identifies the
+document. Each `open({ kind: 'token' })` is independent — one engine can hold
+many handles, each carrying its own per-document token.
+
+```ts
+const doc = await engine.open({
+  kind: 'token',
+  token: () => fetchDocToken(documentId),
+});
+```
+
+The handle and all of its RPCs carry this token, not the engine-level one.
+
+### Open by id
+
+Use this when your frontend has a tenant session (for example a JWT minted at
+login by your auth backend) and just needs to open one of many documents the
+tenant owns.
+
+```ts
+const doc = await engine.open({
+  kind: 'id',
+  id: 'doc_proposal_2026',
+  layerName: 'default', // optional; omit for the server default layer
+  token: () => fetchTenantToken(), // optional per-open override
+});
+```
+
+Without a per-open `token`, the engine uses the token supplied at construction.
+
+## Scope and identity live on the server
+
+Authorization — what the caller may do (`doc.text.copy`, `doc.annotate.read`,
+`annotations:update:self`, …) and who they are — is carried **inside the JWT**
+and enforced by the server. The engine reads them from the token; it does not
+accept them as client options.
+
+<Callout type="info">
+  The local engine takes <code>scope</code> and <code>identity</code> through
+  <code>open()</code> options because there's no JWT involved. The cloud engine
+  intentionally <strong>ignores</strong> those options — the token is the
+  authority. This is what keeps the same SDK code portable between local and
+  cloud. Read the resolved grants from
+  <a href="/docs/engine/core-concepts/security-and-access"><code>doc.security.effectiveScope</code></a>.
+</Callout>
+
+## Anonymous engines
+
+If every `open()` supplies its own doc-scoped token, the engine itself needs no
+credentials — omit `token` at construction. Requests then go out without an
+`Authorization` header until a per-open token is provided.
+
+```ts
+const engine = createCloudEngine({ baseUrl: 'https://pdf.your-app.com' });
+const doc = await engine.open({ kind: 'token', token: shareLinkJwt });
+```
+
+## What failures look like
+
+Auth problems surface as typed `EngineError`s: a `401` becomes
+`Unauthenticated`, a `403` becomes `Forbidden`. See
+[Async & errors](/docs/engine/core-concepts/async-and-errors) for the full list
+and handling patterns.

@@ -1,0 +1,127 @@
+---
+title: Health & scaling
+description: Probes, the native worker pool, replicas, and memory sizing for running the CloudPDF server reliably under load.
+---
+
+import { Callout } from '@/components/docs/callout';
+import { Cards, Card } from '@/components/docs/cards';
+
+# Health & scaling
+
+The server is built to run as many stateless replicas behind a load balancer.
+This page covers the probes you wire up, how to size the native worker pool, and
+the one important property of the runtime that shapes your resilience strategy.
+
+## Health probes
+
+Two endpoints, both public (no token required):
+
+| Endpoint | Meaning | Use as |
+| --- | --- | --- |
+| `/healthz` | The process is alive. | Liveness probe — restart the instance if this fails. |
+| `/readyz` | The instance is ready to serve. | Readiness probe — route traffic only when this passes. |
+
+```sh
+curl localhost:3000/healthz   # {"status":"ok"}
+curl localhost:3000/readyz    # {"status":"ok"}
+```
+
+Point your load balancer or orchestrator at `/readyz` for traffic decisions and
+`/healthz` for restarts. The [Docker image](/docs/server/deployment/docker)
+includes a built-in `HEALTHCHECK`, and the [Helm chart](/docs/server/deployment/helm)
+wires both probes for you.
+
+## The worker pool
+
+PDF rendering is CPU-heavy and runs in a pool of native worker threads, so
+requests render in parallel without blocking the HTTP loop. Size it with:
+
+```sh
+CLOUDPDF_WORKER_POOL_SIZE=max   # an integer, or "max" for all cores
+```
+
+- **Default:** `min(2, cpu count)` — deliberately conservative.
+- **`max`:** use every available core. Good when the instance is dedicated to the
+  server.
+- **An integer:** pin an exact number, e.g. leave headroom for other processes.
+
+A useful rule of thumb: give the instance roughly one CPU per worker, then tune
+from there using your render latency and CPU graphs.
+
+## Memory sizing
+
+Each worker thread carries its own copy of font and CMap data, so memory grows
+with the pool size, not just with traffic. When you raise
+`CLOUDPDF_WORKER_POOL_SIZE`, raise the instance's memory to match — budget for
+per-thread font/CMap duplication on top of your documents' working set. Watch for
+restarts caused by hitting a memory limit and give the pool more headroom if you
+see them.
+
+## Resilience: run more than one replica
+
+<Callout type="warn">
+  The native runtime is <strong>thread-confined</strong>: a hard native crash
+  takes down the <strong>whole process</strong>, not just the one request that
+  triggered it. A single malformed document should never be able to take your
+  service offline.
+</Callout>
+
+The answer is horizontal redundancy, not a bigger single instance:
+
+- **Run at least two replicas** (Docker Compose `--scale`, or Helm
+  `replicaCount`/HPA) so one crash never means zero capacity.
+- **Use a PodDisruptionBudget** (the Helm chart includes one) so node
+  maintenance can't drain all replicas at once.
+- **Keep the worker pool sensible.** A larger pool means a crash takes more
+  in-flight requests down with the process — balance throughput against
+  blast radius.
+- **Let liveness restart crashed instances** and readiness keep traffic off them
+  until they're back.
+
+## Autoscaling
+
+On Kubernetes, the Helm chart can create a HorizontalPodAutoscaler on CPU (and
+optionally memory). Because the server is stateless — all state lives in
+[Postgres](/docs/server/configuration/database) and the
+[object store](/docs/server/configuration/storage) — replicas scale up and down
+freely:
+
+```yaml
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+```
+
+<Callout type="info">
+  Scaling out requires Postgres and a shared object store — SQLite and local-disk
+  storage are single-instance only. See
+  <a href="/docs/server/configuration/database">Database</a> and
+  <a href="/docs/server/configuration/storage">Storage</a>.
+</Callout>
+
+## A production checklist
+
+- Postgres, with migrations run as a separate step
+  ([Migrations](/docs/server/operations/migrations)).
+- A shared object store (S3 / GCS / Azure Blob).
+- At least two replicas, with `/readyz` and `/healthz` wired up.
+- `CLOUDPDF_WORKER_POOL_SIZE` and memory tuned together.
+- A pinned image version or digest — never `:latest`.
+- `CLOUDPDF_JWT_SECRET` injected from a secret manager.
+
+## Next steps
+
+<Cards>
+  <Card
+    title="Helm / Kubernetes"
+    description="Replicas, HPA, PDB, and probes, configured for you."
+    href="/docs/server/deployment/helm"
+  />
+  <Card
+    title="Configuration reference"
+    description="Every setting, including the worker pool."
+    href="/docs/server/configuration"
+  />
+</Cards>

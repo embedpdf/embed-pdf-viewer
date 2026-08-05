@@ -1,192 +1,120 @@
-import type { NextConfig } from 'next'
-import nextra from 'nextra'
-import type { Pluggable } from 'unified'
-import { remarkNpm2Yarn } from '@theguild/remark-npm2yarn'
-import { globSync } from 'glob'
-import { visit } from 'unist-util-visit'
-import { Plugin } from 'unified'
-import { remarkCodeExample } from './src/lib/remark-code-example'
-import { rehypeCodeExample } from './src/lib/rehype-code-example'
-import { rehypeCdnUrls } from './src/lib/rehype-cdn-urls'
-import { readFileSync } from 'fs'
-import { resolve } from 'path'
-import { fileURLToPath } from 'url'
-import { dirname } from 'path'
+import crypto from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
 
-// Get __dirname equivalent in ESM
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = dirname(__filename)
+import type { NextConfig } from 'next';
+import nextra from 'nextra';
+import { remarkNpm2Yarn } from '@theguild/remark-npm2yarn';
+import { visit } from 'unist-util-visit';
 
-// Read snippet version from package.json for use in client components
-const snippetPackageJson = JSON.parse(
-  readFileSync(resolve(__dirname, '../viewers/snippet/package.json'), 'utf8'),
-)
-const SNIPPET_VERSION = snippetPackageJson.version
-// Extract major version for CDN URL (e.g., "2.0.1" → "2")
-const SNIPPET_MAJOR_VERSION = SNIPPET_VERSION.split('.')[0]
+import { rehypeCodeExample } from './src/lib/rehype-code-example';
+import { remarkCodeExample } from './src/lib/remark-code-example';
 
-/**
- * This plugin overrides the import source for the Tabs component to use the custom component
- * @param tree - The markdown AST
- * @returns The modified markdown AST
- */
-const overrideNpm2YarnImports: Plugin = () => {
-  return (tree) => {
-    // Find and modify the import statements added by remarkNpm2Yarn
-    visit(tree, 'mdxjsEsm', (node: any) => {
-      if (node.data?.estree?.body) {
-        for (const statement of node.data.estree.body) {
-          // Look for import declarations from 'nextra/components'
-          if (
-            statement.type === 'ImportDeclaration' &&
-            statement.source.value === 'nextra/components'
-          ) {
-            // Change the import source to your component
-            statement.source.value = '@/components/tabs'
-          }
-        }
+// Nextra 4 emits the Tabs import from `nextra/components` for npm2yarn blocks
+// regardless of the plugin's `packageName` option, so rewrite the import
+// source to the branded EmbedPDF Tabs.
+const overrideNpm2YarnImports = () => (tree: any) => {
+  visit(tree, 'mdxjsEsm', (node: any) => {
+    const body = node.data?.estree?.body;
+    if (!body) return;
+    for (const statement of body) {
+      if (
+        statement.type === 'ImportDeclaration' &&
+        statement.source.value === 'nextra/components'
+      ) {
+        statement.source.value = '@/components/docs/tabs';
+        statement.source.raw = "'@/components/docs/tabs'";
       }
-    })
+    }
+  });
+  return tree;
+};
 
-    return tree
+// GitHub "view source" base for docs samples. Derived from Vercel's git
+// system env vars (same convention as the commit-SHA reads in mdx.tsx /
+// docs-feedback-store.ts) so every deployment — production and a preview of
+// any branch — links to the exact ref it was built from; there's no `next`→
+// `main` flip to remember at launch. Falls back to the repo default for
+// local / non-Vercel builds.
+const githubOwner = process.env.VERCEL_GIT_REPO_OWNER ?? 'embedpdf';
+const githubRepo = process.env.VERCEL_GIT_REPO_SLUG ?? 'embed-pdf-viewer';
+const githubRef = process.env.VERCEL_GIT_COMMIT_REF ?? process.env.GIT_COMMIT_REF ?? 'main';
+// The website lives at <repo>/website/; sample paths resolve relative to it.
+const githubBaseUrl = `https://github.com/${githubOwner}/${githubRepo}/blob/${githubRef}/website/`;
+
+// The docs code panels are inlined at MDX-compile time by remarkCodeExample
+// via fs.readFileSync — a read webpack can't see, so a change to a sample
+// alone never invalidates the cached compiled MDX (Vercel restores
+// .next/cache across deploys, so stale code panels ship while the separately
+// built live demos stay fresh). Fix: make the samples a first-class cache
+// input by folding a content hash of everything those panels read into
+// webpack's persistent cache version. Samples changed → whole cache discarded
+// → MDX recompiles and re-reads. Samples untouched → full cache reuse.
+function hashDocsCodeInputs(): string {
+  const hash = crypto.createHash('sha256');
+  const walk = (dir: string) => {
+    let entries: fs.Dirent[];
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
+      const abs = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        walk(abs);
+      } else if (entry.isFile()) {
+        hash.update(abs);
+        hash.update(fs.readFileSync(abs));
+      }
+    }
+  };
+  // Everything <Example>/<CodeExample> panels read from disk at compile time.
+  walk(path.resolve(__dirname, 'src', 'samples'));
+  // The demo manifest decides which examples get a live preview; built by
+  // build:demos before next build.
+  try {
+    hash.update(fs.readFileSync(path.resolve(__dirname, 'public', 'demos', 'demos-manifest.json')));
+  } catch {
+    // No demos built (e.g. bare `next build` in CI checks) — still valid.
   }
+  return hash.digest('hex').slice(0, 16);
 }
 
+const docsCodeHash = hashDocsCodeInputs();
+
 const withNextra = nextra({
-  // ... Other Nextra config options,
   mdxOptions: {
+    rehypePrettyCodeOptions: {
+      theme: 'material-theme-palenight',
+      keepBackground: false,
+    },
     remarkPlugins: [
       [
-        remarkNpm2Yarn, // should be before remarkRemoveImports because contains `import { Tabs as $Tabs, Tab as $Tab } from ...`
+        remarkNpm2Yarn,
         {
-          packageName: '@/components/tabs',
+          packageName: '@/components/docs/tabs',
           tabNamesProp: 'items',
           storageKey: 'selectedPackageManager',
         },
-      ] satisfies Pluggable,
-      overrideNpm2YarnImports,
-      [
-        remarkCodeExample,
-        {
-          // Base GitHub URL for your repository
-          githubBaseUrl:
-            'https://github.com/embedpdf/embed-pdf-viewer/blob/main/website/',
-        },
       ],
+      overrideNpm2YarnImports,
+      [remarkCodeExample, { githubBaseUrl }],
     ],
-    rehypePlugins: [rehypeCodeExample, rehypeCdnUrls],
+    rehypePlugins: [rehypeCodeExample],
   },
-})
+});
 
-// Pre-built example packages that should NOT be analyzed/transpiled by Next.js.
-// These packages use Vue/Svelte and have their own build process.
-// Next.js has issues with `export *` re-exports across package boundaries,
-// which causes sporadic "Attempted import error" failures.
-const EXTERNAL_EXAMPLE_PACKAGES = [
-  '@embedpdf/example-vue-tailwind',
-  '@embedpdf/example-svelte-tailwind',
-]
+const nextConfig: NextConfig = {
+  reactStrictMode: true,
+  webpack(config) {
+    // See hashDocsCodeInputs above: docs code panels depend on files webpack
+    // doesn't track, so their hash versions the persistent cache.
+    if (config.cache && typeof config.cache === 'object' && config.cache.type === 'filesystem') {
+      config.cache.version = `${config.cache.version ?? ''}|docs-code:${docsCodeHash}`;
+    }
+    return config;
+  },
+};
 
-// Export a function that handles phase-specific logic and merges with Nextra
-export default async (phase: string) => {
-  // Build config with env
-  const nextConfig: NextConfig = {
-    env: {
-      NEXT_PUBLIC_SNIPPET_VERSION: SNIPPET_VERSION,
-      NEXT_PUBLIC_SNIPPET_MAJOR_VERSION: SNIPPET_MAJOR_VERSION,
-    },
-    // Mark Vue/Svelte example packages as external for server-side bundling
-    serverExternalPackages: EXTERNAL_EXAMPLE_PACKAGES,
-    // Redirects for moved documentation pages (from /docs/{framework}/* to /docs/{framework}/headless/*)
-    async redirects() {
-      const frameworks = ['react', 'vue', 'svelte']
-      const headlessPages = [
-        'engine',
-        'full-example',
-        'getting-started',
-        'introduction',
-        'understanding-plugins',
-      ]
-      const pluginPages = [
-        'plugin-annotation',
-        'plugin-capture',
-        'plugin-commands',
-        'plugin-document-manager',
-        'plugin-export',
-        'plugin-i18n',
-        'plugin-pan',
-        'plugin-print',
-        'plugin-redaction',
-        'plugin-render',
-        'plugin-rotate',
-        'plugin-scroll',
-        'plugin-selection',
-        'plugin-spread',
-        'plugin-thumbnail',
-        'plugin-tiling',
-        'plugin-view-manager',
-        'plugin-viewport',
-        'plugin-zoom',
-      ]
-
-      const redirects: Array<{
-        source: string
-        destination: string
-        permanent: boolean
-      }> = []
-
-      for (const framework of frameworks) {
-        // Redirect headless pages
-        for (const page of headlessPages) {
-          redirects.push({
-            source: `/docs/${framework}/${page}`,
-            destination: `/docs/${framework}/headless/${page}`,
-            permanent: true,
-          })
-        }
-        // Redirect plugin pages
-        for (const plugin of pluginPages) {
-          redirects.push({
-            source: `/docs/${framework}/plugins/${plugin}`,
-            destination: `/docs/${framework}/headless/plugins/${plugin}`,
-            permanent: true,
-          })
-        }
-      }
-
-      return redirects
-    },
-  }
-
-  // Add transpilePackages in development (but exclude the pre-built examples)
-  if (phase === 'phase-development-server') {
-    const fs = await import('node:fs')
-    const allFiles = globSync('../packages/*/package.json')
-
-    const packageNames = allFiles
-      .map((file: any) => {
-        try {
-          const packageJson = JSON.parse(fs.readFileSync(file, 'utf8'))
-          return packageJson.name
-        } catch (error) {
-          return null
-        }
-      })
-      .filter((pkg: string) => pkg?.startsWith('@embedpdf'))
-      // Explicitly exclude the example packages from transpilation
-      .filter((pkg: string) => !EXTERNAL_EXAMPLE_PACKAGES.includes(pkg))
-
-    nextConfig.transpilePackages = packageNames
-  }
-
-  // Apply Nextra wrapper
-  const nextraWrapped = withNextra(nextConfig)
-
-  // If nextra returns a function, call it with phase
-  const finalConfig =
-    typeof nextraWrapped === 'function'
-      ? await (nextraWrapped as (phase: string) => Promise<NextConfig>)(phase)
-      : nextraWrapped
-
-  return finalConfig
-}
+export default withNextra(nextConfig);

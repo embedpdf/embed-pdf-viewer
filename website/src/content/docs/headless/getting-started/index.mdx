@@ -1,0 +1,74 @@
+---
+title: Getting Started
+description: Build your own PDF viewer UI with the EmbedPDF headless libraries.
+---
+
+# Getting Started
+
+The headless libraries give you the engine and the plugin system — you own
+every pixel of the UI. An app depends on two packages: the adapter for your
+framework, and an engine.
+
+## Installation
+
+<Fw only="react">
+```sh npm2yarn
+npm install @embedpdf/react @embedpdf/engine
+```
+</Fw>
+
+<Fw only="vue">
+```sh npm2yarn
+npm install @embedpdf/vue @embedpdf/engine
+```
+</Fw>
+
+<Fw only="svelte">
+```sh npm2yarn
+npm install @embedpdf/svelte @embedpdf/engine
+```
+</Fw>
+
+<Fw only="angular">
+```sh npm2yarn
+npm install @embedpdf/angular @embedpdf/engine
+```
+</Fw>
+
+<Fw only="react">
+  The React adapter exposes every feature as one import line per vertical —
+  registration, components, and hooks travel together, and deleting the line
+  removes the feature from your bundle.
+</Fw>
+
+<Fw only="vue">
+  The Vue adapter mirrors the React surface subpath-for-subpath — the same
+  verticals, exposed as components and composables.
+</Fw>
+
+<Fw only="svelte">
+  The Svelte adapter mirrors the React surface subpath-for-subpath — the same
+  verticals, exposed as components and stores.
+</Fw>
+
+<Fw only="angular">
+  The Angular adapter ships each vertical as a secondary entry point —
+  Angular's native library modularity — with inject functions instead of
+  hooks.
+</Fw>
+
+## Your first viewer
+
+`localEngine()` creates the engine — synchronously, allocating nothing until
+first use, so a module-scope `const engine = localEngine()` is safe (even under
+SSR). Hand it to `<Viewer>`: the viewer warms it up on mount and PDFium boots
+in a worker in the background, so the stage and render layer draw the pages the
+moment a document is ready — no worker wiring, no lifecycle to manage. This is
+the whole app:
+
+<Example name="getting-started/basic" mode="open" />
+
+Prefer the viewer to own the engine's lifetime — created on mount, destroyed on
+unmount? Pass a thunk instead: `engine={() => localEngine()}`. See the
+[Engine getting started](/docs/engine/getting-started) for the ownership model,
+fallback fonts, cloud, and SSR.

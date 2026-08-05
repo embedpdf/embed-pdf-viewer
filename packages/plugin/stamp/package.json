@@ -1,0 +1,50 @@
+{
+  "name": "@embedpdf/plugin-stamp",
+  "version": "2.15.0",
+  "private": false,
+  "description": "Stamp asset libraries: retain imported PDFs as canonical PieceInfo-backed libraries, derive per-page vector assets and previews, materialize opt-in dynamic stamps, and place them through the annotation plugin's armed-stamp flow.",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.cts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "main": "./dist/index.js",
+    "module": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+      ".": {
+        "import": "./dist/index.js",
+        "require": "./dist/index.cjs"
+      },
+      "./package.json": "./package.json"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "epdf-build",
+    "clean": "rimraf dist",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@embedpdf/core": "workspace:*",
+    "@embedpdf/core-js-sandbox": "workspace:*",
+    "@embedpdf/plugin-annotation": "workspace:*",
+    "@embedpdf/plugin-form": "workspace:*",
+    "@embedpdf/engine-core": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "vitest": "^2.1.9",
+    "@embedpdf/tooling-build": "workspace:*",
+    "@embedpdf/engine": "workspace:*"
+  },
+  "license": "Apache-2.0",
+  "sideEffects": false
+}

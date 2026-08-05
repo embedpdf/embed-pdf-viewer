@@ -6,28 +6,25 @@
   "license": "MIT",
   "scripts": {
     "dev": "turbo run dev --parallel",
-    "dev:vanilla": "pnpm --filter @embedpdf/example-vanilla run dev",
-    "clean": "turbo run clean && rimraf .turbo/cache",
-    "build:fresh": "pnpm clean && turbo run build",
     "build": "turbo run build",
-    "build:react-mui": "turbo run build --filter=\"./packages/*\" --filter=\"./examples/react-mui\"",
-    "build:vue-vuetify": "turbo run build --filter=\"./packages/*\" --filter=\"./examples/vue-vuetify\"",
-    "build:svelte-tailwind": "pnpm build:viewers && pnpm --filter @embedpdf/example-svelte-tailwind run build:app",
-    "build:packages": "turbo run build --filter=\"./packages/*\"",
-    "build:viewers": "turbo run build --filter=\"./packages/*\" --filter=\"./viewers/*\"",
-    "build:snippet": "turbo run build --filter=\"./packages/*\" --filter=\"./viewers/snippet\"",
-    "build:watch": "ROARR_LOG=true turbowatch ./config/turbowatch.config.ts | roarr",
-    "watch": "turbo watch",
-    "watch:packages": "turbo watch build --filter=\"./packages/*\"",
+    "build:website": "pnpm --filter @embedpdf/website run db:migrate:build && pnpm --filter @embedpdf/website run search:index:build && turbo run build --filter=@embedpdf/website...",
+    "build:fresh": "pnpm clean && turbo run build",
+    "clean": "turbo run clean && rimraf .turbo/cache",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
     "format": "prettier --write \"**/*.{ts,tsx,js,mjs,jsx,json,css,md}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,mjs,jsx,json,css,md}\"",
+    "build:enterprise": "pnpm --filter @cloudpdf/admin-api build && pnpm --filter @cloudpdf/admin build && pnpm --filter @cloudpdf/engine build && pnpm --filter @cloudpdf/server build && pnpm --filter @cloudpdf/viewer build",
+    "build:release": "turbo run build --filter=\"./packages/**\" && pnpm run build:enterprise",
+    "verify:consume": "pnpm --filter @embedpdf/tooling-consume-fixtures run verify",
+    "verify:engine-runtime-packages": "pnpm --filter @embedpdf/engine-runtime run verify:packages",
     "changeset": "changeset",
-    "ci:publish": "pnpm publish -r --access public --report-summary $GITHUB_WORKSPACE/publish-summary.json",
-    "ci:publish:next": "pnpm publish -r --access public --tag next --publish-branch next --report-summary $GITHUB_WORKSPACE/publish-summary.json"
+    "ci:publish": "node scripts/assert-publish-phase.mjs && pnpm publish -r --access public --tag next --publish-branch main --report-summary"
   },
   "devDependencies": {
     "@changesets/cli": "^2.29.6",
     "@changesets/get-github-info": "^0.6.0",
+    "@next/eslint-plugin-next": "^15.5.12",
     "@roarr/cli": "^5.12.4",
     "@types/node": "latest",
     "@typescript-eslint/eslint-plugin": "^8.32.1",
@@ -47,7 +44,7 @@
     "rimraf": "latest",
     "turbo": "latest",
     "turbowatch": "^2.29.4",
-    "typescript": "latest",
+    "typescript": "^5.9.3",
     "vite": "^6.3.5"
   },
   "lint-staged": {
@@ -59,6 +56,9 @@
     },
     "patchedDependencies": {
       "@changesets/assemble-release-plan@6.0.9": "patches/@changesets__assemble-release-plan@6.0.9.patch"
-    }
+    },
+    "onlyBuiltDependencies": [
+      "better-sqlite3"
+    ]
   }
 }

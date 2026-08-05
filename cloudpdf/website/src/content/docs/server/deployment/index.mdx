@@ -1,0 +1,84 @@
+---
+title: Deployment overview
+description: Choose how to run the CloudPDF server — npm, Docker, Docker Compose, or Helm — based on your scale and operational needs.
+---
+
+import { Cards, Card } from '@/components/docs/cards';
+import { Callout } from '@/components/docs/callout';
+
+# Choosing a deployment
+
+The server is one application, packaged four ways. They run the same binary and
+read the same [`CLOUDPDF_*` configuration](/docs/server/configuration), so the
+choice is purely about *how you want to operate it* — not what it can do.
+
+| Method | Best for | Typical database | Typical storage | Scaling |
+| --- | --- | --- | --- | --- |
+| [**Node / npm**](/docs/server/deployment/npm) | Local dev, existing Node platforms, custom hosts | SQLite or Postgres | Disk or cloud | Manual |
+| [**Docker**](/docs/server/deployment/docker) | Single host, simple self-hosting, CI | SQLite or Postgres | Disk or cloud | Manual / your orchestrator |
+| [**Docker Compose**](/docs/server/deployment/docker-compose) | A full self-hosted stack on one box | Postgres (included) | MinIO / S3 (included) | A few replicas, one host |
+| [**Helm / Kubernetes**](/docs/server/deployment/helm) | Production, startup → enterprise | Postgres (managed) | S3 / GCS / Azure (managed) | Autoscaling, multi-replica, HA |
+
+<Callout type="info">
+  You can always start small and grow. Because storage is configured, not
+  compiled in, moving from SQLite + disk to Postgres + S3 — or from Docker to
+  Kubernetes — is a configuration change, not a rewrite.
+</Callout>
+
+## A quick decision guide
+
+- **Just exploring, or developing locally?** Use [npm](/docs/server/deployment/npm)
+  or the [Quick start](/docs/server/getting-started/quick-start) Docker one-liner.
+- **Self-hosting on a single server or VM?** Use
+  [Docker](/docs/server/deployment/docker) for the server alone, or
+  [Docker Compose](/docs/server/deployment/docker-compose) for the server plus
+  Postgres and object storage in one file.
+- **Running in production, or need high availability?** Use
+  [Helm](/docs/server/deployment/helm). You get multiple replicas, autoscaling,
+  managed schema migrations, and a clean separation of secrets — the things that
+  matter when downtime is expensive.
+
+## What every method needs
+
+No matter how you deploy, the server needs:
+
+1. **A signing secret** — `CLOUDPDF_JWT_SECRET`, shared with the backend that
+   mints tokens. See [Authentication](/docs/server/configuration/authentication).
+2. **A database** — SQLite (default) or Postgres. See
+   [Database](/docs/server/configuration/database).
+3. **An object store** — local disk (default) or a cloud bucket. See
+   [Storage](/docs/server/configuration/storage).
+4. **Persistent volumes** for `/data` when you use SQLite, local storage, or the
+   local cache.
+
+<Callout type="warn">
+  The native PDF runtime is thread-confined — a hard crash takes the whole
+  process down. For anything customer-facing, run <strong>more than one
+  replica</strong> (Compose or Helm) so a single failure can't take you offline.
+  Details in <a href="/docs/server/operations/health-and-scaling">Health &amp; scaling</a>.
+</Callout>
+
+## Pick your path
+
+<Cards>
+  <Card
+    title="Node / npm"
+    description="Install the package, run the CLI."
+    href="/docs/server/deployment/npm"
+  />
+  <Card
+    title="Docker"
+    description="One self-contained image."
+    href="/docs/server/deployment/docker"
+  />
+  <Card
+    title="Docker Compose"
+    description="Server + Postgres + object storage."
+    href="/docs/server/deployment/docker-compose"
+  />
+  <Card
+    title="Helm / Kubernetes"
+    description="Production-grade, autoscaling."
+    href="/docs/server/deployment/helm"
+  />
+</Cards>

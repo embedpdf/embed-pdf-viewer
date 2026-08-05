@@ -1,0 +1,57 @@
+{
+  "name": "@cloudpdf/admin",
+  "version": "2.15.0",
+  "private": false,
+  "description": "CloudPDF admin SDK. Node-only client used by a customer's backend to upload PDFs, manage documents, and mint user tokens against a @cloudpdf/server deployment.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "clean": "rimraf dist",
+    "dev": "tsup --watch",
+    "lint": "eslint src --color",
+    "lint:fix": "eslint src --color --fix",
+    "test": "vitest run"
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/embedpdf/embed-pdf-viewer",
+    "directory": "cloudpdf/admin"
+  },
+  "homepage": "https://www.cloudpdf.com",
+  "bugs": {
+    "url": "https://github.com/embedpdf/embed-pdf-viewer/issues"
+  },
+  "keywords": [
+    "pdf",
+    "cloudpdf",
+    "admin",
+    "sdk"
+  ],
+  "license": "Apache-2.0",
+  "dependencies": {
+    "@cloudpdf/admin-api": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "latest",
+    "rimraf": "^5.0.0",
+    "tsup": "^8.3.0",
+    "typescript": "^5.0.0",
+    "vitest": "^2.1.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
