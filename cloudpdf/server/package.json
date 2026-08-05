@@ -29,7 +29,7 @@
   },
   "files": [
     "dist",
-    "LICENSE.md",
+    "LICENSE",
     "README.md"
   ],
   "repository": {
@@ -47,7 +47,7 @@
     "server",
     "self-hosted"
   ],
-  "license": "SEE LICENSE IN LICENSE.md",
+  "license": "SEE LICENSE IN LICENSE",
   "dependencies": {
     "@cloudpdf/admin-api": "workspace:*",
     "@embedpdf/engine-core": "workspace:*",

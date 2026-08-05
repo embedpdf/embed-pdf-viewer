@@ -5,7 +5,7 @@
  * or modifying this code to disable or circumvent license enforcement, enable
  * protected functionality without a valid license key, or remove protected
  * functionality is a breach of FCL-1.0-ALv2 while this release is governed by
- * that license. See cloudpdf/server/LICENSE.md.
+ * that license. See cloudpdf/server/LICENSE.
  */
 import { createHash, createPublicKey, verify } from 'node:crypto';
 

@@ -3,16 +3,16 @@
 Everything in this repository is licensed under the
 [Apache License 2.0](LICENSE), with one exception: **`cloudpdf/server`** — the
 self-hostable CloudPDF server — is **Fair Source**, under the
-[Fair Core License, Version 1.0, ALv2 Future License](cloudpdf/server/LICENSE.md)
+[Fair Core License, Version 1.0, ALv2 Future License](cloudpdf/server/LICENSE)
 (FCL-1.0-ALv2).
 
-| Code                                                                                                  | Where                          | License                                         |
-| ----------------------------------------------------------------------------------------------------- | ------------------------------ | ----------------------------------------------- |
-| EmbedPDF SDK (`@embedpdf/*`)                                                                          | `packages/`                    | Apache-2.0                                      |
-| CloudPDF client libraries (`@cloudpdf/engine`, `@cloudpdf/viewer*`, `@cloudpdf/admin`, `…/admin-api`) | `cloudpdf/`                    | Apache-2.0                                      |
-| CloudPDF server (`@cloudpdf/server`)                                                                  | `cloudpdf/server/`             | FCL-1.0-ALv2                                    |
-| Websites                                                                                              | `website/`, `cloudpdf/website` | Apache-2.0 code; content per their `LICENSE.md` |
-| Examples & tooling                                                                                    | `examples/`, `tooling/`        | Apache-2.0                                      |
+| Code                                                                                                  | Where                          | License                                      |
+| ----------------------------------------------------------------------------------------------------- | ------------------------------ | -------------------------------------------- |
+| EmbedPDF SDK (`@embedpdf/*`)                                                                          | `packages/`                    | Apache-2.0                                   |
+| CloudPDF client libraries (`@cloudpdf/engine`, `@cloudpdf/viewer*`, `@cloudpdf/admin`, `…/admin-api`) | `cloudpdf/`                    | Apache-2.0                                   |
+| CloudPDF server (`@cloudpdf/server`)                                                                  | `cloudpdf/server/`             | FCL-1.0-ALv2                                 |
+| Websites                                                                                              | `website/`, `cloudpdf/website` | Apache-2.0 code; content per their `LICENSE` |
+| Examples & tooling                                                                                    | `examples/`, `tooling/`        | Apache-2.0                                   |
 
 The rule behind the line: **libraries are Apache-2.0; the deployable server
 product is Fair Source.** Client SDKs, contracts, engines, viewers, plugins —
@@ -41,8 +41,8 @@ The licensor is CloudPDF LTD.
 ## Website content
 
 The websites' application code is Apache-2.0 like the rest of the repository;
-their _content_ is zoned — see [`website/LICENSE.md`](website/LICENSE.md) and
-[`cloudpdf/website/LICENSE.md`](cloudpdf/website/LICENSE.md):
+their _content_ is zoned — see [`website/LICENSE`](website/LICENSE) and
+[`cloudpdf/website/LICENSE`](cloudpdf/website/LICENSE):
 
 - documentation prose: CC-BY-4.0;
 - code samples in the docs: MIT-0 (copy freely, no attribution needed);
@@ -56,8 +56,7 @@ rights.
 
 ## Authority
 
-For any package, the authoritative declaration is its own `LICENSE` /
-`LICENSE.md` file and the `license` field of its `package.json`. Directory
-placement decides nothing. (`@cloudpdf/server`'s `package.json` reads
-`SEE LICENSE IN LICENSE.md` because FCL-1.0-ALv2 is not yet an SPDX
-identifier.)
+For any package, the authoritative declaration is its own `LICENSE` file and
+the `license` field of its `package.json`. Directory placement decides nothing.
+(`@cloudpdf/server`'s `package.json` reads `SEE LICENSE IN LICENSE` because
+FCL-1.0-ALv2 is not yet an SPDX identifier.)

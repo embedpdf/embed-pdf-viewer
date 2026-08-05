@@ -5,7 +5,7 @@ This repository contains code under more than one license.
 The Apache License 2.0 below applies only to the portions identified as
 Apache-2.0 in LICENSING.md. It does not apply to cloudpdf/server, which is
 licensed under the Fair Core License, FCL-1.0-ALv2. The authoritative terms
-for that component are in cloudpdf/server/LICENSE.md.
+for that component are in cloudpdf/server/LICENSE.
 
 Website content may have separate terms as described in LICENSING.md.
 

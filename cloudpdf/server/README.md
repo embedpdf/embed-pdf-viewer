@@ -52,8 +52,8 @@ verified against the same compiled CloudPDF identity on every refresh.
 ## License
 
 The source is Fair Source under
-[FCL-1.0-ALv2](LICENSE.md), but the server is commercially licensed at runtime.
+[FCL-1.0-ALv2](LICENSE), but the server is commercially licensed at runtime.
 Running it requires a valid CloudPDF license key or a signed certificate for an
 air-gapped deployment. The license-key functionality may not be removed,
-changed, disabled, or circumvented. See [LICENSE.md](LICENSE.md) for the
+changed, disabled, or circumvented. See [LICENSE](LICENSE) for the
 authoritative terms.
