@@ -4,20 +4,24 @@ on:
   pull_request:
     paths:
       - 'cloudpdf/server/src/app/buildApp.ts'
+      - 'cloudpdf/server/src/app/secret-policy.ts'
       - 'cloudpdf/server/src/index.ts'
       - 'cloudpdf/server/src/licensing/**'
       - 'cloudpdf/server/src/bin/cloudpdf-server.ts'
       - 'cloudpdf/server/test/licensing.test.ts'
+      - 'cloudpdf/server/test/secret-policy.test.ts'
       - 'cloudpdf/server/package.json'
       - '.github/workflows/license-security.yml'
   push:
     branches: [main]
     paths:
       - 'cloudpdf/server/src/app/buildApp.ts'
+      - 'cloudpdf/server/src/app/secret-policy.ts'
       - 'cloudpdf/server/src/index.ts'
       - 'cloudpdf/server/src/licensing/**'
       - 'cloudpdf/server/src/bin/cloudpdf-server.ts'
       - 'cloudpdf/server/test/licensing.test.ts'
+      - 'cloudpdf/server/test/secret-policy.test.ts'
       - 'cloudpdf/server/package.json'
       - '.github/workflows/license-security.yml'
   workflow_dispatch: {}
