@@ -24,22 +24,22 @@ target_include_directories(${PROJECT_NAME} PRIVATE
 )
 
 if(WIN32)
-  set(PDFIUM_LIB "${PDFIUM_LIB_DIR}/pdfium.dll.lib")
+  set(PDFIUM_LIB "${PDFIUM_LIB_DIR}/embedpdf.dll.lib")
 elseif(APPLE)
-  set(PDFIUM_LIB "${PDFIUM_LIB_DIR}/libpdfium.dylib")
+  set(PDFIUM_LIB "${PDFIUM_LIB_DIR}/libembedpdf.dylib")
   set_target_properties(${PROJECT_NAME} PROPERTIES
     BUILD_RPATH   "@loader_path"
     INSTALL_RPATH "@loader_path"
   )
 elseif(UNIX)
-  if(EXISTS "${PDFIUM_LIB_DIR}/libpdfium.so")
-    set(PDFIUM_LIB "${PDFIUM_LIB_DIR}/libpdfium.so")
+  if(EXISTS "${PDFIUM_LIB_DIR}/libembedpdf.so")
+    set(PDFIUM_LIB "${PDFIUM_LIB_DIR}/libembedpdf.so")
     set_target_properties(${PROJECT_NAME} PROPERTIES
       BUILD_RPATH   "$ORIGIN"
       INSTALL_RPATH "$ORIGIN"
     )
   else()
-    set(PDFIUM_LIB "${PDFIUM_LIB_DIR}/libpdfium.a")
+    set(PDFIUM_LIB "${PDFIUM_LIB_DIR}/libembedpdf.a")
   endif()
 endif()
 

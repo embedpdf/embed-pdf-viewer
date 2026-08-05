@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # The canonical identity of a finished runtime payload: a hash over every
 # input that determines the compiled sidecar contents. The C++ fork work is
-# captured via engine-runtime-build.json (the libpdfium pin — the fork's CI
-# bakes EPDF_* into libpdfium.a); the rest is this repo's generators and
+# captured via engine-runtime-build.json (the runtime pin — the fork's CI
+# bakes EPDF_* into libembedpdf.a); the rest is this repo's generators and
 # compile scripts.
 #
 # Used by build-engine-runtime.yml to name the `runtime-payloads-<hash>`

@@ -44,7 +44,7 @@ SHA256="$(node -e "process.stdout.write(JSON.parse(process.argv[1]).sha256)" "$A
 
 DEST="$OUT_DIR/$TARGET"
 CACHE="$ROOT/build/cache"
-ARCHIVE="$CACHE/libembedpdf-pdf-runtime-$TARGET.tar.gz"
+ARCHIVE="$CACHE/libembedpdf-runtime-$TARGET.tar.gz"
 
 mkdir -p "$CACHE" "$DEST"
 

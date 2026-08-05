@@ -37,7 +37,7 @@
 .DS_Store
 
 # Native source submodules (huge; not needed - we fetch a pinned
-# prebuilt libpdfium and compile only the small N-API addon).
+# prebuilt libembedpdf and compile only the small N-API addon).
 packages/pdfium/pdfium-src
 packages/engine/runtime/runtime-src
 

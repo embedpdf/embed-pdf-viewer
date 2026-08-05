@@ -15,7 +15,7 @@
 #     -f ee/server/Dockerfile -t cloudpdf-server:dev --load .
 #
 # Native PDFium acquisition is selected with --build-arg NATIVE_SRC=...
-#   build    (default) fetch the pinned thread-local libpdfium + compile
+#   build    (default) fetch the pinned thread-local libembedpdf + compile
 #            the N-API addon in-image. Fully self-contained, needs the
 #            C++ toolchain. Used for local/dev builds.
 #   prebuilt reuse a CI-produced packages/engine/runtime/npm/<target>/lib
@@ -67,8 +67,8 @@ COPY . .
 RUN rm -f .npmrc && pnpm install --frozen-lockfile
 
 # Acquire the native PDFium runtime for the target arch (pdf-runtime.node +
-# libpdfium.so).
-#   build    -> fetch the pinned thread-local libpdfium + compile the addon.
+# libembedpdf.so).
+#   build    -> fetch the pinned thread-local libembedpdf + compile the addon.
 #   prebuilt -> CI staged the lib payload into npm/<target>/lib before build
 #               (it arrives via the COPY above); just verify it is present.
 RUN set -eux; \
@@ -81,7 +81,7 @@ RUN set -eux; \
         pnpm --filter @embedpdf/engine-runtime build:target "$TARGET"; \
     fi; \
     test -f "packages/engine/runtime/npm/$TARGET/lib/pdf-runtime.node"; \
-    test -f "packages/engine/runtime/npm/$TARGET/lib/libpdfium.so"
+    test -f "packages/engine/runtime/npm/$TARGET/lib/libembedpdf.so"
 
 # Build the server and its workspace dependency closure. The `<pkg>...`
 # suffix selects @cloudpdf/server + everything it depends on, and pnpm runs
@@ -99,7 +99,7 @@ RUN pnpm --filter "@cloudpdf/server..." run build
 # optional transitive dependency of @embedpdf/engine-runtime, so pnpm is not
 # required to root-link it under /prod/node_modules. Verify the real runtime
 # contract instead: pdf-runtime can resolve its platform addon, and
-# libpdfium.so sits beside the addon for RPATH.
+# libembedpdf.so sits beside the addon for RPATH.
 RUN TARGET="$(cat /runtime-target)" \
  && pnpm --filter=@cloudpdf/server deploy --prod --legacy /prod \
  && test -f /prod/dist/bin/cloudpdf-server.js \
@@ -110,9 +110,9 @@ const path = require('node:path'); \
 const { createRequire } = require('node:module'); \
 const runtimeRequire = createRequire(require.resolve('@embedpdf/engine-runtime')); \
 const addon = runtimeRequire.resolve('@embedpdf/engine-runtime-' + process.env.RUNTIME_TARGET); \
-const so = path.join(path.dirname(addon), 'libpdfium.so'); \
+const so = path.join(path.dirname(addon), 'libembedpdf.so'); \
 if (!fs.existsSync(addon)) throw new Error('missing addon: ' + addon); \
-if (!fs.existsSync(so)) throw new Error('missing libpdfium.so: ' + so); \
+if (!fs.existsSync(so)) throw new Error('missing libembedpdf.so: ' + so); \
 console.log('native runtime package resolved:', addon); \
 "
 

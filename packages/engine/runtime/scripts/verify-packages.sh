@@ -8,21 +8,36 @@ check() {
   test -s "$root/$1" || { echo "missing $1" >&2; exit 1; }
 }
 
-# Require the dynamic libpdfium to ship beside pdf-runtime.node whenever the
-# addon links it dynamically (rpath $ORIGIN / @loader_path). Statically-linked
-# targets have no NEEDED entry and are skipped.
+reject() {
+  test ! -e "$root/$1" || { echo "legacy runtime artifact must not be shipped: $1" >&2; exit 1; }
+}
+
+# Require the dynamic libembedpdf to ship beside pdf-runtime.node whenever the
+# addon links it dynamically (rpath $ORIGIN / @loader_path). Musl targets are
+# statically linked and therefore have no shared-library dependency.
 check_native_deps() {
   local node="$root/npm/$1/lib/pdf-runtime.node"
   case "$1" in
     darwin-*)
-      if otool -L "$node" 2>/dev/null | grep -q 'libpdfium\.dylib'; then
-        check "npm/$1/lib/libpdfium.dylib"
-      fi
+      otool -L "$node" 2>/dev/null | grep -q '@rpath/libembedpdf\.dylib' || {
+        echo "missing @rpath/libembedpdf.dylib dependency: npm/$1/lib/pdf-runtime.node" >&2
+        exit 1
+      }
+      check "npm/$1/lib/libembedpdf.dylib"
+      reject "npm/$1/lib/libpdfium.dylib"
       ;;
-    linux-*|linuxmusl-*)
-      if { objdump -p "$node" 2>/dev/null || readelf -d "$node" 2>/dev/null; } | grep -q 'libpdfium\.so'; then
-        check "npm/$1/lib/libpdfium.so"
-      fi
+    linux-*)
+      { objdump -p "$node" 2>/dev/null || readelf -d "$node" 2>/dev/null; } |
+        grep -q 'libembedpdf\.so' || {
+          echo "missing libembedpdf.so dependency: npm/$1/lib/pdf-runtime.node" >&2
+          exit 1
+        }
+      check "npm/$1/lib/libembedpdf.so"
+      reject "npm/$1/lib/libpdfium.so"
+      ;;
+    linuxmusl-*)
+      reject "npm/$1/lib/libembedpdf.so"
+      reject "npm/$1/lib/libpdfium.so"
       ;;
   esac
 }
@@ -37,7 +52,8 @@ check_target() {
       ;;
     win32-*)
       check "npm/$1/lib/pdf-runtime.node"
-      check "npm/$1/lib/pdfium.dll"
+      check "npm/$1/lib/embedpdf.dll"
+      reject "npm/$1/lib/pdfium.dll"
       ;;
     *)
       check "npm/$1/lib/pdf-runtime.node"

@@ -3,7 +3,7 @@
 The server ships as a self-contained Docker image. A consumer only needs
 `docker pull` + `docker run` - no repo, Node, pnpm, or PDFium toolchain.
 The Node 22 runtime, the bundled `dist`, production `node_modules`, the
-native `libpdfium.so` + `pdf-runtime.node`, `sharp`, `better-sqlite3`, and
+native `libembedpdf.so` + `pdf-runtime.node`, `sharp`, `better-sqlite3`, and
 fonts are all baked in.
 
 ## Build
@@ -49,10 +49,10 @@ build dirs that contain stray nested `package.json` files. All workspace
 
 ### Native PDFium acquisition (`--build-arg NATIVE_SRC=`)
 
-| Value             | Behaviour                                                                 | Used by    |
-| ----------------- | ------------------------------------------------------------------------- | ---------- |
-| `build` (default) | Fetch the pinned thread-local `libpdfium.so` and compile the N-API addon. | local/dev  |
-| `prebuilt`        | Reuse a CI-staged `packages/engine/runtime/npm/linux-x64/lib` payload.    | CI/release |
+| Value             | Behaviour                                                                   | Used by    |
+| ----------------- | --------------------------------------------------------------------------- | ---------- |
+| `build` (default) | Fetch the pinned thread-local `libembedpdf.so` and compile the N-API addon. | local/dev  |
+| `prebuilt`        | Reuse a CI-staged `packages/engine/runtime/npm/linux-x64/lib` payload.      | CI/release |
 
 For `prebuilt`, stage the artifact into the build context first:
 
@@ -63,7 +63,7 @@ docker build -f ee/server/Dockerfile \
   --build-arg NATIVE_SRC=prebuilt -t cloudpdf-server:1.2.3 .
 ```
 
-> The pinned libpdfium **must** be the thread-local-globals build so the
+> The pinned libembedpdf **must** be the thread-local-globals build so the
 > multi-worker pool (`CLOUDPDF_WORKER_POOL_SIZE`) is safe. See
 > [THREAD_CONFINED_RUNTIME.md](./THREAD_CONFINED_RUNTIME.md).
 

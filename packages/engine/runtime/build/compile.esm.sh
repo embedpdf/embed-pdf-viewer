@@ -32,7 +32,7 @@ trap 'rm -rf "$TMP_DIR"' EXIT
 link() {
   local out="$1" environment="$2"
   shift 2
-  em++ "$LIB_DIR/lib/libpdfium.a" \
+  em++ "$LIB_DIR/lib/libembedpdf.a" \
     -sENVIRONMENT="$environment" \
     -sMODULARIZE=1 \
     -sWASM=1 \

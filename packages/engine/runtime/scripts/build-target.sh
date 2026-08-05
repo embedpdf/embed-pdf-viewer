@@ -53,17 +53,21 @@ install_binary() {
 }
 
 mkdir -p "$ROOT/npm/$TARGET/lib"
+rm -f \
+  "$ROOT/npm/$TARGET/lib/libpdfium.dylib" \
+  "$ROOT/npm/$TARGET/lib/libpdfium.so" \
+  "$ROOT/npm/$TARGET/lib/pdfium.dll"
 install_binary "$ROOT/build/build/Release/pdf-runtime.node" "$ROOT/npm/$TARGET/lib/pdf-runtime.node"
 case "$TARGET" in
   win32-*)
-    install_binary "$LIB_DIR/bin/pdfium.dll" "$ROOT/npm/$TARGET/lib/pdfium.dll"
+    install_binary "$LIB_DIR/bin/embedpdf.dll" "$ROOT/npm/$TARGET/lib/embedpdf.dll"
     ;;
   darwin-*)
-    install_binary "$LIB_DIR/lib/libpdfium.dylib" "$ROOT/npm/$TARGET/lib/libpdfium.dylib"
+    install_binary "$LIB_DIR/lib/libembedpdf.dylib" "$ROOT/npm/$TARGET/lib/libembedpdf.dylib"
     ;;
   linux-*)
-    if [[ -f "$LIB_DIR/lib/libpdfium.so" ]]; then
-      install_binary "$LIB_DIR/lib/libpdfium.so" "$ROOT/npm/$TARGET/lib/libpdfium.so"
+    if [[ -f "$LIB_DIR/lib/libembedpdf.so" ]]; then
+      install_binary "$LIB_DIR/lib/libembedpdf.so" "$ROOT/npm/$TARGET/lib/libembedpdf.so"
     fi
     ;;
 esac

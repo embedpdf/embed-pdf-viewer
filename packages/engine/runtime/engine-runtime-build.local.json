@@ -3,12 +3,12 @@
   "sha": "local",
   "artifacts": {
     "wasm32": {
-      "url": "file:///Users/bobsingor/GitHub/pdf-viewer/packages/engine/runtime/runtime-src/out/embedpdf-runtime-artifacts/libembedpdf-pdf-runtime-wasm32-13d32514f.tar.gz",
-      "sha256": "7b4a397f415d2427b47e506fa9479f159f19c5735393a18768206d7252f20a29"
+      "url": "file:///Users/bobsingor/GitHub/pdf-viewer/packages/engine/runtime/runtime-src/out/embedpdf-runtime-artifacts/libembedpdf-runtime-wasm32-608d50ef5.tar.gz",
+      "sha256": "923c2c41466b5683d0fbdc33532a86297ae12c208d6692966c873f538177e846"
     },
     "darwin-arm64": {
-      "url": "file:///Users/bobsingor/GitHub/pdf-viewer/packages/engine/runtime/runtime-src/out/embedpdf-runtime-artifacts/libembedpdf-pdf-runtime-darwin-arm64-58c48b47f.tar.gz",
-      "sha256": "f0dfbbc2df4bb658a87d0080a5fa3dec51174729a638f6242163d921c534b218"
+      "url": "file:///Users/bobsingor/GitHub/pdf-viewer/packages/engine/runtime/runtime-src/out/embedpdf-runtime-artifacts/libembedpdf-runtime-darwin-arm64-608d50ef5.tar.gz",
+      "sha256": "a43585949c0e6fead6bafb4ff5ac7fcbe1e3061df79c9a6bd648c8bd71dc5735"
     }
   }
 }

@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TARGET="${1:-wasm32}"
-ARCHIVE="${2:-$ROOT/build/local-artifacts/libembedpdf-pdf-runtime-$TARGET-local.tar.gz}"
+ARCHIVE="${2:-$ROOT/build/local-artifacts/libembedpdf-runtime-$TARGET-local.tar.gz}"
 MANIFEST="$ROOT/engine-runtime-build.local.json"
 
 if [[ ! -f "$ARCHIVE" ]]; then
