@@ -1,0 +1,7 @@
+# @embedpdf/core-ui
+
+## 3.0.0-next.0
+
+### Major Changes
+
+- [#711](https://github.com/embedpdf/embed-pdf-viewer/pull/711) by [@bobsingor](https://github.com/bobsingor) – Introduces the framework-free core for full-viewer chrome. It defines structural UI schemas, toolbar measurement and overflow solving, menu projection, and keyboard shortcut parsing without owning rendered components.
