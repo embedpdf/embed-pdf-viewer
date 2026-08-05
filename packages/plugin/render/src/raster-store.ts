@@ -1,8 +1,8 @@
 import type { PageImageHandle } from '@embedpdf/core';
 
 /**
- * Client-side mirror of the server's one-door read-through (SCALE-OUT
- * §2.1c/§2.1e): per-key SINGLEFLIGHT + LRU over encoded page images.
+ * Client-side mirror of the server's one-door read-through: per-key
+ * SINGLEFLIGHT + LRU over encoded page images.
  *
  * The key is the raster's canonical identity (conformed viewport +
  * annotations flag + epoch — see `renderSourceKey`), so the lattice does the

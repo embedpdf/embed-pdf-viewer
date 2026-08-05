@@ -46,7 +46,7 @@ export class CloudMetadataService implements MetadataService {
     return AbortablePromise.run<DocumentMetadata>(async (signal) => {
       const buildPath = async (s: AbortSignal): Promise<string> => {
         const manifest = await this.manifest.get(s);
-        // WS2b plane rule: the metadata leaf depends on the `metadata`
+        // Plane-scope rule: the metadata leaf depends on the `metadata`
         // plane — while inherited, one doc-level URL serves every visitor.
         return planesInherited(manifest, ['metadata'])
           ? wirePaths.docMetadata(this.docId, manifest.metadataVersion)

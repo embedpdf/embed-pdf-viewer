@@ -94,7 +94,7 @@ export async function registerDocsRoutes(app: FastifyInstance, deps: DocsRouteDe
     return manifest;
   });
 
-  // ── WS2b doc-level (shared) reads: served from the BASE worker session,
+  // ── Plane-scoped doc-level reads: served from the BASE worker session,
   //    visible through a layer-pinned token only while the plane each
   //    depends on is inherited (`requireSharedDocRead` = auth chain +
   //    origin plane guard). ────────────────────────────────────────────────

@@ -174,7 +174,7 @@ export class CloudDocumentSecurityService implements DocumentSecurityService {
       identity: response.identity,
       originPasswordPolicy: response.originPasswordPolicy,
       expiresAt: response.expiresAt,
-      // Deployment render lattice (WS2). Absent on pre-lattice servers.
+      // Deployment render lattice. Absent on older servers without render policy support.
       ...(response.renderPolicy ? { renderPolicy: response.renderPolicy } : {}),
     };
     this.http.setCdnAccess({

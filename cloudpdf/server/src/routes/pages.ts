@@ -63,7 +63,7 @@ type ReadScope =
 export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDeps): Promise<void> {
   const { documentService, layerService, pool, imageEncoder, derivedRenders } = deps;
 
-  // Doc-level SHARED routes (WS2b plane model): served from the BASE worker
+  // Doc-level SHARED routes (plane-scope model): served from the BASE worker
   // session; visible through a layer-pinned token only while every plane the
   // resource depends on is inherited (`requireSharedDocRead` is the one
   // door — auth chain + origin plane guard).
@@ -527,8 +527,8 @@ async function renderPageImage(input: {
   signal: AbortSignal;
   scope: ReadScope;
   /**
-   * The render FAMILY this route belongs to (token/path law, SCALE-OUT
-   * §2b.2): `…/render/pages/` is annotation-free, `…/render/annotated/pages/`
+   * The render FAMILY this route belongs to: `…/render/pages/` is
+   * annotation-free, `…/render/annotated/pages/`
    * annotated — at BOTH the doc and layer tiers. The token carries no
    * annotatedness at all; each family's query schema enforces its own pin
    * grammar (`annotationVersion` required on versioned annotated requests,
@@ -589,7 +589,7 @@ async function renderPageImage(input: {
     );
   }
 
-  // ── The derived-artifact plane (SCALE-OUT.md §2.1b/§2.1c) ────────────
+  // ── The derived-artifact plane ───────────────────────────────────────
   // Lattice renders are durable: URL space == artifact space at canonical
   // points. Off-lattice tokens are rejected when enforcement is on (the
   // storage-DoS guard); until the SDK ships its `snap` helper they fall
@@ -605,8 +605,8 @@ async function renderPageImage(input: {
       : {}),
   });
   // Enforcement is scoped to FULL-PAGE requests: rect targets belong to
-  // the tile policy once it exists (WS2c) and stay compute-only until
-  // then — otherwise flipping `enforce` would 400 every region render.
+  // the tile policy once advertised and stay compute-only until then;
+  // otherwise flipping `enforce` would 400 every region render.
   if (
     derived !== undefined &&
     derived.enforced &&

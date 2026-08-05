@@ -142,7 +142,7 @@ export interface DocumentAccessInfo {
   };
   readonly expiresAt: number;
   /**
-   * The deployment's render lattice (SCALE-OUT WS2): canonical full-page
+   * The deployment's render lattice: canonical full-page
    * `viewport.width` points whose renders are durable, CDN-shared
    * artifacts, plus the reserved tile-pyramid block. Local engines report
    * nothing here (continuous rendering); cloud engines surface it so

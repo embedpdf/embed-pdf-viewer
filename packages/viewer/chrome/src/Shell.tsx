@@ -187,8 +187,8 @@ export function Shell() {
                 <>
                   <RenderLayer annotations={false} />
                   {/* Deep-zoom tiles ABOVE the base rung — main lens only
-                      (the thumbnail rail composes without it; SCALE-OUT
-                      §2.1e per-view enablement). Engages by demand
+                      (the thumbnail rail composes without per-view tiling).
+                      Engages by demand
                       arithmetic when the deployment lattice caps the base. */}
                   <TileLayer annotations={false} />
                   <SelectionLayer />

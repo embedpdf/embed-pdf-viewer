@@ -60,7 +60,7 @@ export class CloudPageRenderService implements PageRenderService {
             ...(includeAnnotations ? { annotationVersion: page.cache.annotationVersion } : {}),
           },
         );
-        // WS2b plane rule: a render resolves at the DOC-LEVEL (shared base)
+        // Plane-scope rule: a render resolves at the DOC-LEVEL (shared base)
         // path iff every plane it depends on is inherited — annotation-free
         // renders (full pages AND tiles; the rect target rides the same
         // token) depend on `content`, annotated ones on

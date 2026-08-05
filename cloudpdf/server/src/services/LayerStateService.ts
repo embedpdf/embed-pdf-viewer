@@ -121,7 +121,7 @@ export class LayerStateService {
   }
 
   /**
-   * WS2b plane scopes, the PURE half. A layer is a set of per-plane DELTAS
+   * Plane scopes, the PURE half. A layer is a set of per-plane DELTAS
    * over the immutable base; each plane is `'base'` (inherited — no delta,
    * the layer's view of that plane IS the base's view) or `'layer'` (owned —
    * the first write to that plane transferred ownership).
@@ -159,7 +159,7 @@ export class LayerStateService {
   }
 
   /**
-   * WS2b plane scopes, the DURABLE half — the ONE condition behind the
+   * Plane scopes, the DURABLE half — the ONE condition behind the
    * manifest `scopes` block, the `/v1/access` edge grant, and every origin
    * guard on the doc-level shared routes (the guard is the truth; the grant
    * is the TTL-bounded optimization). A layer with no row has never been
@@ -206,7 +206,7 @@ export class LayerStateService {
     >,
     pages: DurablePageRow[],
     /**
-     * WS2b plane scopes for this layer (see {@link computeLayerScopes}) —
+     * Plane scopes for this layer (see {@link computeLayerScopes}) —
      * whole-layer by design (edge grants are prefix-level): one owned page
      * flips the whole plane.
      */
@@ -263,7 +263,7 @@ export class LayerStateService {
   }
 
   /** The BASE view's revision scope — the `docSessionId` every SHARED
-   *  (doc-level) annotation read stamps on its tokens (WS2b). */
+   *  (doc-level) annotation read stamps on its tokens. */
   baseRevisionScopeId(docId: string): string {
     return `cloud:base:${docId}`;
   }

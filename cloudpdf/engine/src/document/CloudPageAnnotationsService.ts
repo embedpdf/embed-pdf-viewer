@@ -82,7 +82,7 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
             `no page with object number ${this.pageObjectNumber} in document ${this.docId}`,
           );
         }
-        // WS2b plane rule: the list depends on the `annotations` plane. A
+        // Plane-scope rule: the list depends on the `annotations` plane. A
         // base's own annotations (weak-identity ones included) are simply
         // VISIBLE through an inheriting layer, so every visitor reads ONE
         // doc-level URL served from the base session.
@@ -147,7 +147,7 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
           { ...options, format },
           { annotationVersion: page.cache.annotationVersion },
         );
-        // WS2b: same `annotations` plane switch as list() — the appearance
+        // Same `annotations` plane switch as list(): the appearance
         // batch shares too.
         return planesInherited(manifest, ['annotations'])
           ? wirePaths.docPageAnnotationAppearances(this.docId, this.pageObjectNumber, wireToken)
@@ -204,7 +204,7 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
     return AbortablePromise.run<AttachmentContent>(async (signal) => {
       const buildPath = async (s: AbortSignal): Promise<string> => {
         const manifest = await this.manifest.get(s);
-        // WS2b: a FileAttachment annotation's bytes depend on BOTH planes —
+        // A FileAttachment annotation's bytes depend on BOTH planes —
         // the annotation must exist in this view (`annotations`) and the
         // byte pin is `attachmentsVersion` (`attachments`).
         return planesInherited(manifest, ['annotations', 'attachments'])

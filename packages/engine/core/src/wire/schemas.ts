@@ -310,7 +310,7 @@ export const AccessResponseSchema = z.object({
         widths: z.array(z.number().int().positive()),
       }),
       /**
-       * RESERVED for the deep-zoom vertical (WS2c): scale-based pyramid ×
+       * RESERVED for deep-zoom tile support: scale-based pyramid ×
        * fixed tile size, constant per-job cost. Absent until the tiling
        * plugin ships.
        */
@@ -378,7 +378,7 @@ export const CachePinsSchema: z.ZodType<CachePins> = z.object({
 });
 
 /**
- * WS2b plane scopes — DERIVED from the version counters at every emission
+ * Plane scopes are DERIVED from the version counters at every emission
  * point (layer manifests, mutation cache envelopes, SSE rows), never stored.
  * Additive/optional both ways: old clients ignore it, old servers omit it
  * (consumers treat absence as all-'layer' — never wrong, only unshared).
@@ -438,7 +438,7 @@ export const DocumentManifestSchema = z.object({
   attachmentsVersion: z.number().int().positive().default(1),
   auditHead: z.number().int().nonnegative(),
   baseSha: z.string(),
-  // WS2b plane scopes — layer manifests only; absent = all-'layer'.
+  // Plane scopes: layer manifests only; absent = all-'layer'.
   scopes: LayerScopesSchema.optional(),
   pages: z.array(ManifestPageSchema),
 }) as unknown as z.ZodType<DocumentManifest>;
@@ -599,7 +599,7 @@ const RenderBackgroundSchema = z.enum(['white', 'transparent']);
 const RenderQualitySchema = z.coerce.number().int().min(1).max(100);
 
 /**
- * The token/path law (SCALE-OUT §2b.2): annotatedness is PATH-expressed —
+ * Token/path rule: annotatedness is PATH-expressed —
  * the render FAMILY the route belongs to — never token/query-expressed.
  * Each family therefore gets its own query schema, built from one shared
  * base:

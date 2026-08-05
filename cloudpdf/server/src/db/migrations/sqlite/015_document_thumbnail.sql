@@ -4,7 +4,7 @@
 --   pending  -> not yet warmed (skeleton tile; read-through still works)
 --   ready    -> the warm lattice artifact exists
 --   locked   -> user-password document: NO derived artifact, by design —
---               a thumbnail is content disclosure (SCALE-OUT.md §2.2)
+--               a thumbnail is content disclosure
 --   failed   -> warm attempt errored (read-through remains the repair path)
 --
 -- `thumbnail_key` is the storage key of the warmed base-tier artifact so

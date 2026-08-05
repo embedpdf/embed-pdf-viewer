@@ -52,7 +52,7 @@ export interface DocumentManifest {
   auditHead: number;
   baseSha: string;
   /**
-   * WS2b plane scopes (layer manifests only; absent on base manifests and
+   * Plane scopes (layer manifests only; absent on base manifests and
    * on pre-plane servers = all-`'layer'`). Whole-layer by design — edge
    * grants are prefix-level — and DERIVED from the version counters at
    * every emission point, never stored. See {@link LayerScopes}.

@@ -67,7 +67,7 @@ function PageSurface({
   // like the axis-aligned shadow behind it (no hairline seam).
   const contentLeft = frame.left + (t.viewWidth - t.contentWidth) / 2;
   const contentTop = frame.top + (t.viewHeight - t.contentHeight) / 2;
-  // The page-view DEMAND (SCALE-OUT §2.1e) is a PULL: the getter closes over
+  // The page-view DEMAND is a PULL: the getter closes over
   // stable references (capability + pon) and reads the stage's live state at
   // call time — visibility is the STAGE's data (`VisiblePage.visibleRect`),
   // not something an adapter re-derives or caches. Absent from the visible

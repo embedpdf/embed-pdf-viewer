@@ -60,7 +60,7 @@ export async function registerAccessRoutes(
     // `effectiveScope` expansion from the same source keeps the
     // response internally consistent.
     const pdfBits = decodePdfBits(unlocked.probe.pdfPermissionsBits);
-    // WS2b edge grant: each doc-level shared prefix rides this caller's CDN
+    // Plane-scoped edge grant: each doc-level shared prefix rides this caller's CDN
     // credential only while every plane it depends on is inherited by the
     // pinned layer — the SAME scopes the manifest advertises and the origin
     // guards enforce (the origin is the truth; this grant is the
@@ -146,7 +146,7 @@ function buildAccessResponse(
     expiresAt,
     // The render lattice rides /access, NEVER the manifest: manifests are
     // version-pinned immutable objects; the lattice is mutable deployment
-    // policy (SCALE-OUT.md §2.1b).
+    // policy.
     ...(renderPolicy ? { renderPolicy } : {}),
   };
 }

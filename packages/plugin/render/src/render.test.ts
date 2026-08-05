@@ -187,7 +187,7 @@ describe('effects + capability wired together', () => {
   });
 });
 
-// ── d1: policy conformance (SCALE-OUT §2.1e — the three-layer law) ──────────
+// ── Policy conformance: the three-layer rule ────────────────────────────────
 
 const LATTICE = {
   kind: 'lattice',

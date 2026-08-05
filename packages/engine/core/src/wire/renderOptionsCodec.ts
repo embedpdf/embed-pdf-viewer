@@ -19,7 +19,7 @@ export interface RenderVersions {
  * extending `PageImageOptions`, the render query schemas, and
  * `RenderTokenSchema.fields`; this function does not change.
  *
- * The token/path law (SCALE-OUT §2b.2): tokens carry VERSION PINS and RENDER
+ * Token/path rule: tokens carry VERSION PINS and RENDER
  * PARAMETERS; anything that changes the artifact's plane-dependency set is
  * PATH-expressed. Annotatedness changes the planes (`content` vs
  * `content + annotations`), so the wire map never carries

@@ -178,7 +178,7 @@ export interface BuildAppOptions {
   /** Treat pending migrations as drift at boot. Defaults to false. */
   failOnPending?: boolean;
   /**
-   * The render lattice (SCALE-OUT.md §2.1b): canonical FULL-PAGE
+   * The render lattice: canonical FULL-PAGE
    * `viewport.width` points whose renders are DURABLE derived artifacts —
    * the bounded quantity is output pixels, never zoom. `maxRenderPixels`
    * is the worker-side allocation budget every server render carries.
@@ -204,7 +204,7 @@ export interface AppBundle {
   pool?: WorkerThreadPool;
   /** Present only when `db` + `objectStore` were configured. */
   lifecycle?: DocumentLifecycleService;
-  /** WS2 — the derived-artifact plane for renders (cacheRoot + pool + db). */
+  /** The derived-artifact plane for renders (cacheRoot + pool + db). */
   derivedRenders?: DerivedRenderService;
   /** Present only when `enableRevocation: true` with a `db`. */
   revokedJtisGuard?: RevokedJtisGuard;
@@ -423,7 +423,7 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
       await baseFileCache.sweepPartials();
     }
 
-    // WS2 (SCALE-OUT §2.1b/§2.1c): the derived-artifact plane for renders.
+    // The derived-artifact plane for renders.
     // Needs a worker + the base-file cache — admin-only deploys skip it.
     if (baseFileCache && pool) {
       derivedRenders = new DerivedRenderService({

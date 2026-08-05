@@ -340,7 +340,7 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     return;
   }
 
-  // The warmed page-1 tile (WS2) and the original bytes both live behind
+  // The warmed page-1 tile and the original bytes both live behind
   // TENANT-scoped admin routes, so the browser cannot fetch them directly —
   // it holds doc-scoped tokens only. Proxying here is what a real dashboard
   // backend does too.
@@ -527,7 +527,7 @@ function toDemoDocument(
     name,
     sizeBytes: doc.storageSizeBytes,
     createdAt: doc.createdAt,
-    // Pre-WS2 servers omit the field; treat that as "no tile coming".
+    // Older servers omit the field; treat that as "no tile coming".
     thumbnailState: doc.thumbnailState ?? 'failed',
     shareCount,
   };

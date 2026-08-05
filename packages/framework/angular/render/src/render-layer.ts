@@ -44,7 +44,7 @@ export class EpdfRenderLayer {
   private readonly page = injectPage();
   private readonly render = injectCapability(RenderToken);
   // ONE tracked dependency: the raster's canonical identity — conformed
-  // viewport + annotations flag + epoch (SCALE-OUT §2.1e identity law).
+  // viewport + annotations flag + epoch.
   // Inside a lattice rung, zoom changes don't move it: no refetch, no DOM
   // churn — the stage's CSS transform does the scaling. It changes exactly at
   // rung crossings and on CONFIRMED mutations (epoch bumps at commit, never

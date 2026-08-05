@@ -30,7 +30,7 @@ export class CloudDocumentActionsService implements DocumentActionsService {
       this.http.getJsonWithRefresh(
         async (currentSignal) => {
           const manifest = await this.manifest.get(currentSignal);
-          // WS2b plane rule: catalog actions depend on the `actions` plane
+          // Plane-scope rule: catalog actions depend on the `actions` plane
           // (constant-inherited until action writing exists) — one
           // doc-level URL, base session, no layer warm-up on open.
           return planesInherited(manifest, ['actions'])

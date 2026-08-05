@@ -49,7 +49,7 @@ async function openLayer(layer: string) {
 const urlOf = (h: { source: { kind: string; url?: string } }) =>
   h.source.kind === 'url' ? h.source.url! : '';
 
-describe('WS2b plane-scoped view sharing (cloud SDK, real runtime)', () => {
+describe('plane-scoped view sharing (cloud SDK, real runtime)', () => {
   test('pristine layers share EVERY plane — the base HAS annotations and they are visible', async () => {
     const alice = await openLayer('alice');
     const bob = await openLayer('bob');

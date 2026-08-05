@@ -55,7 +55,7 @@ export const api = {
         { method: 'DELETE' },
       ),
 
-    /** Warmed page-1 tile (WS2). Proxied because the browser holds no admin token. */
+    /** Warmed page-1 tile, proxied because the browser holds no admin token. */
     thumbnailUrl: (tenantId: string, docId: string) =>
       `/api/documents/${encodeURIComponent(docId)}/thumbnail?tenantId=${encodeURIComponent(tenantId)}`,
 

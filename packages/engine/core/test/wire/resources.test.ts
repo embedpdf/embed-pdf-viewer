@@ -228,7 +228,7 @@ describe('cdnCoverageForScope', () => {
     actions: 'base',
   } as const;
 
-  it('scopes: an owned plane withholds exactly the doc-level resources depending on it (WS2b)', () => {
+  it('scopes: an owned plane withholds exactly the doc-level resources depending on it', () => {
     const ids = (c: ReturnType<typeof cdnCoverageForScope>) => new Set(c.map((e) => e.resourceId));
     const shared = ids(
       cdnCoverageForScope(['*'], NO_BITS, {
@@ -281,7 +281,7 @@ describe('cdnCoverageForScope', () => {
     );
   });
 
-  it('scopes: every plane is an independent axis (WS2b)', () => {
+  it('scopes: every plane is an independent axis', () => {
     const ids = (c: ReturnType<typeof cdnCoverageForScope>) => new Set(c.map((e) => e.resourceId));
     // Annotations owned: annotation lists + the annotated render family go;
     // the annotation-free content trio survives — this is the most common
@@ -430,7 +430,7 @@ describe('cdnCoverageForScope', () => {
         'page-annotations',
         'annotations-read',
         // doc.open (session establishment) also covers the doc-level shared
-        // families (WS2b plane model); attachment BYTES stay behind
+        // families (plane-scope model); attachment BYTES stay behind
         // doc.download.
         'layout',
         'metadata',

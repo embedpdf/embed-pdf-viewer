@@ -69,7 +69,7 @@ export class CloudDocumentPagesService implements DocumentPagesService {
     return AbortablePromise.run<PageListSnapshot>(async (signal) => {
       const buildPath = async (s: AbortSignal): Promise<string> => {
         const manifest = await this.manifest.get(s);
-        // WS2b plane rule: the layout leaf depends on the `layout` plane —
+        // Plane-scope rule: the layout leaf depends on the `layout` plane —
         // while inherited (no move/rotate/insert/delete ever ran), every
         // visitor's page list is ONE doc-level URL served from the base
         // session; the SDK open sequence creates no layer session.
@@ -179,8 +179,7 @@ export class CloudDocumentPagesService implements DocumentPagesService {
       );
       // Nothing flattened means no artifact and therefore no coherence bump.
       if (result.meta === null) return result;
-      // Flatten bakes annotations into page content (WS2b: both planes
-      // flip).
+      // Flatten bakes annotations into page content, so both planes flip.
       this.manifest.apply(result.meta, ['content', 'annotations']);
       this.publisher.publishLocal({
         type: 'pages.flattened',

@@ -87,7 +87,7 @@ export class CloudRevisionBridge {
     ref: AnnotationRef,
     opts?: {
       /**
-       * WS2b: additional `docSessionId`s to accept as equivalent to
+       * Additional `docSessionId`s to accept as equivalent to
        * `pageState`'s own — in practice the doc's BASE revision scope. A
        * weak/index ref minted by a SHARED base read carries the base scope
        * (the response is one CDN object for every inheriting layer, so it

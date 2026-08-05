@@ -6,7 +6,7 @@ import { RasterStore } from './raster-store';
 import { TileManager } from './tile-manager';
 
 /**
- * Red-line suite for the retention invariant (SCALE-OUT §2.1e): every
+ * Red-line suite for the retention invariant: every
  * screen region paints the sharpest PAINTED pixels available, quality per
  * region only goes up while a want set resolves, and release is per-region
  * occlusion — never "no longer wanted".

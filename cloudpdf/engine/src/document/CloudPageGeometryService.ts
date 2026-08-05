@@ -38,7 +38,7 @@ export class CloudPageGeometryService implements PageGeometryService {
             `no page with object number ${this.pageObjectNumber} in document ${this.docId}`,
           );
         }
-        // WS2b plane rule: geometry depends on the `content` plane (see
+        // Plane-scope rule: geometry depends on the `content` plane (see
         // CloudPageTextService for the full rationale).
         return planesInherited(manifest, ['content'])
           ? wirePaths.docPageGeometry(this.docId, this.pageObjectNumber, page.cache.contentVersion)

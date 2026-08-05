@@ -74,7 +74,7 @@ export interface RenderCapability {
    * Render a page (by its durable pon) to an ENCODED image. Abortable. Encoded
    * output is identical for local & cloud and cheap over the wire (vs. raw RGBA).
    *
-   * CONFORMS to the deployment policy (the three-layer law, SCALE-OUT §2.1e):
+   * CONFORMS to the deployment policy's three-layer rule:
    * under a lattice the desired `scale` converts to the canonical ladder width
    * via `snapFullPageViewport`; under `continuous` it passes through exactly.
    * Same-key requests collapse in the plugin's raster store (singleflight +
@@ -102,8 +102,8 @@ export interface RenderCapability {
   /** The document's advertised policy (sugar over `DocumentMeta.renderPolicy`). */
   renderPolicy(): EngineRenderPolicy;
   /**
-   * The tile paint plan for a page under a host-supplied demand (SCALE-OUT
-   * §2.1e — tiling is a STRATEGY inside this plugin, not a sibling).
+   * The tile paint plan for a page under a host-supplied demand. Tiling is a
+   * STRATEGY inside this plugin, not a sibling.
    * Memoized: the same object returns until the demand, an epoch, or a
    * tile resolution actually changes it, so layers can subscribe with
    * plain `Object.is`. Calling it schedules the want-set fetches (visible

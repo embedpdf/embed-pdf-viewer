@@ -88,7 +88,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     void refresh();
   }, [refresh]);
 
-  // Thumbnails are warmed AFTER commit (WS2 `warmDocumentThumbnail` is
+  // Thumbnails are warmed AFTER commit (`warmDocumentThumbnail` is
   // fire-and-forget), so a freshly uploaded document lands `pending` and turns
   // `ready` a beat later. Poll only while something is actually pending.
   const pending = documents.some((d) => d.thumbnailState === 'pending' || d.state === 'pending');

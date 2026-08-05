@@ -8,7 +8,7 @@ import { Badge, Button, Spinner, cx, formatBytes, formatWhen } from '../ui/primi
 /**
  * The library: everything this tenant has uploaded, each tile showing its
  * page-1 render. Those tiles are the demo's first argument — they were
- * rasterized on the server at ingest (WS2 warms them at commit) and arrive as
+ * rasterized on the server at ingest (the commit path warms them) and arrive as
  * plain images, so server-side rendering is proven before anything is clicked.
  */
 export function LibraryScreen({

@@ -3,7 +3,7 @@
  * handle: policy conformance (the one consumer of the deployment render
  * lattice), per-page raster versioning fed by the document event stream, and
  * the tile paint-plan machinery (tiling is a strategy here, not a sibling
- * plugin — SCALE-OUT §2.1e).
+ * plugin).
  */
 export { renderPlugin } from './render.plugin';
 export { RenderToken } from './types';

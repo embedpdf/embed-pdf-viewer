@@ -14,7 +14,7 @@ import type { RenderAction, RenderCapability, RenderPluginOptions, RenderState }
 
 /**
  * The render capability: the ONE policy consumer in the client stack
- * (three-layer law, SCALE-OUT §2.1e). The engine never snaps; framework
+ * (the three-layer rule). The engine never snaps; framework
  * layers never see the policy; everything between — conforming a desired
  * scale to the deployment lattice, collapsing same-rung asks in the raster
  * store, exposing stable source keys — happens here.
@@ -60,7 +60,7 @@ export function createRenderCapability(
   };
 
   // Tiling shares THIS store, THIS policy, THIS ledger — one scheduler,
-  // one budget, one invalidation truth (SCALE-OUT §2.1e).
+  // one budget, one invalidation truth.
   const tiles = new TileManager({
     store,
     config: resolveTiling(options.tiling),

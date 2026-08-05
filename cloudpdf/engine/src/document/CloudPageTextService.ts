@@ -46,7 +46,7 @@ export class CloudPageTextService implements PageTextService {
             `no page with object number ${this.pageObjectNumber} in document ${this.docId}`,
           );
         }
-        // WS2b plane rule: text depends on the `content` plane — while it
+        // Plane-scope rule: text depends on the `content` plane — while it
         // is inherited, every visitor's layer reads ONE doc-level URL (and
         // the base worker session at the origin).
         return planesInherited(manifest, ['content'])

@@ -22,7 +22,7 @@ import { createValidTestLicenseGate } from '../src/licensing/testing';
 const STUB_ENTRY = new URL('./_helpers/stub-worker-entry.cjs', import.meta.url);
 const SECRET = 'derived-renders-secret';
 
-/** Canonical lattice tokens (SCALE-OUT §2.1): alphabetical, codec-exact. */
+/** Canonical lattice tokens: alphabetical and codec-exact. */
 const THUMB_TOKEN =
   'background=white,contentVersion=1,format=webp,viewport.kind=width,viewport.width=320';
 const W640_TOKEN =
@@ -30,8 +30,8 @@ const W640_TOKEN =
 /** Off-lattice: a width outside the ladder (the old viewer default). */
 const OFFLATTICE_TOKEN =
   'annotationVersion=1,background=white,contentVersion=1,format=webp,viewport.kind=width,viewport.width=720';
-/** Rect-target region render: the (future) tile policy's jurisdiction —
- *  exempt from full-page enforcement, compute-only until WS2c. */
+/** Rect-target region render: the tile policy's jurisdiction — exempt from
+ *  full-page enforcement and compute-only until tile support is advertised. */
 const RECT_TOKEN =
   'background=white,contentVersion=1,format=webp,target.kind=rect,target.rect.bottom=0,target.rect.left=0,target.rect.right=100,target.rect.top=100,viewport.kind=width,viewport.width=64';
 
@@ -45,7 +45,7 @@ interface Fixture {
   storage: FsObjectStore;
 }
 
-describe('WS2 derived renders', () => {
+describe('derived renders', () => {
   let fx: Fixture;
 
   beforeEach(async () => {
@@ -105,8 +105,8 @@ describe('WS2 derived renders', () => {
     const headers = { Authorization: `Bearer ${docToken(tenantId, docId)}` };
 
     // Default fixture: enforce=false → width-kind renders still work. The
-    // token is ANNOTATED, so it lives under the annotated family (WS2b
-    // prefix law: `/render/pages/` serves annotation-free tokens only).
+    // token is ANNOTATED, so it lives under the annotated family (the prefix
+    // rule makes `/render/pages/` serve annotation-free tokens only).
     const res = await fetch(
       `${fx.baseUrl}/v1/docs/${docId}/render/annotated/pages/1/data@${OFFLATTICE_TOKEN}`,
       {
@@ -294,7 +294,7 @@ describe('WS2 derived renders', () => {
     expect((await tile.arrayBuffer()).byteLength).toBeGreaterThan(0);
 
     // The warmed artifact is the SAME canonical object the doc-plane
-    // read-through would produce — one door (SCALE-OUT §2.1c).
+    // read-through would produce — one door.
     const baseSha = createHash('sha256').update(bytes).digest('hex');
     expect(
       await fx.storage.exists(StorageKeys.derivedRenderBase(tenantId, baseSha, 1, THUMB_TOKEN)),

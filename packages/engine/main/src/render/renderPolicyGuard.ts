@@ -7,7 +7,7 @@ import {
 } from '@embedpdf/engine-core/runtime';
 
 /**
- * Local mirror of the server's lattice enforcement (SCALE-OUT §2.1b).
+ * Local mirror of the server's render-lattice enforcement.
  *
  * A `localEngine({ renderPolicy })` deployment opts the local engine into
  * the SAME policy discipline the cloud advertises over `/v1/access`:
@@ -61,7 +61,7 @@ function foldBudget<T extends { maxOutputPixels?: number }>(
 /**
  * Enforced-lattice check for a FULL-PAGE render. Throws the same
  * InvalidArg-with-policy the enforcing server's 400 carries. Rect
- * targets pass untouched (tile jurisdiction, WS2c).
+ * targets pass untouched because they belong to the tile policy.
  */
 export function assertFullPageOnLattice(
   policy: EngineRenderPolicy,

@@ -246,7 +246,7 @@ export class HttpClient {
    * `getBlob` with the same single-retry stale-version recovery as
    * {@link getJsonWithRefresh}: a 404 on a versioned URL triggers
    * `onStaleVersion` (a manifest refresh) and one re-resolve + retry.
-   * Render blobs ride this rail (WS2b): a scope flip re-resolves the
+   * Render blobs ride this rail: a scope flip re-resolves the
    * doc-vs-layer path family instead of failing on a stale URL.
    */
   async getBlobWithRefresh(

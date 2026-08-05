@@ -32,7 +32,7 @@ export function createEngine(): Engine {
     // the engine's lazy boot.
     worker: () => new EngineWorker(),
     fallbackFonts: [DROID_FALLBACK_FONT],
-    // Deployment render policy (SCALE-OUT §2.1e) — the same lattice a cloud
+    // Deployment render policy — the same lattice a cloud
     // deployment advertises, configured locally the way permissions are
     // overridden. Quantizes zoom to ladder rungs (renders reuse across zoom
     // levels), budgets worker memory, and engages TILING past the ladder top

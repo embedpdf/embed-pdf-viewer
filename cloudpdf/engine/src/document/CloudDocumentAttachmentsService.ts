@@ -63,7 +63,7 @@ export class CloudDocumentAttachmentsService implements DocumentAttachmentsServi
     return AbortablePromise.run<EmbeddedFileItem[]>(async (signal) => {
       const buildPath = async (s: AbortSignal): Promise<string> => {
         const manifest = await this.manifest.get(s);
-        // WS2b plane rule: the listing depends on the `attachments` plane —
+        // Plane-scope rule: the listing depends on the `attachments` plane —
         // while inherited, one CDN object serves every visitor's sidebar
         // from the base worker session.
         return planesInherited(manifest, ['attachments'])
@@ -96,7 +96,7 @@ export class CloudDocumentAttachmentsService implements DocumentAttachmentsServi
     return AbortablePromise.run<AttachmentContent>(async (signal) => {
       const buildPath = async (s: AbortSignal): Promise<string> => {
         const manifest = await this.manifest.get(s);
-        // WS2b: same plane switch as list() — the byte leaf shares too.
+        // Same plane switch as list(): the byte leaf shares too.
         return planesInherited(manifest, ['attachments'])
           ? wirePaths.docAttachmentFile(this.docId, ref.key, manifest.attachmentsVersion)
           : wirePaths.layerAttachmentFile(

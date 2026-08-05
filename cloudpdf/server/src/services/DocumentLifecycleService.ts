@@ -265,7 +265,7 @@ export class DocumentLifecycleService {
     }
     await this.usageMeters?.recordUpload(updated.id, updated.createdAt);
 
-    // Thumbnail lifecycle (SCALE-OUT §2.2). User-password documents get NO
+    // Thumbnail lifecycle: user-password documents get NO
     // derived artifact — a thumbnail is content disclosure, and the lock
     // tile IS the correct render. Everything else warms fire-and-forget:
     // the read-through path is the correctness path, warming is latency.

@@ -62,7 +62,7 @@ export interface ManifestAccessor {
   refresh(signal: AbortSignal): Promise<DocumentManifest>;
   /**
    * Absorb mutation-returned state/cache deltas when safe. `owns` names the
-   * WS2b planes this mutation kind takes ownership of (the monotone-flip
+   * planes this mutation kind takes ownership of (the monotone-flip
    * rule): annotation/form writes own `annotations`; flatten and
    * redaction-apply own `content + annotations`. The flip runs even when
    * the version-gated delta merge is skipped — scopes only ever move
@@ -342,7 +342,7 @@ export class CloudDocumentHandle implements DocumentHandle {
   }
 
   /**
-   * WS2b monotone flip: mark the planes a mutation OWNS as layer-scoped in
+   * Monotone plane-scope flip: mark the planes a mutation OWNS as layer-scoped in
    * the cached manifest. Scopes only ever move base → layer (no revert op
    * exists), so flipping is safe under ANY event ordering — a duplicate or
    * out-of-order event still proves the plane diverged at some point — and
@@ -451,7 +451,7 @@ export class CloudDocumentHandle implements DocumentHandle {
   private absorbPageDelete(cache: PageStructureCache, deletedPages: PageObjectNumber[]): void {
     // Delete changes the page SET: a view that removed content must never
     // resolve base artifacts again, so content AND annotations flip with
-    // layout (§2.5's rule).
+    // layout.
     this.flipScopes(['layout', 'content', 'annotations']);
     this.manifestFloorVersion = Math.max(this.manifestFloorVersion, cache.docVersion);
     this.inflightManifest = null;

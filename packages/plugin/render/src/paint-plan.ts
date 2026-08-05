@@ -2,7 +2,7 @@ import type { PageImageHandle } from '@embedpdf/core';
 import type { Rect } from '@embedpdf/core-geometry';
 
 /**
- * The demand a page HOST supplies (SCALE-OUT §2.1e dependency inversion):
+ * The demand a page HOST supplies through dependency inversion:
  * plugin-render defines the shape, producers fill it. The Stage's page
  * host knows the camera and supplies `visibleRect`/`velocity`; a
  * stage-less `<PageView>` supplies neither — absent `visibleRect` means
@@ -60,8 +60,8 @@ export interface TilingConfig {
   /** Tile edge in device px. Default 512. */
   tileSize?: number;
   /**
-   * Client pyramid used while the policy doesn't advertise `tiles`
-   * (reserved until WS2c). Default `[1, 2, 4, 8, 16, 32]` — ×2 aligned.
+   * Client pyramid used while the policy doesn't advertise `tiles`.
+   * Default `[1, 2, 4, 8, 16, 32]` — ×2 aligned.
    */
   scales?: readonly number[];
   /**

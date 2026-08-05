@@ -17,7 +17,7 @@ export interface DemoDocument {
   name: string;
   sizeBytes: number | null;
   createdAt: number;
-  /** WS2 warms this at commit; `locked` means the PDF needs a password. */
+  /** Warmed at commit; `locked` means the PDF needs a password. */
   thumbnailState: ThumbnailState;
   /** Count of live shares the demo has minted for this document. */
   shareCount: number;

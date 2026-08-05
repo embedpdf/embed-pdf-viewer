@@ -29,7 +29,7 @@ import {
 } from './tiles';
 
 /**
- * The tile retention state machine (SCALE-OUT §2.1e). One instance per
+ * The tile retention state machine. One instance per
  * plugin instance (per document), all levels and pages in one place, over
  * the SAME RasterStore the base renders use.
  *
@@ -113,8 +113,8 @@ export class TileManager {
       return EMPTY_TILE_PLAN;
     }
 
-    // Level selection: pyramid from the policy when advertised (WS2c),
-    // client defaults until then — same snapped requests either way.
+    // Level selection: use the advertised policy pyramid when available,
+    // otherwise use client defaults — same snapped requests either way.
     const pyramid = policy.kind === 'lattice' && policy.tiles ? policy.tiles.scales : config.scales;
     const wantScale = snapToPyramid(pyramid, demand.desiredDeviceWidth / page.width);
     const grid = tileGrid(page, wantScale, config.tileSize);
@@ -353,7 +353,7 @@ export class TileManager {
       if (entry.scale === wantScale || entry.handle === undefined) continue;
       const overlap = intersectRects(entry.rect, painted.rect);
       if (overlap.width <= 0 || overlap.height <= 0) continue;
-      // VISIBLE footprint only (SCALE-OUT §2.1e): an edge parent whose
+      // VISIBLE footprint only: an edge parent whose
       // offscreen children were never fetched must still release once its
       // on-screen region is covered — and its bytes stay in the store, so
       // a pan that re-exposes the rest re-promotes from cache.

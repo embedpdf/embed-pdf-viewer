@@ -245,8 +245,8 @@ export class DocumentService {
       ) {
         // Bind to the token's PINNED layer, not 'default': a session
         // unlocked for layer "alice" must authorize alice's shared base
-        // reads (WS2b — execution targets the base session, authorization
-        // follows the claimed layer).
+        // reads. Execution targets the base session; authorization follows
+        // the claimed layer.
         await this.assertPasswordSession(ctx, docId, pinnedLayerName(ctx));
       }
       return cached;
@@ -312,7 +312,7 @@ export class DocumentService {
   async getEffectivePdfBits(
     ctx: OpenContext,
     docId: string,
-    // Default to the token's pinned layer (WS2b): doc-level shared routes
+    // Default to the token's pinned layer: doc-level shared routes
     // must evaluate the CLAIMED layer's post-unlock bits, not 'default''s.
     layerName: string = pinnedLayerName(ctx),
   ): Promise<PdfBits> {
@@ -361,7 +361,7 @@ export class DocumentService {
   ): Promise<DocumentHead> {
     const row = await this.requireReadyRow(ctx, docId);
     const baseSha = requireBaseSha(row);
-    // Password-session lookup follows the token's pinned layer (WS2b):
+    // Password-session lookup follows the token's pinned layer:
     // the base session is one shared materialization, but the credential
     // that authorizes opening it belongs to the CLAIMED layer.
     const openPassword = password ?? (await this.passwordForOpen(ctx, row, pinnedLayerName(ctx)));
@@ -411,16 +411,16 @@ export class DocumentService {
   async getLayerHead(ctx: OpenContext, docId: string, layerName: string): Promise<DocumentHead> {
     const head = await this.getHead(ctx, docId);
     const layer = await this.layerState.repos.layers.findByDocAndName(docId, layerName);
-    // WS2b warming policy: the BASE is always warmed (getHead above fires
+    // Plane-scoped warming policy: the BASE is always warmed (getHead above fires
     // the doc warm); the LAYER session is warmed iff the layer OWNS at
     // least one plane — a pristine layer's reads all execute on the base
     // session, so eagerly warming it would resurrect the
-    // session-per-visitor bomb this workstream exists to kill.
+    // session-per-visitor explosion this policy avoids.
     if (layer) void this.warmLayerIfOwned(ctx, docId, layerName).catch(() => undefined);
     return layer ? { ...head, docVersion: layer.docVersion } : head;
   }
 
-  /** Fire-and-forget half of the WS2b warming policy (see getLayerHead). */
+  /** Fire-and-forget half of the plane-scoped warming policy (see getLayerHead). */
   private async warmLayerIfOwned(
     ctx: OpenContext,
     docId: string,
@@ -454,7 +454,7 @@ export class DocumentService {
       // No layer row yet -> immutable base view: docVersion from head, the
       // geometry pointer at its initial epoch (1) — and every plane
       // trivially INHERITED, so every visitor's never-written layer
-      // resolves all reads at the shared base URLs (WS2b).
+      // resolves all reads at the shared base URLs.
       return this.layerState.buildLayerManifest(
         docId,
         head.baseSha,
@@ -475,7 +475,7 @@ export class DocumentService {
       this.loadDurableBasePageStates(docId),
     );
     const pages = await this.layerState.ensureLayerPagesFromBase({ layerId: layer.id, docId });
-    // WS2b plane scopes: annotation writes own `annotations` only (renders/
+    // Plane scopes: annotation writes own `annotations` only (renders/
     // text/geometry keep sharing); move/rotate own `layout` only (normalized
     // artifacts survive); flatten/redaction/page-set changes own `content`.
     return this.layerState.buildLayerManifest(
@@ -489,7 +489,7 @@ export class DocumentService {
   }
 
   /**
-   * WS2b plane scopes — see
+   * Plane scopes — see
    * {@link LayerStateService.computeLayerScopesFromDb}. Exposed here so the
    * origin guards on the doc-level shared routes and `/v1/access` (the edge
    * grant) consume the exact condition the manifest `scopes` block
@@ -509,7 +509,7 @@ export class DocumentService {
   async getLayerLayout(
     ctx: OpenContext,
     docId: string,
-    /** Omit for the BASE view (WS2b shared reads: no layer session). */
+    /** Omit for the BASE view (shared reads use no layer session). */
     layerName?: string,
     signal?: AbortSignal,
   ): Promise<PageListSnapshot> {
@@ -535,7 +535,7 @@ export class DocumentService {
   async getLayerActions(
     ctx: OpenContext,
     docId: string,
-    /** Omit for the BASE view (WS2b shared reads: no layer session). */
+    /** Omit for the BASE view (shared reads use no layer session). */
     layerName?: string,
     signal?: AbortSignal,
   ): Promise<DocumentActionsSnapshot> {
@@ -719,7 +719,7 @@ export class DocumentService {
   async readLayerMetadata(
     ctx: OpenContext,
     docId: string,
-    /** Omit for the BASE view (WS2b shared reads: no layer session). */
+    /** Omit for the BASE view (shared reads use no layer session). */
     layerName?: string,
     signal?: AbortSignal,
   ): Promise<DocumentMetadata> {
@@ -1223,7 +1223,7 @@ export class DocumentService {
   async listAttachments(
     ctx: OpenContext,
     docId: string,
-    /** Omit for the BASE view (WS2b shared reads: no layer session). */
+    /** Omit for the BASE view (shared reads use no layer session). */
     layerName?: string,
     signal?: AbortSignal,
   ): Promise<EmbeddedFileItem[]> {
@@ -1247,7 +1247,7 @@ export class DocumentService {
   }
 
   /** Decode one document-level embedded file (by key) to a temp path.
-   *  Omit `layerName` for the BASE view (WS2b shared reads). */
+   *  Omit `layerName` for the BASE view's shared reads. */
   async readAttachmentFileToTemp(
     ctx: OpenContext,
     docId: string,
@@ -1269,7 +1269,7 @@ export class DocumentService {
   }
 
   /** Decode a FileAttachment annotation's embedded file to a temp path.
-   *  Omit `layerName` for the BASE view (WS2b shared reads). */
+   *  Omit `layerName` for the BASE view's shared reads. */
   async readAnnotationFileToTemp(
     ctx: OpenContext,
     docId: string,

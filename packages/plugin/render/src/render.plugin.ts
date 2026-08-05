@@ -6,8 +6,8 @@ import { RenderToken } from './types';
 import type { RenderAction, RenderCapability, RenderPluginOptions, RenderState } from './types';
 
 /**
- * Document-scoped. The ONE policy consumer in the client stack (SCALE-OUT
- * §2.1e): the doc-bind effect resolves the engine's advertised render
+ * Document-scoped. The ONE policy consumer in the client stack: the doc-bind
+ * effect resolves the engine's advertised render
  * policy; `renderPage` conforms desired scales to it and collapses
  * same-rung asks in the raster store; the tile manager turns host-supplied
  * demand into a retention-safe paint plan over the SAME store. State is the

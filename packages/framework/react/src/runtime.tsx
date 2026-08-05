@@ -393,8 +393,8 @@ export interface PageContextValue {
    *  for upright viewport-space UI that frames a selected page region. */
   toClientRect(rect: Rect): Rect;
   /**
-   * The page-view DEMAND for raster planning (SCALE-OUT §2.1e dependency
-   * inversion): plugin-render defines the shape; the host that CREATED this
+   * The page-view DEMAND for raster planning uses dependency inversion:
+   * plugin-render defines the shape; the host that CREATED this
    * context fills it — as a PULL. The Stage host's getter closes over the
    * stage capability and reads `VisiblePage.visibleRect` live at call time
    * (visibility is the STAGE's data; adapters never re-derive camera math or

@@ -1,5 +1,5 @@
 /**
- * Plane-scope block (SCALE-OUT §WS2b): a layer is a set of per-plane DELTAS
+ * Plane-scope block: a layer is a set of per-plane DELTAS
  * over the immutable base, and each plane is either inherited (`'base'` — no
  * delta; the layer's view of that plane IS the base's view, so its reads
  * resolve at the shared doc-level URLs and execute on the base worker

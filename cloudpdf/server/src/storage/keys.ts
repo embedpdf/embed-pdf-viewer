@@ -41,7 +41,7 @@ export const StorageKeys = {
     return layerArtifactKey(tenantId, docId, layerName, version);
   },
   /**
-   * Base-tier derived render (SCALE-OUT.md §2.1): sha-addressed WITHIN the
+   * Base-tier derived render: sha-addressed WITHIN the
    * tenant (cross-tenant sha-sharing would leak document existence), the
    * canonical render token IS the filename — the key is the request. The
    * token charset ([A-Za-z0-9.=,-]) is object-key-safe on fs/S3/GCS/Azure.

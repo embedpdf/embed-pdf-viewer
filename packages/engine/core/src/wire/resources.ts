@@ -33,14 +33,14 @@ export type DocResourceId =
   | 'head'
   | 'manifest'
   | 'page-render'
-  // WS2b prefix law: annotated renders are their OWN family — they depend
+  // Plane-prefix rule: annotated renders are their OWN family — they depend
   // on content+annotations while `/render/pages/` depends on content alone,
   // and edge grants see only prefixes, so the dependency set must be
   // visible in the path.
   | 'page-render-annotated'
   | 'page-text'
   | 'page-geometry'
-  // WS2b plane model: doc-level shared variants, one per plane-dependent
+  // Plane-scope model: doc-level shared variants, one per plane-dependent
   // read family. Each resolves at the base view while the planes it depends
   // on are inherited — see the RESOURCE_PLANES map in wire/cdn/coverage.ts.
   | 'page-annotations'

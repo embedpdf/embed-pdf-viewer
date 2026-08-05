@@ -17,7 +17,7 @@ type SharedReadCtx = {
 };
 
 /**
- * WS2b plane guard at the ORIGIN (the truth; the `/v1/access` edge grant is
+ * Plane guard at the ORIGIN (the truth; the `/v1/access` edge grant is
  * only the TTL-bounded optimization). Every doc-user token is layer-pinned
  * (`layer_name`, default 'default'), and a doc-level shared resource is
  * visible through it only while EVERY plane the resource depends on is

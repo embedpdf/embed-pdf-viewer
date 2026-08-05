@@ -29,7 +29,7 @@ export async function registerMetadataRoutes(
 ): Promise<void> {
   const { service, layerService } = deps;
 
-  // WS2b doc-level (shared) read: served from the BASE worker session while
+  // Plane-scoped doc-level read: served from the BASE worker session while
   // the caller's layer inherits the metadata plane.
   app.get('/v1/docs/:docId/metadata@:token', async (req, reply) => {
     const { docId, token } = req.params as { docId: string; token: string };

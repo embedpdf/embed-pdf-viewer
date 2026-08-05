@@ -54,7 +54,7 @@ export interface CdnCoverageEntry {
  * never text or annotations.
  */
 /**
- * WS2b plane map: the planes each DOC-LEVEL shared resource depends on. A
+ * Plane map: the planes each DOC-LEVEL shared resource depends on. A
  * layer token's edge credential covers a resource's prefix iff EVERY listed
  * plane is inherited (`'base'`) in the caller's scopes — the same condition
  * the origin guard enforces (origin is the truth; this grant is the
@@ -89,7 +89,7 @@ export function cdnCoverageForScope(
     docId: string;
     layerName?: string;
     /**
-     * WS2b plane scopes of the caller's pinned layer. A doc-level shared
+     * Plane scopes of the caller's pinned layer. A doc-level shared
      * resource's prefix is covered iff every plane it depends on is
      * inherited (`'base'`). Omitted = no layer in play (tenant tokens) —
      * everything the capability scope allows is granted.

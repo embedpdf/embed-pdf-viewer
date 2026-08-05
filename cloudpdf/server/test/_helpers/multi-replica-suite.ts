@@ -20,8 +20,8 @@ import {
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 /**
- * WS1 multi-replica correctness suite (SCALE-OUT.md §1.4/§1.6), engine-
- * parameterized: N replicas share durable truth (one database + one object
+ * Multi-replica correctness suite, engine-parameterized: N replicas share
+ * durable truth (one database + one object
  * store) while each holds its own worker materialization. Every test is a
  * statement of the invariant: durable truth must contain exactly the
  * committed writes — no losses, no ghosts, no uncommitted bytes under a
@@ -142,8 +142,8 @@ export function runMultiReplicaSuite(factory: ReplicaDbFactory): void {
 
       const total = PER_REPLICA * 2;
 
-      // Durable truth, probed three independent ways — the invariant from
-      // SCALE-OUT.md §1.5: the artifact at current_version N contains every
+      // Durable truth, probed three independent ways: the artifact at
+      // current_version N contains every
       // committed mutation ≤ N.
       const final = await readCurrentArtifact(cluster, DOC, LAYER);
       expect(final.annots).toHaveLength(total);

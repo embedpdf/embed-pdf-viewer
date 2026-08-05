@@ -1826,7 +1826,7 @@ export class LayerService {
 
     const page = await this.requireLayerPage(layer.id, ref.pageObjectNumber);
     const durablePageState = this.layerState.decorateLayerPageState(docId, layerName, page);
-    // WS2b: refs minted by SHARED base reads carry the base revision scope;
+    // Refs minted by SHARED base reads carry the base revision scope;
     // the generation check still gates staleness (see the bridge's doc).
     this.requireRevisionBridge().validateClientIndexRef(durablePageState, ref, {
       aliasDocSessionIds: [this.layerState.baseRevisionScopeId(docId)],
@@ -2877,7 +2877,7 @@ export class LayerService {
       // Attempt-artifact hygiene: any upload whose commit did not win is
       // unreachable garbage (unique per-attempt keys). Best-effort, awaited
       // so a caller observing the response never sees the orphan; crash
-      // windows are the orphan sweeper's job (SCALE-OUT.md).
+      // windows are the orphan sweeper's job.
       await this.cleanupPendingAttempts(ctx, docId, layerName);
     }
   }

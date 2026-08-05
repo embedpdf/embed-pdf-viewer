@@ -10,7 +10,7 @@ import type { PageState } from '../revision/PageState';
  * patch only when their cached manifest is exactly at that version. Otherwise
  * they must refresh instead of manufacturing a mixed-version manifest.
  *
- * Deliberately does NOT carry plane scopes (WS2b): scopes only ever move
+ * Deliberately does NOT carry plane scopes: scopes only ever move
  * base → layer, and each mutation kind knows exactly which planes it owns, so
  * the client flips them locally when absorbing this delta (the monotone-flip
  * rule); the manifest is the authoritative source and the 404 → refresh rail

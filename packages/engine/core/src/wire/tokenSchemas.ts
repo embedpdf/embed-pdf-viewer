@@ -40,8 +40,8 @@ export const DownloadTokenSchema = {
  * dotted path here and a matching branch in `PageImageOptionsWireSchema`.
  * No encoder/decoder code changes.
  *
- * `includeAnnotations` is deliberately NOT a token field (token/path law,
- * SCALE-OUT §2b.2): annotatedness changes the artifact's plane-dependency
+ * `includeAnnotations` is deliberately NOT a token field: annotatedness
+ * changes the artifact's plane-dependency
  * set, so it is expressed by the path FAMILY (`…/render/pages/` vs
  * `…/render/annotated/pages/`), never inside the token. `annotationVersion`
  * belongs to the annotated family's tokens only — each family's query

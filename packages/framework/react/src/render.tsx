@@ -30,7 +30,7 @@ export function RenderLayer({ annotations = true }: RenderLayerProps = {}) {
   const render = useCapability(RenderToken);
   const ref = useRef<HTMLImageElement>(null);
   // ONE dependency: the raster's canonical identity — conformed viewport +
-  // annotations flag + epoch (SCALE-OUT §2.1e identity law). Inside a lattice
+  // annotations flag + epoch. Inside a lattice
   // rung, zoom changes don't move it: no refetch, no DOM churn — the stage's
   // CSS transform does the scaling. It changes exactly at rung crossings and
   // on CONFIRMED mutations (epoch bumps at commit, never mid-gesture). Under
@@ -101,7 +101,7 @@ export interface TileLayerProps {
 }
 
 /**
- * TileLayer — the sharp plane above the base rung (SCALE-OUT §2.1e).
+ * TileLayer — the sharp plane above the base rung.
  *
  * Mounting it is the per-lens OPT-IN; whether it spends anything is demand
  * arithmetic (a thumbnail rail's demand never engages). The paint list is the

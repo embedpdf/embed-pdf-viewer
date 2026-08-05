@@ -21,7 +21,7 @@ import type { CdnSigner, SignInput } from '../src/cdn/CdnSigner';
 import { createValidTestLicenseGate } from '../src/licensing/testing';
 
 /**
- * WS2b — plane-scoped view sharing. The law under test: a layer is a set of
+ * Plane-scoped view sharing. The rule under test: a layer is a set of
  * per-plane DELTAS over the immutable base; every read resolves at the
  * doc-level (shared) URL iff EVERY plane it depends on is inherited, executes
  * on the BASE worker session while it does, and each mutation kind flips
@@ -59,7 +59,7 @@ interface Fixture {
   coverageLog: Array<{ layerName?: string; resourceIds: string[] }>;
 }
 
-describe('WS2b plane-scoped view sharing', () => {
+describe('plane-scoped view sharing', () => {
   // One app per describe (tests seed distinct docs and run sequentially):
   // ten per-test boots made the beforeEach hook flaky under full-suite load.
   let fx: Fixture;
@@ -124,7 +124,7 @@ describe('WS2b plane-scoped view sharing', () => {
       (await fetch(annotated, { headers: auth(docToken(tenantId, docId, 'bob')) })).status,
     ).toBe(200);
 
-    // THE economics this workstream exists for: 1,000 pristine visitors are
+    // The key sharing property: 1,000 pristine visitors are
     // this test's two — ZERO layer worker sessions were ever created, and
     // the durable read-through collapsed the annotation-free render into a
     // single worker render.
@@ -268,7 +268,7 @@ describe('WS2b plane-scoped view sharing', () => {
       layout: 'layer',
     });
 
-    // §2.5's rule at the origin: never base artifacts for a view that
+    // Origin rule: never serve base artifacts for a view that
     // removed content — even for pages the view still contains.
     const aliceAuth = auth(docToken(tenantId, docId, 'alice'));
     const bobAuth = auth(docToken(tenantId, docId, 'bob'));
@@ -405,7 +405,7 @@ describe('WS2b plane-scoped view sharing', () => {
   });
 });
 
-describe('WS2b attachments plane (independent axis)', () => {
+describe('attachments plane (independent axis)', () => {
   let fx: Fixture;
 
   beforeAll(async () => {

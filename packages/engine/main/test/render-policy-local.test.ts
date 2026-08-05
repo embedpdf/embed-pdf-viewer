@@ -25,7 +25,7 @@ const annotatedPath = resolve(
 
 /**
  * `localEngine({ renderPolicy })` — the deployment policy plane on the
- * LOCAL engine (SCALE-OUT §2.1b): advertisement via `render.policy()`,
+ * LOCAL engine: advertisement via `render.policy()`,
  * off-lattice rejection under `enforced: true` (server parity), and the
  * `maxRenderPixels` budget riding into every worker render.
  */

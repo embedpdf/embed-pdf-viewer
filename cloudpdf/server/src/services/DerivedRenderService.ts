@@ -24,8 +24,8 @@ import type { ObjectStore } from '../storage/ObjectStore';
 export interface DerivedRenderServiceOptions {
   storage: ObjectStore;
   /**
-   * Full-page width ladder (SCALE-OUT §2.1b: the bounded quantity is
-   * OUTPUT PIXELS, never zoom). Default `[320, 640, 1280, 2560]`.
+   * Full-page width ladder. The bounded quantity is OUTPUT PIXELS, never
+   * zoom. Default `[320, 640, 1280, 2560]`.
    */
   widths?: number[];
   /**
@@ -45,8 +45,8 @@ export interface DerivedRenderServiceOptions {
   /**
    * When true, off-lattice VERSIONED FULL-PAGE render tokens are rejected
    * with 400 (`renderPolicy` echoed). Rect-target requests are exempt —
-   * they belong to the tile policy once it exists (WS2c) and stay
-   * compute-only until then. When false (default until the client stack
+   * they belong to the tile policy once advertised and stay compute-only
+   * until then. When false (default until the client stack
    * ships `snapFullPageViewport` everywhere), off-lattice renders are
    * computed but never persisted — no breakage, no storage-DoS surface.
    */
@@ -82,7 +82,7 @@ export interface DerivedRenderResult {
 }
 
 /**
- * The derived-artifact plane for renders (SCALE-OUT.md §2.1b/§2.1c).
+ * The derived-artifact plane for renders.
  *
  * ONE door: `getOrRender` is a read-through over the object store with
  * per-key singleflight — the route's miss path and the ingest warmer both
@@ -120,8 +120,8 @@ export class DerivedRenderService {
   policy(): RenderPolicy {
     return {
       fullPage: { widths: [...this.widths] },
-      // `tiles` is deliberately ABSENT until the deep-zoom vertical ships
-      // (WS2c) — the schema reserves its shape so the contract never churns.
+      // `tiles` is deliberately ABSENT until deep-zoom tile support ships;
+      // the schema reserves its shape so the contract never churns.
       appearances: { scales: [...this.appearanceScales] },
       maxRenderPixels: this.maxPixels,
       formats: ['webp'],

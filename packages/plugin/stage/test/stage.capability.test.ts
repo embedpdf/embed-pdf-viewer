@@ -1528,7 +1528,7 @@ describe('viewRotation: the NON-persistent view rotation (Adobe "Rotate View")',
   });
 });
 
-describe("VisiblePage.visibleRect — visibility is the stage's data (SCALE-OUT §2.1e)", () => {
+describe("VisiblePage.visibleRect — visibility is the stage's data", () => {
   it('initial view (zoom 1, 1000×700 viewport): full width, 676pt of height', () => {
     const { stage } = harness(PORTRAIT);
     const p = stage.visiblePages()[0]!;

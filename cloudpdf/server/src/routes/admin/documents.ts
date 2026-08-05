@@ -13,7 +13,7 @@ import type { ObjectStore } from '../../storage/ObjectStore';
 
 export interface AdminDocumentsRouteDeps {
   lifecycle: DocumentLifecycleService;
-  /** Serves warmed thumbnail artifacts (WS2). Absent = 404 on the route. */
+  /** Serves warmed thumbnail artifacts. Absent = 404 on the route. */
   storage?: ObjectStore;
 }
 
@@ -181,7 +181,7 @@ export async function registerAdminDocumentsRoutes(
   });
 
   /**
-   * The dashboard-tile artifact (WS2): serves the WARMED base-tier render
+   * The dashboard-tile artifact: serves the WARMED base-tier render
    * by its stored key — no token grammar, no page knowledge needed by the
    * dashboard. 404 with the state while `pending`/`locked`/`failed` (the
    * doc-plane render routes remain the read-through repair path).
@@ -265,7 +265,7 @@ function docPublic(d: {
     metadata: d.metadata,
     idempotencyKey: d.idempotencyKey,
     failureReason: d.failureReason,
-    // Dashboard tile contract (SCALE-OUT §2.1c): the URL is valid the
+    // Dashboard tile contract: the URL is valid the
     // whole time — `pending` just means a fetch pays the read-through.
     thumbnailState: d.thumbnailState,
     thumbnailUrl: d.thumbnailState === 'ready' ? adminWirePaths.documentThumbnail(d.id) : null,

@@ -9,7 +9,7 @@ import type { PageRenderViewport } from '../dto/PageRender';
  *   engine always answers this: rendering is in-process, there is no
  *   shared cache to protect, and exactness is the local product promise.
  * - `lattice` — the deployment treats a finite set of render points as
- *   durable, CDN-shared artifacts (SCALE-OUT WS2). The bounded quantity
+ *   durable, CDN-shared artifacts. The bounded quantity
  *   is OUTPUT PIXELS, never zoom:
  *
  *   - `fullPage.widths` — full-page renders quantize on `viewport.width`

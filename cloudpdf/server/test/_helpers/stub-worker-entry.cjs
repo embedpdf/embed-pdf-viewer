@@ -211,7 +211,10 @@ function annotationDto(a, index) {
 
 /** Legacy canned annotation for lenient fallbacks (ref did not resolve). */
 function cannedAnnotation(pon, index = 0) {
-  return annotationDto({ pon, seq: pon + index, nm: `stub-${pon}-${index}`, contents: null }, index);
+  return annotationDto(
+    { pon, seq: pon + index, nm: `stub-${pon}-${index}`, contents: null },
+    index,
+  );
 }
 
 /** Annotations of one page, in session order, as DTOs. */
@@ -429,7 +432,7 @@ parentPort.on('message', (msg) => {
         return;
       }
       // Deterministic catalog-actions snapshot: byte-identical for the base
-      // session and every pristine layer session (the WS2b sharing claim).
+      // session and every pristine layer session (the plane-sharing rule).
       parentPort.postMessage({
         kind: 'resolve',
         jobId: msg.jobId,
@@ -881,7 +884,7 @@ parentPort.on('message', (msg) => {
       return;
     }
     case 'attachments.list': {
-      // Base-session capable (WS2b shared reads): no layerName resolves the
+      // Base-session capable (plane-scoped shared reads): no layerName resolves the
       // doc's base session, mirroring the real WorkerHost.
       const meta = openDocs.get(sessionKey(msg));
       if (!meta) {

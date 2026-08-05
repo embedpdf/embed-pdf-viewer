@@ -113,7 +113,7 @@ export const wirePaths = {
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/layout@${encodeLayoutToken(layoutVersion)}`,
 
   /**
-   * Immutable BASE page-geometry list (WS2b plane model): the shared-URL
+   * Immutable BASE page-geometry list (plane-scope model): the shared-URL
    * variant a layout-inheriting layer resolves at — every visitor's page
    * list is ONE CDN object served from the base worker session.
    */
@@ -137,7 +137,7 @@ export const wirePaths = {
   layerMetadataCurrent: (docId: string, layerName: string) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/metadata`,
 
-  /** Immutable BASE metadata (WS2b plane model): the shared-URL variant a
+  /** Immutable BASE metadata (plane-scope model): the shared-URL variant a
    *  metadata-inheriting layer resolves at. */
   docMetadata: (docId: string, metadataVersion: number) =>
     `/v1/docs/${encodeURIComponent(docId)}/metadata@${encodeMetadataToken(metadataVersion)}`,
@@ -146,7 +146,7 @@ export const wirePaths = {
   layerActions: (docId: string, layerName: string, actionsVersion: number) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/actions@${encodeActionsToken(actionsVersion)}`,
 
-  /** Immutable BASE catalog actions (WS2b plane model): the shared-URL
+  /** Immutable BASE catalog actions (plane-scope model): the shared-URL
    *  variant an actions-inheriting layer resolves at. */
   docActions: (docId: string, actionsVersion: number) =>
     `/v1/docs/${encodeURIComponent(docId)}/actions@${encodeActionsToken(actionsVersion)}`,
@@ -156,14 +156,14 @@ export const wirePaths = {
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/metadata`,
 
   /**
-   * Immutable BASE /EmbeddedFiles listing (WS2b): the shared-URL variant an
+   * Immutable BASE /EmbeddedFiles listing: the shared-URL variant an
    * attachments-undiverged layer resolves at — every visitor's sidebar list
    * is ONE CDN object served from the base worker session.
    */
   docAttachments: (docId: string, attachmentsVersion: number) =>
     `/v1/docs/${encodeURIComponent(docId)}/attachments@${encodeAttachmentsToken(attachmentsVersion)}`,
 
-  /** Immutable BASE decoded bytes of one embedded file (WS2b twin of
+  /** Immutable BASE decoded bytes of one embedded file (twin of
    *  `layerAttachmentFile` — same capability tier split). */
   docAttachmentFile: (docId: string, key: string, attachmentsVersion: number) =>
     `/v1/docs/${encodeURIComponent(docId)}/attachment-files/${encodeTokenText(key)}/data@${encodeAttachmentsToken(attachmentsVersion)}`,
@@ -206,7 +206,7 @@ export const wirePaths = {
 
   /**
    * Immutable BASE bytes of a FileAttachment annotation's embedded file
-   * (WS2b plane model). Depends on the `annotations` plane (the annotation
+   * (plane-scope model). Depends on the `annotations` plane (the annotation
    * exists in this view) AND the `attachments` plane (the pin); the origin
    * guard requires both inherited.
    */
@@ -252,7 +252,7 @@ export const wirePaths = {
     `/v1/docs/${encodeURIComponent(docId)}/render/pages/${pageObjectNumber}/data`,
 
   /**
-   * Immutable BASE annotated render (WS2b plane model). Its OWN path family,
+   * Immutable BASE annotated render (plane-scope model). Its OWN path family,
    * not a token flag under `/render/pages/`: an annotated render depends on
    * `content + annotations`, an annotation-free one on `content` alone, and
    * edge grants are prefix-scoped — the prefix law says a path's prefix must
@@ -300,7 +300,7 @@ export const wirePaths = {
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/render/annotated/pages/${pageObjectNumber}/data`,
 
   /**
-   * Immutable BASE annotation list for a single page (WS2b plane model):
+   * Immutable BASE annotation list for a single page (plane-scope model):
    * the shared-URL variant an annotations-inheriting layer resolves at — a
    * base's own annotations (weak-identity ones included) are simply visible
    * through every pristine layer, so 1,000 visitors' sidebars are ONE CDN
@@ -309,7 +309,7 @@ export const wirePaths = {
   docPageAnnotations: (docId: string, pageObjectNumber: number, annotationVersion: number) =>
     `/v1/docs/${encodeURIComponent(docId)}/annotations/pages/${pageObjectNumber}/items@${encodeAnnotationToken(annotationVersion)}`,
 
-  /** Immutable BASE appearance batch (WS2b twin of
+  /** Immutable BASE appearance batch (twin of
    *  `layerPageAnnotationAppearances` — same `annotations` plane gate). */
   docPageAnnotationAppearances: (docId: string, pageObjectNumber: number, token: TokenInput) =>
     `/v1/docs/${encodeURIComponent(docId)}/annotations/pages/${pageObjectNumber}/appearances@${encodeAnnotationAppearancesRenderToken(token)}`,

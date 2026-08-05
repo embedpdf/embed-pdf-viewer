@@ -6,7 +6,7 @@ import type { Rect } from '@embedpdf/core-geometry';
 export { intersectRects } from '@embedpdf/core-geometry';
 
 /**
- * Pure tile-grid math (SCALE-OUT §2.1e).
+ * Pure tile-grid math.
  *
  * The pyramid is ALIGNED: one origin (the page's top-left), a fixed tile
  * size in device pixels, and ×2 scale steps. Alignment is what makes the

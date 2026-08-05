@@ -47,12 +47,12 @@ describe('doc.render.policy (cloud)', () => {
     try {
       expect(doc.render).toBeDefined();
       const policy = await doc.render!.policy();
-      // The deployment default (SCALE-OUT §2.1b): a full-page WIDTH ladder
+      // The deployment default: a full-page WIDTH ladder
       // — the bounded quantity is output pixels, never zoom — plus the
       // appearance SCALE lattice (appearances must track the page's
       // effective render scale to composite crisply), with the tiles
-      // block reserved-absent until WS2c, unenforced until the client
-      // stack ships snap everywhere.
+      // block absent until the server advertises tile support, and
+      // unenforced until the client stack snaps requests everywhere.
       expect(policy).toEqual({
         kind: 'lattice',
         fullPage: { widths: [320, 640, 1280, 2560] },

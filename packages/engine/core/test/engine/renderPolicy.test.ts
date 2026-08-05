@@ -134,7 +134,7 @@ describe('snapTileScale', () => {
   };
 
   test('continuous and tiles-less lattices are the identity — the reserved-block contract', () => {
-    // Until WS2c ships the server never advertises `tiles`; the tiling
+    // Until the server advertises tile support, the tiling
     // client falls back to its own default pyramid, and this helper must
     // not invent one.
     expect(snapTileScale(CONTINUOUS_RENDER_POLICY, 4.5)).toBe(4.5);

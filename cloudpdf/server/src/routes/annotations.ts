@@ -90,7 +90,7 @@ export async function registerAnnotationRoutes(
     derivedRenders,
   } = deps;
 
-  // ── WS2b doc-level (shared) reads: a base's own annotations —
+  // ── Plane-scoped doc-level reads: a base's own annotations —
   //    weak-identity ones included — are simply VISIBLE through every
   //    annotations-inheriting layer, so the list and appearance batches are
   //    ONE CDN object served from the BASE worker session. Guarded by the
@@ -728,7 +728,7 @@ async function renderAnnotationAppearances(input: {
     );
   }
 
-  // Appearance-scale enforcement (SCALE-OUT §2.1b): the appearance lattice
+  // Appearance-scale enforcement: the appearance lattice
   // bounds SCALE — appearances are sized by `rect × scale`, so a page-sized
   // stamp at a high scale is a full-page memory bomb wearing a different
   // token. Same scoping as pages: only VERSIONED (token) requests are

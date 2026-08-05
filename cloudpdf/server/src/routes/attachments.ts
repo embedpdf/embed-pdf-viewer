@@ -62,7 +62,7 @@ export async function registerAttachmentRoutes(
 ): Promise<void> {
   const { documentService, layerService } = deps;
 
-  // ── WS2b doc-level (shared) reads: served from the BASE worker session —
+  // ── Plane-scoped doc-level reads: served from the BASE worker session —
   //    no layer session is created for plane-inheriting visitors. The plane
   //    guard + auth chain live in `requireSharedDocRead` (one door). ──────
 
