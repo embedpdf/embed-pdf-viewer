@@ -7,7 +7,9 @@
 #
 #   docker build -f ee/server/Dockerfile -t cloudpdf-server:dev .
 #
-# Cross-build for linux/amd64 from another arch (e.g. Apple Silicon):
+# The image is multi-arch (linux/amd64 + linux/arm64); a plain build targets
+# the host arch. Cross-build the other one explicitly, e.g. amd64 from
+# Apple Silicon:
 #
 #   docker buildx build --platform linux/amd64 \
 #     -f ee/server/Dockerfile -t cloudpdf-server:dev --load .
@@ -16,12 +18,13 @@
 #   build    (default) fetch the pinned thread-local libpdfium + compile
 #            the N-API addon in-image. Fully self-contained, needs the
 #            C++ toolchain. Used for local/dev builds.
-#   prebuilt reuse a CI-produced packages/engine/runtime/npm/linux-x64/lib
+#   prebuilt reuse a CI-produced packages/engine/runtime/npm/<target>/lib
 #            payload that is staged into the build context before build.
 #            Faster, and pins the image to the exact released binary.
 #
-# Target platform is always linux-x64 / glibc (Debian), because the
-# native deps (libpdfium.so, better-sqlite3, sharp/libvips) are glibc.
+# Target platform is glibc Debian on amd64 or arm64: TARGETARCH picks the
+# native runtime target (linux-x64 | linux-arm64), and the other native deps
+# (better-sqlite3, sharp/libvips) install their matching glibc builds.
 
 ARG NODE_VERSION=22
 
@@ -38,6 +41,15 @@ ARG NODE_VERSION=22
 # ---------------------------------------------------------------------------
 FROM node:${NODE_VERSION}-bookworm AS builder
 ARG NATIVE_SRC=build
+# amd64|arm64, injected by BuildKit from --platform (defaults to the host
+# arch). Mapped once to the runtime target naming (linux-x64|linux-arm64)
+# used by packages/engine/runtime/npm/<target>; later RUN steps read the file.
+ARG TARGETARCH
+RUN case "${TARGETARCH:-$(uname -m)}" in \
+      amd64|x86_64)  echo linux-x64   > /runtime-target ;; \
+      arm64|aarch64) echo linux-arm64 > /runtime-target ;; \
+      *) echo "unsupported target arch: ${TARGETARCH:-$(uname -m)}" >&2; exit 1 ;; \
+    esac
 WORKDIR /repo
 # clang + lld are required by the native build: generate-functions.mjs
 # shells out to `clang` for an AST dump, and cmake-js links with lld
@@ -54,20 +66,22 @@ COPY . .
 # and keeping it would force an ${NPM_TOKEN} substitution.
 RUN rm -f .npmrc && pnpm install --frozen-lockfile
 
-# Acquire the linux-x64 native PDFium runtime (pdf-runtime.node + libpdfium.so).
+# Acquire the native PDFium runtime for the target arch (pdf-runtime.node +
+# libpdfium.so).
 #   build    -> fetch the pinned thread-local libpdfium + compile the addon.
-#   prebuilt -> CI staged the lib payload into npm/linux-x64/lib before build
+#   prebuilt -> CI staged the lib payload into npm/<target>/lib before build
 #               (it arrives via the COPY above); just verify it is present.
 RUN set -eux; \
+    TARGET="$(cat /runtime-target)"; \
     if [ "$NATIVE_SRC" = "prebuilt" ]; then \
-      test -f packages/engine/runtime/npm/linux-x64/lib/pdf-runtime.node \
-        || { echo "NATIVE_SRC=prebuilt but no prebuilt lib in build context" >&2; exit 1; }; \
+      test -f "packages/engine/runtime/npm/$TARGET/lib/pdf-runtime.node" \
+        || { echo "NATIVE_SRC=prebuilt but no prebuilt $TARGET lib in build context" >&2; exit 1; }; \
     else \
       CC=clang CXX=clang++ LDFLAGS=-fuse-ld=lld \
-        pnpm --filter @embedpdf/engine-runtime build:target linux-x64; \
+        pnpm --filter @embedpdf/engine-runtime build:target "$TARGET"; \
     fi; \
-    test -f packages/engine/runtime/npm/linux-x64/lib/pdf-runtime.node; \
-    test -f packages/engine/runtime/npm/linux-x64/lib/libpdfium.so
+    test -f "packages/engine/runtime/npm/$TARGET/lib/pdf-runtime.node"; \
+    test -f "packages/engine/runtime/npm/$TARGET/lib/libpdfium.so"
 
 # Build the server and its workspace dependency closure. The `<pkg>...`
 # suffix selects @cloudpdf/server + everything it depends on, and pnpm runs
@@ -81,19 +95,21 @@ RUN pnpm --filter "@cloudpdf/server..." run build
 # node_modules incl. the native package, sharp, sqlite). --legacy is required:
 # the repo does not set inject-workspace-packages, so the new deploy
 # implementation would refuse to run.
-# The linux-x64 platform package is an optional transitive dependency of
-# @embedpdf/engine-runtime, so pnpm is not required to root-link it under
-# /prod/node_modules. Verify the real runtime contract instead: pdf-runtime can
-# resolve its platform addon, and libpdfium.so sits beside the addon for RPATH.
-RUN pnpm --filter=@cloudpdf/server deploy --prod --legacy /prod \
+# The per-arch platform package (@embedpdf/engine-runtime-<target>) is an
+# optional transitive dependency of @embedpdf/engine-runtime, so pnpm is not
+# required to root-link it under /prod/node_modules. Verify the real runtime
+# contract instead: pdf-runtime can resolve its platform addon, and
+# libpdfium.so sits beside the addon for RPATH.
+RUN TARGET="$(cat /runtime-target)" \
+ && pnpm --filter=@cloudpdf/server deploy --prod --legacy /prod \
  && test -f /prod/dist/bin/cloudpdf-server.js \
  && cd /prod \
- && node -e "\
+ && RUNTIME_TARGET="$TARGET" node -e "\
 const fs = require('node:fs'); \
 const path = require('node:path'); \
 const { createRequire } = require('node:module'); \
 const runtimeRequire = createRequire(require.resolve('@embedpdf/engine-runtime')); \
-const addon = runtimeRequire.resolve('@embedpdf/engine-runtime-linux-x64'); \
+const addon = runtimeRequire.resolve('@embedpdf/engine-runtime-' + process.env.RUNTIME_TARGET); \
 const so = path.join(path.dirname(addon), 'libpdfium.so'); \
 if (!fs.existsSync(addon)) throw new Error('missing addon: ' + addon); \
 if (!fs.existsSync(so)) throw new Error('missing libpdfium.so: ' + so); \
