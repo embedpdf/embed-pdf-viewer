@@ -18,12 +18,26 @@ const props = withDefaults(defineProps<Props>(), {
 });
 
 const { provides: tilingCapability } = useTilingCapability();
-const url = ref<string>();
+const canvasRef = ref<HTMLCanvasElement | null>(null);
+const hasContent = ref(false);
 const relScale = computed(() => props.scale / props.tile.srcScale);
 
-// Track last rendered tile ID to prevent duplicates
+let currentBitmap: ImageBitmap | null = null;
 let lastRenderedId: string | undefined;
 let currentTask: any = null;
+
+function paintBitmap(bitmap: ImageBitmap) {
+  if (!canvasRef.value) return;
+  try {
+    const canvas = canvasRef.value;
+    canvas.width = bitmap.width;
+    canvas.height = bitmap.height;
+    canvas.getContext('bitmaprenderer')!.transferFromImageBitmap(bitmap);
+    hasContent.value = true;
+  } catch {
+    // Bitmap was detached
+  }
+}
 
 watch(
   [() => props.tile.id, () => props.documentId, tilingCapability],
@@ -32,17 +46,18 @@ watch(
 
     const scope = capability.forDocument(docId);
 
-    // CRITICAL: Clear image immediately when documentId changes
+    // CRITICAL: Clear state immediately when documentId changes
     if (prevDocId !== undefined && prevDocId !== docId) {
-      if (url.value) {
-        URL.revokeObjectURL(url.value);
-        url.value = undefined;
+      hasContent.value = false;
+      if (currentBitmap) {
+        currentBitmap.close();
+        currentBitmap = null;
       }
       if (currentTask) {
         currentTask.abort({ code: PdfErrorCode.Cancelled, message: 'switching documents' });
         currentTask = null;
       }
-      lastRenderedId = undefined; // Reset so new document tiles render
+      lastRenderedId = undefined;
     }
 
     // Already rendered this exact tile (for same document)
@@ -53,11 +68,10 @@ watch(
       currentTask.abort({ code: PdfErrorCode.Cancelled, message: 'switching tiles' });
       currentTask = null;
     }
-
-    // Clean up old URL
-    if (url.value) {
-      URL.revokeObjectURL(url.value);
-      url.value = undefined;
+    if (currentBitmap) {
+      currentBitmap.close();
+      currentBitmap = null;
+      hasContent.value = false;
     }
 
     lastRenderedId = tileId;
@@ -68,8 +82,13 @@ watch(
       dpr: props.dpr,
     });
 
-    currentTask.wait((blob: Blob) => {
-      url.value = URL.createObjectURL(blob);
+    currentTask.wait((bitmap: ImageBitmap) => {
+      if (currentBitmap) {
+        currentBitmap.close();
+      }
+      currentBitmap = bitmap;
+      paintBitmap(bitmap);
+      currentBitmap = null; // transferred to canvas, don't close
       currentTask = null;
     }, ignore);
   },
@@ -80,16 +99,17 @@ onBeforeUnmount(() => {
   if (currentTask) {
     currentTask.abort({ code: PdfErrorCode.Cancelled, message: 'unmounting' });
   }
-  if (url.value) {
-    URL.revokeObjectURL(url.value);
+  if (currentBitmap) {
+    currentBitmap.close();
+    currentBitmap = null;
   }
 });
 </script>
 
 <template>
-  <img
-    v-if="url"
-    :src="url"
+  <canvas
+    v-show="hasContent"
+    ref="canvasRef"
     :style="{
       position: 'absolute',
       left: `${tile.screenRect.origin.x * relScale}px`,

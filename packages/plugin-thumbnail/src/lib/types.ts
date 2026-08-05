@@ -87,7 +87,21 @@ export interface RefreshPagesEvent {
 // Scoped thumbnail capability
 export interface ThumbnailScope {
   scrollToThumb(pageIdx: number): void;
-  renderThumb(pageIdx: number, dpr: number): Task<Blob, PdfErrorReason>;
+  /**
+   * Get or create a cached thumbnail bitmap for the given page.
+   *
+   * Returns an LRU-cached `Task<ImageBitmap>` — multiple calls for the same
+   * page return the **same** task instance.
+   *
+   * **Caller must NOT close the bitmap.** The LRU cache owns its lifecycle.
+   * Use `drawImage` (pixel copy) rather than `transferFromImageBitmap`
+   * (ownership transfer) to paint, since the bitmap must remain valid for
+   * other consumers.
+   *
+   * Bitmaps are automatically freed on LRU eviction, page refresh, or
+   * document close.
+   */
+  renderThumb(pageIdx: number, dpr: number): Task<ImageBitmap, PdfErrorReason>;
   updateWindow(scrollY: number, viewportH: number): void;
   getWindow(): WindowState | null;
   onWindow: EventHook<WindowState | null>;
@@ -98,7 +112,8 @@ export interface ThumbnailScope {
 export interface ThumbnailCapability {
   // Active document operations
   scrollToThumb(pageIdx: number): void;
-  renderThumb(pageIdx: number, dpr: number): Task<Blob, PdfErrorReason>;
+  /** {@inheritDoc ThumbnailScope.renderThumb} */
+  renderThumb(pageIdx: number, dpr: number): Task<ImageBitmap, PdfErrorReason>;
   updateWindow(scrollY: number, viewportH: number): void;
   getWindow(): WindowState | null;
 

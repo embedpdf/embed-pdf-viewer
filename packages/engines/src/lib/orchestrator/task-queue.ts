@@ -1,14 +1,7 @@
-import { Task, TaskError, Logger, NoopLogger } from '@embedpdf/models';
+import { Task, Logger, NoopLogger, RenderPriority } from '@embedpdf/models';
 
 const LOG_SOURCE = 'TaskQueue';
 const LOG_CATEGORY = 'Queue';
-
-export enum Priority {
-  CRITICAL = 3,
-  HIGH = 2,
-  MEDIUM = 1,
-  LOW = 0,
-}
 
 // ============================================================================
 // Type Utilities
@@ -35,14 +28,14 @@ export type ExtractTaskProgress<T> = T extends Task<any, any, infer P> ? P : nev
 
 export interface QueuedTask<T extends Task<any, any, any>> {
   id: string;
-  priority: Priority;
+  priority: RenderPriority;
   meta?: Record<string, unknown>;
   executeFactory: () => T; // Factory function - called when it's time to execute!
   cancelled?: boolean;
 }
 
 export interface EnqueueOptions {
-  priority?: Priority;
+  priority?: RenderPriority;
   meta?: Record<string, unknown>;
   fifo?: boolean;
 }
@@ -152,7 +145,7 @@ export class WorkerTaskQueue {
    *   const task = queue.enqueue({
    *     execute: () => this.executor.getMetadata(doc),  // Factory - not called yet!
    *     meta: { operation: 'getMetadata' }
-   *   }, { priority: Priority.LOW });
+   *   }, { priority: RenderPriority.LOW });
    *
    * The returned task has the SAME type as executor.getMetadata() would return!
    */
@@ -164,7 +157,7 @@ export class WorkerTaskQueue {
     options: EnqueueOptions = {},
   ): T {
     const id = this.generateId();
-    const priority = options.priority ?? Priority.MEDIUM;
+    const priority = options.priority ?? RenderPriority.MEDIUM;
 
     // Create a proxy task that we return to the user
     // This task bridges to the real task that will be created later

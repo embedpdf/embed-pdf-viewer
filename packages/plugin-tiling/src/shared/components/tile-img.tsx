@@ -12,6 +12,16 @@ interface TileImgProps {
   scale: number;
 }
 
+function paintBitmap(canvas: HTMLCanvasElement, bitmap: ImageBitmap) {
+  try {
+    canvas.width = bitmap.width;
+    canvas.height = bitmap.height;
+    canvas.getContext('bitmaprenderer')!.transferFromImageBitmap(bitmap);
+  } catch {
+    // Bitmap was detached
+  }
+}
+
 export function TileImg({ documentId, pageIndex, tile, dpr, scale }: TileImgProps) {
   const { provides: tilingCapability } = useTilingCapability();
   const scope = useMemo(
@@ -19,55 +29,49 @@ export function TileImg({ documentId, pageIndex, tile, dpr, scale }: TileImgProp
     [tilingCapability, documentId],
   );
 
-  const [url, setUrl] = useState<string>();
-  const urlRef = useRef<string | null>(null);
-
   const relativeScale = scale / tile.srcScale;
+
+  const [hasContent, setHasContent] = useState(false);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   /* kick off render exactly once per tile */
   useEffect(() => {
-    if (tile.status === 'ready' && urlRef.current) return; // already done
     if (!scope) return;
+
+    let currentBitmap: ImageBitmap | null = null;
     const task = scope.renderTile({ pageIndex, tile, dpr });
-    task.wait((blob) => {
-      const objectUrl = URL.createObjectURL(blob);
-      urlRef.current = objectUrl;
-      setUrl(objectUrl);
+    task.wait((output) => {
+      currentBitmap = output;
+      const canvas = canvasRef.current;
+      if (canvas) {
+        paintBitmap(canvas, output);
+        currentBitmap = null; // transferred to canvas
+        setHasContent(true);
+      }
     }, ignore);
 
     return () => {
-      if (urlRef.current) {
-        URL.revokeObjectURL(urlRef.current);
-        urlRef.current = null;
-      } else {
-        task.abort({
-          code: PdfErrorCode.Cancelled,
-          message: 'canceled render task',
-        });
+      task.abort({
+        code: PdfErrorCode.Cancelled,
+        message: 'canceled render task',
+      });
+      if (currentBitmap) {
+        currentBitmap.close();
+        currentBitmap = null;
       }
+      setHasContent(false);
     };
-  }, [scope, pageIndex, tile.id]); // id includes scale, so unique
+  }, [scope, pageIndex, tile.id]);
 
-  const handleImageLoad = () => {
-    if (urlRef.current) {
-      URL.revokeObjectURL(urlRef.current);
-      urlRef.current = null;
-    }
+  const positionStyle = {
+    position: 'absolute' as const,
+    left: tile.screenRect.origin.x * relativeScale,
+    top: tile.screenRect.origin.y * relativeScale,
+    width: tile.screenRect.size.width * relativeScale,
+    height: tile.screenRect.size.height * relativeScale,
   };
 
-  if (!url) return null; // could render a placeholder
   return (
-    <img
-      src={url}
-      onLoad={handleImageLoad}
-      style={{
-        position: 'absolute',
-        left: tile.screenRect.origin.x * relativeScale,
-        top: tile.screenRect.origin.y * relativeScale,
-        width: tile.screenRect.size.width * relativeScale,
-        height: tile.screenRect.size.height * relativeScale,
-        display: 'block',
-      }}
-    />
+    <canvas ref={canvasRef} style={{ ...positionStyle, display: hasContent ? 'block' : 'none' }} />
   );
 }

@@ -200,7 +200,7 @@ export class TilingPlugin extends BasePlugin<TilingPluginConfig, TilingCapabilit
 
     this.dispatch(markTileStatus(id, options.pageIndex, options.tile.id, 'rendering'));
 
-    const task = this.renderCapability.forDocument(id).renderPageRect({
+    const task = this.renderCapability.forDocument(id).renderPageRectBitmap({
       pageIndex: options.pageIndex,
       rect: options.tile.pageRect,
       options: {
