@@ -61,5 +61,10 @@
       "./package.json": "./package.json",
       "./styles.css": "./src/styles.css"
     }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/embedpdf/embed-pdf-viewer.git",
+    "directory": "packages/viewer/chrome"
   }
 }

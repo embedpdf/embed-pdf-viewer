@@ -2,7 +2,7 @@
   "name": "embedpdf",
   "private": true,
   "version": "0.0.0",
-  "packageManager": "pnpm@10.4.0",
+  "packageManager": "pnpm@10.34.0",
   "license": "MIT",
   "scripts": {
     "dev": "turbo run dev --parallel",
@@ -17,6 +17,7 @@
     "build:cloudpdf": "turbo run build --filter=\"./cloudpdf/**\" --filter=\"!@cloudpdf/website\"",
     "build:release": "turbo run build --filter=\"./packages/**\" && pnpm run build:cloudpdf",
     "verify:consume": "pnpm --filter @embedpdf/tooling-consume-fixtures run verify",
+    "bootstrap:package": "node scripts/bootstrap-package.mjs",
     "verify:engine-runtime-packages": "pnpm --filter @embedpdf/engine-runtime run verify:packages",
     "changeset": "changeset",
     "ci:publish": "node scripts/assert-publish-phase.mjs && pnpm publish -r --access public --tag next --publish-branch main --report-summary"

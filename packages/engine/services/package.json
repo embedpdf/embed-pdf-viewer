@@ -29,8 +29,8 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/embedpdf/embed-pdf-viewer",
-    "directory": "packages/engine-services"
+    "url": "git+https://github.com/embedpdf/embed-pdf-viewer.git",
+    "directory": "packages/engine/services"
   },
   "homepage": "https://www.embedpdf.com",
   "bugs": {

@@ -38,5 +38,10 @@
     "vitest": "^2.1.9",
     "@embedpdf/tooling-build": "workspace:*"
   },
-  "license": "Apache-2.0"
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/embedpdf/embed-pdf-viewer.git",
+    "directory": "packages/framework/web"
+  }
 }
