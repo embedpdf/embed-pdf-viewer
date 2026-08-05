@@ -16,7 +16,7 @@ import { useCapability, useSelector } from './runtime';
  *   await redaction.applyAll();          // irreversible — confirm first
  */
 
-// One-line-per-feature (ADAPTERS.md): registration travels with the UI.
+// One-line-per-feature: registration travels with the UI.
 export * from '@embedpdf/plugin-redaction';
 
 export function useRedaction(): RedactionCapability & {

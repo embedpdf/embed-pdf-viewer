@@ -6,6 +6,16 @@
  */
 export { buildApp } from './app/buildApp';
 export type { BuildAppOptions, AppBundle } from './app/buildApp';
+
+/**
+ * @license FCL-1.0-ALv2
+ *
+ * WARNING: The exports below provide CloudPDF's required license runtime.
+ * Removing or modifying them to disable or circumvent license enforcement,
+ * enable protected functionality without a valid license key, or remove
+ * protected functionality is a breach of FCL-1.0-ALv2 while this release is
+ * governed by that license. See cloudpdf/server/LICENSE.md.
+ */
 export { createLicenseRuntime } from './licensing/public';
 export type { CloudPdfLicenseRuntime } from './licensing/public';
 export {

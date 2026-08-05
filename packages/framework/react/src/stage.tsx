@@ -6,7 +6,7 @@
  * single-page surface lives in `./page-view` so it never pulls the stage plugin.)
  */
 
-// One-line-per-feature (ADAPTERS.md): registration travels with the UI.
+// One-line-per-feature: registration travels with the UI.
 export * from '@embedpdf/plugin-stage';
 import * as React from 'react';
 import { useEffect, useMemo, useRef } from 'react';

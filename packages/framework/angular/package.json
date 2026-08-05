@@ -2,7 +2,7 @@
   "name": "@embedpdf/angular",
   "version": "2.15.0",
   "private": false,
-  "description": "Angular adapter for EmbedPDF v3: one generic signal binding + structural components (EpdfViewer, EpdfStage) + headless layers & inject functions. The whole framework surface, one secondary entry point per feature (ADAPTERS.md).",
+  "description": "Angular adapter for EmbedPDF v3: one generic signal binding + structural components (EpdfViewer, EpdfStage) + headless layers & inject functions. The whole framework surface, one secondary entry point per feature.",
   "sideEffects": false,
   "module": "./dist/fesm2022/embedpdf-angular.mjs",
   "types": "./dist/index.d.ts",

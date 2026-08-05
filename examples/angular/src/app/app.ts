@@ -1,7 +1,7 @@
 /**
  * The root: chooses the engine + plugin set and mounts the viewer. Everything
  * that READS the kernel lives in <app-workspace>, INSIDE <epdf-viewer>, where
- * the host is injectable. One import line per feature (ADAPTERS.md).
+ * the host is injectable. One import line per feature.
  */
 import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { EpdfViewer } from '@embedpdf/angular/runtime';

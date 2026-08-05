@@ -7,7 +7,7 @@
  * on this — there is no per-plugin framework code.
  */
 
-// One-line-per-feature (ADAPTERS.md): registration travels with the UI.
+// One-line-per-feature: registration travels with the UI.
 export * from '@embedpdf/core';
 import * as React from 'react';
 import {

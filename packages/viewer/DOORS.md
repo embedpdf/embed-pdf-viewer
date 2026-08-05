@@ -1,8 +1,8 @@
 # Doors — the law for the viewer product line
 
-`NAMING.md` is the law for where a package lives, `ADAPTERS.md` for adapter
-authors, `tooling/build/README.md` for how packages build. This file is the law
-for **how one viewer serves several deliveries**: EmbedPDF with the built-in
+`NAMING.md` is the law for where a package lives, and
+`tooling/build/README.md` for how packages build. This file is the law for
+**how one viewer serves several deliveries**: EmbedPDF with the built-in
 engine, CloudPDF with a remote one, a CDN snippet, and one wrapper per
 framework — without forking the viewer once.
 

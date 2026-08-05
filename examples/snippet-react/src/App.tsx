@@ -1,6 +1,6 @@
 /**
  * The example is now a thin CONSUMER of @embedpdf/viewer-chrome: it chooses an
- * engine (the one decision every host makes — ADAPTERS.md) and supplies demo
+ * engine (the one decision every host makes) and supplies demo
  * documents. Everything else — plugin set, toolbars, theme, translations — is
  * the chrome's.
  */

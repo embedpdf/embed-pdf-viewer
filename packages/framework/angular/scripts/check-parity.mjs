@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Framework parity by spec (ADAPTERS.md rule 5): the React package's `exports`
+ * Framework parity by spec: the React package's `exports`
  * map IS the vertical manifest — no second hand-written list. This script
  * fails when React grows a vertical this package neither ships (an
  * ng-package.json entry point) nor explicitly defers (the PENDING set), and
@@ -42,7 +42,9 @@ const verticals = Object.keys(reactPkg.exports)
   .map((k) => k.replace(/^\.\//, ''));
 
 const missing = verticals.filter(
-  (v) => !PENDING.has(v) && !existsSync(fileURLToPath(new URL(`../${v}/ng-package.json`, import.meta.url))),
+  (v) =>
+    !PENDING.has(v) &&
+    !existsSync(fileURLToPath(new URL(`../${v}/ng-package.json`, import.meta.url))),
 );
 const shipped = [...PENDING].filter((v) =>
   existsSync(fileURLToPath(new URL(`../${v}/ng-package.json`, import.meta.url))),

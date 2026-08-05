@@ -8,7 +8,7 @@
  * already renders the hover ghost.
  */
 
-// One-line-per-feature (ADAPTERS.md): registration travels with the UI.
+// One-line-per-feature: registration travels with the UI.
 export * from '@embedpdf/plugin-stamp';
 import { useEffect, useState } from 'react';
 import { StampToken, type StampAsset, type StampLibrary } from '@embedpdf/plugin-stamp';

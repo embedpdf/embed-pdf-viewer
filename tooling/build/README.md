@@ -2,8 +2,7 @@
 
 `epdf-build` turns a publishable TS package into dual ESM+CJS with
 declarations, and proves the result on every build. `PLUGINS.md` is the law for
-plugin authors, `ADAPTERS.md` for adapter authors; this file is the law for how
-packages BUILD.
+plugin authors; this file is the law for how packages BUILD.
 
 ## The laws
 

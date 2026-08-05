@@ -1,9 +1,8 @@
 # Docs architecture — author once, render per integration
 
-The law for how documentation is structured so that five integrations never mean
-five copies. Companion to `ADAPTERS.md` (which makes this possible: framework
-parity is enforced by spec, so "one page of prose + per-framework code" is
-rendering, not aspiration).
+The law for how documentation is structured so that five integrations never
+mean five copies. Framework parity makes this possible: "one page of prose +
+per-framework code" is rendering, not aspiration.
 
 ## The two halves
 
@@ -18,10 +17,9 @@ rendering, not aspiration).
   Svelte, and Angular. The config API and prose remain shared; installation and
   code examples resolve from the integration in the URL.
 - **Headless docs carry the same integration switcher**, limited to React, Vue,
-  Svelte, and Angular. One source page per
-  vertical (the ADAPTERS.md table is the sitemap: stage, render, selection,
-  annotation, form, search, …). Prose is shared; code and API names render
-  per framework.
+  Svelte, and Angular. There is one source page per feature: stage, render,
+  selection, annotation, form, search, and so on. Prose is shared; code and API
+  names render per framework.
 
 Viewer and Headless share one persisted integration preference. Switching
 products carries React, Vue, Svelte, or Angular with you. Vanilla JS falls back

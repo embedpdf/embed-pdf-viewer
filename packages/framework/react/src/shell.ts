@@ -11,7 +11,7 @@
  * inside a <DocumentGate>.
  */
 
-// One-line-per-feature (ADAPTERS.md): registration travels with the UI.
+// One-line-per-feature: registration travels with the UI.
 export * from '@embedpdf/plugin-shell';
 import { useMemo } from 'react';
 import { ShellToken } from '@embedpdf/plugin-shell';

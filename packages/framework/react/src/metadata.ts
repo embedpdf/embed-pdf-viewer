@@ -11,7 +11,7 @@ import { useCapability, useSelector } from './runtime';
  *   await update({ title: 'New title' }); // three-state patch; writes to the layer
  */
 
-// One-line-per-feature (ADAPTERS.md): registration travels with the UI.
+// One-line-per-feature: registration travels with the UI.
 export * from '@embedpdf/plugin-metadata';
 export function useMetadata(): {
   metadata: DocumentMetadata | null;

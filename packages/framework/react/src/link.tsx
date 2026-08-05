@@ -9,7 +9,7 @@
  * (select / move / resize / retarget through the selection editor).
  */
 
-// One-line-per-feature (ADAPTERS.md): registration travels with the UI.
+// One-line-per-feature: registration travels with the UI.
 export * from '@embedpdf/plugin-link';
 import * as React from 'react';
 import { useEffect } from 'react';

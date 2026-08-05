@@ -220,6 +220,15 @@ export interface AppBundle {
 }
 
 /**
+ * @license FCL-1.0-ALv2
+ *
+ * WARNING: The server-construction and request-gating code below is part of
+ * CloudPDF's license-key functionality. Removing or modifying it to disable or
+ * circumvent license enforcement, enable protected functionality without a
+ * valid license key, or remove protected functionality is a breach of
+ * FCL-1.0-ALv2 while this release is governed by that license. See
+ * cloudpdf/server/LICENSE.md.
+ *
  * Build the Fastify app with JWT auth, admin routes, and the cloud
  * document routes when their adapters are configured. Caller is
  * responsible for `app.listen()`.

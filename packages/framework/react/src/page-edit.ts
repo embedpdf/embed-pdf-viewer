@@ -13,7 +13,7 @@ import { useCapability } from './runtime';
  *   if (editor.canEdit()) { … }
  */
 
-// One-line-per-feature (ADAPTERS.md): registration travels with the UI.
+// One-line-per-feature: registration travels with the UI.
 export * from '@embedpdf/plugin-page-edit';
 export function usePageEditor(): PageEditCapability {
   return useCapability(PageEditToken);

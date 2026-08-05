@@ -9,7 +9,7 @@
  * the engine is still booting.
  */
 
-// One-line-per-feature (ADAPTERS.md): registration travels with the UI.
+// One-line-per-feature: registration travels with the UI.
 export * from '@embedpdf/plugin-i18n';
 import { useMemo } from 'react';
 import { I18nToken } from '@embedpdf/plugin-i18n';

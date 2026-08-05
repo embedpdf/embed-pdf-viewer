@@ -7,7 +7,7 @@
  * Zero pointer handling here; that's the PagePointerSource + the hub.
  */
 
-// One-line-per-feature (ADAPTERS.md): registration travels with the UI.
+// One-line-per-feature: registration travels with the UI.
 export * from '@embedpdf/plugin-selection';
 import * as React from 'react';
 import { useEffect } from 'react';

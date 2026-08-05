@@ -21,13 +21,17 @@ product we sell, so it ships fair-source instead of proprietary.
 
 ## What the FCL means for you
 
-- **Free to use, modify, and self-host.** Internal use of any kind — including
-  commercial — is a Permitted Purpose. Running the CloudPDF server behind your
-  own applications requires no agreement with us.
-- **No competing service.** You may not offer the server itself (or a
-  substantially similar product) to third parties.
-- **License keys are off-limits.** Paid features are gated by license keys; the
-  FCL forbids removing or circumventing that gate.
+- **Source-available, not free to run.** The FCL lets you inspect, copy, and
+  modify the source for a Permitted Purpose, subject to its terms, but it does
+  not grant you a CloudPDF license. The server fails closed: running or
+  self-hosting a current FCL-licensed release requires a valid CloudPDF license
+  key, or a signed certificate for an air-gapped deployment.
+- **The license gate must remain intact.** You may not move, change, disable,
+  or circumvent the license-key functionality; enable protected functionality
+  without a valid key; or remove protected functionality.
+- **No Competing Use.** You may not use the server for a Competing Use as
+  defined in the FCL, including offering a product or service that substitutes
+  for CloudPDF or provides the same or substantially similar functionality.
 - **It becomes Apache-2.0 automatically.** Each release converts to the Apache
   License 2.0 two years after it is made available — per release, so an old
   enough version is plain open source.

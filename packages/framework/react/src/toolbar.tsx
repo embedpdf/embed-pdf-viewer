@@ -16,7 +16,7 @@
  * pixels, this component owns the physics.
  */
 
-// One-line-per-feature (ADAPTERS.md): registration travels with the UI.
+// One-line-per-feature: registration travels with the UI.
 export * from '@embedpdf/core-ui';
 import * as React from 'react';
 import { useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from 'react';

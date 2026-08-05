@@ -8,7 +8,7 @@
  * DOM that turn the registry's pure stroke matcher into a live keymap.
  */
 
-// One-line-per-feature (ADAPTERS.md): registration travels with the UI.
+// One-line-per-feature: registration travels with the UI.
 // (resolvedCommandsEqual lives in the plugin now — it's pure value equality
 // over ResolvedCommand, framework-free — and arrives through this star.)
 export * from '@embedpdf/plugin-commands';

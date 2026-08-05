@@ -9,7 +9,7 @@
  * conformance, want sets, retention, release) is plugin-render's.
  */
 
-// One-line-per-feature (ADAPTERS.md): registration travels with the UI.
+// One-line-per-feature: registration travels with the UI.
 export * from '@embedpdf/plugin-render';
 import * as React from 'react';
 import { useEffect, useRef } from 'react';

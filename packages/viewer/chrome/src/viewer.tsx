@@ -11,12 +11,12 @@
  *    or the host's own schema — never merged.
  *
  * The engine stays a prop — choosing local-wasm vs cloud is the host's
- * decision (ADAPTERS.md), and each delivery wires its own. The chrome —
+ * decision, and each delivery wires its own. The chrome —
  * toolbars, translations, theme — renders at t≈0; only the pages wait on
  * the engine. Customization is mount-time (exactly like v2's init config);
  * changing these props on a mounted viewer does not rebuild the workspace.
  */
-// One import line per feature (ADAPTERS.md): each subpath carries the
+// One import line per feature: each subpath carries the
 // plugin AND its UI; delete a line and the feature leaves the bundle.
 import { useEffect, useState, type ReactNode } from 'react';
 import { Viewer, useKernel } from '@embedpdf/react/runtime';

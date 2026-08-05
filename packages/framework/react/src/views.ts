@@ -7,7 +7,7 @@
  * so its Stage binds to that pane's active document.
  */
 
-// One-line-per-feature (ADAPTERS.md): registration travels with the UI.
+// One-line-per-feature: registration travels with the UI.
 export * from '@embedpdf/plugin-view-manager';
 import { ViewManagerToken } from '@embedpdf/plugin-view-manager';
 import type { ViewInfo } from '@embedpdf/plugin-view-manager';

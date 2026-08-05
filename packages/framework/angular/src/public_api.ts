@@ -1,5 +1,5 @@
 /**
- * @embedpdf/angular — the opt-in "everything" barrel (ADAPTERS.md rule 2).
+ * @embedpdf/angular — the opt-in "everything" barrel.
  * Fine for prototyping; examples, docs, and quickstarts import the secondary
  * entry points exclusively, which make the bundle guarantee legible.
  */

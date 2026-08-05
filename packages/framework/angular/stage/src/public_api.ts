@@ -3,7 +3,7 @@
  * templates + the stage facade inject functions.
  */
 
-// One-line-per-feature (ADAPTERS.md): registration travels with the UI.
+// One-line-per-feature: registration travels with the UI.
 export * from '@embedpdf/plugin-stage';
 export * from './templates';
 export * from './page-surface';

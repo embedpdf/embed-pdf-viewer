@@ -8,7 +8,7 @@
  * via useSearch().
  */
 
-// One-line-per-feature (ADAPTERS.md): registration travels with the UI.
+// One-line-per-feature: registration travels with the UI.
 export * from '@embedpdf/plugin-search';
 import * as React from 'react';
 import { SearchToken } from '@embedpdf/plugin-search';

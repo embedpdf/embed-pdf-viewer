@@ -13,6 +13,9 @@ const fixturePath = resolve(
   '..',
   '..',
   '..',
+  'examples',
+  'snippet-react',
+  'public',
   'interactive_pdf_forms_javascript_demo.pdf',
 );
 

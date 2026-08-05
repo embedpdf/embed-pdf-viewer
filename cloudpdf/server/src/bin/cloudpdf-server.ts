@@ -30,6 +30,16 @@ import { createSecretsProviderRegistry } from '../security/secrets/createSecrets
 import { createSecretResolver, type SecretResolver } from '../security/secrets/SecretResolver';
 import { loadSecretsConfigFromEnv } from '../security/secrets/config/loadSecretsConfigFromEnv';
 import type { Kysely } from 'kysely';
+
+/**
+ * @license FCL-1.0-ALv2
+ *
+ * WARNING: The license bootstrap imported below is part of CloudPDF's
+ * license-key functionality. Removing or modifying it to disable or circumvent
+ * license enforcement, enable protected functionality without a valid license
+ * key, or remove protected functionality is a breach of FCL-1.0-ALv2 while
+ * this release is governed by that license. See cloudpdf/server/LICENSE.md.
+ */
 import { LicenseRuntime } from '../licensing/LicenseRuntime';
 import { ConnectedUsageReporter } from '../licensing/ConnectedUsageReporter';
 import { UsageMeters } from '../licensing/UsageMeters';

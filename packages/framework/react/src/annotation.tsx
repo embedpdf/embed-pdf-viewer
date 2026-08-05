@@ -9,7 +9,7 @@
  * `customRenderer` may wrap or replace it.
  */
 
-// One-line-per-feature (ADAPTERS.md): registration travels with the UI.
+// One-line-per-feature: registration travels with the UI.
 export * from '@embedpdf/plugin-annotation';
 import * as React from 'react';
 import { useEffect, useLayoutEffect, useState } from 'react';
