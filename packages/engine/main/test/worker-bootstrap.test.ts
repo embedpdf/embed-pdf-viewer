@@ -59,14 +59,14 @@ afterEach(() => {
 describe('engine worker boot — wasm source handling', () => {
   test('explicit source (no fallback): the URL goes straight to the runtime, nothing is fetched here', async () => {
     const { posted, init, settled } = makeScope();
-    init({ kind: 'init', wasmUrl: 'https://self.host/pdfium.wasm' });
+    init({ kind: 'init', wasmUrl: 'https://self.host/embedpdf.wasm' });
     await settled();
 
     expect(posted[0]).toEqual({ kind: 'ready' });
     expect(fetchMock).not.toHaveBeenCalled();
     expect(createRuntimeMock).toHaveBeenCalledWith({
       prefer: 'wasm',
-      wasmUrl: 'https://self.host/pdfium.wasm',
+      wasmUrl: 'https://self.host/embedpdf.wasm',
       wasmBinary: undefined,
     });
   });
@@ -76,14 +76,14 @@ describe('engine worker boot — wasm source handling', () => {
     const { posted, init, settled } = makeScope();
     init({
       kind: 'init',
-      wasmUrl: 'https://app.example/assets/pdfium.wasm',
-      fallbackWasmUrl: 'https://cdn.example/pdfium.wasm',
+      wasmUrl: 'https://app.example/assets/embedpdf.wasm',
+      fallbackWasmUrl: 'https://cdn.example/embedpdf.wasm',
     });
     await settled();
 
     expect(posted[0]).toEqual({ kind: 'ready' });
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(fetchMock).toHaveBeenCalledWith('https://app.example/assets/pdfium.wasm');
+    expect(fetchMock).toHaveBeenCalledWith('https://app.example/assets/embedpdf.wasm');
     expect(warnSpy).not.toHaveBeenCalled();
     const opts = createRuntimeMock.mock.calls[0][0]!;
     expect(opts.wasmBinary).toBeInstanceOf(ArrayBuffer);
@@ -104,7 +104,7 @@ describe('engine worker boot — wasm source handling', () => {
     init({
       kind: 'init',
       wasmUrl: 'https://app.example/missing.wasm',
-      fallbackWasmUrl: 'https://cdn.example/pdfium.wasm',
+      fallbackWasmUrl: 'https://cdn.example/embedpdf.wasm',
     });
     await settled();
 
@@ -114,7 +114,7 @@ describe('engine worker boot — wasm source handling', () => {
     expect(order).toEqual([
       'fetch:https://app.example/missing.wasm',
       'warn',
-      'fetch:https://cdn.example/pdfium.wasm',
+      'fetch:https://cdn.example/embedpdf.wasm',
     ]);
   });
 
@@ -125,7 +125,7 @@ describe('engine worker boot — wasm source handling', () => {
     init({
       kind: 'init',
       wasmUrl: 'https://app.example/missing.wasm',
-      fallbackWasmUrl: 'https://cdn.example/pdfium.wasm',
+      fallbackWasmUrl: 'https://cdn.example/embedpdf.wasm',
     });
     await settled();
 
@@ -133,7 +133,7 @@ describe('engine worker boot — wasm source handling', () => {
     const error = String(posted[0].error);
     expect(error).toContain('https://app.example/missing.wasm');
     expect(error).toContain('ECONNREFUSED');
-    expect(error).toContain('https://cdn.example/pdfium.wasm');
+    expect(error).toContain('https://cdn.example/embedpdf.wasm');
     expect(error).toContain('HTTP 404');
     expect(warnSpy).toHaveBeenCalledTimes(1);
   });
@@ -145,8 +145,8 @@ describe('engine worker boot — wasm source handling', () => {
     const { posted, init, settled } = makeScope();
     init({
       kind: 'init',
-      wasmUrl: 'https://app.example/assets/pdfium.wasm',
-      fallbackWasmUrl: 'https://cdn.example/pdfium.wasm',
+      wasmUrl: 'https://app.example/assets/embedpdf.wasm',
+      fallbackWasmUrl: 'https://cdn.example/embedpdf.wasm',
     });
     await settled();
 
@@ -162,8 +162,8 @@ describe('engine worker boot — wasm source handling', () => {
     const bytes = new ArrayBuffer(4);
     init({
       kind: 'init',
-      wasmUrl: 'https://app.example/assets/pdfium.wasm',
-      fallbackWasmUrl: 'https://cdn.example/pdfium.wasm',
+      wasmUrl: 'https://app.example/assets/embedpdf.wasm',
+      fallbackWasmUrl: 'https://cdn.example/embedpdf.wasm',
       wasmBinary: bytes,
     });
     await settled();

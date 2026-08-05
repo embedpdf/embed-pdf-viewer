@@ -17,7 +17,7 @@ export function App() {
 
 No engine or wasm configuration is needed: the built-in local engine (PDFium
 compiled to WebAssembly, running in a Web Worker) is the default, and your
-bundler ships `pdfium.wasm` inside your own build. Self-hosting, strict-CSP
+bundler ships `embedpdf.wasm` inside your own build. Self-hosting, strict-CSP
 worker delivery, and injecting a different engine implementation are all
 available through the `engine` prop — see the docs.
 

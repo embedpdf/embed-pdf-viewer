@@ -15,7 +15,7 @@ import type { LocalEngineConfig } from './config';
 export interface LocalEngineDefaults {
   /**
    * Fallback wasm location, used only when the config names no wasm source of
-   * its own. The snippet door passes its self-located `pdfium.wasm` sibling
+   * its own. The snippet door passes its self-located `embedpdf.wasm` sibling
    * here; the npm door passes nothing, leaving the engine's own bundler-default
    * resolution in charge. Passing it in beats module-level state: the door's
    * one difference is visible at the call site.

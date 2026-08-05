@@ -3,9 +3,9 @@
  *
  *   - `./worker-entry.ts` — shipped as raw TS source (`@embedpdf/engine/worker-entry`),
  *     compiled by the consumer's bundler (Vite `?worker`, manual `new Worker`).
- *   - `workers/pdfium-worker.js` — a self-contained BUILT artifact (Emscripten
+ *   - `workers/embedpdf-worker.js` — a self-contained BUILT artifact (Emscripten
  *     glue statically bundled), used two ways: stringified into
- *     `workers/pdfium-worker.source.js` for the default inline-blob spawn, and
+ *     `workers/embedpdf-worker.source.js` for the default inline-blob spawn, and
  *     copied verbatim by strict-CSP users as a same-origin static worker.
  *
  * Boot is INIT-DRIVEN: the worker does nothing until the main thread posts
@@ -28,7 +28,7 @@ import type { WorkerRequest } from './protocol';
 /** The first message every engine worker expects. */
 export interface EngineWorkerInit {
   kind: 'init';
-  /** Absolute URL of `pdfium.wasm`. Omitted = the Emscripten glue resolves it
+  /** Absolute URL of `embedpdf.wasm`. Omitted = the Emscripten glue resolves it
    *  as a sibling of the worker script (`import.meta.url`). */
   wasmUrl?: string;
   /**
@@ -40,7 +40,7 @@ export interface EngineWorkerInit {
    * fetching another copy of the same binary would mask them.
    */
   fallbackWasmUrl?: string;
-  /** Pre-fetched `pdfium.wasm` bytes (transferred) — wins over `wasmUrl`. */
+  /** Pre-fetched `embedpdf.wasm` bytes (transferred) — wins over `wasmUrl`. */
   wasmBinary?: ArrayBuffer;
 }
 
@@ -106,7 +106,7 @@ async function resolveBootSource(
     primaryFailure = err;
   }
   console.warn(
-    `[embedpdf] pdfium.wasm was not found at ${init.wasmUrl} (${describeError(primaryFailure)}). ` +
+    `[embedpdf] embedpdf.wasm was not found at ${init.wasmUrl} (${describeError(primaryFailure)}). ` +
       `Falling back to ${init.fallbackWasmUrl}. Your toolchain did not ship the wasm asset with ` +
       `your build — to avoid the CDN request, self-host the file and pass \`wasmUrl\`/\`assetsUrl\` ` +
       `to localEngine(). See https://www.embedpdf.com/docs/self-hosting`,
@@ -115,7 +115,7 @@ async function resolveBootSource(
     return { wasmBinary: await fetchWasm(init.fallbackWasmUrl) };
   } catch (fallbackFailure) {
     throw new Error(
-      `failed to fetch pdfium.wasm from both ${init.wasmUrl} ` +
+      `failed to fetch embedpdf.wasm from both ${init.wasmUrl} ` +
         `(${describeError(primaryFailure)}) and the fallback ${init.fallbackWasmUrl} ` +
         `(${describeError(fallbackFailure)})`,
     );
@@ -140,8 +140,8 @@ function describeBootError(err: unknown, init: EngineWorkerInit): string {
   const detail = String((err as Error)?.stack ?? err);
   if (init.wasmBinary) return detail;
   const source = init.wasmUrl
-    ? `failed to load pdfium.wasm from ${init.wasmUrl}`
-    : 'failed to load pdfium.wasm (resolved relative to the worker script)';
+    ? `failed to load embedpdf.wasm from ${init.wasmUrl}`
+    : 'failed to load embedpdf.wasm (resolved relative to the worker script)';
   return (
     `${source}. If this URL is unreachable (offline, air-gapped, or blocked), ` +
     `self-host the file and pass \`wasmUrl\`/\`assetsUrl\` to localEngine(), or provide ` +

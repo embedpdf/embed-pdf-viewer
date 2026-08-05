@@ -30,7 +30,7 @@ export type { PDFViewerExtras } from './component';
 
 /**
  * Props on THIS door: `engine` is OPTIONAL — omit it for the built-in local
- * engine (zero bundler config; your bundler ships `pdfium.wasm` inside your own
+ * engine (zero bundler config; your bundler ships `embedpdf.wasm` inside your own
  * build, sibling-first with a pinned-CDN fetch-failure fallback), or pass its
  * options bag (`{ wasmUrl }` / `{ assetsUrl }` / worker URLs for strict CSP).
  */

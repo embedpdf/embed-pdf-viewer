@@ -1,9 +1,9 @@
 {
-  "fork": "embedpdf/pdfium",
+  "fork": "embedpdf/runtime",
   "sha": "local",
   "artifacts": {
     "wasm32": {
-      "url": "file:///absolute/path/to/packages/pdf-runtime/build/local-artifacts/libembedpdf-pdf-runtime-wasm32-local.tar.gz",
+      "url": "file:///absolute/path/to/packages/engine/runtime/build/local-artifacts/libembedpdf-pdf-runtime-wasm32-local.tar.gz",
       "sha256": "<sha256>"
     }
   }

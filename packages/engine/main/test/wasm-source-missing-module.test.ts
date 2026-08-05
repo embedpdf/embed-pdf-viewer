@@ -18,8 +18,8 @@ describe('resolveInlineWasmSource without the wasm-url module', () => {
   });
 
   test('explicit options are unaffected', async () => {
-    const resolved = await resolveInlineWasmSource({ wasmUrl: '/my/pdfium.wasm' });
-    expect(resolved.wasmUrl).toBe('/my/pdfium.wasm');
+    const resolved = await resolveInlineWasmSource({ wasmUrl: '/my/embedpdf.wasm' });
+    expect(resolved.wasmUrl).toBe('/my/embedpdf.wasm');
     expect(resolved.fallbackWasmUrl).toBeUndefined();
   });
 });

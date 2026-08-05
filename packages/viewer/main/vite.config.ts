@@ -10,14 +10,14 @@
  *   1. `vite build` — the npm entry (`dist/index.js`). The engine is
  *      EXTERNALIZED: it is pure TS (no react aliasing needed), and consumers'
  *      bundlers must process it themselves so the engine's bundler-resolved
- *      wasm default (`new URL('./lib/pdfium.wasm', import.meta.url)` inside
+ *      wasm default (`new URL('./lib/embedpdf.wasm', import.meta.url)` inside
  *      @embedpdf/engine-runtime-wasm32/wasm-url) lands in THEIR asset
  *      pipeline — that is what makes <PDFViewer> zero-config in Next/Vite.
  *      Prebundling the engine would freeze that URL against this package
  *      instead, and Vite lib mode would inline the 6 MB binary as base64.
  *
  *   2. `vite build --mode snippet` — the CDN artifact (`dist/embedpdf.js`),
- *      fully self-contained: engine bundled, `pdfium.wasm` copied to dist as
+ *      fully self-contained: engine bundled, `embedpdf.wasm` copied to dist as
  *      the snippet's self-located sibling (src/snippet.ts), and the engine's
  *      wasm-url module stubbed out (the snippet never consults the default,
  *      and the stub keeps the binary out of the JS).
@@ -34,19 +34,19 @@ import tailwindcss from '@tailwindcss/vite';
 // would re-resolve from the importer and fail.
 const preact = (specifier: string) => fileURLToPath(import.meta.resolve(specifier));
 
-// The snippet artifact carries its own pdfium.wasm at the dist root: the
+// The snippet artifact carries its own embedpdf.wasm at the dist root: the
 // snippet entry defaults to this SIBLING (self-locating — see src/snippet.ts),
 // which is what makes air-gapping the snippet "copy the folder". Copied
 // verbatim from the exact wasm32 package this build resolves.
-const copyPdfiumWasm = (): PluginOption => ({
-  name: 'copy-pdfium-wasm',
+const copyEmbedPdfWasm = (): PluginOption => ({
+  name: 'copy-embedpdf-wasm',
   apply: 'build',
   generateBundle() {
     this.emitFile({
       type: 'asset',
-      fileName: 'pdfium.wasm',
+      fileName: 'embedpdf.wasm',
       source: fs.readFileSync(
-        fileURLToPath(import.meta.resolve('@embedpdf/engine-runtime-wasm32/pdfium.wasm')),
+        fileURLToPath(import.meta.resolve('@embedpdf/engine-runtime-wasm32/embedpdf.wasm')),
       ),
     });
   },
@@ -60,7 +60,7 @@ export default defineConfig(({ mode }) => {
     ? { embedpdf: 'src/doors/snippet.ts' }
     : { index: 'src/doors/local.ts', core: 'src/doors/core.ts' };
   return {
-    plugins: [tailwindcss(), ...(snippet ? [copyPdfiumWasm()] : [])],
+    plugins: [tailwindcss(), ...(snippet ? [copyEmbedPdfWasm()] : [])],
     resolve: {
       alias: [
         { find: 'react-dom/client', replacement: preact('preact/compat/client') },

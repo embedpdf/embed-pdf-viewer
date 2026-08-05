@@ -1,6 +1,7 @@
 # @embedpdf/engine
 
-The EmbedPDF local engine: PDFium compiled to WebAssembly, running inside a
+The EmbedPDF local engine: [EmbedPDF Runtime](https://github.com/embedpdf/runtime)
+(our fork of PDFium) compiled to WebAssembly, running inside a
 Web Worker, speaking the Engine v3 interface — the same contract as the
 [`@cloudpdf/engine`](https://www.npmjs.com/package/@cloudpdf/engine) cloud client.
 
@@ -28,7 +29,7 @@ await engine.destroy();
 `localEngine()` needs no wasm or worker wiring:
 
 - The worker ships inside this package and spawns from a blob URL.
-- `pdfium.wasm` resolves sibling-first: your bundler (webpack 5/Next, Vite,
+- `embedpdf.wasm` resolves sibling-first: your bundler (webpack 5/Next, Vite,
   Turbopack, Rspack, Parcel 2) emits it into your own build. Toolchains that
   can't are caught by a version-pinned CDN fallback (a console warning tells
   you when that happens and how to self-host).
@@ -39,12 +40,12 @@ Everything is overridable through `LocalEngineRecipeOptions`:
 
 ```ts
 localEngine({
-  assetsUrl: '/embedpdf/', // self-hosted pdfium.wasm directory
-  worker: '/embedpdf/pdfium-worker.js', // same-origin worker for strict CSP
+  assetsUrl: '/embedpdf/', // self-hosted embedpdf.wasm directory
+  worker: '/embedpdf/embedpdf-worker.js', // same-origin worker for strict CSP
 });
 ```
 
-- Copy `workers/pdfium-worker.js` and `pdfium.wasm` from this package into one
+- Copy `workers/embedpdf-worker.js` and `embedpdf.wasm` from this package into one
   served directory for a complete self-hosted, CSP-clean setup.
 - `wasmBinary` accepts pre-fetched bytes for fully air-gapped deployments
   (explicit sources never contact a CDN).

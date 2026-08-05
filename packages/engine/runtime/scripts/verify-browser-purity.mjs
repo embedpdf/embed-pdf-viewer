@@ -9,7 +9,7 @@
  * fails to resolve it and this script fails.
  *
  * Do not "fix" a failure here with stubs or externals — fix the graph: the
- * browser entries (`src/index.browser.ts`, `pdfium.browser.js`) must never
+ * browser entries (`src/index.browser.ts`, `embedpdf.browser.js`) must never
  * import Node-anything. See src/shared.ts for the architecture.
  */
 import { build } from 'esbuild';
@@ -19,7 +19,7 @@ const root = fileURLToPath(new URL('..', import.meta.url));
 
 const ENTRIES = [
   'dist/index.browser.js', // the package's `default` condition (pulls the wasm32 browser glue)
-  'npm/wasm32/lib/pdfium.browser.js', // the glue on its own, for clear attribution
+  'npm/wasm32/lib/embedpdf.browser.js', // the glue on its own, for clear attribution
 ];
 
 let failed = false;

@@ -2,7 +2,7 @@
   "name": "@embedpdf/engine",
   "version": "2.15.0",
   "private": false,
-  "description": "Engine v3 local implementation: WASM PDFium running inside a Web Worker (or inline for Node), driven by an O(log n) abort-aware WorkerQueue. Speaks the same Engine interface as the cloud engine.",
+  "description": "Engine v3 local implementation: the EmbedPDF Runtime (our PDFium fork) as WASM inside a Web Worker (or inline for Node), driven by an O(log n) abort-aware WorkerQueue. Speaks the same Engine interface as the cloud engine.",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
@@ -16,8 +16,8 @@
     "./package.json": "./package.json",
     "./worker-entry": "./src/worker/worker-entry.ts",
     "./worker-source": {
-      "types": "./workers/pdfium-worker.source.d.ts",
-      "default": "./workers/pdfium-worker.source.js"
+      "types": "./workers/embedpdf-worker.source.d.ts",
+      "default": "./workers/embedpdf-worker.source.js"
     }
   },
   "scripts": {
@@ -76,8 +76,8 @@
       "./package.json": "./package.json",
       "./worker-entry": "./src/worker/worker-entry.ts",
       "./worker-source": {
-        "types": "./workers/pdfium-worker.source.d.ts",
-        "default": "./workers/pdfium-worker.source.js"
+        "types": "./workers/embedpdf-worker.source.d.ts",
+        "default": "./workers/embedpdf-worker.source.js"
       }
     }
   },
@@ -90,7 +90,7 @@
   },
   "sideEffects": [
     "./src/worker/worker-entry.ts",
-    "./workers/pdfium-worker.js",
+    "./workers/embedpdf-worker.js",
     "./workers/encoder-worker.js"
   ]
 }

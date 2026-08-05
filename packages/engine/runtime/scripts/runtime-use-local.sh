@@ -28,7 +28,7 @@ URL="file://$ARCHIVE"
 node - <<'NODE' "$MANIFEST" "$TARGET" "$URL" "$SHA256"
 const fs = require('node:fs');
 const [file, target, url, sha256] = process.argv.slice(2);
-let manifest = { fork: 'embedpdf/pdfium', sha: 'local', artifacts: {} };
+let manifest = { fork: 'embedpdf/runtime', sha: 'local', artifacts: {} };
 if (fs.existsSync(file)) manifest = JSON.parse(fs.readFileSync(file, 'utf8'));
 manifest.artifacts ??= {};
 manifest.artifacts[target] = { url, sha256 };

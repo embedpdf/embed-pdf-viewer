@@ -139,7 +139,7 @@ export function createLocalEngineWithWorker(opts: CreateLocalEngineWithWorkerOpt
  * has no meaningful location of its own) receives the sibling-first default —
  * the bundler-resolved asset URL with the version-pinned CDN as a
  * fetch-failure-only fallback (see resolveInlineWasmSource); every other
- * delivery self-resolves `pdfium.wasm` as a sibling of the worker script when
+ * delivery self-resolves `embedpdf.wasm` as a sibling of the worker script when
  * no explicit source is configured.
  */
 function workerBoot(
@@ -232,8 +232,8 @@ async function createEngineWorker(
     throw new Error(
       '[embedpdf] could not create the engine worker from a blob: URL — most likely your ' +
         'Content-Security-Policy omits `worker-src blob:`. Self-host the worker instead: copy ' +
-        "@embedpdf/engine's workers/pdfium-worker.js and pdfium.wasm into one served directory " +
-        "and pass `worker: '/that/directory/pdfium-worker.js'` to localEngine(). " +
+        "@embedpdf/engine's workers/embedpdf-worker.js and embedpdf.wasm into one served directory " +
+        "and pass `worker: '/that/directory/embedpdf-worker.js'` to localEngine(). " +
         'See https://www.embedpdf.com/docs/self-hosting',
       { cause },
     );
@@ -265,7 +265,7 @@ export interface LocalEngineRecipeOptions extends WasmSourceOptions {
    * `'inline'`) for the zero-config default: the worker source shipped inside
    * this package, spawned from a blob URL (requires `worker-src blob:` under
    * a strict CSP). Pass a same-origin URL string to a copied
-   * `workers/pdfium-worker.js` for strict-CSP setups, or a `() => Worker`
+   * `workers/embedpdf-worker.js` for strict-CSP setups, or a `() => Worker`
    * thunk (called once at boot) for full control — CSP nonces, a custom
    * worker build, a shared lifecycle, ... A live `Worker` also works, but the
    * thunk form keeps construction fully allocation-free.

@@ -6,17 +6,17 @@
   },
   "name": "@embedpdf/engine-runtime-wasm32",
   "type": "module",
-  "main": "./lib/pdfium.node.cjs",
-  "module": "./lib/pdfium.browser.js",
+  "main": "./lib/embedpdf.node.cjs",
+  "module": "./lib/embedpdf.browser.js",
   "exports": {
     ".": {
       "node": {
-        "import": "./lib/pdfium.node.js",
-        "require": "./lib/pdfium.node.cjs"
+        "import": "./lib/embedpdf.node.js",
+        "require": "./lib/embedpdf.node.cjs"
       },
-      "default": "./lib/pdfium.browser.js"
+      "default": "./lib/embedpdf.browser.js"
     },
-    "./pdfium.wasm": "./lib/pdfium.wasm",
+    "./embedpdf.wasm": "./lib/embedpdf.wasm",
     "./wasm-url": {
       "types": "./wasm-url.d.ts",
       "default": "./wasm-url.js"

@@ -1,5 +1,5 @@
 /**
- * Where does `pdfium.wasm` come from?
+ * Where does `embedpdf.wasm` come from?
  *
  * The wasm binary is the ONE runtime-fetched asset of the local engine.
  * Everything else (the worker code) travels through the module graph, so it
@@ -9,7 +9,7 @@
  *
  *   1. `wasmBinary`  — caller-supplied bytes, zero network (air-gapped).
  *   2. `wasmUrl`     — exact URL.
- *   3. `assetsUrl`   — base directory; `pdfium.wasm` is appended.
+ *   3. `assetsUrl`   — base directory; `embedpdf.wasm` is appended.
  *   4. the default   — depends on how the worker itself is delivered:
  *      - inline blob worker (the zero-config path): SIBLING-FIRST. The
  *        bundler-resolved URL from `@embedpdf/engine-runtime-wasm32/wasm-url`
@@ -18,9 +18,9 @@
  *        worker has no meaningful location, so both URLs are resolved here on
  *        the main thread and must be absolute.
  *      - a real worker URL / caller-built worker: nothing is sent, and the
- *        Emscripten glue resolves `pdfium.wasm` as a SIBLING of the worker
- *        script (`import.meta.url`). Copying `pdfium-worker.js` and
- *        `pdfium.wasm` into one directory is a complete self-host setup, and
+ *        Emscripten glue resolves `embedpdf.wasm` as a SIBLING of the worker
+ *        script (`import.meta.url`). Copying `embedpdf-worker.js` and
+ *        `embedpdf.wasm` into one directory is a complete self-host setup, and
  *        bundler-emitted workers (Vite `?worker`) keep their bundler-managed
  *        asset next to the worker chunk.
  */
@@ -39,11 +39,11 @@ import { WASM32_VERSION } from './generated/wasm32-version';
 export type WorkerSource = 'inline' | string | Worker | (() => Worker);
 
 export interface WasmSourceOptions {
-  /** Exact URL of `pdfium.wasm` (absolute, or relative to the page). */
+  /** Exact URL of `embedpdf.wasm` (absolute, or relative to the page). */
   wasmUrl?: string;
-  /** Pre-fetched `pdfium.wasm` bytes — no network request is made. */
+  /** Pre-fetched `embedpdf.wasm` bytes — no network request is made. */
   wasmBinary?: ArrayBuffer | Uint8Array;
-  /** Base directory for self-hosted runtime assets; `pdfium.wasm` is appended. */
+  /** Base directory for self-hosted runtime assets; `embedpdf.wasm` is appended. */
   assetsUrl?: string;
 }
 
@@ -61,7 +61,7 @@ export interface ResolvedWasmSource {
   wasmBinary?: ArrayBuffer;
 }
 
-export const DEFAULT_WASM_URL = `https://cdn.jsdelivr.net/npm/@embedpdf/engine-runtime-wasm32@${WASM32_VERSION}/lib/pdfium.wasm`;
+export const DEFAULT_WASM_URL = `https://cdn.jsdelivr.net/npm/@embedpdf/engine-runtime-wasm32@${WASM32_VERSION}/lib/embedpdf.wasm`;
 
 /**
  * Resolve the caller's wasm options into what the worker init carries.
@@ -79,7 +79,7 @@ export function resolveWasmSource(options: WasmSourceOptions): ResolvedWasmSourc
   }
   if (options.assetsUrl !== undefined) {
     const base = options.assetsUrl.endsWith('/') ? options.assetsUrl : `${options.assetsUrl}/`;
-    return { wasmUrl: toAbsoluteUrl(`${base}pdfium.wasm`) };
+    return { wasmUrl: toAbsoluteUrl(`${base}embedpdf.wasm`) };
   }
   return {};
 }
@@ -90,7 +90,7 @@ export function resolveWasmSource(options: WasmSourceOptions): ResolvedWasmSourc
  * otherwise the default is SIBLING-FIRST:
  *
  *   1. `@embedpdf/engine-runtime-wasm32/wasm-url` — a static
- *      `new URL('./lib/pdfium.wasm', import.meta.url)` that bundlers resolve
+ *      `new URL('./lib/embedpdf.wasm', import.meta.url)` that bundlers resolve
  *      at build time, shipping the wasm inside the consumer's own build.
  *   2. the version-pinned jsDelivr URL as `fallbackWasmUrl` — used by the
  *      worker only when fetching (1) fails (a toolchain that left the URL
@@ -113,7 +113,7 @@ export async function resolveInlineWasmSource(
     const sibling: unknown = (await import('@embedpdf/engine-runtime-wasm32/wasm-url')).default;
     if (typeof sibling === 'string' && sibling.length > 0) {
       // Not always absolute: webpack's RelativeURL runtime yields a
-      // root-relative href like `/_next/static/media/pdfium.<hash>.wasm`,
+      // root-relative href like `/_next/static/media/embedpdf.<hash>.wasm`,
       // which a blob: worker cannot resolve (see toAbsoluteUrl).
       return { wasmUrl: toAbsoluteUrl(sibling), fallbackWasmUrl: DEFAULT_WASM_URL };
     }
@@ -124,7 +124,7 @@ export async function resolveInlineWasmSource(
 }
 
 /**
- * Resolve against the page NOW: a relative URL like `/assets/pdfium.wasm`
+ * Resolve against the page NOW: a relative URL like `/assets/embedpdf.wasm`
  * cannot be resolved inside a `blob:` worker (blob URLs are not hierarchical),
  * so the absolute form must cross the postMessage boundary.
  */

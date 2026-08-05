@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Link the wasm32 artifacts: ONE shared pdfium.wasm + three environment-pure
+# Link the wasm32 artifacts: ONE shared embedpdf.wasm + three environment-pure
 # JS glues around it.
 #
-#   pdfium.browser.js  ESM  -sENVIRONMENT=web,worker  (zero Node branches)
-#   pdfium.node.js     ESM  -sENVIRONMENT=node
-#   pdfium.node.cjs    CJS  -sENVIRONMENT=node
+#   embedpdf.browser.js  ESM  -sENVIRONMENT=web,worker  (zero Node branches)
+#   embedpdf.node.js     ESM  -sENVIRONMENT=node
+#   embedpdf.node.cjs    CJS  -sENVIRONMENT=node
 #
 # Environment forks live in the package's export conditions, NOT in a
 # universal loader: a universal glue's unused Node branches import Node
@@ -12,8 +12,8 @@
 # — Vite merely papers over it with stubs. Limiting -sENVIRONMENT removes the
 # excluded environments' support code at the source.
 #
-# Each glue is linked in its own temp dir as `pdfium.{js,cjs}` so all of them
-# reference the SAME wasm basename (`pdfium.wasm`, resolved relative to the
+# Each glue is linked in its own temp dir as `embedpdf.{js,cjs}` so all of them
+# reference the SAME wasm basename (`embedpdf.wasm`, resolved relative to the
 # glue via import.meta.url / __dirname); the wasm outputs are verified
 # identical and published once.
 set -euo pipefail
@@ -51,18 +51,19 @@ link() {
 }
 
 mkdir -p "$TMP_DIR/browser" "$TMP_DIR/node-esm" "$TMP_DIR/node-cjs"
-link "$TMP_DIR/browser/pdfium.js" "web,worker" -sEXPORT_ES6=1
-link "$TMP_DIR/node-esm/pdfium.js" "node" -sEXPORT_ES6=1
-link "$TMP_DIR/node-cjs/pdfium.cjs" "node"
+link "$TMP_DIR/browser/embedpdf.js" "web,worker" -sEXPORT_ES6=1
+link "$TMP_DIR/node-esm/embedpdf.js" "node" -sEXPORT_ES6=1
+link "$TMP_DIR/node-cjs/embedpdf.cjs" "node"
 
 # The wasm must be environment-independent (ENVIRONMENT only shapes the JS
-# glue). Verify, then publish one copy every glue's `pdfium.wasm` reference
+# glue). Verify, then publish one copy every glue's `embedpdf.wasm` reference
 # resolves to.
-cmp "$TMP_DIR/browser/pdfium.wasm" "$TMP_DIR/node-esm/pdfium.wasm"
-cmp "$TMP_DIR/browser/pdfium.wasm" "$TMP_DIR/node-cjs/pdfium.wasm"
+cmp "$TMP_DIR/browser/embedpdf.wasm" "$TMP_DIR/node-esm/embedpdf.wasm"
+cmp "$TMP_DIR/browser/embedpdf.wasm" "$TMP_DIR/node-cjs/embedpdf.wasm"
 
-rm -f "$OUT_DIR/pdfium.js" "$OUT_DIR/pdfium.cjs" # pre-split universal glues
-cp "$TMP_DIR/browser/pdfium.js" "$OUT_DIR/pdfium.browser.js"
-cp "$TMP_DIR/node-esm/pdfium.js" "$OUT_DIR/pdfium.node.js"
-cp "$TMP_DIR/node-cjs/pdfium.cjs" "$OUT_DIR/pdfium.node.cjs"
-cp "$TMP_DIR/browser/pdfium.wasm" "$OUT_DIR/pdfium.wasm"
+# pre-split universal glues + pre-rename pdfium.* outputs
+rm -f "$OUT_DIR/embedpdf.js" "$OUT_DIR/embedpdf.cjs" "$OUT_DIR"/pdfium.*
+cp "$TMP_DIR/browser/embedpdf.js" "$OUT_DIR/embedpdf.browser.js"
+cp "$TMP_DIR/node-esm/embedpdf.js" "$OUT_DIR/embedpdf.node.js"
+cp "$TMP_DIR/node-cjs/embedpdf.cjs" "$OUT_DIR/embedpdf.node.cjs"
+cp "$TMP_DIR/browser/embedpdf.wasm" "$OUT_DIR/embedpdf.wasm"

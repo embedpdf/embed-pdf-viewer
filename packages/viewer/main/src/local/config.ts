@@ -18,7 +18,7 @@ import type { MountTarget, ViewerConfigBase } from '../kernel';
  * EmbedPDF.init({
  *   target: '#viewer',
  *   src: '/report.pdf',
- *   engine: { assetsUrl: '/embedpdf/', worker: '/embedpdf/pdfium-worker.js' },
+ *   engine: { assetsUrl: '/embedpdf/', worker: '/embedpdf/embedpdf-worker.js' },
  * });
  * ```
  */

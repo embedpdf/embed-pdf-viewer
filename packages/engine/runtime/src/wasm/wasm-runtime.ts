@@ -275,7 +275,7 @@ function buildEmscriptenOptions(opts: CreatePdfRuntimeOptions): Record<string, u
       path.endsWith('.wasm') ? wasmUrl : prefix + path;
   }
   // Bytes in hand must mean NO location is ever needed: without a locateFile,
-  // Emscripten still computes the wasm's URL via `new URL('pdfium.wasm',
+  // Emscripten still computes the wasm's URL via `new URL('embedpdf.wasm',
   // import.meta.url)`, which THROWS inside a blob: worker (blob URLs can't be
   // a base). The name is only used as a lookup key against wasmBinary — the
   // glue never fetches it.

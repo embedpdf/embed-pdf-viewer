@@ -8,17 +8,17 @@ describe('resolveWasmSource (explicit sources only)', () => {
   });
 
   test('wasmUrl passes through, with no fallback attached', () => {
-    const resolved = resolveWasmSource({ wasmUrl: 'https://example.test/pdfium.wasm' });
-    expect(resolved.wasmUrl).toBe('https://example.test/pdfium.wasm');
+    const resolved = resolveWasmSource({ wasmUrl: 'https://example.test/embedpdf.wasm' });
+    expect(resolved.wasmUrl).toBe('https://example.test/embedpdf.wasm');
     expect(resolved.fallbackWasmUrl).toBeUndefined();
   });
 
-  test('assetsUrl appends pdfium.wasm, trailing slash or not', () => {
+  test('assetsUrl appends embedpdf.wasm, trailing slash or not', () => {
     expect(resolveWasmSource({ assetsUrl: 'https://example.test/assets' }).wasmUrl).toBe(
-      'https://example.test/assets/pdfium.wasm',
+      'https://example.test/assets/embedpdf.wasm',
     );
     expect(resolveWasmSource({ assetsUrl: 'https://example.test/assets/' }).wasmUrl).toBe(
-      'https://example.test/assets/pdfium.wasm',
+      'https://example.test/assets/embedpdf.wasm',
     );
   });
 
@@ -35,7 +35,7 @@ describe('resolveWasmSource (explicit sources only)', () => {
   test('wasmBinary wins over wasmUrl and assetsUrl', () => {
     const resolved = resolveWasmSource({
       wasmBinary: new Uint8Array([9]),
-      wasmUrl: 'https://example.test/pdfium.wasm',
+      wasmUrl: 'https://example.test/embedpdf.wasm',
       assetsUrl: 'https://example.test/assets',
     });
     expect(resolved.wasmBinary).toBeDefined();
@@ -46,9 +46,9 @@ describe('resolveWasmSource (explicit sources only)', () => {
 describe('resolveInlineWasmSource (the inline blob worker default)', () => {
   test('explicit options win and never carry a fallback', async () => {
     const resolved = await resolveInlineWasmSource({
-      wasmUrl: 'https://example.test/pdfium.wasm',
+      wasmUrl: 'https://example.test/embedpdf.wasm',
     });
-    expect(resolved.wasmUrl).toBe('https://example.test/pdfium.wasm');
+    expect(resolved.wasmUrl).toBe('https://example.test/embedpdf.wasm');
     expect(resolved.fallbackWasmUrl).toBeUndefined();
   });
 
@@ -57,7 +57,7 @@ describe('resolveInlineWasmSource (the inline blob worker default)', () => {
     // In node the wasm-url module resolves at runtime to a file: URL of the
     // real workspace binary — a bundler would have rewritten it to an emitted
     // asset URL. Either way, the primary is NOT the CDN.
-    expect(resolved.wasmUrl).toMatch(/pdfium\.wasm$/);
+    expect(resolved.wasmUrl).toMatch(/embedpdf\.wasm$/);
     expect(resolved.wasmUrl).not.toBe(DEFAULT_WASM_URL);
     expect(resolved.fallbackWasmUrl).toBe(DEFAULT_WASM_URL);
     expect(resolved.wasmBinary).toBeUndefined();

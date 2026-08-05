@@ -12,7 +12,7 @@ PENDING="$LOCK_DIR/pending"
 mkdir -p "$LOCK_DIR"
 
 if [[ ! -d "$SRC/.git" && ! -f "$SRC/.git" ]]; then
-  echo "runtime-src missing; run: git submodule update --init --recursive packages/pdf-runtime/runtime-src" >&2
+  echo "runtime-src missing; run: git submodule update --init --recursive packages/engine/runtime/runtime-src" >&2
   exit 1
 fi
 

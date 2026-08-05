@@ -101,7 +101,7 @@ function engineOf(config: ElementConfig): Engine | EngineFactory {
     throw new Error(
       '[embedpdf] no engine: this build has no default engine. Pass one in the config ' +
         "(`engine: () => yourEngine()`), or import '@embedpdf/viewer' (which bundles the " +
-        "local PDFium engine) instead of '@embedpdf/viewer/core'.",
+        "bundled local engine) instead of '@embedpdf/viewer/core'.",
     );
   }
   return provider(option);

@@ -1,5 +1,5 @@
 {
-  "fork": "embedpdf/pdfium",
+  "fork": "embedpdf/runtime",
   "sha": "local",
   "artifacts": {
     "wasm32": {

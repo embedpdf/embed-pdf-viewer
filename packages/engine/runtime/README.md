@@ -2,7 +2,9 @@
 
 Low-level PDF execution runtime for EmbedPDF.
 
-This package is powered by EmbedPDF's fork of PDFium and provides a single runtime abstraction over WebAssembly and native Node.js builds. Most users should continue to use `@embedpdf/engines`; this package is the implementation layer used by future engine releases.
+This package is powered by [EmbedPDF Runtime](https://github.com/embedpdf/runtime), our fork of PDFium, and provides a single runtime abstraction over WebAssembly and native Node.js builds. Most users should continue to use `@embedpdf/engines`; this package is the implementation layer used by future engine releases.
+
+PDFium is a Google project; EmbedPDF Runtime is an independent fork, not affiliated with or endorsed by Google.
 
 ## Packages
 

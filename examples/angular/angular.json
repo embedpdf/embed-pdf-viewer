@@ -19,7 +19,7 @@
             "assets": [
               { "glob": "**/*", "input": "public" },
               {
-                "glob": "pdfium.wasm",
+                "glob": "embedpdf.wasm",
                 "input": "../../../packages/engine/runtime/npm/wasm32/lib",
                 "output": "."
               }

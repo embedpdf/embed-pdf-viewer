@@ -1,6 +1,6 @@
 /**
  * Web Worker bootstrap for engine-local, shipped as raw TS source AND used as
- * the entry for the built `workers/pdfium-worker.js` artifact (see
+ * the entry for the built `workers/embedpdf-worker.js` artifact (see
  * scripts/build-workers.mjs).
  *
  * Consumers can wire it up via Vite's `?worker` import

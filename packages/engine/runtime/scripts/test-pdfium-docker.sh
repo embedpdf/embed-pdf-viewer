@@ -23,7 +23,7 @@ export PDFIUM_GTEST_ARGS="${PDFIUM_GTEST_ARGS:-}"
 image_name="pdf-runtime-pdf-runtime-linux-test"
 WORKSPACE="$(cd "$ROOT/../.." && pwd)"
 LINUX_CLANG_VOLUME="pdf-runtime_linux-llvm-build"
-LINUX_CLANG_DIR="/workspace/packages/pdf-runtime/runtime-src/third_party/llvm-build/Release+Asserts"
+LINUX_CLANG_DIR="/workspace/packages/engine/runtime/runtime-src/third_party/llvm-build/Release+Asserts"
 LINUX_CLANG_URL="https://commondatastorage.googleapis.com/chromium-browser-clang/Linux_x64/clang-llvmorg-23-init-2224-g5bd8dadb-1.tar.xz"
 
 echo "=== building pdf-runtime-linux-test image ==="
@@ -39,7 +39,7 @@ docker run --rm \
   -v "$WORKSPACE:/workspace" \
   -v pdf-runtime_pdf-runtime-gclient:/root/.cache \
   -v "$LINUX_CLANG_VOLUME:$LINUX_CLANG_DIR" \
-  -w /workspace/packages/pdf-runtime \
+  -w /workspace/packages/engine/runtime \
   -e PDF_RUNTIME_SYNC \
   -e PDF_RUNTIME_TARGET_OS_LIST=linux \
   -e PDFIUM_TEST_SUITE \
