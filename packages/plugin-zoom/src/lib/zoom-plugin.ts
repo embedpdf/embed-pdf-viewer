@@ -85,12 +85,24 @@ export class ZoomPlugin extends BasePlugin<
 
     // Keep automatic modes up to date per document
     this.viewport.onViewportResize(
-      (event) => this.recalcAuto(event.documentId, VerticalZoomFocus.Top),
-      {
-        mode: 'debounce',
-        wait: 150,
-        keyExtractor: (event) => event.documentId,
-      },
+        (event) => {
+          const docState = this.getDocumentState(event.documentId);
+          if (!docState) return;
+
+          if (typeof docState.zoomLevel === 'number') {
+            this.handleRequest(
+                { level: docState.zoomLevel, focus: VerticalZoomFocus.Top },
+                event.documentId
+            );
+            return;
+          }
+          this.recalcAuto(event.documentId, VerticalZoomFocus.Top);
+        },
+        {
+          mode: 'debounce',
+          wait: 150,
+          keyExtractor: (event) => event.documentId,
+        },
     );
 
     // Subscribe to spread changes
@@ -529,11 +541,10 @@ export class ZoomPlugin extends BasePlugin<
   private recalcAuto(documentId: string, focus?: VerticalZoomFocus) {
     const docState = this.getDocumentState(documentId);
     if (!docState) return;
-
     if (
-      docState.zoomLevel === ZoomMode.Automatic ||
-      docState.zoomLevel === ZoomMode.FitPage ||
-      docState.zoomLevel === ZoomMode.FitWidth
+        docState.zoomLevel === ZoomMode.Automatic ||
+        docState.zoomLevel === ZoomMode.FitPage ||
+        docState.zoomLevel === ZoomMode.FitWidth
     ) {
       this.handleRequest({ level: docState.zoomLevel, focus }, documentId);
     }
