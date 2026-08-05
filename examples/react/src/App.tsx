@@ -15,7 +15,6 @@ import type {
 import { interactionPlugin } from '@embedpdf/plugin-interaction';
 import { selectionPlugin } from '@embedpdf/plugin-selection';
 import { annotationPlugin } from '@embedpdf/plugin-annotation';
-import { persistPlugin } from '@embedpdf/plugin-persist';
 import { renderPlugin } from '@embedpdf/plugin-render';
 import { pageEditPlugin } from '@embedpdf/plugin-page-edit';
 import { metadataPlugin } from '@embedpdf/plugin-metadata';
@@ -152,8 +151,6 @@ const plugins = [
     locales: [en],
     loaders: { es: () => import('./locales/es').then((m) => m.es) },
   }),
-  // effects-only plugin: requires Stage, mirrors per-document view-state to localStorage.
-  persistPlugin({ key: 'embedpdf:v3-demo' }),
   // workspace plugin: partitions open documents into reorderable panes (each pane
   // owns its own tab strip; tabs can be dragged between panes).
   viewManagerPlugin(),

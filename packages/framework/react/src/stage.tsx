@@ -212,8 +212,8 @@ export function Stage({
   useEffect(() => {
     const el = ref.current!;
     // Only report the viewport size. Initial placement (home) is the Stage plugin's
-    // job — it watches the viewport and homes once it's ready (and a persist plugin
-    // can override that). The shell stays dumb.
+    // job — it watches the viewport and homes once it's ready (and a higher-priority
+    // initial-view provider can override that). The shell stays dumb.
     const setVp = () => stage.setViewport({ width: el.clientWidth, height: el.clientHeight });
     const ro = new ResizeObserver(setVp);
     ro.observe(el);

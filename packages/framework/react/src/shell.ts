@@ -1,7 +1,7 @@
 /**
  * The React surface for @embedpdf/plugin-shell. The app owns every
  * surface's DOM; these hooks bind its open/closed state to the kernel so
- * commands can drive it and persist can restore it.
+ * commands can drive it and applications can restore it.
  *
  * These hooks are TOTAL: shell state is document-scoped, and chrome that uses
  * it (panel buttons, mode bands, menu anchors) stays mounted across the

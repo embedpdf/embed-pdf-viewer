@@ -21,7 +21,6 @@
     "@embedpdf/plugin-annotation": "workspace:*",
     "@embedpdf/plugin-page-edit": "workspace:*",
     "@embedpdf/plugin-metadata": "workspace:*",
-    "@embedpdf/plugin-persist": "workspace:*",
     "@embedpdf/plugin-render": "workspace:*",
     "@embedpdf/plugin-view-manager": "workspace:*",
     "@embedpdf/react": "workspace:*",

@@ -703,7 +703,7 @@ export function createStageCapability(
   };
   const snapshotSettings = (): StageSettings => pickSettings(ctx.getState());
 
-  // Initial-view providers (persist, deep-link, an explicit prop…). One owner
+  // Initial-view providers (storage restore, deep-link, an explicit prop…). One owner
   // (placeInitial) resolves them by priority — no effect-ordering races.
   const initialViewProviders: Array<{ priority: number; fn: () => StageViewState | null }> = [];
   let hasPlaced = false;
@@ -819,7 +819,7 @@ export function createStageCapability(
     setViewport: (v) => {
       // Initial placement is LEVEL-triggered, owned here: the moment the stage
       // first learns a real size (both axes) and the document has pages, resolve
-      // the initial view (persist/deep-link providers, else reset). Every report
+      // the initial view (storage/deep-link providers, else reset). Every report
       // re-checks the condition — no watch, no effect-registration race, no edge
       // to miss when the viewport was already sized before anyone listened.
       if (!hasPlaced) {

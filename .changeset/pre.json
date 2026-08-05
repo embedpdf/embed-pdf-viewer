@@ -46,7 +46,6 @@
     "@embedpdf/plugin-link": "2.15.0",
     "@embedpdf/plugin-metadata": "2.15.0",
     "@embedpdf/plugin-page-edit": "2.15.0",
-    "@embedpdf/plugin-persist": "2.15.0",
     "@embedpdf/plugin-redaction": "2.15.0",
     "@embedpdf/plugin-render": "2.15.0",
     "@embedpdf/plugin-search": "2.15.0",

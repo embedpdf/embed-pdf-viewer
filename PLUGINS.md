@@ -19,7 +19,7 @@ A plugin can omit pieces:
 | Kind                                  | Has                                                   |
 | ------------------------------------- | ----------------------------------------------------- |
 | **Stateful + API** (stage, marker)    | types · reducer · capability · plugin · index         |
-| **Effects-only** (persist, telemetry) | types · effects · plugin · index — no state, no token |
+| **Effects-only** (storage, telemetry) | types · effects · plugin · index — no state, no token |
 
 ## The five rules
 
@@ -41,8 +41,7 @@ A plugin can omit pieces:
 - **Tiling / render** — `watch` the Stage camera → request rasters for visible pages
   (debounce + abort on the next change).
 - **Search** — `onAction('SEARCH')` → `ctx.engine.search()` (async) → dispatch hits.
-- **Persistence** — `watch` view-state → debounce-save; restore on load. _(see
-  `plugin-persist`.)_
+- **Persistence** — `watch` view-state → debounce-save; restore on load.
 - **Coordination** — `onAction(CORE_DOCUMENT_LOADED)` → seed per-page state;
   on annotation created → mark history dirty.
 - **Telemetry** — `onAction(...)` → emit analytics.

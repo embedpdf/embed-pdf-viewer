@@ -83,9 +83,9 @@ describe('initial placement is level-triggered (the new-pane / HMR race)', () =>
     );
   });
 
-  it('initial-view providers (persist) still win over the default placement', () => {
+  it('initial-view providers still win over the default placement', () => {
     const { stage } = harness(PORTRAIT, undefined, { skipViewport: true });
-    // a persist-like provider registers BEFORE the first viewport report (as in
+    // a restoring provider registers BEFORE the first viewport report (as in
     // openDocument: effects run synchronously; the report is a later macrotask)
     stage.provideInitialView(50, () => ({
       ...stage.settings(),

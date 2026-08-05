@@ -8,7 +8,7 @@ import { createCapabilityToken } from '@embedpdf/core';
  * plugin stores WHICH surfaces are open; the app owns their DOM entirely
  * (v2's sidebar/modal schema does not exist in v3). Document-scoped: each
  * document keeps its own panels, so switching tabs restores them — and the
- * state is plain serializable data, so plugin-persist snapshots it for free.
+ * state is plain serializable data, so applications can snapshot and restore it.
  *
  * Exclusivity replaces v2's placement/slot machinery: a surface opened with
  * an `exclusive` tag closes every other surface carrying the same tag (e.g.

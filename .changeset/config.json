@@ -44,7 +44,6 @@
       "@embedpdf/plugin-link",
       "@embedpdf/plugin-metadata",
       "@embedpdf/plugin-page-edit",
-      "@embedpdf/plugin-persist",
       "@embedpdf/plugin-redaction",
       "@embedpdf/plugin-render",
       "@embedpdf/plugin-search",
