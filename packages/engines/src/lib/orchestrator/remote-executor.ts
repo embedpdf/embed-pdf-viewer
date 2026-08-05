@@ -3,6 +3,7 @@ import {
   Logger,
   NoopLogger,
   PdfDocumentObject,
+  SanitizeOptions,
   PdfPageObject,
   PdfTask,
   PdfErrorReason,
@@ -128,6 +129,7 @@ type MessageType =
   | 'mergePages'
   | 'preparePrintDocument'
   | 'saveAsCopy'
+  | 'sanitizeDocument'
   | 'closeDocument'
   | 'closeAllDocuments'
   | 'setDocumentEncryption'
@@ -654,6 +656,10 @@ export class RemoteExecutor implements IPdfiumExecutor {
 
   saveAsCopy(doc: PdfDocumentObject): PdfTask<ArrayBuffer> {
     return this.send<ArrayBuffer>('saveAsCopy', [doc]);
+  }
+
+  sanitizeDocument(doc: PdfDocumentObject, options?: SanitizeOptions): PdfTask<ArrayBuffer> {
+    return this.send<ArrayBuffer>('sanitizeDocument', [doc, options]);
   }
 
   closeDocument(doc: PdfDocumentObject): PdfTask<boolean> {

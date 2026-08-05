@@ -45,6 +45,7 @@ import {
   PdfAddAttachmentParams,
   AnnotationAppearanceMap,
   ImageDataLike,
+  SanitizeOptions,
 } from '@embedpdf/models';
 import { ExecuteRequest, Response, SpecificExecuteRequest } from './runner';
 
@@ -769,6 +770,22 @@ export class WebWorkerEngine implements PdfEngine {
     const task = new WorkerTask<ArrayBuffer>(this.worker, requestId);
 
     const request: ExecuteRequest = createRequest(requestId, 'saveAsCopy', [doc]);
+    this.proxy(task, request);
+
+    return task;
+  }
+
+  /**
+   * {@inheritDoc @embedpdf/models!PdfEngine.sanitizeDocument}
+   *
+   * @public
+   */
+  sanitizeDocument(doc: PdfDocumentObject, options?: SanitizeOptions) {
+    this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'sanitizeDocument', doc, options);
+    const requestId = this.generateRequestId(doc.id);
+    const task = new WorkerTask<ArrayBuffer>(this.worker, requestId);
+
+    const request: ExecuteRequest = createRequest(requestId, 'sanitizeDocument', [doc, options]);
     this.proxy(task, request);
 
     return task;
