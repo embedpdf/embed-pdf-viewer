@@ -7,7 +7,7 @@
 
   <!-- Badges -->
 
-<a href="https://github.com/embedpdf/embed-pdf-viewer/blob/main/LICENSE"><img alt="License" src="https://img.shields.io/github/license/embedpdf/embed-pdf-viewer.svg?style=for-the-badge&labelColor=000000"></a>
+<a href="https://github.com/embedpdf/embed-pdf-viewer/blob/main/LICENSE"><img alt="License: Apache 2.0" src="https://img.shields.io/badge/license-Apache%202.0-blue.svg?style=for-the-badge&labelColor=000000"></a>
 <a href="https://snippet.embedpdf.com/"><img alt="Live demo" src="https://img.shields.io/badge/Try%20the%20Live%20Demo-ff1493.svg?style=for-the-badge&labelColor=000000"></a>
 <a href="https://discord.gg/mHHABmmuVU"><img alt="Join our Discord" src="https://img.shields.io/discord/1351694551047475313?logo=discord&style=for-the-badge&labelColor=000000"></a>
 
