@@ -62,8 +62,12 @@
     "@embedpdf/website": "0.0.0"
   },
   "changesets": [
-    "initial-cloudpdf-contract",
+    "cloudpdf-admin-tenant-management",
+    "cloudpdf-contract-openapi",
+    "cloudpdf-server-tenant-api",
+    "embedpdf-engine-core-wire-templates",
     "initial-cloudpdf-admin",
+    "initial-cloudpdf-contract",
     "initial-cloudpdf-engine",
     "initial-cloudpdf-server",
     "initial-cloudpdf-viewer-react",

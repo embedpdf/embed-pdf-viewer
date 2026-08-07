@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/engine-runtime",
-  "version": "3.0.0-next.0",
+  "version": "3.0.0-next.1",
   "private": false,
   "description": "Low-level PDF execution runtime for EmbedPDF, backed by EmbedPDF's fork of PDFium and distributed as WASM and native platform packages.",
   "type": "module",
