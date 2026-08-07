@@ -49,7 +49,9 @@ export interface AdminE2eDialectFixture {
  * abstraction is broken.
  */
 export function runAdminE2e(dialect: AdminE2eDialectFixture): void {
-  async function buildFixture(opts: { sweepIntervalMs?: number } = {}): Promise<Fixture> {
+  async function buildFixture(
+    opts: { sweepIntervalMs?: number; enableRevocation?: boolean } = {},
+  ): Promise<Fixture> {
     const storageRoot = await mkdtemp(join(tmpdir(), 'embedpdf-admin-e2e-'));
     const db = await dialect.makeDb();
     const store = new FsObjectStore({ root: storageRoot });
@@ -64,6 +66,7 @@ export function runAdminE2e(dialect: AdminE2eDialectFixture): void {
       autoProvisionTenant: true,
       sweepIntervalMs: opts.sweepIntervalMs ?? 0,
       pendingTtlMs: 100,
+      ...(opts.enableRevocation ? { enableRevocation: true } : {}),
     });
     const addr = await bundle.app.listen({ host: '127.0.0.1', port: 0 });
     const baseUrl = typeof addr === 'string' ? addr : `http://127.0.0.1:${addr}`;
@@ -79,7 +82,16 @@ export function runAdminE2e(dialect: AdminE2eDialectFixture): void {
 
   function adminToken(
     tenantId: string,
-    opts: { scope?: ('*' | 'docs.create' | 'docs.read' | 'docs.delete')[] } = {},
+    opts: {
+      scope?: (
+        | '*'
+        | 'docs.create'
+        | 'docs.read'
+        | 'docs.delete'
+        | 'tokens.issue-doc'
+        | 'tokens.revoke'
+      )[];
+    } = {},
   ): string {
     return signDevToken(SECRET, {
       sub: `admin-${tenantId}`,
@@ -480,6 +492,169 @@ export function runAdminE2e(dialect: AdminE2eDialectFixture): void {
         body: JSON.stringify({ id: 'sneaky' }),
       });
       expect(res.status).toBe(403);
+    });
+  });
+
+  describe(`Token minting [${dialect.label}]`, () => {
+    let fx: Fixture;
+
+    beforeAll(async () => {
+      fx = await buildFixture({ enableRevocation: true });
+    });
+    afterAll(async () => {
+      await tearDown(fx);
+    });
+
+    function decodeJwtPayload(token: string): Record<string, unknown> {
+      const payload = token.split('.')[1]!;
+      return JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as Record<
+        string,
+        unknown
+      >;
+    }
+
+    test('api token mints a tenant working credential that works end-to-end', async () => {
+      const root = createCloudAdmin({ baseUrl: fx.baseUrl, apiToken: API_TOKEN });
+      const issued = await root.tenant('mint-t').tokens.issueTenant({
+        sub: 'billing-service',
+        scope: ['docs.create', 'docs.read'],
+        expiresIn: 3600,
+      });
+
+      const claims = decodeJwtPayload(issued.token);
+      expect(claims['sub']).toBe('billing-service');
+      expect(claims['tenant_id']).toBe('mint-t');
+      expect(claims['jti']).toBe(issued.jti);
+      expect(claims['exp']).toBe(issued.expiresAt);
+
+      const delegated = createCloudAdmin({
+        baseUrl: fx.baseUrl,
+        tenantToken: issued.token,
+      }).tenant('mint-t');
+      const doc = await delegated.documents.create({ bytes: fakePdf(95, 400) });
+      expect(doc.document.tenantId).toBe('mint-t');
+      const page = await delegated.documents.list();
+      expect(page.documents.find((d) => d.id === doc.document.id)).toBeTruthy();
+    });
+
+    test('tenant JWT with tokens.issue-doc mints doc tokens; minted token is doc-scoped', async () => {
+      const admin = createCloudAdmin({
+        baseUrl: fx.baseUrl,
+        tenantToken: adminToken('mint-doc-t', {
+          scope: ['docs.create', 'docs.read', 'tokens.issue-doc'],
+        }),
+      }).tenant('mint-doc-t');
+      const doc = await admin.documents.create({ bytes: fakePdf(96, 420) });
+
+      const issued = await admin.tokens.issueDoc({
+        sub: 'end-user-9',
+        docId: doc.document.id,
+        scope: ['doc.open', 'doc.render'],
+        displayName: 'Jane',
+        expiresIn: 900,
+      });
+      const claims = decodeJwtPayload(issued.token);
+      expect(claims['doc_id']).toBe(doc.document.id);
+      expect(claims['scope']).toEqual(['doc.open', 'doc.render']);
+      expect(claims['display_name']).toBe('Jane');
+      expect(claims['tenant_id']).toBe('mint-doc-t');
+
+      // A doc-scoped token is rejected on the tenant surface — proof it
+      // verified and classified as doc-scoped.
+      const asViewer = createCloudAdmin({
+        baseUrl: fx.baseUrl,
+        tenantToken: issued.token,
+      }).tenant('mint-doc-t');
+      let err: AdminError | undefined;
+      try {
+        await asViewer.documents.list();
+      } catch (e) {
+        err = e as AdminError;
+      }
+      expect(err?.status).toBe(403);
+    });
+
+    test('kind tenant requires the api token — a tenant JWT cannot mint tenant authority', async () => {
+      const admin = createCloudAdmin({
+        baseUrl: fx.baseUrl,
+        tenantToken: adminToken('mint-esc'),
+      }).tenant('mint-esc');
+      let err: AdminError | undefined;
+      try {
+        await admin.tokens.issueTenant({ sub: 'self', scope: ['*'], expiresIn: 3600 });
+      } catch (e) {
+        err = e as AdminError;
+      }
+      expect(err?.status).toBe(403);
+    });
+
+    test('issuing doc tokens needs tokens.issue-doc', async () => {
+      const admin = createCloudAdmin({
+        baseUrl: fx.baseUrl,
+        tenantToken: adminToken('mint-noscope', { scope: ['docs.read'] }),
+      }).tenant('mint-noscope');
+      let err: AdminError | undefined;
+      try {
+        await admin.tokens.issueDoc({
+          sub: 'u',
+          docId: 'whatever',
+          scope: ['doc.open'],
+          expiresIn: 900,
+        });
+      } catch (e) {
+        err = e as AdminError;
+      }
+      expect(err?.status).toBe(403);
+    });
+
+    test('scope vocabulary, doc existence, tenant binding, and ttl bounds are enforced', async () => {
+      const root = createCloudAdmin({ baseUrl: fx.baseUrl, apiToken: API_TOKEN });
+      const mine = root.tenant('mint-checks');
+      const doc = await mine.documents.create({ bytes: fakePdf(97, 300) });
+      const foreign = await root
+        .tenant('mint-foreign')
+        .documents.create({ bytes: fakePdf(98, 301) });
+
+      const attempts: Array<[Record<string, unknown>, number]> = [
+        [{ sub: 'u', docId: doc.document.id, scope: ['doc.hack'], expiresIn: 900 }, 400],
+        [{ sub: 'u', docId: 'does-not-exist', scope: ['doc.open'], expiresIn: 900 }, 404],
+        [{ sub: 'u', docId: foreign.document.id, scope: ['doc.open'], expiresIn: 900 }, 403],
+        [{ sub: 'u', docId: doc.document.id, scope: ['doc.open'], expiresIn: 30 }, 400],
+      ];
+      for (const [input, status] of attempts) {
+        let err: AdminError | undefined;
+        try {
+          await mine.tokens.issueDoc(input as never);
+        } catch (e) {
+          err = e as AdminError;
+        }
+        expect(err?.status, JSON.stringify(input)).toBe(status);
+      }
+    });
+
+    test('security_events records issuance and revocation', async () => {
+      const root = createCloudAdmin({ baseUrl: fx.baseUrl, apiToken: API_TOKEN });
+      const issued = await root.tenant('mint-audit').tokens.issueTenant({
+        sub: 'audited-service',
+        scope: ['docs.read'],
+        expiresIn: 3600,
+      });
+      await root.tenant('mint-audit').tokens.revoke(issued.jti, { reason: 'test cleanup' });
+
+      const rows = await fx.db
+        .selectFrom('security_events')
+        .selectAll()
+        .where('tenant_id', '=', 'mint-audit')
+        .orderBy('id', 'asc')
+        .execute();
+      expect(rows.length).toBe(2);
+      expect(rows[0]!.kind).toBe('token.issued');
+      expect(rows[0]!.jti).toBe(issued.jti);
+      expect(rows[0]!.actor).toBe('api-token');
+      expect(rows[0]!.via).toBe('api-token');
+      expect(rows[1]!.kind).toBe('token.revoked');
+      expect(rows[1]!.jti).toBe(issued.jti);
+      expect(rows[1]!.reason).toBe('test cleanup');
     });
   });
 

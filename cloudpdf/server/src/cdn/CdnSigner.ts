@@ -18,7 +18,7 @@
  *
  * `info` follows the unified adapter pattern — `kind` discriminator
  * plus public diagnostic fields (no secrets). Surfaced via
- * /v1/admin/status.
+ * /v1/deployment/status.
  */
 
 import type { CdnAccessInfo, CdnAdapter } from '@embedpdf/engine-core/runtime';

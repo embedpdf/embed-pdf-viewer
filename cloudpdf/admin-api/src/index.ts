@@ -32,6 +32,7 @@ export const adminWirePaths = {
   /** The warmed dashboard-tile artifact. Returns 404 while `pending`/`locked`. */
   documentThumbnail: (tenantId: string, docId: string) =>
     `/v1/tenants/${encodeURIComponent(tenantId)}/documents/${encodeURIComponent(docId)}/thumbnail`,
+  tokenIssue: (tenantId: string) => `/v1/tenants/${encodeURIComponent(tenantId)}/tokens`,
   tokenRevoke: (tenantId: string, jti: string) =>
     `/v1/tenants/${encodeURIComponent(tenantId)}/tokens/${encodeURIComponent(jti)}/revoke`,
   /** Deployment-global singletons: API-token only, no tenant context. */
@@ -276,6 +277,80 @@ export const AdminTenantListResponseSchema = z.object({
 });
 export type AdminTenantListResponse = z.infer<typeof AdminTenantListResponseSchema>;
 
+/**
+ * Tenant-token scopes used by the admin surface. The wildcard `*`
+ * always satisfies a scope check and is deliberately not listed —
+ * operations declare the *specific* scope they require.
+ *
+ * `tokens.issue-doc` and `tokens.revoke` are deliberately separate:
+ * issuance leaking is a confidentiality risk (unauthorized access
+ * creation), revocation leaking is an availability risk (mass session
+ * kill). Different failure directions, different scopes.
+ */
+export const adminTenantScopes = [
+  'docs.create',
+  'docs.read',
+  'docs.delete',
+  'tokens.issue-doc',
+  'tokens.revoke',
+] as const;
+export type AdminTenantScope = (typeof adminTenantScopes)[number];
+
+export const AdminTokenIssueDocRequestSchema = z.object({
+  kind: z.literal('doc'),
+  /** Subject of the minted token — the end user's id in your system. */
+  sub: z.string().min(1).max(256),
+  docId: z.string().regex(docIdPattern),
+  layerName: z.string().min(1).max(256).optional(),
+  /**
+   * Doc capability scopes (`doc.open`, `doc.render`, …, plus the
+   * collab grammar). Validated server-side against the engine's scope
+   * vocabulary — an unknown string rejects the whole request.
+   */
+  scope: z.array(z.string().min(1).max(128)).min(1).max(64),
+  userId: z.string().max(256).optional(),
+  displayName: z.string().max(256).optional(),
+  groupId: z.string().max(256).optional(),
+  groups: z.array(z.string().max(256)).max(64).optional(),
+  /** Token lifetime in seconds. */
+  expiresIn: z
+    .number()
+    .int()
+    .min(60)
+    .max(60 * 60 * 24 * 90),
+});
+export type AdminTokenIssueDocRequest = z.infer<typeof AdminTokenIssueDocRequestSchema>;
+
+export const AdminTokenIssueTenantRequestSchema = z.object({
+  kind: z.literal('tenant'),
+  sub: z.string().min(1).max(256),
+  scope: z
+    .array(z.union([z.literal('*'), z.enum(adminTenantScopes)]))
+    .min(1)
+    .max(16),
+  /** Token lifetime in seconds. */
+  expiresIn: z
+    .number()
+    .int()
+    .min(60)
+    .max(60 * 60 * 24 * 90),
+});
+export type AdminTokenIssueTenantRequest = z.infer<typeof AdminTokenIssueTenantRequestSchema>;
+
+export const AdminTokenIssueRequestSchema = z.discriminatedUnion('kind', [
+  AdminTokenIssueDocRequestSchema,
+  AdminTokenIssueTenantRequestSchema,
+]);
+export type AdminTokenIssueRequest = z.infer<typeof AdminTokenIssueRequestSchema>;
+
+export const AdminTokenIssueResponseSchema = z.object({
+  token: z.string(),
+  jti: z.string(),
+  /** Unix seconds. */
+  expiresAt: z.number(),
+});
+export type AdminTokenIssueResponse = z.infer<typeof AdminTokenIssueResponseSchema>;
+
 // ---------------------------------------------------------------------------
 // Operation registry
 // ---------------------------------------------------------------------------
@@ -286,14 +361,6 @@ export type AdminTenantListResponse = z.infer<typeof AdminTenantListResponseSche
 // registry is executed, not merely described), and the OpenAPI document is
 // generated from the same entries in CI. Migration status: `documents.list`
 // is registered; the remaining admin operations move in as they are touched.
-
-/**
- * Tenant-token scopes used by the admin surface. The wildcard `*` always
- * satisfies a scope check and is deliberately not listed — operations
- * declare the *specific* scope they require.
- */
-export const adminTenantScopes = ['docs.create', 'docs.read', 'docs.delete', 'tokens.mint'] as const;
-export type AdminTenantScope = (typeof adminTenantScopes)[number];
 
 /**
  * The two credential kinds of the one-rule auth model: the API token
@@ -544,13 +611,31 @@ export const adminOperations = {
       200: { contentType: 'application/json', schema: AdminLicenseStatusResponseSchema },
     },
   },
+  'tokens.issue': {
+    operationId: 'tokens.issue',
+    summary: 'Mint a delegated JWT: a doc token, or (API token only) a tenant token.',
+    method: 'POST',
+    path: '/v1/tenants/:tenantId/tokens',
+    credentials: ['api-token', 'tenant-jwt'],
+    scope: ['tokens.issue-doc'],
+    params: AdminTenantParamsSchema,
+    body: { contentType: 'application/json', schema: AdminTokenIssueRequestSchema },
+    responses: {
+      200: { contentType: 'application/json', schema: AdminTokenIssueResponseSchema },
+      400: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+      403: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+      404: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+    },
+    notes:
+      'kind "tenant" requires the API token — authority mints only downward. Mounted only when the deployment can sign (HS256 mode); asymmetric deployments mint with their own private key.',
+  },
   'tokens.revoke': {
     operationId: 'tokens.revoke',
     summary: 'Revoke a token by jti; live sessions drop on their next heartbeat.',
     method: 'POST',
     path: '/v1/tenants/:tenantId/tokens/:jti/revoke',
     credentials: ['api-token', 'tenant-jwt'],
-    scope: ['tokens.mint'],
+    scope: ['tokens.revoke'],
     params: AdminTenantJtiParamsSchema,
     body: { contentType: 'application/json', schema: AdminTokenRevokeRequestSchema, required: false },
     responses: {

@@ -9,7 +9,13 @@ import { registerJwtAuth, requireApiToken } from './jwt-plugin';
 import type { AuthFailureLimiterOptions } from './auth-failure-limiter';
 import { assertProductionSecret, requiresProductionSecrets, resolveSecret } from './secret-policy';
 import { DbJwksCacheStore } from '../auth/JwksCacheStore';
-import type { JwtVerifierConfig, RevocationCheck, JwksCacheStore } from '../auth/JwtVerifier';
+import {
+  signDevToken,
+  type JwtVerifierConfig,
+  type JwksCacheStore,
+  type RevocationCheck,
+  type SignDevTokenInput,
+} from '../auth/JwtVerifier';
 import { RevokedJtisGuard } from '../auth/RevokedJtisGuard';
 import { NoneCdnSigner } from '../cdn/adapters/NoneCdnSigner';
 import type { CdnSigner } from '../cdn/CdnSigner';
@@ -21,6 +27,7 @@ import { WorkerThreadPool, type FallbackFontDescriptor } from '../runtime/Worker
 import { BaseFileCache } from '../storage/BaseFileCache';
 import type { ObjectStoreWithInfo } from '../storage/ObjectStore';
 import { PdfPasswordVerificationsRepo } from '../db/repos/pdf_password_verifications.repo';
+import { SecurityEventsRepo } from '../db/repos/security-events.repo';
 import { TenantsRepo } from '../db/repos/tenants.repo';
 import { DocumentPagesRepo, LayerPagesRepo, LayersRepo } from '../db/repos/page_state.repo';
 import { WeakAnnotationSessionsRepo } from '../db/repos/weak_annotation_sessions.repo';
@@ -131,7 +138,7 @@ export interface BuildAppOptions {
   authFailureLimit?: Partial<AuthFailureLimiterOptions> | false;
   /**
    * Optional Kysely DB handle. When supplied together with `objectStore`,
-   * the admin routes under `/v1/admin/*` are registered. Engine-only
+   * the tenant/deployment admin surfaces are registered. Engine-only
    * deployments can omit both.
    */
   db?: Kysely<Schema>;
@@ -519,9 +526,20 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
       tenants: new TenantsRepo(opts.db),
       storage: opts.objectStore,
     });
-    if (revokedJtisGuard) {
-      await registerAdminTokensRoutes(app, { guard: revokedJtisGuard });
-    }
+    // Issue mounts only when the deployment can sign (HS256 — the
+    // verifier secret doubles as signing material); revoke only when
+    // revocation is enabled. Both write security_events.
+    const verifierForSigning = opts.verifier;
+    await registerAdminTokensRoutes(app, {
+      ...(revokedJtisGuard ? { guard: revokedJtisGuard } : {}),
+      ...(verifierForSigning.mode === 'hs256'
+        ? {
+            sign: (input: SignDevTokenInput) => signDevToken(verifierForSigning.secret, input),
+          }
+        : {}),
+      documents: new DocumentsRepo(opts.db),
+      securityEvents: new SecurityEventsRepo(opts.db),
+    });
 
     // Phase 3: wire the doc-scoped routes when the operator has
     // chosen a cache root. Requires the worker pool — admin-only

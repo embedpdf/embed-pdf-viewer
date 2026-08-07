@@ -104,6 +104,20 @@ export class HttpClient {
     return this.parseJsonResponse(res, parser);
   }
 
+  async postEmpty(path: string, body: unknown, opts: RequestOptions = {}): Promise<void> {
+    const res = await this.request(
+      path,
+      {
+        method: 'POST',
+        body: JSON.stringify(body ?? {}),
+        headers: { 'Content-Type': 'application/json' },
+      },
+      opts,
+    );
+    if (res.status === 204 || res.ok) return;
+    throw await AdminError.fromResponse(res);
+  }
+
   async deleteEmpty(path: string, opts: RequestOptions = {}): Promise<void> {
     const res = await this.request(path, { method: 'DELETE' }, opts);
     if (res.status === 204) return;

@@ -36,6 +36,8 @@ import sql018 from './018_documents_list_order.sql';
 import down018 from './018_documents_list_order.down.sql';
 import sql019 from './019_tenant_provenance.sql';
 import down019 from './019_tenant_provenance.down.sql';
+import sql020 from './020_security_events.sql';
+import down020 from './020_security_events.down.sql';
 import type { MigrationSource } from '../../migrator/runner';
 
 /**
@@ -69,4 +71,5 @@ export const postgresMigrations: ReadonlyArray<MigrationSource> = [
   { version: '017', name: '017_license_usage.sql', sql: sql017, down: down017 },
   { version: '018', name: '018_documents_list_order.sql', sql: sql018, down: down018 },
   { version: '019', name: '019_tenant_provenance.sql', sql: sql019, down: down019 },
+  { version: '020', name: '020_security_events.sql', sql: sql020, down: down020 },
 ];

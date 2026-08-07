@@ -1,5 +1,6 @@
 import { Documents } from './documents/Documents';
 import { Tenants } from './tenants/Tenants';
+import { TenantTokens } from './tokens/TenantTokens';
 import { HttpClient, type HttpClientOptions } from './transport/HttpClient';
 
 export interface CloudAdminOptions extends HttpClientOptions {
@@ -15,12 +16,14 @@ export interface CloudAdminOptions extends HttpClientOptions {
  */
 export class TenantClient {
   readonly documents: Documents;
+  readonly tokens: TenantTokens;
 
   constructor(
     http: HttpClient,
     readonly tenantId: string,
   ) {
     this.documents = new Documents(http, tenantId);
+    this.tokens = new TenantTokens(http, tenantId);
   }
 }
 

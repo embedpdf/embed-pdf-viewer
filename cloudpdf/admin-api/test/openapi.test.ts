@@ -67,6 +67,7 @@ describe('operation registry', () => {
     expect(sub(adminOperations['documents.thumbnail'].path)).toBe(
       adminWirePaths.documentThumbnail(tid, id),
     );
+    expect(sub(adminOperations['tokens.issue'].path)).toBe(adminWirePaths.tokenIssue(tid));
     expect(sub(adminOperations['tokens.revoke'].path)).toBe(adminWirePaths.tokenRevoke(tid, jti));
     expect(adminOperations['license.status'].path).toBe(adminWirePaths.deploymentLicenseStatus);
     expect(adminOperations['tenants.create'].path).toBe(adminWirePaths.tenants);

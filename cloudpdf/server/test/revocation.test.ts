@@ -16,7 +16,7 @@ import { buildAppForTesting } from '../src/app/buildApp';
 import { createValidTestLicenseGate } from '../src/licensing/testing';
 
 /**
- * Phase 2 — RevokedJtisGuard + `/v1/admin/tokens/:jti/revoke`
+ * Phase 2 — RevokedJtisGuard + `/v1/tenants/tenant-rev/tokens/:jti/revoke`
  *
  * These tests cover the full request path: a token containing `jti`
  * is rejected the moment the revoke endpoint flips its bit. We also
@@ -110,7 +110,7 @@ describe('RevokedJtisGuard (unit)', () => {
   });
 });
 
-describe('POST /v1/admin/tokens/:jti/revoke (E2E)', () => {
+describe('POST /v1/tenants/tenant-rev/tokens/:jti/revoke (E2E)', () => {
   let bundle: AppBundle;
   let baseUrl = '';
   let storageRoot = '';
@@ -152,11 +152,11 @@ describe('POST /v1/admin/tokens/:jti/revoke (E2E)', () => {
     });
 
     // Before revoke: GET /list works.
-    let res = await fetch(`${baseUrl}/v1/admin/documents`, { headers: authHeader(tok) });
+    let res = await fetch(`${baseUrl}/v1/tenants/tenant-rev/documents`, { headers: authHeader(tok) });
     expect(res.status).toBe(200);
 
     // Revoke the jti.
-    res = await fetch(`${baseUrl}/v1/admin/tokens/jti-to-revoke/revoke`, {
+    res = await fetch(`${baseUrl}/v1/tenants/tenant-rev/tokens/jti-to-revoke/revoke`, {
       method: 'POST',
       headers: { ...authHeader(tok), 'content-type': 'application/json' },
       body: JSON.stringify({ reason: 'manual' }),
@@ -172,7 +172,7 @@ describe('POST /v1/admin/tokens/:jti/revoke (E2E)', () => {
     // After revoke: same token is rejected. The body is deliberately
     // generic — why a token failed (revoked vs expired vs bad signature)
     // is for the server logs, not the anonymous caller.
-    res = await fetch(`${baseUrl}/v1/admin/documents`, { headers: authHeader(tok) });
+    res = await fetch(`${baseUrl}/v1/tenants/tenant-rev/documents`, { headers: authHeader(tok) });
     expect(res.status).toBe(401);
     const body = (await res.json()) as { error: string };
     expect(body.error).toBe('invalid token');
@@ -184,21 +184,21 @@ describe('POST /v1/admin/tokens/:jti/revoke (E2E)', () => {
       tenant_id: 'tenant-rev',
       jti: 'jti-other',
     });
-    const res = await fetch(`${baseUrl}/v1/admin/tokens/abc/revoke`, {
+    const res = await fetch(`${baseUrl}/v1/tenants/tenant-rev/tokens/abc/revoke`, {
       method: 'POST',
       headers: authHeader(noScope),
     });
     expect(res.status).toBe(403);
   });
 
-  test('docs.read alone cannot revoke (requires tokens.mint or *)', async () => {
+  test('docs.read alone cannot revoke (requires tokens.revoke or *)', async () => {
     const tok = signDevToken(SECRET, {
       sub: 'reader',
       tenant_id: 'tenant-rev',
       scope: ['docs.read'],
       jti: 'jti-reader',
     });
-    const res = await fetch(`${baseUrl}/v1/admin/tokens/whatever/revoke`, {
+    const res = await fetch(`${baseUrl}/v1/tenants/tenant-rev/tokens/whatever/revoke`, {
       method: 'POST',
       headers: authHeader(tok),
     });

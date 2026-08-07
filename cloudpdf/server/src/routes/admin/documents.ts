@@ -21,22 +21,22 @@ export interface AdminDocumentsRouteDeps {
 }
 
 /**
- * Admin routes for document upload + lifecycle, mounted under `/v1/admin/*`.
+ * Tenant document routes, mounted under `/v1/tenants/:tenantId/documents`.
  *
  * The flow customers walk through:
- *   1. POST /v1/admin/documents/init
+ *   1. POST /v1/tenants/:tenantId/documents/init
  *      body: { contentLength, contentSha256, metadata?, idempotencyKey?, dedupMode?, docId? }
  *      -> { id, state, tag: 'created'|'resumed'|'deduped', upload?: { ... } }
  *
  *   2. (If not deduped:) PUT the bytes to `upload.url` (presigned) OR
- *      POST them to `/v1/admin/documents/:id/upload-direct` (FS-mode
+ *      POST them to `.../documents/:id/upload-direct` (FS-mode
  *      fallback / customers behind strict egress).
  *
- *   3. POST /v1/admin/documents/:id/commit
+ *   3. POST .../documents/:id/commit
  *      body: { sha256 }
  *      -> { id, state, baseSha, ... }
  *
- * Listing / deleting / downloading are flat REST against `/v1/admin/documents`.
+ * Listing / deleting / downloading are flat REST against the tenant documents collection.
  */
 export async function registerAdminDocumentsRoutes(
   app: FastifyInstance,

@@ -275,16 +275,16 @@ describe('derived renders', () => {
       'Content-Type': 'application/json',
     };
     const bytes = stubPdfBytes({ pageCount: 3 });
-    const docId = await adminUpload(fx, adminHeaders, bytes);
+    const docId = await adminUpload(fx, tenantId, adminHeaders, bytes);
 
     // Warm is fire-and-forget from commit — poll the list until ready.
     await vi.waitFor(async () => {
-      const doc = await adminGetDoc(fx, adminHeaders, docId);
+      const doc = await adminGetDoc(fx, tenantId, adminHeaders, docId);
       expect(doc.thumbnailState).toBe('ready');
     });
 
-    const doc = await adminGetDoc(fx, adminHeaders, docId);
-    expect(doc.thumbnailUrl).toBe(`/v1/admin/documents/${docId}/thumbnail`);
+    const doc = await adminGetDoc(fx, tenantId, adminHeaders, docId);
+    expect(doc.thumbnailUrl).toBe(`/v1/tenants/${tenantId}/documents/${docId}/thumbnail`);
 
     const tile = await fetch(`${fx.baseUrl}${doc.thumbnailUrl}`, {
       headers: { Authorization: `Bearer ${adminToken(tenantId)}` },
@@ -308,10 +308,10 @@ describe('derived renders', () => {
       'Content-Type': 'application/json',
     };
     const bytes = stubPdfBytes({ pageCount: 2, requiresPassword: true });
-    const docId = await adminUpload(fx, adminHeaders, bytes);
+    const docId = await adminUpload(fx, tenantId, adminHeaders, bytes);
 
     await vi.waitFor(async () => {
-      const doc = await adminGetDoc(fx, adminHeaders, docId);
+      const doc = await adminGetDoc(fx, tenantId, adminHeaders, docId);
       expect(doc.thumbnailState).toBe('locked');
     });
 
@@ -319,7 +319,7 @@ describe('derived renders', () => {
     const { deleted } = await fx.storage.deletePrefix(`${tenantId}/derived/`);
     expect(deleted).toBe(0);
 
-    const tile = await fetch(`${fx.baseUrl}/v1/admin/documents/${docId}/thumbnail`, {
+    const tile = await fetch(`${fx.baseUrl}/v1/tenants/${tenantId}/documents/${docId}/thumbnail`, {
       headers: { Authorization: `Bearer ${adminToken(tenantId)}` },
     });
     expect(tile.status).toBe(404);
@@ -334,20 +334,20 @@ describe('derived renders', () => {
       'Content-Type': 'application/json',
     };
     const bytes = stubPdfBytes({ pageCount: 2 });
-    const docA = await adminUpload(fx, adminHeaders, bytes);
+    const docA = await adminUpload(fx, tenantId, adminHeaders, bytes);
     await vi.waitFor(async () => {
-      expect((await adminGetDoc(fx, adminHeaders, docA)).thumbnailState).toBe('ready');
+      expect((await adminGetDoc(fx, tenantId, adminHeaders, docA)).thumbnailState).toBe('ready');
     });
 
-    const docB = await adminUpload(fx, adminHeaders, bytes, { idempotencyKey: 'second-copy' });
+    const docB = await adminUpload(fx, tenantId, adminHeaders, bytes, { idempotencyKey: 'second-copy' });
     await vi.waitFor(async () => {
-      expect((await adminGetDoc(fx, adminHeaders, docB)).thumbnailState).toBe('ready');
+      expect((await adminGetDoc(fx, tenantId, adminHeaders, docB)).thumbnailState).toBe('ready');
     });
 
     // One base-tier artifact serves both documents (sha-addressed tier).
     const baseSha = createHash('sha256').update(bytes).digest('hex');
-    const a = await adminGetDoc(fx, adminHeaders, docA);
-    const b = await adminGetDoc(fx, adminHeaders, docB);
+    const a = await adminGetDoc(fx, tenantId, adminHeaders, docA);
+    const b = await adminGetDoc(fx, tenantId, adminHeaders, docB);
     expect(a.thumbnailUrl).not.toBeNull();
     expect(b.thumbnailUrl).not.toBeNull();
     expect(
@@ -517,12 +517,13 @@ function spyPagesRenderCount(fx: Fixture): { count: () => number } {
 /** Drive the real admin upload flow: init → upload-direct → commit. */
 async function adminUpload(
   fx: Fixture,
+  tenantId: string,
   headers: Record<string, string>,
   bytes: Uint8Array,
   opts?: { idempotencyKey?: string },
 ): Promise<string> {
   const sha256 = createHash('sha256').update(bytes).digest('hex');
-  const init = await fetch(`${fx.baseUrl}/v1/admin/documents/init`, {
+  const init = await fetch(`${fx.baseUrl}/v1/tenants/${tenantId}/documents/init`, {
     method: 'POST',
     headers,
     body: JSON.stringify({
@@ -535,7 +536,7 @@ async function adminUpload(
   const initBody = (await init.json()) as { tag: string; document: { id: string } };
   const docId = initBody.document.id;
 
-  const upload = await fetch(`${fx.baseUrl}/v1/admin/documents/${docId}/upload-direct`, {
+  const upload = await fetch(`${fx.baseUrl}/v1/tenants/${tenantId}/documents/${docId}/upload-direct`, {
     method: 'POST',
     headers: {
       Authorization: headers.Authorization!,
@@ -546,7 +547,7 @@ async function adminUpload(
   });
   expect(upload.status).toBe(200);
 
-  const commit = await fetch(`${fx.baseUrl}/v1/admin/documents/${docId}/commit`, {
+  const commit = await fetch(`${fx.baseUrl}/v1/tenants/${tenantId}/documents/${docId}/commit`, {
     method: 'POST',
     headers,
     body: JSON.stringify({ sha256 }),
@@ -557,10 +558,11 @@ async function adminUpload(
 
 async function adminGetDoc(
   fx: Fixture,
+  tenantId: string,
   headers: Record<string, string>,
   docId: string,
 ): Promise<{ thumbnailState: string; thumbnailUrl: string | null }> {
-  const res = await fetch(`${fx.baseUrl}/v1/admin/documents/${docId}`, {
+  const res = await fetch(`${fx.baseUrl}/v1/tenants/${tenantId}/documents/${docId}`, {
     headers: { Authorization: headers.Authorization! },
   });
   expect(res.status).toBe(200);

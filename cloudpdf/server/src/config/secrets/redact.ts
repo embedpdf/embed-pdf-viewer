@@ -2,7 +2,7 @@
  * Walk a config tree and replace any `SecretRef`-shaped objects with a
  * stable, log-safe placeholder. Used by status endpoints, debug
  * loggers, and config printers — anything that may emit configs to
- * non-secure output channels (logs, `/v1/admin/status`, support
+ * non-secure output channels (logs, `/v1/deployment/status`, support
  * tickets, etc.).
  *
  * SecretRef-shape detection is structural: an object that has both

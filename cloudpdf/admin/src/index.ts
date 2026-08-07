@@ -26,6 +26,13 @@ export type {
   TenantListOptions,
   TenantListPage,
 } from './tenants/Tenants';
+export { TenantTokens } from './tokens/TenantTokens';
+export type {
+  IssueDocTokenInput,
+  IssueTenantTokenInput,
+  IssuedToken,
+  RevokeTokenOptions,
+} from './tokens/TenantTokens';
 export { HttpClient } from './transport/HttpClient';
 export type { HttpClientOptions, RequestOptions } from './transport/HttpClient';
 export { AdminError } from './transport/AdminError';

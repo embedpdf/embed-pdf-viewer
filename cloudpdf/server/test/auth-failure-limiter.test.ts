@@ -2,7 +2,6 @@ import { describe, expect, test } from 'vitest';
 import { AuthFailureLimiter } from '../src/app/auth-failure-limiter';
 import { buildAppForTesting } from '../src/app/buildApp';
 import { createValidTestLicenseGate } from '../src/licensing/testing';
-import { signDevToken } from '../src/auth/JwtVerifier';
 
 describe('AuthFailureLimiter', () => {
   function makeClock(startAt = 1_000_000) {
@@ -61,11 +60,13 @@ describe('AuthFailureLimiter', () => {
 
 describe('auth failure throttling through the app', () => {
   const SECRET = 'auth-limiter-integration-secret';
+  const LIMITER_API_TOKEN = 'auth-limiter-api-token';
 
   async function makeApp(authFailureLimit?: { maxFailures: number; windowMs?: number } | false) {
     return buildAppForTesting({
       licenseGate: createValidTestLicenseGate(),
       verifier: { mode: 'hs256', secret: SECRET },
+      apiAuthTokens: [LIMITER_API_TOKEN],
       workerEntry: null,
       ...(authFailureLimit !== undefined ? { authFailureLimit } : {}),
     });
@@ -77,7 +78,7 @@ describe('auth failure throttling through the app', () => {
       const bad = { authorization: 'Bearer not-a-jwt' };
       const first = await bundle.app.inject({
         method: 'GET',
-        url: '/v1/admin/license/status',
+        url: '/v1/deployment/license/status',
         headers: bad,
       });
       expect(first.statusCode).toBe(401);
@@ -86,14 +87,14 @@ describe('auth failure throttling through the app', () => {
 
       const second = await bundle.app.inject({
         method: 'GET',
-        url: '/v1/admin/license/status',
+        url: '/v1/deployment/license/status',
         headers: bad,
       });
       expect(second.statusCode).toBe(401);
 
       const third = await bundle.app.inject({
         method: 'GET',
-        url: '/v1/admin/license/status',
+        url: '/v1/deployment/license/status',
         headers: bad,
       });
       expect(third.statusCode).toBe(429);
@@ -102,10 +103,10 @@ describe('auth failure throttling through the app', () => {
 
       // The block covers the source, valid token or not — that is the
       // point of early rejection (no verify CPU for a hostile source)...
-      const valid = signDevToken(SECRET, { sub: 'u', tenant_id: 't', scope: ['docs.read'] });
+      const valid = LIMITER_API_TOKEN;
       const blockedValid = await bundle.app.inject({
         method: 'GET',
-        url: '/v1/admin/license/status',
+        url: '/v1/deployment/license/status',
         headers: { authorization: `Bearer ${valid}` },
       });
       expect(blockedValid.statusCode).toBe(429);
@@ -113,7 +114,7 @@ describe('auth failure throttling through the app', () => {
       // ...but other sources are untouched.
       const otherIp = await bundle.app.inject({
         method: 'GET',
-        url: '/v1/admin/license/status',
+        url: '/v1/deployment/license/status',
         headers: { authorization: `Bearer ${valid}` },
         remoteAddress: '203.0.113.9',
       });
@@ -126,9 +127,9 @@ describe('auth failure throttling through the app', () => {
   test('missing bearer tokens also consume the failure budget', async () => {
     const bundle = await makeApp({ maxFailures: 1, windowMs: 60_000 });
     try {
-      const first = await bundle.app.inject({ method: 'GET', url: '/v1/admin/license/status' });
+      const first = await bundle.app.inject({ method: 'GET', url: '/v1/deployment/license/status' });
       expect(first.statusCode).toBe(401);
-      const second = await bundle.app.inject({ method: 'GET', url: '/v1/admin/license/status' });
+      const second = await bundle.app.inject({ method: 'GET', url: '/v1/deployment/license/status' });
       expect(second.statusCode).toBe(429);
     } finally {
       await bundle.shutdown();
@@ -143,7 +144,7 @@ describe('auth failure throttling through the app', () => {
         expect(res.statusCode).toBe(200);
       }
       // Budget untouched: an authed request still gets 401, not 429.
-      const after = await bundle.app.inject({ method: 'GET', url: '/v1/admin/license/status' });
+      const after = await bundle.app.inject({ method: 'GET', url: '/v1/deployment/license/status' });
       expect(after.statusCode).toBe(401);
     } finally {
       await bundle.shutdown();
@@ -153,11 +154,11 @@ describe('auth failure throttling through the app', () => {
   test('successful auth is never throttled at any request rate', async () => {
     const bundle = await makeApp({ maxFailures: 2, windowMs: 60_000 });
     try {
-      const valid = signDevToken(SECRET, { sub: 'u', tenant_id: 't', scope: ['docs.read'] });
+      const valid = LIMITER_API_TOKEN;
       for (let i = 0; i < 20; i++) {
         const res = await bundle.app.inject({
           method: 'GET',
-          url: '/v1/admin/license/status',
+          url: '/v1/deployment/license/status',
           headers: { authorization: `Bearer ${valid}` },
         });
         expect(res.statusCode).toBe(200);
@@ -173,7 +174,7 @@ describe('auth failure throttling through the app', () => {
       for (let i = 0; i < 40; i++) {
         const res = await bundle.app.inject({
           method: 'GET',
-          url: '/v1/admin/license/status',
+          url: '/v1/deployment/license/status',
           headers: { authorization: 'Bearer nope' },
         });
         expect(res.statusCode).toBe(401);
