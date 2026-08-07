@@ -113,6 +113,9 @@ importers:
 
   cloudpdf/admin-api:
     dependencies:
+      '@embedpdf/engine-core':
+        specifier: workspace:*
+        version: link:../../packages/engine/core
       zod:
         specifier: ^3.23.8
         version: 3.25.76
