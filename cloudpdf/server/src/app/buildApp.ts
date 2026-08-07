@@ -85,7 +85,8 @@ export interface BuildAppOptions {
   /**
    * Static API auth tokens (the deployment's root credential, valid on
    * every surface). A list so rotation is overlap-then-retire. Empty or
-   * absent disables the credential entirely.
+   * absent disables the credential entirely. Production licenses require
+   * every configured token to be a random secret of at least 32 bytes.
    */
   apiAuthTokens?: ReadonlyArray<string>;
   /**
@@ -410,9 +411,19 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
       option: 'verifier.secret',
     });
   }
+  const apiAuthTokens = (opts.apiAuthTokens ?? []).filter((token) => token.length > 0);
+  if (enforceProductionSecrets) {
+    for (const [index, token] of apiAuthTokens.entries()) {
+      assertProductionSecret(token, {
+        name: `API authentication token ${index + 1}`,
+        envVar: 'CLOUDPDF_API_AUTH_TOKENS',
+        option: `apiAuthTokens[${index}]`,
+      });
+    }
+  }
   await registerJwtAuth(app, {
     verifier: verifierConfig,
-    ...(opts.apiAuthTokens ? { apiAuthTokens: opts.apiAuthTokens } : {}),
+    ...(apiAuthTokens.length > 0 ? { apiAuthTokens } : {}),
     ...(opts.authFailureLimit !== undefined ? { authFailureLimit: opts.authFailureLimit } : {}),
   });
 
@@ -824,15 +835,48 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
 }
 
 /**
- * Strict base64 decode for the `X-Document-Password` header: single
- * value only, and the decoded text must round-trip (rejects garbage
- * that Buffer's lenient decoder would silently mangle).
+ * Strict base64 decode for the `X-Document-Password` header: single,
+ * bounded value only, with valid optional padding and a canonical
+ * round-trip (rejects garbage that Buffer's lenient decoder would
+ * silently mangle).
  */
+const MAX_DOCUMENT_PASSWORD_HEADER_LENGTH = 4_096;
+
+function removeBase64Padding(value: string): string | null {
+  let end = value.length;
+  while (end > 0 && value.charCodeAt(end - 1) === 0x3d) end--;
+
+  const paddingLength = value.length - end;
+  if (paddingLength > 2) return null;
+
+  const unpadded = value.slice(0, end);
+  if (unpadded.includes('=')) return null;
+
+  // Unpadded base64 is accepted. If the caller includes padding, it must
+  // have exactly the length required by the final four-character block.
+  const remainder = unpadded.length % 4;
+  if (remainder === 1) return null;
+  const requiredPadding = remainder === 0 ? 0 : 4 - remainder;
+  if (paddingLength !== 0 && paddingLength !== requiredPadding) return null;
+
+  return unpadded;
+}
+
 function decodeBase64Header(value: string | string[]): string | null {
-  if (Array.isArray(value) || value.length === 0) return null;
-  const buf = Buffer.from(value, 'base64');
+  if (
+    Array.isArray(value) ||
+    value.length === 0 ||
+    value.length > MAX_DOCUMENT_PASSWORD_HEADER_LENGTH
+  ) {
+    return null;
+  }
+
+  const canonicalInput = removeBase64Padding(value);
+  if (canonicalInput === null) return null;
+
+  const buf = Buffer.from(canonicalInput, 'base64');
   if (buf.length === 0) return null;
-  if (buf.toString('base64').replace(/=+$/, '') !== value.replace(/=+$/, '')) return null;
+  if (removeBase64Padding(buf.toString('base64')) !== canonicalInput) return null;
   try {
     return new TextDecoder('utf-8', { fatal: true }).decode(buf);
   } catch {

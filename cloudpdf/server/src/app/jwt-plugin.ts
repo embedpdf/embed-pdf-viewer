@@ -1,4 +1,4 @@
-import { createHash, timingSafeEqual } from 'node:crypto';
+import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import {
@@ -60,9 +60,9 @@ export interface JwtPluginOptions {
   /**
    * Static API auth tokens (the deployment's root credential). A
    * bearer that matches any of these — compared in constant time via
-   * SHA-256 digests — authenticates as `req.apiAuth` without JWT
-   * verification. A list so rotation is overlap-then-retire. Empty or
-   * absent disables the credential (JWT-only deployment).
+   * process-local keyed digests — authenticates as `req.apiAuth`
+   * without JWT verification. A list so rotation is overlap-then-retire.
+   * Empty or absent disables the credential (JWT-only deployment).
    */
   apiAuthTokens?: ReadonlyArray<string>;
   /**
@@ -93,6 +93,7 @@ export async function registerJwtAuth(app: FastifyInstance, opts: JwtPluginOptio
   const verifier: JwtVerifier = createJwtVerifier(asConfig(opts.verifier));
   const publics = new Set(opts.publicPaths ?? []);
   const apiTokens = (opts.apiAuthTokens ?? []).filter((t) => t.length > 0);
+  const matchesApiToken = createApiTokenMatcher(apiTokens);
   const limiter =
     opts.authFailureLimit === false
       ? null
@@ -124,7 +125,7 @@ export async function registerJwtAuth(app: FastifyInstance, opts: JwtPluginOptio
     }
     const token = auth.slice('Bearer '.length).trim();
 
-    if (apiTokens.length > 0 && matchesAnyApiToken(token, apiTokens)) {
+    if (matchesApiToken(token)) {
       req.apiAuth = true;
       return;
     }
@@ -144,18 +145,28 @@ export async function registerJwtAuth(app: FastifyInstance, opts: JwtPluginOptio
 }
 
 /**
- * Constant-time membership check: both sides are SHA-256'd so
- * `timingSafeEqual` never sees attacker-controlled lengths, and every
- * candidate is compared (no early exit on match).
+ * Build a constant-time membership check once at registration. HMAC gives
+ * `timingSafeEqual` fixed-size inputs without treating an API credential as
+ * a stored password hash. The random comparison key and candidate digests
+ * live only for this app instance, and every candidate is checked on every
+ * request (no early exit on match).
  */
-function matchesAnyApiToken(presented: string, tokens: ReadonlyArray<string>): boolean {
-  const presentedDigest = createHash('sha256').update(presented).digest();
-  let matched = false;
-  for (const candidate of tokens) {
-    const candidateDigest = createHash('sha256').update(candidate).digest();
-    if (timingSafeEqual(presentedDigest, candidateDigest)) matched = true;
-  }
-  return matched;
+function createApiTokenMatcher(tokens: ReadonlyArray<string>): (presented: string) => boolean {
+  if (tokens.length === 0) return () => false;
+
+  const comparisonKey = randomBytes(32);
+  const digest = (token: string): Buffer =>
+    createHmac('sha256', comparisonKey).update(token).digest();
+  const candidateDigests = tokens.map(digest);
+
+  return (presented: string): boolean => {
+    const presentedDigest = digest(presented);
+    let matched = false;
+    for (const candidateDigest of candidateDigests) {
+      if (timingSafeEqual(presentedDigest, candidateDigest)) matched = true;
+    }
+    return matched;
+  };
 }
 
 export interface TenantAccessContext {

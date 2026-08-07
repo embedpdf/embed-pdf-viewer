@@ -30,6 +30,7 @@ import { createValidTestLicenseGate } from '../src/licensing/testing';
 
 const STUB_ENTRY = new URL('./_helpers/stub-worker-entry.cjs', import.meta.url);
 const SECRET = 'doc-plane-api-secret';
+const RETIRING_API_TOKEN = 'doc-plane-retiring-root-token';
 const API_TOKEN = 'doc-plane-root-token';
 
 interface Fixture {
@@ -52,7 +53,8 @@ beforeAll(async () => {
   const bundle = await buildAppForTesting({
     licenseGate: createValidTestLicenseGate(),
     verifier: { mode: 'hs256', secret: SECRET },
-    apiAuthTokens: [API_TOKEN],
+    // Exercise overlap rotation: requests below use the second candidate.
+    apiAuthTokens: [RETIRING_API_TOKEN, API_TOKEN],
     workerEntry: STUB_ENTRY,
     poolSize: 2,
     db,
@@ -373,6 +375,31 @@ describe('X-Document-Password (API token only)', () => {
   test('malformed base64 is rejected before any document work', async () => {
     const res = await fetch(`${fx.baseUrl}/v1/docs/${docId}/manifest`, {
       headers: apiHeaders({ 'X-Document-Password': '!!!not-base64!!!' }),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  test('unpadded base64 remains accepted', async () => {
+    const encoded = Buffer.from('Test', 'utf8').toString('base64').slice(0, -2);
+    const res = await fetch(`${fx.baseUrl}/v1/docs/${docId}/manifest`, {
+      headers: apiHeaders({ 'X-Document-Password': encoded }),
+    });
+    expect(res.status, await res.clone().text()).toBe(200);
+  });
+
+  test.each(['VGVzdA=', 'VGVzdA===', 'VG=VzdA=='])(
+    'invalid base64 padding is rejected: %s',
+    async (encoded) => {
+      const res = await fetch(`${fx.baseUrl}/v1/docs/${docId}/manifest`, {
+        headers: apiHeaders({ 'X-Document-Password': encoded }),
+      });
+      expect(res.status).toBe(400);
+    },
+  );
+
+  test('an oversized password header is rejected before decoding', async () => {
+    const res = await fetch(`${fx.baseUrl}/v1/docs/${docId}/manifest`, {
+      headers: apiHeaders({ 'X-Document-Password': 'A'.repeat(4_097) }),
     });
     expect(res.status).toBe(400);
   });

@@ -74,7 +74,9 @@ import { UsageMeters } from '../licensing/UsageMeters';
  *   CLOUDPDF_JWT_SECRET    (default: dev secret — allowed only on development licenses)
  *   CLOUDPDF_API_AUTH_TOKENS  comma-separated static root credentials, valid on
  *                             every surface; a list so rotation is
- *                             overlap-then-retire. Unset = JWT-only deployment.
+ *                             overlap-then-retire. Each token must be >= 32
+ *                             bytes under a production license. Unset =
+ *                             JWT-only deployment.
  *   CLOUDPDF_PASSWORD_VERIFICATION_HMAC_SECRET / CLOUDPDF_PASSWORD_SESSION_SERVER_SECRET
  *                          (>= 32 bytes; required with a production license)
  *   CLOUDPDF_TRUST_PROXY   1|hops|CSV of proxy IPs (real client IPs behind a LB)
@@ -275,6 +277,7 @@ function printHelp(): void {
       '    CLOUDPDF_STORAGE_S3_BUCKET, CLOUDPDF_STORAGE_S3_REGION, CLOUDPDF_STORAGE_S3_ENDPOINT',
       '  Auth',
       '    CLOUDPDF_JWT_SECRET    HS256 secret, >= 32 bytes (required with a production license)',
+      '    CLOUDPDF_API_AUTH_TOKENS  comma-separated root tokens, each >= 32 bytes in production',
       '    CLOUDPDF_PASSWORD_VERIFICATION_HMAC_SECRET   >= 32 bytes (required with a production license)',
       '    CLOUDPDF_PASSWORD_SESSION_SERVER_SECRET      >= 32 bytes (required with a production license + KMS)',
       '    CLOUDPDF_PASSWORD_SESSION_SERVER_SECRET_ID   secret rotation id (default: dev-v1)',
