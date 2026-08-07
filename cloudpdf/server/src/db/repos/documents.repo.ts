@@ -8,6 +8,17 @@ import type {
   DocumentState,
 } from '../schema';
 
+export interface DocumentListOptions {
+  limit?: number;
+  state?: DocumentState;
+  /**
+   * Keyset cursor: only rows strictly after this (created_at, id)
+   * position in `created_at DESC, id DESC` order. The id tiebreaker
+   * makes pagination stable for same-millisecond created_at values.
+   */
+  before?: { createdAt: number; id: string };
+}
+
 export interface DocumentSecurityInfo {
   encryptionState: DocumentEncryptionState;
   encryptionRequiresPassword: boolean | null;
@@ -179,16 +190,25 @@ export class DocumentsRepo {
     return r ? mapRow(r) : null;
   }
 
-  async listForTenant(
-    tenantId: string,
-    opts: { limit?: number; state?: DocumentState } = {},
-  ): Promise<DocumentRow[]> {
+  async listForTenant(tenantId: string, opts: DocumentListOptions = {}): Promise<DocumentRow[]> {
     let q = this.db
       .selectFrom('documents')
       .selectAll()
       .where('tenant_id', '=', tenantId)
-      .orderBy('created_at', 'desc');
+      .orderBy('created_at', 'desc')
+      .orderBy('id', 'desc');
     if (opts.state) q = q.where('state', '=', opts.state);
+    if (opts.before) {
+      const { createdAt, id } = opts.before;
+      // Spelled as OR rather than a row-value comparison so both
+      // dialects plan it against idx_documents_tenant_created_id.
+      q = q.where((eb) =>
+        eb.or([
+          eb('created_at', '<', createdAt),
+          eb.and([eb('created_at', '=', createdAt), eb('id', '<', id)]),
+        ]),
+      );
+    }
     if (opts.limit) q = q.limit(opts.limit);
     const rows = await q.execute();
     return rows.map(mapRow);

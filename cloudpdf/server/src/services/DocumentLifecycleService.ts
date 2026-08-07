@@ -1,5 +1,9 @@
 import { randomBytes } from 'node:crypto';
-import { DocumentsRepo, type DocumentRow } from '../db/repos/documents.repo';
+import {
+  DocumentsRepo,
+  type DocumentListOptions,
+  type DocumentRow,
+} from '../db/repos/documents.repo';
 import { TenantsRepo } from '../db/repos/tenants.repo';
 import { StorageKeys } from '../storage/keys';
 import type { ObjectBody, ObjectStoreWithInfo, PresignedUpload } from '../storage/ObjectStore';
@@ -285,7 +289,7 @@ export class DocumentLifecycleService {
     return { doc: updated };
   }
 
-  async list(tenantId: string, opts: { limit?: number } = {}): Promise<DocumentRow[]> {
+  async list(tenantId: string, opts: DocumentListOptions = {}): Promise<DocumentRow[]> {
     return this.documents.listForTenant(tenantId, opts);
   }
 

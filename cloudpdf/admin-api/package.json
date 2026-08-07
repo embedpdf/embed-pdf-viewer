@@ -11,17 +11,26 @@
       "types": "./dist/index.d.ts",
       "development": "./src/index.ts",
       "default": "./dist/index.js"
-    }
+    },
+    "./openapi": {
+      "types": "./dist/openapi.d.ts",
+      "development": "./src/openapi.ts",
+      "default": "./dist/openapi.js"
+    },
+    "./openapi.json": "./openapi.json"
   },
   "scripts": {
     "build": "tsup",
     "clean": "rimraf dist",
     "dev": "tsup --watch",
+    "emit:openapi": "tsup && node scripts/emit-openapi.mjs",
+    "test": "vitest run",
     "lint": "eslint src --color",
     "lint:fix": "eslint src --color --fix"
   },
   "files": [
     "dist",
+    "openapi.json",
     "LICENSE",
     "README.md"
   ],
@@ -42,13 +51,15 @@
   ],
   "license": "Apache-2.0",
   "dependencies": {
-    "zod": "^3.23.8"
+    "zod": "^3.23.8",
+    "zod-to-json-schema": "^3.24.6"
   },
   "devDependencies": {
     "@types/node": "latest",
     "rimraf": "^5.0.0",
     "tsup": "^8.3.0",
-    "typescript": "^5.0.0"
+    "typescript": "^5.0.0",
+    "vitest": "^2.1.0"
   },
   "publishConfig": {
     "access": "public",
@@ -56,7 +67,12 @@
       ".": {
         "types": "./dist/index.d.ts",
         "default": "./dist/index.js"
-      }
+      },
+      "./openapi": {
+        "types": "./dist/openapi.d.ts",
+        "default": "./dist/openapi.js"
+      },
+      "./openapi.json": "./openapi.json"
     }
   }
 }

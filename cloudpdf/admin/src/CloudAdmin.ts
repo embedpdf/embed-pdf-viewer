@@ -7,17 +7,46 @@ export interface CloudAdminOptions extends HttpClientOptions {
 }
 
 /**
- * Cloud-admin SDK root. Created with `createCloudAdmin(...)`. Hosts
- * resource sub-clients (`documents`, future: `tokens`, `bases`, ...).
- *
- * Carries a *tenant-scoped admin* credential. Never instantiate from
- * the browser — there is no leak-protected mode of operation here.
+ * A tenant-scoped view of the deployment: every call is addressed
+ * under `/v1/tenants/{tenantId}/…`. With an API token the client may
+ * open any tenant; with a tenant JWT the server enforces that the
+ * path tenant equals the token's tenant.
  */
-export class CloudAdmin {
+export class TenantClient {
   readonly documents: Documents;
 
+  constructor(
+    http: HttpClient,
+    readonly tenantId: string,
+  ) {
+    this.documents = new Documents(http, tenantId);
+  }
+}
+
+/**
+ * Cloud-admin SDK root. Created with `createCloudAdmin(...)` holding
+ * exactly one credential:
+ *
+ *   - `apiToken` — the deployment's root credential, valid everywhere.
+ *   - `tenantToken` — a delegated tenant JWT, valid only under its own
+ *     tenant subtree.
+ *
+ * `tenant(id)` returns the tenant-scoped client; future sub-clients
+ * (`tenants` CRUD, `deployment`) mount here as the surfaces land.
+ *
+ * Never instantiate from the browser — there is no leak-protected
+ * mode of operation here.
+ */
+export class CloudAdmin {
+  private readonly http: HttpClient;
+
   private constructor(http: HttpClient) {
-    this.documents = new Documents(http);
+    this.http = http;
+  }
+
+  /** Tenant-scoped view. Synchronous — pure URL addressing, no minting. */
+  tenant(tenantId: string): TenantClient {
+    return new TenantClient(this.http, tenantId);
   }
 
   static fromOptions(opts: CloudAdminOptions): CloudAdmin {

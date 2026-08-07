@@ -1,13 +1,15 @@
 import {
   AdminDocumentCommitRequestSchema,
   AdminDocumentInitRequestSchema,
+  adminOperations,
   adminWirePaths,
   type AdminDocumentCommitRequest,
   type AdminDocumentInitRequest,
+  type AdminOperation,
 } from '@cloudpdf/admin-api';
-import type { FastifyInstance, FastifyRequest } from 'fastify';
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 
-import { requireScope } from '../../app/jwt-plugin';
+import { requireTenantAccess } from '../../app/jwt-plugin';
 import type { DocumentLifecycleService } from '../../services/DocumentLifecycleService';
 import type { ObjectStore } from '../../storage/ObjectStore';
 
@@ -42,13 +44,22 @@ export async function registerAdminDocumentsRoutes(
   const { lifecycle, storage } = deps;
 
   /**
-   * Stable direct-upload URL builder. The @cloudpdf/admin SDK uses this
-   * URL exactly as returned (no string interpolation on its side).
+   * Every route mounts from its registry entry: method, path, scope,
+   * and accepted credentials come from `adminOperations`, so the
+   * contract is executed rather than merely described. Handlers own
+   * behavior only.
    */
-  const directUrlForDoc = (docId: string): string => adminWirePaths.documentUploadDirect(docId);
+  const mount = (
+    op: AdminOperation,
+    handler: (req: FastifyRequest, reply: FastifyReply) => unknown,
+  ): void => {
+    app.route({ method: op.method, url: op.path, handler });
+  };
 
-  app.post(adminWirePaths.documentsInit, async (req, reply) => {
-    const ctx = requireScope(req, ['docs.create']);
+  const initOp = adminOperations['documents.init'];
+  mount(initOp, async (req, reply) => {
+    const { tenantId } = req.params as { tenantId: string };
+    const ctx = requireTenantAccess(req, tenantId, initOp.scope);
     const body = parseInitBody(req);
 
     const result = await lifecycle.init({
@@ -70,11 +81,13 @@ export async function registerAdminDocumentsRoutes(
       });
     }
 
+    // Stable direct-upload URL: the @cloudpdf/admin SDK uses it exactly
+    // as returned (no string interpolation on its side).
     const upload = await lifecycle.issueUpload(
       result.doc.id,
       ctx.tenantId,
       body.contentLength,
-      directUrlForDoc,
+      (docId) => adminWirePaths.documentUploadDirect(tenantId, docId),
       { ttlSec: body.uploadTtlSec },
     );
     return reply.send({
@@ -84,9 +97,10 @@ export async function registerAdminDocumentsRoutes(
     });
   });
 
-  app.post(`${adminWirePaths.documents}/:id/commit`, async (req, reply) => {
-    const ctx = requireScope(req, ['docs.create']);
-    const { id } = req.params as { id: string };
+  const commitOp = adminOperations['documents.commit'];
+  mount(commitOp, async (req, reply) => {
+    const { tenantId, id } = req.params as { tenantId: string; id: string };
+    const ctx = requireTenantAccess(req, tenantId, commitOp.scope);
     const body = parseCommitBody(req);
 
     const result = await lifecycle.commit({
@@ -97,9 +111,10 @@ export async function registerAdminDocumentsRoutes(
     return reply.send({ document: docPublic(result.doc) });
   });
 
-  app.post(`${adminWirePaths.documents}/:id/upload-direct`, async (req, reply) => {
-    const ctx = requireScope(req, ['docs.create']);
-    const { id } = req.params as { id: string };
+  const uploadDirectOp = adminOperations['documents.uploadDirect'];
+  mount(uploadDirectOp, async (req, reply) => {
+    const { tenantId, id } = req.params as { tenantId: string; id: string };
+    const ctx = requireTenantAccess(req, tenantId, uploadDirectOp.scope);
 
     const lenHeader = req.headers['content-length'];
     const len = typeof lenHeader === 'string' ? Number.parseInt(lenHeader, 10) : Number.NaN;
@@ -146,26 +161,37 @@ export async function registerAdminDocumentsRoutes(
     return reply.send({ sha256 });
   });
 
-  app.get(adminWirePaths.documents, async (req, reply) => {
-    const ctx = requireScope(req, ['docs.read']);
-    const q = req.query as { limit?: string } | undefined;
-    const limit = q?.limit ? Number.parseInt(q.limit, 10) : 100;
-    const docs = await lifecycle.list(ctx.tenantId, {
-      limit: Number.isFinite(limit) ? limit : 100,
-    });
-    return reply.send({ documents: docs.map(docPublic) });
+  const listOp = adminOperations['documents.list'];
+  mount(listOp, async (req, reply) => {
+    const { tenantId } = req.params as { tenantId: string };
+    const ctx = requireTenantAccess(req, tenantId, listOp.scope);
+    const parsed = listOp.query.safeParse(req.query ?? {});
+    if (!parsed.success) {
+      throw makeError('InvalidArg', 400, formatSchemaError(parsed.error.issues));
+    }
+    const { limit, cursor, state } = parsed.data;
+    const before = cursor === undefined ? undefined : decodeListCursor(cursor);
+
+    // limit+1 probes for a next page without a COUNT query.
+    const rows = await lifecycle.list(ctx.tenantId, { limit: limit + 1, state, before });
+    const page = rows.slice(0, limit);
+    const last = page[page.length - 1];
+    const nextCursor = rows.length > limit && last ? encodeListCursor(last) : null;
+    return reply.send({ documents: page.map(docPublic), nextCursor });
   });
 
-  app.get(`${adminWirePaths.documents}/:id`, async (req, reply) => {
-    const ctx = requireScope(req, ['docs.read']);
-    const { id } = req.params as { id: string };
+  const getOp = adminOperations['documents.get'];
+  mount(getOp, async (req, reply) => {
+    const { tenantId, id } = req.params as { tenantId: string; id: string };
+    const ctx = requireTenantAccess(req, tenantId, getOp.scope);
     const doc = await lifecycle.get(ctx.tenantId, id);
     return reply.send({ document: docPublic(doc) });
   });
 
-  app.get(`${adminWirePaths.documents}/:id/download`, async (req, reply) => {
-    const ctx = requireScope(req, ['docs.read']);
-    const { id } = req.params as { id: string };
+  const downloadOp = adminOperations['documents.download'];
+  mount(downloadOp, async (req, reply) => {
+    const { tenantId, id } = req.params as { tenantId: string; id: string };
+    const ctx = requireTenantAccess(req, tenantId, downloadOp.scope);
     const bytes = await lifecycle.download(ctx.tenantId, id);
     return reply
       .type('application/pdf')
@@ -173,9 +199,10 @@ export async function registerAdminDocumentsRoutes(
       .send(Buffer.from(bytes));
   });
 
-  app.delete(`${adminWirePaths.documents}/:id`, async (req, reply) => {
-    const ctx = requireScope(req, ['docs.delete']);
-    const { id } = req.params as { id: string };
+  const deleteOp = adminOperations['documents.delete'];
+  mount(deleteOp, async (req, reply) => {
+    const { tenantId, id } = req.params as { tenantId: string; id: string };
+    const ctx = requireTenantAccess(req, tenantId, deleteOp.scope);
     await lifecycle.delete(ctx.tenantId, id);
     return reply.code(204).send();
   });
@@ -186,19 +213,28 @@ export async function registerAdminDocumentsRoutes(
    * dashboard. 404 with the state while `pending`/`locked`/`failed` (the
    * doc-plane render routes remain the read-through repair path).
    */
-  app.get(`${adminWirePaths.documents}/:id/thumbnail`, async (req, reply) => {
-    const ctx = requireScope(req, ['docs.read']);
-    const { id } = req.params as { id: string };
+  const thumbnailOp = adminOperations['documents.thumbnail'];
+  mount(thumbnailOp, async (req, reply) => {
+    const { tenantId, id } = req.params as { tenantId: string; id: string };
+    const ctx = requireTenantAccess(req, tenantId, thumbnailOp.scope);
     const doc = await lifecycle.get(ctx.tenantId, id);
     if (!storage || doc.thumbnailState !== 'ready' || !doc.thumbnailKey) {
       return reply.code(404).send({
-        error: { code: 'ThumbnailNotReady', state: doc.thumbnailState },
+        error: {
+          code: 'ThumbnailNotReady',
+          message: 'thumbnail is not ready to serve',
+          state: doc.thumbnailState,
+        },
       });
     }
     const bytes = await storage.get(doc.thumbnailKey);
     if (!bytes) {
       return reply.code(404).send({
-        error: { code: 'ThumbnailNotReady', state: 'pending' },
+        error: {
+          code: 'ThumbnailNotReady',
+          message: 'thumbnail is not ready to serve',
+          state: 'pending',
+        },
       });
     }
     return reply
@@ -268,11 +304,48 @@ function docPublic(d: {
     // Dashboard tile contract: the URL is valid the
     // whole time — `pending` just means a fetch pays the read-through.
     thumbnailState: d.thumbnailState,
-    thumbnailUrl: d.thumbnailState === 'ready' ? adminWirePaths.documentThumbnail(d.id) : null,
+    thumbnailUrl:
+      d.thumbnailState === 'ready' ? adminWirePaths.documentThumbnail(d.tenantId, d.id) : null,
     createdAt: d.createdAt,
     updatedAt: d.updatedAt,
     createdBy: d.createdBy,
   };
+}
+
+/**
+ * List cursors are opaque `v1.<base64url(JSON)>` tokens over the keyset
+ * position `{ t: createdAt, id }`. Opaque by contract — the format may
+ * change, so clients round-trip `nextCursor` verbatim. Anything that does
+ * not decode to a well-formed v1 position fails closed as InvalidArg. A
+ * forged position is harmless: `tenant_id` binds first in the query, so a
+ * cursor can only ever select within the caller's own tenant.
+ */
+function encodeListCursor(row: { createdAt: number; id: string }): string {
+  const payload = JSON.stringify({ t: row.createdAt, id: row.id });
+  return `v1.${Buffer.from(payload, 'utf8').toString('base64url')}`;
+}
+
+function decodeListCursor(cursor: string): { createdAt: number; id: string } {
+  if (cursor.startsWith('v1.')) {
+    try {
+      const parsed = JSON.parse(
+        Buffer.from(cursor.slice('v1.'.length), 'base64url').toString('utf8'),
+      ) as { t?: unknown; id?: unknown };
+      if (
+        parsed !== null &&
+        typeof parsed === 'object' &&
+        typeof parsed.t === 'number' &&
+        Number.isFinite(parsed.t) &&
+        typeof parsed.id === 'string' &&
+        parsed.id.length > 0
+      ) {
+        return { createdAt: parsed.t, id: parsed.id };
+      }
+    } catch {
+      // fall through to the single failure exit
+    }
+  }
+  throw makeError('InvalidArg', 400, 'cursor is malformed; pass a nextCursor value verbatim');
 }
 
 function makeError(code: string, status: number, message: string): Error {

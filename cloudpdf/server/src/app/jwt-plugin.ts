@@ -1,3 +1,5 @@
+import { createHash, timingSafeEqual } from 'node:crypto';
+
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import {
   checkAnyCapability,
@@ -30,6 +32,12 @@ import { AuthFailureLimiter, type AuthFailureLimiterOptions } from './auth-failu
 declare module 'fastify' {
   interface FastifyRequest {
     tenant?: { id: string; sub: string; claims: JwtClaims };
+    /**
+     * True when the bearer matched a configured API auth token — the
+     * deployment's root credential, valid on every surface. No tenant
+     * context is attached; tenant-scoped guards take it from the URL.
+     */
+    apiAuth?: boolean;
   }
 }
 
@@ -43,6 +51,14 @@ export interface JwtPluginOptions {
   verifier: JwtVerifierConfig | { secret: string };
   /** Routes that should bypass authentication (e.g. health checks). */
   publicPaths?: ReadonlyArray<string>;
+  /**
+   * Static API auth tokens (the deployment's root credential). A
+   * bearer that matches any of these — compared in constant time via
+   * SHA-256 digests — authenticates as `req.apiAuth` without JWT
+   * verification. A list so rotation is overlap-then-retire. Empty or
+   * absent disables the credential (JWT-only deployment).
+   */
+  apiAuthTokens?: ReadonlyArray<string>;
   /**
    * Throttle on authentication FAILURES per client IP (never on
    * successful traffic — valid tokens are not counted). A source over
@@ -70,6 +86,7 @@ function asConfig(input: JwtPluginOptions['verifier']): JwtVerifierConfig {
 export async function registerJwtAuth(app: FastifyInstance, opts: JwtPluginOptions): Promise<void> {
   const verifier: JwtVerifier = createJwtVerifier(asConfig(opts.verifier));
   const publics = new Set(opts.publicPaths ?? []);
+  const apiTokens = (opts.apiAuthTokens ?? []).filter((t) => t.length > 0);
   const limiter =
     opts.authFailureLimit === false
       ? null
@@ -100,6 +117,12 @@ export async function registerJwtAuth(app: FastifyInstance, opts: JwtPluginOptio
       return;
     }
     const token = auth.slice('Bearer '.length).trim();
+
+    if (apiTokens.length > 0 && matchesAnyApiToken(token, apiTokens)) {
+      req.apiAuth = true;
+      return;
+    }
+
     try {
       const claims = await verifier.verify(token);
       req.tenant = { id: claims.tenant_id, sub: claims.sub, claims };
@@ -112,6 +135,64 @@ export async function registerJwtAuth(app: FastifyInstance, opts: JwtPluginOptio
       return;
     }
   });
+}
+
+/**
+ * Constant-time membership check: both sides are SHA-256'd so
+ * `timingSafeEqual` never sees attacker-controlled lengths, and every
+ * candidate is compared (no early exit on match).
+ */
+function matchesAnyApiToken(presented: string, tokens: ReadonlyArray<string>): boolean {
+  const presentedDigest = createHash('sha256').update(presented).digest();
+  let matched = false;
+  for (const candidate of tokens) {
+    const candidateDigest = createHash('sha256').update(candidate).digest();
+    if (timingSafeEqual(presentedDigest, candidateDigest)) matched = true;
+  }
+  return matched;
+}
+
+export interface TenantAccessContext {
+  tenantId: string;
+  sub: string;
+  via: 'api-token' | 'tenant-jwt';
+}
+
+/**
+ * The one-rule auth model for tenant-scoped routes: the API token is
+ * valid for any tenant; a tenant JWT only for the tenant its
+ * `tenant_id` names — the path tenant must match, and at least one of
+ * `wanted` scopes (or `*`) must be held. Doc-scoped tokens are always
+ * rejected.
+ */
+export function requireTenantAccess(
+  req: FastifyRequest,
+  tenantId: string,
+  wanted: ReadonlyArray<TenantScope>,
+): TenantAccessContext {
+  if (req.apiAuth) {
+    return { tenantId, sub: 'api-token', via: 'api-token' };
+  }
+  const ctx = requireScope(req, wanted);
+  if (ctx.tenantId !== tenantId) {
+    const err = new Error(
+      `token is for tenant "${ctx.tenantId}", path names tenant "${tenantId}"`,
+    ) as Error & { code: string; status: number };
+    err.code = 'Forbidden';
+    err.status = 403;
+    throw err;
+  }
+  return { tenantId, sub: ctx.sub, via: 'tenant-jwt' };
+}
+
+/** Deployment-surface guard: the root credential only, never a JWT. */
+export function requireApiToken(req: FastifyRequest): void {
+  if (!req.apiAuth) {
+    const err = new Error('api token required') as Error & { code: string; status: number };
+    err.code = 'Forbidden';
+    err.status = 403;
+    throw err;
+  }
 }
 
 export function requireTenant(req: FastifyRequest): string {

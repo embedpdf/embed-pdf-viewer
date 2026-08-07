@@ -1,8 +1,8 @@
 # @cloudpdf/admin
 
-The CloudPDF admin SDK — Node-only, for a customer's **backend**. It carries
-a tenant-scoped admin credential to upload PDFs, manage the document
-lifecycle, and mint user-scoped document JWTs against a
+The CloudPDF admin SDK — Node-only, for a customer's **backend**. It holds
+your deployment's API token (or a delegated tenant JWT) to upload PDFs and
+manage the document lifecycle against a
 [`@cloudpdf/server`](https://www.npmjs.com/package/@cloudpdf/server)
 deployment.
 
@@ -17,12 +17,12 @@ npm install @cloudpdf/admin
 ```ts
 import { createCloudAdmin } from '@cloudpdf/admin';
 
-const admin = createCloudAdmin({
-  baseUrl: 'https://api.cloudpdf.com',
-  token: process.env.CLOUDPDF_ADMIN_TOKEN!,
+const cloud = createCloudAdmin({
+  baseUrl: 'https://engine.example.com',
+  apiToken: process.env.CLOUDPDF_API_AUTH_TOKEN!,
 });
 
-const doc = await admin.documents.create({
+const doc = await cloud.tenant('default').documents.create({
   bytes,
   metadata: { name: 'report.pdf' },
 });

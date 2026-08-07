@@ -1,10 +1,11 @@
+import { adminOperations } from '@cloudpdf/admin-api';
 import { EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
 import compress from '@fastify/compress';
 import multipart from '@fastify/multipart';
 import Fastify, { type FastifyInstance } from 'fastify';
 import type { Kysely } from 'kysely';
 
-import { registerJwtAuth, requireScope } from './jwt-plugin';
+import { registerJwtAuth, requireApiToken } from './jwt-plugin';
 import type { AuthFailureLimiterOptions } from './auth-failure-limiter';
 import { assertProductionSecret, requiresProductionSecrets, resolveSecret } from './secret-policy';
 import { DbJwksCacheStore } from '../auth/JwksCacheStore';
@@ -70,6 +71,12 @@ export interface BuildAppOptions {
    * deployments, or RS/ES/JWKS modes for production IdP integration.
    */
   verifier: JwtVerifierConfig;
+  /**
+   * Static API auth tokens (the deployment's root credential, valid on
+   * every surface). A list so rotation is overlap-then-retire. Empty or
+   * absent disables the credential entirely.
+   */
+  apiAuthTokens?: ReadonlyArray<string>;
   /**
    * If true and `db` is supplied, wire a `RevokedJtisGuard` into the
    * verifier so revoked `jti`s are rejected at request time. Off by
@@ -394,6 +401,7 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
   }
   await registerJwtAuth(app, {
     verifier: verifierConfig,
+    ...(opts.apiAuthTokens ? { apiAuthTokens: opts.apiAuthTokens } : {}),
     ...(opts.authFailureLimit !== undefined ? { authFailureLimit: opts.authFailureLimit } : {}),
   });
 
@@ -422,13 +430,20 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
     return { license, status: 'ok' };
   });
   app.get('/v1/license/status', async () => opts.licenseGate.getStatus());
-  app.get('/v1/admin/license/status', async (request) => {
-    requireScope(request, ['docs.read']);
-    return {
-      license: opts.licenseGate.getStatus(),
-      reporting: opts.usageReporter ? await opts.usageReporter.status() : null,
-      usage: usageMeters ? await usageMeters.snapshot() : null,
-    };
+  // Deployment surface: API token only — license state, reporting, and
+  // meters are deployment-global, so no tenant credential may read them.
+  const licenseStatusOp = adminOperations['license.status'];
+  app.route({
+    method: licenseStatusOp.method,
+    url: licenseStatusOp.path,
+    handler: async (request) => {
+      requireApiToken(request);
+      return {
+        license: opts.licenseGate.getStatus(),
+        reporting: opts.usageReporter ? await opts.usageReporter.status() : null,
+        usage: usageMeters ? await usageMeters.snapshot() : null,
+      };
+    },
   });
 
   // Drift detection at boot. Production deployments should supply

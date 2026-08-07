@@ -32,6 +32,8 @@ import sql016 from './016_license_runtime.sql';
 import down016 from './016_license_runtime.down.sql';
 import sql017 from './017_license_usage.sql';
 import down017 from './017_license_usage.down.sql';
+import sql018 from './018_documents_list_order.sql';
+import down018 from './018_documents_list_order.down.sql';
 import type { MigrationSource } from '../../migrator/runner';
 
 /**
@@ -63,4 +65,5 @@ export const sqliteMigrations: ReadonlyArray<MigrationSource> = [
   { version: '015', name: '015_document_thumbnail.sql', sql: sql015, down: down015 },
   { version: '016', name: '016_license_runtime.sql', sql: sql016, down: down016 },
   { version: '017', name: '017_license_usage.sql', sql: sql017, down: down017 },
+  { version: '018', name: '018_documents_list_order.sql', sql: sql018, down: down018 },
 ];

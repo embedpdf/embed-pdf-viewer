@@ -17,6 +17,7 @@ import { createCloudAdmin, AdminError } from '@cloudpdf/admin';
 import { createValidTestLicenseGate } from '../../src/licensing/testing';
 
 const SECRET = 'admin-e2e-secret';
+const API_TOKEN = 'admin-e2e-root-api-token';
 
 interface Fixture {
   bundle: AppBundle;
@@ -56,6 +57,7 @@ export function runAdminE2e(dialect: AdminE2eDialectFixture): void {
     const bundle = await buildAppForTesting({
       licenseGate: createValidTestLicenseGate(),
       verifier: { mode: 'hs256', secret: SECRET },
+      apiAuthTokens: [API_TOKEN],
       workerEntry: null,
       db,
       objectStore: store,
@@ -110,7 +112,7 @@ export function runAdminE2e(dialect: AdminE2eDialectFixture): void {
       const admin = createCloudAdmin({
         baseUrl: fx.baseUrl,
         tenantToken: adminToken('tenant-a'),
-      });
+      }).tenant('tenant-a');
       const bytes = fakePdf(1, 4096);
 
       let progressMax = 0;
@@ -132,15 +134,15 @@ export function runAdminE2e(dialect: AdminE2eDialectFixture): void {
       expect(back.byteLength).toBe(bytes.byteLength);
       expect(sha256Hex(back)).toBe(result.document.baseSha);
 
-      const list = await admin.documents.list();
-      expect(list.find((d) => d.id === result.document.id)).toBeTruthy();
+      const page = await admin.documents.list();
+      expect(page.documents.find((d) => d.id === result.document.id)).toBeTruthy();
     });
 
     test('idempotency-key returns the same doc on retry without re-uploading', async () => {
       const admin = createCloudAdmin({
         baseUrl: fx.baseUrl,
         tenantToken: adminToken('tenant-idemp'),
-      });
+      }).tenant('tenant-idemp');
       const bytes = fakePdf(2, 2048);
       const key = 'retry-1';
 
@@ -156,7 +158,7 @@ export function runAdminE2e(dialect: AdminE2eDialectFixture): void {
       const admin = createCloudAdmin({
         baseUrl: fx.baseUrl,
         tenantToken: adminToken('tenant-dedup'),
-      });
+      }).tenant('tenant-dedup');
       const bytes = fakePdf(3, 1024);
       const first = await admin.documents.create({ bytes });
       const second = await admin.documents.create({ bytes, dedupMode: 'reuse-existing' });
@@ -172,7 +174,7 @@ export function runAdminE2e(dialect: AdminE2eDialectFixture): void {
       const admin = createCloudAdmin({
         baseUrl: fx.baseUrl,
         tenantToken: adminToken('tenant-shamm'),
-      });
+      }).tenant('tenant-shamm');
       const bytes = fakePdf(4, 512);
       const declaredButWrongSha = 'f'.repeat(64);
 
@@ -202,15 +204,15 @@ export function runAdminE2e(dialect: AdminE2eDialectFixture): void {
       const adminA = createCloudAdmin({
         baseUrl: fx.baseUrl,
         tenantToken: adminToken('tenant-iso-a'),
-      });
+      }).tenant('tenant-iso-a');
       const adminB = createCloudAdmin({
         baseUrl: fx.baseUrl,
         tenantToken: adminToken('tenant-iso-b'),
-      });
+      }).tenant('tenant-iso-b');
       const doc = await adminA.documents.create({ bytes: fakePdf(5, 256) });
 
-      const listB = await adminB.documents.list();
-      expect(listB.find((d) => d.id === doc.document.id)).toBeUndefined();
+      const pageB = await adminB.documents.list();
+      expect(pageB.documents.find((d) => d.id === doc.document.id)).toBeUndefined();
 
       let err: AdminError | undefined;
       try {
@@ -236,7 +238,7 @@ export function runAdminE2e(dialect: AdminE2eDialectFixture): void {
       const admin = createCloudAdmin({
         baseUrl: fx.baseUrl,
         tenantToken: adminToken('tenant-del'),
-      });
+      }).tenant('tenant-del');
       const doc = await admin.documents.create({ bytes: fakePdf(6, 1500) });
       const key = StorageKeys.basePdf(doc.document.tenantId, doc.document.id);
       expect(await fx.store.stat(key)).not.toBeNull();
@@ -255,7 +257,9 @@ export function runAdminE2e(dialect: AdminE2eDialectFixture): void {
 
     test('non-admin token is rejected by admin routes', async () => {
       const nonAdmin = signDevToken(SECRET, { sub: 'engine-user', tenant_id: 'tenant-x' });
-      const admin = createCloudAdmin({ baseUrl: fx.baseUrl, tenantToken: nonAdmin });
+      const admin = createCloudAdmin({ baseUrl: fx.baseUrl, tenantToken: nonAdmin }).tenant(
+        'tenant-x',
+      );
       let err: AdminError | undefined;
       try {
         await admin.documents.list();
@@ -265,16 +269,57 @@ export function runAdminE2e(dialect: AdminE2eDialectFixture): void {
       expect(err?.status).toBe(403);
     });
 
+    test('api token reaches any tenant; tenant JWT is pinned to its path subtree', async () => {
+      const root = createCloudAdmin({ baseUrl: fx.baseUrl, apiToken: API_TOKEN });
+      const a = await root.tenant('tenant-root-a').documents.create({ bytes: fakePdf(90, 256) });
+      const b = await root.tenant('tenant-root-b').documents.create({ bytes: fakePdf(91, 257) });
+      expect(a.document.tenantId).toBe('tenant-root-a');
+      expect(b.document.tenantId).toBe('tenant-root-b');
+
+      // A tenant JWT for tenant-root-a addressing tenant-root-b's subtree
+      // is a clear 403 — the one-rule model's mismatch case.
+      const cross = createCloudAdmin({
+        baseUrl: fx.baseUrl,
+        tenantToken: adminToken('tenant-root-a'),
+      }).tenant('tenant-root-b');
+      let err: AdminError | undefined;
+      try {
+        await cross.documents.list();
+      } catch (e) {
+        err = e as AdminError;
+      }
+      expect(err?.status).toBe(403);
+    });
+
+    test('deployment surface is api-token only', async () => {
+      const licenseUrl = `${fx.baseUrl}/v1/deployment/license/status`;
+
+      const withApiToken = await fetch(licenseUrl, {
+        headers: { authorization: `Bearer ${API_TOKEN}` },
+      });
+      expect(withApiToken.status).toBe(200);
+      const body = (await withApiToken.json()) as { license?: unknown };
+      expect(body.license).toBeDefined();
+
+      const withTenantJwt = await fetch(licenseUrl, {
+        headers: { authorization: `Bearer ${adminToken('tenant-a')}` },
+      });
+      expect(withTenantJwt.status).toBe(403);
+    });
+
     test('docs.read scope alone cannot create', async () => {
       const readOnly = signDevToken(SECRET, {
         sub: 'reader',
         tenant_id: 'tenant-ro',
         scope: ['docs.read'],
       });
-      const admin = createCloudAdmin({ baseUrl: fx.baseUrl, tenantToken: readOnly });
+      const admin = createCloudAdmin({ baseUrl: fx.baseUrl, tenantToken: readOnly }).tenant(
+        'tenant-ro',
+      );
 
-      const list = await admin.documents.list();
-      expect(Array.isArray(list)).toBe(true);
+      const page = await admin.documents.list();
+      expect(Array.isArray(page.documents)).toBe(true);
+      expect(page.nextCursor).toBeNull();
 
       let err: AdminError | undefined;
       try {
@@ -300,7 +345,7 @@ export function runAdminE2e(dialect: AdminE2eDialectFixture): void {
       const admin = createCloudAdmin({
         baseUrl: fx.baseUrl,
         tenantToken: adminToken('tenant-sweep'),
-      });
+      }).tenant('tenant-sweep');
       const bytes = fakePdf(9, 4096);
 
       const init = await admin.documents.init({
@@ -319,6 +364,164 @@ export function runAdminE2e(dialect: AdminE2eDialectFixture): void {
         err = e as AdminError;
       }
       expect(err?.status).toBe(404);
+    });
+  });
+
+  describe(`Admin documents list pagination [${dialect.label}]`, () => {
+    let fx: Fixture;
+
+    beforeAll(async () => {
+      fx = await buildFixture();
+    });
+    afterAll(async () => {
+      await tearDown(fx);
+    });
+
+    test('cursor walk visits every doc exactly once, even with created_at ties', async () => {
+      const admin = createCloudAdmin({
+        baseUrl: fx.baseUrl,
+        tenantToken: adminToken('tenant-page-tie'),
+      }).tenant('tenant-page-tie');
+      for (let i = 0; i < 7; i++) {
+        await admin.documents.create({ bytes: fakePdf(20 + i, 300 + i) });
+      }
+      // Collapse every created_at to one timestamp: ordering now rides
+      // entirely on the id tiebreaker, the exact case a bare
+      // `ORDER BY created_at DESC` walk duplicates or drops rows on.
+      await fx.db
+        .updateTable('documents')
+        .set({ created_at: 1_700_000_000_000 })
+        .where('tenant_id', '=', 'tenant-page-tie')
+        .execute();
+
+      const seen: string[] = [];
+      let cursor: string | undefined;
+      let pages = 0;
+      do {
+        const page = await admin.documents.list({ limit: 3, cursor });
+        expect(page.documents.length).toBeLessThanOrEqual(3);
+        seen.push(...page.documents.map((d) => d.id));
+        cursor = page.nextCursor ?? undefined;
+        pages += 1;
+      } while (cursor !== undefined);
+
+      expect(pages).toBe(3); // 3 + 3 + 1
+      expect(seen).toHaveLength(7);
+      expect(new Set(seen).size).toBe(7);
+    });
+
+    test('pages come newest first across cursor boundaries', async () => {
+      const admin = createCloudAdmin({
+        baseUrl: fx.baseUrl,
+        tenantToken: adminToken('tenant-page-order'),
+      }).tenant('tenant-page-order');
+      const ids: string[] = [];
+      for (let i = 0; i < 3; i++) {
+        const doc = await admin.documents.create({ bytes: fakePdf(40 + i, 200 + i) });
+        ids.push(doc.document.id);
+        // Distinct, ascending created_at so "newest first" has one answer.
+        await fx.db
+          .updateTable('documents')
+          .set({ created_at: 1_700_000_000_000 + i * 1000 })
+          .where('id', '=', doc.document.id)
+          .execute();
+      }
+
+      const first = await admin.documents.list({ limit: 2 });
+      expect(first.documents.map((d) => d.id)).toEqual([ids[2], ids[1]]);
+      expect(first.nextCursor).not.toBeNull();
+
+      const second = await admin.documents.list({ limit: 2, cursor: first.nextCursor! });
+      expect(second.documents.map((d) => d.id)).toEqual([ids[0]]);
+      expect(second.nextCursor).toBeNull();
+    });
+
+    test('out-of-range limit and malformed cursor are 400s, not silent clamps', async () => {
+      const admin = createCloudAdmin({
+        baseUrl: fx.baseUrl,
+        tenantToken: adminToken('tenant-page-bad'),
+      }).tenant('tenant-page-bad');
+
+      for (const limit of [0, 999]) {
+        let err: AdminError | undefined;
+        try {
+          await admin.documents.list({ limit });
+        } catch (e) {
+          err = e as AdminError;
+        }
+        expect(err?.status).toBe(400);
+      }
+
+      for (const cursor of ['not-a-cursor', 'v1.%%%%', `v1.${Buffer.from('[1]').toString('base64url')}`]) {
+        let err: AdminError | undefined;
+        try {
+          await admin.documents.list({ cursor });
+        } catch (e) {
+          err = e as AdminError;
+        }
+        expect(err?.status).toBe(400);
+      }
+    });
+
+    test('state filter composes with the cursor', async () => {
+      const admin = createCloudAdmin({
+        baseUrl: fx.baseUrl,
+        tenantToken: adminToken('tenant-page-state'),
+      }).tenant('tenant-page-state');
+      await admin.documents.create({ bytes: fakePdf(60, 400) });
+      await admin.documents.create({ bytes: fakePdf(61, 401) });
+
+      // Manufacture a failed doc via the sha-mismatch path.
+      const bytes = fakePdf(62, 402);
+      const wrongSha = 'f'.repeat(64);
+      const init = await admin.documents.init({
+        contentLength: bytes.byteLength,
+        contentSha256: wrongSha,
+      });
+      if (init.tag === 'deduped') throw new Error('unexpected dedup');
+      await admin.documents.uploadDirect({
+        docId: init.document.id,
+        body: bytes,
+        contentLength: bytes.byteLength,
+      });
+      await expect(
+        admin.documents.commit({ docId: init.document.id, sha256: wrongSha }),
+      ).rejects.toThrow(/sha_mismatch/);
+
+      const failed = await admin.documents.list({ state: 'failed' });
+      expect(failed.documents.map((d) => d.id)).toEqual([init.document.id]);
+      expect(failed.nextCursor).toBeNull();
+
+      const readyFirst = await admin.documents.list({ state: 'ready', limit: 1 });
+      expect(readyFirst.documents).toHaveLength(1);
+      expect(readyFirst.documents[0]!.state).toBe('ready');
+      expect(readyFirst.nextCursor).not.toBeNull();
+
+      const readyRest = await admin.documents.list({
+        state: 'ready',
+        limit: 1,
+        cursor: readyFirst.nextCursor!,
+      });
+      expect(readyRest.documents).toHaveLength(1);
+      expect(readyRest.documents[0]!.state).toBe('ready');
+      expect(readyRest.documents[0]!.id).not.toBe(readyFirst.documents[0]!.id);
+      expect(readyRest.nextCursor).toBeNull();
+    });
+
+    test('iterate() drains every page lazily', async () => {
+      const admin = createCloudAdmin({
+        baseUrl: fx.baseUrl,
+        tenantToken: adminToken('tenant-page-iter'),
+      }).tenant('tenant-page-iter');
+      for (let i = 0; i < 5; i++) {
+        await admin.documents.create({ bytes: fakePdf(80 + i, 500 + i) });
+      }
+      const ids: string[] = [];
+      for await (const doc of admin.documents.iterate({ limit: 2 })) {
+        ids.push(doc.id);
+      }
+      expect(ids).toHaveLength(5);
+      expect(new Set(ids).size).toBe(5);
     });
   });
 }

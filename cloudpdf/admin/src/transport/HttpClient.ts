@@ -8,10 +8,16 @@ export type FetchBody = Uint8Array | string | null | undefined;
 export interface HttpClientOptions {
   baseUrl: string;
   /**
-   * Tenant-scoped admin credential. Either a string or a function returning a
-   * fresh token, matching the `@cloudpdf/engine` client shape.
+   * The deployment's static root credential (`CLOUDPDF_API_AUTH_TOKENS`),
+   * valid on every surface. Pass exactly one of `apiToken` / `tenantToken`.
    */
-  tenantToken: string | (() => string | Promise<string>);
+  apiToken?: string;
+  /**
+   * A delegated tenant JWT, valid only under its own tenant subtree.
+   * Either a string or a function returning a fresh token, matching the
+   * `@cloudpdf/engine` client shape.
+   */
+  tenantToken?: string | (() => string | Promise<string>);
   /** Optional `fetch` override for tests or non-global runtimes. */
   fetch?: typeof globalThis.fetch;
   /** Default request timeout in ms. */
@@ -38,10 +44,12 @@ export class HttpClient {
 
   constructor(opts: HttpClientOptions) {
     if (!opts.baseUrl) throw new Error('HttpClient: baseUrl required');
-    if (!opts.tenantToken) throw new Error('HttpClient: tenantToken required');
+    if ((opts.apiToken === undefined) === (opts.tenantToken === undefined)) {
+      throw new Error('HttpClient: pass exactly one of apiToken or tenantToken');
+    }
 
     this.baseUrl = opts.baseUrl.replace(/\/$/, '');
-    const token = opts.tenantToken;
+    const token = opts.apiToken ?? opts.tenantToken!;
     this.tokenFn = typeof token === 'function' ? token : () => token;
     this.fetchFn = opts.fetch ?? globalThis.fetch?.bind(globalThis);
     this.defaultTimeoutMs = opts.timeoutMs ?? 60_000;
