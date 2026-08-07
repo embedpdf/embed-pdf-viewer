@@ -81,13 +81,6 @@ jobs:
         target: [linux-x64, linuxmusl-x64, wasm32]
     steps:
       - uses: actions/checkout@v6
-      - if: ${{ !contains(matrix.target, 'linuxmusl') }}
-        uses: pnpm/action-setup@v5
-      - if: ${{ !contains(matrix.target, 'linuxmusl') }}
-        uses: actions/setup-node@v6
-        with:
-          node-version: 22
-          cache: pnpm
       - name: Cache runtime payload
         id: payload-cache
         uses: actions/cache@v5
@@ -105,6 +98,13 @@ jobs:
             'packages/engine/runtime/build/compile.sh',
             'packages/engine/runtime/build/compile.esm.sh'
             ) }}
+      - if: ${{ steps.payload-cache.outputs.cache-hit != 'true' && !contains(matrix.target, 'linuxmusl') }}
+        uses: pnpm/action-setup@v5
+      - if: ${{ steps.payload-cache.outputs.cache-hit != 'true' && !contains(matrix.target, 'linuxmusl') }}
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
       - if: ${{ steps.payload-cache.outputs.cache-hit != 'true' && !contains(matrix.target, 'linuxmusl') }}
         run: pnpm install --frozen-lockfile
       - if: ${{ steps.payload-cache.outputs.cache-hit != 'true' && !contains(matrix.target, 'linuxmusl') }}
@@ -162,13 +162,6 @@ jobs:
         target: [linux-arm64, linuxmusl-arm64]
     steps:
       - uses: actions/checkout@v6
-      - if: ${{ !contains(matrix.target, 'linuxmusl') }}
-        uses: pnpm/action-setup@v5
-      - if: ${{ !contains(matrix.target, 'linuxmusl') }}
-        uses: actions/setup-node@v6
-        with:
-          node-version: 22
-          cache: pnpm
       - name: Cache runtime payload
         id: payload-cache
         uses: actions/cache@v5
@@ -186,6 +179,13 @@ jobs:
             'packages/engine/runtime/build/compile.sh',
             'packages/engine/runtime/build/compile.esm.sh'
             ) }}
+      - if: ${{ steps.payload-cache.outputs.cache-hit != 'true' && !contains(matrix.target, 'linuxmusl') }}
+        uses: pnpm/action-setup@v5
+      - if: ${{ steps.payload-cache.outputs.cache-hit != 'true' && !contains(matrix.target, 'linuxmusl') }}
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
       - if: ${{ steps.payload-cache.outputs.cache-hit != 'true' && !contains(matrix.target, 'linuxmusl') }}
         run: pnpm install --frozen-lockfile
       - if: ${{ steps.payload-cache.outputs.cache-hit != 'true' && !contains(matrix.target, 'linuxmusl') }}
@@ -235,11 +235,6 @@ jobs:
         target: [darwin-arm64, darwin-x64]
     steps:
       - uses: actions/checkout@v6
-      - uses: pnpm/action-setup@v5
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 22
-          cache: pnpm
       - name: Cache runtime payload
         id: payload-cache
         uses: actions/cache@v5
@@ -257,6 +252,13 @@ jobs:
             'packages/engine/runtime/build/compile.sh',
             'packages/engine/runtime/build/compile.esm.sh'
             ) }}
+      - if: steps.payload-cache.outputs.cache-hit != 'true'
+        uses: pnpm/action-setup@v5
+      - if: steps.payload-cache.outputs.cache-hit != 'true'
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
       - if: steps.payload-cache.outputs.cache-hit != 'true'
         run: pnpm install --frozen-lockfile
       - if: steps.payload-cache.outputs.cache-hit != 'true'
@@ -291,11 +293,6 @@ jobs:
         target: [win32-x64, win32-arm64]
     steps:
       - uses: actions/checkout@v6
-      - uses: pnpm/action-setup@v5
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 22
-          cache: pnpm
       - name: Cache runtime payload
         id: payload-cache
         uses: actions/cache@v5
@@ -313,6 +310,13 @@ jobs:
             'packages/engine/runtime/build/compile.sh',
             'packages/engine/runtime/build/compile.esm.sh'
             ) }}
+      - if: steps.payload-cache.outputs.cache-hit != 'true'
+        uses: pnpm/action-setup@v5
+      - if: steps.payload-cache.outputs.cache-hit != 'true'
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
       - if: steps.payload-cache.outputs.cache-hit != 'true'
         run: pnpm install --frozen-lockfile
       - if: steps.payload-cache.outputs.cache-hit != 'true'
