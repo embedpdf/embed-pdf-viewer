@@ -35,9 +35,15 @@ declare module 'fastify' {
     /**
      * True when the bearer matched a configured API auth token — the
      * deployment's root credential, valid on every surface. No tenant
-     * context is attached; tenant-scoped guards take it from the URL.
+     * context is attached; tenant-scoped guards take it from the URL,
+     * doc-plane guards from the document row.
      */
     apiAuth?: boolean;
+    /**
+     * Decoded `X-Document-Password`, set by the doc-plane API-token
+     * hook. Never logged; carried into `RequestJwtContext.docPassword`.
+     */
+    docPassword?: string;
   }
 }
 
@@ -267,6 +273,12 @@ export interface RequestJwtContext {
   unlockKey: string | null;
   scope: ReadonlyArray<string>;
   identity: IdentityClaims;
+  /**
+   * Per-request document password (decoded `X-Document-Password`),
+   * present only on API-token requests — backends supply the password
+   * per call instead of holding a KMS-bound viewer session.
+   */
+  docPassword?: string;
 }
 
 export function requireDocAccess(
@@ -301,7 +313,7 @@ export function requireDocAccess(
       err.status = 403;
       throw err;
     }
-    return { tenantId: t.id, sub: t.sub, mode: 'doc', jwt: jwtContext(t.claims) };
+    return { tenantId: t.id, sub: t.sub, mode: 'doc', jwt: requestJwtContext(req, t.claims) };
   }
 
   // TenantClaims path. The tenant owns every doc in their tenant
@@ -317,7 +329,7 @@ export function requireDocAccess(
     err.status = 403;
     throw err;
   }
-  return { tenantId: t.id, sub: t.sub, mode: 'tenant', jwt: jwtContext(t.claims) };
+  return { tenantId: t.id, sub: t.sub, mode: 'tenant', jwt: requestJwtContext(req, t.claims) };
 }
 
 export function requireLayerDocAccess(
@@ -384,7 +396,7 @@ export function requireDocAccessOnly(
       err.status = 403;
       throw err;
     }
-    return { tenantId: t.id, sub: t.sub, mode: 'doc', jwt: jwtContext(t.claims) };
+    return { tenantId: t.id, sub: t.sub, mode: 'doc', jwt: requestJwtContext(req, t.claims) };
   }
 
   // Tenant branch — same policy as the legacy requireDocAccess.
@@ -397,7 +409,7 @@ export function requireDocAccessOnly(
     err.status = 403;
     throw err;
   }
-  return { tenantId: t.id, sub: t.sub, mode: 'tenant', jwt: jwtContext(t.claims) };
+  return { tenantId: t.id, sub: t.sub, mode: 'tenant', jwt: requestJwtContext(req, t.claims) };
 }
 
 /**
@@ -625,6 +637,16 @@ function throwForbidden(message: string): never {
   err.code = 'Forbidden';
   err.status = 403;
   throw err;
+}
+
+/**
+ * Context builder for the doc-plane guards: the claims-derived context
+ * plus the per-request document password when the API-token hook
+ * attached one.
+ */
+function requestJwtContext(req: FastifyRequest, claims: JwtClaims): RequestJwtContext {
+  const base = jwtContext(claims);
+  return req.docPassword ? { ...base, docPassword: req.docPassword } : base;
 }
 
 function jwtContext(claims: JwtClaims): RequestJwtContext {

@@ -1,3 +1,5 @@
+import { TextDecoder } from 'node:util';
+
 import { adminOperations } from '@cloudpdf/admin-api';
 import { EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
 import compress from '@fastify/compress';
@@ -11,6 +13,7 @@ import { assertProductionSecret, requiresProductionSecrets, resolveSecret } from
 import { DbJwksCacheStore } from '../auth/JwksCacheStore';
 import {
   signDevToken,
+  type JwtClaims,
   type JwtVerifierConfig,
   type JwksCacheStore,
   type RevocationCheck,
@@ -541,6 +544,78 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
       securityEvents: new SecurityEventsRepo(opts.db),
     });
 
+    // API-token requests reach the doc plane as a synthesized
+    // tenant-mode principal for the DOC'S OWN tenant — recovered from
+    // the document row, which is an addressing lookup (storage keys and
+    // services are tenant-keyed), not an authorization decision: the
+    // API token is already root. Every existing guard then takes its
+    // tenant branch unchanged. `/v1/access` + `/v1/warm` stay JWT-only:
+    // they are viewer-session bootstrap (view metering, exp-bound CDN
+    // grants), and a root credential has no session to establish.
+    //
+    // `X-Document-Password` (base64) rides only API-token requests —
+    // backends supply encrypted-doc passwords per call; viewers keep
+    // the KMS session flow via /v1/access.
+    const documentsForApiAuth = new DocumentsRepo(opts.db);
+    app.addHook('preHandler', async (req, reply) => {
+      const passwordHeader = req.headers['x-document-password'];
+      if (!req.apiAuth) {
+        if (passwordHeader !== undefined) {
+          return reply.code(403).send({
+            error: {
+              code: 'Forbidden',
+              message: 'X-Document-Password requires the api token; viewers unlock via /v1/access',
+            },
+          });
+        }
+        return;
+      }
+      const pathname = req.url.split('?', 1)[0] ?? req.url;
+      if (pathname === '/v1/access' || pathname === '/v1/warm') {
+        return reply.code(403).send({
+          error: {
+            code: 'Forbidden',
+            message: 'the api token cannot establish viewer sessions; mint a doc token instead',
+          },
+        });
+      }
+      const docId = (req.params as { docId?: string } | undefined)?.docId;
+      if (!docId || !pathname.startsWith('/v1/docs/')) return;
+      const row = await documentsForApiAuth.findById(docId);
+      if (!row) {
+        return reply.code(404).send({
+          error: { code: 'NotFound', message: `document does not exist: ${docId}` },
+        });
+      }
+      const now = Math.floor(Date.now() / 1000);
+      req.tenant = {
+        id: row.tenantId,
+        sub: 'api-token',
+        claims: {
+          sub: 'api-token',
+          tenant_id: row.tenantId,
+          scope: ['*'],
+          iat: now,
+          // Far-future exp: the SSE auth-expiring event never fires for
+          // the root credential — its lifetime is env rotation, not a
+          // JWT clock.
+          exp: now + 10 * 365 * 24 * 60 * 60,
+        } as JwtClaims,
+      };
+      if (passwordHeader !== undefined) {
+        const decoded = decodeBase64Header(passwordHeader);
+        if (decoded === null) {
+          return reply.code(400).send({
+            error: {
+              code: 'InvalidArg',
+              message: 'X-Document-Password must be a single base64-encoded UTF-8 value',
+            },
+          });
+        }
+        req.docPassword = decoded;
+      }
+    });
+
     // Phase 3: wire the doc-scoped routes when the operator has
     // chosen a cache root. Requires the worker pool — admin-only
     // deploys (no `workerEntry`) keep the legacy admin surface and
@@ -746,6 +821,23 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
     kms: opts.kms,
     shutdown,
   };
+}
+
+/**
+ * Strict base64 decode for the `X-Document-Password` header: single
+ * value only, and the decoded text must round-trip (rejects garbage
+ * that Buffer's lenient decoder would silently mangle).
+ */
+function decodeBase64Header(value: string | string[]): string | null {
+  if (Array.isArray(value) || value.length === 0) return null;
+  const buf = Buffer.from(value, 'base64');
+  if (buf.length === 0) return null;
+  if (buf.toString('base64').replace(/=+$/, '') !== value.replace(/=+$/, '')) return null;
+  try {
+    return new TextDecoder('utf-8', { fatal: true }).decode(buf);
+  } catch {
+    return null;
+  }
 }
 
 function isReadOnlyLicenseRequest(method: string, pathname: string): boolean {
