@@ -4,7 +4,7 @@ import {
   AdminTokenIssueRequestSchema,
   AdminTokenRevokeRequestSchema,
   adminOperations,
-} from '@cloudpdf/admin-api';
+} from '@cloudpdf/contract';
 import { validateScopeArray } from '@embedpdf/engine-core/runtime';
 import type { FastifyInstance } from 'fastify';
 

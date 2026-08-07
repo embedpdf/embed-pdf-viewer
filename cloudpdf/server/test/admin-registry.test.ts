@@ -2,7 +2,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
-import { adminOperations } from '@cloudpdf/admin-api';
+import { adminOperations } from '@cloudpdf/contract';
 import {
   createSqliteDb,
   FsObjectStore,

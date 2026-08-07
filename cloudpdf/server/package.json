@@ -49,7 +49,7 @@
   ],
   "license": "SEE LICENSE IN LICENSE",
   "dependencies": {
-    "@cloudpdf/admin-api": "workspace:*",
+    "@cloudpdf/contract": "workspace:*",
     "@embedpdf/engine-core": "workspace:*",
     "@embedpdf/engine-services": "workspace:*",
     "@embedpdf/engine-runtime": "workspace:*",

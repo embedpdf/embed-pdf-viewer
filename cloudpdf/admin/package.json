@@ -42,7 +42,7 @@
   ],
   "license": "Apache-2.0",
   "dependencies": {
-    "@cloudpdf/admin-api": "workspace:*"
+    "@cloudpdf/contract": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "latest",

@@ -6,7 +6,7 @@ import {
   AdminDocumentResponseSchema,
   AdminUploadDirectResponseSchema,
   adminWirePaths,
-} from '@cloudpdf/admin-api';
+} from '@cloudpdf/contract';
 import { AdminError } from '../transport/AdminError';
 import { HttpClient } from '../transport/HttpClient';
 import type {

@@ -4,7 +4,7 @@ import {
   AdminTenantResponseSchema,
   adminWirePaths,
   type AdminTenantRecord,
-} from '@cloudpdf/admin-api';
+} from '@cloudpdf/contract';
 
 import { HttpClient } from '../transport/HttpClient';
 

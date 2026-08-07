@@ -2,7 +2,7 @@ import {
   AdminTokenIssueResponseSchema,
   adminWirePaths,
   type AdminTenantScope,
-} from '@cloudpdf/admin-api';
+} from '@cloudpdf/contract';
 
 import { HttpClient } from '../transport/HttpClient';
 

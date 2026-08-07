@@ -6,7 +6,7 @@ import {
   type AdminDocumentCommitRequest,
   type AdminDocumentInitRequest,
   type AdminOperation,
-} from '@cloudpdf/admin-api';
+} from '@cloudpdf/contract';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 
 import { requireTenantAccess } from '../../app/jwt-plugin';

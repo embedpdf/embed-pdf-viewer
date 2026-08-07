@@ -1,4 +1,4 @@
-import { AdminErrorPayloadSchema, type AdminErrorPayload } from '@cloudpdf/admin-api';
+import { AdminErrorPayloadSchema, type AdminErrorPayload } from '@cloudpdf/contract';
 
 /**
  * Error thrown by every @cloudpdf/admin call on a non-2xx HTTP response.

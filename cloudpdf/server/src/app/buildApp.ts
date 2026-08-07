@@ -1,6 +1,6 @@
 import { TextDecoder } from 'node:util';
 
-import { adminOperations } from '@cloudpdf/admin-api';
+import { adminOperations } from '@cloudpdf/contract';
 import { EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
 import compress from '@fastify/compress';
 import multipart from '@fastify/multipart';

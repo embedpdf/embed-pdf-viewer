@@ -1,4 +1,4 @@
-# @cloudpdf/admin-api
+# @cloudpdf/contract
 
 ## 3.0.0-next.0
 
