@@ -156,10 +156,22 @@ describe('buildApp secret enforcement', () => {
     ).rejects.toThrow(/JWT HS256 secret.*too short/);
   });
 
-  test('production-kind license boots with a strong hs256 secret', async () => {
+  test('production-kind license refuses a short root API token', async () => {
+    await expect(
+      buildAppForTesting({
+        licenseGate: gateWith({ licenseKind: 'subscription' }),
+        verifier: { mode: 'hs256', secret: STRONG },
+        apiAuthTokens: ['short-root-token'],
+        workerEntry: null,
+      }),
+    ).rejects.toThrow(/API authentication token 1.*too short/);
+  });
+
+  test('production-kind license boots with strong hs256 and root API secrets', async () => {
     const bundle = await buildAppForTesting({
       licenseGate: gateWith({ licenseKind: 'subscription' }),
       verifier: { mode: 'hs256', secret: STRONG },
+      apiAuthTokens: [`api-${STRONG}`],
       workerEntry: null,
     });
     try {

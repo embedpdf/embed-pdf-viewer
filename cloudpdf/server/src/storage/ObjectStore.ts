@@ -84,7 +84,7 @@ export interface ObjectStat {
  *
  * The `info` field follows the unified adapter pattern (see
  * ADAPTERS.md) — `kind` is the discriminator, other fields are
- * public identifiers safe to expose via `/v1/admin/status`.
+ * public identifiers safe to expose via `/v1/deployment/status`.
  */
 export interface ObjectStore {
   /**
@@ -204,7 +204,7 @@ export type ObjectStoreKind = 'fs' | 's3' | 'gcs' | 'azure-blob';
 /**
  * Diagnostic identity for an ObjectStore. `kind` is the discriminator;
  * other fields are public identifiers safe to expose via
- * `/v1/admin/status` — bucket names, hostnames, root paths. Never
+ * `/v1/deployment/status` — bucket names, hostnames, root paths. Never
  * secret material.
  */
 export interface ObjectStoreInfo {

@@ -10,7 +10,7 @@
   "fixed": [
     [
       "@cloudpdf/admin",
-      "@cloudpdf/admin-api",
+      "@cloudpdf/contract",
       "@cloudpdf/engine",
       "@cloudpdf/server",
       "@cloudpdf/viewer",

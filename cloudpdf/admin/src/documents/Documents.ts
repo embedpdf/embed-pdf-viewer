@@ -6,10 +6,16 @@ import {
   AdminDocumentResponseSchema,
   AdminUploadDirectResponseSchema,
   adminWirePaths,
-} from '@cloudpdf/admin-api';
+} from '@cloudpdf/contract';
 import { AdminError } from '../transport/AdminError';
 import { HttpClient } from '../transport/HttpClient';
-import type { CommitResponse, DedupMode, DocumentRecord, InitResponse } from './types';
+import type {
+  CommitResponse,
+  DedupMode,
+  DocumentRecord,
+  DocumentState,
+  InitResponse,
+} from './types';
 
 export interface DocumentCreateInput {
   /** PDF bytes. The SDK computes SHA-256 in flight. */
@@ -60,6 +66,24 @@ export interface DocumentCommitInput {
   sha256: string;
 }
 
+export interface DocumentListOptions {
+  /** Page size, 1..200 (server default 100). */
+  limit?: number;
+  /** Opaque continuation token from a previous page's `nextCursor`. */
+  cursor?: string;
+  /** Only documents currently in this lifecycle state. */
+  state?: DocumentState;
+}
+
+export interface DocumentListPage {
+  documents: DocumentRecord[];
+  /**
+   * Cursor for the next page; `null` on the last page — and when the
+   * server predates pagination, which also cannot continue.
+   */
+  nextCursor: string | null;
+}
+
 /**
  * High-level documents API. Hides the three-step `init -> PUT -> commit`
  * dance behind a single `create()` call. The escape-hatch
@@ -67,7 +91,10 @@ export interface DocumentCommitInput {
  * uppy / resumable.js / AzCopy.
  */
 export class Documents {
-  constructor(private readonly http: HttpClient) {}
+  constructor(
+    private readonly http: HttpClient,
+    private readonly tenantId: string,
+  ) {}
 
   /**
    * Single-call upload. Streams the PDF straight to cloud storage
@@ -146,14 +173,14 @@ export class Documents {
   }
 
   async init(input: DocumentInitInput): Promise<InitResponse> {
-    return this.http.postJson(adminWirePaths.documentsInit, input, (raw) =>
+    return this.http.postJson(adminWirePaths.documentsInit(this.tenantId), input, (raw) =>
       AdminDocumentInitResponseSchema.parse(raw),
     );
   }
 
   async commit(input: DocumentCommitInput): Promise<CommitResponse> {
     return this.http.postJson(
-      adminWirePaths.documentCommit(input.docId),
+      adminWirePaths.documentCommit(this.tenantId, input.docId),
       { sha256: input.sha256 },
       (raw) => AdminDocumentCommitResponseSchema.parse(raw),
     );
@@ -168,7 +195,7 @@ export class Documents {
     sha256: string;
   }> {
     return this.http.postBytesJson(
-      adminWirePaths.documentUploadDirect(input.docId),
+      adminWirePaths.documentUploadDirect(this.tenantId, input.docId),
       input.body,
       (raw) => AdminUploadDirectResponseSchema.parse(raw),
       {
@@ -181,30 +208,44 @@ export class Documents {
   }
 
   async get(docId: string): Promise<DocumentRecord> {
-    const response = await this.http.getJson(adminWirePaths.document(docId), (raw) =>
-      AdminDocumentResponseSchema.parse(raw),
+    const response = await this.http.getJson(
+      adminWirePaths.document(this.tenantId, docId),
+      (raw) => AdminDocumentResponseSchema.parse(raw),
     );
     return response.document;
   }
 
-  async list(opts: { limit?: number } = {}): Promise<DocumentRecord[]> {
+  /** One page of documents, newest first. */
+  async list(opts: DocumentListOptions = {}): Promise<DocumentListPage> {
     const params = new URLSearchParams();
     if (opts.limit !== undefined) params.set('limit', String(opts.limit));
-    const path =
-      params.size > 0 ? `${adminWirePaths.documents}?${params}` : adminWirePaths.documents;
+    if (opts.cursor !== undefined) params.set('cursor', opts.cursor);
+    if (opts.state !== undefined) params.set('state', opts.state);
+    const base = adminWirePaths.documents(this.tenantId);
+    const path = params.size > 0 ? `${base}?${params}` : base;
     const response = await this.http.getJson(path, (raw) =>
       AdminDocumentListResponseSchema.parse(raw),
     );
-    return response.documents;
+    return { documents: response.documents, nextCursor: response.nextCursor ?? null };
+  }
+
+  /** Every document, newest first, fetching pages as they are consumed. */
+  async *iterate(opts: Omit<DocumentListOptions, 'cursor'> = {}): AsyncGenerator<DocumentRecord> {
+    let cursor: string | undefined;
+    do {
+      const page = await this.list({ ...opts, cursor });
+      for (const doc of page.documents) yield doc;
+      cursor = page.nextCursor ?? undefined;
+    } while (cursor !== undefined);
   }
 
   async delete(docId: string): Promise<void> {
-    await this.http.deleteEmpty(adminWirePaths.document(docId));
+    await this.http.deleteEmpty(adminWirePaths.document(this.tenantId, docId));
   }
 
   /** Admin-side download for verification / migration tooling. */
   async download(docId: string): Promise<Uint8Array> {
-    const res = await this.http.getResponse(adminWirePaths.documentDownload(docId));
+    const res = await this.http.getResponse(adminWirePaths.documentDownload(this.tenantId, docId));
     const buf = await res.arrayBuffer();
     return new Uint8Array(buf);
   }

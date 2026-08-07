@@ -5,7 +5,7 @@
   "type": "module",
   "description": "The CloudPDF product demo: upload documents, share them as different people with different scopes, open them in the cloud viewer, and watch every wire call in the inspector. No wasm in the bundle — rendering happens on the server.",
   "scripts": {
-    "build:deps": "pnpm --filter @embedpdf/engine-core build && pnpm --filter @embedpdf/engine-services build && pnpm --filter @cloudpdf/admin-api build && pnpm --filter @cloudpdf/admin build && pnpm --filter @cloudpdf/engine build && pnpm --filter @cloudpdf/server build",
+    "build:deps": "pnpm --filter @embedpdf/engine-core build && pnpm --filter @embedpdf/engine-services build && pnpm --filter @cloudpdf/contract build && pnpm --filter @cloudpdf/admin build && pnpm --filter @cloudpdf/engine build && pnpm --filter @cloudpdf/server build",
     "dev": "pnpm run build:deps && concurrently -k -n api,ui \"pnpm run dev:api\" \"pnpm run dev:ui\"",
     "dev:api": "tsx server/dev-server.ts",
     "dev:ui": "vite --host 127.0.0.1 --port 5178",

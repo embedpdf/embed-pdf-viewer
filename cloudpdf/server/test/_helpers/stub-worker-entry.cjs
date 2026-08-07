@@ -298,6 +298,18 @@ function rejectNotOpen(msg) {
   });
 }
 
+function rejectPasswordIncorrect(msg) {
+  parentPort.postMessage({
+    kind: 'reject',
+    jobId: msg.jobId,
+    error: {
+      name: 'EngineError',
+      message: 'incorrect document password',
+      code: 'DocPasswordIncorrect',
+    },
+  });
+}
+
 function rejectAnnotationNotFound(msg) {
   parentPort.postMessage({
     kind: 'reject',
@@ -358,14 +370,24 @@ parentPort.on('message', (msg) => {
       const bytes = msg.basePath ? readFileSync(msg.basePath) : Buffer.alloc(0);
       const pageCount = bytes.byteLength > 0 ? bytes[0] : 0;
       openDocs.set(sessionKey(msg), { pageCount, ...layerMeta(msg) });
-      parentPort.postMessage({
-        kind: 'resolve',
-        jobId: msg.jobId,
-        result: { tag: 'open', docId: msg.docId, security: openSecurity() },
-      });
+      const resolveOpen = () =>
+        parentPort.postMessage({
+          kind: 'resolve',
+          jobId: msg.jobId,
+          result: { tag: 'open', docId: msg.docId, security: openSecurity() },
+        });
+      // Deterministic singleflight seam for the API-password integration
+      // test: keep the canonical open in flight long enough for a second
+      // caller with a different password to join it.
+      if (msg.docId === 'docapisingleflight') setTimeout(resolveOpen, 100);
+      else resolveOpen();
       return;
     }
     case 'document.checkPasswordPermissions': {
+      if (msg.password === 'api-wrong-password') {
+        rejectPasswordIncorrect(msg);
+        return;
+      }
       parentPort.postMessage({
         kind: 'resolve',
         jobId: msg.jobId,

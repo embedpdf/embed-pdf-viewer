@@ -1,3 +1,5 @@
+import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
+
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import {
   checkAnyCapability,
@@ -30,6 +32,18 @@ import { AuthFailureLimiter, type AuthFailureLimiterOptions } from './auth-failu
 declare module 'fastify' {
   interface FastifyRequest {
     tenant?: { id: string; sub: string; claims: JwtClaims };
+    /**
+     * True when the bearer matched a configured API auth token — the
+     * deployment's root credential, valid on every surface. No tenant
+     * context is attached; tenant-scoped guards take it from the URL,
+     * doc-plane guards from the document row.
+     */
+    apiAuth?: boolean;
+    /**
+     * Decoded `X-Document-Password`, set by the doc-plane API-token
+     * hook. Never logged; carried into `RequestJwtContext.docPassword`.
+     */
+    docPassword?: string;
   }
 }
 
@@ -43,6 +57,14 @@ export interface JwtPluginOptions {
   verifier: JwtVerifierConfig | { secret: string };
   /** Routes that should bypass authentication (e.g. health checks). */
   publicPaths?: ReadonlyArray<string>;
+  /**
+   * Static API auth tokens (the deployment's root credential). A
+   * bearer that matches any of these — compared in constant time via
+   * process-local keyed digests — authenticates as `req.apiAuth`
+   * without JWT verification. A list so rotation is overlap-then-retire.
+   * Empty or absent disables the credential (JWT-only deployment).
+   */
+  apiAuthTokens?: ReadonlyArray<string>;
   /**
    * Throttle on authentication FAILURES per client IP (never on
    * successful traffic — valid tokens are not counted). A source over
@@ -70,6 +92,8 @@ function asConfig(input: JwtPluginOptions['verifier']): JwtVerifierConfig {
 export async function registerJwtAuth(app: FastifyInstance, opts: JwtPluginOptions): Promise<void> {
   const verifier: JwtVerifier = createJwtVerifier(asConfig(opts.verifier));
   const publics = new Set(opts.publicPaths ?? []);
+  const apiTokens = (opts.apiAuthTokens ?? []).filter((t) => t.length > 0);
+  const matchesApiToken = createApiTokenMatcher(apiTokens);
   const limiter =
     opts.authFailureLimit === false
       ? null
@@ -100,6 +124,12 @@ export async function registerJwtAuth(app: FastifyInstance, opts: JwtPluginOptio
       return;
     }
     const token = auth.slice('Bearer '.length).trim();
+
+    if (matchesApiToken(token)) {
+      req.apiAuth = true;
+      return;
+    }
+
     try {
       const claims = await verifier.verify(token);
       req.tenant = { id: claims.tenant_id, sub: claims.sub, claims };
@@ -112,6 +142,74 @@ export async function registerJwtAuth(app: FastifyInstance, opts: JwtPluginOptio
       return;
     }
   });
+}
+
+/**
+ * Build a constant-time membership check once at registration. HMAC gives
+ * `timingSafeEqual` fixed-size inputs without treating an API credential as
+ * a stored password hash. The random comparison key and candidate digests
+ * live only for this app instance, and every candidate is checked on every
+ * request (no early exit on match).
+ */
+function createApiTokenMatcher(tokens: ReadonlyArray<string>): (presented: string) => boolean {
+  if (tokens.length === 0) return () => false;
+
+  const comparisonKey = randomBytes(32);
+  const digest = (token: string): Buffer =>
+    createHmac('sha256', comparisonKey).update(token).digest();
+  const candidateDigests = tokens.map(digest);
+
+  return (presented: string): boolean => {
+    const presentedDigest = digest(presented);
+    let matched = false;
+    for (const candidateDigest of candidateDigests) {
+      if (timingSafeEqual(presentedDigest, candidateDigest)) matched = true;
+    }
+    return matched;
+  };
+}
+
+export interface TenantAccessContext {
+  tenantId: string;
+  sub: string;
+  via: 'api-token' | 'tenant-jwt';
+}
+
+/**
+ * The one-rule auth model for tenant-scoped routes: the API token is
+ * valid for any tenant; a tenant JWT only for the tenant its
+ * `tenant_id` names — the path tenant must match, and at least one of
+ * `wanted` scopes (or `*`) must be held. Doc-scoped tokens are always
+ * rejected.
+ */
+export function requireTenantAccess(
+  req: FastifyRequest,
+  tenantId: string,
+  wanted: ReadonlyArray<TenantScope>,
+): TenantAccessContext {
+  if (req.apiAuth) {
+    return { tenantId, sub: 'api-token', via: 'api-token' };
+  }
+  const ctx = requireScope(req, wanted);
+  if (ctx.tenantId !== tenantId) {
+    const err = new Error(
+      `token is for tenant "${ctx.tenantId}", path names tenant "${tenantId}"`,
+    ) as Error & { code: string; status: number };
+    err.code = 'Forbidden';
+    err.status = 403;
+    throw err;
+  }
+  return { tenantId, sub: ctx.sub, via: 'tenant-jwt' };
+}
+
+/** Deployment-surface guard: the root credential only, never a JWT. */
+export function requireApiToken(req: FastifyRequest): void {
+  if (!req.apiAuth) {
+    const err = new Error('api token required') as Error & { code: string; status: number };
+    err.code = 'Forbidden';
+    err.status = 403;
+    throw err;
+  }
 }
 
 export function requireTenant(req: FastifyRequest): string {
@@ -186,6 +284,12 @@ export interface RequestJwtContext {
   unlockKey: string | null;
   scope: ReadonlyArray<string>;
   identity: IdentityClaims;
+  /**
+   * Per-request document password (decoded `X-Document-Password`),
+   * present only on API-token requests — backends supply the password
+   * per call instead of holding a KMS-bound viewer session.
+   */
+  docPassword?: string;
 }
 
 export function requireDocAccess(
@@ -220,7 +324,7 @@ export function requireDocAccess(
       err.status = 403;
       throw err;
     }
-    return { tenantId: t.id, sub: t.sub, mode: 'doc', jwt: jwtContext(t.claims) };
+    return { tenantId: t.id, sub: t.sub, mode: 'doc', jwt: requestJwtContext(req, t.claims) };
   }
 
   // TenantClaims path. The tenant owns every doc in their tenant
@@ -236,7 +340,7 @@ export function requireDocAccess(
     err.status = 403;
     throw err;
   }
-  return { tenantId: t.id, sub: t.sub, mode: 'tenant', jwt: jwtContext(t.claims) };
+  return { tenantId: t.id, sub: t.sub, mode: 'tenant', jwt: requestJwtContext(req, t.claims) };
 }
 
 export function requireLayerDocAccess(
@@ -303,7 +407,7 @@ export function requireDocAccessOnly(
       err.status = 403;
       throw err;
     }
-    return { tenantId: t.id, sub: t.sub, mode: 'doc', jwt: jwtContext(t.claims) };
+    return { tenantId: t.id, sub: t.sub, mode: 'doc', jwt: requestJwtContext(req, t.claims) };
   }
 
   // Tenant branch — same policy as the legacy requireDocAccess.
@@ -316,7 +420,7 @@ export function requireDocAccessOnly(
     err.status = 403;
     throw err;
   }
-  return { tenantId: t.id, sub: t.sub, mode: 'tenant', jwt: jwtContext(t.claims) };
+  return { tenantId: t.id, sub: t.sub, mode: 'tenant', jwt: requestJwtContext(req, t.claims) };
 }
 
 /**
@@ -544,6 +648,16 @@ function throwForbidden(message: string): never {
   err.code = 'Forbidden';
   err.status = 403;
   throw err;
+}
+
+/**
+ * Context builder for the doc-plane guards: the claims-derived context
+ * plus the per-request document password when the API-token hook
+ * attached one.
+ */
+function requestJwtContext(req: FastifyRequest, claims: JwtClaims): RequestJwtContext {
+  const base = jwtContext(claims);
+  return req.docPassword ? { ...base, docPassword: req.docPassword } : base;
 }
 
 function jwtContext(claims: JwtClaims): RequestJwtContext {

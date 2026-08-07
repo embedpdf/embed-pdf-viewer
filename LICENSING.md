@@ -9,7 +9,7 @@ self-hostable CloudPDF server — is **Fair Source**, under the
 | Code                                                                                                  | Where                          | License                                      |
 | ----------------------------------------------------------------------------------------------------- | ------------------------------ | -------------------------------------------- |
 | EmbedPDF SDK (`@embedpdf/*`)                                                                          | `packages/`                    | Apache-2.0                                   |
-| CloudPDF client libraries (`@cloudpdf/engine`, `@cloudpdf/viewer*`, `@cloudpdf/admin`, `…/admin-api`) | `cloudpdf/`                    | Apache-2.0                                   |
+| CloudPDF client libraries (`@cloudpdf/engine`, `@cloudpdf/viewer*`, `@cloudpdf/admin`, `…/contract`) | `cloudpdf/`                    | Apache-2.0                                   |
 | CloudPDF server (`@cloudpdf/server`)                                                                  | `cloudpdf/server/`             | FCL-1.0-ALv2                                 |
 | Websites                                                                                              | `website/`, `cloudpdf/website` | Apache-2.0 code; content per their `LICENSE` |
 | Examples & tooling                                                                                    | `examples/`, `tooling/`        | Apache-2.0                                   |

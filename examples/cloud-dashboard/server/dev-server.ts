@@ -301,12 +301,12 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
 
   if (req.method === 'GET' && url.pathname === '/api/documents') {
     const tenantId = url.searchParams.get('tenantId') || defaultTenant;
-    const [docs, counts] = [
+    const [page, counts] = [
       await adminForTenant(tenantId).documents.list({ limit: 100 }),
       shares.countByDoc(tenantId),
     ];
     sendJson(res, 200, {
-      documents: docs.map((doc) => toDemoDocument(doc, counts.get(doc.id) ?? 0)),
+      documents: page.documents.map((doc) => toDemoDocument(doc, counts.get(doc.id) ?? 0)),
     });
     return;
   }
@@ -452,7 +452,7 @@ function adminForTenant(tenantId: string) {
   return createCloudAdmin({
     baseUrl: engineBaseUrl,
     tenantToken: tenantTokenFor(tenantId),
-  });
+  }).tenant(tenantId);
 }
 
 function tenantTokenFor(tenantId: string): string {

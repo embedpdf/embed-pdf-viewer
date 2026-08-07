@@ -156,7 +156,7 @@ describe('requireScope — Layer 3 (tenant route guard)', () => {
     });
     const claims = await verify(tok);
     expect(requireScope(fakeReq(claims), ['docs.delete']).tenantId).toBe('t');
-    expect(requireScope(fakeReq(claims), ['tokens.mint']).tenantId).toBe('t');
+    expect(requireScope(fakeReq(claims), ['tokens.issue-doc']).tenantId).toBe('t');
   });
 
   test('rejects a doc-scoped token reaching a tenant route', async () => {
@@ -272,7 +272,7 @@ describe('requireDocAccess — Layer 3 (doc route guard, legacy helper)', () => 
     const tok = signDevToken(SECRET, {
       sub: 'u',
       tenant_id: 't',
-      scope: ['tokens.mint'],
+      scope: ['tokens.issue-doc'],
     });
     const claims = await verify(tok);
     expect(() => requireDocAccess(fakeReq(claims), 'doc-1', ['doc.open'])).toThrow(

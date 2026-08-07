@@ -113,7 +113,7 @@ export {
   FormFieldPatchSchema,
   FormValueEntrySchema,
 } from './forms/schema';
-export { DEFAULT_LAYER_NAME, wirePaths } from './wire/paths';
+export { DEFAULT_LAYER_NAME, wirePaths, wireTemplates } from './wire/paths';
 // General resource catalog + route-guard helper (server uses this for
 // every read endpoint, not just CDN-cacheable ones).
 export { checkResourceAccess, DOC_RESOURCES } from './wire/resources';

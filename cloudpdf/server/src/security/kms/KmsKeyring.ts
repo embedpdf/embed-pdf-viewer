@@ -28,7 +28,7 @@ export interface DataKey {
  * (matches `KmsConfig.kind`); `keyId` is the runtime key identifier
  * (e.g., an AWS ARN, GCP resource name, Azure key URL, or static
  * label). Additional fields are public identifiers safe to expose via
- * `/v1/admin/status` — region, vault URL, etc. NEVER include secret
+ * `/v1/deployment/status` — region, vault URL, etc. NEVER include secret
  * material.
  */
 export interface KmsKeyringInfo {

@@ -1,14 +1,24 @@
+import { TextDecoder } from 'node:util';
+
+import { adminOperations } from '@cloudpdf/contract';
 import { EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
 import compress from '@fastify/compress';
 import multipart from '@fastify/multipart';
 import Fastify, { type FastifyInstance } from 'fastify';
 import type { Kysely } from 'kysely';
 
-import { registerJwtAuth, requireScope } from './jwt-plugin';
+import { registerJwtAuth, requireApiToken } from './jwt-plugin';
 import type { AuthFailureLimiterOptions } from './auth-failure-limiter';
 import { assertProductionSecret, requiresProductionSecrets, resolveSecret } from './secret-policy';
 import { DbJwksCacheStore } from '../auth/JwksCacheStore';
-import type { JwtVerifierConfig, RevocationCheck, JwksCacheStore } from '../auth/JwtVerifier';
+import {
+  signDevToken,
+  type JwtClaims,
+  type JwtVerifierConfig,
+  type JwksCacheStore,
+  type RevocationCheck,
+  type SignDevTokenInput,
+} from '../auth/JwtVerifier';
 import { RevokedJtisGuard } from '../auth/RevokedJtisGuard';
 import { NoneCdnSigner } from '../cdn/adapters/NoneCdnSigner';
 import type { CdnSigner } from '../cdn/CdnSigner';
@@ -20,6 +30,7 @@ import { WorkerThreadPool, type FallbackFontDescriptor } from '../runtime/Worker
 import { BaseFileCache } from '../storage/BaseFileCache';
 import type { ObjectStoreWithInfo } from '../storage/ObjectStore';
 import { PdfPasswordVerificationsRepo } from '../db/repos/pdf_password_verifications.repo';
+import { SecurityEventsRepo } from '../db/repos/security-events.repo';
 import { TenantsRepo } from '../db/repos/tenants.repo';
 import { DocumentPagesRepo, LayerPagesRepo, LayersRepo } from '../db/repos/page_state.repo';
 import { WeakAnnotationSessionsRepo } from '../db/repos/weak_annotation_sessions.repo';
@@ -42,6 +53,7 @@ import { registerPageRoutes } from '../routes/pages';
 import { registerRedactionRoutes } from '../routes/redactions';
 import { registerSearchRoutes } from '../routes/search';
 import { registerAdminDocumentsRoutes } from '../routes/admin/documents';
+import { registerAdminTenantsRoutes } from '../routes/admin/tenants';
 import { registerAdminTokensRoutes } from '../routes/admin/tokens';
 import { SharpImageEncoder } from '../render/SharpImageEncoder';
 import type { KmsKeyring } from '../security';
@@ -70,6 +82,13 @@ export interface BuildAppOptions {
    * deployments, or RS/ES/JWKS modes for production IdP integration.
    */
   verifier: JwtVerifierConfig;
+  /**
+   * Static API auth tokens (the deployment's root credential, valid on
+   * every surface). A list so rotation is overlap-then-retire. Empty or
+   * absent disables the credential entirely. Production licenses require
+   * every configured token to be a random secret of at least 32 bytes.
+   */
+  apiAuthTokens?: ReadonlyArray<string>;
   /**
    * If true and `db` is supplied, wire a `RevokedJtisGuard` into the
    * verifier so revoked `jti`s are rejected at request time. Off by
@@ -123,7 +142,7 @@ export interface BuildAppOptions {
   authFailureLimit?: Partial<AuthFailureLimiterOptions> | false;
   /**
    * Optional Kysely DB handle. When supplied together with `objectStore`,
-   * the admin routes under `/v1/admin/*` are registered. Engine-only
+   * the tenant/deployment admin surfaces are registered. Engine-only
    * deployments can omit both.
    */
   db?: Kysely<Schema>;
@@ -392,8 +411,19 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
       option: 'verifier.secret',
     });
   }
+  const apiAuthTokens = (opts.apiAuthTokens ?? []).filter((token) => token.length > 0);
+  if (enforceProductionSecrets) {
+    for (const [index, token] of apiAuthTokens.entries()) {
+      assertProductionSecret(token, {
+        name: `API authentication token ${index + 1}`,
+        envVar: 'CLOUDPDF_API_AUTH_TOKENS',
+        option: `apiAuthTokens[${index}]`,
+      });
+    }
+  }
   await registerJwtAuth(app, {
     verifier: verifierConfig,
+    ...(apiAuthTokens.length > 0 ? { apiAuthTokens } : {}),
     ...(opts.authFailureLimit !== undefined ? { authFailureLimit: opts.authFailureLimit } : {}),
   });
 
@@ -422,13 +452,20 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
     return { license, status: 'ok' };
   });
   app.get('/v1/license/status', async () => opts.licenseGate.getStatus());
-  app.get('/v1/admin/license/status', async (request) => {
-    requireScope(request, ['docs.read']);
-    return {
-      license: opts.licenseGate.getStatus(),
-      reporting: opts.usageReporter ? await opts.usageReporter.status() : null,
-      usage: usageMeters ? await usageMeters.snapshot() : null,
-    };
+  // Deployment surface: API token only — license state, reporting, and
+  // meters are deployment-global, so no tenant credential may read them.
+  const licenseStatusOp = adminOperations['license.status'];
+  app.route({
+    method: licenseStatusOp.method,
+    url: licenseStatusOp.path,
+    handler: async (request) => {
+      requireApiToken(request);
+      return {
+        license: opts.licenseGate.getStatus(),
+        reporting: opts.usageReporter ? await opts.usageReporter.status() : null,
+        usage: usageMeters ? await usageMeters.snapshot() : null,
+      };
+    },
   });
 
   // Drift detection at boot. Production deployments should supply
@@ -499,9 +536,96 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
       lifecycle,
       storage: opts.objectStore,
     });
-    if (revokedJtisGuard) {
-      await registerAdminTokensRoutes(app, { guard: revokedJtisGuard });
-    }
+    await registerAdminTenantsRoutes(app, {
+      tenants: new TenantsRepo(opts.db),
+      storage: opts.objectStore,
+    });
+    // Issue mounts only when the deployment can sign (HS256 — the
+    // verifier secret doubles as signing material); revoke only when
+    // revocation is enabled. Both write security_events.
+    const verifierForSigning = opts.verifier;
+    await registerAdminTokensRoutes(app, {
+      ...(revokedJtisGuard ? { guard: revokedJtisGuard } : {}),
+      ...(verifierForSigning.mode === 'hs256'
+        ? {
+            sign: (input: SignDevTokenInput) => signDevToken(verifierForSigning.secret, input),
+          }
+        : {}),
+      documents: new DocumentsRepo(opts.db),
+      securityEvents: new SecurityEventsRepo(opts.db),
+    });
+
+    // API-token requests reach the doc plane as a synthesized
+    // tenant-mode principal for the DOC'S OWN tenant — recovered from
+    // the document row, which is an addressing lookup (storage keys and
+    // services are tenant-keyed), not an authorization decision: the
+    // API token is already root. Every existing guard then takes its
+    // tenant branch unchanged. `/v1/access` + `/v1/warm` stay JWT-only:
+    // they are viewer-session bootstrap (view metering, exp-bound CDN
+    // grants), and a root credential has no session to establish.
+    //
+    // `X-Document-Password` (base64) rides only API-token requests —
+    // backends supply encrypted-doc passwords per call; viewers keep
+    // the KMS session flow via /v1/access.
+    const documentsForApiAuth = new DocumentsRepo(opts.db);
+    app.addHook('preHandler', async (req, reply) => {
+      const passwordHeader = req.headers['x-document-password'];
+      if (!req.apiAuth) {
+        if (passwordHeader !== undefined) {
+          return reply.code(403).send({
+            error: {
+              code: 'Forbidden',
+              message: 'X-Document-Password requires the api token; viewers unlock via /v1/access',
+            },
+          });
+        }
+        return;
+      }
+      const pathname = req.url.split('?', 1)[0] ?? req.url;
+      if (pathname === '/v1/access' || pathname === '/v1/warm') {
+        return reply.code(403).send({
+          error: {
+            code: 'Forbidden',
+            message: 'the api token cannot establish viewer sessions; mint a doc token instead',
+          },
+        });
+      }
+      const docId = (req.params as { docId?: string } | undefined)?.docId;
+      if (!docId || !pathname.startsWith('/v1/docs/')) return;
+      const row = await documentsForApiAuth.findById(docId);
+      if (!row) {
+        return reply.code(404).send({
+          error: { code: 'NotFound', message: `document does not exist: ${docId}` },
+        });
+      }
+      const now = Math.floor(Date.now() / 1000);
+      req.tenant = {
+        id: row.tenantId,
+        sub: 'api-token',
+        claims: {
+          sub: 'api-token',
+          tenant_id: row.tenantId,
+          scope: ['*'],
+          iat: now,
+          // Far-future exp: the SSE auth-expiring event never fires for
+          // the root credential — its lifetime is env rotation, not a
+          // JWT clock.
+          exp: now + 10 * 365 * 24 * 60 * 60,
+        } as JwtClaims,
+      };
+      if (passwordHeader !== undefined) {
+        const decoded = decodeBase64Header(passwordHeader);
+        if (decoded === null) {
+          return reply.code(400).send({
+            error: {
+              code: 'InvalidArg',
+              message: 'X-Document-Password must be a single base64-encoded UTF-8 value',
+            },
+          });
+        }
+        req.docPassword = decoded;
+      }
+    });
 
     // Phase 3: wire the doc-scoped routes when the operator has
     // chosen a cache root. Requires the worker pool — admin-only
@@ -708,6 +832,56 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
     kms: opts.kms,
     shutdown,
   };
+}
+
+/**
+ * Strict base64 decode for the `X-Document-Password` header: single,
+ * bounded value only, with valid optional padding and a canonical
+ * round-trip (rejects garbage that Buffer's lenient decoder would
+ * silently mangle).
+ */
+const MAX_DOCUMENT_PASSWORD_HEADER_LENGTH = 4_096;
+
+function removeBase64Padding(value: string): string | null {
+  let end = value.length;
+  while (end > 0 && value.charCodeAt(end - 1) === 0x3d) end--;
+
+  const paddingLength = value.length - end;
+  if (paddingLength > 2) return null;
+
+  const unpadded = value.slice(0, end);
+  if (unpadded.includes('=')) return null;
+
+  // Unpadded base64 is accepted. If the caller includes padding, it must
+  // have exactly the length required by the final four-character block.
+  const remainder = unpadded.length % 4;
+  if (remainder === 1) return null;
+  const requiredPadding = remainder === 0 ? 0 : 4 - remainder;
+  if (paddingLength !== 0 && paddingLength !== requiredPadding) return null;
+
+  return unpadded;
+}
+
+function decodeBase64Header(value: string | string[]): string | null {
+  if (
+    Array.isArray(value) ||
+    value.length === 0 ||
+    value.length > MAX_DOCUMENT_PASSWORD_HEADER_LENGTH
+  ) {
+    return null;
+  }
+
+  const canonicalInput = removeBase64Padding(value);
+  if (canonicalInput === null) return null;
+
+  const buf = Buffer.from(canonicalInput, 'base64');
+  if (buf.length === 0) return null;
+  if (removeBase64Padding(buf.toString('base64')) !== canonicalInput) return null;
+  try {
+    return new TextDecoder('utf-8', { fatal: true }).decode(buf);
+  } catch {
+    return null;
+  }
 }
 
 function isReadOnlyLicenseRequest(method: string, pathname: string): boolean {

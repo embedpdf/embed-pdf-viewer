@@ -116,7 +116,13 @@ export type JwtClaims = TenantClaims | DocUserClaims;
  * superset wildcard. New scopes go here and have to be plumbed
  * through `requireScope` at every tenant route guard.
  */
-export type TenantScope = '*' | 'docs.create' | 'docs.read' | 'docs.delete' | 'tokens.mint';
+export type TenantScope =
+  | '*'
+  | 'docs.create'
+  | 'docs.read'
+  | 'docs.delete'
+  | 'tokens.issue-doc'
+  | 'tokens.revoke';
 
 /**
  * Doc-scope strings on the wire. After the scope-vocabulary migration

@@ -31,6 +31,8 @@ export interface TenantsTable {
   name: string;
   config_json: string | null;
   created_at: number;
+  /** 1 when the namespace materialized on first use rather than via explicit create. */
+  auto_provisioned: number;
 }
 
 export interface DocumentsTable {
@@ -226,6 +228,25 @@ export interface PdfPasswordSessionsTable {
   auth_tag: Buffer;
 }
 
+/**
+ * Append-only auth-control-plane history: token issuance and
+ * revocation. Never the doc-mutation audit_log (that backs viewer SSE)
+ * and never GC'd (unlike revoked_jtis). tenant_id has no FK — the
+ * trail survives tenant deletion.
+ */
+export interface SecurityEventsTable {
+  tenant_id: string;
+  kind: string;
+  jti: string | null;
+  doc_id: string | null;
+  scope_json: string;
+  actor: string;
+  via: string;
+  reason: string | null;
+  expires_at: number | null;
+  created_at: number;
+}
+
 export interface SchemaMigrationsTable {
   /** Monotonically-increasing version (zero-padded for lexical sort). */
   version: string;
@@ -321,7 +342,7 @@ export interface LicenseOperationLeaseTable {
  * INSERT/SELECT differences via the `Generated<T>` brand.
  */
 export interface Database {
-  tenants: TenantsTable & { created_at: Generated<number> };
+  tenants: TenantsTable & { created_at: Generated<number>; auto_provisioned: Generated<number> };
   documents: DocumentsTable & {
     created_at: Generated<number>;
     updated_at: Generated<number>;
@@ -335,6 +356,7 @@ export interface Database {
   audit_exports: AuditExportsTable;
   pdf_password_verifications: PdfPasswordVerificationsTable;
   pdf_password_sessions: PdfPasswordSessionsTable;
+  security_events: SecurityEventsTable & { id: Generated<number> };
   schema_migrations: SchemaMigrationsTable;
   revoked_jtis: RevokedJtisTable;
   jwks_cache: JwksCacheTable;

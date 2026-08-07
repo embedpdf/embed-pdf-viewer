@@ -72,6 +72,11 @@ import { UsageMeters } from '../licensing/UsageMeters';
  *   CLOUDPDF_REALTIME       in-process        (opt OUT of LISTEN/NOTIFY; postgres
  *                                              defaults to cross-replica delivery)
  *   CLOUDPDF_JWT_SECRET    (default: dev secret — allowed only on development licenses)
+ *   CLOUDPDF_API_AUTH_TOKENS  comma-separated static root credentials, valid on
+ *                             every surface; a list so rotation is
+ *                             overlap-then-retire. Each token must be >= 32
+ *                             bytes under a production license. Unset =
+ *                             JWT-only deployment.
  *   CLOUDPDF_PASSWORD_VERIFICATION_HMAC_SECRET / CLOUDPDF_PASSWORD_SESSION_SERVER_SECRET
  *                          (>= 32 bytes; required with a production license)
  *   CLOUDPDF_TRUST_PROXY   1|hops|CSV of proxy IPs (real client IPs behind a LB)
@@ -272,6 +277,7 @@ function printHelp(): void {
       '    CLOUDPDF_STORAGE_S3_BUCKET, CLOUDPDF_STORAGE_S3_REGION, CLOUDPDF_STORAGE_S3_ENDPOINT',
       '  Auth',
       '    CLOUDPDF_JWT_SECRET    HS256 secret, >= 32 bytes (required with a production license)',
+      '    CLOUDPDF_API_AUTH_TOKENS  comma-separated root tokens, each >= 32 bytes in production',
       '    CLOUDPDF_PASSWORD_VERIFICATION_HMAC_SECRET   >= 32 bytes (required with a production license)',
       '    CLOUDPDF_PASSWORD_SESSION_SERVER_SECRET      >= 32 bytes (required with a production license + KMS)',
       '    CLOUDPDF_PASSWORD_SESSION_SERVER_SECRET_ID   secret rotation id (default: dev-v1)',
@@ -639,6 +645,10 @@ async function cmdServe(): Promise<void> {
       '[cloudpdf-server] WARNING: CLOUDPDF_JWT_SECRET not set, using insecure dev secret',
     );
   }
+  const API_AUTH_TOKENS = (process.env['CLOUDPDF_API_AUTH_TOKENS'] ?? '')
+    .split(',')
+    .map((t) => t.trim())
+    .filter((t) => t.length > 0);
   const FAIL_ON_PENDING = process.env['CLOUDPDF_FAIL_ON_PENDING'] === '1';
   const AUTO_PROVISION_TENANT = process.env['CLOUDPDF_AUTO_PROVISION_TENANT'] === '1';
   const CACHE_ROOT = process.env['CLOUDPDF_CACHE_ROOT'] ?? './data/cache';
@@ -748,6 +758,7 @@ async function cmdServe(): Promise<void> {
       licenseGate: licenseRuntime,
       ...(usageReporter ? { usageReporter } : {}),
       verifier: { mode: 'hs256', secret: JWT_SECRET },
+      ...(API_AUTH_TOKENS.length > 0 ? { apiAuthTokens: API_AUTH_TOKENS } : {}),
       workerEntry: WORKER_ENTRY_URL,
       fallbackFonts: loadFallbackFontsFromEnv(),
       db: dbCtx.db,

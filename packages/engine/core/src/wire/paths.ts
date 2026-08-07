@@ -498,3 +498,32 @@ export const wirePaths = {
    */
   docWarm: '/v1/warm',
 } as const;
+
+/**
+ * Fastify-style templates for the PLAIN (unversioned) doc-plane routes —
+ * the backend-callable subset that the `@cloudpdf/contract` contract
+ * documents. The immutable `@{version}` variants above remain viewer
+ * protocol and are deliberately absent. These templates are the single
+ * statement of those paths: the contract package imports them, and the
+ * server's route table is pinned to them by the doc-plane registry
+ * conformance test.
+ */
+export const wireTemplates = {
+  docHead: '/v1/docs/:docId/head',
+  layerManifest: '/v1/docs/:docId/layers/:layerName/manifest',
+  layerMetadata: '/v1/docs/:docId/layers/:layerName/metadata',
+  layerRenderPage: '/v1/docs/:docId/layers/:layerName/render/pages/:pon/data',
+  layerTextPage: '/v1/docs/:docId/layers/:layerName/text/pages/:pon/data',
+  layerAnnotationItems: '/v1/docs/:docId/layers/:layerName/annotations/pages/:pon/items',
+  layerAnnotationItem: '/v1/docs/:docId/layers/:layerName/annotations/pages/:pon/items/:annotKey',
+  layerForm: '/v1/docs/:docId/layers/:layerName/form',
+  layerFormFieldValue: '/v1/docs/:docId/layers/:layerName/form/fields/:fieldKey/value',
+  layerFormFieldReset: '/v1/docs/:docId/layers/:layerName/form/fields/:fieldKey/reset',
+  layerFormData: '/v1/docs/:docId/layers/:layerName/form/data',
+  layerPagesMove: '/v1/docs/:docId/layers/:layerName/pages/move',
+  layerPagesRotate: '/v1/docs/:docId/layers/:layerName/pages/rotate',
+  layerPagesDelete: '/v1/docs/:docId/layers/:layerName/pages/delete',
+  layerPagesFlatten: '/v1/docs/:docId/layers/:layerName/pages/flatten',
+  layerRedactionsApply: '/v1/docs/:docId/layers/:layerName/redactions/apply',
+  layerDownload: '/v1/docs/:docId/layers/:layerName/download',
+} as const;

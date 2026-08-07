@@ -237,30 +237,65 @@ export class DocumentService {
     password: string | null = null,
   ): Promise<DocumentHead> {
     const cached = this.heads.get(docId);
-    if (cached) {
-      if (
-        !password &&
-        cached.encryption.state === 'encrypted' &&
-        cached.encryption.requiresPassword === true
-      ) {
-        // Bind to the token's PINNED layer, not 'default': a session
-        // unlocked for layer "alice" must authorize alice's shared base
-        // reads. Execution targets the base session; authorization follows
-        // the claimed layer.
-        await this.assertPasswordSession(ctx, docId, pinnedLayerName(ctx));
-      }
+    // An unprotected warm session needs no password authorization. An
+    // explicit password is the viewer `/v1/access` bootstrap path: its
+    // caller validates that password immediately after ensuring the
+    // canonical session exists.
+    if (
+      cached &&
+      (password !== null ||
+        cached.encryption.state !== 'encrypted' ||
+        cached.encryption.requiresPassword !== true)
+    ) {
       return cached;
     }
-    const inflight = this.opens.get(docId);
-    if (inflight) return inflight;
-    const promise = this.doOpen(ctx, docId, password);
-    this.opens.set(docId, promise);
-    try {
-      const head = await promise;
-      this.heads.set(docId, head);
-      return head;
-    } finally {
-      this.opens.delete(docId);
+
+    const row = await this.requireReadyRow(ctx, docId);
+    // Resolve and authorize THIS caller before consulting either the warm
+    // session cache (`heads`) or the open singleflight (`opens`). Neither
+    // shared map says anything about the caller's password.
+    const openPassword = password ?? (await this.passwordForOpen(ctx, row, pinnedLayerName(ctx)));
+
+    const authorizedCached = this.heads.get(docId);
+    if (authorizedCached) return authorizedCached;
+    return this.openCanonicalDocument(row, openPassword);
+  }
+
+  /**
+   * Ensure the one canonical base session is open. A caller may join an
+   * existing open only after its own authorization has completed. If the
+   * other opener fails (for example, it supplied a wrong password), this
+   * caller retries with its own credential instead of inheriting that
+   * unrelated failure.
+   */
+  private async openCanonicalDocument(
+    row: DocumentRow,
+    password: string | null,
+  ): Promise<DocumentHead> {
+    for (;;) {
+      const cached = this.heads.get(row.id);
+      if (cached) return cached;
+
+      const inflight = this.opens.get(row.id);
+      if (inflight) {
+        try {
+          return await inflight;
+        } catch {
+          // The failed promise belonged to another caller. Once its
+          // compare-and-delete cleanup runs, retry with our credential.
+          continue;
+        }
+      }
+
+      const promise = this.doOpen(row, password);
+      this.opens.set(row.id, promise);
+      try {
+        const head = await promise;
+        this.heads.set(row.id, head);
+        return head;
+      } finally {
+        if (this.opens.get(row.id) === promise) this.opens.delete(row.id);
+      }
     }
   }
 
@@ -295,10 +330,10 @@ export class DocumentService {
    * Precedence (one source of truth per caller, per moment):
    *   1. Unencrypted doc                  → DB row bits
    *   2. Encrypted doc + active session   → session.pdf_permissions_bits
-   *   3. Encrypted doc + no session       → DB row bits (typically
-   *      null/restrictive); the route's `assertPasswordSession` guard
-   *      refuses the request before any work happens, so this path is
-   *      defensive rather than expected.
+   *   3. Encrypted doc + no viewer session → DB row bits (typically
+   *      null/restrictive); the downstream base/layer open door refuses
+   *      the request before dispatching PDF work. API-token calls are
+   *      stateless and authorize their header password at that same door.
    *
    * `securityFingerprint` is part of the session binding, so a
    * re-uploaded PDF (changes the fingerprint) automatically invalidates
@@ -354,17 +389,9 @@ export class DocumentService {
     return head;
   }
 
-  private async doOpen(
-    ctx: OpenContext,
-    docId: string,
-    password: string | null = null,
-  ): Promise<DocumentHead> {
-    const row = await this.requireReadyRow(ctx, docId);
+  private async doOpen(row: DocumentRow, password: string | null = null): Promise<DocumentHead> {
+    const docId = row.id;
     const baseSha = requireBaseSha(row);
-    // Password-session lookup follows the token's pinned layer:
-    // the base session is one shared materialization, but the credential
-    // that authorizes opening it belongs to the CLAIMED layer.
-    const openPassword = password ?? (await this.passwordForOpen(ctx, row, pinnedLayerName(ctx)));
 
     let handle: LocalFileHandle | null = await this.cache.acquire({
       sha: baseSha,
@@ -379,7 +406,7 @@ export class DocumentService {
           baseKey: baseSha,
           basePath: handle!.path,
           layer: { kind: 'fresh' as const },
-          password: openPassword,
+          password,
         });
       const result = await this.pool.runOpen(docId, baseSha, build);
       if (result.tag !== 'open') {
@@ -444,8 +471,8 @@ export class DocumentService {
     layerName: string,
   ): Promise<DocumentManifest> {
     const row = await this.requireReadyRow(ctx, docId);
-    await this.assertPasswordSession(ctx, docId, layerName);
-    const head = await this.openOnPool(ctx, docId, await this.passwordForOpen(ctx, row, layerName));
+    const password = await this.passwordForOpen(ctx, row, layerName);
+    const head = await this.openOnPool(ctx, docId, password);
     const layer = await this.layerState.repos.layers.findByDocAndName(docId, layerName);
     if (!layer) {
       const pages = await this.layerState.ensureBasePages(docId, () =>
@@ -610,12 +637,16 @@ export class DocumentService {
     password: string | null = null,
   ): Promise<void> {
     const key = layerSessionKey(docId, layerName);
-    if (!password) await this.assertPasswordSession(ctx, docId, layerName);
+    const row = await this.requireReadyRow(ctx, docId);
+    // Authorization must happen before the layer-session freshness cache
+    // can return. A fresh worker session belongs to the document, not to
+    // the caller that happened to open it.
+    const openPassword = password ?? (await this.passwordForOpen(ctx, row, layerName));
     // Let any in-flight open/reload settle before judging freshness.
     const existing = this.layerOpens.get(key);
     if (existing) await existing.catch(() => undefined);
     if (this.layerSessionVersions.get(key) === currentVersion) return;
-    await this.reloadLayerOnPool(ctx, docId, layerName, password);
+    await this.reloadLayerOnPool(ctx, docId, layerName, openPassword);
   }
 
   /** Mark a layer session stale: the next fresh-ensure reloads it. */
@@ -855,17 +886,8 @@ export class DocumentService {
     mode: 'any' | 'owner',
     now: number,
   ): Promise<UnlockLayerAccessResult | null> {
-    if (!this.passwordVerifications) return null;
-
-    const cached = await this.passwordVerifications.findValid({
-      tenantId: ctx.tenantId,
-      docId: row.id,
-      baseSha: requireBaseSha(row),
-      securityFingerprint: securityFingerprint(row),
-      password,
-    });
+    const cached = await this.findCachedPasswordVerification(ctx, row, password, mode);
     if (!cached) return null;
-    this.assertPasswordMode(mode, cached.openedAs);
 
     const probe = securityInfoFromCachedVerification(cached);
     await this.persistPasswordSession(ctx, binding, password, factsFromCachedVerification(cached));
@@ -874,6 +896,31 @@ export class DocumentService {
       this.issuePasswordGrant(binding, ctx, now),
       this.boundSessionExpiry(ctx, now, this.passwordSessionTtlMs),
     );
+  }
+
+  /**
+   * Authentication-neutral lookup of a verified password proof. The proof
+   * is bound to tenant + document + base SHA + security fingerprint +
+   * password, but deliberately not to a JWT. Viewer callers layer their
+   * JWT-bound password session on top; API-token callers use the proof
+   * directly for this request.
+   */
+  private async findCachedPasswordVerification(
+    ctx: OpenContext,
+    row: DocumentRow,
+    password: string,
+    mode: 'any' | 'owner',
+  ): Promise<PasswordVerificationRow | null> {
+    if (!this.passwordVerifications) return null;
+    const cached = await this.passwordVerifications.findValid({
+      tenantId: ctx.tenantId,
+      docId: row.id,
+      baseSha: requireBaseSha(row),
+      securityFingerprint: securityFingerprint(row),
+      password,
+    });
+    if (cached) this.assertPasswordMode(mode, cached.openedAs);
+    return cached;
   }
 
   /**
@@ -922,12 +969,41 @@ export class DocumentService {
     now: number,
   ): Promise<UnlockLayerAccessResult> {
     await this.ensureLayerOnPool(ctx, row.id, layerName, password);
+    const { probe, facts } = await this.checkPasswordOnOpenDocument(
+      ctx,
+      row,
+      password,
+      mode,
+      layerName,
+    );
+    await this.persistPasswordSession(ctx, binding, password, facts);
+
+    return this.accessResultFromProbe(
+      probe,
+      this.issuePasswordGrant(binding, ctx, now),
+      this.boundSessionExpiry(ctx, now, this.passwordSessionTtlMs),
+    );
+  }
+
+  /**
+   * Validate a candidate against an already-open PDFium session without
+   * mutating that session's active password or permissions. The runtime
+   * command uses `CheckPasswordNoMutate`; this is the cache-miss path for
+   * both viewer unlock and stateless API-token authorization.
+   */
+  private async checkPasswordOnOpenDocument(
+    ctx: OpenContext,
+    row: DocumentRow,
+    password: string,
+    mode: 'any' | 'owner',
+    layerName?: string,
+  ): Promise<{ probe: DocumentSecurityProbeInfo; facts: PasswordSessionFacts }> {
     const result = await this.pool.run(row.id, (jobId) =>
       wirePack({
         kind: 'document.checkPasswordPermissions' as const,
         jobId,
         docId: row.id,
-        layerName,
+        ...(layerName !== undefined ? { layerName } : {}),
         password,
         mode,
       }),
@@ -941,7 +1017,13 @@ export class DocumentService {
     this.assertPasswordMode(mode, result.security.pdfOpenedAs ?? 'none');
 
     const facts = factsFromProbe(result.security);
-    if (facts && this.passwordVerifications) {
+    if (!facts) {
+      throw new EngineError(
+        EngineErrorCode.WireFormat,
+        'password verification returned no PDF permission facts',
+      );
+    }
+    if (this.passwordVerifications) {
       await this.passwordVerifications.upsert(
         {
           tenantId: ctx.tenantId,
@@ -953,15 +1035,7 @@ export class DocumentService {
         facts,
       );
     }
-    if (facts) {
-      await this.persistPasswordSession(ctx, binding, password, facts);
-    }
-
-    return this.accessResultFromProbe(
-      result.security,
-      this.issuePasswordGrant(binding, ctx, now),
-      this.boundSessionExpiry(ctx, now, this.passwordSessionTtlMs),
-    );
+    return { probe: result.security, facts };
   }
 
   private assertPasswordMode(mode: 'any' | 'owner', openedAs: 'none' | 'user' | 'owner'): void {
@@ -986,13 +1060,7 @@ export class DocumentService {
   async assertPasswordSession(ctx: OpenContext, docId: string, layerName: string): Promise<void> {
     const row = await this.requireReadyRow(ctx, docId);
     if (!requiresPasswordSession(row)) return;
-    this.requirePasswordSessionInfrastructure();
-    const session = await this.passwordSessions!.findActive(
-      this.passwordSessionBinding(ctx, row, layerName),
-    );
-    if (!session) {
-      throw new EngineError(EngineErrorCode.DocPasswordRequired, 'document password required');
-    }
+    await this.passwordForOpen(ctx, row, layerName);
   }
 
   private async passwordForOpen(
@@ -1001,6 +1069,29 @@ export class DocumentService {
     layerName: string,
   ): Promise<string | null> {
     if (!requiresPasswordSession(row)) return null;
+
+    // API-token requests are stateless. A matching HMAC proof authorizes
+    // the request immediately; on a miss, validate against the one live
+    // canonical PDFium session (opening that same session if the document
+    // is cold), then populate the proof cache. No JWT session is created.
+    if (ctx.sub === 'api-token') {
+      const password = ctx.jwt?.docPassword;
+      if (!password) {
+        throw new EngineError(
+          EngineErrorCode.DocPasswordRequired,
+          'document is password-protected: supply X-Document-Password (base64) with the api token',
+        );
+      }
+      const cached = await this.findCachedPasswordVerification(ctx, row, password, 'any');
+      if (cached) return password;
+
+      await this.openCanonicalDocument(row, password);
+      await this.checkPasswordOnOpenDocument(ctx, row, password, 'any');
+      return password;
+    }
+
+    // Viewer requests keep the JWT-bound, KMS-encrypted password-session
+    // flow established by `/v1/access`.
     this.requirePasswordSessionInfrastructure();
     const binding = this.passwordSessionBinding(ctx, row, layerName);
     const password = await this.passwordSessions!.decryptActivePassword(
@@ -1143,7 +1234,6 @@ export class DocumentService {
     mode: PdfSaveMode,
     signal?: AbortSignal,
   ): Promise<SavedPdfFile> {
-    await this.assertPasswordSession(ctx, docId, layerName);
     await this.ensureLayerOnPool(ctx, docId, layerName);
     const dir = await mkdtemp(join(tmpdir(), 'embedpdf-download-'));
     const path = join(dir, `${safeFilePart(docId)}-${safeFilePart(layerName)}.pdf`);

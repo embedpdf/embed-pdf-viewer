@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { flatten, unflatten } from '../../../packages/engine-core/src/wire/flatten';
+import { flatten, unflatten } from '@embedpdf/engine-core/wire';
 
 describe('flatten / unflatten', () => {
   test('flat scalars pass through', () => {
