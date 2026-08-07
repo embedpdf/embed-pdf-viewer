@@ -1,4 +1,5 @@
 import { Documents } from './documents/Documents';
+import { Tenants } from './tenants/Tenants';
 import { HttpClient, type HttpClientOptions } from './transport/HttpClient';
 
 export interface CloudAdminOptions extends HttpClientOptions {
@@ -38,10 +39,14 @@ export class TenantClient {
  * mode of operation here.
  */
 export class CloudAdmin {
+  /** The /v1/tenants collection — lifecycle, API-token only. */
+  readonly tenants: Tenants;
+
   private readonly http: HttpClient;
 
   private constructor(http: HttpClient) {
     this.http = http;
+    this.tenants = new Tenants(http);
   }
 
   /** Tenant-scoped view. Synchronous — pure URL addressing, no minting. */

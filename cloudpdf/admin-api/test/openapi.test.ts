@@ -20,7 +20,9 @@ describe('operation registry', () => {
   test('every operation lives on a known surface with a coherent credential set', () => {
     for (const op of Object.values(adminOperations)) {
       expect(
-        op.path.startsWith('/v1/tenants/') || op.path.startsWith('/v1/deployment/'),
+        op.path === '/v1/tenants' ||
+          op.path.startsWith('/v1/tenants/') ||
+          op.path.startsWith('/v1/deployment/'),
         op.path,
       ).toBe(true);
       expect(op.credentials.length).toBeGreaterThan(0);
@@ -67,6 +69,10 @@ describe('operation registry', () => {
     );
     expect(sub(adminOperations['tokens.revoke'].path)).toBe(adminWirePaths.tokenRevoke(tid, jti));
     expect(adminOperations['license.status'].path).toBe(adminWirePaths.deploymentLicenseStatus);
+    expect(adminOperations['tenants.create'].path).toBe(adminWirePaths.tenants);
+    expect(adminOperations['tenants.list'].path).toBe(adminWirePaths.tenants);
+    expect(sub(adminOperations['tenants.get'].path)).toBe(adminWirePaths.tenant(tid));
+    expect(sub(adminOperations['tenants.delete'].path)).toBe(adminWirePaths.tenant(tid));
   });
 });
 

@@ -127,7 +127,9 @@ export class DocumentLifecycleService {
   }
 
   async init(input: InitInput): Promise<InitResult> {
-    if (this.autoProvisionTenant) await this.tenants.ensure({ id: input.tenantId });
+    if (this.autoProvisionTenant) {
+      await this.tenants.ensure({ id: input.tenantId, autoProvisioned: true });
+    }
 
     const dedupMode: DedupMode = input.dedupMode ?? 'always-create';
 

@@ -31,6 +31,8 @@ export interface TenantsTable {
   name: string;
   config_json: string | null;
   created_at: number;
+  /** 1 when the namespace materialized on first use rather than via explicit create. */
+  auto_provisioned: number;
 }
 
 export interface DocumentsTable {
@@ -321,7 +323,7 @@ export interface LicenseOperationLeaseTable {
  * INSERT/SELECT differences via the `Generated<T>` brand.
  */
 export interface Database {
-  tenants: TenantsTable & { created_at: Generated<number> };
+  tenants: TenantsTable & { created_at: Generated<number>; auto_provisioned: Generated<number> };
   documents: DocumentsTable & {
     created_at: Generated<number>;
     updated_at: Generated<number>;

@@ -367,6 +367,122 @@ export function runAdminE2e(dialect: AdminE2eDialectFixture): void {
     });
   });
 
+  describe(`Tenants collection [${dialect.label}]`, () => {
+    let fx: Fixture;
+
+    beforeAll(async () => {
+      fx = await buildFixture();
+    });
+    afterAll(async () => {
+      await tearDown(fx);
+    });
+
+    test('explicit create is ensure-style and marks provenance', async () => {
+      const root = createCloudAdmin({ baseUrl: fx.baseUrl, apiToken: API_TOKEN });
+
+      const first = await root.tenants.create({ id: 'acme', name: 'Acme Corp' });
+      expect(first.created).toBe(true);
+      expect(first.tenant.id).toBe('acme');
+      expect(first.tenant.name).toBe('Acme Corp');
+      expect(first.tenant.autoProvisioned).toBe(false);
+
+      const second = await root.tenants.create({ id: 'acme' });
+      expect(second.created).toBe(false);
+      expect(second.tenant.name).toBe('Acme Corp');
+    });
+
+    test('invalid tenant id is a 400, not a namespace', async () => {
+      const root = createCloudAdmin({ baseUrl: fx.baseUrl, apiToken: API_TOKEN });
+      let err: AdminError | undefined;
+      try {
+        await root.tenants.create({ id: 'has spaces!' });
+      } catch (e) {
+        err = e as AdminError;
+      }
+      expect(err?.status).toBe(400);
+    });
+
+    test('auto-provisioned tenants carry the marker', async () => {
+      const admin = createCloudAdmin({
+        baseUrl: fx.baseUrl,
+        tenantToken: adminToken('tenant-auto-mark'),
+      }).tenant('tenant-auto-mark');
+      await admin.documents.create({ bytes: fakePdf(70, 300) });
+
+      const root = createCloudAdmin({ baseUrl: fx.baseUrl, apiToken: API_TOKEN });
+      const record = await root.tenants.get('tenant-auto-mark');
+      expect(record.autoProvisioned).toBe(true);
+    });
+
+    test('list paginates with cursors and iterate drains it', async () => {
+      const root = createCloudAdmin({ baseUrl: fx.baseUrl, apiToken: API_TOKEN });
+      const ids = ['pg-a', 'pg-b', 'pg-c', 'pg-d', 'pg-e'];
+      for (const id of ids) await root.tenants.create({ id });
+
+      const firstPage = await root.tenants.list({ limit: 2 });
+      expect(firstPage.tenants.length).toBe(2);
+      expect(firstPage.nextCursor).not.toBeNull();
+
+      const seen: string[] = [];
+      for await (const tenant of root.tenants.iterate({ limit: 2 })) {
+        seen.push(tenant.id);
+      }
+      for (const id of ids) expect(seen).toContain(id);
+      expect(new Set(seen).size).toBe(seen.length);
+    });
+
+    test('delete cascades: documents, stored bytes, and the tenant itself', async () => {
+      const admin = createCloudAdmin({
+        baseUrl: fx.baseUrl,
+        tenantToken: adminToken('tenant-cascade'),
+      }).tenant('tenant-cascade');
+      const doc = await admin.documents.create({ bytes: fakePdf(71, 700) });
+      const key = StorageKeys.basePdf('tenant-cascade', doc.document.id);
+      expect(await fx.store.stat(key)).not.toBeNull();
+
+      const root = createCloudAdmin({ baseUrl: fx.baseUrl, apiToken: API_TOKEN });
+      await root.tenants.delete('tenant-cascade');
+
+      expect(await fx.store.stat(key)).toBeNull();
+
+      let getErr: AdminError | undefined;
+      try {
+        await root.tenants.get('tenant-cascade');
+      } catch (e) {
+        getErr = e as AdminError;
+      }
+      expect(getErr?.status).toBe(404);
+
+      let docErr: AdminError | undefined;
+      try {
+        await root.tenant('tenant-cascade').documents.get(doc.document.id);
+      } catch (e) {
+        docErr = e as AdminError;
+      }
+      expect(docErr?.status).toBe(404);
+
+      let delErr: AdminError | undefined;
+      try {
+        await root.tenants.delete('tenant-cascade');
+      } catch (e) {
+        delErr = e as AdminError;
+      }
+      expect(delErr?.status).toBe(404);
+    });
+
+    test('the collection is api-token only', async () => {
+      const res = await fetch(`${fx.baseUrl}/v1/tenants`, {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${adminToken('tenant-a')}`,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ id: 'sneaky' }),
+      });
+      expect(res.status).toBe(403);
+    });
+  });
+
   describe(`Admin documents list pagination [${dialect.label}]`, () => {
     let fx: Fixture;
 

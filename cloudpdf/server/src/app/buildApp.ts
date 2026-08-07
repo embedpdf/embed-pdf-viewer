@@ -43,6 +43,7 @@ import { registerPageRoutes } from '../routes/pages';
 import { registerRedactionRoutes } from '../routes/redactions';
 import { registerSearchRoutes } from '../routes/search';
 import { registerAdminDocumentsRoutes } from '../routes/admin/documents';
+import { registerAdminTenantsRoutes } from '../routes/admin/tenants';
 import { registerAdminTokensRoutes } from '../routes/admin/tokens';
 import { SharpImageEncoder } from '../render/SharpImageEncoder';
 import type { KmsKeyring } from '../security';
@@ -512,6 +513,10 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
     });
     await registerAdminDocumentsRoutes(app, {
       lifecycle,
+      storage: opts.objectStore,
+    });
+    await registerAdminTenantsRoutes(app, {
+      tenants: new TenantsRepo(opts.db),
       storage: opts.objectStore,
     });
     if (revokedJtisGuard) {

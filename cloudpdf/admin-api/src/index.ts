@@ -230,6 +230,52 @@ export const AdminLicenseStatusResponseSchema = z.object({
 });
 export type AdminLicenseStatusResponse = z.infer<typeof AdminLicenseStatusResponseSchema>;
 
+export const AdminTenantRecordSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  /** True when the namespace materialized on first use rather than via explicit create. */
+  autoProvisioned: z.boolean(),
+  createdAt: z.number(),
+});
+export type AdminTenantRecord = z.infer<typeof AdminTenantRecordSchema>;
+
+export const AdminTenantCreateRequestSchema = z.object({
+  id: z.string().regex(tenantIdPattern),
+  /** Display name; defaults to the id. */
+  name: z.string().min(1).max(256).optional(),
+});
+export type AdminTenantCreateRequest = z.infer<typeof AdminTenantCreateRequestSchema>;
+
+export const AdminTenantCreateResponseSchema = z.object({
+  tenant: AdminTenantRecordSchema,
+  /** False when the tenant already existed — create is ensure-style. */
+  created: z.boolean(),
+});
+export type AdminTenantCreateResponse = z.infer<typeof AdminTenantCreateResponseSchema>;
+
+export const AdminTenantResponseSchema = z.object({
+  tenant: AdminTenantRecordSchema,
+});
+export type AdminTenantResponse = z.infer<typeof AdminTenantResponseSchema>;
+
+export const AdminTenantListQuerySchema = z.object({
+  limit: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(ADMIN_DOCUMENT_LIST_MAX_LIMIT)
+    .default(ADMIN_DOCUMENT_LIST_DEFAULT_LIMIT),
+  cursor: z.string().min(1).optional(),
+});
+export type AdminTenantListQuery = z.infer<typeof AdminTenantListQuerySchema>;
+
+export const AdminTenantListResponseSchema = z.object({
+  tenants: z.array(AdminTenantRecordSchema),
+  /** Opaque cursor for the next page; `null` on the last page. */
+  nextCursor: z.string().nullable().optional(),
+});
+export type AdminTenantListResponse = z.infer<typeof AdminTenantListResponseSchema>;
+
 // ---------------------------------------------------------------------------
 // Operation registry
 // ---------------------------------------------------------------------------
@@ -319,6 +365,60 @@ export interface AdminOperation {
 }
 
 export const adminOperations = {
+  'tenants.create': {
+    operationId: 'tenants.create',
+    summary: 'Create a tenant, or confirm it already exists — ensure-style, idempotent.',
+    method: 'POST',
+    path: adminWirePaths.tenants,
+    credentials: ['api-token'],
+    scope: [],
+    body: { contentType: 'application/json', schema: AdminTenantCreateRequestSchema },
+    responses: {
+      200: { contentType: 'application/json', schema: AdminTenantCreateResponseSchema },
+      400: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+    },
+  },
+  'tenants.list': {
+    operationId: 'tenants.list',
+    summary: 'List tenants, newest first, cursor-paginated.',
+    method: 'GET',
+    path: adminWirePaths.tenants,
+    credentials: ['api-token'],
+    scope: [],
+    query: AdminTenantListQuerySchema,
+    responses: {
+      200: { contentType: 'application/json', schema: AdminTenantListResponseSchema },
+      400: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+    },
+  },
+  'tenants.get': {
+    operationId: 'tenants.get',
+    summary: 'Fetch one tenant record.',
+    method: 'GET',
+    path: '/v1/tenants/:tenantId',
+    credentials: ['api-token'],
+    scope: [],
+    params: AdminTenantParamsSchema,
+    responses: {
+      200: { contentType: 'application/json', schema: AdminTenantResponseSchema },
+      404: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+    },
+  },
+  'tenants.delete': {
+    operationId: 'tenants.delete',
+    summary: 'Delete a tenant and everything under it.',
+    method: 'DELETE',
+    path: '/v1/tenants/:tenantId',
+    credentials: ['api-token'],
+    scope: [],
+    params: AdminTenantParamsSchema,
+    responses: {
+      204: {},
+      404: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+    },
+    notes:
+      'Destroys the tenant and everything in its namespace — documents, layers, stored bytes, audit history. Irreversible.',
+  },
   'documents.init': {
     operationId: 'documents.init',
     summary: 'Begin an upload: create (or resume/dedupe) a pending document and issue upload access.',

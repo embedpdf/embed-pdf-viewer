@@ -19,6 +19,13 @@ export type {
   DocumentInitInput,
   DocumentCommitInput,
 } from './documents/Documents';
+export { Tenants } from './tenants/Tenants';
+export type {
+  TenantCreateInput,
+  TenantCreateResult,
+  TenantListOptions,
+  TenantListPage,
+} from './tenants/Tenants';
 export { HttpClient } from './transport/HttpClient';
 export type { HttpClientOptions, RequestOptions } from './transport/HttpClient';
 export { AdminError } from './transport/AdminError';
