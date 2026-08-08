@@ -31,8 +31,7 @@ export const adminWirePaths = {
   tenants: '/v1/tenants',
   tenant: (tenantId: string) => `/v1/tenants/${encodeURIComponent(tenantId)}`,
   documents: (tenantId: string) => `/v1/tenants/${encodeURIComponent(tenantId)}/documents`,
-  documentsInit: (tenantId: string) =>
-    `/v1/tenants/${encodeURIComponent(tenantId)}/documents/init`,
+  documentsInit: (tenantId: string) => `/v1/tenants/${encodeURIComponent(tenantId)}/documents/init`,
   document: (tenantId: string, docId: string) =>
     `/v1/tenants/${encodeURIComponent(tenantId)}/documents/${encodeURIComponent(docId)}`,
   documentCommit: (tenantId: string, docId: string) =>
@@ -518,7 +517,8 @@ export const adminOperations = {
   },
   'documents.init': {
     operationId: 'documents.init',
-    summary: 'Begin an upload: create (or resume/dedupe) a pending document and issue upload access.',
+    summary:
+      'Begin an upload: create (or resume/dedupe) a pending document and issue upload access.',
     method: 'POST',
     path: '/v1/tenants/:tenantId/documents/init',
     credentials: ['api-token', 'tenant-jwt'],
@@ -630,8 +630,8 @@ export const adminOperations = {
       404: { contentType: 'application/json', schema: AdminThumbnailUnavailablePayloadSchema },
     },
   },
-  'license.status': {
-    operationId: 'license.status',
+  'deployment.licenseStatus': {
+    operationId: 'deployment.licenseStatus',
     summary: 'License decision plus usage-reporting and meter snapshots for this deployment.',
     method: 'GET',
     path: adminWirePaths.deploymentLicenseStatus,
@@ -667,7 +667,11 @@ export const adminOperations = {
     credentials: ['api-token', 'tenant-jwt'],
     scope: ['tokens.revoke'],
     params: AdminTenantJtiParamsSchema,
-    body: { contentType: 'application/json', schema: AdminTokenRevokeRequestSchema, required: false },
+    body: {
+      contentType: 'application/json',
+      schema: AdminTokenRevokeRequestSchema,
+      required: false,
+    },
     responses: {
       204: {},
       400: { contentType: 'application/json', schema: AdminErrorPayloadSchema },

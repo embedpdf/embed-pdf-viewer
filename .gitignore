@@ -24,3 +24,6 @@ temp/
 # Local environment files
 **/.env*
 !**/.env.example
+
+# Local Fern SDK generation output (CI uploads validated artifacts; never commit this tree)
+/sdks/
