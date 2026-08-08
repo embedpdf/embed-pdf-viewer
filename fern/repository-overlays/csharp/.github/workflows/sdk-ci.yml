@@ -17,4 +17,4 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '9.0.x'
-      - run: dotnet build src/CloudpdfApi/CloudpdfApi.csproj -c Release -f net8.0
+      - run: dotnet build src/CloudPDF/CloudPDF.csproj -c Release -f net8.0

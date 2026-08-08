@@ -5,6 +5,7 @@ import { copyFileSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import { LANGUAGES, mapSdkVersion, readCanonicalVersion } from './sdk-version.mjs';
+import { normalizeSdkBranding } from './sdk-branding.mjs';
 
 const language = process.argv[2];
 if (!LANGUAGES.includes(language)) {
@@ -45,6 +46,7 @@ writeFileSync(
 );
 
 copyFileSync(`${repositoryDirectory}cloudpdf/contract/LICENSE`, `${outputDirectory}/LICENSE`);
+normalizeSdkBranding(outputDirectory, language);
 
 // The Ruby generator intentionally leaves registry metadata in its generated
 // custom.gemspec.rb hook. Fill that hook deterministically until each SDK has
@@ -69,7 +71,7 @@ end
 // prerelease SDKs fail to compile. Preserve the NuGet package version and use a
 // stable numeric binary version for the current major/minor/patch line.
 if (language === 'csharp') {
-  const projectPath = `${outputDirectory}/src/CloudpdfApi/CloudpdfApi.csproj`;
+  const projectPath = `${outputDirectory}/src/CloudPDF/CloudPDF.csproj`;
   const numericBinaryVersion = `${canonicalVersion.split('-')[0]}.0`;
   const project = readFileSync(projectPath, 'utf8')
     .replace(

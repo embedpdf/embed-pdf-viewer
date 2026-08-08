@@ -19,3 +19,8 @@ jobs:
           ruby-version: '3.3'
       - run: ruby -e 'Dir["lib/**/*.rb"].each { |file| RubyVM::InstructionSequence.compile_file(file) }'
       - run: gem build cloudpdf.gemspec --output /tmp/cloudpdf-ruby.gem
+      - name: Verify packaged require graph
+        run: |
+          ruby_gem_home="$(mktemp -d)"
+          gem install /tmp/cloudpdf-ruby.gem --local --no-document --install-dir "$ruby_gem_home"
+          GEM_HOME="$ruby_gem_home" GEM_PATH="$ruby_gem_home" ruby -e 'require "cloudpdf"; abort "CloudPDF::Client was not packaged" unless defined?(CloudPDF::Client)'

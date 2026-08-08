@@ -19,6 +19,39 @@ published by this workflow.
 | Java       | `embedpdf/cloudpdf-sdk-java`       |
 | Ruby       | `embedpdf/cloudpdf-sdk-ruby`       |
 
+## Public package identities
+
+CloudPDF is treated as an indivisible brand name in generated documentation,
+namespaces, modules, and root client types. Registry identifiers still follow
+each ecosystem's casing and scoping conventions.
+
+| SDK        | Package identity                         | Primary client                           |
+| ---------- | ---------------------------------------- | ---------------------------------------- |
+| TypeScript | `@cloudpdf/sdk`                          | `CloudPDFClient`                         |
+| Python     | `cloudpdf`                               | `CloudPDFClient` / `AsyncCloudPDFClient` |
+| PHP        | `cloudpdf/sdk`                           | `CloudPDF\CloudPDFClient`                |
+| .NET       | `CloudPDF`                               | `CloudPDF.CloudPDFClient`                |
+| Go         | `github.com/embedpdf/cloudpdf-sdk-go/v3` | idiomatic `NewClient`                    |
+| Java       | `com.cloudpdf:sdk`                       | `com.cloudpdf.api.CloudPDFClient`        |
+| Ruby       | `cloudpdf`                               | `CloudPDF::Client`                       |
+
+Fern derives some human-readable branding and identifiers from its lowercase
+organization slug. The required post-generation metadata step therefore
+structurally normalizes generated README titles, descriptions, and visible code
+without rewriting link destinations. It also corrects PHP's non-configurable
+base exception casing, removes Fern's stale PHP formatter caches, and separates
+Ruby's lowercase gem and require identity (`cloudpdf`) from its public module
+(`CloudPDF`). Generator configuration controls all other public code
+identifiers.
+
+Validation recursively checks generated text and paths. Every case-insensitive
+brand match must use the registry form `cloudpdf` or the public form `CloudPDF`;
+Markdown link destinations and binary files are excluded. The PHP build also
+proves Composer PSR-4 loading by constructing both renamed exception classes.
+The Ruby build installs the generated gem into an isolated `GEM_HOME` and
+requires `cloudpdf`, proving the packaged require graph rather than only the
+source checkout.
+
 The normal pull-request and `main` triggers are read-only validation. The
 release workflow calls the same generation workflow with repository sync
 enabled only after the multi-architecture server manifest exists and passes

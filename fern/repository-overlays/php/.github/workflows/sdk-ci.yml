@@ -20,3 +20,10 @@ jobs:
           tools: composer
       - run: find src -type f -name '*.php' -print0 | xargs -0 -P 4 -n1 php -l >/dev/null
       - run: composer validate --no-check-publish --no-interaction
+      - name: Verify packaged autoloading
+        run: |
+          php_package_test="$(mktemp -d)"
+          tar --exclude=.git --exclude=vendor -cf - . | tar -xf - -C "$php_package_test"
+          cd "$php_package_test"
+          composer dump-autoload --no-dev --no-interaction --optimize --strict-psr --quiet
+          php -r "require 'vendor/autoload.php'; \$base = new CloudPDF\Exceptions\CloudPDFException('test'); \$api = new CloudPDF\Exceptions\CloudPDFApiException('test', 500, null); if (!(\$base instanceof Exception) || !(\$api instanceof CloudPDF\Exceptions\CloudPDFException)) { throw new RuntimeException('CloudPDF exception autoload verification failed'); }"
