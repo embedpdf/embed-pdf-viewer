@@ -454,7 +454,7 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
   app.get('/v1/license/status', async () => opts.licenseGate.getStatus());
   // Deployment surface: API token only — license state, reporting, and
   // meters are deployment-global, so no tenant credential may read them.
-  const licenseStatusOp = adminOperations['license.status'];
+  const licenseStatusOp = adminOperations['deployment.licenseStatus'];
   app.route({
     method: licenseStatusOp.method,
     url: licenseStatusOp.path,

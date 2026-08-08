@@ -107,6 +107,12 @@ jobs:
       - name: Verify license security
         run: pnpm --filter @cloudpdf/server exec vitest run test/licensing.test.ts
 
+      # The version PR regenerates openapi.json through `pnpm ci:version`.
+      # Keep a release-time guard as well so a stale committed contract can
+      # never reach npm, the server image, or downstream SDK repositories.
+      - name: Verify CloudPDF contract and OpenAPI freshness
+        run: pnpm --filter @cloudpdf/contract test
+
       - name: Build packages
         run: pnpm run build:release
 
@@ -167,6 +173,7 @@ jobs:
           # GA: remove the "(next)" suffixes; the publish command stays the same.
           commit: 'chore: version packages (next)'
           title: 'chore: version packages (next)'
+          version: pnpm ci:version
           publish: pnpm ci:publish
           createGithubReleases: false
 
@@ -399,3 +406,17 @@ jobs:
 
       - name: Verify manifest
         run: docker buildx imagetools inspect 'ghcr.io/embedpdf/cloudpdf-server:${{ steps.ver.outputs.version }}'
+
+  # Generated SDK source is synchronized only after the exact server image is
+  # available and verified. The called workflow still does not publish to any
+  # package registry; it opens one generated-source PR per language repository.
+  sync-sdks:
+    needs: merge-image
+    if: vars.SDK_REPOSITORY_SYNC_ENABLED == 'true'
+    uses: ./.github/workflows/sdk-generate.yml
+    with:
+      sync_repositories: true
+      auto_merge: ${{ vars.SDK_AUTO_MERGE == 'true' }}
+    secrets:
+      SDK_RELEASE_APP_ID: ${{ secrets.SDK_RELEASE_APP_ID }}
+      SDK_RELEASE_APP_PRIVATE_KEY: ${{ secrets.SDK_RELEASE_APP_PRIVATE_KEY }}

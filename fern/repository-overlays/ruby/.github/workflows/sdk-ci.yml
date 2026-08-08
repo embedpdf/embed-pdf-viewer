@@ -1,0 +1,21 @@
+name: SDK CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build and validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+      - run: ruby -e 'Dir["lib/**/*.rb"].each { |file| RubyVM::InstructionSequence.compile_file(file) }'
+      - run: gem build cloudpdf.gemspec --output /tmp/cloudpdf-ruby.gem

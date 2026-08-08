@@ -1,0 +1,258 @@
+name: SDK Generate
+
+# Every trigger generates, validates, builds, and uploads publication-free SDK
+# source artifacts. A release may additionally call this workflow after the
+# server image is verified to open generated-source PRs in the SDK repositories.
+# No package registry credentials are used here.
+
+on:
+  workflow_call:
+    inputs:
+      languages:
+        description: 'Comma-separated subset (default: all)'
+        required: false
+        type: string
+        default: 'typescript,python,php,csharp,go,java,ruby'
+      sync_repositories:
+        description: 'Open or update SDK repository pull requests'
+        required: false
+        type: boolean
+        default: false
+      auto_merge:
+        description: 'Enable native GitHub auto-merge on generated pull requests'
+        required: false
+        type: boolean
+        default: false
+    secrets:
+      SDK_RELEASE_APP_ID:
+        required: false
+      SDK_RELEASE_APP_PRIVATE_KEY:
+        required: false
+  workflow_dispatch:
+    inputs:
+      languages:
+        description: 'Comma-separated subset (default: all)'
+        required: false
+        type: string
+        default: 'typescript,python,php,csharp,go,java,ruby'
+      sync_repositories:
+        description: 'Open/update repository PRs (requires a released server image)'
+        required: false
+        type: boolean
+        default: false
+      auto_merge:
+        description: 'Enable auto-merge after repository requirements pass'
+        required: false
+        type: boolean
+        default: false
+  pull_request:
+    paths:
+      - 'cloudpdf/contract/**'
+      - 'fern/**'
+      - '.github/workflows/sdk-generate.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'cloudpdf/contract/**'
+      - 'fern/**'
+      - '.github/workflows/sdk-generate.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sdk-generate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  version-policy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node --test fern/scripts/sdk-version.test.mjs fern/scripts/sdk-repositories.test.mjs
+
+  generate:
+    needs: version-policy
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [typescript, python, php, csharp, go, java, ruby]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Select language
+        id: select
+        env:
+          LANGUAGE: ${{ matrix.language }}
+          REQUESTED: ${{ inputs.languages || 'typescript,python,php,csharp,go,java,ruby' }}
+        run: |
+          normalized=",${REQUESTED//[[:space:]]/},"
+          if [[ "$normalized" == *",$LANGUAGE,"* ]]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install Fern CLI
+        if: steps.select.outputs.enabled == 'true'
+        run: npm install -g fern-api@5.91.0
+
+      - name: Resolve SDK version
+        if: steps.select.outputs.enabled == 'true'
+        id: version
+        env:
+          LANGUAGE: ${{ matrix.language }}
+        run: |
+          echo "canonical=$(node fern/scripts/sdk-version.mjs canonical)" >> "$GITHUB_OUTPUT"
+          echo "sdk=$(node fern/scripts/sdk-version.mjs "$LANGUAGE")" >> "$GITHUB_OUTPUT"
+
+      - name: Generate ${{ matrix.language }} SDK
+        if: steps.select.outputs.enabled == 'true'
+        env:
+          LANGUAGE: ${{ matrix.language }}
+          SDK_VERSION: ${{ steps.version.outputs.sdk }}
+        run: |
+          fern generate \
+            --group "$LANGUAGE" \
+            --local \
+            --version "$SDK_VERSION" \
+            --force \
+            --no-prompt \
+            --generate-tests \
+            --log-level info
+
+      - name: Record generation metadata
+        if: steps.select.outputs.enabled == 'true'
+        env:
+          LANGUAGE: ${{ matrix.language }}
+        run: node fern/scripts/record-sdk-metadata.mjs "$LANGUAGE"
+
+      - name: Validate generated SDK
+        if: steps.select.outputs.enabled == 'true'
+        env:
+          LANGUAGE: ${{ matrix.language }}
+        run: node fern/scripts/validate-sdk.mjs "$LANGUAGE"
+
+      - uses: actions/setup-python@v5
+        if: steps.select.outputs.enabled == 'true' && matrix.language == 'python'
+        with:
+          python-version: '3.12'
+
+      - uses: actions/setup-dotnet@v4
+        if: steps.select.outputs.enabled == 'true' && matrix.language == 'csharp'
+        with:
+          dotnet-version: '9.0.x'
+
+      - uses: actions/setup-go@v5
+        if: steps.select.outputs.enabled == 'true' && matrix.language == 'go'
+        with:
+          go-version: '1.21.x'
+          cache-dependency-path: sdks/go/go.sum
+
+      - uses: actions/setup-java@v4
+        if: steps.select.outputs.enabled == 'true' && matrix.language == 'java'
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - uses: ruby/setup-ruby@v1
+        if: steps.select.outputs.enabled == 'true' && matrix.language == 'ruby'
+        with:
+          ruby-version: '3.3'
+
+      - name: Build generated SDK
+        if: steps.select.outputs.enabled == 'true'
+        working-directory: sdks/${{ matrix.language }}
+        env:
+          LANGUAGE: ${{ matrix.language }}
+        run: |
+          case "$LANGUAGE" in
+            typescript)
+              corepack enable
+              pnpm install --lockfile=false --ignore-scripts
+              pnpm build
+              ;;
+            python)
+              python -m pip install --disable-pip-version-check build
+              python -m build --wheel --outdir /tmp/cloudpdf-python-dist
+              ;;
+            php)
+              find src -type f -name '*.php' -print0 | xargs -0 -P 4 -n1 php -l >/dev/null
+              composer validate --no-check-publish --no-interaction
+              ;;
+            csharp)
+              dotnet build src/CloudpdfApi/CloudpdfApi.csproj -c Release -f net8.0
+              ;;
+            go)
+              go test -run '^$' ./...
+              ;;
+            java)
+              ./gradlew test --no-daemon
+              ;;
+            ruby)
+              ruby -e 'Dir["lib/**/*.rb"].each { |file| RubyVM::InstructionSequence.compile_file(file) }'
+              gem build cloudpdf.gemspec --output /tmp/cloudpdf-ruby.gem
+              ;;
+          esac
+
+      - name: Resolve SDK repository
+        if: steps.select.outputs.enabled == 'true' && inputs.sync_repositories == true
+        id: repository
+        env:
+          LANGUAGE: ${{ matrix.language }}
+        run: |
+          echo "name=$(node fern/scripts/sdk-repositories.mjs "$LANGUAGE" name)" >> "$GITHUB_OUTPUT"
+          echo "slug=$(node fern/scripts/sdk-repositories.mjs "$LANGUAGE" slug)" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Buildx for released-image verification
+        if: steps.select.outputs.enabled == 'true' && inputs.sync_repositories == true
+        uses: docker/setup-buildx-action@v3
+
+      - name: Verify released server image
+        if: steps.select.outputs.enabled == 'true' && inputs.sync_repositories == true
+        run: docker buildx imagetools inspect 'ghcr.io/embedpdf/cloudpdf-server:${{ steps.version.outputs.canonical }}'
+
+      - name: Create SDK repository token
+        if: steps.select.outputs.enabled == 'true' && inputs.sync_repositories == true
+        id: sdk-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.SDK_RELEASE_APP_ID }}
+          private-key: ${{ secrets.SDK_RELEASE_APP_PRIVATE_KEY }}
+          owner: embedpdf
+          repositories: ${{ steps.repository.outputs.name }}
+
+      - name: Open or update generated SDK pull request
+        if: steps.select.outputs.enabled == 'true' && inputs.sync_repositories == true
+        env:
+          GH_TOKEN: ${{ steps.sdk-token.outputs.token }}
+          SDK_GITHUB_TOKEN: ${{ steps.sdk-token.outputs.token }}
+          SDK_AUTO_MERGE: ${{ inputs.auto_merge }}
+          LANGUAGE: ${{ matrix.language }}
+        run: node fern/scripts/sync-sdk-repository.mjs "$LANGUAGE"
+
+      - name: Upload generated SDK
+        if: steps.select.outputs.enabled == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: cloudpdf-sdk-${{ matrix.language }}-${{ steps.version.outputs.canonical }}
+          path: |
+            sdks/${{ matrix.language }}/
+            !sdks/${{ matrix.language }}/node_modules/
+            !sdks/${{ matrix.language }}/dist/
+            !sdks/${{ matrix.language }}/.gradle/
+            !sdks/${{ matrix.language }}/build/
+            !sdks/${{ matrix.language }}/**/bin/
+            !sdks/${{ matrix.language }}/**/obj/
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 14

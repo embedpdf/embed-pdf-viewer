@@ -1,0 +1,132 @@
+# yaml-language-server: $schema=https://schema.buildwithfern.dev/generators-yml.json
+#
+# Generation-only SDK pipeline. .github/workflows/sdk-generate.yml runs each
+# pinned generator locally and uploads the generated source as a workflow
+# artifact. It does not commit to SDK repositories or publish to registries.
+# Output paths are local scratch, gitignored (/sdks/).
+#
+# The input is always ../cloudpdf/contract/openapi.json — the committed,
+# registry-generated, freshness-tested artifact.
+api:
+  specs:
+    - openapi: ../cloudpdf/contract/openapi.json
+groups:
+  typescript:
+    generators:
+      - name: fern-typescript-sdk
+        version: 3.87.2
+        output:
+          location: local-file-system
+          path: ../sdks/typescript
+        metadata:
+          author: CloudPDF
+          email: hello@cloudpdf.com
+          package-description: The official TypeScript SDK for the CloudPDF API.
+          reference-url: https://www.cloudpdf.com
+          license: Apache-2.0
+        config:
+          packageJson:
+            name: '@cloudpdf/sdk'
+            description: The official TypeScript SDK for the CloudPDF API.
+            license: Apache-2.0
+            repository:
+              type: git
+              url: git+https://github.com/embedpdf/cloudpdf-sdk-typescript.git
+  python:
+    generators:
+      - name: fern-python-sdk
+        version: 5.26.0
+        output:
+          location: local-file-system
+          path: ../sdks/python
+        metadata:
+          author: CloudPDF
+          email: hello@cloudpdf.com
+          package-description: The official Python SDK for the CloudPDF API.
+          reference-url: https://www.cloudpdf.com
+          license: Apache-2.0
+        config:
+          package_name: cloudpdf
+  php:
+    generators:
+      - name: fern-php-sdk
+        version: 2.18.1
+        output:
+          location: local-file-system
+          path: ../sdks/php
+        metadata:
+          author: CloudPDF
+          email: hello@cloudpdf.com
+          package-description: The official PHP SDK for the CloudPDF API.
+          reference-url: https://www.cloudpdf.com
+          license: Apache-2.0
+        config:
+          namespace: Cloudpdf
+          packageName: cloudpdf/cloudpdf
+          composerJson:
+            license: Apache-2.0
+            homepage: https://www.cloudpdf.com
+  csharp:
+    generators:
+      - name: fern-csharp-sdk
+        version: 2.80.0
+        output:
+          location: local-file-system
+          path: ../sdks/csharp
+        metadata:
+          author: CloudPDF
+          email: hello@cloudpdf.com
+          package-description: The official .NET SDK for the CloudPDF API.
+          reference-url: https://www.cloudpdf.com
+          license: Apache-2.0
+        config:
+          namespace: CloudpdfApi
+          package-id: CloudpdfApi
+  go:
+    generators:
+      - name: fern-go-sdk
+        version: 1.55.0
+        output:
+          location: local-file-system
+          path: ../sdks/go
+        metadata:
+          author: CloudPDF
+          email: hello@cloudpdf.com
+          package-description: The official Go SDK for the CloudPDF API.
+          reference-url: https://www.cloudpdf.com
+          license: Apache-2.0
+        config:
+          packageName: cloudpdf
+          module:
+            path: github.com/embedpdf/cloudpdf-sdk-go/v3
+            version: '1.21'
+  java:
+    generators:
+      - name: fern-java-sdk
+        version: 4.17.0
+        output:
+          location: local-file-system
+          path: ../sdks/java
+        metadata:
+          author: CloudPDF
+          email: hello@cloudpdf.com
+          package-description: The official Java SDK for the CloudPDF API.
+          reference-url: https://www.cloudpdf.com
+          license: Apache-2.0
+        config:
+          group: com.cloudpdf
+          artifact: cloudpdf
+          package-prefix: com.cloudpdf.api
+  ruby:
+    generators:
+      - name: fern-ruby-sdk
+        version: 1.21.1
+        output:
+          location: local-file-system
+          path: ../sdks/ruby
+        metadata:
+          author: CloudPDF
+          email: hello@cloudpdf.com
+          package-description: The official Ruby SDK for the CloudPDF API.
+          reference-url: https://www.cloudpdf.com
+          license: Apache-2.0

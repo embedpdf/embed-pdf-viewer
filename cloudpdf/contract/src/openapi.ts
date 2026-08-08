@@ -1,7 +1,7 @@
 /**
- * OpenAPI 3.1 emitter for the admin operation registry.
+ * OpenAPI 3.1 emitter for the backend-callable operation registry.
  *
- * The registry (`adminOperations`) is the contract; this module is a
+ * The registry (`allOperations`) is the contract; this module is a
  * pure projection of it — no hand-authored paths, schemas, or scopes.
  * `scripts/emit-openapi.mjs` writes the committed `openapi.json`, and
  * the freshness test fails CI whenever the two diverge. Downstream
@@ -47,15 +47,18 @@ export interface BuildAdminOpenApiOptions {
   version: string;
 }
 
-export function buildAdminOpenApiDocument(
-  opts: BuildAdminOpenApiOptions,
-): Record<string, unknown> {
+export function buildAdminOpenApiDocument(opts: BuildAdminOpenApiOptions): Record<string, unknown> {
   const paths: Record<string, Record<string, unknown>> = {};
+  const schemas: Record<string, Record<string, unknown>> = {};
+
+  registerSchema(schemas, 'AdminErrorPayload', AdminErrorPayloadSchema);
+  registerSchema(schemas, 'EngineErrorPayload', EngineErrorPayloadSchema);
 
   for (const op of Object.values(allOperations) as AdminOperation[]) {
     const openApiPath = toOpenApiPath(op.path);
+    const method = op.method.toLowerCase();
     const entry = (paths[openApiPath] ??= {});
-    entry[op.method.toLowerCase()] = operationObject(op);
+    entry[method] = operationObject(op, schemas);
   }
 
   return {
@@ -96,28 +99,40 @@ export function buildAdminOpenApiDocument(
             "the capability scopes it carries (each operation's x-required-capability).",
         },
       },
-      schemas: {
-        AdminErrorPayload: schemaOf(AdminErrorPayloadSchema),
-        EngineErrorPayload: schemaOf(EngineErrorPayloadSchema),
-      },
+      schemas,
     },
   };
 }
 
-function operationObject(op: AdminOperation): Record<string, unknown> {
+function operationObject(
+  op: AdminOperation,
+  schemas: Record<string, Record<string, unknown>>,
+): Record<string, unknown> {
   const parameters = [...pathParameters(op), ...queryParameters(op), ...headerParameters(op)];
+  const sdkName = sdkOperationName(op.operationId);
   const out: Record<string, unknown> = {
     operationId: op.operationId,
+    'x-fern-sdk-group-name': sdkName.groups,
+    'x-fern-sdk-method-name': sdkName.method,
     summary: op.summary,
     ...(op.notes ? { description: op.notes } : {}),
     security: op.credentials.map((credential) => ({ [SECURITY_SCHEME[credential]]: [] })),
     'x-required-scope': [...op.scope],
     ...(op.docCapabilities ? { 'x-required-capability': [...op.docCapabilities] } : {}),
     ...(parameters.length > 0 ? { parameters } : {}),
-    ...(op.body ? { requestBody: requestBody(op.body) } : {}),
-    responses: responses(op),
+    ...(op.body ? { requestBody: requestBody(op, op.body, schemas) } : {}),
+    responses: responses(op, schemas),
   };
   return out;
+}
+
+function sdkOperationName(operationId: string): { groups: string[]; method: string } {
+  const parts = operationId.split('.');
+  const method = parts.pop();
+  if (!method || parts.length === 0) {
+    throw new Error(`Operation ID must use resource.method form: ${operationId}`);
+  }
+  return { groups: parts, method };
 }
 
 function headerParameters(op: AdminOperation): Array<Record<string, unknown>> {
@@ -138,7 +153,7 @@ function pathParameters(op: AdminOperation): Array<Record<string, unknown>> {
     name,
     in: 'path',
     required: true,
-    schema: shape[name] ? schemaOf(shape[name]!) : { type: 'string' },
+    schema: shape[name] ? inlineSchemaOf(shape[name]!) : { type: 'string' },
   }));
 }
 
@@ -151,7 +166,7 @@ function queryParameters(op: AdminOperation): Array<Record<string, unknown>> {
     // Optionality is carried by `required` above; strip the ZodOptional
     // wrapper so the schema describes the value's shape rather than
     // `T | undefined` (which converts to a meaningless anyOf/not).
-    schema: schemaOf(unwrapOptional(prop)),
+    schema: inlineSchemaOf(unwrapOptional(prop)),
   }));
 }
 
@@ -161,23 +176,39 @@ function unwrapOptional(schema: z.ZodTypeAny): z.ZodTypeAny {
   return current;
 }
 
-function requestBody(body: AdminOperationBody): Record<string, unknown> {
+function requestBody(
+  op: AdminOperation,
+  body: AdminOperationBody,
+  schemas: Record<string, Record<string, unknown>>,
+): Record<string, unknown> {
+  const schema = body.schema
+    ? registerSchema(schemas, `${sdkTypeName(op.operationId)}Request`, body.schema)
+    : undefined;
   return {
     required: body.required ?? true,
-    content: contentObject(body.contentType, body.schema),
+    content: contentObject(body.contentType, schema),
   };
 }
 
-function responses(op: AdminOperation): Record<string, unknown> {
+function responses(
+  op: AdminOperation,
+  schemas: Record<string, Record<string, unknown>>,
+): Record<string, unknown> {
   const out: Record<string, unknown> = {};
+  const typedResponses = Object.values(op.responses).filter((response) => response.schema).length;
   for (const [status, response] of Object.entries(op.responses) as Array<
     [string, AdminOperationResponse]
   >) {
+    const schema = response.schema
+      ? registerSchema(
+          schemas,
+          `${sdkTypeName(op.operationId)}${typedResponses > 1 ? status : ''}Response`,
+          response.schema,
+        )
+      : undefined;
     out[status] = {
       description: STATUS_TEXT[Number(status)] ?? 'Response',
-      ...(response.contentType
-        ? { content: contentObject(response.contentType, response.schema) }
-        : {}),
+      ...(response.contentType ? { content: contentObject(response.contentType, schema) } : {}),
     };
   }
   // Every operation can additionally fail with its plane's standard
@@ -197,14 +228,17 @@ function responses(op: AdminOperation): Record<string, unknown> {
 
 function contentObject(
   contentType: string | ReadonlyArray<string>,
-  schema?: z.ZodTypeAny,
+  schema?: Record<string, unknown>,
 ): Record<string, unknown> {
   const types = typeof contentType === 'string' ? [contentType] : contentType;
   return Object.fromEntries(types.map((t) => [t, mediaObject(t, schema)]));
 }
 
-function mediaObject(contentType: string, schema?: z.ZodTypeAny): Record<string, unknown> {
-  if (schema) return { schema: schemaOf(schema) };
+function mediaObject(
+  contentType: string,
+  schema?: Record<string, unknown>,
+): Record<string, unknown> {
+  if (schema) return { schema };
   if (contentType === 'multipart/form-data') {
     return {
       schema: {
@@ -217,11 +251,63 @@ function mediaObject(contentType: string, schema?: z.ZodTypeAny): Record<string,
   return { schema: { type: 'string', format: 'binary' } };
 }
 
-function schemaOf(schema: z.ZodTypeAny): Record<string, unknown> {
+function registerSchema(
+  schemas: Record<string, Record<string, unknown>>,
+  name: string,
+  schema: z.ZodTypeAny,
+): Record<string, unknown> {
+  if (schemas[name]) throw new Error(`Duplicate OpenAPI schema name: ${name}`);
+  const componentPath = ['components', 'schemas', name];
+  const referenced = zodToJsonSchema(schema, {
+    target: 'openApi3',
+    $refStrategy: 'root',
+    basePath: ['#', ...componentPath],
+  }) as Record<string, unknown>;
+  // Fern's OpenAPI importer currently expands property-level recursive refs
+  // until it exhausts the Node heap. Preserve every ordinary reuse ref and
+  // replace only the recursive back-edge with the same valid open schema (`{}`)
+  // that zod-to-json-schema uses for its non-reference strategy.
+  schemas[name] = breakAncestorReferences(referenced, componentPath) as Record<string, unknown>;
+  return { $ref: `#/components/schemas/${name}` };
+}
+
+function breakAncestorReferences(value: unknown, path: string[]): unknown {
+  if (Array.isArray(value)) {
+    return value.map((child, index) => breakAncestorReferences(child, [...path, String(index)]));
+  }
+  if (!value || typeof value !== 'object') return value;
+
+  const record = value as Record<string, unknown>;
+  if (typeof record.$ref === 'string' && record.$ref.startsWith('#/')) {
+    const target = record.$ref
+      .slice(2)
+      .split('/')
+      .map((segment) => segment.replaceAll('~1', '/').replaceAll('~0', '~'));
+    if (target.length <= path.length && target.every((segment, index) => path[index] === segment)) {
+      return {};
+    }
+  }
+
+  return Object.fromEntries(
+    Object.entries(record).map(([key, child]) => [
+      key,
+      breakAncestorReferences(child, [...path, key]),
+    ]),
+  );
+}
+
+function inlineSchemaOf(schema: z.ZodTypeAny): Record<string, unknown> {
   return zodToJsonSchema(schema, {
     target: 'openApi3',
     $refStrategy: 'none',
   }) as Record<string, unknown>;
+}
+
+function sdkTypeName(operationId: string): string {
+  return operationId
+    .split('.')
+    .map((part) => `${part[0]!.toUpperCase()}${part.slice(1)}`)
+    .join('');
 }
 
 function objectShape(schema: z.ZodTypeAny): Record<string, z.ZodTypeAny> {

@@ -113,7 +113,9 @@ describe('operation registry', () => {
     );
     expect(sub(adminOperations['tokens.issue'].path)).toBe(adminWirePaths.tokenIssue(tid));
     expect(sub(adminOperations['tokens.revoke'].path)).toBe(adminWirePaths.tokenRevoke(tid, jti));
-    expect(adminOperations['license.status'].path).toBe(adminWirePaths.deploymentLicenseStatus);
+    expect(adminOperations['deployment.licenseStatus'].path).toBe(
+      adminWirePaths.deploymentLicenseStatus,
+    );
     expect(adminOperations['tenants.create'].path).toBe(adminWirePaths.tenants);
     expect(adminOperations['tenants.list'].path).toBe(adminWirePaths.tenants);
     expect(sub(adminOperations['tenants.get'].path)).toBe(adminWirePaths.tenant(tid));
@@ -142,6 +144,28 @@ describe('openapi document', () => {
     expect(documentIds).toEqual(registryIds);
   });
 
+  test('Fern SDK groups and method names follow the public SDK naming policy', () => {
+    const doc = buildAdminOpenApiDocument({ version: pkg.version }) as {
+      paths: Record<
+        string,
+        Record<
+          string,
+          {
+            operationId: string;
+            'x-fern-sdk-group-name': string[];
+            'x-fern-sdk-method-name': string;
+          }
+        >
+      >;
+    };
+
+    for (const operation of Object.values(doc.paths).flatMap((methods) => Object.values(methods))) {
+      const parts = operation.operationId.split('.');
+      expect(operation['x-fern-sdk-method-name']).toBe(parts.pop());
+      expect(operation['x-fern-sdk-group-name']).toEqual(parts);
+    }
+  });
+
   test('query parameter schemas are unwrapped value shapes, not anyOf unions', () => {
     const doc = buildAdminOpenApiDocument({ version: pkg.version }) as {
       paths: Record<string, { get?: { parameters?: Array<{ schema: Record<string, unknown> }> } }>;
@@ -152,6 +176,40 @@ describe('openapi document', () => {
     for (const param of params) {
       expect(param.schema['anyOf']).toBeUndefined();
       expect(param.schema['type']).toBeDefined();
+    }
+  });
+
+  test('every local schema reference resolves within the OpenAPI document', () => {
+    const doc = buildAdminOpenApiDocument({ version: pkg.version });
+    const refs: string[] = [];
+
+    const visit = (value: unknown): void => {
+      if (Array.isArray(value)) {
+        value.forEach(visit);
+        return;
+      }
+      if (!value || typeof value !== 'object') return;
+
+      for (const [key, child] of Object.entries(value)) {
+        if (key === '$ref' && typeof child === 'string' && child.startsWith('#/')) {
+          refs.push(child);
+        }
+        visit(child);
+      }
+    };
+    visit(doc);
+
+    expect(refs.length).toBeGreaterThan(0);
+    for (const ref of refs) {
+      const target = ref
+        .slice(2)
+        .split('/')
+        .map((segment) => segment.replaceAll('~1', '/').replaceAll('~0', '~'))
+        .reduce<unknown>((value, segment) => {
+          expect(value, `${ref} stops before ${segment}`).toBeTruthy();
+          return (value as Record<string, unknown>)[segment];
+        }, doc);
+      expect(target, ref).toBeDefined();
     }
   });
 });
