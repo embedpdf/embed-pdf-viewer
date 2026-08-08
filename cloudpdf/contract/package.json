@@ -1,8 +1,8 @@
 {
   "name": "@cloudpdf/contract",
-  "version": "3.0.0-next.0",
+  "version": "3.0.0-next.1",
   "private": false,
-  "description": "The CloudPDF engine contract: operation registry, zod schemas, and OpenAPI emitter for every backend-callable surface \u2014 used by @cloudpdf/server (to mount and validate) and @cloudpdf/admin (to type requests), and the source of the committed openapi.json.",
+  "description": "The CloudPDF engine contract: operation registry, zod schemas, and OpenAPI emitter for every backend-callable surface — used by @cloudpdf/server (to mount and validate) and @cloudpdf/admin (to type requests), and the source of the committed openapi.json.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
