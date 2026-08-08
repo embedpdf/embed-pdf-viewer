@@ -2,8 +2,46 @@
 
 Fern generates seven SDKs from `cloudpdf/contract/openapi.json`. Generated
 source is scratch output under `sdks/` and is not committed to this repository.
-The GitHub workflow currently uploads each language as an artifact; it does not
-publish packages or write to the future language repositories.
+Every GitHub run uploads each language as an artifact. Release runs may also
+open generated-source pull requests in the language repositories after the
+versioned `cloudpdf-server` image has been verified. No package registry is
+published by this workflow.
+
+## SDK repositories
+
+| Generator  | Repository                         |
+| ---------- | ---------------------------------- |
+| TypeScript | `embedpdf/cloudpdf-sdk-typescript` |
+| Python     | `embedpdf/cloudpdf-sdk-python`     |
+| PHP        | `embedpdf/cloudpdf-sdk-php`        |
+| C# / .NET  | `embedpdf/cloudpdf-sdk-dotnet`     |
+| Go         | `embedpdf/cloudpdf-sdk-go`         |
+| Java       | `embedpdf/cloudpdf-sdk-java`       |
+| Ruby       | `embedpdf/cloudpdf-sdk-ruby`       |
+
+The normal pull-request and `main` triggers are read-only validation. The
+release workflow calls the same generation workflow with repository sync
+enabled only after the multi-architecture server manifest exists and passes
+inspection. Each generated repository PR includes an `SDK CI` workflow and can
+optionally use GitHub native auto-merge after repository requirements pass.
+
+Repository sync uses a GitHub App rather than a personal access token. Install
+one app on the seven repositories with **Contents: read/write**, **Pull
+requests: read/write**, and **Workflows: read/write** (required because generated
+PRs install `.github/workflows/sdk-ci.yml`), then configure these secrets in the
+source repository:
+
+- `SDK_RELEASE_APP_ID`
+- `SDK_RELEASE_APP_PRIVATE_KEY`
+
+Set the repository variable `SDK_REPOSITORY_SYNC_ENABLED=true` after the app is
+installed. Leave `SDK_AUTO_MERGE` unset for review-first PRs; set it to `true`
+only after the destination repositories have the desired branch rules and
+required `Build and validate` status check.
+
+The sync is idempotent per canonical version. A failed post-release sync can be
+retried with the **SDK Generate** workflow dispatch after the corresponding
+`ghcr.io/embedpdf/cloudpdf-server:<version>` image exists.
 
 ## Version policy
 
@@ -62,3 +100,8 @@ it is self-contained.
 Each artifact includes `cloudpdf-generation.json` with the canonical and mapped
 SDK versions, the exact OpenAPI SHA-256, source commit state, Fern CLI version,
 and language generator version.
+
+The repository sync replaces generated source on its version branch while
+keeping each destination repository's `.github` directory repository-owned.
+This lets future registry publishing workflows live with their ecosystem
+credentials without being overwritten by SDK regeneration.

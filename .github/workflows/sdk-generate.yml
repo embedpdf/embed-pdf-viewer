@@ -1,15 +1,50 @@
 name: SDK Generate
 
-# Generation only: each job creates one complete SDK source tree and uploads it
-# as an artifact. No registry credentials or SDK-repository token are used.
+# Every trigger generates, validates, builds, and uploads publication-free SDK
+# source artifacts. A release may additionally call this workflow after the
+# server image is verified to open generated-source PRs in the SDK repositories.
+# No package registry credentials are used here.
 
 on:
+  workflow_call:
+    inputs:
+      languages:
+        description: 'Comma-separated subset (default: all)'
+        required: false
+        type: string
+        default: 'typescript,python,php,csharp,go,java,ruby'
+      sync_repositories:
+        description: 'Open or update SDK repository pull requests'
+        required: false
+        type: boolean
+        default: false
+      auto_merge:
+        description: 'Enable native GitHub auto-merge on generated pull requests'
+        required: false
+        type: boolean
+        default: false
+    secrets:
+      SDK_RELEASE_APP_ID:
+        required: false
+      SDK_RELEASE_APP_PRIVATE_KEY:
+        required: false
   workflow_dispatch:
     inputs:
       languages:
         description: 'Comma-separated subset (default: all)'
         required: false
+        type: string
         default: 'typescript,python,php,csharp,go,java,ruby'
+      sync_repositories:
+        description: 'Open/update repository PRs (requires a released server image)'
+        required: false
+        type: boolean
+        default: false
+      auto_merge:
+        description: 'Enable auto-merge after repository requirements pass'
+        required: false
+        type: boolean
+        default: false
   pull_request:
     paths:
       - 'cloudpdf/contract/**'
@@ -37,7 +72,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: node --test fern/scripts/sdk-version.test.mjs
+      - run: node --test fern/scripts/sdk-version.test.mjs fern/scripts/sdk-repositories.test.mjs
 
   generate:
     needs: version-policy
@@ -57,7 +92,7 @@ jobs:
         id: select
         env:
           LANGUAGE: ${{ matrix.language }}
-          REQUESTED: ${{ github.event.inputs.languages || 'typescript,python,php,csharp,go,java,ruby' }}
+          REQUESTED: ${{ inputs.languages || 'typescript,python,php,csharp,go,java,ruby' }}
         run: |
           normalized=",${REQUESTED//[[:space:]]/},"
           if [[ "$normalized" == *",$LANGUAGE,"* ]]; then
@@ -168,6 +203,42 @@ jobs:
               gem build cloudpdf.gemspec --output /tmp/cloudpdf-ruby.gem
               ;;
           esac
+
+      - name: Resolve SDK repository
+        if: steps.select.outputs.enabled == 'true' && inputs.sync_repositories == true
+        id: repository
+        env:
+          LANGUAGE: ${{ matrix.language }}
+        run: |
+          echo "name=$(node fern/scripts/sdk-repositories.mjs "$LANGUAGE" name)" >> "$GITHUB_OUTPUT"
+          echo "slug=$(node fern/scripts/sdk-repositories.mjs "$LANGUAGE" slug)" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Buildx for released-image verification
+        if: steps.select.outputs.enabled == 'true' && inputs.sync_repositories == true
+        uses: docker/setup-buildx-action@v3
+
+      - name: Verify released server image
+        if: steps.select.outputs.enabled == 'true' && inputs.sync_repositories == true
+        run: docker buildx imagetools inspect 'ghcr.io/embedpdf/cloudpdf-server:${{ steps.version.outputs.canonical }}'
+
+      - name: Create SDK repository token
+        if: steps.select.outputs.enabled == 'true' && inputs.sync_repositories == true
+        id: sdk-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.SDK_RELEASE_APP_ID }}
+          private-key: ${{ secrets.SDK_RELEASE_APP_PRIVATE_KEY }}
+          owner: embedpdf
+          repositories: ${{ steps.repository.outputs.name }}
+
+      - name: Open or update generated SDK pull request
+        if: steps.select.outputs.enabled == 'true' && inputs.sync_repositories == true
+        env:
+          GH_TOKEN: ${{ steps.sdk-token.outputs.token }}
+          SDK_GITHUB_TOKEN: ${{ steps.sdk-token.outputs.token }}
+          SDK_AUTO_MERGE: ${{ inputs.auto_merge }}
+          LANGUAGE: ${{ matrix.language }}
+        run: node fern/scripts/sync-sdk-repository.mjs "$LANGUAGE"
 
       - name: Upload generated SDK
         if: steps.select.outputs.enabled == 'true'
