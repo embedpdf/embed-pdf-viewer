@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/plugin-i18n",
-  "version": "3.0.0-next.0",
+  "version": "3.0.0-next.1",
   "private": false,
   "description": "Workspace-scoped translation: locale packs as store state (pure lookup, reactive for free), lazy pack loading via effects, pure BCP-47 negotiation. Engine-free and DOM-free — alive before the engine boots.",
   "type": "module",
