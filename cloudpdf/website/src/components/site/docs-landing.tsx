@@ -1,6 +1,9 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 
+import { getOperationCount, getSdkLanguages } from '@/lib/api-reference';
+
+import { BackendBand } from './backend-band';
 import { ArrowRight, CheckIcon, CloudIcon, ReactLogo, SvelteLogo, VueLogo } from './icons';
 
 type Tone = 'blue' | 'violet';
@@ -328,6 +331,11 @@ export function DocsLanding() {
             href="/docs/server/getting-started"
           />
         </div>
+
+        <BackendBand
+          languages={getSdkLanguages().map(({ language, label }) => ({ language, label }))}
+          operationCount={getOperationCount()}
+        />
       </div>
     </section>
   );

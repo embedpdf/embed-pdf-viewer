@@ -419,6 +419,13 @@ export interface AdminOperationBody {
 export interface AdminOperation {
   /** Stable `resource.verb` id; becomes the OpenAPI operationId. */
   operationId: string;
+  /**
+   * Short display name for documentation surfaces (page titles, nav) —
+   * a noun phrase like "Create tenant", not a sentence. Emitted as
+   * `x-docs-title`; the API reference renders it verbatim, so naming
+   * an operation is part of designing it.
+   */
+  title: string;
   summary: string;
   method: AdminOperationMethod;
   /** Fastify-style path template (`:param`); rewritten to `{param}` for OpenAPI. */
@@ -463,6 +470,7 @@ export interface AdminOperation {
 export const adminOperations = {
   'tenants.create': {
     operationId: 'tenants.create',
+    title: 'Create tenant',
     summary: 'Create a tenant, or confirm it already exists — ensure-style, idempotent.',
     method: 'POST',
     path: adminWirePaths.tenants,
@@ -476,6 +484,7 @@ export const adminOperations = {
   },
   'tenants.list': {
     operationId: 'tenants.list',
+    title: 'List tenants',
     summary: 'List tenants, newest first, cursor-paginated.',
     method: 'GET',
     path: adminWirePaths.tenants,
@@ -489,6 +498,7 @@ export const adminOperations = {
   },
   'tenants.get': {
     operationId: 'tenants.get',
+    title: 'Get tenant',
     summary: 'Fetch one tenant record.',
     method: 'GET',
     path: '/v1/tenants/:tenantId',
@@ -502,6 +512,7 @@ export const adminOperations = {
   },
   'tenants.delete': {
     operationId: 'tenants.delete',
+    title: 'Delete tenant',
     summary: 'Delete a tenant and everything under it.',
     method: 'DELETE',
     path: '/v1/tenants/:tenantId',
@@ -517,6 +528,7 @@ export const adminOperations = {
   },
   'documents.init': {
     operationId: 'documents.init',
+    title: 'Initialize upload',
     summary:
       'Begin an upload: create (or resume/dedupe) a pending document and issue upload access.',
     method: 'POST',
@@ -532,6 +544,7 @@ export const adminOperations = {
   },
   'documents.commit': {
     operationId: 'documents.commit',
+    title: 'Commit upload',
     summary: 'Finish an upload: verify the SHA-256 and promote the document to ready.',
     method: 'POST',
     path: '/v1/tenants/:tenantId/documents/:id/commit',
@@ -547,6 +560,7 @@ export const adminOperations = {
   },
   'documents.uploadDirect': {
     operationId: 'documents.uploadDirect',
+    title: 'Upload document directly',
     summary: 'Upload the PDF bytes through the origin instead of a presigned URL.',
     method: 'POST',
     path: '/v1/tenants/:tenantId/documents/:id/upload-direct',
@@ -563,6 +577,7 @@ export const adminOperations = {
   },
   'documents.list': {
     operationId: 'documents.list',
+    title: 'List documents',
     summary: 'List documents in the tenant, newest first, cursor-paginated.',
     method: 'GET',
     path: '/v1/tenants/:tenantId/documents',
@@ -577,6 +592,7 @@ export const adminOperations = {
   },
   'documents.get': {
     operationId: 'documents.get',
+    title: 'Get document',
     summary: 'Fetch one document record.',
     method: 'GET',
     path: '/v1/tenants/:tenantId/documents/:id',
@@ -591,6 +607,7 @@ export const adminOperations = {
   },
   'documents.download': {
     operationId: 'documents.download',
+    title: 'Download document',
     summary: 'Download the stored base PDF bytes.',
     method: 'GET',
     path: '/v1/tenants/:tenantId/documents/:id/download',
@@ -605,6 +622,7 @@ export const adminOperations = {
   },
   'documents.delete': {
     operationId: 'documents.delete',
+    title: 'Delete document',
     summary: 'Delete a document and its stored artifacts.',
     method: 'DELETE',
     path: '/v1/tenants/:tenantId/documents/:id',
@@ -619,6 +637,7 @@ export const adminOperations = {
   },
   'documents.thumbnail': {
     operationId: 'documents.thumbnail',
+    title: 'Get thumbnail',
     summary: 'Fetch the warmed dashboard-tile render for a document.',
     method: 'GET',
     path: '/v1/tenants/:tenantId/documents/:id/thumbnail',
@@ -632,6 +651,7 @@ export const adminOperations = {
   },
   'deployment.licenseStatus': {
     operationId: 'deployment.licenseStatus',
+    title: 'License status',
     summary: 'License decision plus usage-reporting and meter snapshots for this deployment.',
     method: 'GET',
     path: adminWirePaths.deploymentLicenseStatus,
@@ -643,6 +663,7 @@ export const adminOperations = {
   },
   'tokens.issue': {
     operationId: 'tokens.issue',
+    title: 'Issue token',
     summary: 'Mint a delegated JWT: a doc token, or (API token only) a tenant token.',
     method: 'POST',
     path: '/v1/tenants/:tenantId/tokens',
@@ -661,6 +682,7 @@ export const adminOperations = {
   },
   'tokens.revoke': {
     operationId: 'tokens.revoke',
+    title: 'Revoke token',
     summary: 'Revoke a token by jti; live sessions drop on their next heartbeat.',
     method: 'POST',
     path: '/v1/tenants/:tenantId/tokens/:jti/revoke',
@@ -739,6 +761,7 @@ const MutationResponseSchema = z.object({ meta: MutationMetaSchema }).passthroug
 export const docOperations = {
   'doc.head': {
     operationId: 'doc.head',
+    title: 'Open document',
     summary: 'Open a document and return its head (versions, page count, security).',
     method: 'GET',
     path: wireTemplates.docHead,
@@ -754,6 +777,7 @@ export const docOperations = {
   },
   'doc.manifest': {
     operationId: 'doc.manifest',
+    title: 'Get manifest',
     summary: "Full layer manifest at the layer's current version.",
     method: 'GET',
     path: wireTemplates.layerManifest,
@@ -769,6 +793,7 @@ export const docOperations = {
   },
   'doc.metadata.get': {
     operationId: 'doc.metadata.get',
+    title: 'Get metadata',
     summary: 'Document metadata (PDF info dictionary view) for a layer.',
     method: 'GET',
     path: wireTemplates.layerMetadata,
@@ -784,6 +809,7 @@ export const docOperations = {
   },
   'doc.render': {
     operationId: 'doc.render',
+    title: 'Render page',
     summary: 'Render one page as an image at the current layer version.',
     method: 'GET',
     path: wireTemplates.layerRenderPage,
@@ -802,6 +828,7 @@ export const docOperations = {
   },
   'doc.text': {
     operationId: 'doc.text',
+    title: 'Extract page text',
     summary: 'Extracted text content for one page.',
     method: 'GET',
     path: wireTemplates.layerTextPage,
@@ -817,6 +844,7 @@ export const docOperations = {
   },
   'doc.annotations.list': {
     operationId: 'doc.annotations.list',
+    title: 'List annotations',
     summary: "One page's annotations at the current layer version.",
     method: 'GET',
     path: wireTemplates.layerAnnotationItems,
@@ -832,6 +860,7 @@ export const docOperations = {
   },
   'doc.annotations.create': {
     operationId: 'doc.annotations.create',
+    title: 'Create annotation',
     summary: 'Create an annotation on a page.',
     method: 'POST',
     path: wireTemplates.layerAnnotationItems,
@@ -852,6 +881,7 @@ export const docOperations = {
   },
   'doc.annotations.update': {
     operationId: 'doc.annotations.update',
+    title: 'Update annotation',
     summary: 'Update one annotation by key.',
     method: 'PATCH',
     path: wireTemplates.layerAnnotationItem,
@@ -869,6 +899,7 @@ export const docOperations = {
   },
   'doc.annotations.delete': {
     operationId: 'doc.annotations.delete',
+    title: 'Delete annotation',
     summary: 'Delete one annotation by key.',
     method: 'DELETE',
     path: wireTemplates.layerAnnotationItem,
@@ -884,6 +915,7 @@ export const docOperations = {
   },
   'doc.forms.get': {
     operationId: 'doc.forms.get',
+    title: 'Get form snapshot',
     summary: 'Reconciled form snapshot: fields, widgets, values.',
     method: 'GET',
     path: wireTemplates.layerForm,
@@ -899,6 +931,7 @@ export const docOperations = {
   },
   'doc.forms.setValue': {
     operationId: 'doc.forms.setValue',
+    title: 'Set form value',
     summary: "Set one form field's value.",
     method: 'POST',
     path: wireTemplates.layerFormFieldValue,
@@ -916,6 +949,7 @@ export const docOperations = {
   },
   'doc.forms.reset': {
     operationId: 'doc.forms.reset',
+    title: 'Reset form field',
     summary: 'Reset one form field to its default value.',
     method: 'POST',
     path: wireTemplates.layerFormFieldReset,
@@ -931,6 +965,7 @@ export const docOperations = {
   },
   'doc.forms.exportData': {
     operationId: 'doc.forms.exportData',
+    title: 'Export form data',
     summary: 'Export form data as FDF or XFDF.',
     method: 'GET',
     path: wireTemplates.layerFormData,
@@ -947,6 +982,7 @@ export const docOperations = {
   },
   'doc.forms.importData': {
     operationId: 'doc.forms.importData',
+    title: 'Import form data',
     summary: 'Import form data (FDF/XFDF), filling matching fields.',
     method: 'POST',
     path: wireTemplates.layerFormData,
@@ -964,6 +1000,7 @@ export const docOperations = {
   },
   'doc.pages.move': {
     operationId: 'doc.pages.move',
+    title: 'Move pages',
     summary: 'Reorder pages.',
     method: 'POST',
     path: wireTemplates.layerPagesMove,
@@ -981,6 +1018,7 @@ export const docOperations = {
   },
   'doc.pages.rotate': {
     operationId: 'doc.pages.rotate',
+    title: 'Rotate pages',
     summary: 'Set absolute rotation on pages.',
     method: 'POST',
     path: wireTemplates.layerPagesRotate,
@@ -998,6 +1036,7 @@ export const docOperations = {
   },
   'doc.pages.delete': {
     operationId: 'doc.pages.delete',
+    title: 'Delete pages',
     summary: 'Delete pages.',
     method: 'POST',
     path: wireTemplates.layerPagesDelete,
@@ -1015,6 +1054,7 @@ export const docOperations = {
   },
   'doc.pages.flatten': {
     operationId: 'doc.pages.flatten',
+    title: 'Flatten pages',
     summary: 'Flatten annotations and form fields into page content.',
     method: 'POST',
     path: wireTemplates.layerPagesFlatten,
@@ -1032,6 +1072,7 @@ export const docOperations = {
   },
   'doc.redactions.apply': {
     operationId: 'doc.redactions.apply',
+    title: 'Apply redactions',
     summary: 'Apply pending redactions, permanently removing content.',
     method: 'POST',
     path: wireTemplates.layerRedactionsApply,
@@ -1049,6 +1090,7 @@ export const docOperations = {
   },
   'doc.download': {
     operationId: 'doc.download',
+    title: 'Download PDF',
     summary: "Download the layer's current PDF (base plus layer edits).",
     method: 'GET',
     path: wireTemplates.layerDownload,
@@ -1067,3 +1109,29 @@ export type DocOperationId = keyof typeof docOperations;
 
 /** Every operation in the published contract: admin surfaces + doc plane. */
 export const allOperations = { ...adminOperations, ...docOperations } as const;
+
+/**
+ * Documentation groups, keyed by the dot-joined `x-fern-sdk-group-name`
+ * path of the operations they contain. Emitted as `x-docs-groups`; the
+ * API reference derives its navigation sections from this manifest, so
+ * key order here is section order there. `slug` overrides the URL
+ * segment when the registry's short group name isn't the public one.
+ * The emitter fails if an operation's group path is missing here.
+ */
+export interface DocsGroup {
+  title: string;
+  slug?: string;
+}
+
+export const docsGroups = {
+  deployment: { title: 'Deployment' },
+  tenants: { title: 'Tenants' },
+  documents: { title: 'Tenant documents' },
+  tokens: { title: 'Tokens' },
+  doc: { title: 'Document operations', slug: 'document-operations' },
+  'doc.annotations': { title: 'Annotations' },
+  'doc.forms': { title: 'Forms' },
+  'doc.metadata': { title: 'Metadata' },
+  'doc.pages': { title: 'Pages' },
+  'doc.redactions': { title: 'Redactions' },
+} as const satisfies Record<string, DocsGroup>;

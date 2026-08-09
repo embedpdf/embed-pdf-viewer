@@ -20,4 +20,8 @@ export default {
     title: 'Privacy',
     type: 'page',
   },
+  contact: {
+    title: 'Contact',
+    type: 'page',
+  },
 };

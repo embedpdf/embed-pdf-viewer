@@ -1,0 +1,525 @@
+import { createHash } from 'node:crypto';
+import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+
+/**
+ * Per-SDK metadata. `install` is the published package coordinate and
+ * the command that installs it — sourced from each SDK's own manifest
+ * (go.mod, build.gradle, gemspec) or README, so the docs quote what is
+ * actually published rather than a hand-typed guess.
+ */
+export const LANGUAGES = {
+  typescript: {
+    label: 'TypeScript',
+    fence: 'typescript',
+    method: (value) => value,
+    pkg: '@cloudpdf/sdk',
+    installFence: 'sh',
+    install: 'npm install @cloudpdf/sdk',
+  },
+  python: {
+    label: 'Python',
+    fence: 'python',
+    method: snakeCase,
+    pkg: 'cloudpdf',
+    installFence: 'sh',
+    install: 'pip install cloudpdf',
+  },
+  php: {
+    label: 'PHP',
+    fence: 'php',
+    method: (value) => value,
+    pkg: 'cloudpdf/sdk',
+    installFence: 'sh',
+    install: 'composer require cloudpdf/sdk',
+  },
+  csharp: {
+    label: '.NET',
+    fence: 'csharp',
+    method: (value) => `${pascalCase(value)}Async`,
+    pkg: 'CloudPDF',
+    installFence: 'sh',
+    install: 'dotnet add package CloudPDF',
+  },
+  go: {
+    label: 'Go',
+    fence: 'go',
+    method: pascalCase,
+    pkg: 'github.com/embedpdf/cloudpdf-sdk-go/v3',
+    installFence: 'sh',
+    install: 'go get github.com/embedpdf/cloudpdf-sdk-go/v3',
+  },
+  java: {
+    label: 'Java',
+    fence: 'java',
+    method: (value) => value,
+    pkg: 'com.cloudpdf:sdk',
+    installFence: 'groovy',
+    install: "implementation 'com.cloudpdf:sdk'",
+  },
+  ruby: {
+    label: 'Ruby',
+    fence: 'ruby',
+    method: snakeCase,
+    pkg: 'cloudpdf',
+    installFence: 'sh',
+    install: 'gem install cloudpdf',
+  },
+};
+
+export const LANGUAGE_NAMES = Object.keys(LANGUAGES);
+
+/**
+ * Every rendered example is a complete program: a per-language "frame"
+ * (imports + client construction with token and base URL) wrapping the
+ * operation call extracted from the generated SDK's reference.md.
+ *
+ * The call is derived truth — Fern generates it from the real SDK, so
+ * method names and argument shapes track the code. The frame is
+ * CloudPDF's editorial voice, defined once per language; without it the
+ * seven Fern generators disagree about what "usage" means (Python
+ * inlined construction, TypeScript showed a bare one-line call).
+ * `frameLines` marks where the frame ends so the renderer can
+ * de-emphasise the boilerplate and keep the call as the visual hero.
+ */
+const SNIPPET_BASE_URL = 'https://yourhost.com/path/to/api';
+
+const FRAMES = {
+  typescript: {
+    imports: () => ['import { CloudPDFClient } from "@cloudpdf/sdk";'],
+    construction: [
+      'const client = new CloudPDFClient({',
+      `    baseUrl: "${SNIPPET_BASE_URL}",`,
+      '    token: "<token>",',
+      '});',
+    ],
+    marker: 'new CloudPDFClient(',
+  },
+  python: {
+    imports: () => ['from cloudpdf import CloudPDFClient'],
+    construction: [
+      'client = CloudPDFClient(',
+      '    token="<token>",',
+      `    base_url="${SNIPPET_BASE_URL}",`,
+      ')',
+    ],
+    marker: 'client = CloudPDFClient(',
+  },
+  php: {
+    imports: () => ['use CloudPDF\\CloudPDFClient;'],
+    construction: [
+      '$client = new CloudPDFClient(',
+      "    token: '<token>',",
+      `    options: ['baseUrl' => '${SNIPPET_BASE_URL}'],`,
+      ');',
+    ],
+    marker: 'new CloudPDFClient(',
+  },
+  csharp: {
+    imports: () => ['using CloudPDF;'],
+    construction: [
+      'var client = new CloudPDFClient(',
+      '    "<token>",',
+      `    new ClientOptions { BaseUrl = "${SNIPPET_BASE_URL}" }`,
+      ');',
+    ],
+    marker: 'new CloudPDFClient(',
+  },
+  go: {
+    // The `client` variable deliberately shadows the client package —
+    // Fern's own reference examples use the same convention, and the
+    // extracted calls (`client.Tenants.List(…)`) depend on it.
+    imports: (call) => [
+      'import (',
+      ...(call.includes('context.') ? ['    "context"', ''] : []),
+      ...(call.includes('cloudpdf.')
+        ? ['    cloudpdf "github.com/embedpdf/cloudpdf-sdk-go/v3"']
+        : []),
+      '    client "github.com/embedpdf/cloudpdf-sdk-go/v3/client"',
+      '    option "github.com/embedpdf/cloudpdf-sdk-go/v3/option"',
+      ')',
+    ],
+    construction: [
+      'client := client.NewClient(',
+      '    option.WithToken("<token>"),',
+      `    option.WithBaseURL("${SNIPPET_BASE_URL}"),`,
+      ')',
+    ],
+    marker: 'client.NewClient(',
+  },
+  java: {
+    imports: () => ['import com.cloudpdf.api.CloudPDFClient;'],
+    construction: [
+      'CloudPDFClient client = CloudPDFClient',
+      '    .builder()',
+      '    .token("<token>")',
+      `    .url("${SNIPPET_BASE_URL}")`,
+      '    .build();',
+    ],
+    marker: 'CloudPDFClient client = CloudPDFClient',
+  },
+  ruby: {
+    imports: () => ['require "cloudpdf"'],
+    construction: [
+      'client = CloudPDF::Client.new(',
+      '  token: "<token>",',
+      `  base_url: "${SNIPPET_BASE_URL}"`,
+      ')',
+    ],
+    marker: 'CloudPDF::Client.new',
+  },
+};
+
+/** Call-specific import lines that must hoist above the construction. */
+const IMPORT_LINE = {
+  typescript: /^import .+;$/,
+  python: /^(?:from|import) \S.*$/,
+  php: /^use .+;$/,
+  csharp: /^using [A-Z][\w.]*;$/,
+  java: /^import .+;$/,
+  ruby: /^require .+$/,
+};
+
+/**
+ * The Fern Python generator inlines the client import and construction
+ * into every usage block; strip them so the shared frame is the only
+ * construction, keeping all seven languages symmetric.
+ */
+function stripPythonConstruction(source) {
+  const lines = source.split('\n');
+  const out = [];
+  let skipping = false;
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (skipping) {
+      if (trimmed === ')') skipping = false;
+      continue;
+    }
+    if (trimmed === 'from cloudpdf import CloudPDFClient') continue;
+    if (trimmed.startsWith('client = CloudPDFClient(')) {
+      if (!trimmed.endsWith(')')) skipping = true;
+      continue;
+    }
+    out.push(line);
+  }
+  return out.join('\n').trim();
+}
+
+function hoistLeadingImports(language, call) {
+  const pattern = IMPORT_LINE[language];
+  if (!pattern) return { hoisted: [], body: call };
+  const lines = call.split('\n');
+  const hoisted = [];
+  let index = 0;
+  while (index < lines.length) {
+    const line = lines[index].trim();
+    if (line === '' && hoisted.length > 0) {
+      index += 1;
+      continue;
+    }
+    if (!pattern.test(line)) break;
+    hoisted.push(line);
+    index += 1;
+  }
+  return { hoisted, body: lines.slice(index).join('\n').trim() };
+}
+
+export function frameSnippet(language, rawSource) {
+  const frame = FRAMES[language];
+  if (!frame) throw new Error(`No snippet frame for language: ${language}`);
+
+  const call = language === 'python' ? stripPythonConstruction(rawSource) : rawSource.trim();
+  const { hoisted, body } = hoistLeadingImports(language, call);
+  const prefix = [...frame.imports(body), ...hoisted, '', ...frame.construction, ''];
+  const source = [...prefix, body].join('\n');
+
+  const constructions = source.split(frame.marker).length - 1;
+  if (constructions !== 1) {
+    throw new Error(
+      `Snippet framing for ${language} produced ${constructions} client constructions:\n${source}`,
+    );
+  }
+  return { source, frameLines: prefix.length };
+}
+
+const UPLOAD_DIRECT_OVERRIDES = {
+  typescript: {
+    source: `import { createReadStream } from "node:fs";
+
+await client.documents.uploadDirect(
+    createReadStream("document.pdf"),
+    "tenantId",
+    "documentId",
+);`,
+  },
+  python: {
+    source: `with open("document.pdf", "rb") as pdf:
+    result = client.documents.upload_direct(
+        tenant_id="tenantId",
+        id="documentId",
+        request=pdf.read(),
+    )`,
+  },
+  php: {
+    status: 'alternative',
+    note: 'The generated PHP client cannot send an application/pdf body for this operation yet. Use the presigned upload returned by documents.init instead.',
+    source: `$upload = $client->documents->init(
+    'tenantId',
+    new DocumentsInitRequest([
+        'contentLength' => filesize('document.pdf'),
+        'contentSha256' => hash_file('sha256', 'document.pdf'),
+    ]),
+);
+
+// PUT document.pdf to the presigned URL in $upload, then commit the upload.`,
+  },
+  csharp: {
+    source: `await using var pdf = File.OpenRead("document.pdf");
+var result = await client.Documents.UploadDirectAsync(
+    "tenantId",
+    "documentId",
+    pdf
+);`,
+  },
+  go: {
+    source: `pdf, err := os.Open("document.pdf")
+if err != nil {
+    return err
+}
+defer pdf.Close()
+
+result, err := client.Documents.UploadDirect(
+    context.Background(),
+    "tenantId",
+    "documentId",
+    pdf,
+)`,
+  },
+  java: {
+    source: `try (InputStream pdf = Files.newInputStream(Path.of("document.pdf"))) {
+    DocumentsUploadDirect200Response result = client.documents().uploadDirect(
+        "tenantId",
+        "documentId",
+        pdf
+    );
+}`,
+  },
+  ruby: {
+    status: 'alternative',
+    note: 'The generated Ruby client cannot send an application/pdf body for this operation yet. Use the presigned upload returned by documents.init instead.',
+    source: `upload = client.documents.init(
+  tenant_id: "tenantId",
+  content_length: File.size("document.pdf"),
+  content_sha256: Digest::SHA256.file("document.pdf").hexdigest
+)
+
+# PUT document.pdf to the presigned URL in upload, then commit the upload.`,
+  },
+};
+
+export function readOpenApi(repositoryRoot) {
+  return JSON.parse(readFileSync(`${repositoryRoot}/cloudpdf/contract/openapi.json`, 'utf8'));
+}
+
+export function collectOperations(openapi) {
+  const operations = [];
+  const methods = ['get', 'post', 'put', 'patch', 'delete', 'head', 'options'];
+
+  for (const [path, pathItem] of Object.entries(openapi.paths ?? {})) {
+    for (const method of methods) {
+      const operation = pathItem[method];
+      if (!operation) continue;
+      const credentials = [
+        ...new Set((operation.security ?? []).flatMap((entry) => Object.keys(entry))),
+      ];
+      operations.push({
+        operationId: operation.operationId,
+        method,
+        path,
+        groups: operation['x-fern-sdk-group-name'],
+        sdkMethod: operation['x-fern-sdk-method-name'],
+        title: operation['x-docs-title'],
+        summary: operation.summary,
+        // API-token-only = operator surface; on managed CloudPDF these
+        // operations belong to the platform, not the customer.
+        operatorOnly: credentials.length === 1 && credentials[0] === 'apiToken',
+      });
+    }
+  }
+
+  return operations;
+}
+
+export function extractSnippetManifest({ openapi, repositoryRoot, artifactsRoot }) {
+  const operations = collectOperations(openapi);
+  const references = Object.fromEntries(
+    LANGUAGE_NAMES.map((language) => [
+      language,
+      parseReference(
+        readFileSync(referencePath({ language, repositoryRoot, artifactsRoot }), 'utf8'),
+        language,
+      ),
+    ]),
+  );
+
+  const snippets = {};
+  const missing = [];
+
+  for (const operation of operations) {
+    snippets[operation.operationId] = {};
+    const group = groupLabel(operation.groups);
+
+    for (const language of LANGUAGE_NAMES) {
+      const override =
+        operation.operationId === 'documents.uploadDirect'
+          ? UPLOAD_DIRECT_OVERRIDES[language]
+          : undefined;
+      const source = override ?? references[language].get(snippetKey(group, operation.sdkMethod));
+      if (!source) {
+        missing.push(`${operation.operationId}:${language}`);
+        continue;
+      }
+      const framed = frameSnippet(language, source.source);
+      snippets[operation.operationId][language] = {
+        status: source.status ?? 'available',
+        ...(source.note ? { note: source.note } : {}),
+        source: framed.source,
+        frameLines: framed.frameLines,
+      };
+    }
+  }
+
+  if (missing.length > 0) {
+    throw new Error(`Missing SDK snippets:\n${missing.map((value) => `- ${value}`).join('\n')}`);
+  }
+
+  return {
+    schemaVersion: 2,
+    canonicalVersion: openapi.info.version,
+    openapiSha256: createHash('sha256')
+      .update(readFileSync(`${repositoryRoot}/cloudpdf/contract/openapi.json`))
+      .digest('hex'),
+    languages: Object.fromEntries(
+      Object.entries(LANGUAGES).map(([name, config]) => [
+        name,
+        {
+          label: config.label,
+          fence: config.fence,
+          pkg: config.pkg,
+          install: config.install,
+          installFence: config.installFence,
+          // The standalone client-construction block (imports + client),
+          // for prose pages that teach setup without a specific call.
+          frame: [...FRAMES[name].imports(''), '', ...FRAMES[name].construction].join('\n'),
+        },
+      ]),
+    ),
+    operations: snippets,
+  };
+}
+
+function referencePath({ language, repositoryRoot, artifactsRoot }) {
+  if (!artifactsRoot) return `${repositoryRoot}/sdks/${language}/reference.md`;
+
+  const artifact = readdirSync(artifactsRoot)
+    .filter((entry) => entry.startsWith(`cloudpdf-sdk-${language}-`))
+    .sort()
+    .at(-1);
+  if (!artifact) throw new Error(`No downloaded SDK artifact found for ${language}`);
+
+  const matches = findFiles(`${artifactsRoot}/${artifact}`, 'reference.md');
+  if (matches.length !== 1) {
+    throw new Error(
+      `Expected one reference.md in ${artifact}, found ${matches.length}: ${matches.join(', ')}`,
+    );
+  }
+  return matches[0];
+}
+
+function findFiles(directory, filename) {
+  return readdirSync(directory).flatMap((entry) => {
+    const absolute = `${directory}/${entry}`;
+    if (statSync(absolute).isDirectory()) return findFiles(absolute, filename);
+    return entry === filename ? [absolute] : [];
+  });
+}
+
+export function parseReference(source, language) {
+  const config = LANGUAGES[language];
+  if (!config) throw new Error(`Unsupported SDK language: ${language}`);
+
+  const snippets = new Map();
+  const headings = [...source.matchAll(/^## (.+)$/gm)];
+
+  for (let index = 0; index < headings.length; index += 1) {
+    const heading = headings[index];
+    const group = heading[1].trim();
+    const start = heading.index + heading[0].length;
+    const end = headings[index + 1]?.index ?? source.length;
+    const section = source.slice(start, end);
+    const details = section.match(/<details><summary>[\s\S]*?<\/details>/g) ?? [];
+
+    for (const detail of details) {
+      const summary = detail.match(/<summary><code>([\s\S]*?)<\/code><\/summary>/)?.[1];
+      const usage = detail.match(/#### 🔌 Usage[\s\S]*?```([^\n]*)\n([\s\S]*?)```/);
+      if (!summary || !usage) continue;
+
+      const method = methodFromSummary(summary, language);
+      if (!method) continue;
+      snippets.set(snippetKey(group, method), { source: usage[2].trim() });
+    }
+  }
+
+  return snippets;
+}
+
+function methodFromSummary(summary, language) {
+  // Fern emits either a plain method, a method wrapped in a source link, or
+  // an HTML-encoded PHP arrow. Extract only that narrow grammar instead of
+  // stripping and decoding arbitrary HTML.
+  const matches = [
+    ...summary.matchAll(/(?:\.|->|-&gt;)(?:<a\b[^>]*>)?([A-Za-z_][A-Za-z0-9_]*)(?:<\/a>)?\s*\(/g),
+  ];
+  const raw = matches.at(-1)?.[1];
+  if (!raw) return undefined;
+
+  if (language === 'python' || language === 'ruby') return camelCase(raw);
+  if (language === 'csharp' && raw.endsWith('Async')) return camelCase(raw.slice(0, -5));
+  if (language === 'go') return camelCase(raw);
+  return raw;
+}
+
+function snippetKey(group, method) {
+  return `${group}:${method}`;
+}
+
+function groupLabel(groups) {
+  return groups.map(titleCase).join(' ');
+}
+
+function titleCase(value) {
+  const words = value.replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/[_-]+/g, ' ');
+  return words.replace(/\b\w/g, (character) => character.toUpperCase());
+}
+
+function snakeCase(value) {
+  return value
+    .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+    .replace(/[- ]+/g, '_')
+    .toLowerCase();
+}
+
+function pascalCase(value) {
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+function camelCase(value) {
+  if (value.includes('_')) {
+    return value.replace(/_([a-z0-9])/g, (_, character) => character.toUpperCase());
+  }
+  return value.charAt(0).toLowerCase() + value.slice(1);
+}
+
+export function repositoryRootFrom(importMetaUrl) {
+  return fileURLToPath(new URL('../../../', importMetaUrl)).replace(/\/$/, '');
+}

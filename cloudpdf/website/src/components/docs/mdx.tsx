@@ -1,9 +1,19 @@
 import type { MDXComponents } from 'mdx/types';
 import Link from 'next/link';
-import type { AnchorHTMLAttributes, HTMLAttributes, ReactNode } from 'react';
+import type { AnchorHTMLAttributes, ReactNode } from 'react';
 
 import { CodeExample } from '@/components/site/code-example';
 
+import {
+  ApiCredentials,
+  ApiGrants,
+  ApiInstall,
+  ApiOperationCount,
+  ApiResources,
+} from './api-overview';
+import { ApiClientSetup, ApiOperation, ApiSnippet } from './api-reference';
+import { DeploymentTab, DeploymentTabs } from './deployment-tabs';
+import { createHeading } from './heading';
 import { Pre } from './pre';
 import { Toc, type TocItem } from './toc';
 
@@ -22,25 +32,6 @@ function Wrapper({ children, toc }: WrapperProps) {
   );
 }
 
-function createHeading(Tag: 'h2' | 'h3' | 'h4', className: string) {
-  return function Heading({ id, children, ...props }: HTMLAttributes<HTMLHeadingElement>) {
-    return (
-      <Tag id={id} className={`group scroll-mt-[100px] ${className}`} {...props}>
-        {children}
-        {id ? (
-          <a
-            href={`#${id}`}
-            aria-label="Link to this section"
-            className="hover:text-cp-blue ml-2 select-none text-[#C2CEE6] opacity-0 transition group-hover:opacity-100"
-          >
-            #
-          </a>
-        ) : null}
-      </Tag>
-    );
-  };
-}
-
 export function useMDXComponents(components?: MDXComponents): MDXComponents {
   return {
     wrapper: Wrapper,
@@ -50,15 +41,9 @@ export function useMDXComponents(components?: MDXComponents): MDXComponents {
         {...props}
       />
     ),
-    h2: createHeading(
-      'h2',
-      'mt-[52px] font-display text-[27px] font-extrabold leading-[1.2] tracking-[-0.02em] text-cp-navy',
-    ),
-    h3: createHeading(
-      'h3',
-      'mt-[34px] font-display text-[18px] font-extrabold leading-[1.3] tracking-[-0.01em] text-cp-navy',
-    ),
-    h4: createHeading('h4', 'mt-7 font-display text-base font-extrabold text-cp-navy'),
+    h2: createHeading('h2'),
+    h3: createHeading('h3'),
+    h4: createHeading('h4'),
     p: (props) => (
       <p
         className="text-cp-ink mt-4 max-w-[70ch] font-sans text-[16.5px] leading-[1.7]"
@@ -108,6 +93,16 @@ export function useMDXComponents(components?: MDXComponents): MDXComponents {
       <td className="border-cp-borderSoft text-cp-ink border-b px-3 py-2" {...props} />
     ),
     pre: Pre,
+    ApiOperation,
+    ApiSnippet,
+    ApiClientSetup,
+    ApiResources,
+    ApiCredentials,
+    ApiGrants,
+    ApiInstall,
+    ApiOperationCount,
+    DeploymentTabs,
+    DeploymentTab,
     CodeExample,
     ...components,
   };

@@ -1,0 +1,160 @@
+---
+title: Authentication
+description: The three CloudPDF credentials — API token, tenant JWT, and document JWT — how each is obtained, and what it can reach.
+---
+
+import { Callout } from '@/components/docs/callout';
+
+# Authentication
+
+CloudPDF has three credentials. The rule that explains all of them:
+**authority mints only downward, and never back up.**
+
+```
+API token       the deployment root   ·  your server env
+   │ mints
+   ▼
+Tenant JWT      one tenant's subtree  ·  your backend
+   │ mints
+   ▼
+Document JWT    one document, scoped  ·  the browser
+```
+
+Each rung can create the rung below it and can do strictly less than the rung
+above. A document JWT can never call an admin route; a tenant JWT can never
+leave its own tenant. Only the bottom rung is ever allowed to reach a browser.
+
+## Where you enter the ladder
+
+<DeploymentTabs>
+  <DeploymentTab mode="saas">
+    On managed CloudPDF the API token is the **platform's** credential and your
+    account is one tenant. You enter at the second rung: your dashboard API key
+    *is* a tenant token, already scoped to your account. Everything below the
+    second rung — minting document tokens, capabilities, revocation — works
+    exactly as documented here, with your API key as the `token`.
+  </DeploymentTab>
+  <DeploymentTab mode="self-hosted">
+    You operate the deployment, so you hold the top rung: the API token
+    configured through `CLOUDPDF_API_AUTH_TOKENS`. You can call anything with
+    it directly, or mint tenant tokens so each of your services can only reach
+    its own tenant.
+  </DeploymentTab>
+</DeploymentTabs>
+
+<ApiCredentials />
+
+## The API token
+
+A static secret configured on the deployment through `CLOUDPDF_API_AUTH_TOKENS`
+(comma-separated, so you can rotate by adding the new value, deploying, then
+removing the old one). It is the deployment root: valid on every surface, it
+passes every scope and capability check, and it is the only credential that can
+mint a tenant token. On managed CloudPDF it belongs to the platform — knowing
+the rung above you exists is part of the model, but you never hold it.
+
+Construct the client with your credential (keep both values in server-side
+configuration, never in a browser bundle):
+
+<ApiClientSetup />
+
+<Callout type="warn">
+  The API token is a root credential. Keep it in server-side configuration only — never in a
+  browser bundle, a mobile app, or a repository. Anything holding it can read and delete every
+  document in every tenant.
+</Callout>
+
+## Tenant tokens
+
+A tenant JWT represents a principal inside **one** tenant. It carries a `scope`
+array naming the tenant-level operations it may perform, and the server rejects
+it on any path whose `tenantId` is not its own `tenant_id`.
+
+On managed CloudPDF this is what your dashboard API key is. On a self-hosted
+deployment, mint one with the API token via
+[issue token](/docs/api-reference/tokens/issue) using `kind: "tenant"` — that
+request is rejected for every other credential, which is the "downward" rule
+doing its job. Use `scope: ["*"]` for a full tenant administrator.
+
+The available scopes:
+
+<ApiGrants kind="scope" />
+
+## Document tokens
+
+A document JWT is the only credential built to leave your infrastructure. It is
+pinned to a single `doc_id`, carries **capabilities** rather than tenant scopes,
+and is typically minted for minutes rather than hours — so an exfiltrated token
+cannot be replayed against another document.
+
+Mint one from your backend for each user session:
+
+<ApiSnippet operationId="tokens.issue" />
+
+That token is what the viewer opens with — see
+[Engine: getting started](/docs/engine/getting-started).
+
+### Capabilities
+
+Each capability unlocks specific operations. Grant the narrowest set that lets
+the user do their job:
+
+<ApiGrants kind="capability" />
+
+A read-only viewer usually needs `doc.open` and `doc.render`; add
+`doc.annotate.read` to display existing annotations, `doc.annotate.modify` to
+let the user create them, and `doc.download` only if they may take the file.
+
+## The trust boundary
+
+The important property: **your application decides, CloudPDF enforces.**
+
+1. A user opens a document in your app.
+2. Your backend applies *your* authorization rules — roles, sharing, billing state.
+3. Only then does it mint a document token carrying exactly the capabilities
+   that decision allows.
+4. The browser receives the token and opens the document.
+
+CloudPDF never sees your user model. It enforces what the token says, so the
+token is where your policy is expressed. Mint per user, per document, per
+session — never one long-lived token reused across users.
+
+## Signing modes
+
+On managed CloudPDF, signing is the platform's concern — mint through the API
+and skip this section. On a self-hosted deployment, how tokens are produced
+depends on how the server verifies them:
+
+- **HS256 (shared secret)** — the deployment holds `CLOUDPDF_JWT_SECRET` and can
+  sign, so the [issue token](/docs/api-reference/tokens/issue) operation is
+  mounted and your backend can mint through the API as shown above. The secret
+  must be at least 32 bytes on a production license.
+- **Asymmetric (public key or JWKS)** — the deployment only *verifies*, holding a
+  public key or a JWKS URL. It cannot sign, so the issue endpoint is not
+  mounted: your backend mints tokens itself with its own private key and
+  publishes the matching public key.
+
+In both modes the claims are identical. A token carries `sub`, `tenant_id`,
+`iat`, `exp`, a `scope` array, and — for document tokens — `doc_id`. Include a
+`jti` if you want to be able to revoke it.
+
+## Revocation
+
+Tokens are short-lived by design, but you can end a session early with
+[revoke token](/docs/api-reference/tokens/revoke) using the `jti` returned at
+issue time. Live viewer sessions drop on their next heartbeat.
+
+`tokens.issue-doc` and `tokens.revoke` are deliberately separate scopes: a leaked
+issuing capability creates unauthorized access, while a leaked revoke capability
+kills sessions. Different blast radii deserve different grants.
+
+## What the errors mean
+
+- **401** — the credential is missing, malformed, expired, or its signature does
+  not verify.
+- **403** — the credential is valid but insufficient: wrong tenant, missing
+  tenant scope, or missing document capability. Each operation page lists what
+  it requires.
+- **422 `DocPasswordRequired`** — the document is encrypted and needs
+  `X-Document-Password`. That header is accepted only with the API token; viewer
+  document tokens use the SDK's password-session flow instead.

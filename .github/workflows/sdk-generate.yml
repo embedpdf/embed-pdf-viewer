@@ -48,12 +48,22 @@ on:
   pull_request:
     paths:
       - 'cloudpdf/contract/**'
+      - 'cloudpdf/website/scripts/**api-reference*'
+      - 'cloudpdf/website/scripts/extract-sdk-snippets.mjs'
+      - 'cloudpdf/website/scripts/sdk-snippets*'
+      - 'cloudpdf/website/src/generated/sdk-snippets.json'
+      - 'cloudpdf/website/src/content/docs/api-reference/**'
       - 'fern/**'
       - '.github/workflows/sdk-generate.yml'
   push:
     branches: [main]
     paths:
       - 'cloudpdf/contract/**'
+      - 'cloudpdf/website/scripts/**api-reference*'
+      - 'cloudpdf/website/scripts/extract-sdk-snippets.mjs'
+      - 'cloudpdf/website/scripts/sdk-snippets*'
+      - 'cloudpdf/website/src/generated/sdk-snippets.json'
+      - 'cloudpdf/website/src/content/docs/api-reference/**'
       - 'fern/**'
       - '.github/workflows/sdk-generate.yml'
 
@@ -266,3 +276,32 @@ jobs:
           if-no-files-found: error
           include-hidden-files: true
           retention-days: 14
+
+  api-reference:
+    name: Verify API reference
+    needs: generate
+    if: ${{ (inputs.languages || 'typescript,python,php,csharp,go,java,ruby') == 'typescript,python,php,csharp,go,java,ruby' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Download generated SDK references
+        uses: actions/download-artifact@v4
+        with:
+          pattern: cloudpdf-sdk-*
+          path: ${{ runner.temp }}/cloudpdf-sdk-artifacts
+
+      - name: Verify 35-operation, seven-language snippet coverage
+        env:
+          SDK_ARTIFACTS_ROOT: ${{ runner.temp }}/cloudpdf-sdk-artifacts
+        run: node cloudpdf/website/scripts/extract-sdk-snippets.mjs --check
+
+      - name: Verify OpenAPI-derived Nextra pages
+        run: node cloudpdf/website/scripts/generate-api-reference.mjs --check
+
+      - name: Test API reference generation
+        run: node --test cloudpdf/website/scripts/*.test.mjs
