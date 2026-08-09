@@ -72,7 +72,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: node --test fern/scripts/sdk-version.test.mjs fern/scripts/sdk-repositories.test.mjs
+      - run: node --test fern/scripts/*.test.mjs
 
   generate:
     needs: version-policy
@@ -188,9 +188,16 @@ jobs:
             php)
               find src -type f -name '*.php' -print0 | xargs -0 -P 4 -n1 php -l >/dev/null
               composer validate --no-check-publish --no-interaction
+              php_package_test="$(mktemp -d)"
+              tar --exclude=.git --exclude=vendor -cf - . | tar -xf - -C "$php_package_test"
+              (
+                cd "$php_package_test"
+                composer dump-autoload --no-dev --no-interaction --optimize --strict-psr --quiet
+                php -r "require 'vendor/autoload.php'; \$base = new CloudPDF\Exceptions\CloudPDFException('test'); \$api = new CloudPDF\Exceptions\CloudPDFApiException('test', 500, null); if (!(\$base instanceof Exception) || !(\$api instanceof CloudPDF\Exceptions\CloudPDFException)) { throw new RuntimeException('CloudPDF exception autoload verification failed'); }"
+              )
               ;;
             csharp)
-              dotnet build src/CloudpdfApi/CloudpdfApi.csproj -c Release -f net8.0
+              dotnet build src/CloudPDF/CloudPDF.csproj -c Release -f net8.0
               ;;
             go)
               go test -run '^$' ./...
@@ -201,6 +208,9 @@ jobs:
             ruby)
               ruby -e 'Dir["lib/**/*.rb"].each { |file| RubyVM::InstructionSequence.compile_file(file) }'
               gem build cloudpdf.gemspec --output /tmp/cloudpdf-ruby.gem
+              ruby_gem_home="$(mktemp -d)"
+              gem install /tmp/cloudpdf-ruby.gem --local --no-document --install-dir "$ruby_gem_home"
+              GEM_HOME="$ruby_gem_home" GEM_PATH="$ruby_gem_home" ruby -e 'require "cloudpdf"; abort "CloudPDF::Client was not packaged" unless defined?(CloudPDF::Client)'
               ;;
           esac
 
