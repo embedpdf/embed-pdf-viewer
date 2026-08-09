@@ -129,8 +129,14 @@ export function getSdkLanguages(): Array<SdkLanguage & { language: string }> {
 
 export function getApiVersion() {
   if (openapi.info.version !== snippets.canonicalVersion) {
+    // Every contract release moves this version, so a plain version bump
+    // is the common cause and re-extracting is the whole fix. Only an
+    // actual operation change needs the SDKs regenerated first, since
+    // the manifest is extracted from their reference.md.
     throw new Error(
-      `API reference version mismatch: OpenAPI is ${openapi.info.version}, snippets are ${snippets.canonicalVersion}`,
+      `API reference version mismatch: OpenAPI is ${openapi.info.version}, snippets are ${snippets.canonicalVersion}.\n` +
+        `Regenerate the manifest: pnpm --filter @cloudpdf/website api:snippets\n` +
+        `If the contract's operations changed, regenerate the SDKs first.`,
     );
   }
   return snippets.canonicalVersion;
