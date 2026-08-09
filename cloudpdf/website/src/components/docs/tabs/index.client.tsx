@@ -78,7 +78,8 @@ export const Tabs: FC<TabsProps> = ({ items, children, storageKey, defaultIndex 
   }
 
   async function copy() {
-    const text = panelRef.current?.textContent ?? '';
+    const text =
+      panelRef.current?.querySelector('pre')?.textContent ?? panelRef.current?.textContent ?? '';
     await navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -90,7 +91,7 @@ export const Tabs: FC<TabsProps> = ({ items, children, storageKey, defaultIndex 
   return (
     <TabsContext.Provider value={true}>
       <div className="mt-[22px] overflow-hidden rounded-[14px] border border-[#21305F] bg-[#0E1A40] shadow-[0_22px_48px_-26px_rgba(8,24,72,0.5)]">
-        <div className="flex items-center gap-1 border-b border-[#1E2C5A] bg-[#0A1638] px-2 py-[7px]">
+        <div className="flex items-center gap-1 overflow-x-auto border-b border-[#1E2C5A] bg-[#0A1638] px-2 py-[7px] [scrollbar-width:thin]">
           {items.map((item, index) => {
             const disabled = isTabObjectItem(item) && item.disabled;
             const label = isTabObjectItem(item) ? item.label : item;
@@ -101,7 +102,7 @@ export const Tabs: FC<TabsProps> = ({ items, children, storageKey, defaultIndex 
                 type="button"
                 disabled={disabled}
                 onClick={() => selectTab(index)}
-                className={`inline-flex cursor-pointer items-center gap-1.5 rounded-[7px] px-[11px] py-[7px] font-sans text-[12px] font-semibold leading-none transition ${
+                className={`inline-flex shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-[7px] px-[11px] py-[7px] font-sans text-[12px] font-semibold leading-none transition ${
                   active
                     ? 'bg-[#1E2C5A] text-white'
                     : disabled
@@ -118,7 +119,7 @@ export const Tabs: FC<TabsProps> = ({ items, children, storageKey, defaultIndex 
             type="button"
             onClick={copy}
             aria-label="Copy code"
-            className={`ml-auto inline-flex items-center justify-center rounded-[7px] p-[7px] transition hover:bg-white/5 ${
+            className={`sticky right-0 ml-auto inline-flex shrink-0 items-center justify-center rounded-[7px] bg-[#0A1638] p-[7px] transition hover:bg-[#101E45] ${
               copied ? 'text-[#6FE0A0]' : 'text-[#6E82BC] hover:text-[#B7C6EA]'
             }`}
           >

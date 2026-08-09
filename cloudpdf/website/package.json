@@ -4,10 +4,15 @@
   "scripts": {
     "dev": "next dev",
     "dev:clean": "rm -rf .next && next dev",
+    "prebuild": "pnpm api:check",
     "build": "next build",
     "start": "next start",
     "clean": "rm -rf .next node_modules/.cache",
-    "lint": "next lint"
+    "lint": "next lint",
+    "api:pages": "node scripts/generate-api-reference.mjs",
+    "api:snippets": "node scripts/extract-sdk-snippets.mjs",
+    "api:metadata": "node scripts/sync-api-reference-metadata.mjs",
+    "api:check": "node scripts/generate-api-reference.mjs --check && node scripts/check-api-reference.mjs && node --test scripts/*.test.mjs"
   },
   "dependencies": {
     "@hugeicons/core-free-icons": "^4.2.0",

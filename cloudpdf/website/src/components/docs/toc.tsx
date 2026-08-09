@@ -61,10 +61,34 @@ function Feedback() {
 
 export function Toc({ toc }: { toc?: TocItem[] }) {
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [derived, setDerived] = useState<TocItem[]>([]);
+
+  // Nextra builds the TOC from markdown headings only, so pages whose sections
+  // are emitted by a component (the API reference) arrive with an empty toc.
+  // Fall back to the headings actually rendered into the article.
+  useEffect(() => {
+    if (toc && toc.length > 0) return;
+    const headings = document.querySelectorAll<HTMLHeadingElement>(
+      'article h2[id], article h3[id]',
+    );
+    setDerived(
+      [...headings].map((heading) => {
+        const label = heading.cloneNode(true) as HTMLHeadingElement;
+        label.querySelector('a[aria-label]')?.remove();
+        return {
+          id: heading.id,
+          value: label.textContent?.trim() ?? '',
+          depth: Number(heading.tagName[1]),
+        };
+      }),
+    );
+  }, [toc]);
+
+  const items = toc && toc.length > 0 ? toc : derived;
 
   useEffect(() => {
-    if (!toc || toc.length === 0) return;
-    const ids = toc.map((item) => item.id);
+    if (items.length === 0) return;
+    const ids = items.map((item) => item.id);
 
     function spy() {
       const top = window.scrollY + 140;
@@ -83,9 +107,9 @@ export function Toc({ toc }: { toc?: TocItem[] }) {
       window.removeEventListener('scroll', spy);
       window.removeEventListener('resize', spy);
     };
-  }, [toc]);
+  }, [items]);
 
-  if (!toc || toc.length === 0) return null;
+  if (items.length === 0) return null;
 
   return (
     <aside className="sticky top-[84px] hidden max-h-[calc(100vh-84px)] w-[232px] shrink-0 self-start overflow-y-auto py-11 xl:block">
@@ -93,7 +117,7 @@ export function Toc({ toc }: { toc?: TocItem[] }) {
         On this page
       </p>
       <ul className="border-cp-borderSoft flex flex-col gap-0.5 border-l-2">
-        {toc.map((item) => {
+        {items.map((item) => {
           const active = activeId === item.id;
           return (
             <li key={item.id} style={{ paddingLeft: `${(item.depth - 2) * 12}px` }}>

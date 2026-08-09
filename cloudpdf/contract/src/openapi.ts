@@ -16,6 +16,7 @@ import { EngineErrorPayloadSchema } from '@embedpdf/engine-core/wire';
 import {
   AdminErrorPayloadSchema,
   allOperations,
+  docsGroups,
   type AdminCredential,
   type AdminOperation,
   type AdminOperationBody,
@@ -55,6 +56,7 @@ export function buildAdminOpenApiDocument(opts: BuildAdminOpenApiOptions): Recor
   registerSchema(schemas, 'EngineErrorPayload', EngineErrorPayloadSchema);
 
   for (const op of Object.values(allOperations) as AdminOperation[]) {
+    assertDocsGroupsCover(op);
     const openApiPath = toOpenApiPath(op.path);
     const method = op.method.toLowerCase();
     const entry = (paths[openApiPath] ??= {});
@@ -75,11 +77,15 @@ export function buildAdminOpenApiDocument(opts: BuildAdminOpenApiOptions): Recor
       license: { name: 'Apache-2.0', identifier: 'Apache-2.0' },
     },
     paths: sortKeys(paths),
+    // Docs navigation manifest: section titles and URL slugs for the API
+    // reference, in sidebar order (see `docsGroups` in the registry).
+    'x-docs-groups': docsGroups,
     components: {
       securitySchemes: {
         apiToken: {
           type: 'http',
           scheme: 'bearer',
+          'x-docs-title': 'API token',
           description:
             "The deployment's static root credential (CLOUDPDF_API_AUTH_TOKENS), valid on every surface.",
         },
@@ -87,6 +93,7 @@ export function buildAdminOpenApiDocument(opts: BuildAdminOpenApiOptions): Recor
           type: 'http',
           scheme: 'bearer',
           bearerFormat: 'JWT',
+          'x-docs-title': 'Tenant token',
           description:
             "Delegated tenant JWT, valid only under its own /v1/tenants/{tenantId}/ subtree — the path tenant must equal the token's tenant_id. Doc-scoped viewer tokens are rejected on every admin route.",
         },
@@ -94,6 +101,7 @@ export function buildAdminOpenApiDocument(opts: BuildAdminOpenApiOptions): Recor
           type: 'http',
           scheme: 'bearer',
           bearerFormat: 'JWT',
+          'x-docs-title': 'Document token',
           description:
             'Doc-scoped JWT, valid only on the /v1/docs/{docId} subtree it names, gated by ' +
             "the capability scopes it carries (each operation's x-required-capability).",
@@ -102,6 +110,22 @@ export function buildAdminOpenApiDocument(opts: BuildAdminOpenApiOptions): Recor
       schemas,
     },
   };
+}
+
+/**
+ * Every prefix of an operation's group path must have a `docsGroups`
+ * entry — the docs sidebar needs a title and slug for each level. This
+ * is the moment a new group becomes part of API design, not a website
+ * build failure three packages later.
+ */
+function assertDocsGroupsCover(op: AdminOperation): void {
+  const { groups } = sdkOperationName(op.operationId);
+  for (let depth = 1; depth <= groups.length; depth += 1) {
+    const key = groups.slice(0, depth).join('.');
+    if (!(key in docsGroups)) {
+      throw new Error(`Operation ${op.operationId} has no docsGroups entry for "${key}"`);
+    }
+  }
 }
 
 function operationObject(
@@ -114,6 +138,7 @@ function operationObject(
     operationId: op.operationId,
     'x-fern-sdk-group-name': sdkName.groups,
     'x-fern-sdk-method-name': sdkName.method,
+    'x-docs-title': op.title,
     summary: op.summary,
     ...(op.notes ? { description: op.notes } : {}),
     security: op.credentials.map((credential) => ({ [SECURITY_SCHEME[credential]]: [] })),

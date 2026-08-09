@@ -1,6 +1,7 @@
 export default {
   index: { title: 'Introduction', type: 'page' },
   server: { title: 'Server', type: 'page' },
+  'api-reference': { title: 'API reference', type: 'page' },
   engine: { title: 'Engine', type: 'page' },
   react: { title: 'React', type: 'page' },
   vue: { title: 'Vue', type: 'page' },

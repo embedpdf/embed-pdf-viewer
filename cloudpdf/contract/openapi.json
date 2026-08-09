@@ -15,6 +15,7 @@
         "operationId": "deployment.licenseStatus",
         "x-fern-sdk-group-name": ["deployment"],
         "x-fern-sdk-method-name": "licenseStatus",
+        "x-docs-title": "License status",
         "summary": "License decision plus usage-reporting and meter snapshots for this deployment.",
         "security": [
           {
@@ -51,6 +52,7 @@
         "operationId": "doc.head",
         "x-fern-sdk-group-name": ["doc"],
         "x-fern-sdk-method-name": "head",
+        "x-docs-title": "Open document",
         "summary": "Open a document and return its head (versions, page count, security).",
         "security": [
           {
@@ -121,6 +123,7 @@
         "operationId": "doc.annotations.list",
         "x-fern-sdk-group-name": ["doc", "annotations"],
         "x-fern-sdk-method-name": "list",
+        "x-docs-title": "List annotations",
         "summary": "One page's annotations at the current layer version.",
         "security": [
           {
@@ -207,6 +210,7 @@
         "operationId": "doc.annotations.create",
         "x-fern-sdk-group-name": ["doc", "annotations"],
         "x-fern-sdk-method-name": "create",
+        "x-docs-title": "Create annotation",
         "summary": "Create an annotation on a page.",
         "description": "Doc JWTs may instead carry collab scopes (annotations:create:self, …) that refine per-annotation authorship rules; the API token is exempt from both.",
         "security": [
@@ -316,6 +320,7 @@
         "operationId": "doc.annotations.update",
         "x-fern-sdk-group-name": ["doc", "annotations"],
         "x-fern-sdk-method-name": "update",
+        "x-docs-title": "Update annotation",
         "summary": "Update one annotation by key.",
         "security": [
           {
@@ -431,6 +436,7 @@
         "operationId": "doc.annotations.delete",
         "x-fern-sdk-group-name": ["doc", "annotations"],
         "x-fern-sdk-method-name": "delete",
+        "x-docs-title": "Delete annotation",
         "summary": "Delete one annotation by key.",
         "security": [
           {
@@ -528,6 +534,7 @@
         "operationId": "doc.download",
         "x-fern-sdk-group-name": ["doc"],
         "x-fern-sdk-method-name": "download",
+        "x-docs-title": "Download PDF",
         "summary": "Download the layer's current PDF (base plus layer edits).",
         "security": [
           {
@@ -608,6 +615,7 @@
         "operationId": "doc.forms.get",
         "x-fern-sdk-group-name": ["doc", "forms"],
         "x-fern-sdk-method-name": "get",
+        "x-docs-title": "Get form snapshot",
         "summary": "Reconciled form snapshot: fields, widgets, values.",
         "security": [
           {
@@ -687,6 +695,7 @@
         "operationId": "doc.forms.exportData",
         "x-fern-sdk-group-name": ["doc", "forms"],
         "x-fern-sdk-method-name": "exportData",
+        "x-docs-title": "Export form data",
         "summary": "Export form data as FDF or XFDF.",
         "security": [
           {
@@ -780,6 +789,7 @@
         "operationId": "doc.forms.importData",
         "x-fern-sdk-group-name": ["doc", "forms"],
         "x-fern-sdk-method-name": "importData",
+        "x-docs-title": "Import form data",
         "summary": "Import form data (FDF/XFDF), filling matching fields.",
         "security": [
           {
@@ -879,6 +889,7 @@
         "operationId": "doc.forms.reset",
         "x-fern-sdk-group-name": ["doc", "forms"],
         "x-fern-sdk-method-name": "reset",
+        "x-docs-title": "Reset form field",
         "summary": "Reset one form field to its default value.",
         "security": [
           {
@@ -967,6 +978,7 @@
         "operationId": "doc.forms.setValue",
         "x-fern-sdk-group-name": ["doc", "forms"],
         "x-fern-sdk-method-name": "setValue",
+        "x-docs-title": "Set form value",
         "summary": "Set one form field's value.",
         "security": [
           {
@@ -1075,6 +1087,7 @@
         "operationId": "doc.manifest",
         "x-fern-sdk-group-name": ["doc"],
         "x-fern-sdk-method-name": "manifest",
+        "x-docs-title": "Get manifest",
         "summary": "Full layer manifest at the layer's current version.",
         "security": [
           {
@@ -1154,6 +1167,7 @@
         "operationId": "doc.metadata.get",
         "x-fern-sdk-group-name": ["doc", "metadata"],
         "x-fern-sdk-method-name": "get",
+        "x-docs-title": "Get metadata",
         "summary": "Document metadata (PDF info dictionary view) for a layer.",
         "security": [
           {
@@ -1233,6 +1247,7 @@
         "operationId": "doc.pages.delete",
         "x-fern-sdk-group-name": ["doc", "pages"],
         "x-fern-sdk-method-name": "delete",
+        "x-docs-title": "Delete pages",
         "summary": "Delete pages.",
         "security": [
           {
@@ -1332,6 +1347,7 @@
         "operationId": "doc.pages.flatten",
         "x-fern-sdk-group-name": ["doc", "pages"],
         "x-fern-sdk-method-name": "flatten",
+        "x-docs-title": "Flatten pages",
         "summary": "Flatten annotations and form fields into page content.",
         "security": [
           {
@@ -1431,6 +1447,7 @@
         "operationId": "doc.pages.move",
         "x-fern-sdk-group-name": ["doc", "pages"],
         "x-fern-sdk-method-name": "move",
+        "x-docs-title": "Move pages",
         "summary": "Reorder pages.",
         "security": [
           {
@@ -1530,6 +1547,7 @@
         "operationId": "doc.pages.rotate",
         "x-fern-sdk-group-name": ["doc", "pages"],
         "x-fern-sdk-method-name": "rotate",
+        "x-docs-title": "Rotate pages",
         "summary": "Set absolute rotation on pages.",
         "security": [
           {
@@ -1629,6 +1647,7 @@
         "operationId": "doc.redactions.apply",
         "x-fern-sdk-group-name": ["doc", "redactions"],
         "x-fern-sdk-method-name": "apply",
+        "x-docs-title": "Apply redactions",
         "summary": "Apply pending redactions, permanently removing content.",
         "security": [
           {
@@ -1728,6 +1747,7 @@
         "operationId": "doc.render",
         "x-fern-sdk-group-name": ["doc"],
         "x-fern-sdk-method-name": "render",
+        "x-docs-title": "Render page",
         "summary": "Render one page as an image at the current layer version.",
         "description": "Render parameters (viewport, format) pass as flat dotted query keys, e.g. `?viewport.kind=width&viewport.width=800`; the full grammar is documented with the viewer.",
         "security": [
@@ -1818,6 +1838,7 @@
         "operationId": "doc.text",
         "x-fern-sdk-group-name": ["doc"],
         "x-fern-sdk-method-name": "text",
+        "x-docs-title": "Extract page text",
         "summary": "Extracted text content for one page.",
         "security": [
           {
@@ -1906,6 +1927,7 @@
         "operationId": "tenants.create",
         "x-fern-sdk-group-name": ["tenants"],
         "x-fern-sdk-method-name": "create",
+        "x-docs-title": "Create tenant",
         "summary": "Create a tenant, or confirm it already exists — ensure-style, idempotent.",
         "security": [
           {
@@ -1960,6 +1982,7 @@
         "operationId": "tenants.list",
         "x-fern-sdk-group-name": ["tenants"],
         "x-fern-sdk-method-name": "list",
+        "x-docs-title": "List tenants",
         "summary": "List tenants, newest first, cursor-paginated.",
         "security": [
           {
@@ -2028,6 +2051,7 @@
         "operationId": "tenants.get",
         "x-fern-sdk-group-name": ["tenants"],
         "x-fern-sdk-method-name": "get",
+        "x-docs-title": "Get tenant",
         "summary": "Fetch one tenant record.",
         "security": [
           {
@@ -2083,6 +2107,7 @@
         "operationId": "tenants.delete",
         "x-fern-sdk-group-name": ["tenants"],
         "x-fern-sdk-method-name": "delete",
+        "x-docs-title": "Delete tenant",
         "summary": "Delete a tenant and everything under it.",
         "description": "Destroys the tenant and everything in its namespace — documents, layers, stored bytes, audit history. Irreversible.",
         "security": [
@@ -2134,6 +2159,7 @@
         "operationId": "documents.list",
         "x-fern-sdk-group-name": ["documents"],
         "x-fern-sdk-method-name": "list",
+        "x-docs-title": "List documents",
         "summary": "List documents in the tenant, newest first, cursor-paginated.",
         "security": [
           {
@@ -2223,6 +2249,7 @@
         "operationId": "documents.get",
         "x-fern-sdk-group-name": ["documents"],
         "x-fern-sdk-method-name": "get",
+        "x-docs-title": "Get document",
         "summary": "Fetch one document record.",
         "security": [
           {
@@ -2300,6 +2327,7 @@
         "operationId": "documents.delete",
         "x-fern-sdk-group-name": ["documents"],
         "x-fern-sdk-method-name": "delete",
+        "x-docs-title": "Delete document",
         "summary": "Delete a document and its stored artifacts.",
         "security": [
           {
@@ -2372,6 +2400,7 @@
         "operationId": "documents.commit",
         "x-fern-sdk-group-name": ["documents"],
         "x-fern-sdk-method-name": "commit",
+        "x-docs-title": "Commit upload",
         "summary": "Finish an upload: verify the SHA-256 and promote the document to ready.",
         "security": [
           {
@@ -2461,6 +2490,7 @@
         "operationId": "documents.download",
         "x-fern-sdk-group-name": ["documents"],
         "x-fern-sdk-method-name": "download",
+        "x-docs-title": "Download document",
         "summary": "Download the stored base PDF bytes.",
         "security": [
           {
@@ -2541,6 +2571,7 @@
         "operationId": "documents.thumbnail",
         "x-fern-sdk-group-name": ["documents"],
         "x-fern-sdk-method-name": "thumbnail",
+        "x-docs-title": "Get thumbnail",
         "summary": "Fetch the warmed dashboard-tile render for a document.",
         "security": [
           {
@@ -2617,6 +2648,7 @@
         "operationId": "documents.uploadDirect",
         "x-fern-sdk-group-name": ["documents"],
         "x-fern-sdk-method-name": "uploadDirect",
+        "x-docs-title": "Upload document directly",
         "summary": "Upload the PDF bytes through the origin instead of a presigned URL.",
         "security": [
           {
@@ -2715,6 +2747,7 @@
         "operationId": "documents.init",
         "x-fern-sdk-group-name": ["documents"],
         "x-fern-sdk-method-name": "init",
+        "x-docs-title": "Initialize upload",
         "summary": "Begin an upload: create (or resume/dedupe) a pending document and issue upload access.",
         "security": [
           {
@@ -2785,6 +2818,7 @@
         "operationId": "tokens.issue",
         "x-fern-sdk-group-name": ["tokens"],
         "x-fern-sdk-method-name": "issue",
+        "x-docs-title": "Issue token",
         "summary": "Mint a delegated JWT: a doc token, or (API token only) a tenant token.",
         "description": "kind \"tenant\" requires the API token — authority mints only downward. Mounted only when the deployment can sign (HS256 mode); asymmetric deployments mint with their own private key.",
         "security": [
@@ -2876,6 +2910,7 @@
         "operationId": "tokens.revoke",
         "x-fern-sdk-group-name": ["tokens"],
         "x-fern-sdk-method-name": "revoke",
+        "x-docs-title": "Revoke token",
         "summary": "Revoke a token by jti; live sessions drop on their next heartbeat.",
         "description": "Mounted only when the deployment enables token revocation.",
         "security": [
@@ -2946,23 +2981,59 @@
       }
     }
   },
+  "x-docs-groups": {
+    "deployment": {
+      "title": "Deployment"
+    },
+    "tenants": {
+      "title": "Tenants"
+    },
+    "documents": {
+      "title": "Tenant documents"
+    },
+    "tokens": {
+      "title": "Tokens"
+    },
+    "doc": {
+      "title": "Document operations",
+      "slug": "document-operations"
+    },
+    "doc.annotations": {
+      "title": "Annotations"
+    },
+    "doc.forms": {
+      "title": "Forms"
+    },
+    "doc.metadata": {
+      "title": "Metadata"
+    },
+    "doc.pages": {
+      "title": "Pages"
+    },
+    "doc.redactions": {
+      "title": "Redactions"
+    }
+  },
   "components": {
     "securitySchemes": {
       "apiToken": {
         "type": "http",
         "scheme": "bearer",
+        "x-docs-title": "API token",
         "description": "The deployment's static root credential (CLOUDPDF_API_AUTH_TOKENS), valid on every surface."
       },
       "tenantToken": {
         "type": "http",
         "scheme": "bearer",
         "bearerFormat": "JWT",
+        "x-docs-title": "Tenant token",
         "description": "Delegated tenant JWT, valid only under its own /v1/tenants/{tenantId}/ subtree — the path tenant must equal the token's tenant_id. Doc-scoped viewer tokens are rejected on every admin route."
       },
       "docToken": {
         "type": "http",
         "scheme": "bearer",
         "bearerFormat": "JWT",
+        "x-docs-title": "Document token",
         "description": "Doc-scoped JWT, valid only on the /v1/docs/{docId} subtree it names, gated by the capability scopes it carries (each operation's x-required-capability)."
       }
     },
