@@ -35,8 +35,8 @@ test('the C# generator publishes source to the consumer-facing .NET repository',
   assert.equal(sdkRepository('csharp').displayName, '.NET');
 });
 
-test('trusted-publishing SDKs receive guarded repository release workflows', () => {
-  for (const language of ['typescript', 'python', 'csharp', 'ruby']) {
+test('every SDK receives a guarded repository release workflow', () => {
+  for (const language of LANGUAGES) {
     const workflowPath = join(
       repositoryDirectory,
       'fern',
@@ -50,11 +50,34 @@ test('trusted-publishing SDKs receive guarded repository release workflows', () 
     const workflow = readFileSync(workflowPath, 'utf8');
     assert.match(workflow, /SDK_AUTO_PUBLISH_ENABLED/);
     assert.match(workflow, /environment: release/);
-    assert.match(workflow, /id-token: write/);
     assert.match(workflow, /cloudpdf-generation\.json/);
     assert.match(workflow, /Protect immutable release tag/);
     assert.match(workflow, /Create GitHub release/);
   }
+});
+
+test('release workflows use each registry publishing mechanism', () => {
+  const workflow = (language) =>
+    readFileSync(
+      join(
+        repositoryDirectory,
+        'fern',
+        'repository-overlays',
+        language,
+        '.github',
+        'workflows',
+        'sdk-release.yml',
+      ),
+      'utf8',
+    );
+
+  for (const language of ['typescript', 'python', 'csharp', 'ruby']) {
+    assert.match(workflow(language), /id-token: write/);
+  }
+  assert.match(workflow('php'), /repo\.packagist\.org/);
+  assert.match(workflow('go'), /proxy\.golang\.org/);
+  assert.match(workflow('java'), /central\.sonatype\.com\/api\/v1\/publisher\/upload/);
+  assert.match(workflow('java'), /MAVEN_GPG_PRIVATE_KEY/);
 });
 
 test('unknown languages and fields fail explicitly', () => {

@@ -19,4 +19,4 @@ jobs:
           distribution: temurin
           java-version: '17'
           cache: gradle
-      - run: ./gradlew test --no-daemon
+      - run: ./gradlew test generatePomFileForMavenPublication jar sourcesJar javadocJar --no-daemon

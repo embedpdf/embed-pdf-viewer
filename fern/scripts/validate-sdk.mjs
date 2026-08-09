@@ -100,8 +100,13 @@ switch (language) {
   case 'php': {
     const manifest = readJson('composer.json');
     assert(manifest.name === 'cloudpdf/sdk', `composer.json name is ${manifest.name}`);
-    assert(manifest.version === expectedVersion, `composer.json version is ${manifest.version}`);
+    assert(!('version' in manifest), 'composer.json version must be derived from the Packagist tag');
     assert(manifest.license === 'Apache-2.0', `composer.json license is ${manifest.license}`);
+    assert(manifest.authors?.[0]?.name === 'CloudPDF', 'Composer author is not CloudPDF');
+    assert(
+      manifest.support?.source === 'https://github.com/embedpdf/cloudpdf-sdk-php',
+      'Composer source URL is not the PHP SDK repository',
+    );
     includes('src/CloudPDFClient.php', expectedVersion);
     includes('src/CloudPDFClient.php', 'class CloudPDFClient');
     includes('src/Exceptions/CloudPDFException.php', 'class CloudPDFException');
@@ -161,7 +166,25 @@ switch (language) {
       build.includes(`version = '${expectedVersion}'`),
       `Gradle version is not ${expectedVersion}`,
     );
-    assert(build.includes("name = 'APACHE-2.0'"), 'Maven license is not Apache-2.0');
+    assert(build.includes("id 'signing'"), 'Gradle signing plugin is not enabled');
+    assert(
+      build.includes("name = 'Apache License, Version 2.0'"),
+      'Maven license name is not publication-ready',
+    );
+    assert(
+      build.includes("url = 'https://www.apache.org/licenses/LICENSE-2.0.txt'"),
+      'Maven license URL is not publication-ready',
+    );
+    assert(
+      build.includes("url = 'https://github.com/embedpdf/cloudpdf-sdk-java'"),
+      'Maven SCM URL is not the Java SDK repository',
+    );
+    assert(build.includes("name = 'centralStaging'"), 'Central staging repository is missing');
+    assert(
+      build.includes("System.getenv('MAVEN_GPG_PRIVATE_KEY')"),
+      'in-memory Maven signing key is not configured',
+    );
+    assert(!build.includes('YOUR-ORG'), 'placeholder Maven SCM organization remains');
     includes('src/main/java/api/CloudPDFClient.java', 'package com.cloudpdf.api;');
     includes('src/main/java/api/CloudPDFClient.java', 'class CloudPDFClient');
     includes('src/main/java/api/core/CloudPDFException.java', 'class CloudPDFException');

@@ -57,8 +57,8 @@ release workflow calls the same generation workflow with repository sync
 enabled only after the multi-architecture server manifest exists and passes
 inspection. Each generated repository PR includes an `SDK CI` workflow and can
 optionally use GitHub native auto-merge after repository requirements pass.
-TypeScript, Python, .NET, and Ruby also receive the guarded release workflow
-described below.
+All seven SDK repositories also receive the guarded release workflow described
+below.
 
 Repository sync uses a GitHub App rather than a personal access token. Install
 one app on the seven repositories with **Contents: read/write**, **Pull
@@ -83,12 +83,18 @@ rejected instead of overwritten.
 
 ## Registry publishing
 
-The first publishing wave is repository-owned for TypeScript, Python, .NET,
-and Ruby. Their `.github/workflows/sdk-release.yml` workflows build the actual
-package, verify `cloudpdf-generation.json` against the ecosystem manifest,
-protect an immutable `v<ecosystem-version>` tag, publish with GitHub OIDC, and
+Publishing is repository-owned for all seven SDKs. Their
+`.github/workflows/sdk-release.yml` workflows build the actual package, verify
+`cloudpdf-generation.json` against the ecosystem manifest, protect an
+immutable `v<ecosystem-version>` tag, verify the public package index, and
 create a matching GitHub release. Canonical prereleases become GitHub
 prereleases; npm additionally publishes them under the `next` dist-tag.
+
+TypeScript, Python, .NET, and Ruby exchange GitHub OIDC identities for
+short-lived registry credentials. Composer and Go releases are the Git tags
+themselves: Packagist and the Go module proxy index those immutable tags. Java
+builds PGP-signed JAR, source, Javadoc, and POM artifacts and uploads their
+checksummed bundle through the Maven Central Portal API.
 
 Publishing is disabled by default. Before the first release, create a GitHub
 environment named `release` in each SDK repository and configure the registry
@@ -96,24 +102,43 @@ to trust this exact environment and workflow:
 
 | Registry | Project | Repository | Additional setup |
 | -------- | ------- | ---------- | ---------------- |
-| npm | `@cloudpdf/sdk` | `cloudpdf-sdk-typescript` | Trusted publisher for `sdk-release.yml`; allow `npm publish` |
-| PyPI | `cloudpdf` | `cloudpdf-sdk-python` | Existing or pending trusted publisher for `sdk-release.yml` |
-| NuGet | `CloudPDF` | `cloudpdf-sdk-dotnet` | Trusted publishing policy for `sdk-release.yml`; repository variable `NUGET_USER` set to the NuGet profile name |
-| RubyGems | `cloudpdf` | `cloudpdf-sdk-ruby` | Existing or pending trusted publisher for `sdk-release.yml` |
+| npm | `@cloudpdf/sdk` | `cloudpdf-sdk-typescript` | Trusted publisher for `sdk-release.yml`; environment `release`; allow `npm publish` |
+| PyPI | `cloudpdf` | `cloudpdf-sdk-python` | Existing or pending trusted publisher for `sdk-release.yml`; environment `release` |
+| Packagist | `cloudpdf/sdk` | `cloudpdf-sdk-php` | Submit the GitHub repository once and enable Packagist's GitHub auto-update hook |
+| NuGet | `CloudPDF` | `cloudpdf-sdk-dotnet` | Trusted publishing policy for `sdk-release.yml`; environment `release`; repository variable `NUGET_USER` set to the NuGet profile name |
+| Go proxy | `github.com/embedpdf/cloudpdf-sdk-go/v3` | `cloudpdf-sdk-go` | None; the workflow pushes the SemVer tag and prompts `proxy.golang.org` to index it |
+| Maven Central | `com.cloudpdf:sdk` | `cloudpdf-sdk-java` | Verified `com.cloudpdf` namespace, Portal user token, and PGP signing key as described below |
+| RubyGems | `cloudpdf` | `cloudpdf-sdk-ruby` | Existing or pending trusted publisher for `sdk-release.yml`; environment `release` |
 
-Use required reviewers on the `release` environments during rollout. Leave
-`SDK_AUTO_PUBLISH_ENABLED` unset and manually dispatch **SDK Release** once in
-each repository. After all four packages install successfully, remove the
-manual approval if desired and set the repository variable
+Required reviewers on `release` are optional. They provide an independent
+authorization boundary, but a self-approval before the job starts does not
+validate build output. Leave `SDK_AUTO_PUBLISH_ENABLED` unset and manually
+dispatch **SDK Release** once in each repository. After all seven packages
+install successfully, set the repository variable
 `SDK_AUTO_PUBLISH_ENABLED=true`; subsequent generated-source merges then
 publish automatically.
 
-The tag is created before registry authentication so a missing trusted
-publisher cannot publish untracked bytes. Fix the registry configuration and
-rerun the same commit: the workflow accepts the existing tag, skips an already
-published registry version, and fills in a missing GitHub release. A tag may be
-reused after workflow-only changes, but any different package source requires a
-new SDK version.
+For Java, generate a Maven Central Portal user token and configure these
+`release` environment secrets in `cloudpdf-sdk-java`:
+
+- `MAVEN_CENTRAL_USERNAME`
+- `MAVEN_CENTRAL_PASSWORD`
+- `MAVEN_GPG_PRIVATE_KEY`
+- `MAVEN_GPG_PASSPHRASE`
+
+The first two values are the generated Portal token credentials, not the
+interactive Central account password. Export the private signing key as ASCII
+armor and publish its public key to a Maven Central-supported keyserver before
+the first release. The workflow keeps the private key in memory, builds a local
+Maven repository, requires every artifact to have a signature, and submits an
+automatic Central deployment. Maven Central performs the authoritative
+signature validation.
+
+The tag is created before registry authentication or external publication. Fix
+the registry configuration and rerun the same commit: the workflow accepts the
+existing tag, skips an already published registry version, and fills in a
+missing GitHub release. A tag may be reused after workflow-only changes, but
+any different package source requires a new SDK version.
 
 npm trusted publishing normally requires the package to exist already. If the
 reserved `@cloudpdf/sdk` name has no published bootstrap version, perform its
