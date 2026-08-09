@@ -1,0 +1,115 @@
+name: SDK Release
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '.github/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sdk-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Release Go module
+    if: github.event_name == 'workflow_dispatch' || vars.SDK_AUTO_PUBLISH_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.21.x'
+          cache-dependency-path: go.sum
+
+      - name: Verify generated release version
+        id: version
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const generation = JSON.parse(fs.readFileSync('cloudpdf-generation.json', 'utf8'));
+          const goMod = fs.readFileSync('go.mod', 'utf8');
+          if (generation.language !== 'go') throw new Error('generation language is not go');
+          if (!goMod.startsWith('module github.com/embedpdf/cloudpdf-sdk-go/v3\n')) {
+            throw new Error('unexpected Go module path');
+          }
+          const prerelease = generation.canonicalVersion.includes('-');
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `version=${generation.sdkVersion}\n`);
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `tag=v${generation.sdkVersion}\n`);
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `prerelease=${prerelease}\n`);
+          NODE
+
+      - name: Validate Go module
+        run: |
+          go mod tidy
+          git diff --exit-code -- go.mod go.sum
+          go test -run '^$' ./...
+
+      - name: Protect immutable release tag
+        env:
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          git fetch --force --tags origin
+          if git rev-parse --quiet --verify "refs/tags/$RELEASE_TAG" >/dev/null; then
+            tagged_commit="$(git rev-list -n 1 "$RELEASE_TAG")"
+            if [ "$tagged_commit" != "$GITHUB_SHA" ]; then
+              if git diff --quiet "$RELEASE_TAG" "$GITHUB_SHA" -- . ':(exclude).github/**'; then
+                echo "::notice::Reusing $RELEASE_TAG after a workflow-only change."
+              else
+                echo "::error::Release tag $RELEASE_TAG already points to different module source at $tagged_commit; bump the SDK version."
+                exit 1
+              fi
+            fi
+          else
+            git config user.name cloudpdf-sdk-bot
+            git config user.email hello@cloudpdf.com
+            git tag -a "$RELEASE_TAG" -m "CloudPDF Go SDK $RELEASE_TAG"
+            git push origin "refs/tags/$RELEASE_TAG"
+          fi
+
+      - name: Publish through the Go module proxy
+        env:
+          MODULE_PATH: github.com/embedpdf/cloudpdf-sdk-go/v3
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          proxy_error="$(mktemp)"
+          for attempt in $(seq 1 60); do
+            if GOPROXY=https://proxy.golang.org go list -m -json "$MODULE_PATH@$RELEASE_TAG" >module.json 2>"$proxy_error"; then
+              node <<'NODE'
+          const fs = require('node:fs');
+          const module = JSON.parse(fs.readFileSync('module.json', 'utf8'));
+          if (module.Path !== process.env.MODULE_PATH || module.Version !== process.env.RELEASE_TAG) {
+            throw new Error(`Go proxy returned ${module.Path}@${module.Version}`);
+          }
+          NODE
+              exit 0
+            fi
+            echo "Go proxy has not indexed $MODULE_PATH@$RELEASE_TAG yet (attempt $attempt/60)."
+            sleep 10
+          done
+          cat "$proxy_error"
+          echo "::error::Go proxy did not index $MODULE_PATH@$RELEASE_TAG."
+          exit 1
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+          PRERELEASE: ${{ steps.version.outputs.prerelease }}
+        run: |
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            exit 0
+          fi
+          args=(--verify-tag --generate-notes --title "CloudPDF Go SDK $RELEASE_TAG")
+          if [ "$PRERELEASE" = 'true' ]; then args+=(--prerelease); fi
+          gh release create "$RELEASE_TAG" "${args[@]}"

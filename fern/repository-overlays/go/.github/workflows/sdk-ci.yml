@@ -18,4 +18,6 @@ jobs:
         with:
           go-version: '1.21.x'
           cache-dependency-path: go.sum
+      - run: go mod tidy
+      - run: git diff --exit-code -- go.mod go.sum
       - run: go test -run '^$' ./...

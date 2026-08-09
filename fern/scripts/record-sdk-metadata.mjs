@@ -58,6 +58,26 @@ if (language === 'typescript') {
   writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 4)}\n`);
 }
 
+if (language === 'php') {
+  const manifestPath = `${outputDirectory}/composer.json`;
+  const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+  // Packagist derives versions from immutable VCS tags and Composer warns when
+  // a published library hard-codes its version in composer.json.
+  delete manifest.version;
+  manifest.authors = [
+    {
+      name: 'CloudPDF',
+      email: 'hello@cloudpdf.com',
+      homepage: 'https://www.cloudpdf.com',
+    },
+  ];
+  manifest.support = {
+    issues: 'https://github.com/embedpdf/cloudpdf-sdk-php/issues',
+    source: 'https://github.com/embedpdf/cloudpdf-sdk-php',
+  };
+  writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+}
+
 if (language === 'python') {
   const projectPath = `${outputDirectory}/pyproject.toml`;
   const project = readFileSync(projectPath, 'utf8')
@@ -117,5 +137,90 @@ if (language === 'csharp') {
       '<FileVersion>$(Version)</FileVersion>',
       `<FileVersion>${numericBinaryVersion}</FileVersion>`,
     );
+  writeFileSync(projectPath, project);
+}
+
+// Maven Central requires source and Javadoc artifacts, complete POM metadata,
+// and a PGP signature for every published artifact. Fern generates the first
+// two but currently leaves placeholder SCM URLs and an OSSRH-era remote
+// repository. Stage a signed local Maven repository instead; the repository
+// release workflow bundles and uploads it through the Central Portal API.
+if (language === 'java') {
+  const projectPath = `${outputDirectory}/build.gradle`;
+  const project = readFileSync(projectPath, 'utf8')
+    .replace("    id 'maven-publish'\n", "    id 'maven-publish'\n    id 'signing'\n")
+    .replace(
+      `                licenses {
+                    license {
+                        name = 'APACHE-2.0'
+                    }
+                }`,
+      `                licenses {
+                    license {
+                        name = 'Apache License, Version 2.0'
+                        url = 'https://www.apache.org/licenses/LICENSE-2.0.txt'
+                        distribution = 'repo'
+                    }
+                }`,
+    )
+    .replace(
+      `                developers {
+                    developer {
+                        name = 'CloudPDF'
+                        email = 'hello@cloudpdf.com'
+                    }
+                }`,
+      `                developers {
+                    developer {
+                        id = 'cloudpdf'
+                        name = 'CloudPDF'
+                        email = 'hello@cloudpdf.com'
+                        organization = 'CloudPDF'
+                        organizationUrl = 'https://www.cloudpdf.com'
+                    }
+                }`,
+    )
+    .replace(
+      `                scm {
+                    connection = 'scm:git:git://github.com/YOUR-ORG/YOUR-REPO.git'
+                    developerConnection = 'scm:git:git://github.com/YOUR-ORG/YOUR-REPO.git'
+                    url = 'https://github.com/YOUR-ORG/YOUR-REPO'
+                }`,
+      `                scm {
+                    connection = 'scm:git:https://github.com/embedpdf/cloudpdf-sdk-java.git'
+                    developerConnection = 'scm:git:ssh://git@github.com/embedpdf/cloudpdf-sdk-java.git'
+                    url = 'https://github.com/embedpdf/cloudpdf-sdk-java'
+                }`,
+    )
+    .replace(
+      `    repositories {
+        maven {
+            url "$System.env.MAVEN_PUBLISH_REGISTRY_URL"
+            credentials {
+                username "$System.env.MAVEN_USERNAME"
+                password "$System.env.MAVEN_PASSWORD"
+            }
+        }
+    }`,
+      `    repositories {
+        maven {
+            name = 'centralStaging'
+            url = layout.buildDirectory.dir('central-staging')
+        }
+    }`,
+    )
+    .concat(`
+tasks.withType(GenerateModuleMetadata) {
+    enabled = false
+}
+
+signing {
+    useInMemoryPgpKeys(
+        System.getenv('MAVEN_GPG_PRIVATE_KEY'),
+        System.getenv('MAVEN_GPG_PASSPHRASE')
+    )
+    sign publishing.publications.maven
+}
+`);
   writeFileSync(projectPath, project);
 }
