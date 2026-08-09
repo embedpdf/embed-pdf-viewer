@@ -91,6 +91,19 @@ jobs:
           fi
           echo "commit=$tagged_commit" >> "$GITHUB_OUTPUT"
 
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+          PRERELEASE: ${{ steps.version.outputs.prerelease }}
+        run: |
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            exit 0
+          fi
+          args=(--verify-tag --generate-notes --title "CloudPDF PHP SDK $RELEASE_TAG")
+          if [ "$PRERELEASE" = 'true' ]; then args+=(--prerelease); fi
+          gh release create "$RELEASE_TAG" "${args[@]}"
+
       - name: Wait for Packagist publication
         env:
           VERSION: ${{ steps.version.outputs.version }}
@@ -105,7 +118,8 @@ jobs:
           const fs = require('node:fs');
           const metadata = JSON.parse(fs.readFileSync(process.env.METADATA_FILE, 'utf8'));
           const releases = metadata.packages?.['cloudpdf/sdk'] ?? [];
-          const release = releases.find((candidate) => candidate.version === process.env.VERSION);
+          const acceptableVersions = new Set([process.env.VERSION, `v${process.env.VERSION}`]);
+          const release = releases.find((candidate) => acceptableVersions.has(candidate.version));
           if (!release) process.exit(2);
           if (release.source?.reference !== process.env.TAGGED_COMMIT) {
             throw new Error(`Packagist ${process.env.VERSION} points to ${release.source?.reference}, expected ${process.env.TAGGED_COMMIT}`);
@@ -126,16 +140,3 @@ jobs:
           done
           echo "::error::Packagist did not index cloudpdf/sdk $VERSION. Register the repository and enable its GitHub hook, then rerun."
           exit 1
-
-      - name: Create GitHub release
-        env:
-          GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ steps.version.outputs.tag }}
-          PRERELEASE: ${{ steps.version.outputs.prerelease }}
-        run: |
-          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
-            exit 0
-          fi
-          args=(--verify-tag --generate-notes --title "CloudPDF PHP SDK $RELEASE_TAG")
-          if [ "$PRERELEASE" = 'true' ]; then args+=(--prerelease); fi
-          gh release create "$RELEASE_TAG" "${args[@]}"
