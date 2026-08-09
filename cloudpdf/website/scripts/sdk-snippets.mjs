@@ -464,8 +464,7 @@ export function parseReference(source, language) {
       const usage = detail.match(/#### 🔌 Usage[\s\S]*?```([^\n]*)\n([\s\S]*?)```/);
       if (!summary || !usage) continue;
 
-      const plainSummary = decodeHtml(summary.replace(/<[^>]+>/g, ''));
-      const method = methodFromSummary(plainSummary, language);
+      const method = methodFromSummary(summary, language);
       if (!method) continue;
       snippets.set(snippetKey(group, method), { source: usage[2].trim() });
     }
@@ -475,7 +474,12 @@ export function parseReference(source, language) {
 }
 
 function methodFromSummary(summary, language) {
-  const matches = [...summary.matchAll(/(?:\.|->)([A-Za-z_][A-Za-z0-9_]*)(?:Async)?\s*\(/g)];
+  // Fern emits either a plain method, a method wrapped in a source link, or
+  // an HTML-encoded PHP arrow. Extract only that narrow grammar instead of
+  // stripping and decoding arbitrary HTML.
+  const matches = [
+    ...summary.matchAll(/(?:\.|->|-&gt;)(?:<a\b[^>]*>)?([A-Za-z_][A-Za-z0-9_]*)(?:<\/a>)?\s*\(/g),
+  ];
   const raw = matches.at(-1)?.[1];
   if (!raw) return undefined;
 
@@ -514,15 +518,6 @@ function camelCase(value) {
     return value.replace(/_([a-z0-9])/g, (_, character) => character.toUpperCase());
   }
   return value.charAt(0).toLowerCase() + value.slice(1);
-}
-
-function decodeHtml(value) {
-  return value
-    .replaceAll('&gt;', '>')
-    .replaceAll('&lt;', '<')
-    .replaceAll('&amp;', '&')
-    .replaceAll('&quot;', '"')
-    .replaceAll('&#39;', "'");
 }
 
 export function repositoryRootFrom(importMetaUrl) {

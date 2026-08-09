@@ -3,6 +3,16 @@ import test from 'node:test';
 
 import { parseReference } from './sdk-snippets.mjs';
 
+function reference(summary, language, source = `${language} usage`) {
+  return `## Methods
+<details><summary><code>${summary}</code></summary>
+#### 🔌 Usage
+\`\`\`${language}
+${source}
+\`\`\`
+</details>`;
+}
+
 test('extracts TypeScript method snippets from Fern reference markdown', () => {
   const snippets = parseReference(
     `## Tenants
@@ -45,4 +55,61 @@ await client.Deployment.LicenseStatusAsync();
 
   assert.ok(python.has('Deployment:licenseStatus'));
   assert.ok(csharp.has('Deployment:licenseStatus'));
+});
+
+test('extracts every generated summary shape without sanitizing HTML', () => {
+  const cases = [
+    {
+      language: 'typescript',
+      summary: 'client.doc.<a href="/Client.ts">download</a>()',
+      method: 'download',
+    },
+    {
+      language: 'python',
+      summary: 'client.deployment.<a href="client.py">license_status</a>()',
+      method: 'licenseStatus',
+    },
+    {
+      language: 'php',
+      summary: '$client-&gt;deployment-&gt;licenseStatus()',
+      method: 'licenseStatus',
+    },
+    {
+      language: 'csharp',
+      summary: 'client.Deployment.<a href="Client.cs">LicenseStatusAsync</a>()',
+      method: 'licenseStatus',
+    },
+    {
+      language: 'go',
+      summary: 'client.Deployment.LicenseStatus()',
+      method: 'licenseStatus',
+    },
+    {
+      language: 'java',
+      summary: 'client.deployment.licenseStatus()',
+      method: 'licenseStatus',
+    },
+    {
+      language: 'ruby',
+      summary: 'client.deployment.<a href="client.rb">license_status</a>()',
+      method: 'licenseStatus',
+    },
+  ];
+
+  for (const { language, summary, method } of cases) {
+    const snippets = parseReference(reference(summary, language), language);
+    assert.equal(snippets.get(`Methods:${method}`)?.source, `${language} usage`);
+  }
+});
+
+test('rejects unexpected nested markup in a method link', () => {
+  const snippets = parseReference(
+    reference(
+      'client.doc.<a href="/Client.ts"><script>alert(1)</script>download</a>()',
+      'typescript',
+    ),
+    'typescript',
+  );
+
+  assert.equal(snippets.size, 0);
 });
