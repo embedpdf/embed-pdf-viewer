@@ -75,6 +75,7 @@ test('release workflows use each registry publishing mechanism', () => {
     assert.match(workflow(language), /id-token: write/);
   }
   assert.match(workflow('php'), /repo\.packagist\.org/);
+  assert.match(workflow('php'), /acceptableVersions/);
   assert.match(workflow('go'), /proxy\.golang\.org/);
   assert.match(workflow('java'), /central\.sonatype\.com\/api\/v1\/publisher\/upload/);
   assert.match(workflow('java'), /MAVEN_GPG_PRIVATE_KEY/);
