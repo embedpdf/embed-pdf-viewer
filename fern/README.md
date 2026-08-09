@@ -57,6 +57,8 @@ release workflow calls the same generation workflow with repository sync
 enabled only after the multi-architecture server manifest exists and passes
 inspection. Each generated repository PR includes an `SDK CI` workflow and can
 optionally use GitHub native auto-merge after repository requirements pass.
+TypeScript, Python, .NET, and Ruby also receive the guarded release workflow
+described below.
 
 Repository sync uses a GitHub App rather than a personal access token. Install
 one app on the seven repositories with **Contents: read/write**, **Pull
@@ -75,6 +77,50 @@ required `Build and validate` status check.
 The sync is idempotent per canonical version. A failed post-release sync can be
 retried with the **SDK Generate** workflow dispatch after the corresponding
 `ghcr.io/embedpdf/cloudpdf-server:<version>` image exists.
+When a version branch already exists, the sync replaces it only if its remote
+SHA still matches the value observed before generation; a concurrent update is
+rejected instead of overwritten.
+
+## Registry publishing
+
+The first publishing wave is repository-owned for TypeScript, Python, .NET,
+and Ruby. Their `.github/workflows/sdk-release.yml` workflows build the actual
+package, verify `cloudpdf-generation.json` against the ecosystem manifest,
+protect an immutable `v<ecosystem-version>` tag, publish with GitHub OIDC, and
+create a matching GitHub release. Canonical prereleases become GitHub
+prereleases; npm additionally publishes them under the `next` dist-tag.
+
+Publishing is disabled by default. Before the first release, create a GitHub
+environment named `release` in each SDK repository and configure the registry
+to trust this exact environment and workflow:
+
+| Registry | Project | Repository | Additional setup |
+| -------- | ------- | ---------- | ---------------- |
+| npm | `@cloudpdf/sdk` | `cloudpdf-sdk-typescript` | Trusted publisher for `sdk-release.yml`; allow `npm publish` |
+| PyPI | `cloudpdf` | `cloudpdf-sdk-python` | Existing or pending trusted publisher for `sdk-release.yml` |
+| NuGet | `CloudPDF` | `cloudpdf-sdk-dotnet` | Trusted publishing policy for `sdk-release.yml`; repository variable `NUGET_USER` set to the NuGet profile name |
+| RubyGems | `cloudpdf` | `cloudpdf-sdk-ruby` | Existing or pending trusted publisher for `sdk-release.yml` |
+
+Use required reviewers on the `release` environments during rollout. Leave
+`SDK_AUTO_PUBLISH_ENABLED` unset and manually dispatch **SDK Release** once in
+each repository. After all four packages install successfully, remove the
+manual approval if desired and set the repository variable
+`SDK_AUTO_PUBLISH_ENABLED=true`; subsequent generated-source merges then
+publish automatically.
+
+The tag is created before registry authentication so a missing trusted
+publisher cannot publish untracked bytes. Fix the registry configuration and
+rerun the same commit: the workflow accepts the existing tag, skips an already
+published registry version, and fills in a missing GitHub release. A tag may be
+reused after workflow-only changes, but any different package source requires a
+new SDK version.
+
+npm trusted publishing normally requires the package to exist already. If the
+reserved `@cloudpdf/sdk` name has no published bootstrap version, perform its
+first publish with a short-lived granular token, then configure the trusted
+publisher and remove the token. PyPI and RubyGems support pending publishers
+for the first release; NuGet's existing `CloudPDF` package can use a trusted
+publishing policy directly.
 
 ## Version policy
 
@@ -136,5 +182,5 @@ and language generator version.
 
 The repository sync replaces generated source on its version branch while
 keeping each destination repository's `.github` directory repository-owned.
-This lets future registry publishing workflows live with their ecosystem
-credentials without being overwritten by SDK regeneration.
+The checked-in overlays install and update the repository CI and release
+workflows without putting registry credentials in the generation workflow.

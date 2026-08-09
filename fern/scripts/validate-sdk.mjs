@@ -58,6 +58,10 @@ switch (language) {
     assert(manifest.name === '@cloudpdf/sdk', `package.json name is ${manifest.name}`);
     assert(manifest.version === expectedVersion, `package.json version is ${manifest.version}`);
     assert(manifest.license === 'Apache-2.0', `package.json license is ${manifest.license}`);
+    assert(
+      manifest.publishConfig?.access === 'public',
+      'package.json publishConfig.access is not public',
+    );
     includes('src/version.ts', expectedVersion);
     includes('src/Client.ts', 'export class CloudPDFClient');
     includes('src/errors/CloudPDFError.ts', 'export class CloudPDFError');
@@ -79,6 +83,14 @@ switch (language) {
     assert(
       pyproject.includes('license = "Apache-2.0"'),
       'pyproject.toml license is not Apache-2.0',
+    );
+    assert(
+      pyproject.includes('description = "The official Python SDK for the CloudPDF API."'),
+      'pyproject.toml description is not publication-ready',
+    );
+    assert(
+      pyproject.includes('authors = ["CloudPDF <hello@cloudpdf.com>"]'),
+      'pyproject.toml authors are not publication-ready',
     );
     includes('src/cloudpdf/core/client_wrapper.py', expectedVersion);
     includes('src/cloudpdf/client.py', 'class CloudPDFClient:');
@@ -120,6 +132,15 @@ switch (language) {
       project.includes('<PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>'),
       'NuGet license is not Apache-2.0',
     );
+    includes('src/CloudPDF/CloudPDF.csproj', '<Authors>CloudPDF</Authors>');
+    includes(
+      'src/CloudPDF/CloudPDF.csproj',
+      '<Description>The official .NET SDK for the CloudPDF API.</Description>',
+    );
+    includes(
+      'src/CloudPDF/CloudPDF.csproj',
+      '<RepositoryUrl>https://github.com/embedpdf/cloudpdf-sdk-dotnet</RepositoryUrl>',
+    );
     includes('src/CloudPDF/Core/Public/Version.cs', expectedVersion);
     includes('src/CloudPDF/CloudPDFClient.cs', 'class CloudPDFClient');
     includes('src/CloudPDF/Core/Public/CloudPDFException.cs', 'class CloudPDFException');
@@ -155,6 +176,12 @@ switch (language) {
     includes('lib/CloudPDF/client.rb', 'class Client');
     includes('README.md', 'require "cloudpdf"');
     includes('custom.gemspec.rb', 'spec.license = "Apache-2.0"');
+    includes('custom.gemspec.rb', 'spec.summary = "The official Ruby SDK for the CloudPDF API."');
+    includes(
+      'custom.gemspec.rb',
+      'spec.metadata["source_code_uri"] = "https://github.com/embedpdf/cloudpdf-sdk-ruby"',
+    );
+    includes('custom.gemspec.rb', 'file.start_with?(".github/")');
     assert(
       !readdirSync(outputDirectory).includes('CloudPDF.gemspec'),
       'uppercase Ruby gemspec still exists',

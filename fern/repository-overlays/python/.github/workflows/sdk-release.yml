@@ -1,0 +1,132 @@
+name: SDK Release
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '.github/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sdk-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Publish cloudpdf
+    if: github.event_name == 'workflow_dispatch' || vars.SDK_AUTO_PUBLISH_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Verify generated release version
+        id: version
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import tomllib
+
+          with open('pyproject.toml', 'rb') as file:
+              manifest = tomllib.load(file)
+          with open('cloudpdf-generation.json', encoding='utf-8') as file:
+              generation = json.load(file)
+          name = manifest['tool']['poetry']['name']
+          version = manifest['tool']['poetry']['version']
+          if generation['language'] != 'python':
+              raise RuntimeError('generation language is not python')
+          if name != 'cloudpdf':
+              raise RuntimeError(f'unexpected PyPI project {name}')
+          if version != generation['sdkVersion']:
+              raise RuntimeError(f'package version {version} does not match generated version {generation["sdkVersion"]}')
+          prerelease = '-' in generation['canonicalVersion']
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
+              output.write(f'version={version}\n')
+              output.write(f'tag=v{version}\n')
+              output.write(f'prerelease={str(prerelease).lower()}\n')
+          PY
+
+      - name: Build and inspect distributions
+        run: |
+          python -m pip install --disable-pip-version-check build
+          python -m build --outdir dist
+          python -m zipfile --list dist/*.whl >/dev/null
+
+      - name: Protect immutable release tag
+        id: release-tag
+        env:
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          git fetch --force --tags origin
+          if git rev-parse --quiet --verify "refs/tags/$RELEASE_TAG" >/dev/null; then
+            tagged_commit="$(git rev-list -n 1 "$RELEASE_TAG")"
+            if [ "$tagged_commit" != "$GITHUB_SHA" ]; then
+              if git diff --quiet "$RELEASE_TAG" "$GITHUB_SHA" -- . ':(exclude).github/**'; then
+                echo "::notice::Reusing $RELEASE_TAG after a workflow-only change."
+              else
+                echo "::error::Release tag $RELEASE_TAG already points to different package source at $tagged_commit; bump the SDK version."
+                exit 1
+              fi
+            fi
+            echo "existed=true" >> "$GITHUB_OUTPUT"
+          else
+            git config user.name cloudpdf-sdk-bot
+            git config user.email hello@cloudpdf.com
+            git tag -a "$RELEASE_TAG" -m "CloudPDF Python SDK $RELEASE_TAG"
+            git push origin "refs/tags/$RELEASE_TAG"
+            echo "existed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check PyPI publication state
+        id: registry
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          TAG_EXISTED: ${{ steps.release-tag.outputs.existed }}
+        run: |
+          http_status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' "https://pypi.org/pypi/cloudpdf/$VERSION/json")"
+          case "$http_status" in
+            200)
+              if [ "$TAG_EXISTED" != 'true' ]; then
+                echo "::error::cloudpdf==$VERSION already exists on PyPI but its release tag did not exist."
+                exit 1
+              fi
+              echo "publish=false" >> "$GITHUB_OUTPUT"
+              ;;
+            404)
+              echo "publish=true" >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              echo "::error::PyPI returned HTTP $http_status while checking cloudpdf==$VERSION."
+              exit 1
+              ;;
+          esac
+
+      - name: Publish to PyPI
+        if: steps.registry.outputs.publish == 'true'
+        uses: pypa/gh-action-pypi-publish@release/v1
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+          PRERELEASE: ${{ steps.version.outputs.prerelease }}
+        run: |
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            exit 0
+          fi
+          args=(--verify-tag --generate-notes --title "CloudPDF Python SDK $RELEASE_TAG")
+          if [ "$PRERELEASE" = 'true' ]; then args+=(--prerelease); fi
+          gh release create "$RELEASE_TAG" "${args[@]}"

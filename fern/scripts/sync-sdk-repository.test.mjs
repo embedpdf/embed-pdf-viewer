@@ -32,7 +32,7 @@ function run(command, args, options = {}) {
   return result.stdout.trim();
 }
 
-test('sync replaces generated source, preserves repository workflows, and opens a PR branch', () => {
+test('sync creates and safely updates a reused PR branch while preserving repository workflows', () => {
   const fixture = mkdtempSync(join(tmpdir(), 'cloudpdf-sdk-sync-test-'));
   try {
     const remote = join(fixture, 'remote.git');
@@ -104,16 +104,34 @@ esac
       },
     });
 
+    // Auto-merge may leave its head ref behind. Regenerating the same canonical
+    // version must safely replace that existing ref using an explicit lease.
+    writeFileSync(join(generated, 'README.md'), 'generated again\n');
+    run(process.execPath, [script, 'typescript'], {
+      env: {
+        ...process.env,
+        PATH: `${fakeBin}:${process.env.PATH}`,
+        GH_LOG: ghLog,
+        GH_TOKEN: 'fixture-token',
+        SDK_GITHUB_TOKEN: 'fixture-token',
+        SDK_GENERATED_DIRECTORY: generated,
+        SDK_REPOSITORY_REMOTE_URL: remote,
+        SDK_AUTO_MERGE: 'true',
+      },
+    });
+
     const branch = `automation/cloudpdf-sdk-v${canonicalVersion}`;
     run('git', ['clone', '--branch', branch, remote, inspection]);
-    assert.equal(readFileSync(join(inspection, 'README.md'), 'utf8'), 'generated\n');
+    assert.equal(readFileSync(join(inspection, 'README.md'), 'utf8'), 'generated again\n');
     assert.equal(
       readFileSync(join(inspection, '.github', 'workflows', 'existing.yml'), 'utf8'),
       'name: Existing\n',
     );
     assert.ok(existsSync(join(inspection, '.github', 'workflows', 'sdk-ci.yml')));
     assert.equal(existsSync(join(inspection, 'node_modules')), false);
-    assert.match(readFileSync(ghLog, 'utf8'), /pr merge .* --auto --squash --delete-branch/);
+    const ghInvocations = readFileSync(ghLog, 'utf8');
+    assert.match(ghInvocations, /pr merge .* --auto --squash --delete-branch/);
+    assert.equal(ghInvocations.match(/^pr create /gm)?.length, 2);
   } finally {
     rmSync(fixture, { recursive: true, force: true });
   }

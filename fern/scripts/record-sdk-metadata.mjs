@@ -48,6 +48,24 @@ writeFileSync(
 copyFileSync(`${repositoryDirectory}cloudpdf/contract/LICENSE`, `${outputDirectory}/LICENSE`);
 normalizeSdkBranding(outputDirectory, language);
 
+// Registry-facing metadata that Fern does not currently expose through every
+// generator configuration. Keep these deterministic and validate them below so
+// a generator upgrade cannot silently publish incomplete package metadata.
+if (language === 'typescript') {
+  const manifestPath = `${outputDirectory}/package.json`;
+  const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+  manifest.publishConfig = { access: 'public' };
+  writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 4)}\n`);
+}
+
+if (language === 'python') {
+  const projectPath = `${outputDirectory}/pyproject.toml`;
+  const project = readFileSync(projectPath, 'utf8')
+    .replace('description = ""', 'description = "The official Python SDK for the CloudPDF API."')
+    .replace('authors = []', 'authors = ["CloudPDF <hello@cloudpdf.com>"]');
+  writeFileSync(projectPath, project);
+}
+
 // The Ruby generator intentionally leaves registry metadata in its generated
 // custom.gemspec.rb hook. Fill that hook deterministically until each SDK has
 // its own repository-owned customization layer.
@@ -61,6 +79,13 @@ def add_custom_gemspec_data(spec)
   spec.email = ["hello@cloudpdf.com"]
   spec.homepage = "https://www.cloudpdf.com"
   spec.license = "Apache-2.0"
+  spec.summary = "The official Ruby SDK for the CloudPDF API."
+  spec.description = "A typed Ruby client for deployment, tenant, and document operations in the CloudPDF API."
+  spec.metadata["homepage_uri"] = spec.homepage
+  spec.metadata["source_code_uri"] = "https://github.com/embedpdf/cloudpdf-sdk-ruby"
+  spec.files = spec.files.reject do |file|
+    file.start_with?(".github/") || file == "cloudpdf-generation.json"
+  end
 end
 `,
   );
@@ -74,6 +99,16 @@ if (language === 'csharp') {
   const projectPath = `${outputDirectory}/src/CloudPDF/CloudPDF.csproj`;
   const numericBinaryVersion = `${canonicalVersion.split('-')[0]}.0`;
   const project = readFileSync(projectPath, 'utf8')
+    .replace(
+      '<PackageId>CloudPDF</PackageId>',
+      `<PackageId>CloudPDF</PackageId>
+    <Authors>CloudPDF</Authors>
+    <Description>The official .NET SDK for the CloudPDF API.</Description>
+    <PackageProjectUrl>https://www.cloudpdf.com</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/embedpdf/cloudpdf-sdk-dotnet</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageTags>cloudpdf;pdf;api;sdk</PackageTags>`,
+    )
     .replace(
       '<AssemblyVersion>$(Version)</AssemblyVersion>',
       `<AssemblyVersion>${numericBinaryVersion}</AssemblyVersion>`,

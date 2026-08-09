@@ -125,10 +125,15 @@ try {
   ]);
 
   const branch = `automation/cloudpdf-sdk-v${canonicalVersion.replaceAll(/[^0-9A-Za-z._-]/g, '-')}`;
-  run('git', ['fetch', 'origin', `refs/heads/${branch}:refs/remotes/origin/${branch}`], {
+  const remoteBranchRef = `refs/heads/${branch}`;
+  const remoteBranch = run('git', ['ls-remote', '--heads', 'origin', remoteBranchRef], {
     cwd: checkoutDirectory,
-    allowFailure: true,
+    capture: true,
   });
+  const remoteBranchSha = remoteBranch ? remoteBranch.split(/\s+/)[0] : '';
+  if (remoteBranchSha && !/^[0-9a-f]+$/.test(remoteBranchSha)) {
+    throw new Error(`${repository.slug}: invalid remote branch SHA ${remoteBranchSha}`);
+  }
   run('git', ['checkout', '-B', branch, 'origin/main'], { cwd: checkoutDirectory });
   run('git', ['config', 'user.name', 'cloudpdf-sdk-bot'], { cwd: checkoutDirectory });
   run('git', ['config', 'user.email', 'hello@cloudpdf.com'], { cwd: checkoutDirectory });
@@ -163,9 +168,20 @@ try {
       ],
       { cwd: checkoutDirectory },
     );
-    run('git', ['push', 'origin', `HEAD:refs/heads/${branch}`, '--force-with-lease'], {
-      cwd: checkoutDirectory,
-    });
+    // The clone is intentionally shallow and tracks only main, so generic
+    // --force-with-lease cannot infer the expected value for a previously used
+    // automation branch. Pin the lease to the exact SHA observed above. An
+    // empty expected SHA means the branch must still be absent.
+    run(
+      'git',
+      [
+        'push',
+        'origin',
+        `HEAD:${remoteBranchRef}`,
+        `--force-with-lease=${remoteBranchRef}:${remoteBranchSha}`,
+      ],
+      { cwd: checkoutDirectory },
+    );
 
     let pullRequestUrl = run(
       'gh',
@@ -197,7 +213,7 @@ try {
 - OpenAPI SHA-256: \`${generation.source.openapiSha256}\`
 - Source commit: \`${process.env.GITHUB_SHA ?? generation.source.gitCommit ?? 'unknown'}\`
 
-This PR contains generated source only. Package registry publishing is intentionally disabled.
+This PR updates generated source and repository-owned automation. Registry publication remains gated by the SDK repository's release workflow and environment.
 `,
       );
       pullRequestUrl = run(
