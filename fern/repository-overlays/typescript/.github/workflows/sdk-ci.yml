@@ -20,3 +20,4 @@ jobs:
       - run: corepack enable
       - run: pnpm install --lockfile=false --ignore-scripts
       - run: pnpm build
+      - run: npm pack --dry-run

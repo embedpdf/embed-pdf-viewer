@@ -1,0 +1,130 @@
+name: SDK Release
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '.github/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sdk-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Publish cloudpdf
+    if: github.event_name == 'workflow_dispatch' || vars.SDK_AUTO_PUBLISH_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+
+      - name: Verify generated release version
+        id: version
+        run: |
+          ruby <<'RUBY'
+          require "json"
+          require_relative "lib/CloudPDF/version"
+
+          generation = JSON.parse(File.read("cloudpdf-generation.json"))
+          raise "generation language is not ruby" unless generation.fetch("language") == "ruby"
+          version = CloudPDF::VERSION
+          unless version == generation.fetch("sdkVersion")
+            raise "package version #{version} does not match generated version #{generation.fetch('sdkVersion')}"
+          end
+          prerelease = generation.fetch("canonicalVersion").include?("-")
+          File.open(ENV.fetch("GITHUB_OUTPUT"), "a") do |output|
+            output.puts "version=#{version}"
+            output.puts "tag=v#{version}"
+            output.puts "prerelease=#{prerelease}"
+          end
+          RUBY
+
+      - name: Build and verify packaged require graph
+        run: |
+          mkdir -p dist
+          gem build cloudpdf.gemspec --output "dist/cloudpdf-${{ steps.version.outputs.version }}.gem"
+          ruby_gem_home="$(mktemp -d)"
+          gem install "dist/cloudpdf-${{ steps.version.outputs.version }}.gem" --local --no-document --install-dir "$ruby_gem_home"
+          GEM_HOME="$ruby_gem_home" GEM_PATH="$ruby_gem_home" ruby -e 'require "cloudpdf"; abort "CloudPDF::Client was not packaged" unless defined?(CloudPDF::Client)'
+
+      - name: Protect immutable release tag
+        id: release-tag
+        env:
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          git fetch --force --tags origin
+          if git rev-parse --quiet --verify "refs/tags/$RELEASE_TAG" >/dev/null; then
+            tagged_commit="$(git rev-list -n 1 "$RELEASE_TAG")"
+            if [ "$tagged_commit" != "$GITHUB_SHA" ]; then
+              if git diff --quiet "$RELEASE_TAG" "$GITHUB_SHA" -- . ':(exclude).github/**'; then
+                echo "::notice::Reusing $RELEASE_TAG after a workflow-only change."
+              else
+                echo "::error::Release tag $RELEASE_TAG already points to different package source at $tagged_commit; bump the SDK version."
+                exit 1
+              fi
+            fi
+            echo "existed=true" >> "$GITHUB_OUTPUT"
+          else
+            git config user.name cloudpdf-sdk-bot
+            git config user.email hello@cloudpdf.com
+            git tag -a "$RELEASE_TAG" -m "CloudPDF Ruby SDK $RELEASE_TAG"
+            git push origin "refs/tags/$RELEASE_TAG"
+            echo "existed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check RubyGems publication state
+        id: registry
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          TAG_EXISTED: ${{ steps.release-tag.outputs.existed }}
+        run: |
+          versions_file="$(mktemp)"
+          http_status="$(curl --silent --show-error --output "$versions_file" --write-out '%{http_code}' https://rubygems.org/api/v1/versions/cloudpdf.json)"
+          if [ "$http_status" != '200' ]; then
+            echo "::error::RubyGems returned HTTP $http_status while checking cloudpdf $VERSION."
+            exit 1
+          fi
+          if ruby -rjson -e 'version = ENV.fetch("VERSION"); exit(JSON.parse(File.read(ARGV.fetch(0))).any? { |item| item["number"] == version } ? 0 : 1)' "$versions_file"; then
+            if [ "$TAG_EXISTED" != 'true' ]; then
+              echo "::error::cloudpdf $VERSION already exists on RubyGems but its release tag did not exist."
+              exit 1
+            fi
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Configure RubyGems trusted publishing
+        if: steps.registry.outputs.publish == 'true'
+        uses: rubygems/configure-rubygems-credentials@dc5a8d8553e6ee01fc26761a49e99e733d17954a
+
+      - name: Publish to RubyGems
+        if: steps.registry.outputs.publish == 'true'
+        run: gem push "dist/cloudpdf-${{ steps.version.outputs.version }}.gem"
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+          PRERELEASE: ${{ steps.version.outputs.prerelease }}
+        run: |
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            exit 0
+          fi
+          args=(--verify-tag --generate-notes --title "CloudPDF Ruby SDK $RELEASE_TAG")
+          if [ "$PRERELEASE" = 'true' ]; then args+=(--prerelease); fi
+          gh release create "$RELEASE_TAG" "${args[@]}"
