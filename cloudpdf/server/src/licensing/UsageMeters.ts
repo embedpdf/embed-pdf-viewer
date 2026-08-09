@@ -9,8 +9,8 @@
  */
 import { sql, type Kysely } from 'kysely';
 
-import type { Database } from '../db/schema';
 import type { LicenseGate, RuntimeMeterPolicy } from './LicenseRuntime';
+import type { Database } from '../db/schema';
 
 export type UsageMetric = RuntimeMeterPolicy['metric'];
 
@@ -52,7 +52,16 @@ export class UsageMeters {
     await this.assertCounterAllowed('pdf.uploads', 1);
   }
 
-  async recordUpload(eventId: string, occurredAt = Date.now()): Promise<number> {
+  /**
+   * `counted` reports whether this event was fresh (not a dedupe
+   * replay) — the caller uses it to move sibling counters (the
+   * per-tenant usage fact) exactly once per real upload, without a
+   * second dedupe table.
+   */
+  async recordUpload(
+    eventId: string,
+    occurredAt = Date.now(),
+  ): Promise<{ value: number; counted: boolean }> {
     const periodStart = monthPeriod(new Date(occurredAt)).periodStart;
     const policy = this.policyFor('pdf.uploads');
     return this.db.transaction().execute(async (tx) => {
@@ -74,9 +83,10 @@ export class UsageMeters {
           .where('metric', '=', 'pdf.uploads')
           .where('period_start', '=', periodStart)
           .executeTakeFirst();
-        return safeNumber(row?.value ?? 0, 'pdf.uploads');
+        return { value: safeNumber(row?.value ?? 0, 'pdf.uploads'), counted: false };
       }
-      return this.incrementCounter(tx, 'pdf.uploads', periodStart, 1, policy);
+      const value = await this.incrementCounter(tx, 'pdf.uploads', periodStart, 1, policy);
+      return { value, counted: true };
     });
   }
 

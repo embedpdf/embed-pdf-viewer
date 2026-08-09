@@ -102,6 +102,7 @@ export async function registerAdminTokensRoutes(
                 tenant_id: tenantId,
                 doc_id: body.docId,
                 ...(body.layerName ? { layer_name: body.layerName } : {}),
+                ...(body.origins ? { origins: body.origins } : {}),
                 scope: body.scope,
                 jti,
                 ttlSeconds: body.expiresIn,

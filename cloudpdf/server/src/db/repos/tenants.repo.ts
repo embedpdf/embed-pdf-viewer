@@ -1,5 +1,6 @@
 import type { Kysely } from 'kysely';
-import type { Database as Schema } from '../schema';
+
+import type { Database as Schema, TenantStatus } from '../schema';
 
 export interface TenantRow {
   id: string;
@@ -7,6 +8,9 @@ export interface TenantRow {
   config: Record<string, unknown> | null;
   /** True when the namespace materialized on first use rather than via explicit create. */
   autoProvisioned: boolean;
+  /** `suspended` fails the namespace closed for every JWT and share exchange. */
+  status: TenantStatus;
+  suspendedAt: number | null;
   createdAt: number;
 }
 
@@ -105,6 +109,23 @@ export class TenantsRepo {
   }
 
   /**
+   * Flip the suspension state. Returns false when the tenant does not
+   * exist. Idempotent: suspending a suspended tenant refreshes
+   * `suspended_at`, resuming an active one is a no-op write.
+   */
+  async setStatus(tenantId: string, status: TenantStatus): Promise<boolean> {
+    const res = await this.db
+      .updateTable('tenants')
+      .set({
+        status,
+        suspended_at: status === 'suspended' ? Date.now() : null,
+      })
+      .where('id', '=', tenantId)
+      .execute();
+    return Number(res[0]?.numUpdatedRows ?? 0) > 0;
+  }
+
+  /**
    * Remove every DB row in the tenant's namespace, children before
    * parents, ending with the tenant row itself. Storage bytes are the
    * caller's job (one `deletePrefix(tenantRoot)` sweep) — kept out of
@@ -113,6 +134,12 @@ export class TenantsRepo {
    */
   async deleteCascadeDb(tenantId: string): Promise<boolean> {
     const existing = await this.findById(tenantId);
+
+    // Grants reference both tenants and documents — they go before
+    // documents. Usage facts are ours to drop with the namespace; the
+    // security-events trail deliberately survives (no FK, by design).
+    await this.db.deleteFrom('share_grants').where('tenant_id', '=', tenantId).execute();
+    await this.db.deleteFrom('tenant_usage_counter').where('tenant_id', '=', tenantId).execute();
 
     await this.db
       .deleteFrom('weak_annotation_session_pages')
@@ -139,10 +166,7 @@ export class TenantsRepo {
       .execute();
     await this.db.deleteFrom('audit_exports').where('tenant_id', '=', tenantId).execute();
     await this.db.deleteFrom('audit_log').where('tenant_id', '=', tenantId).execute();
-    await this.db
-      .deleteFrom('pdf_password_sessions')
-      .where('tenant_id', '=', tenantId)
-      .execute();
+    await this.db.deleteFrom('pdf_password_sessions').where('tenant_id', '=', tenantId).execute();
     await this.db
       .deleteFrom('pdf_password_verifications')
       .where('tenant_id', '=', tenantId)
@@ -161,12 +185,16 @@ function mapRow(r: {
   config_json: string | null;
   created_at: number;
   auto_provisioned: number;
+  status: TenantStatus;
+  suspended_at: number | null;
 }): TenantRow {
   return {
     id: r.id,
     name: r.name,
     config: r.config_json ? (JSON.parse(r.config_json) as Record<string, unknown>) : null,
     autoProvisioned: r.auto_provisioned !== 0,
+    status: r.status,
+    suspendedAt: r.suspended_at === null ? null : Number(r.suspended_at),
     createdAt: r.created_at,
   };
 }

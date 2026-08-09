@@ -1,4 +1,3 @@
-import type { FastifyInstance } from 'fastify';
 import {
   EngineError,
   EngineErrorCode,
@@ -15,12 +14,15 @@ import {
   type LayerScopes,
   type RenderPolicy,
 } from '@embedpdf/engine-core/wire';
+import type { FastifyInstance } from 'fastify';
+
+import { setNoStore } from './_helpers';
 import { requireLayerDocAccessOnly, type RequestJwtContext } from '../app/jwt-plugin';
 import type { CdnSigner } from '../cdn/CdnSigner';
+import type { TenantUsageRepo } from '../db/repos/tenant_usage.repo';
+import type { UsageMeters } from '../licensing/UsageMeters';
 import type { DerivedRenderService } from '../services/DerivedRenderService';
 import type { DocumentService } from '../services/DocumentService';
-import { setNoStore } from './_helpers';
-import type { UsageMeters } from '../licensing/UsageMeters';
 
 export interface AccessRouteDeps {
   service: DocumentService;
@@ -28,13 +30,14 @@ export interface AccessRouteDeps {
   /** When present, /access advertises the deployment's render lattice. */
   derivedRenders?: DerivedRenderService;
   usageMeters?: UsageMeters;
+  tenantUsage?: TenantUsageRepo;
 }
 
 export async function registerAccessRoutes(
   app: FastifyInstance,
   deps: AccessRouteDeps,
 ): Promise<void> {
-  const { service, cdnSigner, derivedRenders, usageMeters } = deps;
+  const { service, cdnSigner, derivedRenders, usageMeters, tenantUsage } = deps;
 
   app.post(wirePaths.access, async (req, reply) => {
     const parsed = AccessRequestSchema.safeParse(req.body ?? {});
@@ -80,7 +83,13 @@ export async function registerAccessRoutes(
     );
     // A view is a successfully authorized viewer access grant. Counting at
     // this choke point avoids charging internal render/cache operations.
-    await usageMeters?.recordView();
+    // Share sessions (`sub: share:<id>`) were already counted at exchange —
+    // skipping them here is the two-choke-point dedupe, applied to both the
+    // deployment-wide license meter and the per-tenant fact.
+    if (!ctx.jwt.claims.sub.startsWith('share:')) {
+      await usageMeters?.recordView();
+      await tenantUsage?.recordView(ctx.tenantId);
+    }
     setNoStore(reply);
     return {
       security: unlocked.security,

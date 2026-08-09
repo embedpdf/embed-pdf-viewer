@@ -20,6 +20,28 @@ const docIdPattern = /^[A-Za-z0-9_-]+$/;
  * not put PII in tenant ids).
  */
 const tenantIdPattern = /^[A-Za-z0-9_-]+$/;
+/**
+ * A web origin pattern: scheme + host (+ optional port), no path. One
+ * leading `*.` label is allowed and matches one or more subdomain
+ * labels (`https://*.acme.com` covers `docs.acme.com`, never bare
+ * `acme.com` and never `evilacme.com`).
+ */
+const originPattern =
+  /^https?:\/\/(\*\.)?[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)*(:\d{1,5})?$/;
+const originPatternArray = z
+  .array(
+    z
+      .string()
+      .max(262)
+      .regex(
+        originPattern,
+        'must be a web origin like https://example.com (optionally one leading *. wildcard label, optional port, no path)',
+      ),
+  )
+  .min(1)
+  .max(32);
+/** Share tokens are the grant row id: `shr_` + 24 url-safe random chars. */
+const shareTokenPattern = /^shr_[A-Za-z0-9_-]{24}$/;
 
 /**
  * Wire paths. The URL carries the full resource identity — tenant
@@ -46,6 +68,18 @@ export const adminWirePaths = {
   tokenIssue: (tenantId: string) => `/v1/tenants/${encodeURIComponent(tenantId)}/tokens`,
   tokenRevoke: (tenantId: string, jti: string) =>
     `/v1/tenants/${encodeURIComponent(tenantId)}/tokens/${encodeURIComponent(jti)}/revoke`,
+  shares: (tenantId: string) => `/v1/tenants/${encodeURIComponent(tenantId)}/shares`,
+  share: (tenantId: string, shareId: string) =>
+    `/v1/tenants/${encodeURIComponent(tenantId)}/shares/${encodeURIComponent(shareId)}`,
+  tenantUsage: (tenantId: string) => `/v1/tenants/${encodeURIComponent(tenantId)}/usage`,
+  tenantSuspend: (tenantId: string) => `/v1/tenants/${encodeURIComponent(tenantId)}/suspend`,
+  tenantResume: (tenantId: string) => `/v1/tenants/${encodeURIComponent(tenantId)}/resume`,
+  /**
+   * The public share-session exchange. Deliberately outside any tenant
+   * subtree: the caller holds only a share token and does not know the
+   * tenant — the grant row resolves it server-side.
+   */
+  shareSessions: '/v1/share-sessions',
   /** Deployment-global singletons: API-token only, no tenant context. */
   deploymentLicenseStatus: '/v1/deployment/license/status',
 } as const;
@@ -247,6 +281,13 @@ export const AdminTenantRecordSchema = z.object({
   name: z.string(),
   /** True when the namespace materialized on first use rather than via explicit create. */
   autoProvisioned: z.boolean(),
+  /**
+   * `suspended` tenants fail closed: every tenant JWT, doc JWT, and
+   * share exchange is refused until resume. The API token is exempt —
+   * the operator must be able to inspect, resume, or delete a
+   * suspended tenant. Optional because older servers omit it.
+   */
+  status: z.enum(['active', 'suspended']).optional(),
   createdAt: z.number(),
 });
 export type AdminTenantRecord = z.infer<typeof AdminTenantRecordSchema>;
@@ -297,6 +338,11 @@ export type AdminTenantListResponse = z.infer<typeof AdminTenantListResponseSche
  * issuance leaking is a confidentiality risk (unauthorized access
  * creation), revocation leaking is an availability risk (mass session
  * kill). Different failure directions, different scopes.
+ *
+ * `shares.manage` covers the whole share-grant lifecycle with one
+ * scope: a grant is a standing mint capability, so creating and
+ * revoking it are the same trust decision — unlike ephemeral tokens,
+ * where issue and revoke fail in different directions.
  */
 export const adminTenantScopes = [
   'docs.create',
@@ -304,6 +350,7 @@ export const adminTenantScopes = [
   'docs.delete',
   'tokens.issue-doc',
   'tokens.revoke',
+  'shares.manage',
 ] as const;
 export type AdminTenantScope = (typeof adminTenantScopes)[number];
 
@@ -323,6 +370,14 @@ export const AdminTokenIssueDocRequestSchema = z.object({
   displayName: z.string().max(256).optional(),
   groupId: z.string().max(256).optional(),
   groups: z.array(z.string().max(256)).max(64).optional(),
+  /**
+   * Origin lock: web origins (scheme + host, optional port; one leading
+   * `*.` wildcard label allowed) the minted token may be presented
+   * from. Enforced on every engine request that carries a browser
+   * `Origin` header — hotlink prevention, not DRM: non-browser callers
+   * are governed by the token itself.
+   */
+  origins: originPatternArray.optional(),
   /** Token lifetime in seconds. */
   expiresIn: z
     .number()
@@ -380,6 +435,183 @@ export type AdminTokenIssueResponse = z.infer<typeof AdminTokenIssueResponseSche
  * valid exactly on the `/v1/docs/{docId}` subtree it names, gated by
  * the capability scopes it carries.
  */
+// ---------------------------------------------------------------------------
+// Share grants
+// ---------------------------------------------------------------------------
+//
+// A share grant is a standing, revocable authorization decision stored
+// with the documents: "anyone presenting this reference, from these
+// origins, gets exactly these capabilities on this document". The grant
+// id doubles as the public share token — it is a REFERENCE whose power
+// is evaluated at exchange time, never a bearer credential, which is
+// what lets it live in public HTML while staying editable and
+// revocable. The only credential it ever produces is an ordinary
+// short-lived doc JWT, minted downward at `shares.exchange`.
+
+export const ShareGrantRecordSchema = z.object({
+  /** Grant id; doubles as the public share token (`shr_…`). */
+  id: z.string(),
+  tenantId: z.string(),
+  docId: z.string(),
+  layerName: z.string(),
+  /** Doc capabilities the exchanged session carries. */
+  scope: z.array(z.string()),
+  /** Origin allowlist; null means any origin. */
+  origins: z.array(z.string()).nullable(),
+  /** True when a passphrase is required at exchange. The passphrase itself is never returned. */
+  passwordProtected: z.boolean(),
+  /** Lifetime of each exchanged session token, in seconds. */
+  sessionTtlSeconds: z.number(),
+  /** Paused grants refuse exchange (404) but keep their configuration. */
+  disabled: z.boolean(),
+  /** Unix epoch ms after which exchange returns 410; null = no expiry. */
+  expiresAt: z.number().nullable(),
+  /** Total successful exchanges — a dashboard convenience, not the usage meter. */
+  exchangeCount: z.number(),
+  lastExchangedAt: z.number().nullable(),
+  createdBy: z.string(),
+  createdAt: z.number(),
+  updatedAt: z.number(),
+});
+export type ShareGrantRecord = z.infer<typeof ShareGrantRecordSchema>;
+
+export const ShareGrantCreateRequestSchema = z.object({
+  docId: z.string().regex(docIdPattern),
+  layerName: z.string().min(1).max(256).optional(),
+  /**
+   * Doc capability scopes the exchanged session will carry. Validated
+   * server-side against the engine's scope vocabulary, same as
+   * `tokens.issue`.
+   */
+  scope: z.array(z.string().min(1).max(128)).min(1).max(64),
+  /** Origin allowlist; omit to allow any origin. */
+  origins: originPatternArray.optional(),
+  /** Optional passphrase gate, checked at exchange. Stored as a hash; never returned. */
+  password: z.string().min(1).max(1024).optional(),
+  /** Lifetime of exchanged session tokens. Default 600. */
+  sessionTtlSeconds: z
+    .number()
+    .int()
+    .min(60)
+    .max(60 * 60)
+    .optional(),
+  /** Unix epoch ms after which the grant stops exchanging; omit for no expiry. */
+  expiresAt: z.number().int().positive().optional(),
+});
+export type ShareGrantCreateRequest = z.infer<typeof ShareGrantCreateRequestSchema>;
+
+/**
+ * Partial update. `origins: null` clears the allowlist (any origin),
+ * `password: null` removes the passphrase, `expiresAt: null` removes
+ * the expiry. Absent fields stay untouched. The exchanged capabilities
+ * and origin lock of every embedded snippet follow the row — editing a
+ * grant retargets the copies already pasted into pages.
+ */
+export const ShareGrantUpdateRequestSchema = z.object({
+  scope: z.array(z.string().min(1).max(128)).min(1).max(64).optional(),
+  origins: originPatternArray.nullable().optional(),
+  password: z.string().min(1).max(1024).nullable().optional(),
+  sessionTtlSeconds: z
+    .number()
+    .int()
+    .min(60)
+    .max(60 * 60)
+    .optional(),
+  disabled: z.boolean().optional(),
+  expiresAt: z.number().int().positive().nullable().optional(),
+});
+export type ShareGrantUpdateRequest = z.infer<typeof ShareGrantUpdateRequestSchema>;
+
+export const ShareGrantResponseSchema = z.object({
+  share: ShareGrantRecordSchema,
+});
+export type ShareGrantResponse = z.infer<typeof ShareGrantResponseSchema>;
+
+export const ShareGrantListQuerySchema = z.object({
+  limit: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(ADMIN_DOCUMENT_LIST_MAX_LIMIT)
+    .default(ADMIN_DOCUMENT_LIST_DEFAULT_LIMIT),
+  cursor: z.string().min(1).optional(),
+  /** Filter to one document's grants. */
+  docId: z.string().regex(docIdPattern).optional(),
+});
+export type ShareGrantListQuery = z.infer<typeof ShareGrantListQuerySchema>;
+
+export const ShareGrantListResponseSchema = z.object({
+  shares: z.array(ShareGrantRecordSchema),
+  /** Opaque cursor for the next page; `null` on the last page. */
+  nextCursor: z.string().nullable().optional(),
+});
+export type ShareGrantListResponse = z.infer<typeof ShareGrantListResponseSchema>;
+
+export const AdminTenantShareParamsSchema = z.object({
+  tenantId: z.string().regex(tenantIdPattern),
+  shareId: z.string().regex(shareTokenPattern),
+});
+export type AdminTenantShareParams = z.infer<typeof AdminTenantShareParamsSchema>;
+
+/**
+ * The share token travels in the BODY, never the path — URLs land in
+ * access logs and proxy logs, and the token is the whole credential.
+ */
+export const ShareExchangeRequestSchema = z.object({
+  shareToken: z.string().regex(shareTokenPattern),
+  /** Required when the grant is passphrase-protected (422 otherwise). */
+  password: z.string().min(1).max(1024).optional(),
+});
+export type ShareExchangeRequest = z.infer<typeof ShareExchangeRequestSchema>;
+
+export const ShareSessionResponseSchema = z.object({
+  /** A doc-scoped session JWT carrying the grant's capabilities and origin lock. */
+  token: z.string(),
+  docId: z.string(),
+  layerName: z.string(),
+  /** Unix seconds when the session token expires; exchange again for a fresh one. */
+  expiresAt: z.number(),
+});
+export type ShareSessionResponse = z.infer<typeof ShareSessionResponseSchema>;
+
+// ---------------------------------------------------------------------------
+// Tenant usage + suspension
+// ---------------------------------------------------------------------------
+
+export const TenantUsageQuerySchema = z.object({
+  /** UTC month to report, `YYYY-MM`. Defaults to the current month. */
+  period: z
+    .string()
+    .regex(/^\d{4}-(0[1-9]|1[0-2])$/)
+    .optional(),
+});
+export type TenantUsageQuery = z.infer<typeof TenantUsageQuerySchema>;
+
+/**
+ * Per-tenant usage FACTS for one UTC month. Deliberately opinion-free:
+ * no limits, no plans, no billing state — those belong to whoever
+ * operates the deployment. `pdf.views` counts share exchanges plus
+ * authorized `/v1/access` grants, deduplicated (a share session that
+ * later establishes access is not counted twice).
+ */
+export const TenantUsageResponseSchema = z.object({
+  tenantId: z.string(),
+  periodStart: z.string(),
+  periodEnd: z.string(),
+  metrics: z.object({
+    'pdf.views': z.number(),
+    'pdf.uploads': z.number(),
+    'storage.bytes': z.number(),
+  }),
+});
+export type TenantUsageResponse = z.infer<typeof TenantUsageResponseSchema>;
+
+export const TenantSuspendRequestSchema = z.object({
+  /** Optional operator reason, written to the security-events trail. */
+  reason: z.string().max(1024).optional(),
+});
+export type TenantSuspendRequest = z.infer<typeof TenantSuspendRequestSchema>;
+
 export const adminCredentials = ['api-token', 'tenant-jwt', 'doc-jwt'] as const;
 export type AdminCredential = (typeof adminCredentials)[number];
 
@@ -699,6 +931,163 @@ export const adminOperations = {
       400: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
     },
     notes: 'Mounted only when the deployment enables token revocation.',
+  },
+  'tenants.usage': {
+    operationId: 'tenants.usage',
+    title: 'Tenant usage',
+    summary: 'Per-tenant usage facts (views, uploads, stored bytes) for one UTC month.',
+    method: 'GET',
+    path: '/v1/tenants/:tenantId/usage',
+    credentials: ['api-token', 'tenant-jwt'],
+    scope: ['docs.read'],
+    params: AdminTenantParamsSchema,
+    query: TenantUsageQuerySchema,
+    responses: {
+      200: { contentType: 'application/json', schema: TenantUsageResponseSchema },
+      400: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+      404: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+    },
+    notes:
+      'Facts only — no limits or billing state. Views count share exchanges plus authorized ' +
+      '/v1/access grants, deduplicated across the two.',
+  },
+  'tenants.suspend': {
+    operationId: 'tenants.suspend',
+    title: 'Suspend tenant',
+    summary: 'Fail the tenant closed: refuse every tenant JWT, doc JWT, and share exchange.',
+    method: 'POST',
+    path: '/v1/tenants/:tenantId/suspend',
+    credentials: ['api-token'],
+    scope: [],
+    params: AdminTenantParamsSchema,
+    body: {
+      contentType: 'application/json',
+      schema: TenantSuspendRequestSchema,
+      required: false,
+    },
+    responses: {
+      204: {},
+      404: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+    },
+    notes:
+      'Instantly reversible with resume. The API token is exempt, so a suspended tenant can ' +
+      'still be inspected, exported, resumed, or deleted.',
+  },
+  'tenants.resume': {
+    operationId: 'tenants.resume',
+    title: 'Resume tenant',
+    summary: 'Lift a suspension; credentials for the tenant verify again.',
+    method: 'POST',
+    path: '/v1/tenants/:tenantId/resume',
+    credentials: ['api-token'],
+    scope: [],
+    params: AdminTenantParamsSchema,
+    responses: {
+      204: {},
+      404: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+    },
+  },
+  'shares.create': {
+    operationId: 'shares.create',
+    title: 'Create share',
+    summary: 'Create a standing share grant for one document — the no-backend embed credential.',
+    method: 'POST',
+    path: '/v1/tenants/:tenantId/shares',
+    credentials: ['api-token', 'tenant-jwt'],
+    scope: ['shares.manage'],
+    params: AdminTenantParamsSchema,
+    body: { contentType: 'application/json', schema: ShareGrantCreateRequestSchema },
+    responses: {
+      200: { contentType: 'application/json', schema: ShareGrantResponseSchema },
+      400: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+      403: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+      404: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+    },
+    notes:
+      'The returned share id IS the public share token. Mounted only when the deployment can ' +
+      'sign (HS256 mode) — exchange mints session JWTs, so grants exist only where minting does.',
+  },
+  'shares.list': {
+    operationId: 'shares.list',
+    title: 'List shares',
+    summary: 'List share grants in the tenant, newest first, cursor-paginated.',
+    method: 'GET',
+    path: '/v1/tenants/:tenantId/shares',
+    credentials: ['api-token', 'tenant-jwt'],
+    scope: ['shares.manage'],
+    params: AdminTenantParamsSchema,
+    query: ShareGrantListQuerySchema,
+    responses: {
+      200: { contentType: 'application/json', schema: ShareGrantListResponseSchema },
+      400: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+    },
+  },
+  'shares.get': {
+    operationId: 'shares.get',
+    title: 'Get share',
+    summary: 'Fetch one share grant.',
+    method: 'GET',
+    path: '/v1/tenants/:tenantId/shares/:shareId',
+    credentials: ['api-token', 'tenant-jwt'],
+    scope: ['shares.manage'],
+    params: AdminTenantShareParamsSchema,
+    responses: {
+      200: { contentType: 'application/json', schema: ShareGrantResponseSchema },
+      404: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+    },
+  },
+  'shares.update': {
+    operationId: 'shares.update',
+    title: 'Update share',
+    summary: 'Edit a grant in place — every embedded copy of the token follows the row.',
+    method: 'PATCH',
+    path: '/v1/tenants/:tenantId/shares/:shareId',
+    credentials: ['api-token', 'tenant-jwt'],
+    scope: ['shares.manage'],
+    params: AdminTenantShareParamsSchema,
+    body: { contentType: 'application/json', schema: ShareGrantUpdateRequestSchema },
+    responses: {
+      200: { contentType: 'application/json', schema: ShareGrantResponseSchema },
+      400: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+      404: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+    },
+  },
+  'shares.delete': {
+    operationId: 'shares.delete',
+    title: 'Revoke share',
+    summary: 'Delete a grant; exchange stops immediately, live sessions lapse at their exp.',
+    method: 'DELETE',
+    path: '/v1/tenants/:tenantId/shares/:shareId',
+    credentials: ['api-token', 'tenant-jwt'],
+    scope: ['shares.manage'],
+    params: AdminTenantShareParamsSchema,
+    responses: {
+      204: {},
+      404: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+    },
+  },
+  'shares.exchange': {
+    operationId: 'shares.exchange',
+    title: 'Exchange share token',
+    summary: 'Trade a public share token for a short-lived document session JWT.',
+    method: 'POST',
+    path: adminWirePaths.shareSessions,
+    credentials: [],
+    scope: [],
+    body: { contentType: 'application/json', schema: ShareExchangeRequestSchema },
+    responses: {
+      200: { contentType: 'application/json', schema: ShareSessionResponseSchema },
+      400: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+      403: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+      404: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+      410: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+      422: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+    },
+    notes:
+      'Unauthenticated, but requires a browser Origin header, checked against the grant ' +
+      "allowlist. Unknown, revoked, and disabled tokens are indistinguishable (404). " +
+      'Passphrase-protected grants return 422 SharePasswordRequired until `password` is ' +
+      'supplied. Mounted only when the deployment can sign (HS256 mode).',
   },
 } as const satisfies Record<string, AdminOperation>;
 export type AdminOperationId = keyof typeof adminOperations;
@@ -1128,6 +1517,7 @@ export const docsGroups = {
   tenants: { title: 'Tenants' },
   documents: { title: 'Tenant documents' },
   tokens: { title: 'Tokens' },
+  shares: { title: 'Shares' },
   doc: { title: 'Document operations', slug: 'document-operations' },
   'doc.annotations': { title: 'Annotations' },
   'doc.forms': { title: 'Forms' },

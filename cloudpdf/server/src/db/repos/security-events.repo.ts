@@ -1,7 +1,23 @@
 import type { Kysely } from 'kysely';
+
 import type { Database as Schema } from '../schema';
 
-export type SecurityEventKind = 'token.issued' | 'token.revoked';
+/**
+ * Share-grant lifecycle rides the same trail as token issuance — a
+ * grant is standing authority (its id travels in the `jti` column as
+ * the credential identifier of the share family). Exchange itself is
+ * deliberately NOT an event kind: it is usage, metered per tenant,
+ * and would drown the trail. Tenant suspension is here because it
+ * gates every credential in the namespace.
+ */
+export type SecurityEventKind =
+  | 'token.issued'
+  | 'token.revoked'
+  | 'share.created'
+  | 'share.updated'
+  | 'share.revoked'
+  | 'tenant.suspended'
+  | 'tenant.resumed';
 
 export interface SecurityEventInput {
   tenantId: string;
@@ -58,7 +74,10 @@ export class SecurityEventsRepo {
       .execute();
   }
 
-  async listForTenant(tenantId: string, opts: { limit?: number } = {}): Promise<SecurityEventRow[]> {
+  async listForTenant(
+    tenantId: string,
+    opts: { limit?: number } = {},
+  ): Promise<SecurityEventRow[]> {
     let q = this.db
       .selectFrom('security_events')
       .selectAll()

@@ -51,9 +51,10 @@
   "dependencies": {
     "@cloudpdf/contract": "workspace:*",
     "@embedpdf/engine-core": "workspace:*",
-    "@embedpdf/engine-services": "workspace:*",
     "@embedpdf/engine-runtime": "workspace:*",
+    "@embedpdf/engine-services": "workspace:*",
     "@fastify/compress": "^8",
+    "@fastify/cors": "^11.3.0",
     "@fastify/multipart": "^9.0.0",
     "better-sqlite3": "^12.10.0",
     "fastify": "^5.0.0",

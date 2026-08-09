@@ -1,20 +1,28 @@
 import {
   AdminTenantCreateRequestSchema,
   AdminTenantListQuerySchema,
+  TenantSuspendRequestSchema,
+  TenantUsageQuerySchema,
   adminOperations,
   type AdminOperation,
 } from '@cloudpdf/contract';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 
-import { requireApiToken } from '../../app/jwt-plugin';
-import type { TenantRow, TenantsRepo } from '../../db/repos/tenants.repo';
-import type { ObjectStore } from '../../storage/ObjectStore';
-import { StorageKeys } from '../../storage/keys';
 import { decodeListCursor, encodeListCursor } from './_cursor';
+import { requireApiToken, requireTenantAccess } from '../../app/jwt-plugin';
+import type { SuspendedTenantsGuard } from '../../auth/SuspendedTenantsGuard';
+import type { SecurityEventsRepo } from '../../db/repos/security-events.repo';
+import type { TenantUsageRepo } from '../../db/repos/tenant_usage.repo';
+import type { TenantRow, TenantsRepo } from '../../db/repos/tenants.repo';
+import { StorageKeys } from '../../storage/keys';
+import type { ObjectStore } from '../../storage/ObjectStore';
 
 export interface AdminTenantsRouteDeps {
   tenants: TenantsRepo;
   storage: ObjectStore;
+  securityEvents: SecurityEventsRepo;
+  suspendedTenants: SuspendedTenantsGuard;
+  tenantUsage: TenantUsageRepo;
 }
 
 /**
@@ -31,7 +39,7 @@ export async function registerAdminTenantsRoutes(
   app: FastifyInstance,
   deps: AdminTenantsRouteDeps,
 ): Promise<void> {
-  const { tenants, storage } = deps;
+  const { tenants, storage, securityEvents, suspendedTenants, tenantUsage } = deps;
 
   const mount = (
     op: AdminOperation,
@@ -98,6 +106,79 @@ export async function registerAdminTenantsRoutes(
     await tenants.deleteCascadeDb(tenantId);
     return reply.code(204).send();
   });
+
+  const suspendOp = adminOperations['tenants.suspend'];
+  mount(suspendOp, async (req, reply) => {
+    requireApiToken(req);
+    const { tenantId } = req.params as { tenantId: string };
+    const parsed = TenantSuspendRequestSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      return reply
+        .code(400)
+        .send({ error: { code: 'InvalidArg', message: formatIssues(parsed.error.issues) } });
+    }
+    const existed = await tenants.setStatus(tenantId, 'suspended');
+    if (!existed) {
+      return reply
+        .code(404)
+        .send({ error: { code: 'NotFound', message: `tenant does not exist: ${tenantId}` } });
+    }
+    // Prime this replica synchronously so the very next request 403s;
+    // siblings converge within the guard's TTL.
+    suspendedTenants.prime(tenantId, true);
+    await securityEvents.append({
+      tenantId,
+      kind: 'tenant.suspended',
+      scope: [],
+      actor: 'api-token',
+      via: 'api-token',
+      ...(parsed.data.reason ? { reason: parsed.data.reason } : {}),
+    });
+    return reply.code(204).send();
+  });
+
+  const resumeOp = adminOperations['tenants.resume'];
+  mount(resumeOp, async (req, reply) => {
+    requireApiToken(req);
+    const { tenantId } = req.params as { tenantId: string };
+    const existed = await tenants.setStatus(tenantId, 'active');
+    if (!existed) {
+      return reply
+        .code(404)
+        .send({ error: { code: 'NotFound', message: `tenant does not exist: ${tenantId}` } });
+    }
+    suspendedTenants.prime(tenantId, false);
+    await securityEvents.append({
+      tenantId,
+      kind: 'tenant.resumed',
+      scope: [],
+      actor: 'api-token',
+      via: 'api-token',
+    });
+    return reply.code(204).send();
+  });
+
+  const usageOp = adminOperations['tenants.usage'];
+  mount(usageOp, async (req, reply) => {
+    const { tenantId } = req.params as { tenantId: string };
+    requireTenantAccess(req, tenantId, usageOp.scope);
+    const parsed = TenantUsageQuerySchema.safeParse(req.query ?? {});
+    if (!parsed.success) {
+      return reply
+        .code(400)
+        .send({ error: { code: 'InvalidArg', message: formatIssues(parsed.error.issues) } });
+    }
+    const tenant = await tenants.findById(tenantId);
+    if (!tenant) {
+      return reply
+        .code(404)
+        .send({ error: { code: 'NotFound', message: `tenant does not exist: ${tenantId}` } });
+    }
+    // `period=YYYY-MM` reports a historical month; monthPeriod works
+    // from any date inside it.
+    const at = parsed.data.period ? new Date(`${parsed.data.period}-01T00:00:00Z`) : new Date();
+    return reply.send(await tenantUsage.snapshot(tenantId, at));
+  });
 }
 
 function tenantPublic(t: TenantRow): Record<string, unknown> {
@@ -105,6 +186,7 @@ function tenantPublic(t: TenantRow): Record<string, unknown> {
     id: t.id,
     name: t.name,
     autoProvisioned: t.autoProvisioned,
+    status: t.status,
     createdAt: t.createdAt,
   };
 }

@@ -1,6 +1,5 @@
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 
-import type { FastifyInstance, FastifyRequest } from 'fastify';
 import {
   checkAnyCapability,
   checkCapability,
@@ -10,10 +9,12 @@ import {
   type DocCapability,
   type PdfBits,
 } from '@embedpdf/engine-core/runtime';
+import { checkResourceAccess, type DocResourceId } from '@embedpdf/engine-core/wire';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
 // checkResourceAccess + DocResourceId live in /wire (resource descriptor
 // table is HTTP-wire surface, used by route guards on every read endpoint).
-import { checkResourceAccess, type DocResourceId } from '@embedpdf/engine-core/wire';
 
+import { AuthFailureLimiter, type AuthFailureLimiterOptions } from './auth-failure-limiter';
 import {
   createJwtVerifier,
   hasDocScope,
@@ -27,7 +28,8 @@ import {
   type JwtVerifierConfig,
   type TenantScope,
 } from '../auth/JwtVerifier';
-import { AuthFailureLimiter, type AuthFailureLimiterOptions } from './auth-failure-limiter';
+import { matchesOrigin } from '../auth/origins';
+import type { SuspendedTenantsGuard } from '../auth/SuspendedTenantsGuard';
 
 declare module 'fastify' {
   interface FastifyRequest {
@@ -77,6 +79,13 @@ export interface JwtPluginOptions {
    * disables (e.g. when the edge already rate-limits).
    */
   authFailureLimit?: Partial<AuthFailureLimiterOptions> | false;
+  /**
+   * Tenant-suspension gate. JWT-authenticated requests for a suspended
+   * tenant fail 403 after signature verification; API-token requests
+   * are exempt by construction (they carry no tenant claims), so the
+   * operator can always reach a suspended tenant.
+   */
+  suspendedTenants?: SuspendedTenantsGuard;
 }
 
 function asConfig(input: JwtPluginOptions['verifier']): JwtVerifierConfig {
@@ -130,9 +139,9 @@ export async function registerJwtAuth(app: FastifyInstance, opts: JwtPluginOptio
       return;
     }
 
+    let claims: JwtClaims;
     try {
-      const claims = await verifier.verify(token);
-      req.tenant = { id: claims.tenant_id, sub: claims.sub, claims };
+      claims = await verifier.verify(token);
     } catch (err) {
       limiter?.recordFailure(req.ip);
       // The reason (bad signature vs expired vs rejected scope) is for the
@@ -141,6 +150,33 @@ export async function registerJwtAuth(app: FastifyInstance, opts: JwtPluginOptio
       reply.code(401).send({ error: 'invalid token' });
       return;
     }
+
+    // Origin lock: enforced whenever the browser identifies itself.
+    // Absent Origin = non-browser caller, governed by the token itself
+    // (the lock's threat model is hotlink embedding, which always
+    // arrives cross-origin from a browser, which always sends Origin).
+    if (isDocUserClaims(claims) && claims.origins) {
+      const origin = req.headers['origin'];
+      if (typeof origin === 'string' && !matchesOrigin(origin, claims.origins)) {
+        limiter?.recordFailure(req.ip);
+        reply.code(403).send({ error: 'origin not allowed for this token' });
+        return;
+      }
+    }
+
+    // Suspension gates every JWT after signature verification: the
+    // caller was authentic, the namespace is closed. Deliberately not
+    // a verify failure — it neither counts against the failure limiter
+    // nor hides behind a generic 401.
+    if (opts.suspendedTenants && (await opts.suspendedTenants.isSuspended(claims.tenant_id))) {
+      reply
+        .code(403)
+        .header('x-cloudpdf-tenant-status', 'suspended')
+        .send({ error: 'tenant suspended' });
+      return;
+    }
+
+    req.tenant = { id: claims.tenant_id, sub: claims.sub, claims };
   });
 }
 
