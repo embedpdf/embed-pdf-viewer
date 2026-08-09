@@ -26,7 +26,7 @@
     "@embedpdf/react": "workspace:*",
     "@embedpdf/plugin-stage": "workspace:*",
     "@embedpdf/core-stage": "workspace:*",
-    "react": "^18.3.1",
+    "react": "^19.2.8",
     "react-dom": "^18.3.1",
     "@embedpdf/plugin-form": "workspace:*",
     "@embedpdf/plugin-search": "workspace:*",
@@ -34,7 +34,7 @@
     "@embedpdf/plugin-i18n": "workspace:*"
   },
   "devDependencies": {
-    "@types/react": "^18.3.0",
+    "@types/react": "^19.2.18",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.0",
     "typescript": "^5.0.0",
