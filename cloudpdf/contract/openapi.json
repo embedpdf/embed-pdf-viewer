@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "CloudPDF Engine API",
-    "version": "3.0.0-next.1",
+    "version": "3.0.0-next.2",
     "description": "The backend-callable surface of the CloudPDF document engine: deployment and tenant administration plus the document operations (reads, annotations, forms, page operations, redaction, download). Interactive viewing goes through the CloudPDF viewer SDKs, whose session protocol is deliberately not part of this API. Generated from the @cloudpdf/contract operation registry — do not edit by hand.",
     "license": {
       "name": "Apache-2.0",
@@ -13,9 +13,7 @@
     "/v1/deployment/license/status": {
       "get": {
         "operationId": "deployment.licenseStatus",
-        "x-fern-sdk-group-name": [
-          "deployment"
-        ],
+        "x-fern-sdk-group-name": ["deployment"],
         "x-fern-sdk-method-name": "licenseStatus",
         "x-docs-title": "License status",
         "summary": "License decision plus usage-reporting and meter snapshots for this deployment.",
@@ -52,9 +50,7 @@
     "/v1/docs/{docId}/head": {
       "get": {
         "operationId": "doc.head",
-        "x-fern-sdk-group-name": [
-          "doc"
-        ],
+        "x-fern-sdk-group-name": ["doc"],
         "x-fern-sdk-method-name": "head",
         "x-docs-title": "Open document",
         "summary": "Open a document and return its head (versions, page count, security).",
@@ -67,9 +63,7 @@
           }
         ],
         "x-required-scope": [],
-        "x-required-capability": [
-          "doc.open"
-        ],
+        "x-required-capability": ["doc.open"],
         "parameters": [
           {
             "name": "docId",
@@ -127,10 +121,7 @@
     "/v1/docs/{docId}/layers/{layerName}/annotations/pages/{pon}/items": {
       "get": {
         "operationId": "doc.annotations.list",
-        "x-fern-sdk-group-name": [
-          "doc",
-          "annotations"
-        ],
+        "x-fern-sdk-group-name": ["doc", "annotations"],
         "x-fern-sdk-method-name": "list",
         "x-docs-title": "List annotations",
         "summary": "One page's annotations at the current layer version.",
@@ -143,9 +134,7 @@
           }
         ],
         "x-required-scope": [],
-        "x-required-capability": [
-          "doc.annotate.read"
-        ],
+        "x-required-capability": ["doc.annotate.read"],
         "parameters": [
           {
             "name": "docId",
@@ -219,10 +208,7 @@
       },
       "post": {
         "operationId": "doc.annotations.create",
-        "x-fern-sdk-group-name": [
-          "doc",
-          "annotations"
-        ],
+        "x-fern-sdk-group-name": ["doc", "annotations"],
         "x-fern-sdk-method-name": "create",
         "x-docs-title": "Create annotation",
         "summary": "Create an annotation on a page.",
@@ -236,9 +222,7 @@
           }
         ],
         "x-required-scope": [],
-        "x-required-capability": [
-          "doc.annotate.modify"
-        ],
+        "x-required-capability": ["doc.annotate.modify"],
         "parameters": [
           {
             "name": "docId",
@@ -334,10 +318,7 @@
     "/v1/docs/{docId}/layers/{layerName}/annotations/pages/{pon}/items/{annotKey}": {
       "patch": {
         "operationId": "doc.annotations.update",
-        "x-fern-sdk-group-name": [
-          "doc",
-          "annotations"
-        ],
+        "x-fern-sdk-group-name": ["doc", "annotations"],
         "x-fern-sdk-method-name": "update",
         "x-docs-title": "Update annotation",
         "summary": "Update one annotation by key.",
@@ -350,9 +331,7 @@
           }
         ],
         "x-required-scope": [],
-        "x-required-capability": [
-          "doc.annotate.modify"
-        ],
+        "x-required-capability": ["doc.annotate.modify"],
         "parameters": [
           {
             "name": "docId",
@@ -455,10 +434,7 @@
       },
       "delete": {
         "operationId": "doc.annotations.delete",
-        "x-fern-sdk-group-name": [
-          "doc",
-          "annotations"
-        ],
+        "x-fern-sdk-group-name": ["doc", "annotations"],
         "x-fern-sdk-method-name": "delete",
         "x-docs-title": "Delete annotation",
         "summary": "Delete one annotation by key.",
@@ -471,9 +447,7 @@
           }
         ],
         "x-required-scope": [],
-        "x-required-capability": [
-          "doc.annotate.modify"
-        ],
+        "x-required-capability": ["doc.annotate.modify"],
         "parameters": [
           {
             "name": "docId",
@@ -558,9 +532,7 @@
     "/v1/docs/{docId}/layers/{layerName}/download": {
       "get": {
         "operationId": "doc.download",
-        "x-fern-sdk-group-name": [
-          "doc"
-        ],
+        "x-fern-sdk-group-name": ["doc"],
         "x-fern-sdk-method-name": "download",
         "x-docs-title": "Download PDF",
         "summary": "Download the layer's current PDF (base plus layer edits).",
@@ -573,9 +545,7 @@
           }
         ],
         "x-required-scope": [],
-        "x-required-capability": [
-          "doc.download"
-        ],
+        "x-required-capability": ["doc.download"],
         "parameters": [
           {
             "name": "docId",
@@ -643,10 +613,7 @@
     "/v1/docs/{docId}/layers/{layerName}/form": {
       "get": {
         "operationId": "doc.forms.get",
-        "x-fern-sdk-group-name": [
-          "doc",
-          "forms"
-        ],
+        "x-fern-sdk-group-name": ["doc", "forms"],
         "x-fern-sdk-method-name": "get",
         "x-docs-title": "Get form snapshot",
         "summary": "Reconciled form snapshot: fields, widgets, values.",
@@ -659,9 +626,7 @@
           }
         ],
         "x-required-scope": [],
-        "x-required-capability": [
-          "doc.forms.read"
-        ],
+        "x-required-capability": ["doc.forms.read"],
         "parameters": [
           {
             "name": "docId",
@@ -728,10 +693,7 @@
     "/v1/docs/{docId}/layers/{layerName}/form/data": {
       "get": {
         "operationId": "doc.forms.exportData",
-        "x-fern-sdk-group-name": [
-          "doc",
-          "forms"
-        ],
+        "x-fern-sdk-group-name": ["doc", "forms"],
         "x-fern-sdk-method-name": "exportData",
         "x-docs-title": "Export form data",
         "summary": "Export form data as FDF or XFDF.",
@@ -744,9 +706,7 @@
           }
         ],
         "x-required-scope": [],
-        "x-required-capability": [
-          "doc.forms.read"
-        ],
+        "x-required-capability": ["doc.forms.read"],
         "parameters": [
           {
             "name": "docId",
@@ -772,10 +732,7 @@
             "required": false,
             "schema": {
               "type": "string",
-              "enum": [
-                "fdf",
-                "xfdf"
-              ]
+              "enum": ["fdf", "xfdf"]
             }
           },
           {
@@ -830,10 +787,7 @@
       },
       "post": {
         "operationId": "doc.forms.importData",
-        "x-fern-sdk-group-name": [
-          "doc",
-          "forms"
-        ],
+        "x-fern-sdk-group-name": ["doc", "forms"],
         "x-fern-sdk-method-name": "importData",
         "x-docs-title": "Import form data",
         "summary": "Import form data (FDF/XFDF), filling matching fields.",
@@ -846,9 +800,7 @@
           }
         ],
         "x-required-scope": [],
-        "x-required-capability": [
-          "doc.forms.fill"
-        ],
+        "x-required-capability": ["doc.forms.fill"],
         "parameters": [
           {
             "name": "docId",
@@ -935,10 +887,7 @@
     "/v1/docs/{docId}/layers/{layerName}/form/fields/{fieldKey}/reset": {
       "post": {
         "operationId": "doc.forms.reset",
-        "x-fern-sdk-group-name": [
-          "doc",
-          "forms"
-        ],
+        "x-fern-sdk-group-name": ["doc", "forms"],
         "x-fern-sdk-method-name": "reset",
         "x-docs-title": "Reset form field",
         "summary": "Reset one form field to its default value.",
@@ -951,9 +900,7 @@
           }
         ],
         "x-required-scope": [],
-        "x-required-capability": [
-          "doc.forms.fill"
-        ],
+        "x-required-capability": ["doc.forms.fill"],
         "parameters": [
           {
             "name": "docId",
@@ -1029,10 +976,7 @@
     "/v1/docs/{docId}/layers/{layerName}/form/fields/{fieldKey}/value": {
       "post": {
         "operationId": "doc.forms.setValue",
-        "x-fern-sdk-group-name": [
-          "doc",
-          "forms"
-        ],
+        "x-fern-sdk-group-name": ["doc", "forms"],
         "x-fern-sdk-method-name": "setValue",
         "x-docs-title": "Set form value",
         "summary": "Set one form field's value.",
@@ -1045,9 +989,7 @@
           }
         ],
         "x-required-scope": [],
-        "x-required-capability": [
-          "doc.forms.fill"
-        ],
+        "x-required-capability": ["doc.forms.fill"],
         "parameters": [
           {
             "name": "docId",
@@ -1143,9 +1085,7 @@
     "/v1/docs/{docId}/layers/{layerName}/manifest": {
       "get": {
         "operationId": "doc.manifest",
-        "x-fern-sdk-group-name": [
-          "doc"
-        ],
+        "x-fern-sdk-group-name": ["doc"],
         "x-fern-sdk-method-name": "manifest",
         "x-docs-title": "Get manifest",
         "summary": "Full layer manifest at the layer's current version.",
@@ -1158,9 +1098,7 @@
           }
         ],
         "x-required-scope": [],
-        "x-required-capability": [
-          "doc.open"
-        ],
+        "x-required-capability": ["doc.open"],
         "parameters": [
           {
             "name": "docId",
@@ -1227,10 +1165,7 @@
     "/v1/docs/{docId}/layers/{layerName}/metadata": {
       "get": {
         "operationId": "doc.metadata.get",
-        "x-fern-sdk-group-name": [
-          "doc",
-          "metadata"
-        ],
+        "x-fern-sdk-group-name": ["doc", "metadata"],
         "x-fern-sdk-method-name": "get",
         "x-docs-title": "Get metadata",
         "summary": "Document metadata (PDF info dictionary view) for a layer.",
@@ -1243,9 +1178,7 @@
           }
         ],
         "x-required-scope": [],
-        "x-required-capability": [
-          "doc.open"
-        ],
+        "x-required-capability": ["doc.open"],
         "parameters": [
           {
             "name": "docId",
@@ -1312,10 +1245,7 @@
     "/v1/docs/{docId}/layers/{layerName}/pages/delete": {
       "post": {
         "operationId": "doc.pages.delete",
-        "x-fern-sdk-group-name": [
-          "doc",
-          "pages"
-        ],
+        "x-fern-sdk-group-name": ["doc", "pages"],
         "x-fern-sdk-method-name": "delete",
         "x-docs-title": "Delete pages",
         "summary": "Delete pages.",
@@ -1328,9 +1258,7 @@
           }
         ],
         "x-required-scope": [],
-        "x-required-capability": [
-          "doc.pages.assemble"
-        ],
+        "x-required-capability": ["doc.pages.assemble"],
         "parameters": [
           {
             "name": "docId",
@@ -1417,10 +1345,7 @@
     "/v1/docs/{docId}/layers/{layerName}/pages/flatten": {
       "post": {
         "operationId": "doc.pages.flatten",
-        "x-fern-sdk-group-name": [
-          "doc",
-          "pages"
-        ],
+        "x-fern-sdk-group-name": ["doc", "pages"],
         "x-fern-sdk-method-name": "flatten",
         "x-docs-title": "Flatten pages",
         "summary": "Flatten annotations and form fields into page content.",
@@ -1433,10 +1358,7 @@
           }
         ],
         "x-required-scope": [],
-        "x-required-capability": [
-          "doc.pages.modify",
-          "doc.annotate.modify"
-        ],
+        "x-required-capability": ["doc.pages.modify", "doc.annotate.modify"],
         "parameters": [
           {
             "name": "docId",
@@ -1523,10 +1445,7 @@
     "/v1/docs/{docId}/layers/{layerName}/pages/move": {
       "post": {
         "operationId": "doc.pages.move",
-        "x-fern-sdk-group-name": [
-          "doc",
-          "pages"
-        ],
+        "x-fern-sdk-group-name": ["doc", "pages"],
         "x-fern-sdk-method-name": "move",
         "x-docs-title": "Move pages",
         "summary": "Reorder pages.",
@@ -1539,9 +1458,7 @@
           }
         ],
         "x-required-scope": [],
-        "x-required-capability": [
-          "doc.pages.assemble"
-        ],
+        "x-required-capability": ["doc.pages.assemble"],
         "parameters": [
           {
             "name": "docId",
@@ -1628,10 +1545,7 @@
     "/v1/docs/{docId}/layers/{layerName}/pages/rotate": {
       "post": {
         "operationId": "doc.pages.rotate",
-        "x-fern-sdk-group-name": [
-          "doc",
-          "pages"
-        ],
+        "x-fern-sdk-group-name": ["doc", "pages"],
         "x-fern-sdk-method-name": "rotate",
         "x-docs-title": "Rotate pages",
         "summary": "Set absolute rotation on pages.",
@@ -1644,9 +1558,7 @@
           }
         ],
         "x-required-scope": [],
-        "x-required-capability": [
-          "doc.pages.assemble"
-        ],
+        "x-required-capability": ["doc.pages.assemble"],
         "parameters": [
           {
             "name": "docId",
@@ -1733,10 +1645,7 @@
     "/v1/docs/{docId}/layers/{layerName}/redactions/apply": {
       "post": {
         "operationId": "doc.redactions.apply",
-        "x-fern-sdk-group-name": [
-          "doc",
-          "redactions"
-        ],
+        "x-fern-sdk-group-name": ["doc", "redactions"],
         "x-fern-sdk-method-name": "apply",
         "x-docs-title": "Apply redactions",
         "summary": "Apply pending redactions, permanently removing content.",
@@ -1749,11 +1658,7 @@
           }
         ],
         "x-required-scope": [],
-        "x-required-capability": [
-          "doc.pages.modify",
-          "doc.annotate.modify",
-          "doc.redact"
-        ],
+        "x-required-capability": ["doc.pages.modify", "doc.annotate.modify", "doc.redact"],
         "parameters": [
           {
             "name": "docId",
@@ -1840,9 +1745,7 @@
     "/v1/docs/{docId}/layers/{layerName}/render/pages/{pon}/data": {
       "get": {
         "operationId": "doc.render",
-        "x-fern-sdk-group-name": [
-          "doc"
-        ],
+        "x-fern-sdk-group-name": ["doc"],
         "x-fern-sdk-method-name": "render",
         "x-docs-title": "Render page",
         "summary": "Render one page as an image at the current layer version.",
@@ -1856,9 +1759,7 @@
           }
         ],
         "x-required-scope": [],
-        "x-required-capability": [
-          "doc.render"
-        ],
+        "x-required-capability": ["doc.render"],
         "parameters": [
           {
             "name": "docId",
@@ -1935,9 +1836,7 @@
     "/v1/docs/{docId}/layers/{layerName}/text/pages/{pon}/data": {
       "get": {
         "operationId": "doc.text",
-        "x-fern-sdk-group-name": [
-          "doc"
-        ],
+        "x-fern-sdk-group-name": ["doc"],
         "x-fern-sdk-method-name": "text",
         "x-docs-title": "Extract page text",
         "summary": "Extracted text content for one page.",
@@ -1950,9 +1849,7 @@
           }
         ],
         "x-required-scope": [],
-        "x-required-capability": [
-          "doc.text.copy"
-        ],
+        "x-required-capability": ["doc.text.copy"],
         "parameters": [
           {
             "name": "docId",
@@ -2028,9 +1925,7 @@
     "/v1/share-sessions": {
       "post": {
         "operationId": "shares.exchange",
-        "x-fern-sdk-group-name": [
-          "shares"
-        ],
+        "x-fern-sdk-group-name": ["shares"],
         "x-fern-sdk-method-name": "exchange",
         "x-docs-title": "Exchange share token",
         "summary": "Trade a public share token for a short-lived document session JWT.",
@@ -2124,9 +2019,7 @@
     "/v1/tenants": {
       "post": {
         "operationId": "tenants.create",
-        "x-fern-sdk-group-name": [
-          "tenants"
-        ],
+        "x-fern-sdk-group-name": ["tenants"],
         "x-fern-sdk-method-name": "create",
         "x-docs-title": "Create tenant",
         "summary": "Create a tenant, or confirm it already exists — ensure-style, idempotent.",
@@ -2181,9 +2074,7 @@
       },
       "get": {
         "operationId": "tenants.list",
-        "x-fern-sdk-group-name": [
-          "tenants"
-        ],
+        "x-fern-sdk-group-name": ["tenants"],
         "x-fern-sdk-method-name": "list",
         "x-docs-title": "List tenants",
         "summary": "List tenants, newest first, cursor-paginated.",
@@ -2252,9 +2143,7 @@
     "/v1/tenants/{tenantId}": {
       "get": {
         "operationId": "tenants.get",
-        "x-fern-sdk-group-name": [
-          "tenants"
-        ],
+        "x-fern-sdk-group-name": ["tenants"],
         "x-fern-sdk-method-name": "get",
         "x-docs-title": "Get tenant",
         "summary": "Fetch one tenant record.",
@@ -2310,9 +2199,7 @@
       },
       "delete": {
         "operationId": "tenants.delete",
-        "x-fern-sdk-group-name": [
-          "tenants"
-        ],
+        "x-fern-sdk-group-name": ["tenants"],
         "x-fern-sdk-method-name": "delete",
         "x-docs-title": "Delete tenant",
         "summary": "Delete a tenant and everything under it.",
@@ -2364,9 +2251,7 @@
     "/v1/tenants/{tenantId}/documents": {
       "get": {
         "operationId": "documents.list",
-        "x-fern-sdk-group-name": [
-          "documents"
-        ],
+        "x-fern-sdk-group-name": ["documents"],
         "x-fern-sdk-method-name": "list",
         "x-docs-title": "List documents",
         "summary": "List documents in the tenant, newest first, cursor-paginated.",
@@ -2378,9 +2263,7 @@
             "tenantToken": []
           }
         ],
-        "x-required-scope": [
-          "docs.read"
-        ],
+        "x-required-scope": ["docs.read"],
         "parameters": [
           {
             "name": "tenantId",
@@ -2417,12 +2300,7 @@
             "required": false,
             "schema": {
               "type": "string",
-              "enum": [
-                "pending",
-                "ready",
-                "failed",
-                "deleting"
-              ]
+              "enum": ["pending", "ready", "failed", "deleting"]
             }
           }
         ],
@@ -2463,9 +2341,7 @@
     "/v1/tenants/{tenantId}/documents/{id}": {
       "get": {
         "operationId": "documents.get",
-        "x-fern-sdk-group-name": [
-          "documents"
-        ],
+        "x-fern-sdk-group-name": ["documents"],
         "x-fern-sdk-method-name": "get",
         "x-docs-title": "Get document",
         "summary": "Fetch one document record.",
@@ -2477,9 +2353,7 @@
             "tenantToken": []
           }
         ],
-        "x-required-scope": [
-          "docs.read"
-        ],
+        "x-required-scope": ["docs.read"],
         "parameters": [
           {
             "name": "tenantId",
@@ -2545,9 +2419,7 @@
       },
       "delete": {
         "operationId": "documents.delete",
-        "x-fern-sdk-group-name": [
-          "documents"
-        ],
+        "x-fern-sdk-group-name": ["documents"],
         "x-fern-sdk-method-name": "delete",
         "x-docs-title": "Delete document",
         "summary": "Delete a document and its stored artifacts.",
@@ -2559,9 +2431,7 @@
             "tenantToken": []
           }
         ],
-        "x-required-scope": [
-          "docs.delete"
-        ],
+        "x-required-scope": ["docs.delete"],
         "parameters": [
           {
             "name": "tenantId",
@@ -2622,9 +2492,7 @@
     "/v1/tenants/{tenantId}/documents/{id}/commit": {
       "post": {
         "operationId": "documents.commit",
-        "x-fern-sdk-group-name": [
-          "documents"
-        ],
+        "x-fern-sdk-group-name": ["documents"],
         "x-fern-sdk-method-name": "commit",
         "x-docs-title": "Commit upload",
         "summary": "Finish an upload: verify the SHA-256 and promote the document to ready.",
@@ -2636,9 +2504,7 @@
             "tenantToken": []
           }
         ],
-        "x-required-scope": [
-          "docs.create"
-        ],
+        "x-required-scope": ["docs.create"],
         "parameters": [
           {
             "name": "tenantId",
@@ -2716,9 +2582,7 @@
     "/v1/tenants/{tenantId}/documents/{id}/download": {
       "get": {
         "operationId": "documents.download",
-        "x-fern-sdk-group-name": [
-          "documents"
-        ],
+        "x-fern-sdk-group-name": ["documents"],
         "x-fern-sdk-method-name": "download",
         "x-docs-title": "Download document",
         "summary": "Download the stored base PDF bytes.",
@@ -2730,9 +2594,7 @@
             "tenantToken": []
           }
         ],
-        "x-required-scope": [
-          "docs.read"
-        ],
+        "x-required-scope": ["docs.read"],
         "parameters": [
           {
             "name": "tenantId",
@@ -2801,9 +2663,7 @@
     "/v1/tenants/{tenantId}/documents/{id}/thumbnail": {
       "get": {
         "operationId": "documents.thumbnail",
-        "x-fern-sdk-group-name": [
-          "documents"
-        ],
+        "x-fern-sdk-group-name": ["documents"],
         "x-fern-sdk-method-name": "thumbnail",
         "x-docs-title": "Get thumbnail",
         "summary": "Fetch the warmed dashboard-tile render for a document.",
@@ -2815,9 +2675,7 @@
             "tenantToken": []
           }
         ],
-        "x-required-scope": [
-          "docs.read"
-        ],
+        "x-required-scope": ["docs.read"],
         "parameters": [
           {
             "name": "tenantId",
@@ -2882,9 +2740,7 @@
     "/v1/tenants/{tenantId}/documents/{id}/upload-proxy": {
       "post": {
         "operationId": "documents.uploadProxy",
-        "x-fern-sdk-group-name": [
-          "documents"
-        ],
+        "x-fern-sdk-group-name": ["documents"],
         "x-fern-sdk-method-name": "uploadProxy",
         "x-docs-title": "Upload document through the origin",
         "summary": "Upload a bounded PDF through the API when the initialized transfer kind is proxy.",
@@ -2897,9 +2753,7 @@
             "tenantToken": []
           }
         ],
-        "x-required-scope": [
-          "docs.create"
-        ],
+        "x-required-scope": ["docs.create"],
         "parameters": [
           {
             "name": "tenantId",
@@ -2932,9 +2786,7 @@
                     "format": "binary"
                   }
                 },
-                "required": [
-                  "file"
-                ]
+                "required": ["file"]
               }
             }
           }
@@ -2986,9 +2838,7 @@
     "/v1/tenants/{tenantId}/documents/init": {
       "post": {
         "operationId": "documents.init",
-        "x-fern-sdk-group-name": [
-          "documents"
-        ],
+        "x-fern-sdk-group-name": ["documents"],
         "x-fern-sdk-method-name": "init",
         "x-docs-title": "Initialize upload",
         "summary": "Begin an upload: create (or resume/dedupe) a pending document and issue upload access.",
@@ -3000,9 +2850,7 @@
             "tenantToken": []
           }
         ],
-        "x-required-scope": [
-          "docs.create"
-        ],
+        "x-required-scope": ["docs.create"],
         "parameters": [
           {
             "name": "tenantId",
@@ -3061,9 +2909,7 @@
     "/v1/tenants/{tenantId}/resume": {
       "post": {
         "operationId": "tenants.resume",
-        "x-fern-sdk-group-name": [
-          "tenants"
-        ],
+        "x-fern-sdk-group-name": ["tenants"],
         "x-fern-sdk-method-name": "resume",
         "x-docs-title": "Resume tenant",
         "summary": "Lift a suspension; credentials for the tenant verify again.",
@@ -3114,9 +2960,7 @@
     "/v1/tenants/{tenantId}/shares": {
       "post": {
         "operationId": "shares.create",
-        "x-fern-sdk-group-name": [
-          "shares"
-        ],
+        "x-fern-sdk-group-name": ["shares"],
         "x-fern-sdk-method-name": "create",
         "x-docs-title": "Create share",
         "summary": "Create a standing share grant for one document — the no-backend embed credential.",
@@ -3129,9 +2973,7 @@
             "tenantToken": []
           }
         ],
-        "x-required-scope": [
-          "shares.manage"
-        ],
+        "x-required-scope": ["shares.manage"],
         "parameters": [
           {
             "name": "tenantId",
@@ -3208,9 +3050,7 @@
       },
       "get": {
         "operationId": "shares.list",
-        "x-fern-sdk-group-name": [
-          "shares"
-        ],
+        "x-fern-sdk-group-name": ["shares"],
         "x-fern-sdk-method-name": "list",
         "x-docs-title": "List shares",
         "summary": "List share grants in the tenant, newest first, cursor-paginated.",
@@ -3222,9 +3062,7 @@
             "tenantToken": []
           }
         ],
-        "x-required-scope": [
-          "shares.manage"
-        ],
+        "x-required-scope": ["shares.manage"],
         "parameters": [
           {
             "name": "tenantId",
@@ -3302,9 +3140,7 @@
     "/v1/tenants/{tenantId}/shares/{shareId}": {
       "get": {
         "operationId": "shares.get",
-        "x-fern-sdk-group-name": [
-          "shares"
-        ],
+        "x-fern-sdk-group-name": ["shares"],
         "x-fern-sdk-method-name": "get",
         "x-docs-title": "Get share",
         "summary": "Fetch one share grant.",
@@ -3316,9 +3152,7 @@
             "tenantToken": []
           }
         ],
-        "x-required-scope": [
-          "shares.manage"
-        ],
+        "x-required-scope": ["shares.manage"],
         "parameters": [
           {
             "name": "tenantId",
@@ -3374,9 +3208,7 @@
       },
       "patch": {
         "operationId": "shares.update",
-        "x-fern-sdk-group-name": [
-          "shares"
-        ],
+        "x-fern-sdk-group-name": ["shares"],
         "x-fern-sdk-method-name": "update",
         "x-docs-title": "Update share",
         "summary": "Edit a grant in place — every embedded copy of the token follows the row.",
@@ -3388,9 +3220,7 @@
             "tenantToken": []
           }
         ],
-        "x-required-scope": [
-          "shares.manage"
-        ],
+        "x-required-scope": ["shares.manage"],
         "parameters": [
           {
             "name": "tenantId",
@@ -3466,9 +3296,7 @@
       },
       "delete": {
         "operationId": "shares.delete",
-        "x-fern-sdk-group-name": [
-          "shares"
-        ],
+        "x-fern-sdk-group-name": ["shares"],
         "x-fern-sdk-method-name": "delete",
         "x-docs-title": "Revoke share",
         "summary": "Delete a grant; exchange stops immediately, live sessions lapse at their exp.",
@@ -3480,9 +3308,7 @@
             "tenantToken": []
           }
         ],
-        "x-required-scope": [
-          "shares.manage"
-        ],
+        "x-required-scope": ["shares.manage"],
         "parameters": [
           {
             "name": "tenantId",
@@ -3533,9 +3359,7 @@
     "/v1/tenants/{tenantId}/suspend": {
       "post": {
         "operationId": "tenants.suspend",
-        "x-fern-sdk-group-name": [
-          "tenants"
-        ],
+        "x-fern-sdk-group-name": ["tenants"],
         "x-fern-sdk-method-name": "suspend",
         "x-docs-title": "Suspend tenant",
         "summary": "Fail the tenant closed: refuse every tenant JWT, doc JWT, and share exchange.",
@@ -3597,9 +3421,7 @@
     "/v1/tenants/{tenantId}/tokens": {
       "post": {
         "operationId": "tokens.issue",
-        "x-fern-sdk-group-name": [
-          "tokens"
-        ],
+        "x-fern-sdk-group-name": ["tokens"],
         "x-fern-sdk-method-name": "issue",
         "x-docs-title": "Issue token",
         "summary": "Mint a delegated JWT: a doc token, or (API token only) a tenant token.",
@@ -3612,9 +3434,7 @@
             "tenantToken": []
           }
         ],
-        "x-required-scope": [
-          "tokens.issue-doc"
-        ],
+        "x-required-scope": ["tokens.issue-doc"],
         "parameters": [
           {
             "name": "tenantId",
@@ -3693,9 +3513,7 @@
     "/v1/tenants/{tenantId}/tokens/{jti}/revoke": {
       "post": {
         "operationId": "tokens.revoke",
-        "x-fern-sdk-group-name": [
-          "tokens"
-        ],
+        "x-fern-sdk-group-name": ["tokens"],
         "x-fern-sdk-method-name": "revoke",
         "x-docs-title": "Revoke token",
         "summary": "Revoke a token by jti; live sessions drop on their next heartbeat.",
@@ -3708,9 +3526,7 @@
             "tenantToken": []
           }
         ],
-        "x-required-scope": [
-          "tokens.revoke"
-        ],
+        "x-required-scope": ["tokens.revoke"],
         "parameters": [
           {
             "name": "tenantId",
@@ -3772,9 +3588,7 @@
     "/v1/tenants/{tenantId}/usage": {
       "get": {
         "operationId": "tenants.usage",
-        "x-fern-sdk-group-name": [
-          "tenants"
-        ],
+        "x-fern-sdk-group-name": ["tenants"],
         "x-fern-sdk-method-name": "usage",
         "x-docs-title": "Tenant usage",
         "summary": "Per-tenant usage facts (views, uploads, stored bytes) for one UTC month.",
@@ -3787,9 +3601,7 @@
             "tenantToken": []
           }
         ],
-        "x-required-scope": [
-          "docs.read"
-        ],
+        "x-required-scope": ["docs.read"],
         "parameters": [
           {
             "name": "tenantId",
@@ -3928,16 +3740,11 @@
                 "type": "string"
               }
             },
-            "required": [
-              "code",
-              "message"
-            ],
+            "required": ["code", "message"],
             "additionalProperties": false
           }
         },
-        "required": [
-          "error"
-        ],
+        "required": ["error"],
         "additionalProperties": false
       },
       "EngineErrorPayload": {
@@ -3945,9 +3752,7 @@
         "properties": {
           "name": {
             "type": "string",
-            "enum": [
-              "EngineError"
-            ]
+            "enum": ["EngineError"]
           },
           "code": {
             "type": "string",
@@ -3980,11 +3785,7 @@
             "additionalProperties": {}
           }
         },
-        "required": [
-          "name",
-          "code",
-          "message"
-        ],
+        "required": ["name", "code", "message"],
         "additionalProperties": false
       },
       "TenantsCreateRequest": {
@@ -4000,9 +3801,7 @@
             "maxLength": 256
           }
         },
-        "required": [
-          "id"
-        ],
+        "required": ["id"],
         "additionalProperties": false
       },
       "TenantsCreate200Response": {
@@ -4022,31 +3821,20 @@
               },
               "status": {
                 "type": "string",
-                "enum": [
-                  "active",
-                  "suspended"
-                ]
+                "enum": ["active", "suspended"]
               },
               "createdAt": {
                 "type": "number"
               }
             },
-            "required": [
-              "id",
-              "name",
-              "autoProvisioned",
-              "createdAt"
-            ],
+            "required": ["id", "name", "autoProvisioned", "createdAt"],
             "additionalProperties": false
           },
           "created": {
             "type": "boolean"
           }
         },
-        "required": [
-          "tenant",
-          "created"
-        ],
+        "required": ["tenant", "created"],
         "additionalProperties": false
       },
       "TenantsCreate400Response": {
@@ -4062,16 +3850,11 @@
                 "type": "string"
               }
             },
-            "required": [
-              "code",
-              "message"
-            ],
+            "required": ["code", "message"],
             "additionalProperties": false
           }
         },
-        "required": [
-          "error"
-        ],
+        "required": ["error"],
         "additionalProperties": false
       },
       "TenantsList200Response": {
@@ -4093,21 +3876,13 @@
                 },
                 "status": {
                   "type": "string",
-                  "enum": [
-                    "active",
-                    "suspended"
-                  ]
+                  "enum": ["active", "suspended"]
                 },
                 "createdAt": {
                   "type": "number"
                 }
               },
-              "required": [
-                "id",
-                "name",
-                "autoProvisioned",
-                "createdAt"
-              ],
+              "required": ["id", "name", "autoProvisioned", "createdAt"],
               "additionalProperties": false
             }
           },
@@ -4116,9 +3891,7 @@
             "nullable": true
           }
         },
-        "required": [
-          "tenants"
-        ],
+        "required": ["tenants"],
         "additionalProperties": false
       },
       "TenantsList400Response": {
@@ -4134,16 +3907,11 @@
                 "type": "string"
               }
             },
-            "required": [
-              "code",
-              "message"
-            ],
+            "required": ["code", "message"],
             "additionalProperties": false
           }
         },
-        "required": [
-          "error"
-        ],
+        "required": ["error"],
         "additionalProperties": false
       },
       "TenantsGet200Response": {
@@ -4163,27 +3931,17 @@
               },
               "status": {
                 "type": "string",
-                "enum": [
-                  "active",
-                  "suspended"
-                ]
+                "enum": ["active", "suspended"]
               },
               "createdAt": {
                 "type": "number"
               }
             },
-            "required": [
-              "id",
-              "name",
-              "autoProvisioned",
-              "createdAt"
-            ],
+            "required": ["id", "name", "autoProvisioned", "createdAt"],
             "additionalProperties": false
           }
         },
-        "required": [
-          "tenant"
-        ],
+        "required": ["tenant"],
         "additionalProperties": false
       },
       "TenantsGet404Response": {
@@ -4199,16 +3957,11 @@
                 "type": "string"
               }
             },
-            "required": [
-              "code",
-              "message"
-            ],
+            "required": ["code", "message"],
             "additionalProperties": false
           }
         },
-        "required": [
-          "error"
-        ],
+        "required": ["error"],
         "additionalProperties": false
       },
       "TenantsDeleteResponse": {
@@ -4224,16 +3977,11 @@
                 "type": "string"
               }
             },
-            "required": [
-              "code",
-              "message"
-            ],
+            "required": ["code", "message"],
             "additionalProperties": false
           }
         },
-        "required": [
-          "error"
-        ],
+        "required": ["error"],
         "additionalProperties": false
       },
       "DocumentsInitRequest": {
@@ -4256,10 +4004,7 @@
           },
           "dedupMode": {
             "type": "string",
-            "enum": [
-              "always-create",
-              "reuse-existing"
-            ]
+            "enum": ["always-create", "reuse-existing"]
           },
           "docId": {
             "type": "string",
@@ -4272,17 +4017,10 @@
           },
           "uploadPreference": {
             "type": "string",
-            "enum": [
-              "auto",
-              "presigned",
-              "proxy"
-            ]
+            "enum": ["auto", "presigned", "proxy"]
           }
         },
-        "required": [
-          "contentLength",
-          "contentSha256"
-        ],
+        "required": ["contentLength", "contentSha256"],
         "additionalProperties": false
       },
       "DocumentsInit200Response": {
@@ -4292,9 +4030,7 @@
             "properties": {
               "tag": {
                 "type": "string",
-                "enum": [
-                  "created"
-                ]
+                "enum": ["created"]
               },
               "document": {
                 "type": "object",
@@ -4307,12 +4043,7 @@
                   },
                   "state": {
                     "type": "string",
-                    "enum": [
-                      "pending",
-                      "ready",
-                      "failed",
-                      "deleting"
-                    ]
+                    "enum": ["pending", "ready", "failed", "deleting"]
                   },
                   "baseSha": {
                     "type": "string",
@@ -4337,12 +4068,7 @@
                   },
                   "thumbnailState": {
                     "type": "string",
-                    "enum": [
-                      "pending",
-                      "ready",
-                      "locked",
-                      "failed"
-                    ]
+                    "enum": ["pending", "ready", "locked", "failed"]
                   },
                   "thumbnailUrl": {
                     "type": "string",
@@ -4381,9 +4107,7 @@
                     "properties": {
                       "kind": {
                         "type": "string",
-                        "enum": [
-                          "presigned"
-                        ]
+                        "enum": ["presigned"]
                       },
                       "presigned": {
                         "type": "object",
@@ -4399,31 +4123,20 @@
                           },
                           "method": {
                             "type": "string",
-                            "enum": [
-                              "PUT"
-                            ]
+                            "enum": ["PUT"]
                           },
                           "expiresAt": {
                             "type": "number"
                           }
                         },
-                        "required": [
-                          "url",
-                          "headers",
-                          "method",
-                          "expiresAt"
-                        ],
+                        "required": ["url", "headers", "method", "expiresAt"],
                         "additionalProperties": false
                       },
                       "key": {
                         "type": "string"
                       }
                     },
-                    "required": [
-                      "kind",
-                      "presigned",
-                      "key"
-                    ],
+                    "required": ["kind", "presigned", "key"],
                     "additionalProperties": false
                   },
                   {
@@ -4431,9 +4144,7 @@
                     "properties": {
                       "kind": {
                         "type": "string",
-                        "enum": [
-                          "proxy"
-                        ]
+                        "enum": ["proxy"]
                       },
                       "url": {
                         "type": "string"
@@ -4442,21 +4153,13 @@
                         "type": "string"
                       }
                     },
-                    "required": [
-                      "kind",
-                      "url",
-                      "key"
-                    ],
+                    "required": ["kind", "url", "key"],
                     "additionalProperties": false
                   }
                 ]
               }
             },
-            "required": [
-              "tag",
-              "document",
-              "upload"
-            ],
+            "required": ["tag", "document", "upload"],
             "additionalProperties": false
           },
           {
@@ -4464,9 +4167,7 @@
             "properties": {
               "tag": {
                 "type": "string",
-                "enum": [
-                  "resumed"
-                ]
+                "enum": ["resumed"]
               },
               "document": {
                 "$ref": "#/components/schemas/DocumentsInit200Response/anyOf/0/properties/document"
@@ -4475,11 +4176,7 @@
                 "$ref": "#/components/schemas/DocumentsInit200Response/anyOf/0/properties/upload"
               }
             },
-            "required": [
-              "tag",
-              "document",
-              "upload"
-            ],
+            "required": ["tag", "document", "upload"],
             "additionalProperties": false
           },
           {
@@ -4487,18 +4184,13 @@
             "properties": {
               "tag": {
                 "type": "string",
-                "enum": [
-                  "deduped"
-                ]
+                "enum": ["deduped"]
               },
               "document": {
                 "$ref": "#/components/schemas/DocumentsInit200Response/anyOf/0/properties/document"
               }
             },
-            "required": [
-              "tag",
-              "document"
-            ],
+            "required": ["tag", "document"],
             "additionalProperties": false
           }
         ]
@@ -4516,16 +4208,11 @@
                 "type": "string"
               }
             },
-            "required": [
-              "code",
-              "message"
-            ],
+            "required": ["code", "message"],
             "additionalProperties": false
           }
         },
-        "required": [
-          "error"
-        ],
+        "required": ["error"],
         "additionalProperties": false
       },
       "DocumentsCommitRequest": {
@@ -4536,9 +4223,7 @@
             "pattern": "^[0-9a-f]{64}$"
           }
         },
-        "required": [
-          "sha256"
-        ],
+        "required": ["sha256"],
         "additionalProperties": false
       },
       "DocumentsCommit200Response": {
@@ -4555,12 +4240,7 @@
               },
               "state": {
                 "type": "string",
-                "enum": [
-                  "pending",
-                  "ready",
-                  "failed",
-                  "deleting"
-                ]
+                "enum": ["pending", "ready", "failed", "deleting"]
               },
               "baseSha": {
                 "type": "string",
@@ -4585,12 +4265,7 @@
               },
               "thumbnailState": {
                 "type": "string",
-                "enum": [
-                  "pending",
-                  "ready",
-                  "locked",
-                  "failed"
-                ]
+                "enum": ["pending", "ready", "locked", "failed"]
               },
               "thumbnailUrl": {
                 "type": "string",
@@ -4623,9 +4298,7 @@
             "additionalProperties": false
           }
         },
-        "required": [
-          "document"
-        ],
+        "required": ["document"],
         "additionalProperties": false
       },
       "DocumentsCommit400Response": {
@@ -4641,16 +4314,11 @@
                 "type": "string"
               }
             },
-            "required": [
-              "code",
-              "message"
-            ],
+            "required": ["code", "message"],
             "additionalProperties": false
           }
         },
-        "required": [
-          "error"
-        ],
+        "required": ["error"],
         "additionalProperties": false
       },
       "DocumentsCommit404Response": {
@@ -4666,16 +4334,11 @@
                 "type": "string"
               }
             },
-            "required": [
-              "code",
-              "message"
-            ],
+            "required": ["code", "message"],
             "additionalProperties": false
           }
         },
-        "required": [
-          "error"
-        ],
+        "required": ["error"],
         "additionalProperties": false
       },
       "DocumentsUploadProxy200Response": {
@@ -4686,9 +4349,7 @@
             "pattern": "^[0-9a-f]{64}$"
           }
         },
-        "required": [
-          "sha256"
-        ],
+        "required": ["sha256"],
         "additionalProperties": false
       },
       "DocumentsUploadProxy400Response": {
@@ -4704,16 +4365,11 @@
                 "type": "string"
               }
             },
-            "required": [
-              "code",
-              "message"
-            ],
+            "required": ["code", "message"],
             "additionalProperties": false
           }
         },
-        "required": [
-          "error"
-        ],
+        "required": ["error"],
         "additionalProperties": false
       },
       "DocumentsUploadProxy409Response": {
@@ -4729,16 +4385,11 @@
                 "type": "string"
               }
             },
-            "required": [
-              "code",
-              "message"
-            ],
+            "required": ["code", "message"],
             "additionalProperties": false
           }
         },
-        "required": [
-          "error"
-        ],
+        "required": ["error"],
         "additionalProperties": false
       },
       "DocumentsList200Response": {
@@ -4757,12 +4408,7 @@
                 },
                 "state": {
                   "type": "string",
-                  "enum": [
-                    "pending",
-                    "ready",
-                    "failed",
-                    "deleting"
-                  ]
+                  "enum": ["pending", "ready", "failed", "deleting"]
                 },
                 "baseSha": {
                   "type": "string",
@@ -4787,12 +4433,7 @@
                 },
                 "thumbnailState": {
                   "type": "string",
-                  "enum": [
-                    "pending",
-                    "ready",
-                    "locked",
-                    "failed"
-                  ]
+                  "enum": ["pending", "ready", "locked", "failed"]
                 },
                 "thumbnailUrl": {
                   "type": "string",
@@ -4830,9 +4471,7 @@
             "nullable": true
           }
         },
-        "required": [
-          "documents"
-        ],
+        "required": ["documents"],
         "additionalProperties": false
       },
       "DocumentsList400Response": {
@@ -4848,16 +4487,11 @@
                 "type": "string"
               }
             },
-            "required": [
-              "code",
-              "message"
-            ],
+            "required": ["code", "message"],
             "additionalProperties": false
           }
         },
-        "required": [
-          "error"
-        ],
+        "required": ["error"],
         "additionalProperties": false
       },
       "DocumentsGet200Response": {
@@ -4874,12 +4508,7 @@
               },
               "state": {
                 "type": "string",
-                "enum": [
-                  "pending",
-                  "ready",
-                  "failed",
-                  "deleting"
-                ]
+                "enum": ["pending", "ready", "failed", "deleting"]
               },
               "baseSha": {
                 "type": "string",
@@ -4904,12 +4533,7 @@
               },
               "thumbnailState": {
                 "type": "string",
-                "enum": [
-                  "pending",
-                  "ready",
-                  "locked",
-                  "failed"
-                ]
+                "enum": ["pending", "ready", "locked", "failed"]
               },
               "thumbnailUrl": {
                 "type": "string",
@@ -4942,9 +4566,7 @@
             "additionalProperties": false
           }
         },
-        "required": [
-          "document"
-        ],
+        "required": ["document"],
         "additionalProperties": false
       },
       "DocumentsGet403Response": {
@@ -4960,16 +4582,11 @@
                 "type": "string"
               }
             },
-            "required": [
-              "code",
-              "message"
-            ],
+            "required": ["code", "message"],
             "additionalProperties": false
           }
         },
-        "required": [
-          "error"
-        ],
+        "required": ["error"],
         "additionalProperties": false
       },
       "DocumentsGet404Response": {
@@ -4985,16 +4602,11 @@
                 "type": "string"
               }
             },
-            "required": [
-              "code",
-              "message"
-            ],
+            "required": ["code", "message"],
             "additionalProperties": false
           }
         },
-        "required": [
-          "error"
-        ],
+        "required": ["error"],
         "additionalProperties": false
       },
       "DocumentsDownload403Response": {
@@ -5010,16 +4622,11 @@
                 "type": "string"
               }
             },
-            "required": [
-              "code",
-              "message"
-            ],
+            "required": ["code", "message"],
             "additionalProperties": false
           }
         },
-        "required": [
-          "error"
-        ],
+        "required": ["error"],
         "additionalProperties": false
       },
       "DocumentsDownload404Response": {
@@ -5035,16 +4642,11 @@
                 "type": "string"
               }
             },
-            "required": [
-              "code",
-              "message"
-            ],
+            "required": ["code", "message"],
             "additionalProperties": false
           }
         },
-        "required": [
-          "error"
-        ],
+        "required": ["error"],
         "additionalProperties": false
       },
       "DocumentsDelete403Response": {
@@ -5060,16 +4662,11 @@
                 "type": "string"
               }
             },
-            "required": [
-              "code",
-              "message"
-            ],
+            "required": ["code", "message"],
             "additionalProperties": false
           }
         },
-        "required": [
-          "error"
-        ],
+        "required": ["error"],
         "additionalProperties": false
       },
       "DocumentsDelete404Response": {
@@ -5085,16 +4682,11 @@
                 "type": "string"
               }
             },
-            "required": [
-              "code",
-              "message"
-            ],
+            "required": ["code", "message"],
             "additionalProperties": false
           }
         },
-        "required": [
-          "error"
-        ],
+        "required": ["error"],
         "additionalProperties": false
       },
       "DocumentsThumbnailResponse": {
@@ -5113,17 +4705,11 @@
                 "type": "string"
               }
             },
-            "required": [
-              "code",
-              "message",
-              "state"
-            ],
+            "required": ["code", "message", "state"],
             "additionalProperties": false
           }
         },
-        "required": [
-          "error"
-        ],
+        "required": ["error"],
         "additionalProperties": false
       },
       "DeploymentLicenseStatusResponse": {
@@ -5146,9 +4732,7 @@
             "properties": {
               "kind": {
                 "type": "string",
-                "enum": [
-                  "doc"
-                ]
+                "enum": ["doc"]
               },
               "sub": {
                 "type": "string",
@@ -5210,13 +4794,7 @@
                 "maximum": 7776000
               }
             },
-            "required": [
-              "kind",
-              "sub",
-              "docId",
-              "scope",
-              "expiresIn"
-            ],
+            "required": ["kind", "sub", "docId", "scope", "expiresIn"],
             "additionalProperties": false
           },
           {
@@ -5224,9 +4802,7 @@
             "properties": {
               "kind": {
                 "type": "string",
-                "enum": [
-                  "tenant"
-                ]
+                "enum": ["tenant"]
               },
               "sub": {
                 "type": "string",
@@ -5239,9 +4815,7 @@
                   "anyOf": [
                     {
                       "type": "string",
-                      "enum": [
-                        "*"
-                      ]
+                      "enum": ["*"]
                     },
                     {
                       "type": "string",
@@ -5265,12 +4839,7 @@
                 "maximum": 7776000
               }
             },
-            "required": [
-              "kind",
-              "sub",
-              "scope",
-              "expiresIn"
-            ],
+            "required": ["kind", "sub", "scope", "expiresIn"],
             "additionalProperties": false
           }
         ]
@@ -5288,11 +4857,7 @@
             "type": "number"
           }
         },
-        "required": [
-          "token",
-          "jti",
-          "expiresAt"
-        ],
+        "required": ["token", "jti", "expiresAt"],
         "additionalProperties": false
       },
       "TokensIssue400Response": {
@@ -5308,16 +4873,11 @@
                 "type": "string"
               }
             },
-            "required": [
-              "code",
-              "message"
-            ],
+            "required": ["code", "message"],
             "additionalProperties": false
           }
         },
-        "required": [
-          "error"
-        ],
+        "required": ["error"],
         "additionalProperties": false
       },
       "TokensIssue403Response": {
@@ -5333,16 +4893,11 @@
                 "type": "string"
               }
             },
-            "required": [
-              "code",
-              "message"
-            ],
+            "required": ["code", "message"],
             "additionalProperties": false
           }
         },
-        "required": [
-          "error"
-        ],
+        "required": ["error"],
         "additionalProperties": false
       },
       "TokensIssue404Response": {
@@ -5358,16 +4913,11 @@
                 "type": "string"
               }
             },
-            "required": [
-              "code",
-              "message"
-            ],
+            "required": ["code", "message"],
             "additionalProperties": false
           }
         },
-        "required": [
-          "error"
-        ],
+        "required": ["error"],
         "additionalProperties": false
       },
       "TokensRevokeRequest": {
@@ -5398,16 +4948,11 @@
                 "type": "string"
               }
             },
-            "required": [
-              "code",
-              "message"
-            ],
+            "required": ["code", "message"],
             "additionalProperties": false
           }
         },
-        "required": [
-          "error"
-        ],
+        "required": ["error"],
         "additionalProperties": false
       },
       "TenantsUsage200Response": {
@@ -5435,20 +4980,11 @@
                 "type": "number"
               }
             },
-            "required": [
-              "pdf.views",
-              "pdf.uploads",
-              "storage.bytes"
-            ],
+            "required": ["pdf.views", "pdf.uploads", "storage.bytes"],
             "additionalProperties": false
           }
         },
-        "required": [
-          "tenantId",
-          "periodStart",
-          "periodEnd",
-          "metrics"
-        ],
+        "required": ["tenantId", "periodStart", "periodEnd", "metrics"],
         "additionalProperties": false
       },
       "TenantsUsage400Response": {
@@ -5464,16 +5000,11 @@
                 "type": "string"
               }
             },
-            "required": [
-              "code",
-              "message"
-            ],
+            "required": ["code", "message"],
             "additionalProperties": false
           }
         },
-        "required": [
-          "error"
-        ],
+        "required": ["error"],
         "additionalProperties": false
       },
       "TenantsUsage404Response": {
@@ -5489,16 +5020,11 @@
                 "type": "string"
               }
             },
-            "required": [
-              "code",
-              "message"
-            ],
+            "required": ["code", "message"],
             "additionalProperties": false
           }
         },
-        "required": [
-          "error"
-        ],
+        "required": ["error"],
         "additionalProperties": false
       },
       "TenantsSuspendRequest": {
@@ -5524,16 +5050,11 @@
                 "type": "string"
               }
             },
-            "required": [
-              "code",
-              "message"
-            ],
+            "required": ["code", "message"],
             "additionalProperties": false
           }
         },
-        "required": [
-          "error"
-        ],
+        "required": ["error"],
         "additionalProperties": false
       },
       "TenantsResumeResponse": {
@@ -5549,16 +5070,11 @@
                 "type": "string"
               }
             },
-            "required": [
-              "code",
-              "message"
-            ],
+            "required": ["code", "message"],
             "additionalProperties": false
           }
         },
-        "required": [
-          "error"
-        ],
+        "required": ["error"],
         "additionalProperties": false
       },
       "SharesCreateRequest": {
@@ -5609,10 +5125,7 @@
             "minimum": 0
           }
         },
-        "required": [
-          "docId",
-          "scope"
-        ],
+        "required": ["docId", "scope"],
         "additionalProperties": false
       },
       "SharesCreate200Response": {
@@ -5696,9 +5209,7 @@
             "additionalProperties": false
           }
         },
-        "required": [
-          "share"
-        ],
+        "required": ["share"],
         "additionalProperties": false
       },
       "SharesCreate400Response": {
@@ -5714,16 +5225,11 @@
                 "type": "string"
               }
             },
-            "required": [
-              "code",
-              "message"
-            ],
+            "required": ["code", "message"],
             "additionalProperties": false
           }
         },
-        "required": [
-          "error"
-        ],
+        "required": ["error"],
         "additionalProperties": false
       },
       "SharesCreate403Response": {
@@ -5739,16 +5245,11 @@
                 "type": "string"
               }
             },
-            "required": [
-              "code",
-              "message"
-            ],
+            "required": ["code", "message"],
             "additionalProperties": false
           }
         },
-        "required": [
-          "error"
-        ],
+        "required": ["error"],
         "additionalProperties": false
       },
       "SharesCreate404Response": {
@@ -5764,16 +5265,11 @@
                 "type": "string"
               }
             },
-            "required": [
-              "code",
-              "message"
-            ],
+            "required": ["code", "message"],
             "additionalProperties": false
           }
         },
-        "required": [
-          "error"
-        ],
+        "required": ["error"],
         "additionalProperties": false
       },
       "SharesList200Response": {
@@ -5864,9 +5360,7 @@
             "nullable": true
           }
         },
-        "required": [
-          "shares"
-        ],
+        "required": ["shares"],
         "additionalProperties": false
       },
       "SharesList400Response": {
@@ -5882,16 +5376,11 @@
                 "type": "string"
               }
             },
-            "required": [
-              "code",
-              "message"
-            ],
+            "required": ["code", "message"],
             "additionalProperties": false
           }
         },
-        "required": [
-          "error"
-        ],
+        "required": ["error"],
         "additionalProperties": false
       },
       "SharesGet200Response": {
@@ -5975,9 +5464,7 @@
             "additionalProperties": false
           }
         },
-        "required": [
-          "share"
-        ],
+        "required": ["share"],
         "additionalProperties": false
       },
       "SharesGet404Response": {
@@ -5993,16 +5480,11 @@
                 "type": "string"
               }
             },
-            "required": [
-              "code",
-              "message"
-            ],
+            "required": ["code", "message"],
             "additionalProperties": false
           }
         },
-        "required": [
-          "error"
-        ],
+        "required": ["error"],
         "additionalProperties": false
       },
       "SharesUpdateRequest": {
@@ -6133,9 +5615,7 @@
             "additionalProperties": false
           }
         },
-        "required": [
-          "share"
-        ],
+        "required": ["share"],
         "additionalProperties": false
       },
       "SharesUpdate400Response": {
@@ -6151,16 +5631,11 @@
                 "type": "string"
               }
             },
-            "required": [
-              "code",
-              "message"
-            ],
+            "required": ["code", "message"],
             "additionalProperties": false
           }
         },
-        "required": [
-          "error"
-        ],
+        "required": ["error"],
         "additionalProperties": false
       },
       "SharesUpdate404Response": {
@@ -6176,16 +5651,11 @@
                 "type": "string"
               }
             },
-            "required": [
-              "code",
-              "message"
-            ],
+            "required": ["code", "message"],
             "additionalProperties": false
           }
         },
-        "required": [
-          "error"
-        ],
+        "required": ["error"],
         "additionalProperties": false
       },
       "SharesDeleteResponse": {
@@ -6201,16 +5671,11 @@
                 "type": "string"
               }
             },
-            "required": [
-              "code",
-              "message"
-            ],
+            "required": ["code", "message"],
             "additionalProperties": false
           }
         },
-        "required": [
-          "error"
-        ],
+        "required": ["error"],
         "additionalProperties": false
       },
       "SharesExchangeRequest": {
@@ -6226,9 +5691,7 @@
             "maxLength": 1024
           }
         },
-        "required": [
-          "shareToken"
-        ],
+        "required": ["shareToken"],
         "additionalProperties": false
       },
       "SharesExchange200Response": {
@@ -6247,12 +5710,7 @@
             "type": "number"
           }
         },
-        "required": [
-          "token",
-          "docId",
-          "layerName",
-          "expiresAt"
-        ],
+        "required": ["token", "docId", "layerName", "expiresAt"],
         "additionalProperties": false
       },
       "SharesExchange400Response": {
@@ -6268,16 +5726,11 @@
                 "type": "string"
               }
             },
-            "required": [
-              "code",
-              "message"
-            ],
+            "required": ["code", "message"],
             "additionalProperties": false
           }
         },
-        "required": [
-          "error"
-        ],
+        "required": ["error"],
         "additionalProperties": false
       },
       "SharesExchange403Response": {
@@ -6293,16 +5746,11 @@
                 "type": "string"
               }
             },
-            "required": [
-              "code",
-              "message"
-            ],
+            "required": ["code", "message"],
             "additionalProperties": false
           }
         },
-        "required": [
-          "error"
-        ],
+        "required": ["error"],
         "additionalProperties": false
       },
       "SharesExchange404Response": {
@@ -6318,16 +5766,11 @@
                 "type": "string"
               }
             },
-            "required": [
-              "code",
-              "message"
-            ],
+            "required": ["code", "message"],
             "additionalProperties": false
           }
         },
-        "required": [
-          "error"
-        ],
+        "required": ["error"],
         "additionalProperties": false
       },
       "SharesExchange410Response": {
@@ -6343,16 +5786,11 @@
                 "type": "string"
               }
             },
-            "required": [
-              "code",
-              "message"
-            ],
+            "required": ["code", "message"],
             "additionalProperties": false
           }
         },
-        "required": [
-          "error"
-        ],
+        "required": ["error"],
         "additionalProperties": false
       },
       "SharesExchange422Response": {
@@ -6368,16 +5806,11 @@
                 "type": "string"
               }
             },
-            "required": [
-              "code",
-              "message"
-            ],
+            "required": ["code", "message"],
             "additionalProperties": false
           }
         },
-        "required": [
-          "error"
-        ],
+        "required": ["error"],
         "additionalProperties": false
       },
       "DocHead200Response": {
@@ -6400,34 +5833,21 @@
           },
           "state": {
             "type": "string",
-            "enum": [
-              "pending",
-              "ready",
-              "failed",
-              "deleting"
-            ]
+            "enum": ["pending", "ready", "failed", "deleting"]
           },
           "encryption": {
             "type": "object",
             "properties": {
               "state": {
                 "type": "string",
-                "enum": [
-                  "unknown",
-                  "none",
-                  "encrypted",
-                  "unsupported"
-                ]
+                "enum": ["unknown", "none", "encrypted", "unsupported"]
               },
               "requiresPassword": {
                 "type": "boolean",
                 "nullable": true
               }
             },
-            "required": [
-              "state",
-              "requiresPassword"
-            ],
+            "required": ["state", "requiresPassword"],
             "additionalProperties": false
           },
           "permissions": {
@@ -6447,11 +5867,7 @@
               },
               "openedAs": {
                 "type": "string",
-                "enum": [
-                  "none",
-                  "user",
-                  "owner"
-                ],
+                "enum": ["none", "user", "owner"],
                 "nullable": true
               },
               "securityHandlerRevision": {
@@ -6482,21 +5898,14 @@
                 "type": "array",
                 "items": {
                   "type": "string",
-                  "enum": [
-                    "password",
-                    "cdn",
-                    "permissions-unknown"
-                  ]
+                  "enum": ["password", "cdn", "permissions-unknown"]
                 }
               },
               "endpoint": {
                 "type": "string"
               }
             },
-            "required": [
-              "required",
-              "reasons"
-            ],
+            "required": ["required", "reasons"],
             "additionalProperties": false
           }
         },
@@ -6517,9 +5926,7 @@
         "properties": {
           "name": {
             "type": "string",
-            "enum": [
-              "EngineError"
-            ]
+            "enum": ["EngineError"]
           },
           "code": {
             "type": "string",
@@ -6552,11 +5959,7 @@
             "additionalProperties": {}
           }
         },
-        "required": [
-          "name",
-          "code",
-          "message"
-        ],
+        "required": ["name", "code", "message"],
         "additionalProperties": false
       },
       "DocManifest200Response": {
@@ -6601,10 +6004,7 @@
             "properties": {
               "content": {
                 "type": "string",
-                "enum": [
-                  "base",
-                  "layer"
-                ]
+                "enum": ["base", "layer"]
               },
               "annotations": {
                 "$ref": "#/components/schemas/DocManifest200Response/properties/scopes/properties/content"
@@ -6622,14 +6022,7 @@
                 "$ref": "#/components/schemas/DocManifest200Response/properties/scopes/properties/content"
               }
             },
-            "required": [
-              "content",
-              "annotations",
-              "layout",
-              "attachments",
-              "metadata",
-              "actions"
-            ],
+            "required": ["content", "annotations", "layout", "attachments", "metadata", "actions"],
             "additionalProperties": false
           },
           "pages": {
@@ -6661,11 +6054,7 @@
                           "minimum": 0
                         }
                       },
-                      "required": [
-                        "docSessionId",
-                        "pageObjectNumber",
-                        "generation"
-                      ],
+                      "required": ["docSessionId", "pageObjectNumber", "generation"],
                       "additionalProperties": false
                     },
                     "weakAnnotationState": {
@@ -6675,14 +6064,10 @@
                           "properties": {
                             "kind": {
                               "type": "string",
-                              "enum": [
-                                "unknown"
-                              ]
+                              "enum": ["unknown"]
                             }
                           },
-                          "required": [
-                            "kind"
-                          ],
+                          "required": ["kind"],
                           "additionalProperties": false
                         },
                         {
@@ -6690,28 +6075,19 @@
                           "properties": {
                             "kind": {
                               "type": "string",
-                              "enum": [
-                                "known"
-                              ]
+                              "enum": ["known"]
                             },
                             "hasAnyWeakAnnotations": {
                               "type": "boolean"
                             }
                           },
-                          "required": [
-                            "kind",
-                            "hasAnyWeakAnnotations"
-                          ],
+                          "required": ["kind", "hasAnyWeakAnnotations"],
                           "additionalProperties": false
                         }
                       ]
                     }
                   },
-                  "required": [
-                    "pageObjectNumber",
-                    "revision",
-                    "weakAnnotationState"
-                  ],
+                  "required": ["pageObjectNumber", "revision", "weakAnnotationState"],
                   "additionalProperties": false
                 },
                 "cache": {
@@ -6728,17 +6104,11 @@
                       "minimum": 0
                     }
                   },
-                  "required": [
-                    "contentVersion",
-                    "annotationVersion"
-                  ],
+                  "required": ["contentVersion", "annotationVersion"],
                   "additionalProperties": false
                 }
               },
-              "required": [
-                "state",
-                "cache"
-              ],
+              "required": ["state", "cache"],
               "additionalProperties": false
             }
           }
@@ -6758,9 +6128,7 @@
         "properties": {
           "name": {
             "type": "string",
-            "enum": [
-              "EngineError"
-            ]
+            "enum": ["EngineError"]
           },
           "code": {
             "type": "string",
@@ -6793,11 +6161,7 @@
             "additionalProperties": {}
           }
         },
-        "required": [
-          "name",
-          "code",
-          "message"
-        ],
+        "required": ["name", "code", "message"],
         "additionalProperties": false
       },
       "DocMetadataGet200Response": {
@@ -6839,11 +6203,7 @@
           },
           "trapped": {
             "type": "string",
-            "enum": [
-              "true",
-              "false",
-              "unknown"
-            ]
+            "enum": ["true", "false", "unknown"]
           },
           "custom": {
             "type": "object",
@@ -6871,9 +6231,7 @@
         "properties": {
           "name": {
             "type": "string",
-            "enum": [
-              "EngineError"
-            ]
+            "enum": ["EngineError"]
           },
           "code": {
             "type": "string",
@@ -6906,11 +6264,7 @@
             "additionalProperties": {}
           }
         },
-        "required": [
-          "name",
-          "code",
-          "message"
-        ],
+        "required": ["name", "code", "message"],
         "additionalProperties": false
       },
       "DocRenderResponse": {
@@ -6918,9 +6272,7 @@
         "properties": {
           "name": {
             "type": "string",
-            "enum": [
-              "EngineError"
-            ]
+            "enum": ["EngineError"]
           },
           "code": {
             "type": "string",
@@ -6953,11 +6305,7 @@
             "additionalProperties": {}
           }
         },
-        "required": [
-          "name",
-          "code",
-          "message"
-        ],
+        "required": ["name", "code", "message"],
         "additionalProperties": false
       },
       "DocText200Response": {
@@ -6971,10 +6319,7 @@
             "minimum": 0
           }
         },
-        "required": [
-          "text",
-          "charCount"
-        ],
+        "required": ["text", "charCount"],
         "additionalProperties": false
       },
       "DocText404Response": {
@@ -6982,9 +6327,7 @@
         "properties": {
           "name": {
             "type": "string",
-            "enum": [
-              "EngineError"
-            ]
+            "enum": ["EngineError"]
           },
           "code": {
             "type": "string",
@@ -7017,11 +6360,7 @@
             "additionalProperties": {}
           }
         },
-        "required": [
-          "name",
-          "code",
-          "message"
-        ],
+        "required": ["name", "code", "message"],
         "additionalProperties": false
       },
       "DocAnnotationsList200Response": {
@@ -7051,11 +6390,7 @@
                     "minimum": 0
                   }
                 },
-                "required": [
-                  "docSessionId",
-                  "pageObjectNumber",
-                  "generation"
-                ],
+                "required": ["docSessionId", "pageObjectNumber", "generation"],
                 "additionalProperties": false
               },
               "weakAnnotationState": {
@@ -7065,14 +6400,10 @@
                     "properties": {
                       "kind": {
                         "type": "string",
-                        "enum": [
-                          "unknown"
-                        ]
+                        "enum": ["unknown"]
                       }
                     },
-                    "required": [
-                      "kind"
-                    ],
+                    "required": ["kind"],
                     "additionalProperties": false
                   },
                   {
@@ -7080,28 +6411,19 @@
                     "properties": {
                       "kind": {
                         "type": "string",
-                        "enum": [
-                          "known"
-                        ]
+                        "enum": ["known"]
                       },
                       "hasAnyWeakAnnotations": {
                         "type": "boolean"
                       }
                     },
-                    "required": [
-                      "kind",
-                      "hasAnyWeakAnnotations"
-                    ],
+                    "required": ["kind", "hasAnyWeakAnnotations"],
                     "additionalProperties": false
                   }
                 ]
               }
             },
-            "required": [
-              "pageObjectNumber",
-              "revision",
-              "weakAnnotationState"
-            ],
+            "required": ["pageObjectNumber", "revision", "weakAnnotationState"],
             "additionalProperties": false
           },
           "annotations": {
@@ -7118,9 +6440,7 @@
                           "properties": {
                             "kind": {
                               "type": "string",
-                              "enum": [
-                                "objectNumber"
-                              ]
+                              "enum": ["objectNumber"]
                             },
                             "pageObjectNumber": {
                               "type": "integer",
@@ -7133,11 +6453,7 @@
                               "minimum": 0
                             }
                           },
-                          "required": [
-                            "kind",
-                            "pageObjectNumber",
-                            "annotObjectNumber"
-                          ],
+                          "required": ["kind", "pageObjectNumber", "annotObjectNumber"],
                           "additionalProperties": false
                         },
                         {
@@ -7145,9 +6461,7 @@
                           "properties": {
                             "kind": {
                               "type": "string",
-                              "enum": [
-                                "nm"
-                              ]
+                              "enum": ["nm"]
                             },
                             "pageObjectNumber": {
                               "type": "integer",
@@ -7158,11 +6472,7 @@
                               "type": "string"
                             }
                           },
-                          "required": [
-                            "kind",
-                            "pageObjectNumber",
-                            "nm"
-                          ],
+                          "required": ["kind", "pageObjectNumber", "nm"],
                           "additionalProperties": false
                         },
                         {
@@ -7170,9 +6480,7 @@
                           "properties": {
                             "kind": {
                               "type": "string",
-                              "enum": [
-                                "index"
-                              ]
+                              "enum": ["index"]
                             },
                             "pageObjectNumber": {
                               "type": "integer",
@@ -7187,12 +6495,7 @@
                               "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/pageState/properties/revision"
                             }
                           },
-                          "required": [
-                            "kind",
-                            "pageObjectNumber",
-                            "index",
-                            "revision"
-                          ],
+                          "required": ["kind", "pageObjectNumber", "index", "revision"],
                           "additionalProperties": false
                         }
                       ]
@@ -7208,10 +6511,7 @@
                     },
                     "identityQuality": {
                       "type": "string",
-                      "enum": [
-                        "durable",
-                        "weak"
-                      ]
+                      "enum": ["durable", "weak"]
                     },
                     "nm": {
                       "type": "string",
@@ -7281,12 +6581,7 @@
                           "type": "number"
                         }
                       },
-                      "required": [
-                        "left",
-                        "bottom",
-                        "right",
-                        "top"
-                      ],
+                      "required": ["left", "bottom", "right", "top"],
                       "additionalProperties": false
                     },
                     "contents": {
@@ -7338,10 +6633,7 @@
                     },
                     "replyType": {
                       "type": "string",
-                      "enum": [
-                        "reply",
-                        "group"
-                      ],
+                      "enum": ["reply", "group"],
                       "nullable": true
                     },
                     "userId": {
@@ -7400,11 +6692,7 @@
                                   "items": {}
                                 }
                               },
-                              "required": [
-                                "type",
-                                "subtype",
-                                "next"
-                              ],
+                              "required": ["type", "subtype", "next"],
                               "additionalProperties": false,
                               "nullable": true
                             },
@@ -7419,20 +6707,11 @@
                               "type": "array",
                               "items": {
                                 "type": "string",
-                                "enum": [
-                                  "cycle-dropped",
-                                  "malformed-next",
-                                  "incomplete"
-                                ]
+                                "enum": ["cycle-dropped", "malformed-next", "incomplete"]
                               }
                             }
                           },
-                          "required": [
-                            "root",
-                            "incomplete",
-                            "warningFlags",
-                            "warnings"
-                          ],
+                          "required": ["root", "incomplete", "warningFlags", "warnings"],
                           "additionalProperties": false
                         },
                         "cursorEnter": {
@@ -7487,11 +6766,7 @@
                           "maximum": 255
                         }
                       },
-                      "required": [
-                        "r",
-                        "g",
-                        "b"
-                      ],
+                      "required": ["r", "g", "b"],
                       "additionalProperties": false
                     },
                     "opacity": {
@@ -7514,10 +6789,7 @@
                                 "type": "number"
                               }
                             },
-                            "required": [
-                              "x",
-                              "y"
-                            ],
+                            "required": ["x", "y"],
                             "additionalProperties": false
                           },
                           "p2": {
@@ -7530,20 +6802,13 @@
                             "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/quadPoints/items/properties/p1"
                           }
                         },
-                        "required": [
-                          "p1",
-                          "p2",
-                          "p3",
-                          "p4"
-                        ],
+                        "required": ["p1", "p2", "p3", "p4"],
                         "additionalProperties": false
                       }
                     },
                     "subtype": {
                       "type": "string",
-                      "enum": [
-                        "highlight"
-                      ]
+                      "enum": ["highlight"]
                     }
                   },
                   "required": [
@@ -7639,9 +6904,7 @@
                     },
                     "subtype": {
                       "type": "string",
-                      "enum": [
-                        "underline"
-                      ]
+                      "enum": ["underline"]
                     }
                   },
                   "required": [
@@ -7737,9 +7000,7 @@
                     },
                     "subtype": {
                       "type": "string",
-                      "enum": [
-                        "squiggly"
-                      ]
+                      "enum": ["squiggly"]
                     }
                   },
                   "required": [
@@ -7835,16 +7096,12 @@
                     },
                     "intent": {
                       "type": "string",
-                      "enum": [
-                        "strikeout-text-edit"
-                      ],
+                      "enum": ["strikeout-text-edit"],
                       "nullable": true
                     },
                     "subtype": {
                       "type": "string",
-                      "enum": [
-                        "strikeout"
-                      ]
+                      "enum": ["strikeout"]
                     }
                   },
                   "required": [
@@ -7942,12 +7199,7 @@
                     },
                     "borderStyle": {
                       "type": "string",
-                      "enum": [
-                        "solid",
-                        "dashed",
-                        "beveled",
-                        "inset"
-                      ]
+                      "enum": ["solid", "dashed", "beveled", "inset"]
                     },
                     "dashArray": {
                       "type": "array",
@@ -7990,12 +7242,7 @@
                           "minimum": 0
                         }
                       },
-                      "required": [
-                        "left",
-                        "top",
-                        "right",
-                        "bottom"
-                      ],
+                      "required": ["left", "top", "right", "bottom"],
                       "additionalProperties": false,
                       "nullable": true
                     },
@@ -8007,9 +7254,7 @@
                     },
                     "subtype": {
                       "type": "string",
-                      "enum": [
-                        "circle"
-                      ]
+                      "enum": ["circle"]
                     }
                   },
                   "required": [
@@ -8130,9 +7375,7 @@
                     },
                     "subtype": {
                       "type": "string",
-                      "enum": [
-                        "square"
-                      ]
+                      "enum": ["square"]
                     }
                   },
                   "required": [
@@ -8257,9 +7500,7 @@
                     },
                     "subtype": {
                       "type": "string",
-                      "enum": [
-                        "polygon"
-                      ]
+                      "enum": ["polygon"]
                     }
                   },
                   "required": [
@@ -8398,17 +7639,12 @@
                           "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/7/properties/lineEndings/properties/start"
                         }
                       },
-                      "required": [
-                        "start",
-                        "end"
-                      ],
+                      "required": ["start", "end"],
                       "additionalProperties": false
                     },
                     "subtype": {
                       "type": "string",
-                      "enum": [
-                        "polyline"
-                      ]
+                      "enum": ["polyline"]
                     }
                   },
                   "required": [
@@ -8525,10 +7761,7 @@
                           "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/quadPoints/items/properties/p1"
                         }
                       },
-                      "required": [
-                        "start",
-                        "end"
-                      ],
+                      "required": ["start", "end"],
                       "additionalProperties": false
                     },
                     "lineEndings": {
@@ -8539,9 +7772,7 @@
                     },
                     "subtype": {
                       "type": "string",
-                      "enum": [
-                        "line"
-                      ]
+                      "enum": ["line"]
                     }
                   },
                   "required": [
@@ -8632,9 +7863,7 @@
                     },
                     "subtype": {
                       "type": "string",
-                      "enum": [
-                        "link"
-                      ]
+                      "enum": ["link"]
                     },
                     "target": {
                       "anyOf": [
@@ -8643,9 +7872,7 @@
                           "properties": {
                             "kind": {
                               "type": "string",
-                              "enum": [
-                                "goto"
-                              ]
+                              "enum": ["goto"]
                             },
                             "destination": {
                               "anyOf": [
@@ -8654,9 +7881,7 @@
                                   "properties": {
                                     "kind": {
                                       "type": "string",
-                                      "enum": [
-                                        "xyz"
-                                      ]
+                                      "enum": ["xyz"]
                                     },
                                     "pageObjectNumber": {
                                       "type": "integer",
@@ -8674,10 +7899,7 @@
                                       "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/9/properties/target/anyOf/0/properties/destination/anyOf/0/properties/left"
                                     }
                                   },
-                                  "required": [
-                                    "kind",
-                                    "pageObjectNumber"
-                                  ],
+                                  "required": ["kind", "pageObjectNumber"],
                                   "additionalProperties": false
                                 },
                                 {
@@ -8685,18 +7907,13 @@
                                   "properties": {
                                     "kind": {
                                       "type": "string",
-                                      "enum": [
-                                        "fit"
-                                      ]
+                                      "enum": ["fit"]
                                     },
                                     "pageObjectNumber": {
                                       "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/9/properties/target/anyOf/0/properties/destination/anyOf/0/properties/pageObjectNumber"
                                     }
                                   },
-                                  "required": [
-                                    "kind",
-                                    "pageObjectNumber"
-                                  ],
+                                  "required": ["kind", "pageObjectNumber"],
                                   "additionalProperties": false
                                 },
                                 {
@@ -8704,9 +7921,7 @@
                                   "properties": {
                                     "kind": {
                                       "type": "string",
-                                      "enum": [
-                                        "fitH"
-                                      ]
+                                      "enum": ["fitH"]
                                     },
                                     "pageObjectNumber": {
                                       "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/9/properties/target/anyOf/0/properties/destination/anyOf/0/properties/pageObjectNumber"
@@ -8715,10 +7930,7 @@
                                       "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/9/properties/target/anyOf/0/properties/destination/anyOf/0/properties/left"
                                     }
                                   },
-                                  "required": [
-                                    "kind",
-                                    "pageObjectNumber"
-                                  ],
+                                  "required": ["kind", "pageObjectNumber"],
                                   "additionalProperties": false
                                 },
                                 {
@@ -8726,9 +7938,7 @@
                                   "properties": {
                                     "kind": {
                                       "type": "string",
-                                      "enum": [
-                                        "fitV"
-                                      ]
+                                      "enum": ["fitV"]
                                     },
                                     "pageObjectNumber": {
                                       "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/9/properties/target/anyOf/0/properties/destination/anyOf/0/properties/pageObjectNumber"
@@ -8737,10 +7947,7 @@
                                       "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/9/properties/target/anyOf/0/properties/destination/anyOf/0/properties/left"
                                     }
                                   },
-                                  "required": [
-                                    "kind",
-                                    "pageObjectNumber"
-                                  ],
+                                  "required": ["kind", "pageObjectNumber"],
                                   "additionalProperties": false
                                 },
                                 {
@@ -8748,9 +7955,7 @@
                                   "properties": {
                                     "kind": {
                                       "type": "string",
-                                      "enum": [
-                                        "fitR"
-                                      ]
+                                      "enum": ["fitR"]
                                     },
                                     "pageObjectNumber": {
                                       "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/9/properties/target/anyOf/0/properties/destination/anyOf/0/properties/pageObjectNumber"
@@ -8783,18 +7988,13 @@
                                   "properties": {
                                     "kind": {
                                       "type": "string",
-                                      "enum": [
-                                        "fitB"
-                                      ]
+                                      "enum": ["fitB"]
                                     },
                                     "pageObjectNumber": {
                                       "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/9/properties/target/anyOf/0/properties/destination/anyOf/0/properties/pageObjectNumber"
                                     }
                                   },
-                                  "required": [
-                                    "kind",
-                                    "pageObjectNumber"
-                                  ],
+                                  "required": ["kind", "pageObjectNumber"],
                                   "additionalProperties": false
                                 },
                                 {
@@ -8802,9 +8002,7 @@
                                   "properties": {
                                     "kind": {
                                       "type": "string",
-                                      "enum": [
-                                        "fitBH"
-                                      ]
+                                      "enum": ["fitBH"]
                                     },
                                     "pageObjectNumber": {
                                       "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/9/properties/target/anyOf/0/properties/destination/anyOf/0/properties/pageObjectNumber"
@@ -8813,10 +8011,7 @@
                                       "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/9/properties/target/anyOf/0/properties/destination/anyOf/0/properties/left"
                                     }
                                   },
-                                  "required": [
-                                    "kind",
-                                    "pageObjectNumber"
-                                  ],
+                                  "required": ["kind", "pageObjectNumber"],
                                   "additionalProperties": false
                                 },
                                 {
@@ -8824,9 +8019,7 @@
                                   "properties": {
                                     "kind": {
                                       "type": "string",
-                                      "enum": [
-                                        "fitBV"
-                                      ]
+                                      "enum": ["fitBV"]
                                     },
                                     "pageObjectNumber": {
                                       "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/9/properties/target/anyOf/0/properties/destination/anyOf/0/properties/pageObjectNumber"
@@ -8835,19 +8028,13 @@
                                       "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/9/properties/target/anyOf/0/properties/destination/anyOf/0/properties/left"
                                     }
                                   },
-                                  "required": [
-                                    "kind",
-                                    "pageObjectNumber"
-                                  ],
+                                  "required": ["kind", "pageObjectNumber"],
                                   "additionalProperties": false
                                 }
                               ]
                             }
                           },
-                          "required": [
-                            "kind",
-                            "destination"
-                          ],
+                          "required": ["kind", "destination"],
                           "additionalProperties": false
                         },
                         {
@@ -8855,18 +8042,13 @@
                           "properties": {
                             "kind": {
                               "type": "string",
-                              "enum": [
-                                "uri"
-                              ]
+                              "enum": ["uri"]
                             },
                             "uri": {
                               "type": "string"
                             }
                           },
-                          "required": [
-                            "kind",
-                            "uri"
-                          ],
+                          "required": ["kind", "uri"],
                           "additionalProperties": false
                         },
                         {
@@ -8874,18 +8056,13 @@
                           "properties": {
                             "kind": {
                               "type": "string",
-                              "enum": [
-                                "goto-remote"
-                              ]
+                              "enum": ["goto-remote"]
                             },
                             "file": {
                               "type": "string"
                             }
                           },
-                          "required": [
-                            "kind",
-                            "file"
-                          ],
+                          "required": ["kind", "file"],
                           "additionalProperties": false
                         },
                         {
@@ -8893,18 +8070,13 @@
                           "properties": {
                             "kind": {
                               "type": "string",
-                              "enum": [
-                                "launch"
-                              ]
+                              "enum": ["launch"]
                             },
                             "path": {
                               "type": "string"
                             }
                           },
-                          "required": [
-                            "kind",
-                            "path"
-                          ],
+                          "required": ["kind", "path"],
                           "additionalProperties": false
                         },
                         {
@@ -8912,14 +8084,10 @@
                           "properties": {
                             "kind": {
                               "type": "string",
-                              "enum": [
-                                "javascript"
-                              ]
+                              "enum": ["javascript"]
                             }
                           },
-                          "required": [
-                            "kind"
-                          ],
+                          "required": ["kind"],
                           "additionalProperties": false
                         },
                         {
@@ -8927,18 +8095,13 @@
                           "properties": {
                             "kind": {
                               "type": "string",
-                              "enum": [
-                                "named"
-                              ]
+                              "enum": ["named"]
                             },
                             "name": {
                               "type": "string"
                             }
                           },
-                          "required": [
-                            "kind",
-                            "name"
-                          ],
+                          "required": ["kind", "name"],
                           "additionalProperties": false
                         },
                         {
@@ -8946,14 +8109,10 @@
                           "properties": {
                             "kind": {
                               "type": "string",
-                              "enum": [
-                                "unsupported"
-                              ]
+                              "enum": ["unsupported"]
                             }
                           },
-                          "required": [
-                            "kind"
-                          ],
+                          "required": ["kind"],
                           "additionalProperties": false
                         }
                       ],
@@ -9057,9 +8216,7 @@
                     },
                     "intent": {
                       "type": "string",
-                      "enum": [
-                        "ink-highlight"
-                      ],
+                      "enum": ["ink-highlight"],
                       "nullable": true
                     },
                     "inkList": {
@@ -9076,9 +8233,7 @@
                     },
                     "subtype": {
                       "type": "string",
-                      "enum": [
-                        "ink"
-                      ]
+                      "enum": ["ink"]
                     }
                   },
                   "required": [
@@ -9168,10 +8323,7 @@
                     },
                     "intent": {
                       "type": "string",
-                      "enum": [
-                        "free-text",
-                        "free-text-callout"
-                      ]
+                      "enum": ["free-text", "free-text-callout"]
                     },
                     "fontFamily": {
                       "type": "string",
@@ -9199,11 +8351,7 @@
                     },
                     "textAlign": {
                       "type": "string",
-                      "enum": [
-                        "left",
-                        "center",
-                        "right"
-                      ]
+                      "enum": ["left", "center", "right"]
                     },
                     "color": {
                       "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/color"
@@ -9290,9 +8438,7 @@
                     },
                     "subtype": {
                       "type": "string",
-                      "enum": [
-                        "free-text"
-                      ]
+                      "enum": ["free-text"]
                     }
                   },
                   "required": [
@@ -9392,9 +8538,7 @@
                     },
                     "intent": {
                       "type": "string",
-                      "enum": [
-                        "replace"
-                      ],
+                      "enum": ["replace"],
                       "nullable": true
                     },
                     "rectDifferences": {
@@ -9407,9 +8551,7 @@
                     },
                     "subtype": {
                       "type": "string",
-                      "enum": [
-                        "caret"
-                      ]
+                      "enum": ["caret"]
                     }
                   },
                   "required": [
@@ -9515,9 +8657,7 @@
                     },
                     "subtype": {
                       "type": "string",
-                      "enum": [
-                        "text"
-                      ]
+                      "enum": ["text"]
                     }
                   },
                   "required": [
@@ -9614,9 +8754,7 @@
                     },
                     "subtype": {
                       "type": "string",
-                      "enum": [
-                        "stamp"
-                      ]
+                      "enum": ["stamp"]
                     }
                   },
                   "required": [
@@ -9707,12 +8845,7 @@
                     },
                     "icon": {
                       "type": "string",
-                      "enum": [
-                        "push-pin",
-                        "paperclip",
-                        "graph",
-                        "tag"
-                      ]
+                      "enum": ["push-pin", "paperclip", "graph", "tag"]
                     },
                     "file": {
                       "type": "object",
@@ -9737,16 +8870,12 @@
                           "type": "string"
                         }
                       },
-                      "required": [
-                        "name"
-                      ],
+                      "required": ["name"],
                       "additionalProperties": false
                     },
                     "subtype": {
                       "type": "string",
-                      "enum": [
-                        "file-attachment"
-                      ]
+                      "enum": ["file-attachment"]
                     }
                   },
                   "required": [
@@ -9870,9 +8999,7 @@
                     },
                     "subtype": {
                       "type": "string",
-                      "enum": [
-                        "widget"
-                      ]
+                      "enum": ["widget"]
                     },
                     "fieldObjectNumber": {
                       "type": "integer",
@@ -10022,9 +9149,7 @@
                     },
                     "subtype": {
                       "type": "string",
-                      "enum": [
-                        "redact"
-                      ]
+                      "enum": ["redact"]
                     }
                   },
                   "required": [
@@ -10118,9 +9243,7 @@
                     },
                     "subtype": {
                       "type": "string",
-                      "enum": [
-                        "unsupported"
-                      ]
+                      "enum": ["unsupported"]
                     },
                     "rawSubtypeCode": {
                       "type": "integer"
@@ -10155,10 +9278,7 @@
             }
           }
         },
-        "required": [
-          "pageState",
-          "annotations"
-        ],
+        "required": ["pageState", "annotations"],
         "additionalProperties": false
       },
       "DocAnnotationsList404Response": {
@@ -10166,9 +9286,7 @@
         "properties": {
           "name": {
             "type": "string",
-            "enum": [
-              "EngineError"
-            ]
+            "enum": ["EngineError"]
           },
           "code": {
             "type": "string",
@@ -10201,11 +9319,7 @@
             "additionalProperties": {}
           }
         },
-        "required": [
-          "name",
-          "code",
-          "message"
-        ],
+        "required": ["name", "code", "message"],
         "additionalProperties": false
       },
       "DocAnnotationsCreateRequest": {
@@ -10244,11 +9358,7 @@
                           "minimum": 0
                         }
                       },
-                      "required": [
-                        "docSessionId",
-                        "pageObjectNumber",
-                        "generation"
-                      ],
+                      "required": ["docSessionId", "pageObjectNumber", "generation"],
                       "additionalProperties": false
                     },
                     "weakAnnotationState": {
@@ -10258,14 +9368,10 @@
                           "properties": {
                             "kind": {
                               "type": "string",
-                              "enum": [
-                                "unknown"
-                              ]
+                              "enum": ["unknown"]
                             }
                           },
-                          "required": [
-                            "kind"
-                          ],
+                          "required": ["kind"],
                           "additionalProperties": false
                         },
                         {
@@ -10273,28 +9379,19 @@
                           "properties": {
                             "kind": {
                               "type": "string",
-                              "enum": [
-                                "known"
-                              ]
+                              "enum": ["known"]
                             },
                             "hasAnyWeakAnnotations": {
                               "type": "boolean"
                             }
                           },
-                          "required": [
-                            "kind",
-                            "hasAnyWeakAnnotations"
-                          ],
+                          "required": ["kind", "hasAnyWeakAnnotations"],
                           "additionalProperties": false
                         }
                       ]
                     }
                   },
-                  "required": [
-                    "pageObjectNumber",
-                    "revision",
-                    "weakAnnotationState"
-                  ],
+                  "required": ["pageObjectNumber", "revision", "weakAnnotationState"],
                   "additionalProperties": false
                 }
               },
@@ -10335,40 +9432,25 @@
                               "minimum": 0
                             }
                           },
-                          "required": [
-                            "contentVersion",
-                            "annotationVersion"
-                          ],
+                          "required": ["contentVersion", "annotationVersion"],
                           "additionalProperties": false
                         }
                       },
-                      "required": [
-                        "pageObjectNumber",
-                        "cache"
-                      ],
+                      "required": ["pageObjectNumber", "cache"],
                       "additionalProperties": false
                     }
                   }
                 },
-                "required": [
-                  "previousDocVersion",
-                  "docVersion",
-                  "pages"
-                ],
+                "required": ["previousDocVersion", "docVersion", "pages"],
                 "additionalProperties": false,
                 "nullable": true
               }
             },
-            "required": [
-              "affectedPages",
-              "cacheDelta"
-            ],
+            "required": ["affectedPages", "cacheDelta"],
             "additionalProperties": false
           }
         },
-        "required": [
-          "meta"
-        ],
+        "required": ["meta"],
         "additionalProperties": true
       },
       "DocAnnotationsCreate400Response": {
@@ -10376,9 +9458,7 @@
         "properties": {
           "name": {
             "type": "string",
-            "enum": [
-              "EngineError"
-            ]
+            "enum": ["EngineError"]
           },
           "code": {
             "type": "string",
@@ -10411,11 +9491,7 @@
             "additionalProperties": {}
           }
         },
-        "required": [
-          "name",
-          "code",
-          "message"
-        ],
+        "required": ["name", "code", "message"],
         "additionalProperties": false
       },
       "DocAnnotationsCreate404Response": {
@@ -10423,9 +9499,7 @@
         "properties": {
           "name": {
             "type": "string",
-            "enum": [
-              "EngineError"
-            ]
+            "enum": ["EngineError"]
           },
           "code": {
             "type": "string",
@@ -10458,11 +9532,7 @@
             "additionalProperties": {}
           }
         },
-        "required": [
-          "name",
-          "code",
-          "message"
-        ],
+        "required": ["name", "code", "message"],
         "additionalProperties": false
       },
       "DocAnnotationsUpdateRequest": {
@@ -10501,11 +9571,7 @@
                           "minimum": 0
                         }
                       },
-                      "required": [
-                        "docSessionId",
-                        "pageObjectNumber",
-                        "generation"
-                      ],
+                      "required": ["docSessionId", "pageObjectNumber", "generation"],
                       "additionalProperties": false
                     },
                     "weakAnnotationState": {
@@ -10515,14 +9581,10 @@
                           "properties": {
                             "kind": {
                               "type": "string",
-                              "enum": [
-                                "unknown"
-                              ]
+                              "enum": ["unknown"]
                             }
                           },
-                          "required": [
-                            "kind"
-                          ],
+                          "required": ["kind"],
                           "additionalProperties": false
                         },
                         {
@@ -10530,28 +9592,19 @@
                           "properties": {
                             "kind": {
                               "type": "string",
-                              "enum": [
-                                "known"
-                              ]
+                              "enum": ["known"]
                             },
                             "hasAnyWeakAnnotations": {
                               "type": "boolean"
                             }
                           },
-                          "required": [
-                            "kind",
-                            "hasAnyWeakAnnotations"
-                          ],
+                          "required": ["kind", "hasAnyWeakAnnotations"],
                           "additionalProperties": false
                         }
                       ]
                     }
                   },
-                  "required": [
-                    "pageObjectNumber",
-                    "revision",
-                    "weakAnnotationState"
-                  ],
+                  "required": ["pageObjectNumber", "revision", "weakAnnotationState"],
                   "additionalProperties": false
                 }
               },
@@ -10592,40 +9645,25 @@
                               "minimum": 0
                             }
                           },
-                          "required": [
-                            "contentVersion",
-                            "annotationVersion"
-                          ],
+                          "required": ["contentVersion", "annotationVersion"],
                           "additionalProperties": false
                         }
                       },
-                      "required": [
-                        "pageObjectNumber",
-                        "cache"
-                      ],
+                      "required": ["pageObjectNumber", "cache"],
                       "additionalProperties": false
                     }
                   }
                 },
-                "required": [
-                  "previousDocVersion",
-                  "docVersion",
-                  "pages"
-                ],
+                "required": ["previousDocVersion", "docVersion", "pages"],
                 "additionalProperties": false,
                 "nullable": true
               }
             },
-            "required": [
-              "affectedPages",
-              "cacheDelta"
-            ],
+            "required": ["affectedPages", "cacheDelta"],
             "additionalProperties": false
           }
         },
-        "required": [
-          "meta"
-        ],
+        "required": ["meta"],
         "additionalProperties": true
       },
       "DocAnnotationsUpdate400Response": {
@@ -10633,9 +9671,7 @@
         "properties": {
           "name": {
             "type": "string",
-            "enum": [
-              "EngineError"
-            ]
+            "enum": ["EngineError"]
           },
           "code": {
             "type": "string",
@@ -10668,11 +9704,7 @@
             "additionalProperties": {}
           }
         },
-        "required": [
-          "name",
-          "code",
-          "message"
-        ],
+        "required": ["name", "code", "message"],
         "additionalProperties": false
       },
       "DocAnnotationsUpdate404Response": {
@@ -10680,9 +9712,7 @@
         "properties": {
           "name": {
             "type": "string",
-            "enum": [
-              "EngineError"
-            ]
+            "enum": ["EngineError"]
           },
           "code": {
             "type": "string",
@@ -10715,11 +9745,7 @@
             "additionalProperties": {}
           }
         },
-        "required": [
-          "name",
-          "code",
-          "message"
-        ],
+        "required": ["name", "code", "message"],
         "additionalProperties": false
       },
       "DocAnnotationsDelete200Response": {
@@ -10754,11 +9780,7 @@
                           "minimum": 0
                         }
                       },
-                      "required": [
-                        "docSessionId",
-                        "pageObjectNumber",
-                        "generation"
-                      ],
+                      "required": ["docSessionId", "pageObjectNumber", "generation"],
                       "additionalProperties": false
                     },
                     "weakAnnotationState": {
@@ -10768,14 +9790,10 @@
                           "properties": {
                             "kind": {
                               "type": "string",
-                              "enum": [
-                                "unknown"
-                              ]
+                              "enum": ["unknown"]
                             }
                           },
-                          "required": [
-                            "kind"
-                          ],
+                          "required": ["kind"],
                           "additionalProperties": false
                         },
                         {
@@ -10783,28 +9801,19 @@
                           "properties": {
                             "kind": {
                               "type": "string",
-                              "enum": [
-                                "known"
-                              ]
+                              "enum": ["known"]
                             },
                             "hasAnyWeakAnnotations": {
                               "type": "boolean"
                             }
                           },
-                          "required": [
-                            "kind",
-                            "hasAnyWeakAnnotations"
-                          ],
+                          "required": ["kind", "hasAnyWeakAnnotations"],
                           "additionalProperties": false
                         }
                       ]
                     }
                   },
-                  "required": [
-                    "pageObjectNumber",
-                    "revision",
-                    "weakAnnotationState"
-                  ],
+                  "required": ["pageObjectNumber", "revision", "weakAnnotationState"],
                   "additionalProperties": false
                 }
               },
@@ -10845,40 +9854,25 @@
                               "minimum": 0
                             }
                           },
-                          "required": [
-                            "contentVersion",
-                            "annotationVersion"
-                          ],
+                          "required": ["contentVersion", "annotationVersion"],
                           "additionalProperties": false
                         }
                       },
-                      "required": [
-                        "pageObjectNumber",
-                        "cache"
-                      ],
+                      "required": ["pageObjectNumber", "cache"],
                       "additionalProperties": false
                     }
                   }
                 },
-                "required": [
-                  "previousDocVersion",
-                  "docVersion",
-                  "pages"
-                ],
+                "required": ["previousDocVersion", "docVersion", "pages"],
                 "additionalProperties": false,
                 "nullable": true
               }
             },
-            "required": [
-              "affectedPages",
-              "cacheDelta"
-            ],
+            "required": ["affectedPages", "cacheDelta"],
             "additionalProperties": false
           }
         },
-        "required": [
-          "meta"
-        ],
+        "required": ["meta"],
         "additionalProperties": true
       },
       "DocAnnotationsDelete404Response": {
@@ -10886,9 +9880,7 @@
         "properties": {
           "name": {
             "type": "string",
-            "enum": [
-              "EngineError"
-            ]
+            "enum": ["EngineError"]
           },
           "code": {
             "type": "string",
@@ -10921,11 +9913,7 @@
             "additionalProperties": {}
           }
         },
-        "required": [
-          "name",
-          "code",
-          "message"
-        ],
+        "required": ["name", "code", "message"],
         "additionalProperties": false
       },
       "DocFormsGet200Response": {
@@ -10933,11 +9921,7 @@
         "properties": {
           "formKind": {
             "type": "string",
-            "enum": [
-              "none",
-              "acroform",
-              "xfa"
-            ]
+            "enum": ["none", "acroform", "xfa"]
           },
           "needsAppearances": {
             "type": "boolean"
@@ -10956,9 +9940,7 @@
                           "properties": {
                             "kind": {
                               "type": "string",
-                              "enum": [
-                                "objectNumber"
-                              ]
+                              "enum": ["objectNumber"]
                             },
                             "fieldObjectNumber": {
                               "type": "integer",
@@ -10966,10 +9948,7 @@
                               "minimum": 0
                             }
                           },
-                          "required": [
-                            "kind",
-                            "fieldObjectNumber"
-                          ],
+                          "required": ["kind", "fieldObjectNumber"],
                           "additionalProperties": false
                         },
                         {
@@ -10977,19 +9956,14 @@
                           "properties": {
                             "kind": {
                               "type": "string",
-                              "enum": [
-                                "fqn"
-                              ]
+                              "enum": ["fqn"]
                             },
                             "name": {
                               "type": "string",
                               "minLength": 1
                             }
                           },
-                          "required": [
-                            "kind",
-                            "name"
-                          ],
+                          "required": ["kind", "name"],
                           "additionalProperties": false
                         }
                       ]
@@ -11003,10 +9977,7 @@
                     },
                     "origin": {
                       "type": "string",
-                      "enum": [
-                        "acroform",
-                        "recovered"
-                      ]
+                      "enum": ["acroform", "recovered"]
                     },
                     "flags": {
                       "type": "object",
@@ -11025,12 +9996,7 @@
                           "minimum": 0
                         }
                       },
-                      "required": [
-                        "readOnly",
-                        "required",
-                        "noExport",
-                        "raw"
-                      ],
+                      "required": ["readOnly", "required", "noExport", "raw"],
                       "additionalProperties": false
                     },
                     "alternateName": {
@@ -11048,14 +10014,10 @@
                           "properties": {
                             "kind": {
                               "type": "string",
-                              "enum": [
-                                "none"
-                              ]
+                              "enum": ["none"]
                             }
                           },
-                          "required": [
-                            "kind"
-                          ],
+                          "required": ["kind"],
                           "additionalProperties": false
                         },
                         {
@@ -11063,18 +10025,13 @@
                           "properties": {
                             "kind": {
                               "type": "string",
-                              "enum": [
-                                "scalar"
-                              ]
+                              "enum": ["scalar"]
                             },
                             "value": {
                               "type": "string"
                             }
                           },
-                          "required": [
-                            "kind",
-                            "value"
-                          ],
+                          "required": ["kind", "value"],
                           "additionalProperties": false
                         },
                         {
@@ -11082,9 +10039,7 @@
                           "properties": {
                             "kind": {
                               "type": "string",
-                              "enum": [
-                                "array"
-                              ]
+                              "enum": ["array"]
                             },
                             "values": {
                               "type": "array",
@@ -11093,10 +10048,7 @@
                               }
                             }
                           },
-                          "required": [
-                            "kind",
-                            "values"
-                          ],
+                          "required": ["kind", "values"],
                           "additionalProperties": false
                         },
                         {
@@ -11104,14 +10056,10 @@
                           "properties": {
                             "kind": {
                               "type": "string",
-                              "enum": [
-                                "unsupported"
-                              ]
+                              "enum": ["unsupported"]
                             }
                           },
-                          "required": [
-                            "kind"
-                          ],
+                          "required": ["kind"],
                           "additionalProperties": false
                         }
                       ]
@@ -11163,11 +10111,7 @@
                                   "items": {}
                                 }
                               },
-                              "required": [
-                                "type",
-                                "subtype",
-                                "next"
-                              ],
+                              "required": ["type", "subtype", "next"],
                               "additionalProperties": false,
                               "nullable": true
                             },
@@ -11182,20 +10126,11 @@
                               "type": "array",
                               "items": {
                                 "type": "string",
-                                "enum": [
-                                  "cycle-dropped",
-                                  "malformed-next",
-                                  "incomplete"
-                                ]
+                                "enum": ["cycle-dropped", "malformed-next", "incomplete"]
                               }
                             }
                           },
-                          "required": [
-                            "root",
-                            "incomplete",
-                            "warningFlags",
-                            "warnings"
-                          ],
+                          "required": ["root", "incomplete", "warningFlags", "warnings"],
                           "additionalProperties": false
                         },
                         "format": {
@@ -11224,18 +10159,13 @@
                             "minimum": 0
                           }
                         },
-                        "required": [
-                          "annotObjectNumber",
-                          "pageObjectNumber"
-                        ],
+                        "required": ["annotObjectNumber", "pageObjectNumber"],
                         "additionalProperties": false
                       }
                     },
                     "family": {
                       "type": "string",
-                      "enum": [
-                        "text"
-                      ]
+                      "enum": ["text"]
                     },
                     "value": {
                       "type": "string"
@@ -11346,9 +10276,7 @@
                     },
                     "family": {
                       "type": "string",
-                      "enum": [
-                        "checkbox"
-                      ]
+                      "enum": ["checkbox"]
                     },
                     "checked": {
                       "type": "boolean"
@@ -11415,9 +10343,7 @@
                     },
                     "family": {
                       "type": "string",
-                      "enum": [
-                        "radio"
-                      ]
+                      "enum": ["radio"]
                     },
                     "value": {
                       "type": "string"
@@ -11485,9 +10411,7 @@
                     },
                     "family": {
                       "type": "string",
-                      "enum": [
-                        "combobox"
-                      ]
+                      "enum": ["combobox"]
                     },
                     "value": {
                       "type": "string"
@@ -11513,11 +10437,7 @@
                             "type": "boolean"
                           }
                         },
-                        "required": [
-                          "label",
-                          "value",
-                          "selected"
-                        ],
+                        "required": ["label", "value", "selected"],
                         "additionalProperties": false
                       }
                     }
@@ -11579,9 +10499,7 @@
                     },
                     "family": {
                       "type": "string",
-                      "enum": [
-                        "listbox"
-                      ]
+                      "enum": ["listbox"]
                     },
                     "selectedValues": {
                       "type": "array",
@@ -11655,9 +10573,7 @@
                     },
                     "family": {
                       "type": "string",
-                      "enum": [
-                        "pushbutton"
-                      ]
+                      "enum": ["pushbutton"]
                     }
                   },
                   "required": [
@@ -11713,9 +10629,7 @@
                     },
                     "family": {
                       "type": "string",
-                      "enum": [
-                        "signature"
-                      ]
+                      "enum": ["signature"]
                     }
                   },
                   "required": [
@@ -11771,9 +10685,7 @@
                     },
                     "family": {
                       "type": "string",
-                      "enum": [
-                        "unknown"
-                      ]
+                      "enum": ["unknown"]
                     },
                     "rawValue": {
                       "type": "string"
@@ -11810,12 +10722,7 @@
             }
           }
         },
-        "required": [
-          "formKind",
-          "needsAppearances",
-          "fields",
-          "calculationOrder"
-        ],
+        "required": ["formKind", "needsAppearances", "fields", "calculationOrder"],
         "additionalProperties": false
       },
       "DocFormsGet404Response": {
@@ -11823,9 +10730,7 @@
         "properties": {
           "name": {
             "type": "string",
-            "enum": [
-              "EngineError"
-            ]
+            "enum": ["EngineError"]
           },
           "code": {
             "type": "string",
@@ -11858,11 +10763,7 @@
             "additionalProperties": {}
           }
         },
-        "required": [
-          "name",
-          "code",
-          "message"
-        ],
+        "required": ["name", "code", "message"],
         "additionalProperties": false
       },
       "DocFormsSetValueRequest": {
@@ -11901,11 +10802,7 @@
                           "minimum": 0
                         }
                       },
-                      "required": [
-                        "docSessionId",
-                        "pageObjectNumber",
-                        "generation"
-                      ],
+                      "required": ["docSessionId", "pageObjectNumber", "generation"],
                       "additionalProperties": false
                     },
                     "weakAnnotationState": {
@@ -11915,14 +10812,10 @@
                           "properties": {
                             "kind": {
                               "type": "string",
-                              "enum": [
-                                "unknown"
-                              ]
+                              "enum": ["unknown"]
                             }
                           },
-                          "required": [
-                            "kind"
-                          ],
+                          "required": ["kind"],
                           "additionalProperties": false
                         },
                         {
@@ -11930,28 +10823,19 @@
                           "properties": {
                             "kind": {
                               "type": "string",
-                              "enum": [
-                                "known"
-                              ]
+                              "enum": ["known"]
                             },
                             "hasAnyWeakAnnotations": {
                               "type": "boolean"
                             }
                           },
-                          "required": [
-                            "kind",
-                            "hasAnyWeakAnnotations"
-                          ],
+                          "required": ["kind", "hasAnyWeakAnnotations"],
                           "additionalProperties": false
                         }
                       ]
                     }
                   },
-                  "required": [
-                    "pageObjectNumber",
-                    "revision",
-                    "weakAnnotationState"
-                  ],
+                  "required": ["pageObjectNumber", "revision", "weakAnnotationState"],
                   "additionalProperties": false
                 }
               },
@@ -11992,40 +10876,25 @@
                               "minimum": 0
                             }
                           },
-                          "required": [
-                            "contentVersion",
-                            "annotationVersion"
-                          ],
+                          "required": ["contentVersion", "annotationVersion"],
                           "additionalProperties": false
                         }
                       },
-                      "required": [
-                        "pageObjectNumber",
-                        "cache"
-                      ],
+                      "required": ["pageObjectNumber", "cache"],
                       "additionalProperties": false
                     }
                   }
                 },
-                "required": [
-                  "previousDocVersion",
-                  "docVersion",
-                  "pages"
-                ],
+                "required": ["previousDocVersion", "docVersion", "pages"],
                 "additionalProperties": false,
                 "nullable": true
               }
             },
-            "required": [
-              "affectedPages",
-              "cacheDelta"
-            ],
+            "required": ["affectedPages", "cacheDelta"],
             "additionalProperties": false
           }
         },
-        "required": [
-          "meta"
-        ],
+        "required": ["meta"],
         "additionalProperties": true
       },
       "DocFormsSetValue400Response": {
@@ -12033,9 +10902,7 @@
         "properties": {
           "name": {
             "type": "string",
-            "enum": [
-              "EngineError"
-            ]
+            "enum": ["EngineError"]
           },
           "code": {
             "type": "string",
@@ -12068,11 +10935,7 @@
             "additionalProperties": {}
           }
         },
-        "required": [
-          "name",
-          "code",
-          "message"
-        ],
+        "required": ["name", "code", "message"],
         "additionalProperties": false
       },
       "DocFormsSetValue404Response": {
@@ -12080,9 +10943,7 @@
         "properties": {
           "name": {
             "type": "string",
-            "enum": [
-              "EngineError"
-            ]
+            "enum": ["EngineError"]
           },
           "code": {
             "type": "string",
@@ -12115,11 +10976,7 @@
             "additionalProperties": {}
           }
         },
-        "required": [
-          "name",
-          "code",
-          "message"
-        ],
+        "required": ["name", "code", "message"],
         "additionalProperties": false
       },
       "DocFormsReset200Response": {
@@ -12154,11 +11011,7 @@
                           "minimum": 0
                         }
                       },
-                      "required": [
-                        "docSessionId",
-                        "pageObjectNumber",
-                        "generation"
-                      ],
+                      "required": ["docSessionId", "pageObjectNumber", "generation"],
                       "additionalProperties": false
                     },
                     "weakAnnotationState": {
@@ -12168,14 +11021,10 @@
                           "properties": {
                             "kind": {
                               "type": "string",
-                              "enum": [
-                                "unknown"
-                              ]
+                              "enum": ["unknown"]
                             }
                           },
-                          "required": [
-                            "kind"
-                          ],
+                          "required": ["kind"],
                           "additionalProperties": false
                         },
                         {
@@ -12183,28 +11032,19 @@
                           "properties": {
                             "kind": {
                               "type": "string",
-                              "enum": [
-                                "known"
-                              ]
+                              "enum": ["known"]
                             },
                             "hasAnyWeakAnnotations": {
                               "type": "boolean"
                             }
                           },
-                          "required": [
-                            "kind",
-                            "hasAnyWeakAnnotations"
-                          ],
+                          "required": ["kind", "hasAnyWeakAnnotations"],
                           "additionalProperties": false
                         }
                       ]
                     }
                   },
-                  "required": [
-                    "pageObjectNumber",
-                    "revision",
-                    "weakAnnotationState"
-                  ],
+                  "required": ["pageObjectNumber", "revision", "weakAnnotationState"],
                   "additionalProperties": false
                 }
               },
@@ -12245,40 +11085,25 @@
                               "minimum": 0
                             }
                           },
-                          "required": [
-                            "contentVersion",
-                            "annotationVersion"
-                          ],
+                          "required": ["contentVersion", "annotationVersion"],
                           "additionalProperties": false
                         }
                       },
-                      "required": [
-                        "pageObjectNumber",
-                        "cache"
-                      ],
+                      "required": ["pageObjectNumber", "cache"],
                       "additionalProperties": false
                     }
                   }
                 },
-                "required": [
-                  "previousDocVersion",
-                  "docVersion",
-                  "pages"
-                ],
+                "required": ["previousDocVersion", "docVersion", "pages"],
                 "additionalProperties": false,
                 "nullable": true
               }
             },
-            "required": [
-              "affectedPages",
-              "cacheDelta"
-            ],
+            "required": ["affectedPages", "cacheDelta"],
             "additionalProperties": false
           }
         },
-        "required": [
-          "meta"
-        ],
+        "required": ["meta"],
         "additionalProperties": true
       },
       "DocFormsReset404Response": {
@@ -12286,9 +11111,7 @@
         "properties": {
           "name": {
             "type": "string",
-            "enum": [
-              "EngineError"
-            ]
+            "enum": ["EngineError"]
           },
           "code": {
             "type": "string",
@@ -12321,11 +11144,7 @@
             "additionalProperties": {}
           }
         },
-        "required": [
-          "name",
-          "code",
-          "message"
-        ],
+        "required": ["name", "code", "message"],
         "additionalProperties": false
       },
       "DocFormsExportDataResponse": {
@@ -12333,9 +11152,7 @@
         "properties": {
           "name": {
             "type": "string",
-            "enum": [
-              "EngineError"
-            ]
+            "enum": ["EngineError"]
           },
           "code": {
             "type": "string",
@@ -12368,11 +11185,7 @@
             "additionalProperties": {}
           }
         },
-        "required": [
-          "name",
-          "code",
-          "message"
-        ],
+        "required": ["name", "code", "message"],
         "additionalProperties": false
       },
       "DocFormsImportDataRequest": {
@@ -12411,11 +11224,7 @@
                           "minimum": 0
                         }
                       },
-                      "required": [
-                        "docSessionId",
-                        "pageObjectNumber",
-                        "generation"
-                      ],
+                      "required": ["docSessionId", "pageObjectNumber", "generation"],
                       "additionalProperties": false
                     },
                     "weakAnnotationState": {
@@ -12425,14 +11234,10 @@
                           "properties": {
                             "kind": {
                               "type": "string",
-                              "enum": [
-                                "unknown"
-                              ]
+                              "enum": ["unknown"]
                             }
                           },
-                          "required": [
-                            "kind"
-                          ],
+                          "required": ["kind"],
                           "additionalProperties": false
                         },
                         {
@@ -12440,28 +11245,19 @@
                           "properties": {
                             "kind": {
                               "type": "string",
-                              "enum": [
-                                "known"
-                              ]
+                              "enum": ["known"]
                             },
                             "hasAnyWeakAnnotations": {
                               "type": "boolean"
                             }
                           },
-                          "required": [
-                            "kind",
-                            "hasAnyWeakAnnotations"
-                          ],
+                          "required": ["kind", "hasAnyWeakAnnotations"],
                           "additionalProperties": false
                         }
                       ]
                     }
                   },
-                  "required": [
-                    "pageObjectNumber",
-                    "revision",
-                    "weakAnnotationState"
-                  ],
+                  "required": ["pageObjectNumber", "revision", "weakAnnotationState"],
                   "additionalProperties": false
                 }
               },
@@ -12502,40 +11298,25 @@
                               "minimum": 0
                             }
                           },
-                          "required": [
-                            "contentVersion",
-                            "annotationVersion"
-                          ],
+                          "required": ["contentVersion", "annotationVersion"],
                           "additionalProperties": false
                         }
                       },
-                      "required": [
-                        "pageObjectNumber",
-                        "cache"
-                      ],
+                      "required": ["pageObjectNumber", "cache"],
                       "additionalProperties": false
                     }
                   }
                 },
-                "required": [
-                  "previousDocVersion",
-                  "docVersion",
-                  "pages"
-                ],
+                "required": ["previousDocVersion", "docVersion", "pages"],
                 "additionalProperties": false,
                 "nullable": true
               }
             },
-            "required": [
-              "affectedPages",
-              "cacheDelta"
-            ],
+            "required": ["affectedPages", "cacheDelta"],
             "additionalProperties": false
           }
         },
-        "required": [
-          "meta"
-        ],
+        "required": ["meta"],
         "additionalProperties": true
       },
       "DocFormsImportData400Response": {
@@ -12543,9 +11324,7 @@
         "properties": {
           "name": {
             "type": "string",
-            "enum": [
-              "EngineError"
-            ]
+            "enum": ["EngineError"]
           },
           "code": {
             "type": "string",
@@ -12578,11 +11357,7 @@
             "additionalProperties": {}
           }
         },
-        "required": [
-          "name",
-          "code",
-          "message"
-        ],
+        "required": ["name", "code", "message"],
         "additionalProperties": false
       },
       "DocFormsImportData404Response": {
@@ -12590,9 +11365,7 @@
         "properties": {
           "name": {
             "type": "string",
-            "enum": [
-              "EngineError"
-            ]
+            "enum": ["EngineError"]
           },
           "code": {
             "type": "string",
@@ -12625,11 +11398,7 @@
             "additionalProperties": {}
           }
         },
-        "required": [
-          "name",
-          "code",
-          "message"
-        ],
+        "required": ["name", "code", "message"],
         "additionalProperties": false
       },
       "DocPagesMoveRequest": {
@@ -12668,11 +11437,7 @@
                           "minimum": 0
                         }
                       },
-                      "required": [
-                        "docSessionId",
-                        "pageObjectNumber",
-                        "generation"
-                      ],
+                      "required": ["docSessionId", "pageObjectNumber", "generation"],
                       "additionalProperties": false
                     },
                     "weakAnnotationState": {
@@ -12682,14 +11447,10 @@
                           "properties": {
                             "kind": {
                               "type": "string",
-                              "enum": [
-                                "unknown"
-                              ]
+                              "enum": ["unknown"]
                             }
                           },
-                          "required": [
-                            "kind"
-                          ],
+                          "required": ["kind"],
                           "additionalProperties": false
                         },
                         {
@@ -12697,28 +11458,19 @@
                           "properties": {
                             "kind": {
                               "type": "string",
-                              "enum": [
-                                "known"
-                              ]
+                              "enum": ["known"]
                             },
                             "hasAnyWeakAnnotations": {
                               "type": "boolean"
                             }
                           },
-                          "required": [
-                            "kind",
-                            "hasAnyWeakAnnotations"
-                          ],
+                          "required": ["kind", "hasAnyWeakAnnotations"],
                           "additionalProperties": false
                         }
                       ]
                     }
                   },
-                  "required": [
-                    "pageObjectNumber",
-                    "revision",
-                    "weakAnnotationState"
-                  ],
+                  "required": ["pageObjectNumber", "revision", "weakAnnotationState"],
                   "additionalProperties": false
                 }
               },
@@ -12759,40 +11511,25 @@
                               "minimum": 0
                             }
                           },
-                          "required": [
-                            "contentVersion",
-                            "annotationVersion"
-                          ],
+                          "required": ["contentVersion", "annotationVersion"],
                           "additionalProperties": false
                         }
                       },
-                      "required": [
-                        "pageObjectNumber",
-                        "cache"
-                      ],
+                      "required": ["pageObjectNumber", "cache"],
                       "additionalProperties": false
                     }
                   }
                 },
-                "required": [
-                  "previousDocVersion",
-                  "docVersion",
-                  "pages"
-                ],
+                "required": ["previousDocVersion", "docVersion", "pages"],
                 "additionalProperties": false,
                 "nullable": true
               }
             },
-            "required": [
-              "affectedPages",
-              "cacheDelta"
-            ],
+            "required": ["affectedPages", "cacheDelta"],
             "additionalProperties": false
           }
         },
-        "required": [
-          "meta"
-        ],
+        "required": ["meta"],
         "additionalProperties": true
       },
       "DocPagesMove400Response": {
@@ -12800,9 +11537,7 @@
         "properties": {
           "name": {
             "type": "string",
-            "enum": [
-              "EngineError"
-            ]
+            "enum": ["EngineError"]
           },
           "code": {
             "type": "string",
@@ -12835,11 +11570,7 @@
             "additionalProperties": {}
           }
         },
-        "required": [
-          "name",
-          "code",
-          "message"
-        ],
+        "required": ["name", "code", "message"],
         "additionalProperties": false
       },
       "DocPagesMove404Response": {
@@ -12847,9 +11578,7 @@
         "properties": {
           "name": {
             "type": "string",
-            "enum": [
-              "EngineError"
-            ]
+            "enum": ["EngineError"]
           },
           "code": {
             "type": "string",
@@ -12882,11 +11611,7 @@
             "additionalProperties": {}
           }
         },
-        "required": [
-          "name",
-          "code",
-          "message"
-        ],
+        "required": ["name", "code", "message"],
         "additionalProperties": false
       },
       "DocPagesRotateRequest": {
@@ -12925,11 +11650,7 @@
                           "minimum": 0
                         }
                       },
-                      "required": [
-                        "docSessionId",
-                        "pageObjectNumber",
-                        "generation"
-                      ],
+                      "required": ["docSessionId", "pageObjectNumber", "generation"],
                       "additionalProperties": false
                     },
                     "weakAnnotationState": {
@@ -12939,14 +11660,10 @@
                           "properties": {
                             "kind": {
                               "type": "string",
-                              "enum": [
-                                "unknown"
-                              ]
+                              "enum": ["unknown"]
                             }
                           },
-                          "required": [
-                            "kind"
-                          ],
+                          "required": ["kind"],
                           "additionalProperties": false
                         },
                         {
@@ -12954,28 +11671,19 @@
                           "properties": {
                             "kind": {
                               "type": "string",
-                              "enum": [
-                                "known"
-                              ]
+                              "enum": ["known"]
                             },
                             "hasAnyWeakAnnotations": {
                               "type": "boolean"
                             }
                           },
-                          "required": [
-                            "kind",
-                            "hasAnyWeakAnnotations"
-                          ],
+                          "required": ["kind", "hasAnyWeakAnnotations"],
                           "additionalProperties": false
                         }
                       ]
                     }
                   },
-                  "required": [
-                    "pageObjectNumber",
-                    "revision",
-                    "weakAnnotationState"
-                  ],
+                  "required": ["pageObjectNumber", "revision", "weakAnnotationState"],
                   "additionalProperties": false
                 }
               },
@@ -13016,40 +11724,25 @@
                               "minimum": 0
                             }
                           },
-                          "required": [
-                            "contentVersion",
-                            "annotationVersion"
-                          ],
+                          "required": ["contentVersion", "annotationVersion"],
                           "additionalProperties": false
                         }
                       },
-                      "required": [
-                        "pageObjectNumber",
-                        "cache"
-                      ],
+                      "required": ["pageObjectNumber", "cache"],
                       "additionalProperties": false
                     }
                   }
                 },
-                "required": [
-                  "previousDocVersion",
-                  "docVersion",
-                  "pages"
-                ],
+                "required": ["previousDocVersion", "docVersion", "pages"],
                 "additionalProperties": false,
                 "nullable": true
               }
             },
-            "required": [
-              "affectedPages",
-              "cacheDelta"
-            ],
+            "required": ["affectedPages", "cacheDelta"],
             "additionalProperties": false
           }
         },
-        "required": [
-          "meta"
-        ],
+        "required": ["meta"],
         "additionalProperties": true
       },
       "DocPagesRotate400Response": {
@@ -13057,9 +11750,7 @@
         "properties": {
           "name": {
             "type": "string",
-            "enum": [
-              "EngineError"
-            ]
+            "enum": ["EngineError"]
           },
           "code": {
             "type": "string",
@@ -13092,11 +11783,7 @@
             "additionalProperties": {}
           }
         },
-        "required": [
-          "name",
-          "code",
-          "message"
-        ],
+        "required": ["name", "code", "message"],
         "additionalProperties": false
       },
       "DocPagesRotate404Response": {
@@ -13104,9 +11791,7 @@
         "properties": {
           "name": {
             "type": "string",
-            "enum": [
-              "EngineError"
-            ]
+            "enum": ["EngineError"]
           },
           "code": {
             "type": "string",
@@ -13139,11 +11824,7 @@
             "additionalProperties": {}
           }
         },
-        "required": [
-          "name",
-          "code",
-          "message"
-        ],
+        "required": ["name", "code", "message"],
         "additionalProperties": false
       },
       "DocPagesDeleteRequest": {
@@ -13182,11 +11863,7 @@
                           "minimum": 0
                         }
                       },
-                      "required": [
-                        "docSessionId",
-                        "pageObjectNumber",
-                        "generation"
-                      ],
+                      "required": ["docSessionId", "pageObjectNumber", "generation"],
                       "additionalProperties": false
                     },
                     "weakAnnotationState": {
@@ -13196,14 +11873,10 @@
                           "properties": {
                             "kind": {
                               "type": "string",
-                              "enum": [
-                                "unknown"
-                              ]
+                              "enum": ["unknown"]
                             }
                           },
-                          "required": [
-                            "kind"
-                          ],
+                          "required": ["kind"],
                           "additionalProperties": false
                         },
                         {
@@ -13211,28 +11884,19 @@
                           "properties": {
                             "kind": {
                               "type": "string",
-                              "enum": [
-                                "known"
-                              ]
+                              "enum": ["known"]
                             },
                             "hasAnyWeakAnnotations": {
                               "type": "boolean"
                             }
                           },
-                          "required": [
-                            "kind",
-                            "hasAnyWeakAnnotations"
-                          ],
+                          "required": ["kind", "hasAnyWeakAnnotations"],
                           "additionalProperties": false
                         }
                       ]
                     }
                   },
-                  "required": [
-                    "pageObjectNumber",
-                    "revision",
-                    "weakAnnotationState"
-                  ],
+                  "required": ["pageObjectNumber", "revision", "weakAnnotationState"],
                   "additionalProperties": false
                 }
               },
@@ -13273,40 +11937,25 @@
                               "minimum": 0
                             }
                           },
-                          "required": [
-                            "contentVersion",
-                            "annotationVersion"
-                          ],
+                          "required": ["contentVersion", "annotationVersion"],
                           "additionalProperties": false
                         }
                       },
-                      "required": [
-                        "pageObjectNumber",
-                        "cache"
-                      ],
+                      "required": ["pageObjectNumber", "cache"],
                       "additionalProperties": false
                     }
                   }
                 },
-                "required": [
-                  "previousDocVersion",
-                  "docVersion",
-                  "pages"
-                ],
+                "required": ["previousDocVersion", "docVersion", "pages"],
                 "additionalProperties": false,
                 "nullable": true
               }
             },
-            "required": [
-              "affectedPages",
-              "cacheDelta"
-            ],
+            "required": ["affectedPages", "cacheDelta"],
             "additionalProperties": false
           }
         },
-        "required": [
-          "meta"
-        ],
+        "required": ["meta"],
         "additionalProperties": true
       },
       "DocPagesDelete400Response": {
@@ -13314,9 +11963,7 @@
         "properties": {
           "name": {
             "type": "string",
-            "enum": [
-              "EngineError"
-            ]
+            "enum": ["EngineError"]
           },
           "code": {
             "type": "string",
@@ -13349,11 +11996,7 @@
             "additionalProperties": {}
           }
         },
-        "required": [
-          "name",
-          "code",
-          "message"
-        ],
+        "required": ["name", "code", "message"],
         "additionalProperties": false
       },
       "DocPagesDelete404Response": {
@@ -13361,9 +12004,7 @@
         "properties": {
           "name": {
             "type": "string",
-            "enum": [
-              "EngineError"
-            ]
+            "enum": ["EngineError"]
           },
           "code": {
             "type": "string",
@@ -13396,11 +12037,7 @@
             "additionalProperties": {}
           }
         },
-        "required": [
-          "name",
-          "code",
-          "message"
-        ],
+        "required": ["name", "code", "message"],
         "additionalProperties": false
       },
       "DocPagesFlattenRequest": {
@@ -13439,11 +12076,7 @@
                           "minimum": 0
                         }
                       },
-                      "required": [
-                        "docSessionId",
-                        "pageObjectNumber",
-                        "generation"
-                      ],
+                      "required": ["docSessionId", "pageObjectNumber", "generation"],
                       "additionalProperties": false
                     },
                     "weakAnnotationState": {
@@ -13453,14 +12086,10 @@
                           "properties": {
                             "kind": {
                               "type": "string",
-                              "enum": [
-                                "unknown"
-                              ]
+                              "enum": ["unknown"]
                             }
                           },
-                          "required": [
-                            "kind"
-                          ],
+                          "required": ["kind"],
                           "additionalProperties": false
                         },
                         {
@@ -13468,28 +12097,19 @@
                           "properties": {
                             "kind": {
                               "type": "string",
-                              "enum": [
-                                "known"
-                              ]
+                              "enum": ["known"]
                             },
                             "hasAnyWeakAnnotations": {
                               "type": "boolean"
                             }
                           },
-                          "required": [
-                            "kind",
-                            "hasAnyWeakAnnotations"
-                          ],
+                          "required": ["kind", "hasAnyWeakAnnotations"],
                           "additionalProperties": false
                         }
                       ]
                     }
                   },
-                  "required": [
-                    "pageObjectNumber",
-                    "revision",
-                    "weakAnnotationState"
-                  ],
+                  "required": ["pageObjectNumber", "revision", "weakAnnotationState"],
                   "additionalProperties": false
                 }
               },
@@ -13530,40 +12150,25 @@
                               "minimum": 0
                             }
                           },
-                          "required": [
-                            "contentVersion",
-                            "annotationVersion"
-                          ],
+                          "required": ["contentVersion", "annotationVersion"],
                           "additionalProperties": false
                         }
                       },
-                      "required": [
-                        "pageObjectNumber",
-                        "cache"
-                      ],
+                      "required": ["pageObjectNumber", "cache"],
                       "additionalProperties": false
                     }
                   }
                 },
-                "required": [
-                  "previousDocVersion",
-                  "docVersion",
-                  "pages"
-                ],
+                "required": ["previousDocVersion", "docVersion", "pages"],
                 "additionalProperties": false,
                 "nullable": true
               }
             },
-            "required": [
-              "affectedPages",
-              "cacheDelta"
-            ],
+            "required": ["affectedPages", "cacheDelta"],
             "additionalProperties": false
           }
         },
-        "required": [
-          "meta"
-        ],
+        "required": ["meta"],
         "additionalProperties": true
       },
       "DocPagesFlatten400Response": {
@@ -13571,9 +12176,7 @@
         "properties": {
           "name": {
             "type": "string",
-            "enum": [
-              "EngineError"
-            ]
+            "enum": ["EngineError"]
           },
           "code": {
             "type": "string",
@@ -13606,11 +12209,7 @@
             "additionalProperties": {}
           }
         },
-        "required": [
-          "name",
-          "code",
-          "message"
-        ],
+        "required": ["name", "code", "message"],
         "additionalProperties": false
       },
       "DocPagesFlatten404Response": {
@@ -13618,9 +12217,7 @@
         "properties": {
           "name": {
             "type": "string",
-            "enum": [
-              "EngineError"
-            ]
+            "enum": ["EngineError"]
           },
           "code": {
             "type": "string",
@@ -13653,11 +12250,7 @@
             "additionalProperties": {}
           }
         },
-        "required": [
-          "name",
-          "code",
-          "message"
-        ],
+        "required": ["name", "code", "message"],
         "additionalProperties": false
       },
       "DocRedactionsApplyRequest": {
@@ -13696,11 +12289,7 @@
                           "minimum": 0
                         }
                       },
-                      "required": [
-                        "docSessionId",
-                        "pageObjectNumber",
-                        "generation"
-                      ],
+                      "required": ["docSessionId", "pageObjectNumber", "generation"],
                       "additionalProperties": false
                     },
                     "weakAnnotationState": {
@@ -13710,14 +12299,10 @@
                           "properties": {
                             "kind": {
                               "type": "string",
-                              "enum": [
-                                "unknown"
-                              ]
+                              "enum": ["unknown"]
                             }
                           },
-                          "required": [
-                            "kind"
-                          ],
+                          "required": ["kind"],
                           "additionalProperties": false
                         },
                         {
@@ -13725,28 +12310,19 @@
                           "properties": {
                             "kind": {
                               "type": "string",
-                              "enum": [
-                                "known"
-                              ]
+                              "enum": ["known"]
                             },
                             "hasAnyWeakAnnotations": {
                               "type": "boolean"
                             }
                           },
-                          "required": [
-                            "kind",
-                            "hasAnyWeakAnnotations"
-                          ],
+                          "required": ["kind", "hasAnyWeakAnnotations"],
                           "additionalProperties": false
                         }
                       ]
                     }
                   },
-                  "required": [
-                    "pageObjectNumber",
-                    "revision",
-                    "weakAnnotationState"
-                  ],
+                  "required": ["pageObjectNumber", "revision", "weakAnnotationState"],
                   "additionalProperties": false
                 }
               },
@@ -13787,40 +12363,25 @@
                               "minimum": 0
                             }
                           },
-                          "required": [
-                            "contentVersion",
-                            "annotationVersion"
-                          ],
+                          "required": ["contentVersion", "annotationVersion"],
                           "additionalProperties": false
                         }
                       },
-                      "required": [
-                        "pageObjectNumber",
-                        "cache"
-                      ],
+                      "required": ["pageObjectNumber", "cache"],
                       "additionalProperties": false
                     }
                   }
                 },
-                "required": [
-                  "previousDocVersion",
-                  "docVersion",
-                  "pages"
-                ],
+                "required": ["previousDocVersion", "docVersion", "pages"],
                 "additionalProperties": false,
                 "nullable": true
               }
             },
-            "required": [
-              "affectedPages",
-              "cacheDelta"
-            ],
+            "required": ["affectedPages", "cacheDelta"],
             "additionalProperties": false
           }
         },
-        "required": [
-          "meta"
-        ],
+        "required": ["meta"],
         "additionalProperties": true
       },
       "DocRedactionsApply400Response": {
@@ -13828,9 +12389,7 @@
         "properties": {
           "name": {
             "type": "string",
-            "enum": [
-              "EngineError"
-            ]
+            "enum": ["EngineError"]
           },
           "code": {
             "type": "string",
@@ -13863,11 +12422,7 @@
             "additionalProperties": {}
           }
         },
-        "required": [
-          "name",
-          "code",
-          "message"
-        ],
+        "required": ["name", "code", "message"],
         "additionalProperties": false
       },
       "DocRedactionsApply404Response": {
@@ -13875,9 +12430,7 @@
         "properties": {
           "name": {
             "type": "string",
-            "enum": [
-              "EngineError"
-            ]
+            "enum": ["EngineError"]
           },
           "code": {
             "type": "string",
@@ -13910,11 +12463,7 @@
             "additionalProperties": {}
           }
         },
-        "required": [
-          "name",
-          "code",
-          "message"
-        ],
+        "required": ["name", "code", "message"],
         "additionalProperties": false
       },
       "DocDownloadResponse": {
@@ -13922,9 +12471,7 @@
         "properties": {
           "name": {
             "type": "string",
-            "enum": [
-              "EngineError"
-            ]
+            "enum": ["EngineError"]
           },
           "code": {
             "type": "string",
@@ -13957,11 +12504,7 @@
             "additionalProperties": {}
           }
         },
-        "required": [
-          "name",
-          "code",
-          "message"
-        ],
+        "required": ["name", "code", "message"],
         "additionalProperties": false
       }
     }
