@@ -59,7 +59,10 @@ const IMPORT_SOURCE = /\bfrom\s+['"]([^'"]+)['"]/g;
 const IMPORT_NAMES = /\bimport\s*(?:type\s*)?\{([^}]*)\}/g;
 const CALL = /\b([a-z][A-Za-z0-9_]*)\s*\(/g;
 const JSX_TAG = /<\/?([A-Z][A-Za-z0-9_]*)/g;
-const PASCAL = /\b([A-Z][a-z0-9]+(?:[A-Z][A-Za-z0-9]*)+|[A-Z][A-Za-z0-9]*_[A-Za-z0-9_]+)\b/g;
+// Once the first lowercase-to-uppercase hump is present, the rest is one
+// linear alphanumeric run. Repeating a run that already accepts uppercase
+// created exponentially many equivalent partitions for the regexp engine.
+const PASCAL = /\b([A-Z][a-z0-9]+[A-Z][A-Za-z0-9]*|[A-Z][A-Za-z0-9]*_[A-Za-z0-9_]+)\b/g;
 
 function collect(source: string, pattern: RegExp, group = 1): string[] {
   const found: string[] = [];
@@ -99,7 +102,7 @@ export function symbolsFromCode(code: string): string[] {
     ),
     ...collect(code, CALL),
     ...collect(code, JSX_TAG),
-    ...collect(code, PASCAL, 0),
+    ...collect(code, PASCAL),
   ].filter(keep);
 }
 

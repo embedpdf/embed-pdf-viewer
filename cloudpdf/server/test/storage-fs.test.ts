@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { lstat, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
@@ -150,12 +150,35 @@ describe('FsObjectStore', () => {
   });
 
   test('absolute(...) rejects traversal attempts', async () => {
-    await expect(
-      store.put('../../etc/passwd', new Uint8Array([0]), { contentLength: 1 }),
-    ).rejects.toThrow(/invalid|escapes/);
-    await expect(
-      store.put('/etc/passwd', new Uint8Array([0]), { contentLength: 1 }),
-    ).rejects.toThrow(/invalid|escapes/);
+    for (const key of ['../../etc/passwd', '/etc/passwd', '.', 'nested/..', 'a//b', 'a\\b']) {
+      await expect(store.put(key, new Uint8Array([0]), { contentLength: 1 })).rejects.toThrow(
+        /invalid|escapes/,
+      );
+    }
+  });
+
+  test('deletePrefix cannot resolve to the storage root', async () => {
+    await store.put('safe/file.pdf', new Uint8Array([1]), { contentLength: 1 });
+
+    await expect(store.deletePrefix('.')).rejects.toThrow(/invalid|escapes/);
+    await expect(store.deletePrefix('safe/..')).rejects.toThrow(/invalid|escapes/);
+    expect(await store.get('safe/file.pdf')).not.toBeNull();
+  });
+
+  test('deletePrefix unlinks symlinks without traversing their targets', async () => {
+    const outside = await mkdtemp(join(tmpdir(), 'embedpdf-fs-outside-'));
+    const sentinel = join(outside, 'sentinel.txt');
+    try {
+      await writeFile(sentinel, 'keep me');
+      await store.put('safe/file.pdf', new Uint8Array([1]), { contentLength: 1 });
+      await symlink(outside, join(root, 'safe', 'escape'));
+
+      await expect(store.deletePrefix('safe/')).resolves.toEqual({ deleted: 2 });
+      await expect(lstat(join(root, 'safe', 'escape'))).rejects.toMatchObject({ code: 'ENOENT' });
+      await expect(readFile(sentinel, 'utf8')).resolves.toBe('keep me');
+    } finally {
+      await rm(outside, { recursive: true, force: true });
+    }
   });
 
   test('presign methods return null (FS has no presign concept)', async () => {

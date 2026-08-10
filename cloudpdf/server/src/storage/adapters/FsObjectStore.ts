@@ -1,6 +1,8 @@
 import { createHash, randomBytes } from 'node:crypto';
+import { createReadStream, createWriteStream } from 'node:fs';
 import {
   mkdir,
+  lstat,
   readFile,
   rename,
   rm,
@@ -11,9 +13,9 @@ import {
   rmdir,
 } from 'node:fs/promises';
 import { dirname, join, resolve, sep } from 'node:path';
-import { createReadStream, createWriteStream } from 'node:fs';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
+
 import type {
   MaterializeOpts,
   MaterializeResult,
@@ -24,6 +26,13 @@ import type {
   PresignedUpload,
   PresignUploadOpts,
 } from '../ObjectStore';
+
+// ObjectStore keys are URL-safe, slash-delimited names produced by
+// StorageKeys. Keep the filesystem adapter's boundary stricter than a generic
+// path API: no absolute paths, platform separators, dot segments, empty
+// segments, or control/unicode characters can reach node:fs.
+const SAFE_OBJECT_KEY =
+  /^[A-Za-z0-9_~!$&'()*+,;=@%-][A-Za-z0-9._~!$&'()*+,;=@%-]*(?:\/[A-Za-z0-9_~!$&'()*+,;=@%-][A-Za-z0-9._~!$&'()*+,;=@%-]*)*$/;
 
 export interface FsObjectStoreOptions {
   /** Absolute path to the root directory all keys live under. */
@@ -47,8 +56,9 @@ export interface FsObjectStoreOptions {
  *     The admin route picks the `upload-proxy` flow when this adapter
  *     is active.
  *
- * Security: every key is `resolve`-joined to `root` and the result is
- * required to remain under `root` to prevent `../` traversal.
+ * Security: every key must match the object-key grammar, is `resolve`-joined
+ * to `root`, and is required to remain strictly below `root`. Recursive
+ * deletion uses `lstat`, so a symlink is unlinked rather than followed.
  */
 export class FsObjectStore implements ObjectStore {
   readonly info: { kind: 'fs'; location: string; root: string };
@@ -224,16 +234,17 @@ export class FsObjectStore implements ObjectStore {
   private async walkDelete(abs: string): Promise<number> {
     let s;
     try {
-      s = await stat(abs);
+      // Do not follow symlinks. A link inside the object-store root is an
+      // object to remove, never a directory to traverse.
+      s = await lstat(abs);
     } catch (err) {
       if (isENOENT(err)) return 0;
       throw err;
     }
-    if (s.isFile()) {
+    if (!s.isDirectory()) {
       await safeUnlink(abs);
       return 1;
     }
-    if (!s.isDirectory()) return 0;
     let count = 0;
     const entries = await readdir(abs);
     for (const entry of entries) {
@@ -263,15 +274,16 @@ export class FsObjectStore implements ObjectStore {
   }
 
   /**
-   * Resolve and validate that `key` stays under `root`. Throws on any
-   * attempt to escape (e.g. `..` segments, absolute keys).
+   * Validate the object-key grammar, then resolve it strictly below `root`.
+   * Rejecting the root itself matters for prefix deletion: `.` or `a/..`
+   * must never turn into a request to wipe the whole store.
    */
   private absolute(key: string): string {
-    if (!key || key.startsWith('/') || key.includes('\0')) {
+    if (!SAFE_OBJECT_KEY.test(key)) {
       throw new Error(`FsObjectStore: invalid key "${key}"`);
     }
     const abs = resolve(this.root, key);
-    if (abs !== this.root && !abs.startsWith(this.root + sep)) {
+    if (!abs.startsWith(this.root + sep)) {
       throw new Error(`FsObjectStore: key "${key}" escapes root`);
     }
     return abs;
