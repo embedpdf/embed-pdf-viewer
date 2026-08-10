@@ -58,8 +58,8 @@ export const adminWirePaths = {
     `/v1/tenants/${encodeURIComponent(tenantId)}/documents/${encodeURIComponent(docId)}`,
   documentCommit: (tenantId: string, docId: string) =>
     `/v1/tenants/${encodeURIComponent(tenantId)}/documents/${encodeURIComponent(docId)}/commit`,
-  documentUploadDirect: (tenantId: string, docId: string) =>
-    `/v1/tenants/${encodeURIComponent(tenantId)}/documents/${encodeURIComponent(docId)}/upload-direct`,
+  documentUploadProxy: (tenantId: string, docId: string) =>
+    `/v1/tenants/${encodeURIComponent(tenantId)}/documents/${encodeURIComponent(docId)}/upload-proxy`,
   documentDownload: (tenantId: string, docId: string) =>
     `/v1/tenants/${encodeURIComponent(tenantId)}/documents/${encodeURIComponent(docId)}/download`,
   /** The warmed dashboard-tile artifact. Returns 404 while `pending`/`locked`. */
@@ -86,6 +86,9 @@ export const adminWirePaths = {
 
 export const DedupModeSchema = z.enum(['always-create', 'reuse-existing']);
 export type DedupMode = z.infer<typeof DedupModeSchema>;
+
+export const UploadPreferenceSchema = z.enum(['auto', 'presigned', 'proxy']);
+export type UploadPreference = z.infer<typeof UploadPreferenceSchema>;
 
 export const DocumentStateSchema = z.enum(['pending', 'ready', 'failed', 'deleting']);
 export type DocumentState = z.infer<typeof DocumentStateSchema>;
@@ -116,6 +119,7 @@ export const AdminDocumentInitRequestSchema = z.object({
   dedupMode: DedupModeSchema.optional(),
   docId: z.string().regex(docIdPattern).optional(),
   uploadTtlSec: z.number().finite().min(60).max(3600).optional(),
+  uploadPreference: UploadPreferenceSchema.optional(),
 });
 export type AdminDocumentInitRequest = z.infer<typeof AdminDocumentInitRequestSchema>;
 
@@ -134,7 +138,7 @@ export const AdminInitUploadSchema = z.discriminatedUnion('kind', [
     key: z.string(),
   }),
   z.object({
-    kind: z.literal('direct'),
+    kind: z.literal('proxy'),
     url: z.string(),
     key: z.string(),
   }),
@@ -206,10 +210,10 @@ export const AdminDocumentListResponseSchema = z.object({
 });
 export type AdminDocumentListResponse = z.infer<typeof AdminDocumentListResponseSchema>;
 
-export const AdminUploadDirectResponseSchema = z.object({
+export const AdminUploadProxyResponseSchema = z.object({
   sha256: z.string().regex(sha256Hex),
 });
-export type AdminUploadDirectResponse = z.infer<typeof AdminUploadDirectResponseSchema>;
+export type AdminUploadProxyResponse = z.infer<typeof AdminUploadProxyResponseSchema>;
 
 export const AdminErrorPayloadSchema = z.object({
   error: z.object({
@@ -790,22 +794,25 @@ export const adminOperations = {
       404: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
     },
   },
-  'documents.uploadDirect': {
-    operationId: 'documents.uploadDirect',
-    title: 'Upload document directly',
-    summary: 'Upload the PDF bytes through the origin instead of a presigned URL.',
+  'documents.uploadProxy': {
+    operationId: 'documents.uploadProxy',
+    title: 'Upload document through the origin',
+    summary: 'Upload a bounded PDF through the API when the initialized transfer kind is proxy.',
     method: 'POST',
-    path: '/v1/tenants/:tenantId/documents/:id/upload-direct',
+    path: '/v1/tenants/:tenantId/documents/:id/upload-proxy',
     credentials: ['api-token', 'tenant-jwt'],
     scope: ['docs.create'],
     params: AdminTenantDocParamsSchema,
     body: {
-      contentType: ['application/pdf', 'application/octet-stream', 'multipart/form-data'],
+      contentType: 'multipart/form-data',
     },
     responses: {
-      200: { contentType: 'application/json', schema: AdminUploadDirectResponseSchema },
+      200: { contentType: 'application/json', schema: AdminUploadProxyResponseSchema },
       400: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+      409: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
     },
+    notes:
+      'This bounded origin-mediated fallback must only be used after documents.init returns upload.kind=proxy. Auto mode prefers a presigned object-store PUT whenever available.',
   },
   'documents.list': {
     operationId: 'documents.list',

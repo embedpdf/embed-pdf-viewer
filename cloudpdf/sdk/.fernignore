@@ -1,0 +1,6 @@
+# Full-file ownership for the workflow layer around Fern's generated protocol.
+src/index.ts
+src/CloudPDFClient.ts
+src/uploads/**
+tests/uploads.test.ts
+README.md

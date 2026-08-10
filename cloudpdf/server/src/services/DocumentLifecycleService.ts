@@ -15,6 +15,8 @@ import { StorageKeys } from '../storage/keys';
 import type { ObjectBody, ObjectStoreWithInfo, PresignedUpload } from '../storage/ObjectStore';
 
 export type DedupMode = 'always-create' | 'reuse-existing';
+export type UploadPreference = 'auto' | 'presigned' | 'proxy';
+export type UploadProxyPolicy = 'fallback-only' | 'allowed' | 'disabled';
 
 export interface InitInput {
   tenantId: string;
@@ -37,6 +39,8 @@ export interface InitInput {
   docId?: string;
   /** Presigned URL TTL. */
   uploadTtlSec?: number;
+  /** Preferred transfer path. `auto` keeps object storage off the origin. */
+  uploadPreference?: UploadPreference;
 }
 
 export type InitResult =
@@ -52,8 +56,8 @@ export type InitUpload =
       key: string;
     }
   | {
-      kind: 'direct';
-      /** Path on the API the client POSTs the body to. */
+      kind: 'proxy';
+      /** Path on the API the client POSTs a multipart `file` to. */
       url: string;
       key: string;
     };
@@ -68,7 +72,7 @@ export interface CommitResult {
   doc: DocumentRow;
 }
 
-export interface UploadDirectInput {
+export interface UploadProxyInput {
   tenantId: string;
   docId: string;
   body: ObjectBody;
@@ -94,6 +98,8 @@ export interface DocumentLifecycleOptions {
   tenantUsage?: TenantUsageRepo;
   /** When present, document delete revokes the document's share grants. */
   shareGrants?: ShareGrantsRepo;
+  /** Controls whether origin-mediated uploads may be selected. */
+  uploadProxyPolicy?: UploadProxyPolicy;
 }
 
 /**
@@ -124,6 +130,7 @@ export class DocumentLifecycleService {
   private readonly usageMeters?: UsageMeters;
   private readonly tenantUsage?: TenantUsageRepo;
   private readonly shareGrants?: ShareGrantsRepo;
+  private readonly uploadProxyPolicy: UploadProxyPolicy;
 
   constructor(opts: DocumentLifecycleOptions) {
     this.documents = opts.documents;
@@ -135,6 +142,7 @@ export class DocumentLifecycleService {
     this.usageMeters = opts.usageMeters;
     this.tenantUsage = opts.tenantUsage;
     this.shareGrants = opts.shareGrants;
+    this.uploadProxyPolicy = opts.uploadProxyPolicy ?? 'fallback-only';
   }
 
   async init(input: InitInput): Promise<InitResult> {
@@ -157,11 +165,22 @@ export class DocumentLifecycleService {
         input.idempotencyKey,
       );
       if (existing) {
+        this.assertSameUploadIntent(existing, input);
         // If the row is already committed, return `deduped` (no
         // upload). If pending, return `resumed` so the route hands
         // back a fresh upload URL to finish the half-finished work.
-        if (existing.state === 'ready' || existing.state === 'failed') {
+        if (existing.state === 'ready') {
           return { tag: 'deduped', doc: existing };
+        }
+        if (existing.state === 'failed') {
+          throw conflict(
+            `idempotency key ${input.idempotencyKey} belongs to failed document ${existing.id}`,
+          );
+        }
+        if (existing.state !== 'pending') {
+          throw conflict(
+            `idempotency key ${input.idempotencyKey} belongs to document ${existing.id} in state ${existing.state}`,
+          );
         }
         return { tag: 'resumed', doc: existing };
       }
@@ -178,7 +197,13 @@ export class DocumentLifecycleService {
       metadata: input.metadata ?? null,
       idempotencyKey: input.idempotencyKey ?? null,
       createdBy: input.sub,
+      expectedSha256: input.contentSha256,
+      expectedSizeBytes: input.contentLength,
     });
+
+    // A concurrent request can win the idempotency-key insert between the
+    // lookup and createPending. Validate the row returned from that race too.
+    if (!created.created) this.assertSameUploadIntent(created.row, input);
 
     return { tag: created.created ? 'created' : 'resumed', doc: created.row };
   }
@@ -188,37 +213,87 @@ export class DocumentLifecycleService {
   }
 
   /**
-   * Materialize the upload artifact (presigned PUT for S3/cloud
-   * backends, direct origin POST for FS). Called by the admin route
-   * after `init`; the route owns the direct-upload URL space so the
+   * Materialize the upload artifact (presigned PUT for object storage,
+   * bounded origin proxy for the fallback). Called by the admin route
+   * after `init`; the route owns the proxy URL space so the
    * service stays Fastify-agnostic.
    */
   async issueUpload(
     docId: string,
     tenantId: string,
     contentLength: number,
-    directUrlForDoc: (docId: string) => string,
-    opts: { ttlSec?: number } = {},
+    proxyUrlForDoc: (docId: string) => string,
+    opts: { ttlSec?: number; preference?: UploadPreference } = {},
   ): Promise<InitUpload> {
+    const doc = await this.documents.requireOwned(docId, tenantId);
+    if (doc.state !== 'pending') {
+      throw conflict(`document ${doc.id} is not pending (state=${doc.state})`);
+    }
     const key = this.buildUploadKey(docId, tenantId);
     const ttl = opts.ttlSec ?? 900;
-    if (this.storage.info.kind === 'fs') {
-      return { kind: 'direct', url: directUrlForDoc(docId), key };
+    const preference = opts.preference ?? 'auto';
+    const makePresigned = () =>
+      this.storage.presignUpload(key, ttl, {
+        contentLength,
+        contentType: 'application/pdf',
+      });
+
+    let upload: InitUpload;
+    if (preference === 'proxy') {
+      if (this.uploadProxyPolicy === 'disabled') {
+        throw badRequest('proxy uploads are disabled by this deployment');
+      }
+      if (this.uploadProxyPolicy === 'fallback-only') {
+        const available = await makePresigned();
+        if (available) {
+          throw badRequest(
+            'proxy uploads are fallback-only; use the presigned upload returned by auto mode',
+          );
+        }
+      }
+      upload = { kind: 'proxy', url: proxyUrlForDoc(docId), key };
+    } else {
+      const presigned = await makePresigned();
+      if (presigned) {
+        upload = { kind: 'presigned', presigned, key };
+      } else if (preference === 'presigned') {
+        throw badRequest('presigned uploads are unavailable for this storage adapter');
+      } else if (this.uploadProxyPolicy === 'disabled') {
+        throw badRequest(
+          'this storage adapter cannot issue presigned uploads and proxy uploads are disabled',
+        );
+      } else {
+        upload = { kind: 'proxy', url: proxyUrlForDoc(docId), key };
+      }
     }
-    const presigned = await this.storage.presignUpload(key, ttl, {
-      contentLength,
-      contentType: 'application/pdf',
+
+    const expiresAt =
+      upload.kind === 'presigned' ? upload.presigned.expiresAt : Date.now() + ttl * 1000;
+    const persisted = await this.documents.setUploadIntent({
+      id: docId,
+      tenantId,
+      kind: upload.kind,
+      expiresAt,
     });
-    if (!presigned) {
-      return { kind: 'direct', url: directUrlForDoc(docId), key };
-    }
-    return { kind: 'presigned', presigned, key };
+    if (!persisted) throw conflict(`document ${docId} state changed while issuing upload access`);
+    return upload;
   }
 
-  async uploadDirect(input: UploadDirectInput): Promise<{ sha256: string }> {
+  async uploadProxy(input: UploadProxyInput): Promise<{ sha256: string }> {
     const doc = await this.documents.requireOwned(input.docId, input.tenantId);
     if (doc.state !== 'pending') {
       throw conflict(`document ${doc.id} is not pending (state=${doc.state})`);
+    }
+    if (doc.uploadKind !== 'proxy') {
+      throw conflict(`document ${doc.id} was not initialized for a proxy upload`);
+    }
+    if (doc.uploadExpiresAt !== null && doc.uploadExpiresAt < Date.now()) {
+      throw conflict(`proxy upload access expired for document ${doc.id}; call init again`);
+    }
+    if (doc.expectedSizeBytes !== null && doc.expectedSizeBytes !== input.contentLength) {
+      throw badRequest(
+        `size_mismatch: init declared ${doc.expectedSizeBytes} bytes but proxy received ${input.contentLength}`,
+      );
     }
     const key = this.buildUploadKey(doc.id, doc.tenantId);
     return this.storage.put(key, input.body, { contentLength: input.contentLength });
@@ -241,6 +316,11 @@ export class DocumentLifecycleService {
     if (doc.state !== 'pending') {
       throw conflict(`document ${doc.id} is not pending (state=${doc.state})`);
     }
+    if (doc.expectedSha256 !== null && doc.expectedSha256 !== input.sha256) {
+      throw conflict(
+        `commit SHA does not match the SHA pinned at init for document ${doc.id}`,
+      );
+    }
 
     const key = this.buildUploadKey(doc.id, doc.tenantId);
     const stat = await this.storage.stat(key);
@@ -249,17 +329,25 @@ export class DocumentLifecycleService {
       await this.documents.markFailed(doc.id, doc.tenantId, 'missing_upload');
       throw badRequest(`no bytes found at ${key}; PUT before commit`);
     }
+    if (doc.expectedSizeBytes !== null && stat.size !== doc.expectedSizeBytes) {
+      await this.documents.markFailed(doc.id, doc.tenantId, 'size_mismatch');
+      await this.storage.delete(key);
+      throw badRequest(
+        `size_mismatch: init declared ${doc.expectedSizeBytes} bytes but storage contains ${stat.size}`,
+      );
+    }
     const observedSha = await this.storage.getSha256(key);
     if (!observedSha) {
       await this.documents.markFailed(doc.id, doc.tenantId, 'sha_unavailable');
       throw new Error('object store could not produce SHA-256 for the uploaded bytes');
     }
-    if (observedSha !== input.sha256) {
+    const expectedSha = doc.expectedSha256 ?? input.sha256;
+    if (observedSha !== expectedSha) {
       await this.documents.markFailed(doc.id, doc.tenantId, 'sha_mismatch');
       // Also remove the bad bytes so a retry isn't reading stale data.
       await this.storage.delete(key);
       throw badRequest(
-        `sha_mismatch: client declared ${input.sha256} but server observed ${observedSha}`,
+        `sha_mismatch: init declared ${expectedSha} but server observed ${observedSha}`,
       );
     }
 
@@ -304,6 +392,21 @@ export class DocumentLifecycleService {
     }
 
     return { doc: updated };
+  }
+
+  private assertSameUploadIntent(existing: DocumentRow, input: InitInput): void {
+    const expectedSha = existing.expectedSha256 ?? existing.baseSha;
+    const expectedSize = existing.expectedSizeBytes ?? existing.storageSizeBytes;
+    if (expectedSha !== null && expectedSha !== input.contentSha256) {
+      throw conflict(
+        `idempotency key ${input.idempotencyKey} was already used for different content`,
+      );
+    }
+    if (expectedSize !== null && expectedSize !== input.contentLength) {
+      throw conflict(
+        `idempotency key ${input.idempotencyKey} was already used for a different byte length`,
+      );
+    }
   }
 
   async list(tenantId: string, opts: DocumentListOptions = {}): Promise<DocumentRow[]> {

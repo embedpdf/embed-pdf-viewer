@@ -65,7 +65,7 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
-    "@cloudpdf/admin": "workspace:^",
+    "@cloudpdf/sdk": "workspace:^",
     "@smithy/util-stream": "^4.6.1",
     "@testcontainers/postgresql": "^11.14.0",
     "@types/better-sqlite3": "^7.6.13",

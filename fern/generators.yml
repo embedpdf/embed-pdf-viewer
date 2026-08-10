@@ -2,8 +2,9 @@
 #
 # Generation-only SDK pipeline. .github/workflows/sdk-generate.yml runs each
 # pinned generator locally and uploads the generated source as a workflow
-# artifact. It does not commit to SDK repositories or publish to registries.
-# Output paths are local scratch, gitignored (/sdks/).
+# artifact. It does not publish to registries. TypeScript is generated into the
+# committed workspace package at cloudpdf/sdk; other outputs are gitignored
+# scratch trees under /sdks/ and may be synchronized to external repositories.
 #
 # The input is always ../cloudpdf/contract/openapi.json — the committed,
 # registry-generated, freshness-tested artifact.
@@ -17,7 +18,7 @@ groups:
         version: 3.87.2
         output:
           location: local-file-system
-          path: ../sdks/typescript
+          path: ../cloudpdf/sdk
         metadata:
           author: CloudPDF
           email: hello@cloudpdf.com
@@ -39,7 +40,8 @@ groups:
             license: Apache-2.0
             repository:
               type: git
-              url: git+https://github.com/embedpdf/cloudpdf-sdk-typescript.git
+              url: git+https://github.com/embedpdf/embed-pdf-viewer.git
+              directory: cloudpdf/sdk
   python:
     generators:
       - name: fern-python-sdk

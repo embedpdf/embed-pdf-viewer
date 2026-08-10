@@ -514,7 +514,7 @@ function spyPagesRenderCount(fx: Fixture): { count: () => number } {
   return { count: () => renders };
 }
 
-/** Drive the real admin upload flow: init → upload-direct → commit. */
+/** Drive the real admin upload flow: init → upload-proxy → commit. */
 async function adminUpload(
   fx: Fixture,
   tenantId: string,
@@ -536,14 +536,14 @@ async function adminUpload(
   const initBody = (await init.json()) as { tag: string; document: { id: string } };
   const docId = initBody.document.id;
 
-  const upload = await fetch(`${fx.baseUrl}/v1/tenants/${tenantId}/documents/${docId}/upload-direct`, {
+  const form = new FormData();
+  form.append('file', new Blob([new Uint8Array(bytes)], { type: 'application/pdf' }), 'doc.pdf');
+  const upload = await fetch(`${fx.baseUrl}/v1/tenants/${tenantId}/documents/${docId}/upload-proxy`, {
     method: 'POST',
     headers: {
       Authorization: headers.Authorization!,
-      'Content-Type': 'application/pdf',
-      'Content-Length': String(bytes.byteLength),
     },
-    body: Buffer.from(bytes),
+    body: form,
   });
   expect(upload.status).toBe(200);
 

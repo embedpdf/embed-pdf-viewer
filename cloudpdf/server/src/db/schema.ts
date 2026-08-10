@@ -17,7 +17,7 @@ import type { Generated } from 'kysely';
  * Lifecycle state of a `documents` row.
  *
  * - `pending`  - row reserved; bytes not yet committed (init call returned
- *                a presigned PUT or upload-direct URL).
+ *                a presigned PUT or upload-proxy URL).
  * - `ready`    - bytes verified (sha matches) and visible to the engine.
  * - `failed`   - terminal failure (sha mismatch, timeout, explicit abort).
  * - `deleting` - cascade-delete in progress; storage prefix being torn down.
@@ -50,6 +50,14 @@ export interface DocumentsTable {
   state: DocumentState;
   base_sha: string | null;
   storage_size_bytes: number | null;
+  /** SHA-256 declared at init and verified at commit. */
+  expected_sha256: string | null;
+  /** Exact PDF byte length declared at init and verified before commit. */
+  expected_size_bytes: number | null;
+  /** The server-selected transfer path for this pending upload. */
+  upload_kind: 'presigned' | 'proxy' | null;
+  /** Absolute epoch milliseconds when the issued upload access expires. */
+  upload_expires_at: number | null;
   encryption_state: DocumentEncryptionState;
   encryption_requires_password: boolean | number | null;
   security_handler_revision: number | null;

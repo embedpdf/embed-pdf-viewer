@@ -14,7 +14,10 @@ if (!LANGUAGES.includes(language)) {
 }
 
 const repositoryDirectory = fileURLToPath(new URL('../../', import.meta.url));
-const outputDirectory = `${repositoryDirectory}sdks/${language}`;
+const outputDirectory =
+  language === 'typescript'
+    ? `${repositoryDirectory}cloudpdf/sdk`
+    : `${repositoryDirectory}sdks/${language}`;
 const canonicalVersion = readCanonicalVersion();
 const expectedVersion = mapSdkVersion(canonicalVersion, language);
 const languageNames = {
@@ -62,8 +65,22 @@ switch (language) {
       manifest.publishConfig?.access === 'public',
       'package.json publishConfig.access is not public',
     );
+    assert(
+      manifest.repository?.directory === 'cloudpdf/sdk',
+      'package.json repository.directory is not cloudpdf/sdk',
+    );
+    assert(
+      manifest.scripts?.['test:unit'] === 'vitest run --project unit',
+      'package.json test:unit is not a finite CI command',
+    );
+    assert(
+      fernMetadata.originGitCommit === null && fernMetadata.originGitCommitIsDirty === null,
+      'committed TypeScript Fern metadata contains nondeterministic Git state',
+    );
     includes('src/version.ts', expectedVersion);
     includes('src/Client.ts', 'export class CloudPDFClient');
+    includes('src/CloudPDFClient.ts', 'public readonly uploads: Uploads');
+    includes('src/uploads/Uploads.ts', 'class Uploads');
     includes('src/errors/CloudPDFError.ts', 'export class CloudPDFError');
     includes('src/errors/CloudPDFTimeoutError.ts', 'export class CloudPDFTimeoutError');
     break;
@@ -100,7 +117,10 @@ switch (language) {
   case 'php': {
     const manifest = readJson('composer.json');
     assert(manifest.name === 'cloudpdf/sdk', `composer.json name is ${manifest.name}`);
-    assert(!('version' in manifest), 'composer.json version must be derived from the Packagist tag');
+    assert(
+      !('version' in manifest),
+      'composer.json version must be derived from the Packagist tag',
+    );
     assert(manifest.license === 'Apache-2.0', `composer.json license is ${manifest.license}`);
     assert(manifest.authors?.[0]?.name === 'CloudPDF', 'Composer author is not CloudPDF');
     assert(
@@ -197,6 +217,20 @@ switch (language) {
     includes('lib/CloudPDF/version.rb', `VERSION = "${expectedVersion}"`);
     includes('lib/CloudPDF/client.rb', 'module CloudPDF');
     includes('lib/CloudPDF/client.rb', 'class Client');
+    includes(
+      'lib/CloudPDF/documents/client.rb',
+      'body.add_file(name: "file", file: params[:file], content_type: "application/pdf")',
+    );
+    assert(
+      !read('lib/CloudPDF/documents/client.rb').includes('to_form_data_part'),
+      'Ruby multipart upload still calls the nonexistent to_form_data_part helper',
+    );
+    includes(
+      'lib/CloudPDF/documents/types/upload_proxy_documents_request.rb',
+      'field :file, -> { Object }, optional: false',
+    );
+    includes('reference.md', 'File.open("document.pdf", "rb") do |file|');
+    includes('reference.md', 'file: file');
     includes('README.md', 'require "cloudpdf"');
     includes('custom.gemspec.rb', 'spec.license = "Apache-2.0"');
     includes('custom.gemspec.rb', 'spec.summary = "The official Ruby SDK for the CloudPDF API."');

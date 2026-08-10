@@ -29,8 +29,8 @@ export interface AdminDocumentsRouteDeps {
  *      -> { id, state, tag: 'created'|'resumed'|'deduped', upload?: { ... } }
  *
  *   2. (If not deduped:) PUT the bytes to `upload.url` (presigned) OR
- *      POST them to `.../documents/:id/upload-direct` (FS-mode
- *      fallback / customers behind strict egress).
+ *      POST multipart to `.../documents/:id/upload-proxy` when the
+ *      deployment selected the bounded origin fallback.
  *
  *   3. POST .../documents/:id/commit
  *      body: { sha256 }
@@ -73,6 +73,7 @@ export async function registerAdminDocumentsRoutes(
       dedupMode: body.dedupMode,
       docId: body.docId,
       uploadTtlSec: body.uploadTtlSec,
+      uploadPreference: body.uploadPreference,
     });
 
     if (result.tag === 'deduped') {
@@ -82,14 +83,14 @@ export async function registerAdminDocumentsRoutes(
       });
     }
 
-    // Stable direct-upload URL: the @cloudpdf/admin SDK uses it exactly
+    // Stable proxy-upload URL: SDKs use it exactly
     // as returned (no string interpolation on its side).
     const upload = await lifecycle.issueUpload(
       result.doc.id,
       ctx.tenantId,
       body.contentLength,
-      (docId) => adminWirePaths.documentUploadDirect(tenantId, docId),
-      { ttlSec: body.uploadTtlSec },
+      (docId) => adminWirePaths.documentUploadProxy(tenantId, docId),
+      { ttlSec: body.uploadTtlSec, preference: body.uploadPreference },
     );
     return reply.send({
       tag: result.tag,
@@ -112,52 +113,27 @@ export async function registerAdminDocumentsRoutes(
     return reply.send({ document: docPublic(result.doc) });
   });
 
-  const uploadDirectOp = adminOperations['documents.uploadDirect'];
-  mount(uploadDirectOp, async (req, reply) => {
+  const uploadProxyOp = adminOperations['documents.uploadProxy'];
+  mount(uploadProxyOp, async (req, reply) => {
     const { tenantId, id } = req.params as { tenantId: string; id: string };
-    const ctx = requireTenantAccess(req, tenantId, uploadDirectOp.scope);
+    const ctx = requireTenantAccess(req, tenantId, uploadProxyOp.scope);
 
-    const lenHeader = req.headers['content-length'];
-    const len = typeof lenHeader === 'string' ? Number.parseInt(lenHeader, 10) : Number.NaN;
-    if (!Number.isFinite(len) || len <= 0) {
-      throw makeError('InvalidArg', 400, 'Content-Length header required for upload-direct');
+    // Proxy uploads are deliberately multipart-only. That shape is portable
+    // across Fern's generators and, unlike the previous implementation, we
+    // compare the PDF part's length rather than the multipart envelope's
+    // Content-Length.
+    const data = await req.file();
+    if (!data || data.fieldname !== 'file') {
+      throw makeError('InvalidArg', 400, 'expected multipart with a file field');
     }
+    const buf = await data.toBuffer();
+    const bytes = new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength);
 
-    // We accept either a raw application/pdf body or a multipart
-    // upload with a single "file" field. The @cloudpdf/admin SDK uses
-    // raw body; `curl -F file=@x.pdf` works via multipart for ops
-    // convenience. Raw PDF uploads land in `req.body` as a Buffer
-    // thanks to the content-type parser registered in `buildApp`.
-    const contentType = (req.headers['content-type'] ?? '').toString();
-    let bytes: Uint8Array;
-    if (contentType.startsWith('multipart/')) {
-      const data = await req.file();
-      if (!data) throw makeError('InvalidArg', 400, 'expected multipart with file field');
-      const buf = await data.toBuffer();
-      bytes = new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength);
-    } else if (Buffer.isBuffer(req.body)) {
-      bytes = new Uint8Array(req.body.buffer, req.body.byteOffset, req.body.byteLength);
-    } else {
-      throw makeError(
-        'InvalidArg',
-        400,
-        `unsupported content-type for upload-direct: ${contentType || '(missing)'}`,
-      );
-    }
-
-    if (bytes.byteLength !== len) {
-      throw makeError(
-        'InvalidArg',
-        400,
-        `Content-Length mismatch: header=${len}, body=${bytes.byteLength}`,
-      );
-    }
-
-    const { sha256 } = await lifecycle.uploadDirect({
+    const { sha256 } = await lifecycle.uploadProxy({
       tenantId: ctx.tenantId,
       docId: id,
       body: bytes,
-      contentLength: len,
+      contentLength: bytes.byteLength,
     });
     return reply.send({ sha256 });
   });

@@ -1,0 +1,17 @@
+{
+  "language": "typescript",
+  "canonicalVersion": "3.0.0-next.1",
+  "sdkVersion": "3.0.0-next.1",
+  "source": {
+    "repository": "embedpdf/embed-pdf-viewer",
+    "openapi": "cloudpdf/contract/openapi.json",
+    "openapiSha256": "65f9768ac3d27301ed0fa7cd3b27e613e463945966ab42f1cec94ae216d979c1",
+    "gitCommit": null,
+    "gitCommitIsDirty": null
+  },
+  "fern": {
+    "cliVersion": "5.91.0",
+    "generatorName": "fernapi/fern-typescript-sdk",
+    "generatorVersion": "3.87.2"
+  }
+}

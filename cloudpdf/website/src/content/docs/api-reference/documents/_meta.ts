@@ -6,6 +6,6 @@ export default {
   commit: 'Commit',
   download: 'Download',
   thumbnail: 'Thumbnail',
-  'upload-direct': 'Upload Direct',
+  'upload-proxy': 'Upload Proxy',
   init: 'Init',
 };

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { createHash } from 'node:crypto';
-import { copyFileSync, readFileSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import { LANGUAGES, mapSdkVersion, readCanonicalVersion } from './sdk-version.mjs';
@@ -14,8 +14,26 @@ if (!LANGUAGES.includes(language)) {
 }
 
 const repositoryDirectory = fileURLToPath(new URL('../../', import.meta.url));
-const outputDirectory = `${repositoryDirectory}sdks/${language}`;
+const outputDirectory =
+  language === 'typescript'
+    ? `${repositoryDirectory}cloudpdf/sdk`
+    : `${repositoryDirectory}sdks/${language}`;
 const fernMetadata = JSON.parse(readFileSync(`${outputDirectory}/.fern/metadata.json`, 'utf8'));
+if (language === 'typescript') {
+  // A committed generated tree cannot contain provenance for the commit or
+  // environment that generated it: CI and local regeneration would always
+  // produce different metadata. Git already supplies provenance for this
+  // workspace-resident artifact; the OpenAPI hash below is the deterministic
+  // freshness identity.
+  fernMetadata.originGitCommit = null;
+  fernMetadata.originGitCommitIsDirty = null;
+  delete fernMetadata.invokedBy;
+  delete fernMetadata.ciProvider;
+  writeFileSync(
+    `${outputDirectory}/.fern/metadata.json`,
+    `${JSON.stringify(fernMetadata, null, 4)}\n`,
+  );
+}
 const canonicalVersion = readCanonicalVersion();
 const sdkVersion = mapSdkVersion(canonicalVersion, language);
 const openApiSha256 = createHash('sha256')
@@ -52,9 +70,58 @@ normalizeSdkBranding(outputDirectory, language);
 // generator configuration. Keep these deterministic and validate them below so
 // a generator upgrade cannot silently publish incomplete package metadata.
 if (language === 'typescript') {
+  // The TypeScript SDK is a package in this repository's pnpm workspace, not
+  // a standalone generated repository. Remove Fern's nested workspace marker
+  // so installs consistently resolve through the root lockfile.
+  const nestedWorkspacePath = `${outputDirectory}/pnpm-workspace.yaml`;
+  if (existsSync(nestedWorkspacePath)) {
+    const nestedWorkspace = readFileSync(nestedWorkspacePath, 'utf8');
+    if (nestedWorkspace !== "packages: ['.']") {
+      throw new Error('TypeScript nested pnpm workspace shape changed; revisit its removal');
+    }
+    unlinkSync(nestedWorkspacePath);
+  }
+
+  // fern-typescript-sdk 3.87.2 emits a useless JavaScript string escape in its
+  // ESM rename helper. It is behaviorally harmless, but CodeQL correctly flags
+  // it and a direct edit would be overwritten by the next generation. Patch
+  // only the dynamic-import regex block and fail closed if Fern changes shape.
+  const renameScriptPath = `${outputDirectory}/scripts/rename-to-esm-files.js`;
+  let renameScript = readFileSync(renameScriptPath, 'utf8');
+  const dynamicRegexStart = renameScript.indexOf('        const dynamicRegex = new RegExp(');
+  const dynamicRegexEnd = renameScript.indexOf(
+    '        newContent = newContent.replace(dynamicRegex,',
+    dynamicRegexStart,
+  );
+  if (dynamicRegexStart === -1 || dynamicRegexEnd === -1) {
+    throw new Error('TypeScript ESM rename helper shape changed; revisit the regex patch');
+  }
+
+  const generatedRelativeImportPattern = String.raw`(\\.\\.\?\\/[^'"]+)`;
+  const patchedRelativeImportPattern = String.raw`(\\.\\.?\\/[^'"]+)`;
+  const dynamicRegexBlock = renameScript.slice(dynamicRegexStart, dynamicRegexEnd);
+  const hasGeneratedPattern = dynamicRegexBlock.includes(generatedRelativeImportPattern);
+  const hasPatchedPattern = dynamicRegexBlock.includes(patchedRelativeImportPattern);
+  if (hasGeneratedPattern === hasPatchedPattern) {
+    throw new Error('TypeScript ESM rename helper regex changed; revisit the regex patch');
+  }
+  if (hasGeneratedPattern) {
+    renameScript =
+      renameScript.slice(0, dynamicRegexStart) +
+      dynamicRegexBlock.replace(generatedRelativeImportPattern, patchedRelativeImportPattern) +
+      renameScript.slice(dynamicRegexEnd);
+    writeFileSync(renameScriptPath, renameScript);
+  }
+
   const manifestPath = `${outputDirectory}/package.json`;
   const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+  delete manifest.packageManager;
   manifest.publishConfig = { access: 'public' };
+  // Fern's defaults are watch-mode commands. Generation runs in CI and the
+  // workspace release gate, so these must be finite checks.
+  manifest.scripts.test = 'vitest run';
+  manifest.scripts['test:unit'] = 'vitest run --project unit';
+  manifest.scripts['test:wire'] = 'vitest run --project wire';
   writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 4)}\n`);
 }
 
@@ -90,6 +157,80 @@ if (language === 'python') {
 // custom.gemspec.rb hook. Fill that hook deterministically until each SDK has
 // its own repository-owned customization layer.
 if (language === 'ruby') {
+  // fern-ruby-sdk 1.21.1 emits a call to `to_form_data_part` for binary
+  // multipart fields, but neither Ruby's File nor the generated runtime
+  // defines that method. Route the file through the runtime's real add_file
+  // API and make the required parameter visible in its request model. Keep
+  // this strict so a generator upgrade forces us to re-evaluate the patch.
+  const uploadClientPath = `${outputDirectory}/lib/CloudPDF/documents/client.rb`;
+  const generatedMultipartLine =
+    'body.add_part(params[:file].to_form_data_part(name: "file")) if params[:file]';
+  const patchedMultipartLine =
+    'body.add_file(name: "file", file: params[:file], content_type: "application/pdf")';
+  let uploadClient = readFileSync(uploadClientPath, 'utf8');
+  if (
+    !uploadClient.includes(generatedMultipartLine) &&
+    !uploadClient.includes(patchedMultipartLine)
+  ) {
+    throw new Error('Ruby upload proxy generator shape changed; revisit the multipart patch');
+  }
+  if (uploadClient.includes(generatedMultipartLine)) {
+    uploadClient = uploadClient.replace(
+      generatedMultipartLine,
+      `raise ArgumentError, "file is required" unless params[:file]
+        body.add_file(name: "file", file: params[:file], content_type: "application/pdf")`,
+    );
+  }
+  uploadClient = uploadClient.replace(
+    '# @option params [String] :id\n      #\n      # @example\n      #   client.documents.upload_proxy(\n      #     tenant_id: "tenantId",\n      #     id: "id"\n      #   )',
+    '# @option params [String] :id\n      # @option params [#read] :file\n      #\n      # @example\n      #   client.documents.upload_proxy(\n      #     tenant_id: "tenantId",\n      #     id: "id",\n      #     file: File.open("document.pdf", "rb")\n      #   )',
+  );
+  writeFileSync(uploadClientPath, uploadClient);
+
+  const uploadTypePath = `${outputDirectory}/lib/CloudPDF/documents/types/upload_proxy_documents_request.rb`;
+  const generatedIdField = '        field :id, -> { String }, optional: false, nullable: false\n';
+  const patchedFileField = '        field :file, -> { Object }, optional: false, nullable: false\n';
+  const uploadTypeSource = readFileSync(uploadTypePath, 'utf8');
+  if (
+    !uploadTypeSource.includes(generatedIdField) &&
+    !uploadTypeSource.includes(patchedFileField)
+  ) {
+    throw new Error('Ruby upload proxy request shape changed; revisit the file field patch');
+  }
+  const uploadType = uploadTypeSource.includes(patchedFileField)
+    ? uploadTypeSource
+    : uploadTypeSource.replace(generatedIdField, `${generatedIdField}\n${patchedFileField}`);
+  writeFileSync(uploadTypePath, uploadType);
+
+  const referencePath = `${outputDirectory}/reference.md`;
+  const generatedReferenceExample = `client.documents.upload_proxy(
+  tenant_id: "tenantId",
+  id: "id"
+)`;
+  const patchedReferenceExample = 'File.open("document.pdf", "rb") do |file|';
+  const referenceSource = readFileSync(referencePath, 'utf8');
+  if (
+    !referenceSource.includes(generatedReferenceExample) &&
+    !referenceSource.includes(patchedReferenceExample)
+  ) {
+    throw new Error('Ruby upload proxy reference shape changed; revisit the file example patch');
+  }
+  if (referenceSource.includes(generatedReferenceExample)) {
+    writeFileSync(
+      referencePath,
+      referenceSource.replace(
+        generatedReferenceExample,
+        `File.open("document.pdf", "rb") do |file|
+  client.documents.upload_proxy(
+    tenant_id: "tenantId",
+    id: "id",
+    file: file
+  )
+end`,
+      ),
+    );
+  }
+
   writeFileSync(
     `${outputDirectory}/custom.gemspec.rb`,
     `# frozen_string_literal: true
@@ -208,8 +349,7 @@ if (language === 'java') {
             url = layout.buildDirectory.dir('central-staging')
         }
     }`,
-    )
-    .concat(`
+    ).concat(`
 tasks.withType(GenerateModuleMetadata) {
     enabled = false
 }

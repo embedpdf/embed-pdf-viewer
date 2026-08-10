@@ -2879,15 +2879,16 @@
         }
       }
     },
-    "/v1/tenants/{tenantId}/documents/{id}/upload-direct": {
+    "/v1/tenants/{tenantId}/documents/{id}/upload-proxy": {
       "post": {
-        "operationId": "documents.uploadDirect",
+        "operationId": "documents.uploadProxy",
         "x-fern-sdk-group-name": [
           "documents"
         ],
-        "x-fern-sdk-method-name": "uploadDirect",
-        "x-docs-title": "Upload document directly",
-        "summary": "Upload the PDF bytes through the origin instead of a presigned URL.",
+        "x-fern-sdk-method-name": "uploadProxy",
+        "x-docs-title": "Upload document through the origin",
+        "summary": "Upload a bounded PDF through the API when the initialized transfer kind is proxy.",
+        "description": "This bounded origin-mediated fallback must only be used after documents.init returns upload.kind=proxy. Auto mode prefers a presigned object-store PUT whenever available.",
         "security": [
           {
             "apiToken": []
@@ -2922,18 +2923,6 @@
         "requestBody": {
           "required": true,
           "content": {
-            "application/pdf": {
-              "schema": {
-                "type": "string",
-                "format": "binary"
-              }
-            },
-            "application/octet-stream": {
-              "schema": {
-                "type": "string",
-                "format": "binary"
-              }
-            },
             "multipart/form-data": {
               "schema": {
                 "type": "object",
@@ -2956,7 +2945,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocumentsUploadDirect200Response"
+                  "$ref": "#/components/schemas/DocumentsUploadProxy200Response"
                 }
               }
             }
@@ -2966,7 +2955,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocumentsUploadDirect400Response"
+                  "$ref": "#/components/schemas/DocumentsUploadProxy400Response"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentsUploadProxy409Response"
                 }
               }
             }
@@ -4270,6 +4269,14 @@
             "type": "number",
             "minimum": 60,
             "maximum": 3600
+          },
+          "uploadPreference": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "presigned",
+              "proxy"
+            ]
           }
         },
         "required": [
@@ -4425,7 +4432,7 @@
                       "kind": {
                         "type": "string",
                         "enum": [
-                          "direct"
+                          "proxy"
                         ]
                       },
                       "url": {
@@ -4671,7 +4678,7 @@
         ],
         "additionalProperties": false
       },
-      "DocumentsUploadDirect200Response": {
+      "DocumentsUploadProxy200Response": {
         "type": "object",
         "properties": {
           "sha256": {
@@ -4684,7 +4691,32 @@
         ],
         "additionalProperties": false
       },
-      "DocumentsUploadDirect400Response": {
+      "DocumentsUploadProxy400Response": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "code",
+              "message"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "additionalProperties": false
+      },
+      "DocumentsUploadProxy409Response": {
         "type": "object",
         "properties": {
           "error": {

@@ -6,11 +6,13 @@ import test from 'node:test';
 import { LANGUAGES, repositoryDirectory } from './sdk-version.mjs';
 import { SDK_REPOSITORIES, sdkRepository } from './sdk-repositories.mjs';
 
-test('every generated language has one distinct public SDK repository', () => {
-  assert.deepEqual(Object.keys(SDK_REPOSITORIES).sort(), [...LANGUAGES].sort());
+const externalLanguages = LANGUAGES.filter((language) => language !== 'typescript');
 
-  const slugs = LANGUAGES.map((language) => sdkRepository(language).slug);
-  assert.equal(new Set(slugs).size, LANGUAGES.length);
+test('every external generated language has one distinct public SDK repository', () => {
+  assert.deepEqual(Object.keys(SDK_REPOSITORIES).sort(), [...externalLanguages].sort());
+
+  const slugs = externalLanguages.map((language) => sdkRepository(language).slug);
+  assert.equal(new Set(slugs).size, externalLanguages.length);
   for (const [index, slug] of slugs.entries()) {
     assert.match(slug, /^embedpdf\/cloudpdf-sdk-[a-z]+$/);
     assert.ok(
@@ -19,13 +21,13 @@ test('every generated language has one distinct public SDK repository', () => {
           repositoryDirectory,
           'fern',
           'repository-overlays',
-          LANGUAGES[index],
+          externalLanguages[index],
           '.github',
           'workflows',
           'sdk-ci.yml',
         ),
       ),
-      `${LANGUAGES[index]} is missing its repository CI overlay`,
+      `${externalLanguages[index]} is missing its repository CI overlay`,
     );
   }
 });
@@ -36,7 +38,7 @@ test('the C# generator publishes source to the consumer-facing .NET repository',
 });
 
 test('every SDK receives a guarded repository release workflow', () => {
-  for (const language of LANGUAGES) {
+  for (const language of externalLanguages) {
     const workflowPath = join(
       repositoryDirectory,
       'fern',
@@ -71,7 +73,7 @@ test('release workflows use each registry publishing mechanism', () => {
       'utf8',
     );
 
-  for (const language of ['typescript', 'python', 'csharp', 'ruby']) {
+  for (const language of ['python', 'csharp', 'ruby']) {
     assert.match(workflow(language), /id-token: write/);
   }
   assert.match(workflow('php'), /repo\.packagist\.org/);
@@ -83,4 +85,5 @@ test('release workflows use each registry publishing mechanism', () => {
 
 test('unknown languages and fields fail explicitly', () => {
   assert.throws(() => sdkRepository('swift'), /Unsupported SDK language/);
+  assert.throws(() => sdkRepository('typescript'), /monorepo workspace package/);
 });

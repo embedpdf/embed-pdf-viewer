@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "canonicalVersion": "3.0.0-next.1",
-  "openapiSha256": "8653708bff460e6cda9f80632283ebdb8eba31e8a14cd6a16e81056f55e93f4c",
+  "openapiSha256": "65f9768ac3d27301ed0fa7cd3b27e613e463945966ab42f1cec94ae216d979c1",
   "languages": {
     "typescript": {
       "label": "TypeScript",
@@ -1245,42 +1245,40 @@
         "frameLines": 7
       }
     },
-    "documents.uploadDirect": {
+    "documents.uploadProxy": {
       "typescript": {
         "status": "available",
-        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\nimport { createReadStream } from \"node:fs\";\n\nconst client = new CloudPDFClient({\n    baseUrl: \"https://yourhost.com/path/to/api\",\n    token: \"<token>\",\n});\n\nawait client.documents.uploadDirect(\n    createReadStream(\"document.pdf\"),\n    \"tenantId\",\n    \"documentId\",\n);",
+        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\nimport { readFile } from \"node:fs/promises\";\n\nconst client = new CloudPDFClient({\n    baseUrl: \"https://yourhost.com/path/to/api\",\n    token: \"<token>\",\n});\n\nawait client.documents.uploadProxy({\n    file: new Blob([await readFile(\"document.pdf\")], { type: \"application/pdf\" }),\n    tenantId: \"tenantId\",\n    id: \"documentId\",\n});",
         "frameLines": 8
       },
       "python": {
         "status": "available",
-        "source": "from cloudpdf import CloudPDFClient\n\nclient = CloudPDFClient(\n    token=\"<token>\",\n    base_url=\"https://yourhost.com/path/to/api\",\n)\n\nwith open(\"document.pdf\", \"rb\") as pdf:\n    result = client.documents.upload_direct(\n        tenant_id=\"tenantId\",\n        id=\"documentId\",\n        request=pdf.read(),\n    )",
+        "source": "from cloudpdf import CloudPDFClient\n\nclient = CloudPDFClient(\n    token=\"<token>\",\n    base_url=\"https://yourhost.com/path/to/api\",\n)\n\nwith open(\"document.pdf\", \"rb\") as pdf:\n    result = client.documents.upload_proxy(\n        file=pdf,\n        tenant_id=\"tenantId\",\n        id=\"documentId\",\n    )",
         "frameLines": 7
       },
       "php": {
-        "status": "alternative",
-        "note": "The generated PHP client cannot send an application/pdf body for this operation yet. Use the presigned upload returned by documents.init instead.",
-        "source": "use CloudPDF\\CloudPDFClient;\n\n$client = new CloudPDFClient(\n    token: '<token>',\n    options: ['baseUrl' => 'https://yourhost.com/path/to/api'],\n);\n\n$upload = $client->documents->init(\n    'tenantId',\n    new DocumentsInitRequest([\n        'contentLength' => filesize('document.pdf'),\n        'contentSha256' => hash_file('sha256', 'document.pdf'),\n    ]),\n);\n\n// PUT document.pdf to the presigned URL in $upload, then commit the upload.",
-        "frameLines": 7
+        "status": "available",
+        "source": "use CloudPDF\\CloudPDFClient;\nuse CloudPDF\\Documents\\Requests\\UploadProxyDocumentsRequest;\nuse CloudPDF\\Utils\\File;\n\n$client = new CloudPDFClient(\n    token: '<token>',\n    options: ['baseUrl' => 'https://yourhost.com/path/to/api'],\n);\n\n$result = $client->documents->uploadProxy(\n    'tenantId',\n    'documentId',\n    new UploadProxyDocumentsRequest([\n        'file' => File::createFromFilepath('document.pdf'),\n    ]),\n);",
+        "frameLines": 9
       },
       "csharp": {
         "status": "available",
-        "source": "using CloudPDF;\n\nvar client = new CloudPDFClient(\n    \"<token>\",\n    new ClientOptions { BaseUrl = \"https://yourhost.com/path/to/api\" }\n);\n\nawait using var pdf = File.OpenRead(\"document.pdf\");\nvar result = await client.Documents.UploadDirectAsync(\n    \"tenantId\",\n    \"documentId\",\n    pdf\n);",
+        "source": "using CloudPDF;\n\nvar client = new CloudPDFClient(\n    \"<token>\",\n    new ClientOptions { BaseUrl = \"https://yourhost.com/path/to/api\" }\n);\n\nawait using var pdf = File.OpenRead(\"document.pdf\");\nvar result = await client.Documents.UploadProxyAsync(\n    new UploadProxyDocumentsRequest {\n        TenantId = \"tenantId\",\n        Id = \"documentId\",\n        File = new FileParameter {\n            Stream = pdf,\n            FileName = \"document.pdf\",\n            ContentType = \"application/pdf\",\n        },\n    }\n);",
         "frameLines": 7
       },
       "go": {
         "status": "available",
-        "source": "import (\n    \"context\"\n\n    client \"github.com/embedpdf/cloudpdf-sdk-go/v3/client\"\n    option \"github.com/embedpdf/cloudpdf-sdk-go/v3/option\"\n)\n\nclient := client.NewClient(\n    option.WithToken(\"<token>\"),\n    option.WithBaseURL(\"https://yourhost.com/path/to/api\"),\n)\n\npdf, err := os.Open(\"document.pdf\")\nif err != nil {\n    return err\n}\ndefer pdf.Close()\n\nresult, err := client.Documents.UploadDirect(\n    context.Background(),\n    \"tenantId\",\n    \"documentId\",\n    pdf,\n)",
-        "frameLines": 12
+        "source": "import (\n    \"context\"\n\n    \"os\"\n\n    cloudpdf \"github.com/embedpdf/cloudpdf-sdk-go/v3\"\n    client \"github.com/embedpdf/cloudpdf-sdk-go/v3/client\"\n    option \"github.com/embedpdf/cloudpdf-sdk-go/v3/option\"\n)\n\nclient := client.NewClient(\n    option.WithToken(\"<token>\"),\n    option.WithBaseURL(\"https://yourhost.com/path/to/api\"),\n)\n\npdf, err := os.Open(\"document.pdf\")\nif err != nil {\n    return err\n}\ndefer pdf.Close()\n\nresult, err := client.Documents.UploadProxy(\n    context.Background(),\n    &cloudpdf.UploadProxyDocumentsRequest{\n        TenantID: \"tenantId\",\n        ID: \"documentId\",\n        File: pdf,\n    },\n)",
+        "frameLines": 15
       },
       "java": {
         "status": "available",
-        "source": "import com.cloudpdf.api.CloudPDFClient;\n\nCloudPDFClient client = CloudPDFClient\n    .builder()\n    .token(\"<token>\")\n    .url(\"https://yourhost.com/path/to/api\")\n    .build();\n\ntry (InputStream pdf = Files.newInputStream(Path.of(\"document.pdf\"))) {\n    DocumentsUploadDirect200Response result = client.documents().uploadDirect(\n        \"tenantId\",\n        \"documentId\",\n        pdf\n    );\n}",
-        "frameLines": 8
+        "source": "import com.cloudpdf.api.CloudPDFClient;\nimport java.io.InputStream;\nimport java.nio.file.Files;\nimport java.nio.file.Path;\n\nCloudPDFClient client = CloudPDFClient\n    .builder()\n    .token(\"<token>\")\n    .url(\"https://yourhost.com/path/to/api\")\n    .build();\n\ntry (InputStream pdf = Files.newInputStream(Path.of(\"document.pdf\"))) {\n    var result = client.documents().uploadProxy(\n        \"tenantId\",\n        \"documentId\",\n        pdf,\n        \"document.pdf\"\n    );\n}",
+        "frameLines": 11
       },
       "ruby": {
-        "status": "alternative",
-        "note": "The generated Ruby client cannot send an application/pdf body for this operation yet. Use the presigned upload returned by documents.init instead.",
-        "source": "require \"cloudpdf\"\n\nclient = CloudPDF::Client.new(\n  token: \"<token>\",\n  base_url: \"https://yourhost.com/path/to/api\"\n)\n\nupload = client.documents.init(\n  tenant_id: \"tenantId\",\n  content_length: File.size(\"document.pdf\"),\n  content_sha256: Digest::SHA256.file(\"document.pdf\").hexdigest\n)\n\n# PUT document.pdf to the presigned URL in upload, then commit the upload.",
+        "status": "available",
+        "source": "require \"cloudpdf\"\n\nclient = CloudPDF::Client.new(\n  token: \"<token>\",\n  base_url: \"https://yourhost.com/path/to/api\"\n)\n\nresult = client.documents.upload_proxy(\n  file: File.open(\"document.pdf\", \"rb\"),\n  tenant_id: \"tenantId\",\n  id: \"documentId\"\n)",
         "frameLines": 7
       }
     },

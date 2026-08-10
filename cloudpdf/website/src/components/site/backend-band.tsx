@@ -26,9 +26,9 @@ import { ArrowRight } from './icons';
 const STEPS = [
   {
     method: 'POST',
-    title: 'Upload a document',
-    description: 'One call, or resumable presigned uploads.',
-    href: '/docs/api-reference/documents/upload-direct',
+    title: 'Initialize an upload',
+    description: 'Get upload access, transfer, then commit.',
+    href: '/docs/api-reference/documents/init',
   },
   {
     method: 'POST',

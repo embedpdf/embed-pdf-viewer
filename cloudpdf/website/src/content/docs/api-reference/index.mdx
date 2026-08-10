@@ -58,9 +58,9 @@ remembered for every example in the reference.
 
 Three steps, and only the last one runs in a browser.
 
-1. **[Upload a document](/docs/api-reference/documents/upload-direct)** — one call for
-   files you already hold. For large or resumable uploads use
-   [initialize](/docs/api-reference/documents/init) → `PUT` → [commit](/docs/api-reference/documents/commit).
+1. **[Initialize an upload](/docs/api-reference/documents/init)** — request upload
+   access, transfer the file using the returned instructions, then
+   [commit the upload](/docs/api-reference/documents/commit).
 2. **[Issue a document token](/docs/api-reference/tokens/issue)** — a short-lived JWT
    pinned to one document, carrying exactly the capabilities that user should have.
 3. **Open it** — hand that token to the viewer or headless components. See
