@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { createHash } from 'node:crypto';
-import { copyFileSync, readFileSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import { LANGUAGES, mapSdkVersion, readCanonicalVersion } from './sdk-version.mjs';
@@ -70,6 +70,18 @@ normalizeSdkBranding(outputDirectory, language);
 // generator configuration. Keep these deterministic and validate them below so
 // a generator upgrade cannot silently publish incomplete package metadata.
 if (language === 'typescript') {
+  // The TypeScript SDK is a package in this repository's pnpm workspace, not
+  // a standalone generated repository. Remove Fern's nested workspace marker
+  // so installs consistently resolve through the root lockfile.
+  const nestedWorkspacePath = `${outputDirectory}/pnpm-workspace.yaml`;
+  if (existsSync(nestedWorkspacePath)) {
+    const nestedWorkspace = readFileSync(nestedWorkspacePath, 'utf8');
+    if (nestedWorkspace !== "packages: ['.']") {
+      throw new Error('TypeScript nested pnpm workspace shape changed; revisit its removal');
+    }
+    unlinkSync(nestedWorkspacePath);
+  }
+
   // fern-typescript-sdk 3.87.2 emits a useless JavaScript string escape in its
   // ESM rename helper. It is behaviorally harmless, but CodeQL correctly flags
   // it and a direct edit would be overwritten by the next generation. Patch
@@ -103,6 +115,7 @@ if (language === 'typescript') {
 
   const manifestPath = `${outputDirectory}/package.json`;
   const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+  delete manifest.packageManager;
   manifest.publishConfig = { access: 'public' };
   // Fern's defaults are watch-mode commands. Generation runs in CI and the
   // workspace release gate, so these must be finite checks.

@@ -203,10 +203,11 @@ jobs:
         run: |
           case "$LANGUAGE" in
             typescript)
+              cd ../..
               corepack enable
               pnpm install --frozen-lockfile --ignore-scripts --filter @cloudpdf/sdk...
-              pnpm build
-              pnpm test:unit
+              pnpm --filter @cloudpdf/sdk build
+              pnpm --filter @cloudpdf/sdk test:unit
               ;;
             python)
               python -m pip install --disable-pip-version-check build

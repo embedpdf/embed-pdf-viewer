@@ -179,7 +179,6 @@
         "stream": false,
         "crypto": false
     },
-    "packageManager": "pnpm@10.33.0",
     "engines": {
         "node": ">=18.0.0"
     },
