@@ -81,7 +81,7 @@ async function updateFileContents(file) {
 
         // Handle dynamic imports (yield import, await import, regular import())
         const dynamicRegex = new RegExp(
-            `(yield\\s+import|await\\s+import|import)\\s*\\(\\s*['"](\\.\\.\?\\/[^'"]+)(\\${oldExt})['"]\\s*\\)`,
+            `(yield\\s+import|await\\s+import|import)\\s*\\(\\s*['"](\\.\\.?\\/[^'"]+)(\\${oldExt})['"]\\s*\\)`,
             "g",
         );
         newContent = newContent.replace(dynamicRegex, `$1("$2${newExt}")`);

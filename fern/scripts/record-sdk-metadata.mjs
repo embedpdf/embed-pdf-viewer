@@ -20,12 +20,15 @@ const outputDirectory =
     : `${repositoryDirectory}sdks/${language}`;
 const fernMetadata = JSON.parse(readFileSync(`${outputDirectory}/.fern/metadata.json`, 'utf8'));
 if (language === 'typescript') {
-  // A committed generated tree cannot contain the SHA of the commit that will
-  // eventually contain that tree: CI would always regenerate a different SHA.
-  // Git already supplies provenance for this workspace-resident artifact; the
-  // OpenAPI hash below is the deterministic freshness identity.
+  // A committed generated tree cannot contain provenance for the commit or
+  // environment that generated it: CI and local regeneration would always
+  // produce different metadata. Git already supplies provenance for this
+  // workspace-resident artifact; the OpenAPI hash below is the deterministic
+  // freshness identity.
   fernMetadata.originGitCommit = null;
   fernMetadata.originGitCommitIsDirty = null;
+  delete fernMetadata.invokedBy;
+  delete fernMetadata.ciProvider;
   writeFileSync(
     `${outputDirectory}/.fern/metadata.json`,
     `${JSON.stringify(fernMetadata, null, 4)}\n`,
@@ -67,6 +70,37 @@ normalizeSdkBranding(outputDirectory, language);
 // generator configuration. Keep these deterministic and validate them below so
 // a generator upgrade cannot silently publish incomplete package metadata.
 if (language === 'typescript') {
+  // fern-typescript-sdk 3.87.2 emits a useless JavaScript string escape in its
+  // ESM rename helper. It is behaviorally harmless, but CodeQL correctly flags
+  // it and a direct edit would be overwritten by the next generation. Patch
+  // only the dynamic-import regex block and fail closed if Fern changes shape.
+  const renameScriptPath = `${outputDirectory}/scripts/rename-to-esm-files.js`;
+  let renameScript = readFileSync(renameScriptPath, 'utf8');
+  const dynamicRegexStart = renameScript.indexOf('        const dynamicRegex = new RegExp(');
+  const dynamicRegexEnd = renameScript.indexOf(
+    '        newContent = newContent.replace(dynamicRegex,',
+    dynamicRegexStart,
+  );
+  if (dynamicRegexStart === -1 || dynamicRegexEnd === -1) {
+    throw new Error('TypeScript ESM rename helper shape changed; revisit the regex patch');
+  }
+
+  const generatedRelativeImportPattern = String.raw`(\\.\\.\?\\/[^'"]+)`;
+  const patchedRelativeImportPattern = String.raw`(\\.\\.?\\/[^'"]+)`;
+  const dynamicRegexBlock = renameScript.slice(dynamicRegexStart, dynamicRegexEnd);
+  const hasGeneratedPattern = dynamicRegexBlock.includes(generatedRelativeImportPattern);
+  const hasPatchedPattern = dynamicRegexBlock.includes(patchedRelativeImportPattern);
+  if (hasGeneratedPattern === hasPatchedPattern) {
+    throw new Error('TypeScript ESM rename helper regex changed; revisit the regex patch');
+  }
+  if (hasGeneratedPattern) {
+    renameScript =
+      renameScript.slice(0, dynamicRegexStart) +
+      dynamicRegexBlock.replace(generatedRelativeImportPattern, patchedRelativeImportPattern) +
+      renameScript.slice(dynamicRegexEnd);
+    writeFileSync(renameScriptPath, renameScript);
+  }
+
   const manifestPath = `${outputDirectory}/package.json`;
   const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
   manifest.publishConfig = { access: 'public' };
