@@ -5,6 +5,7 @@ import type { FastifyInstance, FastifyReply } from 'fastify';
 
 import { setNoStore } from './_helpers';
 import { AuthFailureLimiter } from '../app/auth-failure-limiter';
+import { RequestRateLimiter } from '../app/request-rate-limiter';
 import type { SignDevTokenInput } from '../auth/JwtVerifier';
 import { matchesOrigin } from '../auth/origins';
 import { verifySharePassword } from '../auth/share-password';
@@ -22,8 +23,9 @@ export interface ShareSessionRouteDeps {
   usageMeters?: UsageMeters;
   tenantUsage: TenantUsageRepo;
   /** Test seams; production uses the defaults below. */
+  ipAttemptLimit?: { maxAttempts: number; windowMs: number };
+  tokenAttemptLimit?: { maxAttempts: number; windowMs: number };
   ipFailureLimit?: { maxFailures: number; windowMs: number };
-  grantRateLimit?: { maxFailures: number; windowMs: number };
 }
 
 /**
@@ -36,27 +38,44 @@ export interface ShareSessionRouteDeps {
  * revocable and editable after the token is pasted into public HTML.
  *
  * The route lives on `publicPaths`, so the auth hook's failure limiter
- * never sees it — it carries its own two limiters instead: failures
- * per IP (token probing), successes per grant (one hot link cannot
- * melt a replica; cross-replica fairness belongs at the edge, same
- * doctrine as the auth-failure limiter).
+ * never sees it — it carries its own three limiters, one per tier:
+ *
+ *   - attempts per IP (volume): every request consumes, before any
+ *     parsing or I/O, so no request shape can demand unbounded work
+ *     from one source. Generous — a real viewer exchanges once per
+ *     page load, so the budget sits far above legitimate NAT traffic.
+ *   - failures per IP (probe): token spray and passphrase guessing
+ *     accrue count and lock the source out; legitimate outcomes never
+ *     count, exactly like the auth hook's limiter.
+ *   - attempts per token (volume): the share token IS the grant row
+ *     id, so its budget is consumed before the row is fetched — a
+ *     blocked token performs no DB work, and one hot link cannot melt
+ *     a replica.
+ *
+ * All three are in-process, per replica; cross-replica fairness
+ * belongs at the edge, same doctrine as the auth-failure limiter.
  *
  * Unknown, revoked, disabled, and suspended-tenant tokens are all the
  * same 404: existence of a grant is itself information. Stale-but-
  * legitimate outcomes (disabled, expired, suspended) do not count as
- * probe failures — an old embed on a real site keeps polling and must
- * not 429 its visitors' shared NAT.
+ * probe FAILURES — an old embed on a real site keeps polling and must
+ * not 429 its visitors' shared NAT. They do consume the token's own
+ * attempt budget, which is what bounds the DB work a dead link can
+ * demand while still blocking per token, never per NAT.
  */
 export async function registerShareSessionRoutes(
   app: FastifyInstance,
   deps: ShareSessionRouteDeps,
 ): Promise<void> {
   const { sign, grants, documents, suspendedTenants, usageMeters, tenantUsage } = deps;
+  const ipAttempts = new RequestRateLimiter(
+    deps.ipAttemptLimit ?? { maxAttempts: 300, windowMs: 60_000 },
+  );
+  const tokenAttempts = new RequestRateLimiter(
+    deps.tokenAttemptLimit ?? { maxAttempts: 120, windowMs: 60_000 },
+  );
   const ipFailures = new AuthFailureLimiter(
     deps.ipFailureLimit ?? { maxFailures: 30, windowMs: 60_000 },
-  );
-  const grantRate = new AuthFailureLimiter(
-    deps.grantRateLimit ?? { maxFailures: 120, windowMs: 60_000 },
   );
 
   const op = adminOperations['shares.exchange'];
@@ -64,6 +83,14 @@ export async function registerShareSessionRoutes(
     method: op.method,
     url: op.path,
     handler: async (req, reply) => {
+      // Volume tier first: consume() is synchronous, so the budget
+      // check and its accounting cannot be separated by awaited work —
+      // a concurrent burst cannot overshoot the budget.
+      const ipBlockedMs = ipAttempts.consume(req.ip);
+      if (ipBlockedMs > 0) return tooMany(reply, ipBlockedMs);
+
+      // Probe tier: sources over their failure budget stay locked out.
+      // Read-only — a blocked probe does not extend its own block.
       const blockedMs = ipFailures.retryAfterMs(req.ip);
       if (blockedMs > 0) return tooMany(reply, blockedMs);
 
@@ -87,14 +114,19 @@ export async function registerShareSessionRoutes(
         });
       }
 
+      // Volume tier, per token — consumed BEFORE the row is fetched
+      // (the token is the grant id, and the schema already bounded its
+      // shape). A blocked token never reaches the database. Attempts,
+      // not successes: stale-grant outcomes and passphrase roundtrips
+      // consume too, so no single token can demand unbounded work.
+      const tokenBlockedMs = tokenAttempts.consume(shareToken);
+      if (tokenBlockedMs > 0) return tooMany(reply, tokenBlockedMs);
+
       const grant = await grants.findById(shareToken);
       if (!grant) {
         ipFailures.recordFailure(req.ip);
         return notFound(reply);
       }
-
-      const grantBlockedMs = grantRate.retryAfterMs(grant.id);
-      if (grantBlockedMs > 0) return tooMany(reply, grantBlockedMs);
 
       if (grant.disabled) return notFound(reply);
       if (await suspendedTenants.isSuspended(grant.tenantId)) return notFound(reply);
@@ -144,7 +176,6 @@ export async function registerShareSessionRoutes(
         ttlSeconds: ttl,
       });
 
-      grantRate.recordFailure(grant.id);
       await grants.touchExchanged(grant.id);
       // A view = a share exchange or an authorized /v1/access grant,
       // deduplicated via the sub prefix above. Both meters move here:
