@@ -2,5 +2,5 @@
 '@cloudpdf/contract': minor
 ---
 
-Adds the integrity-pinned document upload protocol, including presigned and
-multipart proxy transfer choices.
+Adds the integrity-pinned `init → transfer → commit` document upload protocol,
+including presigned PUT and policy-controlled multipart proxy transfer modes.
