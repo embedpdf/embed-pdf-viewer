@@ -28,7 +28,7 @@ const STEPS = [
     method: 'POST',
     title: 'Upload a document',
     description: 'One call, or resumable presigned uploads.',
-    href: '/docs/api-reference/documents/upload-direct',
+    href: '/docs/api-reference/documents/upload',
   },
   {
     method: 'POST',

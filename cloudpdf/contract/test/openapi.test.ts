@@ -114,8 +114,8 @@ describe('operation registry', () => {
     expect(sub(adminOperations['documents.commit'].path)).toBe(
       adminWirePaths.documentCommit(tid, id),
     );
-    expect(sub(adminOperations['documents.uploadDirect'].path)).toBe(
-      adminWirePaths.documentUploadDirect(tid, id),
+    expect(sub(adminOperations['documents.uploadProxy'].path)).toBe(
+      adminWirePaths.documentUploadProxy(tid, id),
     );
     expect(sub(adminOperations['documents.download'].path)).toBe(
       adminWirePaths.documentDownload(tid, id),

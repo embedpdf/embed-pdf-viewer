@@ -87,7 +87,7 @@ const FIXTURES: Fixture[] = [
   {
     name: 'node-esm',
     packages: [
-      '@cloudpdf/admin',
+      '@cloudpdf/sdk',
       '@cloudpdf/engine',
       '@embedpdf/core-annotation',
       '@embedpdf/core-geometry',
@@ -109,7 +109,7 @@ const FIXTURES: Fixture[] = [
   {
     name: 'node-cjs',
     packages: [
-      '@cloudpdf/admin',
+      '@cloudpdf/sdk',
       '@cloudpdf/engine',
       '@embedpdf/core-annotation',
       '@embedpdf/core-geometry',

@@ -5,11 +5,6 @@ import { fileURLToPath } from 'node:url';
 import { LANGUAGES } from './sdk-version.mjs';
 
 export const SDK_REPOSITORIES = Object.freeze({
-  typescript: {
-    name: 'cloudpdf-sdk-typescript',
-    slug: 'embedpdf/cloudpdf-sdk-typescript',
-    displayName: 'TypeScript',
-  },
   python: {
     name: 'cloudpdf-sdk-python',
     slug: 'embedpdf/cloudpdf-sdk-python',
@@ -45,7 +40,11 @@ export const SDK_REPOSITORIES = Object.freeze({
 export function sdkRepository(language) {
   const repository = SDK_REPOSITORIES[language];
   if (!repository || !LANGUAGES.includes(language)) {
-    throw new Error(`Unsupported SDK language: ${language}`);
+    throw new Error(
+      language === 'typescript'
+        ? 'TypeScript SDK is a monorepo workspace package, not an external SDK repository'
+        : `Unsupported SDK language: ${language}`,
+    );
   }
   return repository;
 }

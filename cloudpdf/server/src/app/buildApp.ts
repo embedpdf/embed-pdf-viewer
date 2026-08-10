@@ -66,7 +66,10 @@ import { UsageMeters } from '../licensing/UsageMeters';
 import type { ConnectedUsageReporter } from '../licensing/ConnectedUsageReporter';
 import { isLicenseGateTrusted } from '../licensing/trusted-license-gates';
 import { WorkerThreadPool, type FallbackFontDescriptor } from '../runtime/WorkerThreadPool';
-import { DocumentLifecycleService } from '../services/DocumentLifecycleService';
+import {
+  DocumentLifecycleService,
+  type UploadProxyPolicy,
+} from '../services/DocumentLifecycleService';
 import { BaseFileCache } from '../storage/BaseFileCache';
 import type { ObjectStoreWithInfo } from '../storage/ObjectStore';
 
@@ -131,6 +134,8 @@ export interface BuildAppOptions {
   workerEntry: URL | string | null;
   /** Override Fastify body limit. Defaults to 50 MiB. */
   bodyLimit?: number;
+  /** Origin-mediated upload policy. Defaults to `fallback-only`. */
+  uploadProxyPolicy?: UploadProxyPolicy;
   /**
    * Fastify `trustProxy` passthrough. REQUIRED for `request.ip` (and thus
    * the auth-failure limiter) to see real client addresses when the server
@@ -390,10 +395,8 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
     limits: { fileSize: opts.bodyLimit ?? 50 * 1024 * 1024 },
   });
 
-  // Raw upload bodies for /v1/admin/.../upload-direct. Fastify only
-  // pre-parses application/json by default; binary uploads need this
-  // explicit parser. We keep it scoped to PDF mime types so a stray
-  // JSON request still gets the JSON-parsing error path.
+  // Raw PDF parsers are retained for document APIs that accept binary
+  // payloads. Upload proxy itself is multipart-only for SDK portability.
   app.addContentTypeParser(
     'application/pdf',
     { parseAs: 'buffer', bodyLimit: opts.bodyLimit ?? 50 * 1024 * 1024 },
@@ -579,6 +582,7 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
       tenants: new TenantsRepo(opts.db),
       storage: opts.objectStore,
       autoProvisionTenant: opts.autoProvisionTenant ?? false,
+      uploadProxyPolicy: opts.uploadProxyPolicy ?? 'fallback-only',
       securityProbe: new DocumentSecurityProbe({ cache: baseFileCache, pool }),
       ...(derivedRenders ? { derivedRenders } : {}),
       ...(usageMeters ? { usageMeters } : {}),

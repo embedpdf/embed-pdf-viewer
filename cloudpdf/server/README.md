@@ -11,12 +11,32 @@ Clients speak to it through:
 - [`@cloudpdf/engine`](https://www.npmjs.com/package/@cloudpdf/engine) — the
   browser engine client (Engine v3 over HTTPS), used standalone or injected
   into the EmbedPDF viewer / [`@cloudpdf/viewer`](https://www.npmjs.com/package/@cloudpdf/viewer).
-- [`@cloudpdf/admin`](https://www.npmjs.com/package/@cloudpdf/admin) — the
-  Node-only backend SDK for uploading documents and minting user tokens.
+- [`@cloudpdf/sdk`](https://www.npmjs.com/package/@cloudpdf/sdk) — the generated
+  API client plus the integrity-pinned upload workflow for backend applications.
 
 ## Documentation
 
 Deployment and configuration guides: https://www.cloudpdf.com
+
+## Upload transport policy
+
+Document uploads use `init → transfer → commit`. The server pins the expected
+SHA-256, byte length, and selected transport during init; commit verifies the
+stored object against that intent.
+
+`CLOUDPDF_UPLOAD_PROXY_POLICY` controls whether PDF bytes may pass through the
+API origin:
+
+- `fallback-only` (default) prefers a storage-adapter presigned `PUT` and uses
+  the bounded multipart proxy only when the adapter cannot presign. An explicit
+  request for proxy is rejected when presigning is available.
+- `allowed` also permits clients to explicitly request the proxy.
+- `disabled` never accepts proxy uploads; init fails when the storage adapter
+  cannot presign.
+
+Keep the default for compatibility, or use `disabled` when every configured
+storage adapter supports presigned uploads. The proxy is still constrained by
+the server body/file-size limit; it is not an unbounded streaming bypass.
 
 ## License configuration
 

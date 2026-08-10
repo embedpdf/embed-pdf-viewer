@@ -53,7 +53,7 @@ What decides whether a path gets a group level is one line:
 > **A directory level exists to hold siblings.**
 
 That is why every `packages/` group is grouped (each has siblings) and why
-`cloudpdf/engine`, `cloudpdf/server`, `cloudpdf/admin`, `cloudpdf/contract`
+`cloudpdf/engine`, `cloudpdf/server`, `cloudpdf/sdk`, `cloudpdf/contract`
 sit flat: a group level over a lone package carries no information.
 `cloudpdf/viewer/` is grouped because the viewer product line has five members
 (`main` plus one wrapper per framework). When a flat CloudPDF package gains a

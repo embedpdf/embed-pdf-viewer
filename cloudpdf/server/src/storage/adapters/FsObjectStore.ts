@@ -37,14 +37,14 @@ export interface FsObjectStoreOptions {
  *   - PUT writes to `<root>/<key>.partial`, hash-streams the bytes,
  *     then atomic-renames into `<root>/<key>` once the SHA-256 is
  *     computed. A killed process leaves a `.partial` behind, never a
- *     half-written `key`. The admin upload-direct route logs and GCs
+ *     half-written `key`. The admin upload-proxy route logs and GCs
  *     these on boot.
  *   - `deletePrefix` walks the tree depth-first and removes empty
  *     dirs as it unwinds. Concurrency: a parallel writer can race; we
  *     surface that as an `ENOENT` on the unlink and treat it as
  *     "already gone".
  *   - Presigned URLs are not supported (FS has no per-key auth model).
- *     The admin route picks the `upload-direct` flow when this adapter
+ *     The admin route picks the `upload-proxy` flow when this adapter
  *     is active.
  *
  * Security: every key is `resolve`-joined to `root` and the result is

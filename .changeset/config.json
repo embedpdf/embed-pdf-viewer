@@ -9,8 +9,8 @@
   "commit": false,
   "fixed": [
     [
-      "@cloudpdf/admin",
       "@cloudpdf/contract",
+      "@cloudpdf/sdk",
       "@cloudpdf/engine",
       "@cloudpdf/server",
       "@cloudpdf/viewer",

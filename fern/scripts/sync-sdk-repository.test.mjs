@@ -66,7 +66,7 @@ test('sync creates and safely updates a reused PR branch while preserving reposi
       join(generated, 'cloudpdf-generation.json'),
       `${JSON.stringify(
         {
-          language: 'typescript',
+          language: 'python',
           canonicalVersion,
           sdkVersion: canonicalVersion,
           source: { openapiSha256: 'fixture', gitCommit: 'fixture' },
@@ -83,7 +83,7 @@ test('sync creates and safely updates a reused PR branch while preserving reposi
 printf '%s\\n' "$*" >> "$GH_LOG"
 case "$1 $2" in
   "pr list") exit 0 ;;
-  "pr create") printf '%s\\n' 'https://github.com/embedpdf/cloudpdf-sdk-typescript/pull/1' ;;
+  "pr create") printf '%s\\n' 'https://github.com/embedpdf/cloudpdf-sdk-python/pull/1' ;;
   "pr merge") exit 0 ;;
   *) printf '%s\\n' "unexpected gh invocation: $*" >&2; exit 1 ;;
 esac
@@ -91,7 +91,7 @@ esac
     );
     chmodSync(fakeGh, 0o700);
 
-    run(process.execPath, [script, 'typescript'], {
+    run(process.execPath, [script, 'python'], {
       env: {
         ...process.env,
         PATH: `${fakeBin}:${process.env.PATH}`,
@@ -107,7 +107,7 @@ esac
     // Auto-merge may leave its head ref behind. Regenerating the same canonical
     // version must safely replace that existing ref using an explicit lease.
     writeFileSync(join(generated, 'README.md'), 'generated again\n');
-    run(process.execPath, [script, 'typescript'], {
+    run(process.execPath, [script, 'python'], {
       env: {
         ...process.env,
         PATH: `${fakeBin}:${process.env.PATH}`,

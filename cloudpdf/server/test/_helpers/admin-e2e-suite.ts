@@ -13,7 +13,7 @@ import {
   type DbSchema,
 } from '../../src/index';
 import { buildAppForTesting } from '../../src/app/buildApp';
-import { createCloudAdmin, AdminError } from '@cloudpdf/admin';
+import { createCloudAdmin, AdminError } from './sdk-admin-adapter';
 import { createValidTestLicenseGate } from '../../src/licensing/testing';
 
 const SECRET = 'admin-e2e-secret';
@@ -166,6 +166,20 @@ export function runAdminE2e(dialect: AdminE2eDialectFixture): void {
       expect(second.document.id).toBe(first.document.id);
     });
 
+    test('idempotency-key cannot be reused for different content', async () => {
+      const admin = createCloudAdmin({
+        baseUrl: fx.baseUrl,
+        tenantToken: adminToken('tenant-idemp-intent'),
+      }).tenant('tenant-idemp-intent');
+      const key = 'pinned-intent';
+
+      await admin.documents.create({ bytes: fakePdf(20, 1024), idempotencyKey: key });
+
+      await expect(
+        admin.documents.create({ bytes: fakePdf(21, 1024), idempotencyKey: key }),
+      ).rejects.toMatchObject({ status: 409 });
+    });
+
     test('dedupMode reuse-existing returns the prior doc when content sha matches', async () => {
       const admin = createCloudAdmin({
         baseUrl: fx.baseUrl,
@@ -195,12 +209,11 @@ export function runAdminE2e(dialect: AdminE2eDialectFixture): void {
         contentSha256: declaredButWrongSha,
       });
       if (init.tag === 'deduped') throw new Error('unexpected dedup');
-      expect(init.upload.kind).toBe('direct');
+      expect(init.upload.kind).toBe('proxy');
 
-      await admin.documents.uploadDirect({
+      await admin.documents.uploadProxy({
         docId: init.document.id,
         body: bytes,
-        contentLength: bytes.byteLength,
       });
 
       await expect(
@@ -210,6 +223,23 @@ export function runAdminE2e(dialect: AdminE2eDialectFixture): void {
       const after = await admin.documents.get(init.document.id);
       expect(after.state).toBe('failed');
       expect(after.failureReason).toBe('sha_mismatch');
+    });
+
+    test('proxy rejects bytes that do not match the size pinned at init', async () => {
+      const admin = createCloudAdmin({
+        baseUrl: fx.baseUrl,
+        tenantToken: adminToken('tenant-size-intent'),
+      }).tenant('tenant-size-intent');
+      const bytes = fakePdf(22, 600);
+      const init = await admin.documents.init({
+        contentLength: bytes.byteLength + 1,
+        contentSha256: sha256Hex(bytes),
+      });
+      if (init.tag === 'deduped') throw new Error('unexpected dedup');
+
+      await expect(
+        admin.documents.uploadProxy({ docId: init.document.id, body: bytes }),
+      ).rejects.toMatchObject({ status: 400 });
     });
 
     test('tenant isolation: tenant B cannot read or delete tenant A docs', async () => {
@@ -770,10 +800,9 @@ export function runAdminE2e(dialect: AdminE2eDialectFixture): void {
         contentSha256: wrongSha,
       });
       if (init.tag === 'deduped') throw new Error('unexpected dedup');
-      await admin.documents.uploadDirect({
+      await admin.documents.uploadProxy({
         docId: init.document.id,
         body: bytes,
-        contentLength: bytes.byteLength,
       });
       await expect(
         admin.documents.commit({ docId: init.document.id, sha256: wrongSha }),

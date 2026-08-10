@@ -247,6 +247,16 @@ function readCorsOriginsEnv(): '*' | string[] | undefined {
   return origins;
 }
 
+function readUploadProxyPolicyEnv(): 'fallback-only' | 'allowed' | 'disabled' {
+  const raw = process.env['CLOUDPDF_UPLOAD_PROXY_POLICY']?.trim().toLowerCase();
+  if (!raw) return 'fallback-only';
+  if (raw === 'fallback-only' || raw === 'allowed' || raw === 'disabled') return raw;
+  fail(
+    2,
+    `CLOUDPDF_UPLOAD_PROXY_POLICY must be fallback-only, allowed, or disabled (got ${raw})`,
+  );
+}
+
 /** CLOUDPDF_ENABLE_REVOCATION=1 mounts tokens.revoke and enforces the jti denylist. */
 function readEnableRevocationEnv(): boolean {
   const raw = process.env['CLOUDPDF_ENABLE_REVOCATION']?.trim().toLowerCase();
@@ -793,6 +803,7 @@ async function cmdServe(): Promise<void> {
   const authFailureLimit = readAuthFailureLimitEnv();
   const corsOrigins = readCorsOriginsEnv();
   const enableRevocation = readEnableRevocationEnv();
+  const uploadProxyPolicy = readUploadProxyPolicyEnv();
 
   let bundle: Awaited<ReturnType<typeof buildApp>>;
   try {
@@ -812,6 +823,7 @@ async function cmdServe(): Promise<void> {
       cacheRoot: CACHE_ROOT,
       ...(CACHE_MAX_BYTES !== undefined ? { cacheMaxBytes: CACHE_MAX_BYTES } : {}),
       ...(AUTO_PROVISION_TENANT ? { autoProvisionTenant: true } : {}),
+      uploadProxyPolicy,
       expectedMigrations: dbCtx.migrations,
       failOnPending: FAIL_ON_PENDING,
       ...(realtimeBus ? { realtimeBus } : {}),

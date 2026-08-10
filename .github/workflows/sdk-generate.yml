@@ -48,6 +48,7 @@ on:
   pull_request:
     paths:
       - 'cloudpdf/contract/**'
+      - 'cloudpdf/sdk/**'
       - 'cloudpdf/website/scripts/**api-reference*'
       - 'cloudpdf/website/scripts/extract-sdk-snippets.mjs'
       - 'cloudpdf/website/scripts/sdk-snippets*'
@@ -59,6 +60,7 @@ on:
     branches: [main]
     paths:
       - 'cloudpdf/contract/**'
+      - 'cloudpdf/sdk/**'
       - 'cloudpdf/website/scripts/**api-reference*'
       - 'cloudpdf/website/scripts/extract-sdk-snippets.mjs'
       - 'cloudpdf/website/scripts/sdk-snippets*'
@@ -110,6 +112,11 @@ jobs:
           else
             echo "enabled=false" >> "$GITHUB_OUTPUT"
           fi
+          if [[ "$LANGUAGE" == "typescript" ]]; then
+            echo "directory=cloudpdf/sdk" >> "$GITHUB_OUTPUT"
+          else
+            echo "directory=sdks/$LANGUAGE" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Install Fern CLI
         if: steps.select.outputs.enabled == 'true'
@@ -151,6 +158,15 @@ jobs:
           LANGUAGE: ${{ matrix.language }}
         run: node fern/scripts/validate-sdk.mjs "$LANGUAGE"
 
+      - name: Verify committed TypeScript SDK is fresh
+        if: steps.select.outputs.enabled == 'true' && matrix.language == 'typescript'
+        run: |
+          git diff --exit-code -- cloudpdf/sdk
+          if [[ -n "$(git status --porcelain --untracked-files=all -- cloudpdf/sdk)" ]]; then
+            git status --short --untracked-files=all -- cloudpdf/sdk
+            exit 1
+          fi
+
       - uses: actions/setup-python@v5
         if: steps.select.outputs.enabled == 'true' && matrix.language == 'python'
         with:
@@ -181,15 +197,16 @@ jobs:
 
       - name: Build generated SDK
         if: steps.select.outputs.enabled == 'true'
-        working-directory: sdks/${{ matrix.language }}
+        working-directory: ${{ steps.select.outputs.directory }}
         env:
           LANGUAGE: ${{ matrix.language }}
         run: |
           case "$LANGUAGE" in
             typescript)
               corepack enable
-              pnpm install --lockfile=false --ignore-scripts
+              pnpm install --frozen-lockfile --ignore-scripts --filter @cloudpdf/sdk...
               pnpm build
+              pnpm test:unit
               ;;
             python)
               python -m pip install --disable-pip-version-check build
@@ -225,7 +242,7 @@ jobs:
           esac
 
       - name: Resolve SDK repository
-        if: steps.select.outputs.enabled == 'true' && inputs.sync_repositories == true
+        if: steps.select.outputs.enabled == 'true' && inputs.sync_repositories == true && matrix.language != 'typescript'
         id: repository
         env:
           LANGUAGE: ${{ matrix.language }}
@@ -234,15 +251,15 @@ jobs:
           echo "slug=$(node fern/scripts/sdk-repositories.mjs "$LANGUAGE" slug)" >> "$GITHUB_OUTPUT"
 
       - name: Set up Buildx for released-image verification
-        if: steps.select.outputs.enabled == 'true' && inputs.sync_repositories == true
+        if: steps.select.outputs.enabled == 'true' && inputs.sync_repositories == true && matrix.language != 'typescript'
         uses: docker/setup-buildx-action@v3
 
       - name: Verify released server image
-        if: steps.select.outputs.enabled == 'true' && inputs.sync_repositories == true
+        if: steps.select.outputs.enabled == 'true' && inputs.sync_repositories == true && matrix.language != 'typescript'
         run: docker buildx imagetools inspect 'ghcr.io/embedpdf/cloudpdf-server:${{ steps.version.outputs.canonical }}'
 
       - name: Create SDK repository token
-        if: steps.select.outputs.enabled == 'true' && inputs.sync_repositories == true
+        if: steps.select.outputs.enabled == 'true' && inputs.sync_repositories == true && matrix.language != 'typescript'
         id: sdk-token
         uses: actions/create-github-app-token@v2
         with:
@@ -252,7 +269,7 @@ jobs:
           repositories: ${{ steps.repository.outputs.name }}
 
       - name: Open or update generated SDK pull request
-        if: steps.select.outputs.enabled == 'true' && inputs.sync_repositories == true
+        if: steps.select.outputs.enabled == 'true' && inputs.sync_repositories == true && matrix.language != 'typescript'
         env:
           GH_TOKEN: ${{ steps.sdk-token.outputs.token }}
           SDK_GITHUB_TOKEN: ${{ steps.sdk-token.outputs.token }}
@@ -266,13 +283,13 @@ jobs:
         with:
           name: cloudpdf-sdk-${{ matrix.language }}-${{ steps.version.outputs.canonical }}
           path: |
-            sdks/${{ matrix.language }}/
-            !sdks/${{ matrix.language }}/node_modules/
-            !sdks/${{ matrix.language }}/dist/
-            !sdks/${{ matrix.language }}/.gradle/
-            !sdks/${{ matrix.language }}/build/
-            !sdks/${{ matrix.language }}/**/bin/
-            !sdks/${{ matrix.language }}/**/obj/
+            ${{ steps.select.outputs.directory }}/
+            !${{ steps.select.outputs.directory }}/node_modules/
+            !${{ steps.select.outputs.directory }}/dist/
+            !${{ steps.select.outputs.directory }}/.gradle/
+            !${{ steps.select.outputs.directory }}/build/
+            !${{ steps.select.outputs.directory }}/**/bin/
+            !${{ steps.select.outputs.directory }}/**/obj/
           if-no-files-found: error
           include-hidden-files: true
           retention-days: 14
@@ -295,7 +312,7 @@ jobs:
           pattern: cloudpdf-sdk-*
           path: ${{ runner.temp }}/cloudpdf-sdk-artifacts
 
-      - name: Verify 35-operation, seven-language snippet coverage
+      - name: Verify all-operation, seven-language snippet coverage
         env:
           SDK_ARTIFACTS_ROOT: ${{ runner.temp }}/cloudpdf-sdk-artifacts
         run: node cloudpdf/website/scripts/extract-sdk-snippets.mjs --check

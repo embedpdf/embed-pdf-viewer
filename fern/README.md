@@ -1,23 +1,23 @@
 # CloudPDF SDK generation
 
-Fern generates seven SDKs from `cloudpdf/contract/openapi.json`. Generated
-source is scratch output under `sdks/` and is not committed to this repository.
-Every GitHub run uploads each language as an artifact. Release runs may also
-open generated-source pull requests in the language repositories after the
-versioned `cloudpdf-server` image has been verified. No package registry is
-published by this workflow.
+Fern generates seven SDKs from `cloudpdf/contract/openapi.json`. TypeScript is
+generated and committed at `cloudpdf/sdk`; it is published with the monorepo's
+normal Changesets release. The other six SDKs are scratch output under `sdks/`
+and are synchronized to their ecosystem repositories after the versioned
+`cloudpdf-server` image has been verified. The generation workflow itself does
+not publish any package registry.
 
 ## SDK repositories
 
-| Generator  | Repository                         |
-| ---------- | ---------------------------------- |
-| TypeScript | `embedpdf/cloudpdf-sdk-typescript` |
-| Python     | `embedpdf/cloudpdf-sdk-python`     |
-| PHP        | `embedpdf/cloudpdf-sdk-php`        |
-| C# / .NET  | `embedpdf/cloudpdf-sdk-dotnet`     |
-| Go         | `embedpdf/cloudpdf-sdk-go`         |
-| Java       | `embedpdf/cloudpdf-sdk-java`       |
-| Ruby       | `embedpdf/cloudpdf-sdk-ruby`       |
+| Generator  | Source residency                             |
+| ---------- | -------------------------------------------- |
+| TypeScript | `embedpdf/embed-pdf-viewer` → `cloudpdf/sdk` |
+| Python     | `embedpdf/cloudpdf-sdk-python`               |
+| PHP        | `embedpdf/cloudpdf-sdk-php`                  |
+| C# / .NET  | `embedpdf/cloudpdf-sdk-dotnet`               |
+| Go         | `embedpdf/cloudpdf-sdk-go`                   |
+| Java       | `embedpdf/cloudpdf-sdk-java`                 |
+| Ruby       | `embedpdf/cloudpdf-sdk-ruby`                 |
 
 ## Public package identities
 
@@ -41,8 +41,11 @@ structurally normalizes generated README titles, descriptions, and visible code
 without rewriting link destinations. It also corrects PHP's non-configurable
 base exception casing, removes Fern's stale PHP formatter caches, and separates
 Ruby's lowercase gem and require identity (`cloudpdf`) from its public module
-(`CloudPDF`). Generator configuration controls all other public code
-identifiers.
+(`CloudPDF`). Fern's Ruby generator 1.21.1 currently emits a nonexistent helper
+for binary multipart fields; the same strict post-generation step replaces it
+with the generated runtime's `add_file` API and restores the required `file`
+field and example. Generation fails loudly if that upstream shape changes.
+Generator configuration controls all other public code identifiers.
 
 Validation recursively checks generated text and paths. Every case-insensitive
 brand match must use the registry form `cloudpdf` or the public form `CloudPDF`;
@@ -57,11 +60,12 @@ release workflow calls the same generation workflow with repository sync
 enabled only after the multi-architecture server manifest exists and passes
 inspection. Each generated repository PR includes an `SDK CI` workflow and can
 optionally use GitHub native auto-merge after repository requirements pass.
-All seven SDK repositories also receive the guarded release workflow described
-below.
+All six external SDK repositories also receive the guarded release workflow
+described below. TypeScript instead uses the monorepo's existing release
+workflow.
 
 Repository sync uses a GitHub App rather than a personal access token. Install
-one app on the seven repositories with **Contents: read/write**, **Pull
+one app on the six external repositories with **Contents: read/write**, **Pull
 requests: read/write**, and **Workflows: read/write** (required because generated
 PRs install `.github/workflows/sdk-ci.yml`), then configure these secrets in the
 source repository:
@@ -83,38 +87,42 @@ rejected instead of overwritten.
 
 ## Registry publishing
 
-Publishing is repository-owned for all seven SDKs. Their
-`.github/workflows/sdk-release.yml` workflows build the actual package, verify
+Publishing follows source residency. `@cloudpdf/sdk` belongs to the workspace:
+it is in the Changesets fixed group with `@cloudpdf/contract` and is published
+by `.github/workflows/release.yml` through `pnpm ci:publish`. The six external
+SDKs use their `.github/workflows/sdk-release.yml` workflows to build the actual package, verify
 `cloudpdf-generation.json` against the ecosystem manifest, protect an
 immutable `v<ecosystem-version>` tag, verify the public package index, and
 create a matching GitHub release. Canonical prereleases become GitHub
 prereleases; npm additionally publishes them under the `next` dist-tag.
 
-TypeScript, Python, .NET, and Ruby exchange GitHub OIDC identities for
+The monorepo's npm job, plus Python, .NET, and Ruby, exchange GitHub OIDC identities for
 short-lived registry credentials. Composer and Go releases are the Git tags
 themselves: Packagist and the Go module proxy index those immutable tags. Java
 builds PGP-signed JAR, source, Javadoc, and POM artifacts and uploads their
 checksummed bundle through the Maven Central Portal API.
 
 Publishing is disabled by default. Before the first release, create a GitHub
-environment named `release` in each SDK repository and configure the registry
-to trust this exact environment and workflow:
+environment named `release` in each external SDK repository and configure the
+registry to trust this exact environment and workflow. Configure npm against
+the monorepo release workflow:
 
-| Registry | Project | Repository | Additional setup |
-| -------- | ------- | ---------- | ---------------- |
-| npm | `@cloudpdf/sdk` | `cloudpdf-sdk-typescript` | Trusted publisher for `sdk-release.yml`; environment `release`; allow `npm publish` |
-| PyPI | `cloudpdf` | `cloudpdf-sdk-python` | Existing or pending trusted publisher for `sdk-release.yml`; environment `release` |
-| Packagist | `cloudpdf/sdk` | `cloudpdf-sdk-php` | Submit the GitHub repository once and enable Packagist's GitHub auto-update hook |
-| NuGet | `CloudPDF` | `cloudpdf-sdk-dotnet` | Trusted publishing policy for `sdk-release.yml`; environment `release`; repository variable `NUGET_USER` set to the NuGet profile name |
-| Go proxy | `github.com/embedpdf/cloudpdf-sdk-go/v3` | `cloudpdf-sdk-go` | None; the workflow pushes the SemVer tag and prompts `proxy.golang.org` to index it |
-| Maven Central | `com.cloudpdf:sdk` | `cloudpdf-sdk-java` | Verified `com.cloudpdf` namespace, Portal user token, and PGP signing key as described below |
-| RubyGems | `cloudpdf` | `cloudpdf-sdk-ruby` | Existing or pending trusted publisher for `sdk-release.yml`; environment `release` |
+| Registry      | Project                                  | Repository            | Additional setup                                                                                                                       |
+| ------------- | ---------------------------------------- | --------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| npm           | `@cloudpdf/sdk`                          | `embed-pdf-viewer`    | Trusted publisher for `.github/workflows/release.yml`; allow the monorepo npm publish job                                              |
+| PyPI          | `cloudpdf`                               | `cloudpdf-sdk-python` | Existing or pending trusted publisher for `sdk-release.yml`; environment `release`                                                     |
+| Packagist     | `cloudpdf/sdk`                           | `cloudpdf-sdk-php`    | Submit the GitHub repository once and enable Packagist's GitHub auto-update hook                                                       |
+| NuGet         | `CloudPDF`                               | `cloudpdf-sdk-dotnet` | Trusted publishing policy for `sdk-release.yml`; environment `release`; repository variable `NUGET_USER` set to the NuGet profile name |
+| Go proxy      | `github.com/embedpdf/cloudpdf-sdk-go/v3` | `cloudpdf-sdk-go`     | None; the workflow pushes the SemVer tag and prompts `proxy.golang.org` to index it                                                    |
+| Maven Central | `com.cloudpdf:sdk`                       | `cloudpdf-sdk-java`   | Verified `com.cloudpdf` namespace, Portal user token, and PGP signing key as described below                                           |
+| RubyGems      | `cloudpdf`                               | `cloudpdf-sdk-ruby`   | Existing or pending trusted publisher for `sdk-release.yml`; environment `release`                                                     |
 
 Required reviewers on `release` are optional. They provide an independent
 authorization boundary, but a self-approval before the job starts does not
 validate build output. Leave `SDK_AUTO_PUBLISH_ENABLED` unset and manually
-dispatch **SDK Release** once in each repository. After all seven packages
-install successfully, set the repository variable
+dispatch **SDK Release** once in each external repository and publish the npm
+package with the normal monorepo release. After all seven packages install
+successfully, set the external repository variable
 `SDK_AUTO_PUBLISH_ENABLED=true`; subsequent generated-source merges then
 publish automatically.
 

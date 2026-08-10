@@ -2,10 +2,10 @@
   "mode": "pre",
   "tag": "next",
   "initialVersions": {
-    "@cloudpdf/admin": "2.15.0",
     "@cloudpdf/contract": "2.15.0",
     "@cloudpdf/engine": "2.15.0",
     "@cloudpdf/server": "2.15.0",
+    "@cloudpdf/sdk": "2.15.0",
     "@cloudpdf/viewer": "2.15.0",
     "@cloudpdf/viewer-react": "2.15.0",
     "@embedpdf/example-v3-angular": "0.0.0",
@@ -62,11 +62,9 @@
     "@embedpdf/website": "0.0.0"
   },
   "changesets": [
-    "cloudpdf-admin-tenant-management",
     "cloudpdf-contract-openapi",
     "cloudpdf-server-tenant-api",
     "embedpdf-engine-core-wire-templates",
-    "initial-cloudpdf-admin",
     "initial-cloudpdf-contract",
     "initial-cloudpdf-engine",
     "initial-cloudpdf-server",

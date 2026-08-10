@@ -1,0 +1,31 @@
+{
+    "cliVersion": "5.91.0",
+    "generatorName": "fernapi/fern-typescript-sdk",
+    "generatorVersion": "3.87.2",
+    "generatorConfig": {
+        "naming": {
+            "namespace": "CloudPDF",
+            "client": "CloudPDFClient",
+            "error": "CloudPDFError",
+            "timeoutError": "CloudPDFTimeoutError",
+            "environment": "CloudPDFEnvironment",
+            "environmentUrls": "CloudPDFEnvironmentUrls",
+            "version": "CloudPDFVersion"
+        },
+        "packageJson": {
+            "name": "@cloudpdf/sdk",
+            "description": "The official TypeScript SDK for the CloudPDF API.",
+            "license": "Apache-2.0",
+            "repository": {
+                "type": "git",
+                "url": "git+https://github.com/embedpdf/embed-pdf-viewer.git",
+                "directory": "cloudpdf/sdk"
+            }
+        }
+    },
+    "originGitCommit": null,
+    "originGitCommitIsDirty": null,
+    "invokedBy": "manual",
+    "requestedVersion": "3.0.0-next.1",
+    "sdkVersion": "3.0.0-next.1"
+}

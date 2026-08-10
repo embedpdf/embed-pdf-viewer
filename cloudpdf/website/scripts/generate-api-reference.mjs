@@ -73,8 +73,11 @@ export function buildGeneratedFiles() {
   });
 
   for (const [directory, entries] of entriesByDirectory) {
+    const editorialEntries =
+      directory === 'documents' ? [{ slug: 'upload', title: 'Upload a document' }] : [];
     const childGroups = groupList.filter((group) => group.parentDirectory === directory);
     const metaEntries = [
+      ...editorialEntries.map(({ slug, title }) => `  ${objectKey(slug)}: ${jsString(title)},`),
       ...entries.map(({ slug, title }) => `  ${objectKey(slug)}: ${jsString(title)},`),
       ...childGroups.map(({ slug, title }) => `  ${objectKey(slug)}: ${jsString(title)},`),
     ];

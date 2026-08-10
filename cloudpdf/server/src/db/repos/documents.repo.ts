@@ -35,6 +35,10 @@ export interface DocumentRow {
   state: DocumentState;
   baseSha: string | null;
   storageSizeBytes: number | null;
+  expectedSha256: string | null;
+  expectedSizeBytes: number | null;
+  uploadKind: 'presigned' | 'proxy' | null;
+  uploadExpiresAt: number | null;
   security: DocumentSecurityInfo;
   docVersion: number;
   metadata: Record<string, unknown> | null;
@@ -55,6 +59,15 @@ export interface CreatePendingInput {
   metadata: Record<string, unknown> | null;
   idempotencyKey: string | null;
   createdBy: string | null;
+  expectedSha256?: string | null;
+  expectedSizeBytes?: number | null;
+}
+
+export interface SetUploadIntentInput {
+  id: string;
+  tenantId: string;
+  kind: 'presigned' | 'proxy';
+  expiresAt: number;
 }
 
 export interface CommitInput {
@@ -97,6 +110,10 @@ export class DocumentsRepo {
           state: 'pending',
           base_sha: null,
           storage_size_bytes: null,
+          expected_sha256: input.expectedSha256 ?? null,
+          expected_size_bytes: input.expectedSizeBytes ?? null,
+          upload_kind: null,
+          upload_expires_at: null,
           encryption_state: 'unknown',
           encryption_requires_password: null,
           security_handler_revision: null,
@@ -188,6 +205,23 @@ export class DocumentsRepo {
       .limit(1)
       .executeTakeFirst();
     return r ? mapRow(r) : null;
+  }
+
+  /** Persist the transfer path before the client is allowed to send bytes. */
+  async setUploadIntent(input: SetUploadIntentInput): Promise<DocumentRow | null> {
+    const res = await this.db
+      .updateTable('documents')
+      .set({
+        upload_kind: input.kind,
+        upload_expires_at: input.expiresAt,
+        updated_at: Date.now(),
+      })
+      .where('id', '=', input.id)
+      .where('tenant_id', '=', input.tenantId)
+      .where('state', '=', 'pending')
+      .execute();
+    if (Number(res[0]?.numUpdatedRows ?? 0) === 0) return null;
+    return this.findById(input.id);
   }
 
   async listForTenant(tenantId: string, opts: DocumentListOptions = {}): Promise<DocumentRow[]> {
@@ -327,6 +361,10 @@ function mapRow(r: {
   state: DocumentState;
   base_sha: string | null;
   storage_size_bytes: number | null;
+  expected_sha256?: string | null;
+  expected_size_bytes?: number | null;
+  upload_kind?: 'presigned' | 'proxy' | null;
+  upload_expires_at?: number | null;
   encryption_state?: DocumentEncryptionState | null;
   encryption_requires_password?: boolean | number | null;
   security_handler_revision?: number | null;
@@ -350,6 +388,16 @@ function mapRow(r: {
     state: r.state,
     baseSha: r.base_sha,
     storageSizeBytes: r.storage_size_bytes,
+    expectedSha256: r.expected_sha256 ?? null,
+    expectedSizeBytes:
+      r.expected_size_bytes === null || r.expected_size_bytes === undefined
+        ? null
+        : Number(r.expected_size_bytes),
+    uploadKind: r.upload_kind ?? null,
+    uploadExpiresAt:
+      r.upload_expires_at === null || r.upload_expires_at === undefined
+        ? null
+        : Number(r.upload_expires_at),
     security: {
       encryptionState: r.encryption_state ?? 'unknown',
       encryptionRequiresPassword: nullableBooleanFromDb(r.encryption_requires_password),

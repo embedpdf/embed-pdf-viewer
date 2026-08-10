@@ -132,6 +132,7 @@ const FRAMES = {
     imports: (call) => [
       'import (',
       ...(call.includes('context.') ? ['    "context"', ''] : []),
+      ...(call.includes('os.') ? ['    "os"', ''] : []),
       ...(call.includes('cloudpdf.')
         ? ['    cloudpdf "github.com/embedpdf/cloudpdf-sdk-go/v3"']
         : []),
@@ -242,43 +243,48 @@ export function frameSnippet(language, rawSource) {
   return { source, frameLines: prefix.length };
 }
 
-const UPLOAD_DIRECT_OVERRIDES = {
+const UPLOAD_PROXY_OVERRIDES = {
   typescript: {
-    source: `import { createReadStream } from "node:fs";
+    source: `import { readFile } from "node:fs/promises";
 
-await client.documents.uploadDirect(
-    createReadStream("document.pdf"),
-    "tenantId",
-    "documentId",
-);`,
+await client.documents.uploadProxy({
+    file: new Blob([await readFile("document.pdf")], { type: "application/pdf" }),
+    tenantId: "tenantId",
+    id: "documentId",
+});`,
   },
   python: {
     source: `with open("document.pdf", "rb") as pdf:
-    result = client.documents.upload_direct(
+    result = client.documents.upload_proxy(
+        file=pdf,
         tenant_id="tenantId",
         id="documentId",
-        request=pdf.read(),
     )`,
   },
   php: {
-    status: 'alternative',
-    note: 'The generated PHP client cannot send an application/pdf body for this operation yet. Use the presigned upload returned by documents.init instead.',
-    source: `$upload = $client->documents->init(
-    'tenantId',
-    new DocumentsInitRequest([
-        'contentLength' => filesize('document.pdf'),
-        'contentSha256' => hash_file('sha256', 'document.pdf'),
-    ]),
-);
+    source: `use CloudPDF\\Documents\\Requests\\UploadProxyDocumentsRequest;
+use CloudPDF\\Utils\\File;
 
-// PUT document.pdf to the presigned URL in $upload, then commit the upload.`,
+$result = $client->documents->uploadProxy(
+    'tenantId',
+    'documentId',
+    new UploadProxyDocumentsRequest([
+        'file' => File::createFromFilepath('document.pdf'),
+    ]),
+);`,
   },
   csharp: {
     source: `await using var pdf = File.OpenRead("document.pdf");
-var result = await client.Documents.UploadDirectAsync(
-    "tenantId",
-    "documentId",
-    pdf
+var result = await client.Documents.UploadProxyAsync(
+    new UploadProxyDocumentsRequest {
+        TenantId = "tenantId",
+        Id = "documentId",
+        File = new FileParameter {
+            Stream = pdf,
+            FileName = "document.pdf",
+            ContentType = "application/pdf",
+        },
+    }
 );`,
   },
   go: {
@@ -288,32 +294,35 @@ if err != nil {
 }
 defer pdf.Close()
 
-result, err := client.Documents.UploadDirect(
+result, err := client.Documents.UploadProxy(
     context.Background(),
-    "tenantId",
-    "documentId",
-    pdf,
+    &cloudpdf.UploadProxyDocumentsRequest{
+        TenantID: "tenantId",
+        ID: "documentId",
+        File: pdf,
+    },
 )`,
   },
   java: {
-    source: `try (InputStream pdf = Files.newInputStream(Path.of("document.pdf"))) {
-    DocumentsUploadDirect200Response result = client.documents().uploadDirect(
+    source: `import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+
+try (InputStream pdf = Files.newInputStream(Path.of("document.pdf"))) {
+    var result = client.documents().uploadProxy(
         "tenantId",
         "documentId",
-        pdf
+        pdf,
+        "document.pdf"
     );
 }`,
   },
   ruby: {
-    status: 'alternative',
-    note: 'The generated Ruby client cannot send an application/pdf body for this operation yet. Use the presigned upload returned by documents.init instead.',
-    source: `upload = client.documents.init(
+    source: `result = client.documents.upload_proxy(
+  file: File.open("document.pdf", "rb"),
   tenant_id: "tenantId",
-  content_length: File.size("document.pdf"),
-  content_sha256: Digest::SHA256.file("document.pdf").hexdigest
-)
-
-# PUT document.pdf to the presigned URL in upload, then commit the upload.`,
+  id: "documentId"
+)`,
   },
 };
 
@@ -371,8 +380,8 @@ export function extractSnippetManifest({ openapi, repositoryRoot, artifactsRoot 
 
     for (const language of LANGUAGE_NAMES) {
       const override =
-        operation.operationId === 'documents.uploadDirect'
-          ? UPLOAD_DIRECT_OVERRIDES[language]
+        operation.operationId === 'documents.uploadProxy'
+          ? UPLOAD_PROXY_OVERRIDES[language]
           : undefined;
       const source = override ?? references[language].get(snippetKey(group, operation.sdkMethod));
       if (!source) {
@@ -419,7 +428,11 @@ export function extractSnippetManifest({ openapi, repositoryRoot, artifactsRoot 
 }
 
 function referencePath({ language, repositoryRoot, artifactsRoot }) {
-  if (!artifactsRoot) return `${repositoryRoot}/sdks/${language}/reference.md`;
+  if (!artifactsRoot) {
+    return language === 'typescript'
+      ? `${repositoryRoot}/cloudpdf/sdk/reference.md`
+      : `${repositoryRoot}/sdks/${language}/reference.md`;
+  }
 
   const artifact = readdirSync(artifactsRoot)
     .filter((entry) => entry.startsWith(`cloudpdf-sdk-${language}-`))

@@ -172,7 +172,9 @@ export type {
   InitResult,
   InitUpload,
   CommitResult,
-  UploadDirectInput,
+  UploadProxyInput,
+  UploadPreference,
+  UploadProxyPolicy,
 } from './services/DocumentLifecycleService';
 
 // Phase 3 — document open + worker integration.

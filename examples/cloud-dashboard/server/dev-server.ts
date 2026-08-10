@@ -3,7 +3,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { mkdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { createCloudAdmin } from '@cloudpdf/admin';
+import { CloudPDFClient } from '@cloudpdf/sdk';
 import {
   AzureFrontDoorCdnSigner,
   BunnyCdnSigner,
@@ -302,7 +302,7 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
   if (req.method === 'GET' && url.pathname === '/api/documents') {
     const tenantId = url.searchParams.get('tenantId') || defaultTenant;
     const [page, counts] = [
-      await adminForTenant(tenantId).documents.list({ limit: 100 }),
+      await sdkForTenant(tenantId).documents.list({ tenantId, limit: 100 }),
       shares.countByDoc(tenantId),
     ];
     sendJson(res, 200, {
@@ -319,8 +319,9 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
       sendJson(res, 400, { error: { message: 'empty upload body' } });
       return;
     }
-    const created = await adminForTenant(tenantId).documents.create({
-      bytes,
+    const created = await sdkForTenant(tenantId).uploads.create({
+      tenantId,
+      source: bytes,
       metadata: { name: fileName, source: 'cloud-dashboard' },
       idempotencyKey: `demo-${tenantId}-${fileName}-${bytes.byteLength}-${Date.now()}`,
     });
@@ -334,7 +335,7 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
   const docMatch = matchPath(url.pathname, '/api/documents/:id');
   if (docMatch && req.method === 'DELETE') {
     const tenantId = url.searchParams.get('tenantId') || defaultTenant;
-    await adminForTenant(tenantId).documents.delete(docMatch.id!);
+    await sdkForTenant(tenantId).documents.delete({ tenantId, id: docMatch.id! });
     await shares.removeForDocument(tenantId, docMatch.id!);
     sendJson(res, 200, { ok: true });
     return;
@@ -448,11 +449,12 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
   sendJson(res, 404, { error: { message: `not found: ${req.method} ${url.pathname}` } });
 }
 
-function adminForTenant(tenantId: string) {
-  return createCloudAdmin({
+function sdkForTenant(tenantId: string): CloudPDFClient {
+  return new CloudPDFClient({
     baseUrl: engineBaseUrl,
-    tenantToken: tenantTokenFor(tenantId),
-  }).tenant(tenantId);
+    environment: engineBaseUrl,
+    token: tenantTokenFor(tenantId),
+  });
 }
 
 function tenantTokenFor(tenantId: string): string {

@@ -8,7 +8,7 @@ page operations, redaction, download).
 The registry is executed, not merely described:
 [`@cloudpdf/server`](https://www.npmjs.com/package/@cloudpdf/server) mounts
 its admin routes from these entries and validates with these schemas, the
-[`@cloudpdf/admin`](https://www.npmjs.com/package/@cloudpdf/admin) SDK types
+[`@cloudpdf/sdk`](https://www.npmjs.com/package/@cloudpdf/sdk) protocol and workflow types
 its requests with them, and the committed `openapi.json` is generated from
 them (`pnpm emit:openapi`) — a freshness test fails CI whenever the two
 diverge.
