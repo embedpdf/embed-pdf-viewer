@@ -47,6 +47,15 @@ with the generated runtime's `add_file` API and restores the required `file`
 field and example. Generation fails loudly if that upstream shape changes.
 Generator configuration controls all other public code identifiers.
 
+CloudPDF also enables Fern's built-in pager generation in the pinned local CLI.
+The Apache-licensed generators contain the pagination implementations, but
+Fern CLI 5.91.0 disables them for non-entitled hosted organizations even during
+`--local` generation. `enable-local-pagination.mjs` narrowly patches that one
+execution flag after installation, is pinned to the exact CLI version, and
+fails closed if Fern changes the bundle shape. This keeps cursor behavior in
+the generated clients for all seven languages instead of adding seven
+hand-written pagination wrappers.
+
 Validation recursively checks generated text and paths. Every case-insensitive
 brand match must use the registry form `cloudpdf` or the public form `CloudPDF`;
 Markdown link destinations and binary files are excluded. The PHP build also
@@ -190,7 +199,9 @@ Generate one language locally with the pinned CLI and mapped version:
 ```sh
 LANGUAGE=python
 SDK_VERSION=$(node fern/scripts/sdk-version.mjs "$LANGUAGE")
-npx --yes fern-api@5.91.0 generate \
+npm install --prefix /tmp/cloudpdf-fern fern-api@5.91.0
+node fern/scripts/enable-local-pagination.mjs /tmp/cloudpdf-fern/node_modules/fern-api
+node /tmp/cloudpdf-fern/node_modules/fern-api/cli.cjs generate \
   --group "$LANGUAGE" \
   --local \
   --version "$SDK_VERSION" \

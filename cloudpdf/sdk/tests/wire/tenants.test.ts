@@ -14,10 +14,21 @@ describe("TenantsClient", () => {
             nextCursor: "nextCursor",
         };
 
-        server.mockEndpoint().get("/v1/tenants").respondWith().statusCode(200).jsonBody(rawResponseBody).build();
+        server
+            .mockEndpoint({ once: false })
+            .get("/v1/tenants")
+            .respondWith()
+            .statusCode(200)
+            .jsonBody(rawResponseBody)
+            .build();
 
-        const response = await client.tenants.list();
-        expect(response).toEqual(rawResponseBody);
+        const expected = rawResponseBody;
+        const page = await client.tenants.list();
+
+        expect(expected.tenants).toEqual(page.data);
+        expect(page.hasNextPage()).toBe(true);
+        const nextPage = await page.getNextPage();
+        expect(expected.tenants).toEqual(nextPage.data);
     });
 
     test("list (2)", async () => {

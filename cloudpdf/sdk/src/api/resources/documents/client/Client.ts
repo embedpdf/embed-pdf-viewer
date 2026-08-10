@@ -35,71 +35,83 @@ export class DocumentsClient {
      *         tenantId: "tenantId"
      *     })
      */
-    public list(
+    public async list(
         request: CloudPDF.ListDocumentsRequest,
         requestOptions?: DocumentsClient.RequestOptions,
-    ): core.HttpResponsePromise<CloudPDF.DocumentsList200Response> {
-        return core.HttpResponsePromise.fromPromise(this.__list(request, requestOptions));
-    }
-
-    private async __list(
-        request: CloudPDF.ListDocumentsRequest,
-        requestOptions?: DocumentsClient.RequestOptions,
-    ): Promise<core.WithRawResponse<CloudPDF.DocumentsList200Response>> {
-        const { tenantId, limit, cursor, state } = request;
-        const _queryParams: Record<string, unknown> = {
-            limit,
-            cursor,
-            state: state != null ? state : undefined,
-        };
-        const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
-        const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
-            _authRequest.headers,
-            this._options?.headers,
-            requestOptions?.headers,
-        );
-        const _response = await core.fetcher({
-            url: core.url.join(
-                (await core.Supplier.get(this._options.baseUrl)) ??
-                    (await core.Supplier.get(this._options.environment)),
-                `v1/tenants/${core.url.encodePathParam(tenantId)}/documents`,
-            ),
-            method: "GET",
-            headers: _headers,
-            queryString: core.url
-                .queryBuilder()
-                .addMany(_queryParams)
-                .mergeAdditional(requestOptions?.queryParams)
-                .build(),
-            timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
-            maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
-            abortSignal: requestOptions?.abortSignal,
-            fetchFn: this._options?.fetch,
-            logging: this._options.logging,
-        });
-        if (_response.ok) {
-            return { data: _response.body as CloudPDF.DocumentsList200Response, rawResponse: _response.rawResponse };
-        }
-
-        if (_response.error.reason === "status-code") {
-            switch (_response.error.statusCode) {
-                case 400:
-                    throw new CloudPDF.BadRequestError(_response.error.body as unknown, _response.rawResponse);
-                default:
-                    throw new errors.CloudPDFError({
-                        statusCode: _response.error.statusCode,
-                        body: _response.error.body,
+    ): Promise<core.Page<CloudPDF.DocumentsList200Response.Documents.Item, CloudPDF.DocumentsList200Response>> {
+        const list = core.HttpResponsePromise.interceptFunction(
+            async (
+                request: CloudPDF.ListDocumentsRequest,
+            ): Promise<core.WithRawResponse<CloudPDF.DocumentsList200Response>> => {
+                const { tenantId, limit, cursor, state } = request;
+                const _queryParams: Record<string, unknown> = {
+                    limit,
+                    cursor,
+                    state: state != null ? state : undefined,
+                };
+                const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
+                const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
+                    _authRequest.headers,
+                    this._options?.headers,
+                    requestOptions?.headers,
+                );
+                const _response = await core.fetcher({
+                    url: core.url.join(
+                        (await core.Supplier.get(this._options.baseUrl)) ??
+                            (await core.Supplier.get(this._options.environment)),
+                        `v1/tenants/${core.url.encodePathParam(tenantId)}/documents`,
+                    ),
+                    method: "GET",
+                    headers: _headers,
+                    queryString: core.url
+                        .queryBuilder()
+                        .addMany(_queryParams)
+                        .mergeAdditional(requestOptions?.queryParams)
+                        .build(),
+                    timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
+                    maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
+                    abortSignal: requestOptions?.abortSignal,
+                    fetchFn: this._options?.fetch,
+                    logging: this._options.logging,
+                });
+                if (_response.ok) {
+                    return {
+                        data: _response.body as CloudPDF.DocumentsList200Response,
                         rawResponse: _response.rawResponse,
-                    });
-            }
-        }
-
-        return handleNonStatusCodeError(
-            _response.error,
-            _response.rawResponse,
-            "GET",
-            "/v1/tenants/{tenantId}/documents",
+                    };
+                }
+                if (_response.error.reason === "status-code") {
+                    switch (_response.error.statusCode) {
+                        case 400:
+                            throw new CloudPDF.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                        default:
+                            throw new errors.CloudPDFError({
+                                statusCode: _response.error.statusCode,
+                                body: _response.error.body,
+                                rawResponse: _response.rawResponse,
+                            });
+                    }
+                }
+                return handleNonStatusCodeError(
+                    _response.error,
+                    _response.rawResponse,
+                    "GET",
+                    "/v1/tenants/{tenantId}/documents",
+                );
+            },
         );
+        const dataWithRawResponse = await list(request).withRawResponse();
+        return new core.Page<CloudPDF.DocumentsList200Response.Documents.Item, CloudPDF.DocumentsList200Response>({
+            response: dataWithRawResponse.data,
+            rawResponse: dataWithRawResponse.rawResponse,
+            hasNextPage: (response) =>
+                response?.nextCursor != null &&
+                !(typeof response?.nextCursor === "string" && response?.nextCursor === ""),
+            getItems: (response) => response?.documents ?? [],
+            loadPage: (response) => {
+                return list(core.setObjectProperty(request, "cursor", response?.nextCursor));
+            },
+        });
     }
 
     /**

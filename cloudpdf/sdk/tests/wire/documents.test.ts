@@ -31,17 +31,22 @@ describe("DocumentsClient", () => {
         };
 
         server
-            .mockEndpoint()
+            .mockEndpoint({ once: false })
             .get("/v1/tenants/tenantId/documents")
             .respondWith()
             .statusCode(200)
             .jsonBody(rawResponseBody)
             .build();
 
-        const response = await client.documents.list({
+        const expected = rawResponseBody;
+        const page = await client.documents.list({
             tenantId: "tenantId",
         });
-        expect(response).toEqual(rawResponseBody);
+
+        expect(expected.documents).toEqual(page.data);
+        expect(page.hasNextPage()).toBe(true);
+        const nextPage = await page.getNextPage();
+        expect(expected.documents).toEqual(nextPage.data);
     });
 
     test("list (2)", async () => {

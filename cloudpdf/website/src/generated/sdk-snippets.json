@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "canonicalVersion": "3.0.0-next.1",
-  "openapiSha256": "65f9768ac3d27301ed0fa7cd3b27e613e463945966ab42f1cec94ae216d979c1",
+  "openapiSha256": "56a862ac59abb2902ef151bd1123bedd7fa2ca82cbb87147b38e50837e402d41",
   "languages": {
     "typescript": {
       "label": "TypeScript",
@@ -878,7 +878,7 @@
     "tenants.list": {
       "typescript": {
         "status": "available",
-        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n    baseUrl: \"https://yourhost.com/path/to/api\",\n    token: \"<token>\",\n});\n\nawait client.tenants.list();",
+        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n    baseUrl: \"https://yourhost.com/path/to/api\",\n    token: \"<token>\",\n});\n\nconst pageableResponse = await client.tenants.list();\nfor await (const item of pageableResponse) {\n    console.log(item);\n}\n\n// Or you can manually iterate page-by-page\nlet page = await client.tenants.list();\nwhile (page.hasNextPage()) {\n    page = await page.getNextPage();\n}\n\n// You can also access the underlying response\nconst response = page.response;",
         "frameLines": 7
       },
       "python": {
@@ -1026,7 +1026,7 @@
     "documents.list": {
       "typescript": {
         "status": "available",
-        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n    baseUrl: \"https://yourhost.com/path/to/api\",\n    token: \"<token>\",\n});\n\nawait client.documents.list({\n    tenantId: \"tenantId\"\n});",
+        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n    baseUrl: \"https://yourhost.com/path/to/api\",\n    token: \"<token>\",\n});\n\nconst pageableResponse = await client.documents.list({\n    tenantId: \"tenantId\"\n});\nfor await (const item of pageableResponse) {\n    console.log(item);\n}\n\n// Or you can manually iterate page-by-page\nlet page = await client.documents.list({\n    tenantId: \"tenantId\"\n});\nwhile (page.hasNextPage()) {\n    page = await page.getNextPage();\n}\n\n// You can also access the underlying response\nconst response = page.response;",
         "frameLines": 7
       },
       "python": {
@@ -1359,7 +1359,7 @@
     "shares.list": {
       "typescript": {
         "status": "available",
-        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n    baseUrl: \"https://yourhost.com/path/to/api\",\n    token: \"<token>\",\n});\n\nawait client.shares.list({\n    tenantId: \"tenantId\"\n});",
+        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n    baseUrl: \"https://yourhost.com/path/to/api\",\n    token: \"<token>\",\n});\n\nconst pageableResponse = await client.shares.list({\n    tenantId: \"tenantId\"\n});\nfor await (const item of pageableResponse) {\n    console.log(item);\n}\n\n// Or you can manually iterate page-by-page\nlet page = await client.shares.list({\n    tenantId: \"tenantId\"\n});\nwhile (page.hasNextPage()) {\n    page = await page.getNextPage();\n}\n\n// You can also access the underlying response\nconst response = page.response;",
         "frameLines": 7
       },
       "python": {

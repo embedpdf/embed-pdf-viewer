@@ -383,7 +383,7 @@ await client.shares.exchange({
 </dl>
 </details>
 
-<details><summary><code>client.shares.<a href="/src/api/resources/shares/client/Client.ts">list</a>({ ...params }) -> CloudPDF.SharesList200Response</code></summary>
+<details><summary><code>client.shares.<a href="/src/api/resources/shares/client/Client.ts">list</a>({ ...params }) -> core.Page&lt;CloudPDF.SharesList200Response.Shares.Item, CloudPDF.SharesList200Response&gt;</code></summary>
 <dl>
 <dd>
 
@@ -396,9 +396,23 @@ await client.shares.exchange({
 <dd>
 
 ```typescript
-await client.shares.list({
+const pageableResponse = await client.shares.list({
     tenantId: "tenantId"
 });
+for await (const item of pageableResponse) {
+    console.log(item);
+}
+
+// Or you can manually iterate page-by-page
+let page = await client.shares.list({
+    tenantId: "tenantId"
+});
+while (page.hasNextPage()) {
+    page = await page.getNextPage();
+}
+
+// You can also access the underlying response
+const response = page.response;
 
 ```
 </dd>
@@ -658,7 +672,7 @@ await client.shares.update({
 </details>
 
 ## Tenants
-<details><summary><code>client.tenants.<a href="/src/api/resources/tenants/client/Client.ts">list</a>({ ...params }) -> CloudPDF.TenantsList200Response</code></summary>
+<details><summary><code>client.tenants.<a href="/src/api/resources/tenants/client/Client.ts">list</a>({ ...params }) -> core.Page&lt;CloudPDF.TenantsList200Response.Tenants.Item, CloudPDF.TenantsList200Response&gt;</code></summary>
 <dl>
 <dd>
 
@@ -671,7 +685,19 @@ await client.shares.update({
 <dd>
 
 ```typescript
-await client.tenants.list();
+const pageableResponse = await client.tenants.list();
+for await (const item of pageableResponse) {
+    console.log(item);
+}
+
+// Or you can manually iterate page-by-page
+let page = await client.tenants.list();
+while (page.hasNextPage()) {
+    page = await page.getNextPage();
+}
+
+// You can also access the underlying response
+const response = page.response;
 
 ```
 </dd>
@@ -1056,7 +1082,7 @@ await client.tenants.usage({
 </details>
 
 ## Documents
-<details><summary><code>client.documents.<a href="/src/api/resources/documents/client/Client.ts">list</a>({ ...params }) -> CloudPDF.DocumentsList200Response</code></summary>
+<details><summary><code>client.documents.<a href="/src/api/resources/documents/client/Client.ts">list</a>({ ...params }) -> core.Page&lt;CloudPDF.DocumentsList200Response.Documents.Item, CloudPDF.DocumentsList200Response&gt;</code></summary>
 <dl>
 <dd>
 
@@ -1069,9 +1095,23 @@ await client.tenants.usage({
 <dd>
 
 ```typescript
-await client.documents.list({
+const pageableResponse = await client.documents.list({
     tenantId: "tenantId"
 });
+for await (const item of pageableResponse) {
+    console.log(item);
+}
+
+// Or you can manually iterate page-by-page
+let page = await client.documents.list({
+    tenantId: "tenantId"
+});
+while (page.hasNextPage()) {
+    page = await page.getNextPage();
+}
+
+// You can also access the underlying response
+const response = page.response;
 
 ```
 </dd>

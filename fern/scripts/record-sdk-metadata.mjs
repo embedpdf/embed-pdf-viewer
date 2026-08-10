@@ -113,6 +113,28 @@ if (language === 'typescript') {
     writeFileSync(renameScriptPath, renameScript);
   }
 
+  // fern-typescript-sdk 3.87.2 omits `await` from the manual pagination
+  // example even though Page.getNextPage() is asynchronous. Keep the
+  // package reference and the website snippets extracted from it runnable.
+  const referencePath = `${outputDirectory}/reference.md`;
+  let reference = readFileSync(referencePath, 'utf8');
+  const generatedNextPage = 'page = page.getNextPage();';
+  const patchedNextPage = 'page = await page.getNextPage();';
+  const generatedNextPageCount = reference.split(generatedNextPage).length - 1;
+  const patchedNextPageCount = reference.split(patchedNextPage).length - 1;
+  if (
+    !(
+      (generatedNextPageCount === 3 && patchedNextPageCount === 0) ||
+      (generatedNextPageCount === 0 && patchedNextPageCount === 3)
+    )
+  ) {
+    throw new Error('TypeScript pagination reference shape changed; revisit the await patch');
+  }
+  if (generatedNextPageCount === 3) {
+    reference = reference.replaceAll(generatedNextPage, patchedNextPage);
+    writeFileSync(referencePath, reference);
+  }
+
   const manifestPath = `${outputDirectory}/package.json`;
   const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
   delete manifest.packageManager;

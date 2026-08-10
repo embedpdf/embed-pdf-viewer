@@ -164,17 +164,22 @@ describe("SharesClient", () => {
         };
 
         server
-            .mockEndpoint()
+            .mockEndpoint({ once: false })
             .get("/v1/tenants/tenantId/shares")
             .respondWith()
             .statusCode(200)
             .jsonBody(rawResponseBody)
             .build();
 
-        const response = await client.shares.list({
+        const expected = rawResponseBody;
+        const page = await client.shares.list({
             tenantId: "tenantId",
         });
-        expect(response).toEqual(rawResponseBody);
+
+        expect(expected.shares).toEqual(page.data);
+        expect(page.hasNextPage()).toBe(true);
+        const nextPage = await page.getNextPage();
+        expect(expected.shares).toEqual(nextPage.data);
     });
 
     test("list (2)", async () => {
