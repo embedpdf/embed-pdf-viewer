@@ -20,6 +20,9 @@ import {
   type MigrationSource,
 } from '../db/migrator/runner';
 import type { Database as Schema } from '../db/schema';
+import { ConnectedUsageReporter } from '../licensing/ConnectedUsageReporter';
+import { LicenseRuntime } from '../licensing/LicenseRuntime';
+import { UsageMeters } from '../licensing/UsageMeters';
 import { PostgresRealtimeBus } from '../realtime/PostgresRealtimeBus';
 import { loadFallbackFontsFromEnv } from '../runtime/loadFallbackFontsFromEnv';
 import { loadKmsConfigFromEnv } from '../security/kms/config/loadKmsConfigFromEnv';
@@ -29,9 +32,9 @@ import { loadSecretsConfigFromEnv } from '../security/secrets/config/loadSecrets
 import { createSecretsProviderRegistry } from '../security/secrets/createSecretsProvider';
 import { createSecretResolver, type SecretResolver } from '../security/secrets/SecretResolver';
 import { EventLogService } from '../services/EventLogService';
+import { loadObjectStoreConfigFromEnv } from '../storage/config/loadObjectStoreConfigFromEnv';
 import { createObjectStore } from '../storage/createObjectStore';
 import type { ObjectStore } from '../storage/ObjectStore';
-import { loadObjectStoreConfigFromEnv } from '../storage/config/loadObjectStoreConfigFromEnv';
 
 /**
  * @license FCL-1.0-ALv2
@@ -42,9 +45,6 @@ import { loadObjectStoreConfigFromEnv } from '../storage/config/loadObjectStoreC
  * key, or remove protected functionality is a breach of FCL-1.0-ALv2 while
  * this release is governed by that license. See cloudpdf/server/LICENSE.
  */
-import { LicenseRuntime } from '../licensing/LicenseRuntime';
-import { ConnectedUsageReporter } from '../licensing/ConnectedUsageReporter';
-import { UsageMeters } from '../licensing/UsageMeters';
 
 /**
  * Multi-command CLI:
@@ -81,6 +81,11 @@ import { UsageMeters } from '../licensing/UsageMeters';
  *                          (>= 32 bytes; required with a production license)
  *   CLOUDPDF_TRUST_PROXY   1|hops|CSV of proxy IPs (real client IPs behind a LB)
  *   CLOUDPDF_AUTH_FAILURE_LIMIT  failed auths/IP/window, 'off' to disable (default 30)
+ *   CLOUDPDF_ENABLE_REVOCATION   1 mounts tokens.revoke + enforces the jti denylist
+ *   CLOUDPDF_CORS_ORIGINS  '*' (reflect any) or CSV allowlist; unset = CORS off.
+ *                          Needed for browser-direct viewing across origins —
+ *                          bearer tokens stay the security boundary, and the
+ *                          per-credential origins claim carries the origin policy.
  *   CLOUDPDF_STORAGE_KIND  fs|s3|gcs|azure-blob   (default: fs)
  *   CLOUDPDF_STORAGE_FS_ROOT                (default: ./data/objects)
  *   CLOUDPDF_CACHE_ROOT                      (default: ./data/cache; enables /v1/docs/*)
@@ -216,6 +221,38 @@ function readTrustProxyEnv(): boolean | number | string[] | undefined {
     .filter((s) => s.length > 0);
 }
 
+/**
+ * CLOUDPDF_CORS_ORIGINS → buildApp `corsOrigins`: `*` reflects any
+ * origin (bearer tokens are the security boundary; per-credential
+ * origin locks carry the real policy), a CSV pins an allowlist, absent
+ * leaves CORS off (same-origin / proxy-fronted deployments).
+ */
+function readCorsOriginsEnv(): '*' | string[] | undefined {
+  const raw = process.env['CLOUDPDF_CORS_ORIGINS']?.trim();
+  if (!raw) return undefined;
+  if (raw === '*') return '*';
+  const origins = raw
+    .split(',')
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+  if (origins.length === 0) return undefined;
+  for (const origin of origins) {
+    if (!/^https?:\/\//.test(origin)) {
+      fail(
+        2,
+        `CLOUDPDF_CORS_ORIGINS entries must be origins like https://app.example.com (got ${origin})`,
+      );
+    }
+  }
+  return origins;
+}
+
+/** CLOUDPDF_ENABLE_REVOCATION=1 mounts tokens.revoke and enforces the jti denylist. */
+function readEnableRevocationEnv(): boolean {
+  const raw = process.env['CLOUDPDF_ENABLE_REVOCATION']?.trim().toLowerCase();
+  return raw === '1' || raw === 'true';
+}
+
 function readAuthFailureLimitEnv(): { maxFailures: number; windowMs?: number } | false | undefined {
   const raw = process.env['CLOUDPDF_AUTH_FAILURE_LIMIT']?.trim();
   const windowRaw = process.env['CLOUDPDF_AUTH_FAILURE_WINDOW_MS']?.trim();
@@ -285,6 +322,9 @@ function printHelp(): void {
       '                           (set behind a LB so rate limits see real client IPs)',
       '    CLOUDPDF_AUTH_FAILURE_LIMIT      failed auths per IP per window; off to disable (default: 30)',
       '    CLOUDPDF_AUTH_FAILURE_WINDOW_MS  window for the failure limit (default: 60000)',
+      '    CLOUDPDF_ENABLE_REVOCATION       1 mounts tokens.revoke + enforces the jti denylist',
+      '    CLOUDPDF_CORS_ORIGINS  * (reflect any) or CSV allowlist; absent = CORS off',
+      '                           (needed for browser-direct viewing across origins)',
       '  Commercial license',
       '    CLOUDPDF_LICENSE_MODE   connected|air-gapped (explicit in production)',
       '    CLOUDPDF_LICENSE_KEY    required for connected mode',
@@ -751,6 +791,8 @@ async function cmdServe(): Promise<void> {
 
   const trustProxy = readTrustProxyEnv();
   const authFailureLimit = readAuthFailureLimitEnv();
+  const corsOrigins = readCorsOriginsEnv();
+  const enableRevocation = readEnableRevocationEnv();
 
   let bundle: Awaited<ReturnType<typeof buildApp>>;
   try {
@@ -759,6 +801,8 @@ async function cmdServe(): Promise<void> {
       ...(usageReporter ? { usageReporter } : {}),
       verifier: { mode: 'hs256', secret: JWT_SECRET },
       ...(API_AUTH_TOKENS.length > 0 ? { apiAuthTokens: API_AUTH_TOKENS } : {}),
+      ...(corsOrigins !== undefined ? { corsOrigins } : {}),
+      ...(enableRevocation ? { enableRevocation: true } : {}),
       workerEntry: WORKER_ENTRY_URL,
       fallbackFonts: loadFallbackFontsFromEnv(),
       db: dbCtx.db,

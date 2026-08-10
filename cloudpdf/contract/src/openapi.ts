@@ -31,6 +31,7 @@ const STATUS_TEXT: Record<number, string> = {
   403: 'Forbidden',
   404: 'Not found',
   409: 'Conflict',
+  410: 'Gone',
   422: 'Unprocessable',
 };
 

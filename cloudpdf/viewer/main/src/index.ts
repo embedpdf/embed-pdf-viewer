@@ -32,10 +32,18 @@ import { resolveCloudConfig, type CloudSource } from './config';
 export * from '@embedpdf/viewer/core';
 export { cloudEngine } from '@cloudpdf/engine';
 export type { CloudEngineOptions } from '@cloudpdf/engine';
+// Share-session primitives for custom flows (pre-exchange to inspect a
+// docId, hand-rolled password prompts, bespoke documents arrays).
+export { exchangeShareToken, shareSessionSource, ShareExchangeError } from '@cloudpdf/engine';
+export type { ShareSession, ShareExchangeOptions } from '@cloudpdf/engine';
 export { resolveCloudConfig } from './config';
-export type { CloudSource } from './config';
+export type { CloudSource, CloudShareSource, CloudInitialDocument } from './config';
 
-export interface CloudInitOptions extends Omit<InitOptions, 'engine' | 'src'>, CloudSource {}
+// `documents` is omitted from the base so the CLOUD list type (which
+// additionally accepts `{ kind: 'share' }` sources) governs.
+export interface CloudInitOptions
+  extends Omit<InitOptions, 'engine' | 'src' | 'documents'>,
+    CloudSource {}
 
 /** Create an <embedpdf-viewer> backed by the cloud engine and mount it. */
 function init(options: CloudInitOptions): EmbedPdfViewerElement {

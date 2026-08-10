@@ -16,28 +16,34 @@ import down008 from './008_pdf_password_verifications.down.sql';
 import sql008 from './008_pdf_password_verifications.sql';
 import down009 from './009_pdf_password_sessions.down.sql';
 import sql009 from './009_pdf_password_sessions.sql';
-import sql010 from './010_layer_layout_version.sql';
-import sql011 from './011_drop_page_index.sql';
-import sql012 from './012_layer_metadata_version.sql';
-import sql013 from './013_realtime_events.sql';
-import sql014 from './014_layer_attachments_version.sql';
-import sql015 from './015_document_thumbnail.sql';
 import down010 from './010_layer_layout_version.down.sql';
+import sql010 from './010_layer_layout_version.sql';
 import down011 from './011_drop_page_index.down.sql';
+import sql011 from './011_drop_page_index.sql';
 import down012 from './012_layer_metadata_version.down.sql';
+import sql012 from './012_layer_metadata_version.sql';
 import down013 from './013_realtime_events.down.sql';
+import sql013 from './013_realtime_events.sql';
 import down014 from './014_layer_attachments_version.down.sql';
+import sql014 from './014_layer_attachments_version.sql';
 import down015 from './015_document_thumbnail.down.sql';
-import sql016 from './016_license_runtime.sql';
+import sql015 from './015_document_thumbnail.sql';
 import down016 from './016_license_runtime.down.sql';
-import sql017 from './017_license_usage.sql';
+import sql016 from './016_license_runtime.sql';
 import down017 from './017_license_usage.down.sql';
-import sql018 from './018_documents_list_order.sql';
+import sql017 from './017_license_usage.sql';
 import down018 from './018_documents_list_order.down.sql';
-import sql019 from './019_tenant_provenance.sql';
+import sql018 from './018_documents_list_order.sql';
 import down019 from './019_tenant_provenance.down.sql';
-import sql020 from './020_security_events.sql';
+import sql019 from './019_tenant_provenance.sql';
 import down020 from './020_security_events.down.sql';
+import sql020 from './020_security_events.sql';
+import down021 from './021_share_grants.down.sql';
+import sql021 from './021_share_grants.sql';
+import down022 from './022_tenant_usage.down.sql';
+import sql022 from './022_tenant_usage.sql';
+import down023 from './023_tenant_status.down.sql';
+import sql023 from './023_tenant_status.sql';
 import type { MigrationSource } from '../../migrator/runner';
 
 /**
@@ -72,4 +78,7 @@ export const postgresMigrations: ReadonlyArray<MigrationSource> = [
   { version: '018', name: '018_documents_list_order.sql', sql: sql018, down: down018 },
   { version: '019', name: '019_tenant_provenance.sql', sql: sql019, down: down019 },
   { version: '020', name: '020_security_events.sql', sql: sql020, down: down020 },
+  { version: '021', name: '021_share_grants.sql', sql: sql021, down: down021 },
+  { version: '022', name: '022_tenant_usage.sql', sql: sql022, down: down022 },
+  { version: '023', name: '023_tenant_status.sql', sql: sql023, down: down023 },
 ];

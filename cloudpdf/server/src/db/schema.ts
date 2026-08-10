@@ -26,6 +26,8 @@ export type DocumentState = 'pending' | 'ready' | 'failed' | 'deleting';
 export type DocumentEncryptionState = 'unknown' | 'none' | 'encrypted' | 'unsupported';
 export type DocumentPdfOpenedAs = 'none' | 'user' | 'owner';
 
+export type TenantStatus = 'active' | 'suspended';
+
 export interface TenantsTable {
   id: string;
   name: string;
@@ -33,6 +35,13 @@ export interface TenantsTable {
   created_at: number;
   /** 1 when the namespace materialized on first use rather than via explicit create. */
   auto_provisioned: number;
+  /**
+   * `suspended` fails the namespace closed: every tenant JWT, doc JWT,
+   * and share exchange is refused (403) until resume. The API token is
+   * exempt so the operator can always inspect, resume, or delete.
+   */
+  status: TenantStatus;
+  suspended_at: number | null;
 }
 
 export interface DocumentsTable {
@@ -247,6 +256,54 @@ export interface SecurityEventsTable {
   created_at: number;
 }
 
+/**
+ * Share grants: standing, revocable authorization decisions for the
+ * no-backend embed flow. The row id IS the public share token — a
+ * REFERENCE evaluated at exchange time, never a bearer credential,
+ * which is what makes grants long-lived, editable, and revocable while
+ * every credential that reaches a browser stays a short-lived doc JWT.
+ */
+export interface ShareGrantsTable {
+  /** `shr_` + 24 url-safe random chars; doubles as the public share token. */
+  id: string;
+  tenant_id: string;
+  doc_id: string;
+  layer_name: string;
+  /** Doc capability scopes the exchanged session carries (JSON array). */
+  scope_json: string;
+  /** Origin allowlist (JSON array); NULL = any origin. */
+  origins_json: string | null;
+  /** scrypt envelope (`scrypt$N$r$p$salt$hash`); NULL = no passphrase. */
+  password_hash: string | null;
+  session_ttl_seconds: number;
+  /** 1 = paused: exchange refuses (404) but configuration is kept. */
+  disabled: number;
+  /** Unix epoch ms; NULL = no expiry. */
+  expires_at: number | null;
+  /** Successful exchanges — dashboard convenience, not the usage meter. */
+  exchange_count: number;
+  last_exchanged_at: number | null;
+  created_by: string;
+  created_at: number;
+  updated_at: number;
+}
+
+/**
+ * Per-tenant usage FACTS, one row per (tenant, metric, UTC month).
+ * Deliberately separate from `license_usage_counter`: that table
+ * answers "is this deployment within its license" and stays
+ * deployment-wide; this one answers "what did each tenant consume"
+ * and carries no limits — enforcement above the license is whoever
+ * operates the deployment's business, expressed via tenant suspension.
+ */
+export interface TenantUsageCounterTable {
+  tenant_id: string;
+  metric: 'pdf.uploads' | 'pdf.views';
+  period_start: string;
+  value: number;
+  updated_at: number;
+}
+
 export interface SchemaMigrationsTable {
   /** Monotonically-increasing version (zero-padded for lexical sort). */
   version: string;
@@ -342,7 +399,12 @@ export interface LicenseOperationLeaseTable {
  * INSERT/SELECT differences via the `Generated<T>` brand.
  */
 export interface Database {
-  tenants: TenantsTable & { created_at: Generated<number>; auto_provisioned: Generated<number> };
+  tenants: TenantsTable & {
+    created_at: Generated<number>;
+    auto_provisioned: Generated<number>;
+    status: Generated<TenantStatus>;
+    suspended_at: Generated<number | null>;
+  };
   documents: DocumentsTable & {
     created_at: Generated<number>;
     updated_at: Generated<number>;
@@ -357,6 +419,8 @@ export interface Database {
   pdf_password_verifications: PdfPasswordVerificationsTable;
   pdf_password_sessions: PdfPasswordSessionsTable;
   security_events: SecurityEventsTable & { id: Generated<number> };
+  share_grants: ShareGrantsTable;
+  tenant_usage_counter: TenantUsageCounterTable;
   schema_migrations: SchemaMigrationsTable;
   revoked_jtis: RevokedJtisTable;
   jwks_cache: JwksCacheTable;

@@ -1,15 +1,18 @@
 import { randomBytes } from 'node:crypto';
+
+import type { DerivedRenderService } from './DerivedRenderService';
+import { DocumentSecurityProbe } from './DocumentSecurityProbe';
 import {
   DocumentsRepo,
   type DocumentListOptions,
   type DocumentRow,
 } from '../db/repos/documents.repo';
+import type { ShareGrantsRepo } from '../db/repos/share_grants.repo';
+import type { TenantUsageRepo } from '../db/repos/tenant_usage.repo';
 import { TenantsRepo } from '../db/repos/tenants.repo';
+import type { UsageMeters } from '../licensing/UsageMeters';
 import { StorageKeys } from '../storage/keys';
 import type { ObjectBody, ObjectStoreWithInfo, PresignedUpload } from '../storage/ObjectStore';
-import { DocumentSecurityProbe } from './DocumentSecurityProbe';
-import type { DerivedRenderService } from './DerivedRenderService';
-import type { UsageMeters } from '../licensing/UsageMeters';
 
 export type DedupMode = 'always-create' | 'reuse-existing';
 
@@ -87,6 +90,10 @@ export interface DocumentLifecycleOptions {
   /** When present, commit warms the document's thumbnail (fire-and-forget). */
   derivedRenders?: DerivedRenderService;
   usageMeters?: UsageMeters;
+  /** When present, fresh commits also move the per-tenant upload fact. */
+  tenantUsage?: TenantUsageRepo;
+  /** When present, document delete revokes the document's share grants. */
+  shareGrants?: ShareGrantsRepo;
 }
 
 /**
@@ -115,6 +122,8 @@ export class DocumentLifecycleService {
   private readonly securityProbe: DocumentSecurityProbe;
   private readonly derivedRenders?: DerivedRenderService;
   private readonly usageMeters?: UsageMeters;
+  private readonly tenantUsage?: TenantUsageRepo;
+  private readonly shareGrants?: ShareGrantsRepo;
 
   constructor(opts: DocumentLifecycleOptions) {
     this.documents = opts.documents;
@@ -124,6 +133,8 @@ export class DocumentLifecycleService {
     this.securityProbe = opts.securityProbe ?? new DocumentSecurityProbe();
     this.derivedRenders = opts.derivedRenders;
     this.usageMeters = opts.usageMeters;
+    this.tenantUsage = opts.tenantUsage;
+    this.shareGrants = opts.shareGrants;
   }
 
   async init(input: InitInput): Promise<InitResult> {
@@ -217,9 +228,12 @@ export class DocumentLifecycleService {
     const doc = await this.documents.requireOwned(input.docId, input.tenantId);
     if (doc.state === 'ready') {
       // Idempotent commit: if the existing base_sha matches, return
-      // the doc unchanged; otherwise this is a programmer error.
+      // the doc unchanged; otherwise this is a programmer error. The
+      // event dedupe reports counted: false here, so the tenant fact
+      // never double-moves.
       if (doc.baseSha === input.sha256) {
-        await this.usageMeters?.recordUpload(doc.id, doc.createdAt);
+        const recorded = await this.usageMeters?.recordUpload(doc.id, doc.createdAt);
+        if (recorded?.counted) await this.tenantUsage?.recordUpload(doc.tenantId);
         return { doc };
       }
       throw conflict(`document ${doc.id} already committed with different base_sha`);
@@ -269,7 +283,8 @@ export class DocumentLifecycleService {
     if (!updated) {
       throw conflict(`document ${doc.id} state changed during commit`);
     }
-    await this.usageMeters?.recordUpload(updated.id, updated.createdAt);
+    const recorded = await this.usageMeters?.recordUpload(updated.id, updated.createdAt);
+    if (recorded?.counted) await this.tenantUsage?.recordUpload(updated.tenantId);
 
     // Thumbnail lifecycle: user-password documents get NO
     // derived artifact — a thumbnail is content disclosure, and the lock
@@ -335,6 +350,11 @@ export class DocumentLifecycleService {
     }
     const prefix = StorageKeys.docRoot(tenantId, docId);
     await this.storage.deletePrefix(prefix);
+    // Grants die with the document — explicitly, not via FK cascade,
+    // because SQLite deployments may run without foreign_keys ON and a
+    // dangling grant would be a stored 404, not a security hole (the
+    // exchange re-checks the document), but still a wart in listings.
+    await this.shareGrants?.deleteByDoc(docId, tenantId);
     await this.documents.finalizeDelete(docId, tenantId);
   }
 

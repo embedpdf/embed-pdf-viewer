@@ -654,8 +654,8 @@ test('stores deployment usage locally and enforces hard counter limits atomicall
   try {
     await expect(meters.recordView()).resolves.toBe(1);
     await expect(meters.recordView()).rejects.toBeInstanceOf(UsageLimitError);
-    await expect(meters.recordUpload('doc-one')).resolves.toBe(1);
-    await expect(meters.recordUpload('doc-one')).resolves.toBe(1);
+    await expect(meters.recordUpload('doc-one')).resolves.toEqual({ value: 1, counted: true });
+    await expect(meters.recordUpload('doc-one')).resolves.toEqual({ value: 1, counted: false });
     const snapshot = await meters.snapshot();
     expect(snapshot.metrics['pdf.views']).toBe(1);
     expect(snapshot.metrics['pdf.uploads']).toBe(1);

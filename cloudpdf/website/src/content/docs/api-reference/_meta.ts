@@ -6,5 +6,6 @@ export default {
   tenants: 'Tenants',
   documents: 'Tenant documents',
   tokens: 'Tokens',
+  shares: 'Shares',
   'document-operations': 'Document operations',
 };

@@ -24,10 +24,22 @@ describe('operation registry', () => {
       expect(
         op.path === '/v1/tenants' ||
           op.path.startsWith('/v1/tenants/') ||
-          op.path.startsWith('/v1/deployment/'),
+          op.path.startsWith('/v1/deployment/') ||
+          op.path === adminWirePaths.shareSessions,
         op.path,
       ).toBe(true);
-      expect(op.credentials.length).toBeGreaterThan(0);
+      if (op.credentials.length === 0) {
+        // The PUBLIC surface is exactly the share-session exchange: the
+        // grant row is the authorization, so no bearer credential
+        // exists. Any new unauthenticated operation must be added here
+        // deliberately — an empty credential list anywhere else is a
+        // registry mistake, not a new feature.
+        expect(op.path, `${op.operationId} must not be unauthenticated`).toBe(
+          adminWirePaths.shareSessions,
+        );
+        expect(op.scope.length).toBe(0);
+        continue;
+      }
       if (op.credentials.includes('tenant-jwt')) {
         // Scope governs the tenant-jwt path, so it must exist there…
         expect(op.scope.length).toBeGreaterThan(0);

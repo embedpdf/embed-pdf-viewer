@@ -4,4 +4,7 @@ export default {
   create: 'Create',
   get: 'Get',
   delete: 'Delete',
+  resume: 'Resume',
+  suspend: 'Suspend',
+  usage: 'Usage',
 };

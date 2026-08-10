@@ -1,4 +1,5 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
+
 import { InvalidScope, validateScopeArray } from '@embedpdf/engine-core/runtime';
 import {
   createLocalJWKSet,
@@ -76,6 +77,7 @@ export interface TenantClaims extends BaseClaims {
   scope: ReadonlyArray<TenantScope>;
   doc_id?: never;
   layer_name?: never;
+  origins?: never;
 }
 
 /**
@@ -96,6 +98,14 @@ export interface DocUserClaims extends BaseClaims {
   scope: ReadonlyArray<DocScope>;
   /** Phase 5: pin a specific layer. Optional. */
   layer_name?: string;
+  /**
+   * Origin lock: web origin patterns this token may be presented from,
+   * enforced by the auth hook whenever the request carries a browser
+   * `Origin` header (see `matchesOrigin`). Doc tokens only — tenant
+   * tokens never reach browsers, so an origin lock there is a
+   * misconfigured token. Absent = any origin.
+   */
+  origins?: ReadonlyArray<string>;
 }
 
 /**
@@ -122,7 +132,8 @@ export type TenantScope =
   | 'docs.read'
   | 'docs.delete'
   | 'tokens.issue-doc'
-  | 'tokens.revoke';
+  | 'tokens.revoke'
+  | 'shares.manage';
 
 /**
  * Doc-scope strings on the wire. After the scope-vocabulary migration
@@ -578,11 +589,31 @@ function coerceClaims(payload: JWTPayload): JwtClaims {
     throw new Error('jwt layer_name must be a non-empty string');
   }
 
+  const originsRaw = (payload as { origins?: unknown }).origins;
+  let origins: ReadonlyArray<string> | undefined;
+  if (originsRaw !== undefined) {
+    if (!Array.isArray(originsRaw) || originsRaw.length === 0) {
+      throw new Error('jwt origins must be a non-empty array');
+    }
+    for (const o of originsRaw) {
+      if (typeof o !== 'string' || o.length === 0) {
+        throw new Error('jwt origins must contain non-empty strings');
+      }
+    }
+    origins = originsRaw as ReadonlyArray<string>;
+  }
+
   if (layerName !== undefined && docId === undefined) {
     // `layer_name` only makes sense on a doc-scoped token. Without
     // a `doc_id` it has nothing to scope to and is almost certainly
     // a misconfigured token.
     throw new Error('jwt layer_name requires doc_id');
+  }
+  if (origins !== undefined && docId === undefined) {
+    // Same shape of mistake as layer_name: an origin lock exists to
+    // constrain browser presentation, and only doc tokens reach
+    // browsers. A tenant token carrying one was mis-minted.
+    throw new Error('jwt origins requires doc_id');
   }
 
   if (docId !== undefined) {
@@ -606,9 +637,13 @@ function coerceClaims(payload: JWTPayload): JwtClaims {
       }
     }
     const docScope = (scope ?? []) as ReadonlyArray<DocScope>;
-    const out: DocUserClaims = layerName
-      ? { ...base, doc_id: docId, scope: docScope, layer_name: layerName }
-      : { ...base, doc_id: docId, scope: docScope };
+    const out: DocUserClaims = {
+      ...base,
+      doc_id: docId,
+      scope: docScope,
+      ...(layerName !== undefined ? { layer_name: layerName } : {}),
+      ...(origins !== undefined ? { origins } : {}),
+    };
     return out;
   }
   // Tenant token.
@@ -750,6 +785,8 @@ export interface SignDevTokenInput {
   doc_id?: string;
   /** Optional layer pin; only valid with `doc_id`. */
   layer_name?: string;
+  /** Optional origin lock; only valid with `doc_id`. */
+  origins?: ReadonlyArray<string>;
   jti?: string;
   extras?: JwtClaimsExtras;
 }
@@ -757,6 +794,9 @@ export interface SignDevTokenInput {
 export function signDevToken(secret: string | Buffer, input: SignDevTokenInput): string {
   if (input.layer_name && !input.doc_id) {
     throw new Error('signDevToken: layer_name requires doc_id');
+  }
+  if (input.origins && !input.doc_id) {
+    throw new Error('signDevToken: origins requires doc_id');
   }
   const now = Math.floor(Date.now() / 1000);
   const ttl = input.ttlSeconds ?? 3600;
@@ -768,6 +808,7 @@ export function signDevToken(secret: string | Buffer, input: SignDevTokenInput):
     ...(input.scope ? { scope: input.scope } : {}),
     ...(input.doc_id ? { doc_id: input.doc_id } : {}),
     ...(input.layer_name ? { layer_name: input.layer_name } : {}),
+    ...(input.origins ? { origins: input.origins } : {}),
     ...(input.jti ? { jti: input.jti } : {}),
     ...(input.extras ?? {}),
   };

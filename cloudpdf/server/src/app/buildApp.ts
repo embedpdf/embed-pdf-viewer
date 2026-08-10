@@ -1,14 +1,15 @@
 import { TextDecoder } from 'node:util';
 
-import { adminOperations } from '@cloudpdf/contract';
+import { adminOperations, adminWirePaths } from '@cloudpdf/contract';
 import { EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
 import compress from '@fastify/compress';
+import cors from '@fastify/cors';
 import multipart from '@fastify/multipart';
 import Fastify, { type FastifyInstance } from 'fastify';
 import type { Kysely } from 'kysely';
 
-import { registerJwtAuth, requireApiToken } from './jwt-plugin';
 import type { AuthFailureLimiterOptions } from './auth-failure-limiter';
+import { registerJwtAuth, requireApiToken } from './jwt-plugin';
 import { assertProductionSecret, requiresProductionSecrets, resolveSecret } from './secret-policy';
 import { DbJwksCacheStore } from '../auth/JwksCacheStore';
 import {
@@ -20,31 +21,32 @@ import {
   type SignDevTokenInput,
 } from '../auth/JwtVerifier';
 import { RevokedJtisGuard } from '../auth/RevokedJtisGuard';
+import { SuspendedTenantsGuard } from '../auth/SuspendedTenantsGuard';
 import { NoneCdnSigner } from '../cdn/adapters/NoneCdnSigner';
 import type { CdnSigner } from '../cdn/CdnSigner';
 import { validate as validateMigrations, type MigrationSource } from '../db/migrator/runner';
 import { DocumentsRepo } from '../db/repos/documents.repo';
+import { DocumentPagesRepo, LayerPagesRepo, LayersRepo } from '../db/repos/page_state.repo';
 import { PdfPasswordSessionsRepo } from '../db/repos/pdf_password_sessions.repo';
-import type { Database as Schema } from '../db/schema';
-import { WorkerThreadPool, type FallbackFontDescriptor } from '../runtime/WorkerThreadPool';
-import { BaseFileCache } from '../storage/BaseFileCache';
-import type { ObjectStoreWithInfo } from '../storage/ObjectStore';
 import { PdfPasswordVerificationsRepo } from '../db/repos/pdf_password_verifications.repo';
 import { SecurityEventsRepo } from '../db/repos/security-events.repo';
+import { ShareGrantsRepo } from '../db/repos/share_grants.repo';
+import { TenantUsageRepo } from '../db/repos/tenant_usage.repo';
 import { TenantsRepo } from '../db/repos/tenants.repo';
-import { DocumentPagesRepo, LayerPagesRepo, LayersRepo } from '../db/repos/page_state.repo';
 import { WeakAnnotationSessionsRepo } from '../db/repos/weak_annotation_sessions.repo';
+import type { Database as Schema } from '../db/schema';
+import { InProcessRealtimeBus, type RealtimeBus } from '../realtime/RealtimeBus';
+import { SharpImageEncoder } from '../render/SharpImageEncoder';
+import { registerAccessRoutes } from '../routes/access';
+import { registerDocsRoutes } from '../routes/docs';
+import { CloudRevisionBridge } from '../services/CloudRevisionBridge';
 import { DerivedRenderService } from '../services/DerivedRenderService';
-import { DocumentLifecycleService } from '../services/DocumentLifecycleService';
 import { DocumentService } from '../services/DocumentService';
 import { DocumentSecurityProbe } from '../services/DocumentSecurityProbe';
-import { CloudRevisionBridge } from '../services/CloudRevisionBridge';
 import { EventLogService } from '../services/EventLogService';
-import { LayerStateService } from '../services/LayerStateService';
 import { LayerService } from '../services/LayerService';
+import { LayerStateService } from '../services/LayerStateService';
 import { WeakAnnotationSessionService } from '../services/WeakAnnotationSessionService';
-import { registerDocsRoutes } from '../routes/docs';
-import { registerAccessRoutes } from '../routes/access';
 import { registerAnnotationRoutes } from '../routes/annotations';
 import { registerAttachmentRoutes } from '../routes/attachments';
 import { registerFormRoutes } from '../routes/forms';
@@ -53,16 +55,20 @@ import { registerPageRoutes } from '../routes/pages';
 import { registerRedactionRoutes } from '../routes/redactions';
 import { registerSearchRoutes } from '../routes/search';
 import { registerAdminDocumentsRoutes } from '../routes/admin/documents';
+import { registerAdminSharesRoutes } from '../routes/admin/shares';
 import { registerAdminTenantsRoutes } from '../routes/admin/tenants';
 import { registerAdminTokensRoutes } from '../routes/admin/tokens';
-import { SharpImageEncoder } from '../render/SharpImageEncoder';
+import { registerShareSessionRoutes } from '../routes/share-sessions';
 import type { KmsKeyring } from '../security';
-import { InProcessRealtimeBus, type RealtimeBus } from '../realtime/RealtimeBus';
 import { registerEventsRoutes } from '../routes/events';
 import type { LicenseGate } from '../licensing/LicenseRuntime';
 import { UsageMeters } from '../licensing/UsageMeters';
 import type { ConnectedUsageReporter } from '../licensing/ConnectedUsageReporter';
 import { isLicenseGateTrusted } from '../licensing/trusted-license-gates';
+import { WorkerThreadPool, type FallbackFontDescriptor } from '../runtime/WorkerThreadPool';
+import { DocumentLifecycleService } from '../services/DocumentLifecycleService';
+import { BaseFileCache } from '../storage/BaseFileCache';
+import type { ObjectStoreWithInfo } from '../storage/ObjectStore';
 
 export interface BuildAppOptions {
   /** Required commercial gate for every server construction. */
@@ -140,6 +146,16 @@ export interface BuildAppOptions {
    * edge layer (WAF / ingress) already rate-limits. See `JwtPluginOptions`.
    */
   authFailureLimit?: Partial<AuthFailureLimiterOptions> | false;
+  /**
+   * CORS for browser-direct deployments. `'*'` reflects any request
+   * origin — acceptable because CORS here is transport permission, not
+   * authorization: bearer tokens are the security boundary, and the
+   * per-credential `origins` claim (plus per-grant allowlists) carries
+   * the actual origin policy, which a static server-wide list cannot
+   * express. Pass an explicit list to pin instead. Absent = CORS off
+   * (today's behavior: same-origin or proxy-fronted deployments).
+   */
+  corsOrigins?: '*' | ReadonlyArray<string>;
   /**
    * Optional Kysely DB handle. When supplied together with `objectStore`,
    * the tenant/deployment admin surfaces are registered. Engine-only
@@ -253,6 +269,8 @@ export interface AppBundle {
   derivedRenders?: DerivedRenderService;
   /** Present only when `enableRevocation: true` with a `db`. */
   revokedJtisGuard?: RevokedJtisGuard;
+  /** Present whenever a `db` is configured; tests use it to clear the TTL cache. */
+  suspendedTenantsGuard?: SuspendedTenantsGuard;
   /** Phase 3 — present only when `cacheRoot` is set (+ pool + db). */
   documentService?: DocumentService;
   /** Phase 5 — write-side lazy layer materialization service. */
@@ -349,6 +367,19 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
     await realtimeBus.close();
   });
 
+  // CORS before the auth hook so preflights (which carry no
+  // Authorization) are answered instead of 401'd. `credentials` stays
+  // false: the bearer rides an explicit header, never cookies.
+  if (opts.corsOrigins !== undefined) {
+    await app.register(cors, {
+      origin: opts.corsOrigins === '*' ? true : [...opts.corsOrigins],
+      methods: ['GET', 'POST', 'PATCH', 'DELETE'],
+      allowedHeaders: ['authorization', 'content-type', 'x-engine-session-id', 'last-event-id'],
+      credentials: false,
+      maxAge: 86_400,
+    });
+  }
+
   await app.register(compress, {
     global: true,
     threshold: 1024,
@@ -395,6 +426,20 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
     jwksCacheStore = new DbJwksCacheStore(opts.db);
   }
 
+  // Tenant suspension gate: consulted by the auth hook for every JWT
+  // and by the share exchange. API-token requests never touch it.
+  const suspendedTenantsGuard = opts.db ? new SuspendedTenantsGuard({ db: opts.db }) : undefined;
+
+  // The deployment can sign iff it verifies with the shared secret —
+  // the ONE condition gating every minting surface: tokens.issue, the
+  // share-grant routes, and the public exchange. Asymmetric/JWKS
+  // deployments verify only; their backends mint with their own keys.
+  const verifierForSigning = opts.verifier;
+  const signer =
+    verifierForSigning.mode === 'hs256'
+      ? (input: SignDevTokenInput) => signDevToken(verifierForSigning.secret, input)
+      : undefined;
+
   // Inject the revocation + cache store into whichever mode the
   // caller picked. We don't overwrite if they're already set.
   const verifierConfig = {
@@ -425,6 +470,12 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
     verifier: verifierConfig,
     ...(apiAuthTokens.length > 0 ? { apiAuthTokens } : {}),
     ...(opts.authFailureLimit !== undefined ? { authFailureLimit: opts.authFailureLimit } : {}),
+    ...(suspendedTenantsGuard ? { suspendedTenants: suspendedTenantsGuard } : {}),
+    // The exchange is the one public v1 surface: the grant row is the
+    // authorization, and the route carries its own limiters.
+    ...(signer && opts.db && opts.objectStore
+      ? { publicPaths: [adminWirePaths.shareSessions] }
+      : {}),
   });
 
   // `documentService` is allocated below, but the pool's onEvict
@@ -531,29 +582,49 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
       securityProbe: new DocumentSecurityProbe({ cache: baseFileCache, pool }),
       ...(derivedRenders ? { derivedRenders } : {}),
       ...(usageMeters ? { usageMeters } : {}),
+      tenantUsage: new TenantUsageRepo(opts.db),
+      shareGrants: new ShareGrantsRepo(opts.db),
     });
     await registerAdminDocumentsRoutes(app, {
       lifecycle,
       storage: opts.objectStore,
     });
+    const tenantUsage = new TenantUsageRepo(opts.db);
     await registerAdminTenantsRoutes(app, {
       tenants: new TenantsRepo(opts.db),
       storage: opts.objectStore,
+      securityEvents: new SecurityEventsRepo(opts.db),
+      suspendedTenants: suspendedTenantsGuard!,
+      tenantUsage,
     });
     // Issue mounts only when the deployment can sign (HS256 — the
     // verifier secret doubles as signing material); revoke only when
     // revocation is enabled. Both write security_events.
-    const verifierForSigning = opts.verifier;
     await registerAdminTokensRoutes(app, {
       ...(revokedJtisGuard ? { guard: revokedJtisGuard } : {}),
-      ...(verifierForSigning.mode === 'hs256'
-        ? {
-            sign: (input: SignDevTokenInput) => signDevToken(verifierForSigning.secret, input),
-          }
-        : {}),
+      ...(signer ? { sign: signer } : {}),
       documents: new DocumentsRepo(opts.db),
       securityEvents: new SecurityEventsRepo(opts.db),
     });
+    // The share family (grant lifecycle + public exchange) exists only
+    // where minting does — same condition as tokens.issue, because a
+    // grant is a standing mint capability.
+    if (signer) {
+      const shareGrants = new ShareGrantsRepo(opts.db);
+      await registerAdminSharesRoutes(app, {
+        grants: shareGrants,
+        documents: new DocumentsRepo(opts.db),
+        securityEvents: new SecurityEventsRepo(opts.db),
+      });
+      await registerShareSessionRoutes(app, {
+        sign: signer,
+        grants: shareGrants,
+        documents: new DocumentsRepo(opts.db),
+        suspendedTenants: suspendedTenantsGuard!,
+        ...(usageMeters ? { usageMeters } : {}),
+        tenantUsage,
+      });
+    }
 
     // API-token requests reach the doc plane as a synthesized
     // tenant-mode principal for the DOC'S OWN tenant — recovered from
@@ -719,6 +790,7 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
         cdnSigner: opts.cdnSigner ?? new NoneCdnSigner(),
         ...(derivedRenders ? { derivedRenders } : {}),
         ...(usageMeters ? { usageMeters } : {}),
+        tenantUsage: new TenantUsageRepo(opts.db),
       });
       await registerDocsRoutes(app, { service: documentService });
       await registerMetadataRoutes(app, { service: documentService, layerService });
@@ -825,6 +897,7 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
     pool,
     lifecycle,
     revokedJtisGuard,
+    suspendedTenantsGuard,
     documentService,
     layerService,
     derivedRenders,
@@ -889,8 +962,13 @@ function isReadOnlyLicenseRequest(method: string, pathname: string): boolean {
 
   // These POST endpoints calculate or mint read access, but do not change the
   // customer's document contents. They remain available so an expired or
-  // suspended license can never hold existing data hostage.
-  return method === 'POST' && (pathname === '/v1/access' || pathname === '/v1/warm');
+  // suspended license can never hold existing data hostage. The share
+  // exchange belongs here for the same reason: it mints read sessions
+  // for already-shared documents.
+  return (
+    method === 'POST' &&
+    (pathname === '/v1/access' || pathname === '/v1/warm' || pathname === '/v1/share-sessions')
+  );
 }
 
 function mapToHttp(code: string): number {
