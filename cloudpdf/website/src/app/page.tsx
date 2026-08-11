@@ -8,6 +8,7 @@ import { GuideSection } from '@/components/site/guide-section';
 import { HeroScene } from '@/components/site/hero-scene';
 import { ArrowRight, PlayIcon } from '@/components/site/icons';
 import { ProblemSection } from '@/components/site/problem-section';
+import { START_URL } from '../lib/site-urls';
 
 const TRUST: { label: string; icon: IconSvgElement }[] = [
   { label: 'Developer first', icon: SourceCodeIcon },
@@ -33,7 +34,7 @@ export default function HomePage() {
               components, hosted or self-hosted.
             </p>
             <div className="mt-[34px] flex flex-wrap gap-4">
-              <CpButton href="#" variant="primary">
+              <CpButton href={START_URL} variant="primary">
                 <span>Start building</span>
                 <ArrowRight width={20} height={20} />
               </CpButton>

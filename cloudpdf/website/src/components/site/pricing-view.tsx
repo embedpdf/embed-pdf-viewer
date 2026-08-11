@@ -1,16 +1,41 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
+import type { PublicPlan } from '../../lib/saas-plans';
+import { PORTAL_URL } from '../../lib/site-urls';
 import { ArrowRight, CheckIcon } from './icons';
 import { useSalesDialog } from './sales-dialog';
 
 type Billing = 'monthly' | 'annual';
 
-const FEATURES: { name: string; icon: ReactNode }[] = [
+/**
+ * The two managed tiers render straight from the platform catalog:
+ * price, included usage, and trial length are data, never copy. The
+ * taglines and shared feature labels below are the page's judgment.
+ */
+const TIER_COPY: Record<string, { tagline: string }> = {
+  growth: { tagline: 'More capacity for growing teams.' },
+  standard: { tagline: 'A focused production workspace.' },
+};
+
+const SHARED_FEATURES: { icon: ReactNode; name: string }[] = [
   {
-    name: 'Annotations',
+    name: 'Embeddable viewer snippet',
+    icon: (
+      <>
+        <path d="m8 8-4 4 4 4" />
+        <path d="m16 8 4 4-4 4" />
+      </>
+    ),
+  },
+  {
+    name: 'Public share links, domain-locked',
+    icon: <path d="M9 15l6-6M10 6l1-1a4 4 0 0 1 6 6l-1 1M14 18l-1 1a4 4 0 0 1-6-6l1-1" />,
+  },
+  {
+    name: 'Annotations & forms',
     icon: (
       <>
         <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
@@ -19,30 +44,7 @@ const FEATURES: { name: string; icon: ReactNode }[] = [
     ),
   },
   {
-    name: 'Role-based access',
-    icon: (
-      <>
-        <circle cx="9" cy="8" r="3" />
-        <path d="M3 20c0-3 2.7-5 6-5s6 2 6 5" />
-        <path d="M16 7a3 3 0 0 1 0 6M21 20c0-2.5-1.5-4-3.5-4.7" />
-      </>
-    ),
-  },
-  {
-    name: 'Signed URLs',
-    icon: <path d="M9 15l6-6M10 6l1-1a4 4 0 0 1 6 6l-1 1M14 18l-1 1a4 4 0 0 1-6-6l1-1" />,
-  },
-  {
-    name: 'BYO storage',
-    icon: (
-      <>
-        <rect x="3" y="4" width="18" height="12" rx="1.5" />
-        <path d="M8 20h8M12 16v4" />
-      </>
-    ),
-  },
-  {
-    name: 'Audit logs',
+    name: 'Developer API & SDKs',
     icon: (
       <>
         <rect x="4" y="3" width="16" height="18" rx="2" />
@@ -51,74 +53,67 @@ const FEATURES: { name: string; icon: ReactNode }[] = [
     ),
   },
   {
-    name: 'SSO / SAML',
+    name: 'Usage dashboard',
     icon: (
       <>
-        <path d="M12 2l8 4v6c0 5-3.5 9-8 10-4.5-1-8-5-8-10V6z" />
-        <path d="m9 12 2 2 4-4" />
+        <path d="M3 3v18h18" />
+        <path d="M7 15v3M12 10v8M17 6v12" />
       </>
     ),
   },
-  {
-    name: 'Priority support',
-    icon: <path d="M12 3l2.5 5.5L20 9l-4 4 1 6-5-3-5 3 1-6-4-4 5.5-.5z" />,
-  },
 ];
 
-function FeatureList() {
-  return (
-    <ul className="mt-5 flex flex-col">
-      {FEATURES.map((f) => (
-        <li
-          key={f.name}
-          className="text-cp-ink flex items-center gap-3 px-1 py-[5px] font-sans text-[15px] leading-[1.3]"
-        >
-          <span className="text-cp-blue inline-flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-[#EEF4FF]">
-            <svg
-              width={16}
-              height={16}
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              {f.icon}
-            </svg>
-          </span>
-          <span className="flex-1">{f.name}</span>
-          <span className="text-cp-blue flex-shrink-0">
-            <CheckIcon width={18} height={18} strokeWidth={2.4} />
-          </span>
-        </li>
-      ))}
-    </ul>
-  );
+function formatMoneyMinor(minor: number): string {
+  const dollars = minor / 100;
+  return `$${dollars.toLocaleString('en-US', {
+    maximumFractionDigits: Number.isInteger(dollars) ? 0 : 2,
+  })}`;
+}
+
+function formatCount(limitValue: string): string {
+  return Number(limitValue).toLocaleString('en-US');
+}
+
+function formatStorage(limitValue: string): string {
+  return `${Math.round(Number(limitValue) / 1024 ** 3)} GB`;
+}
+
+function meterLines(plan: PublicPlan): string[] {
+  const byMetric = new Map(plan.meters.map((meter) => [meter.metricCode, meter]));
+  const views = byMetric.get('pdf.views');
+  const uploads = byMetric.get('pdf.uploads');
+  const storage = byMetric.get('storage.bytes');
+  return [
+    ...(views ? [`${formatCount(views.limitValue)} document views / month`] : []),
+    ...(uploads ? [`${formatCount(uploads.limitValue)} uploads / month`] : []),
+    ...(storage ? [`${formatStorage(storage.limitValue)} storage`] : []),
+  ];
 }
 
 function Plan({
-  icon,
-  name,
-  tagline,
-  monthly,
-  annual,
-  includesMonthly,
-  includesAnnual,
   billing,
+  icon,
+  monthlyPlan,
+  annualPlan,
+  tier,
   variant,
 }: {
-  icon: ReactNode;
-  name: string;
-  tagline: string;
-  monthly: string;
-  annual: string;
-  includesMonthly: string;
-  includesAnnual: string;
+  annualPlan: PublicPlan;
   billing: Billing;
-  variant: 'primary' | 'outline';
+  icon: ReactNode;
+  monthlyPlan: PublicPlan;
+  tier: string;
+  variant: 'outline' | 'primary';
 }) {
   const isAnnual = billing === 'annual';
+  const active = isAnnual ? annualPlan : monthlyPlan;
+  const annualTotalMinor = Number(annualPlan.unitAmountMinor);
+  const perMonthMinor = isAnnual
+    ? Math.round(annualTotalMinor / 12)
+    : Number(monthlyPlan.unitAmountMinor);
+  const name = tier.charAt(0).toUpperCase() + tier.slice(1);
+  const included = meterLines(active);
+
   return (
     <div className="border-cp-border flex flex-col rounded-[20px] border bg-white p-[30px] pb-[26px] shadow-[0_1px_2px_rgba(10,26,77,0.04),0_18px_40px_-28px_rgba(10,26,77,0.18)] transition-all hover:border-[#CFE0FF] hover:shadow-[0_1px_2px_rgba(10,26,77,0.04),0_26px_56px_-28px_rgba(22,119,255,0.3)]">
       <div className="flex items-center gap-4">
@@ -130,30 +125,71 @@ function Plan({
             {name}
           </div>
           <div className="text-cp-blue mt-1 font-sans text-[13px] font-medium leading-[1.35]">
-            {tagline}
+            {TIER_COPY[tier]?.tagline ?? 'Managed CloudPDF workspace.'}
           </div>
         </div>
       </div>
 
       <div className="mt-[26px]">
-        <div className="text-cp-muted font-sans text-sm">Starting at</div>
+        <div className="text-cp-muted font-sans text-sm">
+          {active.trialDays}-day free trial, then
+        </div>
         <div className="mt-2.5 flex items-baseline gap-1">
           <span className="font-display text-cp-blue text-[44px] font-extrabold leading-none tracking-[-0.03em]">
-            {isAnnual ? annual : monthly}
+            {formatMoneyMinor(perMonthMinor)}
           </span>
           <span className="text-cp-muted font-sans text-base">/mo</span>
         </div>
         <div className="text-cp-muted mt-3 font-sans text-[13.5px] leading-[1.4]">
-          {isAnnual ? includesAnnual : includesMonthly}
+          {isAnnual
+            ? `Billed ${formatMoneyMinor(annualTotalMinor)} annually`
+            : 'Billed monthly · cancel anytime'}
         </div>
       </div>
 
       <div className="bg-cp-borderSoft mt-[22px] h-px" />
 
-      <FeatureList />
+      <ul className="mt-5 flex flex-col">
+        {included.map((line) => (
+          <li
+            key={line}
+            className="text-cp-ink flex items-center gap-3 px-1 py-[5px] font-sans text-[15px] font-semibold leading-[1.3]"
+          >
+            <span className="text-cp-blue flex-shrink-0">
+              <CheckIcon width={18} height={18} strokeWidth={2.4} />
+            </span>
+            <span className="flex-1">{line}</span>
+          </li>
+        ))}
+        {SHARED_FEATURES.map((feature) => (
+          <li
+            key={feature.name}
+            className="text-cp-ink flex items-center gap-3 px-1 py-[5px] font-sans text-[15px] leading-[1.3]"
+          >
+            <span className="text-cp-blue inline-flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-[#EEF4FF]">
+              <svg
+                width={16}
+                height={16}
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                {feature.icon}
+              </svg>
+            </span>
+            <span className="flex-1">{feature.name}</span>
+            <span className="text-cp-blue flex-shrink-0">
+              <CheckIcon width={18} height={18} strokeWidth={2.4} />
+            </span>
+          </li>
+        ))}
+      </ul>
 
       <a
-        href="#"
+        href={`${PORTAL_URL}/saas?plan=${encodeURIComponent(active.code)}`}
         className={`mt-[26px] flex h-[50px] w-full items-center justify-center gap-2.5 rounded-[10px] font-sans text-base font-bold no-underline transition-all ${
           variant === 'primary'
             ? 'bg-cp-blue hover:bg-cp-blue600 text-white hover:shadow-[0_8px_20px_rgba(22,119,255,0.28)]'
@@ -167,9 +203,23 @@ function Plan({
   );
 }
 
-export function PricingView() {
+export function PricingView({ plans }: { plans: PublicPlan[] }) {
   const { openSalesDialog } = useSalesDialog();
   const [billing, setBilling] = useState<Billing>('monthly');
+
+  const byTier = useMemo(() => {
+    const map = new Map<string, { annual?: PublicPlan; monthly?: PublicPlan }>();
+    for (const plan of plans) {
+      const entry = map.get(plan.tier) ?? {};
+      if (plan.billingInterval === 'year') entry.annual = plan;
+      else entry.monthly = plan;
+      map.set(plan.tier, entry);
+    }
+    return map;
+  }, [plans]);
+
+  const standard = byTier.get('standard');
+  const growth = byTier.get('growth');
 
   return (
     <section className="bg-cp-bg relative w-full overflow-clip py-[clamp(48px,6vw,88px)] pb-[clamp(64px,8vw,120px)]">
@@ -222,8 +272,8 @@ export function PricingView() {
             </h1>
             <div className="bg-cp-blue mt-[30px] h-[7px] w-16 rounded-[10px]" />
             <p className="text-cp-ink mt-7 max-w-[430px] font-sans text-[19px] leading-[1.6]">
-              Choose the deployment model that fits your needs today. Upgrade or switch anytime as
-              you grow.
+              Start on the managed cloud with a 14-day free trial. Prefer your own
+              infrastructure? Talk to us about self-hosting.
             </p>
 
             <div className="mt-[clamp(36px,4vw,52px)]">
@@ -249,7 +299,7 @@ export function PricingView() {
                 ))}
               </div>
               <div className="text-cp-muted mt-3.5 font-sans text-sm leading-[1.5]">
-                Save up to <b className="text-cp-blue font-bold">20%</b> with annual billing
+                Save up to <b className="text-cp-blue font-bold">17%</b> with annual billing
               </div>
             </div>
           </div>
@@ -257,56 +307,99 @@ export function PricingView() {
           {/* CARDS */}
           <div className="flex flex-col gap-[22px]">
             <div className="grid grid-cols-1 gap-[22px] min-[621px]:grid-cols-2">
-              <Plan
-                billing={billing}
-                variant="primary"
-                name="Managed SaaS"
-                tagline="We host and manage everything."
-                monthly="$199"
-                annual="$165"
-                includesMonthly="Includes 10,000 documents / month"
-                includesAnnual="Billed $1,980 annually · 10,000 documents / month"
-                icon={
-                  <svg
-                    width={28}
-                    height={28}
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.9"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M7 18a4.5 4.5 0 0 1-.5-8.97A5.5 5.5 0 0 1 17 8.5a4 4 0 0 1 .5 9.5H7z" />
-                  </svg>
+              {standard?.monthly && standard.annual ? (
+                <Plan
+                  annualPlan={standard.annual}
+                  billing={billing}
+                  monthlyPlan={standard.monthly}
+                  tier="standard"
+                  variant="outline"
+                  icon={
+                    <svg
+                      width={28}
+                      height={28}
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.9"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M7 18a4.5 4.5 0 0 1-.5-8.97A5.5 5.5 0 0 1 17 8.5a4 4 0 0 1 .5 9.5H7z" />
+                    </svg>
+                  }
+                />
+              ) : null}
+              {growth?.monthly && growth.annual ? (
+                <Plan
+                  annualPlan={growth.annual}
+                  billing={billing}
+                  monthlyPlan={growth.monthly}
+                  tier="growth"
+                  variant="primary"
+                  icon={
+                    <svg
+                      width={26}
+                      height={26}
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.9"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M3 17l6-6 4 4 8-8" />
+                      <path d="M14 7h7v7" />
+                    </svg>
+                  }
+                />
+              ) : null}
+            </div>
+
+            {/* Self-hosted band: licensed software is a conversation, not a cart. */}
+            <div className="border-cp-border flex items-center gap-[26px] rounded-[20px] border bg-white px-8 py-[26px] shadow-[0_1px_2px_rgba(10,26,77,0.04),0_18px_40px_-30px_rgba(10,26,77,0.16)] max-[720px]:flex-col max-[720px]:items-start max-[720px]:gap-5">
+              <span className="text-cp-blue bg-cp-surface inline-flex h-[60px] w-[60px] flex-shrink-0 items-center justify-center rounded-[15px]">
+                <svg
+                  width={28}
+                  height={28}
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.9"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <rect x="3" y="4" width="18" height="6" rx="1.5" />
+                  <rect x="3" y="14" width="18" height="6" rx="1.5" />
+                  <path d="M7 7h.01M7 17h.01" />
+                </svg>
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className="font-display text-cp-navy text-[22px] font-extrabold leading-[1.15] tracking-[-0.02em]">
+                  Self-hosted
+                </div>
+                <div className="text-cp-blue mt-1.5 font-sans text-[15.5px] font-semibold leading-[1.4]">
+                  The same engine, deployed in your infrastructure.
+                </div>
+                <div className="text-cp-muted mt-0.5 font-sans text-[14.5px] leading-[1.4]">
+                  Docker, Helm, or bare metal — licensed annually. Talk to us for a
+                  quote and an evaluation license.
+                </div>
+              </div>
+              <button
+                className="border-cp-blue text-cp-blue hover:border-cp-blue600 hover:text-cp-blue600 flex h-[50px] flex-shrink-0 cursor-pointer items-center justify-center gap-2.5 rounded-[10px] border-2 px-[22px] font-sans text-base font-bold transition-all hover:bg-[rgba(22,119,255,0.08)] max-[720px]:w-full"
+                data-testid="pricing-self-hosted-contact-sales"
+                onClick={() =>
+                  openSalesDialog({
+                    placement: 'pricing-self-hosted',
+                    productInterest: 'cloudpdf-self-hosted',
+                  })
                 }
-              />
-              <Plan
-                billing={billing}
-                variant="outline"
-                name="Self-hosted"
-                tagline="Deploy in your own infrastructure."
-                monthly="$999"
-                annual="$799"
-                includesMonthly="Includes 10,000 documents / month"
-                includesAnnual="Billed annually · 10,000 documents / month"
-                icon={
-                  <svg
-                    width={26}
-                    height={26}
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.9"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <rect x="3" y="4" width="18" height="6" rx="1.5" />
-                    <rect x="3" y="14" width="18" height="6" rx="1.5" />
-                    <path d="M7 7h.01M7 17h.01" />
-                  </svg>
-                }
-              />
+                type="button"
+              >
+                <span>Talk to us</span>
+                <ArrowRight width={20} height={20} />
+              </button>
             </div>
 
             {/* Enterprise band */}

@@ -8,6 +8,7 @@ import { CpButton } from './button';
 import { ArrowRight, SearchIcon } from './icons';
 import { SearchModal } from './search-modal';
 import { useSalesDialog } from './sales-dialog';
+import { APP_URL, START_URL } from '../../lib/site-urls';
 
 const NAV = [
   { label: 'Docs', href: '/docs' },
@@ -21,6 +22,19 @@ export function Header() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [metaLabel, setMetaLabel] = useState('⌘');
+  const [signedIn, setSignedIn] = useState(false);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch('/api/platform/v1/me', {
+      cache: 'no-store',
+      credentials: 'include',
+      signal: controller.signal,
+    })
+      .then((response) => setSignedIn(response.ok))
+      .catch(() => setSignedIn(false));
+    return () => controller.abort();
+  }, []);
 
   useEffect(() => {
     if (!/Mac|iPhone|iPad/.test(navigator.platform)) setMetaLabel('Ctrl');
@@ -105,8 +119,8 @@ export function Header() {
           >
             Contact sales
           </CpButton>
-          <CpButton href="#" variant="primary" size="sm">
-            <span>Start building</span>
+          <CpButton href={signedIn ? APP_URL : START_URL} variant="primary" size="sm">
+            <span>{signedIn ? 'Open dashboard' : 'Start building'}</span>
             <ArrowRight width={18} height={18} />
           </CpButton>
         </div>
@@ -192,8 +206,8 @@ export function Header() {
         >
           Contact sales
         </CpButton>
-        <CpButton href="#" variant="primary" size="sm" className="mt-2.5 w-full">
-          Start building
+        <CpButton href={signedIn ? APP_URL : START_URL} variant="primary" size="sm" className="mt-2.5 w-full">
+          {signedIn ? 'Open dashboard' : 'Start building'}
         </CpButton>
       </div>
 
