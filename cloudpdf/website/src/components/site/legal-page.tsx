@@ -22,7 +22,7 @@ export function LegalPage({ description, eyebrow, lastUpdated, sections, title }
     <main className="bg-cp-bg min-h-screen">
       <section className="relative overflow-hidden border-b border-[#E4EAF4] bg-white">
         <div className="cp-dots pointer-events-none absolute -right-10 -top-8 h-44 w-56 text-[#D9E7FF]" />
-        <div className="relative mx-auto w-full max-w-[1180px] px-[clamp(20px,4vw,64px)] py-[clamp(64px,8vw,104px)]">
+        <div className="relative mx-auto w-full max-w-[1440px] px-[clamp(20px,4vw,78px)] py-[clamp(64px,8vw,104px)]">
           <p className="font-display text-cp-blue text-sm font-extrabold uppercase tracking-[0.16em]">
             {eyebrow}
           </p>
@@ -36,7 +36,13 @@ export function LegalPage({ description, eyebrow, lastUpdated, sections, title }
         </div>
       </section>
 
-      <div className="mx-auto grid w-full max-w-[1180px] gap-12 px-[clamp(20px,4vw,64px)] py-[clamp(56px,7vw,88px)] min-[960px]:grid-cols-[240px_minmax(0,1fr)] min-[960px]:gap-16">
+      {/*
+        The TOC gets 300px because at 240px its labels had ~150px of room and
+        14 of 16 privacy entries wrapped to two lines. The article is capped
+        rather than left to fill the wider container — legal prose at 16px
+        reads badly past ~90 characters, and this track is ~955px.
+      */}
+      <div className="mx-auto grid w-full max-w-[1440px] gap-12 px-[clamp(20px,4vw,78px)] py-[clamp(56px,7vw,88px)] min-[960px]:grid-cols-[300px_minmax(0,1fr)] min-[960px]:gap-16">
         <aside className="min-w-0">
           <LegalTableOfContents
             title={title}
@@ -47,7 +53,7 @@ export function LegalPage({ description, eyebrow, lastUpdated, sections, title }
           />
         </aside>
 
-        <article className="min-w-0">
+        <article className="min-w-0 max-w-[780px]">
           {sections.map((section, index) => (
             <section
               key={section.id}
