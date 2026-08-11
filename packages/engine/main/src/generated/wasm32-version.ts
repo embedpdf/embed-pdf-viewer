@@ -6,4 +6,4 @@
  * the published version, which pins the default jsDelivr wasm URL to the
  * exact binary this package was built against.
  */
-export const WASM32_VERSION = '3.0.0-next.1';
+export const WASM32_VERSION = '3.0.0-next.2';
