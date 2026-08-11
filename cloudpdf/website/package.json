@@ -2,7 +2,7 @@
   "name": "@cloudpdf/website",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -p 3400",
     "dev:clean": "rm -rf .next && next dev",
     "prebuild": "pnpm api:check",
     "build": "next build",

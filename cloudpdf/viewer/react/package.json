@@ -2,13 +2,18 @@
   "name": "@cloudpdf/viewer-react",
   "version": "3.0.0-next.1",
   "private": false,
-  "description": "React wrapper for the full viewer wired to CloudPDF: <CloudPDFViewer docToken=\"…\" />. A thin cloud DOOR over @embedpdf/viewer-react/core — no wasm, no workers, rendering happens on a @cloudpdf/server deployment (or CloudPDF SaaS) over HTTPS.",
+  "description": "React wrapper for the full viewer wired to CloudPDF: the CloudPDFViewer component. A thin cloud door over @embedpdf/viewer-react/core - no wasm, no workers, rendering happens on a @cloudpdf/server deployment (or CloudPDF SaaS) over HTTPS.",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.cts",
   "exports": {
-    ".": "./src/index.ts",
+    ".": {
+      "types": "./dist/index.d.ts",
+      "development": "./src/index.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
     "./package.json": "./package.json"
   },
   "files": [
