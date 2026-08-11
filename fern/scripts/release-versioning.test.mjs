@@ -85,3 +85,19 @@ test('versioning and SDK freshness use one pinned TypeScript generator path', ()
   assert.match(workflow, /CLOUDPDF_FERN_CLI: fern/);
   assert.match(workflow, /node fern\/scripts\/generate-typescript-sdk\.mjs/);
 });
+
+test('Fern sdkVersion validation is scoped to the TypeScript generator', () => {
+  const validator = read('fern/scripts/validate-sdk.mjs');
+  const switchIndex = validator.indexOf('switch (language)');
+  const typescriptIndex = validator.indexOf("case 'typescript':", switchIndex);
+  const pythonIndex = validator.indexOf("case 'python':", typescriptIndex);
+
+  assert.notEqual(switchIndex, -1);
+  assert.notEqual(typescriptIndex, -1);
+  assert.notEqual(pythonIndex, -1);
+  assert.doesNotMatch(validator.slice(0, switchIndex), /fernMetadata\.sdkVersion/);
+  assert.match(
+    validator.slice(typescriptIndex, pythonIndex),
+    /fernMetadata\.sdkVersion === expectedVersion/,
+  );
+});
