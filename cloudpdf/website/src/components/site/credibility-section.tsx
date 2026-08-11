@@ -10,6 +10,12 @@ const CARD_PAD = 'p-[clamp(26px,2.4vw,34px)]';
 
 const GITHUB_PATH =
   'M12 .5C5.37.5 0 5.78 0 12.29c0 5.2 3.44 9.6 8.21 11.16.6.11.82-.25.82-.56v-2.16c-3.34.71-4.04-1.57-4.04-1.57-.55-1.36-1.34-1.72-1.34-1.72-1.09-.72.08-.71.08-.71 1.2.08 1.84 1.21 1.84 1.21 1.07 1.78 2.81 1.27 3.49.97.11-.76.42-1.27.76-1.56-2.67-.29-5.47-1.29-5.47-5.74 0-1.27.46-2.31 1.21-3.12-.12-.29-.53-1.46.11-3.05 0 0 .98-.31 3.2 1.19a11.5 11.5 0 0 1 5.83 0c2.22-1.5 3.2-1.19 3.2-1.19.64 1.59.24 2.76.12 3.05.76.81 1.21 1.85 1.21 3.12 0 4.46-2.81 5.45-5.49 5.73.43.36.81 1.09.81 2.2v3.26c0 .31.22.68.83.56C20.57 21.88 24 17.48 24 12.29 24 5.78 18.63.5 12 .5z';
+/**
+ * The stars on this row are EmbedPDF's, the open-source viewer CloudPDF is
+ * built on. The card names it explicitly so nobody lands on a repo called
+ * `embed-pdf-viewer` wondering where CloudPDF went.
+ */
+const EMBEDPDF_REPO_URL = 'https://github.com/embedpdf/embed-pdf-viewer';
 const STAR_PATH = 'M12 2.5l2.7 5.9 6.4.6-4.8 4.3 1.4 6.3L12 16.9 6.3 19.6l1.4-6.3L2.9 9l6.4-.6z';
 
 /**
@@ -63,19 +69,22 @@ export function CredibilitySection() {
                   4k+
                 </div>
                 <h3 className="font-display text-cp-navy mt-[7px] text-[21px] font-extrabold leading-[1.18] tracking-[-0.014em]">
-                  GitHub stars
+                  stars on <em className="text-cp-blue not-italic">EmbedPDF</em>
                 </h3>
                 <p className="text-cp-ink mt-[13px] font-sans text-[14.5px] leading-[1.55]">
-                  Join thousands of developers building with CloudPDF.
+                  CloudPDF is built on EmbedPDF, our open-source PDF viewer. Same team, same core —
+                  CloudPDF is the hosted platform around it.
                 </p>
                 <Link
-                  href="#"
+                  href={EMBEDPDF_REPO_URL}
+                  target="_blank"
+                  rel="noreferrer"
                   className="border-cp-border text-cp-blue hover:text-cp-blue600 group mt-[22px] inline-flex h-11 items-center gap-2.5 whitespace-nowrap rounded-[10px] border-[1.5px] bg-white px-5 font-sans text-[14px] font-bold no-underline transition-all duration-200 hover:border-[#BCD2FB] hover:shadow-[0_10px_22px_-12px_rgba(22,119,255,0.4)]"
                 >
                   <svg width={18} height={18} viewBox="0 0 24 24" fill="currentColor">
                     <path d={GITHUB_PATH} />
                   </svg>
-                  <span>Star on GitHub</span>
+                  <span>Star EmbedPDF on GitHub</span>
                   <svg
                     width={16}
                     height={16}
