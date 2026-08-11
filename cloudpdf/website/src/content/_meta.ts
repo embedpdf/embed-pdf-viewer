@@ -24,4 +24,8 @@ export default {
     title: 'Contact',
     type: 'page',
   },
+  'refund-policy': {
+    title: 'Refund Policy',
+    type: 'page',
+  },
 };
