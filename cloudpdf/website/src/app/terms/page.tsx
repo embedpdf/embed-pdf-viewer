@@ -18,7 +18,7 @@ export const metadata: Metadata = {
 
 const COMPANY = 'CloudPDF LTD';
 const CONTACT_EMAIL = 'hello@cloudpdf.com';
-const LAST_UPDATED = '4 August 2026';
+const LAST_UPDATED = '12 August 2026';
 
 const sections: readonly LegalSection[] = [
   {
@@ -41,8 +41,9 @@ const sections: readonly LegalSection[] = [
         <LegalCallout>
           A signed commercial agreement, order form, accepted custom offer, checkout summary, or
           other ordering document is an “Order”. If an Order conflicts with these Terms, the Order
-          controls for that purchase. Open-source code and separately licensed software remain
-          governed by their applicable license files.
+          controls for that purchase, but it does not reduce the 14-day refund right for a
+          transaction processed through Paddle. Open-source code and separately licensed software
+          remain governed by their applicable license files.
         </LegalCallout>
       </>
     ),
@@ -200,14 +201,14 @@ const sections: readonly LegalSection[] = [
           </li>
           <li>
             You may cancel future renewal through the available billing flow or by contacting us.
-            Cancellation normally takes effect at the end of the paid term and does not
-            retroactively refund that term.
+            Cancellation normally takes effect at the end of the paid term and prevents future
+            renewal. Cancellation and requesting a refund are separate actions.
           </li>
           <li>
-            Refund eligibility and requests are described in our{' '}
-            <LegalLink href="/refund-policy">Refund Policy</LegalLink>, alongside the checkout,
-            Paddle’s terms, and mandatory law. Nothing in these Terms limits rights that cannot
-            lawfully be limited.
+            You may request a full refund within 14 calendar days of an initial purchase or renewal
+            transaction, as described in our{' '}
+            <LegalLink href="/refund-policy">Refund Policy</LegalLink>. Nothing in these Terms
+            limits rights that cannot lawfully be limited.
           </li>
         </LegalList>
         <LegalParagraph>
