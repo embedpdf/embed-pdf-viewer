@@ -1,5 +1,7 @@
 # @embedpdf/engine-core
 
+## 3.0.0-next.2
+
 ## 3.0.0-next.1
 
 ### Minor Changes
