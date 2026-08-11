@@ -1,5 +1,13 @@
 'use client';
 
+import {
+  Analytics01Icon,
+  ApiIcon,
+  Link02Icon,
+  PencilEdit02Icon,
+  SourceCodeIcon,
+} from '@hugeicons/core-free-icons';
+import { HugeiconsIcon, type IconSvgElement } from '@hugeicons/react';
 import type { ReactNode } from 'react';
 import { useMemo, useState } from 'react';
 
@@ -20,47 +28,12 @@ const TIER_COPY: Record<string, { tagline: string }> = {
   standard: { tagline: 'A focused production workspace.' },
 };
 
-const SHARED_FEATURES: { icon: ReactNode; name: string }[] = [
-  {
-    name: 'Embeddable viewer snippet',
-    icon: (
-      <>
-        <path d="m8 8-4 4 4 4" />
-        <path d="m16 8 4 4-4 4" />
-      </>
-    ),
-  },
-  {
-    name: 'Public share links, domain-locked',
-    icon: <path d="M9 15l6-6M10 6l1-1a4 4 0 0 1 6 6l-1 1M14 18l-1 1a4 4 0 0 1-6-6l1-1" />,
-  },
-  {
-    name: 'Annotations & forms',
-    icon: (
-      <>
-        <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-        <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-      </>
-    ),
-  },
-  {
-    name: 'Developer API & SDKs',
-    icon: (
-      <>
-        <rect x="4" y="3" width="16" height="18" rx="2" />
-        <path d="M8 8h8M8 12h8M8 16h5" />
-      </>
-    ),
-  },
-  {
-    name: 'Usage dashboard',
-    icon: (
-      <>
-        <path d="M3 3v18h18" />
-        <path d="M7 15v3M12 10v8M17 6v12" />
-      </>
-    ),
-  },
+const SHARED_FEATURES: { icon: IconSvgElement; name: string }[] = [
+  { name: 'Embeddable viewer snippet', icon: SourceCodeIcon },
+  { name: 'Public share links, domain-locked', icon: Link02Icon },
+  { name: 'Annotations & forms', icon: PencilEdit02Icon },
+  { name: 'Developer API & SDKs', icon: ApiIcon },
+  { name: 'Usage dashboard', icon: Analytics01Icon },
 ];
 
 function formatMoneyMinor(minor: number): string {
@@ -155,35 +128,32 @@ function Plan({
             key={line}
             className="text-cp-ink flex items-center gap-3 px-1 py-[5px] font-sans text-[15px] font-semibold leading-[1.3]"
           >
-            <span className="text-cp-blue flex-shrink-0">
+            {/* w-7 matches the width of the feature icon boxes below so both
+                lists start their text at the same x. Deliberately no h-7 —
+                that would pad these rows to 28px and space them out. */}
+            <span className="text-cp-blue inline-flex w-7 flex-shrink-0 items-center justify-center">
               <CheckIcon width={18} height={18} strokeWidth={2.4} />
             </span>
             <span className="flex-1">{line}</span>
           </li>
         ))}
+      </ul>
+
+      {/*
+        Two different kinds of claim: the list above is this tier's quota, the
+        list below ships with every plan. They were one <ul> with identical
+        spacing, so the groups ran together.
+      */}
+      <ul className="mt-[18px] flex flex-col">
         {SHARED_FEATURES.map((feature) => (
           <li
             key={feature.name}
             className="text-cp-ink flex items-center gap-3 px-1 py-[5px] font-sans text-[15px] leading-[1.3]"
           >
             <span className="text-cp-blue inline-flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-[#EEF4FF]">
-              <svg
-                width={16}
-                height={16}
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                {feature.icon}
-              </svg>
+              <HugeiconsIcon icon={feature.icon} size={16} strokeWidth={2} />
             </span>
             <span className="flex-1">{feature.name}</span>
-            <span className="text-cp-blue flex-shrink-0">
-              <CheckIcon width={18} height={18} strokeWidth={2.4} />
-            </span>
           </li>
         ))}
       </ul>
@@ -205,7 +175,7 @@ function Plan({
 
 export function PricingView({ plans }: { plans: PublicPlan[] }) {
   const { openSalesDialog } = useSalesDialog();
-  const [billing, setBilling] = useState<Billing>('monthly');
+  const [billing, setBilling] = useState<Billing>('annual');
 
   const byTier = useMemo(() => {
     const map = new Map<string, { annual?: PublicPlan; monthly?: PublicPlan }>();
@@ -272,8 +242,8 @@ export function PricingView({ plans }: { plans: PublicPlan[] }) {
             </h1>
             <div className="bg-cp-blue mt-[30px] h-[7px] w-16 rounded-[10px]" />
             <p className="text-cp-ink mt-7 max-w-[430px] font-sans text-[19px] leading-[1.6]">
-              Start on the managed cloud with a 14-day free trial. Prefer your own
-              infrastructure? Talk to us about self-hosting.
+              Start on the managed cloud with a 14-day free trial. Prefer your own infrastructure?
+              Talk to us about self-hosting.
             </p>
 
             <div className="mt-[clamp(36px,4vw,52px)]">
@@ -382,8 +352,8 @@ export function PricingView({ plans }: { plans: PublicPlan[] }) {
                   The same engine, deployed in your infrastructure.
                 </div>
                 <div className="text-cp-muted mt-0.5 font-sans text-[14.5px] leading-[1.4]">
-                  Docker, Helm, or bare metal — licensed annually. Talk to us for a
-                  quote and an evaluation license.
+                  Docker, Helm, or bare metal — licensed annually. Talk to us for a quote and an
+                  evaluation license.
                 </div>
               </div>
               <button
