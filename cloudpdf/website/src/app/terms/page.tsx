@@ -177,6 +177,7 @@ const sections: readonly LegalSection[] = [
           transaction is also governed by the{' '}
           <LegalLink href="https://www.paddle.com/legal/buyer-terms">Paddle Buyer Terms</LegalLink>{' '}
           and Paddle’s{' '}
+          <LegalLink href="https://www.paddle.com/legal/refund-policy">Refund Policy</LegalLink> and{' '}
           <LegalLink href="https://www.paddle.com/legal/privacy">Privacy Policy</LegalLink>.
         </LegalParagraph>
         <LegalParagraph>
@@ -203,7 +204,8 @@ const sections: readonly LegalSection[] = [
             retroactively refund that term.
           </li>
           <li>
-            Refund and statutory cancellation rights are handled in accordance with the checkout,
+            Refund eligibility and requests are described in our{' '}
+            <LegalLink href="/refund-policy">Refund Policy</LegalLink>, alongside the checkout,
             Paddle’s terms, and mandatory law. Nothing in these Terms limits rights that cannot
             lawfully be limited.
           </li>
