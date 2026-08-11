@@ -5,13 +5,17 @@
 # disagrees with its declared build configuration surfaces here as a dirty
 # tree — on the pull request, instead of at the release workflow's
 # "Verify publish worktree" gate after a version PR has already merged.
+#
+# Triggers are deliberately narrow: the rewrite is a function of the
+# manifest and the build preset, never of source code, so only changes to
+# a package.json, the tooling, or the lockfile (which can move tooling
+# dependencies) can introduce drift. Source-only PRs never run this.
 name: build-hygiene
 
 on:
   pull_request:
     paths:
-      - 'packages/**'
-      - 'cloudpdf/**'
+      - '**/package.json'
       - 'tooling/**'
       - 'pnpm-lock.yaml'
       - '.github/workflows/build-hygiene.yml'
@@ -45,6 +49,20 @@ jobs:
 
       - name: Install deps
         run: pnpm install --frozen-lockfile
+        env:
+          # .npmrc interpolates it; empty beats a WARN on public installs.
+          NPM_TOKEN: ''
+
+      # Hydrate the wasm32 runtime payload from the public content-addressed
+      # shelf (the same script Vercel previews and fresh clones use) — the
+      # engine worker bundle inlines its browser glue at build time. Payload
+      # libs are gitignored, so this cannot dirty the worktree being judged.
+      - name: Fetch engine runtime payload
+        run: pnpm --filter @embedpdf/engine-runtime fetch:payload
+        env:
+          # A PR that changes runtime sources races its own Build PDF
+          # Runtime workflow, which publishes the payload for the new hash.
+          EPDF_PAYLOAD_WAIT_MINUTES: '30'
 
       - name: Build packages
         run: pnpm run build:release
