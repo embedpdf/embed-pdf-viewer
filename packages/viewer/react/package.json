@@ -9,13 +9,11 @@
   "types": "./dist/index.d.cts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
       "development": "./src/index.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
     },
     "./core": {
-      "types": "./dist/core.d.ts",
       "development": "./src/core.ts",
       "import": "./dist/core.js",
       "require": "./dist/core.cjs"
@@ -70,5 +68,8 @@
     "type": "git",
     "url": "git+https://github.com/embedpdf/embed-pdf-viewer.git",
     "directory": "packages/viewer/react"
+  },
+  "epdf": {
+    "devExports": "development"
   }
 }

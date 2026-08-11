@@ -1,0 +1,83 @@
+# Builds every publishable package and asserts the worktree stays clean.
+#
+# epdf-build owns generated manifest fields (`exports`, `publishConfig`)
+# and tsdown rewrites them on every build, so a hand-edited manifest that
+# disagrees with its declared build configuration surfaces here as a dirty
+# tree — on the pull request, instead of at the release workflow's
+# "Verify publish worktree" gate after a version PR has already merged.
+#
+# Triggers are deliberately narrow: the rewrite is a function of the
+# manifest and the build preset, never of source code, so only changes to
+# a package.json, the tooling, or the lockfile (which can move tooling
+# dependencies) can introduce drift. Source-only PRs never run this.
+name: build-hygiene
+
+on:
+  pull_request:
+    paths:
+      - '**/package.json'
+      - 'tooling/**'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/build-hygiene.yml'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-hygiene-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify-clean-worktree:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PNPM
+        uses: pnpm/action-setup@v5
+        with:
+          run_install: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install deps
+        run: pnpm install --frozen-lockfile
+        env:
+          # .npmrc interpolates it; empty beats a WARN on public installs.
+          NPM_TOKEN: ''
+
+      # Hydrate the wasm32 runtime payload from the public content-addressed
+      # shelf (the same script Vercel previews and fresh clones use) — the
+      # engine worker bundle inlines its browser glue at build time. Payload
+      # libs are gitignored, so this cannot dirty the worktree being judged.
+      - name: Fetch engine runtime payload
+        run: pnpm --filter @embedpdf/engine-runtime fetch:payload
+        env:
+          # A PR that changes runtime sources races its own Build PDF
+          # Runtime workflow, which publishes the payload for the new hash.
+          EPDF_PAYLOAD_WAIT_MINUTES: '30'
+
+      - name: Build packages
+        run: pnpm run build:release
+
+      # Same as release.yml: build-workers.mjs regenerates this tracked
+      # source pin before compiling it into dist. The generated source is
+      # not part of the package, so restore it and judge the rest.
+      - name: Restore build-time WASM version source
+        run: git restore --source=HEAD -- packages/engine/main/src/generated/wasm32-version.ts
+
+      - name: Verify build left the worktree clean
+        run: |
+          status="$(git status --short --untracked-files=all)"
+          if [ -n "$status" ]; then
+            echo "::error::Building rewrote tracked files — commit the build-normalized form or fix the package's epdf configuration:"
+            echo "$status"
+            exit 1
+          fi

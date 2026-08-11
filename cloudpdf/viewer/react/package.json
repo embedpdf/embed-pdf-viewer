@@ -9,7 +9,6 @@
   "types": "./dist/index.d.cts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
       "development": "./src/index.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
@@ -66,5 +65,8 @@
       },
       "./package.json": "./package.json"
     }
+  },
+  "epdf": {
+    "devExports": "development"
   }
 }

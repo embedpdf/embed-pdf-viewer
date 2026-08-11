@@ -9,19 +9,16 @@
   "types": "./dist/index.d.cts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
       "development": "./src/index.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
     },
     "./chrome": {
-      "types": "./dist/chrome.d.ts",
       "development": "./src/config/chrome.ts",
       "import": "./dist/chrome.js",
       "require": "./dist/chrome.cjs"
     },
     "./commands": {
-      "types": "./dist/commands.d.ts",
       "development": "./src/config/commands.ts",
       "import": "./dist/commands.js",
       "require": "./dist/commands.cjs"
@@ -32,7 +29,8 @@
   "epdf": {
     "rawExports": [
       "./styles.css"
-    ]
+    ],
+    "devExports": "development"
   },
   "files": [
     "dist",
