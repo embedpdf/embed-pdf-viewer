@@ -14,21 +14,54 @@ import Link from 'next/link';
 
 import { CloudBanner, CloudMark } from './cloud-banner';
 
+/**
+ * Chronological, because the stepper draws a journey line and promises one:
+ * you need somewhere to point the viewer at before you can drop it in. The
+ * `Visual` reference keeps ordering a pure data change — step components are
+ * hoisted function declarations, so they can be referenced from here.
+ */
 const STEPS = [
   {
     n: 1,
-    title: 'Drop in the viewer',
-    desc: 'Use the ready-made viewer or go headless with components and APIs.',
+    title: 'Choose how it runs',
+    desc: 'Start on managed SaaS, or deploy the server into your own environment.',
+    Visual: StepDeploy,
   },
   {
     n: 2,
-    title: 'Add the workflow layer',
-    desc: 'Add annotations, permissions, signing, and collaboration without custom infrastructure.',
+    title: 'Drop in the viewer',
+    desc: 'Upload a document, then use the ready-made viewer or go headless with components and APIs.',
+    Visual: StepViewer,
   },
   {
     n: 3,
-    title: 'Deploy your way',
-    desc: 'Pick managed SaaS or self-hosted, depending on your team and compliance needs.',
+    title: 'Turn on the hard parts',
+    desc: 'Annotations, permissions, signing, and collaboration — without custom infrastructure.',
+    Visual: StepChips,
+  },
+];
+
+/**
+ * The two choices above (step 1 and step 2) are correlated in practice, so we
+ * name the two routes through them rather than leaving the reader to work out
+ * which of the four combinations is theirs.
+ */
+const PATHS = [
+  {
+    label: 'Fastest path',
+    labelClass: 'bg-cp-blue/10 text-cp-blue',
+    title: 'Managed SaaS + ready-made viewer',
+    desc: 'No infrastructure to run, no UI to build. A working viewer in your app in under 10 minutes.',
+    href: '/docs/engine/getting-started/quick-start',
+    cta: 'Start here',
+  },
+  {
+    label: 'Most control',
+    labelClass: 'bg-[#7A5AF8]/10 text-[#7A5AF8]',
+    title: 'Self-hosted + headless components',
+    desc: 'Your environment, your data, your interface. A deeper integration for teams with strict requirements.',
+    href: '/docs/server/getting-started',
+    cta: 'See the self-host guide',
   },
 ];
 
@@ -118,6 +151,27 @@ function StepChips() {
   );
 }
 
+function StepDeploy() {
+  return (
+    <div className="grid grid-cols-2 gap-4 max-[460px]:grid-cols-1">
+      <DeployCard
+        icon={<CloudMark width={28} height={18} />}
+        iconWrap="bg-cp-blue/10"
+        title="Managed SaaS"
+        desc="Fully managed by CloudPDF. Scale instantly. Always up to date."
+        href="/docs/engine/getting-started"
+      />
+      <DeployCard
+        icon={<HugeiconsIcon icon={ServerStack01Icon} size={28} strokeWidth={1.9} />}
+        iconWrap="bg-[#7A5AF8]/10 text-[#7A5AF8]"
+        title="Self-hosted"
+        desc="Deploy in your environment. Full control and data residency."
+        href="/docs/server/getting-started"
+      />
+    </div>
+  );
+}
+
 function DeployCard({
   icon,
   iconWrap,
@@ -177,7 +231,8 @@ export function GuideSection() {
             CloudPDF <em className="text-cp-blue not-italic">handles the hard parts.</em>
           </h2>
           <p className="text-cp-muted mx-auto mt-5 max-w-[640px] text-pretty font-sans text-[clamp(16px,1.35vw,19px)] leading-[1.6]">
-            A simple 3-step plan to go from viewer to production-grade workflow.
+            Three steps to production — whether you want it live in ten minutes or wired deep into
+            your own stack.
           </p>
         </div>
 
@@ -216,27 +271,42 @@ export function GuideSection() {
                 {step.desc}
               </p>
               <div className="mt-[clamp(26px,3vw,38px)]">
-                {step.n === 1 && <StepViewer />}
-                {step.n === 2 && <StepChips />}
-                {step.n === 3 && (
-                  <div className="grid grid-cols-2 gap-4 max-[460px]:grid-cols-1">
-                    <DeployCard
-                      icon={<CloudMark width={28} height={18} />}
-                      iconWrap="bg-cp-blue/10"
-                      title="Managed SaaS"
-                      desc="Fully managed by CloudPDF. Scale instantly. Always up to date."
-                      href="/docs/engine/getting-started"
-                    />
-                    <DeployCard
-                      icon={<HugeiconsIcon icon={ServerStack01Icon} size={28} strokeWidth={1.9} />}
-                      iconWrap="bg-[#7A5AF8]/10 text-[#7A5AF8]"
-                      title="Self-hosted"
-                      desc="Deploy in your environment. Full control and data residency."
-                      href="/docs/server/getting-started"
-                    />
-                  </div>
-                )}
+                <step.Visual />
               </div>
+            </div>
+          ))}
+        </div>
+
+        {/* the two routes through steps 1 and 2 */}
+        <div className="mt-[clamp(44px,5.5vw,68px)] grid gap-[clamp(16px,1.6vw,22px)] min-[761px]:grid-cols-2">
+          {PATHS.map((path) => (
+            <div
+              key={path.label}
+              className="border-cp-border flex flex-col rounded-[18px] border bg-white p-[clamp(22px,2.2vw,30px)] shadow-[0_22px_44px_-30px_rgba(10,26,77,0.3)] transition-all duration-200 hover:border-[#D8E4FB] hover:shadow-[0_24px_46px_-24px_rgba(10,26,77,0.26),0_3px_10px_rgba(10,26,77,0.05)]"
+            >
+              <span
+                className={`font-display inline-block w-max rounded-full px-3 py-[7px] text-[11.5px] font-extrabold uppercase leading-none tracking-[0.1em] ${path.labelClass}`}
+              >
+                {path.label}
+              </span>
+              <h4 className="font-display text-cp-navy m-0 mt-[18px] text-[clamp(18px,1.7vw,21px)] font-extrabold leading-[1.2] tracking-[-0.014em]">
+                {path.title}
+              </h4>
+              <p className="text-cp-muted m-0 mb-[18px] mt-3 font-sans text-[14.5px] leading-[1.55]">
+                {path.desc}
+              </p>
+              <Link
+                href={path.href}
+                className="text-cp-blue hover:text-cp-blue600 group/link font-display mt-auto inline-flex items-center gap-1.5 text-[14px] font-bold no-underline transition-colors"
+              >
+                {path.cta}
+                <HugeiconsIcon
+                  icon={ArrowRight01Icon}
+                  size={15}
+                  strokeWidth={2.4}
+                  className="transition-transform duration-150 group-hover/link:translate-x-[3px]"
+                />
+              </Link>
             </div>
           ))}
         </div>
