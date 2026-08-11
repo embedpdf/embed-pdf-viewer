@@ -20,8 +20,9 @@
     "bootstrap:package": "node scripts/bootstrap-package.mjs",
     "verify:engine-runtime-packages": "pnpm --filter @embedpdf/engine-runtime run verify:packages",
     "changeset": "changeset",
-    "ci:version": "changeset version && pnpm --filter @cloudpdf/contract emit:openapi && pnpm exec prettier --write cloudpdf/contract/openapi.json && pnpm --filter @cloudpdf/website api:metadata && pnpm --filter @cloudpdf/website api:pages",
-    "ci:publish": "node scripts/assert-publish-phase.mjs && pnpm publish -r --access public --tag next --publish-branch main --report-summary"
+    "cloudpdf:sdk:generate": "node fern/scripts/generate-typescript-sdk.mjs",
+    "ci:version": "changeset version && pnpm --filter @cloudpdf/contract emit:openapi && pnpm run cloudpdf:sdk:generate && pnpm --filter @cloudpdf/website api:metadata && pnpm --filter @cloudpdf/website api:pages",
+    "ci:publish": "node scripts/assert-publish-phase.mjs && node fern/scripts/validate-sdk.mjs typescript && pnpm publish -r --access public --tag next --publish-branch main --report-summary"
   },
   "devDependencies": {
     "@changesets/cli": "^2.29.6",

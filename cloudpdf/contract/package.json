@@ -23,7 +23,7 @@
     "build": "tsup",
     "clean": "rimraf dist",
     "dev": "tsup --watch",
-    "emit:openapi": "tsup && node scripts/emit-openapi.mjs",
+    "emit:openapi": "tsup && node scripts/emit-openapi.mjs && prettier --write openapi.json",
     "test": "vitest run",
     "lint": "eslint src --color",
     "lint:fix": "eslint src --color --fix"

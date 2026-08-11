@@ -213,6 +213,21 @@ Each artifact includes `cloudpdf-generation.json` with the canonical and mapped
 SDK versions, the exact OpenAPI SHA-256, source commit state, Fern CLI version,
 and language generator version.
 
+The TypeScript SDK is a committed workspace package, so a Changesets version PR
+regenerates it after resolving the new canonical version. Run that same path
+locally with:
+
+```bash
+pnpm run cloudpdf:sdk:generate
+```
+
+The command pins Fern CLI 5.91.0, generates `cloudpdf/sdk`, records normalized
+metadata, and validates every version-bearing file. Changesets is the sole owner
+of `CHANGELOG.md`; the wrapper snapshots and restores it because Fern currently
+writes a release heading even when the file is in `.fernignore`. `ci:publish`
+repeats the TypeScript validation before npm publishing, independently of the
+SDK freshness workflow.
+
 The repository sync replaces generated source on its version branch while
 keeping each destination repository's `.github` directory repository-owned.
 The checked-in overlays install and update the repository CI and release

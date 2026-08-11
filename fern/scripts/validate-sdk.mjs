@@ -60,6 +60,13 @@ switch (language) {
     const manifest = readJson('package.json');
     assert(manifest.name === '@cloudpdf/sdk', `package.json name is ${manifest.name}`);
     assert(manifest.version === expectedVersion, `package.json version is ${manifest.version}`);
+    // requestedVersion is stable across Fern generators. sdkVersion is not:
+    // some generators omit it, while Go prefixes it with "v". The TypeScript
+    // SDK is published from this workspace, so validate its value exactly here.
+    assert(
+      fernMetadata.sdkVersion === expectedVersion,
+      `.fern/metadata.json sdkVersion is ${fernMetadata.sdkVersion}, expected ${expectedVersion}`,
+    );
     assert(manifest.license === 'Apache-2.0', `package.json license is ${manifest.license}`);
     assert(
       manifest.publishConfig?.access === 'public',
@@ -78,6 +85,8 @@ switch (language) {
       'committed TypeScript Fern metadata contains nondeterministic Git state',
     );
     includes('src/version.ts', expectedVersion);
+    includes('src/BaseClient.ts', `"X-Fern-SDK-Version": "${expectedVersion}"`);
+    includes('src/BaseClient.ts', `"User-Agent": "@cloudpdf/sdk/${expectedVersion}"`);
     includes('src/Client.ts', 'export class CloudPDFClient');
     includes('src/CloudPDFClient.ts', 'public readonly uploads: Uploads');
     includes('src/uploads/Uploads.ts', 'class Uploads');
