@@ -2193,11 +2193,6 @@
           }
         ],
         "x-required-scope": [],
-        "x-fern-pagination": {
-          "cursor": "$request.cursor",
-          "next_cursor": "$response.nextCursor",
-          "results": "$response.tenants"
-        },
         "parameters": [
           {
             "name": "limit",
@@ -2386,11 +2381,6 @@
         "x-required-scope": [
           "docs.read"
         ],
-        "x-fern-pagination": {
-          "cursor": "$request.cursor",
-          "next_cursor": "$response.nextCursor",
-          "results": "$response.documents"
-        },
         "parameters": [
           {
             "name": "tenantId",
@@ -3235,11 +3225,6 @@
         "x-required-scope": [
           "shares.manage"
         ],
-        "x-fern-pagination": {
-          "cursor": "$request.cursor",
-          "next_cursor": "$response.nextCursor",
-          "results": "$response.shares"
-        },
         "parameters": [
           {
             "name": "tenantId",

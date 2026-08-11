@@ -1,16 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, test } from 'vitest';
-import { z } from 'zod';
 
 import { EngineErrorPayloadSchema, wirePaths, wireTemplates } from '@embedpdf/engine-core/wire';
 
-import {
-  adminOperations,
-  adminWirePaths,
-  allOperations,
-  docOperations,
-  type AdminOperation,
-} from '../src/index';
+import { adminOperations, adminWirePaths, allOperations, docOperations } from '../src/index';
 import { buildAdminOpenApiDocument } from '../src/openapi';
 
 const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as {
@@ -56,32 +49,6 @@ describe('operation registry', () => {
         // API-token-only operations have no scope model.
         expect(op.scope.length).toBe(0);
       }
-    }
-  });
-
-  test('cursor-paginated operations declare a coherent generated-pager contract', () => {
-    for (const op of Object.values(allOperations) as AdminOperation[]) {
-      const queryShape = op.query instanceof z.ZodObject ? op.query.shape : {};
-      const hasCursor = 'cursor' in queryShape;
-
-      expect(Boolean(op.pagination), `${op.operationId} pagination metadata`).toBe(hasCursor);
-      if (!op.pagination) continue;
-
-      expect(op.method, op.operationId).toBe('GET');
-      expect(queryShape.cursor?.safeParse(undefined).success, op.operationId).toBe(true);
-      expect(queryShape.cursor?.safeParse('opaque-cursor').success, op.operationId).toBe(true);
-
-      const successSchema = op.responses[200]?.schema;
-      expect(successSchema, `${op.operationId} 200 response`).toBeInstanceOf(z.ZodObject);
-      const responseShape = (successSchema as z.AnyZodObject).shape;
-      expect(responseShape[op.pagination.results], `${op.operationId} results`).toBeInstanceOf(
-        z.ZodArray,
-      );
-
-      const nextCursor = responseShape.nextCursor;
-      expect(nextCursor?.safeParse(undefined).success, op.operationId).toBe(true);
-      expect(nextCursor?.safeParse(null).success, op.operationId).toBe(true);
-      expect(nextCursor?.safeParse('opaque-cursor').success, op.operationId).toBe(true);
     }
   });
 
@@ -209,39 +176,6 @@ describe('openapi document', () => {
       expect(operation['x-fern-sdk-method-name']).toBe(parts.pop());
       expect(operation['x-fern-sdk-group-name']).toEqual(parts);
     }
-  });
-
-  test('Fern pagination extensions follow the shared cursor protocol', () => {
-    const doc = buildAdminOpenApiDocument({ version: pkg.version }) as {
-      paths: Record<
-        string,
-        Record<string, { operationId: string; 'x-fern-pagination'?: Record<string, string> }>
-      >;
-    };
-    const operations = Object.values(doc.paths).flatMap((methods) => Object.values(methods));
-    const paginated = Object.fromEntries(
-      operations
-        .filter((operation) => operation['x-fern-pagination'])
-        .map((operation) => [operation.operationId, operation['x-fern-pagination']]),
-    );
-
-    expect(paginated).toEqual({
-      'documents.list': {
-        cursor: '$request.cursor',
-        next_cursor: '$response.nextCursor',
-        results: '$response.documents',
-      },
-      'shares.list': {
-        cursor: '$request.cursor',
-        next_cursor: '$response.nextCursor',
-        results: '$response.shares',
-      },
-      'tenants.list': {
-        cursor: '$request.cursor',
-        next_cursor: '$response.nextCursor',
-        results: '$response.tenants',
-      },
-    });
   });
 
   test('query parameter schemas are unwrapped value shapes, not anyOf unions', () => {

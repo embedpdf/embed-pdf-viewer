@@ -81,22 +81,19 @@ class DocumentsAdapter {
   }
 
   async list(options: Record<string, unknown> = {}): Promise<any> {
-    const pager = await call(
+    const page = await call(
       this.client.documents.list({ tenantId: this.tenantId, ...options } as never),
     );
-    const page = pager.response;
     return { ...page, nextCursor: page.nextCursor ?? null };
   }
 
   async *iterate(options: Record<string, unknown> = {}): AsyncGenerator<any> {
-    const pager = await call(
-      this.client.documents.list({ tenantId: this.tenantId, ...options } as never),
-    );
-    for (;;) {
-      for (const document of pager.data) yield document;
-      if (!pager.hasNextPage()) return;
-      await call(pager.getNextPage());
-    }
+    let cursor: string | undefined;
+    do {
+      const page = await this.list({ ...options, cursor });
+      for (const document of page.documents) yield document;
+      cursor = page.nextCursor ?? undefined;
+    } while (cursor !== undefined);
   }
 
   async delete(docId: string): Promise<void> {
@@ -136,7 +133,9 @@ class TokensAdapter {
   }
 
   async revoke(jti: string, options: Record<string, unknown> = {}): Promise<void> {
-    await call(this.client.tokens.revoke({ tenantId: this.tenantId, jti, ...options } as never));
+    await call(
+      this.client.tokens.revoke({ tenantId: this.tenantId, jti, ...options } as never),
+    );
   }
 }
 
@@ -162,18 +161,17 @@ class TenantsAdapter {
   }
 
   async list(options: Record<string, unknown> = {}): Promise<any> {
-    const pager = await call(this.client.tenants.list(options as never));
-    const page = pager.response;
+    const page = await call(this.client.tenants.list(options as never));
     return { ...page, nextCursor: page.nextCursor ?? null };
   }
 
   async *iterate(options: Record<string, unknown> = {}): AsyncGenerator<any> {
-    const pager = await call(this.client.tenants.list(options as never));
-    for (;;) {
-      for (const tenant of pager.data) yield tenant;
-      if (!pager.hasNextPage()) return;
-      await call(pager.getNextPage());
-    }
+    let cursor: string | undefined;
+    do {
+      const page = await this.list({ ...options, cursor });
+      for (const tenant of page.tenants) yield tenant;
+      cursor = page.nextCursor ?? undefined;
+    } while (cursor !== undefined);
   }
 
   async delete(tenantId: string): Promise<void> {

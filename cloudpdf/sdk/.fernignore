@@ -3,5 +3,4 @@ src/index.ts
 src/CloudPDFClient.ts
 src/uploads/**
 tests/uploads.test.ts
-tests/pagination.test.ts
 README.md

@@ -29,7 +29,6 @@ const languageNames = {
   java: 'Java',
   ruby: 'Ruby',
 };
-const paginatedResources = ['documents', 'tenants', 'shares'];
 
 function read(path) {
   return readFileSync(`${outputDirectory}/${path}`, 'utf8');
@@ -84,15 +83,6 @@ switch (language) {
     includes('src/uploads/Uploads.ts', 'class Uploads');
     includes('src/errors/CloudPDFError.ts', 'export class CloudPDFError');
     includes('src/errors/CloudPDFTimeoutError.ts', 'export class CloudPDFTimeoutError');
-    for (const resource of paginatedResources) {
-      includes(`src/api/resources/${resource}/client/Client.ts`, 'Promise<core.Page<');
-    }
-    includes('tests/pagination.test.ts', 'preserves filters');
-    includes('reference.md', 'page = await page.getNextPage();');
-    assert(
-      !read('reference.md').includes('page = page.getNextPage();'),
-      'reference.md contains an unawaited asynchronous pagination example',
-    );
     break;
   }
   case 'python': {
@@ -122,10 +112,6 @@ switch (language) {
     includes('src/cloudpdf/core/client_wrapper.py', expectedVersion);
     includes('src/cloudpdf/client.py', 'class CloudPDFClient:');
     includes('src/cloudpdf/client.py', 'class AsyncCloudPDFClient:');
-    for (const resource of paginatedResources) {
-      includes(`src/cloudpdf/${resource}/client.py`, 'SyncPager[');
-      includes(`src/cloudpdf/${resource}/client.py`, 'AsyncPager[');
-    }
     break;
   }
   case 'php': {
@@ -145,10 +131,6 @@ switch (language) {
     includes('src/CloudPDFClient.php', 'class CloudPDFClient');
     includes('src/Exceptions/CloudPDFException.php', 'class CloudPDFException');
     includes('src/Exceptions/CloudPDFApiException.php', 'class CloudPDFApiException');
-    for (const resource of paginatedResources) {
-      const className = `${resource[0].toUpperCase()}${resource.slice(1)}`;
-      includes(`src/${className}/${className}Client.php`, 'return new CursorPager(');
-    }
     assert(
       !readdirSync(`${outputDirectory}/src/Exceptions`).includes('CloudpdfException.php'),
       'incorrectly cased CloudpdfException.php still exists',
@@ -188,19 +170,12 @@ switch (language) {
     includes('src/CloudPDF/CloudPDFClient.cs', 'class CloudPDFClient');
     includes('src/CloudPDF/Core/Public/CloudPDFException.cs', 'class CloudPDFException');
     includes('src/CloudPDF/Core/Public/CloudPDFApiException.cs', 'class CloudPDFApiException');
-    for (const resource of paginatedResources) {
-      const className = `${resource[0].toUpperCase()}${resource.slice(1)}`;
-      includes(`src/CloudPDF/${className}/I${className}Client.cs`, 'Task<Pager<');
-    }
     break;
   }
   case 'go': {
     includes('go.mod', 'module github.com/embedpdf/cloudpdf-sdk-go/v3');
     includes('core/request_option.go', `X-Fern-SDK-Version", "v${expectedVersion}`);
     includes('client/client.go', 'func NewClient(');
-    for (const resource of paginatedResources) {
-      includes(`${resource}/client.go`, 'internal.NewCursorPager(');
-    }
     break;
   }
   case 'java': {
@@ -235,13 +210,6 @@ switch (language) {
     includes('src/main/java/api/core/CloudPDFException.java', 'class CloudPDFException');
     includes('src/main/java/api/core/CloudPDFApiException.java', 'class CloudPDFApiException');
     includes('src/main/java/api/core/ClientOptions.java', expectedVersion);
-    for (const resource of paginatedResources) {
-      const className = `${resource[0].toUpperCase()}${resource.slice(1)}`;
-      includes(
-        `src/main/java/api/resources/${resource}/${className}Client.java`,
-        'SyncPagingIterable<',
-      );
-    }
     break;
   }
   case 'ruby': {
@@ -249,9 +217,6 @@ switch (language) {
     includes('lib/CloudPDF/version.rb', `VERSION = "${expectedVersion}"`);
     includes('lib/CloudPDF/client.rb', 'module CloudPDF');
     includes('lib/CloudPDF/client.rb', 'class Client');
-    for (const resource of paginatedResources) {
-      includes(`lib/CloudPDF/${resource}/client.rb`, 'CursorItemIterator.new(');
-    }
     includes(
       'lib/CloudPDF/documents/client.rb',
       'body.add_file(name: "file", file: params[:file], content_type: "application/pdf")',

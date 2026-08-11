@@ -648,11 +648,6 @@ export interface AdminOperationBody {
   required?: boolean;
 }
 
-export interface AdminOperationPagination {
-  /** Response array yielded by generated SDK pagers. */
-  results: string;
-}
-
 /**
  * One admin operation, fully described: everything a server needs to mount
  * it and everything a generator needs to document it.
@@ -697,12 +692,6 @@ export interface AdminOperation {
   params?: z.ZodTypeAny;
   /** Query-string schema. */
   query?: z.ZodTypeAny;
-  /**
-   * Standard CloudPDF cursor pagination. The request cursor is always
-   * `cursor` and the response continuation is always `nextCursor`; only
-   * the response array name varies between resources.
-   */
-  pagination?: AdminOperationPagination;
   /** Request body. */
   body?: AdminOperationBody;
   /** Success and known-error responses by HTTP status code. */
@@ -738,7 +727,6 @@ export const adminOperations = {
     credentials: ['api-token'],
     scope: [],
     query: AdminTenantListQuerySchema,
-    pagination: { results: 'tenants' },
     responses: {
       200: { contentType: 'application/json', schema: AdminTenantListResponseSchema },
       400: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
@@ -836,7 +824,6 @@ export const adminOperations = {
     scope: ['docs.read'],
     params: AdminTenantParamsSchema,
     query: AdminDocumentListQuerySchema,
-    pagination: { results: 'documents' },
     responses: {
       200: { contentType: 'application/json', schema: AdminDocumentListResponseSchema },
       400: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
@@ -1037,7 +1024,6 @@ export const adminOperations = {
     scope: ['shares.manage'],
     params: AdminTenantParamsSchema,
     query: ShareGrantListQuerySchema,
-    pagination: { results: 'shares' },
     responses: {
       200: { contentType: 'application/json', schema: ShareGrantListResponseSchema },
       400: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
@@ -1106,7 +1092,7 @@ export const adminOperations = {
     },
     notes:
       'Unauthenticated, but requires a browser Origin header, checked against the grant ' +
-      'allowlist. Unknown, revoked, and disabled tokens are indistinguishable (404). ' +
+      "allowlist. Unknown, revoked, and disabled tokens are indistinguishable (404). " +
       'Passphrase-protected grants return 422 SharePasswordRequired until `password` is ' +
       'supplied. Mounted only when the deployment can sign (HS256 mode).',
   },

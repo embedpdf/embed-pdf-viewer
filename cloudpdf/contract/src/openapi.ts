@@ -145,15 +145,6 @@ function operationObject(
     security: op.credentials.map((credential) => ({ [SECURITY_SCHEME[credential]]: [] })),
     'x-required-scope': [...op.scope],
     ...(op.docCapabilities ? { 'x-required-capability': [...op.docCapabilities] } : {}),
-    ...(op.pagination
-      ? {
-          'x-fern-pagination': {
-            cursor: '$request.cursor',
-            next_cursor: '$response.nextCursor',
-            results: `$response.${op.pagination.results}`,
-          },
-        }
-      : {}),
     ...(parameters.length > 0 ? { parameters } : {}),
     ...(op.body ? { requestBody: requestBody(op, op.body, schemas) } : {}),
     responses: responses(op, schemas),

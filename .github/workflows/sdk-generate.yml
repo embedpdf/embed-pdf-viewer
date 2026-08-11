@@ -120,9 +120,7 @@ jobs:
 
       - name: Install Fern CLI
         if: steps.select.outputs.enabled == 'true'
-        run: |
-          npm install -g fern-api@5.91.0
-          node fern/scripts/enable-local-pagination.mjs "$(npm root -g)/fern-api"
+        run: npm install -g fern-api@5.91.0
 
       - name: Resolve SDK version
         if: steps.select.outputs.enabled == 'true'
