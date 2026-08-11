@@ -58,6 +58,11 @@ const bronzeSponsors: Sponsor[] = [
     logo: '/sponsors/sponsor-forml.png',
     url: 'https://forml.eu?utm_source=embedpdf&utm_campaign=oss',
   },
+  {
+    name: 'Hive',
+    logo: '/sponsors/sponsor-hive.png',
+    url: 'https://hive.com/?utm_source=embedpdf&utm_campaign=oss',
+  },
 ]
 
 // Animated background component (shared style)
