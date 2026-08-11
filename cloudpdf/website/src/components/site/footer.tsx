@@ -14,6 +14,7 @@ const FOOTER_GROUPS = [
     title: 'Legal',
     links: [
       { label: 'Terms of Service', href: '/terms' },
+      { label: 'Refund Policy', href: '/refund-policy' },
       { label: 'Privacy Policy', href: '/privacy' },
     ],
   },
