@@ -51,6 +51,10 @@ assert(
   fernMetadata.requestedVersion === expectedVersion,
   `.fern/metadata.json requestedVersion is ${fernMetadata.requestedVersion}, expected ${expectedVersion}`,
 );
+assert(
+  fernMetadata.sdkVersion === expectedVersion,
+  `.fern/metadata.json sdkVersion is ${fernMetadata.sdkVersion}, expected ${expectedVersion}`,
+);
 includes('LICENSE', 'Apache License');
 includes('README.md', `# CloudPDF ${languageNames[language]} SDK`);
 assertCanonicalCloudPdfCasing(outputDirectory);
@@ -78,6 +82,8 @@ switch (language) {
       'committed TypeScript Fern metadata contains nondeterministic Git state',
     );
     includes('src/version.ts', expectedVersion);
+    includes('src/BaseClient.ts', `"X-Fern-SDK-Version": "${expectedVersion}"`);
+    includes('src/BaseClient.ts', `"User-Agent": "@cloudpdf/sdk/${expectedVersion}"`);
     includes('src/Client.ts', 'export class CloudPDFClient');
     includes('src/CloudPDFClient.ts', 'public readonly uploads: Uploads');
     includes('src/uploads/Uploads.ts', 'class Uploads');

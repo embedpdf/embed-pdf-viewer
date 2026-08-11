@@ -136,24 +136,29 @@ jobs:
         env:
           LANGUAGE: ${{ matrix.language }}
           SDK_VERSION: ${{ steps.version.outputs.sdk }}
+          CLOUDPDF_FERN_CLI: fern
         run: |
-          fern generate \
-            --group "$LANGUAGE" \
-            --local \
-            --version "$SDK_VERSION" \
-            --force \
-            --no-prompt \
-            --generate-tests \
-            --log-level info
+          if [[ "$LANGUAGE" == "typescript" ]]; then
+            node fern/scripts/generate-typescript-sdk.mjs
+          else
+            fern generate \
+              --group "$LANGUAGE" \
+              --local \
+              --version "$SDK_VERSION" \
+              --force \
+              --no-prompt \
+              --generate-tests \
+              --log-level info
+          fi
 
       - name: Record generation metadata
-        if: steps.select.outputs.enabled == 'true'
+        if: steps.select.outputs.enabled == 'true' && matrix.language != 'typescript'
         env:
           LANGUAGE: ${{ matrix.language }}
         run: node fern/scripts/record-sdk-metadata.mjs "$LANGUAGE"
 
       - name: Validate generated SDK
-        if: steps.select.outputs.enabled == 'true'
+        if: steps.select.outputs.enabled == 'true' && matrix.language != 'typescript'
         env:
           LANGUAGE: ${{ matrix.language }}
         run: node fern/scripts/validate-sdk.mjs "$LANGUAGE"
