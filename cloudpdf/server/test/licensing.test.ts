@@ -12,6 +12,7 @@ import { UsageLimitError, UsageMeters } from '../src/licensing/UsageMeters';
 import type { LicenseGate } from '../src/licensing/LicenseRuntime';
 import { ConnectedUsageReporter } from '../src/licensing/ConnectedUsageReporter';
 import { LicenseStateRepository } from '../src/licensing/LicenseStateRepository';
+import { deriveConnectedReportingCredential } from '../src/licensing/reporting-credential';
 import { buildApp, buildAppForTesting } from '../src/app/buildApp';
 
 const accountId = 'account-test';
@@ -482,9 +483,17 @@ test('connected cache requires an encrypted, signed proof bound to the key and d
   });
   vi.stubGlobal('fetch', fetchMock);
 
+  // The reporting credential needs no configuration beyond the license key:
+  // it is derived from the key and the signed cloudpdfLicenseId metadata.
+  const expectedReportingCredential = deriveConnectedReportingCredential({
+    cloudpdfLicenseId: 'cloudpdf-license-record-id',
+    licenseKey: key,
+  });
+
   const first = await LicenseRuntime.create({ db, env, identity, startTimer: false });
   expect(first.getStatus()).toMatchObject({ access: 'full', code: 'VALID' });
   expect(first.getConnectedReportingLicenseId()).toBe('cloudpdf-license-record-id');
+  expect(first.getConnectedReportingCredential()).toBe(expectedReportingCredential);
   await first.close();
 
   const state = await new LicenseStateRepository(db).load();
@@ -493,6 +502,7 @@ test('connected cache requires an encrypted, signed proof bound to the key and d
   const cached = await LicenseRuntime.create({ db, env, identity, startTimer: false });
   expect(cached.getStatus()).toMatchObject({ access: 'full', code: 'VALID_CACHED' });
   expect(cached.getConnectedReportingLicenseId()).toBe('cloudpdf-license-record-id');
+  expect(cached.getConnectedReportingCredential()).toBe(expectedReportingCredential);
   expect(fetchMock).not.toHaveBeenCalled();
   await cached.close();
 
@@ -707,7 +717,7 @@ test('connected reporting retries the persisted sequence and payload after a fai
     controlPlaneUrl: 'https://accounts.example.test',
     db,
     meters,
-    reportingToken: 'reporting-secret',
+    reportingCredential: 'cpr_v1_test-reporting-credential',
   });
 
   try {
@@ -720,7 +730,7 @@ test('connected reporting retries the persisted sequence and payload after a fai
     responseStatus = 200;
     await expect(reporter.reportNow()).resolves.toBe(true);
     expect(requests[1]?.body).toEqual(requests[0]?.body);
-    expect(requests[1]?.authorization).toBe('Bearer reporting-secret');
+    expect(requests[1]?.authorization).toBe('Bearer cpr_v1_test-reporting-credential');
     expect(requests[1]?.url).toBe(
       `https://accounts.example.test/v1/licenses/${cloudPdfLicenseId}/usage`,
     );
