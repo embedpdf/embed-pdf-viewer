@@ -85,9 +85,9 @@ export interface OpenInputById {
  * `GET /v1/docs/:docId/head`. The returned handle is bound to this
  * token; subsequent operations on it carry that bearer.
  *
- * Use this for share-link / embed-link UX where the bearer of the
- * token is authorised for exactly one document (e.g. a third-party
- * reviewer the customer has shared a single doc with).
+ * Use this when your backend mints doc-scoped JWTs itself (e.g. a
+ * logged-in reviewer authorised for exactly one document). For the
+ * no-backend public-share flow, use `kind: 'share'` instead.
  *
  * Rejected by `@embedpdf/engine`.
  */
@@ -103,7 +103,37 @@ export interface OpenInputToken {
   password?: string | null;
 }
 
-export type OpenInput = OpenInputBytes | OpenInputLayerBytes | OpenInputById | OpenInputToken;
+/**
+ * Cloud-engine: open via a public share token (`shr_…`) from the
+ * dashboard's embed snippet. A share token is a REFERENCE to a
+ * stored grant on the server, not a credential — the engine
+ * exchanges it for a short-lived doc-scoped session JWT and
+ * silently re-exchanges near expiry, so revoking or editing the
+ * share retargets every embedded copy at the next renewal. No
+ * backend required; the engine itself may be constructed with no
+ * engine-level token at all.
+ *
+ * Rejected by `@embedpdf/engine`.
+ */
+export interface OpenInputShare {
+  kind: 'share';
+  /** Public share token (`shr_…`) identifying the grant. */
+  shareToken: string;
+  /**
+   * Passphrase for a protected grant. This is the SHARE passphrase,
+   * checked by the exchange endpoint — not the PDF's encryption
+   * password, which stays in `password` like every other kind.
+   */
+  sharePassword?: string;
+  password?: string | null;
+}
+
+export type OpenInput =
+  | OpenInputBytes
+  | OpenInputLayerBytes
+  | OpenInputById
+  | OpenInputToken
+  | OpenInputShare;
 
 export interface OpenOptions {
   password?: string | null;

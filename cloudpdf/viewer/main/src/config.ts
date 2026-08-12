@@ -13,37 +13,26 @@
  */
 import {
   cloudEngine,
-  shareSessionSource,
   type CloudEngineOptions,
+  type OpenInputShare,
   type TokenSource,
 } from '@cloudpdf/engine';
 import type { EngineFactory, InitialDocument } from '@embedpdf/viewer/core';
 
 /**
- * The cloud-only document source: a public share token, resolved to a
- * self-renewing session at open time. This `kind` exists ONLY in the
- * cloud vocabulary — `resolveCloudConfig` lowers it to the open-source
- * viewer's ordinary `{ kind: 'token' }` before the kernel ever sees
- * it, so the engine-agnostic core never learns what a share is.
+ * @deprecated `{ kind: 'share' }` is a standard `OpenInput` kind now
+ * (`OpenInputShare` from `@cloudpdf/engine`), understood by
+ * `engine.open()` directly. Note the grant passphrase field is
+ * `sharePassword` (was `password` on the old viewer-only type).
  */
-export interface CloudShareSource {
-  kind: 'share';
-  /** Public share token (`shr_…`) from the dashboard's embed snippet. */
-  shareToken: string;
-  /** Passphrase for a protected share. */
-  password?: string;
-}
+export type CloudShareSource = OpenInputShare;
 
 /**
- * `InitialDocument`, cloud edition: every open-source `source` still
- * works, plus `{ kind: 'share' }`. Each entry is its own tab with its
- * own credential — mixing share tokens, doc JWTs, and ids in one
- * viewer is fully supported, and every share entry exchanges and
- * renews independently.
+ * @deprecated Cloud share sources are part of the standard `OpenInput`
+ * union, so the ordinary `InitialDocument` from `@embedpdf/viewer/core`
+ * already admits them. Use it directly.
  */
-export type CloudInitialDocument = Omit<InitialDocument, 'source'> & {
-  source: InitialDocument['source'] | CloudShareSource;
-};
+export type CloudInitialDocument = InitialDocument;
 
 /** The cloud connection, plus the document shorthands. */
 export interface CloudSource extends CloudEngineOptions {
@@ -54,20 +43,21 @@ export interface CloudSource extends CloudEngineOptions {
   docId?: string;
   /**
    * Sugar: open one document by its public share token (`shr_…`, from
-   * the dashboard's embed snippet). The token is exchanged for a
-   * short-lived session JWT and silently re-exchanged near expiry —
-   * revoking or editing the share on the server retargets every
-   * embedded copy at the next renewal. No backend required. For
-   * multiple documents, use `documents` with `{ kind: 'share' }`
-   * sources instead.
+   * the dashboard's embed snippet) — `open({ kind: 'share' })`. The
+   * engine exchanges it for a short-lived session JWT and silently
+   * re-exchanges near expiry — revoking or editing the share on the
+   * server retargets every embedded copy at the next renewal. No
+   * backend required. For multiple documents, use `documents` with
+   * `{ kind: 'share' }` sources instead.
    */
   shareToken?: string;
   /** Passphrase for a protected `shareToken`. */
   sharePassword?: string;
   /** Full control, exactly as the open-source viewer takes it — one tab per
-   *  entry, each with its own source, including cloud `{ kind: 'share' }`
-   *  entries. Wins over the `docToken`/`docId`/`shareToken` shorthands. */
-  documents?: CloudInitialDocument[];
+   *  entry, each with its own source, including `{ kind: 'share' }` entries
+   *  (a standard OpenInput kind the cloud engine resolves itself). Wins over
+   *  the `docToken`/`docId`/`shareToken` shorthands. */
+  documents?: InitialDocument[];
 }
 
 /**
@@ -81,6 +71,11 @@ export interface CloudSource extends CloudEngineOptions {
  *
  * The engine comes back as a THUNK, which is what gives the viewer ownership of
  * its lifetime: created on mount, destroyed on unmount.
+ *
+ * Document sources need no lowering here: `{ kind: 'share' }` is part of the
+ * standard `OpenInput` union and the cloud engine resolves it itself
+ * (exchange, renewal, revocation-at-renewal). This module only expands the
+ * one-document shorthands.
  *
  * The return type is deliberately INFERRED. The destructuring below is the only
  * statement of what this module consumes, so what passes through in `rest` and
@@ -104,41 +99,21 @@ export function resolveCloudConfig<T extends CloudSource>(options: T) {
 
   const engine: EngineFactory = () => cloudEngine({ baseUrl, token, sessionId, fetch: fetchFn });
 
-  // A share token becomes a self-renewing doc-token source: the
-  // exchanged JWT carries `doc_id`, so downstream this is exactly the
-  // `docToken` path — the transport re-invokes the source per request
-  // and picks up fresh sessions transparently.
-  const shareTokenSource = (token_: string, password?: string): TokenSource =>
-    shareSessionSource(baseUrl, token_, {
-      ...(password !== undefined ? { password } : {}),
-      ...(fetchFn ? { fetch: fetchFn } : {}),
-    });
-
-  // Lower cloud `{ kind: 'share' }` sources before the kernel sees the
-  // list: each entry gets its OWN exchanging source, so a multi-tab
-  // viewer mixes shares, doc JWTs, and ids freely and every share
-  // renews (and can be revoked) independently.
-  const lowerDocument = (doc: CloudInitialDocument): InitialDocument => {
-    // `OpenSource` includes a thunk variant, so narrow past functions
-    // before reading the discriminant.
-    if (typeof doc.source === 'function' || doc.source.kind !== 'share') {
-      return doc as InitialDocument;
-    }
-    const { shareToken: share, password } = doc.source;
-    return { ...doc, source: { kind: 'token', token: shareTokenSource(share, password) } };
-  };
-
-  const initialDocuments: InitialDocument[] = documents
-    ? documents.map(lowerDocument)
-    : [
-        ...(docToken !== undefined
-          ? [{ source: { kind: 'token' as const, token: docToken } }]
-          : []),
-        ...(shareToken !== undefined
-          ? [{ source: { kind: 'token' as const, token: shareTokenSource(shareToken, sharePassword) } }]
-          : []),
-        ...(docId !== undefined ? [{ source: { kind: 'id' as const, id: docId } }] : []),
-      ];
+  const initialDocuments: InitialDocument[] = documents ?? [
+    ...(docToken !== undefined ? [{ source: { kind: 'token' as const, token: docToken } }] : []),
+    ...(shareToken !== undefined
+      ? [
+          {
+            source: {
+              kind: 'share' as const,
+              shareToken,
+              ...(sharePassword !== undefined ? { sharePassword } : {}),
+            },
+          },
+        ]
+      : []),
+    ...(docId !== undefined ? [{ source: { kind: 'id' as const, id: docId } }] : []),
+  ];
 
   return { ...rest, engine, documents: initialDocuments };
 }

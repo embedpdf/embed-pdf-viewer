@@ -59,18 +59,33 @@ export interface HttpFileResponse {
 }
 
 export class HttpClient {
-  private readonly baseUrl: string;
+  private readonly base: string;
   private readonly tokenFn: (() => string | Promise<string>) | null;
   private readonly fetchFn: typeof globalThis.fetch;
   private readonly sessionId: string | null;
   private cdnBinding: CdnBinding | null = null;
 
   constructor(opts: HttpClientOptions) {
-    this.baseUrl = opts.baseUrl.replace(/\/$/, '');
+    this.base = opts.baseUrl.replace(/\/$/, '');
     const token = opts.token;
     this.tokenFn = token === undefined ? null : typeof token === 'function' ? token : () => token;
     this.sessionId = opts.sessionId ?? null;
     this.fetchFn = opts.fetch ?? globalThis.fetch.bind(globalThis);
+  }
+
+  /** Normalized server base URL (no trailing slash). */
+  get baseUrl(): string {
+    return this.base;
+  }
+
+  /**
+   * The fetch implementation this client sends requests through (injected
+   * or global). Exposed so sibling transports spawned per-open — the
+   * share-session exchange, most of all — ride the same fetch the engine
+   * was configured with (test doubles, SSR `Origin`-attaching wrappers).
+   */
+  get fetchImpl(): typeof globalThis.fetch {
+    return this.fetchFn;
   }
 
   /**

@@ -20,7 +20,12 @@ export { HttpClient } from './transport/HttpClient';
 export type { HttpClientOptions } from './transport/HttpClient';
 export { decodeUnverifiedClaims } from './transport/decodeUnverifiedClaims';
 export type { UnverifiedClaims } from './transport/decodeUnverifiedClaims';
-export { exchangeShareToken, shareSessionSource, ShareExchangeError } from './share';
+export {
+  exchangeShareToken,
+  shareSessionSource,
+  ShareExchangeError,
+  engineErrorFromShareExchange,
+} from './share';
 export type { ShareSession, ShareExchangeOptions } from './share';
 
 import { CloudEngine, type CloudEngineOptions } from './CloudEngine';
@@ -69,6 +74,7 @@ export type {
   DocumentCapabilities,
   PageHandle,
   OpenInput,
+  OpenInputShare,
   OpenOptions,
   TokenSource,
   MetadataService,

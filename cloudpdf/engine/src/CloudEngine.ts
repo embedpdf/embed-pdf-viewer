@@ -12,6 +12,7 @@ import { generateUuid } from '@embedpdf/engine-services';
 
 import { CloudDocumentHandle } from './document/CloudDocumentHandle';
 import { CloudDocumentSecurityService } from './document/CloudDocumentSecurityService';
+import { engineErrorFromShareExchange, ShareExchangeError, shareSessionSource } from './share';
 import { decodeUnverifiedClaims } from './transport/decodeUnverifiedClaims';
 import { HttpClient, type HttpClientOptions } from './transport/HttpClient';
 
@@ -54,8 +55,33 @@ export class CloudEngine implements Engine {
 
     // Presence-based precedence, same rule the local engine documents: an
     // options.password key wins (even explicitly null), else input.password.
+    // For 'share' inputs `input.password` is still the PDF password — the
+    // grant passphrase travels separately as `input.sharePassword`.
     const effectivePassword =
       options && 'password' in options ? (options.password ?? null) : (input.password ?? null);
+
+    if (input.kind === 'share') {
+      // Open by public share token: exchange `shr_…` for a short-lived
+      // doc-scoped session JWT, then delegate to the 'token' arm — the
+      // handle binds to a SELF-RENEWING source, so revoking or editing
+      // the share retargets this open at the next renewal. The exchange
+      // rides the engine's own transport config (baseUrl + fetch);
+      // exchange failures surface as EngineErrors on open AND on every
+      // later renewal (RPCs, SSE reconnects), never as raw
+      // ShareExchangeErrors.
+      const raw = shareSessionSource(this.http.baseUrl, input.shareToken, {
+        ...(input.sharePassword !== undefined ? { password: input.sharePassword } : {}),
+        fetch: this.http.fetchImpl,
+      });
+      const token = async () => {
+        try {
+          return await raw();
+        } catch (error) {
+          throw error instanceof ShareExchangeError ? engineErrorFromShareExchange(error) : error;
+        }
+      };
+      return this.open({ kind: 'token', token, password: input.password ?? null }, options);
+    }
 
     if (input.kind === 'token') {
       // Open by doc-scoped JWT. We never verify the token SDK-side
@@ -146,7 +172,7 @@ export class CloudEngine implements Engine {
     return AbortablePromise.rejectReason(
       new EngineError(
         EngineErrorCode.InvalidArg,
-        `cloud engine supports OpenInput.kind === 'token' or 'id' (got '${(input as { kind?: string }).kind}')`,
+        `cloud engine supports OpenInput.kind === 'token', 'id', or 'share' (got '${(input as { kind?: string }).kind}')`,
       ),
     );
   }

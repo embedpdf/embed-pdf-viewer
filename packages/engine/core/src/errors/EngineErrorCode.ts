@@ -5,6 +5,14 @@ export const EngineErrorCode = {
   DocOpenFailed: 'DocOpenFailed',
   DocPasswordRequired: 'DocPasswordRequired',
   DocPasswordIncorrect: 'DocPasswordIncorrect',
+  /**
+   * A share-token exchange (`open({ kind: 'share' })`) needs the grant's
+   * passphrase: none was supplied, or the supplied one was rejected —
+   * indistinguishable by design, mirroring the server. Prompt and retry
+   * with `sharePassword`. Distinct from `DocPasswordRequired`, which is
+   * about the PDF's own encryption password.
+   */
+  SharePasswordRequired: 'SharePasswordRequired',
   Aborted: 'Aborted',
   Network: 'Network',
   Unauthenticated: 'Unauthenticated',
