@@ -35,9 +35,19 @@ import { TenantUsageRepo } from '../db/repos/tenant_usage.repo';
 import { TenantsRepo } from '../db/repos/tenants.repo';
 import { WeakAnnotationSessionsRepo } from '../db/repos/weak_annotation_sessions.repo';
 import type { Database as Schema } from '../db/schema';
+import type { ConnectedUsageReporter } from '../licensing/ConnectedUsageReporter';
+import type { LicenseGate } from '../licensing/LicenseRuntime';
+import { isLicenseGateTrusted } from '../licensing/trusted-license-gates';
+import { UsageMeters } from '../licensing/UsageMeters';
 import { InProcessRealtimeBus, type RealtimeBus } from '../realtime/RealtimeBus';
 import { SharpImageEncoder } from '../render/SharpImageEncoder';
 import { registerAccessRoutes } from '../routes/access';
+import { registerAdminDocumentsRoutes } from '../routes/admin/documents';
+import { registerAdminSharesRoutes } from '../routes/admin/shares';
+import { registerAdminTenantsRoutes } from '../routes/admin/tenants';
+import { registerAdminTokensRoutes } from '../routes/admin/tokens';
+import { registerAnnotationRoutes } from '../routes/annotations';
+import { registerAttachmentRoutes } from '../routes/attachments';
 import { registerDocsRoutes } from '../routes/docs';
 import { CloudRevisionBridge } from '../services/CloudRevisionBridge';
 import { DerivedRenderService } from '../services/DerivedRenderService';
@@ -47,24 +57,14 @@ import { EventLogService } from '../services/EventLogService';
 import { LayerService } from '../services/LayerService';
 import { LayerStateService } from '../services/LayerStateService';
 import { WeakAnnotationSessionService } from '../services/WeakAnnotationSessionService';
-import { registerAnnotationRoutes } from '../routes/annotations';
-import { registerAttachmentRoutes } from '../routes/attachments';
 import { registerFormRoutes } from '../routes/forms';
 import { registerMetadataRoutes } from '../routes/metadata';
 import { registerPageRoutes } from '../routes/pages';
 import { registerRedactionRoutes } from '../routes/redactions';
 import { registerSearchRoutes } from '../routes/search';
-import { registerAdminDocumentsRoutes } from '../routes/admin/documents';
-import { registerAdminSharesRoutes } from '../routes/admin/shares';
-import { registerAdminTenantsRoutes } from '../routes/admin/tenants';
-import { registerAdminTokensRoutes } from '../routes/admin/tokens';
 import { registerShareSessionRoutes } from '../routes/share-sessions';
 import type { KmsKeyring } from '../security';
 import { registerEventsRoutes } from '../routes/events';
-import type { LicenseGate } from '../licensing/LicenseRuntime';
-import { UsageMeters } from '../licensing/UsageMeters';
-import type { ConnectedUsageReporter } from '../licensing/ConnectedUsageReporter';
-import { isLicenseGateTrusted } from '../licensing/trusted-license-gates';
 import { WorkerThreadPool, type FallbackFontDescriptor } from '../runtime/WorkerThreadPool';
 import {
   DocumentLifecycleService,
@@ -548,6 +548,14 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
         root: opts.cacheRoot,
         maxBytes: opts.cacheMaxBytes ?? 4 * 1024 * 1024 * 1024,
         store: opts.objectStore,
+        // Failed materialises were once completely silent (callers
+        // like the security probe swallow them by design) — always
+        // give them a log line.
+        onEvent: (e) => {
+          if (e.kind === 'materialize-error') {
+            app.log.warn({ sha: e.sha, error: e.error }, 'base file cache: materialize failed');
+          }
+        },
       });
       // One-shot boot sweep: a crash during a prior materialise can
       // leave `.partial.*` files behind. Better to clean them up
@@ -574,6 +582,8 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
         pool,
         encoder: new SharpImageEncoder(),
         documents: new DocumentsRepo(opts.db),
+        onWarmError: (err, ctx) =>
+          app.log.warn({ err, ...ctx }, 'thumbnail warm failed; thumbnailState=failed'),
       });
     }
 
@@ -583,7 +593,13 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
       storage: opts.objectStore,
       autoProvisionTenant: opts.autoProvisionTenant ?? false,
       uploadProxyPolicy: opts.uploadProxyPolicy ?? 'fallback-only',
-      securityProbe: new DocumentSecurityProbe({ cache: baseFileCache, pool }),
+      securityProbe: new DocumentSecurityProbe({
+        cache: baseFileCache,
+        pool,
+        onError: (err, ctx) =>
+          app.log.warn({ err, ...ctx }, 'security probe failed; recording unknown security state'),
+      }),
+      ...(baseFileCache ? { fileCache: baseFileCache } : {}),
       ...(derivedRenders ? { derivedRenders } : {}),
       ...(usageMeters ? { usageMeters } : {}),
       tenantUsage: new TenantUsageRepo(opts.db),

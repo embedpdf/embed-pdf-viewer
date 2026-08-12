@@ -16,15 +16,16 @@ import { dirname, join, resolve, sep } from 'node:path';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 
-import type {
-  MaterializeOpts,
-  MaterializeResult,
-  ObjectBody,
-  ObjectStat,
-  ObjectStore,
-  PresignedDownload,
-  PresignedUpload,
-  PresignUploadOpts,
+import {
+  ShaMismatchError,
+  type MaterializeOpts,
+  type MaterializeResult,
+  type ObjectBody,
+  type ObjectStat,
+  type ObjectStore,
+  type PresignedDownload,
+  type PresignedUpload,
+  type PresignUploadOpts,
 } from '../ObjectStore';
 
 // ObjectStore keys are URL-safe, slash-delimited names produced by
@@ -139,8 +140,13 @@ export class FsObjectStore implements ObjectStore {
   async getSha256(key: string): Promise<string | null> {
     const abs = this.absolute(key);
     try {
-      const buf = await readFile(abs);
-      return createHash('sha256').update(buf).digest('hex');
+      // Stream rather than readFile: base PDFs can be hundreds of MB
+      // and this must never hold a whole object in RAM.
+      const hash = createHash('sha256');
+      for await (const chunk of createReadStream(abs)) {
+        hash.update(chunk as Buffer);
+      }
+      return hash.digest('hex');
     } catch (err) {
       if (isENOENT(err)) return null;
       throw err;
@@ -205,10 +211,7 @@ export class FsObjectStore implements ObjectStore {
       const sha = hash.digest('hex');
       if (sha !== opts.expectedSha) {
         await safeUnlink(partial);
-        throw new Error(
-          `FsObjectStore.materializeLocal: sha mismatch for ${key} ` +
-            `(expected ${opts.expectedSha}, got ${sha})`,
-        );
+        throw new ShaMismatchError(`FsObjectStore.materializeLocal ${key}`, opts.expectedSha, sha);
       }
       await rename(partial, destPath);
       return { path: destPath, size, sha256: sha };

@@ -11,8 +11,14 @@ import type { ShareGrantsRepo } from '../db/repos/share_grants.repo';
 import type { TenantUsageRepo } from '../db/repos/tenant_usage.repo';
 import { TenantsRepo } from '../db/repos/tenants.repo';
 import type { UsageMeters } from '../licensing/UsageMeters';
+import type { BaseFileCache, LocalFileHandle } from '../storage/BaseFileCache';
 import { StorageKeys } from '../storage/keys';
-import type { ObjectBody, ObjectStoreWithInfo, PresignedUpload } from '../storage/ObjectStore';
+import {
+  ShaMismatchError,
+  type ObjectBody,
+  type ObjectStoreWithInfo,
+  type PresignedUpload,
+} from '../storage/ObjectStore';
 
 export type DedupMode = 'always-create' | 'reuse-existing';
 export type UploadPreference = 'auto' | 'presigned' | 'proxy';
@@ -91,6 +97,14 @@ export interface DocumentLifecycleOptions {
    */
   autoProvisionTenant?: boolean;
   securityProbe?: DocumentSecurityProbe;
+  /**
+   * Base-file cache shared with the security probe and render plane.
+   * When present, commit verifies the uploaded bytes by materialising
+   * them into this cache — ONE object-store read serves both the
+   * sha verification and the probe that follows. Absent (admin-only
+   * deploys), commit falls back to a streaming remote hash.
+   */
+  fileCache?: Pick<BaseFileCache, 'acquire'>;
   /** When present, commit warms the document's thumbnail (fire-and-forget). */
   derivedRenders?: DerivedRenderService;
   usageMeters?: UsageMeters;
@@ -113,9 +127,12 @@ export interface DocumentLifecycleOptions {
  *                  if the customer supplied a stale idempotency key
  *                  pointing at a different content sha.
  *   - `commit`   - returns `null`/throws `Conflict` if the row is no
- *                  longer pending. Verifies sha by reading
- *                  `objectStore.getSha256(key)`; mismatch -> marks
- *                  failed + throws `InvalidArg('sha_mismatch')`.
+ *                  longer pending. Verifies sha by materialising the
+ *                  upload into the base-file cache (one object-store
+ *                  read, reused by the security probe); falls back to
+ *                  a streaming `objectStore.getSha256(key)` when no
+ *                  cache is wired. Mismatch -> marks failed + throws
+ *                  `InvalidArg('sha_mismatch')`.
  *   - `delete`   - two-phase: flip to `deleting`, drop storage prefix,
  *                  remove DB row. A crash between phases leaves
  *                  `deleting` rows for the sweeper to retry.
@@ -126,6 +143,7 @@ export class DocumentLifecycleService {
   private readonly storage: ObjectStoreWithInfo;
   private readonly autoProvisionTenant: boolean;
   private readonly securityProbe: DocumentSecurityProbe;
+  private readonly fileCache?: Pick<BaseFileCache, 'acquire'>;
   private readonly derivedRenders?: DerivedRenderService;
   private readonly usageMeters?: UsageMeters;
   private readonly tenantUsage?: TenantUsageRepo;
@@ -138,6 +156,7 @@ export class DocumentLifecycleService {
     this.storage = opts.storage;
     this.autoProvisionTenant = opts.autoProvisionTenant ?? false;
     this.securityProbe = opts.securityProbe ?? new DocumentSecurityProbe();
+    this.fileCache = opts.fileCache;
     this.derivedRenders = opts.derivedRenders;
     this.usageMeters = opts.usageMeters;
     this.tenantUsage = opts.tenantUsage;
@@ -317,9 +336,7 @@ export class DocumentLifecycleService {
       throw conflict(`document ${doc.id} is not pending (state=${doc.state})`);
     }
     if (doc.expectedSha256 !== null && doc.expectedSha256 !== input.sha256) {
-      throw conflict(
-        `commit SHA does not match the SHA pinned at init for document ${doc.id}`,
-      );
+      throw conflict(`commit SHA does not match the SHA pinned at init for document ${doc.id}`);
     }
 
     const key = this.buildUploadKey(doc.id, doc.tenantId);
@@ -336,62 +353,99 @@ export class DocumentLifecycleService {
         `size_mismatch: init declared ${doc.expectedSizeBytes} bytes but storage contains ${stat.size}`,
       );
     }
-    const observedSha = await this.storage.getSha256(key);
-    if (!observedSha) {
-      await this.documents.markFailed(doc.id, doc.tenantId, 'sha_unavailable');
-      throw new Error('object store could not produce SHA-256 for the uploaded bytes');
-    }
-    const expectedSha = doc.expectedSha256 ?? input.sha256;
-    if (observedSha !== expectedSha) {
+    const declaredSha = doc.expectedSha256 ?? input.sha256;
+    if (!/^[0-9a-f]{64}$/.test(declaredSha)) {
       await this.documents.markFailed(doc.id, doc.tenantId, 'sha_mismatch');
-      // Also remove the bad bytes so a retry isn't reading stale data.
       await this.storage.delete(key);
-      throw badRequest(
-        `sha_mismatch: init declared ${expectedSha} but server observed ${observedSha}`,
-      );
+      throw badRequest('sha_mismatch: declared sha256 must be 64 lowercase hex chars');
     }
 
-    const probe = await this.securityProbe.probe({
-      key,
-      expectedSha: observedSha,
-    });
+    // Verify the uploaded bytes with a SINGLE object-store read.
+    // `fileCache.acquire` materialises the object into the base-file
+    // cache and hashes it on the way down (ShaMismatchError when the
+    // bytes don't hash to `declaredSha`); the security probe below then
+    // reuses that warm entry instead of downloading a second time.
+    let baseHandle: LocalFileHandle | null = null;
+    try {
+      if (this.fileCache) {
+        try {
+          baseHandle = await this.fileCache.acquire({ sha: declaredSha, key });
+        } catch (err) {
+          if (err instanceof ShaMismatchError) {
+            await this.documents.markFailed(doc.id, doc.tenantId, 'sha_mismatch');
+            // Also remove the bad bytes so a retry isn't reading stale data.
+            await this.storage.delete(key);
+            throw badRequest(
+              `sha_mismatch: init declared ${err.expected} but server observed ${err.actual}`,
+            );
+          }
+          throw err;
+        }
+      }
+      if (!baseHandle || baseHandle.sourceKey !== key) {
+        // No cache wired, OR the content-addressed cache already held
+        // these bytes materialised from a DIFFERENT object's key — a
+        // hit proves nothing about what is stored at OUR key, so hash
+        // the remote object directly (streaming, constant memory).
+        const observedSha = await this.storage.getSha256(key);
+        if (!observedSha) {
+          await this.documents.markFailed(doc.id, doc.tenantId, 'sha_unavailable');
+          throw new Error('object store could not produce SHA-256 for the uploaded bytes');
+        }
+        if (observedSha !== declaredSha) {
+          await this.documents.markFailed(doc.id, doc.tenantId, 'sha_mismatch');
+          // Also remove the bad bytes so a retry isn't reading stale data.
+          await this.storage.delete(key);
+          throw badRequest(
+            `sha_mismatch: init declared ${declaredSha} but server observed ${observedSha}`,
+          );
+        }
+      }
 
-    // Meter only a newly committed document. The ready/idempotent return at
-    // the top of this method never reaches this path.
-    await this.usageMeters?.assertUploadAllowed();
-    await this.usageMeters?.assertStorageAllowed(stat.size);
+      const probe = await this.securityProbe.probe({
+        key,
+        expectedSha: declaredSha,
+      });
 
-    const updated = await this.documents.commit({
-      id: doc.id,
-      tenantId: doc.tenantId,
-      baseSha: observedSha,
-      storageSizeBytes: stat.size,
-      security: probe.security,
-    });
-    if (!updated) {
-      throw conflict(`document ${doc.id} state changed during commit`);
+      // Meter only a newly committed document. The ready/idempotent return at
+      // the top of this method never reaches this path.
+      await this.usageMeters?.assertUploadAllowed();
+      await this.usageMeters?.assertStorageAllowed(stat.size);
+
+      const updated = await this.documents.commit({
+        id: doc.id,
+        tenantId: doc.tenantId,
+        baseSha: declaredSha,
+        storageSizeBytes: stat.size,
+        security: probe.security,
+      });
+      if (!updated) {
+        throw conflict(`document ${doc.id} state changed during commit`);
+      }
+      const recorded = await this.usageMeters?.recordUpload(updated.id, updated.createdAt);
+      if (recorded?.counted) await this.tenantUsage?.recordUpload(updated.tenantId);
+
+      // Thumbnail lifecycle: user-password documents get NO
+      // derived artifact — a thumbnail is content disclosure, and the lock
+      // tile IS the correct render. Everything else warms fire-and-forget:
+      // the read-through path is the correctness path, warming is latency.
+      if (probe.security.encryptionRequiresPassword === true) {
+        await this.documents.setThumbnail(doc.id, doc.tenantId, 'locked');
+      } else if (this.derivedRenders) {
+        void this.derivedRenders
+          .warmDocumentThumbnail({
+            tenantId: doc.tenantId,
+            docId: doc.id,
+            baseSha: declaredSha,
+            baseKey: key,
+          })
+          .catch(() => undefined); // warm records `failed` itself
+      }
+
+      return { doc: updated };
+    } finally {
+      baseHandle?.release();
     }
-    const recorded = await this.usageMeters?.recordUpload(updated.id, updated.createdAt);
-    if (recorded?.counted) await this.tenantUsage?.recordUpload(updated.tenantId);
-
-    // Thumbnail lifecycle: user-password documents get NO
-    // derived artifact — a thumbnail is content disclosure, and the lock
-    // tile IS the correct render. Everything else warms fire-and-forget:
-    // the read-through path is the correctness path, warming is latency.
-    if (probe.security.encryptionRequiresPassword === true) {
-      await this.documents.setThumbnail(doc.id, doc.tenantId, 'locked');
-    } else if (this.derivedRenders) {
-      void this.derivedRenders
-        .warmDocumentThumbnail({
-          tenantId: doc.tenantId,
-          docId: doc.id,
-          baseSha: observedSha,
-          baseKey: key,
-        })
-        .catch(() => undefined); // warm records `failed` itself
-    }
-
-    return { doc: updated };
   }
 
   private assertSameUploadIntent(existing: DocumentRow, input: InitInput): void {

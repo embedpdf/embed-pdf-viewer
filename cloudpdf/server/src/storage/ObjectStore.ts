@@ -158,7 +158,8 @@ export interface ObjectStore {
    * Returns the size and SHA-256 of the materialised bytes. If the
    * adapter stores the SHA in object metadata (S3) we trust that and
    * skip a redundant rehash; otherwise we hash during materialise.
-   * `expectedSha` is verified at the end; mismatch throws.
+   * `expectedSha` is verified at the end; mismatch throws
+   * `ShaMismatchError`.
    */
   materializeLocal(
     key: string,
@@ -220,3 +221,24 @@ export interface ObjectStoreInfo {
  * downstream code; remove after callers migrate.
  */
 export type ObjectStoreWithInfo = ObjectStore;
+
+/**
+ * Thrown by `materializeLocal` when the materialised bytes (or the
+ * backend-recorded SHA they were compared against) don't match
+ * `MaterializeOpts.expectedSha`. A typed class so callers can
+ * distinguish "the object genuinely doesn't hash to what was
+ * declared" (commit maps it to a 400 `sha_mismatch`) from transport
+ * failures, which stay retryable.
+ */
+export class ShaMismatchError extends Error {
+  constructor(
+    context: string,
+    /** SHA-256 hex the caller expected. */
+    readonly expected: string,
+    /** SHA-256 hex actually observed. */
+    readonly actual: string,
+  ) {
+    super(`${context}: sha mismatch (expected ${expected}, got ${actual})`);
+    this.name = 'ShaMismatchError';
+  }
+}

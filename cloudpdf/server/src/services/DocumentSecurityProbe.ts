@@ -1,7 +1,8 @@
 import { EngineError, EngineErrorCode, wirePack } from '@embedpdf/engine-core/runtime';
+
 import type { DocumentSecurityInfo } from '../db/repos/documents.repo';
-import type { BaseFileCache, LocalFileHandle } from '../storage/BaseFileCache';
 import type { WorkerThreadPool } from '../runtime/WorkerThreadPool';
+import type { BaseFileCache, LocalFileHandle } from '../storage/BaseFileCache';
 
 export interface DocumentSecurityProbeInput {
   key: string;
@@ -17,6 +18,14 @@ export interface DocumentSecurityProbeResult {
 export interface DocumentSecurityProbeOptions {
   cache?: BaseFileCache;
   pool?: WorkerThreadPool;
+  /**
+   * Called when a probe attempt fails before the security state is
+   * recorded as `unknown`. The probe is deliberately best-effort — it
+   * never fails a commit — but the cause must not be invisible: a
+   * broken materialise path once hid behind this catch for every
+   * presigned upload. Wire this to the app logger.
+   */
+  onError?: (err: unknown, ctx: { key: string; sha: string }) => void;
 }
 
 /**
@@ -58,7 +67,8 @@ export class DocumentSecurityProbe {
         );
       }
       return { security: result.security };
-    } catch {
+    } catch (err) {
+      this.opts.onError?.(err, { key: input.key, sha: input.expectedSha });
       return { security: unknownSecurity() };
     } finally {
       handle?.release();
