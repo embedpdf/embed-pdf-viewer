@@ -52,6 +52,8 @@ const withNextra = nextra({
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  // The docs kit ships raw TypeScript source (workspace package).
+  transpilePackages: ['@embedpdf/docs-kit'],
 };
 
 export default withNextra(nextConfig);

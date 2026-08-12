@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@embedpdf/angular": "workspace:*",
+    "@embedpdf/docs-kit": "workspace:*",
     "@embedpdf/engine": "workspace:*",
     "@embedpdf/react": "workspace:*",
     "@embedpdf/viewer-react": "workspace:*",

@@ -7,6 +7,16 @@ html {
   scroll-behavior: smooth;
 }
 
+/* ---- @embedpdf/docs-kit token contract (docs/kit/src/tokens.ts) ----
+   EmbedPDF brand values, mapped from the ep-* palette in tailwind.config. */
+:root {
+  --dk-accent: #0876fd;
+  --dk-heading: #07204c;
+  --dk-muted: #5a6b92;
+  --dk-border: #e6eaf2;
+  --dk-accent-surface: #ecf2fe;
+}
+
 ::selection {
   background: #e6f0ff;
   color: #0a1a4d;
@@ -129,18 +139,22 @@ html {
 /* ---- Dark code-surface scrollbar (browser defaults are built for white
    pages and glow on the navy cards; MUI-style inset pill instead). Apply to
    every scroll container whose background is the dark code palette. ---- */
-.ep-dark-scroll {
+.ep-dark-scroll,
+.dk-dark-scroll {
   scrollbar-width: thin;
   scrollbar-color: #2e3f6e transparent;
 }
-.ep-dark-scroll::-webkit-scrollbar {
+.ep-dark-scroll::-webkit-scrollbar,
+.dk-dark-scroll::-webkit-scrollbar {
   width: 10px;
   height: 10px;
 }
-.ep-dark-scroll::-webkit-scrollbar-track {
+.ep-dark-scroll::-webkit-scrollbar-track,
+.dk-dark-scroll::-webkit-scrollbar-track {
   background: transparent;
 }
-.ep-dark-scroll::-webkit-scrollbar-thumb {
+.ep-dark-scroll::-webkit-scrollbar-thumb,
+.dk-dark-scroll::-webkit-scrollbar-thumb {
   background: #2e3f6e;
   border-radius: 999px;
   border: 3px solid transparent;

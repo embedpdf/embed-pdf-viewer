@@ -337,6 +337,9 @@ importers:
 
   cloudpdf/website:
     dependencies:
+      '@embedpdf/docs-kit':
+        specifier: workspace:*
+        version: link:../../docs/kit
       '@hugeicons/core-free-icons':
         specifier: ^4.2.0
         version: 4.2.0
@@ -392,6 +395,21 @@ importers:
       typescript:
         specifier: ^5.0.0
         version: 5.9.3
+
+  docs/kit:
+    devDependencies:
+      '@types/react':
+        specifier: ^18.3.0
+        version: 18.3.28
+      next:
+        specifier: ^15.4.10
+        version: 15.5.12(@babel/core@7.29.7)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(sass@1.97.3)
+      react:
+        specifier: ^18.3.1
+        version: 18.3.1
+      typescript:
+        specifier: ~5.8.3
+        version: 5.8.3
 
   examples/angular:
     dependencies:
@@ -1626,6 +1644,9 @@ importers:
       '@embedpdf/angular':
         specifier: workspace:*
         version: link:../packages/framework/angular
+      '@embedpdf/docs-kit':
+        specifier: workspace:*
+        version: link:../docs/kit
       '@embedpdf/engine':
         specifier: workspace:*
         version: link:../packages/engine/main

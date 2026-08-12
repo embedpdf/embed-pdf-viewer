@@ -6,6 +6,9 @@ packages:
   - 'cloudpdf/**'
   - 'tooling/*'
   - 'website'
+  # Shared docs machinery + (later) the shared docs corpus — see
+  # DOCS-PLATFORM-ARCHITECTURE.md.
+  - 'docs/*'
   # exclude generated outputs that can contain nested package.json copies
   # (ng-packagr always emits one into dist) and confuse workspace discovery.
   - '!**/dist/**'

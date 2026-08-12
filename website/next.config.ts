@@ -107,6 +107,8 @@ const withNextra = nextra({
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  // The docs kit ships raw TypeScript source (workspace package).
+  transpilePackages: ['@embedpdf/docs-kit'],
   webpack(config) {
     // See hashDocsCodeInputs above: docs code panels depend on files webpack
     // doesn't track, so their hash versions the persistent cache.

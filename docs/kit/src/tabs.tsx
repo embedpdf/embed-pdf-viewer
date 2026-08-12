@@ -2,7 +2,7 @@
 
 import type { ComponentProps } from 'react';
 
-import { Tabs as _Tabs, Tab } from './index.client';
+import { Tabs as _Tabs, Tab } from './tabs.client';
 
 // Workaround for "Cannot access Tab.propTypes on the server. You cannot dot
 // into a client module from a server component." — re-export through a plain
@@ -11,4 +11,4 @@ export const Tabs = Object.assign((props: ComponentProps<typeof _Tabs>) => <_Tab
   Tab,
 });
 
-export { useInTabs } from './index.client';
+export { useInTabs, TabsContext } from './tabs.client';

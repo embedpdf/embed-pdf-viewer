@@ -1,5 +1,3 @@
-import { frameworkFromDocsPath } from '@/lib/docs-feedback';
-
 /**
  * Same-origin forwarder: the docs feedback widget posts here; this route
  * enriches the payload with build facts only the server knows (framework
@@ -11,7 +9,7 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 const MAX_BODY_BYTES = 5_000;
-const SITE_ENGINE = 'local';
+const SITE_ENGINE = 'cloud';
 
 function isSameOrigin(request: Request): boolean {
   const origin = request.headers.get('origin');
@@ -54,7 +52,6 @@ export async function POST(request: Request) {
     return Response.json({ ok: false, error: 'Invalid JSON.' }, { status: 400 });
   }
 
-  const path = typeof body.path === 'string' ? body.path : '';
   const enriched = {
     ...body,
     docsRevision:
@@ -63,7 +60,7 @@ export async function POST(request: Request) {
       null,
     engine: SITE_ENGINE,
     environment: deployEnvironment(),
-    framework: frameworkFromDocsPath(path),
+    framework: null,
   };
 
   const upstream = await fetch(new URL('/v1/public/docs-feedback', platformUrl), {

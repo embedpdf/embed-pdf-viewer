@@ -15,6 +15,7 @@
     "api:check": "node scripts/generate-api-reference.mjs --check && node scripts/check-api-reference.mjs && node --test scripts/*.test.mjs"
   },
   "dependencies": {
+    "@embedpdf/docs-kit": "workspace:*",
     "@hugeicons/core-free-icons": "^4.2.0",
     "@hugeicons/react": "^1.1.7",
     "@theguild/remark-npm2yarn": "^0.3.3",
