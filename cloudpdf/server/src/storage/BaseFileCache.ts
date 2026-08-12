@@ -2,6 +2,7 @@ import { createReadStream } from 'node:fs';
 import { mkdir, readdir, stat, unlink } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
+
 import type { ObjectStoreWithInfo } from './ObjectStore';
 
 /**
@@ -56,6 +57,15 @@ export interface LocalFileHandle {
   readonly size: number;
   readonly sha256: string;
   /**
+   * Object-store key the entry was ORIGINALLY materialised from. The
+   * cache is content-addressed, so a hit may have been fetched under a
+   * different key than the one this `acquire()` passed — same bytes,
+   * different object. Callers that need "the object at MY key was
+   * read and verified" (commit does) must check this and re-verify
+   * their own key when it differs.
+   */
+  readonly sourceKey: string;
+  /**
    * Decrement the refcount. After the last `release()` the file is
    * eligible for LRU eviction; before then it's pinned to disk.
    *
@@ -69,6 +79,8 @@ export interface LocalFileHandle {
 interface CacheEntry {
   sha: string;
   path: string;
+  /** Object-store key of the materialise that produced this entry. */
+  key: string;
   size: number;
   refcount: number;
   /** Order tracker — incremented on every access, used for LRU. */
@@ -180,6 +192,7 @@ export class BaseFileCache {
     entry = {
       sha,
       path,
+      key: opts.key,
       size: 0,
       refcount: 1,
       lastUsed: ++this.accessTick,
@@ -246,6 +259,7 @@ export class BaseFileCache {
       path: entry.path,
       size: entry.size,
       sha256: entry.sha,
+      sourceKey: entry.key,
       release: onRelease,
     };
   }

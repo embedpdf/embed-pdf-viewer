@@ -1,4 +1,5 @@
 import { Buffer } from 'node:buffer';
+
 import {
   EngineError,
   EngineErrorCode,
@@ -56,6 +57,13 @@ export interface DerivedRenderServiceOptions {
   pool?: WorkerThreadPool;
   encoder?: SharpImageEncoder;
   documents?: DocumentsRepo;
+  /**
+   * Called when a thumbnail warm fails, right before the document's
+   * thumbnail state is recorded as `failed`. Warming is deliberately
+   * fire-and-forget, but the cause must not be invisible — wire this
+   * to the app logger.
+   */
+  onWarmError?: (err: unknown, ctx: { docId: string; tenantId: string }) => void;
 }
 
 export interface LatticeClassification {
@@ -102,6 +110,7 @@ export class DerivedRenderService {
   private readonly pool?: WorkerThreadPool;
   private readonly encoder?: SharpImageEncoder;
   private readonly documents?: DocumentsRepo;
+  private readonly onWarmError?: (err: unknown, ctx: { docId: string; tenantId: string }) => void;
   private readonly inFlight = new Map<string, Promise<DerivedRenderResult>>();
 
   constructor(opts: DerivedRenderServiceOptions) {
@@ -114,6 +123,7 @@ export class DerivedRenderService {
     this.pool = opts.pool;
     this.encoder = opts.encoder;
     this.documents = opts.documents;
+    this.onWarmError = opts.onWarmError;
   }
 
   /** The advertised deployment policy — rides `/v1/access`, never manifests. */
@@ -365,7 +375,8 @@ export class DerivedRenderService {
       } finally {
         handle.release();
       }
-    } catch {
+    } catch (err) {
+      this.onWarmError?.(err, { docId: input.docId, tenantId: input.tenantId });
       await this.documents
         ?.setThumbnail(input.docId, input.tenantId, 'failed')
         .catch(() => undefined);

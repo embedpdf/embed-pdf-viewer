@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { Readable } from 'node:stream';
-import { mkdtemp, readFile, rm, stat } from 'node:fs/promises';
+import { mkdtemp, readdir, readFile, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { sdkStreamMixin } from '@smithy/util-stream';
@@ -16,6 +16,7 @@ import {
   S3Client,
 } from '@aws-sdk/client-s3';
 import { S3ObjectStore } from '../src/storage/adapters/S3ObjectStore';
+import { ShaMismatchError } from '../src/storage/ObjectStore';
 import { StorageKeys } from '../src/storage/keys';
 
 const s3Mock = mockClient(S3Client);
@@ -221,6 +222,80 @@ describe('S3ObjectStore', () => {
         store.materializeLocal('k', dest, { expectedSha: sha256Hex(bytes) }),
       ).rejects.toThrow(/sha mismatch/);
       await expect(stat(dest)).rejects.toMatchObject({ code: 'ENOENT' });
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  test('materializeLocal hashes the download when no SHA metadata exists (presigned uploads)', async () => {
+    const store = newStore();
+    const total = 5 * 1024;
+    const bytes = randomBytes(total);
+    const chunk = 1024;
+    const sha = sha256Hex(bytes);
+
+    // A presigned browser PUT cannot carry signed x-amz-meta-* headers,
+    // so HEAD reports no metadata and the fallback must hash the
+    // finished partial. Regression: this branch used to re-read the
+    // write-only descriptor and die with EBADF on every such upload.
+    s3Mock.on(HeadObjectCommand).resolves({
+      ContentLength: total,
+      ETag: '"abc"',
+      Metadata: {},
+    });
+    s3Mock.on(GetObjectCommand).callsFake((input: { Range?: string }) => {
+      const m = /^bytes=(\d+)-(\d+)$/.exec(input.Range ?? '');
+      if (!m) throw new Error(`unexpected range: ${input.Range}`);
+      const start = parseInt(m[1]!, 10);
+      const end = parseInt(m[2]!, 10);
+      const slice = bytes.slice(start, end + 1);
+      return { Body: sdkStreamMixin(Readable.from([Buffer.from(slice)])) };
+    });
+
+    const dir = await mkdtemp(join(tmpdir(), 's3-mat-'));
+    try {
+      const dest = join(dir, 'out.pdf');
+      const r = await store.materializeLocal('k', dest, {
+        expectedSha: sha,
+        chunkSizeBytes: chunk,
+        concurrency: 4,
+      });
+      expect(r.size).toBe(total);
+      expect(r.sha256).toBe(sha);
+      expect(await readFile(dest)).toEqual(Buffer.from(bytes));
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  test('materializeLocal without metadata rejects bytes that hash differently', async () => {
+    const store = newStore();
+    const total = 2048;
+    const bytes = randomBytes(total);
+
+    s3Mock.on(HeadObjectCommand).resolves({
+      ContentLength: total,
+      ETag: '"x"',
+      Metadata: {},
+    });
+    s3Mock.on(GetObjectCommand).resolves({
+      Body: sdkStreamMixin(Readable.from([Buffer.from(bytes)])),
+    });
+
+    const dir = await mkdtemp(join(tmpdir(), 's3-mat-'));
+    try {
+      const dest = join(dir, 'bad.pdf');
+      const err = await store
+        .materializeLocal('k', dest, { expectedSha: 'a'.repeat(64) })
+        .then(
+          () => null,
+          (e: unknown) => e,
+        );
+      expect(err).toBeInstanceOf(ShaMismatchError);
+      expect((err as ShaMismatchError).actual).toBe(sha256Hex(bytes));
+      // Neither the destination nor any .partial.* may survive.
+      await expect(stat(dest)).rejects.toMatchObject({ code: 'ENOENT' });
+      expect(await readdir(dir)).toEqual([]);
     } finally {
       await rm(dir, { recursive: true, force: true });
     }

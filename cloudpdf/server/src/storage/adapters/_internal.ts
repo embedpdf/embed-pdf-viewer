@@ -19,10 +19,12 @@
  */
 
 import { createHash, randomBytes } from 'node:crypto';
+import { createReadStream } from 'node:fs';
 import { open, mkdir, rename, unlink } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import type { Readable } from 'node:stream';
-import type { MaterializeOpts, MaterializeResult } from '../ObjectStore';
+
+import { ShaMismatchError, type MaterializeOpts, type MaterializeResult } from '../ObjectStore';
 
 /**
  * Custom-metadata key under which every remote adapter stashes the
@@ -123,6 +125,14 @@ export async function materializeViaRanges(
   const { size } = source;
   const concurrency = Math.max(1, opts.concurrency ?? 8);
   const chunk = Math.max(1, opts.chunkSizeBytes ?? 16 * 1024 * 1024);
+
+  // A backend-recorded SHA that already disagrees with the caller's
+  // expectation can never produce a valid file — fail before paying
+  // for the download.
+  if (source.knownSha256 && source.knownSha256 !== opts.expectedSha) {
+    throw new ShaMismatchError(`${label}.materializeLocal`, opts.expectedSha, source.knownSha256);
+  }
+
   await mkdir(dirname(destPath), { recursive: true });
   const partial = `${destPath}.partial.${randomBytes(6).toString('hex')}`;
 
@@ -138,6 +148,7 @@ export async function materializeViaRanges(
   }
 
   const fh = await open(partial, 'w');
+  let fhOpen = true;
   try {
     let nextRange = 0;
     const worker = async (): Promise<void> => {
@@ -151,7 +162,22 @@ export async function materializeViaRanges(
         let offset = r.start;
         for await (const piece of stream) {
           const buf = piece instanceof Buffer ? piece : Buffer.from(piece as Uint8Array);
-          await fh.write(buf, 0, buf.byteLength, offset);
+          // Positional writes may land short of the full buffer; a
+          // silently dropped tail would only surface as PDFium reading
+          // garbage, so loop until every byte is on disk.
+          let done = 0;
+          while (done < buf.byteLength) {
+            const { bytesWritten } = await fh.write(
+              buf,
+              done,
+              buf.byteLength - done,
+              offset + done,
+            );
+            if (bytesWritten <= 0) {
+              throw new Error(`${label}.materializeLocal: short write at offset ${offset + done}`);
+            }
+            done += bytesWritten;
+          }
           offset += buf.byteLength;
         }
       }
@@ -161,26 +187,30 @@ export async function materializeViaRanges(
     );
     await Promise.all(workers);
 
+    // The handle was opened write-only and the ranges landed out of
+    // order, so the hash can't be computed inline or through `fh`.
+    // Close first, then (when the backend recorded no SHA on PUT —
+    // every presigned browser upload) stream-hash the finished partial
+    // from disk before promoting it.
+    fhOpen = false;
+    await fh.close();
+
     let materialisedSha = source.knownSha256;
     if (!materialisedSha) {
-      materialisedSha = await streamingSha256(fh.createReadStream({ start: 0 }));
+      materialisedSha = await streamingSha256(createReadStream(partial));
     }
     if (materialisedSha !== opts.expectedSha) {
-      await fh.close();
-      await safeUnlink(partial);
-      throw new Error(
-        `${label}.materializeLocal: sha mismatch ` +
-          `(expected ${opts.expectedSha}, got ${materialisedSha})`,
-      );
+      throw new ShaMismatchError(`${label}.materializeLocal`, opts.expectedSha, materialisedSha);
     }
-    await fh.close();
     await rename(partial, destPath);
     return { path: destPath, size, sha256: materialisedSha };
   } catch (err) {
-    try {
-      await fh.close();
-    } catch {
-      // already closed / never opened — ignore
+    if (fhOpen) {
+      try {
+        await fh.close();
+      } catch {
+        // the write failure is the interesting error — ignore
+      }
     }
     await safeUnlink(partial);
     throw err;

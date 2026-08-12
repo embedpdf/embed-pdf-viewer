@@ -184,6 +184,7 @@ export type {
   BaseFileCacheEvent,
   LocalFileHandle,
 } from './storage/BaseFileCache';
+export { ShaMismatchError } from './storage/ObjectStore';
 export type { MaterializeOpts, MaterializeResult } from './storage/ObjectStore';
 export { DocumentService } from './services/DocumentService';
 export type {

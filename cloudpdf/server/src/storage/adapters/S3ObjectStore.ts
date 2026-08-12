@@ -20,7 +20,9 @@
  */
 
 import { Readable } from 'node:stream';
+
 import type { ObjectIdentifier } from '@aws-sdk/client-s3';
+
 import type {
   MaterializeOpts,
   MaterializeResult,
@@ -34,6 +36,7 @@ import type {
 import {
   drainReadable,
   computeSha256Hex,
+  streamingSha256,
   materializeViaRanges,
   SHA256_METADATA_KEY,
 } from './_internal';
@@ -170,11 +173,14 @@ export class S3ObjectStore implements ObjectStore {
       // S3 lowercases user-metadata keys on read.
       const fromMeta = meta[SHA256_METADATA_KEY];
       if (fromMeta) return fromMeta;
-      // Fall back to streaming the body. Only used when an object was
-      // PUT outside our SDK (presigned PUT by a misbehaving client).
-      const bytes = await this.get(key);
-      if (!bytes) return null;
-      return computeSha256Hex(bytes);
+      // No metadata means the object was PUT outside our SDK — the
+      // normal shape of every presigned browser upload (SigV4 refuses
+      // unsigned x-amz-meta-* headers, so those uploads can't carry a
+      // recorded SHA). Hash the body as it streams; never buffer the
+      // whole object (base PDFs can be hundreds of MB).
+      const got = await client.send(new cmd.GetObjectCommand({ Bucket: this.bucket, Key: key }));
+      if (!got.Body) return null;
+      return await streamingSha256(got.Body as Readable);
     } catch (err) {
       if (isS3NotFound(err)) return null;
       throw err;
