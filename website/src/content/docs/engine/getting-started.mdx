@@ -82,7 +82,8 @@ const engine = cloudEngine({ baseUrl: 'https://pdf.example.com', token });
 Two deliberate differences surface the split:
 
 - **What `open()` accepts.** Local opens `{ kind: 'bytes' }`; cloud opens
-  `{ kind: 'id' }` / `{ kind: 'token' }`, addressing server-side documents.
+  `{ kind: 'id' }` / `{ kind: 'token' }` / `{ kind: 'share' }`, addressing
+  server-side documents by id, doc-scoped JWT, or public share token.
 - **Fonts.** `cloudEngine()` has no `fallbackFonts` option — fallback fonts are
   a server policy on the cloud (`engine.fonts` is undefined there).
 

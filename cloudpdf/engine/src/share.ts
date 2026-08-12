@@ -1,4 +1,4 @@
-import type { TokenSource } from '@embedpdf/engine-core/runtime';
+import { EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
 
 /**
  * Share-session exchange: the client half of the no-backend embed flow.
@@ -6,7 +6,7 @@ import type { TokenSource } from '@embedpdf/engine-core/runtime';
  * A share token (`shr_…`) is a REFERENCE to a stored grant on the
  * server, not a credential — `exchangeShareToken` trades it for an
  * ordinary short-lived doc JWT, and `shareSessionSource` wraps that in
- * a self-renewing {@link TokenSource}. Because the engine's transport
+ * a self-renewing token source. Because the engine's transport
  * invokes its token source on every request (and SSE reconnects call
  * it again), renewal is nothing more than "exchange again when the
  * cached session is nearly out" — no timers, no listeners.
@@ -78,11 +78,45 @@ export async function exchangeShareToken(
   return (await res.json()) as ShareSession;
 }
 
+/**
+ * Lift a {@link ShareExchangeError} into the engine's error taxonomy, so
+ * `open({ kind: 'share' })` and every later renewal fail with the same
+ * `EngineError` family as all other engine calls. The wire code and HTTP
+ * status survive in `details`; the original error rides as `cause`.
+ *
+ * `SharePasswordRequired` gets its own engine code — it is the one outcome
+ * callers branch on programmatically (prompt for the grant passphrase and
+ * retry). Everything else maps by meaning, with the HTTP status as the
+ * fallback discriminator.
+ */
+export function engineErrorFromShareExchange(error: ShareExchangeError): EngineError {
+  const code =
+    error.code === 'SharePasswordRequired'
+      ? EngineErrorCode.SharePasswordRequired
+      : error.code === 'NotFound'
+        ? EngineErrorCode.NotFound
+        : error.code === 'ShareExpired' ||
+            error.code === 'OriginNotAllowed' ||
+            error.code === 'OriginRequired'
+          ? EngineErrorCode.Forbidden
+          : error.status === 401
+            ? EngineErrorCode.Unauthenticated
+            : error.status === 400
+              ? EngineErrorCode.InvalidArg
+              : EngineErrorCode.Unknown;
+  return new EngineError(code, `share exchange failed: ${error.message}`, {
+    details: { shareCode: error.code, status: error.status },
+    cause: error,
+  });
+}
+
 /** Renew this many seconds before `expiresAt` so in-flight requests never race expiry. */
 const RENEW_MARGIN_SECONDS = 60;
 
 /**
- * A caching, self-renewing {@link TokenSource} over the exchange.
+ * A caching, self-renewing token source over the exchange — the callable
+ * member of the engine's `TokenSource` union, assignable wherever one is
+ * taken.
  * Concurrent callers share one in-flight exchange; a failed exchange
  * clears it so the next request retries rather than caching the error.
  */
@@ -90,7 +124,7 @@ export function shareSessionSource(
   baseUrl: string,
   shareToken: string,
   opts: ShareExchangeOptions = {},
-): TokenSource {
+): () => Promise<string> {
   let session: ShareSession | null = null;
   let inflight: Promise<string> | null = null;
   return async () => {

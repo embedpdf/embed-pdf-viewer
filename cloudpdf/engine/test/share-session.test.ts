@@ -17,15 +17,22 @@ import {
 } from '@cloudpdf/server';
 import { buildAppForTesting } from '../../server/src/app/buildApp';
 import { createValidTestLicenseGate } from '../../server/src/licensing/testing';
+import { EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
 import { createCloudEngine } from '../src/index';
 import { exchangeShareToken, shareSessionSource, ShareExchangeError } from '../src/share';
 
 /**
- * SDK side of the no-backend embed flow: a share token exchanged into a
- * self-renewing TokenSource that drives an ordinary
- * `open({ kind: 'token' })`. The exchange endpoint requires a browser
- * Origin header — browsers send it automatically; here (Node) the
- * fetch wrapper plays the browser.
+ * SDK side of the no-backend embed flow, at both levels:
+ *
+ *   - the primitives: a share token exchanged into a self-renewing
+ *     token source that drives an ordinary `open({ kind: 'token' })`
+ *   - the engine arm: `open({ kind: 'share' })`, which performs the
+ *     exchange itself on the engine's own transport (baseUrl + fetch)
+ *     and surfaces exchange failures as EngineErrors
+ *
+ * The exchange endpoint requires a browser Origin header — browsers
+ * send it automatically; here (Node) the fetch wrapper plays the
+ * browser.
  */
 
 const STUB_ENTRY = fileURLToPath(
@@ -124,11 +131,18 @@ async function createShare(body: Record<string, unknown>): Promise<string> {
   return ((await res.json()) as { share: { id: string } }).share.id;
 }
 
-/** Node fetch playing the browser: attach Origin like a cross-origin page would. */
+/**
+ * Node fetch playing the browser: attach Origin like a cross-origin page
+ * would. Merges via `Headers` — engine transport passes a `Headers`
+ * instance, which a plain object spread would silently flatten to `{}`
+ * (dropping `Authorization`).
+ */
 function browserFetch(origin: string, counter?: { exchanges: number }): typeof fetch {
   return async (input, init) => {
     if (counter && String(input).endsWith('/v1/share-sessions')) counter.exchanges += 1;
-    return fetch(input, { ...init, headers: { ...(init?.headers ?? {}), origin } });
+    const headers = new Headers(init?.headers);
+    headers.set('origin', origin);
+    return fetch(input, { ...init, headers });
   };
 }
 
@@ -212,6 +226,88 @@ describe('share sessions (SDK)', () => {
         }),
       });
       expect(again.id).toBe('doc-multi-b');
+    } finally {
+      await engine.destroy();
+    }
+  });
+
+  test("open({ kind: 'share' }) exchanges on the engine's own transport", async () => {
+    await seedDocument('doc-open-share');
+    const shareId = await createShare({
+      docId: 'doc-open-share',
+      scope: ['doc.open', 'doc.render'],
+      origins: ['https://acme.com'],
+    });
+
+    // The Origin-attaching fetch is configured on the ENGINE, not the
+    // open call — proving the share arm forwards the engine's transport
+    // (fetchImpl + baseUrl) into the exchange. No engine-level token:
+    // the anonymous-engine embed scenario.
+    const counter = { exchanges: 0 };
+    const engine = createCloudEngine({
+      baseUrl: fx.baseUrl,
+      fetch: browserFetch('https://acme.com', counter),
+    });
+    try {
+      const handle = await engine.open({ kind: 'share', shareToken: shareId });
+      expect(handle.id).toBe('doc-open-share');
+      expect(counter.exchanges).toBe(1);
+    } finally {
+      await engine.destroy();
+    }
+  });
+
+  test("open({ kind: 'share' }) with a passphrase-protected grant", async () => {
+    await seedDocument('doc-open-share-pass');
+    const shareId = await createShare({
+      docId: 'doc-open-share-pass',
+      scope: ['doc.open'],
+      password: 'open-sesame',
+    });
+
+    const engine = createCloudEngine({
+      baseUrl: fx.baseUrl,
+      fetch: browserFetch('https://acme.com'),
+    });
+    try {
+      // Without the passphrase: an EngineError with the dedicated code —
+      // the prompt-and-retry signal — never a raw ShareExchangeError.
+      try {
+        await engine.open({ kind: 'share', shareToken: shareId });
+        expect.unreachable('share open without a passphrase must reject');
+      } catch (err) {
+        expect(err).toBeInstanceOf(EngineError);
+        expect(EngineError.is(err, EngineErrorCode.SharePasswordRequired)).toBe(true);
+        expect((err as EngineError).details).toMatchObject({
+          shareCode: 'SharePasswordRequired',
+        });
+      }
+
+      // With it: an ordinary handle.
+      const handle = await engine.open({
+        kind: 'share',
+        shareToken: shareId,
+        sharePassword: 'open-sesame',
+      });
+      expect(handle.id).toBe('doc-open-share-pass');
+    } finally {
+      await engine.destroy();
+    }
+  });
+
+  test("open({ kind: 'share' }) maps unknown grants to NotFound", async () => {
+    const engine = createCloudEngine({
+      baseUrl: fx.baseUrl,
+      fetch: browserFetch('https://acme.com'),
+    });
+    try {
+      try {
+        await engine.open({ kind: 'share', shareToken: `shr_${'B'.repeat(24)}` });
+        expect.unreachable('unknown share must reject');
+      } catch (err) {
+        expect(err).toBeInstanceOf(EngineError);
+        expect(EngineError.is(err, EngineErrorCode.NotFound)).toBe(true);
+      }
     } finally {
       await engine.destroy();
     }

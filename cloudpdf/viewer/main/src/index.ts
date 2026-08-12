@@ -39,8 +39,9 @@ export type { ShareSession, ShareExchangeOptions } from '@cloudpdf/engine';
 export { resolveCloudConfig } from './config';
 export type { CloudSource, CloudShareSource, CloudInitialDocument } from './config';
 
-// `documents` is omitted from the base so the CLOUD list type (which
-// additionally accepts `{ kind: 'share' }` sources) governs.
+// `documents` is omitted from the base so CloudSource's list (same
+// InitialDocument type — `{ kind: 'share' }` is a standard OpenInput
+// kind now) governs without a conflicting redeclaration.
 export interface CloudInitOptions
   extends Omit<InitOptions, 'engine' | 'src' | 'documents'>,
     CloudSource {}
