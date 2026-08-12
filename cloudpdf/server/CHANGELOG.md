@@ -1,5 +1,23 @@
 # @cloudpdf/server
 
+## 3.0.0-next.3
+
+### Minor Changes
+
+- [#748](https://github.com/embedpdf/embed-pdf-viewer/pull/748) by [@bobsingor](https://github.com/bobsingor) – Derives the connected usage-reporting credential from the license key, so a connected deployment is configured with `CLOUDPDF_LICENSE_KEY` alone.
+  - Computes the reporting credential as `cpr_v1_` + base64url(HMAC-SHA256) over a domain-separated message that binds the signed `cloudpdfLicenseId` license metadata, so the wire credential is one-way (it can never reveal the license key) and never authenticates another license record.
+  - Retires `CLOUDPDF_LICENSE_REPORTING_TOKEN`. A deployment that still sets it boots normally; the variable is ignored and the server logs a warning asking for its removal.
+  - Existing connected deployments upgrade by removing the retired variable. During the coordinated verifier cutover on the CloudPDF side a usage report may answer 401; reports retry every five minutes with cumulative counters, so no usage is lost and license validation is unaffected.
+  - Air-gapped deployments are unchanged and continue to send no telemetry.
+  - Pins fixed cross-runtime derivation test vectors shared with the CloudPDF control plane.
+
+- [#746](https://github.com/embedpdf/embed-pdf-viewer/pull/746) by [@bobsingor](https://github.com/bobsingor) – Fixes presigned-upload materialization and makes commit-time sha verification single-read and constant-memory.
+  - Fixes the range materializer crashing with `EBADF` whenever an object carried no SHA metadata — the shape of every presigned browser upload. The failure was silent: commits still reached `ready` while the security probe recorded `unknown` and thumbnail warming recorded `failed`. The hash fallback now closes the write-only handle and streams the finished partial from disk, guards against short positional writes, and rejects a metadata/expected-sha disagreement before paying for the download.
+  - Replaces the S3 and FS `getSha256` fallbacks that buffered whole objects in RAM with streaming hashes — constant memory regardless of document size.
+  - Commit now verifies uploaded bytes with a single object-store read when a base-file cache is wired (`DocumentLifecycleOptions.fileCache`): the upload is materialized into the cache, hashed on the way down, and reused by the security probe instead of being downloaded a second time. `LocalFileHandle.sourceKey` reports which object key materialized a content-addressed entry, so a cross-key cache hit still triggers a direct verification of the committing document's own object.
+  - Adds a typed `ShaMismatchError` (exported) thrown by all `materializeLocal` implementations, letting callers distinguish declared-hash mismatches from retryable transport failures.
+  - Surfaces previously swallowed failures: `DocumentSecurityProbeOptions.onError`, `DerivedRenderServiceOptions.onWarmError`, and base-file-cache `materialize-error` events are now wired to the server log.
+
 ## 3.0.0-next.2
 
 ### Minor Changes

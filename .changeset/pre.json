@@ -65,6 +65,8 @@
     "cloudpdf-contract-openapi",
     "cloudpdf-contract-share-grants",
     "cloudpdf-engine-share-sessions",
+    "cloudpdf-server-derived-reporting-credential",
+    "cloudpdf-server-materialize-verify",
     "cloudpdf-server-share-grants",
     "cloudpdf-server-tenant-api",
     "cloudpdf-viewer-react-share-tokens",

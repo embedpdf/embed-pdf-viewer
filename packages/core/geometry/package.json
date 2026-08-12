@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/core-geometry",
-  "version": "3.0.0-next.2",
+  "version": "3.0.0-next.3",
   "private": false,
   "description": "The viewer's pure 2D coordinate primitives: Point/Size, page rotation, and the rotation/scale transforms shared by stage-core, the stage plugin, and every framework adapter. Zero dependencies, DOM-free, serializable — the bottom of the pyramid.",
   "type": "module",
