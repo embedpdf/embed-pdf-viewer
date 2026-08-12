@@ -1,6 +1,6 @@
 {
   "name": "@cloudpdf/viewer-react",
-  "version": "3.0.0-next.2",
+  "version": "3.0.0-next.3",
   "private": false,
   "description": "React wrapper for the full viewer wired to CloudPDF: the CloudPDFViewer component. A thin cloud door over @embedpdf/viewer-react/core - no wasm, no workers, rendering happens on a @cloudpdf/server deployment (or CloudPDF SaaS) over HTTPS.",
   "type": "module",

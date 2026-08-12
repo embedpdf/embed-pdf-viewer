@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/plugin-search",
-  "version": "3.0.0-next.2",
+  "version": "3.0.0-next.3",
   "private": false,
   "description": "Document text search: drives the engine's budgeted search slices, converts match rects to content space, and integrates with the Stage for viewport-first scanning and reveal-on-navigate.",
   "type": "module",
