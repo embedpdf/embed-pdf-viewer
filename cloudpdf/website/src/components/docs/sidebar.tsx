@@ -4,6 +4,10 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
 
+import { pageSupportsEngine } from '@embedpdf/docs-kit';
+
+import { DOCS_SITE } from '@/docs-site';
+
 import { useConfig } from './config-provider';
 import { MethodBadge } from './method-badge';
 
@@ -15,7 +19,7 @@ type TreeItem = {
    * Page frontmatter; API reference pages carry their HTTP `method`
    * and — for API-token-only operations — `audience: operator` here.
    */
-  frontMatter?: { method?: string; audience?: string };
+  frontMatter?: { method?: string; audience?: string; engines?: string[] };
   children?: TreeItem[];
 };
 
@@ -49,9 +53,12 @@ function SidebarLink({ item, pathname }: { item: TreeItem; pathname: string }) {
 }
 
 function SidebarTree({ items, pathname }: { items: TreeItem[]; pathname: string }) {
+  // Rung 4 of the fork ladder: pages declaring `engines:` they don't
+  // support on this site simply don't exist in its navigation.
+  const visible = items.filter((item) => pageSupportsEngine(item.frontMatter, DOCS_SITE.engine));
   return (
     <>
-      {items.map((item) => {
+      {visible.map((item) => {
         const hasChildren = Boolean(item.children && item.children.length > 0);
 
         if (hasChildren) {

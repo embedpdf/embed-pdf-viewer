@@ -7,6 +7,9 @@ import nextra from 'nextra';
 import { remarkNpm2Yarn } from '@theguild/remark-npm2yarn';
 import { visit } from 'unist-util-visit';
 
+import { remarkEngineAxis } from '@embedpdf/docs-kit/mdx';
+
+import { DOCS_SITE } from './src/docs-site';
 import { rehypeCodeExample } from './src/lib/rehype-code-example';
 import { remarkCodeExample } from './src/lib/remark-code-example';
 
@@ -90,6 +93,9 @@ const withNextra = nextra({
       keepBackground: false,
     },
     remarkPlugins: [
+      // Resolve the engine axis FIRST, so every later plugin (and the
+      // compiled page) only ever sees this site's flavour.
+      [remarkEngineAxis, { engine: DOCS_SITE.engine }],
       [
         remarkNpm2Yarn,
         {

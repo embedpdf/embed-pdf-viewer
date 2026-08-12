@@ -14,6 +14,8 @@ export {
   type FeedbackSite,
 } from './feedback';
 export { Toc, useSectionSpy, type TocItem } from './toc';
+export { pageSupportsEngine, type DocsEngine, type DocsSiteBinding } from './axis';
+export { EngineCrossLink } from './engine-cross-link';
 export { Heading, createHeading, HEADING_STYLES } from './heading';
 export { MethodBadge, methodStyle } from './method-badge';
 export { Pre } from './pre';
