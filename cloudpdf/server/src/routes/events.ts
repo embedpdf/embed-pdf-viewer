@@ -70,8 +70,15 @@ export async function registerEventsRoutes(
     const head = await layerAuditHead(opts.db, ctx.tenantId, docId, layerName);
     const requested = parseLastEventId(req);
 
+    // CORS (and any other Fastify hook) has queued its response headers on
+    // the reply. Hijacking bypasses Fastify's normal send path, so preserve
+    // those headers explicitly when switching to the raw SSE response.
+    const headers = reply.getHeaders();
     reply.hijack();
     const raw = reply.raw;
+    for (const [name, value] of Object.entries(headers)) {
+      if (value !== undefined) raw.setHeader(name, value);
+    }
     raw.writeHead(200, {
       'content-type': 'text/event-stream',
       'cache-control': 'no-cache, no-transform',

@@ -166,6 +166,31 @@ describe('GET /events — the SSE half of the document event stream', () => {
     await sse.close();
   });
 
+  test('the hijacked SSE response preserves wildcard CORS headers', async () => {
+    const tenantId = 'tenant-sse';
+    const docId = 'docssecors';
+    const layerName = 'alice';
+    const origin = 'https://customer.example';
+    await seedDocument(fx, tenantId, docId, { pageCount: 1 });
+
+    const abort = new AbortController();
+    try {
+      const res = await fetch(`${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/events`, {
+        headers: {
+          Authorization: `Bearer ${docToken(tenantId, docId, layerName)}`,
+          Accept: 'text/event-stream',
+          Origin: origin,
+        },
+        signal: abort.signal,
+      });
+      expect(res.status).toBe(200);
+      expect(res.headers.get('access-control-allow-origin')).toBe(origin);
+      expect(res.headers.get('vary')).toContain('Origin');
+    } finally {
+      abort.abort();
+    }
+  });
+
   test('Last-Event-ID resumes exactly: only rows past the cursor are replayed', async () => {
     const tenantId = 'tenant-sse';
     const docId = 'docsse002';
@@ -332,6 +357,7 @@ async function buildFixture(): Promise<Fixture> {
   const bundle = await buildAppForTesting({
     licenseGate: createValidTestLicenseGate(),
     verifier: { mode: 'hs256', secret: SECRET },
+    corsOrigins: '*',
     workerEntry: STUB_ENTRY,
     poolSize: 1,
     db,
