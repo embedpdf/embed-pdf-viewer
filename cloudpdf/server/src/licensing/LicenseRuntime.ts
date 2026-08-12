@@ -23,6 +23,7 @@ import type { KeygenResponseProof } from './keygen-response';
 import { LicenseStateRepository } from './LicenseStateRepository';
 import { verifyMachineCertificate, type VerifiedMachineCertificate } from './offline-certificate';
 import { resolveCloudPdfLicenseIdentity, type CloudPdfLicenseIdentity } from './product';
+import { deriveConnectedReportingCredential } from './reporting-credential';
 import { markLicenseGateTrusted } from './trusted-license-gates';
 import { parseSecretRefUri } from '../config/secrets/parseSecretRefUri';
 import type { Database } from '../db/schema';
@@ -150,6 +151,20 @@ export class LicenseRuntime implements LicenseGate {
   /** Internal server bootstrap value sourced only from verified license metadata. */
   getConnectedReportingLicenseId(): string | null {
     return this.connectedReportingLicenseId;
+  }
+
+  /**
+   * Internal server bootstrap value: the usage-reporting bearer credential,
+   * derived one-way from the configured license key and the signed
+   * cloudpdfLicenseId metadata. Null until a connected validation has
+   * surfaced the license ID; always null in air-gapped mode.
+   */
+  getConnectedReportingCredential(): string | null {
+    if (!this.key || !this.connectedReportingLicenseId) return null;
+    return deriveConnectedReportingCredential({
+      cloudpdfLicenseId: this.connectedReportingLicenseId,
+      licenseKey: this.key,
+    });
   }
 
   async close(): Promise<void> {

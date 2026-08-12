@@ -13,9 +13,7 @@ import type { Kysely, Selectable } from 'kysely';
 
 import type { LicenseUsageSnapshot } from './UsageMeters';
 import { UsageMeters } from './UsageMeters';
-import { parseSecretRefUri } from '../config/secrets/parseSecretRefUri';
 import type { Database, LicenseReportingStateTable } from '../db/schema';
-import type { SecretResolver } from '../security/secrets/SecretResolver';
 
 const productionControlPlaneUrl = 'https://api.cloudpdf.com';
 
@@ -54,15 +52,14 @@ export class ConnectedUsageReporter {
     private readonly meters: UsageMeters,
     private readonly cloudPdfLicenseId: string,
     private readonly controlPlaneUrl: string,
-    private readonly reportingToken: string,
+    private readonly reportingCredential: string,
   ) {}
 
   static async create(input: {
     cloudPdfLicenseId: string;
     db: Kysely<Database>;
     meters: UsageMeters;
-    reportingToken?: string;
-    secretResolver?: SecretResolver;
+    reportingCredential: string;
   }): Promise<ConnectedUsageReporter> {
     return this.createWithControlPlane(input, productionControlPlaneUrl);
   }
@@ -73,8 +70,7 @@ export class ConnectedUsageReporter {
     controlPlaneUrl: string;
     db: Kysely<Database>;
     meters: UsageMeters;
-    reportingToken?: string;
-    secretResolver?: SecretResolver;
+    reportingCredential: string;
   }): Promise<ConnectedUsageReporter> {
     return this.createWithControlPlane(
       input,
@@ -87,16 +83,14 @@ export class ConnectedUsageReporter {
       cloudPdfLicenseId: string;
       db: Kysely<Database>;
       meters: UsageMeters;
-      reportingToken?: string;
-      secretResolver?: SecretResolver;
+      reportingCredential: string;
     },
     controlPlaneUrl: string,
   ): Promise<ConnectedUsageReporter> {
-    const reportingToken = await resolveSecret(
-      input.reportingToken,
-      input.secretResolver,
-      'CLOUDPDF_LICENSE_REPORTING_TOKEN',
-    );
+    const reportingCredential = input.reportingCredential.trim();
+    if (!reportingCredential) {
+      throw new Error('A connected reporting credential is required for usage reporting');
+    }
     const cloudPdfLicenseId = input.cloudPdfLicenseId.trim();
     if (!cloudPdfLicenseId) {
       throw new Error('A signed CloudPDF reporting license ID is required');
@@ -106,7 +100,7 @@ export class ConnectedUsageReporter {
       input.meters,
       cloudPdfLicenseId,
       controlPlaneUrl,
-      reportingToken,
+      reportingCredential,
     );
   }
 
@@ -129,7 +123,7 @@ export class ConnectedUsageReporter {
       await this.markAttempt();
       const response = await postWithRetry(
         `${this.controlPlaneUrl}/v1/licenses/${encodeURIComponent(pending.licenseId)}/usage`,
-        this.reportingToken,
+        this.reportingCredential,
         pending.payload,
       );
       if (!response.ok) {
@@ -308,7 +302,7 @@ export class ConnectedUsageReporter {
 
 async function postWithRetry(
   url: string,
-  token: string,
+  credential: string,
   payload: UsageReportPayload,
 ): Promise<Response> {
   let lastError: unknown;
@@ -317,7 +311,7 @@ async function postWithRetry(
       const response = await fetch(url, {
         body: JSON.stringify(payload),
         headers: {
-          authorization: `Bearer ${token}`,
+          authorization: `Bearer ${credential}`,
           'content-type': 'application/json',
         },
         method: 'POST',
@@ -332,22 +326,6 @@ async function postWithRetry(
     await new Promise((resolve) => setTimeout(resolve, 250 * 2 ** attempt));
   }
   throw lastError;
-}
-
-async function resolveSecret(
-  raw: string | undefined,
-  resolver: SecretResolver | undefined,
-  name: string,
-): Promise<string> {
-  const value = raw?.trim();
-  if (!value) throw new Error(`${name} is required for connected usage reporting`);
-  if (!value.startsWith('secret://')) return value;
-  if (!resolver) throw new Error(`A SecretResolver is required when ${name} is a secret:// URI`);
-  const resolved = await resolver.resolve({
-    reportingToken: { as: 'string', ref: parseSecretRefUri(value) },
-  });
-  if (!resolved.reportingToken.trim()) throw new Error(`${name} resolved to an empty secret`);
-  return resolved.reportingToken.trim();
 }
 
 function requireHttpsUrl(value: string | undefined, name: string): string {

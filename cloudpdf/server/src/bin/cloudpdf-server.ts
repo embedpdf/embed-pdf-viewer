@@ -100,8 +100,9 @@ import type { ObjectStore } from '../storage/ObjectStore';
  *   CLOUDPDF_WORKER_POOL_SIZE  int|max  (default: min(2, cpus))
  *   CLOUDPDF_FALLBACK_FONTS  JSON [{key,path,familyName?,...}]  (default: none)
  *   CLOUDPDF_LICENSE_MODE     connected|air-gapped
- *   CLOUDPDF_LICENSE_KEY      required for connected mode
- *   CLOUDPDF_LICENSE_REPORTING_TOKEN     required for connected usage reporting
+ *   CLOUDPDF_LICENSE_KEY      required for connected mode; usage reporting
+ *                             derives its credential from this key
+ *                             (CLOUDPDF_LICENSE_REPORTING_TOKEN is retired)
  *
  * Exit codes:
  *   0  success
@@ -251,10 +252,7 @@ function readUploadProxyPolicyEnv(): 'fallback-only' | 'allowed' | 'disabled' {
   const raw = process.env['CLOUDPDF_UPLOAD_PROXY_POLICY']?.trim().toLowerCase();
   if (!raw) return 'fallback-only';
   if (raw === 'fallback-only' || raw === 'allowed' || raw === 'disabled') return raw;
-  fail(
-    2,
-    `CLOUDPDF_UPLOAD_PROXY_POLICY must be fallback-only, allowed, or disabled (got ${raw})`,
-  );
+  fail(2, `CLOUDPDF_UPLOAD_PROXY_POLICY must be fallback-only, allowed, or disabled (got ${raw})`);
 }
 
 /** CLOUDPDF_ENABLE_REVOCATION=1 mounts tokens.revoke and enforces the jti denylist. */
@@ -758,9 +756,17 @@ async function cmdServe(): Promise<void> {
     initialLicense.mode === 'connected' &&
     initialLicense.telemetryProfile === 'aggregated-usage'
   ) {
+    if (process.env['CLOUDPDF_LICENSE_REPORTING_TOKEN']) {
+      console.warn(
+        '[cloudpdf-server] CLOUDPDF_LICENSE_REPORTING_TOKEN is retired and ignored: ' +
+          'the usage-reporting credential is derived from CLOUDPDF_LICENSE_KEY. ' +
+          'Remove the variable from this deployment.',
+      );
+    }
     try {
       const cloudPdfLicenseId = licenseRuntime.getConnectedReportingLicenseId();
-      if (!cloudPdfLicenseId) {
+      const reportingCredential = licenseRuntime.getConnectedReportingCredential();
+      if (!cloudPdfLicenseId || !reportingCredential) {
         throw new Error(
           'Connected license requires usage reporting but its signed metadata is missing cloudpdfLicenseId',
         );
@@ -769,8 +775,7 @@ async function cmdServe(): Promise<void> {
         cloudPdfLicenseId,
         db: dbCtx.db,
         meters: new UsageMeters(dbCtx.db, licenseRuntime),
-        reportingToken: process.env['CLOUDPDF_LICENSE_REPORTING_TOKEN'],
-        secretResolver: resolver,
+        reportingCredential,
       });
     } catch (error) {
       await licenseRuntime.close();
