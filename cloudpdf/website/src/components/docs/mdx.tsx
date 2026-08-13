@@ -15,6 +15,7 @@ import {
 } from './api-overview';
 import { ApiClientSetup, ApiOperation, ApiSnippet } from './api-reference';
 import { DeploymentTab, DeploymentTabs } from './deployment-tabs';
+import { Fw } from './framework';
 import { createHeading } from './heading';
 import { Pre } from './pre';
 import { Toc, type TocItem } from './toc';
@@ -97,6 +98,7 @@ export function useMDXComponents(components?: MDXComponents): MDXComponents {
     pre: Pre,
     ApiOperation,
     EngineCrossLink,
+    Fw,
     ApiSnippet,
     ApiClientSetup,
     ApiResources,

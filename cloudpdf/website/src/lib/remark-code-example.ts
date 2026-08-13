@@ -59,6 +59,45 @@ function readCodeFile(codePath: string, githubBaseUrl?: string): FileInfo | null
 }
 
 /**
+ * Resolve `<Example name="topic/base">` to the React variant's files, both
+ * shapes of the shared-corpus convention (docs/content/samples):
+ *
+ *   <topic>/<base>.react.tsx     single file — the file IS the app
+ *   <topic>/<base>.react/        multi-file — entry App.tsx first
+ *
+ * Display names hide the variant infix (basic.react.tsx → basic.tsx), same
+ * as the EmbedPDF site, so readers see the file tree they would write.
+ */
+function collectReactSampleFiles(name: string, githubBaseUrl?: string): FileInfo[] {
+  const sampleDirectory = path.resolve(process.cwd(), 'src', 'samples', path.dirname(name));
+  const base = path.basename(name);
+  let entries: string[] = [];
+  try {
+    entries = fs.readdirSync(sampleDirectory);
+  } catch {
+    return [];
+  }
+
+  const relativeDir = `samples/${path.dirname(name)}`;
+
+  const variantDir = path.join(sampleDirectory, `${base}.react`);
+  if (entries.includes(`${base}.react`) && fs.statSync(variantDir).isDirectory()) {
+    return fs
+      .readdirSync(variantDir)
+      .sort((a, b) => (a === 'App.tsx' ? -1 : b === 'App.tsx' ? 1 : a.localeCompare(b)))
+      .map((file) => readCodeFile(`${relativeDir}/${base}.react/${file}`, githubBaseUrl))
+      .filter((file): file is FileInfo => file !== null);
+  }
+
+  return entries
+    .filter((file) => file.startsWith(`${base}.react.`))
+    .sort()
+    .map((file) => readCodeFile(`${relativeDir}/${file}`, githubBaseUrl))
+    .filter((file): file is FileInfo => file !== null)
+    .map((file) => ({ ...file, filename: file.filename.replace('.react.', '.') }));
+}
+
+/**
  * Remark plugin that processes <CodeExample> components, reading the referenced
  * source files from disk so they can be highlighted and displayed.
  *
@@ -71,6 +110,29 @@ export const remarkCodeExample = (options: RemarkCodeExampleOptions = {}) => {
 
   return (tree: any) => {
     visit(tree, 'mdxJsxFlowElement', (node: any) => {
+      // Shared-corpus `<Example name="topic/base">` (docs/content samples):
+      // resolve the React variant's real files and rewrite into an ordinary
+      // CodeExample node so the existing highlight + render path owns it.
+      // React-first: framework fan-out arrives with the switcher port.
+      if (node.name === 'Example') {
+        const nameAttr = node.attributes?.find(
+          (attr: any) => attr.type === 'mdxJsxAttribute' && attr.name === 'name',
+        );
+        if (typeof nameAttr?.value !== 'string') return;
+        const files = collectReactSampleFiles(nameAttr.value, githubBaseUrl);
+        if (files.length === 0) {
+          console.warn(`[remark-code-example] No react sample for <Example name="${nameAttr.value}">`);
+          return;
+        }
+        node.name = 'CodeExample';
+        node.children = [];
+        node.attributes = [
+          { type: 'mdxJsxAttribute', name: '__codeFiles', value: JSON.stringify(files) },
+          { type: 'mdxJsxAttribute', name: '__needsHighlighting', value: 'true' },
+        ];
+        return;
+      }
+
       if (node.name !== 'CodeExample') return;
 
       const codePathAttr = node.attributes?.find(

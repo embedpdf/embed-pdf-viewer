@@ -337,9 +337,18 @@ importers:
 
   cloudpdf/website:
     dependencies:
+      '@cloudpdf/engine':
+        specifier: workspace:*
+        version: link:../engine
       '@embedpdf/docs-kit':
         specifier: workspace:*
         version: link:../../docs/kit
+      '@embedpdf/engine':
+        specifier: workspace:*
+        version: link:../../packages/engine/main
+      '@embedpdf/react':
+        specifier: workspace:*
+        version: link:../../packages/framework/react
       '@hugeicons/core-free-icons':
         specifier: ^4.2.0
         version: 4.2.0
@@ -395,6 +404,8 @@ importers:
       typescript:
         specifier: ^5.0.0
         version: 5.9.3
+
+  docs/content: {}
 
   docs/kit:
     dependencies:

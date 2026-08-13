@@ -4,7 +4,7 @@
   "scripts": {
     "dev": "next dev -p 3400",
     "dev:clean": "rm -rf .next && next dev",
-    "prebuild": "pnpm api:check",
+    "prebuild": "pnpm api:check && pnpm run docs:check",
     "build": "next build",
     "start": "next start",
     "clean": "rm -rf .next node_modules/.cache",
@@ -12,10 +12,16 @@
     "api:pages": "node scripts/generate-api-reference.mjs",
     "api:snippets": "node scripts/extract-sdk-snippets.mjs",
     "api:metadata": "node scripts/sync-api-reference-metadata.mjs",
-    "api:check": "node scripts/generate-api-reference.mjs --check && node scripts/check-api-reference.mjs && node --test scripts/*.test.mjs"
+    "api:check": "node scripts/generate-api-reference.mjs --check && node scripts/check-api-reference.mjs && node --test scripts/*.test.mjs",
+    "docs:sync": "node ../../docs/content/scripts/sync.mjs --target . --engine cloud --frameworks react",
+    "docs:check": "node ../../docs/content/scripts/sync.mjs --target . --engine cloud --frameworks react --check",
+    "check:samples": "tsc -p tsconfig.samples-cloud.json"
   },
   "dependencies": {
+    "@cloudpdf/engine": "workspace:*",
     "@embedpdf/docs-kit": "workspace:*",
+    "@embedpdf/engine": "workspace:*",
+    "@embedpdf/react": "workspace:*",
     "@hugeicons/core-free-icons": "^4.2.0",
     "@hugeicons/react": "^1.1.7",
     "@theguild/remark-npm2yarn": "^0.3.3",

@@ -13,7 +13,10 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit && pnpm run check:samples",
     "check:samples": "tsc -p tsconfig.samples-engine.json && tsc -p tsconfig.samples-react.json && ngc -p tsconfig.samples-angular.json",
-    "build:demos": "vite build --config vite.demos.config.ts && vite build --config vite.demos-ng.config.ts"
+    "build:demos": "vite build --config vite.demos.config.ts && vite build --config vite.demos-ng.config.ts",
+    "docs:sync": "node ../docs/content/scripts/sync.mjs --target . --engine local",
+    "docs:check": "node ../docs/content/scripts/sync.mjs --target . --engine local --check",
+    "prebuild": "pnpm run docs:check"
   },
   "dependencies": {
     "@embedpdf/angular": "workspace:*",
