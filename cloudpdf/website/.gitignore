@@ -22,3 +22,4 @@ next-env.d.ts
 .env*.local
 public/demos/
 .demo-ng-entries/
+public/search-index.bin

@@ -62,6 +62,11 @@ const nextConfig: NextConfig = {
   transpilePackages: ['@embedpdf/docs-kit'],
   // "/docs/…page.md" is rewritten to the Markdown Route Handler by
   // middleware.ts, which also owns the fan-out courtesy redirects.
+  // The search route reads the per-deploy artifact from the filesystem;
+  // tracing must bundle it into the serverless function.
+  outputFileTracingIncludes: {
+    '/api/search': ['./public/search-index.bin'],
+  },
 };
 
 export default withNextra(nextConfig);

@@ -1,14 +1,30 @@
 import GithubSlugger from 'github-slugger';
 
-import {
-  PRODUCT_INTEGRATIONS,
-  type DocsIntegration,
-  type IntegrationDocsProduct,
-} from '../docs-integrations';
-import { docsProductFromPath } from '../docs-products';
-import { resolveDocsTree, type AstNode } from '../docs-markdown';
+import type { AstNode } from '../docs-markdown';
 import { dedupeSymbols, symbolsFromCode, symbolsFromInlineCode } from './symbols';
 import type { DocsSection } from './types';
+
+/**
+ * The site binding for section extraction: how to resolve raw MDX into this
+ * site's tree (engine flavor, component projections), and how the site's URL
+ * space maps paths to products and products to integrations.
+ */
+export type SearchExtractSite = {
+  /** Resolve one content source for one integration (the kit markdown pass). */
+  resolveTree(options: {
+    sourceCode: string;
+    canonicalPath: string;
+    integration?: string;
+  }): { tree: AstNode };
+  /** `/docs/headless/…` → 'headless'; null for non-product pages. */
+  productFromPath(canonicalPath: string): string | null;
+  /**
+   * Integrations a product's pages resolve under; `[undefined]` for products
+   * with no framework axis. The FIRST integration is canonical: it decides
+   * the section set, ordering, and the shared prose.
+   */
+  integrationsForProduct(product: string | null): readonly (string | undefined)[];
+};
 
 /**
  * A section runs from one heading to the next heading of equal or shallower
@@ -198,12 +214,6 @@ function breadcrumbFor(contentPath: string): string[] {
   return contentPath.split('/').slice(1, -1).map(titleCase);
 }
 
-function integrationsFor(product: string | null): (DocsIntegration | undefined)[] {
-  if (!product || !(product in PRODUCT_INTEGRATIONS)) return [undefined];
-  const supported = PRODUCT_INTEGRATIONS[product as IntegrationDocsProduct];
-  return supported.length > 0 ? [...supported] : [undefined];
-}
-
 export type ExtractPageOptions = {
   sourceCode: string;
   /** Content source path with no integration segment and no extension. */
@@ -220,15 +230,13 @@ export type ExtractPageOptions = {
  * integration-specific text (an `<Fw>` branch, a sample that exists for one
  * framework) is recorded per integration.
  */
-export function extractPageSections({
-  sourceCode,
-  contentPath,
-  title,
-  description,
-}: ExtractPageOptions): DocsSection[] {
+export function extractPageSections(
+  site: SearchExtractSite,
+  { sourceCode, contentPath, title, description }: ExtractPageOptions,
+): DocsSection[] {
   const canonicalPath = `/${contentPath}`;
-  const product = docsProductFromPath(canonicalPath);
-  const integrations = integrationsFor(product);
+  const product = site.productFromPath(canonicalPath);
+  const integrations = site.integrationsForProduct(product);
   const pageTitle =
     typeof title === 'string' && title ? title : titleCase(contentPath.split('/').at(-1) ?? '');
   const pageDescription = typeof description === 'string' && description ? description : null;
@@ -240,7 +248,7 @@ export function extractPageSections({
   const perIntegrationSymbols = new Map<string, Map<string, string[]>>();
 
   for (const integration of integrations) {
-    const { tree } = resolveDocsTree({ sourceCode, canonicalPath, integration });
+    const { tree } = site.resolveTree({ sourceCode, canonicalPath, integration });
     const sections = splitIntoSections(tree);
     const key = integration ?? '*';
 

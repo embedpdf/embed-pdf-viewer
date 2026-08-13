@@ -2,7 +2,7 @@ import { performance } from 'node:perf_hooks';
 
 import { describe, expect, it } from 'vitest';
 
-import { symbolsFromCode } from './symbols';
+import { symbolsFromCode } from '../src/search/symbols';
 
 describe('identifier extraction', () => {
   it('extracts PascalCase and underscore-shaped symbols', () => {

@@ -1,14 +1,20 @@
-import type { DocsIntegration } from '../docs-integrations';
-import type { DocsProduct } from '../docs-products';
+/**
+ * Shared types for the docs search stack (DOCS-PLATFORM-ARCHITECTURE.md):
+ * the index is a per-site build artifact over post-resolution content, the
+ * machinery is the kit's, and the corpus/URL rules are each site's binding.
+ *
+ * This module is deliberately dependency-free (no node imports) so the
+ * dialog can import the highlight markers and response types client-side.
+ */
 
 /**
  * Excerpt highlight markers, shared by the query layer and the client.
  *
- * Deliberately not `<mark>`: `ts_headline` does not escape the text it wraps,
- * so HTML tags would force the client into `dangerouslySetInnerHTML` over
- * strings containing arbitrary doc prose. These are invisible Unicode isolates
- * that never occur in documentation, so the client can split them into real
- * React nodes and the worst possible failure is a missed highlight.
+ * Deliberately not `<mark>`: HTML tags would force the client into
+ * `dangerouslySetInnerHTML` over strings containing arbitrary doc prose.
+ * These are invisible Unicode isolates that never occur in documentation, so
+ * the client can split them into real React nodes and the worst possible
+ * failure is a missed highlight.
  */
 export const HIGHLIGHT_OPEN = '⁨';
 export const HIGHLIGHT_CLOSE = '⁩';
@@ -31,7 +37,7 @@ export type DocsSection = {
   sectionTitle: string | null;
   /** Human trail for result display: `['Headless', 'Plugins', 'Stage']`. */
   breadcrumb: string[];
-  product: DocsProduct | null;
+  product: string | null;
   /** Heading depth (2 for `##`, 3 for `###`); 0 for the lede. */
   depth: number;
   /** Position on the page, so equal-scoring sections keep reading order. */
@@ -42,7 +48,7 @@ export type DocsSection = {
    * Prose that only exists behind an `<Fw only=…>` branch, keyed by
    * integration. Searchable, but weighted below shared prose.
    */
-  variantProse: Partial<Record<DocsIntegration, string>>;
+  variantProse: Record<string, string>;
   /** Identifiers worth exact-matching, keyed by integration ('*' = shared). */
   symbols: Record<string, string[]>;
 };
@@ -55,7 +61,7 @@ export type DocsSearchHit = {
   pageTitle: string;
   sectionTitle: string | null;
   breadcrumb: string[];
-  product: DocsProduct | null;
+  product: string | null;
   /** Prose window around the match, for the result row. */
   excerpt: string;
   /** Which retrievers found this, for debugging and telemetry. */
@@ -67,6 +73,6 @@ export type DocsSearchResponse = {
   query: string;
   /** True when the dense half was skipped (no key, timeout, provider error). */
   degraded: boolean;
-  integration: DocsIntegration | null;
+  integration: string | null;
   hits: DocsSearchHit[];
 };

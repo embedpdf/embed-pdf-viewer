@@ -4,15 +4,13 @@ import { createHash } from 'node:crypto';
 
 import { parse as parseYaml } from 'yaml';
 
-import { extractPageSections } from './extract';
+import { extractPageSections, type SearchExtractSite } from './extract';
 import type { DocsSection } from './types';
 
 /**
  * Build-time corpus enumeration. Reads the filesystem, so this module must
- * never be pulled into a request path — the API route talks to Postgres.
+ * never be pulled into a request path — the API route reads the artifact.
  */
-
-const CONTENT_ROOT = path.resolve(process.cwd(), 'src', 'content');
 
 function walkMdx(directory: string): string[] {
   let entries: fs.Dirent[];
@@ -43,11 +41,11 @@ function readFrontmatter(source: string): Frontmatter {
 }
 
 /**
- * `src/content/docs/headless/plugins/stage.mdx` → `docs/headless/plugins/stage`.
+ * `<root>/docs/headless/plugins/stage.mdx` → `docs/headless/plugins/stage`.
  * An `index.mdx` collapses onto its directory, matching Nextra's routing.
  */
-export function contentPathFor(absolutePath: string): string {
-  const relative = path.relative(CONTENT_ROOT, absolutePath).split(path.sep).join('/');
+export function contentPathFor(contentRoot: string, absolutePath: string): string {
+  const relative = path.relative(contentRoot, absolutePath).split(path.sep).join('/');
   const withoutExtension = relative.replace(/\.mdx$/, '');
   return withoutExtension.replace(/\/index$/, '');
 }
@@ -107,22 +105,22 @@ export type CorpusPage = {
 };
 
 /**
- * Extracts every indexable section in the docs tree.
+ * Extracts every indexable section under `<contentRoot>/docs`.
  *
- * Resolution errors are deliberately fatal: `resolveDocsTree` throws on an MDX
- * component with no Markdown projection, and a silently skipped page would be
- * a page nobody can find.
+ * Resolution errors are deliberately fatal: the site's tree resolution throws
+ * on an MDX component with no Markdown projection, and a silently skipped
+ * page would be a page nobody can find.
  */
-export function collectCorpus(): CorpusPage[] {
-  const files = walkMdx(path.join(CONTENT_ROOT, 'docs')).sort();
+export function collectCorpus(site: SearchExtractSite, contentRoot: string): CorpusPage[] {
+  const files = walkMdx(path.join(contentRoot, 'docs')).sort();
 
   return files.flatMap((absolutePath) => {
     const source = fs.readFileSync(absolutePath, 'utf-8');
     const frontmatter = readFrontmatter(source);
     if (frontmatter.searchable === false) return [];
 
-    const contentPath = contentPathFor(absolutePath);
-    const sections = extractPageSections({
+    const contentPath = contentPathFor(contentRoot, absolutePath);
+    const sections = extractPageSections(site, {
       sourceCode: source,
       contentPath,
       title: frontmatter.title,

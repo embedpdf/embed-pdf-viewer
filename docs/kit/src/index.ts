@@ -34,6 +34,11 @@ export {
   VueIcon,
 } from './icons';
 export { DocsProductSwitcher, type DocsProductItem } from './product-switcher';
+export {
+  SearchDialog,
+  type SearchDialogProduct,
+  type SearchDialogProps,
+} from './search-dialog';
 export { DOCS_KIT_TOKENS, type DocsKitToken } from './tokens';
 export {
   renderDocsMarkdownWith,

@@ -1,5 +1,7 @@
 import {
   renderDocsMarkdownWith,
+  resolveDocsTreeWith,
+  type AstNode,
   type DocsMarkdownSite,
   type RenderDocsMarkdownOptions,
 } from '@embedpdf/docs-kit';
@@ -44,4 +46,15 @@ export function renderDocsMarkdown(options: Omit<RenderDocsMarkdownOptions, 'var
     ...options,
     variantKey: product === 'headless' ? 'framework' : 'integration',
   });
+}
+
+/** The resolved-tree pass the search extractor builds its sections from. */
+export function resolveDocsTree({
+  sourceCode,
+  integration,
+}: {
+  sourceCode: string;
+  integration?: string;
+}): { tree: AstNode } {
+  return { tree: resolveDocsTreeWith(site, { sourceCode, integration }) };
 }

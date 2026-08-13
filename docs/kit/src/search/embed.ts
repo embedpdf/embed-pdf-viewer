@@ -12,9 +12,9 @@ export const EMBEDDING_MODEL = process.env.OPENAI_EMBEDDINGS_MODEL ?? 'text-embe
 
 /**
  * Matryoshka truncation: `text-embedding-3-small` is trained so a 512-dim
- * prefix keeps almost all retrieval quality at a third of the storage and a
- * much cheaper HNSW index. Changing this requires a new migration — the column
- * is `vector(512)` and Postgres enforces it.
+ * prefix keeps almost all retrieval quality at a third of the storage.
+ * Changing this invalidates the artifact — its header records the dimensions
+ * and the loader refuses a mismatch.
  */
 export const EMBEDDING_DIMENSIONS = 512;
 
@@ -89,9 +89,4 @@ export async function embedQuery(query: string, timeoutMs = 800): Promise<number
   } finally {
     clearTimeout(timeout);
   }
-}
-
-/** pgvector's text input format. */
-export function toVectorLiteral(embedding: number[]): string {
-  return `[${embedding.join(',')}]`;
 }

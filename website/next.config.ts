@@ -115,6 +115,11 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   // The docs kit ships raw TypeScript source (workspace package).
   transpilePackages: ['@embedpdf/docs-kit'],
+  // The search route reads the per-deploy artifact from the filesystem;
+  // tracing must bundle it into the serverless function.
+  outputFileTracingIncludes: {
+    '/api/search': ['./public/search-index.bin'],
+  },
   webpack(config) {
     // See hashDocsCodeInputs above: docs code panels depend on files webpack
     // doesn't track, so their hash versions the persistent cache.

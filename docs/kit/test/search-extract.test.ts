@@ -1,6 +1,30 @@
 import { describe, expect, it } from 'vitest';
 
-import { extractPageSections } from './extract';
+import { resolveDocsTreeWith, type DocsMarkdownSite } from '../src/docs-markdown';
+import { extractPageSections, type SearchExtractSite } from '../src/search/extract';
+
+/**
+ * A minimal fan-out site: headless pages resolve across four frameworks
+ * (react canonical), everything else is variant-less — the same shape both
+ * real sites bind.
+ */
+const FRAMEWORKS = ['react', 'vue', 'svelte', 'angular'];
+
+const markdownSite: DocsMarkdownSite = {
+  siteOrigin: 'https://docs.example',
+  engine: 'local',
+  resolveExampleFiles: () => undefined,
+  readCodeFile: () => null,
+  isFramework: (value) => FRAMEWORKS.includes(value),
+};
+
+const site: SearchExtractSite = {
+  resolveTree: ({ sourceCode, integration }) => ({
+    tree: resolveDocsTreeWith(markdownSite, { sourceCode, integration }),
+  }),
+  productFromPath: (canonicalPath) => canonicalPath.split('/')[2] ?? null,
+  integrationsForProduct: (product) => (product === 'headless' ? FRAMEWORKS : [undefined]),
+};
 
 const ENGINE_PAGE = `---
 title: Engine
@@ -25,7 +49,7 @@ This stays with its parent.
 `;
 
 function sectionsOf(source: string, contentPath: string) {
-  return extractPageSections({ sourceCode: source, contentPath, title: 'Engine' });
+  return extractPageSections(site, { sourceCode: source, contentPath, title: 'Engine' });
 }
 
 describe('section extraction', () => {
@@ -84,7 +108,7 @@ title: Getting started
 `;
 
   it('stores shared prose once and records only genuine per-framework branches', () => {
-    const [installation] = extractPageSections({
+    const [installation] = extractPageSections(site, {
       sourceCode: HEADLESS_PAGE,
       contentPath: 'docs/headless/getting-started',
       title: 'Getting started',
@@ -98,7 +122,7 @@ title: Getting started
   });
 
   it('indexes one row per source section, not one per public route', () => {
-    const sections = extractPageSections({
+    const sections = extractPageSections(site, {
       sourceCode: HEADLESS_PAGE,
       contentPath: 'docs/headless/getting-started',
       title: 'Getting started',

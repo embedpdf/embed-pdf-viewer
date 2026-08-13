@@ -3,9 +3,11 @@
  *
  * Runs before `next build` in the deploy pipeline (and on `pnpm dev` start),
  * so the artifact always describes exactly the content the deployment
- * renders. Sections are content-hashed against the previous artifact, so a
- * rebuild only pays for embeddings that actually changed — and with no
- * OPENAI_API_KEY it writes a lexical-only index instead of failing.
+ * renders — docs pages AND the generated API reference, which indexes
+ * through the same component projections the `.md` export uses. Sections
+ * are content-hashed against the previous artifact, so a rebuild only pays
+ * for embeddings that actually changed — and with no OPENAI_API_KEY it
+ * writes a lexical-only index instead of failing.
  *
  *   pnpm run search:index          # loud: an embedding failure is fatal
  *   pnpm run search:index:build    # deploy: outages degrade, never fail
@@ -17,7 +19,7 @@ import { loadEnvFile } from 'node:process';
 
 import { buildSearchArtifact } from '@embedpdf/docs-kit/search';
 
-import { searchExtractSite } from '../src/lib/search/site';
+import { searchExtractSite } from '../src/lib/search-site';
 
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 

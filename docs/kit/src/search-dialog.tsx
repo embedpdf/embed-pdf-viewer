@@ -4,27 +4,60 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
-import { ChevronRightIcon, SearchIcon } from './icons';
-
 import {
   HIGHLIGHT_CLOSE,
   HIGHLIGHT_OPEN,
   type DocsSearchHit,
   type DocsSearchResponse,
-} from '@/lib/search/types';
+} from './search/types';
 
 /** Long enough that a stalled keystroke does not fire a query of its own. */
 const DEBOUNCE_MS = 140;
 
-const PRODUCT_LABELS: Record<string, string> = {
-  viewer: 'Viewer',
-  headless: 'Headless',
-  engine: 'Engine',
-};
+export type SearchDialogProduct = { value: string; label: string };
+
+function SearchGlyph({ size = 20, className }: { size?: number; className?: string }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+      className={className}
+    >
+      <circle cx="11" cy="11" r="7" />
+      <path d="m20 20-3.5-3.5" />
+    </svg>
+  );
+}
+
+function ChevronGlyph({ size = 14, className }: { size?: number; className?: string }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+      className={className}
+    >
+      <path d="m9 6 6 6-6 6" />
+    </svg>
+  );
+}
 
 function Kbd({ children }: { children: string }) {
   return (
-    <kbd className="border-ep-borderSoft inline-flex h-[22px] min-w-[22px] items-center justify-center rounded-[5px] border bg-white px-1.5 font-mono text-[11px] font-semibold text-[#3D4E75] shadow-[0_1px_0_rgba(14,26,64,0.06)]">
+    <kbd className="inline-flex h-[22px] min-w-[22px] items-center justify-center rounded-[5px] border border-[var(--dk-border)] bg-white px-1.5 font-mono text-[11px] font-semibold text-[var(--dk-muted)] shadow-[0_1px_0_rgba(14,26,64,0.06)]">
       {children}
     </kbd>
   );
@@ -42,10 +75,10 @@ function Spinner({ size = 20 }: { size?: number }) {
       aria-hidden
       className="animate-spin"
     >
-      <circle cx="10" cy="10" r="7.75" stroke="#DCE8FC" strokeWidth="2.25" />
+      <circle cx="10" cy="10" r="7.75" stroke="var(--dk-border)" strokeWidth="2.25" />
       <path
         d="M17.75 10A7.75 7.75 0 0 0 10 2.25"
-        stroke="#0876FD"
+        stroke="var(--dk-accent)"
         strokeWidth="2.25"
         strokeLinecap="round"
       />
@@ -83,10 +116,10 @@ function Excerpt({ text }: { text: string }) {
   }, [text]);
 
   return (
-    <span className="text-ep-subtle block font-sans text-[13px] leading-snug">
+    <span className="block font-sans text-[13px] leading-snug text-[var(--dk-muted)]">
       {parts.map((part, index) =>
         part.highlighted ? (
-          <mark key={index} className="text-ep-navy bg-transparent font-semibold">
+          <mark key={index} className="bg-transparent font-semibold text-[var(--dk-heading)]">
             {part.value}
           </mark>
         ) : (
@@ -118,24 +151,49 @@ function ResultRow({
       onMouseEnter={onHover}
       onClick={onSelect}
       className={`flex w-full cursor-pointer items-center gap-3 px-[18px] py-2.5 text-left transition-colors duration-100 ${
-        active ? 'bg-ep-tint' : 'bg-transparent'
+        active ? 'bg-[var(--dk-accent-surface)]' : 'bg-transparent'
       }`}
     >
       <div className="min-w-0 flex-1">
-        <span className="font-display text-ep-subtle block text-[11px] font-bold uppercase tracking-[0.06em]">
+        <span className="font-display block text-[11px] font-bold uppercase tracking-[0.06em] text-[var(--dk-muted)]">
           {trail}
         </span>
-        <b className="text-ep-navy block font-sans text-sm font-semibold">
+        <b className="block font-sans text-sm font-semibold text-[var(--dk-heading)]">
           {hit.sectionTitle ?? hit.pageTitle}
         </b>
         {hit.excerpt ? <Excerpt text={hit.excerpt} /> : null}
       </div>
-      <ChevronRightIcon size={14} className="flex-shrink-0 text-[#3D4E75]" />
+      <ChevronGlyph size={14} className="flex-shrink-0 text-[var(--dk-muted)]" />
     </button>
   );
 }
 
-export function SearchModal({ onClose }: { onClose: () => void }) {
+export type SearchDialogProps = {
+  onClose: () => void;
+  /** Product filter chips; omit (or []) to hide the chip row. */
+  products?: SearchDialogProduct[];
+  placeholder?: string;
+  /** The site's search endpoint. */
+  apiPath?: string;
+  /** Copy under the empty state, naming what this site's search covers. */
+  emptyHint?: string;
+};
+
+/**
+ * The shared docs search dialog — one view on both sites, riding the
+ * `--dk-*` token contract.
+ *
+ * Always rendered through a portal: site headers tend to carry a
+ * `backdrop-filter`, which would otherwise become the containing block for
+ * this dialog's `fixed inset-0` overlay and clip it to the header strip.
+ */
+export function SearchDialog({
+  onClose,
+  products = [],
+  placeholder = 'Search the docs…',
+  apiPath = '/api/search',
+  emptyHint = 'Search guides, plugins, and API names.',
+}: SearchDialogProps) {
   const router = useRouter();
   const [query, setQuery] = useState('');
   const [product, setProduct] = useState<string | null>(null);
@@ -174,7 +232,7 @@ export function SearchModal({ onClose }: { onClose: () => void }) {
         const params = new URLSearchParams({ q: trimmed });
         if (product) params.set('product', product);
 
-        const result = await fetch(`/api/search?${params}`, { signal: controller.signal });
+        const result = await fetch(`${apiPath}?${params}`, { signal: controller.signal });
         if (!result.ok) throw new Error(`Search failed (${result.status})`);
 
         setResponse((await result.json()) as DocsSearchResponse);
@@ -190,7 +248,7 @@ export function SearchModal({ onClose }: { onClose: () => void }) {
       controller.abort();
       clearTimeout(timer);
     };
-  }, [query, product]);
+  }, [query, product, apiPath]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -218,43 +276,36 @@ export function SearchModal({ onClose }: { onClose: () => void }) {
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose, hits, active, open]);
 
-  // Keyboard navigation has to drag the viewport with it. The lookup is held in
-  // a local rather than chained: Prettier breaks a chained `[active]` onto its
-  // own line, which trips `no-unexpected-multiline` (ASI ambiguity) and fails
-  // the build.
+  // Keyboard navigation has to drag the viewport with it. The lookup is held
+  // in a local rather than chained: Prettier breaks a chained `[active]` onto
+  // its own line, which trips `no-unexpected-multiline` (ASI ambiguity).
   useEffect(() => {
     const options = listRef.current?.querySelectorAll('[role="option"]');
     options?.[active]?.scrollIntoView({ block: 'nearest' });
   }, [active]);
 
-  // The header this modal is mounted under carries a `backdrop-filter`, which
-  // makes it the containing block for every fixed descendant — rendered in
-  // place, the overlay would size itself to the 84px header strip instead of
-  // the viewport, and only that strip would dim or take an outside click.
-  // Portal past the header so `inset-0` means the viewport again.
   return createPortal(
     <div
-      className="ep-anim-fade fixed inset-0 z-[1000] flex items-start justify-center bg-[rgba(7,32,76,0.45)] px-5 pb-5 pt-[clamp(40px,10vh,120px)] backdrop-blur-[4px]"
+      className="dk-anim-fade fixed inset-0 z-[1000] flex items-start justify-center bg-[rgba(7,32,76,0.45)] px-5 pb-5 pt-[clamp(40px,10vh,120px)] backdrop-blur-[4px]"
       onClick={onClose}
     >
       <div
-        className="ep-anim-slide border-ep-borderSoft flex max-h-[70vh] w-full max-w-[580px] flex-col overflow-hidden rounded-[14px] border bg-white shadow-[0_20px_60px_rgba(7,32,76,0.25)]"
+        className="dk-anim-slide flex max-h-[70vh] w-full max-w-[580px] flex-col overflow-hidden rounded-[14px] border border-[var(--dk-border)] bg-white shadow-[0_20px_60px_rgba(7,32,76,0.25)]"
         onClick={(event) => event.stopPropagation()}
       >
         {/* The field carries no focus ring of its own: it is autofocused and is
             the only text input in the dialog, so a ring restates what the caret
-            already says, and the site-wide one collapses onto the text of a
-            padding-less input. The blue caret is the focus signal instead.
-            `data-ring="none"` is the opt-out — that global rule is unlayered
-            and no `outline-none` utility can override it. */}
-        <div className="border-ep-borderSoft flex h-[62px] flex-shrink-0 items-center gap-3 border-b px-[18px]">
+            already says. The accent caret is the focus signal instead. */}
+        <div className="flex h-[62px] flex-shrink-0 items-center gap-3 border-b border-[var(--dk-border)] px-[18px]">
           <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center">
             {status === 'loading' ? (
               <Spinner />
             ) : (
-              <SearchIcon
+              <SearchGlyph
                 size={20}
-                className={`transition-colors duration-150 ${query ? 'text-ep-blue' : 'text-ep-subtle'}`}
+                className={`transition-colors duration-150 ${
+                  query ? 'text-[var(--dk-accent)]' : 'text-[var(--dk-muted)]'
+                }`}
               />
             )}
           </span>
@@ -265,11 +316,11 @@ export function SearchModal({ onClose }: { onClose: () => void }) {
             role="combobox"
             aria-expanded={hits.length > 0}
             aria-controls="search-results"
-            placeholder="Search the docs…"
+            placeholder={placeholder}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             data-ring="none"
-            className="text-ep-navy placeholder:text-ep-subtle caret-ep-blue min-w-0 flex-1 border-none bg-transparent font-sans text-[17px] font-medium tracking-[-0.01em] outline-none"
+            className="min-w-0 flex-1 border-none bg-transparent font-sans text-[17px] font-medium tracking-[-0.01em] text-[var(--dk-heading)] caret-[var(--dk-accent)] outline-none placeholder:text-[var(--dk-muted)]"
           />
           {query ? (
             <button
@@ -279,48 +330,45 @@ export function SearchModal({ onClose }: { onClose: () => void }) {
                 setQuery('');
                 inputRef.current?.focus();
               }}
-              className="text-ep-subtle hover:bg-ep-mist hover:text-ep-navy inline-flex h-[22px] w-[22px] flex-shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors duration-150"
+              className="inline-flex h-[22px] w-[22px] flex-shrink-0 cursor-pointer items-center justify-center rounded-full text-[var(--dk-muted)] transition-colors duration-150 hover:bg-[var(--dk-accent-surface)] hover:text-[var(--dk-heading)]"
             >
               <ClearIcon />
             </button>
           ) : null}
         </div>
 
-        <div className="border-ep-borderSoft flex gap-1.5 border-b px-[18px] py-2">
-          {[null, 'viewer', 'headless', 'engine'].map((value) => (
-            <button
-              key={value ?? 'all'}
-              type="button"
-              onClick={() => setProduct(value)}
-              className={`rounded-full px-2.5 py-1 font-sans text-xs font-semibold transition-colors ${
-                product === value
-                  ? 'bg-ep-navy text-white'
-                  : 'bg-ep-mist text-ep-subtle hover:text-ep-navy'
-              }`}
-            >
-              {value ? PRODUCT_LABELS[value] : 'All'}
-            </button>
-          ))}
-        </div>
+        {products.length > 0 ? (
+          <div className="flex gap-1.5 border-b border-[var(--dk-border)] px-[18px] py-2">
+            {[null, ...products.map((entry) => entry.value)].map((value) => (
+              <button
+                key={value ?? 'all'}
+                type="button"
+                onClick={() => setProduct(value)}
+                className={`rounded-full px-2.5 py-1 font-sans text-xs font-semibold transition-colors ${
+                  product === value
+                    ? 'bg-[var(--dk-heading)] text-white'
+                    : 'bg-[var(--dk-accent-surface)] text-[var(--dk-muted)] hover:text-[var(--dk-heading)]'
+                }`}
+              >
+                {value ? products.find((entry) => entry.value === value)?.label : 'All'}
+              </button>
+            ))}
+          </div>
+        ) : null}
 
-        <div
-          id="search-results"
-          role="listbox"
-          ref={listRef}
-          className="flex-1 overflow-y-auto py-2"
-        >
+        <div id="search-results" role="listbox" ref={listRef} className="flex-1 overflow-y-auto py-2">
           {status === 'idle' && (
-            <p className="text-ep-subtle px-6 py-10 text-center font-sans text-sm font-medium">
-              Search guides, plugins, and API names.
+            <p className="px-6 py-10 text-center font-sans text-sm font-medium text-[var(--dk-muted)]">
+              {emptyHint}
             </p>
           )}
           {status === 'error' && (
-            <p className="text-ep-subtle px-6 py-10 text-center font-sans text-sm font-medium">
+            <p className="px-6 py-10 text-center font-sans text-sm font-medium text-[var(--dk-muted)]">
               Search is temporarily unavailable.
             </p>
           )}
           {status !== 'idle' && status !== 'error' && hits.length === 0 && (
-            <p className="text-ep-subtle px-6 py-10 text-center font-sans text-sm font-medium">
+            <p className="px-6 py-10 text-center font-sans text-sm font-medium text-[var(--dk-muted)]">
               {status === 'loading' ? 'Searching…' : `No results for “${query.trim()}”`}
             </p>
           )}
@@ -335,7 +383,7 @@ export function SearchModal({ onClose }: { onClose: () => void }) {
           ))}
         </div>
 
-        <div className="border-ep-borderSoft text-ep-subtle flex gap-4 border-t bg-[#FAFBFC] px-[18px] py-2.5 font-sans text-xs font-medium">
+        <div className="flex gap-4 border-t border-[var(--dk-border)] bg-[#FAFBFC] px-[18px] py-2.5 font-sans text-xs font-medium text-[var(--dk-muted)]">
           <span className="inline-flex items-center gap-1.5">
             <Kbd>↑</Kbd>
             <Kbd>↓</Kbd> Navigate

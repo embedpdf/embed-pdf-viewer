@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react';
 
 import { CpButton } from './button';
 import { ArrowRight, SearchIcon } from './icons';
-import { SearchModal } from './search-modal';
+import { SearchDialog } from '@embedpdf/docs-kit';
 import { useSalesDialog } from './sales-dialog';
 import { APP_URL, START_URL } from '../../lib/site-urls';
 
@@ -211,7 +211,20 @@ export function Header() {
         </CpButton>
       </div>
 
-      <SearchModal open={searchOpen} onClose={() => setSearchOpen(false)} />
+      {searchOpen && (
+        <SearchDialog
+          onClose={() => setSearchOpen(false)}
+          placeholder="Search docs, components, API…"
+          emptyHint="Search guides, API operations, and SDK names."
+          products={[
+            { value: 'viewer', label: 'Viewer' },
+            { value: 'headless', label: 'Headless' },
+            { value: 'engine', label: 'Engine' },
+            { value: 'server', label: 'Server' },
+            { value: 'api-reference', label: 'API' },
+          ]}
+        />
+      )}
     </header>
   );
 }
