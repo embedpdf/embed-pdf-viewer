@@ -1,10 +1,8 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import type { LocalEngine } from '@embedpdf/engine';
+  import type { DocumentHandle } from '@embedpdf/engine';
 
-  type PdfDocument = Awaited<ReturnType<LocalEngine['open']>>;
-
-  let { doc, pageNumber }: { doc: PdfDocument; pageNumber: number } = $props();
+  let { doc, pageNumber }: { doc: DocumentHandle; pageNumber: number } = $props();
 
   let src = $state<string>();
 

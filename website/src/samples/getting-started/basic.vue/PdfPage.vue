@@ -1,10 +1,8 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
-import type { LocalEngine } from '@embedpdf/engine';
+import type { DocumentHandle } from '@embedpdf/engine';
 
-type PdfDocument = Awaited<ReturnType<LocalEngine['open']>>;
-
-const props = defineProps<{ doc: PdfDocument; pageNumber: number }>();
+const props = defineProps<{ doc: DocumentHandle; pageNumber: number }>();
 const src = ref<string>();
 
 onMounted(async () => {

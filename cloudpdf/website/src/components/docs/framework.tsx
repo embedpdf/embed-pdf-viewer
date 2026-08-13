@@ -1,15 +1,37 @@
+'use client';
+
+import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
 
-/**
- * React-first shim for the shared corpus's `<Fw>` branches: cloudpdf.com
- * mounts headless docs with the framework axis pinned to React until the
- * URL fan-out + switcher port (DOCS-PLATFORM-ARCHITECTURE.md, phase 3
- * follow-up). Same contract as the EmbedPDF site's pathname-driven Fw.
- */
-const ACTIVE_FRAMEWORK = 'react';
+import {
+  DEFAULT_PRODUCT_INTEGRATION,
+  headlessIntegrationFromPath,
+  type HeadlessIntegration,
+} from '@/lib/docs-integrations';
 
-export function Fw({ only, children }: { only: string | string[]; children: ReactNode }) {
+/**
+ * The pathname is the single source of truth for the active framework
+ * (DOCS-PLATFORM-ARCHITECTURE.md): /docs/headless/<fw>/… — no provider
+ * threading, correct during SSR, and every component derives it the same
+ * way. Same contract as the EmbedPDF site.
+ */
+export function useFramework(): HeadlessIntegration {
+  const pathname = usePathname();
+  return headlessIntegrationFromPath(pathname) ?? DEFAULT_PRODUCT_INTEGRATION.headless;
+}
+
+/** Renders children only on the given frameworks' pages. Rare by design —
+ * prose should be framework-neutral; heavy use means the page belongs in the
+ * explicit per-framework fork set (install/SSR). */
+export function Fw({
+  only,
+  children,
+}: {
+  only: HeadlessIntegration | HeadlessIntegration[];
+  children: ReactNode;
+}) {
+  const fw = useFramework();
   const list = Array.isArray(only) ? only : [only];
-  if (!list.includes(ACTIVE_FRAMEWORK)) return null;
+  if (!list.includes(fw)) return null;
   return <>{children}</>;
 }

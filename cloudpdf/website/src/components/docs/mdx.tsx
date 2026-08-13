@@ -13,6 +13,7 @@ import {
 } from './api-overview';
 import { ApiClientSetup, ApiOperation, ApiSnippet } from './api-reference';
 import { DeploymentTab, DeploymentTabs } from './deployment-tabs';
+import { Example } from './example';
 import { Fw } from './framework';
 import { createHeading } from './heading';
 import { Pre } from './pre';
@@ -106,6 +107,7 @@ export function useMDXComponents(components?: MDXComponents): MDXComponents {
     DeploymentTabs,
     DeploymentTab,
     CodeExample,
+    Example,
     ...components,
   };
 }

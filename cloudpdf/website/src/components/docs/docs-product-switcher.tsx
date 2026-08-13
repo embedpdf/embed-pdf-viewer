@@ -10,10 +10,13 @@ import {
 } from '@embedpdf/docs-kit';
 import { usePathname } from 'next/navigation';
 
+import { docsIntegrationFromPath, docsIntegrationHref } from '@/lib/docs-integrations';
+
 /**
- * CloudPDF's product binding over the kit switcher. React-first: hrefs point
- * at plain routes until the framework fan-out port. The API reference stays
- * in the top navbar — this dropdown is the four product documentations.
+ * CloudPDF's product binding over the kit switcher. Viewer and Headless
+ * hrefs carry the visitor's current integration across products; the
+ * framework-less products keep plain routes. The API reference stays in
+ * the top navbar — this dropdown is the four product documentations.
  */
 const PRODUCTS: DocsProductItem[] = [
   {
@@ -49,6 +52,15 @@ const PRODUCTS: DocsProductItem[] = [
 export function DocsProductSwitcher() {
   const pathname = usePathname();
   const activeKey = pathname.split('/')[2] ?? null;
+  const integration = docsIntegrationFromPath(pathname);
 
-  return <KitSwitcher products={PRODUCTS} activeKey={activeKey} />;
+  const products = integration
+    ? PRODUCTS.map((product) =>
+        product.key === 'viewer' || product.key === 'headless'
+          ? { ...product, href: docsIntegrationHref(product.href, integration) }
+          : product,
+      )
+    : PRODUCTS;
+
+  return <KitSwitcher products={products} activeKey={activeKey} />;
 }

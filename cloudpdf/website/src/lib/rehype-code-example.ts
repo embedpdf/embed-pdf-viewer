@@ -26,9 +26,25 @@ export const rehypeCodeExample = () => {
   return async (tree: any) => {
     const highlighter = await getDocsHighlighter();
     const nodesToProcess: Array<{ node: any; files: FileInfo[] }> = [];
+    const exampleNodes: Array<{ node: any; byFramework: Record<string, FileInfo[]> }> = [];
 
     visit(tree, (node: any) => {
-      if (node.type !== 'mdxJsxFlowElement' || node.name !== 'CodeExample') return;
+      if (node.type !== 'mdxJsxFlowElement') return;
+
+      // Framework-resolved samples (<Example name="…">): highlight every
+      // framework's files; the client picks by pathname.
+      if (node.name === 'Example') {
+        const attr = node.attributes?.find((a: any) => a.name === '__fwFiles');
+        if (!attr?.value) return;
+        try {
+          exampleNodes.push({ node, byFramework: JSON.parse(attr.value) });
+        } catch {
+          console.warn('[rehype-code-example] Could not parse __fwFiles');
+        }
+        return;
+      }
+
+      if (node.name !== 'CodeExample') return;
 
       const needsHighlighting = node.attributes?.find(
         (attr: any) => attr.name === '__needsHighlighting',
@@ -56,6 +72,21 @@ export const rehypeCodeExample = () => {
       );
 
       node.attributes.push(createFilesAttribute(highlightedFiles));
+    }
+
+    for (const { node, byFramework } of exampleNodes) {
+      const highlighted: Record<string, FileInfo[]> = {};
+      for (const [fw, files] of Object.entries(byFramework)) {
+        highlighted[fw] = files.map((file) => highlightCodeFile(highlighter, file));
+      }
+      node.attributes = node.attributes.filter(
+        (attr: any) => attr.name !== '__needsHighlighting' && attr.name !== '__fwFiles',
+      );
+      node.attributes.push({
+        type: 'mdxJsxAttribute',
+        name: 'filesByFramework',
+        value: JSON.stringify(highlighted),
+      });
     }
   };
 };

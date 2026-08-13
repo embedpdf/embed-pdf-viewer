@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
-import type { DocumentHandle } from '@embedpdf/engine';
+import type { DocumentHandle } from '@cloudpdf/engine';
 
 const props = defineProps<{ doc: DocumentHandle; pageNumber: number }>();
 const src = ref<string>();

@@ -1,18 +1,18 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 
-import { ArrowRight, CloudIcon, ReactLogo, SvelteLogo, VueLogo } from './icons';
+import {
+  DOCS_INTEGRATION_LABELS,
+  docsGettingStartedHref,
+  PRODUCT_INTEGRATIONS,
+  type DocsIntegration,
+  type FanoutDocsProduct,
+} from '@/lib/docs-integrations';
+
+import { ArrowRight, CloudIcon } from './icons';
+import { IntegrationLogo } from './integration-logo';
 
 type Tone = 'blue' | 'violet';
-
-const REACT = <ReactLogo width={18} height={18} />;
-const VUE = <VueLogo width={17} height={17} />;
-const SVELTE = <SvelteLogo width={15} height={15} />;
-const VANILLA = (
-  <span className="font-display inline-flex h-[18px] w-[18px] items-center justify-center rounded-[4px] bg-[#F7DF1E] text-[9px] font-extrabold leading-none text-[#1A1A1A]">
-    JS
-  </span>
-);
 
 const fwToneStyles: Record<Tone, { link: string; arrow: string }> = {
   blue: {
@@ -27,26 +27,26 @@ const fwToneStyles: Record<Tone, { link: string; arrow: string }> = {
 
 function FrameworkButton({
   tone,
-  href,
-  name,
-  logo,
+  product,
+  integration,
 }: {
   tone: Tone;
-  href: string;
-  name: string;
-  logo: ReactNode;
+  product: FanoutDocsProduct;
+  integration: DocsIntegration;
 }) {
   const s = fwToneStyles[tone];
   return (
     <Link
-      href={href}
-      className={`group flex items-center gap-2.5 rounded-xl border px-3 py-2.5 no-underline transition-all ${s.link}`}
+      href={docsGettingStartedHref(product, integration)}
+      className={`group flex items-center gap-2.5 rounded-xl border px-3 py-2.5 no-underline transition-all ${s.link} ${
+        integration === 'vanilla' ? 'col-span-2 max-[400px]:col-span-1' : ''
+      }`}
     >
       <span className="inline-flex h-[30px] w-[30px] flex-shrink-0 items-center justify-center rounded-[8px] bg-white shadow-[0_1px_2px_rgba(10,26,77,0.06)]">
-        {logo}
+        <IntegrationLogo integration={integration} size={18} />
       </span>
       <span className="font-display text-cp-navy min-w-0 flex-1 truncate text-[14px] font-bold tracking-[-0.01em]">
-        {name}
+        {DOCS_INTEGRATION_LABELS[integration]}
       </span>
       <ArrowRight
         width={16}
@@ -55,6 +55,17 @@ function FrameworkButton({
         className={`flex-shrink-0 transition-transform group-hover:translate-x-0.5 ${s.arrow}`}
       />
     </Link>
+  );
+}
+
+/** Every integration the product documents, each linking into its own docs. */
+function FrameworkGrid({ tone, product }: { tone: Tone; product: FanoutDocsProduct }) {
+  return (
+    <div className="mt-3 grid grid-cols-2 gap-2.5 max-[400px]:grid-cols-1">
+      {PRODUCT_INTEGRATIONS[product].map((integration) => (
+        <FrameworkButton key={integration} tone={tone} product={product} integration={integration} />
+      ))}
+    </div>
   );
 }
 
@@ -134,32 +145,7 @@ export function PlanSection() {
                     <p className="text-cp-muted font-display mt-5 text-[11px] font-bold uppercase leading-none tracking-[0.06em]">
                       Frameworks
                     </p>
-                    <div className="mt-3 grid grid-cols-2 gap-2.5 max-[400px]:grid-cols-1">
-                      <FrameworkButton
-                        tone="blue"
-                        href="/docs/engine/getting-started"
-                        name="Vanilla JS"
-                        logo={VANILLA}
-                      />
-                      <FrameworkButton
-                        tone="blue"
-                        href="/docs/engine/getting-started"
-                        name="React"
-                        logo={REACT}
-                      />
-                      <FrameworkButton
-                        tone="blue"
-                        href="/docs/engine/getting-started"
-                        name="Vue"
-                        logo={VUE}
-                      />
-                      <FrameworkButton
-                        tone="blue"
-                        href="/docs/engine/getting-started"
-                        name="Svelte"
-                        logo={SVELTE}
-                      />
-                    </div>
+                    <FrameworkGrid tone="blue" product="viewer" />
                   </div>
                 </article>
 
@@ -183,26 +169,7 @@ export function PlanSection() {
                     <p className="text-cp-muted font-display mt-5 text-[11px] font-bold uppercase leading-none tracking-[0.06em]">
                       Frameworks
                     </p>
-                    <div className="mt-3 grid grid-cols-2 gap-2.5 max-[400px]:grid-cols-1">
-                      <FrameworkButton
-                        tone="violet"
-                        href="/docs/engine/getting-started"
-                        name="React"
-                        logo={REACT}
-                      />
-                      <FrameworkButton
-                        tone="violet"
-                        href="/docs/engine/getting-started"
-                        name="Vue"
-                        logo={VUE}
-                      />
-                      <FrameworkButton
-                        tone="violet"
-                        href="/docs/engine/getting-started"
-                        name="Svelte"
-                        logo={SVELTE}
-                      />
-                    </div>
+                    <FrameworkGrid tone="violet" product="headless" />
                   </div>
                 </article>
               </div>

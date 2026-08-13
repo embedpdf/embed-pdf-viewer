@@ -8,12 +8,14 @@ export const ENGINES = {
   local: {
     package: '@embedpdf/engine',
     importLine: "import { localEngine } from '@embedpdf/engine';",
-    factoryLine: 'const engine = localEngine();',
+    // The CALL is the swap unit (not a whole statement) so every framework's
+    // binding shape works: `const engine = …`, Angular's `readonly engine = …`.
+    factoryCall: 'localEngine()',
   },
   cloud: {
     package: '@cloudpdf/engine',
     importLine: "import { cloudEngine } from '@cloudpdf/engine';",
     // The docs demo deployment (live; share grants managed in the dashboard).
-    factoryLine: "const engine = cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' });",
+    factoryCall: "cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' })",
   },
 };

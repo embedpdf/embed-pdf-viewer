@@ -11,6 +11,12 @@ export const dynamic = 'force-dynamic';
 const MAX_BODY_BYTES = 5_000;
 const SITE_ENGINE = 'cloud';
 
+/** The framework axis rides the fan-out URL: /docs/headless/<fw>/… */
+function frameworkFromDocsPath(path: string): string | null {
+  const match = path.match(/^\/docs\/headless\/(react|vue|svelte|angular)(?:\/|$)/);
+  return match?.[1] ?? null;
+}
+
 function isSameOrigin(request: Request): boolean {
   const origin = request.headers.get('origin');
   return origin !== null && origin === new URL(request.url).origin;
@@ -52,6 +58,7 @@ export async function POST(request: Request) {
     return Response.json({ ok: false, error: 'Invalid JSON.' }, { status: 400 });
   }
 
+  const path = typeof body.path === 'string' ? body.path : '';
   const enriched = {
     ...body,
     docsRevision:
@@ -60,7 +67,7 @@ export async function POST(request: Request) {
       null,
     engine: SITE_ENGINE,
     environment: deployEnvironment(),
-    framework: null,
+    framework: frameworkFromDocsPath(path),
   };
 
   const upstream = await fetch(new URL('/v1/public/docs-feedback', platformUrl), {

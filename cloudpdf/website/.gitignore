@@ -20,3 +20,5 @@ next-env.d.ts
 
 # local env files
 .env*.local
+public/demos/
+.demo-ng-entries/

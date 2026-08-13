@@ -97,12 +97,25 @@ function transformSample(source, engine, relative) {
   const flavor = ENGINES[engine];
   let output = source;
 
-  // Samples that provision an engine carry the canonical local lines; the
-  // ready-made viewer samples provision none (the viewer owns its engine)
-  // and pass through untouched. A sample with doc-source markers but no
-  // engine lines is inconsistent — fail loudly.
+  // Type-only imports from the local engine package swap to the flavor's
+  // package — both export the same shared document types (OpenInput,
+  // DocumentHandle, …). Applies to EVERY sample file, engine-provisioning
+  // or not: helper components type their props against those exports too.
+  if (engine !== 'local') {
+    output = output.replace(
+      /^(\s*import type \{[^}]*\} from )'@embedpdf\/engine';$/gm,
+      `$1'${flavor.package}';`,
+    );
+  }
+
+  // Samples that provision an engine carry the canonical local import plus
+  // the canonical factory CALL (any binding shape around it); the ready-made
+  // viewer samples provision none (the viewer owns its engine) and pass
+  // through untouched. A sample with doc-source markers but no engine lines
+  // is inconsistent — fail loudly. Comments must never mention the factory
+  // call or the swap below would rewrite them.
   const hasEngineLines =
-    source.includes(ENGINES.local.importLine) && source.includes(ENGINES.local.factoryLine);
+    source.includes(ENGINES.local.importLine) && source.includes(ENGINES.local.factoryCall);
   const hasDocSources = source.includes('[!doc-source');
   if (!hasEngineLines) {
     if (hasDocSources) {
@@ -116,7 +129,7 @@ function transformSample(source, engine, relative) {
 
   if (engine !== 'local') {
     output = output.replace(ENGINES.local.importLine, flavor.importLine);
-    output = output.replace(ENGINES.local.factoryLine, flavor.factoryLine);
+    output = output.replaceAll(ENGINES.local.factoryCall, flavor.factoryCall);
   }
 
   // Swap (or, for local, unwrap) every marked document-source block.

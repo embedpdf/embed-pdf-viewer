@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, shallowRef } from 'vue';
-import { localEngine } from '@embedpdf/engine';
-import type { DocumentHandle, OpenInput } from '@embedpdf/engine';
+import { cloudEngine } from '@cloudpdf/engine';
+import type { DocumentHandle, OpenInput } from '@cloudpdf/engine';
 import PdfPage from './PdfPage.vue';
 
 // The Vue adapter is in progress — this drives the framework-free engine
@@ -10,14 +10,11 @@ const doc = shallowRef<DocumentHandle>();
 
 // The engine is created synchronously and costs nothing until first use —
 // only opening a document does real work.
-const engine = localEngine();
+const engine = cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' });
 
 onMounted(async () => {
-    // The local engine opens bytes — fetch the sample and hand them over.
-  const ebook: OpenInput = await fetch('https://snippet.embedpdf.com/ebook.pdf')
-    .then((response) => response.arrayBuffer())
-    .then((buffer) => ({ kind: 'bytes', id: 'ebook', bytes: new Uint8Array(buffer) }));
-    doc.value = await engine.open(ebook);
+  const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+  doc.value = await engine.open(ebook);
 });
 </script>
 

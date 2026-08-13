@@ -20,13 +20,18 @@ export { MethodBadge, methodStyle } from './method-badge';
 export { Pre } from './pre';
 export { Tabs, useInTabs, TabsContext } from './tabs';
 export {
+  AngularIcon,
   ArrowRight,
   BoltBadgeIcon,
   CheckIcon,
   CopyIcon,
   EngineIcon,
+  JsMark,
   PuzzleBadgeIcon,
+  ReactIcon,
   ServerBadgeIcon,
+  SvelteIcon,
+  VueIcon,
 } from './icons';
 export { DocsProductSwitcher, type DocsProductItem } from './product-switcher';
 export { DOCS_KIT_TOKENS, type DocsKitToken } from './tokens';

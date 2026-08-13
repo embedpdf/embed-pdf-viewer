@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import type { DocumentHandle } from '@embedpdf/engine';
+  import type { DocumentHandle } from '@cloudpdf/engine';
 
   let { doc, pageNumber }: { doc: DocumentHandle; pageNumber: number } = $props();
 

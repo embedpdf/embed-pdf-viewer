@@ -60,10 +60,8 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   // The docs kit ships raw TypeScript source (workspace package).
   transpilePackages: ['@embedpdf/docs-kit'],
-  async rewrites() {
-    // "/docs/…page.md" serves the flavor-resolved Markdown projection.
-    return [{ source: '/docs/:path*.md', destination: '/api/docs/markdown/docs/:path*' }];
-  },
+  // "/docs/…page.md" is rewritten to the Markdown Route Handler by
+  // middleware.ts, which also owns the fan-out courtesy redirects.
 };
 
 export default withNextra(nextConfig);
