@@ -8,6 +8,9 @@ import { unified } from 'unified';
 
 import type { DocsEngine } from './axis';
 
+// eslint-disable-next-line import/no-unresolved — sibling plain-ESM module, typed by its .d.mts
+import { applyInstallChannel } from '../mdx/install-channel.mjs';
+
 /**
  * The Markdown projection: resolves raw MDX down to the plain Markdown one
  * concrete page actually shows — `<Engine>` and `<Fw>` branches taken,
@@ -357,6 +360,14 @@ function yamlValue(value: string) {
   return JSON.stringify(value);
 }
 
+/** Stamp the release channel on every fenced block, matching the pages. */
+function applyInstallChannelToTree(node: AstNode): void {
+  if (node.type === 'code' && typeof node.value === 'string') {
+    node.value = applyInstallChannel(node.value);
+  }
+  for (const child of node.children ?? []) applyInstallChannelToTree(child);
+}
+
 /** Resolve raw MDX to the plain Markdown AST one concrete route shows. */
 export function resolveDocsTreeWith(
   site: DocsMarkdownSite,
@@ -364,6 +375,7 @@ export function resolveDocsTreeWith(
 ) {
   const tree = markdownProcessor.parse(sourceCode) as AstNode;
   tree.children = createResolver(site, integration)(tree.children ?? []);
+  applyInstallChannelToTree(tree);
   return tree;
 }
 

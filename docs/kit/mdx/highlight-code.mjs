@@ -8,6 +8,8 @@
  * between — the shiki instance, the theme, and the whitespace rules —
  * lives here. Plain ESM so next.config-graph modules can load it.
  */
+import { applyInstallChannel } from './install-channel.mjs';
+
 export const CODE_THEME = 'material-theme-palenight';
 
 let highlighterPromise = null;
@@ -41,13 +43,17 @@ export function getDocsHighlighter() {
  */
 export function highlightCodeFile(highlighter, file) {
   try {
-    const highlighted = highlighter.codeToHtml(file.code.trim(), {
+    // Disk-read code files (install.sh samples, codePath sources) flow
+    // through here on their way to a panel; stamp the release channel the
+    // same way the remark plugin stamps authored fences.
+    const code = applyInstallChannel(file.code).trim();
+    const highlighted = highlighter.codeToHtml(code, {
       lang: file.language,
       theme: CODE_THEME,
     });
     const innerMatch = highlighted.match(/<code[^>]*>([\s\S]*)<\/code>/);
     const innerHtml = innerMatch ? innerMatch[1] : highlighted;
-    return { ...file, highlightedCode: innerHtml };
+    return { ...file, code, highlightedCode: innerHtml };
   } catch (err) {
     console.warn(`[docs-kit highlight] Failed to highlight ${file.filename}:`, err);
     return file;

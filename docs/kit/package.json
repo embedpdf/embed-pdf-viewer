@@ -9,7 +9,8 @@
     "./mdx": "./mdx/remark-engine-axis.mjs",
     "./styles.css": "./styles.css",
     "./mdx/highlight": "./mdx/highlight-code.mjs",
-    "./search": "./src/search/index.ts"
+    "./search": "./src/search/index.ts",
+    "./mdx/install-channel": "./mdx/install-channel.mjs"
   },
   "peerDependencies": {
     "next": ">=15",

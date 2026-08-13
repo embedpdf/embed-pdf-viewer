@@ -8,6 +8,7 @@ import { remarkNpm2Yarn } from '@theguild/remark-npm2yarn';
 import { visit } from 'unist-util-visit';
 
 import { remarkEngineAxis } from '@embedpdf/docs-kit/mdx';
+import { remarkInstallChannel } from '@embedpdf/docs-kit/mdx/install-channel';
 
 import { DOCS_SITE } from './src/docs-site';
 import { rehypeCodeExample } from './src/lib/rehype-code-example';
@@ -96,6 +97,9 @@ const withNextra = nextra({
       // Resolve the engine axis FIRST, so every later plugin (and the
       // compiled page) only ever sees this site's flavour.
       [remarkEngineAxis, { engine: DOCS_SITE.engine }],
+      // Stamp the release channel on install commands BEFORE npm2yarn fans
+      // the npm line out, so every package-manager tab inherits the tag.
+      remarkInstallChannel,
       [
         remarkNpm2Yarn,
         {
