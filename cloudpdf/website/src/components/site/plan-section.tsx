@@ -9,6 +9,8 @@ import {
   type FanoutDocsProduct,
 } from '@/lib/docs-integrations';
 
+import { DOCS_LANDING, LANDING_DEPLOYMENTS, LANDING_PRODUCT_PATHS } from '@/lib/docs-landing';
+
 import { ArrowRight, CloudIcon } from './icons';
 import { IntegrationLogo } from './integration-logo';
 
@@ -63,7 +65,12 @@ function FrameworkGrid({ tone, product }: { tone: Tone; product: FanoutDocsProdu
   return (
     <div className="mt-3 grid grid-cols-2 gap-2.5 max-[400px]:grid-cols-1">
       {PRODUCT_INTEGRATIONS[product].map((integration) => (
-        <FrameworkButton key={integration} tone={tone} product={product} integration={integration} />
+        <FrameworkButton
+          key={integration}
+          tone={tone}
+          product={product}
+          integration={integration}
+        />
       ))}
     </div>
   );
@@ -84,6 +91,26 @@ function PlanLink({ href, children }: { href: string; children: ReactNode }) {
     </Link>
   );
 }
+
+const PLAN_DEPLOYMENT_ICONS: Record<'saas' | 'self-hosted', ReactNode> = {
+  saas: <CloudIcon width={24} height={24} />,
+  'self-hosted': (
+    <svg
+      width={24}
+      height={24}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.9"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <rect x="3" y="4" width="18" height="6" rx="1.5" />
+      <rect x="3" y="14" width="18" height="6" rx="1.5" />
+      <path d="M7 7h.01M7 17h.01" />
+    </svg>
+  ),
+};
 
 export function PlanSection() {
   return (
@@ -125,53 +152,40 @@ export function PlanSection() {
               </h3>
 
               <div className="mt-[22px] flex flex-col gap-[18px]">
-                {/* Ready-made Viewer */}
-                <article className="border-cp-border grid grid-cols-[minmax(0,300px)_1fr] items-center gap-x-[30px] rounded-[18px] border bg-white p-[28px_30px] shadow-[0_1px_2px_rgba(10,26,77,0.04)] transition-all duration-200 hover:border-[#D8E4FB] hover:shadow-[0_22px_44px_-22px_rgba(10,26,77,0.26),0_3px_10px_rgba(10,26,77,0.05)] max-[640px]:grid-cols-1 max-[640px]:gap-y-[22px] max-[540px]:p-[24px_22px]">
-                  <div className="flex items-center justify-center overflow-hidden rounded-[14px] bg-[#F4F7FE] p-4">
-                    <img
-                      src="/plan-section/ready-made-viewer.svg"
-                      alt="Preview of the ready-made PDF viewer interface"
-                      loading="lazy"
-                      className="block h-auto w-full"
-                    />
-                  </div>
-                  <div>
-                    <h4 className="font-display text-cp-navy m-0 text-[20px] font-extrabold leading-[1.2] tracking-[-0.012em]">
-                      Ready-made Viewer
-                    </h4>
-                    <p className="text-cp-ink m-0 mt-[9px] max-w-[380px] font-sans text-[15px] leading-[1.55]">
-                      Drop in a production-ready PDF viewer with powerful built-in features.
-                    </p>
-                    <p className="text-cp-muted font-display mt-5 text-[11px] font-bold uppercase leading-none tracking-[0.06em]">
-                      Frameworks
-                    </p>
-                    <FrameworkGrid tone="blue" product="viewer" />
-                  </div>
-                </article>
-
-                {/* Headless Components */}
-                <article className="border-cp-border grid grid-cols-[minmax(0,300px)_1fr] items-center gap-x-[30px] rounded-[18px] border bg-white p-[28px_30px] shadow-[0_1px_2px_rgba(10,26,77,0.04)] transition-all duration-200 hover:border-[#D8E4FB] hover:shadow-[0_22px_44px_-22px_rgba(10,26,77,0.26),0_3px_10px_rgba(10,26,77,0.05)] max-[640px]:grid-cols-1 max-[640px]:gap-y-[22px] max-[540px]:p-[24px_22px]">
-                  <div className="flex items-center justify-center overflow-hidden rounded-[14px] bg-[#F5F4FE] p-4">
-                    <img
-                      src="/plan-section/headless-components.svg"
-                      alt="Headless components and code building blocks"
-                      loading="lazy"
-                      className="block h-auto w-full"
-                    />
-                  </div>
-                  <div>
-                    <h4 className="font-display text-cp-navy m-0 text-[20px] font-extrabold leading-[1.2] tracking-[-0.012em]">
-                      Headless Components
-                    </h4>
-                    <p className="text-cp-ink m-0 mt-[9px] max-w-[380px] font-sans text-[15px] leading-[1.55]">
-                      Build your own UI with flexible, unstyled components and APIs.
-                    </p>
-                    <p className="text-cp-muted font-display mt-5 text-[11px] font-bold uppercase leading-none tracking-[0.06em]">
-                      Frameworks
-                    </p>
-                    <FrameworkGrid tone="violet" product="headless" />
-                  </div>
-                </article>
+                {LANDING_PRODUCT_PATHS.map((path) => (
+                  <article
+                    key={path.id}
+                    className="border-cp-border grid grid-cols-[minmax(0,300px)_1fr] items-center gap-x-[30px] rounded-[18px] border bg-white p-[28px_30px] shadow-[0_1px_2px_rgba(10,26,77,0.04)] transition-all duration-200 hover:border-[#D8E4FB] hover:shadow-[0_22px_44px_-22px_rgba(10,26,77,0.26),0_3px_10px_rgba(10,26,77,0.05)] max-[640px]:grid-cols-1 max-[640px]:gap-y-[22px] max-[540px]:p-[24px_22px]"
+                  >
+                    <div
+                      className={`flex items-center justify-center overflow-hidden rounded-[14px] p-4 ${
+                        path.id === 'viewer' ? 'bg-[#F4F7FE]' : 'bg-[#F5F4FE]'
+                      }`}
+                    >
+                      <img
+                        src={path.image}
+                        alt={path.imageAlt}
+                        loading="lazy"
+                        className="block h-auto w-full"
+                      />
+                    </div>
+                    <div>
+                      <h4 className="font-display text-cp-navy m-0 text-[20px] font-extrabold leading-[1.2] tracking-[-0.012em]">
+                        {path.title}
+                      </h4>
+                      <p className="text-cp-ink m-0 mt-[9px] max-w-[380px] font-sans text-[15px] leading-[1.55]">
+                        {path.plan.desc}
+                      </p>
+                      <p className="text-cp-muted font-display mt-5 text-[11px] font-bold uppercase leading-none tracking-[0.06em]">
+                        {DOCS_LANDING.frameworksLabelShort}
+                      </p>
+                      <FrameworkGrid
+                        tone={path.id === 'viewer' ? 'blue' : 'violet'}
+                        product={path.id}
+                      />
+                    </div>
+                  </article>
+                ))}
               </div>
 
               {/* connector arrow */}
@@ -203,60 +217,37 @@ export function PlanSection() {
             </div>
             <div className="min-w-0 pb-2">
               <h3 className="font-display text-cp-navy mt-[7px] text-[clamp(20px,1.9vw,24px)] font-extrabold leading-[1.2] tracking-[-0.014em]">
-                Choose your deployment
+                {DOCS_LANDING.deploymentLabel}
               </h3>
 
               <div className="mt-[22px] grid grid-cols-1 gap-[18px] min-[621px]:grid-cols-2">
-                {/* Managed SaaS */}
-                <article className="border-cp-border flex flex-col rounded-[18px] border bg-white p-[26px_26px_24px] shadow-[0_1px_2px_rgba(10,26,77,0.04)] transition-all duration-200 hover:border-[#D8E4FB] hover:shadow-[0_22px_44px_-22px_rgba(10,26,77,0.26),0_3px_10px_rgba(10,26,77,0.05)]">
-                  <div className="flex items-center gap-3.5">
-                    <span className="bg-cp-blue/10 text-cp-blue inline-flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-[13px]">
-                      <CloudIcon width={24} height={24} />
-                    </span>
-                    <h4 className="font-display text-cp-navy m-0 text-[19px] font-extrabold leading-[1.2] tracking-[-0.012em]">
-                      Managed SaaS
-                    </h4>
-                  </div>
-                  <p className="text-cp-ink m-0 mt-4 flex-1 font-sans text-[14.5px] leading-[1.55]">
-                    We run it. You focus on building. Always up-to-date, globally scalable, and
-                    secure by default.
-                  </p>
-                  <div className="mt-[18px]">
-                    <PlanLink href="/docs/engine/getting-started">Learn more</PlanLink>
-                  </div>
-                </article>
-
-                {/* Self-hosted Server */}
-                <article className="border-cp-border flex flex-col rounded-[18px] border bg-white p-[26px_26px_24px] shadow-[0_1px_2px_rgba(10,26,77,0.04)] transition-all duration-200 hover:border-[#D8E4FB] hover:shadow-[0_22px_44px_-22px_rgba(10,26,77,0.26),0_3px_10px_rgba(10,26,77,0.05)]">
-                  <div className="flex items-center gap-3.5">
-                    <span className="inline-flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-[13px] bg-[#7A5AF8]/10 text-[#7A5AF8]">
-                      <svg
-                        width={24}
-                        height={24}
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="1.9"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
+                {LANDING_DEPLOYMENTS.map((deployment) => (
+                  <article
+                    key={deployment.id}
+                    className="border-cp-border flex flex-col rounded-[18px] border bg-white p-[26px_26px_24px] shadow-[0_1px_2px_rgba(10,26,77,0.04)] transition-all duration-200 hover:border-[#D8E4FB] hover:shadow-[0_22px_44px_-22px_rgba(10,26,77,0.26),0_3px_10px_rgba(10,26,77,0.05)]"
+                  >
+                    <div className="flex items-center gap-3.5">
+                      <span
+                        className={`inline-flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-[13px] ${
+                          deployment.id === 'saas'
+                            ? 'bg-cp-blue/10 text-cp-blue'
+                            : 'bg-[#7A5AF8]/10 text-[#7A5AF8]'
+                        }`}
                       >
-                        <rect x="3" y="4" width="18" height="6" rx="1.5" />
-                        <rect x="3" y="14" width="18" height="6" rx="1.5" />
-                        <path d="M7 7h.01M7 17h.01" />
-                      </svg>
-                    </span>
-                    <h4 className="font-display text-cp-navy m-0 text-[19px] font-extrabold leading-[1.2] tracking-[-0.012em]">
-                      Self-hosted Server
-                    </h4>
-                  </div>
-                  <p className="text-cp-ink m-0 mt-4 flex-1 font-sans text-[14.5px] leading-[1.55]">
-                    Deploy on your infrastructure. Full control, privacy, and compliance on your
-                    terms.
-                  </p>
-                  <div className="mt-[18px]">
-                    <PlanLink href="/docs/server/getting-started">Learn more</PlanLink>
-                  </div>
-                </article>
+                        {PLAN_DEPLOYMENT_ICONS[deployment.id]}
+                      </span>
+                      <h4 className="font-display text-cp-navy m-0 text-[19px] font-extrabold leading-[1.2] tracking-[-0.012em]">
+                        {deployment.title}
+                      </h4>
+                    </div>
+                    <p className="text-cp-ink m-0 mt-4 flex-1 font-sans text-[14.5px] leading-[1.55]">
+                      {deployment.plan.body}
+                    </p>
+                    <div className="mt-[18px]">
+                      <PlanLink href={deployment.href}>{deployment.plan.cta}</PlanLink>
+                    </div>
+                  </article>
+                ))}
               </div>
             </div>
           </div>

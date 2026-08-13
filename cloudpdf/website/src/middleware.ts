@@ -45,7 +45,9 @@ export function middleware(request: NextRequest) {
 
   // Public Markdown representations are served by a statically generated
   // Route Handler while retaining the discoverable `<page>.md` URL.
-  if (pathname.startsWith('/docs/') && pathname.endsWith('.md')) {
+  // `/docs.md` (the landing) is its own top-level path, hence the matcher's
+  // second entry and the explicit equality check here.
+  if (pathname === '/docs.md' || (pathname.startsWith('/docs/') && pathname.endsWith('.md'))) {
     const url = request.nextUrl.clone();
     url.pathname = `/api/docs/markdown${pathname.slice(0, -3)}`;
     return NextResponse.rewrite(url);
@@ -66,5 +68,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: '/docs/:path*',
+  matcher: ['/docs/:path*', '/docs.md'],
 };

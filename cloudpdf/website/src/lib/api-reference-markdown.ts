@@ -1,4 +1,4 @@
-import type { AstNode } from '@embedpdf/docs-kit';
+import { mdast, type AstNode } from '@embedpdf/docs-kit';
 
 import {
   getApiGroups,
@@ -22,34 +22,8 @@ import {
  * Wired into the kit's Markdown pipeline via `DocsMarkdownSite.projectComponent`.
  */
 
-/* ---------- tiny mdast builders ---------- */
-
-const text = (value: string): AstNode => ({ type: 'text', value });
-const inlineCode = (value: string): AstNode => ({ type: 'inlineCode', value });
-const strong = (value: string): AstNode => ({ type: 'strong', children: [text(value)] });
-const paragraph = (children: AstNode[]): AstNode => ({ type: 'paragraph', children });
-const heading = (depth: number, value: string): AstNode => ({
-  type: 'heading',
-  depth,
-  children: [text(value)],
-});
-const code = (lang: string, value: string): AstNode => ({ type: 'code', lang, value });
-const link = (url: string, label: string): AstNode => ({
-  type: 'link',
-  url,
-  children: [text(label)],
-});
-const listItem = (children: AstNode[]): AstNode => ({ type: 'listItem', spread: false, children });
-const list = (items: AstNode[]): AstNode => ({
-  type: 'list',
-  ordered: false,
-  spread: false,
-  children: items,
-});
-const blockquote = (value: string): AstNode => ({
-  type: 'blockquote',
-  children: [paragraph([text(value)])],
-});
+const { blockquote, code, heading, inlineCode, link, list, listItem, paragraph, strong, text } =
+  mdast;
 
 /* ---------- schema fields (mirrors the page's FieldList) ---------- */
 
@@ -135,7 +109,8 @@ function projectApiOperation(operationId: string): AstNode[] {
   const capabilities = operation['x-required-capability'] ?? [];
   if (schemes.length || scopes.length || capabilities.length) {
     nodes.push(heading(2, 'Authentication'));
-    if (schemes.length > 1) nodes.push(paragraph([text('Any one of these credentials is accepted.')]));
+    if (schemes.length > 1)
+      nodes.push(paragraph([text('Any one of these credentials is accepted.')]));
     nodes.push(
       list(
         schemes.map((scheme) => {
@@ -261,7 +236,10 @@ function projectApiCredentials(): AstNode[] {
         const title = (scheme as { 'x-docs-title'?: string })['x-docs-title'] ?? name;
         return [
           listItem([
-            paragraph([strong(title), ...(scheme.description ? [text(` — ${scheme.description}`)] : [])]),
+            paragraph([
+              strong(title),
+              ...(scheme.description ? [text(` — ${scheme.description}`)] : []),
+            ]),
           ]),
         ];
       }),
@@ -301,11 +279,11 @@ const DEPLOYMENT_MODE_LABELS: Record<string, string> = {
 };
 
 /**
- * The `projectComponent` hook for this site: API-reference components plus
- * the deployment tab pair. Returns null for anything it does not know so
- * the kit's unknown-component rule stays fatal.
+ * API-reference component projections (plus the deployment tab pair),
+ * dispatched from site-markdown.ts. Returns null for anything it does not
+ * know so the kit's unknown-component rule stays fatal.
  */
-export function projectCloudPdfComponent(
+export function projectApiReferenceComponent(
   node: AstNode,
   helpers: {
     resolveNodes: (nodes: AstNode[]) => AstNode[];
@@ -328,7 +306,10 @@ export function projectCloudPdfComponent(
       return projectApiCredentials();
     case 'ApiGrants': {
       const kind = helpers.stringAttribute(node, 'kind');
-      return projectApiGrants(kind === 'scope' ? 'scope' : 'capability', helpers.absoluteContentUrl);
+      return projectApiGrants(
+        kind === 'scope' ? 'scope' : 'capability',
+        helpers.absoluteContentUrl,
+      );
     }
     case 'ApiOperationCount':
       return [text(String(getOperationCount()))];

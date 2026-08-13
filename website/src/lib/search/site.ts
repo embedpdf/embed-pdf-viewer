@@ -5,8 +5,8 @@ import {
   PRODUCT_INTEGRATIONS,
   type IntegrationDocsProduct,
 } from '../docs-integrations';
-import { docsProductFromPath } from '../docs-products';
 import { resolveDocsTree } from '../docs-markdown';
+import { docsProductFromPath } from '../docs-products';
 
 /**
  * This site's binding of the kit search extractor: sections resolve through

@@ -8,7 +8,7 @@ import {
 
 import { DOCS_SITE } from '@/docs-site';
 
-import { projectCloudPdfComponent } from './api-reference-markdown';
+import { projectCloudPdfComponent } from './site-markdown';
 import {
   DOCS_INTEGRATION_LABELS,
   docsIntegrationHref,

@@ -10,6 +10,8 @@ import {
   type FanoutDocsProduct,
 } from '@/lib/docs-integrations';
 
+import { DOCS_LANDING, LANDING_DEPLOYMENTS, LANDING_PRODUCT_PATHS } from '@/lib/docs-landing';
+
 import { BackendBand } from './backend-band';
 import { ArrowRight, CheckIcon, CloudIcon } from './icons';
 import { IntegrationLogo } from './integration-logo';
@@ -158,7 +160,7 @@ function PathCard({
             </svg>
           </span>
           <span className="font-display text-cp-navy text-sm font-bold tracking-[-0.01em]">
-            Get started in your framework
+            {DOCS_LANDING.frameworksLabel}
           </span>
         </div>
         <div className="mt-3.5 grid grid-cols-2 gap-2.5">
@@ -221,6 +223,26 @@ function DeployCard({
   );
 }
 
+const DEPLOYMENT_ICONS: Record<'saas' | 'self-hosted', ReactNode> = {
+  saas: <CloudIcon width={28} height={28} strokeWidth={1.9} />,
+  'self-hosted': (
+    <svg
+      width={26}
+      height={26}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.9"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <rect x="3" y="4" width="18" height="6" rx="1.5" />
+      <rect x="3" y="14" width="18" height="6" rx="1.5" />
+      <path d="M7 7h.01M7 17h.01" />
+    </svg>
+  ),
+};
+
 export function DocsLanding() {
   return (
     <section className="relative py-[clamp(40px,5vw,56px)]">
@@ -228,12 +250,11 @@ export function DocsLanding() {
         {/* heading */}
         <div className="mx-auto max-w-[880px] text-center">
           <h1 className="font-display text-cp-navy text-balance text-[clamp(38px,5vw,60px)] font-extrabold leading-[1.06] tracking-[-0.03em]">
-            Choose the right path to build better{' '}
-            <em className="text-cp-blue not-italic">PDF experiences.</em>
+            {DOCS_LANDING.heading.lead}
+            <em className="text-cp-blue not-italic">{DOCS_LANDING.heading.em}</em>
           </h1>
           <p className="text-cp-ink mx-auto mt-[22px] max-w-[560px] font-sans text-[19px] leading-[1.6]">
-            Launch faster with a ready-made viewer, or build exactly what you need with our headless
-            components.
+            {DOCS_LANDING.intro}
           </p>
         </div>
 
@@ -256,31 +277,24 @@ export function DocsLanding() {
               <rect x="15" y="15" width="6" height="6" rx="1.5" />
               <path d="M12 9v3M12 12H6v3M12 12h6v3" />
             </svg>
-            Choose your implementation path
+            {DOCS_LANDING.pathPill}
           </span>
         </div>
 
         {/* paths */}
         <div className="relative mt-[clamp(36px,4.5vw,56px)] grid grid-cols-1 gap-y-3.5 min-[881px]:grid-cols-2 min-[881px]:gap-x-[clamp(18px,2.2vw,34px)] min-[881px]:gap-y-0">
-          <PathCard
-            tone="blue"
-            product="viewer"
-            image="/plan-section/ready-made-viewer.svg"
-            imageAlt="Preview of the ready-made PDF viewer interface"
-            title="Ready-made Viewer"
-            desc="Embed a complete, feature-rich PDF viewer in minutes."
-            feats={['Drop-in component', 'Fastest way to launch', 'Prebuilt toolbar and layout']}
-          />
-
-          <PathCard
-            tone="violet"
-            product="headless"
-            image="/plan-section/headless-components.svg"
-            imageAlt="Headless components and code building blocks"
-            title="Headless Components"
-            desc="Build custom PDF experiences with our modular, headless API."
-            feats={['Build your own UI', 'Full composability', 'Plugin-friendly']}
-          />
+          {LANDING_PRODUCT_PATHS.map((path) => (
+            <PathCard
+              key={path.id}
+              tone={path.id === 'viewer' ? 'blue' : 'violet'}
+              product={path.id}
+              image={path.image}
+              imageAlt={path.imageAlt}
+              title={path.title}
+              desc={path.landing.desc}
+              feats={[...path.landing.feats]}
+            />
+          ))}
         </div>
 
         {/* deployment label */}
@@ -301,43 +315,23 @@ export function DocsLanding() {
               <path d="m2 17 10 5 10-5" />
               <path d="m2 12 10 5 10-5" />
             </svg>
-            Choose your deployment
+            {DOCS_LANDING.deploymentLabel}
           </span>
         </div>
 
         {/* deployment */}
         <div className="grid grid-cols-1 gap-3.5 min-[881px]:grid-cols-2 min-[881px]:gap-x-[clamp(18px,2.2vw,34px)]">
-          <DeployCard
-            tone="blue"
-            icon={<CloudIcon width={28} height={28} strokeWidth={1.9} />}
-            title="Managed SaaS"
-            lead="We host and manage everything."
-            sub="Get secure, scalable infrastructure so you can focus on your product."
-            href="/docs/engine/getting-started"
-          />
-          <DeployCard
-            tone="violet"
-            icon={
-              <svg
-                width={26}
-                height={26}
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.9"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <rect x="3" y="4" width="18" height="6" rx="1.5" />
-                <rect x="3" y="14" width="18" height="6" rx="1.5" />
-                <path d="M7 7h.01M7 17h.01" />
-              </svg>
-            }
-            title="Self-hosted Server"
-            lead="Deploy in your own environment."
-            sub="Full control, private data, and enterprise compliance on your terms."
-            href="/docs/server/getting-started"
-          />
+          {LANDING_DEPLOYMENTS.map((deployment) => (
+            <DeployCard
+              key={deployment.id}
+              tone={deployment.id === 'saas' ? 'blue' : 'violet'}
+              icon={DEPLOYMENT_ICONS[deployment.id]}
+              title={deployment.title}
+              lead={deployment.landing.lead}
+              sub={deployment.landing.sub}
+              href={deployment.href}
+            />
+          ))}
         </div>
 
         <BackendBand

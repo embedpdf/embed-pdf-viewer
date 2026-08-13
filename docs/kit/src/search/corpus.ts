@@ -12,7 +12,7 @@ import type { DocsSection } from './types';
  * never be pulled into a request path — the API route reads the artifact.
  */
 
-function walkMdx(directory: string): string[] {
+export function walkMdx(directory: string): string[] {
   let entries: fs.Dirent[];
   try {
     entries = fs.readdirSync(directory, { withFileTypes: true });
@@ -27,9 +27,9 @@ function walkMdx(directory: string): string[] {
   });
 }
 
-type Frontmatter = { title?: unknown; description?: unknown; searchable?: unknown };
+export type Frontmatter = { title?: unknown; description?: unknown; searchable?: unknown };
 
-function readFrontmatter(source: string): Frontmatter {
+export function readFrontmatter(source: string): Frontmatter {
   const match = source.match(/^---\r?\n([\s\S]*?)\r?\n---/);
   if (!match) return {};
   try {

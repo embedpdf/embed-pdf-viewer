@@ -34,12 +34,9 @@ export {
   VueIcon,
 } from './icons';
 export { DocsProductSwitcher, type DocsProductItem } from './product-switcher';
-export {
-  SearchDialog,
-  type SearchDialogProduct,
-  type SearchDialogProps,
-} from './search-dialog';
+export { SearchDialog, type SearchDialogProduct, type SearchDialogProps } from './search-dialog';
 export { DOCS_KIT_TOKENS, type DocsKitToken } from './tokens';
+export * as mdast from './mdast';
 export {
   renderDocsMarkdownWith,
   resolveDocsTreeWith,
@@ -50,9 +47,5 @@ export {
   type RenderDocsMarkdownOptions,
 } from './docs-markdown';
 export { PageMarkdownActions } from './page-markdown-actions';
-export {
-  CodeExampleCard,
-  type ExampleFile,
-  type ExampleMode,
-} from './code-example-card';
+export { CodeExampleCard, type ExampleFile, type ExampleMode } from './code-example-card';
 export { CodeExample } from './code-example';

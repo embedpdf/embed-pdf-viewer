@@ -15,6 +15,7 @@ import {
   isDocsIntegration,
   type DocsIntegration,
 } from './docs-integrations';
+import { projectEmbedPdfComponent } from './site-markdown';
 import { docsProductFromPath, type DocsProduct } from './docs-products';
 import { collectSampleFiles, readDocsCodeFile } from './docs-samples';
 import { SITE_ORIGIN } from './site';
@@ -42,6 +43,7 @@ const site: DocsMarkdownSite = {
     isDocsIntegration(integration) ? DOCS_INTEGRATION_LABELS[integration] : integration,
   resolveContentHref: (url, integration) =>
     integration && isDocsIntegration(integration) ? docsIntegrationHref(url, integration) : url,
+  projectComponent: projectEmbedPdfComponent,
 };
 
 /**

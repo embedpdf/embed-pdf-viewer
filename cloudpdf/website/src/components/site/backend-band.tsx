@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { Fragment, type ReactNode } from 'react';
 
 import { MethodBadge } from '@/components/docs/method-badge';
+import { BACKEND_BAND } from '@/lib/docs-landing';
+
 import { ArrowRight } from './icons';
 
 /**
@@ -23,26 +25,7 @@ import { ArrowRight } from './icons';
  * visible: opening happens in the browser, off this API.
  */
 
-const STEPS = [
-  {
-    method: 'POST',
-    title: 'Initialize an upload',
-    description: 'Get upload access, transfer, then commit.',
-    href: '/docs/api-reference/documents/init',
-  },
-  {
-    method: 'POST',
-    title: 'Issue a document token',
-    description: 'Short-lived, one document, one user.',
-    href: '/docs/api-reference/tokens/issue',
-  },
-  {
-    method: null,
-    title: 'Open in your viewer',
-    description: 'The token is all the browser ever holds.',
-    href: '/docs/engine/getting-started',
-  },
-];
+const STEPS = BACKEND_BAND.steps;
 
 /**
  * Brand marks for the seven backend SDKs, in the visual language of the
@@ -164,7 +147,7 @@ export function BackendBand({
             <path d="m2 17 10 5 10-5" />
             <path d="m2 12 10 5 10-5" />
           </svg>
-          Both paths share one backend
+          {BACKEND_BAND.title}
         </span>
       </div>
 
@@ -180,10 +163,10 @@ export function BackendBand({
             </p>
           </div>
           <Link
-            href="/docs/api-reference"
+            href={BACKEND_BAND.apiReferenceHref}
             className="text-cp-blue group inline-flex flex-shrink-0 items-center gap-1.5 font-sans text-[14.5px] font-bold no-underline"
           >
-            All {operationCount} operations
+            {BACKEND_BAND.allOperationsLabel(operationCount)}
             <ArrowRight
               width={17}
               height={17}
@@ -215,13 +198,7 @@ export function BackendBand({
                     <MethodBadge method={step.method} />
                   ) : (
                     <span className="border-cp-border text-cp-blue inline-flex w-[38px] shrink-0 items-center justify-center rounded border bg-white py-[3px]">
-                      <svg
-                        width={9}
-                        height={9}
-                        viewBox="0 0 24 24"
-                        fill="currentColor"
-                        aria-hidden
-                      >
+                      <svg width={9} height={9} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
                         <path d="M6 3.5 20 12 6 20.5v-17z" />
                       </svg>
                     </span>
@@ -260,7 +237,7 @@ export function BackendBand({
               </svg>
             </span>
             <span className="font-display text-cp-navy text-sm font-bold tracking-[-0.01em]">
-              Use it from your language
+              {BACKEND_BAND.sdksLabel}
             </span>
           </div>
           <div className="mt-3.5 grid grid-cols-2 gap-2.5 sm:grid-cols-3 min-[880px]:grid-cols-4">
@@ -269,7 +246,7 @@ export function BackendBand({
                 key={language.language}
                 type="button"
                 onClick={() => chooseLanguage(language.language)}
-                className="group flex cursor-pointer items-center gap-2.5 rounded-xl border border-[#D7E5FF] bg-[#F2F8FF] px-3 py-3 text-left transition-all hover:border-cp-blue hover:bg-white hover:shadow-[0_12px_24px_-12px_rgba(22,119,255,0.55)]"
+                className="hover:border-cp-blue group flex cursor-pointer items-center gap-2.5 rounded-xl border border-[#D7E5FF] bg-[#F2F8FF] px-3 py-3 text-left transition-all hover:bg-white hover:shadow-[0_12px_24px_-12px_rgba(22,119,255,0.55)]"
               >
                 <span className="inline-flex h-[34px] w-[34px] flex-shrink-0 items-center justify-center rounded-[9px] bg-white shadow-[0_1px_2px_rgba(10,26,77,0.06)]">
                   {LANGUAGE_MARKS[language.language] ?? null}
