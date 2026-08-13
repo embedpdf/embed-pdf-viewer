@@ -132,15 +132,18 @@ function transformSample(source, engine, relative) {
     output = output.replaceAll(ENGINES.local.factoryCall, flavor.factoryCall);
   }
 
-  // Swap (or, for local, unwrap) every marked document-source block.
-  const marker = /\/\/ \[!doc-source (\w+)\]\n([\s\S]*?)\/\/ \[!\/doc-source\]\n/g;
-  output = output.replace(marker, (whole, key, body) => {
+  // Swap (or, for local, unwrap) every marked document-source block. Both
+  // marker lines are consumed WITH their leading indent — body lines carry
+  // their own — so unwrapping an indented block never double-indents its
+  // first line or the line after it.
+  const marker = /^([ \t]*)\/\/ \[!doc-source (\w+)\]\n([\s\S]*?)^[ \t]*\/\/ \[!\/doc-source\]\n/gm;
+  output = output.replace(marker, (whole, indent, key, body) => {
     const entry = DEMO_DOCUMENTS[key];
     if (!entry) throw new Error(`${relative}: unknown doc-source key '${key}' (documents.mjs)`);
     if (engine === 'local') return body;
     const name = body.match(/const (\w+)/)?.[1];
     if (!name) throw new Error(`${relative}: doc-source block does not declare a const`);
-    return `${entry.cloudSource(name)}\n`;
+    return `${indent}${entry.cloudSource(name)}\n`;
   });
 
   return output;

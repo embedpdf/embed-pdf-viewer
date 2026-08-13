@@ -13,11 +13,11 @@
   const engine = localEngine();
 
   onMount(async () => {
-        // The local engine opens bytes — fetch the sample and hand them over.
+    // The local engine opens bytes — fetch the sample and hand them over.
     const ebook: OpenInput = await fetch('https://snippet.embedpdf.com/ebook.pdf')
       .then((response) => response.arrayBuffer())
       .then((buffer) => ({ kind: 'bytes', id: 'ebook', bytes: new Uint8Array(buffer) }));
-        doc = await engine.open(ebook);
+    doc = await engine.open(ebook);
   });
 </script>
 
