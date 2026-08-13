@@ -63,6 +63,19 @@ export interface DocsMarkdownSite {
   variantLabel?: (integration: string) => string;
   /** Rewrite a relative content link before absolutising (fan-out routing). */
   resolveContentHref?: (url: string, integration: string | undefined) => string;
+  /**
+   * Site-specific component projections (an API reference, most of all),
+   * consulted after the built-ins and before the fatal unknown-component
+   * throw. Return mdast nodes to project, or null/undefined to fall through.
+   */
+  projectComponent?: (
+    node: AstNode,
+    helpers: {
+      resolveNodes: (nodes: AstNode[]) => AstNode[];
+      absoluteContentUrl: (url: string) => string;
+      stringAttribute: (node: AstNode, name: string) => string;
+    },
+  ) => AstNode[] | null | undefined;
 }
 
 type MarkdownMetadata = {
@@ -273,6 +286,14 @@ function createResolver(site: DocsMarkdownSite, integration: string | undefined)
             },
           ];
         }
+
+        // Site-specific projections (API reference components et al).
+        const projected = site.projectComponent?.(node, {
+          resolveNodes,
+          absoluteContentUrl,
+          stringAttribute,
+        });
+        if (projected) return projected;
 
         // Raw HTML in MDX (lowercase tags): project the common inline
         // elements to their Markdown forms and unwrap anything else —

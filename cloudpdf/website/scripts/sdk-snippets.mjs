@@ -225,6 +225,50 @@ function hoistLeadingImports(language, call) {
   return { hoisted, body: lines.slice(index).join('\n').trim() };
 }
 
+/**
+ * Indent targets per language — DOCS style, not a universal rule: snippets
+ * teach each language's readers in their own idiom. TypeScript re-indents
+ * to the JS-ecosystem 2 (matching every other code block in the docs);
+ * Python (PEP 8), PHP (PSR-12), Java, and C# keep their idiomatic 4; Ruby
+ * already arrives at 2; Go stays as generated.
+ */
+const INDENT_TARGETS = { typescript: 2 };
+
+/**
+ * Whitespace hygiene for every displayed snippet: strip trailing
+ * whitespace, collapse runs of blank lines, drop trailing blanks — and,
+ * for languages with an indent target, re-scale leading indentation from
+ * the detected unit (alignment remainders preserved).
+ */
+export function normalizeSnippetWhitespace(language, source) {
+  let lines = source.split('\n').map((line) => line.replace(/[ \t]+$/, ''));
+
+  const target = INDENT_TARGETS[language];
+  if (target) {
+    const units = lines
+      .filter((line) => /^ +\S/.test(line))
+      .map((line) => line.match(/^ +/)[0].length);
+    const unit = units.length ? Math.min(...units) : 0;
+    if (unit > target) {
+      lines = lines.map((line) => {
+        const match = line.match(/^ +/);
+        if (!match) return line;
+        const depth = Math.floor(match[0].length / unit);
+        const remainder = match[0].length % unit;
+        return ' '.repeat(depth * target + remainder) + line.slice(match[0].length);
+      });
+    }
+  }
+
+  const collapsed = [];
+  for (const line of lines) {
+    if (line === '' && collapsed.at(-1) === '') continue;
+    collapsed.push(line);
+  }
+  while (collapsed.at(-1) === '') collapsed.pop();
+  return collapsed.join('\n');
+}
+
 export function frameSnippet(language, rawSource) {
   const frame = FRAMES[language];
   if (!frame) throw new Error(`No snippet frame for language: ${language}`);
@@ -392,7 +436,7 @@ export function extractSnippetManifest({ openapi, repositoryRoot, artifactsRoot 
       snippets[operation.operationId][language] = {
         status: source.status ?? 'available',
         ...(source.note ? { note: source.note } : {}),
-        source: framed.source,
+        source: normalizeSnippetWhitespace(language, framed.source),
         frameLines: framed.frameLines,
       };
     }

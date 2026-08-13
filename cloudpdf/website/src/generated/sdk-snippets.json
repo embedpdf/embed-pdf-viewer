@@ -64,7 +64,7 @@
     "deployment.licenseStatus": {
       "typescript": {
         "status": "available",
-        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n    baseUrl: \"https://yourhost.com/path/to/api\",\n    token: \"<token>\",\n});\n\nawait client.deployment.licenseStatus();",
+        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.deployment.licenseStatus();",
         "frameLines": 7
       },
       "python": {
@@ -101,7 +101,7 @@
     "doc.head": {
       "typescript": {
         "status": "available",
-        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n    baseUrl: \"https://yourhost.com/path/to/api\",\n    token: \"<token>\",\n});\n\nawait client.doc.head({\n    docId: \"docId\"\n});",
+        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.doc.head({\n  docId: \"docId\"\n});",
         "frameLines": 7
       },
       "python": {
@@ -138,7 +138,7 @@
     "doc.annotations.list": {
       "typescript": {
         "status": "available",
-        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n    baseUrl: \"https://yourhost.com/path/to/api\",\n    token: \"<token>\",\n});\n\nawait client.doc.annotations.list({\n    docId: \"docId\",\n    layerName: \"layerName\",\n    pon: 1\n});",
+        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.doc.annotations.list({\n  docId: \"docId\",\n  layerName: \"layerName\",\n  pon: 1\n});",
         "frameLines": 7
       },
       "python": {
@@ -175,7 +175,7 @@
     "doc.annotations.create": {
       "typescript": {
         "status": "available",
-        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n    baseUrl: \"https://yourhost.com/path/to/api\",\n    token: \"<token>\",\n});\n\nawait client.doc.annotations.create({\n    docId: \"docId\",\n    layerName: \"layerName\",\n    pon: 1,\n    body: {\n        \"key\": \"value\"\n    }\n});",
+        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.doc.annotations.create({\n  docId: \"docId\",\n  layerName: \"layerName\",\n  pon: 1,\n  body: {\n    \"key\": \"value\"\n  }\n});",
         "frameLines": 7
       },
       "python": {
@@ -212,7 +212,7 @@
     "doc.annotations.update": {
       "typescript": {
         "status": "available",
-        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n    baseUrl: \"https://yourhost.com/path/to/api\",\n    token: \"<token>\",\n});\n\nawait client.doc.annotations.update({\n    docId: \"docId\",\n    layerName: \"layerName\",\n    pon: 1,\n    annotKey: \"annotKey\",\n    body: {\n        \"key\": \"value\"\n    }\n});",
+        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.doc.annotations.update({\n  docId: \"docId\",\n  layerName: \"layerName\",\n  pon: 1,\n  annotKey: \"annotKey\",\n  body: {\n    \"key\": \"value\"\n  }\n});",
         "frameLines": 7
       },
       "python": {
@@ -249,7 +249,7 @@
     "doc.annotations.delete": {
       "typescript": {
         "status": "available",
-        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n    baseUrl: \"https://yourhost.com/path/to/api\",\n    token: \"<token>\",\n});\n\nawait client.doc.annotations.delete({\n    docId: \"docId\",\n    layerName: \"layerName\",\n    pon: 1,\n    annotKey: \"annotKey\"\n});",
+        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.doc.annotations.delete({\n  docId: \"docId\",\n  layerName: \"layerName\",\n  pon: 1,\n  annotKey: \"annotKey\"\n});",
         "frameLines": 7
       },
       "python": {
@@ -286,7 +286,7 @@
     "doc.download": {
       "typescript": {
         "status": "available",
-        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n    baseUrl: \"https://yourhost.com/path/to/api\",\n    token: \"<token>\",\n});\n\nawait client.doc.download({\n    docId: \"docId\",\n    layerName: \"layerName\"\n});",
+        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.doc.download({\n  docId: \"docId\",\n  layerName: \"layerName\"\n});",
         "frameLines": 7
       },
       "python": {
@@ -323,7 +323,7 @@
     "doc.forms.get": {
       "typescript": {
         "status": "available",
-        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n    baseUrl: \"https://yourhost.com/path/to/api\",\n    token: \"<token>\",\n});\n\nawait client.doc.forms.get({\n    docId: \"docId\",\n    layerName: \"layerName\"\n});",
+        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.doc.forms.get({\n  docId: \"docId\",\n  layerName: \"layerName\"\n});",
         "frameLines": 7
       },
       "python": {
@@ -360,7 +360,7 @@
     "doc.forms.exportData": {
       "typescript": {
         "status": "available",
-        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n    baseUrl: \"https://yourhost.com/path/to/api\",\n    token: \"<token>\",\n});\n\nawait client.doc.forms.exportData({\n    docId: \"docId\",\n    layerName: \"layerName\"\n});",
+        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.doc.forms.exportData({\n  docId: \"docId\",\n  layerName: \"layerName\"\n});",
         "frameLines": 7
       },
       "python": {
@@ -397,7 +397,7 @@
     "doc.forms.importData": {
       "typescript": {
         "status": "available",
-        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n    baseUrl: \"https://yourhost.com/path/to/api\",\n    token: \"<token>\",\n});\n\nawait client.doc.forms.importData({\n    docId: \"docId\",\n    layerName: \"layerName\",\n    body: {\n        \"key\": \"value\"\n    }\n});",
+        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.doc.forms.importData({\n  docId: \"docId\",\n  layerName: \"layerName\",\n  body: {\n    \"key\": \"value\"\n  }\n});",
         "frameLines": 7
       },
       "python": {
@@ -434,7 +434,7 @@
     "doc.forms.reset": {
       "typescript": {
         "status": "available",
-        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n    baseUrl: \"https://yourhost.com/path/to/api\",\n    token: \"<token>\",\n});\n\nawait client.doc.forms.reset({\n    docId: \"docId\",\n    layerName: \"layerName\",\n    fieldKey: \"fieldKey\"\n});",
+        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.doc.forms.reset({\n  docId: \"docId\",\n  layerName: \"layerName\",\n  fieldKey: \"fieldKey\"\n});",
         "frameLines": 7
       },
       "python": {
@@ -471,7 +471,7 @@
     "doc.forms.setValue": {
       "typescript": {
         "status": "available",
-        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n    baseUrl: \"https://yourhost.com/path/to/api\",\n    token: \"<token>\",\n});\n\nawait client.doc.forms.setValue({\n    docId: \"docId\",\n    layerName: \"layerName\",\n    fieldKey: \"fieldKey\",\n    body: {\n        \"key\": \"value\"\n    }\n});",
+        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.doc.forms.setValue({\n  docId: \"docId\",\n  layerName: \"layerName\",\n  fieldKey: \"fieldKey\",\n  body: {\n    \"key\": \"value\"\n  }\n});",
         "frameLines": 7
       },
       "python": {
@@ -508,7 +508,7 @@
     "doc.manifest": {
       "typescript": {
         "status": "available",
-        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n    baseUrl: \"https://yourhost.com/path/to/api\",\n    token: \"<token>\",\n});\n\nawait client.doc.manifest({\n    docId: \"docId\",\n    layerName: \"layerName\"\n});",
+        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.doc.manifest({\n  docId: \"docId\",\n  layerName: \"layerName\"\n});",
         "frameLines": 7
       },
       "python": {
@@ -545,7 +545,7 @@
     "doc.metadata.get": {
       "typescript": {
         "status": "available",
-        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n    baseUrl: \"https://yourhost.com/path/to/api\",\n    token: \"<token>\",\n});\n\nawait client.doc.metadata.get({\n    docId: \"docId\",\n    layerName: \"layerName\"\n});",
+        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.doc.metadata.get({\n  docId: \"docId\",\n  layerName: \"layerName\"\n});",
         "frameLines": 7
       },
       "python": {
@@ -582,7 +582,7 @@
     "doc.pages.delete": {
       "typescript": {
         "status": "available",
-        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n    baseUrl: \"https://yourhost.com/path/to/api\",\n    token: \"<token>\",\n});\n\nawait client.doc.pages.delete({\n    docId: \"docId\",\n    layerName: \"layerName\",\n    body: {\n        \"key\": \"value\"\n    }\n});",
+        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.doc.pages.delete({\n  docId: \"docId\",\n  layerName: \"layerName\",\n  body: {\n    \"key\": \"value\"\n  }\n});",
         "frameLines": 7
       },
       "python": {
@@ -619,7 +619,7 @@
     "doc.pages.flatten": {
       "typescript": {
         "status": "available",
-        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n    baseUrl: \"https://yourhost.com/path/to/api\",\n    token: \"<token>\",\n});\n\nawait client.doc.pages.flatten({\n    docId: \"docId\",\n    layerName: \"layerName\",\n    body: {\n        \"key\": \"value\"\n    }\n});",
+        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.doc.pages.flatten({\n  docId: \"docId\",\n  layerName: \"layerName\",\n  body: {\n    \"key\": \"value\"\n  }\n});",
         "frameLines": 7
       },
       "python": {
@@ -656,7 +656,7 @@
     "doc.pages.move": {
       "typescript": {
         "status": "available",
-        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n    baseUrl: \"https://yourhost.com/path/to/api\",\n    token: \"<token>\",\n});\n\nawait client.doc.pages.move({\n    docId: \"docId\",\n    layerName: \"layerName\",\n    body: {\n        \"key\": \"value\"\n    }\n});",
+        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.doc.pages.move({\n  docId: \"docId\",\n  layerName: \"layerName\",\n  body: {\n    \"key\": \"value\"\n  }\n});",
         "frameLines": 7
       },
       "python": {
@@ -693,7 +693,7 @@
     "doc.pages.rotate": {
       "typescript": {
         "status": "available",
-        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n    baseUrl: \"https://yourhost.com/path/to/api\",\n    token: \"<token>\",\n});\n\nawait client.doc.pages.rotate({\n    docId: \"docId\",\n    layerName: \"layerName\",\n    body: {\n        \"key\": \"value\"\n    }\n});",
+        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.doc.pages.rotate({\n  docId: \"docId\",\n  layerName: \"layerName\",\n  body: {\n    \"key\": \"value\"\n  }\n});",
         "frameLines": 7
       },
       "python": {
@@ -730,7 +730,7 @@
     "doc.redactions.apply": {
       "typescript": {
         "status": "available",
-        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n    baseUrl: \"https://yourhost.com/path/to/api\",\n    token: \"<token>\",\n});\n\nawait client.doc.redactions.apply({\n    docId: \"docId\",\n    layerName: \"layerName\",\n    body: {\n        \"key\": \"value\"\n    }\n});",
+        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.doc.redactions.apply({\n  docId: \"docId\",\n  layerName: \"layerName\",\n  body: {\n    \"key\": \"value\"\n  }\n});",
         "frameLines": 7
       },
       "python": {
@@ -767,7 +767,7 @@
     "doc.render": {
       "typescript": {
         "status": "available",
-        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n    baseUrl: \"https://yourhost.com/path/to/api\",\n    token: \"<token>\",\n});\n\nawait client.doc.render({\n    docId: \"docId\",\n    layerName: \"layerName\",\n    pon: 1\n});",
+        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.doc.render({\n  docId: \"docId\",\n  layerName: \"layerName\",\n  pon: 1\n});",
         "frameLines": 7
       },
       "python": {
@@ -804,7 +804,7 @@
     "doc.text": {
       "typescript": {
         "status": "available",
-        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n    baseUrl: \"https://yourhost.com/path/to/api\",\n    token: \"<token>\",\n});\n\nawait client.doc.text({\n    docId: \"docId\",\n    layerName: \"layerName\",\n    pon: 1\n});",
+        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.doc.text({\n  docId: \"docId\",\n  layerName: \"layerName\",\n  pon: 1\n});",
         "frameLines": 7
       },
       "python": {
@@ -841,7 +841,7 @@
     "shares.exchange": {
       "typescript": {
         "status": "available",
-        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n    baseUrl: \"https://yourhost.com/path/to/api\",\n    token: \"<token>\",\n});\n\nawait client.shares.exchange({\n    shareToken: \"shareToken\"\n});",
+        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.shares.exchange({\n  shareToken: \"shareToken\"\n});",
         "frameLines": 7
       },
       "python": {
@@ -878,7 +878,7 @@
     "tenants.list": {
       "typescript": {
         "status": "available",
-        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n    baseUrl: \"https://yourhost.com/path/to/api\",\n    token: \"<token>\",\n});\n\nawait client.tenants.list();",
+        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.tenants.list();",
         "frameLines": 7
       },
       "python": {
@@ -915,7 +915,7 @@
     "tenants.create": {
       "typescript": {
         "status": "available",
-        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n    baseUrl: \"https://yourhost.com/path/to/api\",\n    token: \"<token>\",\n});\n\nawait client.tenants.create({\n    id: \"id\"\n});",
+        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.tenants.create({\n  id: \"id\"\n});",
         "frameLines": 7
       },
       "python": {
@@ -952,7 +952,7 @@
     "tenants.get": {
       "typescript": {
         "status": "available",
-        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n    baseUrl: \"https://yourhost.com/path/to/api\",\n    token: \"<token>\",\n});\n\nawait client.tenants.get({\n    tenantId: \"tenantId\"\n});",
+        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.tenants.get({\n  tenantId: \"tenantId\"\n});",
         "frameLines": 7
       },
       "python": {
@@ -989,7 +989,7 @@
     "tenants.delete": {
       "typescript": {
         "status": "available",
-        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n    baseUrl: \"https://yourhost.com/path/to/api\",\n    token: \"<token>\",\n});\n\nawait client.tenants.delete({\n    tenantId: \"tenantId\"\n});",
+        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.tenants.delete({\n  tenantId: \"tenantId\"\n});",
         "frameLines": 7
       },
       "python": {
@@ -1026,7 +1026,7 @@
     "documents.list": {
       "typescript": {
         "status": "available",
-        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n    baseUrl: \"https://yourhost.com/path/to/api\",\n    token: \"<token>\",\n});\n\nawait client.documents.list({\n    tenantId: \"tenantId\"\n});",
+        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.documents.list({\n  tenantId: \"tenantId\"\n});",
         "frameLines": 7
       },
       "python": {
@@ -1063,7 +1063,7 @@
     "documents.get": {
       "typescript": {
         "status": "available",
-        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n    baseUrl: \"https://yourhost.com/path/to/api\",\n    token: \"<token>\",\n});\n\nawait client.documents.get({\n    tenantId: \"tenantId\",\n    id: \"id\"\n});",
+        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.documents.get({\n  tenantId: \"tenantId\",\n  id: \"id\"\n});",
         "frameLines": 7
       },
       "python": {
@@ -1100,7 +1100,7 @@
     "documents.delete": {
       "typescript": {
         "status": "available",
-        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n    baseUrl: \"https://yourhost.com/path/to/api\",\n    token: \"<token>\",\n});\n\nawait client.documents.delete({\n    tenantId: \"tenantId\",\n    id: \"id\"\n});",
+        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.documents.delete({\n  tenantId: \"tenantId\",\n  id: \"id\"\n});",
         "frameLines": 7
       },
       "python": {
@@ -1137,7 +1137,7 @@
     "documents.commit": {
       "typescript": {
         "status": "available",
-        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n    baseUrl: \"https://yourhost.com/path/to/api\",\n    token: \"<token>\",\n});\n\nawait client.documents.commit({\n    tenantId: \"tenantId\",\n    id: \"id\",\n    sha256: \"sha256\"\n});",
+        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.documents.commit({\n  tenantId: \"tenantId\",\n  id: \"id\",\n  sha256: \"sha256\"\n});",
         "frameLines": 7
       },
       "python": {
@@ -1174,7 +1174,7 @@
     "documents.download": {
       "typescript": {
         "status": "available",
-        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n    baseUrl: \"https://yourhost.com/path/to/api\",\n    token: \"<token>\",\n});\n\nawait client.documents.download({\n    tenantId: \"tenantId\",\n    id: \"id\"\n});",
+        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.documents.download({\n  tenantId: \"tenantId\",\n  id: \"id\"\n});",
         "frameLines": 7
       },
       "python": {
@@ -1211,7 +1211,7 @@
     "documents.thumbnail": {
       "typescript": {
         "status": "available",
-        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n    baseUrl: \"https://yourhost.com/path/to/api\",\n    token: \"<token>\",\n});\n\nawait client.documents.thumbnail({\n    tenantId: \"tenantId\",\n    id: \"id\"\n});",
+        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.documents.thumbnail({\n  tenantId: \"tenantId\",\n  id: \"id\"\n});",
         "frameLines": 7
       },
       "python": {
@@ -1248,7 +1248,7 @@
     "documents.uploadProxy": {
       "typescript": {
         "status": "available",
-        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\nimport { readFile } from \"node:fs/promises\";\n\nconst client = new CloudPDFClient({\n    baseUrl: \"https://yourhost.com/path/to/api\",\n    token: \"<token>\",\n});\n\nawait client.documents.uploadProxy({\n    file: new Blob([await readFile(\"document.pdf\")], { type: \"application/pdf\" }),\n    tenantId: \"tenantId\",\n    id: \"documentId\",\n});",
+        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\nimport { readFile } from \"node:fs/promises\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.documents.uploadProxy({\n  file: new Blob([await readFile(\"document.pdf\")], { type: \"application/pdf\" }),\n  tenantId: \"tenantId\",\n  id: \"documentId\",\n});",
         "frameLines": 8
       },
       "python": {
@@ -1285,7 +1285,7 @@
     "documents.init": {
       "typescript": {
         "status": "available",
-        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n    baseUrl: \"https://yourhost.com/path/to/api\",\n    token: \"<token>\",\n});\n\nawait client.documents.init({\n    tenantId: \"tenantId\",\n    contentLength: 1.1,\n    contentSha256: \"contentSha256\"\n});",
+        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.documents.init({\n  tenantId: \"tenantId\",\n  contentLength: 1.1,\n  contentSha256: \"contentSha256\"\n});",
         "frameLines": 7
       },
       "python": {
@@ -1322,7 +1322,7 @@
     "tenants.resume": {
       "typescript": {
         "status": "available",
-        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n    baseUrl: \"https://yourhost.com/path/to/api\",\n    token: \"<token>\",\n});\n\nawait client.tenants.resume({\n    tenantId: \"tenantId\"\n});",
+        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.tenants.resume({\n  tenantId: \"tenantId\"\n});",
         "frameLines": 7
       },
       "python": {
@@ -1359,7 +1359,7 @@
     "shares.list": {
       "typescript": {
         "status": "available",
-        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n    baseUrl: \"https://yourhost.com/path/to/api\",\n    token: \"<token>\",\n});\n\nawait client.shares.list({\n    tenantId: \"tenantId\"\n});",
+        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.shares.list({\n  tenantId: \"tenantId\"\n});",
         "frameLines": 7
       },
       "python": {
@@ -1396,7 +1396,7 @@
     "shares.create": {
       "typescript": {
         "status": "available",
-        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n    baseUrl: \"https://yourhost.com/path/to/api\",\n    token: \"<token>\",\n});\n\nawait client.shares.create({\n    tenantId: \"tenantId\",\n    docId: \"docId\",\n    scope: [\"scope\"]\n});",
+        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.shares.create({\n  tenantId: \"tenantId\",\n  docId: \"docId\",\n  scope: [\"scope\"]\n});",
         "frameLines": 7
       },
       "python": {
@@ -1433,7 +1433,7 @@
     "shares.get": {
       "typescript": {
         "status": "available",
-        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n    baseUrl: \"https://yourhost.com/path/to/api\",\n    token: \"<token>\",\n});\n\nawait client.shares.get({\n    tenantId: \"tenantId\",\n    shareId: \"shareId\"\n});",
+        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.shares.get({\n  tenantId: \"tenantId\",\n  shareId: \"shareId\"\n});",
         "frameLines": 7
       },
       "python": {
@@ -1470,7 +1470,7 @@
     "shares.update": {
       "typescript": {
         "status": "available",
-        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n    baseUrl: \"https://yourhost.com/path/to/api\",\n    token: \"<token>\",\n});\n\nawait client.shares.update({\n    tenantId: \"tenantId\",\n    shareId: \"shareId\"\n});",
+        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.shares.update({\n  tenantId: \"tenantId\",\n  shareId: \"shareId\"\n});",
         "frameLines": 7
       },
       "python": {
@@ -1507,7 +1507,7 @@
     "shares.delete": {
       "typescript": {
         "status": "available",
-        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n    baseUrl: \"https://yourhost.com/path/to/api\",\n    token: \"<token>\",\n});\n\nawait client.shares.delete({\n    tenantId: \"tenantId\",\n    shareId: \"shareId\"\n});",
+        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.shares.delete({\n  tenantId: \"tenantId\",\n  shareId: \"shareId\"\n});",
         "frameLines": 7
       },
       "python": {
@@ -1544,7 +1544,7 @@
     "tenants.suspend": {
       "typescript": {
         "status": "available",
-        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n    baseUrl: \"https://yourhost.com/path/to/api\",\n    token: \"<token>\",\n});\n\nawait client.tenants.suspend({\n    tenantId: \"tenantId\"\n});",
+        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.tenants.suspend({\n  tenantId: \"tenantId\"\n});",
         "frameLines": 7
       },
       "python": {
@@ -1581,7 +1581,7 @@
     "tokens.issue": {
       "typescript": {
         "status": "available",
-        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n    baseUrl: \"https://yourhost.com/path/to/api\",\n    token: \"<token>\",\n});\n\nawait client.tokens.issue({\n    tenantId: \"tenantId\",\n    body: {\n        kind: \"doc\",\n        sub: \"sub\",\n        docId: \"docId\",\n        scope: [\"scope\"],\n        expiresIn: 1\n    }\n});",
+        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.tokens.issue({\n  tenantId: \"tenantId\",\n  body: {\n    kind: \"doc\",\n    sub: \"sub\",\n    docId: \"docId\",\n    scope: [\"scope\"],\n    expiresIn: 1\n  }\n});",
         "frameLines": 7
       },
       "python": {
@@ -1618,7 +1618,7 @@
     "tokens.revoke": {
       "typescript": {
         "status": "available",
-        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n    baseUrl: \"https://yourhost.com/path/to/api\",\n    token: \"<token>\",\n});\n\nawait client.tokens.revoke({\n    tenantId: \"tenantId\",\n    jti: \"jti\"\n});",
+        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.tokens.revoke({\n  tenantId: \"tenantId\",\n  jti: \"jti\"\n});",
         "frameLines": 7
       },
       "python": {
@@ -1655,7 +1655,7 @@
     "tenants.usage": {
       "typescript": {
         "status": "available",
-        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n    baseUrl: \"https://yourhost.com/path/to/api\",\n    token: \"<token>\",\n});\n\nawait client.tenants.usage({\n    tenantId: \"tenantId\"\n});",
+        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.tenants.usage({\n  tenantId: \"tenantId\"\n});",
         "frameLines": 7
       },
       "python": {
