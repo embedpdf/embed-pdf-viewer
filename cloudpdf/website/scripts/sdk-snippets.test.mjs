@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { parseReference } from './sdk-snippets.mjs';
+import { normalizeSnippetWhitespace, parseReference } from './sdk-snippets.mjs';
 
 function reference(summary, language, source = `${language} usage`) {
   return `## Methods
@@ -112,4 +112,40 @@ test('rejects unexpected nested markup in a method link', () => {
   );
 
   assert.equal(snippets.size, 0);
+});
+
+test('normalizeSnippetWhitespace re-indents TypeScript to the docs 2-space style', () => {
+  const framed = [
+    'const client = new CloudPDFClient({',
+    '    baseUrl: "https://yourhost.com",',
+    '    token: "<token>",',
+    '});',
+    '',
+    '',
+    'await client.tenants.create({',
+    '        id: "id",   ',
+    '});',
+    '',
+  ].join('\n');
+  assert.equal(
+    normalizeSnippetWhitespace('typescript', framed),
+    [
+      'const client = new CloudPDFClient({',
+      '  baseUrl: "https://yourhost.com",',
+      '  token: "<token>",',
+      '});',
+      '',
+      'await client.tenants.create({',
+      '    id: "id",',
+      '});',
+    ].join('\n'),
+  );
+});
+
+test('normalizeSnippetWhitespace leaves idiomatic-4 languages at 4', () => {
+  const python = 'client = CloudPDFClient(\n    base_url="x",\n)\n';
+  assert.equal(
+    normalizeSnippetWhitespace('python', python),
+    'client = CloudPDFClient(\n    base_url="x",\n)',
+  );
 });

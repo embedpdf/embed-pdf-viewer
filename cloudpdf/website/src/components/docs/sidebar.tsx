@@ -4,7 +4,14 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
 
+import { pageSupportsEngine } from '@embedpdf/docs-kit';
+
+import { DOCS_SITE } from '@/docs-site';
+import { docsIntegrationFromPath, docsIntegrationHref } from '@/lib/docs-integrations';
+
 import { useConfig } from './config-provider';
+import { DocsProductSwitcher } from './docs-product-switcher';
+import { IntegrationSwitcher } from './integration';
 import { MethodBadge } from './method-badge';
 
 type TreeItem = {
@@ -15,7 +22,7 @@ type TreeItem = {
    * Page frontmatter; API reference pages carry their HTTP `method`
    * and — for API-token-only operations — `audience: operator` here.
    */
-  frontMatter?: { method?: string; audience?: string };
+  frontMatter?: { method?: string; audience?: string; engines?: string[] };
   children?: TreeItem[];
 };
 
@@ -30,12 +37,16 @@ function isOperatorSection(item: TreeItem): boolean {
 
 function SidebarLink({ item, pathname }: { item: TreeItem; pathname: string }) {
   if (!item.route) return null;
-  const active = pathname === item.route;
+  // Content routes are integration-less; rendered hrefs carry the active
+  // integration so every crawlable link is a concrete destination.
+  const integration = docsIntegrationFromPath(pathname);
+  const href = integration ? docsIntegrationHref(item.route, integration) : item.route;
+  const active = pathname === href;
   const method = item.frontMatter?.method;
 
   return (
     <Link
-      href={item.route}
+      href={href}
       className={`-ml-[1.5px] flex items-center gap-2.5 border-l-[1.5px] py-2 pl-[15px] pr-3 font-sans text-[14.5px] font-medium leading-[1.3] no-underline transition-colors ${
         active
           ? 'border-cp-blue text-cp-blue font-bold'
@@ -49,9 +60,12 @@ function SidebarLink({ item, pathname }: { item: TreeItem; pathname: string }) {
 }
 
 function SidebarTree({ items, pathname }: { items: TreeItem[]; pathname: string }) {
+  // Rung 4 of the fork ladder: pages declaring `engines:` they don't
+  // support on this site simply don't exist in its navigation.
+  const visible = items.filter((item) => pageSupportsEngine(item.frontMatter, DOCS_SITE.engine));
   return (
     <>
-      {items.map((item) => {
+      {visible.map((item) => {
         const hasChildren = Boolean(item.children && item.children.length > 0);
 
         if (hasChildren) {
@@ -91,7 +105,9 @@ export function Sidebar() {
 
   return (
     <aside className="sticky top-[84px] hidden h-[calc(100vh-84px)] w-[268px] shrink-0 overflow-y-auto pb-16 pr-3.5 pt-[52px] [scrollbar-color:#D5DEEF_transparent] [scrollbar-width:thin] md:block">
-      <nav className="flex flex-col">
+      <DocsProductSwitcher />
+      <IntegrationSwitcher />
+      <nav className="mt-7 flex flex-col border-t border-[#EAEFF7] pt-6">
         <SidebarTree items={docsDirectories as TreeItem[]} pathname={pathname} />
       </nav>
     </aside>

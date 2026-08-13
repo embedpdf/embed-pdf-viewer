@@ -1,6 +1,8 @@
 import openapiDocument from '../../../contract/openapi.json';
 import snippetDocument from '../generated/sdk-snippets.json';
 
+import { applyInstallChannel } from '@embedpdf/docs-kit/mdx/install-channel';
+
 export type JsonSchema = {
   $ref?: string;
   type?: string | string[];
@@ -124,6 +126,10 @@ export function getSdkLanguages(): Array<SdkLanguage & { language: string }> {
   return Object.entries(snippets.languages).map(([language, config]) => ({
     language,
     ...config,
+    // The npm SDK rides the same release channel as the docs' other install
+    // commands (`@cloudpdf/sdk`'s `latest` is a 0.0.0 placeholder until GA).
+    // Non-npm ecosystems keep their manifest-recorded commands.
+    install: applyInstallChannel(config.install),
   }));
 }
 

@@ -1,10 +1,22 @@
 @import 'tailwindcss';
 @config '../../tailwind.config.ts';
+/* Kit hook baselines (dk-dark-scroll et al) — see docs/kit/styles.css. */
+@import '@embedpdf/docs-kit/styles.css';
 
 html {
   @apply text-base antialiased;
   -webkit-tap-highlight-color: transparent;
   scroll-behavior: smooth;
+}
+
+/* ---- @embedpdf/docs-kit token contract (docs/kit/src/tokens.ts) ----
+   CloudPDF brand values, mapped from the cp-* palette in tailwind.config. */
+:root {
+  --dk-accent: #1677ff;
+  --dk-heading: #0a1a4d;
+  --dk-muted: #5a6b92;
+  --dk-border: #e4eaf4;
+  --dk-accent-surface: #ecf2fe;
 }
 
 .sales-dialog::backdrop {

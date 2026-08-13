@@ -1,3 +1,8 @@
+import {
+  createFilesAttribute,
+  getDocsHighlighter,
+  highlightCodeFile,
+} from '@embedpdf/docs-kit/mdx/highlight';
 import { visit } from 'unist-util-visit';
 
 interface FileInfo {
@@ -9,83 +14,37 @@ interface FileInfo {
   highlightedCode?: string;
 }
 
-const CODE_THEME = 'material-theme-palenight';
-
-let highlighterPromise: Promise<any> | null = null;
-
-async function getHighlighter() {
-  if (!highlighterPromise) {
-    highlighterPromise = (async () => {
-      const { createHighlighter, bundledLanguages } = await import('shiki');
-      return createHighlighter({
-        themes: [CODE_THEME],
-        langs: Object.keys(bundledLanguages).filter((l) => l !== 'mermaid'),
-      });
-    })();
-  }
-  return highlighterPromise;
-}
-
 /**
- * Build an MDX JSX `files` attribute carrying the highlighted file data so the
- * client <CodeExample> component can render it.
- */
-function createFilesAttribute(files: FileInfo[]) {
-  const prop = (name: string, value: string) => ({
-    type: 'Property',
-    method: false,
-    shorthand: false,
-    computed: false,
-    key: { type: 'Identifier', name },
-    value: { type: 'Literal', value, raw: JSON.stringify(value) },
-    kind: 'init',
-  });
-
-  const elements = files.map((file) => ({
-    type: 'ObjectExpression',
-    properties: [
-      prop('filename', file.filename),
-      prop('code', file.code),
-      prop('language', file.language),
-      prop('githubUrl', file.githubUrl || ''),
-      prop('highlightedCode', file.highlightedCode || ''),
-    ],
-  }));
-
-  return {
-    type: 'mdxJsxAttribute',
-    name: 'files',
-    value: {
-      type: 'mdxJsxAttributeValueExpression',
-      value: JSON.stringify(files),
-      data: {
-        estree: {
-          type: 'Program',
-          body: [
-            {
-              type: 'ExpressionStatement',
-              expression: { type: 'ArrayExpression', elements },
-            },
-          ],
-          sourceType: 'module',
-          comments: [],
-        },
-      },
-    },
-  };
-}
-
-/**
- * Rehype plugin that highlights the code collected by `remarkCodeExample` using
- * shiki with a single dark theme (so tokens get direct inline colors).
+ * Rehype pass over the code collected by `remarkCodeExample`. This file only
+ * finds nodes and attaches props — the highlighter, theme, and whitespace
+ * rules are the kit's (`@embedpdf/docs-kit/mdx/highlight`), shared with
+ * embedpdf.com so a rendering fix lands exactly once. (The doubled blank
+ * lines this site once shipped came from a local copy of this pipeline
+ * patching empty line spans — that rule now lives in the kit, fixed.)
  */
 export const rehypeCodeExample = () => {
   return async (tree: any) => {
-    const highlighter = await getHighlighter();
+    const highlighter = await getDocsHighlighter();
     const nodesToProcess: Array<{ node: any; files: FileInfo[] }> = [];
+    const exampleNodes: Array<{ node: any; byFramework: Record<string, FileInfo[]> }> = [];
 
     visit(tree, (node: any) => {
-      if (node.type !== 'mdxJsxFlowElement' || node.name !== 'CodeExample') return;
+      if (node.type !== 'mdxJsxFlowElement') return;
+
+      // Framework-resolved samples (<Example name="…">): highlight every
+      // framework's files; the client picks by pathname.
+      if (node.name === 'Example') {
+        const attr = node.attributes?.find((a: any) => a.name === '__fwFiles');
+        if (!attr?.value) return;
+        try {
+          exampleNodes.push({ node, byFramework: JSON.parse(attr.value) });
+        } catch {
+          console.warn('[rehype-code-example] Could not parse __fwFiles');
+        }
+        return;
+      }
+
+      if (node.name !== 'CodeExample') return;
 
       const needsHighlighting = node.attributes?.find(
         (attr: any) => attr.name === '__needsHighlighting',
@@ -104,33 +63,30 @@ export const rehypeCodeExample = () => {
     });
 
     for (const { node, files } of nodesToProcess) {
-      const highlightedFiles: FileInfo[] = [];
-
-      for (const file of files) {
-        try {
-          const highlighted = highlighter.codeToHtml(file.code.trim(), {
-            lang: file.language,
-            theme: CODE_THEME,
-          });
-
-          const innerMatch = highlighted.match(/<code[^>]*>([\s\S]*)<\/code>/);
-          const innerHtml = (innerMatch ? innerMatch[1] : highlighted).replace(
-            /<span class="line"><\/span>/g,
-            '<span class="line">\n</span>',
-          );
-
-          highlightedFiles.push({ ...file, highlightedCode: innerHtml });
-        } catch (err) {
-          console.warn(`[rehype-code-example] Failed to highlight ${file.filename}:`, err);
-          highlightedFiles.push(file);
-        }
-      }
+      const highlightedFiles: FileInfo[] = files.map((file) =>
+        highlightCodeFile(highlighter, file),
+      );
 
       node.attributes = node.attributes.filter(
         (attr: any) => attr.name !== '__needsHighlighting' && attr.name !== '__codeFiles',
       );
 
       node.attributes.push(createFilesAttribute(highlightedFiles));
+    }
+
+    for (const { node, byFramework } of exampleNodes) {
+      const highlighted: Record<string, FileInfo[]> = {};
+      for (const [fw, files] of Object.entries(byFramework)) {
+        highlighted[fw] = files.map((file) => highlightCodeFile(highlighter, file));
+      }
+      node.attributes = node.attributes.filter(
+        (attr: any) => attr.name !== '__needsHighlighting' && attr.name !== '__fwFiles',
+      );
+      node.attributes.push({
+        type: 'mdxJsxAttribute',
+        name: 'filesByFramework',
+        value: JSON.stringify(highlighted),
+      });
     }
   };
 };

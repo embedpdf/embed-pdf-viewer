@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react';
 
 import { EpButton } from './button';
 import { ChevronRightIcon, GitHubIcon, SearchIcon, SparkIcon } from './icons';
-import { SearchModal } from './search-modal';
+import { SearchDialog } from '@embedpdf/docs-kit';
 
 const NAV_ITEMS: { label: string; href: string }[] = [
   { label: 'Docs', href: '/docs' },
@@ -155,7 +155,16 @@ export function Header() {
         </div>
       )}
 
-      {searchOpen && <SearchModal onClose={() => setSearchOpen(false)} />}
+      {searchOpen && (
+        <SearchDialog
+          onClose={() => setSearchOpen(false)}
+          products={[
+            { value: 'viewer', label: 'Viewer' },
+            { value: 'headless', label: 'Headless' },
+            { value: 'engine', label: 'Engine' },
+          ]}
+        />
+      )}
     </header>
   );
 }

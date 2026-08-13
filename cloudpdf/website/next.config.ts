@@ -3,6 +3,10 @@ import nextra from 'nextra';
 import { remarkNpm2Yarn } from '@theguild/remark-npm2yarn';
 import { visit } from 'unist-util-visit';
 
+import { remarkEngineAxis } from '@embedpdf/docs-kit/mdx';
+import { remarkInstallChannel } from '@embedpdf/docs-kit/mdx/install-channel';
+
+import { DOCS_SITE } from './src/docs-site';
 import { rehypeCodeExample } from './src/lib/rehype-code-example';
 import { remarkCodeExample } from './src/lib/remark-code-example';
 
@@ -35,6 +39,12 @@ const withNextra = nextra({
       keepBackground: false,
     },
     remarkPlugins: [
+      // Resolve the engine axis FIRST, so every later plugin (and the
+      // compiled page) only ever sees this site's flavour.
+      [remarkEngineAxis, { engine: DOCS_SITE.engine }],
+      // Stamp the release channel on install commands BEFORE npm2yarn fans
+      // the npm line out, so every package-manager tab inherits the tag.
+      remarkInstallChannel,
       [
         remarkNpm2Yarn,
         {
@@ -52,6 +62,15 @@ const withNextra = nextra({
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  // The docs kit ships raw TypeScript source (workspace package).
+  transpilePackages: ['@embedpdf/docs-kit'],
+  // "/docs/…page.md" is rewritten to the Markdown Route Handler by
+  // middleware.ts, which also owns the fan-out courtesy redirects.
+  // The search route reads the per-deploy artifact from the filesystem;
+  // tracing must bundle it into the serverless function.
+  outputFileTracingIncludes: {
+    '/api/search': ['./public/search-index.bin'],
+  },
 };
 
 export default withNextra(nextConfig);

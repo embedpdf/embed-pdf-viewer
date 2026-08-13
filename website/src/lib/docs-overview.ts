@@ -12,6 +12,13 @@ export type DocsOverviewPath = {
   integrations: readonly DocsIntegration[];
 };
 
+/** The header's one-line framing; the page and /docs.md both render it. */
+export const DOCS_OVERVIEW_INTRO =
+  'Start with a complete viewer, compose your own interface, or work directly with the engine underneath.';
+
+/** Lead-in for the per-framework link lists in the Markdown projection. */
+export const DOCS_OVERVIEW_INTEGRATIONS_LEAD = 'Get started in your framework';
+
 export const DOCS_OVERVIEW_PATHS: readonly DocsOverviewPath[] = [
   {
     id: 'viewer',

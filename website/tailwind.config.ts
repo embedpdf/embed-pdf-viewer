@@ -1,7 +1,9 @@
 import type { Config } from 'tailwindcss';
 
 export default {
-  content: ['./src/**/*.{js,ts,jsx,tsx,mdx}'],
+  // The docs-kit sources must be scanned too: its components carry Tailwind
+  // classes that only exist in generated CSS if some content glob sees them.
+  content: ['./src/**/*.{js,ts,jsx,tsx,mdx}', '../docs/kit/src/**/*.{ts,tsx}'],
   theme: {
     extend: {
       colors: {

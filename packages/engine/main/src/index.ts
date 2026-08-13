@@ -44,7 +44,22 @@ import {
   type WorkerSource,
 } from './wasm-source';
 
-export type { Engine, EngineFactory } from '@embedpdf/engine-core/runtime';
+// Re-export the shared engine runtime surface so consumers (and code that
+// must stay engine-flavor-portable, like the docs samples) can name every
+// public document type from `@embedpdf/engine` itself — mirroring the
+// `@cloudpdf/engine` entrypoint — instead of reaching into the transitive
+// `@embedpdf/engine-core` dep.
+export type {
+  Engine,
+  EngineFactory,
+  DocumentHandle,
+  DocumentCapabilities,
+  PageHandle,
+  OpenInput,
+  OpenInputShare,
+  OpenOptions,
+  TokenSource,
+} from '@embedpdf/engine-core/runtime';
 export { LocalEngine } from './LocalEngine';
 export type { LocalEngineOptions } from './LocalEngine';
 export type { Transport } from './transport/Transport';

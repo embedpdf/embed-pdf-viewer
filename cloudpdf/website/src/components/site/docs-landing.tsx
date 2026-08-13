@@ -2,9 +2,19 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 
 import { getOperationCount, getSdkLanguages } from '@/lib/api-reference';
+import {
+  DOCS_INTEGRATION_LABELS,
+  docsGettingStartedHref,
+  PRODUCT_INTEGRATIONS,
+  type DocsIntegration,
+  type FanoutDocsProduct,
+} from '@/lib/docs-integrations';
+
+import { DOCS_LANDING, LANDING_DEPLOYMENTS, LANDING_PRODUCT_PATHS } from '@/lib/docs-landing';
 
 import { BackendBand } from './backend-band';
-import { ArrowRight, CheckIcon, CloudIcon, ReactLogo, SvelteLogo, VueLogo } from './icons';
+import { ArrowRight, CheckIcon, CloudIcon } from './icons';
+import { IntegrationLogo } from './integration-logo';
 
 type Tone = 'blue' | 'violet';
 
@@ -42,29 +52,28 @@ const toneStyles: Record<
   },
 };
 
-type Framework = { name: string; cmd: string; logo: ReactNode };
-
-const REACT = <ReactLogo width={20} height={20} />;
-const VUE = <VueLogo width={19} height={19} />;
-const SVELTE = <SvelteLogo width={17} height={17} />;
-const VANILLA = (
-  <span className="font-display inline-flex h-[19px] w-[19px] items-center justify-center rounded bg-[#F7DF1E] text-[9px] font-extrabold tracking-[-0.02em] text-[#1A1A1A]">
-    JS
-  </span>
-);
-
-function FrameworkLink({ fw, tone }: { fw: Framework; tone: Tone }) {
+function FrameworkLink({
+  product,
+  integration,
+  tone,
+}: {
+  product: FanoutDocsProduct;
+  integration: DocsIntegration;
+  tone: Tone;
+}) {
   const s = toneStyles[tone];
   return (
     <Link
-      href="/docs/engine/getting-started"
-      className={`group flex items-center gap-2.5 rounded-xl border px-3 py-3 no-underline transition-all ${s.fwLink}`}
+      href={docsGettingStartedHref(product, integration)}
+      className={`group flex items-center gap-2.5 rounded-xl border px-3 py-3 no-underline transition-all ${s.fwLink} ${
+        integration === 'vanilla' ? 'col-span-2' : ''
+      }`}
     >
       <span className="inline-flex h-[34px] w-[34px] flex-shrink-0 items-center justify-center rounded-[9px] bg-white shadow-[0_1px_2px_rgba(10,26,77,0.06)] transition-colors">
-        {fw.logo}
+        <IntegrationLogo integration={integration} size={20} />
       </span>
       <span className="font-display text-cp-navy min-w-0 flex-1 truncate text-[15px] font-bold tracking-[-0.01em]">
-        {fw.name}
+        {DOCS_INTEGRATION_LABELS[integration]}
       </span>
       <ArrowRight
         width={18}
@@ -78,18 +87,18 @@ function FrameworkLink({ fw, tone }: { fw: Framework; tone: Tone }) {
 
 function PathCard({
   tone,
+  product,
   title,
   desc,
   feats,
-  frameworks,
   image,
   imageAlt,
 }: {
   tone: Tone;
+  product: FanoutDocsProduct;
   title: string;
   desc: string;
   feats: ReactNode[];
-  frameworks: Framework[];
   image: string;
   imageAlt: string;
 }) {
@@ -127,33 +136,43 @@ function PathCard({
         </div>
       </div>
 
-      <div className="border-cp-borderSoft mt-7 flex items-center gap-2.5 border-t pt-6">
-        <span
-          className={`inline-flex flex-shrink-0 ${tone === 'blue' ? 'text-cp-blue' : 'text-cp-violet'}`}
-        >
-          <svg
-            width={17}
-            height={17}
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.1"
-            strokeLinecap="round"
-            strokeLinejoin="round"
+      {/* Pinned to the bottom: the two cards list a different number of
+          integrations, so the leftover height falls above the divider and both
+          framework grids still line up. */}
+      <div className="mt-7 flex flex-1 flex-col justify-end">
+        <div className="border-cp-borderSoft flex items-center gap-2.5 border-t pt-6">
+          <span
+            className={`inline-flex flex-shrink-0 ${tone === 'blue' ? 'text-cp-blue' : 'text-cp-violet'}`}
           >
-            <path d="m18 16 4-4-4-4" />
-            <path d="m6 8-4 4 4 4" />
-            <path d="m14.5 4-5 16" />
-          </svg>
-        </span>
-        <span className="font-display text-cp-navy text-sm font-bold tracking-[-0.01em]">
-          Get started in your framework
-        </span>
-      </div>
-      <div className="mt-3.5 grid grid-cols-2 gap-2.5">
-        {frameworks.map((fw) => (
-          <FrameworkLink key={fw.name} fw={fw} tone={tone} />
-        ))}
+            <svg
+              width={17}
+              height={17}
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.1"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="m18 16 4-4-4-4" />
+              <path d="m6 8-4 4 4 4" />
+              <path d="m14.5 4-5 16" />
+            </svg>
+          </span>
+          <span className="font-display text-cp-navy text-sm font-bold tracking-[-0.01em]">
+            {DOCS_LANDING.frameworksLabel}
+          </span>
+        </div>
+        <div className="mt-3.5 grid grid-cols-2 gap-2.5">
+          {PRODUCT_INTEGRATIONS[product].map((integration) => (
+            <FrameworkLink
+              key={integration}
+              product={product}
+              integration={integration}
+              tone={tone}
+            />
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -204,6 +223,26 @@ function DeployCard({
   );
 }
 
+const DEPLOYMENT_ICONS: Record<'saas' | 'self-hosted', ReactNode> = {
+  saas: <CloudIcon width={28} height={28} strokeWidth={1.9} />,
+  'self-hosted': (
+    <svg
+      width={26}
+      height={26}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.9"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <rect x="3" y="4" width="18" height="6" rx="1.5" />
+      <rect x="3" y="14" width="18" height="6" rx="1.5" />
+      <path d="M7 7h.01M7 17h.01" />
+    </svg>
+  ),
+};
+
 export function DocsLanding() {
   return (
     <section className="relative py-[clamp(40px,5vw,56px)]">
@@ -211,12 +250,11 @@ export function DocsLanding() {
         {/* heading */}
         <div className="mx-auto max-w-[880px] text-center">
           <h1 className="font-display text-cp-navy text-balance text-[clamp(38px,5vw,60px)] font-extrabold leading-[1.06] tracking-[-0.03em]">
-            Choose the right path to build better{' '}
-            <em className="text-cp-blue not-italic">PDF experiences.</em>
+            {DOCS_LANDING.heading.lead}
+            <em className="text-cp-blue not-italic">{DOCS_LANDING.heading.em}</em>
           </h1>
           <p className="text-cp-ink mx-auto mt-[22px] max-w-[560px] font-sans text-[19px] leading-[1.6]">
-            Launch faster with a ready-made viewer, or build exactly what you need with our headless
-            components.
+            {DOCS_LANDING.intro}
           </p>
         </div>
 
@@ -239,40 +277,24 @@ export function DocsLanding() {
               <rect x="15" y="15" width="6" height="6" rx="1.5" />
               <path d="M12 9v3M12 12H6v3M12 12h6v3" />
             </svg>
-            Choose your implementation path
+            {DOCS_LANDING.pathPill}
           </span>
         </div>
 
         {/* paths */}
         <div className="relative mt-[clamp(36px,4.5vw,56px)] grid grid-cols-1 gap-y-3.5 min-[881px]:grid-cols-2 min-[881px]:gap-x-[clamp(18px,2.2vw,34px)] min-[881px]:gap-y-0">
-          <PathCard
-            tone="blue"
-            image="/plan-section/ready-made-viewer.svg"
-            imageAlt="Preview of the ready-made PDF viewer interface"
-            title="Ready-made Viewer"
-            desc="Embed a complete, feature-rich PDF viewer in minutes."
-            feats={['Drop-in component', 'Fastest way to launch', 'Prebuilt toolbar and layout']}
-            frameworks={[
-              { name: 'Vanilla', cmd: '@cloudpdf/js', logo: VANILLA },
-              { name: 'React', cmd: '@cloudpdf/react', logo: REACT },
-              { name: 'Vue', cmd: '@cloudpdf/vue', logo: VUE },
-              { name: 'Svelte', cmd: '@cloudpdf/svelte', logo: SVELTE },
-            ]}
-          />
-
-          <PathCard
-            tone="violet"
-            image="/plan-section/headless-components.svg"
-            imageAlt="Headless components and code building blocks"
-            title="Headless Components"
-            desc="Build custom PDF experiences with our modular, headless API."
-            feats={['Build your own UI', 'Full composability', 'Plugin-friendly']}
-            frameworks={[
-              { name: 'React', cmd: '@cloudpdf/react', logo: REACT },
-              { name: 'Vue', cmd: '@cloudpdf/vue', logo: VUE },
-              { name: 'Svelte', cmd: '@cloudpdf/svelte', logo: SVELTE },
-            ]}
-          />
+          {LANDING_PRODUCT_PATHS.map((path) => (
+            <PathCard
+              key={path.id}
+              tone={path.id === 'viewer' ? 'blue' : 'violet'}
+              product={path.id}
+              image={path.image}
+              imageAlt={path.imageAlt}
+              title={path.title}
+              desc={path.landing.desc}
+              feats={[...path.landing.feats]}
+            />
+          ))}
         </div>
 
         {/* deployment label */}
@@ -293,43 +315,23 @@ export function DocsLanding() {
               <path d="m2 17 10 5 10-5" />
               <path d="m2 12 10 5 10-5" />
             </svg>
-            Choose your deployment
+            {DOCS_LANDING.deploymentLabel}
           </span>
         </div>
 
         {/* deployment */}
         <div className="grid grid-cols-1 gap-3.5 min-[881px]:grid-cols-2 min-[881px]:gap-x-[clamp(18px,2.2vw,34px)]">
-          <DeployCard
-            tone="blue"
-            icon={<CloudIcon width={28} height={28} strokeWidth={1.9} />}
-            title="Managed SaaS"
-            lead="We host and manage everything."
-            sub="Get secure, scalable infrastructure so you can focus on your product."
-            href="/docs/engine/getting-started"
-          />
-          <DeployCard
-            tone="violet"
-            icon={
-              <svg
-                width={26}
-                height={26}
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.9"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <rect x="3" y="4" width="18" height="6" rx="1.5" />
-                <rect x="3" y="14" width="18" height="6" rx="1.5" />
-                <path d="M7 7h.01M7 17h.01" />
-              </svg>
-            }
-            title="Self-hosted Server"
-            lead="Deploy in your own environment."
-            sub="Full control, private data, and enterprise compliance on your terms."
-            href="/docs/server/getting-started"
-          />
+          {LANDING_DEPLOYMENTS.map((deployment) => (
+            <DeployCard
+              key={deployment.id}
+              tone={deployment.id === 'saas' ? 'blue' : 'violet'}
+              icon={DEPLOYMENT_ICONS[deployment.id]}
+              title={deployment.title}
+              lead={deployment.landing.lead}
+              sub={deployment.landing.sub}
+              href={deployment.href}
+            />
+          ))}
         </div>
 
         <BackendBand

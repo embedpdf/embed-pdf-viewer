@@ -3,23 +3,63 @@
   "concurrency": "4",
   "tasks": {
     "build": {
-      "dependsOn": ["^build"],
-      "outputs": ["dist/**"]
+      "dependsOn": [
+        "^build"
+      ],
+      "outputs": [
+        "dist/**"
+      ]
     },
     "@embedpdf/engine#build": {
-      "dependsOn": ["^build"],
-      "outputs": ["dist/**", "workers/**", "src/generated/**"]
+      "dependsOn": [
+        "^build"
+      ],
+      "outputs": [
+        "dist/**",
+        "workers/**",
+        "src/generated/**"
+      ]
     },
     "@embedpdf/website#build:demos": {
-      "dependsOn": ["^build"],
-      "outputs": ["public/demos/**"]
+      "dependsOn": [
+        "^build"
+      ],
+      "outputs": [
+        "public/demos/**"
+      ]
     },
     "@embedpdf/website#build": {
-      "dependsOn": ["build:demos", "^build"],
-      "outputs": [".next/**", "!.next/cache/**"]
+      "dependsOn": [
+        "build:demos",
+        "^build"
+      ],
+      "outputs": [
+        ".next/**",
+        "!.next/cache/**"
+      ]
+    },
+    "@cloudpdf/website#build:demos": {
+      "dependsOn": [
+        "^build"
+      ],
+      "outputs": [
+        "public/demos/**"
+      ]
+    },
+    "@cloudpdf/website#build": {
+      "dependsOn": [
+        "build:demos",
+        "^build"
+      ],
+      "outputs": [
+        ".next/**",
+        "!.next/cache/**"
+      ]
     },
     "check-types": {
-      "dependsOn": ["^check-types"]
+      "dependsOn": [
+        "^check-types"
+      ]
     },
     "typecheck": {},
     "test": {},

@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useState, type ReactNode } from 'react';
+import { useSectionSpy, type TocItem } from '@embedpdf/docs-kit';
+import type { ReactNode } from 'react';
 
 import { Feedback } from './feedback';
-import { Toc, type TocItem } from './toc';
+import { Toc } from './toc';
 
 export function DocsPage({
   children,
@@ -14,46 +15,23 @@ export function DocsPage({
   toc?: TocItem[];
   revision: string;
 }) {
-  const [activeId, setActiveId] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!toc || toc.length === 0) return;
-    const ids = toc.map((item) => item.id);
-
-    function spy() {
-      const top = window.scrollY + 140;
-      let current: string | null = ids[0] ?? null;
-      for (const id of ids) {
-        const element = document.getElementById(id);
-        if (element && element.offsetTop <= top) current = id;
-      }
-      setActiveId(current);
-    }
-
-    spy();
-    window.addEventListener('scroll', spy, { passive: true });
-    window.addEventListener('resize', spy);
-    return () => {
-      window.removeEventListener('scroll', spy);
-      window.removeEventListener('resize', spy);
-    };
-  }, [toc]);
-
-  const hasToc = Boolean(toc?.length);
+  // The kit hook also derives items from rendered headings when the MDX toc
+  // is empty (component-emitted sections), so activeId works everywhere.
+  const { items, activeId } = useSectionSpy(toc);
+  const hasToc = items.length > 0;
 
   return (
     <div className="flex gap-[clamp(28px,4vw,60px)]">
       <article className="prose-embedpdf min-w-0 flex-1 pb-20 pt-9">
         {children}
         <Feedback
-          site="embedpdf"
           sectionId={activeId}
           revision={revision}
           variant="full"
           className={hasToc ? 'xl:hidden' : ''}
         />
       </article>
-      <Toc toc={toc} activeId={activeId} revision={revision} />
+      <Toc toc={items} activeId={activeId} revision={revision} />
     </div>
   );
 }

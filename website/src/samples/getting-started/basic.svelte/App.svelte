@@ -1,30 +1,28 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import type { LocalEngine } from '@embedpdf/engine';
+  import { localEngine } from '@embedpdf/engine';
+  import type { DocumentHandle, OpenInput } from '@embedpdf/engine';
   import PdfPage from './PdfPage.svelte';
 
   // The Svelte adapter is in progress — this drives the framework-free engine
   // directly: App owns the engine and the document, PdfPage renders one page.
-  type PdfDocument = Awaited<ReturnType<LocalEngine['open']>>;
+  let doc = $state<DocumentHandle>();
 
-  let doc = $state<PdfDocument>();
-  let status = $state('Booting engine…');
+  // The engine is created synchronously and costs nothing until first use —
+  // only opening a document does real work.
+  const engine = localEngine();
 
   onMount(async () => {
-    // `localEngine()` IS the engine — no worker wiring needed; PDFium boots in
-    // a worker on first use. The Svelte adapter will own this for you.
-    const { localEngine } = await import('@embedpdf/engine');
-    const engine = localEngine();
-
-    status = 'Opening document…';
-    const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-    const bytes = new Uint8Array(await response.arrayBuffer());
-    doc = await engine.open({ kind: 'bytes', id: 'ebook', bytes });
+    // The local engine opens bytes — fetch the sample and hand them over.
+    const ebook: OpenInput = await fetch('https://snippet.embedpdf.com/ebook.pdf')
+      .then((response) => response.arrayBuffer())
+      .then((buffer) => ({ kind: 'bytes', id: 'ebook', bytes: new Uint8Array(buffer) }));
+    doc = await engine.open(ebook);
   });
 </script>
 
 {#if doc}
   <PdfPage {doc} pageNumber={1} />
 {:else}
-  <p>{status}</p>
+  <p>Opening document…</p>
 {/if}

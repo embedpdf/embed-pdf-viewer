@@ -1,10 +1,22 @@
 @import 'tailwindcss';
 @config '../../tailwind.config.ts';
+/* Kit hook baselines (dk-dark-scroll et al) — see docs/kit/styles.css. */
+@import '@embedpdf/docs-kit/styles.css';
 
 html {
   @apply text-base antialiased;
   -webkit-tap-highlight-color: transparent;
   scroll-behavior: smooth;
+}
+
+/* ---- @embedpdf/docs-kit token contract (docs/kit/src/tokens.ts) ----
+   EmbedPDF brand values, mapped from the ep-* palette in tailwind.config. */
+:root {
+  --dk-accent: #0876fd;
+  --dk-heading: #07204c;
+  --dk-muted: #5a6b92;
+  --dk-border: #e6eaf2;
+  --dk-accent-surface: #ecf2fe;
 }
 
 ::selection {

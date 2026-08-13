@@ -1,3 +1,4 @@
+// Generated from docs/content — edit there, then `pnpm docs:sync`.
 export default {
   'engine-and-handles': 'Engine & handles',
   'pages-and-rendering': 'Pages & rendering',
@@ -5,7 +6,6 @@ export default {
   annotations: 'Annotations',
   'annotation-types': 'Annotation types',
   forms: 'Forms',
-  'custom-fonts': 'Custom fonts',
   metadata: 'Metadata',
   'security-and-access': 'Security & access',
   'async-and-errors': 'Async & errors',

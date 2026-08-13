@@ -26,7 +26,11 @@ import {
   type DocsIntegration,
   type HeadlessIntegration,
 } from '@/lib/docs-integrations';
-import { DOCS_ENGINE_FOUNDATION, DOCS_OVERVIEW_PATHS } from '@/lib/docs-overview';
+import {
+  DOCS_ENGINE_FOUNDATION,
+  DOCS_OVERVIEW_INTRO,
+  DOCS_OVERVIEW_PATHS,
+} from '@/lib/docs-overview';
 
 const HEADLESS_INTEGRATION_ICONS: Record<HeadlessIntegration, ReactNode> = {
   react: <ReactIcon size={18} />,
@@ -262,8 +266,7 @@ export function DocsOverview() {
           Build PDF experiences <span className="ep-grad">your way.</span>
         </h1>
         <p className="text-ep-body mx-auto mt-5 max-w-[620px] font-sans text-[18px] leading-[1.65]">
-          Start with a complete viewer, compose your own interface, or work directly with the engine
-          underneath.
+          {DOCS_OVERVIEW_INTRO}
         </p>
       </header>
 

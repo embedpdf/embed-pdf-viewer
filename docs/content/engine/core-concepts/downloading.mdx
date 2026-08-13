@@ -1,0 +1,80 @@
+---
+title: Downloading
+description: Fetch the full PDF bytes of an open document, with incremental or full-rewrite save modes.
+---
+
+import { Callout } from '@/components/docs/callout';
+
+# Downloading
+
+`doc.download()` returns the complete PDF as bytes — including any annotation or
+metadata edits that have landed on the document.
+
+```ts
+download(opts?: { mode?: PdfSaveMode }): AbortablePromise<Uint8Array>;
+```
+
+## Downloading bytes
+
+```ts
+const bytes = await doc.download();
+
+// Browser: trigger a save dialog
+const blob = new Blob([bytes], { type: 'application/pdf' });
+const url = URL.createObjectURL(blob);
+const a = document.createElement('a');
+a.href = url;
+a.download = 'document.pdf';
+a.click();
+URL.revokeObjectURL(url);
+```
+
+```ts
+// Node: write to disk
+import { writeFile } from 'node:fs/promises';
+await writeFile('document.pdf', await doc.download());
+```
+
+## Save modes
+
+`mode` controls how the PDF is serialized:
+
+| Mode | Behavior |
+| --- | --- |
+| `'incremental'` (default) | Appends changes as an incremental update, preserving the original bytes and the document's revision history. Faster; smaller diffs. |
+| `'rewrite'` | Rewrites the whole file from scratch. Produces a clean, compact PDF without the incremental-update trail. |
+
+```ts
+const compact = await doc.download({ mode: 'rewrite' });
+```
+
+<Callout type="info">
+  <code>'incremental'</code> is the default because it's cheaper and keeps the
+  original file intact. Reach for <code>'rewrite'</code> when you want the
+  smallest possible output or a file without prior revisions.
+</Callout>
+
+## Cancellation and errors
+
+Like every engine call, `download()` is an `AbortablePromise` and rejects with a
+typed `EngineError`:
+
+```ts
+const pending = doc.download({ mode: 'rewrite' });
+// pending.abort() to cancel
+
+try {
+  const bytes = await pending;
+} catch (err) {
+  if (EngineError.is(err, EngineErrorCode.Forbidden)) {
+    // caller's scope doesn't permit download
+  }
+}
+```
+
+<Callout type="warn">
+  Downloading the original bytes is gated by the caller's scope on the cloud. If
+  the token doesn't grant it, <code>download()</code> rejects with
+  <code>Forbidden</code> — check <code>doc.security.effectiveScope</code> before
+  showing a download button.
+</Callout>

@@ -3,13 +3,7 @@ import path from 'node:path';
 
 import { visit } from 'unist-util-visit';
 
-interface FileInfo {
-  filename: string;
-  code: string;
-  language: string;
-  fullPath: string;
-  githubUrl?: string;
-}
+import { collectSampleFiles, readDocsCodeFile, type DocsCodeFile } from './docs-samples';
 
 interface RemarkCodeExampleOptions {
   /**
@@ -20,57 +14,67 @@ interface RemarkCodeExampleOptions {
   githubBaseUrl?: string;
 }
 
-const languageMap: Record<string, string> = {
-  ts: 'typescript',
-  tsx: 'tsx',
-  js: 'javascript',
-  jsx: 'jsx',
-  vue: 'vue',
-  svelte: 'svelte',
-  css: 'css',
-  html: 'html',
-  json: 'json',
-  md: 'markdown',
-  mdx: 'mdx',
-};
-
-function readCodeFile(codePath: string, githubBaseUrl?: string): FileInfo | null {
-  const absolutePath = path.resolve(process.cwd(), 'src', codePath);
-
-  try {
-    const code = fs.readFileSync(absolutePath, 'utf-8');
-    const ext = path.extname(codePath).slice(1);
-    const filename = path.basename(codePath);
-
-    const repoRelativePath = path.relative(process.cwd(), absolutePath);
-    const normalizedPath = repoRelativePath.split(path.sep).join('/');
-
-    return {
-      filename,
-      code,
-      language: languageMap[ext] || ext,
-      fullPath: codePath,
-      githubUrl: githubBaseUrl ? `${githubBaseUrl}${normalizedPath}` : undefined,
-    };
-  } catch {
-    console.warn(`[remark-code-example] Could not read file: ${absolutePath}`);
-    return null;
-  }
-}
-
 /**
  * Remark plugin that processes <CodeExample> components, reading the referenced
- * source files from disk so they can be highlighted and displayed.
+ * source files from disk so they can be highlighted and displayed — and the
+ * shared-corpus `<Example name="topic/base">`, resolving EVERY framework's
+ * files so the client picks by pathname (the fan-out routes).
  *
  * Usage:
+ *   <Example name="stage/basic" />
  *   <CodeExample codePath="content/docs/.../example.tsx"><Demo /></CodeExample>
  *   <CodeExample codePaths={["a.tsx", "b.css"]}><Demo /></CodeExample>
  */
+let demoManifestCache: Record<string, Record<string, string>> | null = null;
+function readDemoManifest(): Record<string, Record<string, string>> {
+  if (demoManifestCache) return demoManifestCache;
+  try {
+    demoManifestCache = JSON.parse(
+      fs.readFileSync(
+        path.resolve(process.cwd(), 'public', 'demos', 'demos-manifest.json'),
+        'utf-8',
+      ),
+    );
+  } catch {
+    demoManifestCache = {};
+  }
+  return demoManifestCache!;
+}
+
 export const remarkCodeExample = (options: RemarkCodeExampleOptions = {}) => {
   const { githubBaseUrl } = options;
 
   return (tree: any) => {
     visit(tree, 'mdxJsxFlowElement', (node: any) => {
+      if (node.name === 'Example') {
+        const nameAttr = node.attributes?.find(
+          (attr: any) => attr.type === 'mdxJsxAttribute' && attr.name === 'name',
+        );
+        if (typeof nameAttr?.value !== 'string') return;
+        const byFramework = collectSampleFiles(nameAttr.value, githubBaseUrl);
+        node.attributes.push({
+          type: 'mdxJsxAttribute',
+          name: '__fwFiles',
+          value: JSON.stringify(byFramework),
+        });
+        // Live demos: built by the demo Vite pass before the docs build;
+        // presence in the manifest = a mounted preview exists.
+        const demos = readDemoManifest()[nameAttr.value];
+        if (demos) {
+          node.attributes.push({
+            type: 'mdxJsxAttribute',
+            name: 'demosByFramework',
+            value: JSON.stringify(demos),
+          });
+        }
+        node.attributes.push({
+          type: 'mdxJsxAttribute',
+          name: '__needsHighlighting',
+          value: 'true',
+        });
+        return;
+      }
+
       if (node.name !== 'CodeExample') return;
 
       const codePathAttr = node.attributes?.find(
@@ -105,9 +109,9 @@ export const remarkCodeExample = (options: RemarkCodeExampleOptions = {}) => {
 
       if (paths.length === 0) return;
 
-      const files: FileInfo[] = paths
-        .map((p) => readCodeFile(p, githubBaseUrl))
-        .filter((f): f is FileInfo => f !== null);
+      const files: DocsCodeFile[] = paths
+        .map((p) => readDocsCodeFile(p, githubBaseUrl))
+        .filter((f): f is DocsCodeFile => f !== null);
 
       if (files.length === 0) return;
 

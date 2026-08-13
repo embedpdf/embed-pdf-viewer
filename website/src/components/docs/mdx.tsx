@@ -1,10 +1,12 @@
 import type { MDXComponents } from 'mdx/types';
 import Link from 'next/link';
-import type { AnchorHTMLAttributes, HTMLAttributes, ReactNode } from 'react';
+import type { AnchorHTMLAttributes, ReactNode } from 'react';
 
+import { DocsOverview } from './docs-overview';
 import { DocsPage } from './docs-page';
 import { Example } from './example';
 import { Fw } from './framework';
+import { createHeading } from './heading';
 import { Pre } from './pre';
 import type { TocItem } from './toc';
 
@@ -25,25 +27,6 @@ function Wrapper({ children, toc }: WrapperProps) {
   );
 }
 
-function createHeading(Tag: 'h2' | 'h3' | 'h4', className: string) {
-  return function Heading({ id, children, ...props }: HTMLAttributes<HTMLHeadingElement>) {
-    return (
-      <Tag id={id} className={`group scroll-mt-[100px] ${className}`} {...props}>
-        {children}
-        {id ? (
-          <a
-            href={`#${id}`}
-            aria-label="Link to this section"
-            className="hover:text-ep-blue ml-2 select-none text-[#C2CEE6] opacity-0 transition group-hover:opacity-100"
-          >
-            #
-          </a>
-        ) : null}
-      </Tag>
-    );
-  };
-}
-
 export function useMDXComponents(components?: MDXComponents): MDXComponents {
   return {
     wrapper: Wrapper,
@@ -53,15 +36,9 @@ export function useMDXComponents(components?: MDXComponents): MDXComponents {
         {...props}
       />
     ),
-    h2: createHeading(
-      'h2',
-      'mt-[52px] font-display text-[27px] font-extrabold leading-[1.2] tracking-[-0.02em] text-ep-navy',
-    ),
-    h3: createHeading(
-      'h3',
-      'mt-[34px] font-display text-[18px] font-extrabold leading-[1.3] tracking-[-0.01em] text-ep-navy',
-    ),
-    h4: createHeading('h4', 'mt-7 font-display text-base font-extrabold text-ep-navy'),
+    h2: createHeading('h2'),
+    h3: createHeading('h3'),
+    h4: createHeading('h4'),
     p: (props) => (
       <p
         className="text-ep-ink mt-4 max-w-[70ch] font-sans text-[16.5px] leading-[1.7]"
@@ -112,6 +89,7 @@ export function useMDXComponents(components?: MDXComponents): MDXComponents {
     ),
     pre: Pre,
     CodeExample,
+    DocsOverview,
     Example,
     Fw,
     ...components,
