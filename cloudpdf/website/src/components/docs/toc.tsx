@@ -1,6 +1,12 @@
 'use client';
 
-import { Feedback, Toc as KitToc, useSectionSpy, type TocItem } from '@embedpdf/docs-kit';
+import {
+  Feedback,
+  PageMarkdownActions,
+  Toc as KitToc,
+  useSectionSpy,
+  type TocItem,
+} from '@embedpdf/docs-kit';
 
 export type { TocItem };
 
@@ -17,7 +23,12 @@ export function Toc({ toc }: { toc?: TocItem[] }) {
     <KitToc
       items={items}
       activeId={activeId}
-      footer={<Feedback site="cloudpdf" sectionId={activeId} revision={revision} variant="compact" />}
+      footer={
+        <>
+          <PageMarkdownActions />
+          <Feedback site="cloudpdf" sectionId={activeId} revision={revision} variant="compact" />
+        </>
+      }
     />
   );
 }

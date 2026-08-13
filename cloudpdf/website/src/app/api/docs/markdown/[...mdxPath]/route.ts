@@ -1,0 +1,34 @@
+import { generateStaticParamsFor, importPage } from 'nextra/pages';
+
+import { renderDocsMarkdown } from '@/lib/docs-markdown';
+
+export const dynamic = 'force-static';
+export const dynamicParams = false;
+
+export const generateStaticParams = generateStaticParamsFor('mdxPath');
+
+type RouteProps = {
+  params: Promise<{ mdxPath: string[] }>;
+};
+
+export async function GET(_request: Request, props: RouteProps) {
+  const { mdxPath } = await props.params;
+
+  // Projection errors deliberately escape: an unsupported MDX component must
+  // fail the build rather than publish an incomplete Markdown representation.
+  const { sourceCode, metadata } = await importPage(mdxPath);
+  const markdown = renderDocsMarkdown({
+    sourceCode,
+    metadata,
+    canonicalPath: `/${mdxPath.join('/')}`,
+  });
+  const filename = `${mdxPath.at(-1) ?? 'documentation'}.md`;
+
+  return new Response(markdown, {
+    headers: {
+      'Content-Type': 'text/markdown; charset=utf-8',
+      'Content-Disposition': `inline; filename="${filename}"`,
+      'X-Content-Type-Options': 'nosniff',
+    },
+  });
+}

@@ -8,7 +8,7 @@ import { cloudEngine } from '@cloudpdf/engine';
 
 import { Demo, Toolbar, Button, Segmented, Spacer, StageFrame, stageFill } from './_shared/chrome';
 
-const engine = cloudEngine({ baseUrl: 'https://demo.cloudpdf.com' });
+const engine = cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' });
 const plugins = [stagePlugin(), renderPlugin()];
 
 // A "preset" is just an object you keep around and apply with update().
@@ -23,7 +23,7 @@ const PRESENTATION: Partial<StageSettings> = {
   anchorAlign: { x: 'center', y: 'center' },
 };
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_demo_ebook' };
+const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 type Feel = 'reading' | 'presentation';
 

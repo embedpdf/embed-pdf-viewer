@@ -1,0 +1,91 @@
+---
+title: Metadata
+description: Read and update a document's Info-dictionary metadata with a three-state patch.
+---
+
+import { Callout } from '@/components/docs/callout';
+
+# Metadata
+
+`doc.metadata` reads and rewrites the document's Info dictionary — title,
+author, dates, and custom keys.
+
+```ts
+interface MetadataService {
+  read(): AbortablePromise<DocumentMetadata>;
+  update(patch: MetadataPatch): AbortablePromise<MetadataUpdateResult>;
+}
+```
+
+## Reading metadata
+
+```ts
+const meta = await doc.metadata.read();
+
+meta.title;    // string | null
+meta.author;   // string | null
+meta.created;  // ISO 8601 string | null (from /CreationDate)
+meta.modified; // ISO 8601 string | null (from /ModDate)
+meta.trapped;  // 'true' | 'false' | 'unknown'
+meta.custom;   // Record<string, string> of non-standard Info entries
+```
+
+The full shape:
+
+```ts
+interface DocumentMetadata {
+  title: string | null;
+  author: string | null;
+  subject: string | null;
+  keywords: string | null;
+  producer: string | null;
+  creator: string | null;
+  created: string | null;   // ISO 8601
+  modified: string | null;  // ISO 8601
+  trapped: 'true' | 'false' | 'unknown';
+  custom: Record<string, string>;
+}
+```
+
+<Callout type="info">
+  Dates come back as ISO 8601 strings. Parsing them into <code>Date</code>s is
+  the caller's job — the engine doesn't assume a timezone for you.
+</Callout>
+
+## Updating metadata
+
+`update()` takes a **three-state patch**, the same convention used by annotation
+patches:
+
+- `undefined` — leave the field untouched
+- `null` — clear the field
+- a value — set the field
+
+```ts
+const result = await doc.metadata.update({
+  title: 'Q2 Proposal (final)',
+  subject: null,            // clear /Subject
+  created: '2026-01-04T09:00:00Z', // engine formats to PDF date syntax
+  custom: {
+    reviewedBy: 'dana',     // set a custom key
+    draftOwner: null,       // remove a custom key
+  },
+});
+
+console.log(result.metadata.title); // re-read result
+```
+
+Notes:
+
+- `created`/`modified` accept ISO 8601 strings; the engine formats them into PDF
+  date syntax (`D:YYYYMMDD…`) on write.
+- `trapped` has no clear form (it's a tri-valued enum) — omit it to leave it
+  untouched.
+- `custom` is a per-key three-state map. Reserved standard keys are rejected.
+- The result includes the re-read `metadata` plus cloud coherence pins so
+  subsequent reads stay consistent.
+
+<Callout type="warn">
+  Writing metadata is gated by <code>doc.metadata.modify</code> on the cloud.
+  Without it, <code>update()</code> rejects with <code>Forbidden</code>.
+</Callout>

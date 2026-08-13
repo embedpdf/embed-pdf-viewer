@@ -15,10 +15,28 @@ export {
 } from './feedback';
 export { Toc, useSectionSpy, type TocItem } from './toc';
 export { pageSupportsEngine, type DocsEngine, type DocsSiteBinding } from './axis';
-export { EngineCrossLink } from './engine-cross-link';
 export { Heading, createHeading, HEADING_STYLES } from './heading';
 export { MethodBadge, methodStyle } from './method-badge';
 export { Pre } from './pre';
 export { Tabs, useInTabs, TabsContext } from './tabs';
-export { ArrowRight, CheckIcon, CopyIcon } from './icons';
+export {
+  ArrowRight,
+  BoltBadgeIcon,
+  CheckIcon,
+  CopyIcon,
+  EngineIcon,
+  PuzzleBadgeIcon,
+  ServerBadgeIcon,
+} from './icons';
+export { DocsProductSwitcher, type DocsProductItem } from './product-switcher';
 export { DOCS_KIT_TOKENS, type DocsKitToken } from './tokens';
+export {
+  renderDocsMarkdownWith,
+  resolveDocsTreeWith,
+  stringifyDocsTree,
+  type AstNode,
+  type DocsCodeFile,
+  type DocsMarkdownSite,
+  type RenderDocsMarkdownOptions,
+} from './docs-markdown';
+export { PageMarkdownActions } from './page-markdown-actions';

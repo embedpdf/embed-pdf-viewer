@@ -8,11 +8,11 @@ import { cloudEngine } from '@cloudpdf/engine';
 // first use (no worker, no WASM). Safe at module scope, even under SSR. The
 // viewer warms it up on mount, PDFium boots in the background in a worker, and
 // only opening a document awaits it — the UI renders at t≈0.
-const engine = cloudEngine({ baseUrl: 'https://demo.cloudpdf.com' });
+const engine = cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' });
 const plugins = [stagePlugin(), renderPlugin()];
 
 // The local engine opens bytes: fetch lazily, under the loading tab.
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_demo_ebook' };
+const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 export default function App() {
   return (

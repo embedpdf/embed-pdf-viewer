@@ -33,10 +33,17 @@ const ALL_FRAMEWORKS = ['react', 'vue', 'svelte', 'angular'];
 
 /** corpus section → site subpath (relative to the site dir). */
 const MOUNTS = {
-  mdx: [{ from: 'headless', to: 'src/content/docs/headless' }],
+  mdx: [
+    { from: 'headless', to: 'src/content/docs/headless' },
+    // Deliberately the core-concepts SUBTREE: each site owns its own
+    // engine/getting-started (genuinely different onboarding) and _meta.
+    { from: 'engine/core-concepts', to: 'src/content/docs/engine/core-concepts' },
+    { from: 'viewer', to: 'src/content/docs/viewer' },
+  ],
   samples: [
     { from: 'samples/stage', to: 'src/samples/stage' },
     { from: 'samples/getting-started', to: 'src/samples/getting-started' },
+    { from: 'samples/viewer', to: 'src/samples/viewer' },
   ],
 };
 
@@ -90,13 +97,24 @@ function transformSample(source, engine, relative) {
   const flavor = ENGINES[engine];
   let output = source;
 
-  if (engine !== 'local') {
-    if (!source.includes(ENGINES.local.importLine) || !source.includes(ENGINES.local.factoryLine)) {
+  // Samples that provision an engine carry the canonical local lines; the
+  // ready-made viewer samples provision none (the viewer owns its engine)
+  // and pass through untouched. A sample with doc-source markers but no
+  // engine lines is inconsistent — fail loudly.
+  const hasEngineLines =
+    source.includes(ENGINES.local.importLine) && source.includes(ENGINES.local.factoryLine);
+  const hasDocSources = source.includes('[!doc-source');
+  if (!hasEngineLines) {
+    if (hasDocSources) {
       throw new Error(
-        `${relative}: expected the canonical local engine import/factory lines ` +
-          `(see engines.mjs) — mark or update the sample`,
+        `${relative}: has doc-source markers but not the canonical local engine ` +
+          `import/factory lines (see engines.mjs) — mark or update the sample`,
       );
     }
+    return output;
+  }
+
+  if (engine !== 'local') {
     output = output.replace(ENGINES.local.importLine, flavor.importLine);
     output = output.replace(ENGINES.local.factoryLine, flavor.factoryLine);
   }
@@ -121,18 +139,44 @@ function buildExpected(engine, frameworks) {
   for (const mount of MOUNTS.mdx) {
     const root = path.join(contentRoot, mount.from);
     const files = walk(root).map((file) => path.relative(root, file));
+    // Rung-4 pages skipped for this engine, per directory — their keys must
+    // also leave the directory's _meta (Nextra fails on keys with no page).
+    const skippedKeysByDir = new Map();
+    const metas = [];
+
     for (const relative of files) {
       const source = fs.readFileSync(path.join(root, relative), 'utf8');
       if (relative.endsWith('.mdx')) {
         const emitAs = resolveMdxOverride(files, relative, engine);
         if (!emitAs) continue;
+        // Rung 4 is EXISTENCE: a page declaring engines it doesn't support
+        // on this site is not emitted at all — no file, no route, no nav.
+        const engines = source.match(/^engines:\s*\[([^\]]*)\]/m)?.[1];
+        if (engines && !engines.split(/[\s,]+/).includes(engine)) {
+          const directory = path.dirname(relative);
+          const key = path.basename(relative, '.mdx');
+          const skipped = skippedKeysByDir.get(directory) ?? new Set();
+          skipped.add(key);
+          skippedKeysByDir.set(directory, skipped);
+          continue;
+        }
         const marked = source.replace(/^(---\n[\s\S]*?\n---\n)/, `$1\n${MDX_MARKER}\n`);
         expected.set(path.join(mount.to, emitAs), marked);
       } else if (relative.endsWith('_meta.ts')) {
-        expected.set(path.join(mount.to, relative), `${META_MARKER}\n${source}`);
+        metas.push({ relative, source });
       } else {
         expected.set(path.join(mount.to, relative), source);
       }
+    }
+
+    for (const { relative, source } of metas) {
+      const skipped = skippedKeysByDir.get(path.dirname(relative)) ?? new Set();
+      const filtered = [...skipped].reduce(
+        (meta, key) =>
+          meta.replace(new RegExp(`^\\s*(?:'${key}'|"${key}"|${key}):.*\\n`, 'm'), ''),
+        source,
+      );
+      expected.set(path.join(mount.to, relative), `${META_MARKER}\n${filtered}`);
     }
   }
 

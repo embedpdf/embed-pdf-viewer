@@ -13,7 +13,7 @@ export const ENGINES = {
   cloud: {
     package: '@cloudpdf/engine',
     importLine: "import { cloudEngine } from '@cloudpdf/engine';",
-    // The docs demo deployment; previews/staging can override at seed time.
-    factoryLine: "const engine = cloudEngine({ baseUrl: 'https://demo.cloudpdf.com' });",
+    // The docs demo deployment (live; share grants managed in the dashboard).
+    factoryLine: "const engine = cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' });",
   },
 };

@@ -6,15 +6,18 @@ import { visit, SKIP } from 'unist-util-visit';
  * Shared MDX marks engine-specific content with `<Engine>` blocks:
  *
  *   <Engine local>…</Engine>
- *   <Engine cloud href="https://www.cloudpdf.com/docs/…">…</Engine>
  *   <Engine only="cloud">…</Engine>              (equivalent spelling)
  *
- * Each site compiles with its own binding. A matching block unwraps in
- * place; a non-matching block is REMOVED — or, when it carries `href`,
- * degrades to a one-line `<EngineCrossLink>` pointing at the sibling site
- * (the upsell surface). Because this happens at compile time, rendered
- * HTML, OG text, markdown export, and the search corpus only ever contain
- * the site's own flavour.
+ * Each site compiles with its own binding. The rule is deliberately blunt:
+ * a matching block unwraps in place; a non-matching block is REMOVED.
+ * Because this happens at compile time, rendered HTML, OG text, markdown
+ * export, and the search corpus only ever contain the site's own flavour.
+ *
+ * A branch hides; a pointer speaks. `<Engine>` exists only for content the
+ * OTHER site's render of the same page makes visible. A cross-site call to
+ * action is ordinary authored content — write the words and the link
+ * yourself (wrapped in the flavor whose readers should see them); this
+ * plugin never manufactures prose.
  *
  * Ships as plain ESM (not TypeScript) so `next.config.ts` can load it from
  * node_modules without a transpile step.
@@ -46,20 +49,6 @@ export function remarkEngineAxis(options) {
         return [SKIP, index];
       }
 
-      const href = readAttribute(node, 'href');
-      if (href) {
-        parent.children.splice(index, 1, {
-          type: node.type,
-          name: 'EngineCrossLink',
-          attributes: [
-            { type: 'mdxJsxAttribute', name: 'engine', value: flavors[0] },
-            { type: 'mdxJsxAttribute', name: 'href', value: href },
-          ],
-          children: [],
-        });
-        return [SKIP, index + 1];
-      }
-
       parent.children.splice(index, 1);
       return [SKIP, index];
     });
@@ -82,9 +71,3 @@ function readFlavors(node) {
   return flavors;
 }
 
-function readAttribute(node, name) {
-  const attribute = (node.attributes ?? []).find(
-    (candidate) => candidate.type === 'mdxJsxAttribute' && candidate.name === name,
-  );
-  return typeof attribute?.value === 'string' ? attribute.value : null;
-}

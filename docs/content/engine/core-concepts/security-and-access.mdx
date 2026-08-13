@@ -1,0 +1,105 @@
+---
+title: Security & access
+description: Inspect encryption and permission state, unlock protected documents, and read the caller's effective scope.
+---
+
+import { Callout } from '@/components/docs/callout';
+
+# Security & access
+
+`doc.security` is your window into a document's protection state and the
+caller's authorization. Use it to gate UI, prompt for passwords, and unlock
+encrypted documents.
+
+```ts
+interface DocumentSecurityService {
+  readonly current: DocumentSecurityState;
+  readonly effectiveScope: ReadonlyArray<string>;
+  readonly identity: IdentityClaims | null;
+  readonly passwordPrompt: PasswordPrompt;
+  unlock(input: { password: string; mode?: 'any' | 'owner' }): AbortablePromise<DocumentUnlockResult>;
+}
+```
+
+## Effective scope drives your UI
+
+`effectiveScope` is the caller's **expanded** capability set — raw JWT scope plus
+PDF permission bits, run through the resolver's implication rules. Gate feature
+visibility off this, not off raw token claims.
+
+```ts
+const canCopy = doc.security.effectiveScope.includes('doc.text.copy');
+const canAnnotate = doc.security.effectiveScope.includes('doc.annotate.write');
+
+if (!canCopy) hideCopyButton();
+```
+
+`identity` is the resolved caller identity (or `null` when anonymous): `user_id`,
+`group_id`, `groups`, `display_name`.
+
+## Inspecting protection state
+
+`current` is the structured security probe:
+
+```ts
+const { encryption, permissions, access } = doc.security.current;
+
+encryption.state;            // 'unknown' | 'none' | 'encrypted' | 'unsupported'
+encryption.requiresPassword; // boolean | null
+permissions.openedAs;        // 'none' | 'user' | 'owner' | null
+permissions.canUpgradeToOwner;
+access.required;             // does the caller need to call /access first?
+access.reasons;              // ('password' | 'cdn' | 'permissions-unknown')[]
+```
+
+## Prompting for a password
+
+Rather than branching on raw flags, read `passwordPrompt` — the single source of
+truth for "should I ask the user for a password?":
+
+- `none` — do nothing.
+- `required` — hard block; show a modal. `hint` labels the prompt.
+- `optional` — soft offer; show a banner (only ever to unlock owner rights).
+
+```ts
+const prompt = doc.security.passwordPrompt;
+
+if (prompt.state === 'required') {
+  const password = await askUser(prompt.hint); // hint: 'user' | 'owner' | null
+  await doc.security.unlock({ password });
+}
+```
+
+## Unlocking
+
+`unlock()` submits a password and, on success, refreshes the security state and
+returns the updated access info.
+
+```ts
+const result = await doc.security.unlock({
+  password: userInput,
+  mode: 'owner', // optional: 'any' (default) or 'owner' to claim owner rights
+});
+
+result.security; // refreshed DocumentSecurityState
+result.access;   // DocumentAccessInfo (scope, identity, CDN, pdf permissions)
+```
+
+<Callout type="info">
+  When a document needs CDN access but no password (an <code>access.reasons</code>
+  of just <code>'cdn'</code>), the engine establishes it transparently during
+  <code>open()</code>, so CDN-signed URLs are ready before your first render. A
+  password requirement is the case you handle explicitly with
+  <code>unlock()</code>.
+</Callout>
+
+## Access vs. scope, briefly
+
+- **Encryption/permissions** describe what the *PDF* allows (its security
+  handler and permission bits).
+- **Scope/identity** describe what the *caller* is authorized to do, carried in
+  the JWT and enforced by the server.
+
+A request can be denied by either layer; both surface as typed `EngineError`s
+(`Forbidden`, `DocPasswordRequired`, `DocPasswordIncorrect`) — see
+[Async & errors](/docs/engine/core-concepts/async-and-errors).

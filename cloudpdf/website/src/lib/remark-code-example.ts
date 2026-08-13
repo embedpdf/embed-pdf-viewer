@@ -34,7 +34,7 @@ const languageMap: Record<string, string> = {
   mdx: 'mdx',
 };
 
-function readCodeFile(codePath: string, githubBaseUrl?: string): FileInfo | null {
+export function readCodeFile(codePath: string, githubBaseUrl?: string): FileInfo | null {
   const absolutePath = path.resolve(process.cwd(), 'src', codePath);
 
   try {
@@ -68,7 +68,7 @@ function readCodeFile(codePath: string, githubBaseUrl?: string): FileInfo | null
  * Display names hide the variant infix (basic.react.tsx → basic.tsx), same
  * as the EmbedPDF site, so readers see the file tree they would write.
  */
-function collectReactSampleFiles(name: string, githubBaseUrl?: string): FileInfo[] {
+export function collectReactSampleFiles(name: string, githubBaseUrl?: string): FileInfo[] {
   const sampleDirectory = path.resolve(process.cwd(), 'src', 'samples', path.dirname(name));
   const base = path.basename(name);
   let entries: string[] = [];
@@ -121,7 +121,12 @@ export const remarkCodeExample = (options: RemarkCodeExampleOptions = {}) => {
         if (typeof nameAttr?.value !== 'string') return;
         const files = collectReactSampleFiles(nameAttr.value, githubBaseUrl);
         if (files.length === 0) {
-          console.warn(`[remark-code-example] No react sample for <Example name="${nameAttr.value}">`);
+          // No react variant synced for this site: drop the node — an
+          // undefined component at runtime would 500 the whole page.
+          console.warn(`[remark-code-example] No react sample for <Example name="${nameAttr.value}"> — omitted`);
+          node.name = 'Fragment';
+          node.children = [];
+          node.attributes = [];
           return;
         }
         node.name = 'CodeExample';

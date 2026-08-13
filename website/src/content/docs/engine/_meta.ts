@@ -7,4 +7,8 @@ export default {
     title: 'Getting Started',
     type: 'doc',
   },
+  'core-concepts': {
+    title: 'Core concepts',
+    type: 'doc',
+  },
 };

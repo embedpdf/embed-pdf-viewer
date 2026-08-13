@@ -9,6 +9,7 @@ import { pageSupportsEngine } from '@embedpdf/docs-kit';
 import { DOCS_SITE } from '@/docs-site';
 
 import { useConfig } from './config-provider';
+import { DocsProductSwitcher } from './docs-product-switcher';
 import { MethodBadge } from './method-badge';
 
 type TreeItem = {
@@ -98,6 +99,7 @@ export function Sidebar() {
 
   return (
     <aside className="sticky top-[84px] hidden h-[calc(100vh-84px)] w-[268px] shrink-0 overflow-y-auto pb-16 pr-3.5 pt-[52px] [scrollbar-color:#D5DEEF_transparent] [scrollbar-width:thin] md:block">
+      <DocsProductSwitcher />
       <nav className="flex flex-col">
         <SidebarTree items={docsDirectories as TreeItem[]} pathname={pathname} />
       </nav>

@@ -7,10 +7,10 @@ import { cloudEngine } from '@cloudpdf/engine';
 
 import { Demo, Toolbar, Button, Select, Spacer, StageFrame, stageFill } from './_shared/chrome';
 
-const engine = cloudEngine({ baseUrl: 'https://demo.cloudpdf.com' });
+const engine = cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' });
 const plugins = [stagePlugin(), renderPlugin()];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_demo_ebook' };
+const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 function LayoutControls() {
   const { flow, layout, spread, setFlow, setLayout, setSpread } = useLayout();

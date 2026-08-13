@@ -15,5 +15,6 @@
     "src/samples/**/*.react.tsx",
     "src/samples/**/*.react/**/*",
     "src/samples/samples-env.d.ts"
-  ]
+  ],
+  "exclude": ["src/samples/viewer/**/*"]
 }

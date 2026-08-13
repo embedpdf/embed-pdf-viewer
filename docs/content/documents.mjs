@@ -4,14 +4,14 @@
  * `// [!doc-source <key>]` markers; the sync generator swaps the whole block
  * for the flavor's form when emitting a cloud site's copy.
  *
- * Cloud share tokens reference grants on the docs demo tenant. Until the
- * seeding step provisions that tenant (phase 3 follow-up), the tokens are
- * placeholders — typechecked as ordinary strings, resolved at seed time.
+ * Cloud share tokens reference live grants on engine.cloudpdf.com, managed
+ * in the dashboard — revoking or editing a grant retargets every docs code
+ * panel (and, later, live demo) at the next renewal.
  */
 export const DEMO_DOCUMENTS = {
   ebook: {
     /** `const <name> = …` emitted for the cloud flavor. */
     cloudSource: (name) =>
-      `const ${name}: OpenInput = { kind: 'share', shareToken: 'shr_demo_ebook' };`,
+      `const ${name}: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };`,
   },
 };

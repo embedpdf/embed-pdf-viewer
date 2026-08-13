@@ -23,7 +23,7 @@ Shared intro prose.
 Install the wasm engine.
 </Engine>
 
-<Engine cloud href="https://www.cloudpdf.com/docs/engine">
+<Engine cloud>
 Point the engine at your deployment.
 </Engine>
 
@@ -38,25 +38,22 @@ describe('remarkEngineAxis', () => {
     expect(local).not.toContain('Point the engine at your deployment.');
   });
 
-  it('degrades an unmatched block with href to a cross-link', () => {
+  it('removes an unmatched block without a trace — pointers are authored, never generated', () => {
     const local = compile(PAGE, 'local');
-    expect(local).toContain('<EngineCrossLink');
-    expect(local).toContain('engine="cloud"');
-    expect(local).toContain('href="https://www.cloudpdf.com/docs/engine"');
+    expect(local).not.toContain('Point the engine at your deployment.');
+    expect(local).not.toMatch(/<Engine[\s>]/);
   });
 
   it('renders the other flavor inline on its own site', () => {
     const cloud = compile(PAGE, 'cloud');
     expect(cloud).toContain('Point the engine at your deployment.');
-    expect(cloud).not.toContain('EngineCrossLink');
     expect(cloud).not.toContain('Install the wasm engine.');
   });
 
-  it('drops an unmatched block without href entirely', () => {
+  it('drops an unmatched block entirely', () => {
     const source = `<Engine cloud>\nCloud-only aside.\n</Engine>\n\nKept.\n`;
     const local = compile(source, 'local');
     expect(local).not.toContain('Cloud-only aside.');
-    expect(local).not.toContain('EngineCrossLink');
     expect(local).toContain('Kept.');
   });
 

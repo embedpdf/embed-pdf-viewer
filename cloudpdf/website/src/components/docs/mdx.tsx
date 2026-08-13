@@ -2,8 +2,6 @@ import type { MDXComponents } from 'mdx/types';
 import Link from 'next/link';
 import type { AnchorHTMLAttributes, ReactNode } from 'react';
 
-import { EngineCrossLink } from '@embedpdf/docs-kit';
-
 import { CodeExample } from '@/components/site/code-example';
 
 import {
@@ -97,7 +95,6 @@ export function useMDXComponents(components?: MDXComponents): MDXComponents {
     ),
     pre: Pre,
     ApiOperation,
-    EngineCrossLink,
     Fw,
     ApiSnippet,
     ApiClientSetup,

@@ -6,7 +6,7 @@ import { cloudEngine } from '@cloudpdf/engine';
 
 import { Demo, StageFrame, stageFill } from './_shared/chrome';
 
-const engine = cloudEngine({ baseUrl: 'https://demo.cloudpdf.com' });
+const engine = cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' });
 
 // Reserve a 26px band below every page — the label lives there, so it never
 // overlaps the page and never scales away when you zoom.
@@ -15,7 +15,7 @@ const plugins = [
   renderPlugin(),
 ];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_demo_ebook' };
+const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 export default function App() {
   return (
