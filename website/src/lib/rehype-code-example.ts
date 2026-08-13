@@ -1,3 +1,8 @@
+import {
+  createFilesAttribute,
+  getDocsHighlighter,
+  highlightCodeFile,
+} from '@embedpdf/docs-kit/mdx/highlight';
 import { visit } from 'unist-util-visit';
 
 interface FileInfo {
@@ -9,100 +14,15 @@ interface FileInfo {
   highlightedCode?: string;
 }
 
-const CODE_THEME = 'material-theme-palenight';
-
-let highlighterPromise: Promise<any> | null = null;
-
-async function getHighlighter() {
-  if (!highlighterPromise) {
-    highlighterPromise = (async () => {
-      const { createHighlighter, bundledLanguages } = await import('shiki');
-      return createHighlighter({
-        themes: [CODE_THEME],
-        langs: Object.keys(bundledLanguages).filter((l) => l !== 'mermaid'),
-      });
-    })();
-  }
-  return highlighterPromise;
-}
-
 /**
- * Build an MDX JSX `files` attribute carrying the highlighted file data so the
- * client <CodeExample> component can render it.
+ * Rehype pass over the code collected by `remarkCodeExample`. This file only
+ * finds nodes and attaches props — the highlighter, theme, and whitespace
+ * rules are the kit's (`@embedpdf/docs-kit/mdx/highlight`), shared with
+ * cloudpdf.com so a rendering fix lands exactly once.
  */
-function createFilesAttribute(files: FileInfo[]) {
-  const prop = (name: string, value: string) => ({
-    type: 'Property',
-    method: false,
-    shorthand: false,
-    computed: false,
-    key: { type: 'Identifier', name },
-    value: { type: 'Literal', value, raw: JSON.stringify(value) },
-    kind: 'init',
-  });
-
-  const elements = files.map((file) => ({
-    type: 'ObjectExpression',
-    properties: [
-      prop('filename', file.filename),
-      prop('code', file.code),
-      prop('language', file.language),
-      prop('githubUrl', file.githubUrl || ''),
-      prop('highlightedCode', file.highlightedCode || ''),
-    ],
-  }));
-
-  return {
-    type: 'mdxJsxAttribute',
-    name: 'files',
-    value: {
-      type: 'mdxJsxAttributeValueExpression',
-      value: JSON.stringify(files),
-      data: {
-        estree: {
-          type: 'Program',
-          body: [
-            {
-              type: 'ExpressionStatement',
-              expression: { type: 'ArrayExpression', elements },
-            },
-          ],
-          sourceType: 'module',
-          comments: [],
-        },
-      },
-    },
-  };
-}
-
-/**
- * Rehype plugin that highlights the code collected by `remarkCodeExample` using
- * shiki with a single dark theme (so tokens get direct inline colors).
- */
-function highlightFile(highlighter: any, file: FileInfo): FileInfo {
-  try {
-    const highlighted = highlighter.codeToHtml(file.code.trim(), {
-      lang: file.language,
-      theme: CODE_THEME,
-    });
-    // Keep shiki's markup verbatim. Its lines are inline `<span class="line">`
-    // joined by real newlines, which the `<pre>` renderer turns into line
-    // breaks directly — so an empty line is one `\n` and needs no help. (Do
-    // NOT inject a `\n` into empty line spans: that only made sense for v2's
-    // `display:grid` code where inter-line whitespace is dropped; under a
-    // plain `<pre>` it double-spaces every blank line.)
-    const innerMatch = highlighted.match(/<code[^>]*>([\s\S]*)<\/code>/);
-    const innerHtml = innerMatch ? innerMatch[1] : highlighted;
-    return { ...file, highlightedCode: innerHtml };
-  } catch (err) {
-    console.warn(`[rehype-code-example] Failed to highlight ${file.filename}:`, err);
-    return file;
-  }
-}
-
 export const rehypeCodeExample = () => {
   return async (tree: any) => {
-    const highlighter = await getHighlighter();
+    const highlighter = await getDocsHighlighter();
     const nodesToProcess: Array<{ node: any; files: FileInfo[] }> = [];
     const exampleNodes: Array<{ node: any; byFramework: Record<string, FileInfo[]> }> = [];
 
@@ -141,7 +61,9 @@ export const rehypeCodeExample = () => {
     });
 
     for (const { node, files } of nodesToProcess) {
-      const highlightedFiles: FileInfo[] = files.map((file) => highlightFile(highlighter, file));
+      const highlightedFiles: FileInfo[] = files.map((file) =>
+        highlightCodeFile(highlighter, file),
+      );
 
       node.attributes = node.attributes.filter(
         (attr: any) => attr.name !== '__needsHighlighting' && attr.name !== '__codeFiles',
@@ -153,7 +75,7 @@ export const rehypeCodeExample = () => {
     for (const { node, byFramework } of exampleNodes) {
       const highlighted: Record<string, FileInfo[]> = {};
       for (const [fw, files] of Object.entries(byFramework)) {
-        highlighted[fw] = files.map((file) => highlightFile(highlighter, file));
+        highlighted[fw] = files.map((file) => highlightCodeFile(highlighter, file));
       }
       node.attributes = node.attributes.filter(
         (attr: any) => attr.name !== '__needsHighlighting' && attr.name !== '__fwFiles',

@@ -16,8 +16,10 @@
  * }
  * ```
  *
- * Optional hook: `.dk-dark-scroll` on dark code panes — a site may style it
- * (thin dark scrollbars) or leave it unstyled for the platform default.
+ * Hook classes such as `.dk-dark-scroll` (dark code panes' scrollbars) get
+ * their baseline from the kit's own stylesheet — import it once per site:
+ * `@import '@embedpdf/docs-kit/styles.css';` — and override after the
+ * import if a brand ever needs to.
  *
  * Adding a variable to this contract is an API change: document it here and
  * set a value in BOTH sites' globals in the same commit.

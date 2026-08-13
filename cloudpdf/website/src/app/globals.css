@@ -1,5 +1,7 @@
 @import 'tailwindcss';
 @config '../../tailwind.config.ts';
+/* Kit hook baselines (dk-dark-scroll et al) — see docs/kit/styles.css. */
+@import '@embedpdf/docs-kit/styles.css';
 
 html {
   @apply text-base antialiased;

@@ -6,7 +6,9 @@
   "description": "Shared docs machinery for embedpdf.com and cloudpdf.com \u2014 components behind the --dk-* token contract. See DOCS-PLATFORM-ARCHITECTURE.md.",
   "exports": {
     ".": "./src/index.ts",
-    "./mdx": "./mdx/remark-engine-axis.mjs"
+    "./mdx": "./mdx/remark-engine-axis.mjs",
+    "./styles.css": "./styles.css",
+    "./mdx/highlight": "./mdx/highlight-code.mjs"
   },
   "peerDependencies": {
     "next": ">=15",
@@ -26,6 +28,7 @@
     "remark-mdx": "^3.1.1",
     "remark-parse": "^11.0.0",
     "remark-stringify": "^11.0.0",
+    "shiki": "3.14.0",
     "unified": "^11.0.5",
     "unist-util-visit": "^5.0.0"
   },
