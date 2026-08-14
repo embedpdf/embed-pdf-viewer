@@ -115,6 +115,7 @@ export function runPageGeometryOrientationConformance(
         if (expectation.kind === 'upright') {
           for (const run of snapshot.runs) {
             expect(isRotatedGeometryRun(run)).toBe(false);
+            if (isRotatedGeometryRun(run)) continue;
             for (const glyph of run.glyphs) {
               expect('looseQuad' in glyph).toBe(false);
               if (glyph.flags & FLAG_EMPTY) {
@@ -129,6 +130,7 @@ export function runPageGeometryOrientationConformance(
         if (expectation.kind === 'empty-only') {
           for (const run of snapshot.runs) {
             expect(isRotatedGeometryRun(run)).toBe(false);
+            if (isRotatedGeometryRun(run)) continue;
             for (const glyph of run.glyphs) {
               expect(glyph.flags & FLAG_EMPTY).toBe(FLAG_EMPTY);
               expect(glyph.looseBox).toEqual({ left: 0, bottom: 0, right: 0, top: 0 });

@@ -30,7 +30,9 @@ export interface SelectionEndpoint {
 }
 
 export interface SelectionSnapshot {
-  pages: Array<{ pon: PageObjectNumber; segments: SelectionSegment[]; rects: Rect[] }>;
+  /** Per-page canonical segments — the ONE geometry consumers act on.
+   *  Boxes are derived views (`segment.rect`, or `rectsForPage()`). */
+  pages: Array<{ pon: PageObjectNumber; segments: SelectionSegment[] }>;
   start: SelectionEndpoint | null;
   end: SelectionEndpoint | null;
   direction: 'forward' | 'backward';

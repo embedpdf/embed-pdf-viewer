@@ -1445,9 +1445,6 @@ importers:
       '@embedpdf/core':
         specifier: workspace:*
         version: link:../../core/main
-      '@embedpdf/core-geometry':
-        specifier: workspace:*
-        version: link:../../core/geometry
       '@embedpdf/engine-core':
         specifier: workspace:*
         version: link:../../engine/core

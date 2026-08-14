@@ -83,6 +83,7 @@ import type {
   SearchSlice,
   SearchSnippet,
 } from '../search/types';
+import type { PdfTextSegment } from '../text/layout';
 export type { CacheDelta, MutationMeta } from '../mutation/MutationMeta';
 
 export const DocumentMetadataSchema: z.ZodType<DocumentMetadata> = z.object({
@@ -547,11 +548,17 @@ export const SearchSnippetSchema: z.ZodType<SearchSnippet> = z.object({
   matchLength: z.number().int().positive(),
 });
 
+export const PdfTextSegmentSchema: z.ZodType<PdfTextSegment> = z.object({
+  quad: PdfQuadSchema,
+  rect: PdfRectSchema,
+  advance: z.union([z.literal(1), z.literal(-1)]),
+});
+
 export const SearchMatchSchema: z.ZodType<SearchMatch> = z.object({
   pageObjectNumber: z.number().int().positive(),
   charStart: z.number().int().nonnegative(),
   charCount: z.number().int().positive(),
-  rects: z.array(PdfRectSchema),
+  segments: z.array(PdfTextSegmentSchema),
   snippet: SearchSnippetSchema.optional(),
 });
 

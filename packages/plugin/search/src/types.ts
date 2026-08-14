@@ -1,5 +1,5 @@
 import { createCapabilityToken, type PageObjectNumber } from '@embedpdf/core';
-import type { Rect } from '@embedpdf/core-geometry';
+import type { Rect, TextQuad } from '@embedpdf/core-geometry';
 import type { RevealAnchor, ScrollBehaviorKind } from '@embedpdf/plugin-stage';
 import type { SearchMode, SearchQuery, SearchSnippet } from '@embedpdf/engine-core/runtime';
 
@@ -10,12 +10,28 @@ import type { SearchMode, SearchQuery, SearchSnippet } from '@embedpdf/engine-co
  * `charStart`/`charCount` keep the engine's text-page offsets, so a hit can
  * later seed a selection or a highlight annotation without re-searching.
  */
+/**
+ * One merged visual line of a match, in content space — the structural twin
+ * of selection's `SelectionSegment` and the engine's `PdfTextSegment`.
+ * `quad` is the geometric authority (corner-named, frame-geometric); `rect`
+ * its AABB; `advance` the reading direction along the baseline.
+ */
+export interface TextSegment {
+  quad: TextQuad;
+  rect: Rect;
+  advance: 1 | -1;
+}
+
 export interface SearchHit {
   pon: PageObjectNumber;
   pageIndex: number;
   charStart: number;
   charCount: number;
-  rects: Rect[];
+  /** Canonical visual-line segments (content space) — the drawing input. */
+  segments: TextSegment[];
+  /** Union envelope of the segments — the scroll/reveal target. Absent when
+   *  a match carries no drawable geometry (degenerate glyphs only). */
+  bounds?: Rect;
   snippet?: SearchSnippet;
 }
 

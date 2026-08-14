@@ -119,10 +119,21 @@ export interface SearchToken {
   budget?: SearchSliceBudget;
 }
 
+/**
+ * The search RESULT representation this client speaks — part of the token
+ * (and therefore the versioned URL), so a response-shape change can never
+ * serve a stale CDN body to a newer client: new tokens are new cache keys,
+ * and old tokens fail decode on new servers. Deliberately ALWAYS encoded —
+ * an exception to the omit-defaults rule, because its entire job is to
+ * change the token bytes when the format changes.
+ */
+export const SEARCH_RESULT_FORMAT = 'segments1';
+
 export const encodeSearchToken = (input: SearchToken): string => {
   const q = input.query;
   return encodeToken(SearchTokenSchema, {
     epoch: input.epoch,
+    format: SEARCH_RESULT_FORMAT,
     q: encodeTokenText(q.text),
     // Canonical keys: every default is OMITTED, never encoded as false/0.
     regex: q.regex ? true : undefined,
@@ -140,6 +151,12 @@ export const decodeSearchToken = (raw: string): SearchToken => {
   const t = decodeToken(SearchTokenSchema, raw);
   if (t.epoch === undefined) throw new Error('search token is missing "epoch"');
   if (t.q === undefined) throw new Error('search token is missing "q"');
+  if (t.format !== SEARCH_RESULT_FORMAT) {
+    throw new Error(
+      `search token has unsupported result format "${t.format ?? 'legacy'}" ` +
+        `(expected "${SEARCH_RESULT_FORMAT}")`,
+    );
+  }
   const query: SearchQuery = {
     text: decodeTokenText(t.q),
     ...(t.regex === 'true' ? { regex: true } : {}),

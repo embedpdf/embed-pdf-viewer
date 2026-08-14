@@ -1,5 +1,4 @@
 import type { DocCapability, PluginContext } from '@embedpdf/core';
-import { textQuadFromRect } from '@embedpdf/core-geometry';
 import { AnnotationToken } from '@embedpdf/plugin-annotation/internal';
 import { InteractionToken } from '@embedpdf/plugin-interaction';
 import { SelectionToken } from '@embedpdf/plugin-selection';
@@ -153,17 +152,13 @@ export function createRedactionCapability(
       const snapshot = selection.snapshot();
       for (const page of snapshot.pages) {
         if (page.segments.length === 0) continue;
-        // REDACTION CHOKE POINT — deliberately AABB, not the oriented quads.
-        // The destructive native apply burns axis-aligned regions today, and
-        // the invariant is marked == previewed == applied: the mark's written
-        // quadPoints, its on-screen preview, and the burn must be the SAME
-        // region, so rotated selections redact their (visibly generous)
-        // bounding boxes. When quad-aware native redaction lands, forward
-        // `page.segments.map((s) => s.quad)` here and delete this comment.
+        // Preserve the selected text frame all the way into `/QuadPoints`.
+        // Native apply now uses these exact cells for text removal and the
+        // final overlay, so marked == previewed == applied for oriented text.
         anno.createMarkup(
           'redact',
           page.pon,
-          page.rects.map(textQuadFromRect),
+          page.segments.map((segment) => segment.quad),
           'redact',
         );
       }

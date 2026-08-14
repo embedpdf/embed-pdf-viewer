@@ -4,12 +4,24 @@ import { createSearchCapability } from '../src/capability';
 import { initialSearchState, searchReducer } from '../src/reducer';
 import type { SearchAction, SearchHit, SearchState } from '../src/types';
 
+const seg = (rect: { x: number; y: number; width: number; height: number }) => ({
+  quad: {
+    upperStart: { x: rect.x, y: rect.y },
+    upperEnd: { x: rect.x + rect.width, y: rect.y },
+    lowerStart: { x: rect.x, y: rect.y + rect.height },
+    lowerEnd: { x: rect.x + rect.width, y: rect.y + rect.height },
+  },
+  rect,
+  advance: 1 as const,
+});
+
 const hit = (pon: number, charStart: number): SearchHit => ({
   pon,
   pageIndex: 0,
   charStart,
   charCount: 4,
-  rects: [{ x: 0, y: 0, width: 10, height: 10 }],
+  segments: [seg({ x: 0, y: 0, width: 10, height: 10 })],
+  bounds: { x: 0, y: 0, width: 10, height: 10 },
 });
 
 const started = (): SearchState =>
@@ -117,7 +129,18 @@ describe('findAll', () => {
       pageObjectNumber: 5,
       charStart,
       charCount: 4,
-      rects: [{ left: 10, bottom: 20, right: 50, top: 40 }],
+      segments: [
+        {
+          quad: {
+            p1: { x: 10, y: 40 },
+            p2: { x: 50, y: 40 },
+            p3: { x: 10, y: 20 },
+            p4: { x: 50, y: 20 },
+          },
+          rect: { left: 10, bottom: 20, right: 50, top: 40 },
+          advance: 1 as const,
+        },
+      ],
     });
     const { ctx, requests, dispatch } = mockCtx([
       { matches: [match(0), match(9)], nextCursor: 'c1', scannedPages: 1, totalPages: 2 },
@@ -132,7 +155,8 @@ describe('findAll', () => {
     for (const h of hits) {
       expect(h.pon).toBe(5);
       expect(h.pageIndex).toBe(0);
-      expect(h.rects.length).toBe(1);
+      expect(h.segments.length).toBe(1);
+      expect(h.bounds).toBeDefined();
     }
     // the cursor was threaded through the second request
     expect((requests[1] as { cursor?: string }).cursor).toBe('c1');

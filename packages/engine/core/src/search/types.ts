@@ -1,5 +1,5 @@
-import type { PdfRect } from '../geometry/primitives';
 import type { PageObjectNumber } from '../identity/PageObjectNumber';
+import type { PdfTextSegment } from '../text/layout';
 
 /**
  * What to search for — THE one shape, engine → wire → plugin state →
@@ -119,15 +119,17 @@ export interface SearchSnippet {
  * space — the same space as `PageTextSnapshot.text` offsets and
  * `PageGeometryRun.charStart` — so a match joins the selection subsystem
  * (extend-selection-from-match, highlight annotations) without any
- * re-mapping. `rects` are merged line boxes in PDF user space (y-up),
- * built by the same line-merge as text selection — matches highlight
- * exactly like selections, one rect per visual line, never per glyph.
+ * re-mapping. `segments` are the CANONICAL visual-line segments (the same
+ * engine-core text layout selection uses) — a match highlights exactly like
+ * a selection of the same characters, one oriented segment per visual line,
+ * never per glyph. Each segment carries the exact quad, its AABB `rect`,
+ * and the reading `advance`.
  */
 export interface SearchMatch {
   pageObjectNumber: PageObjectNumber;
   charStart: number;
   charCount: number;
-  rects: PdfRect[];
+  segments: PdfTextSegment[];
   snippet?: SearchSnippet;
 }
 

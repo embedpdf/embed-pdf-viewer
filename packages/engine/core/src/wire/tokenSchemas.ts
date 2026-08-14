@@ -80,6 +80,7 @@ export const RenderTokenSchema = {
 export const SearchTokenSchema = {
   fields: [
     'epoch',
+    'format',
     'matchCase',
     'matchDiacritics',
     'maxMatches',

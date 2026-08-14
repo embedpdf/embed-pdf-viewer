@@ -18,7 +18,7 @@ import type { SearchRequest, SearchSlice } from '../search/types';
  * layer is unfindable, and a cursor issued before a content mutation is
  * rejected rather than resumed over stale pages.
  *
- * Matches carry merged line rects from the same line-merge as text
+ * Matches carry canonical visual-line segments from the same layout as text
  * selection (never per-glyph boxes) and text-page character offsets that
  * join the selection/geometry subsystem directly.
  */

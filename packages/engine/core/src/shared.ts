@@ -417,7 +417,22 @@ export type {
 } from './search/regex';
 export { matchPageText } from './search/matcher';
 export { SEARCH_SNIPPET_CONTEXT, buildSnippet } from './search/snippet';
-export { searchRectsForRange } from './search/rects';
+export { searchRectsForRange, searchSegmentsForRange } from './search/rects';
+export {
+  buildPageTextLayout,
+  expandTextRangeToLine,
+  expandTextRangeToWord,
+  textGlyphAt,
+  textGlyphQuad,
+  textSegmentsForRange,
+} from './text/layout';
+export type {
+  PageTextLayout,
+  PdfTextSegment,
+  TextLayoutFrame,
+  TextLayoutGlyph,
+  TextLayoutRun,
+} from './text/layout';
 export { searchContentEpoch, canonicalSearchQuery } from './search/epoch';
 
 export type { PageMoveInput } from './mutation/PageMoveInput';
