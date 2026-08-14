@@ -1,3 +1,4 @@
+import { textQuadFromRect } from '@embedpdf/core-geometry';
 import { describe, expect, it } from 'vitest';
 import type {
   AnnotationDraft,
@@ -172,12 +173,7 @@ describe('repository — Replace Text authoring', () => {
       geom: {
         t: 'quads',
         quads: [
-          [
-            { x: 10, y: 20 },
-            { x: 90, y: 20 },
-            { x: 10, y: 35 },
-            { x: 90, y: 35 },
-          ],
+          textQuadFromRect({ x: 10, y: 20, width: 80, height: 15 }),
         ],
       },
       style,
@@ -795,18 +791,8 @@ describe('repository — attached links (fold + desired state + link kind mappin
       geom: {
         t: 'quads',
         quads: [
-          [
-            { x: 0, y: 0 },
-            { x: 50, y: 0 },
-            { x: 0, y: 10 },
-            { x: 50, y: 10 },
-          ],
-          [
-            { x: 0, y: 20 },
-            { x: 30, y: 20 },
-            { x: 0, y: 30 },
-            { x: 30, y: 30 },
-          ],
+          textQuadFromRect({ x: 0, y: 0, width: 50, height: 10 }),
+          textQuadFromRect({ x: 0, y: 20, width: 30, height: 10 }),
         ],
       },
     };

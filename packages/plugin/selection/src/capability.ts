@@ -1,12 +1,19 @@
 import type { PageObjectNumber, PluginContext } from '@embedpdf/core';
-import type { Point, Rect } from '@embedpdf/core-geometry';
+import {
+  applyTextQuad,
+  textQuadBounds,
+  textQuadFromRect,
+  type Point,
+  type Rect,
+} from '@embedpdf/core-geometry';
 import {
   buildPageText,
   expandToLine,
   expandToWord,
   glyphAt,
-  rectsForRange,
+  segmentsForRange,
   type PageText,
+  type SelectionSegment,
 } from './geometry';
 import type {
   GlyphPointer,
@@ -18,17 +25,18 @@ import type {
   SelectionState,
 } from './types';
 
-const EMPTY: Rect[] = [];
+const EMPTY_SEGMENTS: SelectionSegment[] = [];
+const FLAG_EMPTY = 2;
 
 /**
  * The selection capability. The reducer state holds the selection range, the
- * derived content-space rects (per page), and per-page loaded flags; the (large,
- * non-serializable) per-page text geometry is cached HERE in the closure.
+ * derived content-space segments (per page), and per-page loaded flags; the
+ * (large, non-serializable) per-page text geometry is cached HERE in the closure.
  *
  * Selection is cross-page: glyphs are ordered globally by (pageIndex, glyph), so
  * a drag from page 2 into page 4 selects the tail of 2, all of 3, and the head of
- * 4. `recompute` rebuilds the merged line rects for every loaded page in the span
- * and re-runs whenever a mid-span page finishes loading.
+ * 4. `recompute` rebuilds the merged line segments for every loaded page in the
+ * span and re-runs whenever a mid-span page finishes loading.
  */
 export function createSelectionCapability(
   ctx: PluginContext<SelectionState, SelectionAction>,
@@ -36,8 +44,8 @@ export function createSelectionCapability(
   const cache = new Map<number, PageText>();
   const pending = new Set<number>();
   // Consumers (e.g. text-markup) observe the selection without selection knowing
-  // about them: `change` fires whenever the rects change, `commit` when a gesture
-  // ends (pointer-up). One typed callback each — not an event bus.
+  // about them: `change` fires whenever the segments change, `commit` when a
+  // gesture ends (pointer-up). One typed callback each — not an event bus.
   const changeCbs = new Set<() => void>();
   const commitCbs = new Set<() => void>();
   const fireChange = (): void => changeCbs.forEach((cb) => cb());
@@ -62,17 +70,43 @@ export function createSelectionCapability(
   }
 
   function endpointFor(ptr: GlyphPointer, which: 'start' | 'end'): SelectionEndpoint | null {
-    const rects = ctx.getState().rects[ptr.pon] ?? EMPTY;
-    if (!rects.length) return null;
-    return { pon: ptr.pon, rect: which === 'start' ? rects[0] : rects[rects.length - 1] };
+    const segments = ctx.getState().segments[ptr.pon] ?? EMPTY_SEGMENTS;
+    if (!segments.length) return null;
+    const segment = which === 'start' ? segments[0] : segments[segments.length - 1];
+
+    // Anchor the endpoint to the boundary GLYPH's own oriented cell so caret
+    // placement lands on the exact character edge; fall back to the segment
+    // when the glyph is degenerate (e.g. a generated space).
+    const text = cache.get(ptr.pon);
+    const glyph = text?.glyphs[ptr.glyph];
+    if (text && glyph && !(glyph.flags & FLAG_EMPTY) && glyph.loose.width > 0) {
+      const run = text.runs.find((r) => ptr.glyph >= r.start && ptr.glyph < r.start + r.count);
+      const frame = text.frames[run?.frame ?? 0];
+      const frameQuad = textQuadFromRect(glyph.loose);
+      const glyphQuad =
+        run && run.frame !== 0
+          ? applyTextQuad(frame.toContent as never, frameQuad as never)
+          : frameQuad;
+      return {
+        pon: ptr.pon,
+        glyphQuad,
+        advance: segment.advance,
+        rect: textQuadBounds(glyphQuad),
+      };
+    }
+    return { pon: ptr.pon, glyphQuad: segment.quad, advance: segment.advance, rect: segment.rect };
   }
 
   function snapshot(): SelectionSnapshot {
-    const { selection, rects } = ctx.getState();
-    const pages = Object.keys(rects)
+    const { selection, segments } = ctx.getState();
+    const pages = Object.keys(segments)
       .map(Number)
-      .filter((pon) => (rects[pon]?.length ?? 0) > 0)
-      .map((pon) => ({ pon: pon as PageObjectNumber, rects: rects[pon] }));
+      .filter((pon) => (segments[pon]?.length ?? 0) > 0)
+      .map((pon) => ({
+        pon: pon as PageObjectNumber,
+        segments: segments[pon],
+        rects: segments[pon].map((s) => s.rect),
+      }));
     if (!selection) return { pages, start: null, end: null, direction: 'forward' };
     const { start, end, direction } = orderedEnds(selection);
     return {
@@ -100,7 +134,7 @@ export function createSelectionCapability(
             buildPageText(snapshot, layout.boxes.crop, layout.rotation, layout.userUnit),
           );
           ctx.dispatch({ type: 'PAGE_LOADED', pon });
-          if (ctx.getState().selection) recompute(); // a mid-span page arrived → fill its rects
+          if (ctx.getState().selection) recompute(); // a mid-span page arrived → fill its segments
         },
         () => {
           pending.delete(pon); // doc closed / read aborted — ignore
@@ -108,14 +142,14 @@ export function createSelectionCapability(
       );
   }
 
-  // Rebuild merged line rects for every loaded page in the span; ensure the rest.
+  // Rebuild merged line segments for every loaded page in the span; ensure the rest.
   function recompute(sel: SelectionRange | null = ctx.getState().selection): void {
     if (!sel) return;
     const { start, end } = orderedEnds(sel);
     const si = pageIndexOf(start.pon);
     const ei = pageIndexOf(end.pon);
     if (si < 0 || ei < 0) return;
-    const rects: Record<number, Rect[]> = {};
+    const segments: Record<number, SelectionSegment[]> = {};
     for (let i = si; i <= ei; i++) {
       const pon = ponAtIndex(i);
       if (pon == null) continue;
@@ -126,9 +160,9 @@ export function createSelectionCapability(
       }
       const from = i === si ? start.glyph : 0;
       const to = i === ei ? end.glyph : text.glyphs.length - 1;
-      rects[pon] = rectsForRange(text, from, to);
+      segments[pon] = segmentsForRange(text, from, to);
     }
-    ctx.dispatch({ type: 'SET', selection: sel, rects });
+    ctx.dispatch({ type: 'SET', selection: sel, segments });
     fireChange();
   }
 
@@ -186,15 +220,18 @@ export function createSelectionCapability(
 
     snapshot,
 
-    rectsForPage: (pon) => ctx.getState().rects[pon] ?? EMPTY,
+    segmentsForPage: (pon) => ctx.getState().segments[pon] ?? EMPTY_SEGMENTS,
+
+    rectsForPage: (pon) =>
+      (ctx.getState().segments[pon] ?? EMPTY_SEGMENTS).map((s) => s.rect),
 
     hasSelection: () => ctx.getState().selection != null,
 
     selectedPages: () => {
-      const { rects } = ctx.getState();
-      return Object.keys(rects)
+      const { segments } = ctx.getState();
+      return Object.keys(segments)
         .map(Number)
-        .filter((pon) => (rects[pon]?.length ?? 0) > 0) as PageObjectNumber[];
+        .filter((pon) => (segments[pon]?.length ?? 0) > 0) as PageObjectNumber[];
     },
 
     onChange: (cb) => {

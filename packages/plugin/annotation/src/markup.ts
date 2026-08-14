@@ -36,9 +36,12 @@ export function wireMarkup(
           : null;
     selection.setHighlightVisible(previewSubtype == null);
     if (previewSubtype && tool && selection.hasSelection()) {
-      const rectsByPage: Record<number, ReturnType<typeof selection.rectsForPage>> = {};
-      for (const page of selection.snapshot().pages) rectsByPage[page.pon] = page.rects;
-      annotation.previewMarkup(previewSubtype, rectsByPage, tool.preset);
+      const quadsByPage: Record<number, ReturnType<typeof selection.segmentsForPage>[number]['quad'][]> =
+        {};
+      for (const page of selection.snapshot().pages) {
+        quadsByPage[page.pon] = page.segments.map((s) => s.quad);
+      }
+      annotation.previewMarkup(previewSubtype, quadsByPage, tool.preset);
     } else {
       annotation.clearMarkupPreview();
     }
@@ -53,22 +56,44 @@ export function wireMarkup(
     if (!tool || !authoring) return; // pointer tool → leave the selection (copy)
     const snapshot = selection.snapshot();
     if (authoring.kind === 'text-edit' && authoring.operation === 'insert') {
-      if (snapshot.end) annotation.createCaret(snapshot.end.pon, snapshot.end.rect);
+      if (snapshot.end) {
+        annotation.createCaret(snapshot.end.pon, {
+          glyphQuad: snapshot.end.glyphQuad,
+          advance: snapshot.end.advance,
+        });
+      }
       selection.clear();
       return;
     }
     if (authoring.kind === 'text-edit' && authoring.operation === 'replace') {
       // `/IRT` relationships are page-local, so a cross-page selection becomes
-      // one self-contained Caret + StrikeOut pair per page.
+      // one self-contained Caret + StrikeOut pair per page. The true glyph-cell
+      // anchor exists only on the selection's end page; other pages anchor at
+      // their last segment's trailing edge.
       for (const page of snapshot.pages) {
-        const endRect = page.rects[page.rects.length - 1];
-        if (endRect) annotation.createReplaceText(page.pon, page.rects, endRect, tool.preset);
+        const last = page.segments[page.segments.length - 1];
+        if (!last) continue;
+        const anchor =
+          snapshot.end && snapshot.end.pon === page.pon
+            ? { glyphQuad: snapshot.end.glyphQuad, advance: snapshot.end.advance }
+            : { glyphQuad: last.quad, advance: last.advance };
+        annotation.createReplaceText(
+          page.pon,
+          page.segments.map((s) => s.quad),
+          anchor,
+          tool.preset,
+        );
       }
       selection.clear();
       return;
     }
     for (const page of snapshot.pages) {
-      annotation.createMarkup(tool.subtype, page.pon, page.rects, tool.preset);
+      annotation.createMarkup(
+        tool.subtype,
+        page.pon,
+        page.segments.map((s) => s.quad),
+        tool.preset,
+      );
     }
     selection.clear(); // fires onChange → preview clears; blue stays suppressed (markup tool still active)
   });

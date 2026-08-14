@@ -1,5 +1,8 @@
 import { createCapabilityToken, type PageObjectNumber } from '@embedpdf/core';
-import type { Point, Rect } from '@embedpdf/core-geometry';
+import type { Point, Rect, TextQuad } from '@embedpdf/core-geometry';
+import type { SelectionSegment } from './geometry';
+
+export type { SelectionSegment } from './geometry';
 
 /** A glyph address: a page + a flat glyph index within that page's geometry. */
 export interface GlyphPointer {
@@ -13,13 +16,21 @@ export interface SelectionRange {
   focus: GlyphPointer;
 }
 
+/**
+ * A selection boundary, anchored to the boundary GLYPH's own oriented cell.
+ * `advance` is the reading direction of the segment it belongs to (+1 = the
+ * frame's +x), so caret consumers place at the trailing edge without
+ * re-deriving bidi from geometry. `rect` is the AABB (scroll targets).
+ */
 export interface SelectionEndpoint {
   pon: PageObjectNumber;
+  glyphQuad: TextQuad;
+  advance: 1 | -1;
   rect: Rect;
 }
 
 export interface SelectionSnapshot {
-  pages: Array<{ pon: PageObjectNumber; rects: Rect[] }>;
+  pages: Array<{ pon: PageObjectNumber; segments: SelectionSegment[]; rects: Rect[] }>;
   start: SelectionEndpoint | null;
   end: SelectionEndpoint | null;
   direction: 'forward' | 'backward';
@@ -27,8 +38,8 @@ export interface SelectionSnapshot {
 
 export interface SelectionState {
   selection: SelectionRange | null;
-  /** Derived highlight rects per page, in CONTENT space (y-down, PDF units). */
-  rects: Record<number, Rect[]>;
+  /** Derived per-line segments per page, in CONTENT space (y-down, PDF units). */
+  segments: Record<number, SelectionSegment[]>;
   /** Pages whose text geometry has loaded (so the layer re-renders when ready). */
   loaded: Record<number, boolean>;
   /** When a consumer owns the selection visual (e.g. a markup tool draws its own
@@ -38,7 +49,7 @@ export interface SelectionState {
 
 export type SelectionAction =
   | { type: 'PAGE_LOADED'; pon: PageObjectNumber }
-  | { type: 'SET'; selection: SelectionRange; rects: Record<number, Rect[]> }
+  | { type: 'SET'; selection: SelectionRange; segments: Record<number, SelectionSegment[]> }
   | { type: 'CLEAR' }
   | { type: 'SET_HIGHLIGHT_HIDDEN'; hidden: boolean };
 
@@ -60,7 +71,11 @@ export interface SelectionCapability {
   clear(): void;
   /** Coherent read-model for consumers that create annotations or selection UI. */
   snapshot(): SelectionSnapshot;
-  /** Highlight rects for a page, in content space — the layer's only input. */
+  /** Per-line oriented segments for a page, in content space — the layer's input. */
+  segmentsForPage(pon: PageObjectNumber): SelectionSegment[];
+  /** The segments' AABBs — for consumers that genuinely want boxes (scroll,
+   *  conservative regions). Never a substitute for the oriented quads in
+   *  geometry that gets drawn or persisted. */
   rectsForPage(pon: PageObjectNumber): Rect[];
   hasSelection(): boolean;
   /** The pages the current selection covers (those with at least one rect) — so a

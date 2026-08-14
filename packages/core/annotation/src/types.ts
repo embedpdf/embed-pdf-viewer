@@ -11,7 +11,14 @@ import type {
   StrikeoutIntent,
 } from '@embedpdf/engine-core/runtime';
 import type { PageObjectNumber } from '@embedpdf/core';
-import type { PageRotation, Point, Rect as GeometryRect } from '@embedpdf/core-geometry';
+import type {
+  PageRotation,
+  Point,
+  Rect as GeometryRect,
+  TextQuad,
+} from '@embedpdf/core-geometry';
+
+export type { TextQuad } from '@embedpdf/core-geometry';
 
 export type { LineEnding, LineEndings };
 
@@ -23,8 +30,20 @@ export type { LineEnding, LineEndings };
  */
 export type Vec = Point;
 export type Rect = GeometryRect;
-/** Four content-space points (a /QuadPoints quad). */
+/** Four POSITIONAL content-space points — selection chrome / OBB corners.
+ *  Text-markup geometry uses the corner-NAMED {@link TextQuad} instead. */
 export type Quad = [Vec, Vec, Vec, Vec];
+
+/**
+ * Where a text-edit annotation (caret / replace-text) anchors: the boundary
+ * glyph's oriented cell plus the READING direction along its baseline
+ * (+1 = toward `end`, −1 = toward `start` — sequence-derived, never inferred
+ * from geometry).
+ */
+export interface TextEndAnchor {
+  glyphQuad: TextQuad;
+  advance: 1 | -1;
+}
 
 export type Id = string;
 export type Cursor = string;
@@ -103,7 +122,7 @@ export type Geom =
   | { t: 'rect'; rect: Rect; ellipse: boolean; rot?: number } // square / circle (rect = unrotated box)
   | { t: 'line'; a: Vec; b: Vec; ends?: LineEndings; rot?: number } // line (points pre-rotated; rot advisory)
   | { t: 'poly'; points: Vec[]; closed: boolean; ends?: LineEndings; rot?: number } // polygon/polyline (pre-rotated; rot advisory)
-  | { t: 'quads'; quads: Quad[] } // highlight / underline / squiggly / strikeout
+  | { t: 'quads'; quads: TextQuad[] } // highlight / underline / squiggly / strikeout
   | { t: 'caret'; rect: Rect } // caret insertion marker
   | { t: 'ink'; strokes: Vec[][]; rot?: number } // freehand ink (pre-rotated; rot advisory)
   | { t: 'text'; rect: Rect; callout?: Callout; rot?: number }; // free-text box (`rect` is the unrotated text box);
@@ -446,7 +465,7 @@ export interface MarkupPreview {
   subtype: Subtype;
   /** Defaults key, distinct from subtype for presets such as replace-text. */
   preset: string;
-  byPage: Record<number, Quad[]>;
+  byPage: Record<number, TextQuad[]>;
 }
 
 /** Anchor + affordance state for UI that controls an in-progress creation draft. */
@@ -597,21 +616,27 @@ export type Msg =
     }
   | { t: 'finishInkDraft' }
   | { t: 'finishCreationDraft' }
-  | { t: 'createCaret'; pon: PageObjectNumber; rect: Rect; flags?: Partial<AnnotationFlags> }
+  | {
+      t: 'createCaret';
+      pon: PageObjectNumber;
+      anchor: TextEndAnchor;
+      flags?: Partial<AnnotationFlags>;
+    }
   | {
       t: 'createReplaceText';
       pon: PageObjectNumber;
-      rects: Rect[];
-      endRect: Rect;
+      quads: TextQuad[];
+      anchor: TextEndAnchor;
       preset?: string;
     }
-  // text markup: build one annotation from the selected text's per-line rects (the
-  // `text-selection` create gesture). One message per page the selection covers.
+  // text markup: build one annotation from the selected text's per-line oriented
+  // quads (the `text-selection` create gesture). One message per page the
+  // selection covers.
   | {
       t: 'createMarkup';
       subtype: Subtype;
       pon: PageObjectNumber;
-      rects: Rect[];
+      quads: TextQuad[];
       preset?: string;
       /** The tool's `/F` seed — merged over {@link DRAWN_FLAGS} at commit. */
       flags?: Partial<AnnotationFlags>;
@@ -620,7 +645,7 @@ export type Msg =
   | {
       t: 'setMarkupPreview';
       subtype: Subtype;
-      rectsByPage: Record<number, Rect[]>;
+      quadsByPage: Record<number, TextQuad[]>;
       preset?: string;
     }
   | { t: 'clearMarkupPreview' }

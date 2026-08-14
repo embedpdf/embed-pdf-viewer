@@ -65,6 +65,14 @@ export type {
   PageGeometryGlyph,
   PageGeometryRun,
   PageGeometrySnapshot,
+  RotatedGeometryGlyph,
+  RotatedGeometryRun,
+  UprightGeometryRun,
+} from './dto/PageGeometrySnapshot';
+export {
+  glyphLooseBounds,
+  glyphLooseQuad,
+  isRotatedGeometryRun,
 } from './dto/PageGeometrySnapshot';
 export type {
   PageImageHandle,

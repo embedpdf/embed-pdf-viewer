@@ -1321,21 +1321,21 @@ export function createAnnotationCapability(
     finishCreationDraft: () => apply({ t: 'finishCreationDraft' }),
     finishInkDraft: () => apply({ t: 'finishInkDraft' }),
     cancelCreationDraft: () => apply({ t: 'cancel' }),
-    createMarkup: (subtype, pon, rects, preset) =>
+    createMarkup: (subtype, pon, quads, preset) =>
       // A markup tool's `/F` seed rides along (the preset IS the tool id).
       apply({
         t: 'createMarkup',
         subtype,
         pon,
-        rects,
+        quads,
         preset,
         flags: preset ? registry.get(preset)?.flags : undefined,
       }),
-    createCaret: (pon, textEndRect) => apply({ t: 'createCaret', pon, rect: textEndRect }),
-    createReplaceText: (pon, rects, textEndRect, preset) =>
-      apply({ t: 'createReplaceText', pon, rects, endRect: textEndRect, preset }),
-    previewMarkup: (subtype, rectsByPage, preset) =>
-      apply({ t: 'setMarkupPreview', subtype, rectsByPage, preset }),
+    createCaret: (pon, anchor) => apply({ t: 'createCaret', pon, anchor }),
+    createReplaceText: (pon, quads, anchor, preset) =>
+      apply({ t: 'createReplaceText', pon, quads, anchor, preset }),
+    previewMarkup: (subtype, quadsByPage, preset) =>
+      apply({ t: 'setMarkupPreview', subtype, quadsByPage, preset }),
     clearMarkupPreview: () => apply({ t: 'clearMarkupPreview' }),
     setDefaults: (subtype, patch) => apply({ t: 'setDefaults', subtype, patch }),
     // Resolve through the tool's `preset` key so arrow reads arrow's defaults, not

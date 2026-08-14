@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { textQuadFromRect } from '@embedpdf/core-geometry';
 import {
   annotsInBox,
   defaultsFor,
@@ -34,7 +35,7 @@ import {
   calloutLinePoints,
   selectionBounds,
   shapeRectFor,
-  caretRectFromTextEnd,
+  caretRectFromAnchor,
   contentToPdfRect,
   pdfToContentRect,
   contentToPdfPoint,
@@ -421,11 +422,14 @@ describe('annotation-core', () => {
     expect(creationDraftAnchor(m)).toBeNull();
   });
 
-  it('creates a caret at the end of a text line rect', () => {
-    const lineRect = { x: 20, y: 40, width: 80, height: 20 };
-    expect(caretRectFromTextEnd(lineRect)).toEqual({ x: 95, y: 50, width: 10, height: 10 });
+  it('creates a caret at the trailing edge of the boundary glyph', () => {
+    const anchor = {
+      glyphQuad: textQuadFromRect({ x: 90, y: 40, width: 10, height: 20 }),
+      advance: 1 as const,
+    };
+    expect(caretRectFromAnchor(anchor)).toEqual({ x: 95, y: 50, width: 10, height: 10 });
 
-    const [m, fx] = update(initialModel, { t: 'createCaret', pon: PON, rect: lineRect });
+    const [m, fx] = update(initialModel, { t: 'createCaret', pon: PON, anchor });
     const a = m.byId[m.order[0]];
     expect(a).toMatchObject({
       subtype: 'caret',
@@ -453,8 +457,8 @@ describe('annotation-core', () => {
     const [m, fx] = update(seeded, {
       t: 'createReplaceText',
       pon: PON,
-      rects,
-      endRect: rects[1],
+      quads: rects.map(textQuadFromRect),
+      anchor: { glyphQuad: textQuadFromRect(rects[1]), advance: 1 },
       preset: 'replace-text',
     });
 
@@ -484,8 +488,8 @@ describe('annotation-core', () => {
     let m = update(initialModel, {
       t: 'createReplaceText',
       pon: PON,
-      rects: [rect],
-      endRect: rect,
+      quads: [textQuadFromRect(rect)],
+      anchor: { glyphQuad: textQuadFromRect(rect), advance: 1 },
     })[0];
     const [caretTemp, strikeoutTemp] = m.order;
     const durableId = `obj:${PON}:42`;
@@ -911,7 +915,7 @@ describe('annotation-core', () => {
     const m = update(initialModel, {
       t: 'setMarkupPreview',
       subtype: 'highlight',
-      rectsByPage: { [PON]: [{ x: 10, y: 10, width: 80, height: 12 }] },
+      quadsByPage: { [PON]: [textQuadFromRect({ x: 10, y: 10, width: 80, height: 12 })] },
     })[0];
     const ghost = pageItems(m, PON).find((i) => i.source === 'ghost');
     expect(ghost?.subtype).toBe('highlight');
@@ -924,12 +928,7 @@ describe('annotation-core', () => {
     const quads: Geom = {
       t: 'quads',
       quads: [
-        [
-          { x: 0, y: 0 },
-          { x: 100, y: 0 },
-          { x: 0, y: 12 },
-          { x: 100, y: 12 },
-        ],
+        textQuadFromRect({ x: 0, y: 0, width: 100, height: 12 }),
       ],
     };
     const mk = (subtype: string): RenderItem => ({
@@ -950,7 +949,7 @@ describe('annotation-core', () => {
       selected: false,
     });
     const hi = scene(mk('highlight'));
-    expect(hi[0]).toMatchObject({ kind: 'rect', paint: { fill: '#ffd400', blend: 'multiply' } });
+    expect(hi[0]).toMatchObject({ kind: 'poly', closed: true, paint: { fill: '#ffd400', blend: 'multiply' } });
     const sq = scene(mk('squiggly'));
     expect(sq[0].kind).toBe('path');
     expect(sq[0].paint.stroke).toBe('#ffd400');
@@ -1241,12 +1240,7 @@ describe('annotation-core', () => {
       geom: {
         t: 'quads',
         quads: [
-          [
-            { x: 10, y: 10 },
-            { x: 90, y: 10 },
-            { x: 10, y: 30 },
-            { x: 90, y: 30 },
-          ],
+          textQuadFromRect({ x: 10, y: 10, width: 80, height: 20 }),
         ],
       },
       style: {
@@ -1424,12 +1418,7 @@ describe('annotation-core', () => {
       geom: {
         t: 'quads',
         quads: [
-          [
-            { x: 0, y: 0 },
-            { x: 100, y: 0 },
-            { x: 0, y: 100 },
-            { x: 100, y: 100 },
-          ],
+          textQuadFromRect({ x: 0, y: 0, width: 100, height: 100 }),
         ],
       },
       style: {
@@ -2186,12 +2175,7 @@ describe('annotation-core — selectionAnchor carries the knob alongside a centr
       ...square('s2', {
         t: 'quads',
         quads: [
-          [
-            { x: 10, y: 10 },
-            { x: 90, y: 10 },
-            { x: 10, y: 22 },
-            { x: 90, y: 22 },
-          ],
+          textQuadFromRect({ x: 10, y: 10, width: 80, height: 12 }),
         ],
       }),
       subtype: 'highlight',

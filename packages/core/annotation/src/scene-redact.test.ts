@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { textQuadFromRect } from '@embedpdf/core-geometry';
 import { initialModel, update } from './update';
 import { layoutRedactLabel, scene } from './scene';
 import type { Annot, Model, RenderItem, TextStyle } from './types';
@@ -70,7 +71,8 @@ describe('redact scene', () => {
     const nodes = scene(redactItem());
     expect(nodes).toHaveLength(1);
     expect(nodes[0]).toMatchObject({
-      kind: 'rect',
+      kind: 'poly',
+      closed: true,
       paint: { stroke: '#e44234', width: 1.5 },
     });
     expect((nodes[0] as { paint: { fill?: string } }).paint.fill).toBeUndefined();
@@ -78,7 +80,7 @@ describe('redact scene', () => {
 
   it('hovered: fills opaquely and draws the label', () => {
     const nodes = scene(redactItem({ hovered: true, label: { text: 'REDACTED', repeat: false } }));
-    const fills = nodes.filter((n) => n.kind === 'rect');
+    const fills = nodes.filter((n) => n.kind === 'poly');
     const texts = nodes.filter((n) => n.kind === 'text');
     expect(fills).toHaveLength(1);
     expect(fills[0]!.paint).toMatchObject({ fill: '#000000', opacity: 1 });
@@ -99,23 +101,13 @@ describe('redact scene', () => {
         geom: {
           t: 'quads',
           quads: [
-            [
-              { x: 0, y: 0 },
-              { x: 50, y: 0 },
-              { x: 0, y: 10 },
-              { x: 50, y: 10 },
-            ],
-            [
-              { x: 0, y: 14 },
-              { x: 30, y: 14 },
-              { x: 0, y: 24 },
-              { x: 30, y: 24 },
-            ],
+            textQuadFromRect({ x: 0, y: 0, width: 50, height: 10 }),
+            textQuadFromRect({ x: 0, y: 14, width: 30, height: 10 }),
           ],
         },
       }),
     );
-    expect(nodes.filter((n) => n.kind === 'rect')).toHaveLength(2);
+    expect(nodes.filter((n) => n.kind === 'poly')).toHaveLength(2);
   });
 });
 

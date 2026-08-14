@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { textQuadFromRect } from '@embedpdf/core-geometry';
 import {
   DRAWN_FLAGS,
   NO_ANNOTATION_FLAGS,
@@ -296,12 +297,7 @@ describe('screen-anchored bodies (noZoom / noRotate)', () => {
     const quads: Geom = {
       t: 'quads',
       quads: [
-        [
-          { x: 0, y: 0 },
-          { x: 10, y: 0 },
-          { x: 0, y: 5 },
-          { x: 10, y: 5 },
-        ],
+        textQuadFromRect({ x: 0, y: 0, width: 10, height: 5 }),
       ],
     };
     expect(anchoredGeom(quads, { zoom: true, upright: true }, { zoom: 2, rotation: 0 })).toBe(

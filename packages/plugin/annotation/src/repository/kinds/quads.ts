@@ -6,7 +6,8 @@
  * caret are box-like and move by `/Rect`.
  */
 import type { AnnotationDTO, PdfRect } from '@embedpdf/engine-core/runtime';
-import { type Annot, type Quad } from '@embedpdf/core-annotation';
+import { normalizeQuad } from '@embedpdf/core-geometry';
+import { type Annot, type TextQuad } from '@embedpdf/core-annotation';
 
 import type { KindProjection } from '../projection';
 import {
@@ -20,25 +21,33 @@ import {
 type PdfPt = { x: number; y: number };
 type QuadDTO = { p1: PdfPt; p2: PdfPt; p3: PdfPt; p4: PdfPt };
 
-const quadsFromDTO = (quadPoints: QuadDTO[], crop: PdfRect) =>
-  quadPoints.map(
-    (q) =>
-      [
-        pdfToContentPoint(q.p1, crop),
-        pdfToContentPoint(q.p2, crop),
-        pdfToContentPoint(q.p3, crop),
-        pdfToContentPoint(q.p4, crop),
-      ] as Quad,
+/**
+ * Imported `/QuadPoints` → semantic TextQuads. `normalizeQuad` is a
+ * NORMALIZER, not a cast: the de-facto zigzag order passes through, ring-order
+ * producers are repaired, and garbage gets a deterministic labeling — so
+ * drawing code can never put an underline on the wrong edge of a well-formed
+ * quad, rotated ones included.
+ */
+const quadsFromDTO = (quadPoints: QuadDTO[], crop: PdfRect): TextQuad[] =>
+  quadPoints.map((q) =>
+    normalizeQuad({
+      p1: pdfToContentPoint(q.p1, crop),
+      p2: pdfToContentPoint(q.p2, crop),
+      p3: pdfToContentPoint(q.p3, crop),
+      p4: pdfToContentPoint(q.p4, crop),
+    }),
   );
 
-/** Content quads → engine `/QuadPoints` (PDF user space); null off quads geom. */
+/** Content quads → engine `/QuadPoints` (PDF user space, zigzag slot order:
+ *  p1..p4 = upper-start, upper-end, lower-start, lower-end — under the y-flip
+ *  exactly PDFium's documented TL, TR, BL, BR); null off quads geom. */
 export function quadPointsFor(a: Annot, crop: PdfRect): QuadDTO[] | null {
   if (a.geom.t !== 'quads') return null;
   return a.geom.quads.map((q) => ({
-    p1: contentToPdfPoint(q[0], crop),
-    p2: contentToPdfPoint(q[1], crop),
-    p3: contentToPdfPoint(q[2], crop),
-    p4: contentToPdfPoint(q[3], crop),
+    p1: contentToPdfPoint(q.upperStart, crop),
+    p2: contentToPdfPoint(q.upperEnd, crop),
+    p3: contentToPdfPoint(q.lowerStart, crop),
+    p4: contentToPdfPoint(q.lowerEnd, crop),
   }));
 }
 

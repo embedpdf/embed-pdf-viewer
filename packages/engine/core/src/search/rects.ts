@@ -1,4 +1,4 @@
-import type { PageGeometrySnapshot } from '../dto/PageGeometrySnapshot';
+import { glyphLooseBounds, type PageGeometrySnapshot } from '../dto/PageGeometrySnapshot';
 import type { PdfRect } from '../geometry/primitives';
 
 /**
@@ -76,7 +76,10 @@ export function searchRectsForRange(
     for (let ci = s; ci <= e; ci++) {
       const g = run.glyphs[ci - run.charStart];
       if ((g.flags & FLAG_EMPTY) !== 0) continue;
-      const b = g.looseBox;
+      // Rotated runs contribute their cells' AABBs — the pre-orientation
+      // behavior for rotated matches. Oriented search highlights are a
+      // follow-up that reuses the selection plugin's frame machinery.
+      const b = glyphLooseBounds(run, ci - run.charStart);
       if (count > 0 && prevRight > -Infinity) {
         const avg = widthSum / count;
         if (avg > 0 && Math.abs(b.left - prevRight) > CHAR_DISTANCE_FACTOR * avg) flush();

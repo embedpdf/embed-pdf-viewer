@@ -2,7 +2,7 @@ import type { SelectionAction, SelectionState } from './types';
 
 export const initialSelectionState: SelectionState = {
   selection: null,
-  rects: {},
+  segments: {},
   loaded: {},
   highlightHidden: false,
 };
@@ -17,11 +17,11 @@ export const selectionReducer = (
         ? state
         : { ...state, loaded: { ...state.loaded, [action.pon]: true } };
     case 'SET':
-      return { ...state, selection: action.selection, rects: action.rects };
+      return { ...state, selection: action.selection, segments: action.segments };
     case 'CLEAR':
-      return state.selection === null && Object.keys(state.rects).length === 0
+      return state.selection === null && Object.keys(state.segments).length === 0
         ? state
-        : { ...state, selection: null, rects: {} };
+        : { ...state, selection: null, segments: {} };
     case 'SET_HIGHLIGHT_HIDDEN':
       return state.highlightHidden === action.hidden
         ? state

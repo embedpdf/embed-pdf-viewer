@@ -13,6 +13,28 @@ export const QUADPOINTSF_BYTES = 32;
 /** `FS_POINTF { float x, y }` → 8 bytes. */
 export const POINTF_BYTES = 8;
 
+/** Generated from `EPDF_CHAR_GEOMETRY`; pinned by native static_asserts. */
+export const EPDF_CHAR_GEOMETRY_LAYOUT = {
+  bytes: 124,
+  offsets: {
+    looseBox: 0,
+    tightBox: 16,
+    looseQuad: 32,
+    tightQuad: 64,
+    matrix: 96,
+    flags: 120,
+  },
+  flags: {
+    hasTightBox: 1 << 0,
+    hasLooseQuad: 1 << 1,
+    hasTightQuad: 1 << 2,
+    upright: 1 << 3,
+    space: 1 << 4,
+    empty: 1 << 5,
+    synthesized: 1 << 6,
+  },
+} as const;
+
 export interface RectF {
   left: number;
   top: number;
@@ -26,12 +48,12 @@ export interface SizeF {
 }
 
 /** Decode an `FS_RECTF` struct that a native call wrote into `ptr`. */
-export function readRectF(mem: PdfRuntimeMemory, ptr: Ptr): RectF {
+export function readRectF(mem: PdfRuntimeMemory, ptr: Ptr, byteOffset = 0): RectF {
   return {
-    left: readF32(mem, ptr, 0),
-    top: readF32(mem, ptr, 4),
-    right: readF32(mem, ptr, 8),
-    bottom: readF32(mem, ptr, 12),
+    left: readF32(mem, ptr, byteOffset),
+    top: readF32(mem, ptr, byteOffset + 4),
+    right: readF32(mem, ptr, byteOffset + 8),
+    bottom: readF32(mem, ptr, byteOffset + 12),
   };
 }
 
