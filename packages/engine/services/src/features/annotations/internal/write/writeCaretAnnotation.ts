@@ -10,6 +10,7 @@ import {
   setRectangleDifferences,
 } from './annotationWritePrimitives';
 import { applyAnnotationBaseDraft, applyAnnotationBasePatch } from './writeAnnotationBase';
+import { writeBoxTransformMetadata } from './writeAnnotationTransformMetadata';
 import { caretIntentToName } from '../textEditIntent';
 
 /** Default `/C` colour when a caret draft omits it (engine-wide default mark). */
@@ -34,6 +35,11 @@ export function applyCaretDraft(
 ): void {
   applyAnnotationBaseDraft(fn, mem, annotPtr, draft);
   setAnnotRect(fn, mem, annotPtr, draft.rect);
+  // Box-family rotation pair — MUST land before the AP bake sees the caret.
+  writeBoxTransformMetadata(fn, mem, annotPtr, {
+    rotation: draft.rotation,
+    unrotatedRect: draft.unrotatedRect,
+  });
   setAnnotColor(fn, annotPtr, draft.color ?? DEFAULT_CARET_COLOR);
   setAnnotOpacity(fn, annotPtr, draft.opacity ?? DEFAULT_OPACITY);
   if (draft.intent !== undefined) setIntent(fn, annotPtr, caretIntentToName(draft.intent));
@@ -55,6 +61,12 @@ export function applyCaretPatch(
   applyAnnotationBasePatch(fn, mem, annotPtr, patch);
   if (patch.rect !== undefined) {
     setAnnotRect(fn, mem, annotPtr, patch.rect);
+  }
+  if (patch.rotation !== undefined || patch.unrotatedRect !== undefined) {
+    writeBoxTransformMetadata(fn, mem, annotPtr, {
+      rotation: patch.rotation,
+      unrotatedRect: patch.unrotatedRect,
+    });
   }
   if (patch.color !== undefined) {
     setAnnotColor(fn, annotPtr, patch.color);

@@ -11,9 +11,11 @@ import { type Annot, type TextQuad } from '@embedpdf/core-annotation';
 
 import type { KindProjection } from '../projection';
 import {
+  boxGeomFields,
   colorToCss,
   contentToPdfPoint,
   contentToPdfRect,
+  fromPdfRotation,
   pdfToContentPoint,
   pdfToContentRect,
 } from '../seam';
@@ -102,13 +104,17 @@ export const strikeout = markupProjection('strikeout');
 export const caret: KindProjection = {
   ingest: (dto, crop) => {
     const d = dto as Extract<AnnotationDTO, { subtype: 'caret' }>;
+    // Box-family rotation pair: when present, the model's `rect` is the
+    // logical (unrotated) box and `rot` the tilt — the free-text/shape rule.
+    const rot = d.rotation ? fromPdfRotation(d.rotation) : 0;
+    const box = rot && d.unrotatedRect ? d.unrotatedRect : d.rect;
     return {
-      geom: { t: 'caret', rect: pdfToContentRect(d.rect, crop) },
+      geom: { t: 'caret', rect: pdfToContentRect(box, crop), ...(rot ? { rot } : {}) },
       ...(d.intent ? { intent: d.intent } : {}),
     };
   },
   geometry: (a, crop) =>
-    a.geom.t === 'caret' ? { rect: contentToPdfRect(a.geom.rect, crop) } : null,
+    a.geom.t === 'caret' ? boxGeomFields(a.geom.rect, a.geom.rot ?? 0, crop) : null,
   // The fixed drawn-symbol inset + the replace-text intent + seeded contents
   // are create-only statements.
   draftExtras: (a) => ({

@@ -170,10 +170,11 @@ function Shape({ item, page }: { item: RenderItem; page: PageContextValue }) {
   // the viewBox keeps shrinking — decouples them, so a sub-pixel box scales content
   // up by ~1/size and a cloudy border's scallops flood the stage. No clamps here.
   const vb = `${item.box.x} ${item.box.y} ${item.box.width} ${item.box.height}`;
-  // BOX kinds (square/circle) carry an UNROTATED `box` + a `rot` angle; rotate the
-  // whole <svg> about its centre. VERTEX kinds (line/poly/ink) are already rotated
-  // in their geometry, so `rot` is advisory there — never re-applied.
-  const rot = item.geom.t === 'rect' ? (item.rot ?? 0) : 0;
+  // BOX-family kinds (square/circle, caret) carry an UNROTATED `box` + a `rot`
+  // angle; rotate the whole <svg> about its centre. VERTEX kinds (line/poly/ink)
+  // are already rotated in their geometry, so `rot` is advisory there — never
+  // re-applied.
+  const rot = item.geom.t === 'rect' || item.geom.t === 'caret' ? (item.rot ?? 0) : 0;
   return (
     <svg
       viewBox={vb}

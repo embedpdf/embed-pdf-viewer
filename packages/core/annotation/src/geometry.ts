@@ -197,9 +197,19 @@ export const DEFAULT_CHROME_GEOM = {
 /** Normalize degrees into `[0, 360)`. */
 export const normalizeDeg = (d: number): number => ((d % 360) + 360) % 360;
 
-/** A geom's applied rotation (deg), or 0 for the non-rotatable kinds. */
+/** A geom's applied rotation (deg), or 0 for the non-rotatable kinds. A
+ *  caret's `rot` is AUTHORING metadata (its text's baseline tilt): reported
+ *  here so the renderer and selection chrome follow it, while the caret's
+ *  caps (not movable/resizable) keep every rotate gesture away from it. */
 export function geomRotation(g: Geom): number {
-  if (g.t === 'rect' || g.t === 'line' || g.t === 'poly' || g.t === 'ink' || g.t === 'text')
+  if (
+    g.t === 'rect' ||
+    g.t === 'line' ||
+    g.t === 'poly' ||
+    g.t === 'ink' ||
+    g.t === 'text' ||
+    g.t === 'caret'
+  )
     return g.rot ?? 0;
   return 0;
 }
@@ -233,13 +243,17 @@ export function centroidOf(g: Geom): Vec {
   return { x: sx / n, y: sy / n };
 }
 
-/** Is this kind rotatable (the geometry carries a meaningful `rot`)? */
+/** Does the geometry carry a meaningful `rot` (an oriented local box exists)?
+ *  ORIENTATION is a geometry fact; whether the USER may rotate is the separate
+ *  `caps.rotatable` gate — a caret is oriented (it rides its text's tilt) yet
+ *  offers no rotate gesture. */
 export function isRotatableGeom(g: Geom): boolean {
   return (
     g.t === 'rect' ||
     g.t === 'line' ||
     g.t === 'poly' ||
     g.t === 'ink' ||
+    g.t === 'caret' ||
     (g.t === 'text' && !g.callout)
   );
 }
@@ -251,7 +265,10 @@ export function isRotatableGeom(g: Geom): boolean {
  *    pivot IS the box centre this is a pure `rot += delta`.
  *  - VERTEX (`line`/`poly`/`ink`): map every point through the rotation AND bump
  *    the advisory `rot` (the points stay the authoritative visual).
- * Non-rotatable kinds (caret/quads, callouts) are returned unchanged.
+ * Kinds without a rotate VERB are returned unchanged: quads and callouts, and
+ * also the caret — oriented (`isRotatableGeom`) but text-anchored, so its tilt
+ * is authoring metadata that no gesture edits (`geomResetRotation` still
+ * clears it).
  */
 export function geomRotateAbout(g: Geom, pivot: Vec, deltaDeg: number): Geom {
   if (deltaDeg === 0) return g;
@@ -413,7 +430,7 @@ export function fitStampBox(center: Vec, desired: Size, page: Size, rotCW: numbe
 export function geomResetRotation(g: Geom): Geom {
   const rot = geomRotation(g);
   if (!rot) return g;
-  if (g.t === 'rect' || g.t === 'text') return { ...g, rot: 0 };
+  if (g.t === 'rect' || g.t === 'text' || g.t === 'caret') return { ...g, rot: 0 };
   const c = centroidOf(g);
   const rotated = geomRotateAbout(g, c, -rot);
   // geomRotateAbout already set rot = normalize(rot - rot) = 0.
@@ -435,7 +452,7 @@ export function obbFromGeom(
 ): { corners: [Vec, Vec, Vec, Vec]; angle: number } | null {
   if (!isRotatableGeom(g)) return null;
   const rot = geomRotation(g);
-  if (g.t === 'rect' || g.t === 'text') {
+  if (g.t === 'rect' || g.t === 'text' || g.t === 'caret') {
     const c = rectCenter(g.rect);
     const corners = rectCornerPoints(g.rect).map((p) => rotatePoint(p, c, rot));
     return { corners: corners as [Vec, Vec, Vec, Vec], angle: rot };
@@ -694,8 +711,8 @@ export function caretRectFromTextEnd(lineRect: Rect): Rect {
  * Caret box for a text-edit anchor: half the glyph's ink height, centered on
  * the TRAILING baseline corner in READING direction (`advance` decides which
  * end — RTL carets land on the visual left), sitting on the baseline. The box
- * stays axis-aligned (Acrobat draws carets upright regardless of text
- * orientation); the oriented anchor only decides WHERE it sits.
+ * stays axis-aligned; use {@link caretGeomFromAnchor} for the tilt-carrying
+ * geometry.
  */
 export function caretRectFromAnchor(anchor: TextEndAnchor): Rect {
   const q = anchor.glyphQuad;
@@ -703,6 +720,48 @@ export function caretRectFromAnchor(anchor: TextEndAnchor): Rect {
   const size = Math.max(ink / 2, 1);
   const corner = anchor.advance > 0 ? q.lowerEnd : q.lowerStart;
   return { x: corner.x - size / 2, y: corner.y - size, width: size, height: size };
+}
+
+/** Rotations closer than ~0.05° to upright stay upright (float noise guard). */
+const CARET_ROT_EPSILON = 0.05;
+
+/**
+ * Caret GEOMETRY for a text-edit anchor: the box-family pair — an UNROTATED
+ * box whose centre sits half a caret-size ascent-ward of the trailing
+ * baseline corner, plus `rot` = the text's baseline tilt (deg, CW in y-down
+ * content space). Rotating the box about its centre by `rot` lands it
+ * hugging the rotated baseline, symbol pointing at its text. For upright
+ * anchors this degenerates EXACTLY to {@link caretRectFromAnchor} with no
+ * `rot` key — the dominant case is byte-identical.
+ */
+export function caretGeomFromAnchor(anchor: TextEndAnchor): Extract<Geom, { t: 'caret' }> {
+  const q = anchor.glyphQuad;
+  const ink = Math.hypot(q.lowerStart.x - q.upperStart.x, q.lowerStart.y - q.upperStart.y);
+  const size = Math.max(ink / 2, 1);
+  const corner = anchor.advance > 0 ? q.lowerEnd : q.lowerStart;
+  // The caret's own orientation follows the TEXT (the symbol points at its
+  // line regardless of reading direction), so the tilt comes from the
+  // baseline edge, not from `advance`.
+  const bx = q.lowerEnd.x - q.lowerStart.x;
+  const by = q.lowerEnd.y - q.lowerStart.y;
+  const rot = Math.hypot(bx, by) > 0 ? normalizeDeg((Math.atan2(by, bx) * 180) / Math.PI) : 0;
+  const upright = rot < CARET_ROT_EPSILON || rot > 360 - CARET_ROT_EPSILON;
+  if (upright) {
+    return {
+      t: 'caret',
+      rect: { x: corner.x - size / 2, y: corner.y - size, width: size, height: size },
+    };
+  }
+  // Centre = trailing corner + (size/2) toward the ascent side.
+  const ux = (q.upperStart.x - q.lowerStart.x) / ink;
+  const uy = (q.upperStart.y - q.lowerStart.y) / ink;
+  const cx = corner.x + (ux * size) / 2;
+  const cy = corner.y + (uy * size) / 2;
+  return {
+    t: 'caret',
+    rect: { x: cx - size / 2, y: cy - size / 2, width: size, height: size },
+    rot,
+  };
 }
 
 /** Map a TextQuad's corners through a point function (names ride along). */
@@ -1052,7 +1111,10 @@ export function geomHit(
   // already-rotated points, so they hit-test directly (rot is advisory). A
   // callout is COMPOUND: only its box rotates (the leader is page-space), so the
   // inverse rotation applies to the box test alone — see the text branch below.
-  if ((g.t === 'rect' || (g.t === 'text' && !g.callout)) && (g.rot ?? 0) !== 0) {
+  if (
+    (g.t === 'rect' || g.t === 'caret' || (g.t === 'text' && !g.callout)) &&
+    (g.rot ?? 0) !== 0
+  ) {
     p = rotatePoint(p, rectCenter(g.rect), -(g.rot ?? 0));
   }
   // A text box is a solid hit target anywhere inside it (+ the click margin).

@@ -70,8 +70,8 @@ export interface AnnotationAppearancesQuery {
  * (y-up), so the consumer can place the bitmap without a second read.
  *
  * Rotation convention: for annotations whose rotation lives in the AP
- * `/Matrix` — box-family kinds (square/circle/free-text/stamp) whose DTO
- * carries BOTH `rotation` and `unrotatedRect` — the raster renders
+ * `/Matrix` — box-family kinds (square/circle/free-text/stamp/caret) whose
+ * DTO carries BOTH `rotation` and `unrotatedRect` — the raster renders
  * ROTATION-STRIPPED and `rect` is the logical `unrotatedRect`; the consumer
  * re-applies the DTO's `rotation` as a view transform about the box centre
  * (e.g. CSS `rotate`), which makes the raster rotation-invariant (rotating

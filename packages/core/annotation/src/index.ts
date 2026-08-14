@@ -94,6 +94,7 @@ export {
   pdfToContentPoint,
   contentToPdfPoint,
   rectFromPoints,
+  caretGeomFromAnchor,
   caretRectFromAnchor,
   caretRectFromTextEnd,
   selectionBounds,

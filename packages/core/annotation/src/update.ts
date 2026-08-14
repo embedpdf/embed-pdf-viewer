@@ -19,7 +19,7 @@ import {
 import { anchoredGeom, anchorModeOf, unanchoredGeom, type ViewEnv } from './anchor';
 import {
   apSizeChanged,
-  caretRectFromAnchor,
+  caretGeomFromAnchor,
   DEFAULT_CHROME_GEOM,
   geomDragHandle,
   geomResetRotation,
@@ -1148,7 +1148,7 @@ function createReplaceText(
     pon,
     subtype: 'caret',
     intent: 'replace',
-    geom: { t: 'caret', rect: caretRectFromAnchor(anchor) },
+    geom: caretGeomFromAnchor(anchor),
     style,
     flags: DRAWN_FLAGS,
     source: 'vector',
@@ -1186,8 +1186,8 @@ function createCaret(
   anchor: TextEndAnchor,
   flags?: Partial<AnnotationFlags>,
 ): [Model, Effect[]] {
-  const caretRect = caretRectFromAnchor(anchor);
-  if (caretRect.width <= 0 || caretRect.height <= 0) return [m, []];
+  const caretGeom = caretGeomFromAnchor(anchor);
+  if (caretGeom.rect.width <= 0 || caretGeom.rect.height <= 0) return [m, []];
   const id = `tmp:${m.seq + 1}`;
   const def = defaultsFor(m, 'caret');
   const annot: Annot = {
@@ -1195,7 +1195,7 @@ function createCaret(
     ref: null,
     pon,
     subtype: 'caret',
-    geom: { t: 'caret', rect: caretRect },
+    geom: caretGeom,
     style: styleFromProps(def),
     flags: { ...DRAWN_FLAGS, ...flags },
     source: 'vector',

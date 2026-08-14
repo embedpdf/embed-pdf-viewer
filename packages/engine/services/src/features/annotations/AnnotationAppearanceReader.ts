@@ -29,13 +29,16 @@ const ANNOT_SUBTYPE_WIDGET = 20;
 const ANNOT_SUBTYPE_FREETEXT = 3;
 
 /**
- * BOX-family subtypes (free-text 3, square 5, circle 6, stamp 13): the kinds
- * whose v3 writers put rotation in the AP `/Matrix` + `/EMBD_Metadata`
- * `/UnrotatedRect`. Only these are eligible for rotation-stripped appearance
- * rendering — vertex kinds (line/polyline/polygon/ink) pre-rotate their
- * geometry, so their rasters must stay on the classic path.
+ * BOX-family subtypes (free-text 3, square 5, circle 6, stamp 13, caret 14):
+ * the kinds whose v3 writers put rotation in the AP `/Matrix` +
+ * `/EMBD_Metadata` `/UnrotatedRect`. Only these are eligible for
+ * rotation-stripped appearance rendering — vertex kinds
+ * (line/polyline/polygon/ink) pre-rotate their geometry, so their rasters must
+ * stay on the classic path. This set MUST cover every kind whose reader
+ * surfaces the rotation pair: `fromDTO` (plugin-annotation repository) mirrors
+ * this exact condition to re-apply the stripped rotation as `apRot`.
  */
-const BOX_FAMILY_SUBTYPES: ReadonlySet<number> = new Set([3, 5, 6, 13]);
+const BOX_FAMILY_SUBTYPES: ReadonlySet<number> = new Set([3, 5, 6, 13, 14]);
 
 /**
  * Maps an `AnnotationAppearanceMode` onto the PDFium appearance-mode int and

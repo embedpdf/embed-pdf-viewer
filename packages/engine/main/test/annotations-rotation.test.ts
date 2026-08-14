@@ -239,4 +239,68 @@ describe('annotation rotation (local engine) — save + reopen', () => {
     }
     await doc.close();
   });
+
+  test('box kind: a rotated caret round-trips its pair and renders a STRIPPED appearance', async () => {
+    engine = await createLocalEngine({ runtime: { prefer: 'wasm' } });
+
+    // Deliberately asymmetric (8×16) so the rotated AABB (16×8) differs from
+    // the unrotated box — the appearance assertion below can then tell the
+    // stripped path (rect = unrotated box) from the classic one (rect = /Rect).
+    const UNROTATED = { left: 70, bottom: 70, right: 78, top: 86 };
+    // 90° about the same centre (74, 78): width/height swap.
+    const ROTATED_AABB = { left: 66, bottom: 74, right: 82, top: 82 };
+
+    let bytes: Uint8Array;
+    {
+      const doc = await engine.open({ kind: 'bytes', id: 'rot-caret', bytes: annotationsPdf });
+      const created = await doc.page(PAGE).annotations.create({
+        subtype: 'caret',
+        contents: 'rotation: caret',
+        rect: ROTATED_AABB,
+        unrotatedRect: UNROTATED,
+        rotation: 90,
+        color: { r: 30, g: 64, b: 175 },
+        opacity: 1,
+      });
+      expect(created.created.subtype).toBe('caret');
+      bytes = await doc.download({ mode: 'rewrite' });
+      await doc.close();
+    }
+
+    const doc = await engine.open({ kind: 'bytes', id: 'rot-caret-reopened', bytes });
+    const list = await doc.page(PAGE).annotations.list();
+    const caret = list.annotations.find(
+      (a) => a.subtype === 'caret' && a.contents === 'rotation: caret',
+    );
+    expect(caret).toBeDefined();
+    if (caret && caret.subtype === 'caret') {
+      expect(caret.rotation).toBe(90);
+      expect(caret.unrotatedRect).toBeDefined();
+      expect(Math.round(caret.unrotatedRect!.left)).toBe(UNROTATED.left);
+      expect(Math.round(caret.unrotatedRect!.bottom)).toBe(UNROTATED.bottom);
+      expect(Math.round(caret.unrotatedRect!.right)).toBe(UNROTATED.right);
+      expect(Math.round(caret.unrotatedRect!.top)).toBe(UNROTATED.top);
+
+      // Caret is BOX-family in the appearance reader: the raster comes back
+      // rotation-stripped, PLACED BY THE LOGICAL UNROTATED BOX — not by
+      // /Rect. (Before caret joined BOX_FAMILY_SUBTYPES this returned the
+      // rotated AABB and the consumer's re-applied `rotation` doubled the
+      // tilt on reload.)
+      const rendered = await doc.page(PAGE).annotations.renderAppearances();
+      const ap = rendered.appearances.find(
+        (a) =>
+          a.ref.kind === 'objectNumber' &&
+          caret.ref.kind === 'objectNumber' &&
+          a.ref.annotObjectNumber === caret.ref.annotObjectNumber,
+      );
+      expect(ap, 'appearance for caret').toBeDefined();
+      expect(ap!.rect.left).toBeCloseTo(UNROTATED.left, 0);
+      expect(ap!.rect.bottom).toBeCloseTo(UNROTATED.bottom, 0);
+      expect(ap!.rect.right).toBeCloseTo(UNROTATED.right, 0);
+      expect(ap!.rect.top).toBeCloseTo(UNROTATED.top, 0);
+      const data = new Uint8Array(ap!.raster.data);
+      expect(data.some((_, idx) => idx % 4 === 3 && data[idx] > 0)).toBe(true); // non-empty
+    }
+    await doc.close();
+  });
 });

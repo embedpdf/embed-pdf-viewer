@@ -7,6 +7,10 @@ import {
   readIntent,
   readRectangleDifferences,
 } from './annotationReadPrimitives';
+import {
+  readAnnotationRotation,
+  readAnnotationUnrotatedRect,
+} from './readAnnotationTransformMetadata';
 import { caretIntentFromName } from '../textEditIntent';
 
 /** Default `/C` colour when a caret has none (matches the writer default). */
@@ -23,6 +27,8 @@ export function readCaret(
   const opacity = ca == null ? 1 : Math.max(0, Math.min(1, ca));
   const rd = readRectangleDifferences(fn, mem, annotPtr);
   const intent = caretIntentFromName(readIntent(fn, mem, annotPtr));
+  const rotation = readAnnotationRotation(fn, mem, annotPtr);
+  const unrotatedRect = readAnnotationUnrotatedRect(fn, mem, annotPtr);
 
   return {
     ...base,
@@ -31,5 +37,7 @@ export function readCaret(
     color,
     opacity,
     rectDifferences: rd,
+    ...(rotation != null ? { rotation } : {}),
+    ...(unrotatedRect ? { unrotatedRect } : {}),
   };
 }

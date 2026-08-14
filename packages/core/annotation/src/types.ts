@@ -123,7 +123,7 @@ export type Geom =
   | { t: 'line'; a: Vec; b: Vec; ends?: LineEndings; rot?: number } // line (points pre-rotated; rot advisory)
   | { t: 'poly'; points: Vec[]; closed: boolean; ends?: LineEndings; rot?: number } // polygon/polyline (pre-rotated; rot advisory)
   | { t: 'quads'; quads: TextQuad[] } // highlight / underline / squiggly / strikeout
-  | { t: 'caret'; rect: Rect } // caret insertion marker
+  | { t: 'caret'; rect: Rect; rot?: number } // caret insertion marker (rect = unrotated box; rot = its text's baseline tilt, authoring metadata — no gesture)
   | { t: 'ink'; strokes: Vec[][]; rot?: number } // freehand ink (pre-rotated; rot advisory)
   | { t: 'text'; rect: Rect; callout?: Callout; rot?: number }; // free-text box (`rect` is the unrotated text box);
 // a `callout` adds a leader line + arrow. The TEXT is data (DTO `contents`),

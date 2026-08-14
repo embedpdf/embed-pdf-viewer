@@ -475,9 +475,12 @@ export function chrome(
     const style = effStyle(a, view);
     const caps = capsFor(a.subtype);
     const rot = geomRotation(g);
-    const obb = caps.rotatable ? obbFromGeom(g, style.strokeWidth, a.style.border) : null;
+    // Oriented chrome follows the GEOMETRY, not the caps: any tilted kind with
+    // an OBB — a caret riding rotated text included — outlines on its tilt.
+    // The rotate KNOB stays caps-gated (`placeSelectionKnob` / `hitTest`), so
+    // an oriented outline never implies a rotate affordance.
+    const obb = obbFromGeom(g, style.strokeWidth, a.style.border);
     if (obb && rot !== 0) {
-      // a tilted shape: draw the oriented box + the rotate knob off its top edge.
       nodes.push({ kind: 'obb', corners: obb.corners, angle: obb.angle });
     } else {
       nodes.push({
