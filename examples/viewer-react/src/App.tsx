@@ -86,7 +86,7 @@ const lazyDoc = (id: string, name: string): InitialDocument => ({
   source: async () => ({
     kind: 'bytes',
     id,
-    bytes: new Uint8Array(await (await fetch('/rotated_text.pdf')).arrayBuffer()),
+    bytes: new Uint8Array(await (await fetch('/ebook.pdf')).arrayBuffer()),
   }),
 });
 
