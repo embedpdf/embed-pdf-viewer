@@ -1,5 +1,11 @@
 # @embedpdf/plugin-search
 
+## 3.0.0-next.4
+
+### Minor Changes
+
+- [#755](https://github.com/embedpdf/embed-pdf-viewer/pull/755) by [@bobsingor](https://github.com/bobsingor) – Represent search-hit geometry as canonical `segments: TextSegment[]` with a precomputed `bounds` envelope. Search reveal now passes that envelope directly to `stage.reveal(hit.pageIndex, { rect: hit.bounds })` instead of manually folding rectangles.
+
 ## 3.0.0-next.3
 
 ## 3.0.0-next.2

@@ -1,5 +1,24 @@
 # @embedpdf/engine-core
 
+## 3.0.0-next.4
+
+### Minor Changes
+
+- [#755](https://github.com/embedpdf/embed-pdf-viewer/pull/755) by [@bobsingor](https://github.com/bobsingor) – Add the canonical affine-aware text layout engine under `text/layout`: `buildPageTextLayout`, `textGlyphAt`, `expandTextRangeToWord`/`Line`, `textGlyphQuad`, and `textSegmentsForRange`, producing `PdfTextSegment { quad, rect, advance }`.
+
+  Orientation frames are derived from the semantic edges of glyph quads and keyed by baseline direction and ascent handedness. Rotated and mirrored text become upright inside their frame, while shear remains an in-frame variation so mixed roman and italic text stays in one segment. Every run in a cluster uses the same canonical frame, and upright documents retain a byte-identical fast path.
+
+- [#755](https://github.com/embedpdf/embed-pdf-viewer/pull/755) by [@bobsingor](https://github.com/bobsingor) – Extend the caret annotation contract with box-family rotation metadata.
+
+  Caret DTOs, drafts, patches, and schemas now carry optional `rotation` and `unrotatedRect` fields with the same tri-state semantics as other box-family annotations. Rotation-stripped appearance documentation now includes carets.
+
+- [#749](https://github.com/embedpdf/embed-pdf-viewer/pull/749) by [@bobsingor](https://github.com/bobsingor) – Adds `share` to the `OpenInput` union and a `SharePasswordRequired` engine error code.
+  - `OpenInputShare` (`{ kind: 'share', shareToken, sharePassword?, password? }`) is the third cloud reference form, alongside `id` and `token`: a public share token from the dashboard's embed snippet, resolved by the cloud engine itself. Rejected by `@embedpdf/engine`, like the other cloud kinds.
+  - `sharePassword` is the grant's passphrase (checked at exchange); `password` stays the PDF's own encryption password, same slot as every other kind.
+  - `EngineErrorCode.SharePasswordRequired` is the prompt-and-retry signal for protected grants — the share sibling of `DocPasswordRequired`.
+
+- [#755](https://github.com/embedpdf/embed-pdf-viewer/pull/755) by [@bobsingor](https://github.com/bobsingor) – Extends page geometry snapshots with an upright/rotated run union, oriented glyph cells, rotation and ascent-flip metadata, uniform quad and bounds helpers, wire schemas, and orientation conformance coverage.
+
 ## 3.0.0-next.3
 
 ## 3.0.0-next.2

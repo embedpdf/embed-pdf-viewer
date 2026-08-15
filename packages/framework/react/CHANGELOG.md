@@ -1,5 +1,19 @@
 # @embedpdf/react
 
+## 3.0.0-next.4
+
+### Minor Changes
+
+- [#755](https://github.com/embedpdf/embed-pdf-viewer/pull/755) by [@bobsingor](https://github.com/bobsingor) – Render search and selection highlights from canonical text segments. Axis-aligned lines retain their classic appearance, while rotated lines render their true oriented cells.
+
+- [#755](https://github.com/embedpdf/embed-pdf-viewer/pull/755) by [@bobsingor](https://github.com/bobsingor) – Render live caret annotations with their text-baseline rotation.
+
+  The React annotation painter now treats caret SVGs as box-family visuals, applying the caret's authoring rotation about its centre while continuing to leave vertex-geometry rotation advisory.
+
+### Patch Changes
+
+- [#755](https://github.com/embedpdf/embed-pdf-viewer/pull/755) by [@bobsingor](https://github.com/bobsingor) – Renders text-selection highlights from oriented segment polygons so the React selection layer follows rotated, sheared, and mirrored text.
+
 ## 3.0.0-next.3
 
 ## 3.0.0-next.2

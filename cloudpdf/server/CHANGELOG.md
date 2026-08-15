@@ -1,5 +1,11 @@
 # @cloudpdf/server
 
+## 3.0.0-next.4
+
+### Patch Changes
+
+- [#750](https://github.com/embedpdf/embed-pdf-viewer/pull/750) by [@bobsingor](https://github.com/bobsingor) – Preserves configured CORS response headers on the hijacked server-sent events stream, allowing browser clients on permitted origins to subscribe to document layer events.
+
 ## 3.0.0-next.3
 
 ### Minor Changes
