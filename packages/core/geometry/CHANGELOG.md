@@ -1,5 +1,11 @@
 # @embedpdf/core-geometry
 
+## 3.0.0-next.4
+
+### Minor Changes
+
+- [#755](https://github.com/embedpdf/embed-pdf-viewer/pull/755) by [@bobsingor](https://github.com/bobsingor) – Adds semantic `TextQuad` geometry with corner-named transforms, bounds, rectangle conversion, positional PDF quad conversion, and resilient normalization for imported `/QuadPoints`.
+
 ## 3.0.0-next.3
 
 ## 3.0.0-next.2

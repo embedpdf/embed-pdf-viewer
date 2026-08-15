@@ -1,5 +1,7 @@
 # @cloudpdf/sdk
 
+## 3.0.0-next.4
+
 ## 3.0.0-next.3
 
 ## 3.0.0-next.2

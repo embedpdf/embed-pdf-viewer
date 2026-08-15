@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/web",
-  "version": "3.0.0-next.3",
+  "version": "3.0.0-next.4",
   "private": false,
   "description": "Framework-free browser adapters for EmbedPDF v3 — the one home for code that touches window/document (file dialog, clipboard, print…). Imported by the framework layers; never by a plugin or a *-core package, which stay DOM-free.",
   "type": "module",

@@ -1,5 +1,14 @@
 # @cloudpdf/viewer
 
+## 3.0.0-next.4
+
+### Minor Changes
+
+- [#749](https://github.com/embedpdf/embed-pdf-viewer/pull/749) by [@bobsingor](https://github.com/bobsingor) – Share sources pass through to the engine; the viewer-only share vocabulary is retired.
+  - `{ kind: 'share' }` is a standard `OpenInput` kind now, resolved by `engine.open()` itself — `resolveCloudConfig` no longer lowers share entries into token sources, and no longer re-threads `baseUrl`/`fetch` into the exchange.
+  - BREAKING (prerelease line): on share sources the grant passphrase field is `sharePassword` (was `password`, which now means the PDF's own encryption password — the same slot every other kind uses). The top-level `shareToken`/`sharePassword` shorthands are unchanged.
+  - `CloudShareSource` and `CloudInitialDocument` remain as deprecated aliases of `OpenInputShare` and `InitialDocument`.
+
 ## 3.0.0-next.3
 
 ## 3.0.0-next.2

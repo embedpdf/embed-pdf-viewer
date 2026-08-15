@@ -1,5 +1,15 @@
 # @embedpdf/engine
 
+## 3.0.0-next.4
+
+### Minor Changes
+
+- [#755](https://github.com/embedpdf/embed-pdf-viewer/pull/755) by [@bobsingor](https://github.com/bobsingor) – Returns orientation-aware page text geometry from the local engine so consumers can select and annotate rotated, sheared, and mirrored text without collapsing glyph cells into axis-aligned boxes.
+
+### Patch Changes
+
+- [#751](https://github.com/embedpdf/embed-pdf-viewer/pull/751) by [@bobsingor](https://github.com/bobsingor) – Export the shared document types (`OpenInput`, `OpenOptions`, `DocumentHandle`, `PageHandle`, `DocumentCapabilities`, `TokenSource`, …) from the package root, mirroring `@cloudpdf/engine`, so code driving the engine directly can name them without importing from the transitive `@embedpdf/engine-core` dependency.
+
 ## 3.0.0-next.3
 
 ## 3.0.0-next.2
