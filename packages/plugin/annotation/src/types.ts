@@ -28,6 +28,8 @@ import type {
   RenderItem,
   SnapSettings,
   Subtype,
+  TextEndAnchor,
+  TextQuad,
   Vec,
   ViewEnv,
 } from '@embedpdf/core-annotation';
@@ -655,16 +657,22 @@ export interface AnnotationHostCapability extends AnnotationCapability {
   /** Commit the strokes currently buffered by an ink tool's grouping window. */
   finishInkDraft(): void;
   cancelCreationDraft(): void;
-  /** Create one text-markup annotation on a page from the selected text's per-line
-   *  rects (content space) — the `text-selection` create gesture. */
-  createMarkup(subtype: Subtype, pon: PageObjectNumber, rects: Rect[], preset?: string): void;
-  /** Create a caret annotation from the final line rect of a text selection. */
-  createCaret(pon: PageObjectNumber, textEndRect: Rect): void;
+  /** Create one text-markup annotation on a page from the selected text's
+   *  per-line oriented quads (content space) — the `text-selection` create
+   *  gesture. Axis-aligned callers build quads with `textQuadFromRect`. */
+  createMarkup(subtype: Subtype, pon: PageObjectNumber, quads: TextQuad[], preset?: string): void;
+  /** Create a caret annotation at a text-selection end anchor. */
+  createCaret(pon: PageObjectNumber, anchor: TextEndAnchor): void;
   /** Create one Adobe-compatible Caret + StrikeOut replace-text group. */
-  createReplaceText(pon: PageObjectNumber, rects: Rect[], textEndRect: Rect, preset?: string): void;
-  /** Set the live markup preview from the selection's per-page rects (renders a
+  createReplaceText(
+    pon: PageObjectNumber,
+    quads: TextQuad[],
+    anchor: TextEndAnchor,
+    preset?: string,
+  ): void;
+  /** Set the live markup preview from the selection's per-page quads (renders a
    *  ghost that looks like the markup it will become). */
-  previewMarkup(subtype: Subtype, rectsByPage: Record<number, Rect[]>, preset?: string): void;
+  previewMarkup(subtype: Subtype, quadsByPage: Record<number, TextQuad[]>, preset?: string): void;
   clearMarkupPreview(): void;
   // ── stamp placement (consumed by the interaction stamp handler) ──
   /** Place the armed stamp centred on a content point. Returns false (no

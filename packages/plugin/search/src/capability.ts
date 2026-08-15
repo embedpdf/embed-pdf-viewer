@@ -1,14 +1,9 @@
 import type { PageObjectNumber, PluginContext } from '@embedpdf/core';
-import {
-  applyRect,
-  boundsOfRects,
-  pageGeometry,
-  type Rect,
-  type RectIn,
-} from '@embedpdf/core-geometry';
+import { type PointIn, type TextQuad, applyPoint, boundsOfRects, pageGeometry, textQuadBounds } from '@embedpdf/core-geometry';
 import { StageToken } from '@embedpdf/plugin-stage';
 import { EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
 import type {
+  PdfQuad,
   PdfRect,
   SearchMatch,
   SearchMode,
@@ -57,20 +52,9 @@ export function createSearchCapability(
   let generation = 0;
   let inflight: { abort(reason?: unknown): void } | null = null;
 
-  const toContent = (m: ReturnType<typeof pageGeometry>['pdfToContent'], b: PdfRect): Rect =>
-    applyRect(
-      m as never,
-      {
-        x: b.left,
-        y: b.bottom,
-        width: b.right - b.left,
-        height: b.top - b.bottom,
-      } as RectIn<'pdf'>,
-    ) as Rect;
-
   interface PageConverter {
     pageIndex: number;
-    toRect: (b: PdfRect) => Rect;
+    toQuad: (q: PdfQuad) => TextQuad;
   }
 
   function hitsFromSlice(slice: SearchSlice): SearchHit[] {
@@ -88,7 +72,20 @@ export function createSearchCapability(
           { crop: layout.boxes.crop, rotation: layout.rotation, userUnit: layout.userUnit },
           1,
         );
-        conv = { pageIndex: layout.index, toRect: (b) => toContent(pdfToContent, b) };
+        // Engine quads carry frame-geometric slot semantics (p1..p4 =
+        // upper-start, upper-end, lower-start, lower-end) — a trusted
+        // producer, so the y-flip maps corners straight onto their names.
+        const toPoint = (pt: { x: number; y: number }) =>
+          applyPoint(pdfToContent as never, pt as PointIn<'pdf'>) as { x: number; y: number };
+        conv = {
+          pageIndex: layout.index,
+          toQuad: (q) => ({
+            upperStart: toPoint(q.p1),
+            upperEnd: toPoint(q.p2),
+            lowerStart: toPoint(q.p3),
+            lowerEnd: toPoint(q.p4),
+          }),
+        };
       }
       converters.set(pon, conv);
       return conv;
@@ -98,12 +95,20 @@ export function createSearchCapability(
     for (const match of slice.matches) {
       const conv = converterFor(match.pageObjectNumber);
       if (!conv) continue;
+      const segments = match.segments.map((segment) => {
+        const quad = conv.toQuad(segment.quad);
+        // `rect` is recomputed from the MAPPED quad so the pair can't drift.
+        return { quad, rect: textQuadBounds(quad), advance: segment.advance };
+      });
       hits.push({
         pon: match.pageObjectNumber,
         pageIndex: conv.pageIndex,
         charStart: match.charStart,
         charCount: match.charCount,
-        rects: match.rects.map(conv.toRect),
+        segments,
+        ...(segments.length
+          ? { bounds: boundsOfRects(segments.map((s) => s.rect)) ?? undefined }
+          : {}),
         ...(match.snippet ? { snippet: match.snippet } : {}),
       });
     }
@@ -235,7 +240,7 @@ export function createSearchCapability(
     // per-call override > plugin config > find-bar default. Zoom never changes.
     const arrival = { ...DEFAULT_REVEAL, ...config.reveal, ...reveal };
     ctx.tryGet(StageToken)?.reveal(hit.pageIndex, {
-      rect: boundsOfRects(hit.rects) ?? undefined,
+      rect: hit.bounds,
       anchor: arrival.anchor,
       behavior: arrival.behavior,
     });

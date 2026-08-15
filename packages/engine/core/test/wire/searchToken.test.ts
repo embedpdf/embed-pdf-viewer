@@ -4,6 +4,7 @@ import {
   decodeTokenText,
   encodeSearchToken,
   encodeTokenText,
+  SEARCH_RESULT_FORMAT,
 } from '../../src/wire';
 import type { SearchToken } from '../../src/wire';
 
@@ -76,5 +77,19 @@ describe('search token codec', () => {
     expect(() => decodeSearchToken('epoch=ff')).toThrow(/missing "q"/);
     expect(() => decodeSearchToken('q=aGk')).toThrow(/missing "epoch"/);
     expect(() => decodeSearchToken('not a token')).toThrow();
+  });
+
+  test('carries the result-format marker and rejects other formats', () => {
+    // ALWAYS encoded (the deliberate exception to omit-defaults): the marker
+    // exists to change the token bytes — and therefore the CDN cache key —
+    // whenever the result representation changes.
+    const token = encodeSearchToken({ epoch: 'e', query: { text: 'x' }, skip: 0 });
+    expect(token).toContain(`format=${SEARCH_RESULT_FORMAT}`);
+    // A pre-segments token (no format field) must fail decode, not silently
+    // pair a new client with an old cached response shape.
+    expect(() => decodeSearchToken('epoch=ff,q=aGk')).toThrow(/unsupported result format/);
+    expect(() => decodeSearchToken(`epoch=ff,format=rects0,q=aGk`)).toThrow(
+      /unsupported result format/,
+    );
   });
 });

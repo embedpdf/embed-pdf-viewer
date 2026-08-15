@@ -19,7 +19,7 @@ import {
 import { anchoredGeom, anchorModeOf, unanchoredGeom, type ViewEnv } from './anchor';
 import {
   apSizeChanged,
-  caretRectFromTextEnd,
+  caretGeomFromAnchor,
   DEFAULT_CHROME_GEOM,
   geomDragHandle,
   geomResetRotation,
@@ -64,6 +64,8 @@ import type {
   Rect,
   Style,
   Subtype,
+  TextEndAnchor,
+  TextQuad,
   Vec,
 } from './types';
 
@@ -306,13 +308,13 @@ export function update(m: Model, msg: Msg): [Model, Effect[]] {
     case 'finishCreationDraft':
       return finishPolyCreate(m);
     case 'createCaret':
-      return createCaret(m, msg.pon, msg.rect, msg.flags);
+      return createCaret(m, msg.pon, msg.anchor, msg.flags);
     case 'createReplaceText':
-      return createReplaceText(m, msg.pon, msg.rects, msg.endRect, msg.preset);
+      return createReplaceText(m, msg.pon, msg.quads, msg.anchor, msg.preset);
     case 'createMarkup':
-      return createMarkup(m, msg.subtype, msg.pon, msg.rects, msg.preset, msg.flags);
+      return createMarkup(m, msg.subtype, msg.pon, msg.quads, msg.preset, msg.flags);
     case 'setMarkupPreview':
-      return setMarkupPreview(m, msg.subtype, msg.rectsByPage, msg.preset);
+      return setMarkupPreview(m, msg.subtype, msg.quadsByPage, msg.preset);
     case 'clearMarkupPreview':
       return m.preview ? [{ ...m, preview: null }, []] : [m, []];
     case 'select': {
@@ -1071,17 +1073,16 @@ function finishPolyCreate(m: Model): [Model, Effect[]] {
   ];
 }
 
-/** Per-line selection rects → /QuadPoints quads (content space, y-down: UL, UR,
- *  LL, LR). Shared by markup creation and the live preview. */
-const rectsToQuads = (rects: Rect[]): Quad[] =>
-  rects
-    .filter((r) => r.width > 0 && r.height > 0)
-    .map((r) => [
-      { x: r.x, y: r.y },
-      { x: r.x + r.width, y: r.y },
-      { x: r.x, y: r.y + r.height },
-      { x: r.x + r.width, y: r.y + r.height },
-    ]);
+/** Drop degenerate segment quads (zero-length baseline or ink extent). Area is
+ *  the cross product of the two edge vectors — orientation-safe. */
+const usableQuads = (quads: TextQuad[]): TextQuad[] =>
+  quads.filter((q) => {
+    const ux = q.upperEnd.x - q.upperStart.x;
+    const uy = q.upperEnd.y - q.upperStart.y;
+    const sx = q.lowerStart.x - q.upperStart.x;
+    const sy = q.lowerStart.y - q.upperStart.y;
+    return Math.abs(ux * sy - uy * sx) > 0;
+  });
 
 /**
  * Build a text-markup annotation from the selection's per-line rects. The new
@@ -1092,11 +1093,11 @@ function createMarkup(
   m: Model,
   subtype: Subtype,
   pon: Annot['pon'],
-  rects: Rect[],
+  segmentQuads: TextQuad[],
   preset: string = subtype,
   flags?: Partial<AnnotationFlags>,
 ): [Model, Effect[]] {
-  const quads = rectsToQuads(rects);
+  const quads = usableQuads(segmentQuads);
   if (!quads.length) return [m, []];
   const id = `tmp:${m.seq + 1}`;
   const annot: Annot = {
@@ -1132,12 +1133,12 @@ function createMarkup(
 function createReplaceText(
   m: Model,
   pon: Annot['pon'],
-  rects: Rect[],
-  textEndRect: Rect,
+  segmentQuads: TextQuad[],
+  anchor: TextEndAnchor,
   preset = 'replace-text',
 ): [Model, Effect[]] {
-  const quads = rectsToQuads(rects);
-  if (!quads.length || textEndRect.width <= 0 || textEndRect.height <= 0) return [m, []];
+  const quads = usableQuads(segmentQuads);
+  if (!quads.length) return [m, []];
   const primaryId = `tmp:${m.seq + 1}`;
   const strikeoutId = `tmp:${m.seq + 2}`;
   const style = styleFromProps(defaultsFor(m, preset));
@@ -1147,7 +1148,7 @@ function createReplaceText(
     pon,
     subtype: 'caret',
     intent: 'replace',
-    geom: { t: 'caret', rect: caretRectFromTextEnd(textEndRect) },
+    geom: caretGeomFromAnchor(anchor),
     style,
     flags: DRAWN_FLAGS,
     source: 'vector',
@@ -1182,10 +1183,11 @@ function createReplaceText(
 function createCaret(
   m: Model,
   pon: Annot['pon'],
-  textEndRect: Rect,
+  anchor: TextEndAnchor,
   flags?: Partial<AnnotationFlags>,
 ): [Model, Effect[]] {
-  if (textEndRect.width <= 0 || textEndRect.height <= 0) return [m, []];
+  const caretGeom = caretGeomFromAnchor(anchor);
+  if (caretGeom.rect.width <= 0 || caretGeom.rect.height <= 0) return [m, []];
   const id = `tmp:${m.seq + 1}`;
   const def = defaultsFor(m, 'caret');
   const annot: Annot = {
@@ -1193,7 +1195,7 @@ function createCaret(
     ref: null,
     pon,
     subtype: 'caret',
-    geom: { t: 'caret', rect: caretRectFromTextEnd(textEndRect) },
+    geom: caretGeom,
     style: styleFromProps(def),
     flags: { ...DRAWN_FLAGS, ...flags },
     source: 'vector',
@@ -1212,16 +1214,16 @@ function createCaret(
   ];
 }
 
-/** Set / replace the live markup preview from the selection's per-page rects. */
+/** Set / replace the live markup preview from the selection's per-page quads. */
 function setMarkupPreview(
   m: Model,
   subtype: Subtype,
-  rectsByPage: Record<number, Rect[]>,
+  quadsByPage: Record<number, TextQuad[]>,
   preset: string = subtype,
 ): [Model, Effect[]] {
-  const byPage: Record<number, Quad[]> = {};
-  for (const k in rectsByPage) {
-    const quads = rectsToQuads(rectsByPage[k]);
+  const byPage: Record<number, TextQuad[]> = {};
+  for (const k in quadsByPage) {
+    const quads = usableQuads(quadsByPage[k]);
     if (quads.length) byPage[Number(k)] = quads;
   }
   return [{ ...m, preview: { subtype, preset, byPage } }, []];

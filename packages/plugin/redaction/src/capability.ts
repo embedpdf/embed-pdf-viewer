@@ -151,8 +151,16 @@ export function createRedactionCapability(
       if (!selection || !selection.hasSelection()) return false;
       const snapshot = selection.snapshot();
       for (const page of snapshot.pages) {
-        if (page.rects.length === 0) continue;
-        anno.createMarkup('redact', page.pon, page.rects, 'redact');
+        if (page.segments.length === 0) continue;
+        // Preserve the selected text frame all the way into `/QuadPoints`.
+        // Native apply now uses these exact cells for text removal and the
+        // final overlay, so marked == previewed == applied for oriented text.
+        anno.createMarkup(
+          'redact',
+          page.pon,
+          page.segments.map((segment) => segment.quad),
+          'redact',
+        );
       }
       selection.clear();
       return true;

@@ -94,6 +94,8 @@ export {
   pdfToContentPoint,
   contentToPdfPoint,
   rectFromPoints,
+  caretGeomFromAnchor,
+  caretRectFromAnchor,
   caretRectFromTextEnd,
   selectionBounds,
   selectionQuad,
@@ -169,6 +171,8 @@ export type {
   Style,
   Subtype,
   TextAlign,
+  TextEndAnchor,
+  TextQuad,
   TextStyle,
   Vec,
 } from './types';

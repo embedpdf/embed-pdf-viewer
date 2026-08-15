@@ -1,1 +1,5 @@
-export { PageGeometryReader } from './PageGeometryReader';
+export {
+  buildRunsFromRawGlyphs,
+  PageGeometryReader,
+  type RawGeometryGlyphRecord,
+} from './PageGeometryReader';

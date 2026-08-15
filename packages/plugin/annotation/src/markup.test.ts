@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { textQuadFromRect } from '@embedpdf/core-geometry';
 import type { InteractionCapability } from '@embedpdf/plugin-interaction';
 import type { SelectionCapability } from '@embedpdf/plugin-selection';
 
@@ -7,10 +8,15 @@ import type { AnnotationHostCapability } from './types';
 
 describe('selection authoring bridge', () => {
   it('previews and commits Replace Text from its declarative tool recipe', () => {
-    const page1 = [{ x: 10, y: 20, width: 50, height: 12 }];
+    const seg = (r: { x: number; y: number; width: number; height: number }) => ({
+      quad: textQuadFromRect(r),
+      rect: r,
+      advance: 1 as const,
+    });
+    const page1 = [seg({ x: 10, y: 20, width: 50, height: 12 })];
     const page2 = [
-      { x: 10, y: 20, width: 80, height: 12 },
-      { x: 10, y: 34, width: 30, height: 12 },
+      seg({ x: 10, y: 20, width: 80, height: 12 }),
+      seg({ x: 10, y: 34, width: 30, height: 12 }),
     ];
     let onChange: () => void = () => {};
     let onCommit: () => void = () => {};
@@ -29,14 +35,14 @@ describe('selection authoring bridge', () => {
       hasSelection: () => true,
       snapshot: () => ({
         pages: [
-          { pon: 1, rects: page1 },
-          { pon: 2, rects: page2 },
+          { pon: 1, segments: page1, rects: page1.map((s) => s.rect) },
+          { pon: 2, segments: page2, rects: page2.map((s) => s.rect) },
         ],
-        start: { pon: 1, rect: page1[0] },
-        end: { pon: 2, rect: page2[1] },
+        start: { pon: 1, glyphQuad: page1[0].quad, advance: 1 as const, rect: page1[0].rect },
+        end: { pon: 2, glyphQuad: page2[1].quad, advance: 1 as const, rect: page2[1].rect },
         direction: 'forward' as const,
       }),
-      rectsForPage: (pon: number) => (pon === 1 ? page1 : page2),
+      segmentsForPage: (pon: number) => (pon === 1 ? page1 : page2),
       setHighlightVisible: vi.fn(),
       clear: vi.fn(),
       onChange: (cb: () => void) => {
@@ -58,7 +64,7 @@ describe('selection authoring bridge', () => {
     expect(selection.setHighlightVisible).toHaveBeenCalledWith(false);
     expect(annotation.previewMarkup).toHaveBeenCalledWith(
       'strikeout',
-      { 1: page1, 2: page2 },
+      { 1: page1.map((s) => s.quad), 2: page2.map((s) => s.quad) },
       'replace-text',
     );
 
@@ -66,15 +72,15 @@ describe('selection authoring bridge', () => {
     expect(annotation.createReplaceText).toHaveBeenNthCalledWith(
       1,
       1,
-      page1,
-      page1[0],
+      page1.map((s) => s.quad),
+      { glyphQuad: page1[0].quad, advance: 1 },
       'replace-text',
     );
     expect(annotation.createReplaceText).toHaveBeenNthCalledWith(
       2,
       2,
-      page2,
-      page2[1],
+      page2.map((s) => s.quad),
+      { glyphQuad: page2[1].quad, advance: 1 },
       'replace-text',
     );
     expect(selection.clear).toHaveBeenCalledOnce();

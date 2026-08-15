@@ -210,13 +210,36 @@ export class RedactionApplier {
 
   private applyAllOnPage(pagePtr: Ptr): { status: 'applied' | 'unchanged'; removed: number } {
     const { fn, mem } = this.runtime;
+    const hasRedactions = this.pageHasRedactAnnotations(pagePtr);
     return withScratch(mem, I32_BYTES, (countPtr) => {
-      // FALSE here means "no REDACT annotations on the page" — nothing was
-      // written, so the page is unchanged, not failed.
       const ok = fn.EPDFPage_ApplyRedactions(pagePtr, countPtr);
-      if (!ok) return { status: 'unchanged' as const, removed: 0 };
+      if (!ok) {
+        // Native FALSE is overloaded: it means either "no REDACT annotations"
+        // or that applying one failed. Distinguish those cases before the
+        // destructive call so a sanitizer failure is never reported as an
+        // unchanged page.
+        if (hasRedactions) {
+          throw new EngineError(EngineErrorCode.Unknown, 'native page redaction apply failed');
+        }
+        return { status: 'unchanged' as const, removed: 0 };
+      }
       return { status: 'applied' as const, removed: readI32(mem, countPtr) >>> 0 };
     });
+  }
+
+  private pageHasRedactAnnotations(pagePtr: Ptr): boolean {
+    const { fn } = this.runtime;
+    const count = fn.FPDFPage_GetAnnotCount(pagePtr);
+    for (let index = 0; index < count; index++) {
+      const annotPtr = fn.FPDFPage_GetAnnot(pagePtr, index);
+      if (!annotPtr) continue;
+      try {
+        if (subtypeFromCode(fn.FPDFAnnot_GetSubtype(annotPtr)) === 'redact') return true;
+      } finally {
+        fn.FPDFPage_CloseAnnot(annotPtr);
+      }
+    }
+    return false;
   }
 
   private applyRefsOnPage(

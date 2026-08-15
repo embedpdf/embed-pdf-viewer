@@ -12,7 +12,8 @@ import {
   foldText,
   matchLiteral,
   matchRegex,
-  searchRectsForRange,
+  buildPageTextLayout,
+  textSegmentsForRange,
   validateSearchQuery,
 } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule } from '@embedpdf/engine-runtime';
@@ -134,12 +135,14 @@ export class SearchReader {
 
       if (ranges.length > 0) {
         const geometry = new PageGeometryReader(this.runtime, this.session).read(pon, signal);
+        // One canonical layout per page, shared by every match on it.
+        const layout = buildPageTextLayout(geometry);
         for (const range of ranges) {
           matches.push({
             pageObjectNumber: pon,
             charStart: range.start,
             charCount: range.length,
-            rects: searchRectsForRange(geometry, range.start, range.length),
+            segments: textSegmentsForRange(layout, range.start, range.length),
             ...(mode === 'full' ? { snippet: buildSnippet(corpus.original, range) } : {}),
           });
         }

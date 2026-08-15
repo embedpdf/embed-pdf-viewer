@@ -18,6 +18,8 @@ export const CaretDTOSchema: z.ZodType<CaretAnnotationDTO> = z.object({
   ...ColorStyleDTOShape,
   intent: CaretIntentSchema.nullable(),
   rectDifferences: PdfRectDifferencesSchema.nullable(),
+  rotation: z.number().optional(),
+  unrotatedRect: PdfRectSchema.optional(),
   subtype: z.literal('caret'),
 }) as unknown as z.ZodType<CaretAnnotationDTO>;
 
@@ -27,6 +29,8 @@ export const CaretDraftSchema: z.ZodType<CaretDraft> = z.object({
   intent: CaretIntentSchema.optional(),
   rect: PdfRectSchema,
   rectDifferences: PdfRectDifferencesSchema.nullable().optional(),
+  rotation: z.number().nullable().optional(),
+  unrotatedRect: PdfRectSchema.nullable().optional(),
   subtype: z.literal('caret'),
 });
 
@@ -36,5 +40,7 @@ export const CaretPatchSchema: z.ZodType<CaretPatch> = z.object({
   intent: CaretIntentSchema.optional(),
   rect: PdfRectSchema.optional(),
   rectDifferences: PdfRectDifferencesSchema.nullable().optional(),
+  rotation: z.number().nullable().optional(),
+  unrotatedRect: PdfRectSchema.nullable().optional(),
   subtype: z.literal('caret'),
 });

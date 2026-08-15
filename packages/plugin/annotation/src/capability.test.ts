@@ -1,3 +1,4 @@
+import { textQuadFromRect } from '@embedpdf/core-geometry';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type {
   AnnotationDTO,
@@ -116,7 +117,12 @@ describe('Replace Text grouped persistence', () => {
       .mockResolvedValueOnce({ created: strikeoutDTO() });
     const rect = { x: 10, y: 20, width: 80, height: 15 };
 
-    h.capability.createReplaceText(PON, [rect], rect, 'replace-text');
+    h.capability.createReplaceText(
+      PON,
+      [textQuadFromRect(rect)],
+      { glyphQuad: textQuadFromRect(rect), advance: 1 },
+      'replace-text',
+    );
     await vi.waitFor(() => expect(h.create).toHaveBeenCalledTimes(2));
 
     expect(h.create.mock.calls[0]![0]).toMatchObject({
@@ -147,7 +153,12 @@ describe('Replace Text grouped persistence', () => {
       .mockRejectedValueOnce(new Error('strikeout failed'));
     const rect = { x: 10, y: 20, width: 80, height: 15 };
 
-    h.capability.createReplaceText(PON, [rect], rect, 'replace-text');
+    h.capability.createReplaceText(
+      PON,
+      [textQuadFromRect(rect)],
+      { glyphQuad: textQuadFromRect(rect), advance: 1 },
+      'replace-text',
+    );
     await vi.waitFor(() => expect(h.remove).toHaveBeenCalledWith(ref(10)));
     await vi.waitFor(() => expect(h.state().model.order).toHaveLength(0));
   });

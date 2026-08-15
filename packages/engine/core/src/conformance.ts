@@ -49,6 +49,11 @@ export type {
   PageTextConformanceFixture,
   PageTextConformanceOptions,
 } from './conformance/runPageTextConformance';
+export { runPageGeometryOrientationConformance } from './conformance/runPageGeometryOrientationConformance';
+export type {
+  PageGeometryOrientationFixture,
+  PageGeometryOrientationOptions,
+} from './conformance/runPageGeometryOrientationConformance';
 export { runSearchConformance } from './conformance/runSearchConformance';
 export type {
   SearchConformanceFixture,

@@ -21,7 +21,7 @@ import type { DocumentManifest, ManifestPage } from '../dto/DocumentManifest';
 import type { LayerScopes } from '../dto/LayerScopes';
 import type { DocumentMetadata } from '../dto/DocumentMetadata';
 import type { MetadataPatch } from '../dto/MetadataPatch';
-import type { PageGeometrySnapshot } from '../dto/PageGeometrySnapshot';
+import type { PageGeometryRun, PageGeometrySnapshot } from '../dto/PageGeometrySnapshot';
 import type { PageBoxes, PageLayout } from '../dto/PageLayout';
 import type { PageListSnapshot } from '../dto/PageListSnapshot';
 import type { PageImageOptions, PageNetworkRenderFormat, PageRenderQuery } from '../dto/PageRender';
@@ -34,7 +34,12 @@ import { EngineErrorCode } from '../errors/EngineErrorCode';
 import type { FormEffectsResult, FormEffect } from '../forms/effects';
 import { FormFieldDTOSchema, FormSnapshotSchema, FormWidgetRefSchema } from '../forms/schema';
 import { FormFieldRefSchema, FormFieldValueSchema } from '../forms/schema';
-import { PdfRectSchema, PdfRotationSchema, PdfSizeSchema } from '../geometry/schemas';
+import {
+  PdfQuadSchema,
+  PdfRectSchema,
+  PdfRotationSchema,
+  PdfSizeSchema,
+} from '../geometry/schemas';
 import type { AppearanceOutcome } from '../annotation/appearance';
 import type { AnnotationListMutationMeta } from '../mutation/AnnotationListMutationMeta';
 import type {
@@ -78,6 +83,7 @@ import type {
   SearchSlice,
   SearchSnippet,
 } from '../search/types';
+import type { PdfTextSegment } from '../text/layout';
 export type { CacheDelta, MutationMeta } from '../mutation/MutationMeta';
 
 export const DocumentMetadataSchema: z.ZodType<DocumentMetadata> = z.object({
@@ -472,12 +478,35 @@ export const PageGeometryGlyphSchema = z.object({
   tightBox: PdfRectSchema.optional(),
 });
 
-export const PageGeometryRunSchema = z.object({
+export const RotatedGeometryGlyphSchema = z.object({
+  looseQuad: PdfQuadSchema,
+  flags: z.number().int().nonnegative(),
+  tightQuad: PdfQuadSchema.optional(),
+});
+
+export const UprightGeometryRunSchema = z.object({
   rect: PdfRectSchema,
   charStart: z.number().int().nonnegative(),
   glyphs: z.array(PageGeometryGlyphSchema),
   fontSize: z.number().optional(),
 });
+
+export const RotatedGeometryRunSchema = z.object({
+  rect: PdfRectSchema,
+  charStart: z.number().int().nonnegative(),
+  glyphs: z.array(RotatedGeometryGlyphSchema),
+  rotation: z.number(),
+  ascentFlip: z.boolean(),
+  fontSize: z.number().optional(),
+});
+
+// Rotated first: in zod's default strip mode the upright shape would accept a
+// zero-glyph rotated run and silently drop its rotation; the rotated shape can
+// never swallow an upright run (it requires `rotation`/`ascentFlip`).
+export const PageGeometryRunSchema: z.ZodType<PageGeometryRun> = z.union([
+  RotatedGeometryRunSchema,
+  UprightGeometryRunSchema,
+]);
 
 export const PageGeometrySnapshotSchema: z.ZodType<PageGeometrySnapshot> = z.object({
   runs: z.array(PageGeometryRunSchema),
@@ -519,11 +548,17 @@ export const SearchSnippetSchema: z.ZodType<SearchSnippet> = z.object({
   matchLength: z.number().int().positive(),
 });
 
+export const PdfTextSegmentSchema: z.ZodType<PdfTextSegment> = z.object({
+  quad: PdfQuadSchema,
+  rect: PdfRectSchema,
+  advance: z.union([z.literal(1), z.literal(-1)]),
+});
+
 export const SearchMatchSchema: z.ZodType<SearchMatch> = z.object({
   pageObjectNumber: z.number().int().positive(),
   charStart: z.number().int().nonnegative(),
   charCount: z.number().int().positive(),
-  rects: z.array(PdfRectSchema),
+  segments: z.array(PdfTextSegmentSchema),
   snippet: SearchSnippetSchema.optional(),
 });
 

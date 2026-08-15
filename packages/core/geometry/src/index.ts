@@ -600,3 +600,162 @@ export function pageGeometry(input: PageGeometryInput, zoom: number): PageGeomet
   const pdfToView = compose(contentToView, pdfToContent);
   return { pdfToContent, contentToView, pdfToView, viewToPdf: invert(pdfToView) };
 }
+
+/* ── TextQuad — corner-named quads for text-anchored geometry ──────────────
+ *
+ * {@link Quad} is deliberately positional (no corner guarantee) because
+ * imported PDF quads have chaotic corner orders. TextQuad is the SEMANTIC
+ * counterpart for quads whose orientation is KNOWN — produced only by code
+ * that established it (selection segments, glyph cells, or `normalizeQuad`
+ * at an ingest boundary), never by casting.
+ *
+ * Corner names are FRAME-GEOMETRIC in the text's own upright frame:
+ * `upper` is the ascent side, `lower` the baseline side, and `start` → `end`
+ * runs along the frame's +x. VISUAL semantics — deliberately NOT reading
+ * order: bidi/advance direction is a glyph-sequence concern carried
+ * separately where consumers need it. In y-down content space an upright
+ * TextQuad has `upper*` at the smaller y.
+ */
+
+export interface TextQuad {
+  upperStart: Point;
+  upperEnd: Point;
+  lowerStart: Point;
+  lowerEnd: Point;
+}
+
+/** A TextQuad tagged with its coordinate space. */
+export type TextQuadIn<S extends Space> = TextQuad & SpaceBrand<S>;
+
+/** Axis-aligned TextQuad over a rect (y-down: upper = smaller y). */
+export function textQuadFromRect(r: Rect): TextQuad {
+  return {
+    upperStart: { x: r.x, y: r.y },
+    upperEnd: { x: r.x + r.width, y: r.y },
+    lowerStart: { x: r.x, y: r.y + r.height },
+    lowerEnd: { x: r.x + r.width, y: r.y + r.height },
+  };
+}
+
+/** The four corners in slot order: upper-start, upper-end, lower-start, lower-end. */
+export function textQuadPoints(t: TextQuad): [Point, Point, Point, Point] {
+  return [t.upperStart, t.upperEnd, t.lowerStart, t.lowerEnd];
+}
+
+/** The corners as a polygon RING (US → UE → LE → LS) — for `<polygon>`/fills. */
+export function textQuadRing(t: TextQuad): [Point, Point, Point, Point] {
+  return [t.upperStart, t.upperEnd, t.lowerEnd, t.lowerStart];
+}
+
+/** Axis-aligned bounds of a TextQuad. */
+export function textQuadBounds(t: TextQuad): Rect {
+  const xs = [t.upperStart.x, t.upperEnd.x, t.lowerStart.x, t.lowerEnd.x];
+  const ys = [t.upperStart.y, t.upperEnd.y, t.lowerStart.y, t.lowerEnd.y];
+  const minX = Math.min(...xs);
+  const minY = Math.min(...ys);
+  return { x: minX, y: minY, width: Math.max(...xs) - minX, height: Math.max(...ys) - minY };
+}
+
+/** Map a TextQuad through an affine transform (corner semantics ride along). */
+export function applyTextQuad<F extends Space, T extends Space>(
+  m: Mat2D<F, T>,
+  t: TextQuadIn<F>,
+): TextQuadIn<T> {
+  return {
+    upperStart: applyPoint(m, t.upperStart as PointIn<F>),
+    upperEnd: applyPoint(m, t.upperEnd as PointIn<F>),
+    lowerStart: applyPoint(m, t.lowerStart as PointIn<F>),
+    lowerEnd: applyPoint(m, t.lowerEnd as PointIn<F>),
+  } as TextQuadIn<T>;
+}
+
+/** Serialize to the positional zigzag convention (`p1..p4` = US, UE, LS, LE). */
+export function positionalQuad(t: TextQuad): Quad {
+  return { p1: t.upperStart, p2: t.upperEnd, p3: t.lowerStart, p4: t.lowerEnd };
+}
+
+const QUAD_EPSILON = 1e-6;
+
+type QuadCornerList = [Point, Point, Point, Point];
+
+function finitePoint(p: Point): boolean {
+  return Number.isFinite(p.x) && Number.isFinite(p.y);
+}
+
+/** Is `[us, ue, ls, le]` a well-formed zigzag reading of a quad? */
+function zigzagWellFormed([us, ue, ls, le]: QuadCornerList): boolean {
+  if (![us, ue, ls, le].every(finitePoint)) return false;
+  const upper = { x: ue.x - us.x, y: ue.y - us.y };
+  const lower = { x: le.x - ls.x, y: le.y - ls.y };
+  const startSide = { x: ls.x - us.x, y: ls.y - us.y };
+  const endSide = { x: le.x - ue.x, y: le.y - ue.y };
+  const lenU = Math.hypot(upper.x, upper.y);
+  const lenL = Math.hypot(lower.x, lower.y);
+  const lenS = Math.hypot(startSide.x, startSide.y);
+  const lenE = Math.hypot(endSide.x, endSide.y);
+  if (lenU <= QUAD_EPSILON || lenL <= QUAD_EPSILON || lenS <= QUAD_EPSILON || lenE <= QUAD_EPSILON)
+    return false;
+  // Opposite edges roughly parallel, same direction (rejects crossed/reversed).
+  if (upper.x * lower.x + upper.y * lower.y <= 0) return false;
+  if (startSide.x * endSide.x + startSide.y * endSide.y <= 0) return false;
+  // Usable area, consistent winding on both ends.
+  const startArea = upper.x * startSide.y - upper.y * startSide.x;
+  const endArea = lower.x * endSide.y - lower.y * endSide.x;
+  if (Math.abs(startArea) <= QUAD_EPSILON * lenU * lenS) return false;
+  if (Math.abs(endArea) <= QUAD_EPSILON * lenL * lenE) return false;
+  return Math.sign(startArea) === Math.sign(endArea);
+}
+
+/**
+ * Interpret an arbitrary positional quad (an imported `/QuadPoints` entry,
+ * already in content space) as a TextQuad — a NORMALIZER, not a cast:
+ *
+ *   1. the de-facto zigzag order (US, UE, LS, LE) passes through untouched —
+ *      this covers every well-formed writer, rotated quads included;
+ *   2. the common ring order (US, UE, LE, LS) is recognized and repaired;
+ *   3. anything else gets a deterministic geometric labeling: corners sorted
+ *      into a ring around their centroid, "upper" = the edge whose midpoint
+ *      sits highest on screen (smallest y). The 180° "which side is up"
+ *      ambiguity is unresolvable from geometry alone — convention decides.
+ *
+ * Drawing code downstream (`markupScene`) reads corner SEMANTICS, so a
+ * mislabeled import can shift an underline to the wrong edge but can never
+ * crash or self-intersect.
+ */
+export function normalizeQuad(q: Quad): TextQuad {
+  const zigzag: QuadCornerList = [q.p1, q.p2, q.p3, q.p4];
+  if (zigzagWellFormed(zigzag)) {
+    return { upperStart: q.p1, upperEnd: q.p2, lowerStart: q.p3, lowerEnd: q.p4 };
+  }
+  const ring: QuadCornerList = [q.p1, q.p2, q.p4, q.p3];
+  if (zigzagWellFormed(ring)) {
+    return { upperStart: q.p1, upperEnd: q.p2, lowerStart: q.p4, lowerEnd: q.p3 };
+  }
+
+  // Deterministic fallback for degenerate/garbage producers.
+  const pts = [q.p1, q.p2, q.p3, q.p4].map((p) => (finitePoint(p) ? p : { x: 0, y: 0 }));
+  const cx = (pts[0].x + pts[1].x + pts[2].x + pts[3].x) / 4;
+  const cy = (pts[0].y + pts[1].y + pts[2].y + pts[3].y) / 4;
+  const ringSorted = [...pts].sort(
+    (a, b) => Math.atan2(a.y - cy, a.x - cx) - Math.atan2(b.y - cy, b.x - cx),
+  );
+  // Pick the ring edge whose midpoint sits highest on screen as the upper edge.
+  let upperEdge = 0;
+  let bestY = Infinity;
+  for (let i = 0; i < 4; i++) {
+    const midY = (ringSorted[i].y + ringSorted[(i + 1) % 4].y) / 2;
+    if (midY < bestY) {
+      bestY = midY;
+      upperEdge = i;
+    }
+  }
+  const a = ringSorted[upperEdge];
+  const b = ringSorted[(upperEdge + 1) % 4];
+  const c = ringSorted[(upperEdge + 2) % 4];
+  const d = ringSorted[(upperEdge + 3) % 4];
+  // Ring [a, b, c, d] with upper edge a→b ⇒ the opposite edge runs d→c.
+  const startFirst = a.x <= b.x;
+  return startFirst
+    ? { upperStart: a, upperEnd: b, lowerStart: d, lowerEnd: c }
+    : { upperStart: b, upperEnd: a, lowerStart: c, lowerEnd: d };
+}

@@ -4,6 +4,7 @@
  * parent's `link` prop, and the reconciler derives the children it should
  * have from the parent's committed geometry.
  */
+import { textQuadBounds } from '@embedpdf/core-geometry';
 import {
   propsFor,
   selectionQuad,
@@ -71,6 +72,6 @@ const quadBounds = (q: Quad): Rect => unionRect(q);
  * `/QuadPoints` (tier 2).
  */
 export function linkChildRects(a: Annot): Rect[] {
-  if (a.geom.t === 'quads') return a.geom.quads.map(quadBounds);
+  if (a.geom.t === 'quads') return a.geom.quads.map(textQuadBounds);
   return [unionRect(selectionQuad(a.geom, a.style.strokeWidth, a.style.border))];
 }

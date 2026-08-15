@@ -81,10 +81,18 @@ export function runSearchConformance(
         );
         for (const m of matches) {
           expect(m.charCount > 0).toBe(true);
-          expect(m.rects.length > 0).toBe(true);
-          for (const r of m.rects) {
-            expect(r.right > r.left).toBe(true);
-            expect(r.top > r.bottom).toBe(true);
+          expect(m.segments.length > 0).toBe(true);
+          for (const s of m.segments) {
+            expect(s.rect.right > s.rect.left).toBe(true);
+            expect(s.rect.top > s.rect.bottom).toBe(true);
+            // The pair is one constructor's output — enforce it stayed that way.
+            const xs = [s.quad.p1.x, s.quad.p2.x, s.quad.p3.x, s.quad.p4.x];
+            const ys = [s.quad.p1.y, s.quad.p2.y, s.quad.p3.y, s.quad.p4.y];
+            expect(Math.abs(s.rect.left - Math.min(...xs)) < 1e-3).toBe(true);
+            expect(Math.abs(s.rect.right - Math.max(...xs)) < 1e-3).toBe(true);
+            expect(Math.abs(s.rect.bottom - Math.min(...ys)) < 1e-3).toBe(true);
+            expect(Math.abs(s.rect.top - Math.max(...ys)) < 1e-3).toBe(true);
+            expect(s.advance === 1 || s.advance === -1).toBe(true);
           }
         }
       } finally {
@@ -233,7 +241,7 @@ export function runSearchConformance(
         expect(matches.length > 0).toBe(true);
         for (const m of matches) {
           expect(m.charCount > 0).toBe(true);
-          expect(m.rects.length > 0).toBe(true);
+          expect(m.segments.length > 0).toBe(true);
         }
       } finally {
         await doc.close();

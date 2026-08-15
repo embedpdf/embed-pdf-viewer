@@ -12,11 +12,14 @@ import {
   isQuarterTurn,
   pdfToContentMatrix,
   rotateAbout,
+  textQuadPoints,
+  textQuadRing,
   type Mat2D,
   type PageRotation,
   type PointIn,
   type RectIn,
   type Size,
+  type TextQuad,
 } from '@embedpdf/core-geometry';
 import { cloudyBorderExtent, cloudyPath, cloudyPolyPath } from './cloudy';
 import { endingNodes, endingPoints } from './endings';
@@ -30,6 +33,7 @@ import type {
   Rect,
   RenderNode,
   Style,
+  TextEndAnchor,
   Vec,
 } from './types';
 
@@ -193,9 +197,19 @@ export const DEFAULT_CHROME_GEOM = {
 /** Normalize degrees into `[0, 360)`. */
 export const normalizeDeg = (d: number): number => ((d % 360) + 360) % 360;
 
-/** A geom's applied rotation (deg), or 0 for the non-rotatable kinds. */
+/** A geom's applied rotation (deg), or 0 for the non-rotatable kinds. A
+ *  caret's `rot` is AUTHORING metadata (its text's baseline tilt): reported
+ *  here so the renderer and selection chrome follow it, while the caret's
+ *  caps (not movable/resizable) keep every rotate gesture away from it. */
 export function geomRotation(g: Geom): number {
-  if (g.t === 'rect' || g.t === 'line' || g.t === 'poly' || g.t === 'ink' || g.t === 'text')
+  if (
+    g.t === 'rect' ||
+    g.t === 'line' ||
+    g.t === 'poly' ||
+    g.t === 'ink' ||
+    g.t === 'text' ||
+    g.t === 'caret'
+  )
     return g.rot ?? 0;
   return 0;
 }
@@ -218,7 +232,7 @@ export const rotatePoint = (p: Vec, pivot: Vec, deg: number): Vec =>
 export function centroidOf(g: Geom): Vec {
   if (g.t === 'rect' || g.t === 'text' || g.t === 'caret') return rectCenter(g.rect);
   if (g.t === 'line') return { x: (g.a.x + g.b.x) / 2, y: (g.a.y + g.b.y) / 2 };
-  const pts = g.t === 'poly' ? g.points : g.t === 'ink' ? g.strokes.flat() : g.quads.flat();
+  const pts = g.t === 'poly' ? g.points : g.t === 'ink' ? g.strokes.flat() : g.quads.flatMap(textQuadPoints);
   let sx = 0;
   let sy = 0;
   for (const p of pts) {
@@ -229,13 +243,17 @@ export function centroidOf(g: Geom): Vec {
   return { x: sx / n, y: sy / n };
 }
 
-/** Is this kind rotatable (the geometry carries a meaningful `rot`)? */
+/** Does the geometry carry a meaningful `rot` (an oriented local box exists)?
+ *  ORIENTATION is a geometry fact; whether the USER may rotate is the separate
+ *  `caps.rotatable` gate — a caret is oriented (it rides its text's tilt) yet
+ *  offers no rotate gesture. */
 export function isRotatableGeom(g: Geom): boolean {
   return (
     g.t === 'rect' ||
     g.t === 'line' ||
     g.t === 'poly' ||
     g.t === 'ink' ||
+    g.t === 'caret' ||
     (g.t === 'text' && !g.callout)
   );
 }
@@ -247,7 +265,10 @@ export function isRotatableGeom(g: Geom): boolean {
  *    pivot IS the box centre this is a pure `rot += delta`.
  *  - VERTEX (`line`/`poly`/`ink`): map every point through the rotation AND bump
  *    the advisory `rot` (the points stay the authoritative visual).
- * Non-rotatable kinds (caret/quads, callouts) are returned unchanged.
+ * Kinds without a rotate VERB are returned unchanged: quads and callouts, and
+ * also the caret — oriented (`isRotatableGeom`) but text-anchored, so its tilt
+ * is authoring metadata that no gesture edits (`geomResetRotation` still
+ * clears it).
  */
 export function geomRotateAbout(g: Geom, pivot: Vec, deltaDeg: number): Geom {
   if (deltaDeg === 0) return g;
@@ -294,7 +315,7 @@ function apFrameSize(g: Geom): Size {
         ? g.points
         : g.t === 'ink'
           ? g.strokes.flat()
-          : g.quads.flat();
+          : g.quads.flatMap(textQuadPoints);
   const b = unionRect(pts);
   return { width: b.width, height: b.height };
 }
@@ -409,7 +430,7 @@ export function fitStampBox(center: Vec, desired: Size, page: Size, rotCW: numbe
 export function geomResetRotation(g: Geom): Geom {
   const rot = geomRotation(g);
   if (!rot) return g;
-  if (g.t === 'rect' || g.t === 'text') return { ...g, rot: 0 };
+  if (g.t === 'rect' || g.t === 'text' || g.t === 'caret') return { ...g, rot: 0 };
   const c = centroidOf(g);
   const rotated = geomRotateAbout(g, c, -rot);
   // geomRotateAbout already set rot = normalize(rot - rot) = 0.
@@ -431,7 +452,7 @@ export function obbFromGeom(
 ): { corners: [Vec, Vec, Vec, Vec]; angle: number } | null {
   if (!isRotatableGeom(g)) return null;
   const rot = geomRotation(g);
-  if (g.t === 'rect' || g.t === 'text') {
+  if (g.t === 'rect' || g.t === 'text' || g.t === 'caret') {
     const c = rectCenter(g.rect);
     const corners = rectCornerPoints(g.rect).map((p) => rotatePoint(p, c, rot));
     return { corners: corners as [Vec, Vec, Vec, Vec], angle: rot };
@@ -686,6 +707,73 @@ export function caretRectFromTextEnd(lineRect: Rect): Rect {
   };
 }
 
+/**
+ * Caret box for a text-edit anchor: half the glyph's ink height, centered on
+ * the TRAILING baseline corner in READING direction (`advance` decides which
+ * end — RTL carets land on the visual left), sitting on the baseline. The box
+ * stays axis-aligned; use {@link caretGeomFromAnchor} for the tilt-carrying
+ * geometry.
+ */
+export function caretRectFromAnchor(anchor: TextEndAnchor): Rect {
+  const q = anchor.glyphQuad;
+  const ink = Math.hypot(q.lowerStart.x - q.upperStart.x, q.lowerStart.y - q.upperStart.y);
+  const size = Math.max(ink / 2, 1);
+  const corner = anchor.advance > 0 ? q.lowerEnd : q.lowerStart;
+  return { x: corner.x - size / 2, y: corner.y - size, width: size, height: size };
+}
+
+/** Rotations closer than ~0.05° to upright stay upright (float noise guard). */
+const CARET_ROT_EPSILON = 0.05;
+
+/**
+ * Caret GEOMETRY for a text-edit anchor: the box-family pair — an UNROTATED
+ * box whose centre sits half a caret-size ascent-ward of the trailing
+ * baseline corner, plus `rot` = the text's baseline tilt (deg, CW in y-down
+ * content space). Rotating the box about its centre by `rot` lands it
+ * hugging the rotated baseline, symbol pointing at its text. For upright
+ * anchors this degenerates EXACTLY to {@link caretRectFromAnchor} with no
+ * `rot` key — the dominant case is byte-identical.
+ */
+export function caretGeomFromAnchor(anchor: TextEndAnchor): Extract<Geom, { t: 'caret' }> {
+  const q = anchor.glyphQuad;
+  const ink = Math.hypot(q.lowerStart.x - q.upperStart.x, q.lowerStart.y - q.upperStart.y);
+  const size = Math.max(ink / 2, 1);
+  const corner = anchor.advance > 0 ? q.lowerEnd : q.lowerStart;
+  // The caret's own orientation follows the TEXT (the symbol points at its
+  // line regardless of reading direction), so the tilt comes from the
+  // baseline edge, not from `advance`.
+  const bx = q.lowerEnd.x - q.lowerStart.x;
+  const by = q.lowerEnd.y - q.lowerStart.y;
+  const rot = Math.hypot(bx, by) > 0 ? normalizeDeg((Math.atan2(by, bx) * 180) / Math.PI) : 0;
+  const upright = rot < CARET_ROT_EPSILON || rot > 360 - CARET_ROT_EPSILON;
+  if (upright) {
+    return {
+      t: 'caret',
+      rect: { x: corner.x - size / 2, y: corner.y - size, width: size, height: size },
+    };
+  }
+  // Centre = trailing corner + (size/2) toward the ascent side.
+  const ux = (q.upperStart.x - q.lowerStart.x) / ink;
+  const uy = (q.upperStart.y - q.lowerStart.y) / ink;
+  const cx = corner.x + (ux * size) / 2;
+  const cy = corner.y + (uy * size) / 2;
+  return {
+    t: 'caret',
+    rect: { x: cx - size / 2, y: cy - size / 2, width: size, height: size },
+    rot,
+  };
+}
+
+/** Map a TextQuad's corners through a point function (names ride along). */
+function mapTextQuad(q: TextQuad, f: (p: Vec) => Vec): TextQuad {
+  return {
+    upperStart: f(q.upperStart),
+    upperEnd: f(q.upperEnd),
+    lowerStart: f(q.lowerStart),
+    lowerEnd: f(q.lowerEnd),
+  };
+}
+
 /* ── line endings ─────────────────────────────────────────────────────────────
  * The breathing room a stroked line/poly needs beyond its vertices, as a factor
  * of the stroke width (matches v2): the half-stroke under the centre-line plus a
@@ -838,7 +926,7 @@ export function geomVisualBounds(g: Geom, strokeWidth: number, border?: Border):
     return expandRect(unionRect(all), strokeWidth / 2);
   }
   if (g.t === 'rect' || g.t === 'text' || g.t === 'caret') return g.rect;
-  if (g.t === 'quads') return expandRect(unionRect(g.quads.flat()), strokeWidth / 2);
+  if (g.t === 'quads') return expandRect(unionRect(g.quads.flatMap(textQuadPoints)), strokeWidth / 2);
   // Ink is round-capped/round-joined: it never spikes, so a plain `h` grow of the
   // freehand hull is exact — left as-is (the freehand look must not change).
   if (g.t === 'ink') return expandRect(unionRect(g.strokes.flat()), strokeWidth / 2);
@@ -998,7 +1086,7 @@ export function geomBounds(g: Geom): Rect {
   if (g.t === 'line') return rectFromPoints(g.a, g.b);
   if (g.t === 'poly') return unionRect(g.points);
   if (g.t === 'ink') return unionRect(g.strokes.flat());
-  return unionRect(g.quads.flat());
+  return unionRect(g.quads.flatMap(textQuadPoints));
 }
 
 /**
@@ -1023,7 +1111,10 @@ export function geomHit(
   // already-rotated points, so they hit-test directly (rot is advisory). A
   // callout is COMPOUND: only its box rotates (the leader is page-space), so the
   // inverse rotation applies to the box test alone — see the text branch below.
-  if ((g.t === 'rect' || (g.t === 'text' && !g.callout)) && (g.rot ?? 0) !== 0) {
+  if (
+    (g.t === 'rect' || g.t === 'caret' || (g.t === 'text' && !g.callout)) &&
+    (g.rot ?? 0) !== 0
+  ) {
     p = rotatePoint(p, rectCenter(g.rect), -(g.rot ?? 0));
   }
   // A text box is a solid hit target anywhere inside it (+ the click margin).
@@ -1099,10 +1190,10 @@ export function geomHit(
         if (segDist(p, stroke[i], stroke[i + 1]) <= tol) return true;
     return false;
   }
-  // quads (markup): axis-aligned per-line rects — hit anywhere inside any quad.
-  // (Use the quad's bbox: robust to the PDF /QuadPoints corner order, which is
-  // UL,UR,LL,LR — a self-intersecting ring for a generic point-in-poly test.)
-  return g.quads.some((q) => rectContains(unionRect(q), p));
+  // quads (markup): oriented per-line cells — hit anywhere inside any quad.
+  // TextQuad rings are simple (non-self-intersecting) by construction, so the
+  // generic point-in-poly test is exact for rotated text too.
+  return g.quads.some((q) => pointInQuad(p, textQuadRing(q)));
 }
 
 export function geomHandles(g: Geom): Handle[] {
@@ -1158,7 +1249,7 @@ export function geomTranslate(g: Geom, d: Vec): Geom {
   if (g.t === 'line') return { ...g, a: mv(g.a), b: mv(g.b) };
   if (g.t === 'poly') return { ...g, points: g.points.map(mv) };
   if (g.t === 'ink') return { ...g, strokes: g.strokes.map((s) => s.map(mv)) };
-  return { ...g, quads: g.quads.map((q) => q.map(mv) as Quad) };
+  return { ...g, quads: g.quads.map((q) => mapTextQuad(q, mv)) };
 }
 
 const OPPOSITE_HANDLE: Record<RectHandle, RectHandle> = {
@@ -1304,10 +1395,10 @@ export function geomScene(g: Geom, strokeWidth = 0, border?: Border): RenderNode
     // each pen stroke is an open polyline (stroke-only; `scene` paints it)
     return g.strokes.map((stroke) => ({ kind: 'poly', points: stroke, closed: false }));
   }
-  // markup fallback: a closed ring per quad. Reorder UL,UR,LL,LR → UL,UR,LR,LL so
-  // it's a simple (non-self-intersecting) rectangle. (The framework markup layer
-  // renders these per-subtype; this keeps the generic scene correct regardless.)
-  return g.quads.map((q) => ({ kind: 'poly', points: [q[0], q[1], q[3], q[2]], closed: true }));
+  // markup fallback: a closed ring per quad (US → UE → LE → LS). The scene
+  // painter renders these per-subtype; this keeps the generic scene correct
+  // regardless, rotated text included.
+  return g.quads.map((q) => ({ kind: 'poly', points: textQuadRing(q), closed: true }));
 }
 
 /* ── PDF ↔ content bridge ─────────────────────────────────────────────────────

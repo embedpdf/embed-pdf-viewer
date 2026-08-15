@@ -22,7 +22,7 @@ export interface SelectionLayerProps {
 export function SelectionLayer({ color = 'rgba(33, 150, 243, 0.35)' }: SelectionLayerProps) {
   const page = usePage();
   const selection = useCapability(SelectionToken);
-  const rects = useSelector(SelectionToken, (c) => c.rectsForPage(page.pon), shallowArray);
+  const segments = useSelector(SelectionToken, (c) => c.segmentsForPage(page.pon), shallowArray);
   // A consumer (e.g. a markup tool drawing its own preview) can take over the
   // selection visual; when it does, we render nothing so the two never overlap.
   const visible = useSelector(SelectionToken, (c) => c.highlightVisible());
@@ -36,26 +36,28 @@ export function SelectionLayer({ color = 'rgba(33, 150, 243, 0.35)' }: Selection
   if (!visible) return null;
 
   return (
-    <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
-      {rects.map((r, i) => {
-        // content space → un-rotated content view px (rides the page's CSS rotation)
-        const tl = page.transform.pageToContent({ x: r.x, y: r.y });
-        const br = page.transform.pageToContent({ x: r.x + r.width, y: r.y + r.height });
+    <svg
+      style={{
+        position: 'absolute',
+        inset: 0,
+        width: '100%',
+        height: '100%',
+        overflow: 'visible',
+        pointerEvents: 'none',
+      }}
+    >
+      {segments.map((s, i) => {
+        // content space → un-rotated content view px (rides the page's CSS
+        // rotation). An affine map, so mapping the four corners is exact —
+        // upright segments render pixel-identical to the old div-per-rect.
+        const ring = [s.quad.upperStart, s.quad.upperEnd, s.quad.lowerEnd, s.quad.lowerStart].map(
+          (p) => page.transform.pageToContent(p),
+        );
         return (
-          <div
-            key={i}
-            style={{
-              position: 'absolute',
-              left: tl.x,
-              top: tl.y,
-              width: br.x - tl.x,
-              height: br.y - tl.y,
-              background: color,
-            }}
-          />
+          <polygon key={i} points={ring.map((p) => `${p.x},${p.y}`).join(' ')} fill={color} />
         );
       })}
-    </div>
+    </svg>
   );
 }
 

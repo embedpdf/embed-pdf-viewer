@@ -11,4 +11,7 @@ export interface CaretDraft extends AnnotationDraftBase, ColorStyleDraftFields {
   rect: PdfRect;
   /** `/RD` inset of the drawn caret from `/Rect`. */
   rectDifferences?: PdfRectDifferences | null;
+  /** Tri-state box-rotation pair (see the DTO): omitted/`null` = upright. */
+  rotation?: number | null;
+  unrotatedRect?: PdfRect | null;
 }

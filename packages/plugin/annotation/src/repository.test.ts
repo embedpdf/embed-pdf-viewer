@@ -1,3 +1,4 @@
+import { textQuadFromRect } from '@embedpdf/core-geometry';
 import { describe, expect, it } from 'vitest';
 import type {
   AnnotationDraft,
@@ -172,12 +173,7 @@ describe('repository — Replace Text authoring', () => {
       geom: {
         t: 'quads',
         quads: [
-          [
-            { x: 10, y: 20 },
-            { x: 90, y: 20 },
-            { x: 10, y: 35 },
-            { x: 90, y: 35 },
-          ],
+          textQuadFromRect({ x: 10, y: 20, width: 80, height: 15 }),
         ],
       },
       style,
@@ -197,6 +193,34 @@ describe('repository — Replace Text authoring', () => {
       subtype: 'strikeout',
       intent: 'strikeout-text-edit',
       flags: { print: true },
+    });
+  });
+
+  it('a rotated caret emits the box-family transform pair', () => {
+    const caret: Annot = {
+      id: 'tmp:3',
+      ref: null,
+      pon: 1,
+      subtype: 'caret',
+      geom: { t: 'caret', rect: { x: 94, y: 53, width: 6, height: 6 }, rot: 270 },
+      style,
+      flags: DRAWN_FLAGS,
+      source: 'vector',
+    };
+    // Content CW 270° → PDF-convention 90; the logical box rides as
+    // unrotatedRect (a square's rotated AABB is itself, so /Rect matches it).
+    expect(toCreateDraft(caret, CROP)).toMatchObject({
+      subtype: 'caret',
+      rotation: 90,
+      unrotatedRect: { left: 94, right: 100, bottom: 741, top: 747 },
+      rect: { left: 94, right: 100, bottom: 741, top: 747 },
+    });
+
+    const upright: Annot = { ...caret, geom: { t: 'caret', rect: caret.geom.rect } };
+    // Tri-state flatten: upright carets STATE null so a stale pair can't linger.
+    expect(toCreateDraft(upright, CROP)).toMatchObject({
+      rotation: null,
+      unrotatedRect: null,
     });
   });
 });
@@ -795,18 +819,8 @@ describe('repository — attached links (fold + desired state + link kind mappin
       geom: {
         t: 'quads',
         quads: [
-          [
-            { x: 0, y: 0 },
-            { x: 50, y: 0 },
-            { x: 0, y: 10 },
-            { x: 50, y: 10 },
-          ],
-          [
-            { x: 0, y: 20 },
-            { x: 30, y: 20 },
-            { x: 0, y: 30 },
-            { x: 30, y: 30 },
-          ],
+          textQuadFromRect({ x: 0, y: 0, width: 50, height: 10 }),
+          textQuadFromRect({ x: 0, y: 20, width: 30, height: 10 }),
         ],
       },
     };

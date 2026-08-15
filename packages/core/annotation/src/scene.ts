@@ -9,17 +9,19 @@
  * underline/strikeout/squiggly STROKE, widths derived from the line height), so it
  * has its own small painter — but it still emits the same generic SceneNodes.
  */
+import { textQuadBounds, textQuadRing } from '@embedpdf/core-geometry';
 import { geomScene } from './geometry';
 import type {
   Geom,
   Paint,
-  Quad,
   Rect,
   RenderItem,
   SceneNode,
   Style,
   Subtype,
+  TextQuad,
   TextStyle,
+  Vec,
 } from './types';
 
 const num = (n: number): number => Number(n.toFixed(3));
@@ -47,58 +49,77 @@ function shapePaint(style: Style, closed: boolean): Paint {
   };
 }
 
-/** A smooth squiggle (quadratic-bezier wave) along a baseline, adapted from v2's
- *  tile: one `Q` hump then reflected `T` segments alternate up/down across the run. */
-function squigglePath(x: number, y: number, w: number, amp: number): string {
+/** A smooth squiggle (quadratic-bezier wave) along an ARBITRARY baseline,
+ *  generated in the (û, n̂) basis: one `Q` hump then reflected `T` segments
+ *  alternate across the run. Reflection is affine-invariant, so an upright
+ *  quad reproduces the old axis-aligned wave byte-for-byte. `n̂` points from
+ *  the baseline toward the ascent side; humps rise toward the text. */
+function squigglePath(start: Vec, u: Vec, n: Vec, w: number, amp: number): string {
   const half = Math.max(2, amp * 1.5); // half a wavelength
-  let d = `M ${num(x)} ${num(y)} Q ${num(x + half / 2)} ${num(y - amp)} ${num(x + half)} ${num(y)}`;
-  for (let px = x + half; px + half <= x + w + 0.5; px += half) {
-    d += ` T ${num(px + half)} ${num(y)}`;
+  const at = (t: number, off: number): Vec => ({
+    x: start.x + u.x * t + n.x * off,
+    y: start.y + u.y * t + n.y * off,
+  });
+  const p = (v: Vec) => `${num(v.x)} ${num(v.y)}`;
+  const hump = at(half / 2, amp);
+  let d = `M ${p(at(0, 0))} Q ${p(hump)} ${p(at(half, 0))}`;
+  for (let t = half; t + half <= w + 0.5; t += half) {
+    d += ` T ${p(at(t + half, 0))}`;
   }
   return d;
 }
 
-/** Per-subtype markup nodes. Quads are axis-aligned per-line rects (UL,UR,LL,LR);
- *  the colour is the markup `/C` (our model keeps stroke==fill). */
-function markupScene(subtype: Subtype, quads: Quad[], style: Style): SceneNode[] {
+/** Per-subtype markup nodes on the quads' own edges (corner-NAMED TextQuads:
+ *  upper = ascent side, lower = baseline side, start → end along the frame).
+ *  The colour is the markup `/C` (our model keeps stroke==fill). Rotated and
+ *  sheared cells draw along their true baselines; upright output is identical
+ *  to the old axis-aligned math. */
+function markupScene(subtype: Subtype, quads: TextQuad[], style: Style): SceneNode[] {
   const color = style.color;
   const opacity = style.opacity;
   const nodes: SceneNode[] = [];
   for (const q of quads) {
-    const x = q[0].x;
-    const y = q[0].y;
-    const w = q[1].x - q[0].x;
-    const h = q[2].y - q[0].y;
+    const down = { x: q.lowerStart.x - q.upperStart.x, y: q.lowerStart.y - q.upperStart.y };
+    const h = Math.hypot(down.x, down.y); // true ink height
+    const wVec = { x: q.lowerEnd.x - q.lowerStart.x, y: q.lowerEnd.y - q.lowerStart.y };
+    const w = Math.hypot(wVec.x, wVec.y); // true baseline length
     if (w <= 0 || h <= 0) continue;
+    const n = { x: down.x / h, y: down.y / h }; // unit, toward the baseline
     const lw = Math.min(2.5, Math.max(0.75, h * 0.06));
     if (subtype === 'underline') {
-      const yy = y + h - lw;
+      // the baseline edge, inset lw off the descent side (the old `y + h − lw`)
       nodes.push({
         kind: 'line',
-        a: { x, y: yy },
-        b: { x: x + w, y: yy },
+        a: { x: q.lowerStart.x - n.x * lw, y: q.lowerStart.y - n.y * lw },
+        b: { x: q.lowerEnd.x - n.x * lw, y: q.lowerEnd.y - n.y * lw },
         paint: { stroke: color, width: lw, opacity, blend: blendFor(style) },
       });
     } else if (subtype === 'strikeout') {
-      const yy = y + h / 2;
       nodes.push({
         kind: 'line',
-        a: { x, y: yy },
-        b: { x: x + w, y: yy },
+        a: {
+          x: (q.upperStart.x + q.lowerStart.x) / 2,
+          y: (q.upperStart.y + q.lowerStart.y) / 2,
+        },
+        b: { x: (q.upperEnd.x + q.lowerEnd.x) / 2, y: (q.upperEnd.y + q.lowerEnd.y) / 2 },
         paint: { stroke: color, width: lw, opacity, blend: blendFor(style) },
       });
     } else if (subtype === 'squiggly') {
       const amp = Math.min(2, Math.max(1, h * 0.08));
+      const u = { x: wVec.x / w, y: wVec.y / w };
+      const start = { x: q.lowerStart.x - n.x * amp, y: q.lowerStart.y - n.y * amp };
       nodes.push({
         kind: 'path',
-        d: squigglePath(x, y + h - amp, w, amp),
+        // n̂ toward ascent = −(toward baseline)
+        d: squigglePath(start, u, { x: -n.x, y: -n.y }, w, amp),
         paint: { stroke: color, width: lw, opacity, blend: blendFor(style) },
       });
     } else {
       // highlight: translucent fill with `multiply` so the text reads through it
       nodes.push({
-        kind: 'rect',
-        rect: { x, y, width: w, height: h },
+        kind: 'poly',
+        points: textQuadRing(q),
+        closed: true,
         paint: { fill: color, opacity, blend: blendFor(style) },
       });
     }
@@ -106,18 +127,31 @@ function markupScene(subtype: Subtype, quads: Quad[], style: Style): SceneNode[]
   return nodes;
 }
 
-/** A redact mark's regions: per-quad boxes (text marks) or the rect (area). */
-function redactRegions(geom: Geom): Rect[] {
+/** A redact mark's regions: per-quad rings (text marks) or the rect (area).
+ *  `bounds` feeds the (axis-aligned) label layout; `ring` is what gets drawn,
+ *  so rotated text marks outline and fill their true cells. */
+interface RedactRegion {
+  ring: [Vec, Vec, Vec, Vec];
+  bounds: Rect;
+}
+
+const rectRing = (r: Rect): [Vec, Vec, Vec, Vec] => [
+  { x: r.x, y: r.y },
+  { x: r.x + r.width, y: r.y },
+  { x: r.x + r.width, y: r.y + r.height },
+  { x: r.x, y: r.y + r.height },
+];
+
+function redactRegions(geom: Geom): RedactRegion[] {
   if (geom.t === 'quads') {
-    const out: Rect[] = [];
+    const out: RedactRegion[] = [];
     for (const q of geom.quads) {
-      const w = q[1].x - q[0].x;
-      const h = q[2].y - q[0].y;
-      if (w > 0 && h > 0) out.push({ x: q[0].x, y: q[0].y, width: w, height: h });
+      const bounds = textQuadBounds(q);
+      if (bounds.width > 0 && bounds.height > 0) out.push({ ring: textQuadRing(q), bounds });
     }
     return out;
   }
-  if (geom.t === 'rect') return [geom.rect];
+  if (geom.t === 'rect') return [{ ring: rectRing(geom.rect), bounds: geom.rect }];
   return [];
 }
 
@@ -183,15 +217,23 @@ function redactScene(item: RenderItem): SceneNode[] {
       width: item.style.strokeWidth || 1.5,
       opacity: item.style.opacity,
     };
-    return regions.map((rect) => ({ kind: 'rect', rect, paint }) as SceneNode);
+    return regions.map(
+      (region) => ({ kind: 'poly', points: region.ring, closed: true, paint }) as SceneNode,
+    );
   }
   const nodes: SceneNode[] = [];
   if (item.style.interiorColor) {
     const fill = { fill: item.style.interiorColor, opacity: 1 };
-    for (const rect of regions) nodes.push({ kind: 'rect', rect, paint: fill });
+    for (const region of regions) {
+      nodes.push({ kind: 'poly', points: region.ring, closed: true, paint: fill });
+    }
   }
   if (item.label) {
-    for (const region of regions) nodes.push(...layoutRedactLabel(region, item.label, item.text));
+    // Label tiling stays axis-aligned inside the region's bounds — the live
+    // preview approximates; the engine's apply-time painter bakes the truth.
+    for (const region of regions) {
+      nodes.push(...layoutRedactLabel(region.bounds, item.label, item.text));
+    }
   }
   return nodes;
 }

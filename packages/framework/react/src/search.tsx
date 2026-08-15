@@ -43,23 +43,50 @@ export function SearchLayer({
   return (
     <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
       {hits.map((hit: SearchHit) =>
-        hit.rects.map((r, i) => {
-          const tl = page.transform.pageToContent({ x: r.x, y: r.y });
-          const br = page.transform.pageToContent({ x: r.x + r.width, y: r.y + r.height });
+        hit.segments.map(({ quad: q }, i) => {
+          const fill = hit === active ? activeColor : color;
+          // Upright hits keep the classic rounded div (pixel-identical to the
+          // pre-orientation layer); rotated hits draw their true oriented cell.
+          const upright =
+            q.upperStart.y === q.upperEnd.y &&
+            q.lowerStart.y === q.lowerEnd.y &&
+            q.upperStart.x === q.lowerStart.x;
+          if (upright) {
+            const tl = page.transform.pageToContent(q.upperStart);
+            const br = page.transform.pageToContent(q.lowerEnd);
+            return (
+              <div
+                key={`${hit.charStart}:${i}`}
+                style={{
+                  position: 'absolute',
+                  left: tl.x,
+                  top: tl.y,
+                  width: br.x - tl.x,
+                  height: br.y - tl.y,
+                  background: fill,
+                  mixBlendMode: blendMode,
+                  borderRadius: 2,
+                }}
+              />
+            );
+          }
+          const ring = [q.upperStart, q.upperEnd, q.lowerEnd, q.lowerStart].map((p) =>
+            page.transform.pageToContent(p),
+          );
           return (
-            <div
+            <svg
               key={`${hit.charStart}:${i}`}
               style={{
                 position: 'absolute',
-                left: tl.x,
-                top: tl.y,
-                width: br.x - tl.x,
-                height: br.y - tl.y,
-                background: hit === active ? activeColor : color,
+                inset: 0,
+                width: '100%',
+                height: '100%',
+                overflow: 'visible',
                 mixBlendMode: blendMode,
-                borderRadius: 2,
               }}
-            />
+            >
+              <polygon points={ring.map((p) => `${p.x},${p.y}`).join(' ')} fill={fill} />
+            </svg>
           );
         }),
       )}

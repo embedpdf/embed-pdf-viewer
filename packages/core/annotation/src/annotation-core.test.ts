@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { textQuadFromRect } from '@embedpdf/core-geometry';
 import {
   annotsInBox,
   defaultsFor,
@@ -34,7 +35,8 @@ import {
   calloutLinePoints,
   selectionBounds,
   shapeRectFor,
-  caretRectFromTextEnd,
+  caretGeomFromAnchor,
+  caretRectFromAnchor,
   contentToPdfRect,
   pdfToContentRect,
   contentToPdfPoint,
@@ -421,11 +423,111 @@ describe('annotation-core', () => {
     expect(creationDraftAnchor(m)).toBeNull();
   });
 
-  it('creates a caret at the end of a text line rect', () => {
-    const lineRect = { x: 20, y: 40, width: 80, height: 20 };
-    expect(caretRectFromTextEnd(lineRect)).toEqual({ x: 95, y: 50, width: 10, height: 10 });
+  it('caretGeomFromAnchor: upright anchors stay byte-identical, rotated carry rot', () => {
+    const upright = {
+      glyphQuad: textQuadFromRect({ x: 90, y: 40, width: 10, height: 20 }),
+      advance: 1 as const,
+    };
+    expect(caretGeomFromAnchor(upright)).toEqual({
+      t: 'caret',
+      rect: caretRectFromAnchor(upright),
+    });
 
-    const [m, fx] = update(initialModel, { t: 'createCaret', pon: PON, rect: lineRect });
+    // 90°-CCW column in content space: baseline runs UP-screen (lowerStart
+    // (100,80) → lowerEnd (100,56)), ascent points LEFT toward x=88.
+    const rotated = {
+      glyphQuad: {
+        upperStart: { x: 88, y: 80 },
+        upperEnd: { x: 88, y: 56 },
+        lowerStart: { x: 100, y: 80 },
+        lowerEnd: { x: 100, y: 56 },
+      },
+      advance: 1 as const,
+    };
+    const geom = caretGeomFromAnchor(rotated);
+    expect(geom.rot).toBeCloseTo(270, 5); // up-screen, CW-positive convention
+    // ink = 12 → size 6; centre = trailing corner (100,56) + 3·ascent(−1,0).
+    expect(geom.rect.x).toBeCloseTo(94, 5);
+    expect(geom.rect.y).toBeCloseTo(53, 5);
+    expect(geom.rect.width).toBe(6);
+    expect(geom.rect.height).toBe(6);
+
+    // RTL anchors place at the START corner; the tilt still follows the TEXT.
+    const rtl = { glyphQuad: rotated.glyphQuad, advance: -1 as const };
+    const rtlGeom = caretGeomFromAnchor(rtl);
+    expect(rtlGeom.rot).toBeCloseTo(270, 5);
+    expect(rtlGeom.rect.y).toBeCloseTo(77, 5); // centred off lowerStart (100,80)
+  });
+
+  it('a tilted caret draws oriented chrome (obb) with no rotate knob or handles', () => {
+    // The 90°-CCW column anchor from above: caretGeomFromAnchor yields rot 270.
+    const anchor = {
+      glyphQuad: {
+        upperStart: { x: 88, y: 80 },
+        upperEnd: { x: 88, y: 56 },
+        lowerStart: { x: 100, y: 80 },
+        lowerEnd: { x: 100, y: 56 },
+      },
+      advance: 1 as const,
+    };
+    const [m] = update(initialModel, { t: 'createCaret', pon: PON, anchor });
+    const a = m.byId[m.order[0]];
+    expect(a.geom).toMatchObject({ t: 'caret', rot: expect.closeTo(270, 5) });
+
+    // Create auto-selects; oriented chrome follows the GEOMETRY, not the caps…
+    const c = chrome(m, PON);
+    expect(c.find((n) => n.kind === 'obb')).toMatchObject({
+      kind: 'obb',
+      angle: expect.closeTo(270, 5),
+    });
+    expect(c.some((n) => n.kind === 'outline')).toBe(false);
+    // …while every rotate/resize AFFORDANCE stays caps-gated off: no knob (the
+    // hit-test knob branch shares the same gate), no handles.
+    expect(selectionKnob(m, PON)).toBeNull();
+    expect(c.some((n) => n.kind === 'handle')).toBe(false);
+  });
+
+  it('an upright caret keeps the plain axis-aligned outline', () => {
+    const anchor = {
+      glyphQuad: textQuadFromRect({ x: 90, y: 40, width: 10, height: 20 }),
+      advance: 1 as const,
+    };
+    const [m] = update(initialModel, { t: 'createCaret', pon: PON, anchor });
+    const c = chrome(m, PON);
+    expect(c.some((n) => n.kind === 'obb')).toBe(false);
+    expect(c.find((n) => n.kind === 'outline')).toBeDefined();
+  });
+
+  it('obbFromGeom/geomResetRotation treat the caret as a box-family geom', () => {
+    const g: Geom = { t: 'caret', rect: { x: 94, y: 53, width: 6, height: 6 }, rot: 270 };
+    const obb = obbFromGeom(g, 0)!;
+    expect(obb.angle).toBe(270);
+    // A SQUARE box under a quarter turn about its own centre lands on the same
+    // four corner positions (relabeled) — an order-insensitive, convention-free
+    // check that the caret takes the box branch (rect spun about its centre).
+    const sorted = (pts: { x: number; y: number }[]) =>
+      [...pts]
+        .map((p) => ({ x: Math.round(p.x * 1e6) / 1e6, y: Math.round(p.y * 1e6) / 1e6 }))
+        .sort((p, q) => p.x - q.x || p.y - q.y);
+    expect(sorted(obb.corners)).toEqual(
+      sorted([
+        { x: 94, y: 53 },
+        { x: 100, y: 53 },
+        { x: 100, y: 59 },
+        { x: 94, y: 59 },
+      ]),
+    );
+    expect(geomResetRotation(g)).toEqual({ ...g, rot: 0 });
+  });
+
+  it('creates a caret at the trailing edge of the boundary glyph', () => {
+    const anchor = {
+      glyphQuad: textQuadFromRect({ x: 90, y: 40, width: 10, height: 20 }),
+      advance: 1 as const,
+    };
+    expect(caretRectFromAnchor(anchor)).toEqual({ x: 95, y: 50, width: 10, height: 10 });
+
+    const [m, fx] = update(initialModel, { t: 'createCaret', pon: PON, anchor });
     const a = m.byId[m.order[0]];
     expect(a).toMatchObject({
       subtype: 'caret',
@@ -453,8 +555,8 @@ describe('annotation-core', () => {
     const [m, fx] = update(seeded, {
       t: 'createReplaceText',
       pon: PON,
-      rects,
-      endRect: rects[1],
+      quads: rects.map(textQuadFromRect),
+      anchor: { glyphQuad: textQuadFromRect(rects[1]), advance: 1 },
       preset: 'replace-text',
     });
 
@@ -484,8 +586,8 @@ describe('annotation-core', () => {
     let m = update(initialModel, {
       t: 'createReplaceText',
       pon: PON,
-      rects: [rect],
-      endRect: rect,
+      quads: [textQuadFromRect(rect)],
+      anchor: { glyphQuad: textQuadFromRect(rect), advance: 1 },
     })[0];
     const [caretTemp, strikeoutTemp] = m.order;
     const durableId = `obj:${PON}:42`;
@@ -911,7 +1013,7 @@ describe('annotation-core', () => {
     const m = update(initialModel, {
       t: 'setMarkupPreview',
       subtype: 'highlight',
-      rectsByPage: { [PON]: [{ x: 10, y: 10, width: 80, height: 12 }] },
+      quadsByPage: { [PON]: [textQuadFromRect({ x: 10, y: 10, width: 80, height: 12 })] },
     })[0];
     const ghost = pageItems(m, PON).find((i) => i.source === 'ghost');
     expect(ghost?.subtype).toBe('highlight');
@@ -924,12 +1026,7 @@ describe('annotation-core', () => {
     const quads: Geom = {
       t: 'quads',
       quads: [
-        [
-          { x: 0, y: 0 },
-          { x: 100, y: 0 },
-          { x: 0, y: 12 },
-          { x: 100, y: 12 },
-        ],
+        textQuadFromRect({ x: 0, y: 0, width: 100, height: 12 }),
       ],
     };
     const mk = (subtype: string): RenderItem => ({
@@ -950,7 +1047,7 @@ describe('annotation-core', () => {
       selected: false,
     });
     const hi = scene(mk('highlight'));
-    expect(hi[0]).toMatchObject({ kind: 'rect', paint: { fill: '#ffd400', blend: 'multiply' } });
+    expect(hi[0]).toMatchObject({ kind: 'poly', closed: true, paint: { fill: '#ffd400', blend: 'multiply' } });
     const sq = scene(mk('squiggly'));
     expect(sq[0].kind).toBe('path');
     expect(sq[0].paint.stroke).toBe('#ffd400');
@@ -1241,12 +1338,7 @@ describe('annotation-core', () => {
       geom: {
         t: 'quads',
         quads: [
-          [
-            { x: 10, y: 10 },
-            { x: 90, y: 10 },
-            { x: 10, y: 30 },
-            { x: 90, y: 30 },
-          ],
+          textQuadFromRect({ x: 10, y: 10, width: 80, height: 20 }),
         ],
       },
       style: {
@@ -1424,12 +1516,7 @@ describe('annotation-core', () => {
       geom: {
         t: 'quads',
         quads: [
-          [
-            { x: 0, y: 0 },
-            { x: 100, y: 0 },
-            { x: 0, y: 100 },
-            { x: 100, y: 100 },
-          ],
+          textQuadFromRect({ x: 0, y: 0, width: 100, height: 100 }),
         ],
       },
       style: {
@@ -2186,12 +2273,7 @@ describe('annotation-core — selectionAnchor carries the knob alongside a centr
       ...square('s2', {
         t: 'quads',
         quads: [
-          [
-            { x: 10, y: 10 },
-            { x: 90, y: 10 },
-            { x: 10, y: 22 },
-            { x: 90, y: 22 },
-          ],
+          textQuadFromRect({ x: 10, y: 10, width: 80, height: 12 }),
         ],
       }),
       subtype: 'highlight',
