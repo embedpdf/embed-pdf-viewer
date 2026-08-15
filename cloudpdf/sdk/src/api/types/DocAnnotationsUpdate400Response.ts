@@ -19,6 +19,7 @@ export namespace DocAnnotationsUpdate400Response {
         DocOpenFailed: "DocOpenFailed",
         DocPasswordRequired: "DocPasswordRequired",
         DocPasswordIncorrect: "DocPasswordIncorrect",
+        SharePasswordRequired: "SharePasswordRequired",
         Aborted: "Aborted",
         Network: "Network",
         Unauthenticated: "Unauthenticated",
