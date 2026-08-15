@@ -8603,6 +8603,8 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
         opacity: number;
         intent: DocAnnotationsList200ResponseAnnotationsItemCaret.Intent | null;
         rectDifferences: DocAnnotationsList200ResponseAnnotationsItemCaret.RectDifferences | null;
+        rotation?: number | undefined;
+        unrotatedRect?: DocAnnotationsList200ResponseAnnotationsItemCaret.UnrotatedRect | undefined;
     }
 
     export namespace DocAnnotationsList200ResponseAnnotationsItemCaret {
@@ -9261,6 +9263,13 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
             top: number;
             right: number;
             bottom: number;
+        }
+
+        export interface UnrotatedRect {
+            left: number;
+            bottom: number;
+            right: number;
+            top: number;
         }
     }
 
