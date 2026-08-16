@@ -42,6 +42,7 @@ const MOUNTS = {
   ],
   samples: [
     { from: 'samples/stage', to: 'src/samples/stage' },
+    { from: 'samples/selection', to: 'src/samples/selection' },
     { from: 'samples/getting-started', to: 'src/samples/getting-started' },
     { from: 'samples/viewer', to: 'src/samples/viewer' },
   ],

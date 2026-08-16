@@ -1,0 +1,237 @@
+---
+title: Selection
+description: Add visual and programmatic text selection without requiring a DOM text layer.
+---
+
+# Selection
+
+The Selection plugin lets people select text with the pointer, and lets your
+application select the same text with code. It works from PDF text geometry,
+so selecting and highlighting text does not require extracting the literal
+text.
+
+That distinction is useful for permissions: you can allow selection and text
+markups while keeping copy disabled.
+
+## Your first selection
+
+Register the interaction, selection, Stage, and render plugins. Then add a
+`<SelectionLayer>` above the rendered page:
+
+<Example name="selection/basic" mode="open" />
+
+> **Try it:** drag over text, double-click a word, or triple-click a line. A
+> selection can continue from one page to another.
+
+There are two small but important pieces in the example:
+
+- `stagePlugin({ interaction: true })` connects the Stage to the shared
+  interaction system.
+- `<Stage interaction>` sends pointer events through that system. The
+  Selection plugin handles them, while `<SelectionLayer>` only draws the
+  result.
+
+This keeps input, selection state, and rendering separate. You can replace the
+highlight layer without changing how selection works.
+
+At this point, the viewer reads glyph geometry only. It does not request page
+text until your application calls `readText()` or enables clipboard prefetch.
+
+## Select text with code
+
+`useSelection()` gives you the same capability used by pointer gestures. A
+programmatic selection updates the highlight and fires the same change signal:
+
+<Example name="selection/programmatic" />
+
+For one page, pass its durable page object number (`pon`), a starting character
+index, and a character count:
+
+```ts
+selection.select({
+  pon: page.pon,
+  start: 20,
+  count: 40,
+});
+```
+
+Search results use this same character space, so selecting a result needs no
+text-offset conversion:
+
+```ts
+selection.select({
+  pon: hit.pageObjectNumber,
+  start: hit.charStart,
+  count: hit.charCount,
+});
+```
+
+For a range that crosses pages, use `start` and `end` positions:
+
+```ts
+selection.select({
+  start: { pon: firstPage.pon, index: 120 },
+  end: { pon: lastPage.pon, index: 35 },
+});
+```
+
+Ranges are **half-open**: `start` is included and `end` is not. The range
+`[20, 60)` selects characters 20 through 59. These are PDF character indexes,
+not JavaScript string offsets.
+
+Use `selectAll()` for the whole document and `clear()` to remove the current
+selection. An empty range also clears it.
+
+## Read the selection
+
+`snapshot()` is the complete read model. Its `range` can be saved and passed
+back to `select()` later:
+
+```ts
+const saved = selection.snapshot().range;
+
+// Later, after navigation or another action
+if (saved) selection.select(saved);
+```
+
+The snapshot also contains the per-page highlight segments, selection
+direction, and start/end geometry. For common UI, the smaller reads are easier:
+
+```ts
+selection.hasSelection();
+selection.selectedPages();
+selection.menuAnchor();
+selection.segmentsForPage(page.pon);
+```
+
+Use `onChange()` when something should follow the selection while it changes.
+Use `onCommit()` when something should happen after a pointer gesture finishes,
+such as creating a markup or prefetching text for copy.
+
+## Copy selected text
+
+Selection and clipboard access are two separate operations:
+
+```ts
+const text = await selection.readText();
+```
+
+`readText()` returns data and does not touch the clipboard. It reads only the
+selected page ranges and caches each page's text snapshot. Pages in a
+cross-page selection are joined with a newline. With no selection, it returns
+an empty string.
+
+For a browser clipboard, use the React helpers:
+
+```tsx
+import {
+  SelectionClipboard,
+  SelectionToken,
+  copySelection,
+  useSelection,
+} from '@embedpdf/react/selection';
+import { useSelector } from '@embedpdf/react/runtime';
+
+function CopyButton() {
+  const selection = useSelection();
+  const hasSelection = useSelector(SelectionToken, (value) => value.hasSelection());
+
+  return (
+    <button
+      disabled={!hasSelection || !selection.canCopy()}
+      onClick={() => void copySelection(selection)}
+    >
+      Copy
+    </button>
+  );
+}
+
+// Mount once per document view to support ctrl/cmd+C and native Copy.
+function DocumentView() {
+  return <SelectionClipboard />;
+}
+```
+
+`<SelectionClipboard>` prefetches selected text when the selection settles so
+the synchronous browser `copy` event can answer immediately. Keep that default
+when you want native Copy support. Use `prefetch={false}` when your UI calls
+`copySelection()` itself and you want text reads to happen only on demand.
+
+Clipboard access stays in the web adapter. The Selection plugin itself is
+DOM-free, so `readText()` also works in Node, tests, native adapters, and other
+headless environments.
+
+## Add a selection menu
+
+`<SelectionMenu>` anchors one piece of UI to the end of the selection. It stays
+hidden while the user is dragging and appears when the selection settles:
+
+<Example name="selection/menu" />
+
+Mount the menu in the Stage's `overlay` prop. The Stage then keeps it attached
+to the selected text while the user scrolls or zooms.
+
+The menu only handles placement. Its contents are yours: copy, comment,
+highlight, redact, or any action your product supports.
+
+## Selection and copy permissions
+
+Selection geometry and literal text are separate resources:
+
+| Capability        | What it allows                               |
+| ----------------- | -------------------------------------------- |
+| `doc.text.select` | Receive glyph geometry and create selections |
+| `doc.text.copy`   | Receive literal text through `readText()`    |
+| `doc.text.search` | Search text through the search service       |
+
+The public checks mirror those permissions:
+
+```ts
+selection.canSelect(); // doc.text.select
+selection.canCopy(); // doc.text.copy
+```
+
+Use them to hide or disable controls, but do not treat them as the security
+boundary. Both the local and cloud engines enforce the permissions too.
+
+When `canSelect()` is false, the plugin does not request glyph geometry and
+pointer selection stays inactive. Programmatic `select()` and `selectAll()`
+throw `PermissionDenied`. `clear()` is always allowed.
+
+When `canCopy()` is false, selection can still work normally. The user can
+select text and, with annotation permission, create highlights or underlines;
+`readText()` rejects with `PermissionDenied`, and no literal page text is
+returned.
+
+For example, this policy allows markup without copy:
+
+```text
+doc.text.select       allowed
+doc.annotate.modify   allowed
+doc.text.copy         denied
+```
+
+## API at a glance
+
+| Method                 | Purpose                                                  |
+| ---------------------- | -------------------------------------------------------- |
+| `canSelect()`          | Check whether selection is allowed                       |
+| `canCopy()`            | Check whether literal text extraction is allowed         |
+| `select(range)`        | Select a single-page or cross-page character range       |
+| `selectAll()`          | Select the whole document                                |
+| `clear()`              | Clear the selection                                      |
+| `snapshot()`           | Read the complete selection model                        |
+| `hasSelection()`       | Check whether anything is selected                       |
+| `isSelecting()`        | Check whether a pointer selection gesture is in progress |
+| `menuAnchor()`         | Get the anchor for selection-scoped floating UI          |
+| `selectedPages()`      | Get pages with materialized selection segments           |
+| `segmentsForPage(pon)` | Get oriented highlight segments for one page             |
+| `rectsForPage(pon)`    | Get simple bounding boxes for one page                   |
+| `readText()`           | Read selected literal text                               |
+| `onChange(callback)`   | Observe selection changes                                |
+| `onCommit(callback)`   | Observe the end of pointer selection gestures            |
+
+Application code should import this public surface from
+`@embedpdf/plugin-selection` or its framework adapter. The `/internal` entry
+point is for framework and plugin integration and is not a public application
+contract.
