@@ -1,28 +1,37 @@
 /**
  * @embedpdf/plugin-selection — text selection over the engine's text geometry.
  *
- * Standard layout: types.ts · geometry.ts (pure bridge) · reducer.ts ·
- * capability.ts · handler.ts · selection.plugin.ts. The first real client of the
- * interaction hub, and the first consumer of the PDF↔content geometry bridge.
+ * The PUBLIC surface: the plugin factory, the capability token (narrowed to
+ * the public lens), and the range/read vocabulary. Selection ranges live in
+ * CHARACTER space (half-open `TextRange` — the same space search hits
+ * address), geometry needs `doc.text.select`, text extraction needs
+ * `doc.text.copy`, and neither permission implies the other.
+ *
+ * Framework/host plumbing (gesture intents, geometry warming, the reducer,
+ * the coordinate seam) lives behind `@embedpdf/plugin-selection/internal`.
+ * Clipboard writes live in `@embedpdf/web` — this package is DOM-free.
  */
+import type { CapabilityToken } from '@embedpdf/core';
+import { SelectionToken as SelectionHostToken } from './types';
+import type { SelectionCapability } from './types';
+
 export { selectionPlugin } from './selection.plugin';
-export { createSelectionCapability } from './capability';
-export { createTextSelectHandler } from './handler';
-export { initialSelectionState, selectionReducer } from './reducer';
-export {
-  buildSelectionPageGeometry,
-  contentPointToPdf,
-  toContentSegment,
-  toContentTextQuad,
-} from './geometry';
-export type { SelectionPageGeometry, SelectionSegment } from './geometry';
-export { SelectionToken } from './types';
 export type {
-  GlyphPointer,
-  SelectionAction,
   SelectionCapability,
   SelectionEndpoint,
-  SelectionRange,
+  SelectionMenuAnchor,
+  SelectionRangeInput,
   SelectionSnapshot,
-  SelectionState,
+  TextPosition,
+  TextRange,
 } from './types';
+export type { SelectionSegment } from './geometry';
+
+/**
+ * The selection capability token, narrowed to the public
+ * {@link SelectionCapability} lens. It is the SAME runtime token the plugin
+ * provides — the host-only surface (pointer gestures, geometry warming) is
+ * reachable only via `@embedpdf/plugin-selection/internal`.
+ */
+export const SelectionToken =
+  SelectionHostToken as unknown as CapabilityToken<SelectionCapability>;

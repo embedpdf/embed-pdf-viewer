@@ -204,6 +204,16 @@ const annotationStrip: BarSchema = {
   },
 };
 
+// The text-selection strip: appears when a text selection SETTLES (the menu
+// component gates on `isSelecting()`). One command today; "Highlight" et al.
+// are one more id here + one command — no component changes.
+const selectionStrip: BarSchema = {
+  id: 'selection-strip',
+  sections: {
+    center: [group('selection-actions', { importance: 4 }, ['selection:copy'])],
+  },
+};
+
 /**
  * The DEFAULT chrome — exported as a VALUE, which is the whole customization
  * model: consumers pass nothing and track this, transform it, or write their
@@ -219,7 +229,7 @@ export const defaultChrome = defineChrome({
     'mode:redact': redactBar,
   },
   menus: { document: documentMenu, zoom: zoomMenu, 'page-settings': pageSettingsMenu },
-  strips: { annotation: annotationStrip },
+  strips: { annotation: annotationStrip, selection: selectionStrip },
 });
 
 // Lookups take the RESOLVED schema (the host may have replaced the default) —

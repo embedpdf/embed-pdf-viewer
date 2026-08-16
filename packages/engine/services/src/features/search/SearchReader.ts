@@ -8,6 +8,7 @@ import {
   EngineError,
   EngineErrorCode,
   buildSnippet,
+  charRangeForTextOffsets,
   foldOptionsFor,
   foldText,
   matchLiteral,
@@ -123,14 +124,15 @@ export class SearchReader {
       const pon = order[scanned].pageObjectNumber;
       const corpus = acquirePageCorpus(this.runtime, this.session, pon, signal);
 
+      const text = corpus.snapshot.text;
       let ranges: SearchMatchRange[];
       if (query.regex) {
-        ranges = matchRegex(corpus.original, query);
+        ranges = matchRegex(text, query);
       } else if (query.matchCase || query.matchDiacritics) {
         // Non-default fold options: re-fold the cached raw text per query.
-        ranges = matchLiteral(foldText(corpus.original, foldOptionsFor(query)), query);
+        ranges = matchLiteral(foldText(text, foldOptionsFor(query)), query);
       } else {
-        ranges = matchLiteral(corpus, query);
+        ranges = matchLiteral(corpus.folded, query);
       }
 
       if (ranges.length > 0) {
@@ -138,12 +140,18 @@ export class SearchReader {
         // One canonical layout per page, shared by every match on it.
         const layout = buildPageTextLayout(geometry);
         for (const range of ranges) {
+          // Match ranges are TEXT-space (string offsets); the hit DTO and
+          // the geometry layout speak CHARACTER space. Convert exactly once,
+          // here — the biased range helper keeps zero-width characters
+          // adjacent to the match OUTSIDE it on both sides. Snippets stay in
+          // text space (their offsets are internal to the snippet string).
+          const chars = charRangeForTextOffsets(corpus.snapshot, range.start, range.start + range.length);
           matches.push({
             pageObjectNumber: pon,
-            charStart: range.start,
-            charCount: range.length,
-            segments: textSegmentsForRange(layout, range.start, range.length),
-            ...(mode === 'full' ? { snippet: buildSnippet(corpus.original, range) } : {}),
+            charStart: chars.start,
+            charCount: chars.end - chars.start,
+            segments: textSegmentsForRange(layout, chars.start, chars.end - chars.start),
+            ...(mode === 'full' ? { snippet: buildSnippet(text, range) } : {}),
           });
         }
       }

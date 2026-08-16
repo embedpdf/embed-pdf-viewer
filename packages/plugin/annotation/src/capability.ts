@@ -16,6 +16,7 @@ import {
   type BinarySource,
 } from '@embedpdf/engine-core/runtime';
 import { InteractionToken } from '@embedpdf/plugin-interaction';
+import { SelectionToken as SelectionPublicToken } from '@embedpdf/plugin-selection';
 import {
   chrome as coreChrome,
   clickCreateGeom,
@@ -1321,6 +1322,29 @@ export function createAnnotationCapability(
     finishCreationDraft: () => apply({ t: 'finishCreationDraft' }),
     finishInkDraft: () => apply({ t: 'finishInkDraft' }),
     cancelCreationDraft: () => apply({ t: 'cancel' }),
+    markupFromSelection: (subtype, preset) => {
+      // One-shot form of the markup tools' commit: selection quads → one
+      // markup per page → clear. Selection is an OPTIONAL peer — resolve
+      // lazily so annotation keeps working without it installed.
+      const selection = ctx.tryGet(SelectionPublicToken);
+      if (!selection || !selection.hasSelection()) return false;
+      const snapshot = selection.snapshot();
+      let created = false;
+      for (const page of snapshot.pages) {
+        if (!page.segments.length) continue;
+        apply({
+          t: 'createMarkup',
+          subtype,
+          pon: page.pon,
+          quads: page.segments.map((s) => s.quad),
+          preset,
+          flags: preset ? registry.get(preset)?.flags : undefined,
+        });
+        created = true;
+      }
+      if (created) selection.clear();
+      return created;
+    },
     createMarkup: (subtype, pon, quads, preset) =>
       // A markup tool's `/F` seed rides along (the preset IS the tool id).
       apply({

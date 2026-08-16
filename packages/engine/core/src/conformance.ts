@@ -49,6 +49,15 @@ export type {
   PageTextConformanceFixture,
   PageTextConformanceOptions,
 } from './conformance/runPageTextConformance';
+export {
+  runTextDivergenceConformance,
+  TEXT_DIVERGENCE_CASES,
+} from './conformance/runTextDivergenceConformance';
+export type {
+  TextDivergenceCase,
+  TextDivergenceConformanceFixture,
+  TextDivergenceConformanceOptions,
+} from './conformance/runTextDivergenceConformance';
 export { runPageGeometryOrientationConformance } from './conformance/runPageGeometryOrientationConformance';
 export type {
   PageGeometryOrientationFixture,

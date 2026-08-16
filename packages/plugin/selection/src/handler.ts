@@ -1,5 +1,5 @@
 import type { InteractionCapability, InteractionHandler } from '@embedpdf/plugin-interaction';
-import type { SelectionCapability } from './types';
+import type { SelectionHostCapability } from './types';
 
 const CURSOR_TOKEN = 'selection-text';
 const DRAG_THRESHOLD_PX = 4; // viewport px the pointer must move before a drag-select begins
@@ -18,7 +18,7 @@ const DRAG_THRESHOLD_PX = 4; // viewport px the pointer must move before a drag-
  *  - hover               → I-beam only when over text, else the pointer cursor
  */
 export function createTextSelectHandler(
-  selection: SelectionCapability,
+  selection: SelectionHostCapability,
   interaction: InteractionCapability,
 ): InteractionHandler {
   // Per-gesture drag-threshold state (one active gesture at a time — the hub owner).
@@ -37,11 +37,11 @@ export function createTextSelectHandler(
       const { pon, point } = s.page;
       const clicks = s.clickCount ?? 1;
       if (clicks >= 3) {
-        selection.selectLine(pon, point);
+        selection.selectLineAt(pon, point);
         return true;
       }
       if (clicks === 2) {
-        selection.selectWord(pon, point);
+        selection.selectWordAt(pon, point);
         return true;
       }
       // Single click: clear immediately (clicking deselects), then record an anchor

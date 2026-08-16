@@ -12,8 +12,7 @@
 // One-line-per-feature: registration travels with the UI.
 export * from '@embedpdf/plugin-annotation';
 import * as React from 'react';
-import { useEffect, useLayoutEffect, useState } from 'react';
-import { createPortal } from 'react-dom';
+import { useEffect, useState } from 'react';
 import {
   AnnotationToken,
   refKey,
@@ -32,7 +31,6 @@ import {
   scene,
   MITER_LIMIT,
   type AnnotationProps,
-  type AnnotationPropsPatch,
   type CreationDraftAnchor,
   type Paint,
   type Rect,
@@ -41,6 +39,7 @@ import {
 } from '@embedpdf/core-annotation';
 
 export type {
+  CreationDraftAnchor,
   RenderItem,
   Geom,
   LineEnding,
@@ -64,13 +63,6 @@ import {
   useSelector,
 } from './runtime';
 import type { PageContextValue } from './runtime';
-import {
-  positionMenuAroundRect,
-  type AnnotationMenuPlacement,
-  type AnnotationMenuPosition,
-} from './internal/annotation-menu-position';
-
-export type { AnnotationMenuPlacement } from './internal/annotation-menu-position';
 
 /** `#rrggbb` → `rgba(...)` — the marquee's translucent fill derives from the
  *  accent, so one `setChrome({ accent })` restyles every piece of chrome. */
@@ -941,11 +933,10 @@ export function useSelectionFlags(): SelectionFlags | null {
   return useSelector(AnnotationToken, (c) => c.getSelectionFlags());
 }
 
-// ── Selection menu ────────────────────────────────────────────────────────────
-// A headless, render-prop menu that floats over the current selection. The
-// content-space anchor (`selectionAnchor`) is shared by BOTH flavors: the default
-// Stage `<AnnotationMenu>` (in `./annotation-menu`, positions via the camera) and
-// the Stage-free `<PageAnnotationMenu>` below (positions via `page.toClientRect`).
+// ── Selection-menu anchor vocabulary ─────────────────────────────────────────
+// The content-space anchor (`selectionAnchor`) consumed by `<AnnotationMenu>`
+// (./annotation-menu) through the surface-provided ViewProjector — one menu
+// implementation for <Stage> and <PageView> alike (see ./anchored).
 
 /** The selection's menu anchor: the primary page + the union box of the selection
  *  on that page (content space). */
@@ -965,37 +956,6 @@ export function sameAnchor(a: SelectionAnchor | null, b: SelectionAnchor | null)
     a.knob?.x === b.knob?.x &&
     a.knob?.y === b.knob?.y
   );
-}
-
-/** What a menu's render prop receives: the live selection (engine DTOs) + the
- *  selection-scoped intents. Fully headless — you render all UI. */
-export interface AnnotationMenuRenderArgs {
-  selected: ReturnType<typeof useAnnotationSelected>;
-  deleteSelection: () => void;
-  deselect: () => void;
-  /** Restyle the selection with a flat props patch (see `useSelectionProps`). */
-  updateSelection: (patch: AnnotationPropsPatch) => void;
-  /** Rotate the current selection a quarter-turn clockwise about its centre. */
-  rotate90: () => void;
-  /** Reset the current selection to its as-authored orientation. */
-  resetRotation: () => void;
-  /** Group the current selection into one unit (selecting any member then
-   *  selects all). */
-  group: () => Promise<void>;
-  /** Ungroup the group(s) the current selection touches. */
-  ungroup: () => Promise<void>;
-  /** Whether {@link group} would do something for the current selection. */
-  canGroup: boolean;
-  /** Whether {@link ungroup} would do something for the current selection. */
-  canUngroup: boolean;
-}
-
-export interface AnnotationMenuProps {
-  children: (args: AnnotationMenuRenderArgs) => React.ReactNode;
-  /** Gap in screen px between the selection box and the menu (default 8). */
-  gap?: number;
-  /** Where to place the menu relative to the selection box. Default 'top'. */
-  placement?: AnnotationMenuPlacement;
 }
 
 export function sameCreationDraftAnchor(
@@ -1018,150 +978,3 @@ export function sameCreationDraftAnchor(
   );
 }
 
-export interface AnnotationDraftMenuRenderArgs extends CreationDraftAnchor {
-  finish: () => void;
-  cancel: () => void;
-}
-
-export interface AnnotationDraftMenuProps {
-  children: (args: AnnotationDraftMenuRenderArgs) => React.ReactNode;
-  /** Gap in screen px between the draft anchor and the menu (default 8). */
-  gap?: number;
-  /** Where to place the menu relative to the draft anchor. Default 'top'. */
-  placement?: AnnotationMenuPlacement;
-}
-
-/**
- * The Stage-FREE selection menu, for `<PageView>` (no camera). It transforms a
- * selected content rect to client px via `page.toClientRect`, then renders an
- * UPRIGHT menu through a portal to
- * `document.body` (so it never rotates with the page nor clips at a container
- * edge). Re-measures on scroll/resize. For `<Stage>`, prefer `<AnnotationMenu>`
- * from `@embedpdf/react/annotation-menu` (camera-driven, more responsive).
- */
-export function PageAnnotationMenu({ children, gap = 8, placement = 'top' }: AnnotationMenuProps) {
-  const page = usePage();
-  const anno = useCapability(AnnotationHostToken);
-  // This page's view scale sizes the knob the menu dodges; when the anchor is
-  // for another page the value is unused (the `here` guard below bails).
-  const anchor = useSelector(
-    AnnotationHostToken,
-    (c) =>
-      c.selectionAnchor(page.transform.viewScale, page.transform.rotation, page.transform.zoom),
-    sameAnchor,
-  );
-  const selected = useAnnotationSelected();
-  const [pos, setPos] = useState<AnnotationMenuPosition | null>(null);
-  const here = !!anchor && anchor.pon === page.pon;
-
-  // Measure in a layout effect (NOT during render): `page.toClientRect` reads the
-  // page wrapper's live client rect, which only exists after the ref commits.
-  useLayoutEffect(() => {
-    if (!here || !anchor) {
-      setPos(null);
-      return;
-    }
-    const measure = () => {
-      const knob = anchor.knob ? page.toClientPoint(anchor.knob) : null;
-      setPos(positionMenuAroundRect(page.toClientRect(anchor.bounds), placement, gap, knob));
-    };
-    measure();
-    // No camera here — the page only moves when the document scrolls or resizes.
-    window.addEventListener('scroll', measure, true);
-    window.addEventListener('resize', measure);
-    return () => {
-      window.removeEventListener('scroll', measure, true);
-      window.removeEventListener('resize', measure);
-    };
-  }, [here, anchor, page, gap, placement]);
-
-  if (!pos) return null;
-  return createPortal(
-    <div
-      style={{
-        position: 'fixed',
-        left: pos.left,
-        top: pos.top,
-        transform: pos.transform,
-        pointerEvents: 'auto',
-      }}
-    >
-      {children({
-        selected,
-        deleteSelection: anno.deleteSelection,
-        deselect: anno.deselect,
-        updateSelection: anno.updateSelection,
-        rotate90: anno.rotateSelection90,
-        resetRotation: anno.resetSelectionRotation,
-        group: anno.group,
-        ungroup: anno.ungroup,
-        canGroup: anno.canGroup(),
-        canUngroup: anno.canUngroup(),
-      })}
-    </div>,
-    document.body,
-  );
-}
-
-export function PageAnnotationDraftMenu({
-  children,
-  gap = 8,
-  placement = 'top',
-}: AnnotationDraftMenuProps) {
-  const page = usePage();
-  const anno = useCapability(AnnotationHostToken);
-  const anchor = useSelector(
-    AnnotationHostToken,
-    (c) => c.creationDraftAnchor(),
-    sameCreationDraftAnchor,
-  );
-  const [pos, setPos] = useState<AnnotationMenuPosition | null>(null);
-  const ref = React.useRef<HTMLDivElement>(null);
-  const here = !!anchor && anchor.pon === page.pon;
-
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const stop = (e: Event) => e.stopPropagation();
-    el.addEventListener('pointerdown', stop);
-    return () => el.removeEventListener('pointerdown', stop);
-  });
-
-  useLayoutEffect(() => {
-    if (!here || !anchor) {
-      setPos(null);
-      return;
-    }
-    const measure = () => {
-      setPos(positionMenuAroundRect(page.toClientRect(anchor.bounds), placement, gap));
-    };
-    measure();
-    window.addEventListener('scroll', measure, true);
-    window.addEventListener('resize', measure);
-    return () => {
-      window.removeEventListener('scroll', measure, true);
-      window.removeEventListener('resize', measure);
-    };
-  }, [here, anchor, page, gap, placement]);
-
-  if (!anchor || !pos) return null;
-  return createPortal(
-    <div
-      ref={ref}
-      style={{
-        position: 'fixed',
-        left: pos.left,
-        top: pos.top,
-        transform: pos.transform,
-        pointerEvents: 'auto',
-      }}
-    >
-      {children({
-        ...anchor,
-        finish: anno.finishCreationDraft,
-        cancel: anno.cancelCreationDraft,
-      })}
-    </div>,
-    document.body,
-  );
-}

@@ -1,6 +1,6 @@
 import { definePlugin } from '@embedpdf/core';
 import { InteractionToken } from '@embedpdf/plugin-interaction';
-import { SelectionToken } from '@embedpdf/plugin-selection';
+import { SelectionToken } from '@embedpdf/plugin-selection/internal';
 import { createAnnotationCapability } from './capability';
 import { registerAnnotationEffects } from './effects';
 import {

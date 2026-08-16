@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { textQuadFromRect } from '@embedpdf/core-geometry';
 import type { InteractionCapability } from '@embedpdf/plugin-interaction';
-import type { SelectionCapability } from '@embedpdf/plugin-selection';
+import type { SelectionHostCapability } from '@embedpdf/plugin-selection/internal';
 
 import { wireMarkup } from './markup';
 import type { AnnotationHostCapability } from './types';
@@ -53,7 +53,7 @@ describe('selection authoring bridge', () => {
         onCommit = cb;
         return () => {};
       },
-    } as unknown as SelectionCapability;
+    } as unknown as SelectionHostCapability;
     const interaction = {
       activeToolId: () => 'replace-text',
       onToolChange: vi.fn(() => () => {}),

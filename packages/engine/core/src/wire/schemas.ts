@@ -22,6 +22,7 @@ import type { LayerScopes } from '../dto/LayerScopes';
 import type { DocumentMetadata } from '../dto/DocumentMetadata';
 import type { MetadataPatch } from '../dto/MetadataPatch';
 import type { PageGeometryRun, PageGeometrySnapshot } from '../dto/PageGeometrySnapshot';
+import { charMapViolation } from '../text/charmap';
 import type { PageBoxes, PageLayout } from '../dto/PageLayout';
 import type { PageListSnapshot } from '../dto/PageListSnapshot';
 import type { PageImageOptions, PageNetworkRenderFormat, PageRenderQuery } from '../dto/PageRender';
@@ -461,16 +462,27 @@ export const AnnotationListSnapshotAllPagesSchema: z.ZodType<AnnotationListSnaps
   });
 
 /**
- * Wire shape of `GET /v1/docs/:docId/pages/:pon/text@contentVersion=N` and the
- * `pages.text` worker result. Carries the same `pageState` envelope
- * every page-scoped read returns, plus the full plain-text extraction
- * in display order and PDFium's char-count (which may exceed
- * `text.length / 1` when astral-plane characters are present).
+ * Wire shape of `GET …/text/pages/:pon/data@<contentVersion>` and the
+ * `pages.text` worker result: the UTF-16-faithful extraction, the CHARACTER
+ * space size (`charCount` — the space geometry runs tile; NOT `text.length`),
+ * and the optional character→text anchor map. Malformed maps are rejected
+ * here with the shared `charMapViolation` invariants — absent/empty map
+ * REQUIRES `charCount === text.length` (identity).
  */
-export const PageTextSnapshotSchema: z.ZodType<PageTextSnapshot> = z.object({
-  text: z.string(),
-  charCount: z.number().int().nonnegative(),
-});
+export const PageTextSnapshotSchema: z.ZodType<PageTextSnapshot> = z
+  .object({
+    text: z.string(),
+    charCount: z.number().int().nonnegative(),
+    charMap: z
+      .array(z.tuple([z.number().int().nonnegative(), z.number().int().nonnegative()]))
+      .optional(),
+  })
+  .superRefine((snapshot, ctx) => {
+    const violation = charMapViolation(snapshot.charCount, snapshot.text.length, snapshot.charMap);
+    if (violation !== null) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['charMap'], message: violation });
+    }
+  });
 
 export const PageGeometryGlyphSchema = z.object({
   looseBox: PdfRectSchema,

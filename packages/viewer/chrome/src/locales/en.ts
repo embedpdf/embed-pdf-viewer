@@ -71,6 +71,10 @@ export const en: Locale = {
         ungroup: 'Ungroup',
         strip: 'Annotation actions',
       },
+      selection: {
+        copy: 'Copy',
+        strip: 'Text selection actions',
+      },
       shapes: {
         rectangle: 'Rectangle',
         circle: 'Circle',

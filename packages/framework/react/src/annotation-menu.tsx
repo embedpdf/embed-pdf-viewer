@@ -1,149 +1,95 @@
 /**
- * <AnnotationMenu> — the DEFAULT, Stage-bound selection menu.
+ * Annotation menus — thin anchor plumbing over the ONE `<Anchored>` primitive.
  *
- * Marker-style: it transforms the selected content rect through the Stage camera
- * and renders an upright menu in viewport space. Mount it in the Stage `overlay`
- * slot. It re-renders on `visiblePages()`, so it tracks pan/zoom and page
- * rotation/layout changes with no DOM measurement, no portal, no scroll listeners.
+ * These work identically under `<Stage>` (mount in the overlay slot; the
+ * camera projects, no DOM reads) and `<PageView>` (measured + portalled) —
+ * the SURFACE provides the projector, the menu doesn't care.
  *
- * This module is the ONLY annotation menu that imports `@embedpdf/plugin-stage`.
- * For a Stage-free `<PageView>`, use `<PageAnnotationMenu>` from
- * `@embedpdf/react/annotation` instead.
+ * No action bags: actions come from the capability hooks (`useAnnotation()`,
+ * `useAnnotationSelected()`, …), which subscribe properly and compose across
+ * plugins. Render props carry only the ANCHOR'S DATA (the draft menu's
+ * progress facts); the annotation-selection menu takes plain children.
  */
 import * as React from 'react';
-import { useEffect, useRef } from 'react';
-import { StageToken } from '@embedpdf/plugin-stage';
 import { AnnotationToken as AnnotationHostToken } from '@embedpdf/plugin-annotation/internal';
-import { useCapability, useSelector } from './runtime';
-import {
-  sameAnchor,
-  sameCreationDraftAnchor,
-  useAnnotationSelected,
-  type AnnotationDraftMenuProps,
-  type AnnotationMenuProps,
-} from './annotation';
-import { positionMenuAroundRect } from './internal/annotation-menu-position';
+import type { CreationDraftAnchor } from '@embedpdf/core-annotation';
+import { Anchored, useProjectorBinding, type AnchoredPlacement } from './anchored';
+import { useSelector } from './runtime';
+import { sameAnchor, sameCreationDraftAnchor } from './annotation';
 
+export interface AnnotationMenuProps {
+  children: React.ReactNode;
+  /** Gap in screen px between the selection box and the menu (default 15). */
+  gap?: number;
+  /** Where to place the menu relative to the selection box. Default 'top'. */
+  placement?: AnchoredPlacement;
+}
+
+/**
+ * Floats over the current annotation selection (one anchor regardless of
+ * cross-page selection), dodging the rotate knob. Compose the contents from
+ * hooks: `useAnnotation()` for the verbs, `useAnnotationSelected()` /
+ * `useSelectionProps()` for the data.
+ */
 export function AnnotationMenu({ children, gap = 15, placement = 'top' }: AnnotationMenuProps) {
-  const stage = useCapability(StageToken);
-  const anno = useCapability(AnnotationHostToken);
-  // Reposition on pan/zoom AND rotation/layout changes. `visiblePages()` folds in
-  // the scene key, camera, viewport, and DPR, while staying referentially stable.
-  useSelector(StageToken, (c) => c.visiblePages());
-  // Two-step anchor resolve: the pon comes from the scale-less anchor, then the
-  // knob is re-projected with THAT page's view scale so the menu dodges the knob
-  // where it actually renders (screen-constant stalk).
+  // Reading the binding subscribes this component to projection changes
+  // (its identity IS the revision), so the anchor read below re-runs with
+  // fresh view facts in the SAME commit as the surface — the knob offset is
+  // screen-constant, so its content-space position depends on the page's
+  // live view scale.
+  const { projector } = useProjectorBinding();
   const anchor = useSelector(
     AnnotationHostToken,
     (c) => {
       const a = c.selectionAnchor();
       if (!a) return null;
-      const t = stage.pageRect(a.pon)?.transform;
-      return t?.viewScale ? c.selectionAnchor(t.viewScale, t.rotation, t.zoom) : a;
+      const env = projector.viewEnv(a.pon);
+      return env ? c.selectionAnchor(env.scale, env.rotation, env.zoom) : a;
     },
     sameAnchor,
   );
-  const selected = useAnnotationSelected();
-
-  // Isolate the menu from the Stage's pointer forwarding: a pointerdown inside it
-  // must NOT bubble up to the Stage container's NATIVE listener, which would
-  // forward to the interaction hub and read it as a click-outside → deselect (and
-  // unmount this menu). Native listener (not React's) so it runs during real DOM
-  // bubbling, before the Stage's own native listener on the ancestor. Inner button
-  // `onClick` still fires — `click` is a separate event that reaches React's root.
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const stop = (e: Event) => e.stopPropagation();
-    el.addEventListener('pointerdown', stop);
-    return () => el.removeEventListener('pointerdown', stop);
-  });
-
   if (!anchor) return null;
-  const box = stage.pageRectToScreen(anchor.pon, anchor.bounds);
-  if (!box) return null;
-  // Transform the knob via a zero-size rect so page rotation is respected; the
-  // menu then nudges only the edge it sits on (and only if the knob protrudes).
-  const kr = anchor.knob
-    ? stage.pageRectToScreen(anchor.pon, {
-        x: anchor.knob.x,
-        y: anchor.knob.y,
-        width: 0,
-        height: 0,
-      })
-    : null;
-  const pos = positionMenuAroundRect(box, placement, gap, kr ? { x: kr.x, y: kr.y } : null);
   return (
-    <div
-      ref={ref}
-      style={{
-        position: 'absolute',
-        left: pos.left,
-        top: pos.top,
-        transform: pos.transform,
-        pointerEvents: 'auto',
+    <Anchored
+      anchor={{
+        pon: anchor.pon,
+        bounds: anchor.bounds,
+        ...(anchor.knob ? { avoid: [anchor.knob] } : {}),
       }}
+      placement={placement}
+      gap={gap}
     >
-      {children({
-        selected,
-        deleteSelection: anno.deleteSelection,
-        deselect: anno.deselect,
-        updateSelection: anno.updateSelection,
-        rotate90: anno.rotateSelection90,
-        resetRotation: anno.resetSelectionRotation,
-        group: anno.group,
-        ungroup: anno.ungroup,
-        canGroup: anno.canGroup(),
-        canUngroup: anno.canUngroup(),
-      })}
-    </div>
+      {children}
+    </Anchored>
   );
 }
 
+export interface AnnotationDraftMenuProps {
+  /** Render prop receiving the DRAFT ANCHOR'S DATA (subtype, pointCount,
+   *  minPoints, canFinish, …). The verbs are capability calls:
+   *  `useAnnotation().finishCreationDraft()` / `.cancelCreationDraft()`. */
+  children: (anchor: CreationDraftAnchor) => React.ReactNode;
+  /** Gap in screen px between the draft anchor and the menu (default 8). */
+  gap?: number;
+  /** Where to place the menu relative to the draft anchor. Default 'top'. */
+  placement?: AnchoredPlacement;
+}
+
+/** Floats over a live multi-click creation draft (polygon, polyline, …). */
 export function AnnotationDraftMenu({
   children,
   gap = 8,
   placement = 'top',
 }: AnnotationDraftMenuProps) {
-  const stage = useCapability(StageToken);
-  const anno = useCapability(AnnotationHostToken);
-  useSelector(StageToken, (c) => c.visiblePages());
   const anchor = useSelector(
     AnnotationHostToken,
     (c) => c.creationDraftAnchor(),
     sameCreationDraftAnchor,
   );
-
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const stop = (e: Event) => e.stopPropagation();
-    el.addEventListener('pointerdown', stop);
-    return () => el.removeEventListener('pointerdown', stop);
-  });
-
   if (!anchor) return null;
-  const box = stage.pageRectToScreen(anchor.pon, anchor.bounds);
-  if (!box) return null;
-  const pos = positionMenuAroundRect(box, placement, gap);
   return (
-    <div
-      ref={ref}
-      style={{
-        position: 'absolute',
-        left: pos.left,
-        top: pos.top,
-        transform: pos.transform,
-        pointerEvents: 'auto',
-      }}
-    >
-      {children({
-        ...anchor,
-        finish: anno.finishCreationDraft,
-        cancel: anno.cancelCreationDraft,
-      })}
-    </div>
+    <Anchored anchor={anchor} placement={placement} gap={gap}>
+      {children(anchor)}
+    </Anchored>
   );
 }

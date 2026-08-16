@@ -4,12 +4,16 @@
  * Same layers + rotation + chrome frame as a `<Stage>` page, but no
  * camera/scroll/zoom and, crucially, NO dependency on `@embedpdf/plugin-stage`.
  * It builds its own `PageTransform` from a target content width and shares the
- * exact `PageContext` seam, so every layer (RenderLayer, AnnotationLayer,
- * PageAnnotationMenu, …) works here identically.
+ * exact `PageContext` seam, so every layer (RenderLayer, AnnotationLayer, …)
+ * works here identically — and it provides the measured `ViewProjector`, so
+ * anchored UI (`<AnnotationMenu>`, `<SelectionMenu>`) works here too, portalled
+ * and clipping-immune.
  */
 import * as React from 'react';
 import { useMemo, useRef } from 'react';
 import { NO_FRAME, pageTransform, type PageFrame } from '@embedpdf/core-geometry';
+import { observeClientGeometry } from '@embedpdf/web';
+import { ProjectorProvider, type ProjectorBinding, type ViewProjector } from './anchored';
 import {
   DocumentScope,
   makePageContext,
@@ -78,6 +82,34 @@ export function PageView({
       ),
     [docId, pon, page, pageFrame, transform],
   );
+  // The PageView's ViewProjector: no camera, so anchored UI positions by
+  // MEASURING the DOM (client space → portal + position:fixed, immune to
+  // ancestor overflow clipping). `toScreen` answers null until the page
+  // element has committed — <Anchored> forces one post-commit pass to pick
+  // it up. The binding's revision covers state-driven changes (a new
+  // transform/page); `observeClientGeometry` covers the genuinely
+  // browser-driven ones (document scroll, window resize) that no state
+  // change announces.
+  const projector = useMemo<ViewProjector>(
+    () => ({
+      space: 'client',
+      toScreen: (p, rect) => (p === ctx.pon && ref.current ? ctx.toClientRect(rect) : null),
+      toScreenPoint: (p, at) => (p === ctx.pon && ref.current ? ctx.toClientPoint(at) : null),
+      viewEnv: (p) =>
+        p === ctx.pon
+          ? {
+              scale: ctx.transform.viewScale,
+              rotation: ctx.transform.rotation,
+              zoom: ctx.transform.zoom,
+            }
+          : null,
+    }),
+    [ctx],
+  );
+  const projectorBinding = useMemo<ProjectorBinding>(
+    () => ({ projector, revision: ctx, subscribe: observeClientGeometry }),
+    [projector, ctx],
+  );
   if (!docId || !meta || !base) return null;
   const t = transform;
   const outerW = t.viewWidth + pageFrame.left + pageFrame.right;
@@ -86,6 +118,7 @@ export function PageView({
   const contentTop = pageFrame.top + (t.viewHeight - t.contentHeight) / 2;
   return (
     <DocumentScope id={docId}>
+      <ProjectorProvider value={projectorBinding}>
       <div style={{ position: 'relative', width: outerW, height: outerH, ...style }}>
         <PageProvider value={ctx}>
           {/* drop shadow ONLY — transparent, axis-aligned, can't leak behind the bitmap */}
@@ -119,6 +152,7 @@ export function PageView({
           {pageChrome}
         </PageProvider>
       </div>
+      </ProjectorProvider>
     </DocumentScope>
   );
 }

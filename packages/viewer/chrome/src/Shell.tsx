@@ -28,7 +28,7 @@ import {
 import { Stage } from '@embedpdf/react/stage';
 import { Scrollbar } from '@embedpdf/react/scrollbar';
 import { RenderLayer, TileLayer } from '@embedpdf/react/render';
-import { SelectionLayer } from '@embedpdf/react/selection';
+import { SelectionClipboard, SelectionLayer } from '@embedpdf/react/selection';
 import { AnnotationLayer, useFilePickerProvider } from '@embedpdf/react/annotation';
 import { LinkLayer } from '@embedpdf/react/link';
 import type { AnnotationRenderer } from '@embedpdf/react/annotation';
@@ -41,6 +41,7 @@ import { getModeBar } from './config/chrome';
 import { useChromeSchema } from './config-context';
 import { AppToolbar } from './ui/toolbar';
 import { AnnotationStrip } from './ui/annotation-strip';
+import { SelectionStrip } from './ui/selection-strip';
 import { TabBar } from './ui/tab-bar';
 import { ArmedToolCursor } from './ui/tool-cursor';
 import { LeftSidebar, RightSidebar, PageControls } from './ui/panels';
@@ -169,11 +170,16 @@ export function Shell() {
             {/* the armed tool's cursor: its toolbar icon as a real CSS cursor
                 (zero-lag; the hub hides it over annotations/fields/gaps) */}
             <ArmedToolCursor />
+            {/* ctrl/cmd+C and native Edit→Copy for the text selection —
+                prefetches on commit so the copy event answers synchronously.
+                Renders nothing; mount ONCE per document view. */}
+            <SelectionClipboard />
             <Stage
               interaction
               overlay={
                 <>
                   <AnnotationStrip />
+                  <SelectionStrip />
                   {/* headless scrollbars: geometry/behavior from the stage's
                       scroller contract; the look is index.css (data-attrs) */}
                   <Scrollbar axis="y" />

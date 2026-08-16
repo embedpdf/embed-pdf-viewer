@@ -1,19 +1,28 @@
-import type { FoldedText, PageObjectNumber } from '@embedpdf/engine-core/runtime';
+import type { FoldedText, PageObjectNumber, PageTextSnapshot } from '@embedpdf/engine-core/runtime';
 import { foldText } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule } from '@embedpdf/engine-runtime';
 
 import type { DocumentSession } from '../../../document-session/DocumentSession';
 import { PageTextReader } from '../../text/PageTextReader';
 
-interface PageCorpusEntry {
+export interface PageCorpus {
+  /** Default-fold (`{}`) corpus; `folded.original` IS `snapshot.text`. */
+  folded: FoldedText;
+  /**
+   * The page text snapshot the corpus was folded from — carried so match
+   * ranges (text space) can be converted to CHARACTER space via the
+   * engine-core charmap helpers without re-reading the page.
+   */
+  snapshot: PageTextSnapshot;
+}
+
+interface PageCorpusEntry extends PageCorpus {
   /** The session mutation sequence the entry was built at. */
   seq: number;
-  /** Default-fold (`{}`) corpus; `folded.original` is the raw page text. */
-  folded: FoldedText;
 }
 
 /**
- * Per-session, per-page search corpus: the page's extracted text plus its
+ * Per-session, per-page search corpus: the page's text snapshot plus its
  * DEFAULT fold (the one literal queries with default options search).
  * This is the local engine's in-memory equivalent of the server's corpus
  * artifacts — same fold version, same shape, built lazily on first search
@@ -37,7 +46,7 @@ export function acquirePageCorpus(
   session: DocumentSession,
   pageObjectNumber: PageObjectNumber,
   signal: AbortSignal,
-): FoldedText {
+): PageCorpus {
   const seq = session.mutationSeq();
   let pages = cache.get(session);
   if (!pages) {
@@ -46,16 +55,16 @@ export function acquirePageCorpus(
   }
 
   const hit = pages.get(pageObjectNumber);
-  if (hit && hit.seq === seq) return hit.folded;
+  if (hit && hit.seq === seq) return hit;
 
-  const text = new PageTextReader(runtime, session).read(pageObjectNumber, signal).text;
-  const folded = foldText(text);
+  const snapshot = new PageTextReader(runtime, session).read(pageObjectNumber, signal);
+  const entry: PageCorpusEntry = { seq, folded: foldText(snapshot.text), snapshot };
 
   pages.delete(pageObjectNumber); // re-insert = most recently used
-  pages.set(pageObjectNumber, { seq, folded });
+  pages.set(pageObjectNumber, entry);
   if (pages.size > MAX_CACHED_PAGES) {
     const oldest = pages.keys().next().value;
     if (oldest !== undefined) pages.delete(oldest);
   }
-  return folded;
+  return entry;
 }

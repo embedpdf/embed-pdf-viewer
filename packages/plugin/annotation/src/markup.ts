@@ -7,7 +7,7 @@
  * annotation exists. Kept out of the plugin-definition file so that stays lean.
  */
 import type { InteractionCapability } from '@embedpdf/plugin-interaction';
-import type { SelectionCapability } from '@embedpdf/plugin-selection';
+import type { SelectionHostCapability } from '@embedpdf/plugin-selection/internal';
 import type { AnnotationHostCapability } from './types';
 
 /**
@@ -19,7 +19,7 @@ import type { AnnotationHostCapability } from './types';
  */
 export function wireMarkup(
   annotation: AnnotationHostCapability,
-  selection: SelectionCapability,
+  selection: SelectionHostCapability,
   interaction: InteractionCapability,
 ): void {
   // Keep the live preview + the selection's own visual in sync with (active tool,

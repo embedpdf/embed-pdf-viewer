@@ -21,6 +21,7 @@ import type { SpreadMode } from '@embedpdf/react/stage';
 import { InteractionToken } from '@embedpdf/react/interaction';
 import { ShellToken } from '@embedpdf/react/shell';
 import { AnnotationToken } from '@embedpdf/react/annotation';
+import { copySelection, SelectionToken, type TextRange } from '@embedpdf/react/selection';
 import { fieldKeyOf, FormToken } from '@embedpdf/react/form';
 import { LinkToken, type PdfLinkTarget } from '@embedpdf/react/link';
 
@@ -30,6 +31,15 @@ type Ctx = Parameters<NonNullable<CommandDef['run']>>[0];
 const stage = (c: Ctx) => c.tryGet(StageToken);
 const interaction = (c: Ctx) => c.tryGet(InteractionToken);
 const anno = (c: Ctx) => c.tryGet(AnnotationToken);
+const textSelection = (c: Ctx) => c.tryGet(SelectionToken);
+const sameTextRange = (a: TextRange | null, b: TextRange | null): boolean =>
+  a === b ||
+  (!!a &&
+    !!b &&
+    a.start.pon === b.start.pon &&
+    a.start.index === b.start.index &&
+    a.end.pon === b.end.pon &&
+    a.end.index === b.end.index);
 
 // ── annotation-selection predicates (drive the floating strip's contents) ────
 const hasAnnotationSelection = (c: Ctx) => (anno(c)?.selection().length ?? 0) > 0;
@@ -525,6 +535,37 @@ export const defaultCommands: CommandDef[] = [
     categories: ['annotation'],
     run: (c) => void anno(c)?.ungroup(),
     visible: (c) => anno(c)?.canUngroup() ?? false,
+  },
+
+  // ── text selection (the selection strip's verbs) ────────────────────────
+  {
+    id: 'selection:copy',
+    labelKey: 'commands.selection.copy',
+    icon: 'copy',
+    categories: ['selection'],
+    // The permission story rides `visible`: a deployment denying
+    // doc.text.copy shows no Copy at all — and with zero visible commands
+    // the strip renders nothing, so there is never an empty bubble.
+    visible: (c) => {
+      const s = textSelection(c);
+      return !!s && s.hasSelection() && s.canCopy();
+    },
+    // Async Clipboard write inside the click's activation window; instant
+    // when <SelectionClipboard>'s commit prefetch already fetched the text.
+    // A successful copy consumes the selection, which also dismisses its strip.
+    run: (c) => {
+      const s = textSelection(c);
+      if (!s) return;
+      const copiedRange = s.snapshot().range;
+      void copySelection(s).then(
+        (text) => {
+          // Clipboard writes can outlive the click. Never let an older copy
+          // completion clear a newer selection the user made in the meantime.
+          if (text !== '' && sameTextRange(s.snapshot().range, copiedRange)) s.clear();
+        },
+        () => {}, // Copy failed: preserve the selection so the user can retry.
+      );
+    },
   },
 
   // ── link strip items (v2's "Link / Go to link / Remove link") ───────────
