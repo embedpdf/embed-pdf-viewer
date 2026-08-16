@@ -1,5 +1,11 @@
 # @cloudpdf/server
 
+## 3.0.0-next.5
+
+### Patch Changes
+
+- [#760](https://github.com/embedpdf/embed-pdf-viewer/pull/760) by [@bobsingor](https://github.com/bobsingor) – Keep connected licenses usable during Keygen's three-day `EXPIRING` window by relying on the signed validation decision instead of the informational status label. Licenses whose expiry has elapsed remain denied.
+
 ## 3.0.0-next.4
 
 ### Patch Changes

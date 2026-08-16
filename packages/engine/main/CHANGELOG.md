@@ -1,5 +1,11 @@
 # @embedpdf/engine
 
+## 3.0.0-next.5
+
+### Minor Changes
+
+- [#759](https://github.com/embedpdf/embed-pdf-viewer/pull/759) by [@bobsingor](https://github.com/bobsingor) – Return full-fidelity page text snapshots and character-space search ranges from the local engine. Non-printing and supplementary-plane text now round-trip consistently through extraction, search geometry, selection ranges, and text slicing.
+
 ## 3.0.0-next.4
 
 ### Minor Changes

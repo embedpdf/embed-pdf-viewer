@@ -1,5 +1,11 @@
 # @cloudpdf/engine
 
+## 3.0.0-next.5
+
+### Minor Changes
+
+- [#759](https://github.com/embedpdf/embed-pdf-viewer/pull/759) by [@bobsingor](https://github.com/bobsingor) – Support full-fidelity page text snapshots and character-space search ranges through the cloud engine transport. Remote text extraction now preserves the same character-to-text mapping and search-to-selection semantics as the local engine.
+
 ## 3.0.0-next.4
 
 ### Minor Changes
