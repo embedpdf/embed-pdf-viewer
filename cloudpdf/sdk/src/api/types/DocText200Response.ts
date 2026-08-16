@@ -3,4 +3,5 @@
 export interface DocText200Response {
     text: string;
     charCount: number;
+    charMap?: unknown[][] | undefined;
 }
