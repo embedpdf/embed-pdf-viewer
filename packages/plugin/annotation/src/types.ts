@@ -408,6 +408,25 @@ export interface AnnotationCapability {
    */
   registerTool(def: AnnotationToolInput): () => void;
 
+  // ── text-selection authoring (one-shot; requires the selection plugin) ──
+  /**
+   * Turn the CURRENT text selection into markup annotations — one per
+   * selected page, from the selection's oriented per-line quads — then clear
+   * the selection. The one-call form of what the markup tools do on
+   * commit, made for selection-menu buttons ("Highlight") and automation.
+   * `preset` is a tool id whose defaults style the markup (e.g.
+   * `'highlight'`); defaults to the subtype's own. Returns false (and does
+   * nothing) when no selection plugin is installed or nothing is selected.
+   */
+  markupFromSelection(subtype: Subtype, preset?: string): boolean;
+
+  // ── multi-click creation drafts (polygon, polyline, …) ──
+  /** Commit the in-progress multi-click creation draft (no-op when there is
+   *  none, or it can't finish yet — see `creationDraftAnchor().canFinish`). */
+  finishCreationDraft(): void;
+  /** Discard the in-progress multi-click creation draft. */
+  cancelCreationDraft(): void;
+
   // ── lifecycle ──
   deleteSelection(): void;
   deselect(): void;
@@ -653,10 +672,8 @@ export interface AnnotationHostCapability extends AnnotationCapability {
     finish?: boolean,
     displayRotation?: PageRotation,
   ): void;
-  finishCreationDraft(): void;
   /** Commit the strokes currently buffered by an ink tool's grouping window. */
   finishInkDraft(): void;
-  cancelCreationDraft(): void;
   /** Create one text-markup annotation on a page from the selected text's
    *  per-line oriented quads (content space) — the `text-selection` create
    *  gesture. Axis-aligned callers build quads with `textQuadFromRect`. */

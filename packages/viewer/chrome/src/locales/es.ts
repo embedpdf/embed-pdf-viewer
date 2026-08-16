@@ -74,6 +74,10 @@ export const es: Locale = {
         ungroup: 'Desagrupar',
         strip: 'Acciones de anotación',
       },
+      selection: {
+        copy: 'Copiar',
+        strip: 'Acciones de selección de texto',
+      },
       shapes: {
         rectangle: 'Rectángulo',
         circle: 'Círculo',

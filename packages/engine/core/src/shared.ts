@@ -433,6 +433,14 @@ export type {
   TextLayoutGlyph,
   TextLayoutRun,
 } from './text/layout';
+export {
+  boundaryTextOffset,
+  charBoundaryAtTextOffset,
+  charMapViolation,
+  charRangeForTextOffsets,
+  sliceTextByChars,
+} from './text/charmap';
+export type { CharBoundaryBias, CharMapAnchor } from './text/charmap';
 export { searchContentEpoch, canonicalSearchQuery } from './search/epoch';
 
 export type { PageMoveInput } from './mutation/PageMoveInput';

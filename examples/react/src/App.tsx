@@ -35,7 +35,10 @@ import {
   AnnotationLayer,
   AnnotationDraftMenu,
   AnnotationMenu,
+  AnnotationToken,
   useAnnotation,
+  useAnnotationSelected,
+  type CreationDraftAnchor,
   useAnnotationSelection,
   useAnnotationDefaults,
   useSelectionProps,
@@ -104,6 +107,118 @@ const DRAFT_MENU_BTN: React.CSSProperties = {
   lineHeight: 1,
   padding: 0,
 };
+
+/** The draft menu's contents: anchor DATA arrives via the render prop; the
+ *  verbs are plain capability calls — no action bag. */
+function DraftMenuBar({ anchor }: { anchor: CreationDraftAnchor }) {
+  const anno = useAnnotation();
+  const { canFinish, subtype, pointCount, minPoints } = anchor;
+  return (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 6,
+        padding: 6,
+        borderRadius: 10,
+        background: '#1b1f27',
+        border: '1px solid rgba(255,255,255,.12)',
+        boxShadow: '0 8px 24px rgba(0,0,0,.4)',
+      }}
+    >
+      <button
+        aria-label={`Finish ${subtype}`}
+        title={
+          canFinish
+            ? `Finish ${subtype}`
+            : `${subtype} needs ${minPoints - pointCount} more point${
+                minPoints - pointCount === 1 ? '' : 's'
+              }`
+        }
+        disabled={!canFinish}
+        onClick={() => anno.finishCreationDraft()}
+        style={{
+          ...DRAFT_MENU_BTN,
+          opacity: canFinish ? 1 : 0.38,
+          cursor: canFinish ? 'pointer' : 'not-allowed',
+        }}
+      >
+        ✓
+      </button>
+      <button
+        aria-label={`Cancel ${subtype}`}
+        title={`Cancel ${subtype}`}
+        onClick={() => anno.cancelCreationDraft()}
+        style={DRAFT_MENU_BTN}
+      >
+        ×
+      </button>
+    </div>
+  );
+}
+
+/** The selection menu's contents, composed entirely from hooks: the verbs
+ *  from `useAnnotation()`, the reactive reads from selectors — each read is
+ *  its own subscription, so nothing here can go stale. */
+function AnnotationMenuBar() {
+  const anno = useAnnotation();
+  const selected = useAnnotationSelected();
+  const canGroup = useSelector(AnnotationToken, (c) => c.canGroup());
+  const canUngroup = useSelector(AnnotationToken, (c) => c.canUngroup());
+  return (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 6,
+        padding: '6px 8px',
+        borderRadius: 10,
+        background: '#1b1f27',
+        border: '1px solid rgba(255,255,255,.12)',
+        boxShadow: '0 8px 24px rgba(0,0,0,.4)',
+        color: '#e6e6e6',
+        fontSize: 12,
+      }}
+    >
+      {['#e5484d', '#f5a623', '#3858e9', '#30a46c'].map((c) => (
+        <button
+          key={c}
+          title={c}
+          onClick={() => anno.updateSelection({ color: c })}
+          style={{
+            width: 18,
+            height: 18,
+            borderRadius: '50%',
+            background: c,
+            border: '1px solid rgba(255,255,255,.5)',
+            cursor: 'pointer',
+            padding: 0,
+          }}
+        />
+      ))}
+      <span style={{ width: 1, height: 18, background: 'rgba(255,255,255,.18)' }} />
+      {canGroup && (
+        <button onClick={() => anno.group()} style={MENU_BTN}>
+          Group{selected.length > 1 ? ` (${selected.length})` : ''}
+        </button>
+      )}
+      {canUngroup && (
+        <button onClick={() => anno.ungroup()} style={MENU_BTN}>
+          Ungroup
+        </button>
+      )}
+      {(canGroup || canUngroup) && (
+        <span style={{ width: 1, height: 18, background: 'rgba(255,255,255,.18)' }} />
+      )}
+      <button onClick={anno.deleteSelection} style={MENU_BTN}>
+        Delete{selected.length > 1 ? ` (${selected.length})` : ''}
+      </button>
+      <button onClick={anno.deselect} style={MENU_BTN}>
+        Done
+      </button>
+    </div>
+  );
+}
 // The Stage is a LENS: a document can be viewed through several at once. The
 // sidebar is a second lens — wrapped grid, fixed thumbnail zoom — with its own
 // camera per document, fully independent of the main view.
@@ -1362,112 +1477,10 @@ function DocumentView() {
           overlay={
             <>
               <AnnotationDraftMenu placement="bottom" gap={12}>
-                {({ canFinish, finish, cancel, subtype, pointCount, minPoints }) => (
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 6,
-                      padding: 6,
-                      borderRadius: 10,
-                      background: '#1b1f27',
-                      border: '1px solid rgba(255,255,255,.12)',
-                      boxShadow: '0 8px 24px rgba(0,0,0,.4)',
-                    }}
-                  >
-                    <button
-                      aria-label={`Finish ${subtype}`}
-                      title={
-                        canFinish
-                          ? `Finish ${subtype}`
-                          : `${subtype} needs ${minPoints - pointCount} more point${
-                              minPoints - pointCount === 1 ? '' : 's'
-                            }`
-                      }
-                      disabled={!canFinish}
-                      onClick={finish}
-                      style={{
-                        ...DRAFT_MENU_BTN,
-                        opacity: canFinish ? 1 : 0.38,
-                        cursor: canFinish ? 'pointer' : 'not-allowed',
-                      }}
-                    >
-                      ✓
-                    </button>
-                    <button
-                      aria-label={`Cancel ${subtype}`}
-                      title={`Cancel ${subtype}`}
-                      onClick={cancel}
-                      style={DRAFT_MENU_BTN}
-                    >
-                      ×
-                    </button>
-                  </div>
-                )}
+                {(anchor) => <DraftMenuBar anchor={anchor} />}
               </AnnotationDraftMenu>
               <AnnotationMenu placement="bottom">
-                {({
-                  selected,
-                  deleteSelection,
-                  deselect,
-                  updateSelection,
-                  group,
-                  ungroup,
-                  canGroup,
-                  canUngroup,
-                }) => (
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 6,
-                      padding: '6px 8px',
-                      borderRadius: 10,
-                      background: '#1b1f27',
-                      border: '1px solid rgba(255,255,255,.12)',
-                      boxShadow: '0 8px 24px rgba(0,0,0,.4)',
-                      color: '#e6e6e6',
-                      fontSize: 12,
-                    }}
-                  >
-                    {['#e5484d', '#f5a623', '#3858e9', '#30a46c'].map((c) => (
-                      <button
-                        key={c}
-                        title={c}
-                        onClick={() => updateSelection({ color: c })}
-                        style={{
-                          width: 18,
-                          height: 18,
-                          borderRadius: '50%',
-                          background: c,
-                          border: '1px solid rgba(255,255,255,.5)',
-                          cursor: 'pointer',
-                          padding: 0,
-                        }}
-                      />
-                    ))}
-                    <span style={{ width: 1, height: 18, background: 'rgba(255,255,255,.18)' }} />
-                    {canGroup && (
-                      <button onClick={() => group()} style={MENU_BTN}>
-                        Group{selected.length > 1 ? ` (${selected.length})` : ''}
-                      </button>
-                    )}
-                    {canUngroup && (
-                      <button onClick={() => ungroup()} style={MENU_BTN}>
-                        Ungroup
-                      </button>
-                    )}
-                    {(canGroup || canUngroup) && (
-                      <span style={{ width: 1, height: 18, background: 'rgba(255,255,255,.18)' }} />
-                    )}
-                    <button onClick={deleteSelection} style={MENU_BTN}>
-                      Delete{selected.length > 1 ? ` (${selected.length})` : ''}
-                    </button>
-                    <button onClick={deselect} style={MENU_BTN}>
-                      Done
-                    </button>
-                  </div>
-                )}
+                <AnnotationMenuBar />
               </AnnotationMenu>
             </>
           }

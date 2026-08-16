@@ -5,6 +5,7 @@ export const initialSelectionState: SelectionState = {
   segments: {},
   loaded: {},
   highlightHidden: false,
+  selecting: false,
 };
 
 export const selectionReducer = (
@@ -26,6 +27,10 @@ export const selectionReducer = (
       return state.highlightHidden === action.hidden
         ? state
         : { ...state, highlightHidden: action.hidden };
+    case 'SET_SELECTING':
+      return state.selecting === action.selecting
+        ? state
+        : { ...state, selecting: action.selecting };
     default:
       return state;
   }

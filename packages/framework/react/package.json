@@ -10,6 +10,7 @@
   "types": "./dist/index.d.cts",
   "exports": {
     ".": "./src/index.ts",
+    "./anchored": "./src/anchored.tsx",
     "./annotation": "./src/annotation.tsx",
     "./annotation-menu": "./src/annotation-menu.tsx",
     "./commands": "./src/commands.ts",
@@ -41,6 +42,10 @@
       ".": {
         "import": "./dist/index.js",
         "require": "./dist/index.cjs"
+      },
+      "./anchored": {
+        "import": "./dist/anchored.js",
+        "require": "./dist/anchored.cjs"
       },
       "./annotation": {
         "import": "./dist/annotation.js",

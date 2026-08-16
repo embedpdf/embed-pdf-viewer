@@ -20,6 +20,7 @@ export type StageTokenProp = CapabilityToken<StageCapability>;
 import type { PageFrame } from '@embedpdf/core-geometry';
 import { InteractionToken } from '@embedpdf/plugin-interaction';
 import type { PointerSample } from '@embedpdf/plugin-interaction';
+import { ProjectorProvider, type ProjectorBinding, type ViewProjector } from './anchored';
 import { createClickCounter } from './interaction';
 import {
   makePageContext,
@@ -209,6 +210,31 @@ export function Stage({
     (a, b) => a.top === b.top && a.right === b.right && a.bottom === b.bottom && a.left === b.left,
   );
 
+  // The Stage's ViewProjector: anchored UI (menus, popovers) positions through
+  // the CAMERA — pure state, no DOM reads, no portal, and NO subscription:
+  // `pages` (visiblePages) is the binding's revision, so a camera change
+  // re-renders the pages AND every anchored consumer in the SAME React
+  // commit — surface and overlay can never paint a frame apart.
+  const projector = useMemo<ViewProjector>(
+    () => ({
+      space: 'overlay',
+      toScreen: (pon, rect) => stage.pageRectToScreen(pon, rect),
+      toScreenPoint: (pon, at) => {
+        const r = stage.pageRectToScreen(pon, { x: at.x, y: at.y, width: 0, height: 0 });
+        return r ? { x: r.x, y: r.y } : null;
+      },
+      viewEnv: (pon) => {
+        const t = stage.pageRect(pon)?.transform;
+        return t ? { scale: t.viewScale, rotation: t.rotation, zoom: t.zoom } : null;
+      },
+    }),
+    [stage],
+  );
+  const projectorBinding = useMemo<ProjectorBinding>(
+    () => ({ projector, revision: pages }),
+    [projector, pages],
+  );
+
   useEffect(() => {
     const el = ref.current!;
     // Only report the viewport size. Initial placement (home) is the Stage plugin's
@@ -389,7 +415,9 @@ export function Stage({
           chrome={pageChrome}
         />
       ))}
-      {overlay}
+      {/* Anchored UI mounts in the overlay: absolute coords here are the
+          projector's overlay space (the stage container). */}
+      <ProjectorProvider value={projectorBinding}>{overlay}</ProjectorProvider>
     </div>
   );
 }

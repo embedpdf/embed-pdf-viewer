@@ -115,11 +115,16 @@ export interface SearchSnippet {
 }
 
 /**
- * One hit. `charStart`/`charCount` index the page's text-page character
- * space — the same space as `PageTextSnapshot.text` offsets and
- * `PageGeometryRun.charStart` — so a match joins the selection subsystem
- * (extend-selection-from-match, highlight annotations) without any
- * re-mapping. `segments` are the CANONICAL visual-line segments (the same
+ * One hit. `charStart`/`charCount` are a half-open range in the page's
+ * CHARACTER space — the space `PageGeometryRun.charStart` tiles and
+ * selection ranges live in, NOT string offsets into `PageTextSnapshot.text`
+ * (engines convert match string-ranges through the snapshot's `charMap`
+ * before building the hit; see engine-core `text/charmap.ts`). That is what
+ * lets a match join the selection subsystem — select-this-match, markup
+ * creation — with no re-mapping, and it means zero-width characters
+ * adjacent to the matched text are never inside the range. Snippet offsets
+ * are the one exception: they are string offsets INTERNAL to the snippet's
+ * own `text`. `segments` are the CANONICAL visual-line segments (the same
  * engine-core text layout selection uses) — a match highlights exactly like
  * a selection of the same characters, one oriented segment per visual line,
  * never per glyph. Each segment carries the exact quad, its AABB `rect`,

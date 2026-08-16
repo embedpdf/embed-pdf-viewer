@@ -9,6 +9,21 @@
  */
 export { pickImageFile, pickFile, saveFile } from './file-picker';
 export type { PickFileOptions } from './file-picker';
+export { copySelection, wireSelectionClipboard } from './clipboard';
+export type { ClipboardSelectionSource, SelectionClipboardOptions } from './clipboard';
+export {
+  observeClientGeometry,
+  positionAnchoredRect,
+  projectAnchoredTarget,
+} from './anchored-position';
+export type {
+  AnchorTarget,
+  AnchoredPlacement,
+  AnchoredPoint,
+  AnchoredPosition,
+  AnchoredRect,
+  ViewProjector,
+} from './anchored-position';
 export { svgCursor } from './cursor';
 export type { SvgCursorOptions } from './cursor';
 export { sanitizeExternalUri } from './external-uri';
