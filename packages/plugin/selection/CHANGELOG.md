@@ -1,5 +1,11 @@
 # @embedpdf/plugin-selection
 
+## 3.0.0-next.5
+
+### Minor Changes
+
+- [#759](https://github.com/embedpdf/embed-pdf-viewer/pull/759) by [@bobsingor](https://github.com/bobsingor) – Expand the public selection capability with permission checks, programmatic character ranges, select-all, settled gesture state, menu anchors, range snapshots, and full selected-text extraction. Host-only gesture and geometry plumbing now lives behind the `/internal` export, while clipboard access remains DOM-free and outside the plugin.
+
 ## 3.0.0-next.4
 
 ### Minor Changes

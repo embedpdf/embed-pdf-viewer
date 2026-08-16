@@ -1,5 +1,11 @@
 # @embedpdf/engine-runtime
 
+## 3.0.0-next.5
+
+### Minor Changes
+
+- [#759](https://github.com/embedpdf/embed-pdf-viewer/pull/759) by [@bobsingor](https://github.com/bobsingor) – Expose full-fidelity UTF-16 page-text extraction and character-to-text mapping through the EmbedPDF PDFium runtime. Supplementary-plane characters are preserved, while non-printing character slots are represented explicitly instead of silently shifting selection and search offsets.
+
 ## 3.0.0-next.4
 
 ### Minor Changes

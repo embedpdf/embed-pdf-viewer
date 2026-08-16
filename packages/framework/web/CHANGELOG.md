@@ -1,5 +1,11 @@
 # @embedpdf/web
 
+## 3.0.0-next.5
+
+### Minor Changes
+
+- [#759](https://github.com/embedpdf/embed-pdf-viewer/pull/759) by [@bobsingor](https://github.com/bobsingor) – Add framework-neutral anchored-overlay projection and placement utilities for Stage and standalone page surfaces. Add browser clipboard helpers for selected-text prefetch, native copy events, keyboard fallback, and user-initiated clipboard writes while keeping selection plugins DOM-free.
+
 ## 3.0.0-next.4
 
 ## 3.0.0-next.3

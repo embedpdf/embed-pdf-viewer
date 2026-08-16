@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/core-js-sandbox",
-  "version": "3.0.0-next.4",
+  "version": "3.0.0-next.5",
   "private": false,
   "description": "QuickJS-backed, resource-bounded execution adapter for deterministic Acrobat JavaScript.",
   "type": "module",

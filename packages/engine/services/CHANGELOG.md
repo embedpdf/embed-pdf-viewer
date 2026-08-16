@@ -1,5 +1,11 @@
 # @embedpdf/engine-services
 
+## 3.0.0-next.5
+
+### Minor Changes
+
+- [#759](https://github.com/embedpdf/embed-pdf-viewer/pull/759) by [@bobsingor](https://github.com/bobsingor) – Build validated full-fidelity page text snapshots from the runtime's text and character-map calls. Search now converts matched string offsets back into character-space ranges before producing hit geometry, so search, selection, and copied text remain aligned when extracted text diverges from PDF character slots.
+
 ## 3.0.0-next.4
 
 ### Minor Changes

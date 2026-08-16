@@ -1,5 +1,11 @@
 # @embedpdf/react
 
+## 3.0.0-next.5
+
+### Minor Changes
+
+- [#759](https://github.com/embedpdf/embed-pdf-viewer/pull/759) by [@bobsingor](https://github.com/bobsingor) – Add a shared `Anchored` overlay primitive with same-commit Stage projection and measured PageView support. Annotation menus now use this common surface-aware path, replacing the separate PageView menu components, and new `SelectionMenu` and `SelectionClipboard` components provide settled text-selection actions and clipboard integration.
+
 ## 3.0.0-next.4
 
 ### Minor Changes
