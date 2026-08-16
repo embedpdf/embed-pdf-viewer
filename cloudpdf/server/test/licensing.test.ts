@@ -81,19 +81,21 @@ function machineCertificate(input: {
 
 function keygenValidationBody(input: {
   code: string;
+  expiry?: string;
   fingerprint: string;
   key: string;
   metadata?: Record<string, unknown>;
   nonce: number;
+  status?: string;
   valid: boolean;
 }): Record<string, unknown> {
   return {
     data: {
       attributes: {
-        expiry: '2029-02-01T00:00:00.000Z',
+        expiry: input.expiry ?? '2029-02-01T00:00:00.000Z',
         key: input.key,
         metadata: { offlineGraceHours: 72, ...input.metadata },
-        status: 'ACTIVE',
+        status: input.status ?? 'ACTIVE',
       },
       id: 'license-id',
       relationships: {
@@ -299,6 +301,79 @@ test('connected validation activates a deployment and then revalidates', async (
       }),
     }),
   );
+});
+
+test.each(['EXPIRING', 'INACTIVE'])(
+  'connected validation accepts a signed valid license with informational status %s',
+  async (status) => {
+    const { identity, privateKey } = createSigningIdentity();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+        const requestBody = JSON.parse(String(init?.body)) as {
+          meta: { key: string; nonce: number; scope: { fingerprint: string } };
+        };
+        return signedKeygenResponse({
+          body: keygenValidationBody({
+            code: 'VALID',
+            fingerprint: requestBody.meta.scope.fingerprint,
+            key: requestBody.meta.key,
+            nonce: requestBody.meta.nonce,
+            status,
+            valid: true,
+          }),
+          identity,
+          privateKey,
+          url,
+        });
+      }),
+    );
+
+    await expect(
+      validateConnectedLicense({
+        fingerprint: 'deployment-fingerprint',
+        identity,
+        key: 'license-key',
+      }),
+    ).resolves.toMatchObject({ code: 'VALID', valid: true });
+  },
+);
+
+test('connected validation rejects a signed valid decision whose expiry has passed', async () => {
+  const { identity, privateKey } = createSigningIdentity();
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      const requestBody = JSON.parse(String(init?.body)) as {
+        meta: { key: string; nonce: number; scope: { fingerprint: string } };
+      };
+      return signedKeygenResponse({
+        body: keygenValidationBody({
+          code: 'VALID',
+          expiry: '2020-01-01T00:00:00.000Z',
+          fingerprint: requestBody.meta.scope.fingerprint,
+          key: requestBody.meta.key,
+          nonce: requestBody.meta.nonce,
+          valid: true,
+        }),
+        identity,
+        privateKey,
+        url,
+      });
+    }),
+  );
+
+  await expect(
+    validateConnectedLicense({
+      fingerprint: 'deployment-fingerprint',
+      identity,
+      key: 'license-key',
+    }),
+  ).rejects.toMatchObject({
+    code: 'INVALID_RESPONSE',
+    message: 'Keygen returned valid=true for an expired license',
+    retryable: false,
+  });
 });
 
 test('connected validation rejects an unsigned success response', async () => {
