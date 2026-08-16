@@ -135,7 +135,7 @@ describe("DocClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
 
-        const rawResponseBody = { text: "text", charCount: 1 };
+        const rawResponseBody = { text: "text", charCount: 1, charMap: [[{ key: "value" }]] };
 
         server
             .mockEndpoint()
