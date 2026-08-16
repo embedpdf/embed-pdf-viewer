@@ -16,21 +16,10 @@ import {
 } from './_helpers/db-seeded-app';
 
 const here = dirname(fileURLToPath(import.meta.url));
-// Same fixture PDFs as the engine-local suite (the fork's test corpus) and
-// the SAME pinned expectation table — the two engines must produce
-// byte-identical snapshots, maps, and search hit ranges over the wire.
-const resources = resolve(
-  here,
-  '..',
-  '..',
-  '..',
-  'packages',
-  'engine',
-  'runtime',
-  'runtime-src',
-  'testing',
-  'resources',
-);
+// Same vendored fixtures as the engine-local suite; canonical copy and
+// provenance live in packages/engine/main/test/fixtures/README.md, so CI
+// never needs the multi-GB runtime-src submodule.
+const resources = resolve(here, '..', '..', '..', 'packages', 'engine', 'main', 'test', 'fixtures');
 
 const runner: ConformanceTestRunner = {
   describe,
