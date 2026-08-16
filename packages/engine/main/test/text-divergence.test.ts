@@ -10,10 +10,10 @@ import {
 import { createLocalEngine } from '../src/index';
 
 const here = dirname(fileURLToPath(import.meta.url));
-// The divergence fixtures live in the PDFium fork's test corpus (bug_1139 and
-// the ActualText fixture are upstream; the astral ToUnicode one is ours) so
-// the same PDFs also feed the C++ embeddertests.
-const resources = resolve(here, '..', '..', 'runtime', 'runtime-src', 'testing', 'resources');
+// Vendored from the engine-runtime fork's testing/resources so the suite runs
+// without the multi-GB runtime-src submodule — see fixtures/README.md for
+// provenance and the re-sync command.
+const resources = resolve(here, 'fixtures');
 
 const runner: ConformanceTestRunner = {
   describe,
