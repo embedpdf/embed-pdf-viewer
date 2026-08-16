@@ -1,5 +1,11 @@
 # @embedpdf/plugin-annotation
 
+## 3.0.0-next.5
+
+### Minor Changes
+
+- [#759](https://github.com/embedpdf/embed-pdf-viewer/pull/759) by [@bobsingor](https://github.com/bobsingor) – Add `markupFromSelection()` for creating one oriented text-markup annotation per selected page and clearing the consumed selection. Multi-click draft finish and cancel actions are also available on the public annotation capability for composable menu controls.
+
 ## 3.0.0-next.4
 
 ### Minor Changes

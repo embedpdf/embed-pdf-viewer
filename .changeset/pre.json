@@ -64,6 +64,8 @@
     "@embedpdf/docs-kit": "0.0.0"
   },
   "changesets": [
+    "anchored-selection-react",
+    "anchored-selection-web",
     "canonical-text-layout-engine-core",
     "canonical-text-layout-engine-services",
     "canonical-text-layout-plugin-search",
@@ -131,6 +133,7 @@
     "initial-embedpdf-viewer-react",
     "initial-embedpdf-viewer",
     "initial-embedpdf-web",
+    "keygen-expiring-cloudpdf-server",
     "oriented-text-core-annotation",
     "oriented-text-core-geometry",
     "oriented-text-engine-core",
@@ -140,6 +143,15 @@
     "oriented-text-plugin-annotation",
     "oriented-text-plugin-redaction",
     "oriented-text-plugin-selection",
-    "oriented-text-react"
+    "oriented-text-react",
+    "selection-actions-plugin-annotation",
+    "selection-actions-plugin-selection",
+    "selection-strip-viewer-chrome",
+    "text-index-map-cloudpdf-engine",
+    "text-index-map-engine-core",
+    "text-index-map-engine-runtime",
+    "text-index-map-engine-services",
+    "text-index-map-engine",
+    "text-index-map-plugin-search"
   ]
 }
