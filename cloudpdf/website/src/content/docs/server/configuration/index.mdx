@@ -58,6 +58,24 @@ See [Database](/docs/server/configuration/database).
 
 See [Storage](/docs/server/configuration/storage).
 
+## Imports (server-side pull)
+
+On by default with a safe posture (HTTPS-only, public networks, 128 MiB cap).
+Registered connections let the server pull from your own buckets without
+presigning.
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `CLOUDPDF_IMPORT_ENABLED` | on | Set `0` to disable the import endpoint. |
+| `CLOUDPDF_IMPORT_MAX_BYTES` | `128 MiB` | Per-document transfer ceiling. |
+| `CLOUDPDF_IMPORT_TIMEOUT_MS` | `120000` | Wall-clock budget per transfer attempt. |
+| `CLOUDPDF_IMPORT_MAX_CONCURRENT` | `4` | Concurrent transfers per replica (sync + async). |
+| `CLOUDPDF_IMPORT_ALLOW_HTTP` | off | Permit `http://` URL sources (dev / MinIO). |
+| `CLOUDPDF_IMPORT_ALLOW_PRIVATE_NETWORKS` | off | Permit private-address URL sources (dev / in-VPC). |
+| `CLOUDPDF_IMPORT_CONNECTIONS` | — | Comma-separated registry of named pull sources (S3, GCS, Azure Blob, filesystem), each configured via `CLOUDPDF_IMPORT_CONNECTION_*` variables. |
+
+See [Imports](/docs/server/configuration/imports).
+
 ## Engine cache
 
 The cache holds recently used documents and renders so repeat requests are fast.

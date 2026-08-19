@@ -1,0 +1,218 @@
+---
+title: Imports
+description: Configure server-side pulls — import PDFs straight from URLs or from your own S3, GCS, Azure Blob, or filesystem storage.
+---
+
+import { Callout } from '@/components/docs/callout';
+import { Cards, Card } from '@/components/docs/cards';
+
+# Imports
+
+Normally a client *pushes* bytes to CloudPDF (`init → upload → commit`).
+Imports invert that: the **server pulls** a PDF from where it already lives —
+a presigned URL, or a bucket you register — then verifies and commits it
+through the exact same pipeline. Nothing about the document is different
+afterwards; only who moved the bytes changed.
+
+Two source models exist, and they differ by **where authority comes from**:
+
+| Source | Authority | Setup required |
+| --- | --- | --- |
+| `url` | The caller supplies it — a presigned S3/GCS/Azure GET, or any allowed HTTPS URL. | None. Works out of the box. |
+| `connection` | You pre-register it — a named bucket/directory with its own access rules. | This page. |
+
+## Import policy
+
+Imports are **enabled by default** with a safe posture: HTTPS-only, public
+networks only, bounded size and time.
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `CLOUDPDF_IMPORT_ENABLED` | on | Set `0` to disable the import endpoint entirely (it answers 403). |
+| `CLOUDPDF_IMPORT_MAX_BYTES` | `134217728` (128 MiB) | Hard per-document ceiling, enforced against the declared length *and* again byte-by-byte during transfer. |
+| `CLOUDPDF_IMPORT_TIMEOUT_MS` | `120000` | Wall-clock budget for one transfer (connect + stream). |
+| `CLOUDPDF_IMPORT_MAX_CONCURRENT` | `4` | Transfers running at once; excess requests queue fairly. |
+| `CLOUDPDF_IMPORT_ALLOW_HTTP` | off | Permit `http://` URL sources. For dev and internal MinIO only. |
+| `CLOUDPDF_IMPORT_ALLOW_PRIVATE_NETWORKS` | off | Permit URL sources that resolve to private/loopback addresses. For dev and in-VPC stores only. |
+
+Synchronous imports hold the HTTP response open for the whole transfer, so
+keep `MAX_BYTES × your slowest source` comfortably inside `TIMEOUT_MS` — the
+defaults give a same-region 128 MiB pull a wide margin. Larger or slower
+transfers belong in async mode (below), which is not bound by the request.
+
+<Callout type="info">
+  URL sources ship with server-side request forgery protection you don't have
+  to configure: only HTTPS, no redirects, no credentials in URLs, every
+  resolved address must be publicly routable (cloud metadata endpoints and
+  private ranges are refused), addresses are pinned against DNS rebinding,
+  and presigned query strings never appear in logs, errors, or stored
+  failure reasons. The two <code>ALLOW_*</code> switches deliberately loosen
+  parts of this — leave them off in production.
+</Callout>
+
+## Connections
+
+A **connection** is a named source you register once; import requests then
+reference it by id plus an object key — no presigning, no credentials on the
+wire, ever. Declare the list, then configure each name:
+
+```sh
+CLOUDPDF_IMPORT_CONNECTIONS=customer-archive
+
+CLOUDPDF_IMPORT_CONNECTION_CUSTOMER_ARCHIVE_KIND=s3
+CLOUDPDF_IMPORT_CONNECTION_CUSTOMER_ARCHIVE_S3_BUCKET=customer-documents
+CLOUDPDF_IMPORT_CONNECTION_CUSTOMER_ARCHIVE_S3_REGION=eu-west-1
+```
+
+That is a complete, working setup: the whole bucket becomes importable by
+key, restricted to the operator API token (the default — see
+[Authorization](#authorization-who-may-use-a-connection) below).
+
+Names use `[A-Za-z0-9_-]` and are upper-snake-cased in the variable names
+(`customer-archive` → `CUSTOMER_ARCHIVE`). Two names that collide after
+normalization refuse to boot.
+
+### S3 and S3-compatible
+
+```sh
+CLOUDPDF_IMPORT_CONNECTION_CUSTOMER_ARCHIVE_KIND=s3
+CLOUDPDF_IMPORT_CONNECTION_CUSTOMER_ARCHIVE_S3_BUCKET=customer-documents
+CLOUDPDF_IMPORT_CONNECTION_CUSTOMER_ARCHIVE_S3_REGION=eu-west-1
+# MinIO / R2 / Wasabi:
+CLOUDPDF_IMPORT_CONNECTION_CUSTOMER_ARCHIVE_S3_ENDPOINT=https://minio.internal:9000
+```
+
+Credentials follow the standard AWS provider chain — an instance role, IRSA,
+or `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` — exactly like
+[storage](/docs/server/configuration/storage). Nothing credential-shaped goes
+in the connection itself. Grant the role `s3:GetObject` on the source bucket
+(plus `s3:GetObjectVersion` if you pin versions).
+
+### Google Cloud Storage
+
+```sh
+CLOUDPDF_IMPORT_CONNECTION_LEGAL_SCANS_KIND=gcs
+CLOUDPDF_IMPORT_CONNECTION_LEGAL_SCANS_GCS_BUCKET=legal-scans
+# Optional: CLOUDPDF_IMPORT_CONNECTION_LEGAL_SCANS_GCS_PROJECT_ID=my-project
+```
+
+Authenticates via Application Default Credentials (workload identity, or a
+key file referenced by `GOOGLE_APPLICATION_CREDENTIALS`).
+
+### Azure Blob Storage
+
+```sh
+CLOUDPDF_IMPORT_CONNECTION_HR_DOCS_KIND=azure-blob
+CLOUDPDF_IMPORT_CONNECTION_HR_DOCS_AZURE_BLOB_CONTAINER=hr-documents
+CLOUDPDF_IMPORT_CONNECTION_HR_DOCS_AZURE_BLOB_ACCOUNT_NAME=contosoprod
+# Optional custom endpoint:
+# CLOUDPDF_IMPORT_CONNECTION_HR_DOCS_AZURE_BLOB_ENDPOINT=https://...
+```
+
+Authenticates via the standard Azure identity chain (managed identity,
+workload identity, or `az login` locally). Grant the identity blob *read*
+access on the container.
+
+### Filesystem
+
+```sh
+CLOUDPDF_IMPORT_CONNECTION_LOCAL_DROP_KIND=fs
+CLOUDPDF_IMPORT_CONNECTION_LOCAL_DROP_FS_ROOT=/srv/import-inbox
+```
+
+Reads files from a directory on the server host — useful for migration
+workflows ("drop the files on the volume, import by path"). Keys are
+`/`-separated paths relative to the root; absolute paths, `..` segments, and
+symlinks that escape the root are all refused.
+
+<Callout type="warn">
+  Filesystem connections are <strong>operator-only by construction</strong>:
+  they always require the API token, and a configuration that tries to open
+  one to tenant tokens refuses to boot. A directory on the server's own disk
+  is not a tenant-facing surface.
+</Callout>
+
+## Authorization: who may use a connection
+
+Registering a connection is the moment you grant access — so each connection
+carries its own rules, all enforced before a single byte moves:
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `..._CREDENTIALS` | `api-token` | Which credential classes may use it: `api-token`, `tenant-jwt`, or both (comma-separated). |
+| `..._TENANTS` | `*` | Tenant allowlist (comma-separated), or `*` for all tenants. |
+| `..._SCOPE` | `whole-bucket` | What slice of the bucket is reachable: `whole-bucket`, `shared-prefixes`, or `tenant-template`. |
+| `..._SCOPE_PREFIXES` | — | For `shared-prefixes`: comma-separated key prefixes every allowed caller may read. |
+| `..._SCOPE_TEMPLATE` | — | For `tenant-template`: a per-tenant prefix like `tenants/{tenantId}/`. |
+
+The default is deliberately strict: **whole-bucket access belongs to the
+operator's API token only.** Importing is effectively *reading* — whoever can
+import an object can then view it — so opening a connection to tenant tokens
+is only allowed when the connection also says *which slice* each tenant gets:
+
+- **`shared-prefixes`** grants a fixed slice to every allowed caller — right
+  for a common assets folder that all tenants may read.
+- **`tenant-template`** gives each tenant its own slice, computed from the
+  *authenticated* tenant id at request time. One line scales to any number of
+  tenants with zero per-tenant configuration:
+
+```sh
+CLOUDPDF_IMPORT_CONNECTION_ACME_DOCS_KIND=s3
+CLOUDPDF_IMPORT_CONNECTION_ACME_DOCS_S3_BUCKET=app-documents
+CLOUDPDF_IMPORT_CONNECTION_ACME_DOCS_S3_REGION=eu-west-1
+CLOUDPDF_IMPORT_CONNECTION_ACME_DOCS_CREDENTIALS=api-token,tenant-jwt
+CLOUDPDF_IMPORT_CONNECTION_ACME_DOCS_SCOPE=tenant-template
+CLOUDPDF_IMPORT_CONNECTION_ACME_DOCS_SCOPE_TEMPLATE=tenants/{tenantId}/
+```
+
+With this, tenant `acme` can import keys under `tenants/acme/` and nothing
+else — including no `tenants/acme-other/`, because templates must end with
+`/` precisely so tenant slices can never prefix-collide.
+
+All of this is **validated at boot, fail-closed**. A connection that opens
+`tenant-jwt` on a whole bucket, a template without exactly one `{tenantId}`
+placeholder or without the trailing slash, mismatched scope variables, or a
+connection pointing at the server's *own* storage backend (which would let
+imports read CloudPDF's own bucket) — each refuses to start with a message
+naming the connection and the rule.
+
+## Async imports and the worker
+
+Clients may submit an import with `mode: "async"`: the API answers `202`
+immediately and a background worker performs the transfer with automatic
+retries. There is **nothing to deploy or configure** for this — the worker
+runs inside the server process (like the cleanup sweeper), starts whenever
+imports are enabled, and is safe with multiple replicas: jobs are claimed
+with expiring leases, and a replica that dies mid-transfer has its job picked
+up by another.
+
+Two knobs you already know shape it: `CLOUDPDF_IMPORT_MAX_CONCURRENT` bounds
+transfers per replica (sync and async share the budget), and
+`CLOUDPDF_IMPORT_TIMEOUT_MS` bounds each attempt. Failed attempts retry with
+exponential backoff (30s doubling, capped at 15 minutes, five attempts) before
+the document is marked failed.
+
+<Callout type="info">
+  Every import — sync or async — writes a provenance row in the
+  <code>document_imports</code> table: which connection or URL, which object
+  version was actually served, which credential and actor requested it, and
+  the outcome. It's your audit trail for "who pulled what, from where":
+  query it directly, or check a document's <code>failureReason</code> for
+  the sanitized error class (<code>import_not_found</code>,
+  <code>import_denied</code>, <code>import_policy</code>, …).
+</Callout>
+
+## Next steps
+
+<Cards>
+  <Card
+    title="Storage"
+    description="Where imported documents land — the server's own object store."
+    href="/docs/server/configuration/storage"
+  />
+  <Card
+    title="Authentication"
+    description="API tokens vs tenant JWTs — the credential classes connections gate on."
+    href="/docs/server/configuration/authentication"
+  />
+</Cards>
