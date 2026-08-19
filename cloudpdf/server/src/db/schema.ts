@@ -325,6 +325,7 @@ export interface DocumentImportsTable {
   last_error: string | null;
   requested_by: string | null;
   via: string | null;
+  source_json: string | null;
   created_at: number;
   updated_at: number;
 }

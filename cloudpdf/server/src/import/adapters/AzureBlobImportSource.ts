@@ -38,7 +38,8 @@ export interface AzureBlobImportSourceOptions {
 
 export class AzureBlobImportSource implements ImportSource {
   readonly info: ImportSourceInfo;
-  private readonly blobPromise: Promise<BlobClient>;
+  /** Started on first open() — construction stays side-effect-free (see S3ImportSource). */
+  private blobPromise?: Promise<BlobClient>;
 
   constructor(private readonly opts: AzureBlobImportSourceOptions) {
     const conn = opts.connection;
@@ -48,7 +49,11 @@ export class AzureBlobImportSource implements ImportSource {
       location: `${base}/${conn.container}/${opts.key}`,
       connectionId: conn.id,
     };
-    this.blobPromise = this.createBlobClient();
+  }
+
+  private blob(): Promise<BlobClient> {
+    this.blobPromise ??= this.createBlobClient();
+    return this.blobPromise;
   }
 
   private async createBlobClient(): Promise<BlobClient> {
@@ -72,7 +77,7 @@ export class AzureBlobImportSource implements ImportSource {
         true,
       );
     }
-    const blob = await this.blobPromise;
+    const blob = await this.blob();
     let res;
     try {
       res = await blob.download(0, undefined, { abortSignal: opts.signal });

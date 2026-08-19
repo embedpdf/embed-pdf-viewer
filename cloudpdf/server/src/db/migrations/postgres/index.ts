@@ -50,6 +50,8 @@ import down025 from './025_upload_kind_pull.down.sql';
 import sql025 from './025_upload_kind_pull.sql';
 import down026 from './026_document_imports.down.sql';
 import sql026 from './026_document_imports.sql';
+import down027 from './027_document_imports_source_json.down.sql';
+import sql027 from './027_document_imports_source_json.sql';
 import type { MigrationSource } from '../../migrator/runner';
 
 /**
@@ -90,4 +92,5 @@ export const postgresMigrations: ReadonlyArray<MigrationSource> = [
   { version: '024', name: '024_upload_intent.sql', sql: sql024, down: down024 },
   { version: '025', name: '025_upload_kind_pull.sql', sql: sql025, down: down025 },
   { version: '026', name: '026_document_imports.sql', sql: sql026, down: down026 },
+  { version: '027', name: '027_document_imports_source_json.sql', sql: sql027, down: down027 },
 ];

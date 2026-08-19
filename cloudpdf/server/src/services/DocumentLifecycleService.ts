@@ -1,10 +1,15 @@
 import { randomBytes } from 'node:crypto';
 
-import type { AdminImportSource } from '@cloudpdf/contract';
+import { AdminImportSourceSchema, type AdminImportSource } from '@cloudpdf/contract';
+import type { Kysely } from 'kysely';
 
 import type { DerivedRenderService } from './DerivedRenderService';
 import { DocumentSecurityProbe } from './DocumentSecurityProbe';
-import type { DocumentImportsRepo } from '../db/repos/document_imports.repo';
+import {
+  DocumentImportsRepo,
+  type DocumentImportRow,
+  type ImportJobEnqueue,
+} from '../db/repos/document_imports.repo';
 import {
   DocumentsRepo,
   type DocumentListOptions,
@@ -13,6 +18,7 @@ import {
 import type { ShareGrantsRepo } from '../db/repos/share_grants.repo';
 import type { TenantUsageRepo } from '../db/repos/tenant_usage.repo';
 import { TenantsRepo } from '../db/repos/tenants.repo';
+import type { Database as Schema } from '../db/schema';
 import type { ImportPolicy } from '../import/config/ImportPolicySchema';
 import { createImportSource } from '../import/createImportSource';
 import { ImportConnectionRegistry } from '../import/ImportConnectionRegistry';
@@ -54,14 +60,25 @@ export interface ImportInput {
   idempotencyKey?: string | null;
   dedupMode?: DedupMode;
   docId?: string | undefined;
+  /** `sync` (default) holds the response; `async` enqueues a worker job. */
+  mode?: 'sync' | 'async';
 }
 
 /**
- * `imported` — bytes were pulled, verified, and committed.
+ * `imported` — bytes were pulled, verified, and committed (sync).
  * `deduped`  — an existing document satisfied the request without a
  *              transfer (content dedup or idempotent replay).
+ * `accepted` — async: the job is queued; poll the document.
  */
-export type ImportResult = { tag: 'imported' | 'deduped'; doc: DocumentRow };
+export type ImportResult = { tag: 'imported' | 'deduped' | 'accepted'; doc: DocumentRow };
+
+/** What a completed transfer resolved to — the worker's fenced-succeed payload. */
+export interface ImportTransferOutcome extends ImportResult {
+  tag: 'imported';
+  resolvedRevision: string | null;
+  sourceKind: string;
+  sourceLocation: string;
+}
 
 export interface InitInput {
   tenantId: string;
@@ -164,6 +181,12 @@ export interface DocumentLifecycleOptions {
   importConnections?: ImportConnectionRegistry;
   /** Import provenance/audit rows; absent = no provenance recorded. */
   documentImports?: DocumentImportsRepo;
+  /**
+   * Raw database handle for multi-repo transactions: async import
+   * enqueue must create the pending document and its job atomically.
+   * Absent = mode:async is unavailable.
+   */
+  db?: Kysely<Schema>;
 }
 
 /**
@@ -202,6 +225,7 @@ export class DocumentLifecycleService {
   private readonly importPolicy?: ImportPolicy;
   private readonly importConnections: ImportConnectionRegistry;
   private readonly documentImports?: DocumentImportsRepo;
+  private readonly db?: Kysely<Schema>;
   private readonly importGate: Semaphore;
   /** Single-flight per (tenant, idempotencyKey): concurrent retries share one transfer. */
   private readonly inflightImports = new Map<string, Promise<ImportResult>>();
@@ -221,6 +245,7 @@ export class DocumentLifecycleService {
     if (opts.importPolicy) this.importPolicy = opts.importPolicy;
     this.importConnections = opts.importConnections ?? new ImportConnectionRegistry();
     if (opts.documentImports) this.documentImports = opts.documentImports;
+    if (opts.db) this.db = opts.db;
     this.importGate = new Semaphore(opts.importPolicy?.maxConcurrent ?? 1);
   }
 
@@ -404,6 +429,7 @@ export class DocumentLifecycleService {
       expectedSha: input.expected?.sha256?.toLowerCase() ?? null,
       expectedSize: input.expected?.sizeBytes ?? null,
     };
+    if ((input.mode ?? 'sync') === 'async') this.assertAsyncEligible(input, pins);
     const dedupMode: DedupMode = input.dedupMode ?? 'always-create';
     if (dedupMode === 'reuse-existing' && !pins.expectedSha) {
       throw badRequest(
@@ -442,6 +468,7 @@ export class DocumentLifecycleService {
       );
       if (existing) return this.importOntoExisting(existing, input, pins);
     }
+    if ((input.mode ?? 'sync') === 'async') return this.createQueuedImport(input, pins);
     const docId = input.docId ?? generateDocId();
     if (docId.length < 2) {
       throw badRequest(`docId must be at least 2 characters: ${docId}`);
@@ -479,7 +506,160 @@ export class DocumentLifecycleService {
         `idempotency key ${input.idempotencyKey} belongs to an init-created upload; finish it via its ${existing.uploadKind} flow`,
       );
     }
+    if ((input.mode ?? 'sync') === 'async') {
+      await this.enqueueJobFor(existing, input, pins);
+      return { tag: 'accepted', doc: existing };
+    }
+    // A live async job owns this document's transfer — a concurrent
+    // sync re-drive would double-pull the same storage key.
+    const job = await this.documentImports?.findByDoc(existing.id, existing.tenantId);
+    if (job && (job.state === 'queued' || job.state === 'running')) {
+      throw conflict(
+        `an async import is in progress for document ${existing.id}; poll the document instead`,
+      );
+    }
     return this.runImportTransfer(existing, input, pins);
+  }
+
+  /**
+   * Async eligibility, validated at REQUEST time so callers get their
+   * 400 immediately: connection sources only (a presigned URL is a
+   * perishable secret — it cannot sit in a durable job row), the full
+   * authorization/fingerprint gate must pass NOW, and unpinnable
+   * providers need a declared sha to fence retries to one content
+   * identity.
+   */
+  private assertAsyncEligible(input: ImportInput, pins: ResolvedImportPins): void {
+    if (input.source.kind !== 'connection') {
+      throw badRequest('mode=async requires a connection source; url sources are synchronous');
+    }
+    try {
+      createImportSource(input.source, {
+        policy: this.importPolicy!,
+        caller: { via: input.via, tenantId: input.tenantId },
+        connections: this.importConnections,
+        deploymentStorage: this.storage.info,
+      });
+    } catch (err) {
+      if (ImportSourceError.is(err)) {
+        const e = new Error(err.message) as Error & { code: string; status: number };
+        e.code = 'InvalidArg';
+        e.status = 400;
+        throw e;
+      }
+      throw err;
+    }
+    const conn = this.importConnections.get(input.source.connectionId);
+    if (conn?.kind === 'fs' && !pins.expectedSha) {
+      throw badRequest(
+        'filesystem connections have no revisions to pin retries to; async imports from fs require expected.sha256',
+      );
+    }
+  }
+
+  /**
+   * Atomic doc+job creation — one transaction, so a crash can never
+   * leave an idempotency-owned pending document without a runnable
+   * job (3b requirement #4).
+   */
+  private async createQueuedImport(
+    input: ImportInput,
+    pins: ResolvedImportPins,
+  ): Promise<ImportResult> {
+    const db = this.db;
+    if (!db || !this.documentImports) {
+      throw new Error('async imports require the lifecycle db + documentImports options');
+    }
+    const docId = input.docId ?? generateDocId();
+    if (docId.length < 2) {
+      throw badRequest(`docId must be at least 2 characters: ${docId}`);
+    }
+    const outcome = await db.transaction().execute(async (trx) => {
+      const docs = new DocumentsRepo(trx);
+      const jobs = new DocumentImportsRepo(trx);
+      const created = await docs.createPending({
+        id: docId,
+        tenantId: input.tenantId,
+        metadata: input.metadata ?? null,
+        idempotencyKey: input.idempotencyKey ?? null,
+        createdBy: input.sub,
+        expectedSha256: pins.expectedSha,
+        expectedSizeBytes: pins.expectedSize,
+      });
+      if (!created.created) return { kind: 'raced' as const, row: created.row };
+      await jobs.enqueue(this.jobEnqueueInput(created.row, input, pins));
+      return { kind: 'created' as const, row: created.row };
+    });
+    // Same-key race: fold onto whatever row won, like the sync path.
+    if (outcome.kind === 'raced') return this.importOntoExisting(outcome.row, input, pins);
+    return { tag: 'accepted', doc: outcome.row };
+  }
+
+  private async enqueueJobFor(
+    doc: DocumentRow,
+    input: ImportInput,
+    pins: ResolvedImportPins,
+  ): Promise<void> {
+    if (!this.documentImports) {
+      throw new Error('async imports require the documentImports option');
+    }
+    await this.documentImports.enqueue(this.jobEnqueueInput(doc, input, pins));
+  }
+
+  private jobEnqueueInput(
+    doc: DocumentRow,
+    input: ImportInput,
+    pins: ResolvedImportPins,
+  ): ImportJobEnqueue {
+    return {
+      docId: doc.id,
+      tenantId: doc.tenantId,
+      ...wireProvenanceFields(input.source),
+      expectedSha256: pins.expectedSha,
+      expectedSizeBytes: pins.expectedSize,
+      requestedBy: input.sub,
+      via: input.via,
+      sourceJson: JSON.stringify(input.source),
+    };
+  }
+
+  /**
+   * Worker entry: run one queued job's transfer. The job row is the
+   * provenance AND the fence — the worker owns every job transition,
+   * so the transfer runs with provenance writes disabled and reports
+   * its outcome back for a fenced succeed/fail. Retries are pinned to
+   * one content identity: the requested revision, else the revision
+   * captured on the first successful open (3b requirement #6).
+   */
+  async executeQueuedTransfer(
+    doc: DocumentRow,
+    job: DocumentImportRow,
+    hooks: { onOpened?: (resolvedRevision: string | null) => Promise<void> } = {},
+  ): Promise<ImportTransferOutcome> {
+    if (!job.sourceJson) {
+      throw badRequest(`import job for document ${doc.id} carries no source descriptor`);
+    }
+    const parsed = AdminImportSourceSchema.safeParse(JSON.parse(job.sourceJson));
+    if (!parsed.success || parsed.data.kind !== 'connection') {
+      throw badRequest(`import job for document ${doc.id} carries an unusable source descriptor`);
+    }
+    const revision = parsed.data.revision ?? job.resolvedRevision ?? undefined;
+    const source: AdminImportSource = { ...parsed.data, ...(revision ? { revision } : {}) };
+    const input: ImportInput = {
+      tenantId: job.tenantId,
+      sub: job.requestedBy ?? 'import-worker',
+      via: job.via === 'tenant-jwt' ? 'tenant-jwt' : 'api-token',
+      source,
+      mode: 'sync',
+    };
+    const pins: ResolvedImportPins = {
+      expectedSha: job.expectedSha256,
+      expectedSize: job.expectedSizeBytes,
+    };
+    return this.runImportTransfer(doc, input, pins, {
+      provenance: false,
+      ...(hooks.onOpened ? { onOpened: hooks.onOpened } : {}),
+    });
   }
 
   /** The transfer itself: open the source, stream into storage, commit. */
@@ -487,8 +667,10 @@ export class DocumentLifecycleService {
     doc: DocumentRow,
     input: ImportInput,
     pins: ResolvedImportPins,
-  ): Promise<ImportResult> {
+    opts: ImportTransferOpts = {},
+  ): Promise<ImportTransferOutcome> {
     const policy = this.importPolicy!;
+    const provenance = opts.provenance ?? true;
     const release = await this.importGate.acquire();
     const abort = new AbortController();
     const timer = setTimeout(() => abort.abort(), policy.timeoutMs);
@@ -502,16 +684,19 @@ export class DocumentLifecycleService {
       });
       if (!marked) throw conflict(`document ${doc.id} state changed while starting import`);
       // Provenance from the wire descriptor — recorded even when
-      // source construction/authorization fails a moment later.
-      await this.documentImports?.recordAttemptStart({
-        docId: doc.id,
-        tenantId: doc.tenantId,
-        ...wireProvenanceFields(input.source),
-        expectedSha256: pins.expectedSha,
-        expectedSizeBytes: pins.expectedSize,
-        requestedBy: input.sub,
-        via: input.via,
-      });
+      // source construction/authorization fails a moment later. Async
+      // transfers skip this: the CLAIM already owns the job row.
+      if (provenance) {
+        await this.documentImports?.recordAttemptStart({
+          docId: doc.id,
+          tenantId: doc.tenantId,
+          ...wireProvenanceFields(input.source),
+          expectedSha256: pins.expectedSha,
+          expectedSizeBytes: pins.expectedSize,
+          requestedBy: input.sub,
+          via: input.via,
+        });
+      }
 
       let source!: ImportSource;
       let opened: ImportSourceOpen;
@@ -524,9 +709,12 @@ export class DocumentLifecycleService {
         });
         opened = await source.open({ signal: abort.signal });
       } catch (err) {
-        throw await this.importFailure(doc, err);
+        throw await this.importFailure(doc, err, provenance);
       }
       try {
+        // Report the served revision before any bytes flow — async
+        // jobs persist it (fenced) so retries pin to this identity.
+        await opts.onOpened?.(opened.resolvedRevision ?? null);
         if (opened.contentLength > policy.maxBytes) {
           throw new ImportSourceError(
             'too_large',
@@ -547,7 +735,7 @@ export class DocumentLifecycleService {
         await this.usageMeters?.assertStorageAllowed(opened.contentLength);
       } catch (err) {
         opened.body.destroy();
-        throw await this.importFailure(doc, err);
+        throw await this.importFailure(doc, err, provenance);
       }
 
       const key = this.buildUploadKey(doc.id, doc.tenantId);
@@ -568,6 +756,7 @@ export class DocumentLifecycleService {
         throw await this.importFailure(
           doc,
           new ImportSourceError('upstream', `transfer failed: ${sanitizeImportDetail(err)}`, true),
+          provenance,
         );
       } finally {
         abort.signal.removeEventListener('abort', onAbort);
@@ -575,13 +764,15 @@ export class DocumentLifecycleService {
 
       if (pins.expectedSha && observedSha !== pins.expectedSha) {
         await this.documents.markFailed(doc.id, doc.tenantId, 'sha_mismatch');
-        await this.documentImports
-          ?.recordFailure(
-            doc.id,
-            doc.tenantId,
-            'sha_mismatch: declared expected.sha256 does not match the source bytes',
-          )
-          .catch(() => undefined);
+        if (provenance) {
+          await this.documentImports
+            ?.recordFailure(
+              doc.id,
+              doc.tenantId,
+              'sha_mismatch: declared expected.sha256 does not match the source bytes',
+            )
+            .catch(() => undefined);
+        }
         await this.storage.delete(key);
         throw badRequest(
           `sha_mismatch: expected.sha256 declared ${pins.expectedSha} but the source bytes hash to ${observedSha}`,
@@ -598,17 +789,27 @@ export class DocumentLifecycleService {
           sha256: observedSha,
         });
       } catch (err) {
-        await this.documentImports
-          ?.recordFailure(doc.id, doc.tenantId, sanitizeImportDetail(err))
-          .catch(() => undefined);
+        if (provenance) {
+          await this.documentImports
+            ?.recordFailure(doc.id, doc.tenantId, sanitizeImportDetail(err))
+            .catch(() => undefined);
+        }
         throw err;
       }
-      await this.documentImports?.recordSuccess(doc.id, doc.tenantId, {
+      if (provenance) {
+        await this.documentImports?.recordSuccess(doc.id, doc.tenantId, {
+          resolvedRevision: opened.resolvedRevision ?? null,
+          sourceKind: source.info.kind,
+          sourceLocation: source.info.location,
+        });
+      }
+      return {
+        tag: 'imported',
+        doc: committed.doc,
         resolvedRevision: opened.resolvedRevision ?? null,
         sourceKind: source.info.kind,
         sourceLocation: source.info.location,
-      });
-      return { tag: 'imported', doc: committed.doc };
+      };
     } finally {
       clearTimeout(timer);
       release();
@@ -621,11 +822,13 @@ export class DocumentLifecycleService {
    * URL query string); retryable ones leave it pending for a same-key
    * resume and surface as 502.
    */
-  private async importFailure(doc: DocumentRow, err: unknown): Promise<Error> {
+  private async importFailure(doc: DocumentRow, err: unknown, provenance = true): Promise<Error> {
     if (ImportSourceError.is(err)) {
-      await this.documentImports
-        ?.recordFailure(doc.id, doc.tenantId, `import_${err.code}: ${err.message}`)
-        .catch(() => undefined);
+      if (provenance) {
+        await this.documentImports
+          ?.recordFailure(doc.id, doc.tenantId, `import_${err.code}: ${err.message}`)
+          .catch(() => undefined);
+      }
       if (!err.retryable) {
         await this.documents.markFailed(
           doc.id,
@@ -874,10 +1077,16 @@ export class DocumentLifecycleService {
    */
   async sweepStalePending(opts: { olderThanMs: number }): Promise<number> {
     const stale = await this.documents.listStalePending(opts.olderThanMs);
+    let swept = 0;
     for (const doc of stale) {
+      // A queued/running async job OWNS its pending document — the
+      // lease/backoff machinery retires it, never the sweeper.
+      const job = await this.documentImports?.findByDoc(doc.id, doc.tenantId);
+      if (job && (job.state === 'queued' || job.state === 'running')) continue;
       await this.delete(doc.tenantId, doc.id);
+      swept++;
     }
-    return stale.length;
+    return swept;
   }
 }
 
@@ -889,6 +1098,13 @@ function generateDocId(): string {
 interface ResolvedImportPins {
   expectedSha: string | null;
   expectedSize: number | null;
+}
+
+interface ImportTransferOpts {
+  /** false = an async job row owns provenance + fencing; skip unfenced writes. */
+  provenance?: boolean;
+  /** Invoked after a successful open with the served revision (null when none). */
+  onOpened?: (resolvedRevision: string | null) => Promise<void>;
 }
 
 function forbiddenError(message: string): Error {
@@ -933,7 +1149,7 @@ function wireProvenanceFields(source: AdminImportSource): {
 }
 
 /** Strip anything query-shaped so presigned credentials can't leak into reasons. */
-function sanitizeImportDetail(err: unknown): string {
+export function sanitizeImportDetail(err: unknown): string {
   const msg = err instanceof Error ? err.message : String(err);
   return msg.replace(/\?\S*/g, '?[redacted]').slice(0, 300);
 }

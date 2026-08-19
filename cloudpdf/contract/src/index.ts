@@ -236,16 +236,28 @@ export const AdminDocumentImportRequestSchema = z.object({
   idempotencyKey: z.string().optional(),
   dedupMode: DedupModeSchema.optional(),
   docId: z.string().regex(docIdPattern).optional(),
+  /**
+   * `sync` (default) holds the response open for the whole transfer.
+   * `async` accepts the request (202, document `pending`), transfers
+   * in the background, and the caller polls the document. Async
+   * requires a `connection` source (URLs are secrets and expire, so
+   * they cannot sit in a durable job); filesystem connections
+   * additionally require `expected.sha256`, since they have no
+   * revisions to pin retries to.
+   */
+  mode: z.enum(['sync', 'async']).optional(),
 });
 export type AdminDocumentImportRequest = z.infer<typeof AdminDocumentImportRequestSchema>;
 
 export const AdminDocumentImportResponseSchema = z.object({
   /**
-   * `imported` — bytes were pulled, verified, and committed.
+   * `imported` — bytes were pulled, verified, and committed (sync).
    * `deduped`  — an existing document satisfied the request without a
    * transfer (content dedup or idempotent replay).
+   * `accepted` — async: the job is queued (HTTP 202); poll the
+   * document until `ready` or `failed`.
    */
-  tag: z.enum(['imported', 'deduped']),
+  tag: z.enum(['imported', 'deduped', 'accepted']),
   document: AdminDocumentRecordSchema,
 });
 export type AdminDocumentImportResponse = z.infer<typeof AdminDocumentImportResponseSchema>;
@@ -904,12 +916,13 @@ export const adminOperations = {
     body: { contentType: 'application/json', schema: AdminDocumentImportRequestSchema },
     responses: {
       200: { contentType: 'application/json', schema: AdminDocumentImportResponseSchema },
+      202: { contentType: 'application/json', schema: AdminDocumentImportResponseSchema },
       400: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
       403: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
       502: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
     },
     notes:
-      'Synchronous and bounded: the response returns only after the transfer verified and committed (or failed). The deployment import policy gates scheme, network range, and size; sources must declare a length. CloudPDF copies and owns the bytes — the source is never referenced in place. A 502 marks a retryable upstream failure: retry with the same idempotencyKey to resume the same document. URL sources are capabilities and never echoed back. Connection sources name operator-registered storage (bucket/prefix scope, allowed credential classes, and tenant bindings are deployment configuration); `revision` is provider-interpreted (S3 VersionId, GCS generation, Azure version id).',
+      'Default mode is synchronous and bounded: the response returns only after the transfer verified and committed (or failed). mode=async (connection sources only) answers 202 immediately and an in-process worker performs the transfer with leased, fenced retries; poll the document until ready/failed. The deployment import policy gates scheme, network range, and size; sources must declare a length. CloudPDF copies and owns the bytes — the source is never referenced in place. A 502 marks a retryable upstream failure: retry with the same idempotencyKey to resume the same document. URL sources are capabilities and never echoed back. Connection sources name operator-registered storage (bucket/prefix scope, allowed credential classes, and tenant bindings are deployment configuration); `revision` is provider-interpreted (S3 VersionId, GCS generation, Azure version id).',
   },
   'documents.list': {
     operationId: 'documents.list',

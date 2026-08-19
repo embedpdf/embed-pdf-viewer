@@ -11,8 +11,8 @@ import {
 } from '@cloudpdf/contract';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 
-import { requireTenantAccess } from '../../app/jwt-plugin';
 import { decodeListCursor, encodeListCursor } from './_cursor';
+import { requireTenantAccess } from '../../app/jwt-plugin';
 import type { DocumentLifecycleService } from '../../services/DocumentLifecycleService';
 import type { ObjectStore } from '../../storage/ObjectStore';
 
@@ -165,8 +165,11 @@ export async function registerAdminDocumentsRoutes(
       idempotencyKey: body.idempotencyKey ?? null,
       dedupMode: body.dedupMode,
       docId: body.docId,
+      mode: body.mode,
     });
-    return reply.send({ tag: result.tag, document: docPublic(result.doc) });
+    return reply
+      .code(result.tag === 'accepted' ? 202 : 200)
+      .send({ tag: result.tag, document: docPublic(result.doc) });
   });
 
   const listOp = adminOperations['documents.list'];

@@ -15,7 +15,7 @@ import { dirname, join as joinPath } from 'node:path';
 import { createServer, type Server } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterAll, beforeAll, describe, expect, test } from 'vitest';
+import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
 import { mockClient } from 'aws-sdk-client-mock';
 import { sdkStreamMixin } from '@smithy/util-stream';
 import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
@@ -115,6 +115,7 @@ async function buildBundle(
     autoProvisionTenant: true,
     sweepIntervalMs: 0,
     apiAuthTokens: [ROOT_API_TOKEN],
+    importWorkerPollMs: 25,
     importPolicy: ImportPolicySchema.parse({
       allowHttp: true,
       allowPrivateNetworks: true,
@@ -458,6 +459,46 @@ describe('documents.import connection sources E2E', () => {
     expect(del.statusCode).toBe(204);
     expect(await provenance('imp-prov-url')).toBeUndefined();
   });
+
+  test('mode=async answers 202 and the in-process worker completes it', async () => {
+    const res = await importDoc({
+      source: { kind: 'connection', connectionId: 'tenant-docs', key: 'docs/e2e.pdf' },
+      docId: 'imp-async',
+      mode: 'async',
+    });
+    expect(res.statusCode, res.body).toBe(202);
+    const body = JSON.parse(res.body) as { tag: string; document: Record<string, unknown> };
+    expect(body.tag).toBe('accepted');
+    expect(body.document['state']).toBe('pending');
+
+    await vi.waitFor(
+      async () => {
+        const poll = await fx.bundle.app.inject({
+          method: 'GET',
+          url: adminWirePaths.document(TENANT, 'imp-async'),
+          headers: { authorization: `Bearer ${fx.token}` },
+        });
+        const doc = (JSON.parse(poll.body) as { document: Record<string, unknown> }).document;
+        expect(doc['state']).toBe('ready');
+        expect(doc['baseSha']).toBe(PDF_SHA);
+      },
+      { timeout: 8000, interval: 100 },
+    );
+
+    const row = await provenance('imp-async');
+    expect(row).toMatchObject({
+      state: 'succeeded',
+      connection_id: 'tenant-docs',
+      resolved_revision: 'v7',
+      via: 'tenant-jwt',
+    });
+  });
+
+  test('url sources reject mode=async', async () => {
+    const res = await importDoc({ source: { kind: 'url', url: srcUrl('/ok') }, mode: 'async' });
+    expect(res.statusCode, res.body).toBe(400);
+    expect(res.body).toContain('requires a connection source');
+  });
 });
 
 /**
@@ -525,6 +566,15 @@ describe('documents.import fs connection E2E', () => {
       resolved_revision: null,
     });
     expect(String(row?.['source_location'])).toContain('inbox/scan-001.pdf');
+  });
+
+  test('mode=async on fs without expected.sha256 is refused with the pinning hint', async () => {
+    const res = await importVia(ROOT_API_TOKEN, {
+      source: { kind: 'connection', connectionId: 'local-drop', key: 'inbox/scan-001.pdf' },
+      mode: 'async',
+    });
+    expect(res.statusCode, res.body).toBe(400);
+    expect(res.body).toContain('async imports from fs require expected.sha256');
   });
 
   test('a revision on an fs connection is refused with the sha256 hint', async () => {

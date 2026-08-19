@@ -154,6 +154,7 @@ export {
 } from './import/config/ImportConnectionSchema';
 export { loadImportConnectionsFromEnv } from './import/config/loadImportConnectionsFromEnv';
 export { ImportConnectionRegistry } from './import/ImportConnectionRegistry';
+export { ImportWorker, type ImportWorkerOptions } from './import/ImportWorker';
 export { S3ImportSource } from './import/adapters/S3ImportSource';
 export { GcsImportSource } from './import/adapters/GcsImportSource';
 export { AzureBlobImportSource } from './import/adapters/AzureBlobImportSource';

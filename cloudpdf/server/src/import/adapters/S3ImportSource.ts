@@ -40,7 +40,14 @@ export interface S3ImportSourceOptions {
 
 export class S3ImportSource implements ImportSource {
   readonly info: ImportSourceInfo;
-  private readonly depsPromise: Promise<{ client: S3Client; cmd: S3Module }>;
+  /**
+   * Unlike destination adapters (constructed once at boot), sources
+   * are per-request: construction must stay a pure validation step
+   * with NO side effects, so the lazy SDK import starts on first
+   * open() — construct-and-discard (async eligibility gates, tests)
+   * never leaves a dangling in-flight import behind.
+   */
+  private depsPromise?: Promise<{ client: S3Client; cmd: S3Module }>;
 
   constructor(private readonly opts: S3ImportSourceOptions) {
     this.info = {
@@ -48,7 +55,11 @@ export class S3ImportSource implements ImportSource {
       location: `s3://${opts.connection.bucket}/${opts.key}`,
       connectionId: opts.connection.id,
     };
-    this.depsPromise = this.createDeps();
+  }
+
+  private deps(): Promise<{ client: S3Client; cmd: S3Module }> {
+    this.depsPromise ??= this.createDeps();
+    return this.depsPromise;
   }
 
   private async createDeps(): Promise<{ client: S3Client; cmd: S3Module }> {
@@ -69,7 +80,7 @@ export class S3ImportSource implements ImportSource {
         true,
       );
     }
-    const { client, cmd } = await this.depsPromise;
+    const { client, cmd } = await this.deps();
     const conn = this.opts.connection;
     let res;
     try {

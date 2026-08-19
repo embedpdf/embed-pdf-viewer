@@ -39,6 +39,7 @@ import type { Database as Schema } from '../db/schema';
 import type { ImportConnection } from '../import/config/ImportConnectionSchema';
 import { defaultImportPolicy, type ImportPolicy } from '../import/config/ImportPolicySchema';
 import { ImportConnectionRegistry } from '../import/ImportConnectionRegistry';
+import { ImportWorker } from '../import/ImportWorker';
 import type { ConnectedUsageReporter } from '../licensing/ConnectedUsageReporter';
 import type { LicenseGate } from '../licensing/LicenseRuntime';
 import { isLicenseGateTrusted } from '../licensing/trusted-license-gates';
@@ -64,16 +65,16 @@ import { WorkerThreadPool, type FallbackFontDescriptor } from '../runtime/Worker
 import type { KmsKeyring } from '../security';
 import { CloudRevisionBridge } from '../services/CloudRevisionBridge';
 import { DerivedRenderService } from '../services/DerivedRenderService';
+import {
+  DocumentLifecycleService,
+  type UploadProxyPolicy,
+} from '../services/DocumentLifecycleService';
 import { DocumentSecurityProbe } from '../services/DocumentSecurityProbe';
 import { DocumentService } from '../services/DocumentService';
 import { EventLogService } from '../services/EventLogService';
 import { LayerService } from '../services/LayerService';
 import { LayerStateService } from '../services/LayerStateService';
 import { WeakAnnotationSessionService } from '../services/WeakAnnotationSessionService';
-import {
-  DocumentLifecycleService,
-  type UploadProxyPolicy,
-} from '../services/DocumentLifecycleService';
 import { BaseFileCache } from '../storage/BaseFileCache';
 import type { ObjectStoreWithInfo } from '../storage/ObjectStore';
 
@@ -152,6 +153,8 @@ export interface BuildAppOptions {
    * scope/credential combinations refuse to boot.
    */
   importConnections?: ReadonlyArray<ImportConnection>;
+  /** Async import worker idle-poll interval; tests shrink it. Default 1s. */
+  importWorkerPollMs?: number;
   /**
    * Fastify `trustProxy` passthrough. REQUIRED for `request.ip` (and thus
    * the auth-failure limiter) to see real client addresses when the server
@@ -554,6 +557,7 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
   }
 
   let lifecycle: DocumentLifecycleService | undefined;
+  let importWorker: ImportWorker | undefined;
   let layerService: LayerService | undefined;
   let derivedRenders: DerivedRenderService | undefined;
   let sweeperTimer: NodeJS.Timeout | undefined;
@@ -603,15 +607,18 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
       });
     }
 
+    const importPolicy = opts.importPolicy ?? defaultImportPolicy();
+    const documentImportsRepo = new DocumentImportsRepo(opts.db);
     lifecycle = new DocumentLifecycleService({
       documents: new DocumentsRepo(opts.db),
       tenants: new TenantsRepo(opts.db),
       storage: opts.objectStore,
       autoProvisionTenant: opts.autoProvisionTenant ?? false,
       uploadProxyPolicy: opts.uploadProxyPolicy ?? 'fallback-only',
-      importPolicy: opts.importPolicy ?? defaultImportPolicy(),
+      importPolicy: importPolicy,
       importConnections: new ImportConnectionRegistry(opts.importConnections ?? []),
-      documentImports: new DocumentImportsRepo(opts.db),
+      documentImports: documentImportsRepo,
+      db: opts.db,
       securityProbe: new DocumentSecurityProbe({
         cache: baseFileCache,
         pool,
@@ -628,6 +635,20 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
       lifecycle,
       storage: opts.objectStore,
     });
+    // The async-import claim loop: in-process (like the sweeper), one
+    // per replica, safe under multi-replica via fenced leased claims.
+    if (importPolicy.enabled) {
+      importWorker = new ImportWorker({
+        jobs: documentImportsRepo,
+        documents: new DocumentsRepo(opts.db),
+        lifecycle,
+        storage: opts.objectStore,
+        policy: importPolicy,
+        ...(opts.importWorkerPollMs !== undefined ? { pollMs: opts.importWorkerPollMs } : {}),
+        onError: (err, ctx) => app.log.warn({ err, ...ctx }, 'import worker error'),
+      });
+      importWorker.start();
+    }
     const tenantUsage = new TenantUsageRepo(opts.db);
     await registerAdminTenantsRoutes(app, {
       tenants: new TenantsRepo(opts.db),
@@ -919,6 +940,7 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
 
   const shutdown = async () => {
     if (sweeperTimer) clearInterval(sweeperTimer);
+    await importWorker?.stop();
     try {
       await app.close();
     } finally {

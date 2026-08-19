@@ -39,7 +39,8 @@ export interface GcsImportSourceOptions {
 
 export class GcsImportSource implements ImportSource {
   readonly info: ImportSourceInfo;
-  private readonly bucketPromise: Promise<Bucket>;
+  /** Started on first open() — construction stays side-effect-free (see S3ImportSource). */
+  private bucketPromise?: Promise<Bucket>;
 
   constructor(private readonly opts: GcsImportSourceOptions) {
     if (opts.revision !== undefined && !GENERATION_PATTERN.test(opts.revision)) {
@@ -54,7 +55,11 @@ export class GcsImportSource implements ImportSource {
       location: `gs://${opts.connection.bucket}/${opts.key}`,
       connectionId: opts.connection.id,
     };
-    this.bucketPromise = this.createBucket();
+  }
+
+  private bucket(): Promise<Bucket> {
+    this.bucketPromise ??= this.createBucket();
+    return this.bucketPromise;
   }
 
   private async createBucket(): Promise<Bucket> {
@@ -72,7 +77,7 @@ export class GcsImportSource implements ImportSource {
         true,
       );
     }
-    const bucket = await this.bucketPromise;
+    const bucket = await this.bucket();
     const requested = this.opts.revision !== undefined ? Number(this.opts.revision) : undefined;
     const file =
       requested !== undefined
