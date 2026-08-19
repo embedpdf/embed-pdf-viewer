@@ -42,6 +42,7 @@ import { UsageMeters } from '../licensing/UsageMeters';
 import { InProcessRealtimeBus, type RealtimeBus } from '../realtime/RealtimeBus';
 import { SharpImageEncoder } from '../render/SharpImageEncoder';
 import { registerAccessRoutes } from '../routes/access';
+import { defaultImportPolicy, type ImportPolicy } from '../import/config/ImportPolicySchema';
 import { registerAdminDocumentsRoutes } from '../routes/admin/documents';
 import { registerAdminSharesRoutes } from '../routes/admin/shares';
 import { registerAdminTenantsRoutes } from '../routes/admin/tenants';
@@ -136,6 +137,12 @@ export interface BuildAppOptions {
   bodyLimit?: number;
   /** Origin-mediated upload policy. Defaults to `fallback-only`. */
   uploadProxyPolicy?: UploadProxyPolicy;
+  /**
+   * Server-side pull policy for `documents.import`. Defaults to the
+   * schema defaults (enabled, https-only, public networks, 128 MiB).
+   * Pass `{ ...defaultImportPolicy(), enabled: false }` to disable.
+   */
+  importPolicy?: ImportPolicy;
   /**
    * Fastify `trustProxy` passthrough. REQUIRED for `request.ip` (and thus
    * the auth-failure limiter) to see real client addresses when the server
@@ -593,6 +600,7 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
       storage: opts.objectStore,
       autoProvisionTenant: opts.autoProvisionTenant ?? false,
       uploadProxyPolicy: opts.uploadProxyPolicy ?? 'fallback-only',
+      importPolicy: opts.importPolicy ?? defaultImportPolicy(),
       securityProbe: new DocumentSecurityProbe({
         cache: baseFileCache,
         pool,

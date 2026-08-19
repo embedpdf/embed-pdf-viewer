@@ -105,6 +105,23 @@ describe('admin operation registry conformance', () => {
     }
   });
 
+  test('documents.uploadProxy rejects non-multipart requests as InvalidArg', async () => {
+    const op = adminOperations['documents.uploadProxy'];
+    const res = await fx.bundle.app.inject({
+      method: op.method,
+      url: substitutedUrl(op.path),
+      headers: { authorization: `Bearer ${fx.token}` },
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body)).toEqual({
+      error: {
+        code: 'InvalidArg',
+        message: 'expected multipart with a file field',
+      },
+    });
+  });
+
   test('tokens.revoke is not mounted without enableRevocation, as its notes say', async () => {
     const op = adminOperations['tokens.revoke'];
     const res = await fx.bundle.app.inject({

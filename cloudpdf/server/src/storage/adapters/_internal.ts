@@ -22,7 +22,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { createReadStream } from 'node:fs';
 import { open, mkdir, rename, unlink } from 'node:fs/promises';
 import { dirname } from 'node:path';
-import type { Readable } from 'node:stream';
+import { pipeline, Transform, type Readable } from 'node:stream';
 
 import { ShaMismatchError, type MaterializeOpts, type MaterializeResult } from '../ObjectStore';
 
@@ -66,6 +66,87 @@ export async function streamingSha256(stream: Readable): Promise<string> {
     h.update(chunk instanceof Buffer ? chunk : Buffer.from(chunk));
   }
   return h.digest('hex');
+}
+
+/**
+ * The body wrapper for a STREAMED `put`. Hashes and counts the bytes
+ * as they flow toward the backend, enforcing the declared
+ * content-length exactly:
+ *
+ *   - one byte over `declared` errors the body mid-stream, so the
+ *     backend aborts its upload and no visible object materializes;
+ *   - a source that ends short errors in `flush` — BEFORE downstream
+ *     ever sees EOF — so single-shot backends can never finalize an
+ *     undersized object;
+ *   - `sha256()` is defined only after a full, exact-length flush. A
+ *     backend upload call that resolved implies EOF was consumed,
+ *     which implies the flush ran (adapters rely on this order);
+ *   - `error()` hands back the body/source failure so adapters can
+ *     rethrow OUR precise content-length error instead of whatever
+ *     wrapper the SDK put around the aborted request.
+ */
+export interface CountedSha256Body {
+  /** Pass this to the backend SDK as the upload body. */
+  readonly body: Transform;
+  /** SHA-256 hex of the streamed bytes. Throws before full flush. */
+  sha256(): string;
+  /** First body/source failure, if any. */
+  error(): Error | null;
+}
+
+/** See {@link CountedSha256Body}. `label` prefixes error messages. */
+export function countedSha256Body(
+  source: Readable,
+  declared: number,
+  label: string,
+): CountedSha256Body {
+  const hash = createHash('sha256');
+  let written = 0;
+  let digest: string | null = null;
+  let failure: Error | null = null;
+
+  const body = new Transform({
+    transform(chunk, _enc, cb) {
+      const buf = chunk instanceof Buffer ? chunk : Buffer.from(chunk as Uint8Array);
+      written += buf.byteLength;
+      if (written > declared) {
+        cb(new Error(`${label}: declared contentLength=${declared} but received more`));
+        return;
+      }
+      hash.update(buf);
+      cb(null, buf);
+    },
+    flush(cb) {
+      if (written !== declared) {
+        cb(new Error(`${label}: declared contentLength=${declared} but got ${written}`));
+        return;
+      }
+      digest = hash.digest('hex');
+      cb();
+    },
+  });
+  // Capture the first failure (and keep 'error' handled so a backend
+  // that abandons the stream can't crash the process).
+  body.on('error', (err) => {
+    failure ??= err instanceof Error ? err : new Error(String(err));
+  });
+  // pipeline (vs .pipe) propagates errors BOTH ways: a source failure
+  // destroys the body (the backend sees the error), and a backend
+  // abort destroys the source.
+  pipeline(source, body, () => {
+    /* outcome observed via body 'error' / flush */
+  });
+
+  return {
+    body,
+    sha256: () => {
+      if (digest === null) {
+        throw new Error(`${label}: body was not fully consumed; SHA-256 unavailable`);
+      }
+      return digest;
+    },
+    error: () => failure,
+  };
 }
 
 /** `unlink` that swallows ENOENT (best-effort cleanup). */

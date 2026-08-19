@@ -16,7 +16,10 @@
  * MD5 for single-part PUTs, a composite hash for MPU). We compute
  * sha256 on `put`, stash it in object metadata, and read it back on
  * `getSha256`/`materializeLocal` to skip a full re-hash; objects PUT
- * out-of-band fall back to a streaming hash.
+ * out-of-band fall back to a streaming hash. Streamed puts attach
+ * the metadata via a same-key server-side CopyObject after the
+ * streaming PutObject (S3 metadata is write-once PUT headers, and
+ * the digest doesn't exist until the last byte flowed).
  */
 
 import { Readable } from 'node:stream';
@@ -34,6 +37,7 @@ import type {
   PresignUploadOpts,
 } from '../ObjectStore';
 import {
+  countedSha256Body,
   drainReadable,
   computeSha256Hex,
   streamingSha256,
@@ -132,22 +136,71 @@ export class S3ObjectStore implements ObjectStore {
     body: ObjectBody,
     opts: { contentLength: number; contentType?: string },
   ): Promise<{ sha256: string }> {
-    const bytes = body instanceof Uint8Array ? body : await drainReadable(body as Readable);
-    if (bytes.byteLength !== opts.contentLength) {
+    if (!(body instanceof Uint8Array)) return this.putStream(key, body, opts);
+    if (body.byteLength !== opts.contentLength) {
       throw new Error(
-        `S3ObjectStore.put: declared contentLength=${opts.contentLength} but got ${bytes.byteLength}`,
+        `S3ObjectStore.put: declared contentLength=${opts.contentLength} but got ${body.byteLength}`,
       );
     }
-    const sha256 = computeSha256Hex(bytes);
+    const sha256 = computeSha256Hex(body);
     const { client, cmd } = await this.depsPromise;
     await client.send(
       new cmd.PutObjectCommand({
         Bucket: this.bucket,
         Key: key,
-        Body: bytes,
+        Body: body,
         ContentLength: opts.contentLength,
         ContentType: opts.contentType ?? 'application/pdf',
         Metadata: { [SHA256_METADATA_KEY]: sha256 },
+      }),
+    );
+    return { sha256 };
+  }
+
+  /**
+   * Streamed put: ONE streaming PutObject (constant memory — the
+   * counting hasher taps the bytes on their way to the socket), then
+   * ONE same-key server-side CopyObject to attach the SHA-256
+   * metadata. PutObject is atomic: a mid-stream failure (source
+   * error, length violation) aborts the request with no visible
+   * object, and any prior object at the key survives. Single-PUT
+   * ceiling is 5 GiB — far above the bounded origin pathways that
+   * stream through here.
+   */
+  private async putStream(
+    key: string,
+    source: Readable,
+    opts: { contentLength: number; contentType?: string },
+  ): Promise<{ sha256: string }> {
+    const { client, cmd } = await this.depsPromise;
+    const contentType = opts.contentType ?? 'application/pdf';
+    const counted = countedSha256Body(source, opts.contentLength, 'S3ObjectStore.put');
+    try {
+      await client.send(
+        new cmd.PutObjectCommand({
+          Bucket: this.bucket,
+          Key: key,
+          Body: counted.body,
+          ContentLength: opts.contentLength,
+          ContentType: contentType,
+        }),
+      );
+    } catch (err) {
+      // Prefer our precise length/source error over the SDK's wrapper
+      // around the aborted request.
+      throw counted.error() ?? err;
+    }
+    const sha256 = counted.sha256();
+    // CopySource wants `bucket/key`, URL-encoded per path segment.
+    const copySource = [this.bucket, ...key.split('/')].map(encodeURIComponent).join('/');
+    await client.send(
+      new cmd.CopyObjectCommand({
+        Bucket: this.bucket,
+        Key: key,
+        CopySource: copySource,
+        MetadataDirective: 'REPLACE',
+        Metadata: { [SHA256_METADATA_KEY]: sha256 },
+        ContentType: contentType,
       }),
     );
     return { sha256 };

@@ -1,5 +1,7 @@
 import { randomBytes } from 'node:crypto';
 
+import type { AdminImportSource } from '@cloudpdf/contract';
+
 import type { DerivedRenderService } from './DerivedRenderService';
 import { DocumentSecurityProbe } from './DocumentSecurityProbe';
 import {
@@ -10,6 +12,10 @@ import {
 import type { ShareGrantsRepo } from '../db/repos/share_grants.repo';
 import type { TenantUsageRepo } from '../db/repos/tenant_usage.repo';
 import { TenantsRepo } from '../db/repos/tenants.repo';
+import type { ImportPolicy } from '../import/config/ImportPolicySchema';
+import { createImportSource } from '../import/createImportSource';
+import { ImportSourceError, type ImportSourceOpen } from '../import/ImportSource';
+import { Semaphore } from '../import/Semaphore';
 import type { UsageMeters } from '../licensing/UsageMeters';
 import type { BaseFileCache, LocalFileHandle } from '../storage/BaseFileCache';
 import { StorageKeys } from '../storage/keys';
@@ -23,6 +29,31 @@ import {
 export type DedupMode = 'always-create' | 'reuse-existing';
 export type UploadPreference = 'auto' | 'presigned' | 'proxy';
 export type UploadProxyPolicy = 'fallback-only' | 'allowed' | 'disabled';
+
+/** Integrity pins for `documents.import`; enforced when present. */
+export interface ImportExpected {
+  sizeBytes?: number;
+  sha256?: string;
+}
+
+export interface ImportInput {
+  tenantId: string;
+  sub: string;
+  /** Wire descriptor from the request body (v1: `{ kind: 'url' }`). */
+  source: AdminImportSource;
+  expected?: ImportExpected | null;
+  metadata?: Record<string, unknown> | null;
+  idempotencyKey?: string | null;
+  dedupMode?: DedupMode;
+  docId?: string | undefined;
+}
+
+/**
+ * `imported` — bytes were pulled, verified, and committed.
+ * `deduped`  — an existing document satisfied the request without a
+ *              transfer (content dedup or idempotent replay).
+ */
+export type ImportResult = { tag: 'imported' | 'deduped'; doc: DocumentRow };
 
 export interface InitInput {
   tenantId: string;
@@ -114,6 +145,13 @@ export interface DocumentLifecycleOptions {
   shareGrants?: ShareGrantsRepo;
   /** Controls whether origin-mediated uploads may be selected. */
   uploadProxyPolicy?: UploadProxyPolicy;
+  /**
+   * Server-side pull policy for `documents.import`. Absent = imports
+   * disabled (the endpoint answers 403), which keeps direct service
+   * construction (tests, admin-only deploys) closed by default;
+   * `buildApp` supplies the schema defaults.
+   */
+  importPolicy?: ImportPolicy;
 }
 
 /**
@@ -149,6 +187,10 @@ export class DocumentLifecycleService {
   private readonly tenantUsage?: TenantUsageRepo;
   private readonly shareGrants?: ShareGrantsRepo;
   private readonly uploadProxyPolicy: UploadProxyPolicy;
+  private readonly importPolicy?: ImportPolicy;
+  private readonly importGate: Semaphore;
+  /** Single-flight per (tenant, idempotencyKey): concurrent retries share one transfer. */
+  private readonly inflightImports = new Map<string, Promise<ImportResult>>();
 
   constructor(opts: DocumentLifecycleOptions) {
     this.documents = opts.documents;
@@ -162,6 +204,8 @@ export class DocumentLifecycleService {
     this.tenantUsage = opts.tenantUsage;
     this.shareGrants = opts.shareGrants;
     this.uploadProxyPolicy = opts.uploadProxyPolicy ?? 'fallback-only';
+    if (opts.importPolicy) this.importPolicy = opts.importPolicy;
+    this.importGate = new Semaphore(opts.importPolicy?.maxConcurrent ?? 1);
   }
 
   async init(input: InitInput): Promise<InitResult> {
@@ -316,6 +360,256 @@ export class DocumentLifecycleService {
     }
     const key = this.buildUploadKey(doc.id, doc.tenantId);
     return this.storage.put(key, input.body, { contentLength: input.contentLength });
+  }
+
+  /**
+   * `documents.import` — the server-side pull. The same lifecycle as
+   * init → PUT → commit with only the transfer phase swapped: the
+   * server fetches the bytes from a caller-supplied source instead of
+   * the client pushing them. Synchronous and bounded by policy
+   * (`maxBytes` / `timeoutMs`); the doc row is the audit record, not
+   * a job queue.
+   *
+   * Failure model:
+   *   - policy/content failures (bad source, size/sha mismatch, too
+   *     large, 404/denied at the source) are TERMINAL: the row is
+   *     marked failed with a sanitized reason and the call maps to 400;
+   *   - transport failures (network, source 5xx, timeout, truncated
+   *     stream) are RETRYABLE: the row stays pending and the call maps
+   *     to 502 — retrying with the same idempotencyKey resumes the
+   *     same document. Abandoned pendings fall to the sweeper.
+   */
+  async importFromSource(input: ImportInput): Promise<ImportResult> {
+    const policy = this.importPolicy;
+    if (!policy || !policy.enabled) {
+      throw forbiddenError('imports are disabled on this deployment');
+    }
+    const pins: ResolvedImportPins = {
+      expectedSha: input.expected?.sha256?.toLowerCase() ?? null,
+      expectedSize: input.expected?.sizeBytes ?? null,
+    };
+    const dedupMode: DedupMode = input.dedupMode ?? 'always-create';
+    if (dedupMode === 'reuse-existing' && !pins.expectedSha) {
+      throw badRequest(
+        'dedupMode=reuse-existing requires expected.sha256: without a declared hash the server cannot know what content to reuse before transferring',
+      );
+    }
+    if (this.autoProvisionTenant) {
+      await this.tenants.ensure({ id: input.tenantId, autoProvisioned: true });
+    }
+    if (pins.expectedSha && dedupMode === 'reuse-existing') {
+      const existing = await this.documents.findByBaseSha(input.tenantId, pins.expectedSha);
+      if (existing) return { tag: 'deduped', doc: existing };
+    }
+    if (!input.idempotencyKey) return this.importResolved(input, pins);
+    // Single-flight: concurrent same-key imports share one transfer
+    // instead of racing double egress at the same storage key.
+    const gateKey = `${input.tenantId}:${input.idempotencyKey}`;
+    const running = this.inflightImports.get(gateKey);
+    if (running) return running;
+    const attempt = this.importResolved(input, pins).finally(() => {
+      this.inflightImports.delete(gateKey);
+    });
+    this.inflightImports.set(gateKey, attempt);
+    return attempt;
+  }
+
+  /** Resolve idempotent replay/resume, or create the pending row. */
+  private async importResolved(
+    input: ImportInput,
+    pins: ResolvedImportPins,
+  ): Promise<ImportResult> {
+    if (input.idempotencyKey) {
+      const existing = await this.documents.findByIdempotencyKey(
+        input.tenantId,
+        input.idempotencyKey,
+      );
+      if (existing) return this.importOntoExisting(existing, input, pins);
+    }
+    const docId = input.docId ?? generateDocId();
+    if (docId.length < 2) {
+      throw badRequest(`docId must be at least 2 characters: ${docId}`);
+    }
+    const created = await this.documents.createPending({
+      id: docId,
+      tenantId: input.tenantId,
+      metadata: input.metadata ?? null,
+      idempotencyKey: input.idempotencyKey ?? null,
+      createdBy: input.sub,
+      expectedSha256: pins.expectedSha,
+      expectedSizeBytes: pins.expectedSize,
+    });
+    // Same race as init: a concurrent same-key insert can win between
+    // the lookup and createPending. Fold onto whatever row exists.
+    if (!created.created) return this.importOntoExisting(created.row, input, pins);
+    return this.runImportTransfer(created.row, input, pins);
+  }
+
+  /** An idempotency key led to an existing row — replay or resume it. */
+  private async importOntoExisting(
+    existing: DocumentRow,
+    input: ImportInput,
+    pins: ResolvedImportPins,
+  ): Promise<ImportResult> {
+    this.assertSameImportIntent(existing, input.idempotencyKey ?? null, pins);
+    if (existing.state === 'ready') return { tag: 'deduped', doc: existing };
+    if (existing.state !== 'pending') {
+      throw conflict(
+        `idempotency key ${input.idempotencyKey} belongs to document ${existing.id} in state ${existing.state}`,
+      );
+    }
+    if (existing.uploadKind === 'presigned' || existing.uploadKind === 'proxy') {
+      throw conflict(
+        `idempotency key ${input.idempotencyKey} belongs to an init-created upload; finish it via its ${existing.uploadKind} flow`,
+      );
+    }
+    return this.runImportTransfer(existing, input, pins);
+  }
+
+  /** The transfer itself: open the source, stream into storage, commit. */
+  private async runImportTransfer(
+    doc: DocumentRow,
+    input: ImportInput,
+    pins: ResolvedImportPins,
+  ): Promise<ImportResult> {
+    const policy = this.importPolicy!;
+    const release = await this.importGate.acquire();
+    const abort = new AbortController();
+    const timer = setTimeout(() => abort.abort(), policy.timeoutMs);
+    timer.unref?.();
+    try {
+      const marked = await this.documents.setUploadIntent({
+        id: doc.id,
+        tenantId: doc.tenantId,
+        kind: 'pull',
+        expiresAt: Date.now() + policy.timeoutMs,
+      });
+      if (!marked) throw conflict(`document ${doc.id} state changed while starting import`);
+
+      let opened: ImportSourceOpen;
+      try {
+        const source = createImportSource(input.source, policy);
+        opened = await source.open({ signal: abort.signal });
+      } catch (err) {
+        throw await this.importFailure(doc, err);
+      }
+      try {
+        if (opened.contentLength > policy.maxBytes) {
+          throw new ImportSourceError(
+            'too_large',
+            `source declares ${opened.contentLength} bytes; this deployment caps imports at ${policy.maxBytes}`,
+            false,
+          );
+        }
+        if (pins.expectedSize !== null && pins.expectedSize !== opened.contentLength) {
+          throw new ImportSourceError(
+            'unsupported',
+            `size_mismatch: expected.sizeBytes declared ${pins.expectedSize} but the source declares ${opened.contentLength}`,
+            false,
+          );
+        }
+        // Fail fast on quota before paying for the transfer; commit
+        // re-asserts both meters authoritatively.
+        await this.usageMeters?.assertUploadAllowed();
+        await this.usageMeters?.assertStorageAllowed(opened.contentLength);
+      } catch (err) {
+        opened.body.destroy();
+        throw await this.importFailure(doc, err);
+      }
+
+      const key = this.buildUploadKey(doc.id, doc.tenantId);
+      const onAbort = (): void => {
+        opened.body.destroy(new Error('import timed out'));
+      };
+      abort.signal.addEventListener('abort', onAbort, { once: true });
+      let observedSha: string;
+      try {
+        const putRes = await this.storage.put(key, opened.body, {
+          contentLength: opened.contentLength,
+        });
+        observedSha = putRes.sha256;
+      } catch (err) {
+        // Truncated/over-long streams and connection resets land here.
+        // The streaming put is atomic (no visible partial object), so
+        // the row can stay pending for a same-key retry.
+        throw await this.importFailure(
+          doc,
+          new ImportSourceError('upstream', `transfer failed: ${sanitizeImportDetail(err)}`, true),
+        );
+      } finally {
+        abort.signal.removeEventListener('abort', onAbort);
+      }
+
+      if (pins.expectedSha && observedSha !== pins.expectedSha) {
+        await this.documents.markFailed(doc.id, doc.tenantId, 'sha_mismatch');
+        await this.storage.delete(key);
+        throw badRequest(
+          `sha_mismatch: expected.sha256 declared ${pins.expectedSha} but the source bytes hash to ${observedSha}`,
+        );
+      }
+      // From here the EXISTING commit path owns verification, the
+      // security probe, metering, and thumbnail warming — the import
+      // pathway adds no verification machinery of its own.
+      const committed = await this.commit({
+        tenantId: doc.tenantId,
+        docId: doc.id,
+        sha256: observedSha,
+      });
+      return { tag: 'imported', doc: committed.doc };
+    } finally {
+      clearTimeout(timer);
+      release();
+    }
+  }
+
+  /**
+   * Map a transfer-stage failure onto the row + an HTTP-shaped error.
+   * Terminal failures mark the row failed (sanitized reason — never a
+   * URL query string); retryable ones leave it pending for a same-key
+   * resume and surface as 502.
+   */
+  private async importFailure(doc: DocumentRow, err: unknown): Promise<Error> {
+    if (ImportSourceError.is(err)) {
+      if (!err.retryable) {
+        await this.documents.markFailed(
+          doc.id,
+          doc.tenantId,
+          `import_${err.code}: ${err.message}`.slice(0, 500),
+        );
+      }
+      const mapped = new Error(err.message) as Error & { code: string; status: number };
+      if (err.retryable) {
+        mapped.code = 'UpstreamError';
+        mapped.status = 502;
+      } else {
+        mapped.code = 'InvalidArg';
+        mapped.status = 400;
+      }
+      return mapped;
+    }
+    return err instanceof Error ? err : new Error(String(err));
+  }
+
+  /**
+   * Import-flavoured intent check. Unlike init (which REQUIRES the
+   * sha upfront), imports may omit pins — so mismatches are enforced
+   * only when both sides declare a value.
+   */
+  private assertSameImportIntent(
+    existing: DocumentRow,
+    idempotencyKey: string | null,
+    pins: ResolvedImportPins,
+  ): void {
+    const knownSha = existing.expectedSha256 ?? existing.baseSha;
+    if (pins.expectedSha && knownSha && pins.expectedSha !== knownSha) {
+      throw conflict(`idempotency key ${idempotencyKey} was already used for different content`);
+    }
+    const knownSize = existing.expectedSizeBytes ?? existing.storageSizeBytes;
+    if (pins.expectedSize !== null && knownSize !== null && pins.expectedSize !== knownSize) {
+      throw conflict(
+        `idempotency key ${idempotencyKey} was already used for a different byte length`,
+      );
+    }
   }
 
   async commit(input: CommitInput): Promise<CommitResult> {
@@ -532,6 +826,24 @@ export class DocumentLifecycleService {
 function generateDocId(): string {
   // 12 bytes -> 24 hex chars. Fits the 2-char shard naturally.
   return `doc_${randomBytes(12).toString('hex')}`;
+}
+
+interface ResolvedImportPins {
+  expectedSha: string | null;
+  expectedSize: number | null;
+}
+
+function forbiddenError(message: string): Error {
+  const e = new Error(message) as Error & { code: string; status: number };
+  e.code = 'Forbidden';
+  e.status = 403;
+  return e;
+}
+
+/** Strip anything query-shaped so presigned credentials can't leak into reasons. */
+function sanitizeImportDetail(err: unknown): string {
+  const msg = err instanceof Error ? err.message : String(err);
+  return msg.replace(/\?\S*/g, '?[redacted]').slice(0, 300);
 }
 
 function badRequest(message: string): Error {

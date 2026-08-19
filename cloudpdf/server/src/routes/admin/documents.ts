@@ -1,9 +1,11 @@
 import {
   AdminDocumentCommitRequestSchema,
+  AdminDocumentImportRequestSchema,
   AdminDocumentInitRequestSchema,
   adminOperations,
   adminWirePaths,
   type AdminDocumentCommitRequest,
+  type AdminDocumentImportRequest,
   type AdminDocumentInitRequest,
   type AdminOperation,
 } from '@cloudpdf/contract';
@@ -35,6 +37,12 @@ export interface AdminDocumentsRouteDeps {
  *   3. POST .../documents/:id/commit
  *      body: { sha256 }
  *      -> { id, state, baseSha, ... }
+ *
+ * Or, replacing all three when the bytes already live in the
+ * customer's own storage — the server-side pull:
+ *      POST /v1/tenants/:tenantId/documents/import
+ *      body: { source: { kind: 'url', url }, expected?, ... }
+ *      -> { tag: 'imported'|'deduped', document }
  *
  * Listing / deleting / downloading are flat REST against the tenant documents collection.
  */
@@ -122,6 +130,9 @@ export async function registerAdminDocumentsRoutes(
     // across Fern's generators and, unlike the previous implementation, we
     // compare the PDF part's length rather than the multipart envelope's
     // Content-Length.
+    if (!req.isMultipart()) {
+      throw makeError('InvalidArg', 400, 'expected multipart with a file field');
+    }
     const data = await req.file();
     if (!data || data.fieldname !== 'file') {
       throw makeError('InvalidArg', 400, 'expected multipart with a file field');
@@ -136,6 +147,25 @@ export async function registerAdminDocumentsRoutes(
       contentLength: bytes.byteLength,
     });
     return reply.send({ sha256 });
+  });
+
+  const importOp = adminOperations['documents.import'];
+  mount(importOp, async (req, reply) => {
+    const { tenantId } = req.params as { tenantId: string };
+    const ctx = requireTenantAccess(req, tenantId, importOp.scope);
+    const body = parseImportBody(req);
+
+    const result = await lifecycle.importFromSource({
+      tenantId: ctx.tenantId,
+      sub: ctx.sub,
+      source: body.source,
+      expected: body.expected ?? null,
+      metadata: body.metadata ?? null,
+      idempotencyKey: body.idempotencyKey ?? null,
+      dedupMode: body.dedupMode,
+      docId: body.docId,
+    });
+    return reply.send({ tag: result.tag, document: docPublic(result.doc) });
   });
 
   const listOp = adminOperations['documents.list'];
@@ -240,6 +270,20 @@ function parseCommitBody(req: FastifyRequest): AdminDocumentCommitRequest {
   return {
     ...result.data,
     sha256: result.data.sha256.toLowerCase(),
+  };
+}
+
+function parseImportBody(req: FastifyRequest): AdminDocumentImportRequest {
+  const result = AdminDocumentImportRequestSchema.safeParse(req.body);
+  if (!result.success) {
+    throw makeError('InvalidArg', 400, formatSchemaError(result.error.issues));
+  }
+  const expected = result.data.expected;
+  return {
+    ...result.data,
+    ...(expected?.sha256
+      ? { expected: { ...expected, sha256: expected.sha256.toLowerCase() } }
+      : {}),
   };
 }
 

@@ -29,6 +29,7 @@
  */
 
 import { Readable } from 'node:stream';
+
 import type {
   MaterializeOpts,
   MaterializeResult,
@@ -41,7 +42,7 @@ import type {
 } from '../ObjectStore';
 import {
   computeSha256Hex,
-  drainReadable,
+  countedSha256Body,
   materializeViaRanges,
   streamingSha256,
 } from './_internal';
@@ -56,6 +57,14 @@ type UserDelegationKey = Awaited<ReturnType<BlobServiceClient['getUserDelegation
 
 /** Azure blob metadata key (no hyphens allowed — must be a valid identifier). */
 const AZURE_SHA256_METADATA_KEY = 'xembedpdfsha256';
+
+/**
+ * Streamed-put buffering: `uploadStream` stages blocks of
+ * `bufferSize` bytes with `maxConcurrency` in flight, so peak memory
+ * stays bounded (~16 MiB) regardless of object size.
+ */
+const UPLOAD_STREAM_BUFFER_BYTES = 4 * 1024 * 1024;
+const UPLOAD_STREAM_CONCURRENCY = 4;
 
 export interface AzureBlobObjectStoreOptions {
   /** Required: container name. */
@@ -160,19 +169,47 @@ export class AzureBlobObjectStore implements ObjectStore {
     body: ObjectBody,
     opts: { contentLength: number; contentType?: string },
   ): Promise<{ sha256: string }> {
-    const bytes = body instanceof Uint8Array ? body : await drainReadable(body as Readable);
-    if (bytes.byteLength !== opts.contentLength) {
+    if (!(body instanceof Uint8Array)) return this.putStream(key, body, opts);
+    if (body.byteLength !== opts.contentLength) {
       throw new Error(
-        `AzureBlobObjectStore.put: declared contentLength=${opts.contentLength} but got ${bytes.byteLength}`,
+        `AzureBlobObjectStore.put: declared contentLength=${opts.contentLength} but got ${body.byteLength}`,
       );
     }
-    const sha256 = computeSha256Hex(bytes);
+    const sha256 = computeSha256Hex(body);
     const { container } = await this.clientPromise;
-    const buf = Buffer.from(bytes);
+    const buf = Buffer.from(body);
     await container.getBlockBlobClient(key).upload(buf, buf.byteLength, {
       blobHTTPHeaders: { blobContentType: opts.contentType ?? 'application/pdf' },
       metadata: { [AZURE_SHA256_METADATA_KEY]: sha256 },
     });
+    return { sha256 };
+  }
+
+  /**
+   * Streamed put: `uploadStream` stages blocks as the counting hasher
+   * taps the bytes, then `setMetadata` persists the digest (Azure
+   * blob metadata is mutable — no copy dance needed). A failure
+   * before the final commitBlockList leaves only uncommitted blocks
+   * (garbage-collected by Azure), never a visible blob, and any prior
+   * blob at the key survives.
+   */
+  private async putStream(
+    key: string,
+    source: Readable,
+    opts: { contentLength: number; contentType?: string },
+  ): Promise<{ sha256: string }> {
+    const { container } = await this.clientPromise;
+    const blob = container.getBlockBlobClient(key);
+    const counted = countedSha256Body(source, opts.contentLength, 'AzureBlobObjectStore.put');
+    try {
+      await blob.uploadStream(counted.body, UPLOAD_STREAM_BUFFER_BYTES, UPLOAD_STREAM_CONCURRENCY, {
+        blobHTTPHeaders: { blobContentType: opts.contentType ?? 'application/pdf' },
+      });
+    } catch (err) {
+      throw counted.error() ?? err;
+    }
+    const sha256 = counted.sha256();
+    await blob.setMetadata({ [AZURE_SHA256_METADATA_KEY]: sha256 });
     return { sha256 };
   }
 

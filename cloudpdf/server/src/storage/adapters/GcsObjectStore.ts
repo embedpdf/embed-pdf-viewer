@@ -30,6 +30,8 @@
  */
 
 import { Readable } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
+
 import type {
   MaterializeOpts,
   MaterializeResult,
@@ -42,7 +44,7 @@ import type {
 } from '../ObjectStore';
 import {
   computeSha256Hex,
-  drainReadable,
+  countedSha256Body,
   materializeViaRanges,
   SHA256_METADATA_KEY,
   streamingSha256,
@@ -105,19 +107,49 @@ export class GcsObjectStore implements ObjectStore {
     body: ObjectBody,
     opts: { contentLength: number; contentType?: string },
   ): Promise<{ sha256: string }> {
-    const bytes = body instanceof Uint8Array ? body : await drainReadable(body as Readable);
-    if (bytes.byteLength !== opts.contentLength) {
+    if (!(body instanceof Uint8Array)) return this.putStream(key, body, opts);
+    if (body.byteLength !== opts.contentLength) {
       throw new Error(
-        `GcsObjectStore.put: declared contentLength=${opts.contentLength} but got ${bytes.byteLength}`,
+        `GcsObjectStore.put: declared contentLength=${opts.contentLength} but got ${body.byteLength}`,
       );
     }
-    const sha256 = computeSha256Hex(bytes);
+    const sha256 = computeSha256Hex(body);
     const bucket = await this.bucketPromise;
-    await bucket.file(key).save(Buffer.from(bytes), {
+    await bucket.file(key).save(Buffer.from(body), {
       resumable: false,
       contentType: opts.contentType ?? 'application/pdf',
       metadata: { metadata: { [SHA256_METADATA_KEY]: sha256 } },
     });
+    return { sha256 };
+  }
+
+  /**
+   * Streamed put: pipe through the counting hasher into a single-shot
+   * (non-resumable) upload, then persist the digest with
+   * `setMetadata` — GCS custom metadata is mutable, so no copy dance
+   * is needed (unlike S3). A mid-stream failure aborts the upload
+   * with no visible object; any prior object at the key survives
+   * (a new generation only replaces it on successful finalize).
+   */
+  private async putStream(
+    key: string,
+    source: Readable,
+    opts: { contentLength: number; contentType?: string },
+  ): Promise<{ sha256: string }> {
+    const bucket = await this.bucketPromise;
+    const file = bucket.file(key);
+    const counted = countedSha256Body(source, opts.contentLength, 'GcsObjectStore.put');
+    const sink = file.createWriteStream({
+      resumable: false,
+      contentType: opts.contentType ?? 'application/pdf',
+    });
+    try {
+      await pipeline(counted.body, sink);
+    } catch (err) {
+      throw counted.error() ?? err;
+    }
+    const sha256 = counted.sha256();
+    await file.setMetadata({ metadata: { [SHA256_METADATA_KEY]: sha256 } });
     return { sha256 };
   }
 

@@ -55,7 +55,7 @@ export interface DocumentsTable {
   /** Exact PDF byte length declared at init and verified before commit. */
   expected_size_bytes: number | null;
   /** The server-selected transfer path for this pending upload. */
-  upload_kind: 'presigned' | 'proxy' | null;
+  upload_kind: 'presigned' | 'proxy' | 'pull' | null;
   /** Absolute epoch milliseconds when the issued upload access expires. */
   upload_expires_at: number | null;
   encryption_state: DocumentEncryptionState;

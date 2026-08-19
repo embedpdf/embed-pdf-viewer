@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import type { DocCapability } from '@embedpdf/engine-core/runtime';
 import {
   AnnotationListPageSnapshotSchema,
   DocumentHeadSchema,
@@ -10,7 +10,7 @@ import {
   PageTextSnapshotSchema,
   wireTemplates,
 } from '@embedpdf/engine-core/wire';
-import type { DocCapability } from '@embedpdf/engine-core/runtime';
+import { z } from 'zod';
 
 const sha256Hex = /^[0-9a-f]{64}$/i;
 const docIdPattern = /^[A-Za-z0-9_-]+$/;
@@ -54,6 +54,8 @@ export const adminWirePaths = {
   tenant: (tenantId: string) => `/v1/tenants/${encodeURIComponent(tenantId)}`,
   documents: (tenantId: string) => `/v1/tenants/${encodeURIComponent(tenantId)}/documents`,
   documentsInit: (tenantId: string) => `/v1/tenants/${encodeURIComponent(tenantId)}/documents/init`,
+  documentsImport: (tenantId: string) =>
+    `/v1/tenants/${encodeURIComponent(tenantId)}/documents/import`,
   document: (tenantId: string, docId: string) =>
     `/v1/tenants/${encodeURIComponent(tenantId)}/documents/${encodeURIComponent(docId)}`,
   documentCommit: (tenantId: string, docId: string) =>
@@ -172,6 +174,56 @@ export const AdminDocumentCommitResponseSchema = z.object({
   document: AdminDocumentRecordSchema,
 });
 export type AdminDocumentCommitResponse = z.infer<typeof AdminDocumentCommitResponseSchema>;
+
+/**
+ * A server-side pull source for `documents.import`. v1 supports one
+ * universal kind: a caller-minted URL — a presigned S3/GCS/Azure/R2/
+ * MinIO GET, or any HTTPS endpoint the deployment's import policy
+ * allows. The URL is a capability: treat it as a secret. Servers
+ * never echo its query string back in errors, logs, or stored
+ * failure reasons.
+ */
+export const AdminImportSourceSchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('url'),
+    url: z.string().url().max(8192),
+  }),
+]);
+export type AdminImportSource = z.infer<typeof AdminImportSourceSchema>;
+
+export const AdminDocumentImportRequestSchema = z.object({
+  source: AdminImportSourceSchema,
+  /**
+   * Optional integrity pins, enforced when present: `sizeBytes`
+   * against the source's declared Content-Length before the transfer,
+   * `sha256` against the server-observed digest after it. When absent
+   * the server-observed values become authoritative.
+   * `dedupMode=reuse-existing` REQUIRES `sha256` — without a declared
+   * hash the server cannot know what content to reuse.
+   */
+  expected: z
+    .object({
+      sizeBytes: z.number().int().min(1).optional(),
+      sha256: z.string().regex(sha256Hex).optional(),
+    })
+    .optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+  idempotencyKey: z.string().optional(),
+  dedupMode: DedupModeSchema.optional(),
+  docId: z.string().regex(docIdPattern).optional(),
+});
+export type AdminDocumentImportRequest = z.infer<typeof AdminDocumentImportRequestSchema>;
+
+export const AdminDocumentImportResponseSchema = z.object({
+  /**
+   * `imported` — bytes were pulled, verified, and committed.
+   * `deduped`  — an existing document satisfied the request without a
+   * transfer (content dedup or idempotent replay).
+   */
+  tag: z.enum(['imported', 'deduped']),
+  document: AdminDocumentRecordSchema,
+});
+export type AdminDocumentImportResponse = z.infer<typeof AdminDocumentImportResponseSchema>;
 
 export const AdminDocumentResponseSchema = z.object({
   document: AdminDocumentRecordSchema,
@@ -814,6 +866,26 @@ export const adminOperations = {
     notes:
       'This bounded origin-mediated fallback must only be used after documents.init returns upload.kind=proxy. Auto mode prefers a presigned object-store PUT whenever available.',
   },
+  'documents.import': {
+    operationId: 'documents.import',
+    title: 'Import from URL',
+    summary:
+      'Server-side pull: fetch a PDF from a caller-supplied URL (e.g. a presigned object-store GET) into CloudPDF-owned storage, verify it, and commit it.',
+    method: 'POST',
+    path: '/v1/tenants/:tenantId/documents/import',
+    credentials: ['api-token', 'tenant-jwt'],
+    scope: ['docs.create'],
+    params: AdminTenantParamsSchema,
+    body: { contentType: 'application/json', schema: AdminDocumentImportRequestSchema },
+    responses: {
+      200: { contentType: 'application/json', schema: AdminDocumentImportResponseSchema },
+      400: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+      403: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+      502: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+    },
+    notes:
+      'Synchronous and bounded: the response returns only after the transfer verified and committed (or failed). The deployment import policy gates scheme, network range, and size; sources must respond with Content-Length. CloudPDF copies and owns the bytes — the source is never referenced in place. A 502 marks a retryable upstream failure: retry with the same idempotencyKey to resume the same document. The URL is treated as a capability and never echoed back.',
+  },
   'documents.list': {
     operationId: 'documents.list',
     title: 'List documents',
@@ -1092,7 +1164,7 @@ export const adminOperations = {
     },
     notes:
       'Unauthenticated, but requires a browser Origin header, checked against the grant ' +
-      "allowlist. Unknown, revoked, and disabled tokens are indistinguishable (404). " +
+      'allowlist. Unknown, revoked, and disabled tokens are indistinguishable (404). ' +
       'Passphrase-protected grants return 422 SharePasswordRequired until `password` is ' +
       'supplied. Mounted only when the deployment can sign (HS256 mode).',
   },

@@ -131,6 +131,18 @@ export {
 } from './storage/config/ObjectStoreConfigSchema';
 export { loadObjectStoreConfigFromEnv } from './storage/config/loadObjectStoreConfigFromEnv';
 
+// Import (server-side pull) family for documents.import.
+export type { ImportSource, ImportSourceInfo, ImportSourceOpen } from './import/ImportSource';
+export { ImportSourceError } from './import/ImportSource';
+export { createImportSource } from './import/createImportSource';
+export { UrlImportSource, isPubliclyRoutableAddress } from './import/adapters/UrlImportSource';
+export {
+  ImportPolicySchema,
+  defaultImportPolicy,
+  type ImportPolicy,
+} from './import/config/ImportPolicySchema';
+export { loadImportPolicyFromEnv } from './import/config/loadImportPolicyFromEnv';
+
 // CDN adapter family (signers + factory + config + None adapter).
 // HMAC/CloudFront adapters ship in commit G; purge wiring in commit H.
 export type {

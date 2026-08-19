@@ -37,7 +37,7 @@ export interface DocumentRow {
   storageSizeBytes: number | null;
   expectedSha256: string | null;
   expectedSizeBytes: number | null;
-  uploadKind: 'presigned' | 'proxy' | null;
+  uploadKind: 'presigned' | 'proxy' | 'pull' | null;
   uploadExpiresAt: number | null;
   security: DocumentSecurityInfo;
   docVersion: number;
@@ -66,7 +66,7 @@ export interface CreatePendingInput {
 export interface SetUploadIntentInput {
   id: string;
   tenantId: string;
-  kind: 'presigned' | 'proxy';
+  kind: 'presigned' | 'proxy' | 'pull';
   expiresAt: number;
 }
 
@@ -363,7 +363,7 @@ function mapRow(r: {
   storage_size_bytes: number | null;
   expected_sha256?: string | null;
   expected_size_bytes?: number | null;
-  upload_kind?: 'presigned' | 'proxy' | null;
+  upload_kind?: 'presigned' | 'proxy' | 'pull' | null;
   upload_expires_at?: number | null;
   encryption_state?: DocumentEncryptionState | null;
   encryption_requires_password?: boolean | number | null;

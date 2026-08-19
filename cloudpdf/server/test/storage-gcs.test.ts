@@ -11,7 +11,7 @@
  * fake-gcs-server emulator (STORAGE_LIVE=1), not in CI.
  */
 import { createHash } from 'node:crypto';
-import { Readable } from 'node:stream';
+import { Readable, Writable } from 'node:stream';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -83,6 +83,39 @@ vi.mock('@google-cloud/storage', () => {
       // GCS createReadStream end is inclusive.
       const end = opts?.end === undefined ? o.bytes.byteLength - 1 : opts.end;
       return Readable.from([o.bytes.subarray(start, end + 1)]);
+    }
+    createWriteStream(opts?: {
+      resumable?: boolean;
+      contentType?: string;
+      metadata?: { metadata?: Record<string, string> };
+    }): Writable {
+      // Commit-on-finish mirrors real GCS: a destroyed stream (source
+      // error, length violation) must leave no visible object.
+      const chunks: Buffer[] = [];
+      const key = this.key;
+      return new Writable({
+        write(chunk, _enc, cb) {
+          chunks.push(Buffer.from(chunk as Uint8Array));
+          cb();
+        },
+        final(cb) {
+          gcs.objects.set(key, {
+            bytes: Buffer.concat(chunks),
+            contentType: opts?.contentType ?? 'application/octet-stream',
+            metadata: opts?.metadata?.metadata ?? {},
+          });
+          cb();
+        },
+      });
+    }
+    async setMetadata(meta: { metadata?: Record<string, string> }): Promise<void> {
+      const o = gcs.objects.get(this.key);
+      if (!o) {
+        const err = new Error('Not Found') as Error & { code: number };
+        err.code = 404;
+        throw err;
+      }
+      o.metadata = { ...o.metadata, ...(meta.metadata ?? {}) };
     }
     async getSignedUrl(opts: {
       version: string;

@@ -7,6 +7,7 @@ import { sdkStreamMixin } from '@smithy/util-stream';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import { mockClient } from 'aws-sdk-client-mock';
 import {
+  CopyObjectCommand,
   DeleteObjectCommand,
   DeleteObjectsCommand,
   GetObjectCommand,
@@ -313,7 +314,89 @@ describe('S3ObjectStore', () => {
     });
     expect(await store.getSha256(key)).toBe('f'.repeat(64));
   });
+
+  test('streamed put pipes the body through one PutObject and attaches sha via self-copy', async () => {
+    const store = newStore();
+    const bytes = randomBytes(50_000);
+    const sha = sha256Hex(bytes);
+    let received: Buffer | null = null;
+    s3Mock.on(PutObjectCommand).callsFake(async (input: { Body?: unknown }) => {
+      const drained: Buffer[] = [];
+      for await (const c of input.Body as Readable) drained.push(Buffer.from(c as Uint8Array));
+      received = Buffer.concat(drained);
+      return {};
+    });
+    s3Mock.on(CopyObjectCommand).resolves({});
+
+    const r = await store.put('tenant/docs/ab/abx/base.pdf', chunked(bytes, 4_096), {
+      contentLength: bytes.byteLength,
+    });
+    expect(r.sha256).toBe(sha);
+    expect(received).toEqual(Buffer.from(bytes));
+
+    const put = s3Mock.commandCalls(PutObjectCommand)[0]!.args[0].input;
+    expect(put.ContentLength).toBe(bytes.byteLength);
+    // The digest doesn't exist pre-stream; metadata rides the copy.
+    expect(put.Metadata).toBeUndefined();
+
+    const copy = s3Mock.commandCalls(CopyObjectCommand)[0]!.args[0].input;
+    expect(copy.Bucket).toBe('b');
+    expect(copy.Key).toBe('tenant/docs/ab/abx/base.pdf');
+    expect(copy.CopySource).toBe('b/tenant/docs/ab/abx/base.pdf');
+    expect(copy.MetadataDirective).toBe('REPLACE');
+    expect(copy.Metadata).toEqual({ 'x-embedpdf-sha256': sha });
+    expect(copy.ContentType).toBe('application/pdf');
+  });
+
+  test('streamed put surfaces the exact length error on under-delivery and skips the copy', async () => {
+    const store = newStore();
+    s3Mock.on(PutObjectCommand).callsFake(async (input: { Body?: unknown }) => {
+      const drained: Buffer[] = [];
+      for await (const c of input.Body as Readable) drained.push(Buffer.from(c as Uint8Array));
+      return {};
+    });
+    s3Mock.on(CopyObjectCommand).resolves({});
+    await expect(
+      store.put('k', chunked(randomBytes(400), 100), { contentLength: 500 }),
+    ).rejects.toThrow(/contentLength=500 but got 400/);
+    expect(s3Mock.commandCalls(CopyObjectCommand)).toHaveLength(0);
+  });
+
+  test('streamed put aborts on over-delivery before the extra bytes flow', async () => {
+    const store = newStore();
+    s3Mock.on(PutObjectCommand).callsFake(async (input: { Body?: unknown }) => {
+      const drained: Buffer[] = [];
+      for await (const c of input.Body as Readable) drained.push(Buffer.from(c as Uint8Array));
+      return {};
+    });
+    s3Mock.on(CopyObjectCommand).resolves({});
+    await expect(
+      store.put('k', chunked(randomBytes(400), 100), { contentLength: 300 }),
+    ).rejects.toThrow(/received more/);
+    expect(s3Mock.commandCalls(CopyObjectCommand)).toHaveLength(0);
+  });
+
+  test('streamed put fails when the metadata self-copy fails', async () => {
+    const store = newStore();
+    s3Mock.on(PutObjectCommand).callsFake(async (input: { Body?: unknown }) => {
+      const drained: Buffer[] = [];
+      for await (const c of input.Body as Readable) drained.push(Buffer.from(c as Uint8Array));
+      return {};
+    });
+    s3Mock.on(CopyObjectCommand).rejects(new Error('copy denied'));
+    await expect(
+      store.put('k', chunked(randomBytes(200), 64), { contentLength: 200 }),
+    ).rejects.toThrow(/copy denied/);
+  });
 });
+
+function chunked(bytes: Uint8Array, size: number): Readable {
+  const chunks: Buffer[] = [];
+  for (let i = 0; i < bytes.byteLength; i += size) {
+    chunks.push(Buffer.from(bytes.subarray(i, Math.min(i + size, bytes.byteLength))));
+  }
+  return Readable.from(chunks);
+}
 
 function newStore(): S3ObjectStore {
   return new S3ObjectStore({

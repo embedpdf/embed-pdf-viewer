@@ -18,9 +18,9 @@ import type { Readable } from 'node:stream';
 
 /**
  * The bytes payload for a one-shot upload. We accept either a
- * fully-buffered `Uint8Array` (Phase 1 admin pathway: customer
- * POSTs the PDF directly through origin) or a Node `Readable`
- * (future: streaming sources without materializing in RAM).
+ * fully-buffered `Uint8Array` (admin pathway: customer POSTs the PDF
+ * directly through origin) or a Node `Readable` (streaming sources —
+ * server-side pulls — that must never materialize whole in RAM).
  */
 export type ObjectBody = Uint8Array | Readable;
 
@@ -104,8 +104,16 @@ export interface ObjectStore {
    * Direct origin-mediated upload. Used by:
    *   - FS adapter (where there's no presigned PUT to issue)
    *   - Customers behind strict egress policies that can't talk to S3
+   *   - Server-side pulls that stream a remote source into storage
    * Returns the SHA-256 hex digest of the bytes that were written.
-   * Implementations stream-hash if `body` is a `Readable`.
+   *
+   * Streaming contract (all adapters, pinned by the conformance
+   * suite): a `Readable` body is hashed and counted AS IT FLOWS —
+   * constant memory, never buffered whole. `contentLength` is
+   * enforced exactly; under- or over-delivery aborts the transfer
+   * BEFORE a visible object can appear, and any prior object at the
+   * key survives the failed attempt. The recorded SHA-256 lands in
+   * backend metadata so `getSha256`/`materializeLocal` skip re-hashes.
    */
   put(
     key: string,
