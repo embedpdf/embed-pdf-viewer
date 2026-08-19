@@ -4,6 +4,7 @@ import type { AdminImportSource } from '@cloudpdf/contract';
 
 import type { DerivedRenderService } from './DerivedRenderService';
 import { DocumentSecurityProbe } from './DocumentSecurityProbe';
+import type { DocumentImportsRepo } from '../db/repos/document_imports.repo';
 import {
   DocumentsRepo,
   type DocumentListOptions,
@@ -14,7 +15,12 @@ import type { TenantUsageRepo } from '../db/repos/tenant_usage.repo';
 import { TenantsRepo } from '../db/repos/tenants.repo';
 import type { ImportPolicy } from '../import/config/ImportPolicySchema';
 import { createImportSource } from '../import/createImportSource';
-import { ImportSourceError, type ImportSourceOpen } from '../import/ImportSource';
+import { ImportConnectionRegistry } from '../import/ImportConnectionRegistry';
+import {
+  ImportSourceError,
+  type ImportSource,
+  type ImportSourceOpen,
+} from '../import/ImportSource';
 import { Semaphore } from '../import/Semaphore';
 import type { UsageMeters } from '../licensing/UsageMeters';
 import type { BaseFileCache, LocalFileHandle } from '../storage/BaseFileCache';
@@ -39,6 +45,8 @@ export interface ImportExpected {
 export interface ImportInput {
   tenantId: string;
   sub: string;
+  /** Which credential class authenticated the caller (from requireTenantAccess). */
+  via: 'api-token' | 'tenant-jwt';
   /** Wire descriptor from the request body (v1: `{ kind: 'url' }`). */
   source: AdminImportSource;
   expected?: ImportExpected | null;
@@ -152,6 +160,10 @@ export interface DocumentLifecycleOptions {
    * `buildApp` supplies the schema defaults.
    */
   importPolicy?: ImportPolicy;
+  /** Operator-registered pull connections (the `connection` source kind). */
+  importConnections?: ImportConnectionRegistry;
+  /** Import provenance/audit rows; absent = no provenance recorded. */
+  documentImports?: DocumentImportsRepo;
 }
 
 /**
@@ -188,6 +200,8 @@ export class DocumentLifecycleService {
   private readonly shareGrants?: ShareGrantsRepo;
   private readonly uploadProxyPolicy: UploadProxyPolicy;
   private readonly importPolicy?: ImportPolicy;
+  private readonly importConnections: ImportConnectionRegistry;
+  private readonly documentImports?: DocumentImportsRepo;
   private readonly importGate: Semaphore;
   /** Single-flight per (tenant, idempotencyKey): concurrent retries share one transfer. */
   private readonly inflightImports = new Map<string, Promise<ImportResult>>();
@@ -205,6 +219,8 @@ export class DocumentLifecycleService {
     this.shareGrants = opts.shareGrants;
     this.uploadProxyPolicy = opts.uploadProxyPolicy ?? 'fallback-only';
     if (opts.importPolicy) this.importPolicy = opts.importPolicy;
+    this.importConnections = opts.importConnections ?? new ImportConnectionRegistry();
+    if (opts.documentImports) this.documentImports = opts.documentImports;
     this.importGate = new Semaphore(opts.importPolicy?.maxConcurrent ?? 1);
   }
 
@@ -485,10 +501,27 @@ export class DocumentLifecycleService {
         expiresAt: Date.now() + policy.timeoutMs,
       });
       if (!marked) throw conflict(`document ${doc.id} state changed while starting import`);
+      // Provenance from the wire descriptor — recorded even when
+      // source construction/authorization fails a moment later.
+      await this.documentImports?.recordAttemptStart({
+        docId: doc.id,
+        tenantId: doc.tenantId,
+        ...wireProvenanceFields(input.source),
+        expectedSha256: pins.expectedSha,
+        expectedSizeBytes: pins.expectedSize,
+        requestedBy: input.sub,
+        via: input.via,
+      });
 
+      let source!: ImportSource;
       let opened: ImportSourceOpen;
       try {
-        const source = createImportSource(input.source, policy);
+        source = createImportSource(input.source, {
+          policy,
+          caller: { via: input.via, tenantId: doc.tenantId },
+          connections: this.importConnections,
+          deploymentStorage: this.storage.info,
+        });
         opened = await source.open({ signal: abort.signal });
       } catch (err) {
         throw await this.importFailure(doc, err);
@@ -542,6 +575,13 @@ export class DocumentLifecycleService {
 
       if (pins.expectedSha && observedSha !== pins.expectedSha) {
         await this.documents.markFailed(doc.id, doc.tenantId, 'sha_mismatch');
+        await this.documentImports
+          ?.recordFailure(
+            doc.id,
+            doc.tenantId,
+            'sha_mismatch: declared expected.sha256 does not match the source bytes',
+          )
+          .catch(() => undefined);
         await this.storage.delete(key);
         throw badRequest(
           `sha_mismatch: expected.sha256 declared ${pins.expectedSha} but the source bytes hash to ${observedSha}`,
@@ -550,10 +590,23 @@ export class DocumentLifecycleService {
       // From here the EXISTING commit path owns verification, the
       // security probe, metering, and thumbnail warming — the import
       // pathway adds no verification machinery of its own.
-      const committed = await this.commit({
-        tenantId: doc.tenantId,
-        docId: doc.id,
-        sha256: observedSha,
+      let committed: CommitResult;
+      try {
+        committed = await this.commit({
+          tenantId: doc.tenantId,
+          docId: doc.id,
+          sha256: observedSha,
+        });
+      } catch (err) {
+        await this.documentImports
+          ?.recordFailure(doc.id, doc.tenantId, sanitizeImportDetail(err))
+          .catch(() => undefined);
+        throw err;
+      }
+      await this.documentImports?.recordSuccess(doc.id, doc.tenantId, {
+        resolvedRevision: opened.resolvedRevision ?? null,
+        sourceKind: source.info.kind,
+        sourceLocation: source.info.location,
       });
       return { tag: 'imported', doc: committed.doc };
     } finally {
@@ -570,6 +623,9 @@ export class DocumentLifecycleService {
    */
   private async importFailure(doc: DocumentRow, err: unknown): Promise<Error> {
     if (ImportSourceError.is(err)) {
+      await this.documentImports
+        ?.recordFailure(doc.id, doc.tenantId, `import_${err.code}: ${err.message}`)
+        .catch(() => undefined);
       if (!err.retryable) {
         await this.documents.markFailed(
           doc.id,
@@ -806,6 +862,8 @@ export class DocumentLifecycleService {
     // dangling grant would be a stored 404, not a security hole (the
     // exchange re-checks the document), but still a wart in listings.
     await this.shareGrants?.deleteByDoc(docId, tenantId);
+    // Import provenance dies with the document.
+    await this.documentImports?.deleteByDoc(docId, tenantId);
     await this.documents.finalizeDelete(docId, tenantId);
   }
 
@@ -838,6 +896,40 @@ function forbiddenError(message: string): Error {
   e.code = 'Forbidden';
   e.status = 403;
   return e;
+}
+
+/**
+ * Provenance fields derivable from the WIRE descriptor alone —
+ * available even when source construction fails. Success enriches
+ * kind/location with the resolved adapter identity.
+ */
+function wireProvenanceFields(source: AdminImportSource): {
+  sourceKind: string;
+  connectionId: string | null;
+  sourceLocation: string;
+  requestedRevision: string | null;
+} {
+  if (source.kind === 'url') {
+    let location = 'url:invalid';
+    try {
+      const u = new URL(source.url);
+      location = `${u.origin}${u.pathname}`;
+    } catch {
+      // keep the sentinel — never record a raw (possibly signed) URL
+    }
+    return {
+      sourceKind: 'url',
+      connectionId: null,
+      sourceLocation: location,
+      requestedRevision: null,
+    };
+  }
+  return {
+    sourceKind: 'connection',
+    connectionId: source.connectionId,
+    sourceLocation: `connection:${source.connectionId}/${source.key}`,
+    requestedRevision: source.revision ?? null,
+  };
 }
 
 /** Strip anything query-shaped so presigned credentials can't leak into reasons. */

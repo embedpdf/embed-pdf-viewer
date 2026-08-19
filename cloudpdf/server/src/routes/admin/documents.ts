@@ -158,6 +158,7 @@ export async function registerAdminDocumentsRoutes(
     const result = await lifecycle.importFromSource({
       tenantId: ctx.tenantId,
       sub: ctx.sub,
+      via: ctx.via,
       source: body.source,
       expected: body.expected ?? null,
       metadata: body.metadata ?? null,

@@ -20,7 +20,7 @@
  */
 import type { Readable } from 'node:stream';
 
-export type ImportSourceKind = 'url';
+export type ImportSourceKind = 'url' | 's3';
 
 /**
  * Diagnostic identity, mirroring the other adapter families:
@@ -41,6 +41,13 @@ export interface ImportSourceOpen {
   contentLength: number;
   /** Advisory only; the security probe is the arbiter of content. */
   contentType?: string;
+  /**
+   * The revision the backend actually served (S3 VersionId, GCS
+   * generation, Azure version id), when the backend reports one —
+   * even if the request didn't pin a revision. Recorded as
+   * provenance; phase 3b pins async retries to it.
+   */
+  resolvedRevision?: string;
 }
 
 export interface ImportSource {

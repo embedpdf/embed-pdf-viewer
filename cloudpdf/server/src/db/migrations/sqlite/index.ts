@@ -48,6 +48,8 @@ import down024 from './024_upload_intent.down.sql';
 import sql024 from './024_upload_intent.sql';
 import down025 from './025_upload_kind_pull.down.sql';
 import sql025 from './025_upload_kind_pull.sql';
+import down026 from './026_document_imports.down.sql';
+import sql026 from './026_document_imports.sql';
 import type { MigrationSource } from '../../migrator/runner';
 
 /**
@@ -87,4 +89,5 @@ export const sqliteMigrations: ReadonlyArray<MigrationSource> = [
   { version: '023', name: '023_tenant_status.sql', sql: sql023, down: down023 },
   { version: '024', name: '024_upload_intent.sql', sql: sql024, down: down024 },
   { version: '025', name: '025_upload_kind_pull.sql', sql: sql025, down: down025 },
+  { version: '026', name: '026_document_imports.sql', sql: sql026, down: down026 },
 ];

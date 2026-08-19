@@ -193,7 +193,18 @@ export class UrlImportSource implements ImportSource {
       );
     }
     const contentType = res.headers['content-type'];
-    return { body: res, contentLength, ...(contentType ? { contentType } : {}) };
+    // Opportunistic revision provenance: presigned object-store GETs
+    // report the served version in a provider header.
+    const resolvedRevision =
+      headerValue(res.headers['x-amz-version-id']) ??
+      headerValue(res.headers['x-goog-generation']) ??
+      headerValue(res.headers['x-ms-version-id']);
+    return {
+      body: res,
+      contentLength,
+      ...(contentType ? { contentType } : {}),
+      ...(resolvedRevision ? { resolvedRevision } : {}),
+    };
   }
 
   /** Resolve the hostname and refuse any non-public destination. */
@@ -287,4 +298,9 @@ export class UrlImportSource implements ImportSource {
       req.end();
     });
   }
+}
+
+function headerValue(raw: string | string[] | undefined): string | null {
+  if (Array.isArray(raw)) return raw[0] ?? null;
+  return raw && raw.length > 0 ? raw : null;
 }

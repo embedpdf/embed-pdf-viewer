@@ -15,16 +15,22 @@ import { createServer, type Server } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
+import { mockClient } from 'aws-sdk-client-mock';
+import { sdkStreamMixin } from '@smithy/util-stream';
+import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { Readable } from 'node:stream';
 
 import { adminWirePaths } from '@cloudpdf/contract';
 import {
   createSqliteDb,
   FsObjectStore,
+  ImportConnectionSchema,
   ImportPolicySchema,
   migrate,
   signDevToken,
   sqliteMigrations,
   type AppBundle,
+  type ImportConnection,
   type ImportPolicy,
 } from '../src/index';
 import { buildAppForTesting } from '../src/app/buildApp';
@@ -85,11 +91,15 @@ function srcUrl(path: string): string {
 
 interface Fixture {
   bundle: AppBundle;
+  db: ReturnType<typeof createSqliteDb>;
   token: string;
   cleanup: () => Promise<void>;
 }
 
-async function buildBundle(policy: Partial<ImportPolicy> = {}): Promise<Fixture> {
+async function buildBundle(
+  policy: Partial<ImportPolicy> = {},
+  connections: ImportConnection[] = [],
+): Promise<Fixture> {
   const storageRoot = await mkdtemp(join(tmpdir(), 'embedpdf-import-e2e-'));
   const db = createSqliteDb({ path: ':memory:' });
   await migrate(db, { source: { kind: 'inline', migrations: sqliteMigrations } });
@@ -106,10 +116,12 @@ async function buildBundle(policy: Partial<ImportPolicy> = {}): Promise<Fixture>
       allowPrivateNetworks: true,
       ...policy,
     }),
+    importConnections: connections,
   });
   const token = signDevToken(SECRET, { sub: 'import-tester', tenant_id: TENANT, scope: ['*'] });
   return {
     bundle,
+    db,
     token,
     cleanup: async () => {
       await bundle.shutdown();
@@ -294,5 +306,152 @@ describe('documents.import disabled by policy', () => {
     } finally {
       await fx.cleanup();
     }
+  });
+});
+
+/**
+ * Connection-source E2E: operator-registered S3 connections through
+ * the real HTTP surface, with the S3 SDK command-mocked. Asserts the
+ * credential-class gates, prefix scopes, and the document_imports
+ * provenance rows (including sanitized locations and resolved
+ * revisions).
+ */
+const s3Mock = mockClient(S3Client);
+
+describe('documents.import connection sources E2E', () => {
+  const CONNECTIONS: ImportConnection[] = [
+    // Whole bucket, defaults: api-token only — the client posture.
+    ImportConnectionSchema.parse({
+      kind: 's3',
+      id: 'archive',
+      bucket: 'conn-bucket',
+      region: 'us-east-1',
+    }),
+    // Prefix-scoped and opted into tenant-jwt.
+    ImportConnectionSchema.parse({
+      kind: 's3',
+      id: 'tenant-docs',
+      bucket: 'conn-bucket',
+      region: 'us-east-1',
+      credentials: ['api-token', 'tenant-jwt'],
+      scope: { kind: 'shared-prefixes', prefixes: ['docs/'] },
+    }),
+  ];
+
+  let fx: Fixture;
+
+  beforeAll(async () => {
+    s3Mock.reset();
+    s3Mock.on(GetObjectCommand).callsFake((input: { Key: string }) => {
+      if (input.Key !== 'docs/e2e.pdf') {
+        throw Object.assign(new Error('NoSuchKey'), {
+          name: 'NoSuchKey',
+          $metadata: { httpStatusCode: 404 },
+        });
+      }
+      return {
+        Body: sdkStreamMixin(Readable.from([PDF])),
+        ContentLength: PDF.byteLength,
+        ContentType: 'application/pdf',
+        VersionId: 'v7',
+      };
+    });
+    fx = await buildBundle({}, CONNECTIONS);
+  });
+  afterAll(async () => {
+    await fx.cleanup();
+    s3Mock.reset();
+  });
+
+  function importDoc(payload: unknown): ReturnType<typeof fx.bundle.app.inject> {
+    return fx.bundle.app.inject({
+      method: 'POST',
+      url: adminWirePaths.documentsImport(TENANT),
+      headers: { authorization: `Bearer ${fx.token}` },
+      payload: payload as Record<string, unknown>,
+    });
+  }
+
+  async function provenance(docId: string): Promise<Record<string, unknown> | undefined> {
+    return fx.db
+      .selectFrom('document_imports')
+      .selectAll()
+      .where('doc_id', '=', docId)
+      .executeTakeFirst();
+  }
+
+  test('a prefix-scoped tenant-jwt connection imports and records provenance', async () => {
+    const res = await importDoc({
+      source: { kind: 'connection', connectionId: 'tenant-docs', key: 'docs/e2e.pdf' },
+      docId: 'imp-conn-happy',
+    });
+    expect(res.statusCode, res.body).toBe(200);
+    const body = JSON.parse(res.body) as { tag: string; document: Record<string, unknown> };
+    expect(body.tag).toBe('imported');
+    expect(body.document['state']).toBe('ready');
+    expect(body.document['baseSha']).toBe(PDF_SHA);
+
+    const row = await provenance('imp-conn-happy');
+    expect(row).toMatchObject({
+      state: 'succeeded',
+      source_kind: 's3',
+      connection_id: 'tenant-docs',
+      source_location: 's3://conn-bucket/docs/e2e.pdf',
+      resolved_revision: 'v7',
+      via: 'tenant-jwt',
+      requested_by: 'import-tester',
+      attempts: 1,
+    });
+  });
+
+  test('a whole-bucket connection stays api-token only', async () => {
+    const res = await importDoc({
+      source: { kind: 'connection', connectionId: 'archive', key: 'docs/e2e.pdf' },
+      docId: 'imp-conn-cred',
+    });
+    expect(res.statusCode, res.body).toBe(400);
+    expect(res.body).toContain('not usable with tenant-jwt');
+    const row = await provenance('imp-conn-cred');
+    expect(row).toMatchObject({ state: 'failed' });
+    expect(String(row?.['last_error'])).toContain('import_policy');
+  });
+
+  test('keys outside the connection scope are refused', async () => {
+    const res = await importDoc({
+      source: { kind: 'connection', connectionId: 'tenant-docs', key: 'private/e2e.pdf' },
+      docId: 'imp-conn-scope',
+    });
+    expect(res.statusCode, res.body).toBe(400);
+    expect(res.body).toContain('outside the prefixes');
+  });
+
+  test('unknown connections are refused', async () => {
+    const res = await importDoc({
+      source: { kind: 'connection', connectionId: 'nope', key: 'docs/e2e.pdf' },
+    });
+    expect(res.statusCode, res.body).toBe(400);
+    expect(res.body).toContain('unknown import connection');
+  });
+
+  test('url imports record sanitized provenance too', async () => {
+    const res = await importDoc({
+      source: { kind: 'url', url: srcUrl('/ok') },
+      docId: 'imp-prov-url',
+    });
+    expect(res.statusCode, res.body).toBe(200);
+    const row = await provenance('imp-prov-url');
+    expect(row).toMatchObject({ state: 'succeeded', source_kind: 'url', connection_id: null });
+    expect(String(row?.['source_location'])).toContain('/ok');
+    expect(String(row?.['source_location'])).not.toContain('TOPSECRETSIG');
+  });
+
+  test('deleting a document cascades its provenance row', async () => {
+    const del = await fx.bundle.app.inject({
+      method: 'DELETE',
+      url: adminWirePaths.document(TENANT, 'imp-prov-url'),
+      headers: { authorization: `Bearer ${fx.token}` },
+    });
+    expect(del.statusCode).toBe(204);
+    expect(await provenance('imp-prov-url')).toBeUndefined();
   });
 });

@@ -25,6 +25,7 @@ import { SuspendedTenantsGuard } from '../auth/SuspendedTenantsGuard';
 import { NoneCdnSigner } from '../cdn/adapters/NoneCdnSigner';
 import type { CdnSigner } from '../cdn/CdnSigner';
 import { validate as validateMigrations, type MigrationSource } from '../db/migrator/runner';
+import { DocumentImportsRepo } from '../db/repos/document_imports.repo';
 import { DocumentsRepo } from '../db/repos/documents.repo';
 import { DocumentPagesRepo, LayerPagesRepo, LayersRepo } from '../db/repos/page_state.repo';
 import { PdfPasswordSessionsRepo } from '../db/repos/pdf_password_sessions.repo';
@@ -35,6 +36,9 @@ import { TenantUsageRepo } from '../db/repos/tenant_usage.repo';
 import { TenantsRepo } from '../db/repos/tenants.repo';
 import { WeakAnnotationSessionsRepo } from '../db/repos/weak_annotation_sessions.repo';
 import type { Database as Schema } from '../db/schema';
+import type { ImportConnection } from '../import/config/ImportConnectionSchema';
+import { defaultImportPolicy, type ImportPolicy } from '../import/config/ImportPolicySchema';
+import { ImportConnectionRegistry } from '../import/ImportConnectionRegistry';
 import type { ConnectedUsageReporter } from '../licensing/ConnectedUsageReporter';
 import type { LicenseGate } from '../licensing/LicenseRuntime';
 import { isLicenseGateTrusted } from '../licensing/trusted-license-gates';
@@ -42,7 +46,6 @@ import { UsageMeters } from '../licensing/UsageMeters';
 import { InProcessRealtimeBus, type RealtimeBus } from '../realtime/RealtimeBus';
 import { SharpImageEncoder } from '../render/SharpImageEncoder';
 import { registerAccessRoutes } from '../routes/access';
-import { defaultImportPolicy, type ImportPolicy } from '../import/config/ImportPolicySchema';
 import { registerAdminDocumentsRoutes } from '../routes/admin/documents';
 import { registerAdminSharesRoutes } from '../routes/admin/shares';
 import { registerAdminTenantsRoutes } from '../routes/admin/tenants';
@@ -50,23 +53,23 @@ import { registerAdminTokensRoutes } from '../routes/admin/tokens';
 import { registerAnnotationRoutes } from '../routes/annotations';
 import { registerAttachmentRoutes } from '../routes/attachments';
 import { registerDocsRoutes } from '../routes/docs';
-import { CloudRevisionBridge } from '../services/CloudRevisionBridge';
-import { DerivedRenderService } from '../services/DerivedRenderService';
-import { DocumentService } from '../services/DocumentService';
-import { DocumentSecurityProbe } from '../services/DocumentSecurityProbe';
-import { EventLogService } from '../services/EventLogService';
-import { LayerService } from '../services/LayerService';
-import { LayerStateService } from '../services/LayerStateService';
-import { WeakAnnotationSessionService } from '../services/WeakAnnotationSessionService';
+import { registerEventsRoutes } from '../routes/events';
 import { registerFormRoutes } from '../routes/forms';
 import { registerMetadataRoutes } from '../routes/metadata';
 import { registerPageRoutes } from '../routes/pages';
 import { registerRedactionRoutes } from '../routes/redactions';
 import { registerSearchRoutes } from '../routes/search';
 import { registerShareSessionRoutes } from '../routes/share-sessions';
-import type { KmsKeyring } from '../security';
-import { registerEventsRoutes } from '../routes/events';
 import { WorkerThreadPool, type FallbackFontDescriptor } from '../runtime/WorkerThreadPool';
+import type { KmsKeyring } from '../security';
+import { CloudRevisionBridge } from '../services/CloudRevisionBridge';
+import { DerivedRenderService } from '../services/DerivedRenderService';
+import { DocumentSecurityProbe } from '../services/DocumentSecurityProbe';
+import { DocumentService } from '../services/DocumentService';
+import { EventLogService } from '../services/EventLogService';
+import { LayerService } from '../services/LayerService';
+import { LayerStateService } from '../services/LayerStateService';
+import { WeakAnnotationSessionService } from '../services/WeakAnnotationSessionService';
 import {
   DocumentLifecycleService,
   type UploadProxyPolicy,
@@ -143,6 +146,12 @@ export interface BuildAppOptions {
    * Pass `{ ...defaultImportPolicy(), enabled: false }` to disable.
    */
   importPolicy?: ImportPolicy;
+  /**
+   * Operator-registered import connections (the `connection` source
+   * kind). Validated at construction — duplicate ids and invalid
+   * scope/credential combinations refuse to boot.
+   */
+  importConnections?: ReadonlyArray<ImportConnection>;
   /**
    * Fastify `trustProxy` passthrough. REQUIRED for `request.ip` (and thus
    * the auth-failure limiter) to see real client addresses when the server
@@ -601,6 +610,8 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
       autoProvisionTenant: opts.autoProvisionTenant ?? false,
       uploadProxyPolicy: opts.uploadProxyPolicy ?? 'fallback-only',
       importPolicy: opts.importPolicy ?? defaultImportPolicy(),
+      importConnections: new ImportConnectionRegistry(opts.importConnections ?? []),
+      documentImports: new DocumentImportsRepo(opts.db),
       securityProbe: new DocumentSecurityProbe({
         cache: baseFileCache,
         pool,

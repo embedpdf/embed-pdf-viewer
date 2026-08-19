@@ -20,6 +20,7 @@ import {
   type MigrationSource,
 } from '../db/migrator/runner';
 import type { Database as Schema } from '../db/schema';
+import { loadImportConnectionsFromEnv } from '../import/config/loadImportConnectionsFromEnv';
 import { loadImportPolicyFromEnv } from '../import/config/loadImportPolicyFromEnv';
 import { ConnectedUsageReporter } from '../licensing/ConnectedUsageReporter';
 import { LicenseRuntime } from '../licensing/LicenseRuntime';
@@ -93,6 +94,10 @@ import type { ObjectStore } from '../storage/ObjectStore';
  *   CLOUDPDF_IMPORT_ENABLED=0    disable documents.import server-side pulls (default: on)
  *   CLOUDPDF_IMPORT_MAX_BYTES / CLOUDPDF_IMPORT_TIMEOUT_MS / CLOUDPDF_IMPORT_MAX_CONCURRENT
  *   CLOUDPDF_IMPORT_ALLOW_HTTP=1 / CLOUDPDF_IMPORT_ALLOW_PRIVATE_NETWORKS=1   (dev / MinIO)
+ *   CLOUDPDF_IMPORT_CONNECTIONS=name1,name2   operator-registered pull sources; per name:
+ *     CLOUDPDF_IMPORT_CONNECTION_<NAME>_KIND=s3 + _S3_BUCKET/_S3_REGION[/_S3_ENDPOINT],
+ *     _CREDENTIALS=api-token[,tenant-jwt] (default api-token)  _TENANTS=*|csv
+ *     _SCOPE=whole-bucket|shared-prefixes|tenant-template (+_SCOPE_PREFIXES/_SCOPE_TEMPLATE)
  *   CLOUDPDF_CDN_KIND       none|bunny|...    (default: none)
  *   CLOUDPDF_KMS_KIND       static|aws-kms|... (opt-in; encrypted-PDF sessions)
  *   CLOUDPDF_SECRETS_PROVIDERS  registry names (default: env)
@@ -814,6 +819,7 @@ async function cmdServe(): Promise<void> {
   const enableRevocation = readEnableRevocationEnv();
   const uploadProxyPolicy = readUploadProxyPolicyEnv();
   const importPolicy = loadImportPolicyFromEnv();
+  const importConnections = loadImportConnectionsFromEnv();
 
   let bundle: Awaited<ReturnType<typeof buildApp>>;
   try {
@@ -835,6 +841,7 @@ async function cmdServe(): Promise<void> {
       ...(AUTO_PROVISION_TENANT ? { autoProvisionTenant: true } : {}),
       uploadProxyPolicy,
       importPolicy,
+      importConnections,
       expectedMigrations: dbCtx.migrations,
       failOnPending: FAIL_ON_PENDING,
       ...(realtimeBus ? { realtimeBus } : {}),

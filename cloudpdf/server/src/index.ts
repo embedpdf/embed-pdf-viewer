@@ -142,6 +142,23 @@ export {
   type ImportPolicy,
 } from './import/config/ImportPolicySchema';
 export { loadImportPolicyFromEnv } from './import/config/loadImportPolicyFromEnv';
+export {
+  ImportConnectionSchema,
+  ImportConnectionScopeSchema,
+  type ImportConnection,
+  type ImportConnectionScope,
+  type S3ImportConnection,
+} from './import/config/ImportConnectionSchema';
+export { loadImportConnectionsFromEnv } from './import/config/loadImportConnectionsFromEnv';
+export { ImportConnectionRegistry } from './import/ImportConnectionRegistry';
+export { S3ImportSource } from './import/adapters/S3ImportSource';
+export {
+  resolveScopePrefixes,
+  targetsDeploymentStorage,
+  type ImportCallerContext,
+  type ImportSourceDeps,
+} from './import/createImportSource';
+export { DocumentImportsRepo, type DocumentImportRow } from './db/repos/document_imports.repo';
 
 // CDN adapter family (signers + factory + config + None adapter).
 // HMAC/CloudFront adapters ship in commit G; purge wiring in commit H.

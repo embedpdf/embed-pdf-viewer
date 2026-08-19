@@ -304,6 +304,31 @@ export interface ShareGrantsTable {
  * and carries no limits — enforcement above the license is whoever
  * operates the deployment's business, expressed via tenant suspension.
  */
+export interface DocumentImportsTable {
+  id: string;
+  tenant_id: string;
+  doc_id: string;
+  source_kind: string;
+  connection_id: string | null;
+  source_location: string;
+  requested_revision: string | null;
+  resolved_revision: string | null;
+  expected_sha256: string | null;
+  expected_size_bytes: number | null;
+  state: 'queued' | 'running' | 'succeeded' | 'failed';
+  attempts: number;
+  max_attempts: number;
+  next_attempt_at: number;
+  lease_owner: string | null;
+  lease_token: string | null;
+  lease_expires_at: number | null;
+  last_error: string | null;
+  requested_by: string | null;
+  via: string | null;
+  created_at: number;
+  updated_at: number;
+}
+
 export interface TenantUsageCounterTable {
   tenant_id: string;
   metric: 'pdf.uploads' | 'pdf.views';
@@ -428,6 +453,7 @@ export interface Database {
   pdf_password_sessions: PdfPasswordSessionsTable;
   security_events: SecurityEventsTable & { id: Generated<number> };
   share_grants: ShareGrantsTable;
+  document_imports: DocumentImportsTable;
   tenant_usage_counter: TenantUsageCounterTable;
   schema_migrations: SchemaMigrationsTable;
   revoked_jtis: RevokedJtisTable;

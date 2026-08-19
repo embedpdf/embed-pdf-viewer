@@ -15,8 +15,12 @@ import { isPubliclyRoutableAddress, UrlImportSource } from '../src/import/adapte
 import { defaultImportPolicy, ImportPolicySchema } from '../src/import/config/ImportPolicySchema';
 import { loadImportPolicyFromEnv } from '../src/import/config/loadImportPolicyFromEnv';
 import { ImportSourceError } from '../src/import/ImportSource';
+import { runImportSourceConformance } from './_helpers/import-source-conformance';
 
 const BODY = Buffer.from('%PDF-1.7 unit-source body');
+
+/** Objects served at /obj/<name> for the shared conformance suite. */
+const urlObjects = new Map<string, { bytes: Buffer; contentType?: string }>();
 
 let srv: Server;
 let port = 0;
@@ -47,6 +51,21 @@ beforeAll(async () => {
       res.writeHead(200, { 'content-type': 'application/pdf' });
       res.write(BODY);
       res.end();
+      return;
+    }
+    if (url.startsWith('/obj/')) {
+      const name = decodeURIComponent(url.slice('/obj/'.length).split('?')[0]!);
+      const o = urlObjects.get(name);
+      if (!o) {
+        res.writeHead(404);
+        res.end();
+        return;
+      }
+      res.writeHead(200, {
+        'content-type': o.contentType ?? 'application/octet-stream',
+        'content-length': String(o.bytes.byteLength),
+      });
+      res.end(o.bytes);
       return;
     }
     res.writeHead(500);
@@ -237,4 +256,28 @@ describe('loadImportPolicyFromEnv', () => {
       /CLOUDPDF_IMPORT_MAX_BYTES/,
     );
   });
+});
+
+runImportSourceConformance('url', () => {
+  urlObjects.clear();
+  return {
+    seed(name, bytes, opts) {
+      urlObjects.set(name, {
+        bytes: Buffer.from(bytes),
+        ...(opts?.contentType ? { contentType: opts.contentType } : {}),
+      });
+    },
+    source(name, opts) {
+      const policy = ImportPolicySchema.parse({
+        allowHttp: true,
+        allowPrivateNetworks: true,
+        ...(opts?.maxBytes !== undefined ? { maxBytes: opts.maxBytes } : {}),
+      });
+      return new UrlImportSource({
+        url: `http://127.0.0.1:${port}/obj/${encodeURIComponent(name)}?X-Sig=TOPSECRETSIG`,
+        policy,
+      });
+    },
+    missingName: () => 'definitely-missing',
+  };
 });

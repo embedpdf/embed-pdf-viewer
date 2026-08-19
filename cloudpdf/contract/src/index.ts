@@ -19,7 +19,7 @@ const docIdPattern = /^[A-Za-z0-9_-]+$/;
  * they appear in every tenant-scoped path (and therefore in logs — do
  * not put PII in tenant ids).
  */
-const tenantIdPattern = /^[A-Za-z0-9_-]+$/;
+export const tenantIdPattern = /^[A-Za-z0-9_-]+$/;
 /**
  * A web origin pattern: scheme + host (+ optional port), no path. One
  * leading `*.` label is allowed and matches one or more subdomain
@@ -175,18 +175,43 @@ export const AdminDocumentCommitResponseSchema = z.object({
 });
 export type AdminDocumentCommitResponse = z.infer<typeof AdminDocumentCommitResponseSchema>;
 
+/** UTF-8 byte length — provider key limits are byte rules, not JS code units. */
+const utf8ByteLength = (s: string): number => new TextEncoder().encode(s).length;
+
 /**
- * A server-side pull source for `documents.import`. v1 supports one
- * universal kind: a caller-minted URL — a presigned S3/GCS/Azure/R2/
- * MinIO GET, or any HTTPS endpoint the deployment's import policy
- * allows. The URL is a capability: treat it as a secret. Servers
- * never echo its query string back in errors, logs, or stored
- * failure reasons.
+ * A server-side pull source for `documents.import`. The discriminator
+ * distinguishes AUTHORIZATION MODELS, not storage vendors:
+ *
+ *   - `url`        — the CALLER supplies authority: a presigned
+ *     S3/GCS/Azure/R2/MinIO GET, or any HTTPS endpoint the
+ *     deployment's import policy allows. The URL is a capability:
+ *     treat it as a secret. Servers never echo its query string back
+ *     in errors, logs, or stored failure reasons.
+ *   - `connection` — the OPERATOR pre-registered authority: the
+ *     request names a connection and a key; which provider backs it
+ *     (S3, GCS, Azure Blob, filesystem, ...) is deployment
+ *     configuration, never wire surface. `revision` is opaque here
+ *     and provider-interpreted (S3 VersionId, GCS generation, Azure
+ *     version id); unsupported providers reject it.
+ *
+ * Key validation at this layer is deliberately generic (byte length,
+ * no NUL); provider-exact rules live in the server's source adapters,
+ * which know which backend a connection names.
  */
 export const AdminImportSourceSchema = z.discriminatedUnion('kind', [
   z.object({
     kind: z.literal('url'),
     url: z.string().url().max(8192),
+  }),
+  z.object({
+    kind: z.literal('connection'),
+    connectionId: z.string().min(1).max(128),
+    key: z
+      .string()
+      .min(1)
+      .refine((k) => !k.includes('\0'), 'key must not contain NUL')
+      .refine((k) => utf8ByteLength(k) <= 1024, 'key must be at most 1024 UTF-8 bytes'),
+    revision: z.string().min(1).max(1024).optional(),
   }),
 ]);
 export type AdminImportSource = z.infer<typeof AdminImportSourceSchema>;
@@ -868,9 +893,9 @@ export const adminOperations = {
   },
   'documents.import': {
     operationId: 'documents.import',
-    title: 'Import from URL',
+    title: 'Import document',
     summary:
-      'Server-side pull: fetch a PDF from a caller-supplied URL (e.g. a presigned object-store GET) into CloudPDF-owned storage, verify it, and commit it.',
+      'Server-side pull: fetch a PDF from a caller-supplied URL (e.g. a presigned object-store GET) or an operator-registered storage connection into CloudPDF-owned storage, verify it, and commit it.',
     method: 'POST',
     path: '/v1/tenants/:tenantId/documents/import',
     credentials: ['api-token', 'tenant-jwt'],
@@ -884,7 +909,7 @@ export const adminOperations = {
       502: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
     },
     notes:
-      'Synchronous and bounded: the response returns only after the transfer verified and committed (or failed). The deployment import policy gates scheme, network range, and size; sources must respond with Content-Length. CloudPDF copies and owns the bytes — the source is never referenced in place. A 502 marks a retryable upstream failure: retry with the same idempotencyKey to resume the same document. The URL is treated as a capability and never echoed back.',
+      'Synchronous and bounded: the response returns only after the transfer verified and committed (or failed). The deployment import policy gates scheme, network range, and size; sources must declare a length. CloudPDF copies and owns the bytes — the source is never referenced in place. A 502 marks a retryable upstream failure: retry with the same idempotencyKey to resume the same document. URL sources are capabilities and never echoed back. Connection sources name operator-registered storage (bucket/prefix scope, allowed credential classes, and tenant bindings are deployment configuration); `revision` is provider-interpreted (S3 VersionId, GCS generation, Azure version id).',
   },
   'documents.list': {
     operationId: 'documents.list',
