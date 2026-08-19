@@ -26,6 +26,8 @@
  * end with `/` — `tenants/{tenantId}` would let tenant `acme`
  * prefix-match `tenants/acme-other/...`, a real cross-tenant read.
  */
+import { isAbsolute } from 'node:path';
+
 import { z } from 'zod';
 
 /** UTF-8 byte length — provider key limits are byte rules, not code units. */
@@ -107,6 +109,33 @@ export const ImportConnectionSchema = z
       // option is a misconfiguration trap. The fields arrive together
       // with a working assumption implementation.
     }),
+    z.object({
+      kind: z.literal('gcs'),
+      ...connectionCommon,
+      bucket: z.string().min(1),
+      /** Optional GCP project id; ADC usually infers it. */
+      projectId: z.string().min(1).optional(),
+    }),
+    z.object({
+      kind: z.literal('azure-blob'),
+      ...connectionCommon,
+      container: z.string().min(1),
+      accountName: z.string().min(1),
+      /** Custom endpoint; defaults to https://<account>.blob.core.windows.net. */
+      endpoint: z.string().url().optional(),
+      // Keyless only (DefaultAzureCredential) — an account-key option
+      // would need SecretRef custody; it arrives when a client needs
+      // it, together with the implementation (same rule as roleArn).
+    }),
+    z.object({
+      kind: z.literal('fs'),
+      ...connectionCommon,
+      /** Absolute directory the connection may read from. */
+      root: z
+        .string()
+        .min(1)
+        .refine((r) => isAbsolute(r), 'fs connection root must be an absolute path'),
+    }),
   ])
   .superRefine((conn, ctx) => {
     if (conn.credentials.includes('tenant-jwt') && conn.scope.kind === 'whole-bucket') {
@@ -115,7 +144,19 @@ export const ImportConnectionSchema = z
         message: `connection ${conn.id}: tenant-jwt credentials require a key-prefix scope; whole-bucket access is api-token only`,
       });
     }
+    // Filesystem roots live on the server host: the blast radius of a
+    // containment bug is the disk itself, so fs connections are
+    // STRUCTURALLY operator-only — not a default, an invariant.
+    if (conn.kind === 'fs' && conn.credentials.includes('tenant-jwt')) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `connection ${conn.id}: filesystem connections are api-token only`,
+      });
+    }
   });
 
 export type ImportConnection = z.infer<typeof ImportConnectionSchema>;
 export type S3ImportConnection = Extract<ImportConnection, { kind: 's3' }>;
+export type GcsImportConnection = Extract<ImportConnection, { kind: 'gcs' }>;
+export type AzureBlobImportConnection = Extract<ImportConnection, { kind: 'azure-blob' }>;
+export type FsImportConnection = Extract<ImportConnection, { kind: 'fs' }>;

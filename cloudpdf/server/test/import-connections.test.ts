@@ -72,11 +72,41 @@ describe('loadImportConnectionsFromEnv', () => {
 
   test('unsupported kinds and missing required vars refuse to boot', () => {
     expect(() =>
-      loadImportConnectionsFromEnv(envFor('x', { ...S3_MINIMUM, KIND: 'gcs' })),
-    ).toThrowError(/KIND must be 's3'/);
+      loadImportConnectionsFromEnv(envFor('x', { ...S3_MINIMUM, KIND: 'ftp' })),
+    ).toThrowError(/KIND must be one of s3\|gcs\|azure-blob\|fs/);
     expect(() =>
       loadImportConnectionsFromEnv(envFor('x', { KIND: 's3', S3_REGION: 'eu-west-1' })),
     ).toThrowError(/S3_BUCKET is required/);
+    expect(() =>
+      loadImportConnectionsFromEnv(envFor('x', { KIND: 'gcs' })),
+    ).toThrowError(/GCS_BUCKET is required/);
+    expect(() =>
+      loadImportConnectionsFromEnv(envFor('x', { KIND: 'azure-blob', AZURE_BLOB_CONTAINER: 'c' })),
+    ).toThrowError(/AZURE_BLOB_ACCOUNT_NAME is required/);
+    expect(() =>
+      loadImportConnectionsFromEnv(envFor('x', { KIND: 'fs' })),
+    ).toThrowError(/FS_ROOT is required/);
+  });
+
+  test('gcs, azure-blob, and fs connections parse with their provider fields', () => {
+    const [gcs] = loadImportConnectionsFromEnv(
+      envFor('gcs-docs', { KIND: 'gcs', GCS_BUCKET: 'g-bucket', GCS_PROJECT_ID: 'proj-1' }),
+    );
+    expect(gcs).toMatchObject({ kind: 'gcs', bucket: 'g-bucket', projectId: 'proj-1' });
+
+    const [az] = loadImportConnectionsFromEnv(
+      envFor('az-docs', {
+        KIND: 'azure-blob',
+        AZURE_BLOB_CONTAINER: 'docs',
+        AZURE_BLOB_ACCOUNT_NAME: 'acct',
+      }),
+    );
+    expect(az).toMatchObject({ kind: 'azure-blob', container: 'docs', accountName: 'acct' });
+
+    const [fs] = loadImportConnectionsFromEnv(
+      envFor('local-drop', { KIND: 'fs', FS_ROOT: '/srv/inbox' }),
+    );
+    expect(fs).toMatchObject({ kind: 'fs', root: '/srv/inbox', credentials: ['api-token'] });
   });
 
   test('normalized env-name collisions refuse to boot', () => {

@@ -305,10 +305,58 @@ describe('createImportSource authorization gates', () => {
     expect(targetsDeploymentStorage(conn({ bucket: 'other' }), s3Storage('dep'))).toBe(false);
     expect(targetsDeploymentStorage(conn({ bucket: 'dep' }), FS_STORAGE)).toBe(false);
 
+    // gcs: bucket names are globally unique
+    const gcsConn = ImportConnectionSchema.parse({ kind: 'gcs', id: 'g', bucket: 'dep' });
+    expect(targetsDeploymentStorage(gcsConn, { kind: 'gcs', location: 'gs', bucket: 'dep' })).toBe(true);
+    expect(targetsDeploymentStorage(gcsConn, { kind: 'gcs', location: 'gs', bucket: 'other' })).toBe(false);
+    expect(targetsDeploymentStorage(gcsConn, s3Storage('dep'))).toBe(false);
+
+    // azure: identity is (account, container), account case-insensitive
+    const azConn = ImportConnectionSchema.parse({
+      kind: 'azure-blob',
+      id: 'a',
+      container: 'docs',
+      accountName: 'Acct',
+    });
+    expect(
+      targetsDeploymentStorage(azConn, {
+        kind: 'azure-blob',
+        location: 'az',
+        accountName: 'acct',
+        container: 'docs',
+      }),
+    ).toBe(true);
+    expect(
+      targetsDeploymentStorage(azConn, {
+        kind: 'azure-blob',
+        location: 'az',
+        accountName: 'acct',
+        container: 'other',
+      }),
+    ).toBe(false);
+
+    // fs: containment in either direction
+    const fsConn = ImportConnectionSchema.parse({ kind: 'fs', id: 'f', root: '/data/objects/sub' });
+    expect(
+      targetsDeploymentStorage(fsConn, { kind: 'fs', location: '/data/objects', root: '/data/objects' }),
+    ).toBe(true);
+    expect(
+      targetsDeploymentStorage(
+        ImportConnectionSchema.parse({ kind: 'fs', id: 'f2', root: '/data' }),
+        { kind: 'fs', location: '/data/objects', root: '/data/objects' },
+      ),
+    ).toBe(true);
+    expect(
+      targetsDeploymentStorage(
+        ImportConnectionSchema.parse({ kind: 'fs', id: 'f3', root: '/srv/inbox' }),
+        { kind: 'fs', location: '/data/objects', root: '/data/objects' },
+      ),
+    ).toBe(false);
+
     const err = resolveErr(
       wire('test-conn', 'a.pdf'),
       deps([conn({ bucket: 'dep' })], { via: 'api-token', tenantId: 't' }, s3Storage('dep')),
     );
-    expect(err.message).toMatch(/deployment storage bucket/);
+    expect(err.message).toMatch(/deployment storage backend/);
   });
 });

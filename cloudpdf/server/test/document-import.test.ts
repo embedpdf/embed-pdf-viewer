@@ -10,7 +10,8 @@
  * responses or stored failure reasons.
  */
 import { createHash } from 'node:crypto';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { dirname, join as joinPath } from 'node:path';
 import { createServer, type Server } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -96,6 +97,8 @@ interface Fixture {
   cleanup: () => Promise<void>;
 }
 
+const ROOT_API_TOKEN = 'import-e2e-root-token';
+
 async function buildBundle(
   policy: Partial<ImportPolicy> = {},
   connections: ImportConnection[] = [],
@@ -111,6 +114,7 @@ async function buildBundle(
     objectStore: new FsObjectStore({ root: storageRoot }),
     autoProvisionTenant: true,
     sweepIntervalMs: 0,
+    apiAuthTokens: [ROOT_API_TOKEN],
     importPolicy: ImportPolicySchema.parse({
       allowHttp: true,
       allowPrivateNetworks: true,
@@ -453,5 +457,81 @@ describe('documents.import connection sources E2E', () => {
     });
     expect(del.statusCode).toBe(204);
     expect(await provenance('imp-prov-url')).toBeUndefined();
+  });
+});
+
+/**
+ * Filesystem connection E2E — no SDK mocks: a real tmpdir plays the
+ * operator's drop directory. Proves the structural api-token-only
+ * rule end to end and the provenance trail for operator pulls.
+ */
+describe('documents.import fs connection E2E', () => {
+  let dropRoot: string;
+  let fx: Fixture;
+
+  beforeAll(async () => {
+    dropRoot = await mkdtemp(join(tmpdir(), 'embedpdf-import-drop-'));
+    const seeded = joinPath(dropRoot, 'inbox', 'scan-001.pdf');
+    await mkdir(dirname(seeded), { recursive: true });
+    await writeFile(seeded, PDF);
+    fx = await buildBundle({}, [
+      ImportConnectionSchema.parse({ kind: 'fs', id: 'local-drop', root: dropRoot }),
+    ]);
+  });
+  afterAll(async () => {
+    await fx.cleanup();
+    await rm(dropRoot, { recursive: true, force: true });
+  });
+
+  function importVia(auth: string, payload: unknown): ReturnType<typeof fx.bundle.app.inject> {
+    return fx.bundle.app.inject({
+      method: 'POST',
+      url: adminWirePaths.documentsImport(TENANT),
+      headers: { authorization: `Bearer ${auth}` },
+      payload: payload as Record<string, unknown>,
+    });
+  }
+
+  test('tenant-jwt callers are refused structurally', async () => {
+    const res = await importVia(fx.token, {
+      source: { kind: 'connection', connectionId: 'local-drop', key: 'inbox/scan-001.pdf' },
+    });
+    expect(res.statusCode, res.body).toBe(400);
+    expect(res.body).toContain('not usable with tenant-jwt');
+  });
+
+  test('the operator api-token imports from the drop directory', async () => {
+    const res = await importVia(ROOT_API_TOKEN, {
+      source: { kind: 'connection', connectionId: 'local-drop', key: 'inbox/scan-001.pdf' },
+      docId: 'imp-fs-happy',
+    });
+    expect(res.statusCode, res.body).toBe(200);
+    const body = JSON.parse(res.body) as { tag: string; document: Record<string, unknown> };
+    expect(body.tag).toBe('imported');
+    expect(body.document['state']).toBe('ready');
+    expect(body.document['baseSha']).toBe(PDF_SHA);
+
+    const row = await fx.db
+      .selectFrom('document_imports')
+      .selectAll()
+      .where('doc_id', '=', 'imp-fs-happy')
+      .executeTakeFirst();
+    expect(row).toMatchObject({
+      state: 'succeeded',
+      source_kind: 'fs',
+      connection_id: 'local-drop',
+      via: 'api-token',
+      requested_by: 'api-token',
+      resolved_revision: null,
+    });
+    expect(String(row?.['source_location'])).toContain('inbox/scan-001.pdf');
+  });
+
+  test('a revision on an fs connection is refused with the sha256 hint', async () => {
+    const res = await importVia(ROOT_API_TOKEN, {
+      source: { kind: 'connection', connectionId: 'local-drop', key: 'inbox/scan-001.pdf', revision: 'v1' },
+    });
+    expect(res.statusCode, res.body).toBe(400);
+    expect(res.body).toContain('expected.sha256');
   });
 });

@@ -6,10 +6,13 @@
  *
  *   CLOUDPDF_IMPORT_CONNECTIONS=customer-archive,acme-invoices
  *
- *   CLOUDPDF_IMPORT_CONNECTION_CUSTOMER_ARCHIVE_KIND=s3
+ *   CLOUDPDF_IMPORT_CONNECTION_CUSTOMER_ARCHIVE_KIND=s3|gcs|azure-blob|fs
  *   CLOUDPDF_IMPORT_CONNECTION_CUSTOMER_ARCHIVE_S3_BUCKET=customer-documents
  *   CLOUDPDF_IMPORT_CONNECTION_CUSTOMER_ARCHIVE_S3_REGION=eu-west-1
  *   CLOUDPDF_IMPORT_CONNECTION_CUSTOMER_ARCHIVE_S3_ENDPOINT=   (optional; R2/MinIO)
+ *     gcs:        _GCS_BUCKET (+ optional _GCS_PROJECT_ID)
+ *     azure-blob: _AZURE_BLOB_CONTAINER + _AZURE_BLOB_ACCOUNT_NAME (+ optional _AZURE_BLOB_ENDPOINT)
+ *     fs:         _FS_ROOT (absolute path; api-token only, structurally)
  *   CLOUDPDF_IMPORT_CONNECTION_CUSTOMER_ARCHIVE_CREDENTIALS=api-token   (default)
  *   CLOUDPDF_IMPORT_CONNECTION_CUSTOMER_ARCHIVE_TENANTS=*               (default)
  *   CLOUDPDF_IMPORT_CONNECTION_CUSTOMER_ARCHIVE_SCOPE=whole-bucket      (default)
@@ -72,9 +75,9 @@ export function loadImportConnectionsFromEnv(
         .filter(Boolean);
 
     const kind = (v('KIND') ?? '').toLowerCase();
-    if (kind !== 's3') {
+    if (!['s3', 'gcs', 'azure-blob', 'fs'].includes(kind)) {
       throw new Error(
-        `import connection '${name}': KIND must be 's3' (got '${kind || '(unset)'}'); gcs/azure-blob/fs sources arrive in later phases`,
+        `import connection '${name}': KIND must be one of s3|gcs|azure-blob|fs (got '${kind || '(unset)'}')`,
       );
     }
 
@@ -109,13 +112,34 @@ export function loadImportConnectionsFromEnv(
 
     const tenantsRaw = v('TENANTS');
     const credentialsRaw = v('CREDENTIALS');
-    const endpoint = v('S3_ENDPOINT');
+    let provider: Record<string, unknown>;
+    if (kind === 's3') {
+      const endpoint = v('S3_ENDPOINT');
+      provider = {
+        bucket: req('S3_BUCKET'),
+        region: req('S3_REGION'),
+        ...(endpoint ? { endpoint } : {}),
+      };
+    } else if (kind === 'gcs') {
+      const projectId = v('GCS_PROJECT_ID');
+      provider = {
+        bucket: req('GCS_BUCKET'),
+        ...(projectId ? { projectId } : {}),
+      };
+    } else if (kind === 'azure-blob') {
+      const endpoint = v('AZURE_BLOB_ENDPOINT');
+      provider = {
+        container: req('AZURE_BLOB_CONTAINER'),
+        accountName: req('AZURE_BLOB_ACCOUNT_NAME'),
+        ...(endpoint ? { endpoint } : {}),
+      };
+    } else {
+      provider = { root: req('FS_ROOT') };
+    }
     const parsed = ImportConnectionSchema.safeParse({
-      kind: 's3',
+      kind,
       id: name,
-      bucket: req('S3_BUCKET'),
-      region: req('S3_REGION'),
-      ...(endpoint ? { endpoint } : {}),
+      ...provider,
       ...(credentialsRaw ? { credentials: csv(credentialsRaw) } : {}),
       ...(tenantsRaw ? { tenants: tenantsRaw === '*' ? '*' : csv(tenantsRaw) } : {}),
       scope,

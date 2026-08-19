@@ -20,7 +20,7 @@
  */
 import type { Readable } from 'node:stream';
 
-export type ImportSourceKind = 'url' | 's3';
+export type ImportSourceKind = 'url' | 's3' | 'gcs' | 'azure-blob' | 'fs';
 
 /**
  * Diagnostic identity, mirroring the other adapter families:

@@ -20,11 +20,20 @@
  *
  * Provider adapters stay pure byte-readers.
  */
+import { isAbsolute, relative, resolve } from 'node:path';
+
 import { tenantIdPattern, type AdminImportSource } from '@cloudpdf/contract';
 
+import { AzureBlobImportSource } from './adapters/AzureBlobImportSource';
+import { FsImportSource } from './adapters/FsImportSource';
+import { GcsImportSource } from './adapters/GcsImportSource';
 import { S3ImportSource } from './adapters/S3ImportSource';
 import { UrlImportSource } from './adapters/UrlImportSource';
-import type { ImportConnectionScope, S3ImportConnection } from './config/ImportConnectionSchema';
+import type {
+  ImportConnection,
+  ImportConnectionScope,
+  S3ImportConnection,
+} from './config/ImportConnectionSchema';
 import { TENANT_PLACEHOLDER } from './config/ImportConnectionSchema';
 import type { ImportPolicy } from './config/ImportPolicySchema';
 import type { ImportConnectionRegistry } from './ImportConnectionRegistry';
@@ -92,22 +101,23 @@ function resolveConnectionSource(
       false,
     );
   }
+  if (targetsDeploymentStorage(conn, deps.deploymentStorage)) {
+    throw new ImportSourceError(
+      'policy',
+      'import connections must not point at the deployment storage backend',
+      false,
+    );
+  }
+  const common = { key: config.key, revision: config.revision, policy: deps.policy };
   switch (conn.kind) {
-    case 's3': {
-      if (targetsDeploymentStorage(conn, deps.deploymentStorage)) {
-        throw new ImportSourceError(
-          'policy',
-          'import connections must not point at the deployment storage bucket',
-          false,
-        );
-      }
-      return new S3ImportSource({
-        connection: conn,
-        key: config.key,
-        revision: config.revision,
-        policy: deps.policy,
-      });
-    }
+    case 's3':
+      return new S3ImportSource({ connection: conn, ...common });
+    case 'gcs':
+      return new GcsImportSource({ connection: conn, ...common });
+    case 'azure-blob':
+      return new AzureBlobImportSource({ connection: conn, ...common });
+    case 'fs':
+      return new FsImportSource({ connection: conn, ...common });
   }
 }
 
@@ -139,6 +149,19 @@ export function resolveScopePrefixes(
   }
 }
 
+/**
+ * Two absolute paths overlap when either contains the other. Used for
+ * the fs self-storage refusal (a connection rooted inside — or above —
+ * the deployment's object root could read or re-import owned bytes).
+ */
+function pathsOverlap(a: string, b: string): boolean {
+  const ra = resolve(a);
+  const rb = resolve(b);
+  const inside = (rel: string): boolean =>
+    rel === '' || (!rel.startsWith('..') && !isAbsolute(rel));
+  return inside(relative(ra, rb)) || inside(relative(rb, ra));
+}
+
 type S3EndpointClass = { class: 'aws' } | { class: 'custom'; host: string } | { class: 'unknown' };
 
 function classifyS3Endpoint(endpoint: string | undefined): S3EndpointClass {
@@ -153,17 +176,41 @@ function classifyS3Endpoint(endpoint: string | undefined): S3EndpointClass {
 }
 
 /**
- * Canonical backend fingerprint for the self-import refusal. Bucket
- * names are only meaningful per provider: on AWS they are
- * partition-global (implicit resolution and explicit *.amazonaws.com
- * endpoints are the SAME namespace); on custom endpoints (R2/MinIO)
- * identity is (host, bucket). Doubt resolves toward blocking —
- * over-blocking costs a rename, under-blocking is the vulnerability.
+ * Canonical backend fingerprint for the self-import refusal, per
+ * provider family. Names are only meaningful per backend: AWS bucket
+ * names are partition-global (implicit resolution and explicit
+ * *.amazonaws.com endpoints are the SAME namespace) while custom S3
+ * endpoints (R2/MinIO) key identity on (host, bucket); GCS bucket
+ * names are globally unique; Azure identity is (account, container);
+ * fs identity is path containment IN EITHER DIRECTION. Doubt resolves
+ * toward blocking — over-blocking costs a rename, under-blocking is
+ * the vulnerability.
  */
 export function targetsDeploymentStorage(
-  conn: S3ImportConnection,
+  conn: ImportConnection,
   storage: ObjectStoreInfo,
 ): boolean {
+  switch (conn.kind) {
+    case 's3':
+      return targetsS3DeploymentStorage(conn, storage);
+    case 'gcs':
+      // GCS bucket names are globally unique — name equality decides.
+      return storage.kind === 'gcs' && storage['bucket'] === conn.bucket;
+    case 'azure-blob':
+      return (
+        storage.kind === 'azure-blob' &&
+        String(storage['accountName'] ?? '').toLowerCase() === conn.accountName.toLowerCase() &&
+        storage['container'] === conn.container
+      );
+    case 'fs': {
+      if (storage.kind !== 'fs') return false;
+      const root = typeof storage['root'] === 'string' ? storage['root'] : storage.location;
+      return pathsOverlap(conn.root, root);
+    }
+  }
+}
+
+function targetsS3DeploymentStorage(conn: S3ImportConnection, storage: ObjectStoreInfo): boolean {
   if (storage.kind !== 's3') return false;
   if (storage['bucket'] !== conn.bucket) return false;
   const a = classifyS3Endpoint(conn.endpoint);
