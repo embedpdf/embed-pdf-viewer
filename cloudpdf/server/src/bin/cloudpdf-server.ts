@@ -91,7 +91,7 @@ import type { ObjectStore } from '../storage/ObjectStore';
  *   CLOUDPDF_STORAGE_KIND  fs|s3|gcs|azure-blob   (default: fs)
  *   CLOUDPDF_STORAGE_FS_ROOT                (default: ./data/objects)
  *   CLOUDPDF_CACHE_ROOT                      (default: ./data/cache; enables /v1/docs/*)
- *   CLOUDPDF_IMPORT_ENABLED=0    disable documents.import server-side pulls (default: on)
+ *   CLOUDPDF_IMPORT_ENABLED=0    disable documents.importFrom server-side pulls (default: on)
  *   CLOUDPDF_IMPORT_MAX_BYTES / CLOUDPDF_IMPORT_TIMEOUT_MS / CLOUDPDF_IMPORT_MAX_CONCURRENT
  *   CLOUDPDF_IMPORT_ALLOW_HTTP=1 / CLOUDPDF_IMPORT_ALLOW_PRIVATE_NETWORKS=1   (dev / MinIO)
  *   CLOUDPDF_IMPORT_CONNECTIONS=name1,name2   operator-registered pull sources; per name:

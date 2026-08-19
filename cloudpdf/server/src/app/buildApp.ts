@@ -142,7 +142,7 @@ export interface BuildAppOptions {
   /** Origin-mediated upload policy. Defaults to `fallback-only`. */
   uploadProxyPolicy?: UploadProxyPolicy;
   /**
-   * Server-side pull policy for `documents.import`. Defaults to the
+   * Server-side pull policy for `documents.importFrom`. Defaults to the
    * schema defaults (enabled, https-only, public networks, 128 MiB).
    * Pass `{ ...defaultImportPolicy(), enabled: false }` to disable.
    */

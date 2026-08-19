@@ -1,5 +1,6 @@
 export type { DeleteDocumentsRequest } from "./DeleteDocumentsRequest.js";
 export type { DocumentsCommitRequest } from "./DocumentsCommitRequest.js";
+export { DocumentsImportFromRequest } from "./DocumentsImportFromRequest.js";
 export { DocumentsInitRequest } from "./DocumentsInitRequest.js";
 export type { DownloadDocumentsRequest } from "./DownloadDocumentsRequest.js";
 export type { GetDocumentsRequest } from "./GetDocumentsRequest.js";

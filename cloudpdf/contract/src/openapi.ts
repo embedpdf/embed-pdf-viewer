@@ -152,11 +152,67 @@ function operationObject(
   return out;
 }
 
-function sdkOperationName(operationId: string): { groups: string[]; method: string } {
+/**
+ * SDK group and method segments become bare identifiers in the generated
+ * clients, and three target ecosystems cannot carry a reserved word there:
+ * Java and Python generators escape it (`import` → `import_`), silently
+ * forking the documented surface, and Ruby rejects most of its keywords in
+ * `def`. The other targets are structurally safe — C# and Go pascal-case
+ * (keywords are lowercase), TypeScript and PHP allow keywords as member
+ * names — so the set stays exactly as large as the real failure modes.
+ * Like `assertDocsGroupsCover`, this makes a collision an API-design error
+ * at emit time, not a generator surprise three pipeline stages later.
+ */
+const RESERVED_SDK_SEGMENTS: ReadonlyArray<readonly [string, ReadonlySet<string>]> = [
+  [
+    'Java',
+    new Set([
+      ...['abstract', 'assert', 'boolean', 'break', 'byte', 'case', 'catch', 'char', 'class'],
+      ...['const', 'continue', 'default', 'do', 'double', 'else', 'enum', 'extends', 'final'],
+      ...['finally', 'float', 'for', 'goto', 'if', 'implements', 'import', 'instanceof', 'int'],
+      ...['interface', 'long', 'native', 'new', 'package', 'private', 'protected', 'public'],
+      ...['return', 'short', 'static', 'strictfp', 'super', 'switch', 'synchronized', 'this'],
+      ...['throw', 'throws', 'transient', 'try', 'void', 'volatile', 'while'],
+      ...['true', 'false', 'null'],
+    ]),
+  ],
+  [
+    'Python',
+    new Set([
+      ...['False', 'None', 'True', 'and', 'as', 'assert', 'async', 'await', 'break', 'class'],
+      ...['continue', 'def', 'del', 'elif', 'else', 'except', 'finally', 'for', 'from'],
+      ...['global', 'if', 'import', 'in', 'is', 'lambda', 'nonlocal', 'not', 'or', 'pass'],
+      ...['raise', 'return', 'try', 'while', 'with', 'yield'],
+    ]),
+  ],
+  [
+    'Ruby',
+    new Set([
+      ...['alias', 'and', 'begin', 'break', 'case', 'class', 'def', 'do', 'else', 'elsif'],
+      ...['end', 'ensure', 'false', 'for', 'if', 'in', 'module', 'next', 'nil', 'not', 'or'],
+      ...['redo', 'rescue', 'retry', 'return', 'self', 'super', 'then', 'true', 'undef'],
+      ...['unless', 'until', 'when', 'while', 'yield'],
+    ]),
+  ],
+];
+
+export function sdkOperationName(operationId: string): { groups: string[]; method: string } {
   const parts = operationId.split('.');
   const method = parts.pop();
   if (!method || parts.length === 0) {
     throw new Error(`Operation ID must use resource.method form: ${operationId}`);
+  }
+  for (const segment of [...parts, method]) {
+    const collisions = RESERVED_SDK_SEGMENTS.filter(([, words]) => words.has(segment)).map(
+      ([language]) => language,
+    );
+    if (collisions.length > 0) {
+      throw new Error(
+        `Operation "${operationId}" cannot use "${segment}" as an SDK name segment: it is a ` +
+          `reserved word in ${collisions.join(' and ')}, so SDK generators would rename or ` +
+          `reject it. Pick a compound name instead (e.g. importFrom rather than import).`,
+      );
+    }
   }
   return { groups: parts, method };
 }

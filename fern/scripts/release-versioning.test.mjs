@@ -64,26 +64,46 @@ test('the generated SDK leaves its Changesets changelog untouched', () => {
   }
 });
 
-test('versioning and SDK freshness use one pinned TypeScript generator path', () => {
+test('versioning and SDK freshness use one pinned generator path', () => {
   assert.equal(
     rootManifest.scripts['cloudpdf:sdk:generate'],
-    'node fern/scripts/generate-typescript-sdk.mjs',
+    'node fern/scripts/generate-sdks.mjs --only typescript --force',
   );
 
-  const generator = read('fern/scripts/generate-typescript-sdk.mjs');
+  const generator = read('fern/scripts/generate-sdks.mjs');
   assert.match(generator, /FERN_CLI_VERSION = '5\.91\.0'/);
   assert.match(generator, /readCanonicalVersion\(\)/);
-  assert.match(generator, /'--group',\s*'typescript'/);
   assert.match(generator, /changesetsChangelog/);
   assert.match(generator, /finally/);
   assert.match(generator, /restoreFile\(changelogPath, changesetsChangelog\)/);
-  assert.match(generator, /record-sdk-metadata\.mjs', 'typescript'/);
-  assert.match(generator, /validate-sdk\.mjs', 'typescript'/);
+  assert.match(generator, /'fern\/scripts\/record-sdk-metadata\.mjs', language/);
+  assert.match(generator, /'fern\/scripts\/validate-sdk\.mjs', language/);
 
   const workflow = read('.github/workflows/sdk-generate.yml');
-  assert.match(workflow, /npm install -g fern-api@5\.91\.0/);
+  assert.match(
+    workflow,
+    /npm install -g "fern-api@\$\(node fern\/scripts\/generate-sdks\.mjs --print-fern-version\)"/,
+  );
   assert.match(workflow, /CLOUDPDF_FERN_CLI: fern/);
-  assert.match(workflow, /node fern\/scripts\/generate-typescript-sdk\.mjs/);
+  assert.match(workflow, /node fern\/scripts\/generate-sdks\.mjs --only "\$LANGUAGE" --force/);
+  assert.doesNotMatch(workflow, /generate-typescript-sdk/);
+});
+
+test('api:sync converges stale SDKs before rebuilding the docs artifacts', () => {
+  const sync = rootManifest.scripts['api:sync'];
+  const orderedSteps = [
+    'node fern/scripts/generate-sdks.mjs',
+    'pnpm --filter @cloudpdf/website api:snippets',
+    'pnpm --filter @cloudpdf/website api:pages',
+    'pnpm --filter @cloudpdf/website api:check',
+  ];
+
+  let previous = -1;
+  for (const step of orderedSteps) {
+    const index = sync.indexOf(step);
+    assert.ok(index > previous, `${step} is missing or out of order in api:sync`);
+    previous = index;
+  }
 });
 
 test('Fern sdkVersion validation is scoped to the TypeScript generator', () => {

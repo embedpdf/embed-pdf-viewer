@@ -131,7 +131,7 @@ export {
 } from './storage/config/ObjectStoreConfigSchema';
 export { loadObjectStoreConfigFromEnv } from './storage/config/loadObjectStoreConfigFromEnv';
 
-// Import (server-side pull) family for documents.import.
+// Import (server-side pull) family for documents.importFrom.
 export type { ImportSource, ImportSourceInfo, ImportSourceOpen } from './import/ImportSource';
 export { ImportSourceError } from './import/ImportSource';
 export { createImportSource } from './import/createImportSource';

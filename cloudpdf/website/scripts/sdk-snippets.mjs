@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 /**
@@ -405,13 +406,35 @@ export function collectOperations(openapi) {
 
 export function extractSnippetManifest({ openapi, repositoryRoot, artifactsRoot }) {
   const operations = collectOperations(openapi);
+  const openapiSha256 = createHash('sha256')
+    .update(readFileSync(`${repositoryRoot}/cloudpdf/contract/openapi.json`))
+    .digest('hex');
+
+  // Refuse stale inputs up front: extracting from a tree generated against an
+  // older contract would produce a plausible manifest that CI then rejects.
+  const trees = LANGUAGE_NAMES.map((language) => ({
+    language,
+    referenceFile: referencePath({ language, repositoryRoot, artifactsRoot }),
+  }));
+  const staleTrees = trees
+    .map(({ language, referenceFile }) => {
+      const problem = generationStampProblem({
+        referenceFile,
+        expectedOpenapiSha256: openapiSha256,
+      });
+      return problem ? `- ${language}: ${problem}` : null;
+    })
+    .filter(Boolean);
+  if (staleTrees.length > 0) {
+    throw new Error(
+      `Stale generated SDKs:\n${staleTrees.join('\n')}\nRun \`pnpm api:sync\` from the repository root to regenerate them and rebuild the manifest.`,
+    );
+  }
+
   const references = Object.fromEntries(
-    LANGUAGE_NAMES.map((language) => [
+    trees.map(({ language, referenceFile }) => [
       language,
-      parseReference(
-        readFileSync(referencePath({ language, repositoryRoot, artifactsRoot }), 'utf8'),
-        language,
-      ),
+      parseReference(readFileSync(referenceFile, 'utf8'), language),
     ]),
   );
 
@@ -449,9 +472,7 @@ export function extractSnippetManifest({ openapi, repositoryRoot, artifactsRoot 
   return {
     schemaVersion: 2,
     canonicalVersion: openapi.info.version,
-    openapiSha256: createHash('sha256')
-      .update(readFileSync(`${repositoryRoot}/cloudpdf/contract/openapi.json`))
-      .digest('hex'),
+    openapiSha256,
     languages: Object.fromEntries(
       Object.entries(LANGUAGES).map(([name, config]) => [
         name,
@@ -469,6 +490,28 @@ export function extractSnippetManifest({ openapi, repositoryRoot, artifactsRoot 
     ),
     operations: snippets,
   };
+}
+
+/**
+ * A reference.md is only trustworthy when its tree was generated from the
+ * contract being documented. record-sdk-metadata.mjs stamps every generated
+ * tree with cloudpdf-generation.json; require its OpenAPI SHA-256 to match
+ * before extracting so a stale scratch tree cannot silently feed the
+ * manifest. Returns a human-readable problem, or null when the tree is fresh.
+ */
+export function generationStampProblem({ referenceFile, expectedOpenapiSha256 }) {
+  const stampPath = `${dirname(referenceFile)}/cloudpdf-generation.json`;
+  let stamp;
+  try {
+    stamp = JSON.parse(readFileSync(stampPath, 'utf8'));
+  } catch {
+    return 'never generated (no cloudpdf-generation.json in the SDK tree)';
+  }
+  const stamped = stamp.source?.openapiSha256;
+  if (stamped !== expectedOpenapiSha256) {
+    return `generated from OpenAPI ${stamped ? stamped.slice(0, 12) : 'unknown'} (${stamp.canonicalVersion ?? 'unknown version'}), but the contract is now ${expectedOpenapiSha256.slice(0, 12)}`;
+  }
+  return null;
 }
 
 function referencePath({ language, repositoryRoot, artifactsRoot }) {

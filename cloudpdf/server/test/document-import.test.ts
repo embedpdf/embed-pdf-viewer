@@ -1,5 +1,5 @@
 /**
- * documents.import end-to-end: the server-side pull walked through
+ * documents.importFrom end-to-end: the server-side pull walked through
  * the real HTTP surface (auth → zod → lifecycle → storage → commit).
  *
  * A local stateful node:http server plays the customer's object
@@ -136,7 +136,7 @@ async function buildBundle(
   };
 }
 
-describe('documents.import E2E', () => {
+describe('documents.importFrom E2E', () => {
   let fx: Fixture;
 
   beforeAll(async () => {
@@ -294,7 +294,7 @@ describe('documents.import E2E', () => {
   });
 });
 
-describe('documents.import disabled by policy', () => {
+describe('documents.importFrom disabled by policy', () => {
   test('answers 403 without touching the source', async () => {
     const fx = await buildBundle({ enabled: false });
     try {
@@ -323,7 +323,7 @@ describe('documents.import disabled by policy', () => {
  */
 const s3Mock = mockClient(S3Client);
 
-describe('documents.import connection sources E2E', () => {
+describe('documents.importFrom connection sources E2E', () => {
   const CONNECTIONS: ImportConnection[] = [
     // Whole bucket, defaults: api-token only — the client posture.
     ImportConnectionSchema.parse({
@@ -506,7 +506,7 @@ describe('documents.import connection sources E2E', () => {
  * operator's drop directory. Proves the structural api-token-only
  * rule end to end and the provenance trail for operator pulls.
  */
-describe('documents.import fs connection E2E', () => {
+describe('documents.importFrom fs connection E2E', () => {
   let dropRoot: string;
   let fx: Fixture;
 

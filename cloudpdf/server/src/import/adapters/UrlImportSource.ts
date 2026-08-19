@@ -1,5 +1,5 @@
 /**
- * URL import source — the universal `documents.import` integration.
+ * URL import source — the universal `documents.importFrom` integration.
  *
  * The caller mints a URL that already carries its authority (a
  * presigned S3 / GCS / Azure / R2 / MinIO GET, or any HTTPS endpoint

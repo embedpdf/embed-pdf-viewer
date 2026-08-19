@@ -11,7 +11,7 @@
 import { z } from 'zod';
 
 export const ImportPolicySchema = z.object({
-  /** Master switch. Disabled → `documents.import` answers 403. */
+  /** Master switch. Disabled → `documents.importFrom` answers 403. */
   enabled: z.boolean().default(true),
   /** Hard per-document byte ceiling (declared AND enforced mid-stream). */
   maxBytes: z

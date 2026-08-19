@@ -179,7 +179,7 @@ export type AdminDocumentCommitResponse = z.infer<typeof AdminDocumentCommitResp
 const utf8ByteLength = (s: string): number => new TextEncoder().encode(s).length;
 
 /**
- * A server-side pull source for `documents.import`. The discriminator
+ * A server-side pull source for `documents.importFrom`. The discriminator
  * distinguishes AUTHORIZATION MODELS, not storage vendors:
  *
  *   - `url`        — the CALLER supplies authority: a presigned
@@ -903,8 +903,8 @@ export const adminOperations = {
     notes:
       'This bounded origin-mediated fallback must only be used after documents.init returns upload.kind=proxy. Auto mode prefers a presigned object-store PUT whenever available.',
   },
-  'documents.import': {
-    operationId: 'documents.import',
+  'documents.importFrom': {
+    operationId: 'documents.importFrom',
     title: 'Import document',
     summary:
       'Server-side pull: fetch a PDF from a caller-supplied URL (e.g. a presigned object-store GET) or an operator-registered storage connection into CloudPDF-owned storage, verify it, and commit it.',

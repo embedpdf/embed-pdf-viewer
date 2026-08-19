@@ -1,5 +1,5 @@
 /**
- * Pluggable read-only source family for `documents.import` — the
+ * Pluggable read-only source family for `documents.importFrom` — the
  * server-side pull counterpart to the client-push upload pathway.
  *
  * A source is NOT an ObjectStore: it is deliberately incapable of

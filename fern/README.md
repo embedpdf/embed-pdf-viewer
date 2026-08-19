@@ -185,23 +185,38 @@ Inspect the current mapping with:
 node fern/scripts/sdk-version.mjs all
 ```
 
-Generate one language locally with the pinned CLI and mapped version:
+Generate SDKs locally through the orchestrator, which pins the CLI and maps
+every version:
 
 ```sh
-LANGUAGE=python
-SDK_VERSION=$(node fern/scripts/sdk-version.mjs "$LANGUAGE")
-npx --yes fern-api@5.91.0 generate \
-  --group "$LANGUAGE" \
-  --local \
-  --version "$SDK_VERSION" \
-  --force \
-  --no-prompt \
-  --generate-tests
+# Converge: regenerate only the SDKs whose stamp no longer matches the contract
+node fern/scripts/generate-sdks.mjs
+
+# One language, unconditionally
+node fern/scripts/generate-sdks.mjs --only python --force
+
+# Report staleness without generating anything
+node fern/scripts/generate-sdks.mjs --check
 ```
 
-`--generate-tests` is also what makes Fern emit the complete standalone SDK
-project in local mode (package manifest, build configuration, source, README,
-and tests) instead of only the embeddable generated source tree.
+Freshness is judged from each tree's `cloudpdf-generation.json` stamp (OpenAPI
+SHA-256, mapped SDK version, pinned CLI and generator versions), so a
+`generators.yml` configuration edit that does not bump a generator version
+still needs `--force`. Every regenerated language runs the same
+generate → record → validate sequence as the GitHub matrix — extracting
+snippets from a raw `fern generate` tree is not equivalent, because the
+metadata step also normalizes branding and patches generated references.
+The orchestrator passes `--generate-tests`, which is also what makes Fern emit
+the complete standalone SDK project in local mode (package manifest, build
+configuration, source, README, and tests) instead of only the embeddable
+generated source tree.
+
+After a contract change, one command converges everything — stale SDKs, the
+snippet manifest, the generated reference pages, and their checks:
+
+```sh
+pnpm api:sync
+```
 
 The GitHub matrix validates the package identity and mapped version, then runs
 a publication-free build check for every language before uploading the source
@@ -221,12 +236,14 @@ locally with:
 pnpm run cloudpdf:sdk:generate
 ```
 
-The command pins Fern CLI 5.91.0, generates `cloudpdf/sdk`, records normalized
-metadata, and validates every version-bearing file. Changesets is the sole owner
-of `CHANGELOG.md`; the wrapper snapshots and restores it because Fern currently
-writes a release heading even when the file is in `.fernignore`. `ci:publish`
-repeats the TypeScript validation before npm publishing, independently of the
-SDK freshness workflow.
+The command is the TypeScript-only forced mode of
+`fern/scripts/generate-sdks.mjs`: it pins Fern CLI 5.91.0, generates
+`cloudpdf/sdk`, records normalized metadata, and validates every
+version-bearing file. Changesets is the sole owner of `CHANGELOG.md`; the
+orchestrator snapshots and restores it because Fern currently writes a release
+heading even when the file is in `.fernignore`. `ci:publish` repeats the
+TypeScript validation before npm publishing, independently of the SDK
+freshness workflow.
 
 The repository sync replaces generated source on its version branch while
 keeping each destination repository's `.github` directory repository-owned.

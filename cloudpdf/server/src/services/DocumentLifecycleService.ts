@@ -42,7 +42,7 @@ export type DedupMode = 'always-create' | 'reuse-existing';
 export type UploadPreference = 'auto' | 'presigned' | 'proxy';
 export type UploadProxyPolicy = 'fallback-only' | 'allowed' | 'disabled';
 
-/** Integrity pins for `documents.import`; enforced when present. */
+/** Integrity pins for `documents.importFrom`; enforced when present. */
 export interface ImportExpected {
   sizeBytes?: number;
   sha256?: string;
@@ -171,7 +171,7 @@ export interface DocumentLifecycleOptions {
   /** Controls whether origin-mediated uploads may be selected. */
   uploadProxyPolicy?: UploadProxyPolicy;
   /**
-   * Server-side pull policy for `documents.import`. Absent = imports
+   * Server-side pull policy for `documents.importFrom`. Absent = imports
    * disabled (the endpoint answers 403), which keeps direct service
    * construction (tests, admin-only deploys) closed by default;
    * `buildApp` supplies the schema defaults.
@@ -404,7 +404,7 @@ export class DocumentLifecycleService {
   }
 
   /**
-   * `documents.import` — the server-side pull. The same lifecycle as
+   * `documents.importFrom` — the server-side pull. The same lifecycle as
    * init → PUT → commit with only the transfer phase swapped: the
    * server fetches the bytes from a caller-supplied source instead of
    * the client pushing them. Synchronous and bounded by policy

@@ -149,7 +149,7 @@ export async function registerAdminDocumentsRoutes(
     return reply.send({ sha256 });
   });
 
-  const importOp = adminOperations['documents.import'];
+  const importOp = adminOperations['documents.importFrom'];
   mount(importOp, async (req, reply) => {
     const { tenantId } = req.params as { tenantId: string };
     const ctx = requireTenantAccess(req, tenantId, importOp.scope);

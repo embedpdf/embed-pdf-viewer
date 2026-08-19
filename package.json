@@ -21,7 +21,8 @@
     "bootstrap:package": "node scripts/bootstrap-package.mjs",
     "verify:engine-runtime-packages": "pnpm --filter @embedpdf/engine-runtime run verify:packages",
     "changeset": "changeset",
-    "cloudpdf:sdk:generate": "node fern/scripts/generate-typescript-sdk.mjs",
+    "cloudpdf:sdk:generate": "node fern/scripts/generate-sdks.mjs --only typescript --force",
+    "api:sync": "node fern/scripts/generate-sdks.mjs && pnpm --filter @cloudpdf/website api:snippets && pnpm --filter @cloudpdf/website api:pages && pnpm --filter @cloudpdf/website api:check",
     "ci:version": "changeset version && pnpm --filter @cloudpdf/contract emit:openapi && pnpm run cloudpdf:sdk:generate && pnpm --filter @cloudpdf/website api:metadata && pnpm --filter @cloudpdf/website api:pages",
     "ci:publish": "node scripts/assert-publish-phase.mjs && node fern/scripts/validate-sdk.mjs typescript && pnpm publish -r --access public --tag next --publish-branch main --report-summary"
   },
