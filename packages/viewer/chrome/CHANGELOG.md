@@ -1,5 +1,11 @@
 # @embedpdf/viewer-chrome
 
+## 3.0.0-next.6
+
+### Patch Changes
+
+- [#768](https://github.com/embedpdf/embed-pdf-viewer/pull/768) by [@bobsingor](https://github.com/bobsingor) – Adopt the unified `RenderLayer` page composition so the full viewer gets policy-driven deep-zoom tiling without mounting a separate tile layer. Base and sharp tile pixels now follow one rendering lifecycle through zoom, pan, annotation, and page-view surfaces.
+
 ## 3.0.0-next.5
 
 ### Minor Changes

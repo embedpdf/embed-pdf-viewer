@@ -1,5 +1,21 @@
 # @cloudpdf/server
 
+## 3.0.0-next.6
+
+### Minor Changes
+
+- [#766](https://github.com/embedpdf/embed-pdf-viewer/pull/766) by [@bobsingor](https://github.com/bobsingor) – Add durable asynchronous document imports backed by the `document_imports` job table and an in-process worker with one claim loop per replica. Document and job creation is atomic, lease-token-fenced transitions prevent stale workers from overwriting replacements, reconcile-on-claim avoids duplicate transfers after crashes, and exhausted retries fail the document and clean destination bytes. Retries stay pinned to one content identity, filesystem sources require `expected.sha256`, and queued or running imports are protected from the stale-pending sweeper. Migration 027 stores the re-drivable source descriptor in `source_json`.
+
+- [#766](https://github.com/embedpdf/embed-pdf-viewer/pull/766) by [@bobsingor](https://github.com/bobsingor) – Add operator-registered import connections through `CLOUDPDF_IMPORT_CONNECTIONS` for S3 and S3-compatible stores, GCS, Azure Blob, and filesystem roots. Connections enforce credential classes, tenant allowlists, scoped prefixes or tenant-bound key templates, provider-specific revision pinning, and fail-closed authorization. Canonical backend fingerprints reject self-imports, and each import records sanitized source provenance and outcome in the new `document_imports` table from migration 026. A shared conformance suite keeps URL and connection adapters aligned on source-opening behavior.
+
+- [#766](https://github.com/embedpdf/embed-pdf-viewer/pull/766) by [@bobsingor](https://github.com/bobsingor) – Implement server-side PDF imports from caller-supplied URLs through the existing document lifecycle. Deployment policy controls size, timeout, concurrency, HTTPS, and public-network requirements; URL handling blocks private and metadata addresses with DNS pinning, rejects redirects, and requires `Content-Length`. Imports enforce optional size and SHA-256 pins, sanitize failures so URL secrets do not leak, leave documents pending after retryable transport failures, and add the `pull` upload kind in migration 025.
+
+### Patch Changes
+
+- [#766](https://github.com/embedpdf/embed-pdf-viewer/pull/766) by [@bobsingor](https://github.com/bobsingor) – Mount the document import handler under the renamed `documents.importFrom` contract operation and align the server's import policy and lifecycle terminology. The HTTP route and runtime behavior remain unchanged.
+
+- [#766](https://github.com/embedpdf/embed-pdf-viewer/pull/766) by [@bobsingor](https://github.com/bobsingor) – Cloud ObjectStore adapters (S3, GCS, Azure Blob) now truly stream `put` bodies: a `Readable` is hashed and length-enforced as it flows (constant memory) instead of being buffered whole. Under- or over-delivery aborts before a visible object can appear, any prior object at the key survives a failed attempt, and the SHA-256 metadata is attached post-stream (S3 via a same-key server-side copy). FsObjectStore now cleans up its `.partial` file when the source stream errors mid-put.
+
 ## 3.0.0-next.5
 
 ### Patch Changes

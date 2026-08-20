@@ -1,5 +1,11 @@
 # @embedpdf/plugin-stage
 
+## 3.0.0-next.6
+
+### Minor Changes
+
+- [#768](https://github.com/embedpdf/embed-pdf-viewer/pull/768) by [@bobsingor](https://github.com/bobsingor) – Expose transient `cameraResting` state and defer page-origin device snapping while zoom is moving. Pages retain fractional placement through continuous zoom and snap once the camera settles, preventing anchor jitter and per-step content movement without sacrificing crisp resting placement.
+
 ## 3.0.0-next.5
 
 ## 3.0.0-next.4

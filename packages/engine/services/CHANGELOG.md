@@ -1,5 +1,11 @@
 # @embedpdf/engine-services
 
+## 3.0.0-next.6
+
+### Patch Changes
+
+- [#768](https://github.com/embedpdf/embed-pdf-viewer/pull/768) by [@bobsingor](https://github.com/bobsingor) – Bound individual annotation-appearance raster allocations at deep zoom by reducing the effective appearance scale while preserving the original placement rectangle. Oversized page-spanning appearances now degrade softly instead of exhausting the wasm heap with multi-gigabyte bitmap requests.
+
 ## 3.0.0-next.5
 
 ### Minor Changes
