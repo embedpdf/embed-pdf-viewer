@@ -190,7 +190,6 @@ export function createRenderCapability(
     conformViewport,
     paintSettings() {
       return {
-        settleMs: resolved.tiles.settleMs,
         fadeMs: resolved.tiles.fadeMs,
         tiles: resolved.tiles.enabled,
       };

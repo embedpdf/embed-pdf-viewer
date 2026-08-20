@@ -381,7 +381,6 @@ describe('policy conformance', () => {
 
   it('paintSettings resolves the layer-facing knobs', () => {
     expect(harness().capability.paintSettings()).toEqual({
-      settleMs: 150,
       fadeMs: 0,
       tiles: true,
     });

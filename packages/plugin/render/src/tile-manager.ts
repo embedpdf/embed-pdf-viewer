@@ -37,8 +37,9 @@ import {
  *     visible first — center-out — then P1 prefetch when P0 is fully
  *     resolved) and returns a paint list drawn ONLY from resolved entries —
  *     current level AND retained older generations.
- *   - release-on-occlusion: when a want-level tile reports PAINTED (the
- *     layer's decode boundary), retained sources whose visible footprint is
+ *   - release-on-occlusion: when a want-level tile reports PAINTED (after the
+ *     layer's first presentation opportunity), retained sources whose
+ *     visible footprint is
  *     covered by painted want tiles leave the paint list. Their bytes stay
  *     in the RasterStore (demotion, not eviction) — zoom-back re-promotes
  *     from cache.
@@ -291,7 +292,7 @@ export class TileManager {
     return plan;
   }
 
-  /** The layer's decode-boundary report: this key's pixels actually painted. */
+  /** The layer's painted report: this key's pixels had a presentation opportunity. */
   sourcePainted(pon: number, key: string): void {
     const state = this.pages.get(pon);
     const entry = state?.entries.get(key);

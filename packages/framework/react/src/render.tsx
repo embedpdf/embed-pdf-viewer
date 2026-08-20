@@ -11,23 +11,20 @@
  *     the base may spend. A thumbnail-sized demand engages nothing — the
  *     arithmetic is the configuration.
  *
- * Both planes paint at the DECODE boundary: bitmaps are decoded off-DOM
- * (`img.decode()`) before they're committed, so a swap never flashes and
- * retained coarser tiles release only against pixels that are provably
- * compositable. Mid-gesture, existing pixels CSS-scale; new demand is
- * adopted when it settles (the plugin's `settleMs`), which is what makes
- * exact-at-rest rendering affordable.
- *
- * The layer is a dumb painter: every decision (strategy ∧ policy
- * conformance, want sets, retention, release) is plugin-render's.
+ * The layer is a DUMB painter, deliberately thin: plain <img>s bound through
+ * the shared browser adapter, with painted/unpainted reports around their
+ * visible lifetime. Every decision — strategy ∧ policy conformance, want
+ * sets, level settling, retention, release — is plugin-render's; anything
+ * mid-gesture simply CSS-scales until the plugin hands down new pixels.
  */
 
 // One-line-per-feature: registration travels with the UI.
 export * from '@embedpdf/plugin-render';
 import * as React from 'react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef } from 'react';
 import { RenderToken } from '@embedpdf/plugin-render';
 import type { PageViewDemand, TilePaintSource } from '@embedpdf/plugin-render';
+import { bindPaintedImage } from '@embedpdf/web';
 import { useCapability, usePage, useSelector } from './runtime';
 
 export interface RenderLayerProps {
@@ -44,68 +41,6 @@ export interface RenderLayerProps {
   tiles?: boolean;
 }
 
-/**
- * Adopt a changing value when it SETTLES: an idle→change adopts immediately
- * (button zoom, fit modes — no added latency); changes arriving in a rapid
- * stream (pinch, wheel scrub) adopt trailing-edge after `settleMs` of rest.
- * Mid-stream the caller keeps painting the previous value — for a raster
- * key that means the current pixels CSS-scale until the gesture rests.
- */
-function useSettled<T>(value: T, settleMs: number): T {
-  const [settled, setSettled] = useState(value);
-  const stream = useRef({ last: 0 });
-  useEffect(() => {
-    if (Object.is(value, settled)) return;
-    const now = Date.now();
-    const streaming = now - stream.current.last < Math.max(250, settleMs);
-    stream.current.last = now;
-    if (!streaming || settleMs <= 0) {
-      setSettled(value);
-      return;
-    }
-    const timer = setTimeout(() => setSettled(value), settleMs);
-    return () => clearTimeout(timer);
-  }, [value, settled, settleMs]);
-  return settled;
-}
-
-/** Resolve a handle to an object URL and decode it off-DOM. Returns null if
- *  aborted; the caller owns the revoke on success. `width`/`height` are the
- *  decoded bitmap's intrinsic dimensions (0 when no DOM Image exists). */
-async function decodeToUrl(
-  handle: { objectUrl(signal?: AbortSignal): Promise<{ url: string; revoke(): void }> },
-  signal: AbortSignal,
-): Promise<{ url: string; revoke(): void; width: number; height: number } | null> {
-  const obj = await handle.objectUrl(signal);
-  if (signal.aborted) {
-    obj.revoke();
-    return null;
-  }
-  let width = 0;
-  let height = 0;
-  if (typeof Image !== 'undefined') {
-    const probe = new Image();
-    probe.src = obj.url;
-    // decode() failure OR stall falls through to a plain commit — the <img>
-    // itself will still decode-and-paint, just without the flash guarantee.
-    // The timeout matters: decode() can stay pending forever (it does not
-    // reject on decoder-queue pressure), and a commit that never happens
-    // means a painted report that never fires — which would deadlock
-    // retention on that tile. The gate is an optimization, never a wall.
-    await Promise.race([
-      probe.decode().catch(() => {}),
-      new Promise<void>((res) => setTimeout(res, 300)),
-    ]);
-    width = probe.naturalWidth;
-    height = probe.naturalHeight;
-  }
-  if (signal.aborted) {
-    obj.revoke();
-    return null;
-  }
-  return { ...obj, width, height };
-}
-
 let warnedTileSize = false;
 
 export function RenderLayer({ annotations = true, tiles = true }: RenderLayerProps = {}) {
@@ -113,25 +48,22 @@ export function RenderLayer({ annotations = true, tiles = true }: RenderLayerPro
   const render = useCapability(RenderToken);
   const settings = render.paintSettings();
   const ref = useRef<HTMLImageElement>(null);
-  // The displayed raster's object URL — revoked only AFTER its replacement
-  // has decoded and swapped in (double-buffer), never while on screen.
-  const live = useRef<{ url: string; revoke(): void } | null>(null);
 
   // ONE dependency: the raster's canonical identity — conformed width +
   // annotations flag + epoch. Under a lattice it moves only at rung
-  // crossings; under exact mode it tracks the demand (and is CONSTANT above
-  // the budget), so the settle below is the whole gesture story: mid-pinch
-  // the previous raster CSS-scales, the settled key re-renders at rest.
-  const rawKey = useSelector(RenderToken, (c) =>
+  // crossings; under exact mode it tracks the demand and is CONSTANT above
+  // the budget — so the deep-zoom backdrop never refetches, and the sub-
+  // budget range refetches per settled demand exactly like v2 did.
+  const sourceKey = useSelector(RenderToken, (c) =>
     c.renderSourceKey(page.pon, {
       scale: page.transform.renderScale,
       includeAnnotations: annotations,
     }),
   );
-  const sourceKey = useSettled(rawKey, settings.settleMs);
 
   useEffect(() => {
     const controller = new AbortController();
+    let revoke: (() => void) | undefined;
     (async () => {
       try {
         // The capability conforms this to the resolved render points and
@@ -143,29 +75,27 @@ export function RenderLayer({ annotations = true, tiles = true }: RenderLayerPro
           includeAnnotations: annotations,
           signal: controller.signal,
         });
-        const obj = await decodeToUrl(image, controller.signal);
-        if (!obj) return;
-        const previous = live.current;
-        live.current = obj;
+        const obj = await image.objectUrl(controller.signal);
+        if (controller.signal.aborted) {
+          obj.revoke();
+          return;
+        }
+        revoke = obj.revoke;
+        // Imperative src on a STABLE element: the browser keeps the old
+        // bitmap until the new one decodes, and nothing ever re-requests the
+        // old URL — so revoke-on-cleanup is safe here by construction.
         if (ref.current) ref.current.src = obj.url;
-        previous?.revoke();
       } catch {
         /* aborted (camera moved / unmounted) or render failed */
       }
     })();
-    return () => controller.abort();
+    return () => {
+      controller.abort();
+      revoke?.();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- sourceKey IS the
     // render identity; scale/annotations/epoch are folded into it upstream.
   }, [render, page.pon, sourceKey]);
-
-  // The displayed URL outlives individual effects; revoke it on unmount.
-  useEffect(
-    () => () => {
-      live.current?.revoke();
-      live.current = null;
-    },
-    [],
-  );
 
   return (
     <>
@@ -190,9 +120,9 @@ export function RenderLayer({ annotations = true, tiles = true }: RenderLayerPro
 
 /**
  * The sharp plane above the base — the plugin's retention-safe paint plan
- * as keyed <img>s. Each tile reports the decode boundary back (and its
- * inverse on unmount), so retained coarser generations release only when
- * their replacement is truly compositable.
+ * as keyed <img>s. Each tile reports painted after its first presentation
+ * opportunity (and its inverse on unmount), so retained coarser generations
+ * release only when their replacement is truly compositable.
  *
  * Tiles are placed in VIEW (CSS px) space directly — never in page points
  * under a scaled container. Blink quantizes layout lengths to 1/64 CSS px
@@ -227,6 +157,14 @@ function TilePlane({ annotations, fadeMs }: { annotations: boolean; fadeMs: numb
         width: t.contentWidth,
         height: t.contentHeight,
         pointerEvents: 'none',
+        // STACKING CONTRACT: tile <img>s carry zIndex ranks (coarse under
+        // fine) that exist only while generations are mixed — mid-zoom. This
+        // container MUST be a stacking context so those ranks stay internal;
+        // without it they join the Stage's context and paint above every
+        // z-auto sibling (annotations, page chrome, menus) exactly while
+        // zooming. The old scaled container created one implicitly via its
+        // transform; `isolation` is the explicit, no-side-effect way.
+        isolation: 'isolate',
       }}
     >
       {fadeMs > 0 ? (
@@ -251,9 +189,9 @@ function TilePlane({ annotations, fadeMs }: { annotations: boolean; fadeMs: numb
   );
 }
 
-/** One tile: decode-gated object-URL lifecycle + the painted/unpainted
- *  reports. The <img> enters the DOM only with a decoded bitmap behind it,
- *  so arrival never flashes a blank tile-shaped quad. */
+/** One tile: geometry plus the shared browser image binding. The binding
+ *  hides the incomplete image, reports painted after its first presentation
+ *  opportunity, and inverts that report when the element leaves the DOM. */
 function TileImg({
   source,
   view,
@@ -268,56 +206,33 @@ function TileImg({
   onPainted: () => void;
   onUnpainted: () => void;
 }) {
-  const [url, setUrl] = useState<string | null>(null);
-  const revoke = useRef<(() => void) | null>(null);
-  useEffect(() => {
-    const controller = new AbortController();
-    (async () => {
-      try {
-        const obj = await decodeToUrl(source.handle, controller.signal);
-        if (!obj) return;
+  const ref = useRef<HTMLImageElement>(null);
+  useLayoutEffect(() => {
+    if (!ref.current) return;
+    return bindPaintedImage(ref.current, source.handle, { onPainted, onUnpainted });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the handle is
+    // the bitmap's identity; the report callbacks carry stable values.
+  }, [source.handle]);
+  return (
+    <img
+      ref={ref}
+      alt=""
+      draggable={false}
+      onLoad={(e) => {
         // A raster whose intrinsic size disagrees with its rect would be
-        // silently stretched into place — the stale-handle bug class. The
-        // expected size is the engine's own rounding of rect × scale.
-        if (obj.width > 0 && !warnedTileSize) {
+        // silently stretched into place — the stale-handle bug class.
+        const w = e.currentTarget.naturalWidth;
+        if (w > 0 && !warnedTileSize) {
           const expected = Math.round(source.rect.width * source.scale);
-          if (Math.abs(obj.width - expected) > 1) {
+          if (Math.abs(w - expected) > 1) {
             warnedTileSize = true;
             console.warn(
-              `[render] tile bitmap ${obj.width}px wide does not match its rect ` +
+              `[render] tile bitmap ${w}px wide does not match its rect ` +
                 `(expected ~${expected}px) — stale raster identity? key=${source.key}`,
             );
           }
         }
-        revoke.current = obj.revoke;
-        setUrl(obj.url);
-      } catch {
-        /* aborted (plan moved on) */
-      }
-    })();
-    return () => {
-      controller.abort();
-      revoke.current?.();
-      revoke.current = null;
-    };
-  }, [source.handle]);
-  // Post-commit: the decoded <img> is in the tree — report the decode
-  // boundary so retention can release what this tile now occludes. The
-  // cleanup is the INVERSE report: once this <img> leaves the DOM its
-  // pixels are no longer compositable, and retention must not count them.
-  useEffect(() => {
-    if (!url) return;
-    onPainted();
-    return onUnpainted;
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- painted is
-    // per-bitmap: fire once per decoded URL commit, invert on removal.
-  }, [url]);
-  if (!url) return null;
-  return (
-    <img
-      alt=""
-      src={url}
-      draggable={false}
+      }}
       style={{
         position: 'absolute',
         left: view.x,

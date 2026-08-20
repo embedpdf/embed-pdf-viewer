@@ -42,8 +42,6 @@ export interface RenderPluginOptions {
 
 /** Layer-facing paint settings (resolved options the view layers need). */
 export interface PaintSettings {
-  /** Settle gate both planes use before adopting a new demand (ms). */
-  settleMs: number;
   /** Tile arrival cross-fade (ms); 0 = hard pop. */
   fadeMs: number;
   /** Whether the tile plane is enabled at all (`tiles: false` opts out). */
@@ -159,10 +157,10 @@ export interface RenderCapability {
     opts?: { includeAnnotations?: boolean },
   ): TilePaintPlan;
   /**
-   * The painter's decode-boundary report: the `<img>` for this plan key
-   * actually painted (onload). Retained coarser generations covered by
-   * painted want-set tiles release on this signal — never on fetch
-   * completion, which would flash during decode.
+   * The painter's report: the image for this plan key had a presentation
+   * opportunity. Retained coarser generations covered by painted want-set
+   * tiles release on this signal — never on fetch completion or image load,
+   * which could drop the backdrop before replacement pixels are presented.
    */
   tilePainted(pon: PageObjectNumber, key: string): void;
   /**

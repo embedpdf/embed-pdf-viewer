@@ -27,3 +27,5 @@ export type {
 export { svgCursor } from './cursor';
 export type { SvgCursorOptions } from './cursor';
 export { sanitizeExternalUri } from './external-uri';
+export { bindPaintedImage } from './painted-image';
+export type { ObjectUrlImageSource, PaintedImageCallbacks } from './painted-image';

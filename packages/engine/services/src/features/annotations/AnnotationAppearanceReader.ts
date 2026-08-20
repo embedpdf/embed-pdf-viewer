@@ -41,6 +41,15 @@ const ANNOT_SUBTYPE_FREETEXT = 3;
 const BOX_FAMILY_SUBTYPES: ReadonlySet<number> = new Set([3, 5, 6, 13, 14]);
 
 /**
+ * Per-appearance output-pixel ceiling (see the clamp in `renderOne`).
+ * 16 M px ≈ a 4000² raster ≈ 64 MB of transient RGBA — safely inside the
+ * wasm heap for the one-at-a-time batch loop, while a page-sized annotation
+ * stays crisp to roughly 5–6× before its appearance starts stretching.
+ * Small annotations (the overwhelming majority) never come near it.
+ */
+const APPEARANCE_PIXEL_CLAMP = 16_000_000;
+
+/**
  * Maps an `AnnotationAppearanceMode` onto the PDFium appearance-mode int and
  * the `EPDFAnnot_GetAvailableAppearanceModes` bit it occupies.
  *   N -> mode 0 / bit 1, R -> mode 1 / bit 2, D -> mode 2 / bit 4.
@@ -194,6 +203,19 @@ export class AnnotationAppearanceReader {
       }
     }
 
+    // SAFETY CLAMP — an engine invariant, not an option: no single appearance
+    // raster exceeds APPEARANCE_PIXEL_CLAMP output pixels. Appearance size is
+    // `rect × scale`, and rects span orders of magnitude — a page-sized stamp
+    // at a deep-zoom scale would ask for gigabytes and OOM the wasm heap
+    // (observed: a ~600pt annotation at scale ~47 → 3.3 GB malloc). The clamp
+    // REDUCES the effective scale for that appearance instead of rejecting:
+    // the raster still covers the same rect, so the consumer's box-stretch
+    // shows it slightly soft rather than missing — bounded memory with
+    // graceful degradation. `options.maxOutputPixels` (the deployment budget,
+    // reject semantics) still applies after it, unchanged.
+    const rectArea = Math.max(1, (rect.right - rect.left) * (rect.top - rect.bottom));
+    const effScale = Math.min(scale, Math.sqrt(APPEARANCE_PIXEL_CLAMP / rectArea));
+
     // `rect` is already normalized at the read boundary; `rasterize` handles the
     // degenerate-rect / device-size / matrix / bitmap lifecycle. We supply only
     // the annotation draw (transparent background — appearances composite over
@@ -202,7 +224,7 @@ export class AnnotationAppearanceReader {
       rect,
       page,
       rotation,
-      viewport: { kind: 'scale', scale },
+      viewport: { kind: 'scale', scale: effScale },
       ...(maxOutputPixels !== undefined ? { maxOutputPixels } : {}),
       background: 'transparent',
       // `stripRotation` (EmbedPDF box-kind rotation only): render the AP form
