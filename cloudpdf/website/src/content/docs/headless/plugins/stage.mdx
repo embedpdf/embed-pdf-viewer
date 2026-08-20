@@ -16,8 +16,9 @@ You build the chrome and what each page renders. The Stage handles the view.
 ## Your first Stage
 
 Register two plugins: `stagePlugin()` for layout and navigation, and
-`renderPlugin()` to draw page bitmaps. Put a `<Stage>` in your tree and pass
-a render function for each visible page. Here, just the rendered page:
+[`renderPlugin()`](./render) to draw page bitmaps. Put a `<Stage>` in your
+tree and pass a render function for each visible page. Here, just the
+rendered page:
 
 <Example name="stage/basic" mode="open" />
 
@@ -31,7 +32,9 @@ What you get from this alone:
 - **Built-in gestures.** Pan, zoom around the cursor, and scroll are wired up.
 - **A page you own.** `{() => <RenderLayer />}` runs once per visible page.
   Later you stack more layers there (text selection, annotations, search
-  highlights) and they position themselves with the page.
+  highlights) and they position themselves with the page. The
+  [Render page](./render) covers how the bitmaps themselves stay crisp and
+  memory-bounded at every zoom.
 
 ## Zoom
 

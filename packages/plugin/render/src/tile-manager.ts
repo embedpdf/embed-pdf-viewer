@@ -1,19 +1,15 @@
-import {
-  snapFullPageViewport,
-  type EngineRenderPolicy,
-  type PageImageHandle,
-  type PdfRect,
-} from '@embedpdf/core';
+import type { EngineRenderPolicy, PageImageHandle, PdfRect } from '@embedpdf/core';
 import type { Rect } from '@embedpdf/core-geometry';
 
 import {
   EMPTY_TILE_PLAN,
   type PageViewDemand,
-  type ResolvedTiling,
+  type ResolvedRenderOptions,
   type TilePaintPlan,
   type TilePaintSource,
 } from './paint-plan';
 import type { RasterStore } from './raster-store';
+import { baseAskWidth, resolveStrategy, type ResolvedStrategy } from './strategy';
 import {
   inflateRect,
   intersectRects,
@@ -37,16 +33,22 @@ import {
  * pixels available; quality per region only goes up until the want set
  * resolves. Mechanics:
  *   - want vs paint: `plan()` schedules fetches for the want set (P0
- *     visible first, P1 prefetch when P0 is fully resolved) and returns a
- *     paint list drawn ONLY from resolved entries — current level AND
- *     retained older generations.
+ *     visible first — center-out — then P1 prefetch when P0 is fully
+ *     resolved) and returns a paint list drawn ONLY from resolved entries —
+ *     current level AND retained older generations.
  *   - release-on-occlusion: when a want-level tile reports PAINTED (the
- *     layer's img onload — the decode boundary), retained sources whose
- *     visible footprint is covered by painted want tiles leave the paint
- *     list. Their bytes stay in the RasterStore (demotion, not eviction) —
- *     zoom-back re-promotes from cache.
+ *     layer's decode boundary), retained sources whose visible footprint is
+ *     covered by painted want tiles leave the paint list. Their bytes stay
+ *     in the RasterStore (demotion, not eviction) — zoom-back re-promotes
+ *     from cache.
  *   - epoch exception: an invalidation bump means retained pixels are
  *     WRONG — everything of the old epoch drops immediately.
+ *
+ * Levels come from the resolved STRATEGY (policy ∧ options): a pyramid
+ * under a lattice (or the opt-in client ladder), the EXACT settled scale
+ * under exact mode — where the level identity is the demand's device width
+ * across the page, so keys stay integer and stable. The retention/coverage
+ * math is generic over any mix of retained scales.
  *
  * `plan()` is called from selectors: it MUST NOT dispatch. Fetch kickoff
  * is idempotent (the store singleflights); resolution handlers dispatch
@@ -54,11 +56,12 @@ import {
  */
 export class TileManager {
   private readonly pages = new Map<number, PageTileState>();
+  private strategyMemo: { policy: EngineRenderPolicy; strategy: ResolvedStrategy } | null = null;
 
   constructor(
     private readonly deps: {
       store: RasterStore;
-      config: ResolvedTiling;
+      options: ResolvedRenderOptions;
       /** The document fact off the kernel registry — never null: the kernel
        *  materializes it (continuous fallback) before the doc publishes. */
       getPolicy(): EngineRenderPolicy;
@@ -76,9 +79,18 @@ export class TileManager {
     },
   ) {}
 
-  plan(pon: number, demand: PageViewDemand, includeAnnotations: boolean): TilePaintPlan {
-    const { config } = this.deps;
+  private strategy(): ResolvedStrategy {
     const policy = this.deps.getPolicy();
+    if (this.strategyMemo?.policy !== policy) {
+      this.strategyMemo = { policy, strategy: resolveStrategy(policy, this.deps.options) };
+    }
+    return this.strategyMemo.strategy;
+  }
+
+  plan(pon: number, demand: PageViewDemand, includeAnnotations: boolean): TilePaintPlan {
+    const { options } = this.deps;
+    if (!options.tiles.enabled) return EMPTY_TILE_PLAN;
+    const strategy = this.strategy();
     const page = this.deps.getPageSize(pon);
     if (!page) return EMPTY_TILE_PLAN;
 
@@ -91,53 +103,78 @@ export class TileManager {
       state.entries.clear();
       state.epoch = epoch;
       state.wantScale = null;
+      state.wantWidth = null;
       state.planCache = null;
     }
 
-    // Engagement: deficit of the base rung vs demand. Under `continuous`
-    // the base supplies exactly what was asked — deficit 1, never engaged
-    // (v2 exactness); memory protection there is the POLICY's job
-    // (localEngine({ renderPolicy })), not this manager's.
-    const baseSupplied =
-      policy.kind === 'lattice'
-        ? widthOf(snapFullPageViewport(policy, { kind: 'width', width: demand.desiredDeviceWidth }))
-        : demand.desiredDeviceWidth;
-    const deficit = demand.desiredDeviceWidth / baseSupplied;
-    if (deficit <= config.engageAt) {
+    // Engagement: deficit of what the base ACTUALLY supplies vs demand —
+    // the same `baseAsk` the base layer sizes with, so local and cloud run
+    // the identical arithmetic. Exact mode engages at 1.0 (nothing may rest
+    // stretched past the budget); a lattice tolerates its band.
+    const supplied = baseAskWidth(strategy, demand.desiredDeviceWidth);
+    const deficit = demand.desiredDeviceWidth / supplied;
+    if (deficit <= strategy.engageAt) {
+      // Disengage drops bookkeeping immediately; resolved bytes stay in the
+      // RasterStore, so a re-engage promotes from cache — and below the
+      // threshold the base itself is crisp, so nothing visible is lost.
       if (state.entries.size || state.wantScale !== null) {
         this.abortAll(state);
         state.entries.clear();
         state.wantScale = null;
+        state.wantWidth = null;
         state.planCache = null;
       }
       return EMPTY_TILE_PLAN;
     }
 
-    // Level selection: use the advertised policy pyramid when available,
-    // otherwise use client defaults — same snapped requests either way.
-    const pyramid = policy.kind === 'lattice' && policy.tiles ? policy.tiles.scales : config.scales;
-    const wantScale = snapToPyramid(pyramid, demand.desiredDeviceWidth / page.width);
-    const grid = tileGrid(page, wantScale, config.tileSize);
+    // Level selection. Pyramid mode snaps UP the ladder; exact mode renders
+    // the demand itself (clamped by the safety cap), with the level identity
+    // being the integer device width across the page.
+    let wantWidth: number;
+    let wantScale: number;
+    if (strategy.pyramid) {
+      wantScale = snapToPyramid(strategy.pyramid, demand.desiredDeviceWidth / page.width);
+      wantWidth = Math.round(wantScale * page.width);
+    } else {
+      wantWidth = Math.min(
+        Math.max(1, Math.round(demand.desiredDeviceWidth)),
+        Math.round(strategy.tileMaxScale * page.width),
+      );
+      wantScale = wantWidth / page.width;
+    }
+    const grid = tileGrid(page, wantScale, strategy.tileSize);
 
     const visible = demand.visibleRect ?? { x: 0, y: 0, width: page.width, height: page.height };
     state.lastVisible = visible;
     const p0 = tilesInRect(grid, page, visible);
     const ring = inflateRect(
       visible,
-      config.prefetchMargin,
-      config.velocityBias ? demand.velocity : undefined,
+      options.tiles.prefetchMargin,
+      options.tiles.velocityBias ? demand.velocity : undefined,
     );
     const p0Keys = new Set(p0.map((c) => coordKey(c)));
     const p1 = tilesInRect(grid, page, ring).filter((c) => !p0Keys.has(coordKey(c)));
 
-    this.schedule(pon, state, page, grid, wantScale, includeAnnotations, epoch, p0, p1);
+    this.schedule(
+      pon,
+      state,
+      page,
+      grid,
+      wantScale,
+      wantWidth,
+      includeAnnotations,
+      epoch,
+      p0,
+      p1,
+      visible,
+    );
 
     // Paint list: resolved entries intersecting the visible rect, coarser
     // levels first (painter's algorithm — sharper occludes per region).
-    // The memo key holds SNAPPED values only (identity law): raw demand
-    // width matters solely through engagement and the level, both already
-    // folded in — zoom inside a level is plan-stable by construction.
-    const demandKey = `${wantScale}|${rectKey(visible)}|e${epoch}`;
+    // The memo key holds the LEVEL identity (integer width) — zoom inside a
+    // pyramid rung is plan-stable by construction; exact mode re-plans per
+    // settled level, which the schedule gate keeps rare.
+    const demandKey = `w${wantWidth}|${rectKey(visible)}|e${epoch}`;
     if (
       state.planCache &&
       state.planCache.demandKey === demandKey &&
@@ -155,7 +192,7 @@ export class TileManager {
             key: entry.key,
             scale: entry.scale,
             rect: entry.rect,
-            z: zOf(pyramid, entry.scale),
+            z: 0, // ranked below — stacking is scale order among PRESENT entries
             handle: entry.handle,
           });
         }
@@ -163,6 +200,13 @@ export class TileManager {
         fetching.push(entry.key);
       }
     }
+    // Stacking: rank the scales actually present (generic over exact levels
+    // and pyramid rungs alike) — coarse under fine.
+    const rank = new Map<number, number>();
+    for (const s of [...new Set(paint.map((p) => p.scale))].sort((a, b) => a - b)) {
+      rank.set(s, rank.size);
+    }
+    for (const p of paint) p.z = rank.get(p.scale)!;
     paint.sort((a, b) => a.z - b.z || a.key.localeCompare(b.key));
     const plan: TilePaintPlan = {
       engaged: true,
@@ -174,7 +218,7 @@ export class TileManager {
     return plan;
   }
 
-  /** The layer's decode-boundary report: this key's <img> actually painted. */
+  /** The layer's decode-boundary report: this key's pixels actually painted. */
   sourcePainted(pon: number, key: string): void {
     const state = this.pages.get(pon);
     const entry = state?.entries.get(key);
@@ -186,7 +230,7 @@ export class TileManager {
     this.deps.onAdvance(pon);
   }
 
-  /** A lens unmounted its TileLayer: stop fetching, drop bookkeeping.
+  /** A lens unmounted its tile plane: stop fetching, drop bookkeeping.
    *  Resolved bytes stay in the RasterStore for a re-mount. */
   releasePage(pon: number): void {
     const state = this.pages.get(pon);
@@ -201,6 +245,7 @@ export class TileManager {
       state = {
         epoch: -1,
         wantScale: null,
+        wantWidth: null,
         entries: new Map(),
         version: 0,
         planCache: null,
@@ -219,20 +264,23 @@ export class TileManager {
     page: PageSizePt,
     grid: TileGrid,
     wantScale: number,
+    wantWidth: number,
     includeAnnotations: boolean,
     epoch: number,
     p0: TileCoord[],
     p1: TileCoord[],
+    visible: Rect,
   ): void {
-    const { config } = this.deps;
-    const firstEngage = state.wantScale === null;
-    const levelChanged = state.wantScale !== null && state.wantScale !== wantScale;
+    const { options } = this.deps;
+    const firstEngage = state.wantWidth === null;
+    const levelChanged = state.wantWidth !== null && state.wantWidth !== wantWidth;
     state.wantScale = wantScale;
+    state.wantWidth = wantWidth;
 
     // Abort in-flight fetches that left the want set (pan away, level
     // change) — resolved entries are retention's business, not ours.
     const wanted = new Set(
-      [...p0, ...p1].map((c) => this.tileKey(pon, wantScale, c, includeAnnotations, epoch)),
+      [...p0, ...p1].map((c) => this.tileKey(pon, wantWidth, c, includeAnnotations, epoch)),
     );
     for (const [key, entry] of state.entries) {
       if (entry.handle === undefined && !wanted.has(key)) {
@@ -241,22 +289,46 @@ export class TileManager {
       }
     }
 
+    // Center-out: the region under the user's gesture sharpens first.
+    const cx = visible.x + visible.width / 2;
+    const cy = visible.y + visible.height / 2;
+    const span = grid.tileSize / grid.scale;
+    const orderedP0 = [...p0].sort((a, b) => {
+      const da = (a.ix + 0.5) * span - cx;
+      const db = (b.ix + 0.5) * span - cx;
+      const ea = (a.iy + 0.5) * span - cy;
+      const eb = (b.iy + 0.5) * span - cy;
+      return da * da + ea * ea - (db * db + eb * eb);
+    });
+
     const kickoff = () => {
-      const allP0Ready = this.ensureFetches(pon, state, page, grid, includeAnnotations, epoch, p0);
+      const allP0Ready = this.ensureFetches(
+        pon,
+        state,
+        page,
+        grid,
+        wantWidth,
+        includeAnnotations,
+        epoch,
+        orderedP0,
+      );
       // P1 strictly after P0: prefetch never competes with on-screen tiles.
-      if (allP0Ready) this.ensureFetches(pon, state, page, grid, includeAnnotations, epoch, p1);
+      if (allP0Ready) {
+        this.ensureFetches(pon, state, page, grid, wantWidth, includeAnnotations, epoch, p1);
+      }
     };
 
-    // Level-change hysteresis: a zoom passing THROUGH levels shouldn't
-    // fetch each intermediate one. First engagement fires immediately —
-    // there's nothing on screen above the base yet.
-    if (levelChanged && config.settleMs > 0) {
-      state.pendingLevel = wantScale;
+    // Level-change settle: a zoom IN MOTION shouldn't fetch each
+    // intermediate level (under exact mode every gesture frame is a new
+    // level — this gate is what makes exact affordable). First engagement
+    // fires immediately — there's nothing on screen above the base yet.
+    if (levelChanged && options.tiles.settleMs > 0) {
+      state.pendingLevel = wantWidth;
       if (state.settleTimer !== null) clearTimeout(state.settleTimer);
       state.settleTimer = setTimeout(() => {
         state.settleTimer = null;
-        if (state.pendingLevel === wantScale) kickoff();
-      }, config.settleMs);
+        if (state.pendingLevel === wantWidth) kickoff();
+      }, options.tiles.settleMs);
       return;
     }
     if (state.settleTimer !== null && !levelChanged && !firstEngage) {
@@ -275,13 +347,14 @@ export class TileManager {
     state: PageTileState,
     page: PageSizePt,
     grid: TileGrid,
+    wantWidth: number,
     includeAnnotations: boolean,
     epoch: number,
     coords: TileCoord[],
   ): boolean {
     let allReady = true;
     for (const coord of coords) {
-      const key = this.tileKey(pon, grid.scale, coord, includeAnnotations, epoch);
+      const key = this.tileKey(pon, wantWidth, coord, includeAnnotations, epoch);
       const existing = state.entries.get(key);
       if (existing) {
         if (existing.handle === undefined) allReady = false;
@@ -330,19 +403,20 @@ export class TileManager {
   /**
    * The release rule: after `painted` lands on a want-level tile, retained
    * sources (any other level) whose footprint ∩ painted-tile region is
-   * covered by PAINTED want-level tiles leave the paint list. Index
-   * arithmetic via the aligned grid — no rectangle geometry.
+   * covered by PAINTED want-level tiles leave the paint list. The coverage
+   * check is index arithmetic over the WANT grid — generic over whatever
+   * mix of retained scales exists (exact levels included).
    */
   private releaseOccluded(state: PageTileState, painted: TileEntry): void {
-    const wantScale = state.wantScale;
-    if (wantScale === null || painted.scale !== wantScale) return;
+    const { wantScale, wantWidth } = state;
+    if (wantScale === null || wantWidth === null || painted.scale !== wantScale) return;
     const page = this.deps.getPageSize(pagePonOf(painted.key));
     if (!page) return;
-    const grid = tileGrid(page, wantScale, this.deps.config.tileSize);
+    const grid = tileGrid(page, wantScale, this.strategy().tileSize);
     const paintedAt = (c: TileCoord) => {
       const key = this.tileKey(
         pagePonOf(painted.key),
-        wantScale,
+        wantWidth,
         c,
         annotationsOf(painted.key),
         state.epoch,
@@ -374,14 +448,16 @@ export class TileManager {
     }
   }
 
+  /** Level identity is the integer device width across the page — integer
+   *  and stable for pyramid rungs and exact levels alike. */
   private tileKey(
     pon: number,
-    scale: number,
+    levelWidth: number,
     c: TileCoord,
     includeAnnotations: boolean,
     epoch: number,
   ): string {
-    return `t:${pon}|s${scale}|${c.ix},${c.iy}|a${includeAnnotations ? 1 : 0}|e${epoch}`;
+    return `t:${pon}|w${levelWidth}|${c.ix},${c.iy}|a${includeAnnotations ? 1 : 0}|e${epoch}`;
   }
 }
 
@@ -399,29 +475,22 @@ interface TileEntry {
 interface PageTileState {
   epoch: number;
   wantScale: number | null;
+  /** The want level's identity: integer device px across the page. */
+  wantWidth: number | null;
   entries: Map<string, TileEntry>;
   /** Bumped on ready/painted/drop — the plan memo key. */
   version: number;
   planCache: { demandKey: string; version: number; plan: TilePaintPlan } | null;
   settleTimer: ReturnType<typeof setTimeout> | null;
+  /** Pending level identity (wantWidth) while the settle gate runs. */
   pendingLevel: number | null;
   /** Last visible rect from plan() — the release rule's "on screen". */
   lastVisible: Rect | null;
 }
 
-const widthOf = (v: { kind: string; width?: number }): number =>
-  v.kind === 'width' && v.width !== undefined ? v.width : Number.POSITIVE_INFINITY;
-
 const coordKey = (c: TileCoord): string => `${c.ix},${c.iy}`;
 const rectKey = (r: Rect): string =>
   `${Math.round(r.x)},${Math.round(r.y)},${Math.round(r.width)},${Math.round(r.height)}`;
-
-/** Stacking: position in the ascending pyramid (coarse under fine). */
-const zOf = (pyramid: readonly number[], scale: number): number => {
-  const sorted = [...pyramid].sort((a, b) => a - b);
-  const idx = sorted.indexOf(scale);
-  return idx === -1 ? sorted.findIndex((s) => s > scale) : idx;
-};
 
 const pagePonOf = (key: string): number => Number(key.slice(2, key.indexOf('|')));
 const annotationsOf = (key: string): boolean => key.includes('|a1|');

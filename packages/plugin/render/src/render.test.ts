@@ -4,7 +4,7 @@ import type { DocumentEvent, EffectContext } from '@embedpdf/core';
 import { createRenderCapability } from './capability';
 import { annotatedPons, registerRenderEffects } from './effects';
 import { initialRenderState, renderReducer } from './reducer';
-import type { RenderAction, RenderState } from './types';
+import type { RenderAction, RenderPluginOptions, RenderState } from './types';
 
 const PONS = [11, 22, 33];
 
@@ -217,7 +217,7 @@ describe('policy conformance', () => {
     return { task, resolve: (v: unknown) => resolveFn(v) };
   }
 
-  function harness(opts: { policy?: unknown } = {}) {
+  function harness(opts: { policy?: unknown; options?: RenderPluginOptions } = {}) {
     let state = initialRenderState();
     const imageCalls: Array<{ pon: number; options: Record<string, unknown> }> = [];
     const tasks: Array<ReturnType<typeof makeTask>> = [];
@@ -251,7 +251,7 @@ describe('policy conformance', () => {
       cleanup: () => {},
     } as unknown as EffectContext<RenderState, RenderAction>;
     registerRenderEffects(ctx);
-    return { capability: createRenderCapability(ctx), imageCalls, tasks };
+    return { capability: createRenderCapability(ctx, opts.options), imageCalls, tasks };
   }
 
   it('keys are computable the moment the capability exists — the kernel materialized the fact', () => {
@@ -259,10 +259,30 @@ describe('policy conformance', () => {
     expect(h.capability.renderSourceKey(11, { scale: 1 })).toBe('11|w640|a1|e0');
   });
 
-  it('a continuous document keeps exact-scale keys — v2 behavior byte-for-byte', () => {
+  it('continuous conforms to the EXACT device width, capped at the budget', () => {
     const h = harness();
     expect(h.capability.renderPolicy()).toEqual({ kind: 'continuous' });
-    expect(h.capability.renderSourceKey(11, { scale: 1.53 })).toBe('11|s1.53|a1|e0');
+    // Below the budget: the exact demand (612pt × 0.5 = 306) — resting
+    // pixels are never resampled, the dpr-1 crispness rule.
+    expect(h.capability.renderSourceKey(11, { scale: 0.5 })).toBe('11|w306|a1|e0');
+    expect(h.capability.conformViewport(11, 0.5)).toEqual({ kind: 'width', width: 306 });
+    // Past the budget the base holds at maxWidth (default 640) — one stable
+    // key at any deeper zoom; sharpness beyond it is the tile plane's job.
+    expect(h.capability.renderSourceKey(11, { scale: 1.53 })).toBe('11|w640|a1|e0');
+    expect(h.capability.renderSourceKey(11, { scale: 8 })).toBe('11|w640|a1|e0');
+  });
+
+  it('continuous with a ladder quantize opts into rung caching', () => {
+    const h = harness({ options: { fullPage: { quantize: [320, 640, 1280], maxWidth: 1280 } } });
+    expect(h.capability.renderSourceKey(11, { scale: 0.5 })).toBe('11|w320|a1|e0');
+    expect(h.capability.renderSourceKey(11, { scale: 1 })).toBe('11|w640|a1|e0');
+    expect(h.capability.renderSourceKey(11, { scale: 8 })).toBe('11|w1280|a1|e0');
+  });
+
+  it('the budget also filters an advertised ladder (mobile-memory knob)', () => {
+    const h = harness({ policy: LATTICE, options: { fullPage: { maxWidth: 700 } } });
+    // Deployment rungs [320, 640, 1280, 2560] filtered to ≤700 → cap at 640.
+    expect(h.capability.conformViewport(11, 8)).toEqual({ kind: 'width', width: 640 });
   });
 
   it('lattice: scale converts through the page width and snaps UP to the rung', () => {
@@ -332,5 +352,28 @@ describe('policy conformance', () => {
     // The dead entry is not sticky: the next ask fetches fresh.
     void h.capability.renderPage(11, { scale: 1.2 }).catch(() => {});
     expect(h.imageCalls).toHaveLength(2);
+  });
+
+  it("format is a strategy value: 'bmp' rides into engine calls under continuous", () => {
+    const h = harness({ options: { format: 'bmp', quality: 0.9 } });
+    void h.capability.renderPage(11, { scale: 0.5 }).catch(() => {});
+    expect(h.imageCalls[0]!.options.format).toBe('bmp');
+    expect(h.imageCalls[0]!.options.quality).toBe(0.9);
+  });
+
+  it("…and conforms to policy.formats under a lattice — 'bmp' becomes the deployment format", () => {
+    const h = harness({ policy: LATTICE, options: { format: 'bmp' } });
+    void h.capability.renderPage(11, { scale: 0.5 }).catch(() => {});
+    // LATTICE advertises formats: ['webp'] — BMP is local-only by contract.
+    expect(h.imageCalls[0]!.options.format).toBe('webp');
+  });
+
+  it('paintSettings resolves the layer-facing knobs', () => {
+    expect(harness().capability.paintSettings()).toEqual({
+      settleMs: 150,
+      fadeMs: 0,
+      tiles: true,
+    });
+    expect(harness({ options: { tiles: false } }).capability.paintSettings().tiles).toBe(false);
   });
 });

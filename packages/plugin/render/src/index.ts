@@ -7,5 +7,17 @@
  */
 export { renderPlugin } from './render.plugin';
 export { RenderToken } from './types';
-export type { InvalidateScope, RenderCapability, RenderPluginOptions, RenderState } from './types';
-export type { PageViewDemand, TilePaintPlan, TilePaintSource, TilingConfig } from './paint-plan';
+export type {
+  InvalidateScope,
+  PaintSettings,
+  RenderCapability,
+  RenderPluginOptions,
+  RenderState,
+} from './types';
+export type {
+  FullPageOptions,
+  PageViewDemand,
+  TilePaintPlan,
+  TilePaintSource,
+  TilesOptions,
+} from './paint-plan';

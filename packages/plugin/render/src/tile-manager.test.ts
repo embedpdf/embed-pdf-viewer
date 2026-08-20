@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { PageImageHandle, PdfRect } from '@embedpdf/core';
 
-import { resolveTiling } from './paint-plan';
+import { resolveRenderOptions, type TilesOptions } from './paint-plan';
 import { RasterStore } from './raster-store';
 import { TileManager } from './tile-manager';
 
@@ -21,7 +21,7 @@ const LATTICE = {
   enforced: false,
 } as const;
 
-function harness(opts?: { policy?: unknown; tiling?: Parameters<typeof resolveTiling>[0] }) {
+function harness(opts?: { policy?: unknown; tiling?: TilesOptions }) {
   const store = new RasterStore(256);
   const pending: Array<{
     key: string;
@@ -35,7 +35,7 @@ function harness(opts?: { policy?: unknown; tiling?: Parameters<typeof resolveTi
 
   const manager = new TileManager({
     store,
-    config: resolveTiling({ settleMs: 0, ...opts?.tiling }),
+    options: resolveRenderOptions({ tiles: { settleMs: 0, ...opts?.tiling } }),
     getPolicy: () => (opts?.policy === undefined ? LATTICE : opts.policy) as never,
     getPageSize: () => PAGE,
     getEpoch: () => epoch,
@@ -91,11 +91,33 @@ describe('TileManager', () => {
     expect(h.pending).toHaveLength(0);
   });
 
-  it('never engages under a continuous policy — exactness is the policy, not the plugin', () => {
+  it('ENGAGES past the budget under a continuous policy — the local-engine fix', () => {
     const h = harness({ policy: { kind: 'continuous' } });
+    // Demand 4896 vs the default 640 budget: deficit 7.65 → tiles own
+    // sharpness, at the EXACT demanded scale (4896/612 = 8 — resting
+    // pixels are 1:1, the dpr-1 crispness rule).
     const plan = h.manager.plan(1, DEEP, true);
+    expect(plan.engaged).toBe(true);
+    expect(h.pending).toHaveLength(4);
+    expect(h.pending.every((p) => p.scale === 8)).toBe(true);
+  });
+
+  it('continuous below the budget never engages — the base is exact there', () => {
+    const h = harness({ policy: { kind: 'continuous' } });
+    // 600 ≤ 640 budget: base renders exactly 600 — deficit 1, engageAt 1.0.
+    const plan = h.manager.plan(1, { desiredDeviceWidth: 600 }, true);
     expect(plan.engaged).toBe(false);
     expect(h.pending).toHaveLength(0);
+  });
+
+  it('exact mode: the same settled demand re-plans to the same object (memo)', async () => {
+    const h = harness({ policy: { kind: 'continuous' } });
+    h.manager.plan(1, DEEP, true);
+    await h.resolveAll();
+    const a = h.manager.plan(1, DEEP, true);
+    const b = h.manager.plan(1, DEEP, true);
+    expect(b).toBe(a);
+    expect(a.paint).toHaveLength(4);
   });
 
   it('engages past the ladder cap: want = visible tiles at the snapped level', () => {

@@ -103,6 +103,60 @@ Both methods accept the same core options (`image()` adds `format` and
   and the result is cache-friendly on the server's CDN.
 </Callout>
 
+## Render policy
+
+`doc.render.policy()` answers what render parameters this deployment treats
+as first-class:
+
+```ts
+const policy = await doc.render.policy();
+// { kind: 'continuous' }  — or a lattice, see below
+```
+
+<Engine local>
+The local engine always answers `{ kind: 'continuous' }`: rendering happens
+in-process, there is no shared cache to protect, and any viewport renders
+exactly as requested. Exactness is the local product promise — the render
+plugin builds on it to keep resting pixels 1:1 with the screen.
+</Engine>
+
+<Engine cloud>
+A cloud deployment answers a **lattice**: a finite set of render points the
+server treats as durable, CDN-shared artifacts.
+
+```ts
+{
+  kind: 'lattice',
+  fullPage: { widths: [640, 1280, 2560] }, // full-page renders quantize on width
+  formats: ['webp', 'png'],
+  background: 'white',
+  enforced: true, // off-lattice render URLs are rejected with 400
+}
+```
+
+Full-page renders quantize on `viewport.width` — the bounded quantity is
+output pixels, never zoom (a scale lattice would bound artifact *count* but
+not *size*; a poster page at scale 1 is already enormous). The SDK never
+conforms a request implicitly — the same `render.image()` call must not
+return different pixels on local and cloud. Snap explicitly with the shared
+helper when you render by scale:
+
+```ts
+import { snapFullPageViewport } from '@cloudpdf/engine';
+
+const viewport = snapFullPageViewport(policy, { kind: 'scale', scale: 2 }, {
+  pageWidth: page.size.width,
+});
+await doc.page(pon).render.image({ viewport }); // always on the lattice
+```
+</Engine>
+
+The render plugin consumes this policy for you — it conforms every ask,
+caches by the resulting identity, and adds deep-zoom tiles past the ladder's
+top. If you render through the plugin (`<RenderLayer />`, `renderPage`), you
+never call `policy()` yourself. See the
+[Render plugin](/docs/headless/plugins/render) page.
+
 ## Reordering pages
 
 `doc.pages.move(pageObjectNumbers, destIndex)` detaches the listed pages and
