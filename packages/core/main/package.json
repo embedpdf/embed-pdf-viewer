@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/core",
-  "version": "3.0.0-next.5",
+  "version": "3.0.0-next.6",
   "private": false,
   "description": "Pure, framework-free runtime for the EmbedPDF v3 viewer: store, typed capabilities, and plugin lifecycle. DOM-free and serializable.",
   "type": "module",

@@ -1,5 +1,11 @@
 # @embedpdf/engine
 
+## 3.0.0-next.6
+
+### Patch Changes
+
+- [#768](https://github.com/embedpdf/embed-pdf-viewer/pull/768) by [@bobsingor](https://github.com/bobsingor) – Fix the default inline image-encoder worker path so it creates the bundled blob worker instead of attempting to fetch `/inline` and silently falling back to main-thread encoding. Tile rendering now keeps encoding work off the main thread under the default configuration.
+
 ## 3.0.0-next.5
 
 ### Minor Changes

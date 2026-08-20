@@ -1,5 +1,11 @@
 # @embedpdf/web
 
+## 3.0.0-next.6
+
+### Minor Changes
+
+- [#768](https://github.com/embedpdf/embed-pdf-viewer/pull/768) by [@bobsingor](https://github.com/bobsingor) – Add `bindPaintedImage`, a framework-neutral browser adapter for binding object-URL raster sources to image elements. It hides incomplete images, owns abort and URL-revocation cleanup, and reports painted and unpainted state around the image's presented lifetime so React, Vue, Svelte, and Angular adapters can share the same minimal lifecycle.
+
 ## 3.0.0-next.5
 
 ### Minor Changes

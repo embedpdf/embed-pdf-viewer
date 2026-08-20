@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/core-annotation",
-  "version": "3.0.0-next.5",
+  "version": "3.0.0-next.6",
   "private": false,
   "description": "The pure annotation brain: model · update(msg)→[model,effects] · view. Content-space geometry per family, hit-testing, and tools. No DOM, engine, or framework dependencies.",
   "type": "module",
