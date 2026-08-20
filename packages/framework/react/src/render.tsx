@@ -70,29 +70,43 @@ function useSettled<T>(value: T, settleMs: number): T {
 }
 
 /** Resolve a handle to an object URL and decode it off-DOM. Returns null if
- *  aborted; the caller owns the revoke on success. */
+ *  aborted; the caller owns the revoke on success. `width`/`height` are the
+ *  decoded bitmap's intrinsic dimensions (0 when no DOM Image exists). */
 async function decodeToUrl(
   handle: { objectUrl(signal?: AbortSignal): Promise<{ url: string; revoke(): void }> },
   signal: AbortSignal,
-): Promise<{ url: string; revoke(): void } | null> {
+): Promise<{ url: string; revoke(): void; width: number; height: number } | null> {
   const obj = await handle.objectUrl(signal);
   if (signal.aborted) {
     obj.revoke();
     return null;
   }
+  let width = 0;
+  let height = 0;
   if (typeof Image !== 'undefined') {
     const probe = new Image();
     probe.src = obj.url;
-    // decode() failure falls through to a plain commit — the <img> itself
-    // will still decode-and-paint, just without the flash guarantee.
-    await probe.decode().catch(() => {});
+    // decode() failure OR stall falls through to a plain commit — the <img>
+    // itself will still decode-and-paint, just without the flash guarantee.
+    // The timeout matters: decode() can stay pending forever (it does not
+    // reject on decoder-queue pressure), and a commit that never happens
+    // means a painted report that never fires — which would deadlock
+    // retention on that tile. The gate is an optimization, never a wall.
+    await Promise.race([
+      probe.decode().catch(() => {}),
+      new Promise<void>((res) => setTimeout(res, 300)),
+    ]);
+    width = probe.naturalWidth;
+    height = probe.naturalHeight;
   }
   if (signal.aborted) {
     obj.revoke();
     return null;
   }
-  return obj;
+  return { ...obj, width, height };
 }
+
+let warnedTileSize = false;
 
 export function RenderLayer({ annotations = true, tiles = true }: RenderLayerProps = {}) {
   const page = usePage();
@@ -176,10 +190,17 @@ export function RenderLayer({ annotations = true, tiles = true }: RenderLayerPro
 
 /**
  * The sharp plane above the base — the plugin's retention-safe paint plan
- * as keyed <img>s inside ONE container that carries the page scale as a
- * single transform (one rounding context — no tile seams). Each tile
- * reports the decode boundary back, so retained coarser generations
- * release only when their replacement is truly compositable.
+ * as keyed <img>s. Each tile reports the decode boundary back (and its
+ * inverse on unmount), so retained coarser generations release only when
+ * their replacement is truly compositable.
+ *
+ * Tiles are placed in VIEW (CSS px) space directly — never in page points
+ * under a scaled container. Blink quantizes layout lengths to 1/64 CSS px
+ * BEFORE transforms apply, so a pt-space rect under a ×25 zoom transform
+ * turns that harmless 1/64 into ±0.4px+ of per-tile misplacement — visible
+ * seams and per-zoom-step letter shifts that grow with depth. In view
+ * space the same quantization is a fixed ~1/64 CSS px at every zoom.
+ * (v2 placed tiles in screen px for exactly this reason.)
  */
 function TilePlane({ annotations, fadeMs }: { annotations: boolean; fadeMs: number }) {
   const page = usePage();
@@ -196,17 +217,15 @@ function TilePlane({ annotations, fadeMs }: { annotations: boolean; fadeMs: numb
   useEffect(() => () => render.releaseTiles(page.pon), [render, page.pon]);
   if (plan.paint.length === 0) return null;
   const t = page.transform;
-  const scale = t.viewScale;
+  const s = t.viewScale;
   return (
     <div
       style={{
         position: 'absolute',
         left: 0,
         top: 0,
-        width: t.contentWidth / scale,
-        height: t.contentHeight / scale,
-        transform: `scale(${scale})`,
-        transformOrigin: '0 0',
+        width: t.contentWidth,
+        height: t.contentHeight,
         pointerEvents: 'none',
       }}
     >
@@ -217,25 +236,37 @@ function TilePlane({ annotations, fadeMs }: { annotations: boolean; fadeMs: numb
         <TileImg
           key={source.key}
           source={source}
+          view={{
+            x: source.rect.x * s,
+            y: source.rect.y * s,
+            width: source.rect.width * s,
+            height: source.rect.height * s,
+          }}
           fadeMs={fadeMs}
           onPainted={() => render.tilePainted(page.pon, source.key)}
+          onUnpainted={() => render.tileUnpainted(page.pon, source.key)}
         />
       ))}
     </div>
   );
 }
 
-/** One tile: decode-gated object-URL lifecycle + the painted report. The
- *  <img> enters the DOM only with a decoded bitmap behind it, so arrival
- *  never flashes a blank tile-shaped quad. */
+/** One tile: decode-gated object-URL lifecycle + the painted/unpainted
+ *  reports. The <img> enters the DOM only with a decoded bitmap behind it,
+ *  so arrival never flashes a blank tile-shaped quad. */
 function TileImg({
   source,
+  view,
   fadeMs,
   onPainted,
+  onUnpainted,
 }: {
   source: TilePaintSource;
+  /** Placement rect in VIEW (CSS px) space. */
+  view: { x: number; y: number; width: number; height: number };
   fadeMs: number;
   onPainted: () => void;
+  onUnpainted: () => void;
 }) {
   const [url, setUrl] = useState<string | null>(null);
   const revoke = useRef<(() => void) | null>(null);
@@ -245,6 +276,19 @@ function TileImg({
       try {
         const obj = await decodeToUrl(source.handle, controller.signal);
         if (!obj) return;
+        // A raster whose intrinsic size disagrees with its rect would be
+        // silently stretched into place — the stale-handle bug class. The
+        // expected size is the engine's own rounding of rect × scale.
+        if (obj.width > 0 && !warnedTileSize) {
+          const expected = Math.round(source.rect.width * source.scale);
+          if (Math.abs(obj.width - expected) > 1) {
+            warnedTileSize = true;
+            console.warn(
+              `[render] tile bitmap ${obj.width}px wide does not match its rect ` +
+                `(expected ~${expected}px) — stale raster identity? key=${source.key}`,
+            );
+          }
+        }
         revoke.current = obj.revoke;
         setUrl(obj.url);
       } catch {
@@ -258,11 +302,15 @@ function TileImg({
     };
   }, [source.handle]);
   // Post-commit: the decoded <img> is in the tree — report the decode
-  // boundary so retention can release what this tile now occludes.
+  // boundary so retention can release what this tile now occludes. The
+  // cleanup is the INVERSE report: once this <img> leaves the DOM its
+  // pixels are no longer compositable, and retention must not count them.
   useEffect(() => {
-    if (url) onPainted();
+    if (!url) return;
+    onPainted();
+    return onUnpainted;
     // eslint-disable-next-line react-hooks/exhaustive-deps -- painted is
-    // per-bitmap: fire once when this tile's decoded URL commits.
+    // per-bitmap: fire once per decoded URL commit, invert on removal.
   }, [url]);
   if (!url) return null;
   return (
@@ -272,10 +320,10 @@ function TileImg({
       draggable={false}
       style={{
         position: 'absolute',
-        left: source.rect.x,
-        top: source.rect.y,
-        width: source.rect.width,
-        height: source.rect.height,
+        left: view.x,
+        top: view.y,
+        width: view.width,
+        height: view.height,
         zIndex: source.z,
         ...(fadeMs > 0 ? { animation: `epdf-tile-in ${fadeMs}ms ease-out` } : null),
       }}

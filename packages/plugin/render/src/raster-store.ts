@@ -2,14 +2,21 @@ import type { PageImageHandle } from '@embedpdf/core';
 
 /**
  * Client-side mirror of the server's one-door read-through: per-key
- * SINGLEFLIGHT + LRU over encoded page images.
+ * SINGLEFLIGHT + cost-budgeted LRU over encoded page images.
  *
  * The key is the raster's canonical identity (conformed viewport +
- * annotations flag + epoch — see `renderSourceKey`), so the lattice does the
- * caching work: every ask inside one rung is the same key, and rung
+ * annotations flag + epoch — see `renderSourceKey`), so the render points do
+ * the caching work: every ask at one point is the same key, and
  * re-crossings (zoom 1280 → 2560 → back) resolve instantly from the LRU
  * instead of re-rendering. Epoch bumps mint new keys; stale-epoch entries
  * age out through the LRU (they are never re-requested).
+ *
+ * The budget is COST, approximately bytes: an entry costs its encoded byte
+ * length when the handle carries bytes (local), its pixel count as a
+ * decoded-order estimate otherwise (URL-backed cloud handles), and 1 when
+ * neither is known. Entry counts lie — a 512² webp tile and a BMP full page
+ * differ by 100× — and long deep-zoom sessions cycle hundreds of tile keys,
+ * so the budget is what actually bounds memory.
  *
  * Consumer aborts are REFCOUNTED: a caller abandoning a fetch (camera moved,
  * layer unmounted) detaches without killing it for other consumers; the
@@ -20,8 +27,9 @@ import type { PageImageHandle } from '@embedpdf/core';
 export class RasterStore {
   private readonly entries = new Map<string, Entry>();
   private tick = 0;
+  private total = 0;
 
-  constructor(private readonly maxEntries = 48) {}
+  constructor(private readonly maxCost = 128 * 1024 * 1024) {}
 
   acquire(
     key: string,
@@ -44,11 +52,14 @@ export class RasterStore {
     entry.promise = fetch(abort.signal).then(
       (handle) => {
         entry.handle = handle;
+        entry.cost = costOf(handle);
+        this.total += entry.cost;
+        this.evict(); // cost is known only now — budget check at resolution
         return handle;
       },
       (err) => {
         // Failed fetches must not be sticky — drop so the next ask retries.
-        if (this.entries.get(key) === entry) this.entries.delete(key);
+        this.drop(key, entry);
         throw err;
       },
     );
@@ -94,7 +105,7 @@ export class RasterStore {
         // resolved entries stay for the LRU (that's the cache).
         if (entry.refs <= 0 && entry.handle === undefined) {
           entry.abort.abort(abortReason(signal));
-          if (this.entries.get(key) === entry) this.entries.delete(key);
+          this.drop(key, entry);
         }
         reject(abortReason(signal));
       };
@@ -118,15 +129,22 @@ export class RasterStore {
     });
   }
 
+  /** Remove an entry, keeping the cost ledger honest. */
+  private drop(key: string, entry: Entry): void {
+    if (this.entries.get(key) !== entry) return;
+    this.entries.delete(key);
+    if (entry.cost !== undefined) this.total -= entry.cost;
+  }
+
   private evict(): void {
-    if (this.entries.size <= this.maxEntries) return;
+    if (this.total <= this.maxCost) return;
     // Oldest-first over evictable entries: resolved and consumer-free.
     const candidates = [...this.entries.entries()]
       .filter(([, e]) => e.refs <= 0 && e.handle !== undefined)
       .sort((a, b) => a[1].used - b[1].used);
-    for (const [key] of candidates) {
-      if (this.entries.size <= this.maxEntries) return;
-      this.entries.delete(key);
+    for (const [key, entry] of candidates) {
+      if (this.total <= this.maxCost) return;
+      this.drop(key, entry);
     }
   }
 }
@@ -134,9 +152,21 @@ export class RasterStore {
 interface Entry {
   promise: Promise<PageImageHandle>;
   handle?: PageImageHandle;
+  /** Approximate bytes; set at resolution (see class doc). */
+  cost?: number;
   refs: number;
   abort: AbortController;
   used: number;
+}
+
+/** Approximate memory cost: encoded bytes when known, pixel count as a
+ *  decoded-order estimate for URL handles, 1 when nothing is known. */
+function costOf(handle: PageImageHandle): number {
+  if (handle.source?.kind === 'bytes') return handle.source.bytes.byteLength;
+  if (handle.width !== undefined && handle.height !== undefined) {
+    return handle.width * handle.height;
+  }
+  return 1;
 }
 
 function abortReason(signal: AbortSignal): unknown {

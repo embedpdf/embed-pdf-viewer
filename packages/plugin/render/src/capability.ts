@@ -91,6 +91,22 @@ export function createRenderCapability(
     return content + (s.annotatedEpochs[pon] ?? 0);
   };
 
+  // A raster's identity includes its encode format: the cloud policy arrives
+  // async after open, so the resolved format can change under a live store —
+  // the key must change with it. Absent format (engine default) adds nothing,
+  // keeping default-local keys stable.
+  const baseKey = (
+    pon: PageObjectNumber,
+    viewport: PageRenderViewport,
+    annotations: boolean,
+  ): string => {
+    const format = strategy().format;
+    return (
+      `${pon}|w${viewport.kind === 'width' ? viewport.width : 0}` +
+      `|a${annotations ? 1 : 0}|e${epochOf(pon, annotations)}${format ? `|f${format}` : ''}`
+    );
+  };
+
   // Tile resolutions arrive in bursts (a want set landing) — coalesce the
   // wake-ups per frame so N arrivals become one plan bump, one commit.
   const pendingAdvance = new Set<PageObjectNumber>();
@@ -135,6 +151,9 @@ export function createRenderCapability(
       return task;
     },
     onAdvance: wake,
+    ...(resolved.debug
+      ? { debug: (msg: string) => console.debug(`[render] ${msg}`) }
+      : {}),
   });
 
   return {
@@ -143,7 +162,7 @@ export function createRenderCapability(
       if (!doc) return Promise.reject(new Error('render: no document bound'));
       const annotations = includeAnnotations ?? true;
       const viewport = conformViewport(pon, scale);
-      const key = `${pon}|w${viewport.kind === 'width' ? viewport.width : 0}|a${annotations ? 1 : 0}|e${epochOf(pon, annotations)}`;
+      const key = baseKey(pon, viewport, annotations);
       return store.acquire(
         key,
         (storeSignal) => {
@@ -166,8 +185,7 @@ export function createRenderCapability(
     },
     renderSourceKey(pon, { scale, includeAnnotations }) {
       const annotations = includeAnnotations ?? true;
-      const viewport = conformViewport(pon, scale);
-      return `${pon}|w${viewport.kind === 'width' ? viewport.width : 0}|a${annotations ? 1 : 0}|e${epochOf(pon, annotations)}`;
+      return baseKey(pon, conformViewport(pon, scale), annotations);
     },
     conformViewport,
     paintSettings() {
@@ -183,6 +201,9 @@ export function createRenderCapability(
     },
     tilePainted(pon, key) {
       tiles.sourcePainted(pon, key);
+    },
+    tileUnpainted(pon, key) {
+      tiles.sourceUnpainted(pon, key);
     },
     releaseTiles(pon) {
       tiles.releasePage(pon);

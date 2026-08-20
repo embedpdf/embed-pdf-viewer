@@ -368,6 +368,17 @@ describe('policy conformance', () => {
     expect(h.imageCalls[0]!.options.format).toBe('webp');
   });
 
+  it('the encode format is part of the raster identity — keys change with it', () => {
+    // The cloud policy arrives async after open; a resolved-format change
+    // must mint new keys, never serve old-format bytes for the same key.
+    const plain = harness().capability.renderSourceKey(11, { scale: 0.5 });
+    const bmp = harness({ options: { format: 'bmp' } }).capability.renderSourceKey(11, {
+      scale: 0.5,
+    });
+    expect(plain).toBe('11|w306|a1|e0');
+    expect(bmp).toBe('11|w306|a1|e0|fbmp');
+  });
+
   it('paintSettings resolves the layer-facing knobs', () => {
     expect(harness().capability.paintSettings()).toEqual({
       settleMs: 150,

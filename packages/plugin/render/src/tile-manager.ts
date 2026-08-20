@@ -11,14 +11,15 @@ import {
 import type { RasterStore } from './raster-store';
 import { baseAskWidth, resolveStrategy, type ResolvedStrategy } from './strategy';
 import {
+  bleedRect,
   inflateRect,
   intersectRects,
   regionCovered,
   snapToPyramid,
   tileGrid,
   tilesInRect,
-  tileEngineRect,
   tilePaintRect,
+  toEngineRect,
   type PageSizePt,
   type TileCoord,
   type TileGrid,
@@ -76,6 +77,8 @@ export class TileManager {
       ): Promise<PageImageHandle>;
       /** Wake subscribed layers (dispatches PAINT_ADVANCED outside plan()). */
       onAdvance(pon: number): void;
+      /** Diagnostic sink (options.debug) — scheduling and fetch outcomes. */
+      debug?(msg: string): void;
     },
   ) {}
 
@@ -101,6 +104,7 @@ export class TileManager {
     if (state.epoch !== epoch) {
       this.abortAll(state);
       state.entries.clear();
+      state.failedKeys.clear();
       state.epoch = epoch;
       state.wantScale = null;
       state.wantWidth = null;
@@ -118,8 +122,10 @@ export class TileManager {
       // RasterStore, so a re-engage promotes from cache — and below the
       // threshold the base itself is crisp, so nothing visible is lost.
       if (state.entries.size || state.wantScale !== null) {
+        this.deps.debug?.(`disengage pon=${pon} (deficit ${deficit.toFixed(2)})`);
         this.abortAll(state);
         state.entries.clear();
+        state.failedKeys.clear();
         state.wantScale = null;
         state.wantWidth = null;
         state.planCache = null;
@@ -169,6 +175,14 @@ export class TileManager {
       visible,
     );
 
+    // Release retained generations covered by the CURRENT painted set —
+    // evaluated here, not only on painted reports, so release can never be
+    // stranded by report ordering.
+    if (this.releaseCovered(pon, state, page, includeAnnotations)) {
+      state.version += 1;
+      state.planCache = null;
+    }
+
     // Paint list: resolved entries intersecting the visible rect, coarser
     // levels first (painter's algorithm — sharper occludes per region).
     // The memo key holds the LEVEL identity (integer width) — zoom inside a
@@ -184,6 +198,7 @@ export class TileManager {
     }
     const paint: TilePaintSource[] = [];
     const fetching: string[] = [];
+    const bleedPx = this.deps.options.tiles.bleedPx;
     for (const entry of state.entries.values()) {
       const visIntersect = intersectRects(entry.rect, visible);
       if (entry.handle) {
@@ -191,7 +206,11 @@ export class TileManager {
           paint.push({
             key: entry.key,
             scale: entry.scale,
-            rect: entry.rect,
+            // The PLACEMENT rect is the bled one — it matches the bitmap the
+            // fetch rendered. Retention/coverage math stays on the logical
+            // (unbled) `entry.rect`; the overlap strips duplicate the
+            // neighbor's content, so painting them is what kills the seams.
+            rect: bleedPx > 0 ? bleedRect(entry.rect, bleedPx / entry.scale, page) : entry.rect,
             z: 0, // ranked below — stacking is scale order among PRESENT entries
             handle: entry.handle,
           });
@@ -224,10 +243,24 @@ export class TileManager {
     const entry = state?.entries.get(key);
     if (!state || !entry || entry.painted) return;
     entry.painted = true;
-    this.releaseOccluded(state, entry);
+    const page = this.deps.getPageSize(pon);
+    if (page) this.releaseCovered(pon, state, page, annotationsOf(key));
     state.version += 1;
     state.planCache = null;
     this.deps.onAdvance(pon);
+  }
+
+  /**
+   * The inverse report: this key's <img> left the DOM (pan-away, plan drop),
+   * so its pixels are NOT currently compositable. Without this, a tile that
+   * unmounts and later remounts is still counted as painted while its new
+   * <img> re-decodes — and an adjacent fresh `sourcePainted` could release
+   * retained coarse coverage over a region that momentarily has no sharp
+   * pixels. Painted is a statement about the SCREEN, so it follows the DOM.
+   */
+  sourceUnpainted(pon: number, key: string): void {
+    const entry = this.pages.get(pon)?.entries.get(key);
+    if (entry) entry.painted = false;
   }
 
   /** A lens unmounted its tile plane: stop fetching, drop bookkeeping.
@@ -247,6 +280,7 @@ export class TileManager {
         wantScale: null,
         wantWidth: null,
         entries: new Map(),
+        failedKeys: new Set(),
         version: 0,
         planCache: null,
         settleTimer: null,
@@ -274,6 +308,7 @@ export class TileManager {
     const { options } = this.deps;
     const firstEngage = state.wantWidth === null;
     const levelChanged = state.wantWidth !== null && state.wantWidth !== wantWidth;
+    if (levelChanged) state.failedKeys.clear(); // a new level gets fresh chances
     state.wantScale = wantScale;
     state.wantWidth = wantWidth;
 
@@ -323,10 +358,14 @@ export class TileManager {
     // level — this gate is what makes exact affordable). First engagement
     // fires immediately — there's nothing on screen above the base yet.
     if (levelChanged && options.tiles.settleMs > 0) {
+      this.deps.debug?.(`arm settle pon=${pon} level=${wantWidth}`);
       state.pendingLevel = wantWidth;
       if (state.settleTimer !== null) clearTimeout(state.settleTimer);
       state.settleTimer = setTimeout(() => {
         state.settleTimer = null;
+        this.deps.debug?.(
+          `settle fired pon=${pon} level=${wantWidth} current=${state.pendingLevel === wantWidth}`,
+        );
         if (state.pendingLevel === wantWidth) kickoff();
       }, options.tiles.settleMs);
       return;
@@ -353,20 +392,28 @@ export class TileManager {
     coords: TileCoord[],
   ): boolean {
     let allReady = true;
+    let started = 0;
+    const bleedPt = this.deps.options.tiles.bleedPx / grid.scale;
     for (const coord of coords) {
       const key = this.tileKey(pon, wantWidth, coord, includeAnnotations, epoch);
+      // A key that FAILED (non-abort) at this level is not retried until the
+      // level or epoch changes — retrying every plan would loop on a
+      // permanent error. The base shows through the hole; degraded, honest.
+      if (state.failedKeys.has(key)) continue;
       const existing = state.entries.get(key);
       if (existing) {
         if (existing.handle === undefined) allReady = false;
         continue;
       }
       allReady = false;
+      started += 1;
       const abort = new AbortController();
+      const logical = tilePaintRect(grid, page, coord);
       const entry: TileEntry = {
         key,
         scale: grid.scale,
         coord,
-        rect: tilePaintRect(grid, page, coord),
+        rect: logical,
         painted: false,
         abort,
       };
@@ -377,7 +424,9 @@ export class TileManager {
           (signal) =>
             this.deps.fetchTile(
               pon,
-              tileEngineRect(grid, page, coord),
+              // The RENDERED region is the bled rect — it matches the bled
+              // placement rect the paint list emits for this entry.
+              toEngineRect(page, bleedPt > 0 ? bleedRect(logical, bleedPt, page) : logical),
               grid.scale,
               includeAnnotations,
               signal,
@@ -392,41 +441,55 @@ export class TileManager {
             state.planCache = null;
             this.deps.onAdvance(pon);
           },
-          () => {
-            if (state.entries.get(key) === entry) state.entries.delete(key);
+          (err) => {
+            if (state.entries.get(key) !== entry) return;
+            state.entries.delete(key);
+            // Our own abort (pan-away, level change) is expected silence. A
+            // real failure marks the key and WAKES the layers — the plan
+            // recomputes so the rest of the want set keeps making progress
+            // instead of waiting on a resolution that will never come.
+            if (!abort.signal.aborted) {
+              state.failedKeys.add(key);
+              this.deps.debug?.(`tile failed ${key}: ${String(err)}`);
+              state.version += 1;
+              state.planCache = null;
+              this.deps.onAdvance(pon);
+            }
           },
         );
     }
+    if (started > 0) this.deps.debug?.(`fetch pon=${pon} level=${wantWidth} +${started} tiles`);
     return allReady;
   }
 
   /**
-   * The release rule: after `painted` lands on a want-level tile, retained
-   * sources (any other level) whose footprint ∩ painted-tile region is
-   * covered by PAINTED want-level tiles leave the paint list. The coverage
-   * check is index arithmetic over the WANT grid — generic over whatever
+   * The release rule, evaluated as a PURE FUNCTION of the current painted
+   * set: retained sources (any non-want level) whose VISIBLE footprint is
+   * covered by PAINTED want-level tiles leave the paint list. Runs on every
+   * `plan()` and on every painted report — never only "against the tile
+   * that just painted": release must not depend on paint ORDER (center-out
+   * scheduling means the report that completes a retained tile's coverage
+   * routinely lands far away from it), and re-evaluating from current state
+   * also self-heals any painted-flag transition the reports raced past.
+   * Coverage is index arithmetic over the WANT grid — generic over whatever
    * mix of retained scales exists (exact levels included).
    */
-  private releaseOccluded(state: PageTileState, painted: TileEntry): void {
+  private releaseCovered(
+    pon: number,
+    state: PageTileState,
+    page: PageSizePt,
+    includeAnnotations: boolean,
+  ): boolean {
     const { wantScale, wantWidth } = state;
-    if (wantScale === null || wantWidth === null || painted.scale !== wantScale) return;
-    const page = this.deps.getPageSize(pagePonOf(painted.key));
-    if (!page) return;
+    if (wantScale === null || wantWidth === null) return false;
     const grid = tileGrid(page, wantScale, this.strategy().tileSize);
     const paintedAt = (c: TileCoord) => {
-      const key = this.tileKey(
-        pagePonOf(painted.key),
-        wantWidth,
-        c,
-        annotationsOf(painted.key),
-        state.epoch,
-      );
+      const key = this.tileKey(pon, wantWidth, c, includeAnnotations, state.epoch);
       return state.entries.get(key)?.painted === true;
     };
+    let released = false;
     for (const [key, entry] of state.entries) {
       if (entry.scale === wantScale || entry.handle === undefined) continue;
-      const overlap = intersectRects(entry.rect, painted.rect);
-      if (overlap.width <= 0 || overlap.height <= 0) continue;
       // VISIBLE footprint only: an edge parent whose
       // offscreen children were never fetched must still release once its
       // on-screen region is covered — and its bytes stay in the store, so
@@ -434,8 +497,19 @@ export class TileManager {
       const region = state.lastVisible ? intersectRects(entry.rect, state.lastVisible) : entry.rect;
       if (regionCovered(grid, page, region, paintedAt)) {
         state.entries.delete(key);
+        released = true;
+      } else if (this.deps.debug) {
+        const missing = tilesInRect(grid, page, region).filter((c) => !paintedAt(c));
+        const detail = missing.slice(0, 3).map((c) => {
+          const k = this.tileKey(pon, wantWidth, c, includeAnnotations, state.epoch);
+          const e = state.entries.get(k);
+          const st = !e ? 'NO-ENTRY' : e.handle === undefined ? 'PENDING' : 'RESOLVED-unpainted';
+          return `${c.ix},${c.iy}=${st}`;
+        });
+        this.deps.debug(`retained ${key} blocked by: ${detail.join(' ')} (${missing.length} missing)`);
       }
     }
+    return released;
   }
 
   private abortAll(state: PageTileState): void {
@@ -449,7 +523,13 @@ export class TileManager {
   }
 
   /** Level identity is the integer device width across the page — integer
-   *  and stable for pyramid rungs and exact levels alike. */
+   *  and stable for pyramid rungs and exact levels alike. The key also
+   *  carries everything that determines the fetched BITMAP for a coord
+   *  (tile size, bleed, encode format): a raster's identity must include
+   *  its geometry, or a cached handle from one configuration could be
+   *  stretched into another's rect. Format genuinely varies at runtime —
+   *  the cloud policy arrives async after open and can change the resolved
+   *  format under a live store. */
   private tileKey(
     pon: number,
     levelWidth: number,
@@ -457,7 +537,10 @@ export class TileManager {
     includeAnnotations: boolean,
     epoch: number,
   ): string {
-    return `t:${pon}|w${levelWidth}|${c.ix},${c.iy}|a${includeAnnotations ? 1 : 0}|e${epoch}`;
+    const { tiles } = this.deps.options;
+    const format = this.strategy().format;
+    const geometry = `g${tiles.size}.${tiles.bleedPx}${format ? `.${format}` : ''}`;
+    return `t:${pon}|w${levelWidth}|${c.ix},${c.iy}|a${includeAnnotations ? 1 : 0}|e${epoch}|${geometry}`;
   }
 }
 
@@ -478,6 +561,9 @@ interface PageTileState {
   /** The want level's identity: integer device px across the page. */
   wantWidth: number | null;
   entries: Map<string, TileEntry>;
+  /** Keys that FAILED (non-abort) at the current level — not retried until
+   *  the level or epoch changes. */
+  failedKeys: Set<string>;
   /** Bumped on ready/painted/drop — the plan memo key. */
   version: number;
   planCache: { demandKey: string; version: number; plan: TilePaintPlan } | null;

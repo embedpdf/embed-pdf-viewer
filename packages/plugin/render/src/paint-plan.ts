@@ -86,8 +86,24 @@ export interface TilesOptions {
    * advertised `policy.tiles` block always wins.
    */
   quantize?: 'exact' | readonly number[];
-  /** Exact-mode safety clamp on the tile level (device px per point). Default 64. */
+  /**
+   * Exact-mode safety clamp on the tile level (device px per point) — the
+   * sharpness ceiling. Past `maxScale × pageWidth` device px of demand,
+   * tiles CSS-stretch instead of re-rendering. Per-screen tile cost is
+   * constant at any level, so this bounds nothing but numeric range.
+   * Default 128 (≈ 6,400% zoom on a letter page at dpr 2).
+   */
   maxScale?: number;
+  /**
+   * Overlap neighboring tiles by this many device pixels per shared edge
+   * (each tile renders a slightly larger region and is placed to match).
+   * Kills hairline seams whenever tiles display at anything other than 1:1 —
+   * separate `<img>`s at fractional boundaries each get partial-coverage
+   * edge anti-aliasing, and bilinear scaling smears their last row — by
+   * making every edge land over the neighbor's identical content instead of
+   * the backdrop. Default 1; 0 disables.
+   */
+  bleed?: number;
   /**
    * Sharpness deficit (desired ÷ supplied-by-base) above which tiles engage.
    * Resolved default: 1.0 when the base is exact (nothing may rest
@@ -129,6 +145,7 @@ export interface ResolvedRenderOptions {
     size: number;
     quantize: 'exact' | readonly number[];
     maxScale: number;
+    bleedPx: number;
     engageAt: number | undefined;
     prefetchMargin: number;
     velocityBias: boolean;
@@ -139,6 +156,8 @@ export interface ResolvedRenderOptions {
   };
   format?: 'png' | 'webp' | 'bmp';
   quality?: number;
+  /** Diagnostic logging (tile scheduling, fetch outcomes). */
+  debug: boolean;
 }
 
 export function resolveRenderOptions(options: {
@@ -146,6 +165,7 @@ export function resolveRenderOptions(options: {
   tiles?: TilesOptions | false;
   format?: 'png' | 'webp' | 'bmp';
   quality?: number;
+  debug?: boolean;
 }): ResolvedRenderOptions {
   const tiles = options.tiles === false ? undefined : options.tiles;
   return {
@@ -158,7 +178,8 @@ export function resolveRenderOptions(options: {
       enabled: options.tiles !== false,
       size: tiles?.size ?? 512,
       quantize: tiles?.quantize ?? 'exact',
-      maxScale: tiles?.maxScale ?? 64,
+      maxScale: tiles?.maxScale ?? 128,
+      bleedPx: tiles?.bleed ?? 1,
       engageAt: tiles?.engageAt,
       prefetchMargin: tiles?.prefetch?.margin ?? 0.5,
       velocityBias: tiles?.prefetch?.velocityBias ?? true,
@@ -168,5 +189,6 @@ export function resolveRenderOptions(options: {
     },
     format: options.format,
     quality: options.quality,
+    debug: options.debug ?? false,
   };
 }

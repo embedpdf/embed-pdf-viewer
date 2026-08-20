@@ -102,7 +102,8 @@ replacements have actually decoded — the page never blanks mid-zoom.
 | ------------------ | --------------------------------------------------------------- | --------- |
 | `tiles.size`       | Tile edge, in device pixels                                     | `512`     |
 | `tiles.quantize`   | Exact tile sharpness at rest, or a ladder of reusable levels?   | `'exact'` |
-| `tiles.maxScale`   | Safety cap on tile sharpness (device px per PDF point)          | `64`      |
+| `tiles.maxScale`   | The sharpness ceiling (device px per PDF point); beyond it tiles stretch | `128` |
+| `tiles.bleed`      | Overlap neighboring tiles by this many device px (kills seams)  | `1`       |
 | `tiles.engageAt`   | How much stretch to tolerate before tiles fire                  | `1.0` exact / `1.25` ladder |
 | `tiles.prefetch`   | Ring around the view: `{ margin, velocityBias }`                | `0.5`, `true` |
 | `tiles.settleMs`   | How long a zoom must rest before new tiles fetch                | `150`     |
@@ -205,7 +206,8 @@ Set any of these at registration with `renderPlugin({ … })`:
 | `tiles`             | `false` disables the tile plane entirely                               | enabled   |
 | `tiles.size`        | Tile edge in device px                                                 | `512`     |
 | `tiles.quantize`    | `'exact'` tile sharpness, or a scale ladder for pyramid reuse          | `'exact'` |
-| `tiles.maxScale`    | Safety cap on tile sharpness (device px per point)                     | `64`      |
+| `tiles.maxScale`    | The sharpness ceiling (device px per point); beyond it tiles stretch   | `128`     |
+| `tiles.bleed`       | Overlap neighboring tiles by this many device px (kills seams)         | `1`       |
 | `tiles.engageAt`    | Stretch tolerated before tiles engage                                  | `1.0` / `1.25` |
 | `tiles.prefetch.margin` | Prefetch ring size, as a fraction of the view per side             | `0.5`     |
 | `tiles.prefetch.velocityBias` | Stretch the ring toward scroll direction                     | `true`    |
@@ -213,6 +215,7 @@ Set any of these at registration with `renderPlugin({ … })`:
 | `tiles.fadeMs`      | Tile arrival cross-fade, ms                                            | `0`       |
 | `format`            | Encode format for all rasters: `'png'`, `'webp'`, `'bmp'` (local-only) | engine default |
 | `quality`           | Encoder quality for webp/png                                           | engine default |
+| `debug`             | Log tile scheduling and fetch outcomes to the console                  | `false`   |
 
 On the cloud engine, the deployment's advertised policy overrides `quantize`
 values and constrains `format`; your options apply unchanged on the local

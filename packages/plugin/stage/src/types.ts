@@ -206,6 +206,16 @@ export interface VisiblePage extends PageBox {
 
 export interface StageState extends StageSettings {
   camera: Camera;
+  /**
+   * False while the ZOOM is in motion, true once it has rested (~150ms of
+   * frames without a zoom write). Device-snapping of page origins is gated
+   * on this: a continuous zoom and a snapped origin cannot coexist without
+   * the anchor point jittering ±0.5 device px per step (the rounding lands
+   * differently every frame), so pages place fractionally while zooming and
+   * snap once at rest — when crispness actually matters. Pans always snap
+   * (a pure translation snap has no anchor error). Transient like `camera`.
+   */
+  cameraResting: boolean;
   vp: Size;
   /**
    * Device pixels per view pixel (web: `window.devicePixelRatio`). Reported by
@@ -224,6 +234,7 @@ export interface StageState extends StageSettings {
 
 export type StageAction =
   | { type: 'CAMERA'; camera: Camera }
+  | { type: 'CAMERA_REST'; resting: boolean }
   | { type: 'VP'; vp: Size }
   | { type: 'DPR'; dpr: number }
   | { type: 'CURSOR'; cursor: number }

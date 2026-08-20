@@ -32,6 +32,12 @@ export interface RenderPluginOptions {
   format?: NonNullable<PageImageOptions['format']>;
   /** Encoder quality (webp/png); ignored for bmp. */
   quality?: number;
+  /**
+   * Diagnostic logging: tile scheduling, settle timing, fetch outcomes —
+   * the counters that catch convergence issues in long sessions. Console
+   * `debug` level; off by default.
+   */
+  debug?: boolean;
 }
 
 /** Layer-facing paint settings (resolved options the view layers need). */
@@ -159,6 +165,13 @@ export interface RenderCapability {
    * completion, which would flash during decode.
    */
   tilePainted(pon: PageObjectNumber, key: string): void;
+  /**
+   * The inverse report: this plan key's <img> left the DOM, so its pixels
+   * are no longer compositable. Painted is a statement about the SCREEN and
+   * must follow the DOM — a remounting tile re-decodes, and until it
+   * reports painted again, retention may not count it as coverage.
+   */
+  tileUnpainted(pon: PageObjectNumber, key: string): void;
   /** A lens unmounted its tile plane: abort in-flight tile fetches and drop
    *  the page's tile bookkeeping (resolved bytes stay cached). */
   releaseTiles(pon: PageObjectNumber): void;
