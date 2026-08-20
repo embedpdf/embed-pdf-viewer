@@ -55,9 +55,17 @@ import {
  * is idempotent (the store singleflights); resolution handlers dispatch
  * the wake-up (`onAdvance`) that makes subscribed layers recompute.
  */
+/** Backpressure: raw rasters in flight at once (render + encode transit). */
+const MAX_IN_FLIGHT = 8;
+/** Stage-less (no visibleRect) demand is capped to this many whole-page tiles. */
+const STAGELESS_TILE_CAP = 64;
+
 export class TileManager {
   private readonly pages = new Map<number, PageTileState>();
   private strategyMemo: { policy: EngineRenderPolicy; strategy: ResolvedStrategy } | null = null;
+  /** Live fetches across all pages — the backpressure counter. */
+  private inFlight = 0;
+  private warnedStageless = false;
 
   constructor(
     private readonly deps: {
@@ -148,6 +156,41 @@ export class TileManager {
       );
       wantScale = wantWidth / page.width;
     }
+
+    // STAGE-LESS demand (no visibleRect) means the WHOLE page tiles at the
+    // want level — unbounded at deep zoom (a 4,650% page is ~28,000 tiles).
+    // Clamp the level so the whole-page tile count stays bounded: the lens
+    // degrades to bounded sharpness instead of unbounded memory, consistent
+    // with the budget philosophy everywhere else. Hosts that want true deep
+    // zoom supply a visibleRect (the Stage does).
+    if (!demand.visibleRect) {
+      const maxStagelessWidth = Math.max(
+        strategy.tileSize,
+        Math.floor(
+          strategy.tileSize * Math.sqrt((STAGELESS_TILE_CAP * page.width) / page.height),
+        ),
+      );
+      if (wantWidth > maxStagelessWidth) {
+        if (!this.warnedStageless) {
+          this.warnedStageless = true;
+          console.warn(
+            `[render] stage-less tile demand of ${Math.round(demand.desiredDeviceWidth)} device px ` +
+              `would tile the whole page — clamped to ${maxStagelessWidth}. Supply a visibleRect ` +
+              `(host the page in a Stage) for sharp deep zoom.`,
+          );
+        }
+        if (strategy.pyramid) {
+          const fitting = strategy.pyramid.filter(
+            (s) => Math.round(s * page.width) <= maxStagelessWidth,
+          );
+          wantScale = fitting.length ? fitting[fitting.length - 1]! : strategy.pyramid[0]!;
+          wantWidth = Math.round(wantScale * page.width);
+        } else {
+          wantWidth = maxStagelessWidth;
+          wantScale = wantWidth / page.width;
+        }
+      }
+    }
     const grid = tileGrid(page, wantScale, strategy.tileSize);
 
     const visible = demand.visibleRect ?? { x: 0, y: 0, width: page.width, height: page.height };
@@ -198,11 +241,21 @@ export class TileManager {
     }
     const paint: TilePaintSource[] = [];
     const fetching: string[] = [];
+    const stale: string[] = [];
     const bleedPx = this.deps.options.tiles.bleedPx;
     for (const entry of state.entries.values()) {
       const visIntersect = intersectRects(entry.rect, visible);
-      if (entry.handle) {
+      if (entry.resolved) {
         if (visIntersect.width > 0 && visIntersect.height > 0) {
+          // OWNERSHIP: bytes live in the RasterStore alone; the manager
+          // holds keys. Peek resolves the handle at paint time — an entry
+          // whose bytes were evicted is simply no longer resolved (dropped
+          // here; re-fetched on the next pass if still wanted).
+          const handle = this.deps.store.peek(entry.key);
+          if (!handle) {
+            stale.push(entry.key);
+            continue;
+          }
           paint.push({
             key: entry.key,
             scale: entry.scale,
@@ -212,13 +265,14 @@ export class TileManager {
             // neighbor's content, so painting them is what kills the seams.
             rect: bleedPx > 0 ? bleedRect(entry.rect, bleedPx / entry.scale, page) : entry.rect,
             z: 0, // ranked below — stacking is scale order among PRESENT entries
-            handle: entry.handle,
+            handle,
           });
         }
       } else if (entry.scale === wantScale) {
         fetching.push(entry.key);
       }
     }
+    for (const key of stale) state.entries.delete(key);
     // Stacking: rank the scales actually present (generic over exact levels
     // and pyramid rungs alike) — coarse under fine.
     const rank = new Map<number, number>();
@@ -312,14 +366,25 @@ export class TileManager {
     state.wantScale = wantScale;
     state.wantWidth = wantWidth;
 
-    // Abort in-flight fetches that left the want set (pan away, level
-    // change) — resolved entries are retention's business, not ours.
+    // Entries FOLLOW the want set. In-flight fetches that left it abort;
+    // resolved SAME-LEVEL tiles that left it are dropped — their bytes stay
+    // in the RasterStore's LRU, so a pan-back re-promotes from cache
+    // instead of re-rendering. Only cross-level RETAINED entries stay, and
+    // those are the release rules' business. Without this, panning at deep
+    // zoom accumulates every tile ever visited.
     const wanted = new Set(
       [...p0, ...p1].map((c) => this.tileKey(pon, wantWidth, c, includeAnnotations, epoch)),
     );
     for (const [key, entry] of state.entries) {
-      if (entry.handle === undefined && !wanted.has(key)) {
+      if (wanted.has(key)) continue;
+      if (!entry.resolved) {
         entry.abort?.abort();
+        // The transit slot frees NOW, synchronously — the rejection handler
+        // runs a microtask later, and fetches started in THIS plan must see
+        // the freed capacity.
+        this.releaseSlot(entry);
+        state.entries.delete(key);
+      } else if (entry.scale === wantScale) {
         state.entries.delete(key);
       }
     }
@@ -402,10 +467,15 @@ export class TileManager {
       if (state.failedKeys.has(key)) continue;
       const existing = state.entries.get(key);
       if (existing) {
-        if (existing.handle === undefined) allReady = false;
+        if (!existing.resolved) allReady = false;
         continue;
       }
       allReady = false;
+      // BACKPRESSURE: bound raw rasters in transit (render + encode). The
+      // wake → plan → ensureFetches loop is the pump — each resolution
+      // replans and starts the next batch; no queue machinery needed.
+      if (this.inFlight >= MAX_IN_FLIGHT) continue;
+      this.inFlight += 1;
       started += 1;
       const abort = new AbortController();
       const logical = tilePaintRect(grid, page, coord);
@@ -414,7 +484,9 @@ export class TileManager {
         scale: grid.scale,
         coord,
         rect: logical,
+        resolved: false,
         painted: false,
+        charged: true,
         abort,
       };
       state.entries.set(key, entry);
@@ -434,14 +506,18 @@ export class TileManager {
           abort.signal,
         )
         .then(
-          (handle) => {
+          () => {
+            this.releaseSlot(entry);
             if (state.entries.get(key) !== entry) return; // aborted/superseded
-            entry.handle = handle;
+            // The handle stays in the STORE (single ownership) — the paint
+            // list peeks it back out; this entry just records success.
+            entry.resolved = true;
             state.version += 1;
             state.planCache = null;
             this.deps.onAdvance(pon);
           },
           (err) => {
+            this.releaseSlot(entry);
             if (state.entries.get(key) !== entry) return;
             state.entries.delete(key);
             // Our own abort (pan-away, level change) is expected silence. A
@@ -489,7 +565,7 @@ export class TileManager {
     };
     let released = false;
     for (const [key, entry] of state.entries) {
-      if (entry.scale === wantScale || entry.handle === undefined) continue;
+      if (entry.scale === wantScale || !entry.resolved) continue;
       // VISIBLE footprint only: an edge parent whose
       // offscreen children were never fetched must still release once its
       // on-screen region is covered — and its bytes stay in the store, so
@@ -503,7 +579,7 @@ export class TileManager {
         const detail = missing.slice(0, 3).map((c) => {
           const k = this.tileKey(pon, wantWidth, c, includeAnnotations, state.epoch);
           const e = state.entries.get(k);
-          const st = !e ? 'NO-ENTRY' : e.handle === undefined ? 'PENDING' : 'RESOLVED-unpainted';
+          const st = !e ? 'NO-ENTRY' : !e.resolved ? 'PENDING' : 'RESOLVED-unpainted';
           return `${c.ix},${c.iy}=${st}`;
         });
         this.deps.debug(`retained ${key} blocked by: ${detail.join(' ')} (${missing.length} missing)`);
@@ -512,13 +588,28 @@ export class TileManager {
     return released;
   }
 
+  /** Test/diagnostic introspection: bookkeeping size for one page. */
+  stats(pon: number): { entries: number; inFlight: number } {
+    return { entries: this.pages.get(pon)?.entries.size ?? 0, inFlight: this.inFlight };
+  }
+
+  /** Idempotent transit-slot release — the ONE place inFlight decrements. */
+  private releaseSlot(entry: TileEntry): void {
+    if (!entry.charged) return;
+    entry.charged = false;
+    this.inFlight -= 1;
+  }
+
   private abortAll(state: PageTileState): void {
     if (state.settleTimer !== null) {
       clearTimeout(state.settleTimer);
       state.settleTimer = null;
     }
     for (const entry of state.entries.values()) {
-      if (entry.handle === undefined) entry.abort?.abort();
+      if (!entry.resolved) {
+        entry.abort?.abort();
+        this.releaseSlot(entry);
+      }
     }
   }
 
@@ -550,8 +641,13 @@ interface TileEntry {
   coord: TileCoord;
   /** y-down page points. */
   rect: Rect;
-  handle?: PageImageHandle;
+  /** Fetch completed — the BYTES live in the RasterStore (peeked at paint
+   *  time), never here: single ownership is what makes the store's budget
+   *  the actual bound on residency. */
+  resolved: boolean;
   painted: boolean;
+  /** Holds an in-flight transit slot (see releaseSlot — idempotent). */
+  charged?: boolean;
   abort?: AbortController;
 }
 

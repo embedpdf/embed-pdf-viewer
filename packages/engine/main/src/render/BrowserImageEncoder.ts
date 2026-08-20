@@ -222,7 +222,13 @@ export class BrowserImageEncoder implements LocalImageEncoder {
   private createWorker(): Worker {
     const source = this.opts.worker ?? 'inline';
     if (typeof source === 'function') return source();
-    if (typeof source === 'string') return new Worker(toAbsoluteUrl(source));
+    // Branch ORDER is load-bearing: the literal 'inline' IS a string, and it
+    // must resolve to the bundled blob worker — never be fetched as the URL
+    // "/inline" (which returns HTML and kills the pool with a SyntaxError,
+    // silently demoting every consumer to main-thread encoding).
+    if (source !== 'inline' && typeof source === 'string') {
+      return new Worker(toAbsoluteUrl(source));
+    }
     if (!this.workerUrl) {
       this.workerUrl = URL.createObjectURL(
         new Blob([encoderWorkerSource], { type: 'text/javascript' }),

@@ -82,6 +82,11 @@ export class RasterStore {
     return this.entries.size;
   }
 
+  /** Total cost (~bytes) of resolved entries — the budgeted quantity. */
+  get costUsed(): number {
+    return this.total;
+  }
+
   private attach(key: string, entry: Entry, signal?: AbortSignal): Promise<PageImageHandle> {
     if (signal?.aborted) return Promise.reject(abortReason(signal));
     // EVERY consumer holds a ref while the fetch is in flight — including
