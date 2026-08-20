@@ -27,7 +27,7 @@ import {
 } from '@embedpdf/react/runtime';
 import { Stage } from '@embedpdf/react/stage';
 import { Scrollbar } from '@embedpdf/react/scrollbar';
-import { RenderLayer, TileLayer } from '@embedpdf/react/render';
+import { RenderLayer } from '@embedpdf/react/render';
 import { SelectionClipboard, SelectionLayer } from '@embedpdf/react/selection';
 import { AnnotationLayer, useFilePickerProvider } from '@embedpdf/react/annotation';
 import { LinkLayer } from '@embedpdf/react/link';
@@ -191,12 +191,11 @@ export function Shell() {
             >
               {() => (
                 <>
+                  {/* Base + deep-zoom tiles in one layer. Tiles engage by
+                      demand arithmetic when the view wants more pixels than
+                      the base budget supplies — the thumbnail rail's demand
+                      never does, so it mounts the same layer for free. */}
                   <RenderLayer annotations={false} />
-                  {/* Deep-zoom tiles ABOVE the base rung — main lens only
-                      (the thumbnail rail composes without per-view tiling).
-                      Engages by demand
-                      arithmetic when the deployment lattice caps the base. */}
-                  <TileLayer annotations={false} />
                   <SelectionLayer />
                   <SearchLayer />
                   {/* Clickable links (nav plane): anchors under the default

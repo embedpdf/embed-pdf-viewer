@@ -15,8 +15,13 @@ work. Each layer narrows the scope of what you operate on.
 
 ## The engine
 
-`createCloudEngine(options)` returns an object implementing the `Engine`
-interface:
+<Engine cloud>
+`cloudEngine(options)` returns an object implementing the `Engine` interface:
+</Engine>
+
+<Engine local>
+`localEngine()` returns an object implementing the `Engine` interface:
+</Engine>
 
 ```ts
 interface Engine {
@@ -61,6 +66,7 @@ interface DocumentHandle {
   readonly metadata: MetadataService;
   readonly annotations: DocumentAnnotationsService;
   readonly pages: DocumentPagesService;
+  readonly render: DocumentRenderService;
 
   page(pageObjectNumber: PageObjectNumber): PageHandle;
   download(opts?: { mode?: PdfSaveMode }): AbortablePromise<Uint8Array>;
@@ -70,6 +76,9 @@ interface DocumentHandle {
 
 - `metadata`, `annotations`, `pages`, and `security` are **document-scoped
   services** (covered in their own pages).
+- `render` carries the document's render *policy* — not pixels; per-page
+  rendering stays on `page(pon).render`. See
+  [Render policy](/docs/engine/core-concepts/pages-and-rendering#render-policy).
 - `page(pon)` returns a page handle (below).
 - `download()` returns the full PDF bytes — see [Downloading](/docs/engine/core-concepts/downloading).
 - `close()` releases the handle. It's idempotent and safe to call more than
@@ -124,8 +133,9 @@ const page = doc.page(firstPon);
 
 ## Lifecycle at a glance
 
+<Engine cloud>
 ```ts
-const engine = createCloudEngine({ baseUrl, token });
+const engine = cloudEngine({ baseUrl });
 
 const doc = await engine.open({ kind: 'id', id: 'doc_123' }); // open
 const page = doc.page((await doc.pages.list()).pages[0].pageObjectNumber); // work
@@ -134,3 +144,17 @@ await page.render.image();
 await doc.close();    // release the document
 await engine.destroy(); // tear down the engine
 ```
+</Engine>
+
+<Engine local>
+```ts
+const engine = localEngine();
+
+const doc = await engine.open({ kind: 'bytes', id: 'doc_123', bytes }); // open
+const page = doc.page((await doc.pages.list()).pages[0].pageObjectNumber); // work
+await page.render.image();
+
+await doc.close();    // release the document
+await engine.destroy(); // tear down the engine
+```
+</Engine>

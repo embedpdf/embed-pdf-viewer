@@ -372,10 +372,45 @@ export function createStageCapability(
     direction: ctx.getState().direction,
   });
 
+  // Initial-view placement flag — declared up here so the rest detector can
+  // read it; the placement logic further down owns it.
+  let hasPlaced = false;
+
+  // ── camera-rest detector ────────────────────────────────────────────────────
+  // A continuous zoom and a device-snapped origin cannot coexist without the
+  // anchor point jittering (each step rounds differently, ±0.5 device px per
+  // axis). So origin snapping is gated on REST: fractional placement while
+  // the zoom moves, one snap when it settles — when crispness matters. The
+  // window is counted in scheduler frames (the same timing seam the tween
+  // uses), so tests stay deterministic.
+  const REST_MS = 150;
+  let restRaf = 0;
+  const armRest = () => {
+    // Initial placement snaps immediately (first paint is crisp), and an
+    // environment without real frames keeps snapping always-on — rest-gating
+    // is a live-gesture refinement, not a contract.
+    if (!canAnimate || !hasPlaced) return;
+    if (ctx.getState().cameraResting) ctx.dispatch({ type: 'CAMERA_REST', resting: false });
+    if (restRaf) scheduler.caf(restRaf);
+    let t0 = 0;
+    const tick = (ts: number) => {
+      restRaf = 0;
+      if (!t0) t0 = ts;
+      if (ts - t0 >= REST_MS) {
+        ctx.dispatch({ type: 'CAMERA_REST', resting: true });
+        return;
+      }
+      restRaf = scheduler.raf(tick);
+    };
+    restRaf = scheduler.raf(tick);
+  };
+
   // The ONE low-level camera write: clamp to `bounds`, dispatch. MECHANISM only —
   // it never touches the cursor (see syncCursorFromCamera for the policy).
   const setCam = (next: S.Camera, bounds: S.Rect = stayBounds()) => {
-    ctx.dispatch({ type: 'CAMERA', camera: S.clampCamera(next, bounds, vp(), constraint()) });
+    const clamped = S.clampCamera(next, bounds, vp(), constraint());
+    if (clamped.zoom !== cam().zoom) armRest();
+    ctx.dispatch({ type: 'CAMERA', camera: clamped });
   };
 
   /**
@@ -611,10 +646,15 @@ export function createStageCapability(
       : unrotatedPoints(box);
     const c = cam();
     const ratio = dpr();
-    // device-snapped footprint top-left (camera-resolved) — keeps a rotated page
-    // on the device grid; the adapter just consumes it.
-    const screenX = snapToDevice((box.x - c.x) * c.zoom, ratio);
-    const screenY = snapToDevice((box.y - c.y) * c.zoom, ratio);
+    // Footprint top-left (camera-resolved). Device-snapped AT REST — keeps a
+    // rotated page on the device grid; while the zoom is in motion it places
+    // fractionally, because snapping mid-zoom makes the anchor point jitter
+    // ±0.5 device px per step (see StageState.cameraResting).
+    const rawX = (box.x - c.x) * c.zoom;
+    const rawY = (box.y - c.y) * c.zoom;
+    const resting = ctx.getState().cameraResting;
+    const screenX = resting ? snapToDevice(rawX, ratio) : rawX;
+    const screenY = resting ? snapToDevice(rawY, ratio) : rawY;
     const transform = pageTransform({
       pageSize,
       rotation: box.rotation,
@@ -687,7 +727,7 @@ export function createStageCapability(
     const v = vp();
     const sc = buildScene();
     const items = paged() ? sc.items.slice(0, 1) : sc.query(S.cameraWorldRect(c, v));
-    const sig = `${sceneCache!.key}|${ctx.getState().flow}|${c.x},${c.y},${c.zoom}|${v.width}x${v.height}|${dpr()}`;
+    const sig = `${sceneCache!.key}|${ctx.getState().flow}|${c.x},${c.y},${c.zoom}|${v.width}x${v.height}|${dpr()}|r${ctx.getState().cameraResting ? 1 : 0}`;
     if (sig === visSig) return vis;
     visSig = sig;
     vis = items.flatMap((it) => it.pages).map(withTransform);
@@ -705,8 +745,8 @@ export function createStageCapability(
 
   // Initial-view providers (storage restore, deep-link, an explicit prop…). One owner
   // (placeInitial) resolves them by priority — no effect-ordering races.
+  // (`hasPlaced` is declared above the camera-rest detector, which reads it.)
   const initialViewProviders: Array<{ priority: number; fn: () => StageViewState | null }> = [];
-  let hasPlaced = false;
 
   const api: StageCapability = {
     // ── selectors ──

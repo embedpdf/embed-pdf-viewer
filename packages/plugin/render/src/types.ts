@@ -2,17 +2,50 @@ import {
   createCapabilityToken,
   type EngineRenderPolicy,
   type PageImageHandle,
+  type PageImageOptions,
   type PageObjectNumber,
   type PageRenderViewport,
 } from '@embedpdf/core';
 
-import type { PageViewDemand, TilePaintPlan, TilingConfig } from './paint-plan';
+import type { FullPageOptions, PageViewDemand, TilePaintPlan, TilesOptions } from './paint-plan';
 
-/** Options for `renderPlugin()`. Tiling is capability + economics here;
- *  WHICH view tiles is composition (mount a TileLayer per lens), and
- *  WHETHER it engages is demand arithmetic — three levels, three owners. */
+/**
+ * Options for `renderPlugin()` — the render STRATEGY: what the viewer
+ * chooses to spend, and which render points it uses when the engine permits
+ * anything. The shape mirrors the deployment policy (`policy.fullPage` /
+ * `policy.tiles`), and the one composition rule is: a strategy value
+ * applies as written under a `continuous` policy, and the advertised
+ * lattice wins when there is one — so the same options run unchanged
+ * against local and cloud.
+ */
 export interface RenderPluginOptions {
-  tiling?: TilingConfig;
+  /** Base plane: the pixel budget + render points. */
+  fullPage?: FullPageOptions;
+  /** Tile plane strategy; `false` disables the plane entirely. */
+  tiles?: TilesOptions | false;
+  /**
+   * Encode format for BOTH planes. Unset → engine default (png local, the
+   * deployment's format on cloud). `'bmp'` is the local fast path — no
+   * compression, no encoder-worker round trip; under a lattice it conforms
+   * to `policy.formats`.
+   */
+  format?: NonNullable<PageImageOptions['format']>;
+  /** Encoder quality (webp/png); ignored for bmp. */
+  quality?: number;
+  /**
+   * Diagnostic logging: tile scheduling, settle timing, fetch outcomes —
+   * the counters that catch convergence issues in long sessions. Console
+   * `debug` level; off by default.
+   */
+  debug?: boolean;
+}
+
+/** Layer-facing paint settings (resolved options the view layers need). */
+export interface PaintSettings {
+  /** Tile arrival cross-fade (ms); 0 = hard pop. */
+  fadeMs: number;
+  /** Whether the tile plane is enabled at all (`tiles: false` opts out). */
+  tiles: boolean;
 }
 
 export interface RenderPageOptions {
@@ -74,21 +107,23 @@ export interface RenderCapability {
    * Render a page (by its durable pon) to an ENCODED image. Abortable. Encoded
    * output is identical for local & cloud and cheap over the wire (vs. raw RGBA).
    *
-   * CONFORMS to the deployment policy's three-layer rule:
-   * under a lattice the desired `scale` converts to the canonical ladder width
-   * via `snapFullPageViewport`; under `continuous` it passes through exactly.
-   * Same-key requests collapse in the plugin's raster store (singleflight +
-   * LRU), so repeated asks inside one rung cost one engine call.
+   * This is the VIEWER door: the desired `scale` conforms through the
+   * resolved render points (STRATEGY ∧ POLICY) — the exact demand capped at
+   * the pixel budget under `continuous`, the advertised ladder under a
+   * lattice — and same-key requests collapse in the plugin's raster store
+   * (singleflight + LRU). Scale-precise offline output (export, print)
+   * belongs on the engine door: `doc.page(pon).render.image(...)`.
    */
   renderPage(pon: PageObjectNumber, options: RenderPageOptions): Promise<PageImageHandle>;
   /**
    * The identity of the raster `renderPage` would produce for these options —
-   * canonical viewport + annotations flag + epoch, as one stable string.
-   * Layers key their fetch effect on THIS instead of the raw scale: inside a
-   * rung the key never changes (zoom 1.2→1.5 under a [1,2]-ish lattice is a
-   * no-op — no refetch, no DOM churn); it changes exactly at rung crossings
-   * and epoch bumps. Always available: the kernel materializes the policy on
-   * `DocumentMeta` before the document publishes.
+   * conformed width + annotations flag + epoch, as one stable string. Layers
+   * key their fetch effect on THIS instead of the raw scale. Under a lattice
+   * it moves only at rung crossings; under exact-mode `continuous` it tracks
+   * the demand, is constant above the budget (always the budget width), and
+   * the LAYER settle-gates adoption so it never refetches mid-gesture.
+   * Always available: the kernel materializes the policy on `DocumentMeta`
+   * before the document publishes.
    */
   renderSourceKey(
     pon: PageObjectNumber,
@@ -96,9 +131,12 @@ export interface RenderCapability {
   ): string;
   /**
    * The canonical viewport a desired scale conforms to for this page —
-   * width-kind on a lattice, the exact scale under `continuous`.
+   * always width-kind: the exact demand capped at the budget (exact mode)
+   * or the snapped rung (ladder/lattice mode).
    */
   conformViewport(pon: PageObjectNumber, scale: number): PageRenderViewport;
+  /** Resolved layer-facing paint settings (settle, fade, tiles on/off). */
+  paintSettings(): PaintSettings;
   /** The document's advertised policy (sugar over `DocumentMeta.renderPolicy`). */
   renderPolicy(): EngineRenderPolicy;
   /**
@@ -107,9 +145,11 @@ export interface RenderCapability {
    * Memoized: the same object returns until the demand, an epoch, or a
    * tile resolution actually changes it, so layers can subscribe with
    * plain `Object.is`. Calling it schedules the want-set fetches (visible
-   * first, prefetch ring after) — idempotent, store-deduped. Engagement
-   * is pure arithmetic: it fires only when the policy's ladder caps the
-   * base below the demand; a thumbnail-sized demand never engages.
+   * first, center-out, prefetch ring after) — idempotent, store-deduped.
+   * Engagement is pure arithmetic against what the base will ACTUALLY
+   * supply (the same `baseAsk` the base layer sizes with): tiles fire when
+   * demand exceeds the budget/ladder cap × engageAt — on every engine.
+   * A thumbnail-sized demand never engages.
    */
   tilePlan(
     pon: PageObjectNumber,
@@ -117,13 +157,20 @@ export interface RenderCapability {
     opts?: { includeAnnotations?: boolean },
   ): TilePaintPlan;
   /**
-   * The painter's decode-boundary report: the `<img>` for this plan key
-   * actually painted (onload). Retained coarser generations covered by
-   * painted want-set tiles release on this signal — never on fetch
-   * completion, which would flash during decode.
+   * The painter's report: the image for this plan key had a presentation
+   * opportunity. Retained coarser generations covered by painted want-set
+   * tiles release on this signal — never on fetch completion or image load,
+   * which could drop the backdrop before replacement pixels are presented.
    */
   tilePainted(pon: PageObjectNumber, key: string): void;
-  /** A lens unmounted its TileLayer: abort in-flight tile fetches and drop
+  /**
+   * The inverse report: this plan key's <img> left the DOM, so its pixels
+   * are no longer compositable. Painted is a statement about the SCREEN and
+   * must follow the DOM — a remounting tile re-decodes, and until it
+   * reports painted again, retention may not count it as coverage.
+   */
+  tileUnpainted(pon: PageObjectNumber, key: string): void;
+  /** A lens unmounted its tile plane: abort in-flight tile fetches and drop
    *  the page's tile bookkeeping (resolved bytes stay cached). */
   releaseTiles(pon: PageObjectNumber): void;
   /**

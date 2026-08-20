@@ -1,7 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { PageImageHandle, PdfRect } from '@embedpdf/core';
 
-import { resolveTiling } from './paint-plan';
+import { resolveRenderOptions, type TilesOptions } from './paint-plan';
 import { RasterStore } from './raster-store';
 import { TileManager } from './tile-manager';
 
@@ -21,13 +21,14 @@ const LATTICE = {
   enforced: false,
 } as const;
 
-function harness(opts?: { policy?: unknown; tiling?: Parameters<typeof resolveTiling>[0] }) {
+function harness(opts?: { policy?: unknown; tiling?: TilesOptions }) {
   const store = new RasterStore(256);
   const pending: Array<{
     key: string;
     rect: PdfRect;
     scale: number;
     resolve: () => void;
+    fail: (err?: Error) => void;
     aborted: () => boolean;
   }> = [];
   let advances = 0;
@@ -35,7 +36,8 @@ function harness(opts?: { policy?: unknown; tiling?: Parameters<typeof resolveTi
 
   const manager = new TileManager({
     store,
-    config: resolveTiling({ settleMs: 0, ...opts?.tiling }),
+    // bleed 0 keeps the geometry assertions exact; bleed has its own tests.
+    options: resolveRenderOptions({ tiles: { settleMs: 0, bleed: 0, ...opts?.tiling } }),
     getPolicy: () => (opts?.policy === undefined ? LATTICE : opts.policy) as never,
     getPageSize: () => PAGE,
     getEpoch: () => epoch,
@@ -46,6 +48,7 @@ function harness(opts?: { policy?: unknown; tiling?: Parameters<typeof resolveTi
           rect,
           scale,
           resolve: () => resolve({ fake: record.key } as unknown as PageImageHandle),
+          fail: (err?: Error) => reject(err ?? new Error('render failed')),
           aborted: () => signal.aborted,
         };
         signal.addEventListener('abort', () => reject(signal.reason ?? new Error('aborted')), {
@@ -91,11 +94,33 @@ describe('TileManager', () => {
     expect(h.pending).toHaveLength(0);
   });
 
-  it('never engages under a continuous policy — exactness is the policy, not the plugin', () => {
+  it('ENGAGES past the budget under a continuous policy — the local-engine fix', () => {
     const h = harness({ policy: { kind: 'continuous' } });
+    // Demand 4896 vs the default 640 budget: deficit 7.65 → tiles own
+    // sharpness, at the EXACT demanded scale (4896/612 = 8 — resting
+    // pixels are 1:1, the dpr-1 crispness rule).
     const plan = h.manager.plan(1, DEEP, true);
+    expect(plan.engaged).toBe(true);
+    expect(h.pending).toHaveLength(4);
+    expect(h.pending.every((p) => p.scale === 8)).toBe(true);
+  });
+
+  it('continuous below the budget never engages — the base is exact there', () => {
+    const h = harness({ policy: { kind: 'continuous' } });
+    // 600 ≤ 640 budget: base renders exactly 600 — deficit 1, engageAt 1.0.
+    const plan = h.manager.plan(1, { desiredDeviceWidth: 600 }, true);
     expect(plan.engaged).toBe(false);
     expect(h.pending).toHaveLength(0);
+  });
+
+  it('exact mode: the same settled demand re-plans to the same object (memo)', async () => {
+    const h = harness({ policy: { kind: 'continuous' } });
+    h.manager.plan(1, DEEP, true);
+    await h.resolveAll();
+    const a = h.manager.plan(1, DEEP, true);
+    const b = h.manager.plan(1, DEEP, true);
+    expect(b).toBe(a);
+    expect(a.paint).toHaveLength(4);
   });
 
   it('engages past the ladder cap: want = visible tiles at the snapped level', () => {
@@ -249,5 +274,123 @@ describe('TileManager', () => {
     h.manager.plan(1, DEEP, true);
     await h.resolveAll();
     expect(h.advanceCount()).toBeGreaterThanOrEqual(4);
+  });
+
+  it('UNPAINT: a tile leaving the DOM stops counting as coverage until it re-paints', async () => {
+    const h = harness();
+    h.manager.plan(1, DEEP, true);
+    await h.resolveAll();
+    let plan = h.manager.plan(1, DEEP, true);
+    for (const s of plan.paint) h.manager.sourcePainted(1, s.key);
+
+    // Zoom deeper: level 16 wanted over a quarter of the old area.
+    const deeper = {
+      desiredDeviceWidth: 9792,
+      visibleRect: { x: 0, y: 0, width: 64, height: 64 },
+    };
+    h.manager.plan(1, deeper, true);
+    await h.resolveAll();
+    plan = h.manager.plan(1, deeper, true);
+    const fine = plan.paint.filter((s) => s.scale === 16);
+    expect(fine.length).toBeGreaterThan(1);
+
+    // Paint all fine tiles, then one of them UNMOUNTS (pan-away) before the
+    // release question is asked again…
+    for (const s of fine.slice(0, -1)) h.manager.sourcePainted(1, s.key);
+    h.manager.sourceUnpainted(1, fine[0]!.key);
+    h.manager.sourcePainted(1, fine[fine.length - 1]!.key);
+    // …so the retained coarse tile must STAY: its region is not fully
+    // compositable right now.
+    plan = h.manager.plan(1, deeper, true);
+    expect(plan.paint.some((s) => s.scale === 8)).toBe(true);
+
+    // The tile remounts and re-reports painted → NOW the coarse one leaves.
+    h.manager.sourcePainted(1, fine[0]!.key);
+    plan = h.manager.plan(1, deeper, true);
+    expect(plan.paint.some((s) => s.scale === 8)).toBe(false);
+  });
+
+  it('BLEED: paint and fetch rects overlap neighbors by the bleed; retention math stays logical', async () => {
+    const h = harness({ tiling: { bleed: 1, prefetch: { margin: 0 } } });
+    h.manager.plan(1, DEEP, true); // level 8 — bleed is 1/8 pt per side
+    // The FETCHED region is bled: interior tiles ask for span + 2×(1/8) pt.
+    const interior = h.pending.find((p) => p.rect.left > 0)!;
+    expect(interior.rect.right - interior.rect.left).toBeCloseTo(64 + 2 / 8, 5);
+    await h.resolveAll();
+    const plan = h.manager.plan(1, DEEP, true);
+    // Placement rects are bled the same way — neighbors overlap …
+    const first = plan.paint.find((s) => s.rect.x === 0)!; // page-edge clamp
+    const second = plan.paint.find((s) => s.rect.x > 0 && s.rect.x < 64)!;
+    expect(second.rect.x).toBeCloseTo(64 - 1 / 8, 5);
+    expect(first.rect.x + first.rect.width).toBeGreaterThan(second.rect.x);
+    // …and the grid math still counts 2×2 visible tiles (logical, unbled).
+    expect(plan.paint).toHaveLength(4);
+  });
+
+  it('FAILURE: a failed tile wakes the layers, is not retried at this level, retries after a level change', async () => {
+    const h = harness({ tiling: { prefetch: { margin: 0 } } });
+    h.manager.plan(1, DEEP, true);
+    expect(h.pending).toHaveLength(4);
+    const wakesBefore = h.advanceCount();
+    h.pending[0]!.fail(); // real failure, not an abort
+    for (const p of h.pending.slice(1)) p.resolve();
+    await drain();
+    // The failure itself woke subscribers (progress never silently stalls) …
+    expect(h.advanceCount()).toBeGreaterThan(wakesBefore);
+    // …the survivors paint, and the failed coord is NOT refetched at this level.
+    const before = h.pending.length;
+    const plan = h.manager.plan(1, DEEP, true);
+    expect(plan.paint).toHaveLength(3);
+    expect(h.pending.length).toBe(before);
+    // A level change clears the failure memory — the coord gets fresh chances.
+    h.manager.plan(1, { ...DEEP, desiredDeviceWidth: 9792 }, true);
+    expect(h.pending.length).toBeGreaterThan(before);
+  });
+});
+
+describe('settle convergence (regression: a zoom must always land on its final level)', () => {
+  it('burst then rest fetches the FINAL level; a small follow-up step converges too', async () => {
+    vi.useFakeTimers();
+    try {
+      // Exact mode (continuous policy) — every demand is its own level, the
+      // case where the settle gate is the whole affordability story.
+      const h = harness({
+        policy: { kind: 'continuous' },
+        tiling: { settleMs: 150, prefetch: { margin: 0 } },
+      });
+      const demand = (w: number) => ({
+        desiredDeviceWidth: w,
+        visibleRect: { x: 0, y: 0, width: 128, height: 128 },
+      });
+      // First engagement kicks off immediately.
+      h.manager.plan(1, demand(4896), true);
+      expect(h.pending.length).toBeGreaterThan(0);
+      await h.resolveAll();
+
+      // Burst: the level changes every frame; nothing fetches mid-gesture.
+      const before = h.pending.length;
+      h.manager.plan(1, demand(5200), true);
+      h.manager.plan(1, demand(5800), true);
+      h.manager.plan(1, demand(6400), true);
+      expect(h.pending.length).toBe(before);
+
+      // Rest: the settle fires with the FINAL level.
+      await vi.advanceTimersByTimeAsync(200);
+      expect(h.pending.length).toBeGreaterThan(before);
+      await h.resolveAll();
+      let plan = h.manager.plan(1, demand(6400), true);
+      expect(plan.paint.some((s) => Math.abs(s.scale - 6400 / PAGE.width) < 1e-9)).toBe(true);
+
+      // One small step (the anchor-jitter cadence) converges the same way.
+      h.manager.plan(1, demand(6560), true);
+      const beforeSmall = h.pending.length;
+      await vi.advanceTimersByTimeAsync(200);
+      expect(h.pending.length).toBeGreaterThan(beforeSmall);
+      await h.resolveAll();
+      plan = h.manager.plan(1, demand(6560), true);
+      expect(plan.paint.some((s) => Math.abs(s.scale - 6560 / PAGE.width) < 1e-9)).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

@@ -82,14 +82,38 @@ export function tilePaintRect(grid: TileGrid, page: PageSizePt, c: TileCoord): R
   };
 }
 
+/** Engine target rect (y-UP PDF user space, top > bottom) for an arbitrary
+ *  y-down page-point rect. */
+export function toEngineRect(page: PageSizePt, rect: Rect): PdfRect {
+  return {
+    left: rect.x,
+    right: rect.x + rect.width,
+    top: page.height - rect.y,
+    bottom: page.height - (rect.y + rect.height),
+  };
+}
+
 /** Engine target rect: y-UP PDF user space (top > bottom). */
 export function tileEngineRect(grid: TileGrid, page: PageSizePt, c: TileCoord): PdfRect {
-  const paint = tilePaintRect(grid, page, c);
+  return toEngineRect(page, tilePaintRect(grid, page, c));
+}
+
+/**
+ * Expand a paint rect by `pt` page points per side, clamped to the page —
+ * the tile BLEED. Neighboring tiles rendered with bleed overlap by twice
+ * this amount, and the overlapping strips contain identical content (same
+ * page region, same scale), so every img edge composites over its
+ * neighbor's duplicated pixels instead of the backdrop: no AA hairlines,
+ * no bilinear edge smear, at any CSS stretch.
+ */
+export function bleedRect(rect: Rect, pt: number, page: PageSizePt): Rect {
+  const x = Math.max(0, rect.x - pt);
+  const y = Math.max(0, rect.y - pt);
   return {
-    left: paint.x,
-    right: paint.x + paint.width,
-    top: page.height - paint.y,
-    bottom: page.height - (paint.y + paint.height),
+    x,
+    y,
+    width: Math.min(page.width, rect.x + rect.width + pt) - x,
+    height: Math.min(page.height, rect.y + rect.height + pt) - y,
   };
 }
 
