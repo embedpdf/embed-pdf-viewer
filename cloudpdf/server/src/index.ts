@@ -131,6 +131,42 @@ export {
 } from './storage/config/ObjectStoreConfigSchema';
 export { loadObjectStoreConfigFromEnv } from './storage/config/loadObjectStoreConfigFromEnv';
 
+// Import (server-side pull) family for documents.importFrom.
+export type { ImportSource, ImportSourceInfo, ImportSourceOpen } from './import/ImportSource';
+export { ImportSourceError } from './import/ImportSource';
+export { createImportSource } from './import/createImportSource';
+export { UrlImportSource, isPubliclyRoutableAddress } from './import/adapters/UrlImportSource';
+export {
+  ImportPolicySchema,
+  defaultImportPolicy,
+  type ImportPolicy,
+} from './import/config/ImportPolicySchema';
+export { loadImportPolicyFromEnv } from './import/config/loadImportPolicyFromEnv';
+export {
+  ImportConnectionSchema,
+  ImportConnectionScopeSchema,
+  type AzureBlobImportConnection,
+  type FsImportConnection,
+  type GcsImportConnection,
+  type ImportConnection,
+  type ImportConnectionScope,
+  type S3ImportConnection,
+} from './import/config/ImportConnectionSchema';
+export { loadImportConnectionsFromEnv } from './import/config/loadImportConnectionsFromEnv';
+export { ImportConnectionRegistry } from './import/ImportConnectionRegistry';
+export { ImportWorker, type ImportWorkerOptions } from './import/ImportWorker';
+export { S3ImportSource } from './import/adapters/S3ImportSource';
+export { GcsImportSource } from './import/adapters/GcsImportSource';
+export { AzureBlobImportSource } from './import/adapters/AzureBlobImportSource';
+export { FsImportSource } from './import/adapters/FsImportSource';
+export {
+  resolveScopePrefixes,
+  targetsDeploymentStorage,
+  type ImportCallerContext,
+  type ImportSourceDeps,
+} from './import/createImportSource';
+export { DocumentImportsRepo, type DocumentImportRow } from './db/repos/document_imports.repo';
+
 // CDN adapter family (signers + factory + config + None adapter).
 // HMAC/CloudFront adapters ship in commit G; purge wiring in commit H.
 export type {

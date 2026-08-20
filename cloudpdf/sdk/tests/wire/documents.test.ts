@@ -290,6 +290,126 @@ describe("DocumentsClient", () => {
         }).rejects.toThrow(CloudPDF.NotFoundError);
     });
 
+    test("importFrom (1)", async () => {
+        const server = mockServerPool.createServer();
+        const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
+        const rawRequestBody = { source: { kind: "url", url: "url" } };
+        const rawResponseBody = {
+            tag: "imported",
+            document: {
+                id: "id",
+                tenantId: "tenantId",
+                state: "pending",
+                baseSha: "baseSha",
+                storageSizeBytes: 1.1,
+                metadata: { key: "value" },
+                idempotencyKey: "idempotencyKey",
+                failureReason: "failureReason",
+                thumbnailState: "pending",
+                thumbnailUrl: "thumbnailUrl",
+                createdAt: 1.1,
+                updatedAt: 1.1,
+                createdBy: "createdBy",
+            },
+        };
+
+        server
+            .mockEndpoint()
+            .post("/v1/tenants/tenantId/documents/import")
+            .jsonBody(rawRequestBody)
+            .respondWith()
+            .statusCode(200)
+            .jsonBody(rawResponseBody)
+            .build();
+
+        const response = await client.documents.importFrom({
+            tenantId: "tenantId",
+            source: {
+                kind: "url",
+                url: "url",
+            },
+        });
+        expect(response).toEqual(rawResponseBody);
+    });
+
+    test("importFrom (2)", async () => {
+        const server = mockServerPool.createServer();
+        const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
+        const rawRequestBody = { source: { kind: "url", url: "url" } };
+        const rawResponseBody = { key: "value" };
+
+        server
+            .mockEndpoint()
+            .post("/v1/tenants/tenantId/documents/import")
+            .jsonBody(rawRequestBody)
+            .respondWith()
+            .statusCode(400)
+            .jsonBody(rawResponseBody)
+            .build();
+
+        await expect(async () => {
+            return await client.documents.importFrom({
+                tenantId: "tenantId",
+                source: {
+                    kind: "url",
+                    url: "url",
+                },
+            });
+        }).rejects.toThrow(CloudPDF.BadRequestError);
+    });
+
+    test("importFrom (3)", async () => {
+        const server = mockServerPool.createServer();
+        const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
+        const rawRequestBody = { source: { kind: "url", url: "url" } };
+        const rawResponseBody = { key: "value" };
+
+        server
+            .mockEndpoint()
+            .post("/v1/tenants/tenantId/documents/import")
+            .jsonBody(rawRequestBody)
+            .respondWith()
+            .statusCode(403)
+            .jsonBody(rawResponseBody)
+            .build();
+
+        await expect(async () => {
+            return await client.documents.importFrom({
+                tenantId: "tenantId",
+                source: {
+                    kind: "url",
+                    url: "url",
+                },
+            });
+        }).rejects.toThrow(CloudPDF.ForbiddenError);
+    });
+
+    test("importFrom (4)", async () => {
+        const server = mockServerPool.createServer();
+        const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
+        const rawRequestBody = { source: { kind: "url", url: "url" } };
+        const rawResponseBody = { error: { code: "code", message: "message" } };
+
+        server
+            .mockEndpoint()
+            .post("/v1/tenants/tenantId/documents/import")
+            .jsonBody(rawRequestBody)
+            .respondWith()
+            .statusCode(502)
+            .jsonBody(rawResponseBody)
+            .build();
+
+        await expect(async () => {
+            return await client.documents.importFrom({
+                tenantId: "tenantId",
+                source: {
+                    kind: "url",
+                    url: "url",
+                },
+            });
+        }).rejects.toThrow(CloudPDF.BadGatewayError);
+    });
+
     test("init (1)", async () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });

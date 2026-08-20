@@ -112,7 +112,13 @@ export class FsObjectStore implements ObjectStore {
         hash.update(chunk);
         written += chunk.byteLength;
       });
-      await pipeline(readable, writer);
+      try {
+        await pipeline(readable, writer);
+      } catch (err) {
+        // A failed source/pipe must not leave `.partial` litter behind.
+        await safeUnlink(partial);
+        throw err;
+      }
     }
 
     if (written !== opts.contentLength) {

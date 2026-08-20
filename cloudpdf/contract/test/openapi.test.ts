@@ -4,7 +4,7 @@ import { describe, expect, test } from 'vitest';
 import { EngineErrorPayloadSchema, wirePaths, wireTemplates } from '@embedpdf/engine-core/wire';
 
 import { adminOperations, adminWirePaths, allOperations, docOperations } from '../src/index';
-import { buildAdminOpenApiDocument } from '../src/openapi';
+import { buildAdminOpenApiDocument, sdkOperationName } from '../src/openapi';
 
 const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as {
   version: string;
@@ -223,5 +223,35 @@ describe('openapi document', () => {
         }, doc);
       expect(target, ref).toBeDefined();
     }
+  });
+});
+
+describe('sdkOperationName', () => {
+  test('splits resource.method ids into SDK groups and method', () => {
+    expect(sdkOperationName('documents.importFrom')).toEqual({
+      groups: ['documents'],
+      method: 'importFrom',
+    });
+    expect(sdkOperationName('doc.forms.importData')).toEqual({
+      groups: ['doc', 'forms'],
+      method: 'importData',
+    });
+  });
+
+  test('rejects ids without a resource prefix', () => {
+    expect(() => sdkOperationName('import')).toThrow(/resource\.method form/);
+  });
+
+  test('rejects method segments that are reserved words in a target SDK language', () => {
+    // The original documents.import: Java and Python generators escaped it
+    // to import_, silently forking the documented surface.
+    expect(() => sdkOperationName('documents.import')).toThrow(/reserved word in Java and Python/);
+    expect(() => sdkOperationName('documents.yield')).toThrow(/Python and Ruby/);
+  });
+
+  test('rejects reserved words in group segments too', () => {
+    // Groups become accessor methods (Java client.documents()) and
+    // attributes (Python client.documents), so they collide the same way.
+    expect(() => sdkOperationName('class.list')).toThrow(/reserved word/);
   });
 });

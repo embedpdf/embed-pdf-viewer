@@ -7,5 +7,6 @@ export default {
   download: 'Download',
   thumbnail: 'Thumbnail',
   'upload-proxy': 'Upload Proxy',
+  'import-from': 'Import From',
   init: 'Init',
 };

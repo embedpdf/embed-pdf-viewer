@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "canonicalVersion": "3.0.0-next.5",
-  "openapiSha256": "e86b3f1766a77c28cb782a6513b5a86998668cd4e688e5b5ac27342e58637cd7",
+  "openapiSha256": "d6a9898590294b1ae3b0441ad31adafd24d33d826f89005d06306bf5702518e0",
   "languages": {
     "typescript": {
       "label": "TypeScript",
@@ -1279,6 +1279,43 @@
       "ruby": {
         "status": "available",
         "source": "require \"cloudpdf\"\n\nclient = CloudPDF::Client.new(\n  token: \"<token>\",\n  base_url: \"https://yourhost.com/path/to/api\"\n)\n\nresult = client.documents.upload_proxy(\n  file: File.open(\"document.pdf\", \"rb\"),\n  tenant_id: \"tenantId\",\n  id: \"documentId\"\n)",
+        "frameLines": 7
+      }
+    },
+    "documents.importFrom": {
+      "typescript": {
+        "status": "available",
+        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.documents.importFrom({\n  tenantId: \"tenantId\",\n  source: {\n    kind: \"url\",\n    url: \"url\"\n  }\n});",
+        "frameLines": 7
+      },
+      "python": {
+        "status": "available",
+        "source": "from cloudpdf import CloudPDFClient\nfrom cloudpdf.documents import DocumentsImportFromRequestSource_Url\n\nclient = CloudPDFClient(\n    token=\"<token>\",\n    base_url=\"https://yourhost.com/path/to/api\",\n)\n\nclient.documents.import_from(\n    tenant_id=\"tenantId\",\n    source=DocumentsImportFromRequestSource_Url(\n        url=\"url\",\n    ),\n)",
+        "frameLines": 8
+      },
+      "php": {
+        "status": "available",
+        "source": "use CloudPDF\\CloudPDFClient;\n\n$client = new CloudPDFClient(\n    token: '<token>',\n    options: ['baseUrl' => 'https://yourhost.com/path/to/api'],\n);\n\n$client->documents->importFrom(\n    'tenantId',\n    new DocumentsImportFromRequest([\n        'source' => DocumentsImportFromRequestSource::url(new DocumentsImportFromRequestSourceUrl([\n            'url' => 'url',\n        ])),\n    ]),\n);",
+        "frameLines": 7
+      },
+      "csharp": {
+        "status": "available",
+        "source": "using CloudPDF;\n\nvar client = new CloudPDFClient(\n    \"<token>\",\n    new ClientOptions { BaseUrl = \"https://yourhost.com/path/to/api\" }\n);\n\nawait client.Documents.ImportFromAsync(\n    new DocumentsImportFromRequest\n    {\n        TenantId = \"tenantId\",\n        Source = new DocumentsImportFromRequestSource(\n            new DocumentsImportFromRequestSource.Url(\n                new DocumentsImportFromRequestSourceUrl { Url = \"url\" }\n            )\n        ),\n    }\n);",
+        "frameLines": 7
+      },
+      "go": {
+        "status": "available",
+        "source": "import (\n    \"context\"\n\n    cloudpdf \"github.com/embedpdf/cloudpdf-sdk-go/v3\"\n    client \"github.com/embedpdf/cloudpdf-sdk-go/v3/client\"\n    option \"github.com/embedpdf/cloudpdf-sdk-go/v3/option\"\n)\n\nclient := client.NewClient(\n    option.WithToken(\"<token>\"),\n    option.WithBaseURL(\"https://yourhost.com/path/to/api\"),\n)\n\nrequest := &cloudpdf.DocumentsImportFromRequest{\n    TenantID: \"tenantId\",\n    Source: &cloudpdf.DocumentsImportFromRequestSource{\n        URL: &cloudpdf.DocumentsImportFromRequestSourceURL{\n            URL: \"url\",\n        },\n    },\n}\nclient.Documents.ImportFrom(\n    context.TODO(),\n    request,\n)",
+        "frameLines": 13
+      },
+      "java": {
+        "status": "available",
+        "source": "import com.cloudpdf.api.CloudPDFClient;\n\nCloudPDFClient client = CloudPDFClient\n    .builder()\n    .token(\"<token>\")\n    .url(\"https://yourhost.com/path/to/api\")\n    .build();\n\nclient.documents().importFrom(\n    \"tenantId\",\n    DocumentsImportFromRequest\n        .builder()\n        .source(\n            DocumentsImportFromRequestSource.url(\n                DocumentsImportFromRequestSourceUrl\n                    .builder()\n                    .url(\"url\")\n                    .build()\n            )\n        )\n        .build()\n);",
+        "frameLines": 8
+      },
+      "ruby": {
+        "status": "available",
+        "source": "require \"cloudpdf\"\n\nclient = CloudPDF::Client.new(\n  token: \"<token>\",\n  base_url: \"https://yourhost.com/path/to/api\"\n)\n\nclient.documents.import_from(tenant_id: \"tenantId\")",
         "frameLines": 7
       }
     },

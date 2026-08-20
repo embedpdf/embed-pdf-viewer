@@ -1,6 +1,6 @@
 # Server Adapter House Style
 
-The server has four adapter families: **Secrets**, **KMS**, **Storage**, **CDN**. They differ in _what they do_ but share _how they're structured_. This document is the contract a new adapter must follow.
+The server has five adapter families: **Secrets**, **KMS**, **Storage**, **CDN**, **Import** (read-only pull sources for `documents.import`). They differ in _what they do_ but share _how they're structured_. This document is the contract a new adapter must follow.
 
 ---
 

@@ -120,48 +120,21 @@ jobs:
 
       - name: Install Fern CLI
         if: steps.select.outputs.enabled == 'true'
-        run: npm install -g fern-api@5.91.0
+        run: npm install -g "fern-api@$(node fern/scripts/generate-sdks.mjs --print-fern-version)"
 
-      - name: Resolve SDK version
+      - name: Resolve canonical version
         if: steps.select.outputs.enabled == 'true'
         id: version
-        env:
-          LANGUAGE: ${{ matrix.language }}
-        run: |
-          echo "canonical=$(node fern/scripts/sdk-version.mjs canonical)" >> "$GITHUB_OUTPUT"
-          echo "sdk=$(node fern/scripts/sdk-version.mjs "$LANGUAGE")" >> "$GITHUB_OUTPUT"
+        run: echo "canonical=$(node fern/scripts/sdk-version.mjs canonical)" >> "$GITHUB_OUTPUT"
 
+      # Generation, metadata recording, and validation share one code path
+      # with local development: fern/scripts/generate-sdks.mjs.
       - name: Generate ${{ matrix.language }} SDK
         if: steps.select.outputs.enabled == 'true'
         env:
           LANGUAGE: ${{ matrix.language }}
-          SDK_VERSION: ${{ steps.version.outputs.sdk }}
           CLOUDPDF_FERN_CLI: fern
-        run: |
-          if [[ "$LANGUAGE" == "typescript" ]]; then
-            node fern/scripts/generate-typescript-sdk.mjs
-          else
-            fern generate \
-              --group "$LANGUAGE" \
-              --local \
-              --version "$SDK_VERSION" \
-              --force \
-              --no-prompt \
-              --generate-tests \
-              --log-level info
-          fi
-
-      - name: Record generation metadata
-        if: steps.select.outputs.enabled == 'true' && matrix.language != 'typescript'
-        env:
-          LANGUAGE: ${{ matrix.language }}
-        run: node fern/scripts/record-sdk-metadata.mjs "$LANGUAGE"
-
-      - name: Validate generated SDK
-        if: steps.select.outputs.enabled == 'true' && matrix.language != 'typescript'
-        env:
-          LANGUAGE: ${{ matrix.language }}
-        run: node fern/scripts/validate-sdk.mjs "$LANGUAGE"
+        run: node fern/scripts/generate-sdks.mjs --only "$LANGUAGE" --force
 
       - name: Verify committed TypeScript SDK is fresh
         if: steps.select.outputs.enabled == 'true' && matrix.language == 'typescript'

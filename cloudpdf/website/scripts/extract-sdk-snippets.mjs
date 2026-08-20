@@ -22,8 +22,9 @@ if (process.argv.includes('--check')) {
   }
   if (current !== serialized) {
     console.error('The committed SDK snippet manifest is stale.');
-    console.error('Regenerate the workspace TypeScript SDK and six external SDKs, then run:');
-    console.error('  pnpm --filter @cloudpdf/website api:snippets');
+    console.error(
+      'Run `pnpm api:sync` from the repository root to regenerate stale SDKs and rebuild it.',
+    );
     process.exit(1);
   }
   console.log(

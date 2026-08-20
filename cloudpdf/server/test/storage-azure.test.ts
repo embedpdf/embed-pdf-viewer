@@ -75,6 +75,27 @@ vi.mock('@azure/storage-blob', () => {
         metadata: opts.metadata ?? {},
       });
     }
+    async uploadStream(
+      stream: Readable,
+      _bufferSize?: number,
+      _maxConcurrency?: number,
+      opts?: { blobHTTPHeaders?: { blobContentType?: string } },
+    ): Promise<void> {
+      // Drain-then-commit mirrors real Azure block staging: a stream
+      // error rejects before commitBlockList, no visible blob.
+      const chunks: Buffer[] = [];
+      for await (const c of stream) chunks.push(Buffer.from(c as Uint8Array));
+      az.objects.set(this.key, {
+        bytes: Buffer.concat(chunks),
+        contentType: opts?.blobHTTPHeaders?.blobContentType ?? 'application/octet-stream',
+        metadata: {},
+      });
+    }
+    async setMetadata(metadata: Record<string, string>): Promise<void> {
+      const o = az.objects.get(this.key);
+      if (!o) throw Object.assign(new Error('BlobNotFound'), { statusCode: 404 });
+      o.metadata = { ...metadata };
+    }
     async downloadToBuffer(): Promise<Buffer> {
       const o = az.objects.get(this.key);
       if (!o) throw Object.assign(new Error('BlobNotFound'), { statusCode: 404 });

@@ -1,7 +1,14 @@
 import assert from 'node:assert/strict';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import test from 'node:test';
 
-import { normalizeSnippetWhitespace, parseReference } from './sdk-snippets.mjs';
+import {
+  generationStampProblem,
+  normalizeSnippetWhitespace,
+  parseReference,
+} from './sdk-snippets.mjs';
 
 function reference(summary, language, source = `${language} usage`) {
   return `## Methods
@@ -148,4 +155,51 @@ test('normalizeSnippetWhitespace leaves idiomatic-4 languages at 4', () => {
     normalizeSnippetWhitespace('python', python),
     'client = CloudPDFClient(\n    base_url="x",\n)',
   );
+});
+
+test('generationStampProblem accepts a tree stamped with the current OpenAPI document', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'cloudpdf-stamp-'));
+  try {
+    const sha = 'f'.repeat(64);
+    writeFileSync(
+      join(directory, 'cloudpdf-generation.json'),
+      JSON.stringify({ canonicalVersion: '3.0.0-next.5', source: { openapiSha256: sha } }),
+    );
+    assert.equal(
+      generationStampProblem({
+        referenceFile: join(directory, 'reference.md'),
+        expectedOpenapiSha256: sha,
+      }),
+      null,
+    );
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('generationStampProblem flags unstamped and stale trees', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'cloudpdf-stamp-'));
+  try {
+    const missing = generationStampProblem({
+      referenceFile: join(directory, 'reference.md'),
+      expectedOpenapiSha256: 'f'.repeat(64),
+    });
+    assert.match(missing, /never generated/);
+
+    writeFileSync(
+      join(directory, 'cloudpdf-generation.json'),
+      JSON.stringify({
+        canonicalVersion: '3.0.0-next.1',
+        source: { openapiSha256: 'a'.repeat(64) },
+      }),
+    );
+    const stale = generationStampProblem({
+      referenceFile: join(directory, 'reference.md'),
+      expectedOpenapiSha256: 'f'.repeat(64),
+    });
+    assert.match(stale, /generated from OpenAPI aaaaaaaaaaaa/);
+    assert.match(stale, /3\.0\.0-next\.1/);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
 });

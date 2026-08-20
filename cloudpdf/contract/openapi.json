@@ -2835,6 +2835,108 @@
         }
       }
     },
+    "/v1/tenants/{tenantId}/documents/import": {
+      "post": {
+        "operationId": "documents.importFrom",
+        "x-fern-sdk-group-name": ["documents"],
+        "x-fern-sdk-method-name": "importFrom",
+        "x-docs-title": "Import document",
+        "summary": "Server-side pull: fetch a PDF from a caller-supplied URL (e.g. a presigned object-store GET) or an operator-registered storage connection into CloudPDF-owned storage, verify it, and commit it.",
+        "description": "Default mode is synchronous and bounded: the response returns only after the transfer verified and committed (or failed). mode=async (connection sources only) answers 202 immediately and an in-process worker performs the transfer with leased, fenced retries; poll the document until ready/failed. The deployment import policy gates scheme, network range, and size; sources must declare a length. CloudPDF copies and owns the bytes — the source is never referenced in place. A 502 marks a retryable upstream failure: retry with the same idempotencyKey to resume the same document. URL sources are capabilities and never echoed back. Connection sources name operator-registered storage (bucket/prefix scope, allowed credential classes, and tenant bindings are deployment configuration); `revision` is provider-interpreted (S3 VersionId, GCS generation, Azure version id).",
+        "security": [
+          {
+            "apiToken": []
+          },
+          {
+            "tenantToken": []
+          }
+        ],
+        "x-required-scope": ["docs.create"],
+        "parameters": [
+          {
+            "name": "tenantId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]+$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DocumentsImportFromRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentsImportFrom200Response"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentsImportFrom202Response"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentsImportFrom400Response"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentsImportFrom403Response"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentsImportFrom502Response"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminErrorPayload"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/tenants/{tenantId}/documents/init": {
       "post": {
         "operationId": "documents.init",
@@ -4374,6 +4476,309 @@
         "additionalProperties": false
       },
       "DocumentsUploadProxy409Response": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": ["code", "message"],
+            "additionalProperties": false
+          }
+        },
+        "required": ["error"],
+        "additionalProperties": false
+      },
+      "DocumentsImportFromRequest": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": ["url"]
+                  },
+                  "url": {
+                    "type": "string",
+                    "format": "uri",
+                    "maxLength": 8192
+                  }
+                },
+                "required": ["kind", "url"],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": ["connection"]
+                  },
+                  "connectionId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  },
+                  "key": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "revision": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1024
+                  }
+                },
+                "required": ["kind", "connectionId", "key"],
+                "additionalProperties": false
+              }
+            ]
+          },
+          "expected": {
+            "type": "object",
+            "properties": {
+              "sizeBytes": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              }
+            },
+            "additionalProperties": false
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": {}
+          },
+          "idempotencyKey": {
+            "type": "string"
+          },
+          "dedupMode": {
+            "type": "string",
+            "enum": ["always-create", "reuse-existing"]
+          },
+          "docId": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]+$"
+          },
+          "mode": {
+            "type": "string",
+            "enum": ["sync", "async"]
+          }
+        },
+        "required": ["source"],
+        "additionalProperties": false
+      },
+      "DocumentsImportFrom200Response": {
+        "type": "object",
+        "properties": {
+          "tag": {
+            "type": "string",
+            "enum": ["imported", "deduped", "accepted"]
+          },
+          "document": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "tenantId": {
+                "type": "string"
+              },
+              "state": {
+                "type": "string",
+                "enum": ["pending", "ready", "failed", "deleting"]
+              },
+              "baseSha": {
+                "type": "string",
+                "nullable": true
+              },
+              "storageSizeBytes": {
+                "type": "number",
+                "nullable": true
+              },
+              "metadata": {
+                "type": "object",
+                "additionalProperties": {},
+                "nullable": true
+              },
+              "idempotencyKey": {
+                "type": "string",
+                "nullable": true
+              },
+              "failureReason": {
+                "type": "string",
+                "nullable": true
+              },
+              "thumbnailState": {
+                "type": "string",
+                "enum": ["pending", "ready", "locked", "failed"]
+              },
+              "thumbnailUrl": {
+                "type": "string",
+                "nullable": true
+              },
+              "createdAt": {
+                "type": "number"
+              },
+              "updatedAt": {
+                "type": "number"
+              },
+              "createdBy": {
+                "type": "string",
+                "nullable": true
+              }
+            },
+            "required": [
+              "id",
+              "tenantId",
+              "state",
+              "baseSha",
+              "storageSizeBytes",
+              "metadata",
+              "idempotencyKey",
+              "failureReason",
+              "createdAt",
+              "updatedAt",
+              "createdBy"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": ["tag", "document"],
+        "additionalProperties": false
+      },
+      "DocumentsImportFrom202Response": {
+        "type": "object",
+        "properties": {
+          "tag": {
+            "type": "string",
+            "enum": ["imported", "deduped", "accepted"]
+          },
+          "document": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "tenantId": {
+                "type": "string"
+              },
+              "state": {
+                "type": "string",
+                "enum": ["pending", "ready", "failed", "deleting"]
+              },
+              "baseSha": {
+                "type": "string",
+                "nullable": true
+              },
+              "storageSizeBytes": {
+                "type": "number",
+                "nullable": true
+              },
+              "metadata": {
+                "type": "object",
+                "additionalProperties": {},
+                "nullable": true
+              },
+              "idempotencyKey": {
+                "type": "string",
+                "nullable": true
+              },
+              "failureReason": {
+                "type": "string",
+                "nullable": true
+              },
+              "thumbnailState": {
+                "type": "string",
+                "enum": ["pending", "ready", "locked", "failed"]
+              },
+              "thumbnailUrl": {
+                "type": "string",
+                "nullable": true
+              },
+              "createdAt": {
+                "type": "number"
+              },
+              "updatedAt": {
+                "type": "number"
+              },
+              "createdBy": {
+                "type": "string",
+                "nullable": true
+              }
+            },
+            "required": [
+              "id",
+              "tenantId",
+              "state",
+              "baseSha",
+              "storageSizeBytes",
+              "metadata",
+              "idempotencyKey",
+              "failureReason",
+              "createdAt",
+              "updatedAt",
+              "createdBy"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": ["tag", "document"],
+        "additionalProperties": false
+      },
+      "DocumentsImportFrom400Response": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": ["code", "message"],
+            "additionalProperties": false
+          }
+        },
+        "required": ["error"],
+        "additionalProperties": false
+      },
+      "DocumentsImportFrom403Response": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": ["code", "message"],
+            "additionalProperties": false
+          }
+        },
+        "required": ["error"],
+        "additionalProperties": false
+      },
+      "DocumentsImportFrom502Response": {
         "type": "object",
         "properties": {
           "error": {

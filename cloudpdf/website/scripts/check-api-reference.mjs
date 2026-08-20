@@ -45,8 +45,9 @@ if (failures.length) {
   console.error(
     `API reference manifest validation failed:\n${failures.map((value) => `- ${value}`).join('\n')}`,
   );
-  console.error('Run: pnpm --filter @cloudpdf/website api:snippets');
-  console.error('If the contract’s operations changed, regenerate the SDKs first.');
+  console.error(
+    'Run `pnpm api:sync` from the repository root to regenerate stale SDKs and rebuild the manifest.',
+  );
   process.exit(1);
 }
 

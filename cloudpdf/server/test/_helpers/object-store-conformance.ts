@@ -23,6 +23,7 @@
  */
 import { createHash } from 'node:crypto';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { Readable } from 'node:stream';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
@@ -35,6 +36,23 @@ function patternBytes(n: number, seed = 1): Uint8Array {
   const a = new Uint8Array(n);
   for (let i = 0; i < n; i++) a[i] = (i * seed + 13) % 256;
   return a;
+}
+/** Multi-chunk Readable so streamed puts see realistic chunking. */
+function chunkedReadable(bytes: Uint8Array, chunkSize: number): Readable {
+  const chunks: Buffer[] = [];
+  for (let i = 0; i < bytes.byteLength; i += chunkSize) {
+    chunks.push(Buffer.from(bytes.subarray(i, Math.min(i + chunkSize, bytes.byteLength))));
+  }
+  return Readable.from(chunks);
+}
+/** Emits `prefix`, then errors — a mid-transfer source failure. */
+function failingReadable(prefix: Uint8Array, err: Error): Readable {
+  return Readable.from(
+    (async function* () {
+      yield Buffer.from(prefix);
+      throw err;
+    })(),
+  );
 }
 
 /**
@@ -101,6 +119,48 @@ export function runObjectStoreConformance(
         store.put('tnt-1/docs/cd/cde/x.pdf', bytes, { contentLength: bytes.byteLength - 1 }),
       ).rejects.toThrow();
       expect(await store.exists('tnt-1/docs/cd/cde/x.pdf')).toBe(false);
+    });
+
+    test('put streams a Readable body: same sha, bytes, and recorded digest as buffered', async () => {
+      const bytes = patternBytes(96_000, 11);
+      const { sha256 } = await store.put(KEY, chunkedReadable(bytes, 7_000), {
+        contentLength: bytes.byteLength,
+      });
+      expect(sha256).toBe(sha256Hex(bytes));
+      expect(new Uint8Array((await store.get(KEY))!)).toEqual(bytes);
+      expect((await store.stat(KEY))?.size).toBe(96_000);
+      // The sha recorded during the stream must be readable back
+      // (from backend metadata, or a re-hash fallback).
+      expect(await store.getSha256(KEY)).toBe(sha256);
+    });
+
+    test('a Readable that under-delivers rejects and leaves the prior object intact', async () => {
+      const prior = patternBytes(64, 2);
+      await store.put(KEY, prior, { contentLength: prior.byteLength });
+      const actual = patternBytes(1_000, 3);
+      await expect(
+        store.put(KEY, chunkedReadable(actual, 100), { contentLength: 1_500 }),
+      ).rejects.toThrow(/contentLength/);
+      expect(new Uint8Array((await store.get(KEY))!)).toEqual(prior);
+    });
+
+    test('a Readable that over-delivers rejects and leaves the prior object intact', async () => {
+      const prior = patternBytes(64, 2);
+      await store.put(KEY, prior, { contentLength: prior.byteLength });
+      const actual = patternBytes(1_000, 3);
+      await expect(
+        store.put(KEY, chunkedReadable(actual, 100), { contentLength: 500 }),
+      ).rejects.toThrow(/contentLength/);
+      expect(new Uint8Array((await store.get(KEY))!)).toEqual(prior);
+    });
+
+    test('a Readable source error rejects the put and stores nothing at a fresh key', async () => {
+      const fresh = 'tnt-1/docs/ef/efg/bad.pdf';
+      const boom = new Error('source connection reset');
+      await expect(
+        store.put(fresh, failingReadable(patternBytes(256, 4), boom), { contentLength: 1_024 }),
+      ).rejects.toThrow(/source connection reset|contentLength/);
+      expect(await store.exists(fresh)).toBe(false);
     });
 
     test('put is overwrite-idempotent (last write wins)', async () => {
