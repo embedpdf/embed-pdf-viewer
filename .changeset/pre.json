@@ -86,6 +86,7 @@
     "cloudpdf-engine-open-share",
     "cloudpdf-engine-share-sessions",
     "cloudpdf-server-derived-reporting-credential",
+    "cloudpdf-server-empty-json-body",
     "cloudpdf-server-materialize-verify",
     "cloudpdf-server-share-grants",
     "cloudpdf-server-sse-cors",

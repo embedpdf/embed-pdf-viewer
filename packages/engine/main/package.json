@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/engine",
-  "version": "3.0.0-next.6",
+  "version": "3.0.0-next.7",
   "private": false,
   "description": "Engine v3 local implementation: the EmbedPDF Runtime (our PDFium fork) as WASM inside a Web Worker (or inline for Node), driven by an O(log n) abort-aware WorkerQueue. Speaks the same Engine interface as the cloud engine.",
   "type": "module",
