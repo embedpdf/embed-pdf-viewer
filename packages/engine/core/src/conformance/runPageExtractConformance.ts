@@ -32,13 +32,9 @@ export function runPageExtractConformance(
 
   describe(`page extract conformance: ${opts.label}`, () => {
     let engine: Engine;
-    let supported = false;
 
     beforeAll(async () => {
       engine = await opts.makeEngine();
-      const probe = await openFixture(engine, opts);
-      supported = probe.pages.extract !== undefined;
-      await probe.close();
     });
 
     afterAll(async () => {
@@ -46,13 +42,12 @@ export function runPageExtractConformance(
     });
 
     test('pages.extract() returns standalone PDF bytes and leaves the source untouched', async () => {
-      if (!supported) return;
       const doc = await openFixture(engine, opts);
       try {
         const before = await doc.pages.list();
         const target = before.pages[before.pages.length - 1];
 
-        const bytes = await doc.pages.extract!([target.pageObjectNumber]);
+        const bytes = await doc.pages.extract([target.pageObjectNumber]);
         expect(bytes.length > PDF_MAGIC.length).toBe(true);
         expect(Array.from(bytes.slice(0, PDF_MAGIC.length))).toEqual(PDF_MAGIC);
 
@@ -68,7 +63,7 @@ export function runPageExtractConformance(
     });
 
     test('extracted bytes re-open as a document with the requested pages, in caller order', async () => {
-      if (!supported || opts.openKind !== 'bytes') return;
+      if (opts.openKind !== 'bytes') return;
       const doc = await openFixture(engine, opts);
       let extracted: DocumentHandle | null = null;
       try {
@@ -77,7 +72,7 @@ export function runPageExtractConformance(
         // Reversed order on purpose: output order is CALLER order.
         const p0 = list.pages[0];
         const p1 = list.pages[1];
-        const bytes = await doc.pages.extract!([p1.pageObjectNumber, p0.pageObjectNumber]);
+        const bytes = await doc.pages.extract([p1.pageObjectNumber, p0.pageObjectNumber]);
 
         extracted = await engine.open({ kind: 'bytes', id: `${opts.fixture.id}-extracted`, bytes });
         const out = await extracted.pages.list();
@@ -91,12 +86,11 @@ export function runPageExtractConformance(
     });
 
     test('pages.extract() rejects empty input with InvalidArg', async () => {
-      if (!supported) return;
       const doc = await openFixture(engine, opts);
       try {
         let caught: unknown;
         try {
-          await doc.pages.extract!([]);
+          await doc.pages.extract([]);
         } catch (err) {
           caught = err;
         }
@@ -107,14 +101,13 @@ export function runPageExtractConformance(
     });
 
     test('pages.extract() rejects duplicate PONs with InvalidArg', async () => {
-      if (!supported) return;
       const doc = await openFixture(engine, opts);
       try {
         const list = await doc.pages.list();
         const pon = list.pages[0].pageObjectNumber;
         let caught: unknown;
         try {
-          await doc.pages.extract!([pon, pon]);
+          await doc.pages.extract([pon, pon]);
         } catch (err) {
           caught = err;
         }
@@ -125,7 +118,6 @@ export function runPageExtractConformance(
     });
 
     test('pages.extract() rejects unknown PON with NotFound or InvalidArg', async () => {
-      if (!supported) return;
       const doc = await openFixture(engine, opts);
       try {
         const list = await doc.pages.list();
@@ -135,7 +127,7 @@ export function runPageExtractConformance(
 
         let caught: unknown;
         try {
-          await doc.pages.extract!([bogus]);
+          await doc.pages.extract([bogus]);
         } catch (err) {
           caught = err;
         }
@@ -149,11 +141,10 @@ export function runPageExtractConformance(
     });
 
     test('abort on pages.extract() rejects with AbortError', async () => {
-      if (!supported) return;
       const doc = await openFixture(engine, opts);
       try {
         const list = await doc.pages.list();
-        const p = doc.pages.extract!([list.pages[0].pageObjectNumber]);
+        const p = doc.pages.extract([list.pages[0].pageObjectNumber]);
         p.abort('test');
         await expect(p).rejects.toBeInstanceOf(AbortError);
       } finally {

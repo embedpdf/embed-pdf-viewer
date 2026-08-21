@@ -2,6 +2,7 @@ import type { PageListSnapshot } from '../dto/PageListSnapshot';
 import type { PdfRotation } from '../geometry/primitives';
 import type { PageObjectNumber } from '../identity/PageObjectNumber';
 import type { PageDeleteResult } from '../mutation/PageDeleteResult';
+import type { PageInsertBlankSpec } from '../mutation/PageInsertBlankInput';
 import type { PageInsertResult } from '../mutation/PageInsertResult';
 import type { PageMoveResult } from '../mutation/PageMoveResult';
 import type { PageRotateResult } from '../mutation/PageRotateResult';
@@ -77,26 +78,37 @@ export interface DocumentPagesService {
    * the source document is untouched — no revisions bump, no event is
    * published. This is how a page becomes a portable asset (a vector
    * stamp, a signature) that re-enters a document as a stamp draft's
-   * `source` bytes.
+   * `source` bytes. Gated by `doc.download` (it egresses content), not
+   * `doc.pages.assemble`.
    *
-   * Optional while the cloud endpoint ships (the `downloadLayer?`
-   * pattern): the local engine implements it; the cloud engine omits it
-   * until the server exposes extraction. Feature-detect with
-   * `pages.extract !== undefined`.
+   * REQUIRED-parity, delivered: the local engine runs it in the worker,
+   * the cloud engine as POST /pages/extract.
    */
-  extract?(pageObjectNumbers: PageObjectNumber[]): AbortablePromise<Uint8Array>;
+  extract(pageObjectNumbers: PageObjectNumber[]): AbortablePromise<Uint8Array>;
 
   /**
    * Insert every page of a standalone PDF (`bytes`) at `destIndex`
    * (omitted → append). The pages are COPIED in; the inserted copies get
    * fresh object numbers, returned in insertion order. Bytes are a call
    * ARGUMENT (the same law as annotation binaries): the local engine
-   * transfers them to its worker, the cloud engine will ship them as a
-   * multipart mutation.
+   * transfers them to its worker, the cloud engine ships them as a
+   * multipart mutation (POST /pages/insert).
    *
-   * Slated REQUIRED-parity (a cloud viewer must be able to add pages);
-   * optional only until the server endpoint ships — feature-detect with
-   * `pages.insert !== undefined`.
+   * REQUIRED-parity, delivered — a cloud viewer must be able to add pages,
+   * so this is a mandatory member: any engine implements it or is not a
+   * conforming engine.
    */
-  insert?(bytes: Uint8Array | ArrayBuffer, destIndex?: number): AbortablePromise<PageInsertResult>;
+  insert(bytes: Uint8Array | ArrayBuffer, destIndex?: number): AbortablePromise<PageInsertResult>;
+
+  /**
+   * Create `spec.count` (default 1) blank pages of `spec.size` (PDF points)
+   * at `destIndex` (omitted → append). The blank-page sibling of `insert`:
+   * same gate (`doc.pages.assemble`), same result shape, same
+   * `pages.inserted` event — it is a separate verb because its wire is pure
+   * parameters where `insert`'s is a binary payload (cloud: JSON
+   * POST /pages/insert-blank). The new pages get fresh, never-recycled
+   * object numbers; every pre-existing page keeps its identity and
+   * revisions. Mandatory, like `insert`.
+   */
+  insertBlank(spec: PageInsertBlankSpec, destIndex?: number): AbortablePromise<PageInsertResult>;
 }

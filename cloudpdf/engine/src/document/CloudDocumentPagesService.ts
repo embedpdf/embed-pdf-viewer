@@ -6,6 +6,8 @@ import {
   type PageFlattenResult,
   type PageFlattenUsage,
   type PageDeleteResult,
+  type PageInsertBlankSpec,
+  type PageInsertResult,
   type PageListSnapshot,
   type PageMoveResult,
   type PageObjectNumber,
@@ -15,6 +17,7 @@ import {
 import {
   PageDeleteResultSchema,
   PageFlattenResultSchema,
+  PageInsertResultSchema,
   PageListSnapshotSchema,
   PageMoveResultSchema,
   PageRotateResultSchema,
@@ -22,9 +25,18 @@ import {
 } from '@embedpdf/engine-core/wire';
 import type { SessionEventPublisher } from '@embedpdf/engine-services';
 
+import { buildMutationForm } from './buildMutationForm';
 import type { ManifestAccessor } from './CloudDocumentHandle';
 import { planesInherited } from './planes';
 import type { HttpClient } from '../transport/HttpClient';
+
+/** Detach a Uint8Array view into a standalone ArrayBuffer (the resource-map
+ *  shape) without disturbing a larger buffer the caller still owns. */
+function copyToExactBuffer(view: Uint8Array): ArrayBuffer {
+  const copy = new ArrayBuffer(view.byteLength);
+  new Uint8Array(copy).set(view);
+  return copy;
+}
 
 /**
  * Cloud-side document pages service. Mirrors `LocalDocumentPagesService`
@@ -159,6 +171,75 @@ export class CloudDocumentPagesService implements DocumentPagesService {
       this.publisher.publishLocal({ type: 'pages.deleted', pageObjectNumbers, ...result });
       return result;
     });
+  }
+
+  insert(bytes: Uint8Array | ArrayBuffer, destIndex?: number): AbortablePromise<PageInsertResult> {
+    if (this.isClosed()) {
+      return AbortablePromise.rejectReason(
+        new EngineError(EngineErrorCode.DocNotOpen, `document ${this.docId} is closed`),
+      );
+    }
+    return AbortablePromise.run<PageInsertResult>(async (signal) => {
+      // The multipart mutation envelope: the JSON the plain request would
+      // have been rides the `body` part; the source PDF is `resource:source`.
+      const buffer = bytes instanceof ArrayBuffer ? bytes : copyToExactBuffer(bytes);
+      const form = buildMutationForm(
+        destIndex !== undefined ? { destIndex } : {},
+        { source: { bytes: buffer, mimeType: 'application/pdf', name: 'source.pdf' } },
+      );
+      const result = await this.http.postMultipartJson(
+        wirePaths.layerPagesInsert(this.docId, this.layerName),
+        form,
+        (raw) => PageInsertResultSchema.parse(raw),
+        signal,
+      );
+      // Insert changes the page SET: the cached manifest has no rows for
+      // the fresh PONs, so the absorb drops it for a lazy refetch (the
+      // result already carries the full new layout — nothing waits).
+      if (result.cache) this.manifest.applyPageInsert(result.cache);
+      this.publisher.publishLocal({ type: 'pages.inserted', destIndex, ...result });
+      return result;
+    });
+  }
+
+  insertBlank(spec: PageInsertBlankSpec, destIndex?: number): AbortablePromise<PageInsertResult> {
+    if (this.isClosed()) {
+      return AbortablePromise.rejectReason(
+        new EngineError(EngineErrorCode.DocNotOpen, `document ${this.docId} is closed`),
+      );
+    }
+    return AbortablePromise.run<PageInsertResult>(async (signal) => {
+      const result = await this.http.postJson(
+        wirePaths.layerPagesInsertBlank(this.docId, this.layerName),
+        {
+          size: spec.size,
+          ...(spec.count !== undefined ? { count: spec.count } : {}),
+          ...(destIndex !== undefined ? { destIndex } : {}),
+        },
+        (raw) => PageInsertResultSchema.parse(raw),
+        signal,
+      );
+      if (result.cache) this.manifest.applyPageInsert(result.cache);
+      this.publisher.publishLocal({ type: 'pages.inserted', destIndex, ...result });
+      return result;
+    });
+  }
+
+  extract(pageObjectNumbers: PageObjectNumber[]): AbortablePromise<Uint8Array> {
+    if (this.isClosed()) {
+      return AbortablePromise.rejectReason(
+        new EngineError(EngineErrorCode.DocNotOpen, `document ${this.docId} is closed`),
+      );
+    }
+    // A read (gated by doc.download server-side): no absorb, no event —
+    // nothing about the document changed.
+    return AbortablePromise.run<Uint8Array>(async (signal) =>
+      this.http.postJsonBytes(
+        wirePaths.layerPagesExtract(this.docId, this.layerName),
+        { pageObjectNumbers },
+        signal,
+      ),
+    );
   }
 
   flatten(

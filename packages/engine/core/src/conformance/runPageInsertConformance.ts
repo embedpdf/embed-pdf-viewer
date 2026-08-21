@@ -5,9 +5,9 @@ import { EngineError } from '../errors/EngineError';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
 
 /**
- * Page insert conformance. `pages.insert?` is optional only until the cloud
- * endpoint ships (it is slated REQUIRED-parity — a cloud viewer must be able
- * to add pages); the suite runs wherever the implementation exists.
+ * Page insert conformance. `pages.insert` is a REQUIRED member — this suite
+ * runs unconditionally on every engine, so an implementation that loses the
+ * verb fails loudly instead of being skipped past.
  *
  * Invariants:
  *   1. Every page of the source bytes is COPIED in at `destIndex` (omitted →
@@ -27,13 +27,9 @@ export function runPageInsertConformance(
 
   describe(`page insert conformance: ${opts.label}`, () => {
     let engine: Engine;
-    let supported = false;
 
     beforeAll(async () => {
       engine = await opts.makeEngine();
-      const probe = await openFixture(engine, opts);
-      supported = probe.pages.insert !== undefined && probe.pages.extract !== undefined;
-      await probe.close();
     });
 
     afterAll(async () => {
@@ -41,15 +37,14 @@ export function runPageInsertConformance(
     });
 
     test('appends every source page with fresh PONs; existing pages keep identity', async () => {
-      if (!supported) return;
       const doc = await openFixture(engine, opts);
       try {
         const before = await doc.pages.list();
         const beforePons = before.pages.map((p) => p.pageObjectNumber);
         // Self-source: extract the first page, insert it back (append).
-        const single = await doc.pages.extract!([beforePons[0]]);
+        const single = await doc.pages.extract([beforePons[0]]);
 
-        const result = await doc.pages.insert!(single);
+        const result = await doc.pages.insert(single);
         expect(result.insertedPageObjectNumbers.length).toBe(1);
         expect(result.layout.pageCount).toBe(before.pageCount + 1);
         // Existing pages: same identity, same leading positions.
@@ -68,15 +63,14 @@ export function runPageInsertConformance(
     });
 
     test('destIndex places the block mid-document, in source order', async () => {
-      if (!supported) return;
       const doc = await openFixture(engine, opts);
       try {
         const before = await doc.pages.list();
         if (before.pages.length < 2) return;
         const beforePons = before.pages.map((p) => p.pageObjectNumber);
-        const two = await doc.pages.extract!([beforePons[0], beforePons[1]]);
+        const two = await doc.pages.extract([beforePons[0], beforePons[1]]);
 
-        const result = await doc.pages.insert!(two, 1);
+        const result = await doc.pages.insert(two, 1);
         expect(result.insertedPageObjectNumbers.length).toBe(2);
         const pons = result.layout.pages.map((p) => p.pageObjectNumber);
         expect(pons[0]).toBe(beforePons[0]);
@@ -88,13 +82,13 @@ export function runPageInsertConformance(
     });
 
     test('the inserted pages persist through save → re-open', async () => {
-      if (!supported || opts.openKind !== 'bytes') return;
+      if (opts.openKind !== 'bytes') return;
       const doc = await openFixture(engine, opts);
       let reopened: DocumentHandle | null = null;
       try {
         const before = await doc.pages.list();
-        const single = await doc.pages.extract!([before.pages[0].pageObjectNumber]);
-        await doc.pages.insert!(single);
+        const single = await doc.pages.extract([before.pages[0].pageObjectNumber]);
+        await doc.pages.insert(single);
         const bytes = await doc.download();
 
         reopened = await engine.open({
@@ -111,12 +105,11 @@ export function runPageInsertConformance(
     });
 
     test('empty bytes reject with InvalidArg; garbage rejects with MalformedPdf', async () => {
-      if (!supported) return;
       const doc = await openFixture(engine, opts);
       try {
         let caught: unknown;
         try {
-          await doc.pages.insert!(new Uint8Array(0));
+          await doc.pages.insert(new Uint8Array(0));
         } catch (err) {
           caught = err;
         }
@@ -124,7 +117,7 @@ export function runPageInsertConformance(
 
         caught = undefined;
         try {
-          await doc.pages.insert!(new TextEncoder().encode('not a pdf at all'));
+          await doc.pages.insert(new TextEncoder().encode('not a pdf at all'));
         } catch (err) {
           caught = err;
         }
@@ -139,14 +132,13 @@ export function runPageInsertConformance(
     });
 
     test('out-of-range destIndex rejects with InvalidArg', async () => {
-      if (!supported) return;
       const doc = await openFixture(engine, opts);
       try {
         const before = await doc.pages.list();
-        const single = await doc.pages.extract!([before.pages[0].pageObjectNumber]);
+        const single = await doc.pages.extract([before.pages[0].pageObjectNumber]);
         let caught: unknown;
         try {
-          await doc.pages.insert!(single, before.pageCount + 1);
+          await doc.pages.insert(single, before.pageCount + 1);
         } catch (err) {
           caught = err;
         }

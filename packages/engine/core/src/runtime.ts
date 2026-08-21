@@ -114,6 +114,7 @@ export type {
   PagesDeleteWorkerRequest,
   PagesExtractWorkerRequest,
   PagesInsertWorkerRequest,
+  PagesInsertBlankWorkerRequest,
   PagesFlattenWorkerRequest,
   RedactionApplyWorkerRequest,
   PieceInfoReadWorkerRequest,
