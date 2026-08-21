@@ -433,6 +433,27 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
     { parseAs: 'buffer', bodyLimit: opts.bodyLimit ?? 50 * 1024 * 1024 },
     (_req, body, done) => done(null, body),
   );
+  // Fastify's stock JSON parser rejects a bodyless request that still
+  // advertises `Content-Type: application/json` (FST_ERR_CTP_EMPTY_JSON_BODY).
+  // Real clients send exactly that shape on bodyless calls — the Fern
+  // PHP/Go/Ruby SDKs stamp the header unconditionally, as do axios
+  // instances with default headers and `curl -H` scripts — so treat an
+  // empty body as no body. Non-empty bodies still go through the default
+  // parser (keeping secure-json-parse's prototype-poisoning protection),
+  // and handlers that require a body still 400 on `undefined` via their
+  // zod parsing.
+  const defaultJsonParser = app.getDefaultJsonParser('error', 'error');
+  app.addContentTypeParser<string>(
+    'application/json',
+    { parseAs: 'string', bodyLimit: opts.bodyLimit ?? 50 * 1024 * 1024 },
+    (req, body, done) => {
+      if (body === '' || body == null) {
+        done(null, undefined);
+        return;
+      }
+      defaultJsonParser(req, body, done);
+    },
+  );
 
   // Optional revocation + JWKS persistence guards. Both are no-ops
   // unless explicitly enabled — admin-only tests / dev runs don't
@@ -921,9 +942,16 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
       });
       return;
     }
-    const e = err as Error & { code?: string; status?: number };
+    const e = err as Error & { code?: string; status?: number; statusCode?: number };
     if (e.status && typeof e.status === 'number') {
       reply.code(e.status).send({ error: { code: e.code ?? 'Unknown', message: e.message } });
+      return;
+    }
+    // Fastify's own errors (body parsing, payload limits, validation) carry
+    // `statusCode`, not `status`. Pass 4xx through as the client errors they
+    // are; 5xx still falls to the unhandled branch below so it gets logged.
+    if (typeof e.statusCode === 'number' && e.statusCode >= 400 && e.statusCode < 500) {
+      reply.code(e.statusCode).send({ error: { code: e.code ?? 'Unknown', message: e.message } });
       return;
     }
     if (e.code === 'NotFound') {
