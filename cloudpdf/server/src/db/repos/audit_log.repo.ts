@@ -10,6 +10,8 @@ export type AuditMutationKind =
   | 'pages.move'
   | 'pages.rotate'
   | 'pages.delete'
+  | 'pages.insert'
+  | 'pages.insertBlank'
   | 'pages.flatten'
   | 'redaction.apply'
   | 'metadata.update'

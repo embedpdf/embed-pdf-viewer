@@ -1,6 +1,8 @@
 import {
   EngineError,
   EngineErrorCode,
+  PAGE_INSERT_BLANK_MAX_COUNT,
+  type PageInsertBlankSpec,
   type PageInsertResult,
   type PageObjectNumber,
 } from '@embedpdf/engine-core/runtime';
@@ -89,6 +91,77 @@ export class PagesInserter {
     const layout = new PagesReader(this.runtime, this.session).read(signal);
     const insertedPageObjectNumbers: PageObjectNumber[] = layout.pages
       .slice(at, at + insertedCount)
+      .map((page) => page.pageObjectNumber);
+    return { insertedPageObjectNumbers, layout, cache: null };
+  }
+
+  /**
+   * Create `count` blank pages of `size` at `destIndex`. Same mutation
+   * contract as `insert`, but native creation (`FPDFPage_New`) instead of a
+   * deep copy: no source document, so none of the retain-until-close
+   * lifetime hazard above. Each page gets an empty content stream
+   * (`FPDFPage_GenerateContent`) so the saved PDF renders identically in
+   * third-party viewers.
+   */
+  insertBlank(
+    spec: PageInsertBlankSpec,
+    destIndex: number | undefined,
+    signal: AbortSignal,
+  ): PageInsertResult {
+    throwIfAborted(signal);
+    const { size } = spec;
+    const count = spec.count ?? 1;
+    if (
+      !Number.isFinite(size?.width) ||
+      !Number.isFinite(size?.height) ||
+      size.width <= 0 ||
+      size.height <= 0
+    ) {
+      throw new EngineError(
+        EngineErrorCode.InvalidArg,
+        `pages.insertBlank size must have positive finite dimensions, got ${size?.width}x${size?.height}`,
+      );
+    }
+    if (!Number.isInteger(count) || count < 1 || count > PAGE_INSERT_BLANK_MAX_COUNT) {
+      throw new EngineError(
+        EngineErrorCode.InvalidArg,
+        `pages.insertBlank count ${count} out of range [1, ${PAGE_INSERT_BLANK_MAX_COUNT}]`,
+      );
+    }
+
+    const { fn } = this.runtime;
+    const destPtr = this.session.requireDocPtr();
+    const beforeCount = fn.FPDF_GetPageCount(destPtr);
+    const at = destIndex ?? beforeCount;
+    if (!Number.isInteger(at) || at < 0 || at > beforeCount) {
+      throw new EngineError(
+        EngineErrorCode.InvalidArg,
+        `pages.insertBlank destIndex ${at} out of range [0, ${beforeCount}]`,
+      );
+    }
+
+    for (let i = 0; i < count; i++) {
+      // FPDFPage_New would clamp an out-of-range index to "append"; the
+      // guard above keeps that PDFium leniency out of the contract.
+      const pagePtr = fn.FPDFPage_New(destPtr, at + i, size.width, size.height);
+      if (!pagePtr) {
+        // Undo the pages already created so a failure leaves the document
+        // untouched (the registry was never refreshed, so it still agrees).
+        for (let j = 0; j < i; j++) fn.FPDFPage_Delete(destPtr, at);
+        throw new EngineError(
+          EngineErrorCode.Unknown,
+          `FPDFPage_New rejected page ${i + 1}/${count} at index ${at + i}`,
+        );
+      }
+      fn.FPDFPage_GenerateContent(pagePtr);
+      fn.FPDF_ClosePage(pagePtr);
+    }
+
+    this.session.refreshPageRegistry();
+
+    const layout = new PagesReader(this.runtime, this.session).read(signal);
+    const insertedPageObjectNumbers: PageObjectNumber[] = layout.pages
+      .slice(at, at + count)
       .map((page) => page.pageObjectNumber);
     return { insertedPageObjectNumbers, layout, cache: null };
   }

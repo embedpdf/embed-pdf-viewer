@@ -451,6 +451,8 @@ export type { PageRotateResult } from './mutation/PageRotateResult';
 export type { PageDeleteInput } from './mutation/PageDeleteInput';
 export type { PageDeleteResult } from './mutation/PageDeleteResult';
 export type { PageInsertResult } from './mutation/PageInsertResult';
+export type { PageInsertBlankSpec } from './mutation/PageInsertBlankInput';
+export { PAGE_INSERT_BLANK_MAX_COUNT } from './mutation/PageInsertBlankInput';
 export type {
   PageFlattenInput,
   PageFlattenUsage,

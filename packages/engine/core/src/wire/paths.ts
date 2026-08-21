@@ -463,6 +463,26 @@ export const wirePaths = {
   layerPagesFlatten: (docId: string, layerName: string) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/pages/flatten`,
 
+  /**
+   * POST (multipart mutation envelope): copy every page of the `source`
+   * resource part (a standalone PDF) in at the body's `destIndex`.
+   */
+  layerPagesInsert: (docId: string, layerName: string) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/pages/insert`,
+
+  /** POST (plain JSON): create blank pages — pages.insert minus the bytes. */
+  layerPagesInsertBlank: (docId: string, layerName: string) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/pages/insert-blank`,
+
+  /**
+   * POST (plain JSON → `application/pdf` bytes): export the listed pages,
+   * in caller order, as a standalone PDF. A READ over the current layer
+   * state (gated like /download), so it is a POST only for its body —
+   * nothing mutates and no event is published.
+   */
+  layerPagesExtract: (docId: string, layerName: string) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/pages/extract`,
+
   layerRedactionsApply: (docId: string, layerName: string) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/redactions/apply`,
 
@@ -524,6 +544,9 @@ export const wireTemplates = {
   layerPagesRotate: '/v1/docs/:docId/layers/:layerName/pages/rotate',
   layerPagesDelete: '/v1/docs/:docId/layers/:layerName/pages/delete',
   layerPagesFlatten: '/v1/docs/:docId/layers/:layerName/pages/flatten',
+  layerPagesInsert: '/v1/docs/:docId/layers/:layerName/pages/insert',
+  layerPagesInsertBlank: '/v1/docs/:docId/layers/:layerName/pages/insert-blank',
+  layerPagesExtract: '/v1/docs/:docId/layers/:layerName/pages/extract',
   layerRedactionsApply: '/v1/docs/:docId/layers/:layerName/redactions/apply',
   layerDownload: '/v1/docs/:docId/layers/:layerName/download',
 } as const;

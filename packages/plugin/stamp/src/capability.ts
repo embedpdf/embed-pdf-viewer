@@ -224,10 +224,10 @@ export function createStampCapability(
         }
       | undefined;
     try {
-      if (!doc.pieceInfo || !doc.pages.extract) {
+      if (!doc.pieceInfo) {
         throw new EngineError(
           EngineErrorCode.NotImplemented,
-          '[stamp] canonical PDF libraries need an asset engine with pieceInfo and pages.extract',
+          '[stamp] canonical PDF libraries need an asset engine with pieceInfo',
         );
       }
       const snapshot = await doc.pages.list();
@@ -401,12 +401,6 @@ export function createStampCapability(
             }
           | undefined;
         try {
-          if (!doc.pages.insert || !doc.pages.extract) {
-            throw new EngineError(
-              EngineErrorCode.NotImplemented,
-              '[stamp] appending to a canonical library needs pages.insert and pages.extract',
-            );
-          }
           const result = await doc.pages.insert(new Uint8Array(resolved.bytes));
           if (result.insertedPageObjectNumbers.length !== 1) {
             throw new EngineError(

@@ -18,6 +18,7 @@ import type {
   MetadataUpdateResult,
   PageDeleteResult,
   PageFlattenResult,
+  PageInsertResult,
   PageMoveResult,
   PageRotateResult,
   PageRotation,
@@ -117,6 +118,18 @@ export function auditRowToEvent(row: AuditEventRow, mySessionId: string): Docume
         pageObjectNumbers: row.affectedPages,
         origin,
         ...(row.payload as PageDeleteResult),
+      };
+    // Two audit kinds share the `pages.inserted` event (bytes-import and
+    // blank creation produce the same result shape) — the audit log keeps
+    // them distinct for history, the event stream cares about effect. The
+    // originator's `destIndex` gesture field stays absent on remote events
+    // by design: remote consumers derive placement from `layout`.
+    case 'pages.insert':
+    case 'pages.insertBlank':
+      return {
+        type: 'pages.inserted',
+        origin,
+        ...(row.payload as PageInsertResult),
       };
     case 'pages.flatten':
       return {

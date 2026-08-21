@@ -1,6 +1,6 @@
 ---
 title: Pages & rendering
-description: List pages, render them to encoded images or raw rasters, and reorder them.
+description: List pages, render them, and edit page structure — reorder, rotate, delete, add.
 ---
 
 {/* Generated from docs/content — edit there, then `pnpm docs:sync`. */}
@@ -10,7 +10,8 @@ import { Callout } from '@/components/docs/callout';
 # Pages & rendering
 
 Page work splits across two services: the document-scoped `pages` service for
-listing and reordering, and the per-page `render` service for producing pixels.
+listing and structure edits, and the per-page `render` service for producing
+pixels.
 
 ## Listing pages
 
@@ -172,3 +173,65 @@ await doc.pages.move([7, 9], 0);
 
 Per-page revision tokens survive a move, so index-based annotation references
 you're holding remain valid across a reorder.
+
+## Rotating and deleting pages
+
+`rotate` sets the ABSOLUTE display rotation of one or more pages — one value
+for all, the multi-select gesture. It is pure presentation metadata: content
+coordinates are normalized, so cached renders and annotation refs survive
+untouched. (The relative "+90° from here" button belongs in the page-edit
+plugin, which derives the absolute value for you.)
+
+```ts
+await doc.pages.rotate([pon], 90); // 0 | 90 | 180 | 270
+```
+
+`delete` removes pages by identity. Deleting every page is rejected — a
+document keeps at least one — and deleted PONs are retired, never recycled;
+surviving pages keep their identity and revisions.
+
+```ts
+await doc.pages.delete([pon]);
+```
+
+## Adding pages
+
+Two verbs, one result shape. `insert` copies every page of a standalone PDF
+(`bytes`) in at `destIndex` (omitted → append) — the merge/import path.
+`insertBlank` creates blank pages of an explicit size (PDF points), no source
+document needed:
+
+```ts
+// Append every page of another PDF.
+const merged = await doc.pages.insert!(bytes);
+
+// Two blank US-Letter pages at display index 1.
+const added = await doc.pages.insertBlank!(
+  { size: { width: 612, height: 792 }, count: 2 },
+  1,
+);
+
+added.insertedPageObjectNumbers; // fresh PONs, in insertion order
+added.layout; // the full new layout — same shape as pages.list()
+```
+
+The inserted pages get fresh, never-recycled object numbers; every
+pre-existing page keeps its identity and revisions — an insert never
+invalidates refs on its neighbours. Both verbs (and `extract`, below) are
+required members of the contract, implemented identically by the local and
+cloud engines.
+
+## Extracting pages
+
+`extract` is the read that turns pages into a portable asset: the given
+pages, in the order you pass them, serialized as a standalone PDF. The source
+document is untouched — nothing changes, no event fires.
+
+```ts
+const bytes = await doc.pages.extract!([ponA, ponB]);
+// …hand to pages.insert on another document, or download it.
+```
+
+Structure verbs are gated by the document's `doc.pages.assemble` capability
+(PDF permission bit 11); `extract` egresses content, so it is gated by
+`doc.download` instead.

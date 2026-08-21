@@ -5,6 +5,7 @@ import {
   wirePack,
   type DocumentPagesService,
   type PageDeleteResult,
+  type PageInsertBlankSpec,
   type PageInsertResult,
   type PageListSnapshot,
   type PageMoveResult,
@@ -293,6 +294,52 @@ export class LocalDocumentPagesService implements DocumentPagesService {
       else signal.addEventListener('abort', onAbort, { once: true });
       const payload = await submission;
       if (payload.tag !== 'pages.insert') {
+        throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload tag: ${payload.tag}`);
+      }
+      this.publisher.publishLocal({
+        type: 'pages.inserted',
+        destIndex,
+        ...payload.result,
+      });
+      return payload.result;
+    });
+  }
+
+  insertBlank(spec: PageInsertBlankSpec, destIndex?: number): AbortablePromise<PageInsertResult> {
+    if (this.view.isClosed()) {
+      return AbortablePromise.rejectReason(
+        new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.docId}`),
+      );
+    }
+    // The blank-page sibling of pages.insert: same structure gate, same
+    // event; it will map to the cloud's JSON POST /pages/insert-blank when
+    // that ships. Pure parameters — nothing to transfer.
+    try {
+      this.guard.assertCapability('doc.pages.assemble');
+    } catch (err) {
+      return AbortablePromise.rejectReason(err);
+    }
+    const docId = this.docId;
+    const submission = this.queue.enqueue<WorkerResultPayload>(
+      {
+        buildPack: (jobId: JobId) =>
+          wirePack({
+            kind: 'pages.insertBlank',
+            jobId,
+            docId,
+            size: spec.size,
+            count: spec.count,
+            destIndex,
+          }),
+      },
+      { priority: Priority.HIGH },
+    );
+    return AbortablePromise.run<PageInsertResult>(async (signal) => {
+      const onAbort = () => submission.abort(signal.reason);
+      if (signal.aborted) onAbort();
+      else signal.addEventListener('abort', onAbort, { once: true });
+      const payload = await submission;
+      if (payload.tag !== 'pages.insertBlank') {
         throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload tag: ${payload.tag}`);
       }
       this.publisher.publishLocal({

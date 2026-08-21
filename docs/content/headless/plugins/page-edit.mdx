@@ -1,0 +1,124 @@
+---
+title: Page edit
+description: Rotate, reorder, delete, and add pages — document edits written into the PDF.
+---
+
+import { Callout } from '@/components/docs/callout';
+
+# Page edit
+
+Page edit is the organize surface: rotate pages, reorder them, delete them,
+and add new ones — blank, or copied in from another PDF. These are *document*
+edits. They change the file and they are kept on save, unlike the
+[Stage's view rotation](./stage#rotate-the-view), which only changes how pages
+are shown. Keep the two on different buttons.
+
+Register `pageEditPlugin()` and read the capability with `usePageEditor()`:
+
+<Example name="page-edit/organize" mode="open" />
+
+Two things the example shows beyond the calls themselves:
+
+- **Every lens updates by itself.** After an edit, the engine publishes the
+  document's new layout and the page registry swaps — the Stage, thumbnails,
+  and page numbers all re-render without any wiring from you. On a cloud
+  engine the same event reaches every other person in the document, so a
+  collaborator sees the page appear too.
+- **The buttons gate on the capability, not on hope.** `canEdit()` is false
+  when the document's permissions don't allow structural edits, so the
+  affordances never render for a call that would throw. One predicate covers
+  every verb on this page — rotate, move, delete, and add all share the same
+  `doc.pages.assemble` permission.
+
+## Pages are addressed by identity, not position
+
+Every verb takes a `pon` — a page object number, the page's durable identity.
+You get it from the Stage's `usePageList()` entries (`page.pon`), as the
+example above does. An *index* shifts the moment a sibling is moved or
+deleted; a PON never does, so a queued edit still hits the page the user
+clicked, even if the document was reorganized in between.
+
+## Rotate a page
+
+```ts
+const editor = usePageEditor();
+
+editor.rotateBy(pon, 90); // one quarter-turn from wherever the page is now
+editor.rotateBy(pon, -90); // and back
+editor.setRotation([ponA, ponB], 180); // multi-select: one absolute value for all
+```
+
+`rotateBy` is the per-thumbnail button: it reads the page's current rotation
+and sends the resulting absolute value. `setRotation` is the multi-select
+gesture. Rotation is presentation metadata — cached renders and annotations
+survive untouched.
+
+## Reorder pages
+
+```ts
+// Move two pages (in this order) so they start at index 0.
+editor.move([ponB, ponA], 0);
+```
+
+The supplied pages are detached and re-inserted as one contiguous block at
+`destIndex`, in the order you pass them. Pages keep their identity across a
+move — refs you hold stay valid.
+
+## Delete pages
+
+```ts
+editor.delete([pon]);
+```
+
+The engine rejects deleting every page — a document keeps at least one.
+Deleted PONs are retired, never reused.
+
+## Add pages
+
+Two ways in, one placement model:
+
+```ts
+// A blank page after the one the user is looking at, sized to match it.
+editor.addBlank({ placement: { after: pon } });
+
+// Three blank US-Letter pages at the very start.
+editor.addBlank({ size: { width: 612, height: 792 }, count: 3, placement: { index: 0 } });
+
+// Merge another PDF in: every page of `bytes`, appended.
+editor.insert(bytes);
+
+// Or drop that PDF's pages in front of a specific page.
+editor.insert(bytes, { placement: { before: pon } });
+```
+
+`placement` is `{ after: pon }`, `{ before: pon }`, or `{ index }` — omitted
+means append. Prefer the PON forms for anything anchored to a page the user
+can see: they stay correct even if the document is reordered between the
+click and the call.
+
+When you omit `size`, the new blank page matches the page it sits beside —
+the anchor for PON placements, otherwise the insertion point's neighbour —
+so "add page" fits the document without you guessing at paper sizes. `count`
+creates up to 100 pages in one call.
+
+Both verbs resolve with the fresh PONs in insertion order, so you can select
+or scroll to the new pages right away:
+
+```ts
+const result = await editor.addBlank({ placement: { after: pon } });
+result.insertedPageObjectNumbers; // → the new pages' identities
+```
+
+<Callout type="info">
+  Add-page buttons gate on the same <code>canEdit()</code> as rotate, move,
+  and delete — the add verbs are first-class members of the engine contract,
+  implemented identically on the local and cloud engines, and they share the
+  one <code>doc.pages.assemble</code> permission.
+</Callout>
+
+## Permissions
+
+`canEdit()` mirrors the document's `doc.pages.assemble` capability (PDF
+permission bit 11 — insert, rotate, delete). The engine enforces the same
+capability on every verb independently, on both the local and the cloud
+engine, so the check in your UI is a courtesy, not the guard.

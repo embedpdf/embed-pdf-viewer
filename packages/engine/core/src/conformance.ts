@@ -42,6 +42,7 @@ export { runRedactionApplyConformance } from './conformance/runRedactionApplyCon
 export { runPageExtractConformance } from './conformance/runPageExtractConformance';
 export { runAttachmentConformance } from './conformance/runAttachmentConformance';
 export { runPageInsertConformance } from './conformance/runPageInsertConformance';
+export { runPageInsertBlankConformance } from './conformance/runPageInsertBlankConformance';
 export { runPieceInfoConformance } from './conformance/runPieceInfoConformance';
 export { runDocumentEventsConformance } from './conformance/runDocumentEventsConformance';
 export { runPageTextConformance } from './conformance/runPageTextConformance';
