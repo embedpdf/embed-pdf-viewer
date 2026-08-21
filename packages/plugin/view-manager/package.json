@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/plugin-view-manager",
-  "version": "3.0.0-next.6",
+  "version": "3.0.0-next.7",
   "private": false,
   "description": "Workspace-scoped plugin: arranges open documents into reorderable panes (views). Each view points at a document; the framework adapter renders one <DocumentScope> per view. Ships zero framework code.",
   "type": "module",

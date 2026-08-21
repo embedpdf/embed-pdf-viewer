@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "CloudPDF Engine API",
-    "version": "3.0.0-next.6",
+    "version": "3.0.0-next.7",
     "description": "The backend-callable surface of the CloudPDF document engine: deployment and tenant administration plus the document operations (reads, annotations, forms, page operations, redaction, download). Interactive viewing goes through the CloudPDF viewer SDKs, whose session protocol is deliberately not part of this API. Generated from the @cloudpdf/contract operation registry — do not edit by hand.",
     "license": {
       "name": "Apache-2.0",
