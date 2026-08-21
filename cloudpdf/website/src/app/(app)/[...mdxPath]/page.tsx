@@ -4,6 +4,7 @@ import { Fragment } from 'react';
 
 import { useMDXComponents as getMDXComponents } from '../../../../mdx-components';
 
+import { socialImagePath } from '@/lib/docs-social-image';
 import { expandDocsStaticParams, resolveDocsPath } from '@/lib/docs-route';
 
 const nextraParams = generateStaticParamsFor('mdxPath');
@@ -27,7 +28,22 @@ export async function generateMetadata(props: PageProps) {
   const resolved = resolveDocsPath(params.mdxPath);
   if (!resolved) return {};
   const { metadata } = await importPage(resolved.contentPath);
-  return metadata;
+
+  // The card itself is rendered by /api/og and prerendered for this exact
+  // route, so the fan-out siblings each advertise their own integration.
+  const image = {
+    url: socialImagePath(params.mdxPath),
+    alt: `${metadata?.title ?? 'CloudPDF'} | CloudPDF documentation`,
+    width: 1200,
+    height: 630,
+    type: 'image/png',
+  };
+
+  return {
+    ...metadata,
+    openGraph: { ...(metadata?.openGraph ?? {}), images: [image] },
+    twitter: { ...(metadata?.twitter ?? {}), card: 'summary_large_image', images: [image] },
+  };
 }
 
 const Wrapper = getMDXComponents().wrapper ?? Fragment;
