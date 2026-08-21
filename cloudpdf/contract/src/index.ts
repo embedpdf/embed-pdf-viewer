@@ -86,7 +86,11 @@ export const adminWirePaths = {
   deploymentLicenseStatus: '/v1/deployment/license/status',
 } as const;
 
-export const DedupModeSchema = z.enum(['always-create', 'reuse-existing']);
+export const DedupModeSchema = z
+  .enum(['always-create', 'reuse-existing'])
+  .describe(
+    'always-create (default) creates a new document every time. reuse-existing returns a document that already holds the same content instead of storing it twice.',
+  );
 export type DedupMode = z.infer<typeof DedupModeSchema>;
 
 export const UploadPreferenceSchema = z.enum(['auto', 'presigned', 'proxy']);
@@ -198,22 +202,54 @@ const utf8ByteLength = (s: string): number => new TextEncoder().encode(s).length
  * no NUL); provider-exact rules live in the server's source adapters,
  * which know which backend a connection names.
  */
-export const AdminImportSourceSchema = z.discriminatedUnion('kind', [
-  z.object({
-    kind: z.literal('url'),
-    url: z.string().url().max(8192),
-  }),
-  z.object({
-    kind: z.literal('connection'),
-    connectionId: z.string().min(1).max(128),
-    key: z
-      .string()
-      .min(1)
-      .refine((k) => !k.includes('\0'), 'key must not contain NUL')
-      .refine((k) => utf8ByteLength(k) <= 1024, 'key must be at most 1024 UTF-8 bytes'),
-    revision: z.string().min(1).max(1024).optional(),
-  }),
-]);
+export const AdminImportSourceSchema = z
+  .discriminatedUnion('kind', [
+    z
+      .object({
+        kind: z.literal('url'),
+        url: z
+          .string()
+          .url()
+          .max(8192)
+          .describe(
+            'The URL to fetch. Must be allowed by the deployment import policy (scheme, network range, size) and must declare a length.',
+          ),
+      })
+      .describe(
+        'The caller supplies the authority: a presigned S3/GCS/Azure/R2/MinIO GET, or any HTTPS endpoint the deployment import policy allows. The URL is a capability — treat it as a secret. CloudPDF never echoes its query string back in errors, logs, or stored failure reasons.',
+      ),
+    z
+      .object({
+        kind: z.literal('connection'),
+        connectionId: z
+          .string()
+          .min(1)
+          .max(128)
+          .describe('The operator-registered storage connection to read from.'),
+        key: z
+          .string()
+          .min(1)
+          .refine((k) => !k.includes('\0'), 'key must not contain NUL')
+          .refine((k) => utf8ByteLength(k) <= 1024, 'key must be at most 1024 UTF-8 bytes')
+          .describe(
+            "The object key to read, inside the connection's configured scope. At most 1024 UTF-8 bytes.",
+          ),
+        revision: z
+          .string()
+          .min(1)
+          .max(1024)
+          .optional()
+          .describe(
+            'Pins a specific version of the object. Provider-interpreted (S3 VersionId, GCS generation, Azure version id); providers without versioning reject it.',
+          ),
+      })
+      .describe(
+        'The operator pre-registered the authority: the request names a connection and a key inside it. Which provider backs the connection (S3, GCS, Azure Blob, filesystem, ...) is deployment configuration, never wire surface.',
+      ),
+  ])
+  .describe(
+    'Where CloudPDF pulls the bytes from. The two shapes differ in WHO supplies the authority to read, not in which storage vendor holds the file.',
+  );
 export type AdminImportSource = z.infer<typeof AdminImportSourceSchema>;
 
 export const AdminDocumentImportRequestSchema = z.object({
@@ -228,12 +264,31 @@ export const AdminDocumentImportRequestSchema = z.object({
    */
   expected: z
     .object({
-      sizeBytes: z.number().int().min(1).optional(),
-      sha256: z.string().regex(sha256Hex).optional(),
+      sizeBytes: z
+        .number()
+        .int()
+        .min(1)
+        .optional()
+        .describe("Checked against the source's declared Content-Length before the transfer."),
+      sha256: z
+        .string()
+        .regex(sha256Hex)
+        .optional()
+        .describe(
+          'Checked against the server-observed digest after the transfer. Required when dedupMode is reuse-existing.',
+        ),
     })
-    .optional(),
+    .optional()
+    .describe(
+      'Integrity pins, enforced when present. When absent, the server-observed values become authoritative.',
+    ),
   metadata: z.record(z.string(), z.unknown()).optional(),
-  idempotencyKey: z.string().optional(),
+  idempotencyKey: z
+    .string()
+    .optional()
+    .describe(
+      'Retrying with the same key resumes the same document rather than importing a second copy — including after a 502.',
+    ),
   dedupMode: DedupModeSchema.optional(),
   docId: z.string().regex(docIdPattern).optional(),
   /**
@@ -245,7 +300,12 @@ export const AdminDocumentImportRequestSchema = z.object({
    * additionally require `expected.sha256`, since they have no
    * revisions to pin retries to.
    */
-  mode: z.enum(['sync', 'async']).optional(),
+  mode: z
+    .enum(['sync', 'async'])
+    .optional()
+    .describe(
+      'sync (default) holds the response open for the whole transfer. async answers 202 with the document pending and transfers in the background; it requires a connection source, and filesystem connections additionally require expected.sha256.',
+    ),
 });
 export type AdminDocumentImportRequest = z.infer<typeof AdminDocumentImportRequestSchema>;
 

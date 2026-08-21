@@ -9,8 +9,14 @@ import {
   getSdkLanguages,
   getSecurityScheme,
   isOperatorOnly,
-  resolveSchema,
+  exampleRequestBody,
+  requestBodyChoice,
+  schemaFields,
   schemaType,
+  unionDiscriminator,
+  unionVariants,
+  unwrapSchema,
+  variantLabels,
   type ApiParameter,
   type JsonSchema,
 } from '@/lib/api-reference';
@@ -18,10 +24,11 @@ import {
 import { Heading } from './heading';
 import { methodStyle } from './method-badge';
 import { Tabs } from './tabs';
+import { VariantTabs } from './variant-tabs';
 
 const highlighterPromise = createHighlighter({
   themes: ['material-theme-palenight'],
-  langs: ['typescript', 'python', 'php', 'csharp', 'go', 'java', 'ruby'],
+  langs: ['typescript', 'python', 'php', 'csharp', 'go', 'java', 'ruby', 'json'],
 });
 
 const STATUS_STYLES: Record<string, string> = {
@@ -212,6 +219,7 @@ export async function ApiOperation({ operationId }: { operationId: string }) {
               </div>
             ))}
           </div>
+          <RequestBodyExample operation={operation} />
         </Section>
       ) : null}
 
@@ -220,6 +228,7 @@ export async function ApiOperation({ operationId }: { operationId: string }) {
           The selected SDK is remembered across the API reference. Values are examples; replace them
           with identifiers and input from your application.
         </p>
+        <SdkChoiceNote operation={operation} operationId={operationId} />
         <ApiSnippet operationId={operationId} />
       </Section>
 
@@ -259,6 +268,91 @@ export async function ApiOperation({ operationId }: { operationId: string }) {
         </div>
       </Section>
     </>
+  );
+}
+
+/**
+ * The body a caller actually sends, one tab per shape when the body offers
+ * a choice. Derived from the schema, so it cannot drift from the field list
+ * above it — and it is the one place the reference spells out the union
+ * branch the generated SDK example did not take.
+ */
+async function RequestBodyExample({ operation }: { operation: Operation }) {
+  const choice = requestBodyChoice(operation);
+  const examples = choice
+    ? choice.variants.map((variant, index) => ({
+        label: choice.labels[index],
+        json: exampleRequestBody(operation, { property: choice.property, variant }),
+      }))
+    : [{ label: 'application/json', json: exampleRequestBody(operation) }];
+  // Binary and scalar bodies have nothing to spell out.
+  if (examples.every((example) => ['', '{}', 'null'].includes(example.json))) return null;
+
+  const highlighter = await highlighterPromise;
+  const blocks = examples.map((example) => ({
+    ...example,
+    html: highlighter.codeToHtml(example.json, { lang: 'json', theme: 'material-theme-palenight' }),
+  }));
+
+  return (
+    <>
+      <p className={HINT}>
+        {choice
+          ? 'A complete body for each shape. Strings stand in for your own values.'
+          : 'A complete body with every required field. Strings stand in for your own values.'}
+      </p>
+      <Tabs items={blocks.map((block) => block.label)}>
+        {blocks.map((block) => (
+          <div
+            key={block.label}
+            className={SNIPPET_PANEL}
+            dangerouslySetInnerHTML={{ __html: block.html }}
+          />
+        ))}
+      </Tabs>
+    </>
+  );
+}
+
+/**
+ * Fern generates one example per operation and takes the first branch of
+ * any union in the body, so an operation whose body offers a choice ships
+ * an example that silently shows one side of it. Say which side — but only
+ * after confirming the generated snippet really took that branch.
+ */
+function SdkChoiceNote({ operation, operationId }: { operation: Operation; operationId: string }) {
+  const choice = requestBodyChoice(operation);
+  if (!choice) return null;
+
+  const [shown, ...rest] = choice.labels;
+  const source = getOperationSnippets(operationId).find(
+    (snippet) => snippet.language === 'typescript',
+  )?.source;
+  if (!source?.includes(`"${shown}"`)) return null;
+
+  return (
+    <p className={HINT}>
+      This body offers a choice, and the example takes one branch: it sends{' '}
+      {choice.property ? (
+        <>
+          <code>{choice.property}</code> as <code>{shown}</code>
+        </>
+      ) : (
+        <code>{shown}</code>
+      )}
+      . The{' '}
+      <a href="#request-body" className="text-cp-blue font-semibold hover:underline">
+        request body
+      </a>{' '}
+      above carries {rest.length === 1 ? 'the other shape' : `the other ${rest.length} shapes`} —{' '}
+      {rest.map((label, index) => (
+        <Fragment key={label}>
+          {index > 0 ? ', ' : ''}
+          <code>{label}</code>
+        </Fragment>
+      ))}
+      .
+    </p>
   );
 }
 
@@ -308,11 +402,7 @@ function EndpointPath({ path }: { path: string }) {
   );
 }
 
-function Authentication({
-  operation,
-}: {
-  operation: ReturnType<typeof getApiOperation>['operation'];
-}) {
+function Authentication({ operation }: { operation: Operation }) {
   const schemes = [
     ...new Set((operation.security ?? []).flatMap((alternative) => Object.keys(alternative))),
   ];
@@ -380,6 +470,8 @@ function ChipRow({ label, values }: { label: string; values: string[] }) {
   );
 }
 
+type Operation = ReturnType<typeof getApiOperation>['operation'];
+
 type Side = 'request' | 'response';
 
 type Field = {
@@ -402,20 +494,45 @@ function parameterField(parameter: ApiParameter): Field {
   };
 }
 
-/** Object properties, unwrapping a `$ref` and/or an array wrapper on the way. */
-function childFields(schema?: JsonSchema): Field[] {
-  if (!schema) return [];
-  let resolved = resolveSchema(schema).schema;
-  if (resolved.type === 'array' && resolved.items) {
-    resolved = resolveSchema(resolved.items).schema;
-  }
-  return Object.entries(resolved.properties ?? {}).map(([name, property]) => ({
-    key: name,
-    name,
-    schema: property,
-    required: (resolved.required ?? []).includes(name),
-    description: property.description,
+function fieldsOf(schema?: JsonSchema): Field[] {
+  return schemaFields(schema).map((field) => ({ key: field.name, ...field }));
+}
+
+/**
+ * A union's branches as tabs. The same control serves the body root and
+ * every union-typed field below it, so a choice looks like a choice
+ * wherever the reader meets one.
+ */
+function VariantPanels({
+  variants,
+  side,
+  depth,
+}: {
+  variants: JsonSchema[];
+  side: Side;
+  depth: number;
+}) {
+  const labels = variantLabels(variants);
+  const branches = variants.map((variant, index) => ({
+    label: labels[index],
+    description: unwrapSchema(variant)?.description,
+    fields: fieldsOf(variant),
   }));
+
+  return (
+    <VariantTabs labels={labels} discriminator={unionDiscriminator(variants)?.property}>
+      {branches.map((branch) => (
+        <div key={branch.label}>
+          {branch.description ? (
+            <p className="border-cp-borderSoft text-cp-muted border-b px-4 py-3 font-sans text-[14.5px] leading-[1.6]">
+              {branch.description}
+            </p>
+          ) : null}
+          <FieldList fields={branch.fields} side={side} depth={depth} />
+        </div>
+      ))}
+    </VariantTabs>
+  );
 }
 
 function FieldList({ fields, side, depth = 0 }: { fields: Field[]; side: Side; depth?: number }) {
@@ -429,7 +546,13 @@ function FieldList({ fields, side, depth = 0 }: { fields: Field[]; side: Side; d
 }
 
 function FieldRow({ field, side, depth }: { field: Field; side: Side; depth: number }) {
-  const children = depth < MAX_FIELD_DEPTH ? childFields(field.schema) : [];
+  // A union nests one visual level (the tabs) but not one SCHEMA level: its
+  // branches describe this field, so they spend the same depth budget its
+  // properties would have. Without that, a union inside a union inside a
+  // union — annotation, action target, destination — runs out before it
+  // reaches the fields that matter.
+  const variants = depth < MAX_FIELD_DEPTH ? unionVariants(field.schema) : [];
+  const children = depth < MAX_FIELD_DEPTH && !variants.length ? fieldsOf(field.schema) : [];
 
   return (
     <div className="px-4 py-3.5">
@@ -455,7 +578,11 @@ function FieldRow({ field, side, depth }: { field: Field; side: Side; depth: num
           {field.description}
         </p>
       ) : null}
-      {children.length ? (
+      {variants.length ? (
+        <div className="mt-3">
+          <VariantPanels variants={variants} side={side} depth={depth + 1} />
+        </div>
+      ) : children.length ? (
         <div className="border-cp-borderSoft mt-3 rounded-[10px] border bg-[#FBFCFE]">
           <FieldList fields={children} side={side} depth={depth + 1} />
         </div>
@@ -499,9 +626,9 @@ function SchemaBlock({
   side: Side;
   required?: boolean;
 }) {
-  const resolved = schema ? resolveSchema(schema).schema : undefined;
-  const variants = resolved?.anyOf ?? resolved?.oneOf ?? [];
-  const fields = childFields(schema);
+  const resolved = schema ? unwrapSchema(schema) : undefined;
+  const variants = unionVariants(schema);
+  const fields = fieldsOf(schema);
 
   return (
     <>
@@ -520,32 +647,13 @@ function SchemaBlock({
         </p>
       ) : null}
       {variants.length ? (
-        <div className="divide-cp-borderSoft divide-y">
-          {variants.map((variant, index) => (
-            <div key={index} className="px-4 py-3.5">
-              <div className="font-display text-cp-navy mb-2.5 text-[13.5px] font-bold">
-                {variantLabel(variant) ?? `Option ${index + 1}`}
-              </div>
-              <div className="border-cp-borderSoft rounded-[10px] border bg-[#FBFCFE]">
-                <FieldList fields={childFields(variant)} side={side} depth={1} />
-              </div>
-            </div>
-          ))}
+        <div className="px-4 py-3.5">
+          <VariantPanels variants={variants} side={side} depth={0} />
         </div>
       ) : fields.length ? (
         <FieldList fields={fields} side={side} />
       ) : null}
     </>
   );
-}
-
-/** anyOf branches are usually tagged unions — label them by the tag literal. */
-function variantLabel(variant: JsonSchema) {
-  const resolved = resolveSchema(variant).schema;
-  for (const property of Object.values(resolved.properties ?? {})) {
-    if (property.const !== undefined) return String(property.const);
-    if (property.enum?.length === 1) return String(property.enum[0]);
-  }
-  return resolveSchema(variant).name;
 }
 

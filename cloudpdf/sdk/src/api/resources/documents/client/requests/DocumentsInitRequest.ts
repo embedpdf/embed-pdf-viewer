@@ -14,6 +14,7 @@ export interface DocumentsInitRequest {
     contentSha256: string;
     metadata?: Record<string, unknown>;
     idempotencyKey?: string;
+    /** always-create (default) creates a new document every time. reuse-existing returns a document that already holds the same content instead of storing it twice. */
     dedupMode?: DocumentsInitRequest.DedupMode;
     docId?: string;
     uploadTtlSec?: number;
@@ -21,6 +22,7 @@ export interface DocumentsInitRequest {
 }
 
 export namespace DocumentsInitRequest {
+    /** always-create (default) creates a new document every time. reuse-existing returns a document that already holds the same content instead of storing it twice. */
     export const DedupMode = {
         AlwaysCreate: "always-create",
         ReuseExisting: "reuse-existing",

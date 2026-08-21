@@ -40,6 +40,7 @@ test('sync creates and safely updates a reused PR branch while preserving reposi
     const generated = join(fixture, 'generated');
     const fakeBin = join(fixture, 'bin');
     const ghLog = join(fixture, 'gh.log');
+    const ghViewCount = join(fixture, 'gh-view-count');
     const inspection = join(fixture, 'inspection');
     mkdirSync(seed);
     mkdirSync(join(seed, '.github', 'workflows'), { recursive: true });
@@ -84,6 +85,24 @@ printf '%s\\n' "$*" >> "$GH_LOG"
 case "$1 $2" in
   "pr list") exit 0 ;;
   "pr create") printf '%s\\n' 'https://github.com/embedpdf/cloudpdf-sdk-python/pull/1' ;;
+  "pr view")
+    count=0
+    if [ -f "$GH_VIEW_COUNT" ]; then count="$(cat "$GH_VIEW_COUNT")"; fi
+    count=$((count + 1))
+    printf '%s\\n' "$count" > "$GH_VIEW_COUNT"
+    head_oid="$(git rev-parse HEAD)"
+    case "$count" in
+      1)
+        printf '{"headRefOid":"%s","mergeable":"UNKNOWN","mergeStateStatus":"UNKNOWN","statusCheckRollup":[]}\\n' "$head_oid"
+        ;;
+      2)
+        printf '{"headRefOid":"%s","mergeable":"MERGEABLE","mergeStateStatus":"BLOCKED","statusCheckRollup":[{"__typename":"CheckRun","name":"Build and validate","status":"IN_PROGRESS","conclusion":null}]}\\n' "$head_oid"
+        ;;
+      *)
+        printf '{"headRefOid":"%s","mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","statusCheckRollup":[{"__typename":"CheckRun","name":"Build and validate","status":"COMPLETED","conclusion":"SUCCESS"}]}\\n' "$head_oid"
+        ;;
+    esac
+    ;;
   "pr merge") exit 0 ;;
   *) printf '%s\\n' "unexpected gh invocation: $*" >&2; exit 1 ;;
 esac
@@ -96,11 +115,14 @@ esac
         ...process.env,
         PATH: `${fakeBin}:${process.env.PATH}`,
         GH_LOG: ghLog,
+        GH_VIEW_COUNT: ghViewCount,
         GH_TOKEN: 'fixture-token',
         SDK_GITHUB_TOKEN: 'fixture-token',
         SDK_GENERATED_DIRECTORY: generated,
         SDK_REPOSITORY_REMOTE_URL: remote,
         SDK_AUTO_MERGE: 'true',
+        SDK_AUTO_MERGE_MAX_ATTEMPTS: '5',
+        SDK_AUTO_MERGE_POLL_INTERVAL_MS: '0',
       },
     });
 
@@ -112,11 +134,14 @@ esac
         ...process.env,
         PATH: `${fakeBin}:${process.env.PATH}`,
         GH_LOG: ghLog,
+        GH_VIEW_COUNT: ghViewCount,
         GH_TOKEN: 'fixture-token',
         SDK_GITHUB_TOKEN: 'fixture-token',
         SDK_GENERATED_DIRECTORY: generated,
         SDK_REPOSITORY_REMOTE_URL: remote,
         SDK_AUTO_MERGE: 'true',
+        SDK_AUTO_MERGE_MAX_ATTEMPTS: '5',
+        SDK_AUTO_MERGE_POLL_INTERVAL_MS: '0',
       },
     });
 
@@ -130,7 +155,14 @@ esac
     assert.ok(existsSync(join(inspection, '.github', 'workflows', 'sdk-ci.yml')));
     assert.equal(existsSync(join(inspection, 'node_modules')), false);
     const ghInvocations = readFileSync(ghLog, 'utf8');
-    assert.match(ghInvocations, /pr merge .* --auto --squash --delete-branch/);
+    const mergeInvocations = ghInvocations
+      .split('\n')
+      .filter((invocation) => invocation.startsWith('pr merge '));
+    assert.equal(mergeInvocations.length, 2);
+    assert.match(mergeInvocations[0], /--auto --squash --delete-branch/);
+    assert.doesNotMatch(mergeInvocations[1], /--auto/);
+    assert.match(mergeInvocations[1], /--squash --delete-branch/);
+    assert.equal(ghInvocations.match(/^pr view /gm)?.length, 3);
     assert.equal(ghInvocations.match(/^pr create /gm)?.length, 2);
   } finally {
     rmSync(fixture, { recursive: true, force: true });

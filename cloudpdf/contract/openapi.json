@@ -4107,7 +4107,8 @@
           },
           "dedupMode": {
             "type": "string",
-            "enum": ["always-create", "reuse-existing"]
+            "enum": ["always-create", "reuse-existing"],
+            "description": "always-create (default) creates a new document every time. reuse-existing returns a document that already holds the same content instead of storing it twice."
           },
           "docId": {
             "type": "string",
@@ -4510,11 +4511,13 @@
                   "url": {
                     "type": "string",
                     "format": "uri",
-                    "maxLength": 8192
+                    "maxLength": 8192,
+                    "description": "The URL to fetch. Must be allowed by the deployment import policy (scheme, network range, size) and must declare a length."
                   }
                 },
                 "required": ["kind", "url"],
-                "additionalProperties": false
+                "additionalProperties": false,
+                "description": "The caller supplies the authority: a presigned S3/GCS/Azure/R2/MinIO GET, or any HTTPS endpoint the deployment import policy allows. The URL is a capability — treat it as a secret. CloudPDF never echoes its query string back in errors, logs, or stored failure reasons."
               },
               {
                 "type": "object",
@@ -4526,47 +4529,57 @@
                   "connectionId": {
                     "type": "string",
                     "minLength": 1,
-                    "maxLength": 128
+                    "maxLength": 128,
+                    "description": "The operator-registered storage connection to read from."
                   },
                   "key": {
                     "type": "string",
-                    "minLength": 1
+                    "minLength": 1,
+                    "description": "The object key to read, inside the connection's configured scope. At most 1024 UTF-8 bytes."
                   },
                   "revision": {
                     "type": "string",
                     "minLength": 1,
-                    "maxLength": 1024
+                    "maxLength": 1024,
+                    "description": "Pins a specific version of the object. Provider-interpreted (S3 VersionId, GCS generation, Azure version id); providers without versioning reject it."
                   }
                 },
                 "required": ["kind", "connectionId", "key"],
-                "additionalProperties": false
+                "additionalProperties": false,
+                "description": "The operator pre-registered the authority: the request names a connection and a key inside it. Which provider backs the connection (S3, GCS, Azure Blob, filesystem, ...) is deployment configuration, never wire surface."
               }
-            ]
+            ],
+            "description": "Where CloudPDF pulls the bytes from. The two shapes differ in WHO supplies the authority to read, not in which storage vendor holds the file."
           },
           "expected": {
             "type": "object",
             "properties": {
               "sizeBytes": {
                 "type": "integer",
-                "minimum": 1
+                "minimum": 1,
+                "description": "Checked against the source's declared Content-Length before the transfer."
               },
               "sha256": {
                 "type": "string",
-                "pattern": "^[0-9a-f]{64}$"
+                "pattern": "^[0-9a-f]{64}$",
+                "description": "Checked against the server-observed digest after the transfer. Required when dedupMode is reuse-existing."
               }
             },
-            "additionalProperties": false
+            "additionalProperties": false,
+            "description": "Integrity pins, enforced when present. When absent, the server-observed values become authoritative."
           },
           "metadata": {
             "type": "object",
             "additionalProperties": {}
           },
           "idempotencyKey": {
-            "type": "string"
+            "type": "string",
+            "description": "Retrying with the same key resumes the same document rather than importing a second copy — including after a 502."
           },
           "dedupMode": {
             "type": "string",
-            "enum": ["always-create", "reuse-existing"]
+            "enum": ["always-create", "reuse-existing"],
+            "description": "always-create (default) creates a new document every time. reuse-existing returns a document that already holds the same content instead of storing it twice."
           },
           "docId": {
             "type": "string",
@@ -4574,7 +4587,8 @@
           },
           "mode": {
             "type": "string",
-            "enum": ["sync", "async"]
+            "enum": ["sync", "async"],
+            "description": "sync (default) holds the response open for the whole transfer. async answers 202 with the document pending and transfers in the background; it requires a connection source, and filesystem connections additionally require expected.sha256."
           }
         },
         "required": ["source"],
