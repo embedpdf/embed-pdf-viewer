@@ -79,6 +79,102 @@ function run(command, args, options = {}) {
   return options.capture ? (result.stdout ?? '').trim() : '';
 }
 
+const requiredMergeCheck = 'Build and validate';
+
+function positiveIntegerEnvironment(name, fallback, { allowZero = false } = {}) {
+  const raw = process.env[name];
+  if (raw === undefined) return fallback;
+  const value = Number(raw);
+  const minimum = allowZero ? 0 : 1;
+  if (!Number.isInteger(value) || value < minimum) {
+    throw new Error(`${name} must be an integer greater than or equal to ${minimum}`);
+  }
+  return value;
+}
+
+function requiredCheckState(statusCheckRollup) {
+  const check = statusCheckRollup.find(
+    (candidate) =>
+      candidate.name === requiredMergeCheck || candidate.context === requiredMergeCheck,
+  );
+  if (!check) return 'missing';
+
+  if (check.__typename === 'StatusContext') {
+    if (check.state === 'SUCCESS') return 'success';
+    if (check.state === 'PENDING' || check.state === 'EXPECTED') return 'pending';
+    return 'failure';
+  }
+
+  if (check.status !== 'COMPLETED') return 'pending';
+  return check.conclusion === 'SUCCESS' ? 'success' : 'failure';
+}
+
+async function mergeGeneratedPullRequest(pullRequestUrl, expectedHeadSha) {
+  const attempts = positiveIntegerEnvironment('SDK_AUTO_MERGE_MAX_ATTEMPTS', 30);
+  const interval = positiveIntegerEnvironment('SDK_AUTO_MERGE_POLL_INTERVAL_MS', 1000, {
+    allowZero: true,
+  });
+  let lastReason = 'GitHub has not returned pull request state';
+
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    const state = JSON.parse(
+      run(
+        'gh',
+        [
+          'pr',
+          'view',
+          pullRequestUrl,
+          '--repo',
+          repository.slug,
+          '--json',
+          'headRefOid,mergeable,mergeStateStatus,statusCheckRollup',
+        ],
+        { cwd: checkoutDirectory, capture: true },
+      ),
+    );
+    const checkState = requiredCheckState(state.statusCheckRollup ?? []);
+
+    if (state.headRefOid !== expectedHeadSha) {
+      lastReason = `GitHub still reports head ${state.headRefOid ?? 'unknown'}`;
+    } else if (state.mergeable === 'CONFLICTING' || state.mergeStateStatus === 'DIRTY') {
+      throw new Error(`${repository.slug}: generated pull request has merge conflicts`);
+    } else if (checkState === 'failure') {
+      throw new Error(`${repository.slug}: required check ${requiredMergeCheck} failed`);
+    } else if (state.mergeable === 'UNKNOWN') {
+      lastReason = 'GitHub is still calculating mergeability';
+    } else if (checkState === 'missing') {
+      lastReason = `required check ${requiredMergeCheck} is not registered yet`;
+    } else if (state.mergeStateStatus === 'CLEAN' && checkState === 'success') {
+      // Once all requirements have already passed, GitHub rejects the
+      // enablePullRequestAutoMerge mutation. Merge directly, but only after
+      // proving the required check belongs to the exact head we pushed.
+      run('gh', ['pr', 'merge', pullRequestUrl, '--squash', '--delete-branch'], {
+        cwd: checkoutDirectory,
+      });
+      console.log(`${repository.slug}: required checks passed; pull request merged`);
+      return;
+    } else if (state.mergeStateStatus !== 'CLEAN') {
+      // Waiting until the current head and its required check are visible avoids
+      // racing GitHub's post-push mergeability recalculation. Native auto-merge
+      // can now safely wait for the pending check or any other repository rule.
+      run('gh', ['pr', 'merge', pullRequestUrl, '--auto', '--squash', '--delete-branch'], {
+        cwd: checkoutDirectory,
+      });
+      console.log(`${repository.slug}: auto-merge enabled`);
+      return;
+    } else {
+      lastReason = `${requiredMergeCheck} is ${checkState} while GitHub still reports CLEAN`;
+    }
+
+    if (attempt < attempts) {
+      console.log(`${repository.slug}: waiting for merge state (${lastReason})`);
+      await new Promise((resolve) => setTimeout(resolve, interval));
+    }
+  }
+
+  throw new Error(`${repository.slug}: timed out waiting to configure auto-merge: ${lastReason}`);
+}
+
 function copyTree(source, target, sourceRoot = source) {
   mkdirSync(target, { recursive: true });
   for (const entry of readdirSync(source, { withFileTypes: true })) {
@@ -168,6 +264,10 @@ try {
       ],
       { cwd: checkoutDirectory },
     );
+    const pushedHeadSha = run('git', ['rev-parse', 'HEAD'], {
+      cwd: checkoutDirectory,
+      capture: true,
+    });
     // The clone is intentionally shallow and tracks only main, so generic
     // --force-with-lease cannot infer the expected value for a previously used
     // automation branch. Pin the lease to the exact SHA observed above. An
@@ -199,7 +299,7 @@ try {
         '--jq',
         '.[0].url // ""',
       ],
-      { capture: true },
+      { cwd: checkoutDirectory, capture: true },
     );
 
     if (!pullRequestUrl) {
@@ -232,14 +332,13 @@ This PR updates generated source and repository-owned automation. Registry publi
           '--body-file',
           bodyPath,
         ],
-        { capture: true },
+        { cwd: checkoutDirectory, capture: true },
       );
     }
 
     console.log(`${repository.slug}: ${pullRequestUrl}`);
     if (process.env.SDK_AUTO_MERGE === 'true') {
-      run('gh', ['pr', 'merge', pullRequestUrl, '--auto', '--squash', '--delete-branch']);
-      console.log(`${repository.slug}: auto-merge enabled`);
+      await mergeGeneratedPullRequest(pullRequestUrl, pushedHeadSha);
     }
   }
 } finally {

@@ -4,13 +4,20 @@ import {
   getApiGroups,
   getApiOperation,
   getApiVersion,
+  exampleRequestBody,
   getGrantIndex,
   getOperationCount,
   getOperationSnippets,
   getSdkLanguages,
   getSecurityScheme,
-  resolveSchema,
+  requestBodyChoice,
+  schemaFields,
   schemaType,
+  unionDiscriminator,
+  unionVariants,
+  unwrapSchema,
+  variantLabels,
+  type ApiOperation,
   type ApiParameter,
   type JsonSchema,
 } from './api-reference';
@@ -37,18 +44,23 @@ type Field = {
   location?: string;
 };
 
-function childFields(schema?: JsonSchema): Field[] {
-  if (!schema) return [];
-  let resolved = resolveSchema(schema).schema;
-  if (resolved.type === 'array' && resolved.items) {
-    resolved = resolveSchema(resolved.items).schema;
-  }
-  return Object.entries(resolved.properties ?? {}).map(([name, property]) => ({
-    name,
-    schema: property,
-    required: (resolved.required ?? []).includes(name),
-    description: property.description,
-  }));
+/**
+ * One list item per union branch, labelled by the tag that selects it —
+ * the Markdown counterpart of the page's variant tabs. Nothing here may
+ * show less than the page: a reader who fetches the `.md` sees the same
+ * branches, in the same order, under the same labels.
+ */
+function variantItems(variants: JsonSchema[], depth: number): AstNode[] {
+  const labels = variantLabels(variants);
+  return variants.map((variant, index) => {
+    const description = unwrapSchema(variant)?.description;
+    const children: AstNode[] = [
+      paragraph([strong(labels[index]), ...(description ? [text(` — ${description}`)] : [])]),
+    ];
+    const fields = schemaFields(variant);
+    if (fields.length > 0) children.push(list(fields.map((field) => fieldItem(field, depth))));
+    return listItem(children);
+  });
 }
 
 function fieldItem(field: Field, depth: number): AstNode {
@@ -58,8 +70,13 @@ function fieldItem(field: Field, depth: number): AstNode {
   if (field.description) head.push(text(` — ${field.description}`));
 
   const children: AstNode[] = [paragraph(head)];
-  const nested = depth < MAX_FIELD_DEPTH ? childFields(field.schema) : [];
-  if (nested.length > 0) {
+  // A union spends the same depth budget its properties would have — see
+  // the note on FieldRow in components/docs/api-reference.tsx.
+  const variants = depth < MAX_FIELD_DEPTH ? unionVariants(field.schema) : [];
+  const nested = depth < MAX_FIELD_DEPTH && !variants.length ? schemaFields(field.schema) : [];
+  if (variants.length > 0) {
+    children.push(list(variantItems(variants, depth + 1)));
+  } else if (nested.length > 0) {
     children.push(list(nested.map((child) => fieldItem(child, depth + 1))));
   }
   return listItem(children);
@@ -71,23 +88,43 @@ function schemaNodes(contentType: string, schema: JsonSchema | undefined): AstNo
   ];
   if (!schema) return nodes;
 
-  const resolved = resolveSchema(schema).schema;
-  if (resolved.description) nodes.push(paragraph([text(resolved.description)]));
+  const resolved = unwrapSchema(schema);
+  if (resolved?.description) nodes.push(paragraph([text(resolved.description)]));
 
-  const variants = resolved.anyOf ?? resolved.oneOf ?? [];
+  const variants = unionVariants(schema);
   if (variants.length > 0) {
-    for (const [index, variant] of variants.entries()) {
-      const label = resolveSchema(variant).name ?? `Option ${index + 1}`;
-      nodes.push(paragraph([strong(label)]));
-      const fields = childFields(variant);
-      if (fields.length > 0) nodes.push(list(fields.map((field) => fieldItem(field, 1))));
-    }
+    const discriminator = unionDiscriminator(variants);
+    nodes.push(
+      paragraph([
+        text('One of'),
+        ...(discriminator ? [text(', selected by '), inlineCode(discriminator.property)] : []),
+        text(':'),
+      ]),
+      list(variantItems(variants, 0)),
+    );
     return nodes;
   }
 
-  const fields = childFields(schema);
+  const fields = schemaFields(schema);
   if (fields.length > 0) nodes.push(list(fields.map((field) => fieldItem(field, 0))));
   return nodes;
+}
+
+/** The wire body, one block per shape — the page's example, in Markdown. */
+function requestBodyExampleNodes(operation: ApiOperation): AstNode[] {
+  const choice = requestBodyChoice(operation);
+  const examples = choice
+    ? choice.variants.map((variant, index) => ({
+        label: choice.labels[index],
+        json: exampleRequestBody(operation, { property: choice.property, variant }),
+      }))
+    : [{ label: '', json: exampleRequestBody(operation) }];
+  if (examples.every((example) => ['', '{}', 'null'].includes(example.json))) return [];
+
+  return examples.flatMap((example) => [
+    paragraph([strong(example.label ? `Example — ${example.label}` : 'Example')]),
+    code('json', example.json),
+  ]);
 }
 
 /* ---------- component projections ---------- */
@@ -160,6 +197,7 @@ function projectApiOperation(operationId: string): AstNode[] {
     for (const [contentType, media] of Object.entries(operation.requestBody.content ?? {})) {
       nodes.push(...schemaNodes(contentType, media.schema));
     }
+    nodes.push(...requestBodyExampleNodes(operation));
   }
 
   nodes.push(heading(2, 'SDK examples'));
