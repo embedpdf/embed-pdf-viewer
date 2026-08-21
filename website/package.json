@@ -3,18 +3,19 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "dev": "turbo run build:demos && pnpm run search:index:build && next dev --port 3100",
     "build": "next build",
-    "start": "next start",
+    "build:demos": "vite build --config vite.demos.config.ts && vite build --config vite.demos-ng.config.ts",
+    "check:samples": "tsc -p tsconfig.samples-engine.json && tsc -p tsconfig.samples-react.json && ngc -p tsconfig.samples-angular.json",
+    "dev": "turbo run build:demos && pnpm run search:index:build && next dev --port 3100",
+    "docs:check": "node ../docs/content/scripts/sync.mjs --target . --engine local --check",
+    "docs:sync": "node ../docs/content/scripts/sync.mjs --target . --engine local",
+    "og:preview": "node ../docs/kit/scripts/collect-og-cards.mjs",
+    "prebuild": "pnpm run docs:check",
     "search:index": "tsx scripts/build-search-index.ts",
     "search:index:build": "tsx scripts/build-search-index.ts --if-configured",
+    "start": "next start",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit && pnpm run check:samples",
-    "check:samples": "tsc -p tsconfig.samples-engine.json && tsc -p tsconfig.samples-react.json && ngc -p tsconfig.samples-angular.json",
-    "build:demos": "vite build --config vite.demos.config.ts && vite build --config vite.demos-ng.config.ts",
-    "docs:sync": "node ../docs/content/scripts/sync.mjs --target . --engine local",
-    "docs:check": "node ../docs/content/scripts/sync.mjs --target . --engine local --check",
-    "prebuild": "pnpm run docs:check"
+    "typecheck": "tsc --noEmit && pnpm run check:samples"
   },
   "dependencies": {
     "@embedpdf/angular": "workspace:*",

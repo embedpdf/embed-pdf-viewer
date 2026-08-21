@@ -9,3 +9,5 @@ coverage
 public
 .svelte-kit/
 /static/
+# Generated: one long base64 line per font face (docs/kit/scripts/build-og-fonts.mjs).
+docs/kit/src/og/fonts.data.ts
