@@ -127,7 +127,11 @@ function collectSnippets(tree: AstNode, basename: string): OgSnippet[] {
       const child = children[index];
 
       if (child.type === 'code') {
-        const code = typeof child.value === 'string' ? child.value.replace(/\s+$/, '') : '';
+        // trimEnd, not /\s+$/: the regex form is ambiguous about where a
+        // trailing whitespace run starts, so it backtracks once per character
+        // on any block that does NOT end in whitespace — quadratic in the
+        // length of a code block (CodeQL js/polynomial-redos).
+        const code = typeof child.value === 'string' ? child.value.trimEnd() : '';
         if (code) {
           const lang = normalise(child.lang) ?? null;
           snippets.push({
