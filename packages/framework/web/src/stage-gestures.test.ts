@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest';
-import { computeReleaseVelocity } from './stage-gestures';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { computeReleaseVelocity, createStageGestureController } from './stage-gestures';
+import type { StageGestureSink } from './stage-gestures';
 
 describe('computeReleaseVelocity', () => {
   it('reads the mean velocity over the trailing window', () => {
@@ -48,5 +49,261 @@ describe('computeReleaseVelocity', () => {
         100,
       ),
     ).toBeNull();
+  });
+});
+
+// ── controller lifecycle ──────────────────────────────────────────────────────
+// Fake element/window/rAF/clock (the repo's fake-DOM pattern — no jsdom): every
+// listener the controller attaches is captured and fired by hand, frames pump
+// on demand, and the clock only moves when a test advances it. This is the
+// harness that makes the 600-line state machine regression-testable.
+
+interface HarnessOptions {
+  sink?: boolean;
+  claims?: (e: PointerEvent) => boolean;
+  zoomGestures?: boolean;
+  inMotion?: boolean;
+}
+
+function controllerHarness(opts: HarnessOptions = {}) {
+  const elListeners = new Map<string, (e: unknown) => void>();
+  const winListeners = new Map<string, (e: unknown) => void>();
+  const el = {
+    addEventListener: (t: string, fn: (e: unknown) => void) => elListeners.set(t, fn),
+    removeEventListener: (t: string) => elListeners.delete(t),
+    getBoundingClientRect: () => ({ left: 0, top: 0, right: 800, bottom: 600, width: 800, height: 600 }),
+  } as unknown as HTMLElement;
+  const win = {
+    addEventListener: (t: string, fn: (e: unknown) => void) => winListeners.set(t, fn),
+    removeEventListener: (t: string) => winListeners.delete(t),
+  };
+  vi.stubGlobal('window', win);
+  let now = 0;
+  vi.stubGlobal('performance', { now: () => now });
+  const frames: FrameRequestCallback[] = [];
+  vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
+    frames.push(cb);
+    return frames.length;
+  });
+  vi.stubGlobal('cancelAnimationFrame', () => {
+    frames.length = 0; // the controller keeps at most one frame in flight
+  });
+
+  const host = {
+    panBy: vi.fn(),
+    zoomAround: vi.fn(),
+    beginGesture: vi.fn(),
+    endGesture: vi.fn(),
+    fling: vi.fn(),
+    doubleTapZoom: vi.fn(),
+    cameraInMotion: vi.fn(() => opts.inMotion ?? false),
+  };
+  const sink =
+    opts.sink === false
+      ? null
+      : ({
+          down: vi.fn(),
+          move: vi.fn(),
+          up: vi.fn(),
+          cancel: vi.fn(),
+          hover: vi.fn(),
+          longPress: vi.fn(),
+          ...(opts.claims ? { claimsPoint: opts.claims } : {}),
+        } as unknown as StageGestureSink);
+  const detach = createStageGestureController(el, host, {
+    wheelZoomFactor: () => 1.2,
+    sink,
+    zoomGestures: opts.zoomGestures,
+  });
+  const ev = (over: Record<string, unknown> = {}) =>
+    ({
+      pointerId: 7,
+      pointerType: 'touch',
+      clientX: 0,
+      clientY: 0,
+      button: 0,
+      shiftKey: false,
+      preventDefault: () => {},
+      ...over,
+    }) as unknown as PointerEvent;
+  return {
+    host,
+    sink: sink as unknown as Record<string, ReturnType<typeof vi.fn>> | null,
+    detach,
+    down: (o?: Record<string, unknown>) => elListeners.get('pointerdown')!(ev(o)),
+    move: (o?: Record<string, unknown>) => winListeners.get('pointermove')!(ev(o)),
+    up: (o?: Record<string, unknown>) => winListeners.get('pointerup')!(ev(o)),
+    pointerCancel: (o?: Record<string, unknown>) => winListeners.get('pointercancel')!(ev(o)),
+    wheel: (o: Record<string, unknown> = {}) =>
+      elListeners.get('wheel')!({
+        deltaY: 100,
+        deltaX: 0,
+        deltaMode: 0,
+        ctrlKey: false,
+        metaKey: false,
+        shiftKey: false,
+        clientX: 10,
+        clientY: 10,
+        preventDefault: () => {},
+        ...o,
+      }),
+    frame: () => {
+      const f = frames.splice(0);
+      f.forEach((cb) => cb(now));
+    },
+    advance: (ms: number) => {
+      now += ms;
+      vi.advanceTimersByTime(ms);
+    },
+  };
+}
+
+describe('gesture controller lifecycle', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it('pan: slop absorbed, rAF-coalesced, and the RELEASE FLUSHES pending travel', () => {
+    const h = controllerHarness({ sink: false });
+    h.down({ clientX: 0, clientY: 0 });
+    expect(h.host.beginGesture).toHaveBeenCalledTimes(1);
+    h.move({ clientX: 5, clientY: 5 }); // under slop: still a would-be tap
+    expect(h.host.panBy).not.toHaveBeenCalled();
+    h.move({ clientX: 30, clientY: 30 }); // slop crossed: pan, absorbed
+    h.move({ clientX: 60, clientY: 60 });
+    h.frame(); // one application per frame
+    expect(h.host.panBy).toHaveBeenCalledTimes(1);
+    expect(h.host.panBy).toHaveBeenLastCalledWith(30, 30);
+    h.move({ clientX: 80, clientY: 80 });
+    h.up({ clientX: 90, clientY: 90 }); // NO frame ran since the move…
+    // …the release must apply the outstanding 30px itself, before ending
+    expect(h.host.panBy).toHaveBeenCalledTimes(2);
+    expect(h.host.panBy).toHaveBeenLastCalledWith(30, 30);
+    expect(h.host.endGesture).toHaveBeenCalledTimes(1);
+    expect(h.host.fling).not.toHaveBeenCalled(); // zero-dt trail: no fling
+  });
+
+  it('a fast pan release flings; a hold-then-release does not', () => {
+    const h = controllerHarness({ sink: false });
+    h.down({ clientX: 0, clientY: 0 });
+    for (let i = 1; i <= 6; i++) {
+      h.advance(16);
+      h.move({ clientX: 0, clientY: -i * 30 });
+    }
+    h.up({ clientY: -190 });
+    expect(h.host.fling).toHaveBeenCalledTimes(1);
+    const [, vy] = h.host.fling.mock.calls[0]!;
+    expect(vy).toBeLessThan(-500); // px/s, upward
+
+    const h2 = controllerHarness({ sink: false });
+    h2.down({ clientX: 0, clientY: 0 });
+    for (let i = 1; i <= 6; i++) {
+      h2.advance(16);
+      h2.move({ clientX: 0, clientY: -i * 30 });
+    }
+    h2.advance(300); // hold still…
+    h2.up({ clientY: -180 });
+    expect(h2.host.fling).not.toHaveBeenCalled();
+  });
+
+  it('tap forwards a down/up pair; double-tap zooms instead of forwarding twice', () => {
+    const h = controllerHarness();
+    h.down({ clientX: 40, clientY: 40 });
+    h.advance(50);
+    h.up({ clientX: 42, clientY: 41 });
+    expect(h.sink!.down).toHaveBeenCalledTimes(1);
+    expect(h.sink!.up).toHaveBeenCalledTimes(1);
+    expect(h.host.panBy).not.toHaveBeenCalled();
+    h.advance(100);
+    h.down({ clientX: 44, clientY: 43 });
+    h.advance(40);
+    h.up({ clientX: 44, clientY: 43 });
+    expect(h.host.doubleTapZoom).toHaveBeenCalledTimes(1);
+    expect(h.sink!.down).toHaveBeenCalledTimes(1); // second tap did NOT forward
+  });
+
+  it('long-press hands the contact to the hub and closes the camera bracket first', () => {
+    const h = controllerHarness();
+    h.down({ clientX: 40, clientY: 40 });
+    h.advance(460); // long-press timer fires
+    expect(h.host.endGesture).toHaveBeenCalledTimes(1); // handoff closed the bracket
+    expect(h.sink!.longPress).toHaveBeenCalledTimes(1);
+    h.move({ clientX: 60, clientY: 60 });
+    expect(h.sink!.move).toHaveBeenCalledTimes(1);
+    h.up({ clientX: 60, clientY: 60 });
+    expect(h.sink!.up).toHaveBeenCalledTimes(1);
+    expect(h.host.endGesture).toHaveBeenCalledTimes(1); // not double-ended
+  });
+
+  it('claims routing: tool-first contact, second finger cancels into a pinch', () => {
+    const h = controllerHarness({ claims: () => true });
+    h.down({ clientX: 100, clientY: 100 });
+    expect(h.sink!.down).toHaveBeenCalledTimes(1); // owned from the first pixel
+    expect(h.host.beginGesture).not.toHaveBeenCalled(); // not a camera gesture
+    h.move({ clientX: 120, clientY: 120 });
+    expect(h.sink!.move).toHaveBeenCalledTimes(1);
+    h.down({ pointerId: 8, clientX: 300, clientY: 300 }); // second finger
+    expect(h.sink!.cancel).toHaveBeenCalledTimes(1);
+    expect(h.host.beginGesture).toHaveBeenCalledTimes(1); // the pinch's bracket
+    h.move({ pointerId: 8, clientX: 400, clientY: 400 });
+    h.frame();
+    expect(h.host.zoomAround).toHaveBeenCalled(); // span grew → zoom applied
+  });
+
+  it('pinch release flushes the final span step before ending', () => {
+    const h = controllerHarness({ sink: false });
+    h.down({ pointerId: 7, clientX: 100, clientY: 300 });
+    h.down({ pointerId: 8, clientX: 300, clientY: 300 });
+    h.move({ pointerId: 8, clientX: 400, clientY: 300 });
+    h.frame();
+    expect(h.host.zoomAround).toHaveBeenCalledTimes(1);
+    h.move({ pointerId: 8, clientX: 500, clientY: 300 }); // no frame after this…
+    h.up({ pointerId: 8, clientX: 500, clientY: 300 });
+    // …the lift itself flushed the last step (2 zooms), then went single-finger
+    expect(h.host.zoomAround).toHaveBeenCalledTimes(2);
+    expect(h.host.endGesture).not.toHaveBeenCalled(); // finger 7 still down: pan continues
+    h.up({ pointerId: 7, clientX: 100, clientY: 300 });
+    expect(h.host.endGesture).toHaveBeenCalledTimes(1);
+  });
+
+  it('a touch-down while the camera is moving is a CATCH: no tap forwards', () => {
+    const h = controllerHarness({ inMotion: true });
+    h.down({ clientX: 40, clientY: 40 });
+    expect(h.host.beginGesture).toHaveBeenCalledTimes(1); // the catch itself
+    h.advance(50);
+    h.up({ clientX: 40, clientY: 40 });
+    expect(h.sink!.down).not.toHaveBeenCalled();
+    expect(h.host.doubleTapZoom).not.toHaveBeenCalled();
+    expect(h.host.endGesture).toHaveBeenCalledTimes(1);
+  });
+
+  it('wheel: ctrl zooms through the classifier, plain wheel pans', () => {
+    const h = controllerHarness({ sink: false });
+    h.wheel({ ctrlKey: true, clientX: 50, clientY: 60 });
+    expect(h.host.zoomAround).toHaveBeenCalledWith({ x: 50, y: 60 }, 1.2);
+    h.wheel({ deltaY: 40, deltaX: 4 });
+    expect(h.host.panBy).toHaveBeenCalledWith(-4, -40);
+  });
+
+  it('detach mid-gesture balances the open camera bracket', () => {
+    const h = controllerHarness({ sink: false });
+    h.down({ clientX: 0, clientY: 0 });
+    h.move({ clientX: 50, clientY: 50 });
+    h.detach();
+    expect(h.host.endGesture).toHaveBeenCalledTimes(1);
+  });
+
+  it('pointercancel discards without committing a fling', () => {
+    const h = controllerHarness({ sink: false });
+    h.down({ clientX: 0, clientY: 0 });
+    for (let i = 1; i <= 5; i++) {
+      h.advance(16);
+      h.move({ clientX: 0, clientY: -i * 40 });
+    }
+    h.pointerCancel({});
+    expect(h.host.fling).not.toHaveBeenCalled();
+    expect(h.host.endGesture).toHaveBeenCalledTimes(1);
   });
 });

@@ -123,6 +123,11 @@ export function createInteractionCapability(
       syncCursor();
     },
 
+    wouldClaimTouch: (sample) => {
+      for (const h of eligible()) if (h.claimsTouch?.(sample)) return true;
+      return false;
+    },
+
     dispatch: (sample) => {
       const nowOverPage = sample.page != null;
       if (nowOverPage !== overPage) {

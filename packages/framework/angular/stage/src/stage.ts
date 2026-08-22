@@ -174,11 +174,14 @@ export class EpdfStage {
         // framework adapter has one feel. The sink is the hub bridge: it
         // converts events to page-resolved samples exactly as before (`pageAt`
         // per event, so a drag can cross pages).
-        const forward = (phase: PointerSample['phase'], e: PointerEvent, clickCount = 1) => {
-          if (!ix) return;
+        const sampleOf = (
+          phase: PointerSample['phase'],
+          e: PointerEvent,
+          clickCount = 1,
+        ): PointerSample => {
           const r = el.getBoundingClientRect();
           const viewport = { x: e.clientX - r.left, y: e.clientY - r.top };
-          ix.dispatch({
+          return {
             phase,
             viewport,
             page: stage.pageAt(viewport) ?? undefined,
@@ -188,7 +191,10 @@ export class EpdfStage {
             modifiers: { shift: e.shiftKey, alt: e.altKey, ctrl: e.ctrlKey, meta: e.metaKey },
             clickCount,
             pointerType: (e.pointerType || 'mouse') as PointerSample['pointerType'],
-          });
+          };
+        };
+        const forward = (phase: PointerSample['phase'], e: PointerEvent, clickCount = 1) => {
+          ix?.dispatch(sampleOf(phase, e, clickCount));
         };
         const sink: StageGestureSink | null =
           useHub && ix
@@ -201,6 +207,11 @@ export class EpdfStage {
                 // Touch long-press = a word-select down (clickCount 2): the
                 // mobile entry into text selection.
                 longPress: (e) => forward('down', e, 2),
+                // Touch consent: an armed drawing/markup tool takes fingers
+                // wholesale; otherwise per-point claims (a selected
+                // annotation's body or handles) decide. Pure pre-flight.
+                claimsPoint: (e) =>
+                  !!ix.activeTool().touchDirect || ix.wouldClaimTouch(sampleOf('down', e)),
               }
             : null;
         cleanups.push(

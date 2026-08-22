@@ -66,6 +66,16 @@ export interface StageGestureSink {
    *  typically forwards it as a word-select down). Subsequent move/up arrive
    *  via {@link move}/{@link up}. */
   longPress(e: PointerEvent): void;
+  /**
+   * Touch-consent pre-flight, asked at touch-down BEFORE the contact is
+   * classified: does a tool have standing to own this contact? True when the
+   * armed tool takes fingers wholesale (a drawing tool) or something under
+   * the point claims its drags (a selected annotation's body or handles).
+   * True routes the whole contact to {@link down}/{@link move}/{@link up} —
+   * where a second finger still cancels it into a pinch. Must be a pure
+   * read. Absent = never; the contact navigates.
+   */
+  claimsPoint?(e: PointerEvent): boolean;
 }
 
 /** The wheel fields the zoom classifier reads (plugin-stage's `WheelSample`). */
@@ -242,32 +252,41 @@ export function createStageGestureController(
     if (v && Math.hypot(v.vx, v.vy) >= FLING_MIN) host.fling(v.vx, v.vy);
   };
 
+  // ── the application step, shared by the frame loop AND the release paths —
+  // a release must flush whatever the last tick hadn't applied yet, or a fast
+  // flick loses its final sub-frame of travel and a pinch its last span step.
+  const flushPanTo = (x: number, y: number) => {
+    const dx = x - lastApplied.x;
+    const dy = y - lastApplied.y;
+    if (dx !== 0 || dy !== 0) host.panBy(dx, dy);
+    lastApplied = { x, y };
+    dirty = false;
+  };
+  const flushPinch = (ax: number, ay: number, bx: number, by: number) => {
+    const cx = (ax + bx) / 2;
+    const cy = (ay + by) / 2;
+    const span = Math.hypot(ax - bx, ay - by);
+    const dx = cx - lastApplied.x;
+    const dy = cy - lastApplied.y;
+    if (dx !== 0 || dy !== 0) host.panBy(dx, dy);
+    if (zoomGestures && span > MIN_PINCH_SPAN && lastSpan > MIN_PINCH_SPAN && span !== lastSpan) {
+      host.zoomAround(vpt(cx, cy), span / lastSpan);
+    }
+    lastApplied = { x: cx, y: cy };
+    lastSpan = span;
+    dirty = false;
+  };
+
   // ── the per-frame application (one camera write per frame) ────────────────
   const tick = () => {
     frame = 0;
     if (mode === 'pan' || mode === 'mousedrag') {
       const p = pointers.get(panId);
-      if (p && dirty) {
-        host.panBy(p.x - lastApplied.x, p.y - lastApplied.y);
-        lastApplied = { x: p.x, y: p.y };
-        dirty = false;
-      }
+      if (p && dirty) flushPanTo(p.x, p.y);
       frame = requestAnimationFrame(tick);
     } else if (mode === 'pinch') {
       const [a, b] = touches();
-      if (a && b && dirty) {
-        const cx = (a.x + b.x) / 2;
-        const cy = (a.y + b.y) / 2;
-        const span = Math.hypot(a.x - b.x, a.y - b.y);
-        host.panBy(cx - lastApplied.x, cy - lastApplied.y);
-        if (zoomGestures && span > MIN_PINCH_SPAN && lastSpan > MIN_PINCH_SPAN) {
-          const factor = span / lastSpan;
-          if (factor !== 1) host.zoomAround(vpt(cx, cy), factor);
-        }
-        lastApplied = { x: cx, y: cy };
-        lastSpan = span;
-        dirty = false;
-      }
+      if (a && b && dirty) flushPinch(a.x, a.y, b.x, b.y);
       frame = requestAnimationFrame(tick);
     }
   };
@@ -335,9 +354,23 @@ export function createStageGestureController(
           downX: e.clientX,
           downY: e.clientY,
         });
+        // Consent pre-flight — but a MOVING camera always catches first: while
+        // content flies under the finger, the touch means "stop", never "grab
+        // whatever happens to pass beneath it".
+        const moving = host.cameraInMotion();
+        if (!moving && sink?.claimsPoint?.(e)) {
+          // A tool owns this contact from the first pixel (selected-annotation
+          // drag, or an armed drawing tool). No camera transaction — this is
+          // not a navigation gesture; a second finger converts it to a pinch
+          // via the 'tool' branch (sink.cancel), exactly like a long-press.
+          mode = 'tool';
+          touchToolGesture = true;
+          sink.down(e, 1);
+          break;
+        }
         mode = 'pending';
         downEvent = e;
-        suppressTap = host.cameraInMotion(); // a catch, not a tap
+        suppressTap = moving; // a catch, not a tap
         begin(); // stops any fling/tween under the finger
         trail = [];
         pushSample(e.clientX, e.clientY);
@@ -473,6 +506,7 @@ export function createStageGestureController(
         break;
       }
       case 'pan': {
+        flushPanTo(e.clientX, e.clientY); // apply the final sub-frame of travel
         pushSample(e.clientX, e.clientY);
         end();
         maybeFling();
@@ -480,7 +514,18 @@ export function createStageGestureController(
         break;
       }
       case 'pinch': {
-        if (backToSingleFinger()) break;
+        const rest = touches();
+        if (rest.length === 1) {
+          // flush the pinch's last step (lifted finger at its release point),
+          // THEN continue as a single-finger pan on the remaining contact
+          flushPinch(e.clientX, e.clientY, rest[0].x, rest[0].y);
+          mode = 'pan';
+          panId = rest[0].id;
+          lastApplied = { x: rest[0].x, y: rest[0].y };
+          trail = [];
+          dirty = false;
+          break;
+        }
         end();
         maybeFling();
         toIdle();
@@ -493,6 +538,7 @@ export function createStageGestureController(
       }
       case 'mousedrag': {
         if (p.id !== panId) break;
+        flushPanTo(e.clientX, e.clientY);
         end();
         toIdle();
         break;

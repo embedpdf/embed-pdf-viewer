@@ -12,6 +12,7 @@ import {
 } from './handler';
 import { wireMarkup } from './markup';
 import { annotationReducer, initialAnnotationState } from './reducer';
+import { isTouchDirect } from './tools';
 import { AnnotationToken } from './types';
 import type {
   AnnotationAction,
@@ -51,7 +52,13 @@ export const annotationPlugin = (config: AnnotationConfig = {}) =>
       // inert (skipped) when no selection plugin is installed.
       for (const tool of annotation.tools()) {
         if (tool.enables.has('text-select') && !selection) continue;
-        interaction.registerTool({ id: tool.id, cursor: tool.cursor, enables: tool.enables });
+        interaction.registerTool({
+          id: tool.id,
+          cursor: tool.cursor,
+          enables: tool.enables,
+          // drag-create tools own single-finger touch; click-place tools don't
+          touchDirect: isTouchDirect(tool.enables),
+        });
         if (tool.defaults) annotation.setDefaults(tool.preset, tool.defaults);
       }
 

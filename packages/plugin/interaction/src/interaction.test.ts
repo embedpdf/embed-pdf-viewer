@@ -131,3 +131,58 @@ describe('tool cursor skins', () => {
     expect(cap.cursor()).toBe('grab'); // back to the declared cursor
   });
 });
+
+describe('touch consent (wouldClaimTouch) and cancel routing', () => {
+  it('claims only when an ELIGIBLE handler claims; pure — nothing captures', () => {
+    const { cap } = harness();
+    const log: string[] = [];
+    cap.registerHandler({
+      ...handler('edit', 100, 'annotation-edit', log),
+      claimsTouch: (s) => s.page?.pon === 1,
+    });
+    // pan tool does not enable text-select, but DOES enable annotation-edit
+    expect(cap.wouldClaimTouch(sample('down'))).toBe(true);
+    // a claim probe must not start a gesture: the next move is HOVER, not owned
+    cap.dispatch(sample('move'));
+    expect(log).toEqual(['edit:hover']);
+  });
+
+  it('does not claim through handlers the active tool disables', () => {
+    const { cap } = harness('pan'); // pan: no 'text-select'
+    const log: string[] = [];
+    cap.registerHandler({
+      ...handler('select', 60, 'text-select', log),
+      claimsTouch: () => true,
+    });
+    expect(cap.wouldClaimTouch(sample('down'))).toBe(false);
+  });
+
+  it('handlers without claimsTouch never claim', () => {
+    const { cap } = harness();
+    const log: string[] = [];
+    cap.registerHandler(handler('edit', 100, 'annotation-edit', log));
+    expect(cap.wouldClaimTouch(sample('down'))).toBe(false);
+  });
+
+  it("phase 'cancel' routes to onCancel and clears the owner", () => {
+    const { cap } = harness();
+    const log: string[] = [];
+    cap.registerHandler({
+      ...handler('edit', 100, 'annotation-edit', log),
+      onCancel: () => log.push('edit:cancel'),
+    });
+    cap.dispatch(sample('down'));
+    cap.dispatch({ ...sample('move'), phase: 'cancel' });
+    cap.dispatch(sample('move')); // no owner anymore → hover
+    expect(log).toEqual(['edit:down', 'edit:cancel', 'edit:hover']);
+  });
+
+  it("phase 'cancel' falls back to onUp for handlers that predate it", () => {
+    const { cap } = harness();
+    const log: string[] = [];
+    cap.registerHandler(handler('legacy', 100, 'annotation-edit', log));
+    cap.dispatch(sample('down'));
+    cap.dispatch({ ...sample('up'), phase: 'cancel' });
+    expect(log).toEqual(['legacy:down', 'legacy:up']);
+  });
+});

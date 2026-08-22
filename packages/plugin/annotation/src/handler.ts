@@ -93,14 +93,24 @@ export function createEditHandler(
   // The gesture's home page + last resolved point, armed on down. Every
   // move/up resolves against THIS page (the annotation slides along its edge
   // when the cursor overshoots — the core clamps), never against whatever
-  // page the sample happens to hit.
-  let origin: { pon: number; point: Vec } | null = null;
+  // page the sample happens to hit. `downPoint` keeps the untouched origin so
+  // an aborted gesture (second finger → pinch) can REVERT instead of leaving
+  // the annotation half-moved. `touch` rides the whole gesture so every phase
+  // grabs with the same finger-sized zones the down resolved with.
+  let origin: { pon: number; point: Vec; downPoint: Vec; touch: boolean } | null = null;
   return {
     id: 'annotation-edit',
     priority: 100,
     enabledFor: (t) => t.enables.has('annotation-edit'),
+    // Touch consent: a finger owns a tool drag only over the selection's own
+    // chrome or a selected annotation's body (see claimsTouchAt) — unselected
+    // bodies keep scrolling, matching the Markup convention.
+    claimsTouch: (s) =>
+      !!s.page &&
+      anno.claimsTouchAt(s.page.pon, s.page.point, s.page.scale, s.page.rotation, s.page.zoom),
     onDown: (s) => {
       if (!s.page) return false;
+      const touch = s.pointerType === 'touch';
       // While a free-text box is being edited it owns its own pointer events, so a
       // down that reaches the hub at all is a click OUTSIDE the editor — commit and
       // leave text edit. This makes exit hub-driven (deterministic) rather than
@@ -108,8 +118,14 @@ export function createEditHandler(
       const wasEditing = anno.currentEditing() != null;
       if (wasEditing) anno.endTextEdit();
       if (
-        anno.hitKind(s.page.pon, s.page.point, s.page.scale, s.page.rotation, s.page.zoom) ===
-        'empty'
+        anno.hitKind(
+          s.page.pon,
+          s.page.point,
+          s.page.scale,
+          s.page.rotation,
+          s.page.zoom,
+          touch,
+        ) === 'empty'
       ) {
         // Plain empty click drops the selection. Shift-empty preserves it so the
         // lower-priority marquee handler can additive/toggle-select.
@@ -133,8 +149,9 @@ export function createEditHandler(
         s.page.scale,
         s.page.rotation,
         s.page.zoom,
+        touch,
       );
-      origin = { pon: s.page.pon, point: s.page.point };
+      origin = { pon: s.page.pon, point: s.page.point, downPoint: s.page.point, touch };
       return true;
     },
     onMove: (s) => {
@@ -152,6 +169,7 @@ export function createEditHandler(
         s.page?.scale,
         s.page?.rotation,
         s.page?.zoom,
+        origin.touch,
       );
     },
     onUp: (s) => {
@@ -159,8 +177,27 @@ export function createEditHandler(
       // ALWAYS close the gesture — a release over a page gap or outside the
       // window must still commit (a dangling draft leaves a ghost that snaps
       // back on the next interaction). `editUp` doesn't read the point.
-      anno.editPointer('up', origin.pon, pointOn(s, origin.pon) ?? origin.point, false);
+      anno.editPointer(
+        'up',
+        origin.pon,
+        pointOn(s, origin.pon) ?? origin.point,
+        false,
+        undefined,
+        undefined,
+        undefined,
+        origin.touch,
+      );
       origin = null;
+    },
+    onCancel: () => {
+      if (!origin) return;
+      // Aborted (second finger → pinch): REVERT, don't commit — replay the
+      // gesture back to its own down point (every transform is delta-from-
+      // down, so this restores the original geometry), then close it there.
+      const { pon, downPoint, touch } = origin;
+      origin = null;
+      anno.editPointer('move', pon, downPoint, false, undefined, undefined, undefined, touch);
+      anno.editPointer('up', pon, downPoint, false, undefined, undefined, undefined, touch);
     },
     onHover: (s) => {
       // priority 20 → beats text-select's 'text' (10) over an annotation; null clears.
@@ -274,6 +311,15 @@ export function createMarqueeHandler(anno: AnnotationHostCapability): Interactio
       anchor = null;
       last = null;
       dragging = false;
+    },
+    onCancel: () => {
+      // Abort WITHOUT committing a selection; the core's cancel message clears
+      // the marquee draft so no rectangle lingers. (Touch can't currently
+      // reach the marquee — this is symmetry and future-proofing.)
+      anchor = null;
+      last = null;
+      dragging = false;
+      anno.cancelCreationDraft();
     },
   };
 }
@@ -390,6 +436,21 @@ export function createDrawHandler(
         }
       }
       origin = null;
+    },
+    onCancel: () => {
+      // Aborted (second finger → pinch, or a system cancel): the draft DIES,
+      // nothing commits — without this, the up-fallback would commit a shape
+      // whose final point teleports to the second finger. For an ink group
+      // this drops the whole in-window draft (there is no partial discard);
+      // a cancel is a cancel, and the grouping window is sub-second.
+      if (pendingInk) {
+        clearTimeout(pendingInk.timer);
+        pendingInk = null;
+      }
+      drawingPoly = false;
+      drawingCallout = false;
+      origin = null;
+      anno.cancelCreationDraft();
     },
     onHover: (s) => {
       const tool = toolId();

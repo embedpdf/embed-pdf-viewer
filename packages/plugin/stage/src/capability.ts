@@ -1015,19 +1015,25 @@ export function createStageCapability(
     cameraInMotion: () => raf !== 0,
     doubleTapZoom: (pt) => {
       cancelAnim();
-      const sc = buildScene();
-      if (!sc.itemCount) return;
-      const item = paged() ? sc.items[0] : sc.items[itemIndexOfPage(ctx.getState().cursor)];
+      const sc0 = buildScene();
+      if (!sc0.itemCount) return;
+      const item = paged() ? sc0.items[0] : sc0.items[itemIndexOfPage(ctx.getState().cursor)];
       // The toggle's baseline is the automatic fit (fit-width capped at 100%) —
       // a stable "reading" level whatever the current intent happens to be.
       const base = S.resolveZoom({ mode: S.ZoomMode.Automatic }, fitBox(item), vp(), pad());
       const target = cam().zoom > base * 1.4 ? base : Math.min(base * 2.5, S.ZOOM_MAX);
+      // The INTENT commits UP FRONT (the `reveal` precedent): a caught tween
+      // must never leave the camera on some intermediate zoom while the stored
+      // intent still says "fit" — the next refit would snap somewhere the user
+      // didn't ask for. Interrupted or not, the record says where we were going.
+      ctx.dispatch({ type: 'PATCH', patch: { zoom: { level: target } } });
+      // Wrapped grids re-layout on the intent change — anchor the focal point
+      // against the scene that will actually be on screen.
+      const sc = buildScene();
+      if (!sc.itemCount) return;
       const focal = S.anchorAtPoint(sc, S.toWorld(cam(), pt));
       const camera = S.cameraForAnchorAtScreen(focal, sc, pt, target);
-      animateTo(camera, stayBounds(), 240, () => {
-        ctx.dispatch({ type: 'PATCH', patch: { zoom: { level: cam().zoom } } });
-        syncCursorFromCamera();
-      });
+      animateTo(camera, stayBounds(), 240, syncCursorFromCamera);
     },
     // Pointer-less zooms magnify around the zoomAlign focal point (pinch and
     // wheel pass their own pointer to zoomAround — physics beats policy).

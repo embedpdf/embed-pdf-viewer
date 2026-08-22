@@ -29,6 +29,15 @@ export interface Tool {
    */
   gapCursor?: Cursor;
   enables: ReadonlySet<string>;
+  /**
+   * TOUCH CONSENT, rung 1 — "arming this tool is consent to create with a
+   * finger": while it is active, single-finger touch routes to the hub
+   * wholesale (draw/markup/redact tools), and navigation moves to two
+   * fingers — the drawing-app convention. Default false: a finger navigates
+   * first, and only per-point claims ({@link InteractionHandler.claimsTouch})
+   * carve out tool gestures.
+   */
+  touchDirect?: boolean;
 }
 
 export type Phase = 'down' | 'move' | 'up' | 'cancel';
@@ -112,6 +121,17 @@ export interface InteractionHandler {
   onCancel?(sample: PointerSample): void;
   /** Pointer moved with no active gesture — cursor feedback only. */
   onHover?(sample: PointerSample): void;
+  /**
+   * TOUCH CONSENT, rung 2 — "the selected thing owns its drags". Touch
+   * navigation asks this BEFORE a contact is classified: return true and the
+   * whole contact routes to the hub as a tool gesture (down/move/up) instead
+   * of pan/pinch/tap. Implement it ONLY where the user has already narrowed
+   * intent to this point — the annotation handler claims the selected
+   * annotation's body and its handles, nothing else. A pure read: it must
+   * not mutate anything (the down that follows does the mutating). Handlers
+   * without it never claim, so plain surfaces keep navigating.
+   */
+  claimsTouch?(sample: PointerSample): boolean;
 }
 
 /**
@@ -162,6 +182,15 @@ export interface InteractionCapability {
   setCursor(token: string, cursor: Cursor | null, priority?: number): void;
   // ── pointer ingress: the adapter calls this for every normalized event ──
   dispatch(sample: PointerSample): void;
+  /**
+   * The touch-arbitration pre-flight: would any eligible handler claim a
+   * contact at this sample ({@link InteractionHandler.claimsTouch})? Walked
+   * in the same priority order `dispatch` uses, first claim wins. Pure —
+   * nothing is captured or mutated; the gesture controller calls it at
+   * touch-down to route the contact (tool vs navigation), then dispatches
+   * normally.
+   */
+  wouldClaimTouch(sample: PointerSample): boolean;
 }
 
 export const InteractionToken = createCapabilityToken<InteractionCapability>('interaction');

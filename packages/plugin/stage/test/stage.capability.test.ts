@@ -1710,3 +1710,26 @@ describe('doubleTapZoom', () => {
     expect(stage.zoomLevel()).toBeCloseTo(base, 3);
   });
 });
+
+describe('doubleTapZoom interruption (catch) consistency', () => {
+  it('commits the zoom intent UP FRONT — a caught tween never strands a fit intent', () => {
+    const sched = manualScheduler();
+    const { stage } = harness(PORTRAIT, { scheduler: sched.scheduler });
+    expect(stage.zoomMode()).toBe('automatic');
+    stage.doubleTapZoom({ x: 500, y: 350 });
+    // the intent is already recorded, before a single frame runs
+    expect(stage.zoomMode()).toBe('custom');
+    sched.step(0);
+    sched.step(48); // a few frames in, mid-tween…
+    stage.beginGesture(); // …the user catches it
+    expect(stage.cameraInMotion()).toBe(false);
+    // camera sits at an intermediate zoom, and the stored intent AGREES it is
+    // a fixed level (no fit mode left behind to snap on the next refit)
+    expect(stage.zoomMode()).toBe('custom');
+    stage.endGesture();
+    // a later reframe converges to the recorded destination instead of
+    // snapping back to the fit
+    stage.setViewport({ width: 900, height: 700 });
+    expect(stage.zoomLevel()).toBeCloseTo(2.5, 3);
+  });
+});

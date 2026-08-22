@@ -18,6 +18,7 @@ import {
 import { InteractionToken } from '@embedpdf/plugin-interaction';
 import { SelectionToken as SelectionPublicToken } from '@embedpdf/plugin-selection';
 import {
+  canMove,
   chrome as coreChrome,
   clickCreateGeom,
   contentToPdfRect,
@@ -70,7 +71,7 @@ import {
   writableTarget,
 } from './repository';
 import { buildTextItems } from './text-item';
-import { buildToolRegistry } from './tools';
+import { buildToolRegistry, isTouchDirect } from './tools';
 import type { AnnotationToolInput, ResolvedTool } from './tools';
 import type {
   AnnotationAction,
@@ -155,16 +156,23 @@ export function createAnnotationCapability(
 
   /** The CSS-px chrome settings converted to CONTENT units by the page's view
    *  scale (px per content unit) — screen-constant grab zones + stalk at every
-   *  zoom. No scale → the values are read as content units (headless callers). */
-  const chromeGeomAt = (scale?: number): ChromeGeom => {
+   *  zoom. No scale → the values are read as content units (headless callers).
+   *  `boost` widens the GRAB tolerances only (never the drawn chrome or the
+   *  knob's position) — the touch path passes {@link TOUCH_GRAB_BOOST} so
+   *  handles present finger-sized targets. */
+  const chromeGeomAt = (scale?: number, boost = 1): ChromeGeom => {
     const cs = chromeSettings();
     const s = scale || 1;
     return {
-      handleTol: cs.handles.hitSize / 2 / s,
-      knobTol: cs.knob.hitSize / 2 / s,
+      handleTol: (cs.handles.hitSize / 2 / s) * boost,
+      knobTol: (cs.knob.hitSize / 2 / s) * boost,
       knobOffset: cs.knob.offset / s,
     };
   };
+  /** Finger-sized grab zones: 2× the mouse tolerances lands a ~24px handle hit
+   *  box in Apple's ~44pt-target territory without moving any visuals. */
+  const TOUCH_GRAB_BOOST = 2;
+  const grabBoost = (touch?: boolean): number => (touch ? TOUCH_GRAB_BOOST : 1);
 
   // Memoize the derived per-page arrays by input identity, so a selector returns
   // a STABLE reference between dispatches (useSyncExternalStore needs this — the
@@ -1110,7 +1118,12 @@ export function createAnnotationCapability(
       registry.set(resolved.id, resolved);
       const un = ctx
         .tryGet(InteractionToken)
-        ?.registerTool({ id: resolved.id, cursor: resolved.cursor, enables: resolved.enables });
+        ?.registerTool({
+          id: resolved.id,
+          cursor: resolved.cursor,
+          enables: resolved.enables,
+          touchDirect: isTouchDirect(resolved.enables),
+        });
       if (resolved.defaults)
         apply({ t: 'setDefaults', subtype: resolved.preset, patch: resolved.defaults });
       return () => {
@@ -1175,17 +1188,43 @@ export function createAnnotationCapability(
     selectionAnchor: (scale, rotation, zoom) => memoAnchor(scale, rotation, zoom),
     creationDraftAnchor: () => memoDraftAnchor(),
     selection: () => model().selected,
-    hitKind: (pon, point, scale, rotation, zoom) =>
+    hitKind: (pon, point, scale, rotation, zoom, touch) =>
       hitTest(
         model(),
         pon,
         point,
-        chromeGeomAt(scale),
+        chromeGeomAt(scale, grabBoost(touch)),
         model().hitMargin,
         pageBoxOf(pon),
         inertIdsAt(pon),
         viewEnv(zoom, rotation),
       ).t,
+    claimsTouchAt: (pon, point, scale, rotation, zoom) => {
+      const m = model();
+      const t = hitTest(
+        m,
+        pon,
+        point,
+        chromeGeomAt(scale, TOUCH_GRAB_BOOST),
+        m.hitMargin,
+        pageBoxOf(pon),
+        inertIdsAt(pon),
+        viewEnv(zoom, rotation),
+      );
+      // Selection chrome only exists FOR the selection — always a claim (the
+      // hit-tester already suppresses handles on kinds/states that can't
+      // resize or rotate).
+      if (t.t === 'handle' || t.t === 'rotate' || t.t === 'group-handle') return true;
+      // A body claims only when a drag would actually ARM A MOVE — mirror the
+      // core's edit-down exactly (update.ts editPointer: a hit on a selected
+      // member moves the WHOLE selection only if every member canMove). A
+      // selected highlight/caret (selectable, not movable) and a locked
+      // annotation must keep scrolling, never eat the drag into a dead zone.
+      if (t.t === 'annot') {
+        return m.selected.includes(t.id) && m.selected.every((id) => canMove(m, id));
+      }
+      return false;
+    },
     cursorAt: (pon, point, scale, rotation, zoom) =>
       cursorAt(
         model(),
@@ -1261,7 +1300,7 @@ export function createAnnotationCapability(
     },
 
     // intents
-    editPointer: (phase, pon, point, shift, scale, rotation, zoom) =>
+    editPointer: (phase, pon, point, shift, scale, rotation, zoom, touch) =>
       apply({
         t: 'editPointer',
         phase,
@@ -1270,7 +1309,9 @@ export function createAnnotationCapability(
           point,
           shift,
           pageBox: pageBoxOf(pon),
-          chrome: chromeGeomAt(scale),
+          // Touch grabs with the same widened zones the claim used, so the
+          // gesture picks up exactly what claimsTouchAt said it would.
+          chrome: chromeGeomAt(scale, grabBoost(touch)),
           inert: inertIdsAt(pon),
           // the view env (screen-anchored bodies hit/clamp at their footprint)
           ...(zoom != null ? { zoom } : {}),

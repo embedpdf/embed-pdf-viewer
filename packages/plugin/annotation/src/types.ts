@@ -602,7 +602,25 @@ export interface AnnotationHostCapability extends AnnotationCapability {
     scale?: number,
     rotation?: PageRotation,
     zoom?: number,
+    /** Widen grab zones to finger-sized targets (pass `pointerType === 'touch'`). */
+    touch?: boolean,
   ): 'handle' | 'rotate' | 'group-handle' | 'annot' | 'empty';
+  /**
+   * TOUCH CONSENT (the interaction hub's `claimsTouch` predicate): should a
+   * finger landing here own a TOOL gesture instead of navigating? True over
+   * the selection's chrome (resize handles, rotate knob, group box) and over
+   * the body of an already-SELECTED, transformable annotation — never over an
+   * unselected one, so annotation-dense pages still scroll; tap-select first
+   * is the platform convention (Apple Markup). Uses finger-sized grab zones.
+   * Pure read.
+   */
+  claimsTouchAt(
+    pon: PageObjectNumber,
+    point: Vec,
+    scale?: number,
+    rotation?: PageRotation,
+    zoom?: number,
+  ): boolean;
   /** The cursor to show at a content point (resize over a handle, move/pointer over a body, else null). */
   cursorAt(
     pon: PageObjectNumber,
@@ -650,6 +668,10 @@ export interface AnnotationHostCapability extends AnnotationCapability {
     scale?: number,
     rotation?: PageRotation,
     zoom?: number,
+    /** Finger-sized grab zones for the gesture's own hit resolution — pass the
+     *  sample's `pointerType === 'touch'` so the gesture grabs exactly what
+     *  {@link claimsTouchAt} claimed. */
+    touch?: boolean,
   ): void;
   marqueePointer(
     phase: 'down' | 'move' | 'up',
