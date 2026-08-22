@@ -25,7 +25,14 @@ import { SelectionToken as SelectionHostToken } from '@embedpdf/plugin-selection
 import { StageToken, type StageCapability } from '@embedpdf/plugin-stage';
 import { wireSelectionClipboard, type SelectionClipboardOptions } from '@embedpdf/web';
 import { Anchored, type AnchoredPlacement } from './anchored';
-import { shallowArray, useCapability, useOptionalCapability, usePage, useSelector } from './runtime';
+import {
+  shallowArray,
+  useCapability,
+  useKernelValue,
+  useOptionalCapability,
+  usePage,
+  useSelector,
+} from './runtime';
 
 export interface SelectionLayerProps {
   /** Highlight colour (default: translucent blue). */
@@ -139,6 +146,9 @@ export function SelectionMenu({ children, gap = 8, placement = 'top' }: Selectio
 interface Endpoint {
   pon: PageObjectNumber;
   rect: Rect;
+  /** Reading direction of the boundary glyph's segment (+1 = the frame's +x)
+   *  — decides which side of the glyph is the selection's leading edge. */
+  advance: 1 | -1;
 }
 interface Endpoints {
   start: Endpoint;
@@ -152,10 +162,20 @@ const sameEndpoints = (a: Endpoints | null, b: Endpoints | null): boolean => {
   return (
     a.start.pon === b.start.pon &&
     a.end.pon === b.end.pon &&
+    a.start.advance === b.start.advance &&
+    a.end.advance === b.end.advance &&
     sameRect(a.start.rect, b.start.rect) &&
     sameRect(a.end.rect, b.end.rect)
   );
 };
+
+// The iOS caret-handle geometry: a thin BAR that *is* the selection's edge —
+// spanning the boundary line's full (projected) height, flush at the start /
+// end of the highlight — capped by a circle above (start) or below (end). The
+// bar scales with zoom like the text; the head stays screen-constant.
+const HANDLE_HEAD = 12; // px — the circle
+const HANDLE_BAR = 2; // px — the caret bar
+const HANDLE_PAD = 14; // px — invisible finger padding around the visual
 const rectCenter = (r: Rect) => ({ x: r.x + r.width / 2, y: r.y + r.height / 2 });
 
 export interface SelectionHandlesProps {
@@ -166,16 +186,21 @@ export interface SelectionHandlesProps {
 }
 
 /**
- * iOS-style draggable selection handles — the two "lollipops" at the start and
- * end of the text selection. On touch, where a caret drag isn't available,
- * they ARE the way to grow or shrink a selection: a long-press selects a word,
- * then each handle extends from the OPPOSITE endpoint (drag the end handle and
- * the start stays anchored, and vice versa), snapping to glyphs and crossing
- * pages exactly like a pointer drag — it rides the same `beginAt`/`extendTo`
- * gesture path, so highlights, menus, and commit signals all behave
- * identically. Mount in the `<Stage>` overlay slot next to `<SelectionMenu>`;
- * outside a Stage it renders nothing (a `PageView` has no camera to project
- * through). Pointer-isolated, so grabbing a handle never pans the stage.
+ * iOS-style draggable selection handles. Each is drawn the way the platform
+ * draws them: a thin caret BAR that forms the selection's own start/end edge,
+ * spanning that line's height and scaling with zoom, capped by a
+ * screen-constant circle — above the first line at the start, below the last
+ * line at the end. Connected to the highlight, never floating beside it.
+ *
+ * On touch, where a caret drag isn't available, the handles ARE the way to
+ * grow or shrink a selection: a long-press selects a word, then each handle
+ * extends from the OPPOSITE endpoint (drag the end handle and the start stays
+ * anchored, and vice versa), snapping to glyphs and crossing pages exactly
+ * like a pointer drag — it rides the same `beginAt`/`extendTo` gesture path,
+ * so highlights, menus, and commit signals all behave identically. Mount in
+ * the `<Stage>` overlay slot next to `<SelectionMenu>`; outside a Stage it
+ * renders nothing (a `PageView` has no camera to project through).
+ * Pointer-isolated, so grabbing a handle never pans the stage.
  */
 export function SelectionHandles({ color = '#2196f3', token = StageToken }: SelectionHandlesProps) {
   const host = useCapability(SelectionHostToken);
@@ -188,12 +213,17 @@ export function SelectionHandles({ color = '#2196f3', token = StageToken }: Sele
       const s = c.snapshot();
       if (!s.start || !s.end) return null;
       return {
-        start: { pon: s.start.pon, rect: s.start.rect },
-        end: { pon: s.end.pon, rect: s.end.rect },
+        start: { pon: s.start.pon, rect: s.start.rect, advance: s.start.advance },
+        end: { pon: s.end.pon, rect: s.end.rect, advance: s.end.advance },
       };
     },
     sameEndpoints,
   );
+  // The handles are positioned by PROJECTING the endpoint rects through the
+  // camera, so they must re-render whenever the camera moves — visiblePages is
+  // the stage's reference-stable revision for exactly that (the same value the
+  // page surfaces re-render on, so handle and highlight move in one commit).
+  useKernelValue(() => stage?.visiblePages() ?? null);
   const [dragging, setDragging] = useState<'start' | 'end' | null>(null);
   const drag = useRef<{
     baseVpt: { x: number; y: number };
@@ -261,51 +291,67 @@ export function SelectionHandles({ color = '#2196f3', token = StageToken }: Sele
     if (begun) host.end(); // settle → menu reappears, onCommit fires
   };
 
-  const lollipop = (role: 'start' | 'end') => {
-    const head = (
-      <div
-        style={{
-          width: 12,
-          height: 12,
-          borderRadius: '50%',
-          background: color,
-          boxShadow: '0 1px 4px rgba(0, 0, 0, 0.35)',
-        }}
-      />
-    );
-    const stem = <div style={{ width: 2, height: 14, background: color }} />;
+  const renderHandle = (role: 'start' | 'end') => {
+    const ep = endpoints[role];
+    // Overlay space: the stage container's px — the same space Anchored uses.
+    const r = stage.pageRectToScreen(ep.pon, ep.rect);
+    if (!r) return null; // endpoint page not laid out right now
+    // The selection's edge at this endpoint: the boundary glyph's LEADING side
+    // at the start, TRAILING side at the end — mirrored for an RTL segment.
+    const leading = role === 'start' ? ep.advance > 0 : ep.advance < 0;
+    const edgeX = leading ? r.x : r.x + r.width;
+    const visualTop = role === 'start' ? r.y - HANDLE_HEAD : r.y;
     return (
-      <Anchored
-        anchor={{ pon: endpoints[role].pon, bounds: endpoints[role].rect }}
-        placement={role === 'start' ? 'top' : 'bottom'}
-        gap={-4}
+      <div
+        key={role}
+        onPointerDown={startDrag(role)}
+        onPointerMove={moveDrag}
+        onPointerUp={endDrag}
+        onPointerCancel={endDrag}
+        style={{
+          position: 'absolute',
+          left: edgeX - HANDLE_BAR / 2 - HANDLE_PAD,
+          top: visualTop - HANDLE_PAD,
+          width: HANDLE_BAR + 2 * HANDLE_PAD,
+          height: r.height + HANDLE_HEAD + 2 * HANDLE_PAD,
+          touchAction: 'none',
+          cursor: 'grab',
+          pointerEvents: 'auto',
+        }}
       >
+        {/* the caret bar — the selection's own edge, spanning the line height */}
         <div
-          onPointerDown={startDrag(role)}
-          onPointerMove={moveDrag}
-          onPointerUp={endDrag}
-          onPointerCancel={endDrag}
           style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            // a finger-sized hit target around a 12px head
-            padding: '10px 14px',
-            touchAction: 'none',
-            cursor: 'grab',
+            position: 'absolute',
+            left: HANDLE_PAD,
+            top: HANDLE_PAD + (role === 'start' ? HANDLE_HEAD : 0),
+            width: HANDLE_BAR,
+            height: r.height,
+            background: color,
+            borderRadius: HANDLE_BAR / 2,
           }}
-        >
-          {role === 'start' ? head : stem}
-          {role === 'start' ? stem : head}
-        </div>
-      </Anchored>
+        />
+        {/* the head — flush against the bar: above the first line / below the last */}
+        <div
+          style={{
+            position: 'absolute',
+            left: HANDLE_PAD + HANDLE_BAR / 2 - HANDLE_HEAD / 2,
+            top: role === 'start' ? HANDLE_PAD : HANDLE_PAD + r.height,
+            width: HANDLE_HEAD,
+            height: HANDLE_HEAD,
+            borderRadius: '50%',
+            background: color,
+            boxShadow: '0 1px 4px rgba(0, 0, 0, 0.35)',
+          }}
+        />
+      </div>
     );
   };
 
   return (
     <>
-      {lollipop('start')}
-      {lollipop('end')}
+      {renderHandle('start')}
+      {renderHandle('end')}
     </>
   );
 }
