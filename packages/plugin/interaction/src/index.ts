@@ -18,6 +18,7 @@ export type {
   InteractionState,
   Modifiers,
   Phase,
+  PointerKind,
   PointerSample,
   Tool,
   ToolId,

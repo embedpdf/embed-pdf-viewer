@@ -453,6 +453,35 @@ export interface StageCapability {
   /** `Element.scrollBy`: relative offsets — sugar over `scrollTo`. */
   scrollBy(opts: StageScrollToOptions): void;
   zoomAround(screenPt: Point, factor: number): void;
+  /**
+   * Bracket a continuous direct-manipulation gesture (touch pan / pinch).
+   * While a gesture is open the camera writes stay cheap and visually calm:
+   * `zoomAround` defers its zoom-intent PATCH (one per gesture instead of one
+   * per event), and the camera-rest detector holds un-rested — device
+   * snapping and settle-gated rendering wait for the END of the gesture, not
+   * for a 150 ms hesitation inside it. Re-entrant (nesting counts). Opening a
+   * gesture cancels any running tween or fling — that is how a finger
+   * "catches" a moving page.
+   */
+  beginGesture(): void;
+  endGesture(): void;
+  /**
+   * Momentum scroll: keep panning from a release velocity (screen px/s, the
+   * same sign convention as `panBy` deltas), decelerating on UIScrollView's
+   * curve. Every other camera verb — including `beginGesture` from the next
+   * touch — cancels it. No-op without host frames (SSR/tests without a
+   * scheduler jump nowhere: momentum is presentation, not state).
+   */
+  fling(velocityX: number, velocityY: number): void;
+  /** True while the camera is animating (navigation tween or fling) — the
+   *  input layer reads it to tell a "catch" from a tap. */
+  cameraInMotion(): boolean;
+  /**
+   * The touch double-tap toggle: zoomed out → animate to ~2.5× the automatic
+   * fit around `screenPt`; already zoomed past that → animate back to the fit
+   * level, same focal point. Lands as a fixed zoom level either way.
+   */
+  doubleTapZoom(screenPt: Point): void;
   zoomIn(): void;
   zoomOut(): void;
   zoomTo(spec: ZoomSpec): void;

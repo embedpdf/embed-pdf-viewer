@@ -79,6 +79,7 @@ export function PagePointerSource() {
         project: (pon) => (pon === page.pon ? page.toPagePoint(e.clientX, e.clientY) : null),
         modifiers: mods(e),
         clickCount,
+        pointerType: (e.pointerType || 'mouse') as PointerSample['pointerType'],
       };
     };
     let dragging = false;

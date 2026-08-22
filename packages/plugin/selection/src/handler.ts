@@ -67,6 +67,15 @@ export function createTextSelectHandler(
       dragging = false;
       selection.end();
     },
+    onCancel: () => {
+      // Aborted (second finger → pinch, or a system cancel): drop the
+      // in-flight selection instead of committing a sliver of it. end() after
+      // clear() settles the `selecting` flag without anything to commit.
+      anchor = null;
+      dragging = false;
+      selection.clear();
+      selection.end();
+    },
     onHover: (s) => {
       if (!s.page) {
         interaction.setCursor(CURSOR_TOKEN, null); // off the page → pointer

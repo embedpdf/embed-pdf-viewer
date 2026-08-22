@@ -140,6 +140,13 @@ export function createInteractionCapability(
       } else if (sample.phase === 'move') {
         if (owner) owner.onMove?.(sample);
         else for (const h of eligible()) h.onHover?.(sample);
+      } else if (sample.phase === 'cancel') {
+        // Abort, don't commit: navigation took the pointer (second finger →
+        // pinch) or the system cancelled it. onUp is the fallback for handlers
+        // that predate cancel — committing beats a stuck gesture.
+        const o = owner;
+        owner = null;
+        if (o) (o.onCancel ?? o.onUp)?.call(o, sample);
       } else {
         owner?.onUp?.(sample);
         owner = null;

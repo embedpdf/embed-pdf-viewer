@@ -1565,3 +1565,148 @@ describe("VisiblePage.visibleRect — visibility is the stage's data", () => {
     expect(p.visibleRect.height).toBeCloseTo(800, 0);
   });
 });
+
+// ── touch physics: gesture transaction, fling, double-tap ────────────────────
+// A manual scheduler makes the fling/tween loops fully deterministic: `step(ts)`
+// fires every currently-queued frame callback with that timestamp.
+function manualScheduler() {
+  const queue = new Map<number, (t: number) => void>();
+  let handle = 0;
+  return {
+    scheduler: {
+      raf: (cb: (t: number) => void) => {
+        queue.set(++handle, cb);
+        return handle;
+      },
+      caf: (h: number) => {
+        queue.delete(h);
+      },
+    },
+    step(ts: number) {
+      const cbs = [...queue.values()];
+      queue.clear();
+      cbs.forEach((cb) => cb(ts));
+    },
+    pending: () => queue.size,
+  };
+}
+
+describe('gesture transaction (beginGesture/endGesture)', () => {
+  it('defers the pinch zoom intent to endGesture — one PATCH per gesture', () => {
+    const { stage } = harness(PORTRAIT);
+    expect(stage.zoomMode()).toBe('automatic');
+    stage.beginGesture();
+    stage.zoomAround({ x: 500, y: 350 }, 1.5);
+    stage.zoomAround({ x: 500, y: 350 }, 1.1);
+    // camera zoom moved live, but the INTENT is still the fit mode
+    expect(stage.zoomLevel()).toBeCloseTo(stage.camera().zoom, 6);
+    expect(stage.zoomMode()).toBe('automatic');
+    stage.endGesture();
+    // now the gesture's landing is recorded, once
+    expect(stage.zoomMode()).toBe('custom');
+  });
+
+  it('nests: only the OUTERMOST end commits', () => {
+    const { stage } = harness(PORTRAIT);
+    stage.beginGesture();
+    stage.beginGesture();
+    stage.zoomAround({ x: 500, y: 350 }, 2);
+    stage.endGesture();
+    expect(stage.zoomMode()).toBe('automatic'); // still open
+    stage.endGesture();
+    expect(stage.zoomMode()).toBe('custom');
+  });
+
+  it('a pan-only gesture commits no zoom intent', () => {
+    const { stage } = harness(PORTRAIT);
+    stage.beginGesture();
+    stage.panBy(0, -200);
+    stage.endGesture();
+    expect(stage.zoomMode()).toBe('automatic');
+  });
+});
+
+describe('fling (momentum pan)', () => {
+  it('decelerates on the UIScrollView curve and comes to rest', () => {
+    const sched = manualScheduler();
+    const { stage } = harness(PORTRAIT, { scheduler: sched.scheduler });
+    const y0 = stage.camera().y;
+    stage.fling(0, -1000); // a 1000 px/s upward flick (content scrolls down)
+    const deltas: number[] = [];
+    let prev = y0;
+    let ts = 0;
+    for (let i = 0; i < 1000 && sched.pending() > 0; i++) {
+      sched.step(ts);
+      ts += 16;
+      const y = stage.camera().y;
+      if (y !== prev) deltas.push(y - prev);
+      prev = y;
+    }
+    expect(sched.pending()).toBe(0); // it STOPPED on its own
+    // it moved a long way (v0/λ ≈ 500 px at zoom 1), decelerating monotonically
+    const total = stage.camera().y - y0;
+    expect(total).toBeGreaterThan(300);
+    expect(total).toBeLessThan(600);
+    for (let i = 2; i < deltas.length; i++) {
+      expect(deltas[i]).toBeLessThanOrEqual(deltas[i - 1] + 1e-9);
+    }
+  });
+
+  it('is caught by the next gesture (beginGesture cancels it)', () => {
+    const sched = manualScheduler();
+    const { stage } = harness(PORTRAIT, { scheduler: sched.scheduler });
+    stage.fling(0, -1000);
+    sched.step(0);
+    sched.step(16);
+    expect(stage.cameraInMotion()).toBe(true);
+    stage.beginGesture(); // the finger lands
+    expect(stage.cameraInMotion()).toBe(false);
+    expect(sched.pending()).toBe(0);
+    stage.endGesture();
+  });
+
+  it('dies quickly against a content edge instead of grinding on the clamp', () => {
+    const sched = manualScheduler();
+    const { stage } = harness(PORTRAIT, { scheduler: sched.scheduler });
+    const y0 = stage.camera().y; // resting at the top already
+    stage.fling(0, 5000); // flick DOWNWARD: content wants to move down — no room
+    let ts = 0;
+    let frames = 0;
+    while (sched.pending() > 0 && frames < 100) {
+      sched.step(ts);
+      ts += 16;
+      frames++;
+    }
+    expect(frames).toBeLessThan(10); // both axes zeroed by the clamp almost at once
+    expect(stage.camera().y).toBeCloseTo(y0, 4);
+  });
+
+  it('below the stop threshold nothing starts', () => {
+    const sched = manualScheduler();
+    const { stage } = harness(PORTRAIT, { scheduler: sched.scheduler });
+    stage.fling(0, -10); // 10 px/s: imperceptible
+    expect(sched.pending()).toBe(0);
+  });
+});
+
+describe('doubleTapZoom', () => {
+  it('toggles: in to 2.5× the automatic fit, back out at the same point', () => {
+    const sched = manualScheduler();
+    const { stage } = harness(PORTRAIT, { scheduler: sched.scheduler });
+    const base = stage.zoomLevel(); // automatic fit (1: capped at 100%)
+    stage.doubleTapZoom({ x: 500, y: 350 });
+    let ts = 0;
+    while (sched.pending() > 0 && ts < 5000) {
+      sched.step(ts);
+      ts += 16;
+    }
+    expect(stage.zoomLevel()).toBeCloseTo(base * 2.5, 3);
+    expect(stage.zoomMode()).toBe('custom');
+    stage.doubleTapZoom({ x: 500, y: 350 });
+    while (sched.pending() > 0 && ts < 10000) {
+      sched.step(ts);
+      ts += 16;
+    }
+    expect(stage.zoomLevel()).toBeCloseTo(base, 3);
+  });
+});

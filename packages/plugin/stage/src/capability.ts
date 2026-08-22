@@ -376,6 +376,13 @@ export function createStageCapability(
   // read it; the placement logic further down owns it.
   let hasPlaced = false;
 
+  // ── gesture transaction (touch pan/pinch) ───────────────────────────────────
+  // While open: zoomAround defers its intent PATCH, and the rest countdown is
+  // held — a hesitation inside a pinch is not "at rest". Depth-counted so
+  // nested brackets compose.
+  let gestureDepth = 0;
+  let gestureZoomed = false;
+
   // ── camera-rest detector ────────────────────────────────────────────────────
   // A continuous zoom and a device-snapped origin cannot coexist without the
   // anchor point jittering (each step rounds differently, ±0.5 device px per
@@ -409,7 +416,21 @@ export function createStageCapability(
   // it never touches the cursor (see syncCursorFromCamera for the policy).
   const setCam = (next: S.Camera, bounds: S.Rect = stayBounds()) => {
     const clamped = S.clampCamera(next, bounds, vp(), constraint());
-    if (clamped.zoom !== cam().zoom) armRest();
+    if (clamped.zoom !== cam().zoom) {
+      if (gestureDepth > 0) {
+        // Mid-gesture: un-rest immediately (fractional placement) but hold the
+        // 150 ms countdown — rest is declared at endGesture, not at a pinch
+        // hesitation.
+        gestureZoomed = true;
+        if (ctx.getState().cameraResting) ctx.dispatch({ type: 'CAMERA_REST', resting: false });
+        if (restRaf) {
+          scheduler.caf(restRaf);
+          restRaf = 0;
+        }
+      } else {
+        armRest();
+      }
+    }
     ctx.dispatch({ type: 'CAMERA', camera: clamped });
   };
 
@@ -472,6 +493,42 @@ export function createStageCapability(
         raf = 0;
         then?.();
       }
+    };
+    raf = scheduler.raf(tick);
+  };
+
+  // Momentum pan (the touch fling). Shares the `raf` handle with the tween, so
+  // cancelAnim() — every verb's first act — is also "catch the fling".
+  const FLING_DECAY = 0.998; // per ms — UIScrollView's normal deceleration rate
+  const FLING_STOP = 0.02; // px/ms — below ~20 px/s the eye reads "stopped"
+  const startFling = (vx: number, vy: number) => {
+    if (!canAnimate) return;
+    cancelAnim();
+    let vxMs = vx / 1000;
+    let vyMs = vy / 1000;
+    if (Math.hypot(vxMs, vyMs) < FLING_STOP) return;
+    let started = false;
+    let last = 0;
+    const tick = (now: number) => {
+      raf = 0;
+      // First frame assumes one 60Hz step (anchoring like the tween — works
+      // even when the first timestamp is 0).
+      const dt = started ? Math.min(64, Math.max(1, now - last)) : 16;
+      started = true;
+      last = now;
+      const k = Math.pow(FLING_DECAY, dt);
+      const step = (dt * (1 + k)) / 2; // midpoint integral of the decaying velocity
+      const before = cam();
+      setCam(S.panByScreen(before, vxMs * step, vyMs * step));
+      const after = cam();
+      // The clamp ate an axis (content edge): kill that axis's momentum so the
+      // fling doesn't grind on the boundary; the other axis keeps flying.
+      if (vxMs !== 0 && after.x === before.x) vxMs = 0;
+      if (vyMs !== 0 && after.y === before.y) vyMs = 0;
+      vxMs *= k;
+      vyMs *= k;
+      syncCursorFromCamera();
+      if (Math.hypot(vxMs, vyMs) >= FLING_STOP) raf = scheduler.raf(tick);
     };
     raf = scheduler.raf(tick);
   };
@@ -917,8 +974,12 @@ export function createStageCapability(
       // page-relative focal point: the durable identity of "what's under the cursor"
       const focal = before.itemCount ? S.anchorAtPoint(before, S.toWorld(cam(), pt)) : null;
       setCam(S.zoomAround(cam(), pt, factor));
-      // record the resulting fixed level as the zoom intent — focal, so no re-anchor…
-      ctx.dispatch({ type: 'PATCH', patch: { zoom: { level: cam().zoom } } });
+      // record the resulting fixed level as the zoom intent — focal, so no
+      // re-anchor… deferred to endGesture inside a gesture bracket (one PATCH
+      // per pinch instead of one per event).
+      if (gestureDepth === 0) {
+        ctx.dispatch({ type: 'PATCH', patch: { zoom: { level: cam().zoom } } });
+      }
       // …UNLESS zoom is a LAYOUT INPUT (wrapped grid) and the scene just re-wrapped
       // underneath the camera. The old world point is stale then — re-pin the SAME
       // page-point under the cursor and clamp against the new geometry. In every
@@ -928,6 +989,45 @@ export function createStageCapability(
         setCam(S.cameraForAnchorAtScreen(focal, after, pt, cam().zoom));
       }
       syncCursorFromCamera();
+    },
+    beginGesture: () => {
+      gestureDepth++;
+      if (gestureDepth === 1) {
+        cancelAnim(); // catch: the next touch-down stops any tween or fling
+        gestureZoomed = false;
+      }
+    },
+    endGesture: () => {
+      if (gestureDepth === 0) return;
+      gestureDepth--;
+      if (gestureDepth > 0) return;
+      if (gestureZoomed) {
+        gestureZoomed = false;
+        // The deferred zoom intent: ONE patch for the whole gesture. (In a
+        // wrapped grid this may re-wrap the scene; the next reframe
+        // re-anchors through the normal update path.)
+        ctx.dispatch({ type: 'PATCH', patch: { zoom: { level: cam().zoom } } });
+        armRest(); // the gesture is over — NOW the 150 ms rest countdown runs
+      }
+      syncCursorFromCamera();
+    },
+    fling: (vx, vy) => startFling(vx, vy),
+    cameraInMotion: () => raf !== 0,
+    doubleTapZoom: (pt) => {
+      cancelAnim();
+      const sc = buildScene();
+      if (!sc.itemCount) return;
+      const item = paged() ? sc.items[0] : sc.items[itemIndexOfPage(ctx.getState().cursor)];
+      // The toggle's baseline is the automatic fit (fit-width capped at 100%) —
+      // a stable "reading" level whatever the current intent happens to be.
+      const base = S.resolveZoom({ mode: S.ZoomMode.Automatic }, fitBox(item), vp(), pad());
+      const target = cam().zoom > base * 1.4 ? base : Math.min(base * 2.5, S.ZOOM_MAX);
+      const focal = S.anchorAtPoint(sc, S.toWorld(cam(), pt));
+      const camera = S.cameraForAnchorAtScreen(focal, sc, pt, target);
+      animateTo(camera, stayBounds(), 240, () => {
+        ctx.dispatch({ type: 'PATCH', patch: { zoom: { level: cam().zoom } } });
+        syncCursorFromCamera();
+      });
     },
     // Pointer-less zooms magnify around the zoomAlign focal point (pinch and
     // wheel pass their own pointer to zoomAround — physics beats policy).

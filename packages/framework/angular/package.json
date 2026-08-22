@@ -39,7 +39,8 @@
     "@embedpdf/core-stage": "workspace:*",
     "@embedpdf/plugin-stage": "workspace:*",
     "@embedpdf/plugin-render": "workspace:*",
-    "@embedpdf/plugin-interaction": "workspace:*"
+    "@embedpdf/plugin-interaction": "workspace:*",
+    "@embedpdf/web": "workspace:*"
   },
   "peerDependencies": {
     "@angular/common": ">=20.2.0 <23.0.0",

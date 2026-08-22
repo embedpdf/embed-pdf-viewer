@@ -31,7 +31,12 @@ export interface Tool {
   enables: ReadonlySet<string>;
 }
 
-export type Phase = 'down' | 'move' | 'up';
+export type Phase = 'down' | 'move' | 'up' | 'cancel';
+
+/** The physical device class behind a sample — `PointerEvent.pointerType`.
+ *  Adapters fill it so handlers (and arbitration above the hub) can apply
+ *  modality policy: touch navigates first, pen/mouse are tool-first. */
+export type PointerKind = 'mouse' | 'pen' | 'touch';
 
 /**
  * One normalized pointer event. `viewport` is the source container's px (the pan
@@ -67,6 +72,9 @@ export interface PointerSample {
    * do word/line selection without re-implementing timing. Defaults to 1.
    */
   clickCount?: number;
+  /** The device class that produced this sample (see {@link PointerKind}).
+   *  Absent when the source can't say — treat as 'mouse'. */
+  pointerType?: PointerKind;
   /**
    * Project this event onto a SPECIFIC page's content space, unclamped — valid
    * (and expected) outside the page's bounds. `page` answers "what is under the
@@ -94,6 +102,14 @@ export interface InteractionHandler {
   onDown(sample: PointerSample): boolean;
   onMove?(sample: PointerSample): void;
   onUp?(sample: PointerSample): void;
+  /**
+   * The gesture was ABORTED, not completed — the pointer was cancelled by the
+   * system, or navigation took it over (a second finger converted the drag
+   * into a pinch). Discard the in-flight work instead of committing it (a
+   * half-drawn shape, a mid-drag selection). Falls back to {@link onUp} when
+   * absent, since committing is the lesser evil to a stuck gesture.
+   */
+  onCancel?(sample: PointerSample): void;
   /** Pointer moved with no active gesture — cursor feedback only. */
   onHover?(sample: PointerSample): void;
 }

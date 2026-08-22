@@ -29,3 +29,11 @@ export type { SvgCursorOptions } from './cursor';
 export { sanitizeExternalUri } from './external-uri';
 export { bindPaintedImage } from './painted-image';
 export type { ObjectUrlImageSource, PaintedImageCallbacks } from './painted-image';
+export { computeReleaseVelocity, createStageGestureController } from './stage-gestures';
+export type {
+  StageGestureHost,
+  StageGestureOptions,
+  StageGestureSink,
+  StagePointerKind,
+  StageWheelSample,
+} from './stage-gestures';
