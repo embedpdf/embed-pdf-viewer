@@ -241,7 +241,7 @@ export function FullViewer({
   }, [resolved]);
 
   const [plugins] = useState(() => [
-    stagePlugin({ layout: 'vertical', interaction: true }), // main lens; drives the interaction hub
+    stagePlugin({ layout: 'vertical' }), // main lens (tools engage via interactionPlugin below)
     // Thumbnail lens over the SAME document: a single-column grid at a fixed small
     // zoom, its own camera. Click a thumb to navigate the main lens; the sidebar
     // follows the main view (see ui/panels ThumbnailList).

@@ -582,6 +582,14 @@ export interface StageCapability {
   next(opts?: GoToOptions): void;
   /** Step backward by the navigation unit. */
   prev(opts?: GoToOptions): void;
+  /**
+   * This lens's identity — the stage plugin id it was registered under
+   * ('stage' for the main lens; a custom id per additional lens). The surface
+   * binding stamps it on every pointer sample (`PointerSample.source`) and
+   * lens-scoped interaction handlers register under it, so two stages on one
+   * document can never capture each other's input.
+   */
+  lensId(): string;
   /** Set any subset of settings at once — ONE anchor-preserving update. The way to
    *  apply a customer preset: `update(myPreset)`. Writes the responsive BASE:
    *  a matching rule's key wins until its rule stops matching. */

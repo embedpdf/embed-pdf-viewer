@@ -6,7 +6,9 @@
  * (a focal point relative to a page — what survives layout/zoom changes & reloads).
  *
  * Navigation is pure camera math. Bounds/home/margin are three separate functions.
- * No DOM, no framework, fully serializable — this is the v4 Rust core, verbatim.
+ * No DOM, no framework; plain-data model plus derived spatial queries (the DATA
+ * is serializable — `Scene` also carries query methods derived from it). This
+ * is the v4 Rust core, verbatim.
  */
 
 // The pure coordinate primitives live in the dependency-free geometry base

@@ -94,6 +94,15 @@ export interface PointerSample {
    */
   gesture?: 'long-press';
   /**
+   * The LENS this sample came from — the stage plugin id the emitting surface
+   * binding was attached to (a document may be viewed through several stage
+   * lenses at once). Handlers registered with a matching `source` scope only
+   * see their own lens's input, so one lens's drag can never be captured by
+   * another lens's handler. Absent when the source doesn't say (custom
+   * dispatchers, single-lens embeds) — such samples route to every handler.
+   */
+  source?: string;
+  /**
    * Project this event onto a SPECIFIC page's content space, unclamped — valid
    * (and expected) outside the page's bounds. `page` answers "what is under the
    * cursor" and re-resolves per event; `project` answers "where is the cursor
@@ -186,7 +195,15 @@ export interface InteractionCapability {
   setToolCursor(id: ToolId, skin: ToolCursorSkin | null): void;
   // ── registries (return an unregister fn) ──
   registerTool(tool: Tool): () => void;
-  registerHandler(handler: InteractionHandler): () => void;
+  /**
+   * Register a pointer handler. `source` scopes it to ONE lens: the handler
+   * then only sees samples stamped with that source (see
+   * {@link PointerSample.source}) — mandatory for per-lens handlers like the
+   * stage's pan-scroll, or two stages on one document would capture each
+   * other's drags. UNSTAMPED samples still route everywhere (only a definite
+   * mismatch filters), so custom dispatchers keep working.
+   */
+  registerHandler(handler: InteractionHandler, options?: { source?: string }): () => void;
   // ── cursor claim stack (highest priority wins; null clears the token) ──
   setCursor(token: string, cursor: Cursor | null, priority?: number): void;
   // ── pointer ingress: the adapter calls this for every normalized event ──

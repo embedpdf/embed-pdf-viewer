@@ -175,7 +175,6 @@ export function Shell() {
                 Renders nothing; mount ONCE per document view. */}
             <SelectionClipboard />
             <Stage
-              interaction
               overlay={
                 <>
                   <AnnotationStrip />

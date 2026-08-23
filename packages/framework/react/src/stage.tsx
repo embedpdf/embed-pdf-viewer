@@ -10,7 +10,7 @@
 export * from '@embedpdf/plugin-stage';
 import * as React from 'react';
 import { useEffect, useMemo, useRef } from 'react';
-import { StageToken, settingsEqual, wheelZoomFactor } from '@embedpdf/plugin-stage';
+import { StageToken, createScrollHandler, settingsEqual } from '@embedpdf/plugin-stage';
 import type { StageCapability, VisiblePage } from '@embedpdf/plugin-stage';
 import type { CapabilityToken } from '@embedpdf/core';
 
@@ -19,9 +19,7 @@ import type { CapabilityToken } from '@embedpdf/core';
 export type StageTokenProp = CapabilityToken<StageCapability>;
 import type { PageFrame } from '@embedpdf/core-geometry';
 import { InteractionToken } from '@embedpdf/plugin-interaction';
-import type { PointerSample } from '@embedpdf/plugin-interaction';
-import { createStageGestureController } from '@embedpdf/web';
-import type { StageGestureSink } from '@embedpdf/web';
+import { createStageSurface } from '@embedpdf/web';
 import { ProjectorProvider, type ProjectorBinding, type ViewProjector } from './anchored';
 import {
   makePageContext,
@@ -109,7 +107,8 @@ function PageSurface({
             top: frame.top,
             width: t.viewWidth,
             height: t.viewHeight,
-            boxShadow: '0 6px 18px rgba(0,0,0,.18)',
+            // themeable: override via the CSS variable (app stylesheet), no props
+            boxShadow: 'var(--epdf-page-shadow, 0 6px 18px rgba(0,0,0,.18))',
           }}
         />
         {/* the page: white backing + bitmap as ONE rasterized box, so there is no
@@ -163,11 +162,24 @@ export interface StageProps {
   overlay?: React.ReactNode;
   /**
    * Route this Stage's pointer events to the interaction hub (page-resolved via
-   * `pageAt`) instead of the built-in drag-to-pan. Pan then becomes the `pan`
-   * tool's job and dragging in `pointer` mode selects text (incl. across pages).
-   * Pair with `stagePlugin({ interaction: true })`. Default false (built-in pan).
+   * `pageAt`) — AND register this lens's tool-gated pan-scroll handler with it
+   * (lens-scoped, so multiple stages on one document never pan each other).
+   * Pan is then the `pan` tool's job and dragging in `pointer` mode selects
+   * text (incl. across pages).
+   *
+   * Default TRUE: registering `interactionPlugin()` is the one opt-in — tools
+   * just work; without the hub this is inert and the stage falls back to
+   * built-in drag-to-pan, so a hub-less setup costs nothing. Set `false` on
+   * SECONDARY lenses (a thumbnail rail) that should stay click-to-navigate
+   * instead of feeding the document's tools.
    */
   interaction?: boolean;
+  /**
+   * With {@link interaction}: let drags over page GAPS pan regardless of the
+   * active tool (and show a grab cursor there) — the gutter always pans; there
+   * is nothing to draw/select outside a page. Default true.
+   */
+  panFallback?: boolean;
   /**
    * Ambient ZOOM gestures on this stage: ctrl/cmd+wheel and trackpad pinch
    * (Safari gesture events included). Default true. Turn OFF for follower
@@ -186,7 +198,8 @@ export function Stage({
   children,
   pageChrome,
   overlay,
-  interaction = false,
+  interaction = true,
+  panFallback = true,
   zoomGestures = true,
   token = StageToken,
   className,
@@ -238,92 +251,29 @@ export function Stage({
 
   useEffect(() => {
     const el = ref.current!;
-    // Only report the viewport size. Initial placement (home) is the Stage plugin's
-    // job — it watches the viewport and homes once it's ready (and a higher-priority
-    // initial-view provider can override that). The shell stays dumb.
-    const setVp = () => stage.setViewport({ width: el.clientWidth, height: el.clientHeight });
-    const ro = new ResizeObserver(setVp);
-    ro.observe(el);
-    setVp();
-
-    // Report the device pixel ratio so page transforms render crisp. dppx changes
-    // (zoom, dragging between monitors) fire the media query; re-subscribe each
-    // time since the query value itself moves.
-    let mq: MediaQueryList | null = null;
-    const reportDpr = () => {
-      stage.setDevicePixelRatio(window.devicePixelRatio || 1);
-      mq?.removeEventListener('change', reportDpr);
-      mq = window.matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`);
-      mq.addEventListener('change', reportDpr);
-    };
-    reportDpr();
-
-    // ALL gesture input — wheel, Safari trackpad gestures, mouse/pen tool
-    // routing, and the synthesized touch physics (pan/pinch/fling/tap/
-    // long-press) — lives in the shared @embedpdf/web controller, so every
-    // framework adapter has one feel. The sink is the hub bridge: it converts
-    // events to page-resolved samples exactly as before (`pageAt` per event,
-    // so a drag can cross pages).
-    const sampleOf = (
-      phase: PointerSample['phase'],
-      e: PointerEvent,
-      clickCount = 1,
-      gesture?: PointerSample['gesture'],
-    ): PointerSample => {
-      const r = el.getBoundingClientRect();
-      const vpt = { x: e.clientX - r.left, y: e.clientY - r.top };
-      return {
-        phase,
-        viewport: vpt,
-        page: stage.pageAt(vpt) ?? undefined,
-        // Page-anchored gestures (annotation move/resize) track the origin
-        // page's frame through this even when the cursor is off that page.
-        project: (pon) => stage.pointOnPage(pon, vpt),
-        modifiers: { shift: e.shiftKey, alt: e.altKey, ctrl: e.ctrlKey, meta: e.metaKey },
-        clickCount,
-        pointerType: (e.pointerType || 'mouse') as PointerSample['pointerType'],
-        ...(gesture ? { gesture } : {}),
-      };
-    };
-    const forward = (
-      phase: PointerSample['phase'],
-      e: PointerEvent,
-      clickCount = 1,
-      gesture?: PointerSample['gesture'],
-    ) => {
-      ix?.dispatch(sampleOf(phase, e, clickCount, gesture));
-    };
-    const sink: StageGestureSink | null =
-      useHub && ix
-        ? {
-            down: (e, clickCount) => forward('down', e, clickCount),
-            move: (e) => forward('move', e),
-            up: (e) => forward('up', e),
-            cancel: (e) => forward('cancel', e),
-            hover: (e) => forward('move', e), // no owner → the hub routes to onHover
-            // Touch long-press = a word-select down (clickCount 2 keeps the
-            // word-selection contract; the `gesture` marker is the honest
-            // signal for long-press-aware handlers — haptics, pickup).
-            longPress: (e) => forward('down', e, 2, 'long-press'),
-            // Touch consent: an armed drawing/markup tool takes fingers
-            // wholesale; otherwise per-point claims (a selected annotation's
-            // body or handles) decide. A pure pre-flight — nothing captures.
-            claimsPoint: (e) =>
-              !!ix.activeTool().touchDirect || ix.wouldClaimTouch(sampleOf('down', e)),
-          }
-        : null;
-    const detachGestures = createStageGestureController(el, stage, {
+    // The WHOLE browser binding — viewport/DPR reporting, sample normalization,
+    // gesture controller — is the shared @embedpdf/web surface, so every
+    // framework adapter has one feel. This component keeps only React glue.
+    const detachSurface = createStageSurface(el, stage, {
+      hub: useHub ? ix : null,
+      source: stage.lensId(),
       zoomGestures,
-      wheelZoomFactor,
-      sink,
     });
+    // Interaction opt-in lives WITH the sample source: the same knob that
+    // forwards this lens's samples also registers its pan-scroll handler,
+    // lens-scoped — two stages on one document can never pan each other.
+    const offScroll =
+      useHub && ix
+        ? ix.registerHandler(createScrollHandler(stage, ix, { panFallback }), {
+            source: stage.lensId(),
+          })
+        : null;
 
     return () => {
-      ro.disconnect();
-      mq?.removeEventListener('change', reportDpr);
-      detachGestures();
+      offScroll?.();
+      detachSurface();
     };
-  }, [stage, ix, useHub, zoomGestures]);
+  }, [stage, ix, useHub, zoomGestures, panFallback]);
 
   return (
     <div
@@ -339,7 +289,7 @@ export function Stage({
     >
       {pages.map((p) => (
         <PageSurface
-          key={p.pageIndex}
+          key={p.pon} // durable page identity — survives move/delete (matches Angular's `track p.pon`)
           documentId={docId ?? ''}
           page={p}
           frame={frame}

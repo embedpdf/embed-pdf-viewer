@@ -39,3 +39,12 @@ export type {
   StagePointerKind,
   StageWheelSample,
 } from './stage-gestures';
+export { createStageSurface } from './stage-surface';
+export type {
+  StageSurfaceHost,
+  StageSurfaceHub,
+  StageSurfaceOptions,
+  StageSurfaceSample,
+} from './stage-surface';
+export { wheelZoomFactor } from './wheel';
+export type { WheelSample } from './wheel';

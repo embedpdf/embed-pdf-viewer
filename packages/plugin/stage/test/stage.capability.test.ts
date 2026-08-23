@@ -1737,8 +1737,8 @@ describe('doubleTapZoom', () => {
     const sched = manualScheduler();
     const { stage } = harness(PORTRAIT, { scheduler: sched.scheduler });
     stage.setViewport({ width: 393, height: 700 });
-    // 393 < 600 → the default 'compact' responsive rule asserts padding 8
-    const fitW = (393 - 2 * 8) / 600; // automatic == fit-width below 100%
+    // 393 < 600 → the default 'compact' responsive rule asserts padding 4
+    const fitW = (393 - 2 * 4) / 600; // automatic == fit-width below 100%
     expect(stage.zoomLevel()).toBeCloseTo(fitW, 4);
     let ts = 0;
     stage.doubleTapZoom({ x: 200, y: 350 });
@@ -1756,7 +1756,7 @@ describe('doubleTapZoom', () => {
     stage.zoomTo({ level: 0.3 });
     stage.doubleTapZoom({ x: 200, y: 350 });
     settle(sched, 0);
-    expect(stage.zoomLevel()).toBeCloseTo((393 - 2 * 8) / 600, 3); // compact padding
+    expect(stage.zoomLevel()).toBeCloseTo((393 - 2 * 4) / 600, 3); // compact padding
   });
 });
 
@@ -1928,7 +1928,7 @@ describe('responsive settings (container queries for the settings bag)', () => {
     expect(stage.padding()).toBe(24);
     expect(stage.matches('compact')).toBe(false);
     stage.setViewport({ width: 500, height: 700 });
-    expect(stage.padding()).toBe(8);
+    expect(stage.padding()).toBe(4);
     expect(stage.matches('compact')).toBe(true);
     expect(stage.activeRules()).toEqual(['compact']);
     stage.setViewport({ width: 1000, height: 700 });
@@ -1939,14 +1939,14 @@ describe('responsive settings (container queries for the settings bag)', () => {
   it('space, not device: the rule resolves against THIS stage box (an embedded pane)', () => {
     const { stage } = harness(PORTRAIT, {}, { skipViewport: true });
     stage.setViewport({ width: 480, height: 900 }); // a narrow pane on a desktop
-    expect(stage.padding()).toBe(8);
+    expect(stage.padding()).toBe(4);
   });
 
   it('setters write the BASE: a matching rule wins until its rule stops matching', () => {
     const { stage } = harness(PORTRAIT);
     stage.setViewport({ width: 500, height: 700 }); // compact active
     stage.setPadding(40);
-    expect(stage.padding()).toBe(8); // the rule still wins
+    expect(stage.padding()).toBe(4); // the rule still wins
     stage.setViewport({ width: 1000, height: 700 }); // compact releases…
     expect(stage.padding()).toBe(40); // …and the base the setter wrote appears
   });
@@ -1957,7 +1957,7 @@ describe('responsive settings (container queries for the settings bag)', () => {
     const z = stage.zoomLevel();
     expect(z).toBeCloseTo(1.7, 4);
     stage.setViewport({ width: 500, height: 700 }); // crosses into compact
-    expect(stage.padding()).toBe(8); // the rule asserted its key…
+    expect(stage.padding()).toBe(4); // the rule asserted its key…
     expect(stage.zoomLevel()).toBeCloseTo(z, 4); // …and left the pinch alone
   });
 
@@ -1999,7 +1999,7 @@ describe('responsive settings (container queries for the settings bag)', () => {
   it('setResponsive swaps the rules at runtime, releasing what no longer matches', () => {
     const { stage } = harness(PORTRAIT);
     stage.setViewport({ width: 500, height: 700 });
-    expect(stage.padding()).toBe(8);
+    expect(stage.padding()).toBe(4);
     stage.setResponsive([{ name: 'tiny', when: { maxWidth: 400 }, settings: { padding: 2 } }]);
     expect(stage.padding()).toBe(24); // old rule gone, new one not matching
     expect(stage.matches('compact')).toBe(false);
@@ -2013,7 +2013,7 @@ describe('responsive settings (container queries for the settings bag)', () => {
     const saved = stage.viewState(); // captured wide: padding 24 in the snapshot
     stage.setViewport({ width: 500, height: 700 });
     stage.applyViewState(saved);
-    expect(stage.padding()).toBe(8); // the rule re-asserts over the restore
+    expect(stage.padding()).toBe(4); // the rule re-asserts over the restore
     stage.setViewport({ width: 1000, height: 700 });
     expect(stage.padding()).toBe(24); // and the snapshot's base is intact
   });

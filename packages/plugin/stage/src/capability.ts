@@ -37,8 +37,9 @@ import type {
  * Layering, stated honestly:
  *   • stage-core — PURE spatial math (no DOM, no time). Ports to Rust later.
  *   • this capability — the IMPURE platform shell. It dispatches, caches, and owns
- *     the camera tween. It is NOT pure; the one host dependency it has (frame
- *     timing) enters through an injected Scheduler, never a hidden global.
+ *     the camera tween. It is NOT pure; its one host dependency (frame timing)
+ *     enters through the Scheduler seam — injectable, defaulting to the host's
+ *     own frame clock when one exists (see the seam below).
  *
  * The model: EVERY camera move is defined by what it holds fixed.
  *   • gestures (pan/pinch/wheel)  — the content under the pointer. Physics, no setting.
@@ -65,7 +66,11 @@ export function createStageCapability(
   ctx: PluginContext<StageState, StageAction>,
   config: StageConfig = {},
 ): StageCapability {
-  // ── host timing seam (the only host dependency) ──────────────────────────────
+  // ── host timing seam ─────────────────────────────────────────────────────────
+  // Frame timing enters through the Scheduler seam. By DEFAULT the seam binds
+  // to the host's own frame clock (globalThis.requestAnimationFrame) when one
+  // exists — inject to override (tests do); a frameless host degrades to
+  // instant navigation, no animation.
   const host = globalThis as {
     requestAnimationFrame?: (cb: (t: number) => void) => number;
     cancelAnimationFrame?: (handle: number) => void;
@@ -1459,6 +1464,7 @@ export function createStageCapability(
     },
     next: (opts) => step(1, opts),
     prev: (opts) => step(-1, opts),
+    lensId: () => ctx.id,
     update: (patch) => {
       // Writes the responsive BASE; the resolver decides what actually lands
       // (a matching rule's key wins until its rule stops matching). With no

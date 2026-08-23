@@ -26,10 +26,9 @@ import {
   NgZone,
   PLATFORM_ID,
 } from '@angular/core';
-import { StageToken, wheelZoomFactor } from '@embedpdf/plugin-stage';
+import { StageToken, createScrollHandler } from '@embedpdf/plugin-stage';
 import type { StageCapability, VisiblePage } from '@embedpdf/plugin-stage';
 import { InteractionToken } from '@embedpdf/plugin-interaction';
-import type { PointerSample } from '@embedpdf/plugin-interaction';
 import {
   injectDocumentId,
   injectKernelHost,
@@ -39,8 +38,7 @@ import {
   type CapabilityToken,
 } from '@embedpdf/angular/runtime';
 import type { PageFrame } from '@embedpdf/plugin-stage';
-import { createStageGestureController } from '@embedpdf/web';
-import type { StageGestureSink } from '@embedpdf/web';
+import { createStageSurface } from '@embedpdf/web';
 import { EpdfPageChrome, EpdfPageTemplate } from './templates';
 import { EpdfPageSurface } from './page-surface';
 
@@ -82,11 +80,24 @@ const frameEqual = (a: PageFrame, b: PageFrame) =>
 export class EpdfStage {
   /**
    * Route this Stage's pointer events to the interaction hub (page-resolved via
-   * `pageAt`) instead of the built-in drag-to-pan. Pan then becomes the `pan`
-   * tool's job and dragging in `pointer` mode selects text (incl. across pages).
-   * Pair with `stagePlugin({ interaction: true })`. Default false (built-in pan).
+   * `pageAt`) — AND register this lens's tool-gated pan-scroll handler with it
+   * (lens-scoped, so multiple stages on one document never pan each other).
+   * Pan is then the `pan` tool's job and dragging in `pointer` mode selects
+   * text (incl. across pages).
+   *
+   * Default TRUE: registering `interactionPlugin()` is the one opt-in — tools
+   * just work; without the hub this is inert and the stage falls back to
+   * built-in drag-to-pan, so a hub-less setup costs nothing. Set `false` on
+   * SECONDARY lenses (a thumbnail rail) that should stay click-to-navigate
+   * instead of feeding the document's tools.
    */
-  readonly interaction = input(false);
+  readonly interaction = input(true);
+  /**
+   * With `interaction`: let drags over page GAPS pan regardless of the active
+   * tool (and show a grab cursor there) — the gutter always pans; there is
+   * nothing to draw/select outside a page. Default true.
+   */
+  readonly panFallback = input(true);
   /**
    * Ambient ZOOM gestures on this stage: ctrl/cmd+wheel and trackpad pinch
    * (Safari gesture events included). Default true. Turn OFF for follower
@@ -141,90 +152,33 @@ export class EpdfStage {
       const stage = this.stage();
       const ix = this.ix();
       const useHub = this.interaction() && !!ix;
+      const panFallback = this.panFallback();
       const zoomGestures = this.zoomGestures();
       if (!stage) return; // no document yet — nothing to drive
 
       const cleanups: Array<() => void> = [];
       zone.runOutsideAngular(() => {
-        // Only report the viewport size. Initial placement (home) is the Stage
-        // plugin's job — the shell stays dumb.
-        const setViewport = () =>
-          stage.setViewport({ width: el.clientWidth, height: el.clientHeight });
-        const resizeObserver = new ResizeObserver(setViewport);
-        resizeObserver.observe(el);
-        setViewport();
-        cleanups.push(() => resizeObserver.disconnect());
-
-        // Report the device pixel ratio so page transforms render crisp. dppx
-        // changes (zoom, dragging between monitors) fire the media query;
-        // re-subscribe each time since the query value itself moves.
-        let mq: MediaQueryList | null = null;
-        const reportDpr = () => {
-          stage.setDevicePixelRatio(window.devicePixelRatio || 1);
-          mq?.removeEventListener('change', reportDpr);
-          mq = window.matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`);
-          mq.addEventListener('change', reportDpr);
-        };
-        reportDpr();
-        cleanups.push(() => mq?.removeEventListener('change', reportDpr));
-
-        // ALL gesture input — wheel, Safari trackpad gestures, mouse/pen tool
-        // routing, and the synthesized touch physics (pan/pinch/fling/tap/
-        // long-press) — lives in the shared @embedpdf/web controller, so every
-        // framework adapter has one feel. The sink is the hub bridge: it
-        // converts events to page-resolved samples exactly as before (`pageAt`
-        // per event, so a drag can cross pages).
-        const sampleOf = (
-          phase: PointerSample['phase'],
-          e: PointerEvent,
-          clickCount = 1,
-          gesture?: PointerSample['gesture'],
-        ): PointerSample => {
-          const r = el.getBoundingClientRect();
-          const viewport = { x: e.clientX - r.left, y: e.clientY - r.top };
-          return {
-            phase,
-            viewport,
-            page: stage.pageAt(viewport) ?? undefined,
-            // Page-anchored gestures (annotation move/resize) track the origin
-            // page's frame through this even when the cursor is off that page.
-            project: (pon) => stage.pointOnPage(pon, viewport),
-            modifiers: { shift: e.shiftKey, alt: e.altKey, ctrl: e.ctrlKey, meta: e.metaKey },
-            clickCount,
-            pointerType: (e.pointerType || 'mouse') as PointerSample['pointerType'],
-            ...(gesture ? { gesture } : {}),
-          };
-        };
-        const forward = (
-          phase: PointerSample['phase'],
-          e: PointerEvent,
-          clickCount = 1,
-          gesture?: PointerSample['gesture'],
-        ) => {
-          ix?.dispatch(sampleOf(phase, e, clickCount, gesture));
-        };
-        const sink: StageGestureSink | null =
-          useHub && ix
-            ? {
-                down: (e, clickCount) => forward('down', e, clickCount),
-                move: (e) => forward('move', e),
-                up: (e) => forward('up', e),
-                cancel: (e) => forward('cancel', e),
-                hover: (e) => forward('move', e), // no owner → the hub routes to onHover
-                // Touch long-press = a word-select down (clickCount 2 keeps
-                // the word-selection contract; the `gesture` marker is the
-                // honest long-press signal for haptics/pickup handlers).
-                longPress: (e) => forward('down', e, 2, 'long-press'),
-                // Touch consent: an armed drawing/markup tool takes fingers
-                // wholesale; otherwise per-point claims (a selected
-                // annotation's body or handles) decide. Pure pre-flight.
-                claimsPoint: (e) =>
-                  !!ix.activeTool().touchDirect || ix.wouldClaimTouch(sampleOf('down', e)),
-              }
-            : null;
+        // The WHOLE browser binding — viewport/DPR reporting, sample
+        // normalization, gesture controller — is the shared @embedpdf/web
+        // surface, so every framework adapter has one feel. This component
+        // keeps only Angular glue.
         cleanups.push(
-          createStageGestureController(el, stage, { zoomGestures, wheelZoomFactor, sink }),
+          createStageSurface(el, stage, {
+            hub: useHub ? ix : null,
+            source: stage.lensId(),
+            zoomGestures,
+          }),
         );
+        // Interaction opt-in lives WITH the sample source: the same knob that
+        // forwards this lens's samples also registers its pan-scroll handler,
+        // lens-scoped — two stages on one document can never pan each other.
+        if (useHub && ix) {
+          cleanups.push(
+            ix.registerHandler(createScrollHandler(stage, ix, { panFallback }), {
+              source: stage.lensId(),
+            }),
+          );
+        }
       });
       onCleanup(() => cleanups.forEach((fn) => fn()));
     });

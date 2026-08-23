@@ -1,8 +1,6 @@
 import { definePlugin } from '@embedpdf/core';
 import type { CapabilityToken } from '@embedpdf/core';
-import { InteractionToken } from '@embedpdf/plugin-interaction';
 import { createStageCapability } from './capability';
-import { createScrollHandler } from './scroll-handler';
 import { registerStageEffects } from './effects';
 import { initialStageState, stageReducer } from './reducer';
 import { StageToken } from './types';
@@ -27,20 +25,6 @@ import type { StageAction, StageCapability, StageConfig, StageState } from './ty
 export interface StagePluginOptions extends StageConfig {
   id?: string;
   token?: CapabilityToken<StageCapability>;
-  /**
-   * Opt this lens into the interaction hub: register a tool-gated `scroll`
-   * handler (so dragging pans only in `pan` mode). Pair with `<Stage interaction>`
-   * on the React side, which forwards pointer events to the hub. Default false —
-   * secondary lenses (thumbnails) stay click-to-navigate.
-   */
-  interaction?: boolean;
-  /**
-   * When {@link interaction} is on, let drags over page GAPS pan regardless of the
-   * active tool (and show a grab cursor there) — the gutter always pans, matching
-   * v2 and the intuition that there's nothing to draw/select outside a page.
-   * On-page behaviour is untouched. Default true; ignored without `interaction`.
-   */
-  panFallback?: boolean;
 }
 
 /**
@@ -49,29 +33,18 @@ export interface StagePluginOptions extends StageConfig {
  * sibling files.
  */
 export const stagePlugin = (options: StagePluginOptions = {}) => {
-  const {
-    id = 'stage',
-    token = StageToken,
-    interaction = false,
-    panFallback = true,
-    ...config
-  } = options;
+  const { id = 'stage', token = StageToken, ...config } = options;
   return definePlugin<StageState, StageAction, StageCapability>({
     id,
     token,
     scope: 'document', // one instance of THIS lens per open document
-    // When this lens drives interaction, it contributes the pan-scroll handler to
-    // the hub (optional dep — the hub may not be present in a headless setup).
-    optional: interaction ? [InteractionToken] : undefined,
     initialState: () => initialStageState(config),
     reduce: stageReducer,
     capability: (ctx) => createStageCapability(ctx, config),
-    init: interaction
-      ? (ctx) => {
-          const ix = ctx.tryGet(InteractionToken);
-          if (ix) ix.registerHandler(createScrollHandler(ctx.get(token), ix, { panFallback }));
-        }
-      : undefined,
+    // Interaction opt-in lives with the SAMPLE SOURCE, not here: the surface
+    // binding (`<Stage interaction>` / `createStageSurface`) both forwards
+    // pointer samples AND registers this lens's scroll handler, lens-scoped —
+    // one knob, and a handler can never exist without its input stream.
     // INITIAL placement is deliberately NOT an effect: it's LEVEL-triggered
     // inside the capability's setViewport (place when the stage first learns a
     // real size), so it cannot race effect registration. Other plugins only

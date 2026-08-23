@@ -186,3 +186,53 @@ describe('touch consent (wouldClaimTouch) and cancel routing', () => {
     expect(log).toEqual(['legacy:down', 'legacy:up']);
   });
 });
+
+describe('lens-scoped handlers (sample source routing)', () => {
+  const stamped = (phase: 'down' | 'move' | 'up', source?: string): PointerSample => ({
+    ...sample(phase),
+    ...(source ? { source } : {}),
+  });
+
+  it('a source-scoped handler only sees its own lens; the other lens falls through', () => {
+    const { cap } = harness('pan'); // 'scroll'-tagged handlers are live under pan
+    const log: string[] = [];
+    cap.registerHandler(handler('main-scroll', 10, 'scroll', log), { source: 'stage' });
+    cap.registerHandler(handler('thumbs-scroll', 10, 'scroll', log), { source: 'stage-thumbs' });
+    cap.dispatch(stamped('down', 'stage'));
+    cap.dispatch(stamped('up', 'stage'));
+    expect(log).toEqual(['main-scroll:down', 'main-scroll:up']); // never the other lens
+    log.length = 0;
+    cap.dispatch(stamped('down', 'stage-thumbs'));
+    cap.dispatch(stamped('up', 'stage-thumbs'));
+    expect(log).toEqual(['thumbs-scroll:down', 'thumbs-scroll:up']);
+  });
+
+  it('an UNSCOPED handler sees every lens (feature handlers stay global)', () => {
+    const { cap } = harness('pan');
+    const log: string[] = [];
+    cap.registerHandler(handler('global', 10, 'scroll', log));
+    cap.dispatch(stamped('down', 'stage'));
+    cap.dispatch(stamped('up', 'stage'));
+    cap.dispatch(stamped('down', 'stage-thumbs'));
+    cap.dispatch(stamped('up', 'stage-thumbs'));
+    expect(log).toEqual(['global:down', 'global:up', 'global:down', 'global:up']);
+  });
+
+  it('an UNSTAMPED sample routes everywhere — only a definite mismatch filters', () => {
+    const { cap } = harness('pan');
+    const log: string[] = [];
+    cap.registerHandler(handler('main-scroll', 10, 'scroll', log), { source: 'stage' });
+    cap.dispatch(stamped('down')); // custom dispatcher, no source
+    cap.dispatch(stamped('up'));
+    expect(log).toEqual(['main-scroll:down', 'main-scroll:up']);
+  });
+
+  it('unregistering clears the scope entry with the handler', () => {
+    const { cap } = harness('pan');
+    const log: string[] = [];
+    const off = cap.registerHandler(handler('main-scroll', 10, 'scroll', log), { source: 'stage' });
+    off();
+    cap.dispatch(stamped('down', 'stage'));
+    expect(log).toEqual([]);
+  });
+});

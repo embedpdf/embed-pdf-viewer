@@ -32,6 +32,8 @@
  * builds) — @embedpdf/web stays free of plugin imports, per the layering law.
  */
 
+import { wheelZoomFactor } from './wheel';
+
 export type StagePointerKind = 'mouse' | 'pen' | 'touch';
 
 /** What the controller needs from the camera — `StageCapability` satisfies it. */
@@ -78,7 +80,7 @@ export interface StageGestureSink {
   claimsPoint?(e: PointerEvent): boolean;
 }
 
-/** The wheel fields the zoom classifier reads (plugin-stage's `WheelSample`). */
+/** The wheel fields the zoom classifier reads (see `./wheel`'s `WheelSample`). */
 export interface StageWheelSample {
   deltaY: number;
   deltaMode: number;
@@ -91,9 +93,10 @@ export interface StageGestureOptions {
    *  fall through to pan and pinches pan without zooming — but are still
    *  swallowed, never page-zooming the browser. Default true. */
   zoomGestures?: boolean;
-  /** The wheel → zoom-factor classifier (inject plugin-stage's
-   *  `wheelZoomFactor`; injected so this module stays plugin-free). */
-  wheelZoomFactor: (sample: StageWheelSample) => number;
+  /** The wheel → zoom-factor classifier. Defaults to this package's
+   *  `wheelZoomFactor` (browser wheel classification lives HERE, with the rest
+   *  of the browser input handling); inject to override or to fake in tests. */
+  wheelZoomFactor?: (sample: StageWheelSample) => number;
   /** Tool routing for non-navigation gestures; omit for built-in-pan stages. */
   sink?: StageGestureSink | null;
   /** Touch press duration that becomes a long-press (ms). Default 450. */
@@ -150,6 +153,7 @@ export function createStageGestureController(
   options: StageGestureOptions,
 ): () => void {
   const zoomGestures = options.zoomGestures ?? true;
+  const wheelZoom = options.wheelZoomFactor ?? wheelZoomFactor;
   const sink = options.sink ?? null;
   const LONG_PRESS_MS = options.longPressMs ?? 450;
   const SLOP = options.tapSlopPx ?? 10;
@@ -669,7 +673,7 @@ export function createStageGestureController(
   const onWheel = (e: WheelEvent) => {
     e.preventDefault();
     if (zoomGestures && (e.ctrlKey || e.metaKey)) {
-      host.zoomAround(vpt(e.clientX, e.clientY), options.wheelZoomFactor(e));
+      host.zoomAround(vpt(e.clientX, e.clientY), wheelZoom(e));
     } else {
       const dx = e.shiftKey ? e.deltaY : e.deltaX;
       const dy = e.shiftKey ? e.deltaX : e.deltaY;
