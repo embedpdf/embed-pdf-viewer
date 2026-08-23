@@ -462,8 +462,16 @@ export interface StageCapability {
    * for a 150 ms hesitation inside it. Re-entrant (nesting counts). Opening a
    * gesture cancels any running tween or fling — that is how a finger
    * "catches" a moving page.
+   *
+   * `elastic` opts the gesture into RUBBER-BAND overscroll: pans past the
+   * clamp stretch on the iOS resistance curve instead of stopping dead, and
+   * ending the gesture (or a fling reaching an edge) springs the camera home
+   * on a critically-damped curve. The clamp itself stays the untouched law of
+   * REST — elasticity is a transient the gesture is allowed to hold, never a
+   * state the camera can settle in. Touch contacts pass it; mouse drags and
+   * wheel pans stay rigid (the desktop convention). Default false.
    */
-  beginGesture(): void;
+  beginGesture(options?: { elastic?: boolean }): void;
   endGesture(): void;
   /**
    * Momentum scroll: keep panning from a release velocity (screen px/s, the

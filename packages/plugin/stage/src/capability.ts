@@ -11,6 +11,7 @@ import {
 } from '@embedpdf/core-geometry';
 import type { Rect } from '@embedpdf/core-geometry';
 import type { PluginContext } from '@embedpdf/core';
+import { FLING_STOP, easeOutCubic, glideStep, rubberIn, rubberOut, springStep, zoomLerp } from './motion';
 import { SETTINGS_EFFECT, SETTING_KEYS } from './settings';
 import type { SettingEffect } from './settings';
 import type {
@@ -379,9 +380,13 @@ export function createStageCapability(
   // ── gesture transaction (touch pan/pinch) ───────────────────────────────────
   // While open: zoomAround defers its intent PATCH, and the rest countdown is
   // held — a hesitation inside a pinch is not "at rest". Depth-counted so
-  // nested brackets compose.
+  // nested brackets compose. An ELASTIC gesture may additionally hold the
+  // camera past the clamp (rubber-band); `gestureRaw` is its unclamped,
+  // finger-integrated camera — the resistance curve maps it to what renders.
   let gestureDepth = 0;
   let gestureZoomed = false;
+  let gestureElastic = false;
+  let gestureRaw: S.Camera | null = null;
 
   // ── camera-rest detector ────────────────────────────────────────────────────
   // A continuous zoom and a device-snapped origin cannot coexist without the
@@ -434,6 +439,61 @@ export function createStageCapability(
     ctx.dispatch({ type: 'CAMERA', camera: clamped });
   };
 
+  // ── rubber-band (elastic overscroll) ────────────────────────────────────────
+  // The curve pair lives in motion.ts; these are its STATE adapters. One rule
+  // governs where the rubber exists at all: it softens only the edges of a
+  // scroll RANGE. An axis whose content FITS the viewport has no travel — the
+  // clamp holds it at its fitAlign rest, and it stays rigid however hard the
+  // finger tugs (the UIScrollView default: bouncing exists only where content
+  // exceeds bounds).
+  const axisTravels = (origin: number, content: number, view: number, zoom: number): boolean =>
+    !S.travelRange(origin, content, view, zoom, constraint().padding).fits;
+  /** Unclamped finger-integrated camera → the DISPLAYED camera: clamp, then
+   *  re-apply the overshoot through the resistance curve, per travelling axis.
+   *  Inside the bounds this is exactly the clamp (rubber of zero is zero);
+   *  on a fitting axis it is exactly the clamp ALWAYS. */
+  const rubberize = (raw: S.Camera): S.Camera => {
+    const clamped = S.clampCamera(raw, stayBounds(), vp(), constraint());
+    const v = vp();
+    const b = stayBounds();
+    const axis = (rawA: number, clampedA: number, dim: number, travels: boolean): number => {
+      if (!travels) return clampedA;
+      const dWorld = rawA - clampedA;
+      if (dWorld === 0) return clampedA;
+      const out = rubberOut(Math.abs(dWorld) * raw.zoom, Math.max(1, dim));
+      return clampedA + (Math.sign(dWorld) * out) / raw.zoom;
+    };
+    return {
+      zoom: raw.zoom,
+      x: axis(raw.x, clamped.x, v.width, axisTravels(b.x, b.width, v.width, raw.zoom)),
+      y: axis(raw.y, clamped.y, v.height, axisTravels(b.y, b.height, v.height, raw.zoom)),
+    };
+  };
+  /** Displayed camera → the raw position `rubberize` would have produced it
+   *  from. Overshoot is capped just under the asymptote so the inverse stays
+   *  finite whatever state a catch finds the camera in. */
+  const unrubberize = (displayed: S.Camera): S.Camera => {
+    const clamped = S.clampCamera(displayed, stayBounds(), vp(), constraint());
+    const v = vp();
+    const b = stayBounds();
+    const axis = (dispA: number, clampedA: number, dim: number, travels: boolean): number => {
+      if (!travels) return clampedA;
+      const dWorld = dispA - clampedA;
+      if (dWorld === 0) return clampedA;
+      const d = Math.max(1, dim);
+      const out = Math.min(Math.abs(dWorld) * displayed.zoom, d - 1);
+      return clampedA + (Math.sign(dWorld) * rubberIn(out, d)) / displayed.zoom;
+    };
+    return {
+      zoom: displayed.zoom,
+      x: axis(displayed.x, clamped.x, v.width, axisTravels(b.x, b.width, v.width, displayed.zoom)),
+      y: axis(displayed.y, clamped.y, v.height, axisTravels(b.y, b.height, v.height, displayed.zoom)),
+    };
+  };
+  // The elastic write path: NO clamp — used only by the elastic pan and the
+  // edge spring, whose math guarantees every trajectory terminates clamped.
+  const setCamRaw = (c: S.Camera) => ctx.dispatch({ type: 'CAMERA', camera: c });
+
   /**
    * Cursor reconciliation, one direction per interaction:
    *   navigation  → cursor is INTENT, set explicitly; the camera honors it as far
@@ -470,7 +530,6 @@ export function createStageCapability(
     }
     cancelAnim();
     const from = cam();
-    const ease = (t: number) => 1 - Math.pow(1 - t, 3);
     let started = false;
     let t0 = 0;
     const tick = (now: number) => {
@@ -478,7 +537,7 @@ export function createStageCapability(
         started = true;
         t0 = now; // anchor to the first real timestamp (works even when now === 0)
       }
-      const k = ease(Math.min(1, (now - t0) / ms));
+      const k = easeOutCubic(Math.min(1, (now - t0) / ms));
       setCam(
         {
           x: lerp(from.x, target.x, k),
@@ -497,16 +556,96 @@ export function createStageCapability(
     raf = scheduler.raf(tick);
   };
 
-  // Momentum pan (the touch fling). Shares the `raf` handle with the tween, so
-  // cancelAnim() — every verb's first act — is also "catch the fling".
-  const FLING_DECAY = 0.998; // per ms — UIScrollView's normal deceleration rate
-  const FLING_STOP = 0.02; // px/ms — below ~20 px/s the eye reads "stopped"
-  const startFling = (vx: number, vy: number) => {
-    if (!canAnimate) return;
+  /**
+   * Zoom-anchored tween — animates THE INVARIANT, not the coordinates. A
+   * camera move is defined by what it holds fixed; for an anchored zoom that
+   * is "the focal page-point stays at `pt` while scale changes". Lerping
+   * x/y/zoom independently (the plain tween) breaks that mid-flight: holding
+   * a screen point requires `x(t) = focal.x − pt.x / zoom(t)` — hyperbolic in
+   * the zoom — so linear coordinates swing the tapped point along a curved
+   * path (the visible "dip"). Here the zoom interpolates GEOMETRICALLY
+   * (constant rate — zoom is multiplicative) and each frame's camera derives
+   * from the anchor at that zoom, then clamps: the focal point is stationary
+   * by construction, and a zoom-out rails into its fit progressively as the
+   * shrinking travel range lets the clamp take over.
+   */
+  const animateZoomAnchored = (
+    focal: S.Anchor,
+    pt: S.Point,
+    targetZoom: number,
+    ms = 240,
+    then?: () => void,
+  ) => {
+    if (!canAnimate) {
+      const sc = buildScene();
+      if (sc.itemCount) setCam(S.cameraForAnchorAtScreen(focal, sc, pt, targetZoom));
+      then?.();
+      return;
+    }
     cancelAnim();
-    let vxMs = vx / 1000;
-    let vyMs = vy / 1000;
-    if (Math.hypot(vxMs, vyMs) < FLING_STOP) return;
+    const z0 = cam().zoom;
+    let started = false;
+    let t0 = 0;
+    const tick = (now: number) => {
+      if (!started) {
+        started = true;
+        t0 = now;
+      }
+      const k = easeOutCubic(Math.min(1, (now - t0) / ms));
+      const z = zoomLerp(z0, targetZoom, k);
+      const sc = buildScene();
+      if (sc.itemCount) setCam(S.cameraForAnchorAtScreen(focal, sc, pt, z));
+      if (k < 1) {
+        raf = scheduler.raf(tick);
+      } else {
+        raf = 0;
+        then?.();
+      }
+    };
+    raf = scheduler.raf(tick);
+  };
+
+  // Momentum + edge physics — the driver over motion.ts's per-axis laws:
+  //   glide  — the touch fling, decaying on UIScrollView's curve across free
+  //            travel;
+  //   spring — a critically-damped return to the clamp, entered when a glide
+  //            reaches a content edge (remaining velocity becomes the bounce)
+  //            or when the motion STARTS displaced (release while stretched).
+  // Axes are independent (a diagonal fling can bounce off the bottom while
+  // still gliding horizontally). Every trajectory terminates ON the clamp.
+  // Shares the `raf` handle with the tween, so cancelAnim() — every verb's
+  // first act — is also "catch": catching mid-bounce holds the stretch.
+  const startCameraPhysics = (vxFinger: number, vyFinger: number) => {
+    if (!canAnimate) {
+      setCam(cam()); // no host frames: snap straight into bounds
+      return;
+    }
+    cancelAnim();
+    const zoom = cam().zoom;
+    // Per-axis state in camera-space SCREEN px (the camera moves OPPOSITE the
+    // finger; positions scale by zoom once, here, so the laws read in px).
+    interface AxisState {
+      p: number;
+      v: number;
+      springing: boolean;
+      done: boolean;
+    }
+    const c0 = cam();
+    const cl0 = S.clampCamera(c0, stayBounds(), vp(), constraint());
+    const b0 = stayBounds();
+    const v0 = vp();
+    const mk = (camA: number, clampedA: number, fingerV: number): AxisState => ({
+      p: camA * zoom,
+      v: -fingerV / 1000,
+      springing: camA !== clampedA,
+      done: false,
+    });
+    // A fitting axis takes no ballistic motion: no travel to glide across and
+    // no bounce (rigid, like the platform) — release velocity is discarded.
+    // The spring stays armed for a DISPLACED fitting axis (repair to rest).
+    const ax = mk(c0.x, cl0.x, axisTravels(b0.x, b0.width, v0.width, zoom) ? vxFinger : 0);
+    const ay = mk(c0.y, cl0.y, axisTravels(b0.y, b0.height, v0.height, zoom) ? vyFinger : 0);
+    if (!ax.springing && !ay.springing && Math.hypot(ax.v, ay.v) < FLING_STOP) return;
     let started = false;
     let last = 0;
     const tick = (now: number) => {
@@ -516,19 +655,50 @@ export function createStageCapability(
       const dt = started ? Math.min(64, Math.max(1, now - last)) : 16;
       started = true;
       last = now;
-      const k = Math.pow(FLING_DECAY, dt);
-      const step = (dt * (1 + k)) / 2; // midpoint integral of the decaying velocity
-      const before = cam();
-      setCam(S.panByScreen(before, vxMs * step, vyMs * step));
-      const after = cam();
-      // The clamp ate an axis (content edge): kill that axis's momentum so the
-      // fling doesn't grind on the boundary; the other axis keeps flying.
-      if (vxMs !== 0 && after.x === before.x) vxMs = 0;
-      if (vyMs !== 0 && after.y === before.y) vyMs = 0;
-      vxMs *= k;
-      vyMs *= k;
+      // The clamp of the CURRENT position is each axis's home this frame: for
+      // a stretched axis it is the edge; for a fitting axis, its rest point.
+      const cl = S.clampCamera(
+        { x: ax.p / zoom, y: ay.p / zoom, zoom },
+        stayBounds(),
+        vp(),
+        constraint(),
+      );
+      const step = (a: AxisState, edgeWorld: number) => {
+        if (a.done) return;
+        const r = a.springing
+          ? springStep(a.p, a.v, edgeWorld * zoom, dt)
+          : glideStep(a.p, a.v, dt);
+        a.p = r.p;
+        a.v = r.v;
+        a.done = r.done;
+      };
+      step(ax, cl.x);
+      step(ay, cl.y);
+      // A glide that left the travel range converts to a spring AT the edge —
+      // the incoming velocity carries in, so the bounce grows out of physics
+      // rather than a scripted overshoot.
+      const ncl = S.clampCamera(
+        { x: ax.p / zoom, y: ay.p / zoom, zoom },
+        stayBounds(),
+        vp(),
+        constraint(),
+      );
+      const convert = (a: AxisState, clampedA: number) => {
+        if (!a.springing && Math.abs(clampedA * zoom - a.p) > 1e-6) {
+          a.p = clampedA * zoom;
+          a.springing = true;
+          a.done = false;
+        }
+      };
+      convert(ax, ncl.x);
+      convert(ay, ncl.y);
+      setCamRaw({ x: ax.p / zoom, y: ay.p / zoom, zoom });
       syncCursorFromCamera();
-      if (Math.hypot(vxMs, vyMs) >= FLING_STOP) raf = scheduler.raf(tick);
+      if (ax.done && ay.done) {
+        setCam(cam()); // exact landing: clamped, snapped, settled
+        return;
+      }
+      raf = scheduler.raf(tick);
     };
     raf = scheduler.raf(tick);
   };
@@ -945,7 +1115,15 @@ export function createStageCapability(
     },
     panBy: (dx, dy) => {
       cancelAnim();
-      setCam(S.panByScreen(cam(), dx, dy));
+      if (gestureDepth > 0 && gestureElastic) {
+        // Elastic: integrate the finger on the UNCLAMPED camera and display it
+        // through the resistance curve. Initialized from the displayed camera's
+        // inverse, so catching a mid-bounce stretch continues seamlessly.
+        gestureRaw = S.panByScreen(gestureRaw ?? unrubberize(cam()), dx, dy);
+        setCamRaw(rubberize(gestureRaw));
+      } else {
+        setCam(S.panByScreen(cam(), dx, dy));
+      }
       syncCursorFromCamera();
     },
     scrollTo: (opts) => {
@@ -988,19 +1166,28 @@ export function createStageCapability(
       if (after !== before && focal && after.itemCount) {
         setCam(S.cameraForAnchorAtScreen(focal, after, pt, cam().zoom));
       }
+      // A zoom write mid-elastic-gesture (pinch) re-bases the pan integrator:
+      // bounds just changed shape under the stretch, so the displayed camera
+      // becomes the new reference and resistance re-accumulates from here.
+      if (gestureDepth > 0 && gestureElastic) gestureRaw = unrubberize(cam());
       syncCursorFromCamera();
     },
-    beginGesture: () => {
+    beginGesture: (options) => {
       gestureDepth++;
       if (gestureDepth === 1) {
         cancelAnim(); // catch: the next touch-down stops any tween or fling
         gestureZoomed = false;
+        gestureElastic = options?.elastic === true;
+        gestureRaw = null;
       }
     },
     endGesture: () => {
       if (gestureDepth === 0) return;
       gestureDepth--;
       if (gestureDepth > 0) return;
+      gestureRaw = null;
+      const wasElastic = gestureElastic;
+      gestureElastic = false;
       if (gestureZoomed) {
         gestureZoomed = false;
         // The deferred zoom intent: ONE patch for the whole gesture. (In a
@@ -1010,18 +1197,35 @@ export function createStageCapability(
         armRest(); // the gesture is over — NOW the 150 ms rest countdown runs
       }
       syncCursorFromCamera();
+      if (wasElastic) {
+        // Released while stretched → spring home. A fling() arriving right
+        // after simply re-enters the same physics with the release velocity.
+        const c = cam();
+        const cl = S.clampCamera(c, stayBounds(), vp(), constraint());
+        if (cl.x !== c.x || cl.y !== c.y) startCameraPhysics(0, 0);
+      }
     },
-    fling: (vx, vy) => startFling(vx, vy),
+    fling: (vx, vy) => startCameraPhysics(vx, vy),
     cameraInMotion: () => raf !== 0,
     doubleTapZoom: (pt) => {
       cancelAnim();
       const sc0 = buildScene();
       if (!sc0.itemCount) return;
       const item = paged() ? sc0.items[0] : sc0.items[itemIndexOfPage(ctx.getState().cursor)];
-      // The toggle's baseline is the automatic fit (fit-width capped at 100%) —
-      // a stable "reading" level whatever the current intent happens to be.
-      const base = S.resolveZoom({ mode: S.ZoomMode.Automatic }, fitBox(item), vp(), pad());
-      const target = cam().zoom > base * 1.4 ? base : Math.min(base * 2.5, S.ZOOM_MAX);
+      // The ladder (the platform convention): ascending READING POSTURES, each
+      // derived from a zoom intent — see the page (automatic), read the text
+      // (fit-width), inspect (2.5× the automatic fit). A double-tap climbs to
+      // the next posture meaningfully above the current zoom; past the top it
+      // resets to the base fit. Stops within 10% of a neighbor collapse — on
+      // phones automatic IS fit-width, so the ladder degenerates to the
+      // familiar two-state toggle.
+      const fit = fitBox(item);
+      const auto = S.resolveZoom({ mode: S.ZoomMode.Automatic }, fit, vp(), pad());
+      const fitW = S.resolveZoom({ mode: S.ZoomMode.FitWidth }, fit, vp(), pad());
+      const stops = [auto, fitW, Math.min(auto * 2.5, S.ZOOM_MAX)]
+        .sort((a, b) => a - b)
+        .filter((z, i, all) => i === 0 || z > all[i - 1] * 1.1);
+      const target = stops.find((z) => z > cam().zoom * 1.1) ?? stops[0];
       // The INTENT commits UP FRONT (the `reveal` precedent): a caught tween
       // must never leave the camera on some intermediate zoom while the stored
       // intent still says "fit" — the next refit would snap somewhere the user
@@ -1032,8 +1236,9 @@ export function createStageCapability(
       const sc = buildScene();
       if (!sc.itemCount) return;
       const focal = S.anchorAtPoint(sc, S.toWorld(cam(), pt));
-      const camera = S.cameraForAnchorAtScreen(focal, sc, pt, target);
-      animateTo(camera, stayBounds(), 240, syncCursorFromCamera);
+      // The focal-anchored tween: the tapped point holds still by construction
+      // (linear coordinate lerps would swing it mid-flight — the "dip").
+      animateZoomAnchored(focal, pt, target, 240, syncCursorFromCamera);
     },
     // Pointer-less zooms magnify around the zoomAlign focal point (pinch and
     // wheel pass their own pointer to zoomAround — physics beats policy).

@@ -38,7 +38,7 @@ export type StagePointerKind = 'mouse' | 'pen' | 'touch';
 export interface StageGestureHost {
   panBy(dxScreen: number, dyScreen: number): void;
   zoomAround(screenPt: { x: number; y: number }, factor: number): void;
-  beginGesture(): void;
+  beginGesture(options?: { elastic?: boolean }): void;
   endGesture(): void;
   /** Momentum pan from a release velocity in screen px/s. */
   fling(velocityX: number, velocityY: number): void;
@@ -157,6 +157,8 @@ export function createStageGestureController(
   const DOUBLE_TAP_RADIUS = 25;
   const FLING_MIN = options.flingMinVelocity ?? 50;
   const MIN_PINCH_SPAN = 20; // px — below this a span ratio is mostly noise
+  const PINCH_RELEASE_GRACE_MS = 160; // leftover finger must OUTLIVE the release
+  const SETTLE_SPEED = 0.12; // px/ms — below this the leftover finger has SETTLED
 
   const pointers = new Map<number, Tracked>();
   let mode: Mode = 'idle';
@@ -166,6 +168,24 @@ export function createStageGestureController(
   let downEvent: PointerEvent | null = null; // first touch's down, for tap/long-press forwarding
   let longPressTimer: ReturnType<typeof setTimeout> | null = null;
   let panId = -1;
+  // A pan is ARMED once its finger has crossed slop. Fresh touches arm on the
+  // pending→pan transition; the finger LEFT OVER when a pinch ends starts
+  // DISARMED — a gesture's identity persists through its release, so the
+  // leftover contact must re-earn pan-hood exactly like a new finger would.
+  // While disarmed, its micro-rolls neither pan nor pollute the velocity
+  // trail (which still holds the pinch's CENTROID motion — the momentum a
+  // compound gesture actually has). For a GRACE window after the transition
+  // the slop base FOLLOWS the finger: in a fast release the leftover finger
+  // is still genuinely moving, and distance alone cannot tell that from a
+  // deliberate continuation — only outliving the release window can.
+  let panArmed = true;
+  let panGraceUntil = 0;
+  let graceSample = { t: 0, x: 0, y: 0 }; // leftover finger's last observed sample
+  // iOS-visible seam: real WebKit can deliver a trailing gesturechange after
+  // the last pointerup of a pinch — with no touches left, the desktop-trackpad
+  // path would apply a stray end-of-pinch zoom. Any RECENT touch activity
+  // therefore suppresses gesture events; desktop trackpads never have any.
+  let lastTouchAt = -Infinity;
 
   // rAF application state
   let frame = 0;
@@ -175,6 +195,13 @@ export function createStageGestureController(
 
   // velocity trail of the pan focal point (finger, or pinch centroid)
   let trail: Array<{ t: number; x: number; y: number }> = [];
+  // the pinch's SPAN trail, sampled beside the centroid: at release it decides
+  // the gesture's CHARACTER. A fast pinch release has asymmetric finger
+  // speeds (the lifting finger flicks away), which moves the TRUE centroid at
+  // hundreds of px/s — physically real, but zoom-release noise the platform
+  // ignores. Fling only when the centroid rate DOMINATES the span rate
+  // (a two-finger pan); a zoom-dominant release ends still.
+  let spanTrail: Array<{ t: number; x: number; y: number }> = [];
 
   // tap-pair state for double-tap
   let lastTapT = 0;
@@ -221,10 +248,12 @@ export function createStageGestureController(
       frame = 0;
     }
   };
-  const begin = () => {
+  const begin = (elastic = false) => {
     if (!began) {
       began = true;
-      host.beginGesture();
+      // touch contacts are elastic (rubber-band past the clamp); mouse drags
+      // stay rigid — the desktop convention
+      host.beginGesture(elastic ? { elastic: true } : undefined);
     }
   };
   const end = () => {
@@ -238,8 +267,11 @@ export function createStageGestureController(
     downEvent = null;
     touchToolGesture = false;
     trail = [];
+    spanTrail = [];
     dirty = false;
     panId = -1;
+    panArmed = true;
+    panGraceUntil = 0;
     clearLongPress();
     stopFrames();
   };
@@ -272,6 +304,14 @@ export function createStageGestureController(
     if (zoomGestures && span > MIN_PINCH_SPAN && lastSpan > MIN_PINCH_SPAN && span !== lastSpan) {
       host.zoomAround(vpt(cx, cy), span / lastSpan);
     }
+    // The centroid + span trails sample HERE — once per applied frame, where
+    // both fingers are read coherently. Per-event sampling zig-zags (fingers
+    // report sequentially, so each single-finger move fakes a half-step of
+    // centroid motion) and manufactures phantom release velocity. The span
+    // trail is the release gate's evidence of the gesture's CHARACTER.
+    pushSample(cx, cy);
+    spanTrail.push({ t: performance.now(), x: span, y: 0 });
+    if (spanTrail.length > 16) spanTrail.shift();
     lastApplied = { x: cx, y: cy };
     lastSpan = span;
     dirty = false;
@@ -318,6 +358,7 @@ export function createStageGestureController(
   // ── listeners ─────────────────────────────────────────────────────────────
   const onDown = (e: PointerEvent) => {
     const kind = (e.pointerType || 'mouse') as StagePointerKind;
+    if (kind === 'touch') lastTouchAt = performance.now();
     if (kind !== 'touch') {
       if (kind === 'mouse' && e.button !== 0) return;
       if (mode !== 'idle') return; // an active gesture owns the surface
@@ -371,7 +412,7 @@ export function createStageGestureController(
         mode = 'pending';
         downEvent = e;
         suppressTap = moving; // a catch, not a tap
-        begin(); // stops any fling/tween under the finger
+        begin(true); // stops any fling/tween under the finger
         trail = [];
         pushSample(e.clientX, e.clientY);
         clearLongPress();
@@ -406,7 +447,7 @@ export function createStageGestureController(
           downX: e.clientX,
           downY: e.clientY,
         });
-        begin();
+        begin(true);
         enterPinch();
         break;
       }
@@ -419,6 +460,7 @@ export function createStageGestureController(
   const onWindowMove = (e: PointerEvent) => {
     const p = pointers.get(e.pointerId);
     if (!p) return;
+    if (p.kind === 'touch') lastTouchAt = performance.now();
     p.x = e.clientX;
     p.y = e.clientY;
     switch (mode) {
@@ -434,17 +476,42 @@ export function createStageGestureController(
         break;
       }
       case 'pan':
-        if (p.id === panId) {
-          pushSample(p.x, p.y);
-          dirty = true;
+        if (p.id !== panId) break;
+        if (!panArmed) {
+          // pinch-leftover contact. Inside the release-grace window the slop
+          // base follows the finger — a fast release keeps moving and must
+          // never accumulate distance; only a contact that OUTLIVES the
+          // window can re-earn panning by crossing slop from where it
+          // settled.
+          const nowT = performance.now();
+          if (nowT < panGraceUntil) {
+            // a finger that SETTLES (speed drops) inside the window is a
+            // continuation taking hold — end the grace early so a deliberate
+            // pause-then-drag stays responsive
+            const dt = nowT - graceSample.t;
+            if (dt >= 8) {
+              const speed = Math.hypot(p.x - graceSample.x, p.y - graceSample.y) / dt;
+              graceSample = { t: nowT, x: p.x, y: p.y };
+              if (speed < SETTLE_SPEED) panGraceUntil = 0;
+            }
+            p.downX = p.x;
+            p.downY = p.y;
+            break;
+          }
+          if (Math.hypot(p.x - p.downX, p.y - p.downY) <= SLOP) break;
+          panArmed = true;
+          lastApplied = { x: p.x, y: p.y }; // absorb, like any fresh pan
+          trail = [];
+          spanTrail = [];
         }
-        break;
-      case 'pinch': {
-        const [a, b] = touches();
-        if (a && b) pushSample((a.x + b.x) / 2, (a.y + b.y) / 2);
+        pushSample(p.x, p.y);
         dirty = true;
         break;
-      }
+      case 'pinch':
+        // centroid samples are taken per applied FRAME (see flushPinch) —
+        // per-event sampling here would zig-zag between the two fingers
+        dirty = true;
+        break;
       case 'tool':
         sink?.move(e);
         break;
@@ -467,6 +534,11 @@ export function createStageGestureController(
     if (rest.length !== 1) return false;
     mode = 'pan';
     panId = rest[0].id;
+    panArmed = false; // leftover contact re-earns pan-hood via slop
+    panGraceUntil = performance.now() + PINCH_RELEASE_GRACE_MS;
+    graceSample = { t: performance.now(), x: rest[0].x, y: rest[0].y };
+    rest[0].downX = rest[0].x;
+    rest[0].downY = rest[0].y;
     lastApplied = { x: rest[0].x, y: rest[0].y };
     trail = [];
     dirty = false;
@@ -476,6 +548,7 @@ export function createStageGestureController(
   const onUp = (e: PointerEvent) => {
     const p = pointers.get(e.pointerId);
     if (!p) return;
+    if (p.kind === 'touch') lastTouchAt = performance.now();
     pointers.delete(e.pointerId);
     switch (mode) {
       case 'pending': {
@@ -506,6 +579,24 @@ export function createStageGestureController(
         break;
       }
       case 'pan': {
+        if (!panArmed) {
+          // The pinch's OTHER finger leaving: the gesture ends as a pinch.
+          // No flush (release-rolls are noise). Glide is CHARACTER-gated: a
+          // human fast release moves the true centroid (the lifting finger
+          // flicks away), so centroid velocity alone lies — the glide fires
+          // only when the centroid rate DOMINATES the span rate (a
+          // two-finger pan), never on a zoom-dominant release.
+          const now = performance.now();
+          const v = computeReleaseVelocity(trail, now);
+          const vs = computeReleaseVelocity(spanTrail, now);
+          end(); // close the bracket first — endGesture owns the elastic settle
+          if (v) {
+            const speed = Math.hypot(v.vx, v.vy);
+            if (speed >= FLING_MIN && speed > Math.abs(vs?.vx ?? 0)) host.fling(v.vx, v.vy);
+          }
+          toIdle();
+          break;
+        }
         flushPanTo(e.clientX, e.clientY); // apply the final sub-frame of travel
         pushSample(e.clientX, e.clientY);
         end();
@@ -516,13 +607,23 @@ export function createStageGestureController(
       case 'pinch': {
         const rest = touches();
         if (rest.length === 1) {
-          // flush the pinch's last step (lifted finger at its release point),
-          // THEN continue as a single-finger pan on the remaining contact
-          flushPinch(e.clientX, e.clientY, rest[0].x, rest[0].y);
+          // The pinch ends AT ITS LAST COHERENT FRAME. No flush here: the
+          // lifting finger's release position is fresh but the other one's is
+          // stale (its move for this window may not have arrived), and a
+          // centroid of two instants is fiction — in a fast pinch that skewed
+          // write was the visible end-of-pinch hop, and its poisoned trail
+          // sample the phantom fling. Only coherent finger-pairs write the
+          // camera; the sub-frame remainder is discarded, as the platform
+          // recognizers do. The remaining contact gets a DISARMED pan with
+          // the centroid trail preserved and a release-grace window armed.
           mode = 'pan';
           panId = rest[0].id;
+          panArmed = false;
+          panGraceUntil = performance.now() + PINCH_RELEASE_GRACE_MS;
+          graceSample = { t: performance.now(), x: rest[0].x, y: rest[0].y };
+          rest[0].downX = rest[0].x;
+          rest[0].downY = rest[0].y;
           lastApplied = { x: rest[0].x, y: rest[0].y };
-          trail = [];
           dirty = false;
           break;
         }
@@ -588,7 +689,10 @@ export function createStageGestureController(
   };
   const onGestureChange = (e: Event) => {
     e.preventDefault();
-    if (touches().length > 0) return; // iOS: the pointer path owns this pinch
+    // iOS: the pointer path owns touch pinches — and a TRAILING gesturechange
+    // can arrive after the last pointerup, so suppression keys on RECENT
+    // touch activity, not just live contacts. Desktop trackpads have none.
+    if (touches().length > 0 || performance.now() - lastTouchAt < 500) return;
     const g = e as unknown as { scale?: number; clientX: number; clientY: number };
     const scale = g.scale ?? 1;
     if (zoomGestures && scale > 0) {
