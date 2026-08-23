@@ -1,5 +1,11 @@
 # @embedpdf/core-geometry
 
+## 3.0.0-next.7
+
+### Minor Changes
+
+- [#776](https://github.com/embedpdf/embed-pdf-viewer/pull/776) by [@bobsingor](https://github.com/bobsingor) – Add `textQuadEdge` and `textQuadEquals` helpers for orientation-aware glyph edges and corner-wise text-quad change detection.
+
 ## 3.0.0-next.6
 
 ## 3.0.0-next.5

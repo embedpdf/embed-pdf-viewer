@@ -1,5 +1,11 @@
 # @embedpdf/plugin-annotation
 
+## 3.0.0-next.7
+
+### Minor Changes
+
+- [#775](https://github.com/embedpdf/embed-pdf-viewer/pull/775) by [@bobsingor](https://github.com/bobsingor) – Add touch-aware tool consent, hit targets, drag handling, and cancellation so annotation editing cooperates with navigation gestures. Text-edit operations now report whether they handled a gesture, and the annotation capability token includes a missing-plugin hint.
+
 ## 3.0.0-next.6
 
 ## 3.0.0-next.5

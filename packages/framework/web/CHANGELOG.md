@@ -1,5 +1,13 @@
 # @embedpdf/web
 
+## 3.0.0-next.7
+
+### Minor Changes
+
+- [#775](https://github.com/embedpdf/embed-pdf-viewer/pull/775) by [@bobsingor](https://github.com/bobsingor) – Add shared browser Stage surface and touch gesture controllers with lens-scoped input, pan, pinch, fling, double-tap, long-press, and wheel handling. Export vibration and native-shell feedback providers.
+
+- [#776](https://github.com/embedpdf/embed-pdf-viewer/pull/776) by [@bobsingor](https://github.com/bobsingor) – Add a shared native DOM binding for selection-handle drags that shields Stage gestures and handles pointer capture and client-delta tracking.
+
 ## 3.0.0-next.6
 
 ### Minor Changes

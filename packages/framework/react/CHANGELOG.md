@@ -1,5 +1,17 @@
 # @embedpdf/react
 
+## 3.0.0-next.7
+
+### Minor Changes
+
+- [#775](https://github.com/embedpdf/embed-pdf-viewer/pull/775) by [@bobsingor](https://github.com/bobsingor) – Move React Stage input handling to the shared web surface controller, key page surfaces by durable page identity, and add draggable touch selection handles. Interaction now defaults on when the hub is present and can be disabled for secondary lenses.
+
+### Patch Changes
+
+- [#776](https://github.com/embedpdf/embed-pdf-viewer/pull/776) by [@bobsingor](https://github.com/bobsingor) – Refactor `SelectionHandles` to use the shared selection and web primitives so handles align correctly with rotated text and rotated pages.
+
+- [#777](https://github.com/embedpdf/embed-pdf-viewer/pull/777) by [@bobsingor](https://github.com/bobsingor) – Give every Stage lens and standalone `PageView` a stable view identity and use its scoped tile handle. Thumbnail and secondary views can no longer clear the main view's high-resolution tiles.
+
 ## 3.0.0-next.6
 
 ### Minor Changes

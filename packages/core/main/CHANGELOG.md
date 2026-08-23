@@ -1,5 +1,11 @@
 # @embedpdf/core
 
+## 3.0.0-next.7
+
+### Minor Changes
+
+- [#775](https://github.com/embedpdf/embed-pdf-viewer/pull/775) by [@bobsingor](https://github.com/bobsingor) – Add optional hints to capability tokens so missing-dependency errors can tell integrators which plugin to register.
+
 ## 3.0.0-next.6
 
 ## 3.0.0-next.5

@@ -1,5 +1,15 @@
 # @embedpdf/plugin-selection
 
+## 3.0.0-next.7
+
+### Minor Changes
+
+- [#776](https://github.com/embedpdf/embed-pdf-viewer/pull/776) by [@bobsingor](https://github.com/bobsingor) – Add framework-independent selection-handle geometry and drag policies that follow rotated text, rotated pages, and RTL selection boundaries.
+
+### Patch Changes
+
+- [#775](https://github.com/embedpdf/embed-pdf-viewer/pull/775) by [@bobsingor](https://github.com/bobsingor) – Route touch long-press selection through explicit gesture metadata, report whether word and line selection succeeded, and support optional selection feedback without swallowing unhandled gestures.
+
 ## 3.0.0-next.6
 
 ## 3.0.0-next.5
