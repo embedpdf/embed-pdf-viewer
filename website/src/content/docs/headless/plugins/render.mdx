@@ -5,6 +5,8 @@ description: Draw crisp page bitmaps at every zoom level without spending more m
 
 {/* Generated from docs/content — edit there, then `pnpm docs:sync`. */}
 
+import { Cards, Card } from '@/components/docs/cards';
+
 # Render
 
 The render plugin draws your pages. You mount one layer per page; it decides
@@ -224,3 +226,28 @@ values and constrains `format`; your options apply unchanged on the local
 engine. Application code should import this public surface from
 `@embedpdf/plugin-render` (or your framework package's `/render` entry). The
 plugin's internals are not a public application contract.
+
+## Next steps
+
+<Cards>
+  <Card
+    title="Selection"
+    description="Put selectable text over the bitmaps you just rendered."
+    href="./selection"
+  />
+  <Card
+    title="Stage"
+    description="The layout, zoom, and navigation that decide which pages render at all."
+    href="./stage"
+  />
+  <Card
+    title="Pages & rendering"
+    description="The engine call underneath the plugin: page sizes, render options, and what a raster costs."
+    href="/docs/engine/core-concepts/pages-and-rendering"
+  />
+  <Card
+    title="All plugins"
+    description="The rest of the capabilities you can register."
+    href="../plugins"
+  />
+</Cards>

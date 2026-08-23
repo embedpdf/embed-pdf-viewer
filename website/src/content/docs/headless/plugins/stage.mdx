@@ -5,6 +5,8 @@ description: Lay out pages and handle pan, zoom, and page navigation in your PDF
 
 {/* Generated from docs/content — edit there, then `pnpm docs:sync`. */}
 
+import { Cards, Card } from '@/components/docs/cards';
+
 # Stage
 
 The Stage is where your document is shown. It lays pages out (vertical scroll,
@@ -423,4 +425,29 @@ reflows.
 | `viewRotation`   | Display rotation for this view: `0`, `90`, `180`, `270`             | `0`                        |
 | `scrollBehavior` | Whether navigation glides or jumps: `'smooth'`, `'instant'`         | `'smooth'`                 |
 | `responsive`     | Rules that vary settings by the Stage's size                        | one `compact` rule         |
+
+## Next steps
+
+<Cards>
+  <Card
+    title="Render"
+    description="Draw the pixels inside the pages you just laid out — at every zoom, within a memory budget you set."
+    href="./render"
+  />
+  <Card
+    title="Selection"
+    description="Let people select the text on those pages, with the pointer or from code."
+    href="./selection"
+  />
+  <Card
+    title="Pages & rendering"
+    description="Where the page sizes the Stage lays out come from, and what a render actually costs."
+    href="/docs/engine/core-concepts/pages-and-rendering"
+  />
+  <Card
+    title="All plugins"
+    description="The rest of the capabilities you can register."
+    href="../plugins"
+  />
+</Cards>
 

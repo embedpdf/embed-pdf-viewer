@@ -4,7 +4,7 @@
  * contract (see ./tokens.ts); each site maps its brand palette onto it.
  */
 export { Callout } from './callout';
-export { Cards, Card } from './cards';
+export { Cards, Card, CardGrid, GridCard, type GridCardIcon } from './cards';
 export {
   Feedback,
   POSITIVE_FEEDBACK_REASONS,

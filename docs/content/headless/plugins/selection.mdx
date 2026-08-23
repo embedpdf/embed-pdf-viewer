@@ -3,6 +3,8 @@ title: Selection
 description: Add visual and programmatic text selection without requiring a DOM text layer.
 ---
 
+import { Cards, Card } from '@/components/docs/cards';
+
 # Selection
 
 The Selection plugin lets people select text with the pointer, and lets your
@@ -295,3 +297,28 @@ Application code should import this public surface from
 `@embedpdf/plugin-selection` or its framework adapter. The `/internal` entry
 point is for framework and plugin integration and is not a public application
 contract.
+
+## Next steps
+
+<Cards>
+  <Card
+    title="Text"
+    description="The engine side of text: extraction, search, and the character geometry selection is built on."
+    href="/docs/engine/core-concepts/text"
+  />
+  <Card
+    title="Render"
+    description="How the pages under your selection layer get their pixels."
+    href="./render"
+  />
+  <Card
+    title="Stage"
+    description="Layout, zoom, and navigation — the view your selection lives in."
+    href="./stage"
+  />
+  <Card
+    title="All plugins"
+    description="The rest of the capabilities you can register."
+    href="../plugins"
+  />
+</Cards>

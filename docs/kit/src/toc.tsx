@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 
 export type TocItem = {
   value: ReactNode;
@@ -67,10 +67,76 @@ export function useSectionSpy(toc?: TocItem[]): { items: TocItem[]; activeId: st
   return { items, activeId };
 }
 
+const FADE = 28;
+
+/**
+ * Only the heading list scrolls; everything in `footer` stays pinned.
+ *
+ * A long page (Stage is 16 sections) used to overflow the whole rail, which
+ * put a scrollbar down the side and pushed the markdown actions and the
+ * feedback prompt below the fold, where nobody found them. The list gets the
+ * leftover height and scrolls inside itself instead, its scrollbar traded for
+ * a fade at whichever edge still has content behind it.
+ */
+function useRailScroll(items: TocItem[], activeId: string | null) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [edges, setEdges] = useState({ top: false, bottom: false });
+
+  useEffect(() => {
+    const element = ref.current;
+    if (!element) return;
+
+    const update = () => {
+      const overflowing = element.scrollHeight > element.clientHeight + 1;
+      setEdges({
+        top: overflowing && element.scrollTop > 4,
+        bottom:
+          overflowing && element.scrollTop + element.clientHeight < element.scrollHeight - 4,
+      });
+    };
+
+    update();
+    element.addEventListener('scroll', update, { passive: true });
+    const observer = new ResizeObserver(update);
+    observer.observe(element);
+    return () => {
+      element.removeEventListener('scroll', update);
+      observer.disconnect();
+    };
+  }, [items]);
+
+  // Follow the reader: once the list scrolls, the highlighted section would
+  // otherwise drift out of the rail's viewport. Never smooth — this fires
+  // during page scrolling, and an animation here fights the reader.
+  useEffect(() => {
+    const element = ref.current;
+    if (!element || !activeId) return;
+    const link = element.querySelector<HTMLElement>(`a[href="#${CSS.escape(activeId)}"]`);
+    if (!link) return;
+
+    const top = link.offsetTop;
+    const bottom = top + link.offsetHeight;
+    if (top < element.scrollTop) {
+      element.scrollTop = Math.max(0, top - FADE);
+    } else if (bottom > element.scrollTop + element.clientHeight) {
+      element.scrollTop = bottom - element.clientHeight + FADE;
+    }
+  }, [activeId]);
+
+  const mask =
+    edges.top || edges.bottom
+      ? `linear-gradient(to bottom, transparent 0px, #000 ${edges.top ? `${FADE}px` : '0px'}, #000 calc(100% - ${
+          edges.bottom ? `${FADE}px` : '0px'
+        }), transparent 100%)`
+      : undefined;
+
+  return { ref, mask };
+}
+
 /**
  * The "On this page" rail. Purely presentational — pair it with
  * {@link useSectionSpy} and put site extras (markdown actions, the feedback
- * widget) in `footer`.
+ * widget) in `footer`, which stays visible however long the page is.
  */
 export function Toc({
   items,
@@ -81,33 +147,41 @@ export function Toc({
   activeId: string | null;
   footer?: ReactNode;
 }) {
+  const { ref, mask } = useRailScroll(items, activeId);
+
   if (items.length === 0) return null;
 
   return (
-    <aside className="sticky top-[84px] hidden max-h-[calc(100vh-84px)] w-[232px] shrink-0 self-start overflow-y-auto py-11 xl:block">
-      <p className="font-display mb-3.5 text-[11.5px] font-extrabold uppercase tracking-[0.1em] text-[var(--dk-muted)]">
+    <aside className="sticky top-[84px] hidden max-h-[calc(100vh-84px)] w-[232px] shrink-0 flex-col self-start py-11 xl:flex">
+      <p className="font-display mb-3.5 shrink-0 text-[11.5px] font-extrabold uppercase tracking-[0.1em] text-[var(--dk-muted)]">
         On this page
       </p>
-      <ul className="flex flex-col gap-0.5 border-l-2 border-[var(--dk-border)]">
-        {items.map((item) => {
-          const active = activeId === item.id;
-          return (
-            <li key={item.id} style={{ paddingLeft: `${(item.depth - 2) * 12}px` }}>
-              <a
-                href={`#${item.id}`}
-                className={`-ml-0.5 block border-l-2 py-1.5 pl-3.5 font-sans text-[13.5px] leading-[1.4] no-underline transition-colors ${
-                  active
-                    ? 'border-[var(--dk-accent)] font-bold text-[var(--dk-accent)]'
-                    : 'border-transparent text-[var(--dk-muted)] hover:text-[var(--dk-heading)]'
-                }`}
-              >
-                {item.value}
-              </a>
-            </li>
-          );
-        })}
-      </ul>
-      {footer}
+      <div
+        ref={ref}
+        className="dk-rail-scroll min-h-0 flex-1 overflow-y-auto"
+        style={mask ? { maskImage: mask, WebkitMaskImage: mask } : undefined}
+      >
+        <ul className="flex flex-col gap-0.5 border-l-2 border-[var(--dk-border)]">
+          {items.map((item) => {
+            const active = activeId === item.id;
+            return (
+              <li key={item.id} style={{ paddingLeft: `${(item.depth - 2) * 12}px` }}>
+                <a
+                  href={`#${item.id}`}
+                  className={`-ml-0.5 block border-l-2 py-1.5 pl-3.5 font-sans text-[13.5px] leading-[1.4] no-underline transition-colors ${
+                    active
+                      ? 'border-[var(--dk-accent)] font-bold text-[var(--dk-accent)]'
+                      : 'border-transparent text-[var(--dk-muted)] hover:text-[var(--dk-heading)]'
+                  }`}
+                >
+                  {item.value}
+                </a>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+      {footer ? <div className="shrink-0">{footer}</div> : null}
     </aside>
   );
 }

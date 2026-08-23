@@ -253,8 +253,9 @@ function createResolver(site: DocsMarkdownSite, integration: string | undefined)
           return [{ type: 'blockquote', children: resolveNodes(node.children ?? []) }];
         }
 
-        if (node.name === 'Cards') {
-          // Projection: a card grid is a list of links.
+        if (node.name === 'Cards' || node.name === 'CardGrid') {
+          // Projection: either card container is a list of links. Tile vs row
+          // is a visual distinction with no Markdown counterpart.
           return [
             {
               type: 'list',
@@ -265,7 +266,7 @@ function createResolver(site: DocsMarkdownSite, integration: string | undefined)
           ];
         }
 
-        if (node.name === 'Card') {
+        if (node.name === 'Card' || node.name === 'GridCard') {
           const title = stringAttribute(node, 'title');
           const href = stringAttribute(node, 'href');
           const description = expressionStrings(getAttribute(node, 'description'))[0];

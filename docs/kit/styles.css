@@ -35,6 +35,18 @@
   background: transparent;
 }
 
+/* The "On this page" list scrolls inside the rail. Its overflow is signalled
+   by the fade mask <Toc> applies at whichever edge still has content, so the
+   bar itself is redundant — and a full-height gutter down the page edge is
+   exactly what the fade exists to avoid. */
+.dk-rail-scroll {
+  scrollbar-width: none;
+}
+.dk-rail-scroll::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
 /* Entry animations for the search dialog (and any future kit overlay). */
 @keyframes dk-fade-in {
   from {
