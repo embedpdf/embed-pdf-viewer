@@ -219,7 +219,9 @@ export interface InteractionCapability {
   wouldClaimTouch(sample: PointerSample): boolean;
 }
 
-export const InteractionToken = createCapabilityToken<InteractionCapability>('interaction');
+export const InteractionToken = createCapabilityToken<InteractionCapability>('interaction', {
+  hint: `add interactionPlugin() from '@embedpdf/plugin-interaction' to your plugins list`,
+});
 
 /**
  * Resolve a sample against a gesture's HOME page. Page-anchored gestures track

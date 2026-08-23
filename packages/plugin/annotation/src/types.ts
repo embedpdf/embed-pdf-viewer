@@ -791,4 +791,6 @@ export interface AnnotationHostCapability extends AnnotationCapability {
  * here (the package internals + the `/internal` entry use this view). The package
  * root re-exports the SAME token narrowed to {@link AnnotationCapability}.
  */
-export const AnnotationToken = createCapabilityToken<AnnotationHostCapability>('annotation');
+export const AnnotationToken = createCapabilityToken<AnnotationHostCapability>('annotation', {
+  hint: `add annotationPlugin() from '@embedpdf/plugin-annotation' to your plugins list`,
+});

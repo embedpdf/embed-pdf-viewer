@@ -25,9 +25,16 @@ export type {
 
 import type { Action, CapabilityToken, PluginDef } from './types';
 
-/** Create a typed capability token. `name` is for debugging only. */
-export function createCapabilityToken<T>(name: string): CapabilityToken<T> {
-  return { name };
+/**
+ * Create a typed capability token. `name` is the token's identity (debugging,
+ * error messages); `options.hint` is the authored remedy the kernel appends to
+ * the missing-dependency error, so the error contains its own fix.
+ */
+export function createCapabilityToken<T>(
+  name: string,
+  options?: { hint?: string },
+): CapabilityToken<T> {
+  return { name, hint: options?.hint };
 }
 
 /** Identity helper that pins a plugin's generics. The real win is inference. */
