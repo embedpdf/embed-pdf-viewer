@@ -1,1 +1,1 @@
-export { Cards, Card } from '@embedpdf/docs-kit';
+export { Cards, Card, CardGrid, GridCard } from '@embedpdf/docs-kit';

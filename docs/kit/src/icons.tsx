@@ -113,7 +113,6 @@ export function ServerBadgeIcon(props: IconProps) {
   );
 }
 
-
 /* ---- Framework logos: the integration switchers on both sites pick from
    the same vocabulary, so the marks live here. ---- */
 

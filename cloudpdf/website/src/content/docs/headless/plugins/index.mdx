@@ -5,17 +5,38 @@ description: Extend the EmbedPDF headless viewer with plugins.
 
 {/* Generated from docs/content — edit there, then `pnpm docs:sync`. */}
 
+import { CardGrid, GridCard } from '@/components/docs/cards';
+
 # Plugins
 
 Everything beyond the empty page is a plugin: you register the capabilities
 your product needs and mount their layers inside your pages. Each plugin page
 starts with a working example and covers the settings as you need them.
 
-- **[Stage](./stage)** — lay out pages and handle pan, zoom, and page
-  navigation. The view itself.
-- **[Render](./render)** — draw crisp page bitmaps at every zoom without
-  spending more memory than you allow. Deep-zoom tiles included.
-- **[Selection](./selection)** — select text with the pointer or with code,
-  read it, copy it, build a selection menu.
+{/* This page is served at `…/plugins` with NO trailing slash, so a relative
+    href resolves against `…/headless/<framework>/` — one level up from the
+    sibling pages. Hence `plugins/stage`, not `./stage`. Pages INSIDE the
+    directory (stage.mdx and friends) do use `./sibling`. */}
+
+<CardGrid>
+  <GridCard
+    icon="stage"
+    title="Stage"
+    description="Lay out pages and handle pan, zoom, and page navigation. The view itself."
+    href="plugins/stage"
+  />
+  <GridCard
+    icon="render"
+    title="Render"
+    description="Draw crisp page bitmaps at every zoom without spending more memory than you allow. Deep-zoom tiles included."
+    href="plugins/render"
+  />
+  <GridCard
+    icon="selection"
+    title="Selection"
+    description="Select text with the pointer or with code, read it, copy it, build a selection menu."
+    href="plugins/selection"
+  />
+</CardGrid>
 
 More plugin pages (annotations, forms, search) are on the way.

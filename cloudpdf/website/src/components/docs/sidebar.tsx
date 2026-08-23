@@ -95,21 +95,41 @@ function SidebarTree({ items, pathname }: { items: TreeItem[]; pathname: string 
   );
 }
 
-export function Sidebar() {
+/**
+ * Whether this route has docs navigation at all — false on standalone pages
+ * such as the /docs landing. The desktop rail and the mobile drawer must
+ * agree, so both ask this rather than re-deriving the rules.
+ */
+export function useHasDocsNav() {
   const { docsDirectories, activeType } = useConfig();
+
+  if (activeType === 'page') return false;
+  return Boolean(docsDirectories && docsDirectories.length > 0);
+}
+
+/** The navigation itself, free of any rail chrome — shared by both layouts. */
+export function DocsNav() {
+  const { docsDirectories } = useConfig();
   const pathname = usePathname();
 
-  // Hide the sidebar on standalone pages such as the /docs landing.
-  if (activeType === 'page') return null;
-  if (!docsDirectories || docsDirectories.length === 0) return null;
-
   return (
-    <aside className="sticky top-[84px] hidden h-[calc(100vh-84px)] w-[268px] shrink-0 overflow-y-auto pb-16 pr-3.5 pt-[52px] [scrollbar-color:#D5DEEF_transparent] [scrollbar-width:thin] md:block">
+    <>
       <DocsProductSwitcher />
       <IntegrationSwitcher />
       <nav className="mt-7 flex flex-col border-t border-[#EAEFF7] pt-6">
         <SidebarTree items={docsDirectories as TreeItem[]} pathname={pathname} />
       </nav>
+    </>
+  );
+}
+
+export function Sidebar() {
+  const hasNav = useHasDocsNav();
+  if (!hasNav) return null;
+
+  return (
+    <aside className="sticky top-[84px] hidden h-[calc(100vh-84px)] w-[268px] shrink-0 overflow-y-auto pb-16 pr-3.5 pt-[52px] [scrollbar-color:#D5DEEF_transparent] [scrollbar-width:thin] md:block">
+      <DocsNav />
     </aside>
   );
 }
