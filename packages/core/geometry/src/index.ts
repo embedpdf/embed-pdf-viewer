@@ -647,6 +647,30 @@ export function textQuadRing(t: TextQuad): [Point, Point, Point, Point] {
   return [t.upperStart, t.upperEnd, t.lowerEnd, t.lowerStart];
 }
 
+/**
+ * One SIDE edge of the cell — the start (`US → LS`) or end (`UE → LE`) edge,
+ * ASCENT CORNER FIRST. This is the segment a caret or a selection handle
+ * occupies: its length is the glyph's ink height in the text's own frame (not
+ * the AABB height, which grows with tilt), and its direction carries the
+ * text's rotation. Which side is the selection's LEADING edge is a reading
+ * -order question — decide it with `advance`, not with geometry.
+ */
+export function textQuadEdge(t: TextQuad, side: 'start' | 'end'): [Point, Point] {
+  return side === 'start' ? [t.upperStart, t.lowerStart] : [t.upperEnd, t.lowerEnd];
+}
+
+/** Corner-wise equality — an AABB comparison would call a quad that ROTATED
+ *  in place "unchanged"; corners cannot. (Change-detection for quad consumers.) */
+export function textQuadEquals(a: TextQuad, b: TextQuad): boolean {
+  const eq = (p: Point, q: Point) => p.x === q.x && p.y === q.y;
+  return (
+    eq(a.upperStart, b.upperStart) &&
+    eq(a.upperEnd, b.upperEnd) &&
+    eq(a.lowerStart, b.lowerStart) &&
+    eq(a.lowerEnd, b.lowerEnd)
+  );
+}
+
 /** Axis-aligned bounds of a TextQuad. */
 export function textQuadBounds(t: TextQuad): Rect {
   const xs = [t.upperStart.x, t.upperEnd.x, t.lowerStart.x, t.lowerEnd.x];

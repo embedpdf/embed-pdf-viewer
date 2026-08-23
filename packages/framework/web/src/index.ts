@@ -39,6 +39,8 @@ export type {
   StagePointerKind,
   StageWheelSample,
 } from './stage-gestures';
+export { attachSelectionHandle } from './selection-handles';
+export type { AttachSelectionHandleOptions, SelectionHandleSession } from './selection-handles';
 export { createStageSurface } from './stage-surface';
 export type {
   StageSurfaceHost,
