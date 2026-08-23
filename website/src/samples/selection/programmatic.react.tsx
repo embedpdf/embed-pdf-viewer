@@ -23,7 +23,7 @@ import {
 
 const engine = localEngine();
 const plugins = [
-  stagePlugin({ interaction: true }),
+  stagePlugin(),
   renderPlugin(),
   interactionPlugin(),
   selectionPlugin(),
@@ -68,7 +68,7 @@ export default function App() {
         <DocumentGate fallback={<p>Loading…</p>}>
           <SelectionToolbar />
           <StageFrame height={420}>
-            <Stage interaction style={stageFill}>
+            <Stage style={stageFill}>
               {() => (
                 <>
                   <RenderLayer />
