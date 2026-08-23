@@ -26,6 +26,22 @@ export type {
   TextRange,
 } from './types';
 export type { SelectionSegment } from './geometry';
+// Selection-handle policy (the touch affordance): pure geometry + the drag
+// session, consumed by the framework adapters' handle views.
+export {
+  HANDLE_BAR,
+  HANDLE_HEAD,
+  HANDLE_PAD,
+  createSelectionHandleDrag,
+  selectionHandleGeom,
+} from './handles';
+export type {
+  SelectionHandleDragSession,
+  SelectionHandleEndpoint,
+  SelectionHandleGeom,
+  SelectionHandleTarget,
+  SelectionHandleView,
+} from './handles';
 
 /**
  * The selection capability token, narrowed to the public

@@ -4,9 +4,14 @@ import {
   normalizeQuad,
   positionalQuad,
   rotate,
+  rotateAbout,
   textQuadBounds,
+  textQuadEdge,
+  textQuadEquals,
   textQuadFromRect,
   textQuadRing,
+  type Point,
+  type PointIn,
   type Quad,
   type TextQuad,
   type TextQuadIn,
@@ -88,5 +93,79 @@ describe('TextQuad', () => {
     const expected: TextQuad = turned;
     expect(textQuadBounds(expected).width).toBeCloseTo(4, 6);
     expect(textQuadBounds(expected).height).toBeCloseTo(10, 6);
+  });
+});
+
+describe('textQuadEdge', () => {
+  const cell = textQuadFromRect({ x: 100, y: 200, width: 60, height: 16 });
+
+  test('upright: the side edges ARE the rect sides, ascent corner first', () => {
+    expect(textQuadEdge(cell, 'start')).toEqual([
+      { x: 100, y: 200 },
+      { x: 100, y: 216 },
+    ]);
+    expect(textQuadEdge(cell, 'end')).toEqual([
+      { x: 160, y: 200 },
+      { x: 160, y: 216 },
+    ]);
+  });
+
+  test('length is the INK height, invariant under rotation (the AABB is not)', () => {
+    const len = (e: [Point, Point]) => Math.hypot(e[1].x - e[0].x, e[1].y - e[0].y);
+    expect(len(textQuadEdge(cell, 'start'))).toBeCloseTo(16, 9);
+    for (const deg of [30, 45, 90, 180, 270]) {
+      const turned = applyTextQuad(
+        rotate<'content'>((deg * Math.PI) / 180),
+        cell as TextQuadIn<'content'>,
+      );
+      expect(len(textQuadEdge(turned, 'start'))).toBeCloseTo(16, 9);
+      expect(len(textQuadEdge(turned, 'end'))).toBeCloseTo(16, 9);
+    }
+    // …while the AABB height balloons with tilt — why it cannot size a caret
+    const tilted = applyTextQuad(rotate<'content'>(Math.PI / 4), cell as TextQuadIn<'content'>);
+    expect(textQuadBounds(tilted).height).toBeCloseTo(76 / Math.SQRT2, 6);
+  });
+
+  test('direction carries the text rotation', () => {
+    const angle = (e: [Point, Point]) =>
+      (Math.atan2(e[1].y - e[0].y, e[1].x - e[0].x) * 180) / Math.PI;
+    expect(angle(textQuadEdge(cell, 'start'))).toBeCloseTo(90, 9); // straight down
+    const turned = applyTextQuad(rotate<'content'>(Math.PI / 4), cell as TextQuadIn<'content'>);
+    expect(angle(textQuadEdge(turned, 'start'))).toBeCloseTo(135, 9);
+  });
+
+  test('the two edges are parallel and span the cell', () => {
+    const turned = applyTextQuad(rotate<'content'>(0.7), cell as TextQuadIn<'content'>);
+    const [us, ls] = textQuadEdge(turned, 'start');
+    const [ue, le] = textQuadEdge(turned, 'end');
+    // parallel: the cross product of the two edge vectors vanishes
+    const cross =
+      (ls.x - us.x) * (le.y - ue.y) - (ls.y - us.y) * (le.x - ue.x);
+    expect(cross).toBeCloseTo(0, 9);
+    // and they are the advance-width apart
+    expect(Math.hypot(ue.x - us.x, ue.y - us.y)).toBeCloseTo(60, 9);
+  });
+});
+
+describe('textQuadEquals', () => {
+  const cell = textQuadFromRect({ x: 100, y: 200, width: 60, height: 16 });
+
+  test('identical corners are equal; any moved corner is not', () => {
+    expect(textQuadEquals(cell, textQuadFromRect({ x: 100, y: 200, width: 60, height: 16 }))).toBe(
+      true,
+    );
+    expect(textQuadEquals(cell, { ...cell, lowerEnd: { x: 161, y: 216 } })).toBe(false);
+  });
+
+  test('a rotation-in-place with a near-identical AABB still reads as a change', () => {
+    // rotate about the cell centre: the AABB stays centred (and for a square
+    // cell would be IDENTICAL) while every corner moves — the case handle
+    // re-rendering must catch
+    const c = { x: 130, y: 208 };
+    const turned = applyTextQuad(
+      rotateAbout<'content'>(c as PointIn<'content'>, Math.PI / 6),
+      cell as TextQuadIn<'content'>,
+    );
+    expect(textQuadEquals(cell, turned)).toBe(false);
   });
 });
