@@ -176,6 +176,51 @@ const sameEndpoints = (a: Endpoints | null, b: Endpoints | null): boolean => {
 const HANDLE_HEAD = 12; // px — the circle
 const HANDLE_BAR = 2; // px — the caret bar
 const HANDLE_PAD = 14; // px — invisible finger padding around the visual
+
+/**
+ * The handle's event shell. The pointer-DOWN shield must be a NATIVE listener:
+ * the stage's gesture controller listens natively on the container, so a
+ * React-synthetic stopPropagation (which runs at the React root, after the
+ * container) would be too late — the controller would already be panning
+ * underneath the handle drag. (This is the same shield `<Anchored>` installs
+ * for menus.) Once the down is captured here, the real pointer retargets to
+ * this element, so the move/up handlers can stay ordinary props.
+ */
+function HandleShell({
+  style,
+  onDown,
+  onPointerMove,
+  onPointerUp,
+  children,
+}: {
+  style: React.CSSProperties;
+  onDown: (e: PointerEvent) => void;
+  onPointerMove: (e: React.PointerEvent) => void;
+  onPointerUp: (e: React.PointerEvent) => void;
+  children: React.ReactNode;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const downRef = useRef(onDown);
+  downRef.current = onDown;
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const down = (e: PointerEvent) => downRef.current(e);
+    el.addEventListener('pointerdown', down);
+    return () => el.removeEventListener('pointerdown', down);
+  }, []);
+  return (
+    <div
+      ref={ref}
+      style={style}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerUp}
+    >
+      {children}
+    </div>
+  );
+}
 const rectCenter = (r: Rect) => ({ x: r.x + r.width / 2, y: r.y + r.height / 2 });
 
 export interface SelectionHandlesProps {
@@ -239,14 +284,19 @@ export function SelectionHandles({ color = '#2196f3', token = StageToken }: Sele
   // HANDLE drag is itself a selection gesture, so it keeps its handles.
   if (selecting && !dragging) return null;
 
-  const startDrag = (role: 'start' | 'end') => (e: React.PointerEvent) => {
+  const startDrag = (role: 'start' | 'end') => (e: PointerEvent) => {
     const dragged = endpoints[role];
     const opposite = endpoints[role === 'start' ? 'end' : 'start'];
     const screen = stage.pageRectToScreen(dragged.pon, dragged.rect);
     if (!screen) return;
     e.preventDefault();
-    e.stopPropagation();
-    e.currentTarget.setPointerCapture(e.pointerId);
+    e.stopPropagation(); // native: fires BEFORE the stage controller's listener
+    try {
+      (e.currentTarget as Element).setPointerCapture(e.pointerId);
+    } catch {
+      // best-effort, like the scrollbar: an already-released pointer (pen/touch
+      // races, synthetic events in tests) throws — the drag must still arm.
+    }
     drag.current = {
       // Track by DELTAS from the endpoint's own screen position — no DOM
       // geometry reads, and client↔viewport conversion cancels out.
@@ -302,12 +352,11 @@ export function SelectionHandles({ color = '#2196f3', token = StageToken }: Sele
     const edgeX = leading ? r.x : r.x + r.width;
     const visualTop = role === 'start' ? r.y - HANDLE_HEAD : r.y;
     return (
-      <div
+      <HandleShell
         key={role}
-        onPointerDown={startDrag(role)}
+        onDown={startDrag(role)}
         onPointerMove={moveDrag}
         onPointerUp={endDrag}
-        onPointerCancel={endDrag}
         style={{
           position: 'absolute',
           left: edgeX - HANDLE_BAR / 2 - HANDLE_PAD,
@@ -344,7 +393,7 @@ export function SelectionHandles({ color = '#2196f3', token = StageToken }: Sele
             boxShadow: '0 1px 4px rgba(0, 0, 0, 0.35)',
           }}
         />
-      </div>
+      </HandleShell>
     );
   };
 
