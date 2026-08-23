@@ -2,13 +2,16 @@ import { DEFAULT_SETTINGS } from './settings';
 import type { StageAction, StageConfig, StageSettings, StageState } from './types';
 
 export const initialStageState = (config: StageConfig): StageState => {
-  const { scheduler: _scheduler, ...overrides } = config;
+  // `scheduler` and `responsive` are capability config, not settings — strip
+  // them so the spread below stays a pure settings override.
+  const { scheduler: _scheduler, responsive: _responsive, ...overrides } = config;
   return {
     camera: { x: 0, y: 0, zoom: 1 },
     cameraResting: true,
     vp: { width: 0, height: 0 },
     dpr: 1,
     cursor: 0,
+    activeRules: [],
     ...DEFAULT_SETTINGS,
     ...overrides, // config overrides any default; the rest fall back to DEFAULT_SETTINGS
   };
@@ -44,6 +47,8 @@ export const stageReducer = (state: StageState, a: StageAction): StageState => {
       return { ...state, cursor: a.cursor };
     case 'PATCH':
       return applyPatch(state, a.patch);
+    case 'RESPONSIVE':
+      return { ...state, activeRules: a.active };
     default:
       return state;
   }

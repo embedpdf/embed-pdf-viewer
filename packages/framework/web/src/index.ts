@@ -29,3 +29,22 @@ export type { SvgCursorOptions } from './cursor';
 export { sanitizeExternalUri } from './external-uri';
 export { bindPaintedImage } from './painted-image';
 export type { ObjectUrlImageSource, PaintedImageCallbacks } from './painted-image';
+export { vibrationFeedback, wkFeedback } from './feedback';
+export type { WebPlatformFeedback } from './feedback';
+export { computeReleaseVelocity, createStageGestureController } from './stage-gestures';
+export type {
+  StageGestureHost,
+  StageGestureOptions,
+  StageGestureSink,
+  StagePointerKind,
+  StageWheelSample,
+} from './stage-gestures';
+export { createStageSurface } from './stage-surface';
+export type {
+  StageSurfaceHost,
+  StageSurfaceHub,
+  StageSurfaceOptions,
+  StageSurfaceSample,
+} from './stage-surface';
+export { wheelZoomFactor } from './wheel';
+export type { WheelSample } from './wheel';

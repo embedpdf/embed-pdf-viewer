@@ -69,9 +69,19 @@ export function createInteractionCapability(
     if (next !== ctx.getState().cursor) ctx.dispatch({ type: 'SET_CURSOR', cursor: next });
   };
 
-  const eligible = (): InteractionHandler[] => {
+  // Lens scoping: a handler registered with a `source` only sees samples
+  // stamped with it. Filtering is on DEFINITE mismatch only — an unstamped
+  // sample (custom dispatcher, single-lens embed) still routes everywhere.
+  const handlerSources = new Map<InteractionHandler, string>();
+  const eligible = (source?: string): InteractionHandler[] => {
     const tool = active();
-    return handlers.filter((h) => h.enabledFor(tool)).sort((a, b) => b.priority - a.priority);
+    return handlers
+      .filter((h) => {
+        const hs = handlerSources.get(h);
+        return hs === undefined || source === undefined || hs === source;
+      })
+      .filter((h) => h.enabledFor(tool))
+      .sort((a, b) => b.priority - a.priority);
   };
 
   return {
@@ -108,11 +118,13 @@ export function createInteractionCapability(
       syncCursor();
     },
 
-    registerHandler: (handler) => {
+    registerHandler: (handler, options) => {
       handlers.push(handler);
+      if (options?.source !== undefined) handlerSources.set(handler, options.source);
       return () => {
         const i = handlers.indexOf(handler);
         if (i >= 0) handlers.splice(i, 1);
+        handlerSources.delete(handler);
         if (owner === handler) owner = null;
       };
     },
@@ -123,6 +135,11 @@ export function createInteractionCapability(
       syncCursor();
     },
 
+    wouldClaimTouch: (sample) => {
+      for (const h of eligible(sample.source)) if (h.claimsTouch?.(sample)) return true;
+      return false;
+    },
+
     dispatch: (sample) => {
       const nowOverPage = sample.page != null;
       if (nowOverPage !== overPage) {
@@ -131,7 +148,7 @@ export function createInteractionCapability(
       }
       if (sample.phase === 'down') {
         owner = null;
-        for (const h of eligible()) {
+        for (const h of eligible(sample.source)) {
           if (h.onDown(sample)) {
             owner = h;
             break;
@@ -139,7 +156,14 @@ export function createInteractionCapability(
         }
       } else if (sample.phase === 'move') {
         if (owner) owner.onMove?.(sample);
-        else for (const h of eligible()) h.onHover?.(sample);
+        else for (const h of eligible(sample.source)) h.onHover?.(sample);
+      } else if (sample.phase === 'cancel') {
+        // Abort, don't commit: navigation took the pointer (second finger →
+        // pinch) or the system cancelled it. onUp is the fallback for handlers
+        // that predate cancel — committing beats a stuck gesture.
+        const o = owner;
+        owner = null;
+        if (o) (o.onCancel ?? o.onUp)?.call(o, sample);
       } else {
         owner?.onUp?.(sample);
         owner = null;

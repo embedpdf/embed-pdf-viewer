@@ -31,8 +31,11 @@ export function planPlugins(plugins: readonly AnyPlugin[]): PluginPlan {
   for (const plugin of plugins) {
     for (const required of plugin.requires ?? []) {
       if (required !== DocumentsToken && !providerByToken.has(required)) {
+        // The error carries its own fix: tokens author the remedy (hint), so a
+        // forgotten dependency is a ten-second paste, not an investigation.
         throw new Error(
-          `Plugin "${plugin.id}" requires capability "${required.name}", which no plugin provides.`,
+          `Plugin "${plugin.id}" requires capability "${required.name}", which no plugin provides` +
+            (required.hint ? ` — ${required.hint}.` : '.'),
         );
       }
     }

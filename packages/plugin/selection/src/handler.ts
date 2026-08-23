@@ -1,4 +1,8 @@
-import type { InteractionCapability, InteractionHandler } from '@embedpdf/plugin-interaction';
+import type {
+  InteractionCapability,
+  InteractionHandler,
+  PlatformFeedback,
+} from '@embedpdf/plugin-interaction';
 import type { SelectionHostCapability } from './types';
 
 const CURSOR_TOKEN = 'selection-text';
@@ -20,6 +24,7 @@ const DRAG_THRESHOLD_PX = 4; // viewport px the pointer must move before a drag-
 export function createTextSelectHandler(
   selection: SelectionHostCapability,
   interaction: InteractionCapability,
+  feedback?: PlatformFeedback,
 ): InteractionHandler {
   // Per-gesture drag-threshold state (one active gesture at a time — the hub owner).
   let anchor: { pon: number; point: { x: number; y: number }; vx: number; vy: number } | null =
@@ -41,7 +46,12 @@ export function createTextSelectHandler(
         return true;
       }
       if (clicks === 2) {
-        selection.selectWordAt(pon, point);
+        const selected = selection.selectWordAt(pon, point);
+        // The platform's "selection changed" tick — ONLY when a touch
+        // long-press actually engaged a word (never on blank space, never for
+        // a mouse double-click). The gesture marker is the honest signal; a
+        // raw double-click sample never carries it.
+        if (selected && s.gesture === 'long-press') feedback?.selection();
         return true;
       }
       // Single click: clear immediately (clicking deselects), then record an anchor
@@ -65,6 +75,15 @@ export function createTextSelectHandler(
     onUp: () => {
       anchor = null;
       dragging = false;
+      selection.end();
+    },
+    onCancel: () => {
+      // Aborted (second finger → pinch, or a system cancel): drop the
+      // in-flight selection instead of committing a sliver of it. end() after
+      // clear() settles the `selecting` flag without anything to commit.
+      anchor = null;
+      dragging = false;
+      selection.clear();
       selection.end();
     },
     onHover: (s) => {

@@ -242,3 +242,31 @@ describe('annotation flags', () => {
     expect(h.create.mock.calls[0]![0]).toMatchObject({ flags: { print: true } });
   });
 });
+
+describe('claimsTouchAt (touch consent)', () => {
+  it('a SELECTED text markup does not claim — selectable, not movable', async () => {
+    const h = harness();
+    h.create
+      .mockResolvedValueOnce({ created: caretDTO() })
+      .mockResolvedValueOnce({ created: strikeoutDTO() });
+    const rect = { x: 10, y: 20, width: 80, height: 15 };
+    h.capability.createReplaceText(
+      PON,
+      [textQuadFromRect(rect)],
+      { glyphQuad: textQuadFromRect(rect), advance: 1 },
+      'replace-text',
+    );
+    await vi.waitFor(() => expect(h.create).toHaveBeenCalledTimes(2));
+    expect(h.state().model.selected.length).toBe(2);
+    // the strikeout's body IS under the point (the hit-test finds it)…
+    expect(h.capability.hitKind(PON, { x: 50, y: 27 })).toBe('annot');
+    // …but the claim must refuse: the selection cannot MOVE, so a drag here
+    // would be a dead zone — it has to keep scrolling instead.
+    expect(h.capability.claimsTouchAt(PON, { x: 50, y: 27 })).toBe(false);
+  });
+
+  it('empty space never claims', () => {
+    const h = harness();
+    expect(h.capability.claimsTouchAt(PON, { x: 300, y: 400 })).toBe(false);
+  });
+});

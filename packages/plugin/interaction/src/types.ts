@@ -29,9 +29,23 @@ export interface Tool {
    */
   gapCursor?: Cursor;
   enables: ReadonlySet<string>;
+  /**
+   * TOUCH CONSENT, rung 1 — "arming this tool is consent to create with a
+   * finger": while it is active, single-finger touch routes to the hub
+   * wholesale (draw/markup/redact tools), and navigation moves to two
+   * fingers — the drawing-app convention. Default false: a finger navigates
+   * first, and only per-point claims ({@link InteractionHandler.claimsTouch})
+   * carve out tool gestures.
+   */
+  touchDirect?: boolean;
 }
 
-export type Phase = 'down' | 'move' | 'up';
+export type Phase = 'down' | 'move' | 'up' | 'cancel';
+
+/** The physical device class behind a sample — `PointerEvent.pointerType`.
+ *  Adapters fill it so handlers (and arbitration above the hub) can apply
+ *  modality policy: touch navigates first, pen/mouse are tool-first. */
+export type PointerKind = 'mouse' | 'pen' | 'touch';
 
 /**
  * One normalized pointer event. `viewport` is the source container's px (the pan
@@ -67,6 +81,27 @@ export interface PointerSample {
    * do word/line selection without re-implementing timing. Defaults to 1.
    */
   clickCount?: number;
+  /** The device class that produced this sample (see {@link PointerKind}).
+   *  Absent when the source can't say — treat as 'mouse'. */
+  pointerType?: PointerKind;
+  /**
+   * Present when the sample was SYNTHESIZED from a recognized gesture rather
+   * than a raw press. 'long-press': a touch contact held still — the gesture
+   * controller forwards it as a down (with `clickCount: 2`, so word-selection
+   * keeps working unchanged), and this marker is the honest signal for
+   * handlers that must tell a long-press from a genuine double-click
+   * (haptics, pickup affordances). Absent on every raw pointer sample.
+   */
+  gesture?: 'long-press';
+  /**
+   * The LENS this sample came from — the stage plugin id the emitting surface
+   * binding was attached to (a document may be viewed through several stage
+   * lenses at once). Handlers registered with a matching `source` scope only
+   * see their own lens's input, so one lens's drag can never be captured by
+   * another lens's handler. Absent when the source doesn't say (custom
+   * dispatchers, single-lens embeds) — such samples route to every handler.
+   */
+  source?: string;
   /**
    * Project this event onto a SPECIFIC page's content space, unclamped — valid
    * (and expected) outside the page's bounds. `page` answers "what is under the
@@ -94,8 +129,27 @@ export interface InteractionHandler {
   onDown(sample: PointerSample): boolean;
   onMove?(sample: PointerSample): void;
   onUp?(sample: PointerSample): void;
+  /**
+   * The gesture was ABORTED, not completed — the pointer was cancelled by the
+   * system, or navigation took it over (a second finger converted the drag
+   * into a pinch). Discard the in-flight work instead of committing it (a
+   * half-drawn shape, a mid-drag selection). Falls back to {@link onUp} when
+   * absent, since committing is the lesser evil to a stuck gesture.
+   */
+  onCancel?(sample: PointerSample): void;
   /** Pointer moved with no active gesture — cursor feedback only. */
   onHover?(sample: PointerSample): void;
+  /**
+   * TOUCH CONSENT, rung 2 — "the selected thing owns its drags". Touch
+   * navigation asks this BEFORE a contact is classified: return true and the
+   * whole contact routes to the hub as a tool gesture (down/move/up) instead
+   * of pan/pinch/tap. Implement it ONLY where the user has already narrowed
+   * intent to this point — the annotation handler claims the selected
+   * annotation's body and its handles, nothing else. A pure read: it must
+   * not mutate anything (the down that follows does the mutating). Handlers
+   * without it never claim, so plain surfaces keep navigating.
+   */
+  claimsTouch?(sample: PointerSample): boolean;
 }
 
 /**
@@ -141,14 +195,33 @@ export interface InteractionCapability {
   setToolCursor(id: ToolId, skin: ToolCursorSkin | null): void;
   // ── registries (return an unregister fn) ──
   registerTool(tool: Tool): () => void;
-  registerHandler(handler: InteractionHandler): () => void;
+  /**
+   * Register a pointer handler. `source` scopes it to ONE lens: the handler
+   * then only sees samples stamped with that source (see
+   * {@link PointerSample.source}) — mandatory for per-lens handlers like the
+   * stage's pan-scroll, or two stages on one document would capture each
+   * other's drags. UNSTAMPED samples still route everywhere (only a definite
+   * mismatch filters), so custom dispatchers keep working.
+   */
+  registerHandler(handler: InteractionHandler, options?: { source?: string }): () => void;
   // ── cursor claim stack (highest priority wins; null clears the token) ──
   setCursor(token: string, cursor: Cursor | null, priority?: number): void;
   // ── pointer ingress: the adapter calls this for every normalized event ──
   dispatch(sample: PointerSample): void;
+  /**
+   * The touch-arbitration pre-flight: would any eligible handler claim a
+   * contact at this sample ({@link InteractionHandler.claimsTouch})? Walked
+   * in the same priority order `dispatch` uses, first claim wins. Pure —
+   * nothing is captured or mutated; the gesture controller calls it at
+   * touch-down to route the contact (tool vs navigation), then dispatches
+   * normally.
+   */
+  wouldClaimTouch(sample: PointerSample): boolean;
 }
 
-export const InteractionToken = createCapabilityToken<InteractionCapability>('interaction');
+export const InteractionToken = createCapabilityToken<InteractionCapability>('interaction', {
+  hint: `add interactionPlugin() from '@embedpdf/plugin-interaction' to your plugins list`,
+});
 
 /**
  * Resolve a sample against a gesture's HOME page. Page-anchored gestures track

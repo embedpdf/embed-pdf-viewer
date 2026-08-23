@@ -129,7 +129,7 @@ export function PageView({
               top: pageFrame.top,
               width: t.viewWidth,
               height: t.viewHeight,
-              boxShadow: '0 6px 18px rgba(0,0,0,.18)',
+              boxShadow: 'var(--epdf-page-shadow, 0 6px 18px rgba(0,0,0,.18))',
             }}
           />
           {/* white backing + content as ONE box; rotation 0 carries no transform */}

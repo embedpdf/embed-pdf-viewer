@@ -1565,3 +1565,491 @@ describe("VisiblePage.visibleRect — visibility is the stage's data", () => {
     expect(p.visibleRect.height).toBeCloseTo(800, 0);
   });
 });
+
+// ── touch physics: gesture transaction, fling, double-tap ────────────────────
+// A manual scheduler makes the fling/tween loops fully deterministic: `step(ts)`
+// fires every currently-queued frame callback with that timestamp.
+function manualScheduler() {
+  const queue = new Map<number, (t: number) => void>();
+  let handle = 0;
+  return {
+    scheduler: {
+      raf: (cb: (t: number) => void) => {
+        queue.set(++handle, cb);
+        return handle;
+      },
+      caf: (h: number) => {
+        queue.delete(h);
+      },
+    },
+    step(ts: number) {
+      const cbs = [...queue.values()];
+      queue.clear();
+      cbs.forEach((cb) => cb(ts));
+    },
+    pending: () => queue.size,
+  };
+}
+
+describe('gesture transaction (beginGesture/endGesture)', () => {
+  it('defers the pinch zoom intent to endGesture — one PATCH per gesture', () => {
+    const { stage } = harness(PORTRAIT);
+    expect(stage.zoomMode()).toBe('automatic');
+    stage.beginGesture();
+    stage.zoomAround({ x: 500, y: 350 }, 1.5);
+    stage.zoomAround({ x: 500, y: 350 }, 1.1);
+    // camera zoom moved live, but the INTENT is still the fit mode
+    expect(stage.zoomLevel()).toBeCloseTo(stage.camera().zoom, 6);
+    expect(stage.zoomMode()).toBe('automatic');
+    stage.endGesture();
+    // now the gesture's landing is recorded, once
+    expect(stage.zoomMode()).toBe('custom');
+  });
+
+  it('nests: only the OUTERMOST end commits', () => {
+    const { stage } = harness(PORTRAIT);
+    stage.beginGesture();
+    stage.beginGesture();
+    stage.zoomAround({ x: 500, y: 350 }, 2);
+    stage.endGesture();
+    expect(stage.zoomMode()).toBe('automatic'); // still open
+    stage.endGesture();
+    expect(stage.zoomMode()).toBe('custom');
+  });
+
+  it('a pan-only gesture commits no zoom intent', () => {
+    const { stage } = harness(PORTRAIT);
+    stage.beginGesture();
+    stage.panBy(0, -200);
+    stage.endGesture();
+    expect(stage.zoomMode()).toBe('automatic');
+  });
+});
+
+describe('fling (momentum pan)', () => {
+  it('decelerates on the UIScrollView curve and comes to rest', () => {
+    const sched = manualScheduler();
+    const { stage } = harness(PORTRAIT, { scheduler: sched.scheduler });
+    const y0 = stage.camera().y;
+    stage.fling(0, -1000); // a 1000 px/s upward flick (content scrolls down)
+    const deltas: number[] = [];
+    let prev = y0;
+    let ts = 0;
+    for (let i = 0; i < 1000 && sched.pending() > 0; i++) {
+      sched.step(ts);
+      ts += 16;
+      const y = stage.camera().y;
+      if (y !== prev) deltas.push(y - prev);
+      prev = y;
+    }
+    expect(sched.pending()).toBe(0); // it STOPPED on its own
+    // it moved a long way (v0/λ ≈ 500 px at zoom 1), decelerating monotonically
+    const total = stage.camera().y - y0;
+    expect(total).toBeGreaterThan(300);
+    expect(total).toBeLessThan(600);
+    for (let i = 2; i < deltas.length; i++) {
+      expect(deltas[i]).toBeLessThanOrEqual(deltas[i - 1] + 1e-9);
+    }
+  });
+
+  it('is caught by the next gesture (beginGesture cancels it)', () => {
+    const sched = manualScheduler();
+    const { stage } = harness(PORTRAIT, { scheduler: sched.scheduler });
+    stage.fling(0, -1000);
+    sched.step(0);
+    sched.step(16);
+    expect(stage.cameraInMotion()).toBe(true);
+    stage.beginGesture(); // the finger lands
+    expect(stage.cameraInMotion()).toBe(false);
+    expect(sched.pending()).toBe(0);
+    stage.endGesture();
+  });
+
+  it('BOUNCES off a content edge: overshoots, springs back, lands exactly at rest', () => {
+    const sched = manualScheduler();
+    const { stage } = harness(PORTRAIT, { scheduler: sched.scheduler });
+    const y0 = stage.camera().y; // resting at the top already
+    stage.fling(0, 5000); // flick DOWNWARD: content wants to move down — no room
+    let ts = 0;
+    let minY = y0;
+    let frames = 0;
+    while (sched.pending() > 0 && frames < 300) {
+      sched.step(ts);
+      ts += 16;
+      minY = Math.min(minY, stage.camera().y);
+      frames++;
+    }
+    expect(sched.pending()).toBe(0); // it settled on its own
+    expect(minY).toBeLessThan(y0 - 5); // the velocity became a visible overshoot…
+    expect(stage.camera().y).toBeCloseTo(y0, 4); // …and the spring landed on the clamp
+  });
+
+  it('below the stop threshold nothing starts', () => {
+    const sched = manualScheduler();
+    const { stage } = harness(PORTRAIT, { scheduler: sched.scheduler });
+    stage.fling(0, -10); // 10 px/s: imperceptible
+    expect(sched.pending()).toBe(0);
+  });
+});
+
+describe('doubleTapZoom', () => {
+  // The ladder walks ASCENDING reading postures derived from zoom intents:
+  // automatic (see the page) → fit-width (read the text) → 2.5× the automatic
+  // fit (inspect) → reset to the base. Stops within 10% collapse.
+  const FIT_W = (1000 - 2 * PAD) / 600; // 1.586̄ in the PORTRAIT harness
+
+  const settle = (sched: ReturnType<typeof manualScheduler>, from: number): number => {
+    let ts = from;
+    while (sched.pending() > 0 && ts < from + 5000) {
+      sched.step(ts);
+      ts += 16;
+    }
+    return ts;
+  };
+
+  it('climbs the ladder: automatic → fit-width → detail → reset to the base', () => {
+    const sched = manualScheduler();
+    const { stage } = harness(PORTRAIT, { scheduler: sched.scheduler });
+    const base = stage.zoomLevel(); // automatic fit (1: capped at 100%)
+    let ts = 0;
+    stage.doubleTapZoom({ x: 500, y: 350 });
+    ts = settle(sched, ts);
+    expect(stage.zoomLevel()).toBeCloseTo(FIT_W, 3);
+    expect(stage.zoomMode()).toBe('custom');
+    stage.doubleTapZoom({ x: 500, y: 350 });
+    ts = settle(sched, ts);
+    expect(stage.zoomLevel()).toBeCloseTo(base * 2.5, 3);
+    stage.doubleTapZoom({ x: 500, y: 350 });
+    settle(sched, ts);
+    expect(stage.zoomLevel()).toBeCloseTo(base, 3);
+  });
+
+  it('zoomed far OUT, the first tap lands on the nearest posture above, not the top', () => {
+    const sched = manualScheduler();
+    const { stage } = harness(PORTRAIT, { scheduler: sched.scheduler });
+    stage.zoomTo({ level: 0.5 });
+    stage.doubleTapZoom({ x: 500, y: 350 });
+    settle(sched, 0);
+    expect(stage.zoomLevel()).toBeCloseTo(1, 3); // the automatic fit, not 2.5
+  });
+
+  it('phone shape (automatic IS fit-width): the ladder degenerates to the familiar toggle', () => {
+    const sched = manualScheduler();
+    const { stage } = harness(PORTRAIT, { scheduler: sched.scheduler });
+    stage.setViewport({ width: 393, height: 700 });
+    // 393 < 600 → the default 'compact' responsive rule asserts padding 4
+    const fitW = (393 - 2 * 4) / 600; // automatic == fit-width below 100%
+    expect(stage.zoomLevel()).toBeCloseTo(fitW, 4);
+    let ts = 0;
+    stage.doubleTapZoom({ x: 200, y: 350 });
+    ts = settle(sched, ts);
+    expect(stage.zoomLevel()).toBeCloseTo(fitW * 2.5, 3); // one stop up — no dead rung
+    stage.doubleTapZoom({ x: 200, y: 350 });
+    settle(sched, ts);
+    expect(stage.zoomLevel()).toBeCloseTo(fitW, 3);
+  });
+
+  it('phone shape zoomed far out: the first tap restores fit-width (the platform feel)', () => {
+    const sched = manualScheduler();
+    const { stage } = harness(PORTRAIT, { scheduler: sched.scheduler });
+    stage.setViewport({ width: 393, height: 700 });
+    stage.zoomTo({ level: 0.3 });
+    stage.doubleTapZoom({ x: 200, y: 350 });
+    settle(sched, 0);
+    expect(stage.zoomLevel()).toBeCloseTo((393 - 2 * 4) / 600, 3); // compact padding
+  });
+});
+
+describe('doubleTapZoom interruption (catch) consistency', () => {
+  it('commits the zoom intent UP FRONT — a caught tween never strands a fit intent', () => {
+    const sched = manualScheduler();
+    const { stage } = harness(PORTRAIT, { scheduler: sched.scheduler });
+    expect(stage.zoomMode()).toBe('automatic');
+    stage.doubleTapZoom({ x: 500, y: 350 });
+    // the intent is already recorded, before a single frame runs
+    expect(stage.zoomMode()).toBe('custom');
+    sched.step(0);
+    sched.step(48); // a few frames in, mid-tween…
+    stage.beginGesture(); // …the user catches it
+    expect(stage.cameraInMotion()).toBe(false);
+    // camera sits at an intermediate zoom, and the stored intent AGREES it is
+    // a fixed level (no fit mode left behind to snap on the next refit)
+    expect(stage.zoomMode()).toBe('custom');
+    stage.endGesture();
+    // a later reframe converges to the recorded destination instead of
+    // snapping back to the fit (the first ladder stop above automatic is
+    // fit-width in this harness)
+    stage.setViewport({ width: 900, height: 700 });
+    expect(stage.zoomLevel()).toBeCloseTo((1000 - 2 * PAD) / 600, 3);
+  });
+});
+
+describe('rubber-band overscroll (elastic gestures)', () => {
+  it('an elastic pan STRETCHES past the clamp with resistance; a rigid one stops dead', () => {
+    const { stage } = harness(PORTRAIT);
+    const rest = stage.camera().y; // at the top
+    // rigid gesture (mouse drag): the clamp holds
+    stage.beginGesture();
+    stage.panBy(0, 200); // drag DOWN — no travel above the top
+    expect(stage.camera().y).toBeCloseTo(rest, 6);
+    stage.endGesture();
+    // elastic gesture (touch): the camera stretches, but with RESISTANCE —
+    // displaced, yet by less than the finger travelled
+    stage.beginGesture({ elastic: true });
+    stage.panBy(0, 200);
+    const stretched = stage.camera().y;
+    expect(stretched).toBeLessThan(rest); // displaced above the top edge
+    expect(rest - stretched).toBeLessThan(200 / stage.camera().zoom); // …with resistance
+    // more travel keeps stretching, asymptotically (never linearly)
+    stage.panBy(0, 200);
+    const stretched2 = stage.camera().y;
+    expect(stretched2).toBeLessThan(stretched);
+    expect(stretched - stretched2).toBeLessThan(rest - stretched);
+    stage.endGesture();
+  });
+
+  it('release while stretched SPRINGS home to the exact clamp position', () => {
+    const sched = manualScheduler();
+    const { stage } = harness(PORTRAIT, { scheduler: sched.scheduler });
+    const rest = stage.camera().y;
+    stage.beginGesture({ elastic: true });
+    stage.panBy(0, 300);
+    expect(stage.camera().y).toBeLessThan(rest);
+    stage.endGesture(); // released while stretched → the spring starts
+    let ts = 0;
+    let frames = 0;
+    while (sched.pending() > 0 && frames < 300) {
+      sched.step(ts);
+      ts += 16;
+      frames++;
+    }
+    expect(sched.pending()).toBe(0);
+    expect(stage.camera().y).toBeCloseTo(rest, 4);
+  });
+
+  it('wheel pans (no gesture bracket) stay hard-clamped — desktop unchanged', () => {
+    const { stage } = harness(PORTRAIT);
+    const rest = stage.camera().y;
+    stage.panBy(0, 500); // the wheel path: bare panBy
+    expect(stage.camera().y).toBeCloseTo(rest, 6);
+  });
+
+  it('catching a mid-bounce stretch holds it and hands it to the finger', () => {
+    const sched = manualScheduler();
+    const { stage } = harness(PORTRAIT, { scheduler: sched.scheduler });
+    const rest = stage.camera().y;
+    stage.beginGesture({ elastic: true });
+    stage.panBy(0, 300);
+    stage.endGesture();
+    sched.step(0);
+    sched.step(48); // a few spring frames in — still displaced
+    const midBounce = stage.camera().y;
+    expect(midBounce).toBeLessThan(rest);
+    stage.beginGesture({ elastic: true }); // the catch: spring cancelled
+    expect(sched.pending()).toBe(0);
+    expect(stage.camera().y).toBeCloseTo(midBounce, 6); // stretch held, not snapped
+    // and further drag INTO the stretch keeps resisting from where it is
+    stage.panBy(0, 100);
+    expect(stage.camera().y).toBeLessThan(midBounce);
+    stage.endGesture();
+  });
+});
+
+describe('fitting axes stay RIGID (no overscroll without travel)', () => {
+  // The platform rule (UIScrollView's default): the rubber softens only the
+  // edges of a scroll RANGE. An axis whose content fits the viewport has no
+  // travel — it is held by the fit alignment and ignores tugs entirely.
+
+  it('x fits, y travels: an elastic diagonal drag scrolls y but leaves x pinned', () => {
+    const { stage } = harness(PORTRAIT); // 600 < 952 → x fits at zoom 1
+    const rest = stage.camera();
+    stage.beginGesture({ elastic: true });
+    stage.panBy(120, -120); // rightward tug + normal downward scroll
+    expect(stage.camera().x).toBeCloseTo(rest.x, 6); // rigid — no stretch
+    expect(stage.camera().y).toBeGreaterThan(rest.y); // travel axis scrolls
+    stage.endGesture();
+  });
+
+  it('EXACT fit-width (content*zoom === view − 2·padding): still rigid', () => {
+    const { stage } = harness([{ width: 1200, height: 1600 }]); // automatic = fit-width
+    const rest = stage.camera();
+    expect(rest.zoom).toBeCloseTo((1000 - 2 * PAD) / 1200, 6);
+    stage.beginGesture({ elastic: true });
+    stage.panBy(150, 0);
+    expect(stage.camera().x).toBeCloseTo(rest.x, 6);
+    stage.endGesture();
+  });
+
+  it('whole document visible: drags move nothing and release starts no spring', () => {
+    const sched = manualScheduler();
+    const { stage } = harness([{ width: 600, height: 500 }], { scheduler: sched.scheduler });
+    const rest = stage.camera();
+    stage.beginGesture({ elastic: true });
+    stage.panBy(100, 80);
+    expect(stage.camera().x).toBeCloseTo(rest.x, 6);
+    expect(stage.camera().y).toBeCloseTo(rest.y, 6);
+    stage.endGesture();
+    expect(sched.pending()).toBe(0); // nothing displaced → nothing to spring
+  });
+
+  it('a fling discards the fit-axis velocity: y glides, x never moves', () => {
+    const sched = manualScheduler();
+    const { stage } = harness(PORTRAIT, { scheduler: sched.scheduler });
+    const rest = stage.camera();
+    stage.fling(800, -600); // strong horizontal component into the fit axis
+    let ts = 0;
+    let frames = 0;
+    while (sched.pending() > 0 && frames < 600) {
+      sched.step(ts);
+      ts += 16;
+      frames++;
+      expect(stage.camera().x).toBeCloseTo(rest.x, 6); // rigid at EVERY frame
+    }
+    expect(sched.pending()).toBe(0);
+    expect(stage.camera().y).toBeGreaterThan(rest.y); // the travel axis glided
+  });
+
+  it('an axis that STOPS fitting mid-gesture starts rubbering from the true finger position', () => {
+    const { stage } = harness(PORTRAIT);
+    stage.beginGesture({ elastic: true });
+    stage.panBy(200, 0); // tug the fitting axis — rigid, but the raw integrates
+    expect(stage.camera().x).toBeCloseTo(-200, 4); // centered rest at zoom 1
+    stage.zoomAround({ x: 500, y: 350 }, 2); // now 600·2 > 952 → x travels
+    stage.panBy(0, 0);
+    // camera is somewhere sane inside/at travel — critically, no NaN and no jump
+    expect(Number.isFinite(stage.camera().x)).toBe(true);
+    stage.endGesture();
+  });
+});
+
+describe('responsive settings (container queries for the settings bag)', () => {
+  it('the DEFAULT rule: compact containers get the thin gutter, released on exit', () => {
+    const { stage } = harness(PORTRAIT);
+    expect(stage.padding()).toBe(24);
+    expect(stage.matches('compact')).toBe(false);
+    stage.setViewport({ width: 500, height: 700 });
+    expect(stage.padding()).toBe(4);
+    expect(stage.matches('compact')).toBe(true);
+    expect(stage.activeRules()).toEqual(['compact']);
+    stage.setViewport({ width: 1000, height: 700 });
+    expect(stage.padding()).toBe(24);
+    expect(stage.matches('compact')).toBe(false);
+  });
+
+  it('space, not device: the rule resolves against THIS stage box (an embedded pane)', () => {
+    const { stage } = harness(PORTRAIT, {}, { skipViewport: true });
+    stage.setViewport({ width: 480, height: 900 }); // a narrow pane on a desktop
+    expect(stage.padding()).toBe(4);
+  });
+
+  it('setters write the BASE: a matching rule wins until its rule stops matching', () => {
+    const { stage } = harness(PORTRAIT);
+    stage.setViewport({ width: 500, height: 700 }); // compact active
+    stage.setPadding(40);
+    expect(stage.padding()).toBe(4); // the rule still wins
+    stage.setViewport({ width: 1000, height: 700 }); // compact releases…
+    expect(stage.padding()).toBe(40); // …and the base the setter wrote appears
+  });
+
+  it('interaction owns state between crossings: a pinched zoom survives a resize', () => {
+    const { stage } = harness(PORTRAIT);
+    stage.zoomAround({ x: 500, y: 350 }, 1.7); // user zoom → a custom level
+    const z = stage.zoomLevel();
+    expect(z).toBeCloseTo(1.7, 4);
+    stage.setViewport({ width: 500, height: 700 }); // crosses into compact
+    expect(stage.padding()).toBe(4); // the rule asserted its key…
+    expect(stage.zoomLevel()).toBeCloseTo(z, 4); // …and left the pinch alone
+  });
+
+  it('a rule flipping a SCENE setting relayouts at the crossing (spread by orientation)', () => {
+    const { stage } = harness(PORTRAIT, {
+      spread: 'odd',
+      responsive: [{ when: { orientation: 'portrait' }, settings: { spread: 'none' } }],
+    });
+    expect(stage.settings().spread).toBe('odd'); // 1000×700 is landscape
+    stage.setViewport({ width: 600, height: 900 });
+    expect(stage.settings().spread).toBe('none'); // the Books rotate behavior
+    stage.setViewport({ width: 1000, height: 700 });
+    expect(stage.settings().spread).toBe('odd');
+  });
+
+  it('multiple breakpoints compose, later winning per key', () => {
+    const { stage } = harness(PORTRAIT, {
+      responsive: [
+        { name: 'medium', when: { maxWidth: 900 }, settings: { padding: 12 } },
+        { name: 'small', when: { maxWidth: 600 }, settings: { padding: 4 } },
+      ],
+    });
+    expect(stage.padding()).toBe(24);
+    stage.setViewport({ width: 800, height: 700 });
+    expect(stage.padding()).toBe(12);
+    expect(stage.activeRules()).toEqual(['medium']);
+    stage.setViewport({ width: 500, height: 700 });
+    expect(stage.padding()).toBe(4);
+    expect(stage.activeRules()).toEqual(['medium', 'small']);
+  });
+
+  it('responsive: [] opts out entirely', () => {
+    const { stage } = harness(PORTRAIT, { responsive: [] });
+    stage.setViewport({ width: 393, height: 700 });
+    expect(stage.padding()).toBe(24);
+    expect(stage.activeRules()).toEqual([]);
+  });
+
+  it('setResponsive swaps the rules at runtime, releasing what no longer matches', () => {
+    const { stage } = harness(PORTRAIT);
+    stage.setViewport({ width: 500, height: 700 });
+    expect(stage.padding()).toBe(4);
+    stage.setResponsive([{ name: 'tiny', when: { maxWidth: 400 }, settings: { padding: 2 } }]);
+    expect(stage.padding()).toBe(24); // old rule gone, new one not matching
+    expect(stage.matches('compact')).toBe(false);
+    stage.setViewport({ width: 350, height: 700 });
+    expect(stage.padding()).toBe(2);
+    expect(stage.matches('tiny')).toBe(true);
+  });
+
+  it('applyViewState writes the BASE: a desktop snapshot restored on a phone stays compact', () => {
+    const { stage } = harness(PORTRAIT);
+    const saved = stage.viewState(); // captured wide: padding 24 in the snapshot
+    stage.setViewport({ width: 500, height: 700 });
+    stage.applyViewState(saved);
+    expect(stage.padding()).toBe(4); // the rule re-asserts over the restore
+    stage.setViewport({ width: 1000, height: 700 });
+    expect(stage.padding()).toBe(24); // and the snapshot's base is intact
+  });
+});
+
+describe('doubleTapZoom animation — the focal point holds still by construction', () => {
+  it('keeps the tapped content point stationary at EVERY tween frame', () => {
+    const sched = manualScheduler();
+    const { stage } = harness(PORTRAIT, { scheduler: sched.scheduler });
+    const pt = { x: 500, y: 350 };
+    const world = stage.toWorld(pt); // the content under the tap
+    stage.doubleTapZoom(pt);
+    let ts = 0;
+    let maxDrift = 0;
+    while (sched.pending() > 0 && ts < 2000) {
+      sched.step(ts);
+      ts += 16;
+      const s = stage.toScreen(world);
+      maxDrift = Math.max(maxDrift, Math.hypot(s.x - pt.x, s.y - pt.y));
+    }
+    // linear-coordinate lerping drifted this by tens of px mid-flight; the
+    // anchored tween holds it to numeric noise
+    expect(maxDrift).toBeLessThan(0.5);
+    expect(stage.zoomLevel()).toBeCloseTo((1000 - 2 * PAD) / 600, 3); // first ladder stop
+  });
+
+  it('interpolates the zoom GEOMETRICALLY (constant rate), not linearly', () => {
+    const sched = manualScheduler();
+    const { stage } = harness(PORTRAIT, { scheduler: sched.scheduler });
+    const z0 = stage.zoomLevel();
+    const target = (1000 - 2 * PAD) / 600; // the first ladder stop above automatic
+    stage.doubleTapZoom({ x: 500, y: 350 });
+    sched.step(0); // t0 anchor
+    sched.step(120); // exact midpoint of the 240ms tween
+    const ease = (t: number) => 1 - Math.pow(1 - t, 3);
+    const expected = z0 * Math.pow(target / z0, ease(0.5));
+    expect(stage.zoomLevel()).toBeCloseTo(expected, 4);
+  });
+});

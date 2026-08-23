@@ -1,5 +1,5 @@
 import { definePlugin } from '@embedpdf/core';
-import { InteractionToken } from '@embedpdf/plugin-interaction';
+import { FeedbackToken, InteractionToken } from '@embedpdf/plugin-interaction';
 import { createSelectionCapability } from './capability';
 import { createTextSelectHandler } from './handler';
 import { initialSelectionState, selectionReducer } from './reducer';
@@ -22,12 +22,18 @@ export const selectionPlugin = () =>
     token: SelectionToken,
     scope: 'document',
     requires: [InteractionToken],
+    // Platform feedback (haptics) is OPTIONAL: absent in headless setups, the
+    // handler simply never buzzes.
+    optional: [FeedbackToken],
     initialState: initialSelectionState,
     reduce: selectionReducer,
     capability: createSelectionCapability,
     init: (ctx) => {
       const interaction = ctx.get(InteractionToken);
       const selection = ctx.get(SelectionToken); // our own capability (built before init)
-      interaction.registerHandler(createTextSelectHandler(selection, interaction));
+      const feedback = ctx.tryGet(FeedbackToken);
+      interaction.registerHandler(
+        createTextSelectHandler(selection, interaction, feedback ?? undefined),
+      );
     },
   });

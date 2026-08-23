@@ -17,7 +17,7 @@ import { Button, Demo, StageFrame, stageFill } from '../stage/_shared/chrome';
 
 const engine = localEngine();
 const plugins = [
-  stagePlugin({ interaction: true }),
+  stagePlugin(),
   renderPlugin(),
   interactionPlugin(),
   selectionPlugin(),
@@ -63,7 +63,6 @@ export default function App() {
           <SelectionClipboard />
           <StageFrame height={460}>
             <Stage
-              interaction
               style={stageFill}
               overlay={
                 <SelectionMenu>

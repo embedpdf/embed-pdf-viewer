@@ -28,7 +28,7 @@ import {
 import { Stage } from '@embedpdf/react/stage';
 import { Scrollbar } from '@embedpdf/react/scrollbar';
 import { RenderLayer } from '@embedpdf/react/render';
-import { SelectionClipboard, SelectionLayer } from '@embedpdf/react/selection';
+import { SelectionClipboard, SelectionHandles, SelectionLayer } from '@embedpdf/react/selection';
 import { AnnotationLayer, useFilePickerProvider } from '@embedpdf/react/annotation';
 import { LinkLayer } from '@embedpdf/react/link';
 import type { AnnotationRenderer } from '@embedpdf/react/annotation';
@@ -175,11 +175,13 @@ export function Shell() {
                 Renders nothing; mount ONCE per document view. */}
             <SelectionClipboard />
             <Stage
-              interaction
               overlay={
                 <>
                   <AnnotationStrip />
                   <SelectionStrip />
+                  {/* touch: draggable start/end selection handles (long-press
+                      selects a word; the lollipops grow it from there) */}
+                  <SelectionHandles />
                   {/* headless scrollbars: geometry/behavior from the stage's
                       scroller contract; the look is index.css (data-attrs) */}
                   <Scrollbar axis="y" />

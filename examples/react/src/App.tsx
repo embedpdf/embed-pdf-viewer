@@ -227,7 +227,7 @@ const ThumbsStageToken = createCapabilityToken<StageCapability>('stage-thumbs');
 // Plugins are plain, pure values — engine-agnostic. The engine is chosen in
 // ./engine and injected at the root; nothing here knows local vs cloud vs fake.
 const plugins = [
-  stagePlugin({ layout: 'vertical', interaction: true }), // main lens; drives the interaction hub (pan/select)
+  stagePlugin({ layout: 'vertical' }), // main lens (tools engage via interactionPlugin below)
   stagePlugin({
     id: 'stage-thumbs',
     token: ThumbsStageToken,
@@ -1472,7 +1472,6 @@ function DocumentView() {
       <AnnotationBar stylesOpen={stylesOpen} onToggleStyles={() => setStylesOpen((o) => !o)} />
       <div style={{ flex: 1, minHeight: 0, display: 'flex' }}>
         <Stage
-          interaction
           style={{ flex: 1, background: '#0d1117' }}
           overlay={
             <>
@@ -1563,6 +1562,7 @@ function ThumbnailSidebar() {
       </label>
       <Stage
         token={ThumbsStageToken}
+        interaction={false} // secondary lens: click-to-navigate, never the document's tools
         style={{ flex: 1, position: 'relative' }}
         pageChrome={(page) => {
           // BOX-SPACE chrome: the click target/selection border hug the CONTENT
