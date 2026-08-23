@@ -5,6 +5,7 @@ import type { PageMapItem } from 'nextra';
 import { normalizePages } from 'nextra/normalize-pages';
 import { createContext, useContext, type ReactNode } from 'react';
 
+import { DocsMobileNav } from './docs-mobile-nav';
 import { Sidebar } from './sidebar';
 
 type NormalizeResult = ReturnType<typeof normalizePages>;
@@ -31,6 +32,9 @@ export function ConfigProvider({
 
   return (
     <ConfigContext.Provider value={normalized}>
+      {/* Outside the padded container so the bar runs full-bleed, and keyed by
+          route so it re-derives its section list and closes on navigation. */}
+      <DocsMobileNav key={pathname} />
       <div className="mx-auto w-full max-w-[1440px] px-[clamp(20px,4vw,78px)]">
         <div className="flex items-start gap-[clamp(28px,4vw,60px)]">
           <Sidebar />

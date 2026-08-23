@@ -14,6 +14,7 @@ export {
   type FeedbackSite,
 } from './feedback';
 export { Toc, useSectionSpy, type TocItem } from './toc';
+export { DocsMobileBar } from './mobile-bar';
 export { pageSupportsEngine, type DocsEngine, type DocsSiteBinding } from './axis';
 export { Heading, createHeading, HEADING_STYLES } from './heading';
 export { MethodBadge, methodStyle } from './method-badge';

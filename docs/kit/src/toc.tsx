@@ -108,17 +108,22 @@ function useRailScroll(items: TocItem[], activeId: string | null) {
   // Follow the reader: once the list scrolls, the highlighted section would
   // otherwise drift out of the rail's viewport. Never smooth — this fires
   // during page scrolling, and an animation here fights the reader.
+  //
+  // Positions come from rects, not offsetTop: the link's offsetParent is the
+  // sticky <aside>, so offsetTop carries the heading and padding above this
+  // container. That inflation made scrolling DOWN over-correct and scrolling
+  // UP silently fail to bring the earlier section back into view.
   useEffect(() => {
     const element = ref.current;
     if (!element || !activeId) return;
     const link = element.querySelector<HTMLElement>(`a[href="#${CSS.escape(activeId)}"]`);
     if (!link) return;
 
-    const top = link.offsetTop;
+    const top = link.getBoundingClientRect().top - element.getBoundingClientRect().top + element.scrollTop;
     const bottom = top + link.offsetHeight;
-    if (top < element.scrollTop) {
+    if (top < element.scrollTop + FADE) {
       element.scrollTop = Math.max(0, top - FADE);
-    } else if (bottom > element.scrollTop + element.clientHeight) {
+    } else if (bottom > element.scrollTop + element.clientHeight - FADE) {
       element.scrollTop = bottom - element.clientHeight + FADE;
     }
   }, [activeId]);
