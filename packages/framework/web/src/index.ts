@@ -29,6 +29,8 @@ export type { SvgCursorOptions } from './cursor';
 export { sanitizeExternalUri } from './external-uri';
 export { bindPaintedImage } from './painted-image';
 export type { ObjectUrlImageSource, PaintedImageCallbacks } from './painted-image';
+export { vibrationFeedback, wkFeedback } from './feedback';
+export type { WebPlatformFeedback } from './feedback';
 export { computeReleaseVelocity, createStageGestureController } from './stage-gestures';
 export type {
   StageGestureHost,

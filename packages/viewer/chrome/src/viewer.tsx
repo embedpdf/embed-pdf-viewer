@@ -24,7 +24,7 @@ import type { Engine, EngineFactory, InitialDocument } from '@embedpdf/react/run
 import { stagePlugin } from '@embedpdf/react/stage';
 import { renderPlugin } from '@embedpdf/react/render';
 import { pageEditPlugin } from '@embedpdf/react/page-edit';
-import { interactionPlugin } from '@embedpdf/react/interaction';
+import { feedbackPlugin, interactionPlugin, vibrationFeedback } from '@embedpdf/react/interaction';
 import { selectionPlugin } from '@embedpdf/react/selection';
 import { annotationPlugin } from '@embedpdf/react/annotation';
 import { redactionPlugin } from '@embedpdf/react/redaction';
@@ -261,6 +261,11 @@ export function FullViewer({
     renderPlugin(),
     pageEditPlugin(),
     interactionPlugin({ defaultTool: 'pointer' }),
+    // Platform haptics, default-on: the Vibration API where it exists
+    // (Android), a safe silent no-op elsewhere — iOS Safari included, until
+    // Apple ships a haptics API. Native shells swap in their own provider
+    // (`wkFeedback`) instead.
+    feedbackPlugin({ provider: vibrationFeedback }),
     selectionPlugin(),
     // The arrow tool is a `line` preset — same subtype, an arrowhead default. This is
     // the whole integration for a new tool: one `tools` entry + a command/toolbar

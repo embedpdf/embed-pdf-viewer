@@ -237,3 +237,40 @@ describe('annotation draw handler — cancel discards the draft', () => {
     expect(calls.length).toBe(n);
   });
 });
+
+describe('annotation edit handler — double-click / long-press routing', () => {
+  function makeEditAnno(freeText: boolean) {
+    const calls: string[] = [];
+    const anno = {
+      currentEditing: () => null,
+      endTextEdit: () => {},
+      hitKind: () => 'annot',
+      deselect: () => {},
+      beginTextEditAt: () => {
+        calls.push('beginTextEditAt');
+        return freeText;
+      },
+      cursorAt: () => null,
+      editPointer: (phase: string) => calls.push(`edit:${phase}`),
+    } as unknown as AnnotationHostCapability;
+    return { anno, calls };
+  }
+
+  it('over a FREE-TEXT box: enters text edit, no move armed', () => {
+    const { anno, calls } = makeEditAnno(true);
+    const h = createEditHandler(anno, interaction);
+    expect(
+      h.onDown(sample({ phase: 'down', clickCount: 2, page: { pon: PAGE_1, point: { x: 1, y: 2 } } })),
+    ).toBe(true);
+    expect(calls).toEqual(['beginTextEditAt']);
+  });
+
+  it('over any OTHER annotation: falls through to a normal press (select/move), not a swallowed no-op', () => {
+    const { anno, calls } = makeEditAnno(false);
+    const h = createEditHandler(anno, interaction);
+    expect(
+      h.onDown(sample({ phase: 'down', clickCount: 2, page: { pon: PAGE_1, point: { x: 1, y: 2 } } })),
+    ).toBe(true);
+    expect(calls).toEqual(['beginTextEditAt', 'edit:down']); // the press proceeded
+  });
+});

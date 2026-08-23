@@ -10,6 +10,9 @@
 
 // One-line-per-feature: registration travels with the UI.
 export * from '@embedpdf/plugin-interaction';
+// The browser feedback providers live in @embedpdf/web (the plugin is
+// DOM-free); re-exported here so app code has one import for the feature.
+export { vibrationFeedback, wkFeedback } from '@embedpdf/web';
 import * as React from 'react';
 import { useEffect, useRef } from 'react';
 import { InteractionToken } from '@embedpdf/plugin-interaction';

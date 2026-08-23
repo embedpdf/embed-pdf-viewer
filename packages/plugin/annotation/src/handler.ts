@@ -136,10 +136,17 @@ export function createEditHandler(
         // pan / text-selection / draw act on the empty click.
         return wasEditing;
       }
-      // Double-click over a free-text box → enter text edit (not a move).
+      // Double-click / long-press over a FREE-TEXT box → enter text edit (not
+      // a move). Over any other annotation the attempt reports false and the
+      // press falls through to the normal path below (select / arm a move) —
+      // so a long-press on a highlight selects it instead of the gesture
+      // being swallowed by a no-op edit attempt.
       if ((s.clickCount ?? 1) >= 2) {
-        anno.beginTextEditAt(s.page.pon, s.page.point, s.page.scale, s.page.rotation, s.page.zoom);
-        return true;
+        if (
+          anno.beginTextEditAt(s.page.pon, s.page.point, s.page.scale, s.page.rotation, s.page.zoom)
+        ) {
+          return true;
+        }
       }
       anno.editPointer(
         'down',

@@ -268,6 +268,7 @@ export function Stage({
       phase: PointerSample['phase'],
       e: PointerEvent,
       clickCount = 1,
+      gesture?: PointerSample['gesture'],
     ): PointerSample => {
       const r = el.getBoundingClientRect();
       const vpt = { x: e.clientX - r.left, y: e.clientY - r.top };
@@ -281,10 +282,16 @@ export function Stage({
         modifiers: { shift: e.shiftKey, alt: e.altKey, ctrl: e.ctrlKey, meta: e.metaKey },
         clickCount,
         pointerType: (e.pointerType || 'mouse') as PointerSample['pointerType'],
+        ...(gesture ? { gesture } : {}),
       };
     };
-    const forward = (phase: PointerSample['phase'], e: PointerEvent, clickCount = 1) => {
-      ix?.dispatch(sampleOf(phase, e, clickCount));
+    const forward = (
+      phase: PointerSample['phase'],
+      e: PointerEvent,
+      clickCount = 1,
+      gesture?: PointerSample['gesture'],
+    ) => {
+      ix?.dispatch(sampleOf(phase, e, clickCount, gesture));
     };
     const sink: StageGestureSink | null =
       useHub && ix
@@ -294,9 +301,10 @@ export function Stage({
             up: (e) => forward('up', e),
             cancel: (e) => forward('cancel', e),
             hover: (e) => forward('move', e), // no owner → the hub routes to onHover
-            // Touch long-press = a word-select down (clickCount 2): the mobile
-            // entry into text selection; the handles extend it from there.
-            longPress: (e) => forward('down', e, 2),
+            // Touch long-press = a word-select down (clickCount 2 keeps the
+            // word-selection contract; the `gesture` marker is the honest
+            // signal for long-press-aware handlers — haptics, pickup).
+            longPress: (e) => forward('down', e, 2, 'long-press'),
             // Touch consent: an armed drawing/markup tool takes fingers
             // wholesale; otherwise per-point claims (a selected annotation's
             // body or handles) decide. A pure pre-flight — nothing captures.

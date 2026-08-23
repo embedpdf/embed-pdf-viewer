@@ -85,6 +85,15 @@ export interface PointerSample {
    *  Absent when the source can't say — treat as 'mouse'. */
   pointerType?: PointerKind;
   /**
+   * Present when the sample was SYNTHESIZED from a recognized gesture rather
+   * than a raw press. 'long-press': a touch contact held still — the gesture
+   * controller forwards it as a down (with `clickCount: 2`, so word-selection
+   * keeps working unchanged), and this marker is the honest signal for
+   * handlers that must tell a long-press from a genuine double-click
+   * (haptics, pickup affordances). Absent on every raw pointer sample.
+   */
+  gesture?: 'long-press';
+  /**
    * Project this event onto a SPECIFIC page's content space, unclamped — valid
    * (and expected) outside the page's bounds. `page` answers "what is under the
    * cursor" and re-resolves per event; `project` answers "where is the cursor

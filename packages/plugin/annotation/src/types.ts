@@ -578,14 +578,17 @@ export interface AnnotationHostCapability extends AnnotationCapability {
   /** Enter text-edit on a free-text annotation (focus its editable element). */
   beginTextEdit(ref: AnnotationRef): void;
   /** Enter text-edit on whatever free-text box is under a content point — wired
-   *  to a double-click by the interaction edit handler. */
+   *  to a double-click / long-press by the interaction edit handler. Returns
+   *  whether an editable free-text was actually found and opened; false lets
+   *  the caller fall through to a normal press (so a long-press on a highlight
+   *  selects it instead of being swallowed by a no-op edit attempt). */
   beginTextEditAt(
     pon: PageObjectNumber,
     point: Vec,
     scale?: number,
     rotation?: PageRotation,
     zoom?: number,
-  ): void;
+  ): boolean;
   /** Apply the editor's plain text — optimistic locally, debounced to the engine. */
   setContents(ref: AnnotationRef, text: string): void;
   /** Leave text-edit (flush any pending write). */

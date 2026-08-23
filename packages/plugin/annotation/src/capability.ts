@@ -1541,7 +1541,13 @@ export function createAnnotationCapability(
       // A double-click on the box body OR one of its resize handles both target the
       // same annotation; either should open it for editing.
       const id = h.t === 'annot' || h.t === 'handle' ? h.id : null;
-      if (id != null && m.byId[id]?.geom.t === 'text') apply({ t: 'beginTextEdit', id });
+      if (id != null && m.byId[id]?.geom.t === 'text') {
+        apply({ t: 'beginTextEdit', id });
+        return true;
+      }
+      // Nothing editable here — report it so the caller can fall through to a
+      // normal press instead of swallowing the gesture on a non-text annotation.
+      return false;
     },
     setContents: (ref, text) => {
       apply({ t: 'setText', id: refKey(ref), text }); // optimistic, no engine churn
