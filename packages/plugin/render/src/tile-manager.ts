@@ -56,13 +56,25 @@ import {
  * is idempotent (the store singleflights); resolution handlers dispatch
  * the wake-up (`onAdvance`) that makes subscribed layers recompute.
  */
+/** One state entry per VIEW-of-page (see the class doc). */
+const stateKey = (view: string, pon: number): string => `${view}\u0000${pon}`;
+
 /** Backpressure: raw rasters in flight at once (render + encode transit). */
 const MAX_IN_FLIGHT = 8;
 /** Stage-less (no visibleRect) demand is capped to this many whole-page tiles. */
 const STAGELESS_TILE_CAP = 64;
 
 export class TileManager {
-  private readonly pages = new Map<number, PageTileState>();
+  /**
+   * Tile state is PER VIEW-OF-PAGE, never per page: a document may be shown
+   * through several lenses at once (the main view, a thumbnail rail), each
+   * calling `plan` with its own demand. One shared entry would let the
+   * rail's below-engage demand hit the disengage branch and destroy the
+   * main view's tiles on every selector pass (the "sidebar opens, main view
+   * goes blurry" bug). Keyed by `view\0pon`; the RasterStore underneath
+   * stays shared — bytes dedupe across views by conformed width.
+   */
+  private readonly pages = new Map<string, PageTileState>();
   private strategyMemo: { policy: EngineRenderPolicy; strategy: ResolvedStrategy } | null = null;
   /** Live fetches across all pages — the backpressure counter. */
   private inFlight = 0;
@@ -99,7 +111,7 @@ export class TileManager {
     return this.strategyMemo.strategy;
   }
 
-  plan(pon: number, demand: PageViewDemand, includeAnnotations: boolean): TilePaintPlan {
+  plan(view: string, pon: number, demand: PageViewDemand, includeAnnotations: boolean): TilePaintPlan {
     const { options } = this.deps;
     if (!options.tiles.enabled) return EMPTY_TILE_PLAN;
     const strategy = this.strategy();
@@ -107,7 +119,7 @@ export class TileManager {
     if (!page) return EMPTY_TILE_PLAN;
 
     const epoch = this.deps.getEpoch(pon, includeAnnotations);
-    const state = this.pageState(pon);
+    const state = this.pageState(pon, view);
 
     // Epoch exception: old-epoch pixels are WRONG, not blurry — drop all.
     if (state.epoch !== epoch) {
@@ -293,8 +305,8 @@ export class TileManager {
   }
 
   /** The layer's painted report: this key's pixels had a presentation opportunity. */
-  sourcePainted(pon: number, key: string): void {
-    const state = this.pages.get(pon);
+  sourcePainted(view: string, pon: number, key: string): void {
+    const state = this.pages.get(stateKey(view, pon));
     const entry = state?.entries.get(key);
     if (!state || !entry || entry.painted) return;
     entry.painted = true;
@@ -313,22 +325,22 @@ export class TileManager {
    * retained coarse coverage over a region that momentarily has no sharp
    * pixels. Painted is a statement about the SCREEN, so it follows the DOM.
    */
-  sourceUnpainted(pon: number, key: string): void {
-    const entry = this.pages.get(pon)?.entries.get(key);
+  sourceUnpainted(view: string, pon: number, key: string): void {
+    const entry = this.pages.get(stateKey(view, pon))?.entries.get(key);
     if (entry) entry.painted = false;
   }
 
   /** A lens unmounted its tile plane: stop fetching, drop bookkeeping.
    *  Resolved bytes stay in the RasterStore for a re-mount. */
-  releasePage(pon: number): void {
-    const state = this.pages.get(pon);
+  releasePage(view: string, pon: number): void {
+    const state = this.pages.get(stateKey(view, pon));
     if (!state) return;
     this.abortAll(state);
-    this.pages.delete(pon);
+    this.pages.delete(stateKey(view, pon));
   }
 
-  private pageState(pon: number): PageTileState {
-    let state = this.pages.get(pon);
+  private pageState(pon: number, view: string): PageTileState {
+    let state = this.pages.get(stateKey(view, pon));
     if (!state) {
       state = {
         epoch: -1,
@@ -342,7 +354,7 @@ export class TileManager {
         pendingLevel: null,
         lastVisible: null,
       };
-      this.pages.set(pon, state);
+      this.pages.set(stateKey(view, pon), state);
     }
     return state;
   }
@@ -590,8 +602,11 @@ export class TileManager {
   }
 
   /** Test/diagnostic introspection: bookkeeping size for one page. */
-  stats(pon: number): { entries: number; inFlight: number } {
-    return { entries: this.pages.get(pon)?.entries.size ?? 0, inFlight: this.inFlight };
+  stats(view: string, pon: number): { entries: number; inFlight: number } {
+    return {
+      entries: this.pages.get(stateKey(view, pon))?.entries.size ?? 0,
+      inFlight: this.inFlight,
+    };
   }
 
   /** Idempotent transit-slot release — the ONE place inFlight decrements. */

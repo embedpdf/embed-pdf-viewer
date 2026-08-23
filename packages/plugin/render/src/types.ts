@@ -102,6 +102,48 @@ export type RenderAction =
     }
   | { type: 'PAINT_ADVANCED'; pon: PageObjectNumber };
 
+/**
+ * One view's scoped tile surface (see {@link RenderCapability.tilesFor}).
+ * Identity (the view) is bound at creation; every call addresses that view's
+ * own state for the given page.
+ */
+export interface ViewTiles {
+  /**
+   * The tile paint plan for a page under this view's demand. Tiling is a
+   * STRATEGY inside this plugin, not a sibling.
+   * Memoized: the same object returns until the demand, an epoch, or a
+   * tile resolution actually changes it, so layers can subscribe with
+   * plain `Object.is`. Calling it schedules the want-set fetches (visible
+   * first, center-out, prefetch ring after) — idempotent, store-deduped.
+   * Engagement is pure arithmetic against what the base will ACTUALLY
+   * supply (the same `baseAsk` the base layer sizes with): tiles fire when
+   * demand exceeds the budget/ladder cap × engageAt — on every engine.
+   * A thumbnail-sized demand never engages.
+   */
+  plan(
+    pon: PageObjectNumber,
+    demand: PageViewDemand,
+    opts?: { includeAnnotations?: boolean },
+  ): TilePaintPlan;
+  /**
+   * The painter's report: the image for this plan key had a presentation
+   * opportunity. Retained coarser generations covered by painted want-set
+   * tiles release on this signal — never on fetch completion or image load,
+   * which could drop the backdrop before replacement pixels are presented.
+   */
+  painted(pon: PageObjectNumber, key: string): void;
+  /**
+   * The inverse report: this plan key's <img> left the DOM, so its pixels
+   * are no longer compositable. Painted is a statement about the SCREEN and
+   * must follow the DOM — a remounting tile re-decodes, and until it
+   * reports painted again, retention may not count it as coverage.
+   */
+  unpainted(pon: PageObjectNumber, key: string): void;
+  /** This view unmounted its tile plane for the page: abort in-flight tile
+   *  fetches, drop ITS bookkeeping (resolved bytes stay cached). */
+  release(pon: PageObjectNumber): void;
+}
+
 export interface RenderCapability {
   /**
    * Render a page (by its durable pon) to an ENCODED image. Abortable. Encoded
@@ -140,39 +182,16 @@ export interface RenderCapability {
   /** The document's advertised policy (sugar over `DocumentMeta.renderPolicy`). */
   renderPolicy(): EngineRenderPolicy;
   /**
-   * The tile paint plan for a page under a host-supplied demand. Tiling is a
-   * STRATEGY inside this plugin, not a sibling.
-   * Memoized: the same object returns until the demand, an epoch, or a
-   * tile resolution actually changes it, so layers can subscribe with
-   * plain `Object.is`. Calling it schedules the want-set fetches (visible
-   * first, center-out, prefetch ring after) — idempotent, store-deduped.
-   * Engagement is pure arithmetic against what the base will ACTUALLY
-   * supply (the same `baseAsk` the base layer sizes with): tiles fire when
-   * demand exceeds the budget/ladder cap × engageAt — on every engine.
-   * A thumbnail-sized demand never engages.
+   * This view's tile surface — the ONE tile entry point. `view` is the
+   * consuming view's identity (`PageContextValue.view`: a stage lens id, or
+   * a PageView instance id). Tile state is kept PER VIEW × PAGE, so two
+   * views showing the same page plan independently — a thumbnail rail's
+   * never-engaging demand cannot disturb the main view's tiles. Binding the
+   * identity ONCE makes it unforgettable and unmixable: the handle's four
+   * calls can never disagree about whose state they address. Stable per
+   * view — safe as a hook/effect dependency.
    */
-  tilePlan(
-    pon: PageObjectNumber,
-    demand: PageViewDemand,
-    opts?: { includeAnnotations?: boolean },
-  ): TilePaintPlan;
-  /**
-   * The painter's report: the image for this plan key had a presentation
-   * opportunity. Retained coarser generations covered by painted want-set
-   * tiles release on this signal — never on fetch completion or image load,
-   * which could drop the backdrop before replacement pixels are presented.
-   */
-  tilePainted(pon: PageObjectNumber, key: string): void;
-  /**
-   * The inverse report: this plan key's <img> left the DOM, so its pixels
-   * are no longer compositable. Painted is a statement about the SCREEN and
-   * must follow the DOM — a remounting tile re-decodes, and until it
-   * reports painted again, retention may not count it as coverage.
-   */
-  tileUnpainted(pon: PageObjectNumber, key: string): void;
-  /** A lens unmounted its tile plane: abort in-flight tile fetches and drop
-   *  the page's tile bookkeeping (resolved bytes stay cached). */
-  releaseTiles(pon: PageObjectNumber): void;
+  tilesFor(view: string): ViewTiles;
   /**
    * Version of the raster the given options would produce. Key a long-lived
    * render on it: when it bumps, refetch. Base renders version on content

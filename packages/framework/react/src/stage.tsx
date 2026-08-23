@@ -77,6 +77,9 @@ function PageSurface({
     () =>
       makePageContext(
         documentId,
+        // the hosting lens — per-view raster planning keys tile state by it,
+        // so a thumbnail rail and the main view never fight over one plan
+        stage.lensId(),
         page.pon,
         page.pageIndex,
         frame,
