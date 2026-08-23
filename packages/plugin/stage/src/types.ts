@@ -48,6 +48,56 @@ export type GridColumns = 'square' | 'auto' | number;
 export type Gap = number | { px: number };
 
 /**
+ * The one environmental fact a headless stage has: the box it was told about
+ * (`setViewport`). Responsive rules can query nothing else — no user agent, no
+ * pointer type (modality is per-event, on `PointerSample`), no window. Space,
+ * not device: a narrow pane on a desktop is compact too, and each stage
+ * instance resolves against ITS OWN box.
+ */
+export interface StageBox {
+  width: number;
+  height: number;
+  /** Of the CONTAINER, not the device. A square box is 'portrait' (the CSS rule). */
+  orientation: 'portrait' | 'landscape';
+}
+
+/** Declarative box query — all bounds inclusive, all fields optional (AND-ed). */
+export interface BoxQuery {
+  minWidth?: number;
+  maxWidth?: number;
+  minHeight?: number;
+  maxHeight?: number;
+  orientation?: 'portrait' | 'landscape';
+}
+
+/**
+ * One `@container` block for the settings bag: when the box matches, assert
+ * this settings patch. Rules evaluate in source order and ALL matching rules
+ * apply, later winning per key (each key replaced whole — no deep merges).
+ * Effective settings = base (config + runtime setters) ⊕ matching patches.
+ *
+ * Semantics, stated honestly:
+ *   • Runtime setters write the BASE; a matching rule wins over it. Apps
+ *     needing situational absolute control edit the rules (`setResponsive`).
+ *   • Rules assert at TRANSITIONS (box/base/rules changes), not continuously —
+ *     between crossings, interaction owns the state. A rule containing `zoom`
+ *     re-fits when the box crosses it (the rotate-an-iPad behavior) and then
+ *     leaves the pinch alone.
+ *
+ * A rule with a `name` is a queryable fact (`matches(name)`), reactive in
+ * every framework; a named rule with NO settings is a pure shared breakpoint
+ * the app chrome can key its own presentation off — one definition serving
+ * both the layout math and the UI.
+ */
+export interface ResponsiveRule {
+  name?: string;
+  /** Declarative box query, or a predicate for anything the box can answer. */
+  when: BoxQuery | ((box: StageBox) => boolean);
+  /** The settings this situation asserts. Omit for a pure named query. */
+  settings?: Partial<StageSettings>;
+}
+
+/**
  * One axis of the ARRIVAL policy — stage-core's AlignValue ('start' |
  * 'center' | 'end' | viewport fraction 0–1) plus one navigation-only word:
  *   'keep' — this axis does not move on arrival: page forward, hold your
@@ -207,6 +257,12 @@ export interface VisiblePage extends PageBox {
 export interface StageState extends StageSettings {
   camera: Camera;
   /**
+   * Names of the responsive rules currently matching the box, in source order.
+   * State (not derived) so `matches()` is reactive through the ordinary
+   * selector machinery in every framework.
+   */
+  activeRules: readonly string[];
+  /**
    * False while the ZOOM is in motion, true once it has rested (~150ms of
    * frames without a zoom write). Device-snapping of page origins is gated
    * on this: a continuous zoom and a snapped origin cannot coexist without
@@ -238,7 +294,8 @@ export type StageAction =
   | { type: 'VP'; vp: Size }
   | { type: 'DPR'; dpr: number }
   | { type: 'CURSOR'; cursor: number }
-  | { type: 'PATCH'; patch: Partial<StageSettings> };
+  | { type: 'PATCH'; patch: Partial<StageSettings> }
+  | { type: 'RESPONSIVE'; active: readonly string[] };
 
 /**
  * A page-relative view memento: "what I'm looking at and how zoomed". The durable
@@ -526,8 +583,17 @@ export interface StageCapability {
   /** Step backward by the navigation unit. */
   prev(opts?: GoToOptions): void;
   /** Set any subset of settings at once — ONE anchor-preserving update. The way to
-   *  apply a customer preset: `update(myPreset)`. */
+   *  apply a customer preset: `update(myPreset)`. Writes the responsive BASE:
+   *  a matching rule's key wins until its rule stops matching. */
   update(patch: Partial<StageSettings>): void;
+  /** Replace the responsive rules (see {@link ResponsiveRule}); re-resolves
+   *  immediately with the usual anchor-preserving reactions. */
+  setResponsive(rules: readonly ResponsiveRule[]): void;
+  /** Is the named responsive rule currently matching? Reactive: recomputed
+   *  whenever the box crosses a rule boundary. */
+  matches(name: string): boolean;
+  /** Names of all currently-matching rules, in source order. */
+  activeRules(): readonly string[];
   setFlow(flow: FlowMode): void;
   setLayout(layout: LayoutKind): void;
   setSpread(spread: SpreadMode): void;
@@ -562,6 +628,12 @@ export interface StageCapability {
 export interface StageConfig extends Partial<StageSettings> {
   /** Override the host timing seam (tests/SSR). Defaults to browser rAF. */
   scheduler?: Scheduler;
+  /**
+   * Container queries for the settings bag (see {@link ResponsiveRule}).
+   * Defaults to `DEFAULT_RESPONSIVE` (compact containers get the thin phone
+   * gutter); pass `[]` to opt out entirely.
+   */
+  responsive?: readonly ResponsiveRule[];
 }
 
 export const StageToken = createCapabilityToken<StageCapability>('stage');

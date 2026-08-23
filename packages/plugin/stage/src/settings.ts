@@ -1,5 +1,5 @@
 import { ZoomMode } from '@embedpdf/core-stage';
-import type { StageSettings } from './types';
+import type { ResponsiveRule, StageSettings } from './types';
 
 /**
  * Out-of-the-box defaults — a sensible document-reading feel. They are JUST
@@ -34,6 +34,17 @@ export const DEFAULT_SETTINGS: StageSettings = {
   // adapter overrides this at registration with its own logical-unit factor.
   viewUnitsPerPoint: 96 / 72,
 };
+
+/**
+ * Out-of-the-box responsive rules — the platform feel with zero configuration:
+ * a compact container gets the thin gutter phones use (space, not device — an
+ * embedded 500px pane on a desktop is compact too). Override the whole list
+ * with `stagePlugin({ responsive: [...] })`; `responsive: []` opts out. The
+ * 'compact' name is queryable app-side via `stage.matches('compact')`.
+ */
+export const DEFAULT_RESPONSIVE: readonly ResponsiveRule[] = [
+  { name: 'compact', when: { maxWidth: 600 }, settings: { padding: 4 } },
+];
 
 /**
  * How a CHANGE to each setting affects the view — THE single source of truth.

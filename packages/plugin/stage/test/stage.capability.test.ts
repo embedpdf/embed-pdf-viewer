@@ -1737,7 +1737,8 @@ describe('doubleTapZoom', () => {
     const sched = manualScheduler();
     const { stage } = harness(PORTRAIT, { scheduler: sched.scheduler });
     stage.setViewport({ width: 393, height: 700 });
-    const fitW = (393 - 2 * PAD) / 600; // automatic == fit-width below 100%
+    // 393 < 600 → the default 'compact' responsive rule asserts padding 8
+    const fitW = (393 - 2 * 8) / 600; // automatic == fit-width below 100%
     expect(stage.zoomLevel()).toBeCloseTo(fitW, 4);
     let ts = 0;
     stage.doubleTapZoom({ x: 200, y: 350 });
@@ -1755,7 +1756,7 @@ describe('doubleTapZoom', () => {
     stage.zoomTo({ level: 0.3 });
     stage.doubleTapZoom({ x: 200, y: 350 });
     settle(sched, 0);
-    expect(stage.zoomLevel()).toBeCloseTo((393 - 2 * PAD) / 600, 3);
+    expect(stage.zoomLevel()).toBeCloseTo((393 - 2 * 8) / 600, 3); // compact padding
   });
 });
 
@@ -1918,6 +1919,103 @@ describe('fitting axes stay RIGID (no overscroll without travel)', () => {
     // camera is somewhere sane inside/at travel — critically, no NaN and no jump
     expect(Number.isFinite(stage.camera().x)).toBe(true);
     stage.endGesture();
+  });
+});
+
+describe('responsive settings (container queries for the settings bag)', () => {
+  it('the DEFAULT rule: compact containers get the thin gutter, released on exit', () => {
+    const { stage } = harness(PORTRAIT);
+    expect(stage.padding()).toBe(24);
+    expect(stage.matches('compact')).toBe(false);
+    stage.setViewport({ width: 500, height: 700 });
+    expect(stage.padding()).toBe(8);
+    expect(stage.matches('compact')).toBe(true);
+    expect(stage.activeRules()).toEqual(['compact']);
+    stage.setViewport({ width: 1000, height: 700 });
+    expect(stage.padding()).toBe(24);
+    expect(stage.matches('compact')).toBe(false);
+  });
+
+  it('space, not device: the rule resolves against THIS stage box (an embedded pane)', () => {
+    const { stage } = harness(PORTRAIT, {}, { skipViewport: true });
+    stage.setViewport({ width: 480, height: 900 }); // a narrow pane on a desktop
+    expect(stage.padding()).toBe(8);
+  });
+
+  it('setters write the BASE: a matching rule wins until its rule stops matching', () => {
+    const { stage } = harness(PORTRAIT);
+    stage.setViewport({ width: 500, height: 700 }); // compact active
+    stage.setPadding(40);
+    expect(stage.padding()).toBe(8); // the rule still wins
+    stage.setViewport({ width: 1000, height: 700 }); // compact releases…
+    expect(stage.padding()).toBe(40); // …and the base the setter wrote appears
+  });
+
+  it('interaction owns state between crossings: a pinched zoom survives a resize', () => {
+    const { stage } = harness(PORTRAIT);
+    stage.zoomAround({ x: 500, y: 350 }, 1.7); // user zoom → a custom level
+    const z = stage.zoomLevel();
+    expect(z).toBeCloseTo(1.7, 4);
+    stage.setViewport({ width: 500, height: 700 }); // crosses into compact
+    expect(stage.padding()).toBe(8); // the rule asserted its key…
+    expect(stage.zoomLevel()).toBeCloseTo(z, 4); // …and left the pinch alone
+  });
+
+  it('a rule flipping a SCENE setting relayouts at the crossing (spread by orientation)', () => {
+    const { stage } = harness(PORTRAIT, {
+      spread: 'odd',
+      responsive: [{ when: { orientation: 'portrait' }, settings: { spread: 'none' } }],
+    });
+    expect(stage.settings().spread).toBe('odd'); // 1000×700 is landscape
+    stage.setViewport({ width: 600, height: 900 });
+    expect(stage.settings().spread).toBe('none'); // the Books rotate behavior
+    stage.setViewport({ width: 1000, height: 700 });
+    expect(stage.settings().spread).toBe('odd');
+  });
+
+  it('multiple breakpoints compose, later winning per key', () => {
+    const { stage } = harness(PORTRAIT, {
+      responsive: [
+        { name: 'medium', when: { maxWidth: 900 }, settings: { padding: 12 } },
+        { name: 'small', when: { maxWidth: 600 }, settings: { padding: 4 } },
+      ],
+    });
+    expect(stage.padding()).toBe(24);
+    stage.setViewport({ width: 800, height: 700 });
+    expect(stage.padding()).toBe(12);
+    expect(stage.activeRules()).toEqual(['medium']);
+    stage.setViewport({ width: 500, height: 700 });
+    expect(stage.padding()).toBe(4);
+    expect(stage.activeRules()).toEqual(['medium', 'small']);
+  });
+
+  it('responsive: [] opts out entirely', () => {
+    const { stage } = harness(PORTRAIT, { responsive: [] });
+    stage.setViewport({ width: 393, height: 700 });
+    expect(stage.padding()).toBe(24);
+    expect(stage.activeRules()).toEqual([]);
+  });
+
+  it('setResponsive swaps the rules at runtime, releasing what no longer matches', () => {
+    const { stage } = harness(PORTRAIT);
+    stage.setViewport({ width: 500, height: 700 });
+    expect(stage.padding()).toBe(8);
+    stage.setResponsive([{ name: 'tiny', when: { maxWidth: 400 }, settings: { padding: 2 } }]);
+    expect(stage.padding()).toBe(24); // old rule gone, new one not matching
+    expect(stage.matches('compact')).toBe(false);
+    stage.setViewport({ width: 350, height: 700 });
+    expect(stage.padding()).toBe(2);
+    expect(stage.matches('tiny')).toBe(true);
+  });
+
+  it('applyViewState writes the BASE: a desktop snapshot restored on a phone stays compact', () => {
+    const { stage } = harness(PORTRAIT);
+    const saved = stage.viewState(); // captured wide: padding 24 in the snapshot
+    stage.setViewport({ width: 500, height: 700 });
+    stage.applyViewState(saved);
+    expect(stage.padding()).toBe(8); // the rule re-asserts over the restore
+    stage.setViewport({ width: 1000, height: 700 });
+    expect(stage.padding()).toBe(24); // and the snapshot's base is intact
   });
 });
 

@@ -12,8 +12,10 @@ export { destinationToReveal } from './destination';
 export type { DestinationReveal } from './destination';
 export { wheelZoomFactor } from './wheel';
 export type { WheelSample } from './wheel';
-export { DEFAULT_SETTINGS, settingsEqual } from './settings';
+export { DEFAULT_SETTINGS, DEFAULT_RESPONSIVE, settingsEqual } from './settings';
+export { boxOf, matchesQuery, resolveResponsive } from './responsive';
 export type {
+  BoxQuery,
   FlowMode,
   Gap,
   GridColumns,
@@ -22,8 +24,10 @@ export type {
   GoToOptions,
   RevealAnchor,
   RevealAnchorValue,
+  ResponsiveRule,
   RevealOptions,
   RevealZoom,
+  StageBox,
   StageScrollToOptions,
   StageSettings,
   StageState,
