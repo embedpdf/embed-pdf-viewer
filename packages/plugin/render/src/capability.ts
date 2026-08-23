@@ -10,7 +10,13 @@ import { resolveRenderOptions, type ResolvedRenderOptions } from './paint-plan';
 import { RasterStore } from './raster-store';
 import { baseAskWidth, resolveStrategy, type ResolvedStrategy } from './strategy';
 import { TileManager } from './tile-manager';
-import type { RenderAction, RenderCapability, RenderPluginOptions, RenderState } from './types';
+import type {
+  RenderAction,
+  RenderCapability,
+  RenderPluginOptions,
+  RenderState,
+  ViewTiles,
+} from './types';
 
 /**
  * The render capability: the ONE place STRATEGY (plugin options — what the
@@ -129,6 +135,9 @@ export function createRenderCapability(
 
   // Tiling shares THIS store, THIS strategy, THIS ledger — one scheduler,
   // one budget, one invalidation truth.
+  // View-scoped tile handles (see RenderCapability.tilesFor).
+  const viewTiles = new Map<string, ViewTiles>();
+
   const tiles = new TileManager({
     store,
     options: resolved,
@@ -195,17 +204,20 @@ export function createRenderCapability(
       };
     },
     renderPolicy: policy,
-    tilePlan(pon, demand, opts) {
-      return tiles.plan(pon, demand, opts?.includeAnnotations ?? true);
-    },
-    tilePainted(pon, key) {
-      tiles.sourcePainted(pon, key);
-    },
-    tileUnpainted(pon, key) {
-      tiles.sourceUnpainted(pon, key);
-    },
-    releaseTiles(pon) {
-      tiles.releasePage(pon);
+    tilesFor(view) {
+      // One handle per view, reference-stable (a clean hook dependency); the
+      // map lives for the document, like the state it scopes.
+      let handle = viewTiles.get(view);
+      if (!handle) {
+        handle = {
+          plan: (pon, demand, opts) => tiles.plan(view, pon, demand, opts?.includeAnnotations ?? true),
+          painted: (pon, key) => tiles.sourcePainted(view, pon, key),
+          unpainted: (pon, key) => tiles.sourceUnpainted(view, pon, key),
+          release: (pon) => tiles.releasePage(view, pon),
+        };
+        viewTiles.set(view, handle);
+      }
+      return handle;
     },
     renderEpoch(pon, includeAnnotations = true) {
       // The sum of two monotonic counters is itself a valid monotonic version:

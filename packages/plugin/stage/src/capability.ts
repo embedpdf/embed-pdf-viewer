@@ -1312,18 +1312,24 @@ export function createStageCapability(
       const item = paged() ? sc0.items[0] : sc0.items[itemIndexOfPage(ctx.getState().cursor)];
       // The ladder (the platform convention): ascending READING POSTURES, each
       // derived from a zoom intent — see the page (automatic), read the text
-      // (fit-width), inspect (2.5× the automatic fit). A double-tap climbs to
-      // the next posture meaningfully above the current zoom; past the top it
-      // resets to the base fit. Stops within 10% of a neighbor collapse — on
-      // phones automatic IS fit-width, so the ladder degenerates to the
-      // familiar two-state toggle.
+      // (fit-width), inspect (2.5× the automatic fit). Stops within 10% of a
+      // neighbor collapse — on phones automatic IS fit-width, so the ladder
+      // degenerates to the familiar two-state toggle.
+      //
+      // The rule (iOS's): the ladder ascends only from ON a rung — a tap at a
+      // posture moves to the next, wrapping past the top. A pinch to any
+      // OTHER level is leaving the ladder, and double-tap there is a RESET to
+      // the base fit ("take me back to reading"), never a further zoom-in.
       const fit = fitBox(item);
       const auto = S.resolveZoom({ mode: S.ZoomMode.Automatic }, fit, vp(), pad());
       const fitW = S.resolveZoom({ mode: S.ZoomMode.FitWidth }, fit, vp(), pad());
       const stops = [auto, fitW, Math.min(auto * 2.5, S.ZOOM_MAX)]
         .sort((a, b) => a - b)
         .filter((z, i, all) => i === 0 || z > all[i - 1] * 1.1);
-      const target = stops.find((z) => z > cam().zoom * 1.1) ?? stops[0];
+      // the same ±10% band the dedupe uses: "at a posture" tolerates fit drift
+      const near = (z: number, stop: number) => z > stop / 1.1 && z < stop * 1.1;
+      const onRung = stops.findIndex((s) => near(cam().zoom, s));
+      const target = onRung >= 0 ? stops[(onRung + 1) % stops.length] : stops[0];
       // The INTENT commits UP FRONT (the `reveal` precedent): a caught tween
       // must never leave the camera on some intermediate zoom while the stored
       // intent still says "fit" — the next refit would snap somewhere the user

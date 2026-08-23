@@ -404,6 +404,15 @@ export interface PageContextValue {
    * a thumbnail-sized demand turns into "never engages" by arithmetic).
    */
   getViewDemand?: () => PageViewDemand;
+  /**
+   * The hosting VIEW's identity — the stage lens id (`stage.lensId()`) or a
+   * per-instance PageView id. IDENTITY, not an option: per-view raster
+   * planning (tiles) keys its state by this, so two views showing the SAME
+   * page never fight over one plan (a thumbnail rail's never-engaging demand
+   * must not disturb the main view's tiles). Every page context host must
+   * say which view it is.
+   */
+  view: string;
 }
 
 const PageCtx = createContext<PageContextValue | null>(null);
@@ -417,6 +426,7 @@ export function usePage(): PageContextValue {
 
 export function makePageContext(
   documentId: string,
+  view: string,
   pon: number,
   pageIndex: number,
   frame: PageFrame,
@@ -426,6 +436,7 @@ export function makePageContext(
 ): PageContextValue {
   return {
     documentId,
+    view,
     pon,
     pageIndex,
     frame,

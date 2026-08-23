@@ -1758,6 +1758,48 @@ describe('doubleTapZoom', () => {
     settle(sched, 0);
     expect(stage.zoomLevel()).toBeCloseTo((393 - 2 * 4) / 600, 3); // compact padding
   });
+
+  it('pinched IN between rungs: double-tap RESETS to the base fit, never climbs (iOS)', () => {
+    const sched = manualScheduler();
+    const { stage } = harness(PORTRAIT, { scheduler: sched.scheduler });
+    stage.setViewport({ width: 393, height: 700 });
+    const fitW = (393 - 2 * 4) / 600;
+    stage.zoomTo({ level: fitW * 1.5 }); // a pinch left the ladder
+    stage.doubleTapZoom({ x: 200, y: 350 });
+    settle(sched, 0);
+    expect(stage.zoomLevel()).toBeCloseTo(fitW, 3); // back to reading, NOT detail
+  });
+
+  it('pinched BEYOND the top rung: double-tap also resets to the base fit', () => {
+    const sched = manualScheduler();
+    const { stage } = harness(PORTRAIT, { scheduler: sched.scheduler });
+    stage.setViewport({ width: 393, height: 700 });
+    const fitW = (393 - 2 * 4) / 600;
+    stage.zoomTo({ level: fitW * 3.4 }); // past detail (2.5×)
+    stage.doubleTapZoom({ x: 200, y: 350 });
+    settle(sched, 0);
+    expect(stage.zoomLevel()).toBeCloseTo(fitW, 3);
+  });
+
+  it('"at a rung" tolerates ±10% fit drift — a near-fit zoom still climbs', () => {
+    const sched = manualScheduler();
+    const { stage } = harness(PORTRAIT, { scheduler: sched.scheduler });
+    stage.setViewport({ width: 393, height: 700 });
+    const fitW = (393 - 2 * 4) / 600;
+    stage.zoomTo({ level: fitW * 1.05 }); // within the rung's band
+    stage.doubleTapZoom({ x: 200, y: 350 });
+    settle(sched, 0);
+    expect(stage.zoomLevel()).toBeCloseTo(fitW * 2.5, 3); // treated as ON fit-width
+  });
+
+  it('desktop off-ladder reset lands on the base rung (automatic)', () => {
+    const sched = manualScheduler();
+    const { stage } = harness(PORTRAIT, { scheduler: sched.scheduler });
+    stage.zoomTo({ level: 2.0 }); // between fit-width (1.59) and detail (2.5)
+    stage.doubleTapZoom({ x: 500, y: 350 });
+    settle(sched, 0);
+    expect(stage.zoomLevel()).toBeCloseTo(1, 3);
+  });
 });
 
 describe('doubleTapZoom interruption (catch) consistency', () => {

@@ -31,7 +31,7 @@ function harness(opts?: {
   let liveFetches = 0;
   let maxLiveFetches = 0;
 
-  const manager = new TileManager({
+  const raw = new TileManager({
     store,
     options: resolveRenderOptions({ tiles: { settleMs: 0, bleed: 0, ...opts?.tiling } }),
     getPolicy: () => ({ kind: 'continuous' }) as never,
@@ -70,6 +70,18 @@ function harness(opts?: {
     onAdvance: () => {},
   });
 
+  // The tests predate the view axis and address one implicit view; this
+  // facade binds it (trailing `view` overrides for multi-view tests) so the
+  // suite exercises the REAL required-view API through one seam.
+  const manager = {
+    plan: (pon: number, demand: Parameters<TileManager['plan']>[2], ann: boolean, view = 'test') =>
+      raw.plan(view, pon, demand, ann),
+    sourcePainted: (pon: number, key: string, view = 'test') => raw.sourcePainted(view, pon, key),
+    sourceUnpainted: (pon: number, key: string, view = 'test') =>
+      raw.sourceUnpainted(view, pon, key),
+    releasePage: (pon: number, view = 'test') => raw.releasePage(view, pon),
+    stats: (pon: number, view = 'test') => raw.stats(view, pon),
+  };
   return {
     manager,
     store,

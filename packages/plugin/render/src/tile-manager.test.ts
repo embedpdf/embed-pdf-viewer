@@ -34,7 +34,7 @@ function harness(opts?: { policy?: unknown; tiling?: TilesOptions }) {
   let advances = 0;
   let epoch = 0;
 
-  const manager = new TileManager({
+  const raw = new TileManager({
     store,
     // bleed 0 keeps the geometry assertions exact; bleed has its own tests.
     options: resolveRenderOptions({ tiles: { settleMs: 0, bleed: 0, ...opts?.tiling } }),
@@ -61,6 +61,18 @@ function harness(opts?: { policy?: unknown; tiling?: TilesOptions }) {
     },
   });
 
+  // The tests predate the view axis and address one implicit view; this
+  // facade binds it (trailing `view` overrides for multi-view tests) so the
+  // suite exercises the REAL required-view API through one seam.
+  const manager = {
+    plan: (pon: number, demand: Parameters<TileManager['plan']>[2], ann: boolean, view = 'test') =>
+      raw.plan(view, pon, demand, ann),
+    sourcePainted: (pon: number, key: string, view = 'test') => raw.sourcePainted(view, pon, key),
+    sourceUnpainted: (pon: number, key: string, view = 'test') =>
+      raw.sourceUnpainted(view, pon, key),
+    releasePage: (pon: number, view = 'test') => raw.releasePage(view, pon),
+    stats: (pon: number, view = 'test') => raw.stats(view, pon),
+  };
   return {
     manager,
     pending,
@@ -392,5 +404,71 @@ describe('settle convergence (regression: a zoom must always land on its final l
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe('per-VIEW tile state (multi-lens isolation)', () => {
+  // The "sidebar opens, main view goes blurry" regression: the rail's
+  // below-engage demand must never reach the main view's state — before the
+  // view axis, its plan call hit the disengage branch and destroyed the main
+  // lens's entries on every selector pass.
+
+  it("a rail's never-engaging plan leaves the main view's tiles untouched", async () => {
+    const h = harness({ policy: { kind: 'continuous' } });
+    const main = h.manager.plan(1, DEEP, true, 'stage');
+    expect(main.engaged).toBe(true);
+    expect(h.pending).toHaveLength(4);
+    await h.resolveAll();
+    const painted = h.manager.plan(1, DEEP, true, 'stage');
+    expect(painted.paint.length).toBeGreaterThan(0);
+
+    // the sidebar opens: the thumbnail lens plans the SAME page, tiny demand
+    const rail = h.manager.plan(1, { desiredDeviceWidth: 200 }, true, 'stage-thumbs');
+    expect(rail.engaged).toBe(false);
+    expect(rail.paint).toHaveLength(0);
+
+    // …and the main view's plan is byte-identical — nothing dropped, nothing
+    // refetched, no thrash
+    const after = h.manager.plan(1, DEEP, true, 'stage');
+    expect(after.paint.length).toBe(painted.paint.length);
+    expect(h.manager.stats(1, 'stage').entries).toBeGreaterThan(0);
+    expect(h.manager.stats(1, 'stage-thumbs').entries).toBe(0);
+  });
+
+  it('releasing one view keeps the other view fetching and painting', async () => {
+    const h = harness({ policy: { kind: 'continuous' } });
+    h.manager.plan(1, DEEP, true, 'stage');
+    h.manager.plan(1, DEEP, true, 'stage-thumbs'); // a second full-size lens
+    const inFlight = h.pending.filter((p) => !p.aborted()).length;
+    expect(inFlight).toBeGreaterThan(0);
+
+    // the rail scrolls this page out and releases ITS plane…
+    h.manager.releasePage(1, 'stage-thumbs');
+    expect(h.manager.stats(1, 'stage-thumbs').entries).toBe(0);
+    // …while the main view's fetches stay alive and resolve to a paint list
+    await h.resolveAll();
+    const main = h.manager.plan(1, DEEP, true, 'stage');
+    expect(main.paint.length).toBeGreaterThan(0);
+  });
+
+  it('painted reports are view-scoped: one view painting never releases the other', async () => {
+    const h = harness({ policy: { kind: 'continuous' } });
+    h.manager.plan(1, DEEP, true, 'stage');
+    await h.resolveAll();
+    const plan = h.manager.plan(1, DEEP, true, 'stage');
+    const key = plan.paint[0]!.key;
+    // a report against the WRONG view is a no-op…
+    h.manager.sourcePainted(1, key, 'stage-thumbs');
+    expect(h.manager.plan(1, DEEP, true, 'stage')).toBe(plan); // memo intact
+    // …the right view's report advances its own plan
+    h.manager.sourcePainted(1, key, 'stage');
+    expect(h.manager.plan(1, DEEP, true, 'stage')).not.toBe(plan);
+  });
+
+  it('the view argument defaults — single-lens callers keep the implicit view', () => {
+    const h = harness({ policy: { kind: 'continuous' } });
+    h.manager.plan(1, DEEP, true); // no view: the shared implicit one
+    expect(h.manager.stats(1).entries).toBeGreaterThan(0);
+    expect(h.manager.stats(1, 'stage').entries).toBe(0);
   });
 });
