@@ -1,0 +1,253 @@
+---
+title: Render
+description: Draw crisp page bitmaps at every zoom level without spending more memory than you allow.
+---
+
+{/* Generated from docs/content — edit there, then `pnpm docs:sync`. */}
+
+import { Cards, Card } from '@/components/docs/cards';
+
+# Render
+
+The render plugin draws your pages. You mount one layer per page; it decides
+what to actually rasterize — how big, when, and in which format — keeps the
+results cached, and refreshes exactly the pages whose pixels changed.
+
+You place `<RenderLayer />` inside a page. The plugin handles the pixels.
+
+## Your first render
+
+Register `renderPlugin()` next to `stagePlugin()` and render a
+`<RenderLayer />` for each visible page:
+
+<Example name="render/basic" mode="open" />
+
+What you get from this alone:
+
+- **Crisp text at rest.** On the local engine every raster is rendered at
+  exactly the pixels your screen needs — never scaled up or down — which is
+  the only way small text stays sharp on low-resolution displays.
+- **A memory ceiling.** Full-page bitmaps never exceed the pixel budget
+  (640 device pixels wide by default). Deep zoom cannot ask the engine for a
+  gigantic page-sized allocation, no matter how far the user goes.
+- **Caching for free.** Repeated asks for the same raster collapse into one
+  engine call, and results are kept in an LRU so scrolling away and back is
+  instant.
+
+## Crisp at every zoom
+
+A page paints from two planes. The **base plane** is a whole-page bitmap,
+capped at the budget — it paints immediately and doubles as the backdrop
+while sharper pixels load. The **tile plane** covers just the visible region
+with small tiles whenever the view demands more pixels than the base may
+spend. Zoom in far enough and tiles take over sharpness; zoom back out and
+they stand down. You configure neither — the arithmetic decides.
+
+<Example name="render/deep-zoom" />
+
+> **Try it:** zoom in past 200% and watch the network panel. Only tiles for
+> the visible region are fetched, the area under your cursor sharpens first,
+> and when you stop zooming the tiles re-render at exactly your resting zoom.
+
+While a zoom gesture is in motion, the current pixels scale in CSS — nothing
+refetches mid-pinch. When the zoom settles (about 150 ms of rest), both
+planes adopt the new demand and re-render. You read at rest; that is where
+the pixels are exact.
+
+The two engines pick their render sizes differently, on purpose:
+
+- **Local engine** — renders *exact* sizes. Every render is private to this
+  browser, so the plugin asks for precisely the pixels on screen.
+- **Cloud engine** — renders on the deployment's advertised ladder of sizes,
+  so rasters are shared, CDN-cached artifacts. The plugin snaps every ask to
+  the ladder automatically.
+
+Same code, same components — the deployment's policy simply wins when there
+is one.
+
+## How big renders get
+
+One number controls the base plane: the budget. It is denominated in
+**device pixels** (CSS pixels × `devicePixelRatio`), because pixels are what
+cost memory — a "scale" cap would mean wildly different things on an A6 flyer
+and an A0 poster.
+
+| Setting              | The question it answers                                       | Default   |
+| -------------------- | ------------------------------------------------------------- | --------- |
+| `fullPage.maxWidth`  | How wide may a full-page bitmap ever be, in device pixels?     | `640`     |
+| `fullPage.quantize`  | Render exact sizes, or snap to a ladder of reusable sizes?     | `'exact'` |
+
+```ts
+// A heavier base: crisp base-only rendering up to 1280 device px,
+// tiles take over beyond that.
+renderPlugin({ fullPage: { maxWidth: 1280 } });
+```
+
+The default budget is deliberately small: the first paint of a page is a tiny
+render that appears fast, and the tile plane carries sharpness for normal
+reading zooms. Raising it trades slower first paint for fewer tile requests.
+
+On the cloud engine the deployment's ladder replaces all of this — with one
+exception: setting `maxWidth` *yourself* also filters the advertised ladder,
+which is the knob for memory-constrained embeds (every ladder size is
+CDN-valid, so choosing lower ones is always safe).
+
+## Deep-zoom tiles
+
+Tiles engage when the view demands more pixels across a page than the base
+supplies — on a default setup, whenever a page is displayed wider than
+640 device pixels. Each tile is a fixed-size square, so the cost of a tiled
+screen is constant at any zoom: roughly the visible area divided by 512².
+Only the visible region and a small prefetch ring around it are fetched, and
+tiles from your previous zoom stay on screen (scaled) until their sharper
+replacements have actually decoded — the page never blanks mid-zoom.
+
+| Setting            | The question it answers                                        | Default   |
+| ------------------ | --------------------------------------------------------------- | --------- |
+| `tiles.size`       | Tile edge, in device pixels                                     | `512`     |
+| `tiles.quantize`   | Exact tile sharpness at rest, or a ladder of reusable levels?   | `'exact'` |
+| `tiles.maxScale`   | The sharpness ceiling (device px per PDF point); beyond it tiles stretch | `128` |
+| `tiles.bleed`      | Overlap neighboring tiles by this many device px (kills seams)  | `1`       |
+| `tiles.engageAt`   | How much stretch to tolerate before tiles fire                  | `1.0` exact / `1.25` ladder |
+| `tiles.prefetch`   | Ring around the view: `{ margin, velocityBias }`                | `0.5`, `true` |
+| `tiles.settleMs`   | How long a zoom must rest before new tiles fetch                | `150`     |
+| `tiles.fadeMs`     | Cross-fade tile arrivals (0 = instant)                          | `0`       |
+
+A lens that must never tile — even under deep zoom — opts out per layer with
+`<RenderLayer tiles={false} />`, or globally with `renderPlugin({ tiles:
+false })`. Past the budget such a lens rests on the scaled base (soft but
+cheap); the plugin logs a hint in that situation so it is never a mystery.
+
+## Annotations in the bitmap
+
+By default the rendered bitmap includes annotation appearances — highlights,
+stamps, filled form fields — so a plain `<RenderLayer />` shows the document
+as it is. That is what you want for thumbnails and read-only views, and the
+raster refreshes automatically when an annotation changes (see below).
+
+When an `<AnnotationLayer>` owns annotation rendering — live editing, hover
+states, form filling — exclude them from the bitmap so they are not drawn
+twice:
+
+```tsx
+<RenderLayer annotations={false} />
+<AnnotationLayer /* … */ />
+```
+
+One flag covers both planes — base and tiles always agree.
+
+## When pixels change
+
+A rendered bitmap is a snapshot: it goes stale the moment a confirmed edit
+changes those pixels. The plugin watches the document's event stream and
+re-renders exactly the touched pages — an annotation edit refreshes that
+page's bitmaps (and its thumbnail), whether the edit came from this user or
+a collaborator. Nothing refreshes mid-drag; invalidation lands once, at
+commit.
+
+For pixel-changing operations the built-in map does not know about, declare
+the change yourself:
+
+```tsx
+import { RenderToken } from '@embedpdf/react/render';
+import { useCapability } from '@embedpdf/react/runtime';
+
+const render = useCapability(RenderToken);
+
+// After a confirmed operation that changed page pixels:
+render.invalidate({ pons: [pageObjectNumber] }); // 'content' scope: repaint everything
+render.invalidate({ pons: [pon], scope: 'annotations' }); // only baked appearances changed
+```
+
+Long-lived custom renders key on `renderEpoch(pon)` — when it bumps, refetch.
+
+## Faster local rendering
+
+Every raster is encoded before it crosses the engine boundary — PNG by
+default locally, the deployment's format (usually WebP) on cloud. Encoding
+costs CPU per raster; if profiling shows it matters in your embed, `'bmp'`
+skips compression entirely on the local engine:
+
+```ts
+renderPlugin({ format: 'bmp' }); // no encode step — fastest local rendering
+```
+
+The trade is memory: a BMP raster is uncompressed (a 512-px tile is ~1 MB
+versus tens of KB as WebP). On the cloud engine `'bmp'` automatically
+conforms to the deployment's advertised formats — the same code runs against
+both engines.
+
+## Rendering pages yourself
+
+For a custom lens — an export preview, a page picker you fully own — the
+capability renders any page on demand:
+
+```tsx
+import { RenderToken } from '@embedpdf/react/render';
+import { useCapability } from '@embedpdf/react/runtime';
+
+const render = useCapability(RenderToken);
+
+const image = await render.renderPage(pon, { scale: 0.5 });
+const { url, revoke } = await image.objectUrl();
+// …use the URL, call revoke() when done
+```
+
+`renderPage` goes through the same budget, cache, and policy conformance as
+the layers — that is the point. When you need *scale-precise* output instead
+(print, export at exactly 300 dpi), call the engine directly:
+`doc.page(pon).render.image({ viewport: { kind: 'scale', scale } })` — the
+engine door is exact and unbudgeted.
+
+## All the settings
+
+Set any of these at registration with `renderPlugin({ … })`:
+
+| Setting             | What it does                                                          | Default   |
+| ------------------- | --------------------------------------------------------------------- | --------- |
+| `fullPage.maxWidth` | The pixel budget: full-page bitmaps never render wider (device px)     | `640`     |
+| `fullPage.quantize` | `'exact'` sizes, or a width ladder for rung caching                    | `'exact'` |
+| `tiles`             | `false` disables the tile plane entirely                               | enabled   |
+| `tiles.size`        | Tile edge in device px                                                 | `512`     |
+| `tiles.quantize`    | `'exact'` tile sharpness, or a scale ladder for pyramid reuse          | `'exact'` |
+| `tiles.maxScale`    | The sharpness ceiling (device px per point); beyond it tiles stretch   | `128`     |
+| `tiles.bleed`       | Overlap neighboring tiles by this many device px (kills seams)         | `1`       |
+| `tiles.engageAt`    | Stretch tolerated before tiles engage                                  | `1.0` / `1.25` |
+| `tiles.prefetch.margin` | Prefetch ring size, as a fraction of the view per side             | `0.5`     |
+| `tiles.prefetch.velocityBias` | Stretch the ring toward scroll direction                     | `true`    |
+| `tiles.settleMs`    | Rest time before a moving zoom adopts a new render size                | `150`     |
+| `tiles.fadeMs`      | Tile arrival cross-fade, ms                                            | `0`       |
+| `format`            | Encode format for all rasters: `'png'`, `'webp'`, `'bmp'` (local-only) | engine default |
+| `quality`           | Encoder quality for webp/png                                           | engine default |
+| `debug`             | Log tile scheduling and fetch outcomes to the console                  | `false`   |
+
+On the cloud engine, the deployment's advertised policy overrides `quantize`
+values and constrains `format`; your options apply unchanged on the local
+engine. Application code should import this public surface from
+`@embedpdf/plugin-render` (or your framework package's `/render` entry). The
+plugin's internals are not a public application contract.
+
+## Next steps
+
+<Cards>
+  <Card
+    title="Selection"
+    description="Put selectable text over the bitmaps you just rendered."
+    href="./selection"
+  />
+  <Card
+    title="Stage"
+    description="The layout, zoom, and navigation that decide which pages render at all."
+    href="./stage"
+  />
+  <Card
+    title="Pages & rendering"
+    description="The engine call underneath the plugin: page sizes, render options, and what a raster costs."
+    href="/docs/engine/core-concepts/pages-and-rendering"
+  />
+  <Card
+    title="All plugins"
+    description="The rest of the capabilities you can register."
+    href="../plugins"
+  />
+</Cards>

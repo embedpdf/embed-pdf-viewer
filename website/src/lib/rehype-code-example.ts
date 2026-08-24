@@ -1,211 +1,90 @@
-import type { Plugin } from 'unified'
-//@ts-ignore
-import type { Root } from 'hast'
-import { visit } from 'unist-util-visit'
+import {
+  createFilesAttribute,
+  getDocsHighlighter,
+  highlightCodeFile,
+} from '@embedpdf/docs-kit/mdx/highlight';
+import { visit } from 'unist-util-visit';
 
 interface FileInfo {
-  filename: string
-  code: string
-  language: string
-  fullPath: string
-  githubUrl?: string
-  highlightedCode?: string
-}
-
-// Use dynamic import to avoid ESM/CJS issues
-let highlighterPromise: Promise<any> | null = null
-
-async function getHighlighter() {
-  if (!highlighterPromise) {
-    highlighterPromise = (async () => {
-      const { createHighlighter, bundledLanguages } = await import('shiki')
-
-      return createHighlighter({
-        themes: ['github-light', 'github-dark'],
-        langs: Object.keys(bundledLanguages).filter((l) => l !== 'mermaid'),
-      })
-    })()
-  }
-  return highlighterPromise
+  filename: string;
+  code: string;
+  language: string;
+  fullPath: string;
+  githubUrl?: string;
+  highlightedCode?: string;
 }
 
 /**
- * Create an MDX JSX attribute with a complex expression value (for arrays/objects)
+ * Rehype pass over the code collected by `remarkCodeExample`. This file only
+ * finds nodes and attaches props — the highlighter, theme, and whitespace
+ * rules are the kit's (`@embedpdf/docs-kit/mdx/highlight`), shared with
+ * cloudpdf.com so a rendering fix lands exactly once.
  */
-function createFilesAttribute(files: FileInfo[]) {
-  const elements = files.map((file) => ({
-    type: 'ObjectExpression',
-    properties: [
-      {
-        type: 'Property',
-        method: false,
-        shorthand: false,
-        computed: false,
-        key: { type: 'Identifier', name: 'filename' },
-        value: {
-          type: 'Literal',
-          value: file.filename,
-          raw: JSON.stringify(file.filename),
-        },
-        kind: 'init',
-      },
-      {
-        type: 'Property',
-        method: false,
-        shorthand: false,
-        computed: false,
-        key: { type: 'Identifier', name: 'code' },
-        value: {
-          type: 'Literal',
-          value: file.code,
-          raw: JSON.stringify(file.code),
-        },
-        kind: 'init',
-      },
-      {
-        type: 'Property',
-        method: false,
-        shorthand: false,
-        computed: false,
-        key: { type: 'Identifier', name: 'language' },
-        value: {
-          type: 'Literal',
-          value: file.language,
-          raw: JSON.stringify(file.language),
-        },
-        kind: 'init',
-      },
-      {
-        type: 'Property',
-        method: false,
-        shorthand: false,
-        computed: false,
-        key: { type: 'Identifier', name: 'githubUrl' },
-        value: {
-          type: 'Literal',
-          value: file.githubUrl || '',
-          raw: JSON.stringify(file.githubUrl || ''),
-        },
-        kind: 'init',
-      },
-      {
-        type: 'Property',
-        method: false,
-        shorthand: false,
-        computed: false,
-        key: { type: 'Identifier', name: 'highlightedCode' },
-        value: {
-          type: 'Literal',
-          value: file.highlightedCode || '',
-          raw: JSON.stringify(file.highlightedCode || ''),
-        },
-        kind: 'init',
-      },
-    ],
-  }))
+export const rehypeCodeExample = () => {
+  return async (tree: any) => {
+    const highlighter = await getDocsHighlighter();
+    const nodesToProcess: Array<{ node: any; files: FileInfo[] }> = [];
+    const exampleNodes: Array<{ node: any; byFramework: Record<string, FileInfo[]> }> = [];
 
-  return {
-    type: 'mdxJsxAttribute',
-    name: 'files',
-    value: {
-      type: 'mdxJsxAttributeValueExpression',
-      value: JSON.stringify(files),
-      data: {
-        estree: {
-          type: 'Program',
-          body: [
-            {
-              type: 'ExpressionStatement',
-              expression: {
-                type: 'ArrayExpression',
-                elements,
-              },
-            },
-          ],
-          sourceType: 'module',
-          comments: [],
-        },
-      },
-    },
-  }
-}
-
-/**
- * Rehype plugin that highlights code in CodeExample components using shiki.
- * Supports multiple files with individual highlighting and GitHub URLs.
- */
-export const rehypeCodeExample: Plugin<[], Root> = () => {
-  return async (tree) => {
-    const highlighter = await getHighlighter()
-    const nodesToProcess: Array<{ node: any; files: FileInfo[] }> = []
-
-    // First pass: collect all nodes that need processing
     visit(tree, (node: any) => {
-      if (node.type !== 'mdxJsxFlowElement' || node.name !== 'CodeExample') {
-        return
+      if (node.type !== 'mdxJsxFlowElement') return;
+
+      // Framework-resolved samples (<Example name="…">): highlight every
+      // framework's files; the client picks by pathname.
+      if (node.name === 'Example') {
+        const attr = node.attributes?.find((a: any) => a.name === '__fwFiles');
+        if (!attr?.value) return;
+        try {
+          exampleNodes.push({ node, byFramework: JSON.parse(attr.value) });
+        } catch {
+          console.warn('[rehype-code-example] Could not parse __fwFiles');
+        }
+        return;
       }
+
+      if (node.name !== 'CodeExample') return;
 
       const needsHighlighting = node.attributes?.find(
         (attr: any) => attr.name === '__needsHighlighting',
-      )
-      if (!needsHighlighting) return
+      );
+      if (!needsHighlighting) return;
 
-      const filesAttr = node.attributes?.find(
-        (attr: any) => attr.name === '__codeFiles',
-      )
-      if (!filesAttr?.value) return
+      const filesAttr = node.attributes?.find((attr: any) => attr.name === '__codeFiles');
+      if (!filesAttr?.value) return;
 
       try {
-        const files: FileInfo[] = JSON.parse(filesAttr.value)
-        nodesToProcess.push({ node, files })
-      } catch (e) {
-        console.warn('[rehype-code-example] Could not parse __codeFiles')
+        const files: FileInfo[] = JSON.parse(filesAttr.value);
+        nodesToProcess.push({ node, files });
+      } catch {
+        console.warn('[rehype-code-example] Could not parse __codeFiles');
       }
-    })
+    });
 
-    // Second pass: highlight all files
     for (const { node, files } of nodesToProcess) {
-      const highlightedFiles: FileInfo[] = []
+      const highlightedFiles: FileInfo[] = files.map((file) =>
+        highlightCodeFile(highlighter, file),
+      );
 
-      for (const file of files) {
-        try {
-          const highlighted = highlighter.codeToHtml(file.code.trim(), {
-            lang: file.language,
-            themes: {
-              light: 'github-light',
-              dark: 'github-dark',
-            },
-            defaultColor: false,
-          })
-
-          // Extract inner HTML from <code>...</code>
-          const innerMatch = highlighted.match(/<code[^>]*>([\s\S]*)<\/code>/)
-          const innerHtml = (innerMatch ? innerMatch[1] : highlighted).replace(
-            /<span class="line"><\/span>/g,
-            '<span class="line">\n</span>',
-          )
-
-          highlightedFiles.push({
-            ...file,
-            highlightedCode: innerHtml,
-          })
-        } catch (err) {
-          console.warn(
-            `[rehype-code-example] Failed to highlight ${file.filename}:`,
-            err,
-          )
-          highlightedFiles.push(file)
-        }
-      }
-
-      // Remove internal attributes
       node.attributes = node.attributes.filter(
-        (attr: any) =>
-          attr.name !== '__needsHighlighting' && attr.name !== '__codeFiles',
-      )
+        (attr: any) => attr.name !== '__needsHighlighting' && attr.name !== '__codeFiles',
+      );
 
-      // Add the processed files array
-      node.attributes.push(createFilesAttribute(highlightedFiles))
+      node.attributes.push(createFilesAttribute(highlightedFiles));
     }
-  }
-}
+
+    for (const { node, byFramework } of exampleNodes) {
+      const highlighted: Record<string, FileInfo[]> = {};
+      for (const [fw, files] of Object.entries(byFramework)) {
+        highlighted[fw] = files.map((file) => highlightCodeFile(highlighter, file));
+      }
+      node.attributes = node.attributes.filter(
+        (attr: any) => attr.name !== '__needsHighlighting' && attr.name !== '__fwFiles',
+      );
+      node.attributes.push({
+        type: 'mdxJsxAttribute',
+        name: 'filesByFramework',
+        value: JSON.stringify(highlighted),
+      });
+    }
+  };
+};

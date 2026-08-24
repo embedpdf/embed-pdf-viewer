@@ -1,0 +1,107 @@
+---
+title: Migrations
+description: How the CloudPDF server applies database schema changes safely — on boot, as a one-shot job, or via a Helm hook.
+---
+
+import { Callout } from '@/components/docs/callout';
+import { Cards, Card } from '@/components/docs/cards';
+
+# Migrations
+
+Each release of the server may include database schema changes. The migration
+tooling makes applying them predictable, and — just as important — makes a
+*missed* migration fail loudly instead of corrupting data on a stale schema.
+
+Two settings shape the behaviour:
+
+| Variable | Effect |
+| --- | --- |
+| `CLOUDPDF_AUTO_MIGRATE` | Apply pending migrations automatically on boot. Default: on for SQLite, off for Postgres. |
+| `CLOUDPDF_FAIL_ON_PENDING` | Refuse to start if migrations are pending. |
+
+The right combination depends on how many instances you run.
+
+## Single instance (SQLite or one container)
+
+With exactly one instance there's no race, so let it migrate on boot — this is
+the default for SQLite:
+
+```sh
+CLOUDPDF_AUTO_MIGRATE=1
+```
+
+That's the whole story for the [Quick start](/docs/server/getting-started/quick-start)
+and single-container setups.
+
+## Multiple replicas (Postgres)
+
+With more than one replica you must **not** let them race to migrate the same
+database. The pattern: run migrations once as a separate step, and make the app
+pods refuse to serve on a stale schema.
+
+```sh
+# On the app instances:
+CLOUDPDF_AUTO_MIGRATE=0
+CLOUDPDF_FAIL_ON_PENDING=1
+```
+
+```sh
+# As a one-shot step, before rolling out new instances:
+cloudpdf-server migrate up
+```
+
+This gives you two guarantees: replicas never collide, and a deploy that forgets
+to migrate fails fast instead of serving on the wrong schema.
+
+### Docker Compose
+
+The production Compose stack does this with a one-shot `migrate` service the app
+`depends_on`. The app starts only after migrations complete successfully — see
+[Docker Compose](/docs/server/deployment/docker-compose).
+
+### Kubernetes / Helm
+
+The Helm chart runs `migrate up` as a **pre-install / pre-upgrade hook Job**
+before any app pods roll, while the app pods themselves run with
+`CLOUDPDF_AUTO_MIGRATE=0` and `CLOUDPDF_FAIL_ON_PENDING=1`. You get safe,
+ordered migrations on every `helm upgrade` for free — see
+[Helm](/docs/server/deployment/helm).
+
+## Checking state
+
+```sh
+cloudpdf-server migrate status      # applied / pending / drift
+cloudpdf-server migrate up --dry-run  # what would change
+cloudpdf-server migrate validate    # non-zero exit if drift detected
+```
+
+`migrate validate` is handy as a pre-deploy gate: a non-zero exit stops a rollout
+before it serves traffic on a mismatched schema.
+
+## Rolling back
+
+Rollback exists as a deliberate break-glass tool (`migrate down`), not part of
+the normal flow. In production, prefer rolling **forward** with a corrective
+migration. When you must roll back, back up the database first and preview with
+`--dry-run`. Full flags are in the [CLI reference](/docs/server/operations/cli#rolling-back).
+
+<Callout type="warn">
+  Always run the migration step with the <strong>same image version</strong> as
+  the app you're about to deploy. The schema the migration applies must match the
+  code that will run against it.
+</Callout>
+
+## Next steps
+
+<Cards>
+  <Card
+    title="CLI reference"
+    description="All migrate commands and flags."
+    href="/docs/server/operations/cli"
+  />
+  <Card
+    title="Database"
+    description="SQLite vs Postgres, and moving between them."
+    href="/docs/server/configuration/database"
+  />
+</Cards>

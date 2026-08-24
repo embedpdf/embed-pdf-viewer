@@ -1,0 +1,6 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "pnpm --dir .. run build:website",
+  "installCommand": "pnpm install --frozen-lockfile && EPDF_PAYLOAD_WAIT_MINUTES=10 pnpm --filter @embedpdf/engine-runtime run fetch:payload wasm32",
+  "ignoreCommand": "npx turbo-ignore @embedpdf/website"
+}

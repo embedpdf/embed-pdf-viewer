@@ -1,0 +1,26 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Engine v3 - mutations (LocalEngine, WASM)</title>
+  </head>
+  <body>
+    <h1>Engine v3 mutations browser demo</h1>
+    <p>
+      Drives <code>update</code> (weak &rarr; UUID v4 /NM stamp) &rarr;
+      <code>create</code> &times; 2 &rarr; <code>move</code> (single-as-batch)
+      &rarr; <code>move</code> (multi-block, caller-order preserved) &rarr;
+      <code>delete</code> &times; 2 against a single page of
+      <code>/annotations.pdf</code>, using
+      <code>createLocalEngineWithWorker</code> from
+      <code>@embedpdf/engine</code> with the WASM runtime in a Web
+      Worker. The output below shows the <code>AnnotationListMutationMeta</code>
+      envelope returned by each call so the locked impact rules
+      (revision bump on every structural mutation including <code>move</code>,
+      no-op on update, <code>shouldRefetch</code> when weak refs are
+      present, ONE bump per <code>move</code> batch regardless of size)
+      are visible.
+    </p>
+    <pre id="out">Loading...</pre>
+    <script type="module" src="/src/mutations-browser.ts"></script>
+  </body>
+</html>

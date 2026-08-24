@@ -1,0 +1,75 @@
+name: License security
+
+on:
+  pull_request:
+    paths:
+      - 'cloudpdf/server/src/app/buildApp.ts'
+      - 'cloudpdf/server/src/app/secret-policy.ts'
+      - 'cloudpdf/server/src/index.ts'
+      - 'cloudpdf/server/src/licensing/**'
+      - 'cloudpdf/server/src/bin/cloudpdf-server.ts'
+      - 'cloudpdf/server/test/licensing.test.ts'
+      - 'cloudpdf/server/test/secret-policy.test.ts'
+      - 'cloudpdf/server/package.json'
+      - '.github/workflows/license-security.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'cloudpdf/server/src/app/buildApp.ts'
+      - 'cloudpdf/server/src/app/secret-policy.ts'
+      - 'cloudpdf/server/src/index.ts'
+      - 'cloudpdf/server/src/licensing/**'
+      - 'cloudpdf/server/src/bin/cloudpdf-server.ts'
+      - 'cloudpdf/server/test/licensing.test.ts'
+      - 'cloudpdf/server/test/secret-policy.test.ts'
+      - 'cloudpdf/server/package.json'
+      - '.github/workflows/license-security.yml'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: license-security-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: true
+
+jobs:
+  verify:
+    name: signed proofs and fail-closed gates
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v5
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Adversarial licensing tests
+        run: pnpm --filter @cloudpdf/server exec vitest run test/licensing.test.ts
+
+      - name: Build published server artifact
+        # `...` builds the server's workspace dependency closure first
+        # (admin-api, engine-core, engine-services, engine-runtime) in
+        # topological order — the server bundle inlines engine-core/services
+        # from their dist and the dts build needs the runtime's types. The
+        # native runtime payloads are NOT needed: engine-runtime's own build
+        # is JS-only (payload packages are externalized / have no build).
+        run: pnpm --filter "@cloudpdf/server..." build
+
+      - name: Verify published license API boundary
+        run: >-
+          node --input-type=module -e "const m=await import('./cloudpdf/server/dist/index.js');
+          const forbidden=['LicenseRuntime','buildAppForTesting','ConnectedUsageReporter'];
+          const leaked=forbidden.filter((name)=>name in m);
+          if(leaked.length) throw new Error('internal exports leaked: '+leaked.join(','));
+          if(typeof m.createLicenseRuntime!=='function'||typeof m.buildApp!=='function')
+          throw new Error('public license API missing');"

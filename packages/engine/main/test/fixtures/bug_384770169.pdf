@@ -1,0 +1,65 @@
+%PDF-1.7
+% ò¤ô
+1 0 obj <<
+  /Type /Catalog
+  /Pages 2 0 R
+>>
+endobj
+2 0 obj <<
+  /Type /Pages
+  /Count 1
+  /Kids [3 0 R]
+>>
+endobj
+3 0 obj <<
+  /Type /Page
+  /Contents 4 0 R
+  /Parent 2 0 R
+  /MediaBox [0 0 200 200]
+  /Resources <<
+    /Font <<
+      /F1 5 0 R
+    >>
+  >>
+>>
+endobj
+4 0 obj <<
+  /Length 185
+>>
+stream
+BT
+/F1 12 Tf
+1 0 0 1 20 100 Tm
+(What is) Tj
+/Span<</ActualText (my) >> BDC
+50 0 Td (your) Tj
+EMC
+30 0 Td (favorite) Tj
+/Span<</ActualText (food) >> BDC
+50 0 Td (color) Tj
+EMC
+(?) Tj
+ET
+endstream
+endobj
+5 0 obj <<
+  /Type /Font
+  /Subtype /Type1
+  /BaseFont /Helvetica
+>>
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000015 00000 n 
+0000000068 00000 n 
+0000000131 00000 n 
+0000000283 00000 n 
+0000000520 00000 n 
+trailer <<
+  /Root 1 0 R
+  /Size 6
+>>
+startxref
+596
+%%EOF

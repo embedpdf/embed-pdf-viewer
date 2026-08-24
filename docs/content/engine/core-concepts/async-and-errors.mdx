@@ -1,0 +1,108 @@
+---
+title: Async & errors
+description: Every async call is an AbortablePromise; every failure is a typed EngineError. How to cancel work and handle errors.
+---
+
+import { Callout } from '@/components/docs/callout';
+
+# Async & errors
+
+Two primitives run through the entire engine: `AbortablePromise` for every async
+call, and `EngineError` for every failure. Both are re-exported from
+`@cloudpdf/engine`.
+
+## AbortablePromise
+
+Every async method returns an `AbortablePromise`. It's a real `Promise`
+subclass, so you `await` it like anything else — but it also lets you cancel the
+underlying work and (optionally) observe progress.
+
+```ts
+import { AbortablePromise } from '@cloudpdf/engine';
+
+const pending = doc.page(pon).render.image({ viewport: { kind: 'width', width: 1600 } });
+
+// Later — the user scrolled away before it finished:
+pending.abort();
+```
+
+- `abort(reason?)` rejects the promise **immediately** with an `AbortError`
+  (wrapping `reason` if provided) and fires the internal `AbortSignal` so the
+  in-flight `fetch` is cancelled. Aborting an already-settled promise is a no-op.
+- `signal` is the `AbortSignal` for the operation, if you need to chain
+  cancellation.
+- `onProgress(cb)` subscribes to progress events and returns an unsubscribe
+  function (operations that don't emit progress simply never call it).
+
+```ts
+const unsub = pending.onProgress((p) => updateBar(p));
+const image = await pending;
+unsub();
+```
+
+<Callout type="info">
+  Because <code>AbortablePromise</code> is a <code>Promise</code> subclass, any
+  <code>.then()</code>/<code>.catch()</code>/<code>await</code> returns a plain
+  promise — only the original object exposes <code>.abort()</code>. Keep a
+  reference to it if you intend to cancel.
+</Callout>
+
+## EngineError
+
+Failures reject with an `EngineError` carrying a stable `code` from
+`EngineErrorCode`. Use the code, not the message, for control flow.
+
+```ts
+import { EngineError, EngineErrorCode } from '@cloudpdf/engine';
+
+try {
+  const text = await doc.page(pon).text.read();
+} catch (err) {
+  if (EngineError.is(err, EngineErrorCode.Forbidden)) {
+    showUpgradePrompt();
+  } else if (EngineError.is(err, EngineErrorCode.Aborted)) {
+    // user cancelled — ignore
+  } else {
+    throw err;
+  }
+}
+```
+
+### Common codes
+
+HTTP responses from the server map onto these codes:
+
+| Code | Typical cause |
+| --- | --- |
+| `Unauthenticated` | Missing/invalid token (HTTP 401). |
+| `Forbidden` | Token lacks the required scope (HTTP 403). |
+| `NotFound` | Document, page, or annotation doesn't exist (HTTP 404). |
+| `DocPasswordRequired` / `DocPasswordIncorrect` | Encrypted document needs a (correct) password. |
+| `InvalidReference` | A stale or out-of-range `AnnotationRef` (e.g. an `index` ref with an old revision). |
+| `WeakAnnotationSessionConflict` | A structural annotation edit raced another client (HTTP 409). |
+| `Network` | The `fetch` itself failed (offline, DNS, TLS). |
+| `Aborted` | The operation was cancelled via `abort()`. |
+| `InvalidArg` | Malformed input (e.g. an unsupported `OpenInput.kind`). |
+| `RuntimeUnavailable` | The engine was already destroyed, or a browser API (object URLs) is unavailable. |
+| `WireFormat` | The server returned an unexpected response shape. |
+
+<Callout type="warn">
+  Don't pattern-match on error messages — they're for humans and may change.
+  Branch on <code>err.code</code> (or <code>EngineError.is(err, code)</code>),
+  which is part of the stable contract.
+</Callout>
+
+## Putting it together
+
+```ts
+const pending = doc.page(pon).render.image({ viewport: { kind: 'width', width: 1200 } });
+
+try {
+  const image = await pending;
+  const { url, revoke } = await image.objectUrl();
+  show(url, revoke);
+} catch (err) {
+  if (EngineError.is(err, EngineErrorCode.Aborted)) return; // cancelled
+  reportError(err);
+}
+```

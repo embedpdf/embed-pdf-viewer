@@ -1,0 +1,18 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Engine v3 - annotations (LocalEngine, WASM)</title>
+  </head>
+  <body>
+    <h1>Engine v3 annotations browser demo</h1>
+    <p>
+      Uses <code>createLocalEngine</code> from <code>@embedpdf/engine</code>
+      with the WASM runtime to read annotations from
+      <code>/annotations.pdf</code> via the v3 read paths
+      (<code>doc.annotations.listRawAll()</code> and
+      <code>doc.page(pon).annotations.list()</code>).
+    </p>
+    <pre id="out">Loading...</pre>
+    <script type="module" src="/src/annotations-browser.ts"></script>
+  </body>
+</html>

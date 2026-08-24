@@ -1,0 +1,226 @@
+%PDF-1.4
+%‚„œ”
+1 0 obj
+<<
+/Type /Catalog
+/Pages 2 0 R
+>>
+endobj
+2 0 obj
+<<
+/Type /Pages
+/Kids [3 0 R]
+/Count 1
+>>
+endobj
+3 0 obj
+<<
+/Type /Page
+/Parent 2 0 R
+/MediaBox [0 0 612 792]
+/Resources <<>>
+/Annots [4 0 R 5 0 R 6 0 R 7 0 R 8 0 R 9 0 R 10 0 R 11 0 R 12 0 R 13 0 R 14 0 R 15 0 R 16 0 R <<
+/Type /Annot
+/Subtype /Highlight
+/Rect [100 100 200 120]
+/QuadPoints [100 120 200 120 100 100 200 100]
+/C [1 1 0]
+/CA 0.5
+/F 4
+/Contents (direct)
+>>]
+>>
+endobj
+4 0 obj
+<<
+/Type /Annot
+/Subtype /Highlight
+/Rect [50 50 150 70]
+/QuadPoints [50 70 150 70 50 50 150 50]
+/C [1 1 0]
+/CA 0.5
+/F 4
+/Contents (highlight 1)
+/T (alice)
+/M (D:20240101000000Z)
+>>
+endobj
+5 0 obj
+<<
+/Type /Annot
+/Subtype /Highlight
+/Rect [200 200 300 220]
+/QuadPoints [200 220 300 220 200 200 300 200]
+/C [1 0.8 0]
+/CA 0.7
+/F 4
+/Contents (highlight 2)
+>>
+endobj
+6 0 obj
+<<
+/Type /Annot
+/Subtype /Ink
+/Rect [300 300 400 400]
+/InkList [[300 300 320 320 340 340 360 360 380 380]]
+/C [0 0 1]
+/F 4
+>>
+endobj
+7 0 obj
+<<
+/Type /Annot
+/Subtype /Highlight
+/Rect [400 50 500 70]
+/QuadPoints [400 70 500 70 400 50 500 50]
+/C [0 1 0]
+/CA 1
+/F 4
+/NM (named-highlight-1)
+>>
+endobj
+8 0 obj
+<<
+/Type /Annot
+/Subtype /Circle
+/Rect [50 300 150 380]
+/IC [1 0 0]
+/C [0 0 1]
+/CA 1
+/BS << /W 2 /S /S >>
+/F 4
+/Contents (circle 1)
+>>
+endobj
+9 0 obj
+<<
+/Type /Annot
+/Subtype /Square
+/Rect [200 300 320 380]
+/C [0 0.5 0]
+/CA 1
+/BS << /W 3 /S /D /D [3 2] >>
+/F 4
+/Contents (square 1)
+>>
+endobj
+10 0 obj
+<<
+/Type /Annot
+/Subtype /Polygon
+/Rect [50 450 150 540]
+/Vertices [60 460 140 460 100 530]
+/IC [1 1 0]
+/C [0 0 1]
+/CA 1
+/BS << /W 2 /S /S >>
+/F 4
+/Contents (polygon 1)
+>>
+endobj
+11 0 obj
+<<
+/Type /Annot
+/Subtype /PolyLine
+/Rect [200 450 320 540]
+/Vertices [210 460 260 530 310 460]
+/C [1 0 0]
+/CA 1
+/BS << /W 2 /S /S >>
+/LE [/OpenArrow /ClosedArrow]
+/F 4
+/Contents (polyline 1)
+>>
+endobj
+12 0 obj
+<<
+/Type /Annot
+/Subtype /Line
+/Rect [400 450 520 540]
+/L [410 460 510 530]
+/C [0 0.5 0.5]
+/CA 1
+/BS << /W 2 /S /S >>
+/LE [/None /OpenArrow]
+/F 4
+/Contents (line 1)
+>>
+endobj
+13 0 obj
+<<
+/Type /Annot
+/Subtype /Screen
+/Rect [400 300 500 360]
+/F 4
+/Contents (screen 1)
+>>
+endobj
+14 0 obj
+<<
+/Type /Annot
+/Subtype /FreeText
+/Rect [50 600 220 660]
+/DA (/Helv 14 Tf 0.0784 0.1569 0.2353 rg)
+/Q 1
+/IT /FreeText
+/C [0.98 0.98 0.82]
+/CA 1
+/BS << /W 1 /S /S >>
+/F 4
+/Contents (free text 1)
+>>
+endobj
+15 0 obj
+<<
+/Type /Annot
+/Subtype /FreeText
+/Rect [280 600 460 660]
+/DA (/Helv 12 Tf 0 0 0 rg)
+/Q 0
+/IT /FreeTextCallout
+/CL [265 605 320 630 280 640]
+/LE [/None /OpenArrow]
+/BS << /W 1 /S /S >>
+/F 4
+/Contents (callout 1)
+>>
+endobj
+16 0 obj
+<<
+/Type /Annot
+/Subtype /Caret
+/Rect [50 700 90 730]
+/C [0 0 1]
+/CA 1
+/RD [2 2 2 2]
+/F 4
+/Contents (caret 1)
+>>
+endobj
+xref
+0 17
+0000000000 65535 f 
+0000000015 00000 n 
+0000000064 00000 n 
+0000000121 00000 n 
+0000000455 00000 n 
+0000000652 00000 n 
+0000000826 00000 n 
+0000000967 00000 n 
+0000001131 00000 n 
+0000001281 00000 n 
+0000001431 00000 n 
+0000001619 00000 n 
+0000001829 00000 n 
+0000002013 00000 n 
+0000002115 00000 n 
+0000002329 00000 n 
+0000002561 00000 n 
+trailer
+<<
+/Size 17
+/Root 1 0 R
+>>
+startxref
+2690
+%%EOF

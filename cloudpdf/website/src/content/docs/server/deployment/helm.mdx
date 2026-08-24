@@ -1,0 +1,203 @@
+---
+title: Helm / Kubernetes
+description: Deploy the CloudPDF server to Kubernetes with the official Helm chart — replicas, autoscaling, managed migrations, and clean secret handling.
+---
+
+import { Callout } from '@/components/docs/callout';
+import { Cards, Card } from '@/components/docs/cards';
+
+# Run on Kubernetes with Helm
+
+For production — from a single startup deployment to enterprise scale — the Helm
+chart gives you the things that matter when downtime is expensive: multiple
+replicas, autoscaling, a pod disruption budget, managed schema migrations, and a
+clean split between configuration and secrets.
+
+The chart is published as an OCI artifact to the same registry as the image:
+
+```
+oci://ghcr.io/embedpdf/charts/cloudpdf-server
+```
+
+## Prerequisites
+
+- A Kubernetes cluster and `kubectl` access.
+- [Helm 3](https://helm.sh).
+- A **Postgres** database and an **object store** (S3 / GCS / Azure Blob) you
+  manage. The chart does not run a database for you — production should use a
+  managed or operator-run Postgres and a real bucket.
+
+## Install
+
+Create the secrets the server needs, then install:
+
+```sh
+kubectl create secret generic cloudpdf-secrets \
+  --from-literal=CLOUDPDF_JWT_SECRET="$(openssl rand -hex 32)" \
+  --from-literal=CLOUDPDF_DB_URL="postgres://user:pass@db:5432/cloudpdf" \
+  --from-literal=AWS_ACCESS_KEY_ID="..." \
+  --from-literal=AWS_SECRET_ACCESS_KEY="..."
+
+helm install cloudpdf \
+  oci://ghcr.io/embedpdf/charts/cloudpdf-server \
+  --version 1.0.0 \
+  -f values.yaml
+```
+
+A `values.yaml` for the scalable profile (Postgres + S3, multiple replicas):
+
+```yaml
+# values.yaml
+image:
+  repository: ghcr.io/embedpdf/cloudpdf-server
+  tag: '1.0.0'
+
+replicaCount: 2
+
+# Reference the secret you created above instead of putting secrets in values.
+existingSecret: cloudpdf-secrets
+
+# Non-secret configuration becomes a ConfigMap.
+config:
+  CLOUDPDF_DB_DRIVER: postgres
+  CLOUDPDF_STORAGE_KIND: s3
+  CLOUDPDF_STORAGE_S3_BUCKET: my-cloudpdf-bucket
+  CLOUDPDF_STORAGE_S3_REGION: eu-west-1
+  CLOUDPDF_WORKER_POOL_SIZE: 'max'
+
+# Schema migrations run as a pre-upgrade Helm hook Job, so app pods never race.
+migrations:
+  enabled: true
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+
+resources:
+  requests:
+    cpu: '1'
+    memory: 1Gi
+  limits:
+    cpu: '2'
+    memory: 2Gi
+
+ingress:
+  enabled: true
+  className: nginx
+  hosts:
+    - host: pdf.your-app.com
+      paths:
+        - path: /
+          pathType: Prefix
+```
+
+```sh
+helm install cloudpdf oci://ghcr.io/embedpdf/charts/cloudpdf-server \
+  --version 1.0.0 -f values.yaml
+```
+
+## How migrations are handled
+
+When `migrations.enabled` is set, the chart runs `cloudpdf-server migrate up` as
+a **pre-install / pre-upgrade hook Job** before any app pods roll. The app pods
+themselves run with `CLOUDPDF_AUTO_MIGRATE=0` and `CLOUDPDF_FAIL_ON_PENDING=1`,
+which means:
+
+- Replicas never race to migrate the database.
+- A deploy that somehow skips migrations fails fast instead of serving on a
+  stale schema.
+
+See [Migrations](/docs/server/operations/migrations) for the full model.
+
+## Health, scaling & resilience
+
+The chart wires the probes and resilience primitives for you:
+
+- **Liveness** → `/healthz`, **readiness** → `/readyz`.
+- **HorizontalPodAutoscaler** on CPU (and optionally memory) when
+  `autoscaling.enabled` is set.
+- **PodDisruptionBudget** so rolling nodes never take all replicas at once.
+- Non-root `securityContext` by default.
+
+<Callout type="warn">
+  The native runtime is thread-confined — a hard crash takes a whole pod down.
+  Run <strong>at least two replicas</strong>, keep
+  <code>CLOUDPDF_WORKER_POOL_SIZE</code> in step with the CPU you give each pod,
+  and size memory for per-thread font and CMap duplication. Details in
+  <a href="/docs/server/operations/health-and-scaling">Health &amp; scaling</a>.
+</Callout>
+
+## The small-footprint profile (SQLite)
+
+For a low-traffic internal tool, you can run a single replica backed by a
+PersistentVolume instead of Postgres + a bucket:
+
+```yaml
+# values-sqlite.yaml
+replicaCount: 1
+
+strategy:
+  type: Recreate # SQLite has a single writer — never run two pods at once
+
+persistence:
+  enabled: true
+  size: 20Gi
+
+config:
+  CLOUDPDF_DB_DRIVER: sqlite
+  CLOUDPDF_STORAGE_KIND: fs
+  CLOUDPDF_AUTO_MIGRATE: '1'
+
+autoscaling:
+  enabled: false
+
+existingSecret: cloudpdf-secrets # just CLOUDPDF_JWT_SECRET here
+```
+
+<Callout type="info">
+  The SQLite profile is deliberately pinned to one pod with a
+  <code>Recreate</code> strategy because SQLite allows a single writer. For
+  anything that needs more than one replica, use the Postgres + object-storage
+  profile.
+</Callout>
+
+## Secrets the enterprise way
+
+If you run a secrets operator (External Secrets, Vault, sealed-secrets, your
+cloud's CSI driver), create the Kubernetes Secret with that tool and point the
+chart at it via `existingSecret`. The chart never requires you to put secret
+values in `values.yaml`.
+
+## Upgrading
+
+```sh
+helm upgrade cloudpdf oci://ghcr.io/embedpdf/charts/cloudpdf-server \
+  --version 1.1.0 -f values.yaml
+```
+
+The pre-upgrade migration Job runs first; app pods roll only after it succeeds.
+
+## Verify
+
+```sh
+helm test cloudpdf          # optional smoke tests, if enabled
+kubectl get pods            # app pods Running, migration Job Completed
+kubectl get hpa             # autoscaler present
+```
+
+## Next steps
+
+<Cards>
+  <Card
+    title="Health & scaling"
+    description="Worker pool, probes, replicas, and memory sizing."
+    href="/docs/server/operations/health-and-scaling"
+  />
+  <Card
+    title="Configuration reference"
+    description="Every CLOUDPDF_* setting and its Helm values key."
+    href="/docs/server/configuration"
+  />
+</Cards>

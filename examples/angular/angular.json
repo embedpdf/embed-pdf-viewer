@@ -1,0 +1,72 @@
+{
+  "$schema": "./node_modules/@angular/cli/lib/config/schema.json",
+  "version": 1,
+  "projects": {
+    "example-angular": {
+      "projectType": "application",
+      "root": "",
+      "sourceRoot": "src",
+      "prefix": "app",
+      "architect": {
+        "build": {
+          "builder": "@angular/build:application",
+          "options": {
+            "outputPath": "dist",
+            "index": "src/index.html",
+            "browser": "src/main.ts",
+            "polyfills": [],
+            "tsConfig": "tsconfig.app.json",
+            "assets": [
+              { "glob": "**/*", "input": "public" },
+              {
+                "glob": "embedpdf.wasm",
+                "input": "../../../packages/engine/runtime/npm/wasm32/lib",
+                "output": "."
+              }
+            ],
+            "styles": ["src/styles.css"]
+          },
+          "configurations": {
+            "production": {
+              "outputHashing": "all"
+            },
+            "development": {
+              "optimization": false,
+              "extractLicenses": false,
+              "sourceMap": true
+            }
+          },
+          "defaultConfiguration": "production"
+        },
+        "serve": {
+          "builder": "@angular/build:dev-server",
+          "options": {
+            "prebundle": {
+              "exclude": [
+                "@embedpdf/angular",
+                "@embedpdf/angular/runtime",
+                "@embedpdf/angular/stage",
+                "@embedpdf/angular/render",
+                "@embedpdf/core-geometry",
+                "@embedpdf/core",
+                "@embedpdf/core-stage",
+                "@embedpdf/plugin-stage",
+                "@embedpdf/plugin-render",
+                "@embedpdf/plugin-interaction"
+              ]
+            }
+          },
+          "configurations": {
+            "development": {
+              "buildTarget": "example-angular:build:development"
+            },
+            "production": {
+              "buildTarget": "example-angular:build:production"
+            }
+          },
+          "defaultConfiguration": "development"
+        }
+      }
+    }
+  }
+}

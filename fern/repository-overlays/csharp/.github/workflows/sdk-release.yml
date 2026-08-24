@@ -1,0 +1,143 @@
+name: SDK Release
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '.github/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sdk-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Publish CloudPDF
+    if: github.event_name == 'workflow_dispatch' || vars.SDK_AUTO_PUBLISH_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Verify generated release version
+        id: version
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import xml.etree.ElementTree as ET
+
+          project = ET.parse('src/CloudPDF/CloudPDF.csproj').getroot()
+          package_id = project.findtext('./PropertyGroup/PackageId')
+          version = project.findtext('./PropertyGroup/Version')
+          with open('cloudpdf-generation.json', encoding='utf-8') as file:
+              generation = json.load(file)
+          if generation['language'] != 'csharp':
+              raise RuntimeError('generation language is not csharp')
+          if package_id != 'CloudPDF':
+              raise RuntimeError(f'unexpected NuGet package {package_id}')
+          if version != generation['sdkVersion']:
+              raise RuntimeError(f'package version {version} does not match generated version {generation["sdkVersion"]}')
+          prerelease = '-' in generation['canonicalVersion']
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
+              output.write(f'version={version}\n')
+              output.write(f'tag=v{version}\n')
+              output.write(f'prerelease={str(prerelease).lower()}\n')
+          PY
+
+      - name: Pack NuGet package
+        run: dotnet pack src/CloudPDF/CloudPDF.csproj -c Release -o dist
+
+      - name: Protect immutable release tag
+        id: release-tag
+        env:
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          git fetch --force --tags origin
+          if git rev-parse --quiet --verify "refs/tags/$RELEASE_TAG" >/dev/null; then
+            tagged_commit="$(git rev-list -n 1 "$RELEASE_TAG")"
+            if [ "$tagged_commit" != "$GITHUB_SHA" ]; then
+              if git diff --quiet "$RELEASE_TAG" "$GITHUB_SHA" -- . ':(exclude).github/**'; then
+                echo "::notice::Reusing $RELEASE_TAG after a workflow-only change."
+              else
+                echo "::error::Release tag $RELEASE_TAG already points to different package source at $tagged_commit; bump the SDK version."
+                exit 1
+              fi
+            fi
+            echo "existed=true" >> "$GITHUB_OUTPUT"
+          else
+            git config user.name cloudpdf-sdk-bot
+            git config user.email hello@cloudpdf.com
+            git tag -a "$RELEASE_TAG" -m "CloudPDF .NET SDK $RELEASE_TAG"
+            git push origin "refs/tags/$RELEASE_TAG"
+            echo "existed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check NuGet publication state
+        id: registry
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          TAG_EXISTED: ${{ steps.release-tag.outputs.existed }}
+        run: |
+          normalized_version="$(printf '%s' "$VERSION" | tr '[:upper:]' '[:lower:]')"
+          package_url="https://api.nuget.org/v3-flatcontainer/cloudpdf/$normalized_version/cloudpdf.$normalized_version.nupkg"
+          http_status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' "$package_url")"
+          case "$http_status" in
+            200)
+              if [ "$TAG_EXISTED" != 'true' ]; then
+                echo "::error::CloudPDF $VERSION already exists on NuGet but its release tag did not exist."
+                exit 1
+              fi
+              echo "publish=false" >> "$GITHUB_OUTPUT"
+              ;;
+            404)
+              echo "publish=true" >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              echo "::error::NuGet returned HTTP $http_status while checking CloudPDF $VERSION."
+              exit 1
+              ;;
+          esac
+
+      - name: Exchange GitHub identity for a NuGet API key
+        if: steps.registry.outputs.publish == 'true'
+        id: nuget-login
+        uses: NuGet/login@v1
+        with:
+          user: ${{ vars.NUGET_USER }}
+
+      - name: Publish to NuGet
+        if: steps.registry.outputs.publish == 'true'
+        env:
+          NUGET_API_KEY: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}
+        run: dotnet nuget push "dist/CloudPDF.${{ steps.version.outputs.version }}.nupkg" --api-key "$NUGET_API_KEY" --source https://api.nuget.org/v3/index.json
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+          PRERELEASE: ${{ steps.version.outputs.prerelease }}
+        run: |
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            exit 0
+          fi
+          args=(--verify-tag --generate-notes --title "CloudPDF .NET SDK $RELEASE_TAG")
+          if [ "$PRERELEASE" = 'true' ]; then args+=(--prerelease); fi
+          gh release create "$RELEASE_TAG" "${args[@]}"

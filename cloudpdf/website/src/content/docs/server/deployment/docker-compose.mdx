@@ -1,0 +1,216 @@
+---
+title: Docker Compose
+description: Run the CloudPDF server as a full self-hosted stack — with Postgres and S3-compatible storage — on a single host using Docker Compose.
+---
+
+import { Callout } from '@/components/docs/callout';
+import { Cards, Card } from '@/components/docs/cards';
+
+# Run with Docker Compose
+
+Docker Compose is the sweet spot for self-hosting on a single machine. You can
+start with the server alone, then add Postgres and S3-compatible object storage
+when you're ready — all in one file you check into your repo.
+
+## Minimal: the server alone
+
+This is the zero-config profile (SQLite + local disk) wrapped in Compose, so it
+survives reboots and is easy to manage.
+
+```yaml
+# docker-compose.yml
+services:
+  cloudpdf:
+    image: ghcr.io/embedpdf/cloudpdf-server:1.0.0
+    init: true
+    ports:
+      - '3000:3000'
+    environment:
+      CLOUDPDF_JWT_SECRET: ${CLOUDPDF_JWT_SECRET:?set CLOUDPDF_JWT_SECRET in .env}
+    volumes:
+      - cloudpdf-data:/data
+    restart: unless-stopped
+
+volumes:
+  cloudpdf-data:
+```
+
+Put your secret in a `.env` file next to it:
+
+```sh
+# .env
+CLOUDPDF_JWT_SECRET=replace-with-a-long-random-string
+```
+
+Then:
+
+```sh
+docker compose up -d
+curl localhost:3000/healthz   # {"status":"ok"}
+```
+
+<Callout type="info">
+  The container reuses the image's built-in healthcheck, so
+  <code>docker compose ps</code> shows real health, and other services can wait
+  on it with <code>depends_on … condition: service_healthy</code>.
+</Callout>
+
+## Production: server + Postgres + object storage
+
+This stack swaps SQLite for Postgres and the local disk for
+[MinIO](https://min.io) (an S3-compatible object store you run yourself — replace
+it with AWS S3 or any S3-compatible service in production). It also runs schema
+migrations as a **one-shot job** that the app waits for, so migrations never race.
+
+```yaml
+# docker-compose.prod.yml
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: cloudpdf
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: cloudpdf
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U cloudpdf']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  minio:
+    image: minio/minio
+    command: server /data --console-address ':9001'
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY_ID:?set S3_ACCESS_KEY_ID}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_ACCESS_KEY:?set S3_SECRET_ACCESS_KEY}
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ['CMD', 'mc', 'ready', 'local']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  # One-shot: apply schema changes, then exit. The app waits for this to finish.
+  migrate:
+    image: ghcr.io/embedpdf/cloudpdf-server:1.0.0
+    command: ['migrate', 'up']
+    environment:
+      CLOUDPDF_DB_DRIVER: postgres
+      CLOUDPDF_DB_URL: postgres://cloudpdf:${POSTGRES_PASSWORD}@postgres:5432/cloudpdf
+      CLOUDPDF_FAIL_ON_PENDING: '1'
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: 'no'
+
+  cloudpdf:
+    image: ghcr.io/embedpdf/cloudpdf-server:1.0.0
+    init: true
+    ports:
+      - '3000:3000'
+    environment:
+      CLOUDPDF_JWT_SECRET: ${CLOUDPDF_JWT_SECRET:?set CLOUDPDF_JWT_SECRET}
+      # Database
+      CLOUDPDF_DB_DRIVER: postgres
+      CLOUDPDF_DB_URL: postgres://cloudpdf:${POSTGRES_PASSWORD}@postgres:5432/cloudpdf
+      # Object storage (MinIO / S3-compatible)
+      CLOUDPDF_STORAGE_KIND: s3
+      CLOUDPDF_STORAGE_S3_BUCKET: cloudpdf
+      CLOUDPDF_STORAGE_S3_REGION: us-east-1
+      CLOUDPDF_STORAGE_S3_ENDPOINT: http://minio:9000
+      AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY}
+      # Migrations are handled by the one-shot job above
+      CLOUDPDF_AUTO_MIGRATE: '0'
+      CLOUDPDF_FAIL_ON_PENDING: '1'
+      # Concurrency — raise as you give the host more cores
+      CLOUDPDF_WORKER_POOL_SIZE: max
+    volumes:
+      - cloudpdf-cache:/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+volumes:
+  pg-data:
+  minio-data:
+  cloudpdf-cache:
+```
+
+```sh
+# .env
+CLOUDPDF_JWT_SECRET=replace-with-a-long-random-string
+POSTGRES_PASSWORD=replace-with-a-strong-password
+S3_ACCESS_KEY_ID=cloudpdf
+S3_SECRET_ACCESS_KEY=replace-with-a-strong-password
+```
+
+Bring it up:
+
+```sh
+docker compose -f docker-compose.prod.yml up -d
+```
+
+What happens, in order: Postgres and MinIO start and become healthy → the
+`migrate` job runs `migrate up` once and exits → the `cloudpdf` app starts only
+after migrations succeed.
+
+<Callout type="info">
+  Even with Postgres and object storage external, the app still keeps a local
+  cache under <code>/data</code> — that's why it has its own volume. The cache is
+  disposable; the server rebuilds it from the object store.
+</Callout>
+
+## Upgrading
+
+Bump the image tag and re-apply. The migration job runs first and the app waits
+for it:
+
+```sh
+# edit the image tag to the new version, then:
+docker compose -f docker-compose.prod.yml up -d
+```
+
+<Callout type="warn">
+  Pin a real version (or digest) for both the <code>migrate</code> and
+  <code>cloudpdf</code> services, and keep them identical — the schema the job
+  applies must match the code the app runs.
+</Callout>
+
+## Running more than one app replica
+
+To run multiple `cloudpdf` replicas on one host, scale the app service — it's
+safe because state lives in Postgres and object storage, not the container:
+
+```sh
+docker compose -f docker-compose.prod.yml up -d --scale cloudpdf=3
+```
+
+Put a load balancer (or your reverse proxy) in front and point its health checks
+at `/readyz`. For real autoscaling and high availability across machines, move to
+[Helm / Kubernetes](/docs/server/deployment/helm).
+
+## Next steps
+
+<Cards>
+  <Card
+    title="Helm / Kubernetes"
+    description="Autoscaling and high availability across nodes."
+    href="/docs/server/deployment/helm"
+  />
+  <Card
+    title="Storage"
+    description="Configure S3, GCS, or Azure Blob."
+    href="/docs/server/configuration/storage"
+  />
+</Cards>

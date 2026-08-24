@@ -1,0 +1,396 @@
+---
+title: Annotation types
+description: Every annotation you can create and the exact fields each one takes.
+---
+
+import { Callout } from '@/components/docs/callout';
+
+# Annotation types
+
+This page lists every annotation you can create with `page.annotations.create(...)` and
+what you pass for each. For reading, updating, styling, and flags, see
+[Annotations](/docs/engine/core-concepts/annotations).
+
+<Callout type="info">
+  Coordinates are in PDF points with the origin at the bottom-left of the page (y goes
+  up). A rectangle is `{ left, bottom, right, top }` and a point is `{ x, y }`.
+</Callout>
+
+Every annotation also accepts these optional base fields, so they're left out of the
+per-type tables below:
+
+- `contents` — a text note/comment.
+- `flags` — PDF flags, e.g. `{ print: true }` (see [Annotations](/docs/engine/core-concepts/annotations#flags)).
+- `nm` — a stable name you want to assign.
+
+Anything you omit falls back to its default (a 1pt solid red stroke, full opacity, no
+fill).
+
+<Callout type="info">
+  Any annotation kind the engine doesn't author yet is read back as `unsupported`. It's
+  listed and preserved, but can't be created or have its type-specific fields edited.
+</Callout>
+
+## Text markup
+
+`highlight`, `underline`, `squiggly`, and `strikeout` all work the same way: a color and
+one or more `quadPoints` quads marking the text regions. A quad is four points
+(`p1`–`p4`).
+
+```ts
+await page.annotations.create({
+  subtype: 'highlight', // or 'underline' | 'squiggly' | 'strikeout'
+  color: { r: 255, g: 215, b: 0 },
+  opacity: 0.4,
+  quadPoints: [
+    { p1: { x: 72, y: 712 }, p2: { x: 272, y: 712 }, p3: { x: 72, y: 696 }, p4: { x: 272, y: 696 } },
+  ],
+});
+```
+
+| Field | What it is | Required | Default |
+| :--- | :--- | :--- | :--- |
+| `quadPoints` | One quad per marked text region | yes | — |
+| `color` | Markup color `{ r, g, b }` | no | red |
+| `opacity` | Transparency `0`–`1` | no | `1` |
+
+## Square and circle
+
+`square` (rectangle) and `circle` (ellipse) are drawn inside a `rect`, with a stroke
+(`color`) and an optional fill (`interiorColor`).
+
+```ts
+await page.annotations.create({
+  subtype: 'circle', // or 'square'
+  rect: { left: 60, bottom: 300, right: 180, top: 400 },
+  color: { r: 0, g: 0, b: 139 },
+  interiorColor: { r: 30, g: 144, b: 255 },
+  strokeWidth: 2,
+  borderStyle: 'solid',
+  opacity: 0.5,
+});
+```
+
+| Field | What it is | Required | Default |
+| :--- | :--- | :--- | :--- |
+| `rect` | Bounding box `{ left, bottom, right, top }` | yes | — |
+| `color` | Stroke color | no | red |
+| `interiorColor` | Fill color, or `null` for none | no | none |
+| `strokeWidth` | Border thickness | no | `1` |
+| `borderStyle` | `'solid'`/`'dashed'`/`'beveled'`/`'inset'` | no | `'solid'` |
+| `dashArray` | Dash pattern (with `'dashed'`) | no | — |
+| `opacity` | Transparency `0`–`1` | no | `1` |
+| `cloudyIntensity` | Cloudy-border strength (`0` = plain) | no | `0` |
+| `rectDifferences` | Inset of the shape from `rect` (see below) | no | none |
+
+## Polygon and polyline
+
+Both take a `vertices` point list and a `rect`. A `polygon` is closed and can be filled;
+a `polyline` is open and can have arrowheads (`lineEndings`).
+
+```ts
+// Polygon (closed, filled)
+await page.annotations.create({
+  subtype: 'polygon',
+  rect: { left: 60, bottom: 450, right: 180, top: 550 },
+  vertices: [
+    { x: 70, y: 460 },
+    { x: 170, y: 460 },
+    { x: 120, y: 540 },
+  ],
+  color: { r: 0, g: 0, b: 139 },
+  interiorColor: { r: 255, g: 215, b: 0 },
+  strokeWidth: 2,
+});
+
+// Polyline (open, with arrowheads)
+await page.annotations.create({
+  subtype: 'polyline',
+  rect: { left: 220, bottom: 450, right: 360, top: 550 },
+  vertices: [
+    { x: 230, y: 460 },
+    { x: 290, y: 540 },
+    { x: 350, y: 460 },
+  ],
+  color: { r: 220, g: 20, b: 60 },
+  strokeWidth: 2,
+  lineEndings: { start: 'open-arrow', end: 'closed-arrow' },
+});
+```
+
+| Field | What it is | Required | Default |
+| :--- | :--- | :--- | :--- |
+| `vertices` | Ordered points `{ x, y }` | yes | — |
+| `rect` | Bounding box | yes | — |
+| `color` | Stroke color | no | red |
+| `interiorColor` | Fill, or `null` (polygon) | no | none |
+| `strokeWidth` | Line thickness | no | `1` |
+| `borderStyle` | `'solid'`/`'dashed'`/`'beveled'`/`'inset'` | no | `'solid'` |
+| `dashArray` | Dash pattern (with `'dashed'`) | no | — |
+| `opacity` | Transparency `0`–`1` | no | `1` |
+| `lineEndings` | Arrowheads — **polyline only** | no | none |
+| `cloudyIntensity` | Cloudy border — **polygon only** | no | `0` |
+
+## Line
+
+A single straight line between two points, with optional endings.
+
+```ts
+await page.annotations.create({
+  subtype: 'line',
+  rect: { left: 400, bottom: 450, right: 520, top: 550 },
+  linePoints: { start: { x: 410, y: 460 }, end: { x: 510, y: 540 } },
+  color: { r: 0, g: 128, b: 128 },
+  strokeWidth: 2,
+  lineEndings: { start: 'none', end: 'open-arrow' },
+});
+```
+
+| Field | What it is | Required | Default |
+| :--- | :--- | :--- | :--- |
+| `linePoints` | `{ start: { x, y }, end: { x, y } }` | yes | — |
+| `rect` | Bounding box | yes | — |
+| `color` | Stroke color | no | red |
+| `strokeWidth` | Line thickness | no | `1` |
+| `borderStyle` | `'solid'`/`'dashed'`/`'beveled'`/`'inset'` | no | `'solid'` |
+| `dashArray` | Dash pattern (with `'dashed'`) | no | — |
+| `opacity` | Transparency `0`–`1` | no | `1` |
+| `lineEndings` | Endings at start/end | no | none |
+
+## Ink
+
+Freehand drawing. `inkList` is an array of strokes; each stroke is an array of points
+(one pen path). Ink has a stroke but no fill.
+
+```ts
+await page.annotations.create({
+  subtype: 'ink',
+  rect: { left: 60, bottom: 60, right: 300, top: 200 },
+  inkList: [
+    [ { x: 70, y: 80 }, { x: 120, y: 180 }, { x: 180, y: 90 } ], // stroke 1
+    [ { x: 200, y: 100 }, { x: 260, y: 160 } ],                  // stroke 2
+  ],
+  color: { r: 220, g: 20, b: 60 },
+  strokeWidth: 3,
+});
+```
+
+| Field | What it is | Required | Default |
+| :--- | :--- | :--- | :--- |
+| `inkList` | Array of strokes; each an array of points | yes | — |
+| `rect` | Box covering all strokes | yes | — |
+| `color` | Stroke color | no | red |
+| `strokeWidth` | Pen thickness | no | `1` |
+| `borderStyle` | `'solid'`/`'dashed'`/`'beveled'`/`'inset'` | no | `'solid'` |
+| `dashArray` | Dash pattern (with `'dashed'`) | no | — |
+| `opacity` | Transparency `0`–`1` | no | `1` |
+
+## Free text and callout
+
+A `free-text` annotation draws text directly on the page (a sticky label, a comment box,
+or a callout that points at something). It's one type with two `intent` values:
+`'free-text'` for a plain box and `'free-text-callout'` for a box with a leader line.
+
+The colors are the part worth understanding:
+
+- `color` — the **border color and the text color**. This is the one color you almost
+  always set.
+- `fontColor` — optional. Set it only when you want the **text a different color than the
+  border**. Leave it out and the text just follows `color`.
+- `interiorColor` — the **box background**. Leave it out (or pass `null`) for a
+  transparent box.
+
+```ts
+// Plain text box
+await page.annotations.create({
+  subtype: 'free-text',
+  intent: 'free-text',
+  rect: { left: 60, bottom: 600, right: 260, top: 660 },
+  fontFamily: 'helvetica',
+  fontSize: 14,
+  textAlign: 'center',
+  contents: 'Please review this section',
+  color: { r: 20, g: 40, b: 60 },        // border + text
+  interiorColor: { r: 250, g: 250, b: 210 }, // pale yellow background
+});
+
+// Callout (box + leader line pointing at something)
+await page.annotations.create({
+  subtype: 'free-text',
+  intent: 'free-text-callout',
+  rect: { left: 280, bottom: 600, right: 480, top: 660 },
+  fontFamily: 'times-roman',
+  fontSize: 12,
+  textAlign: 'left',
+  contents: 'Look here',
+  color: { r: 0, g: 0, b: 0 },
+  fontColor: { r: 200, g: 0, b: 0 }, // red text, black border
+  calloutLine: [
+    { x: 265, y: 605 }, // the point being called out
+    { x: 320, y: 630 }, // optional knee
+    { x: 280, y: 640 }, // where the line meets the box
+  ],
+  lineEnding: 'open-arrow',
+});
+```
+
+| Field | What it is | Required | Default |
+| :--- | :--- | :--- | :--- |
+| `intent` | `'free-text'` or `'free-text-callout'` | yes | — |
+| `rect` | Bounding box | yes | — |
+| `fontFamily` | A standard font or a registered font key (see below) | yes | — |
+| `fontSize` | Text size in points | yes | — |
+| `textAlign` | `'left'`/`'center'`/`'right'` | yes | — |
+| `contents` | The text to show | no | — |
+| `color` | Border + default text color | no | black |
+| `fontColor` | Text color override | no | follows `color` |
+| `interiorColor` | Box background, or `null` for none | no | none |
+| `opacity` | Transparency `0`–`1` | no | `1` |
+| `strokeWidth` | Border thickness | no | `1` |
+| `borderStyle` | `'solid'`/`'dashed'`/`'beveled'`/`'inset'` | no | `'solid'` |
+| `dashArray` | Dash pattern (with `'dashed'`) | no | — |
+| `calloutLine` | Leader line, 2 or 3 points — **callout only** | no | none |
+| `lineEnding` | Arrowhead at the called-out end — **callout only** | no | none |
+| `rectDifferences` | Inset of the text box from `rect` | no | none |
+
+The `calloutLine` is 2 points for a straight leader or 3 for a knee-jointed one. The
+**first** point is what's being pointed at; the **last** point touches the text box.
+`lineEnding` is the arrowhead drawn at the pointed-at end — same names as
+[line endings](#line-endings).
+
+### Fonts
+
+`fontFamily` is one of the 14 standard PDF fonts, so they render everywhere without
+embedding:
+
+`courier`, `courier-bold`, `courier-bold-oblique`, `courier-oblique`, `helvetica`,
+`helvetica-bold`, `helvetica-bold-oblique`, `helvetica-oblique`, `times-roman`,
+`times-bold`, `times-bold-italic`, `times-italic`, `symbol`, `zapf-dingbats`.
+
+`fontFamily` also accepts the key of a font you've registered with the engine — pass
+`'noto-sc'` instead of a standard name to draw CJK, Cyrillic, or any other script, and a
+glyph subset is embedded on save. See [Custom fonts](/docs/engine/core-concepts/custom-fonts).
+
+<Callout type="info">
+  Vertical alignment and rich text aren't authored yet — text is single-style and
+  top-aligned in the box.
+</Callout>
+
+## Caret
+
+A `caret` marks a place in the text — typically where something should be inserted or
+where an edit was made. It's the simplest annotation: just a position (`rect`), a color,
+and an opacity.
+
+```ts
+await page.annotations.create({
+  subtype: 'caret',
+  rect: { left: 50, bottom: 700, right: 90, top: 730 },
+  color: { r: 0, g: 0, b: 255 },
+});
+```
+
+| Field | What it is | Required | Default |
+| :--- | :--- | :--- | :--- |
+| `rect` | Where the caret sits | yes | — |
+| `color` | Caret color | no | red |
+| `opacity` | Transparency `0`–`1` | no | `1` |
+| `rectDifferences` | Inset of the drawn caret from `rect` | no | none |
+
+## Stamp
+
+A `stamp` places an image — or a vector appearance — inside `rect`. You pass the bytes
+inline as `source`; there is no separate upload or attachment step. The format is
+detected from the bytes themselves (never from a declared mime type), and each format
+takes the best path into the PDF:
+
+- **PNG** — decoded natively, transparency preserved.
+- **JPEG** — embedded as-is (no re-encoding).
+- **Single-page PDF** — cloned in as a *vector* appearance that stays crisp at any zoom.
+
+```ts
+// From a file input, a fetch, or raw bytes — Blob and Uint8Array both work.
+await page.annotations.create({
+  subtype: 'stamp',
+  rect: { left: 72, bottom: 640, right: 222, top: 715 },
+  source: file, // PNG, JPEG, or single-page PDF bytes
+  fit: 'contain',
+});
+```
+
+| Field | What it is | Required | Default |
+| :--- | :--- | :--- | :--- |
+| `rect` | Bounding box | yes | — |
+| `source` | The content bytes: `Blob`, `Uint8Array`, or `{ data, mimeType?, name? }` | yes | — |
+| `fit` | How the content maps into `rect` (see below) | no | `'contain'` |
+| `name` | Standard stamp label (`'Approved'`, `'Draft'`, `'Confidential'`, …) | no | none |
+
+`fit` uses the CSS `object-fit` vocabulary: `'contain'` preserves the aspect ratio and
+keeps the content fully visible, `'cover'` preserves the aspect ratio and fills the box
+(may crop), `'fill'` stretches to the box.
+
+The bytes are written into the stamp's appearance stream, so the document stays fully
+self-contained — it renders in any PDF viewer and survives download and re-open with no
+side-car storage. The call is identical on the local and cloud engines.
+
+Changing the geometry later (an `update` with a new `rect`, or a resize in the viewer)
+re-fits the existing appearance — the image is never re-uploaded or re-encoded. Sending
+a new `source` in an `update` replaces the content:
+
+```ts
+await page.annotations.update(ref, { subtype: 'stamp', source: otherImage });
+```
+
+Unsupported bytes (anything that isn't PNG, JPEG, or PDF) reject with `InvalidArg`
+before any work happens.
+
+## Cloudy borders
+
+`square`, `circle`, and `polygon` support a cloudy (scalloped) border instead of a
+straight one — the wavy outline reviewers often use to circle a region. Turn it on with
+`cloudyIntensity`, a number that sets how pronounced the waves are:
+
+- `0` (or omitted) — a plain, straight border.
+- around `1` — gentle waves.
+- around `2` — larger, more pronounced waves.
+
+```ts
+await page.annotations.create({
+  subtype: 'square',
+  rect: { left: 60, bottom: 300, right: 180, top: 400 },
+  color: { r: 220, g: 20, b: 60 },
+  strokeWidth: 2,
+  cloudyIntensity: 2, // wavy "cloud" outline
+});
+```
+
+Higher values mean bigger scallops. `cloudyIntensity` only affects the outline; the fill
+(`interiorColor`) and everything else behave the same. It has no effect on `line`,
+`polyline`, or text markup.
+
+## Rectangle differences
+
+`square`, `circle`, `free-text`, and `caret` accept an optional `rectDifferences` — the
+gap, in points, between the `rect` you pass and where the shape (or text box) is actually
+drawn. It's four non-negative insets, one per edge:
+
+```ts
+rectDifferences: { left: 6, top: 6, right: 6, bottom: 6 } // drawn 6pt inside rect on every side
+```
+
+You mostly need this with a cloudy border: the scallops bulge outward, so `rect` has to
+be a little larger than the shape to fully contain them. `rectDifferences` records how far
+the shape sits inside `rect` so the bounding box stays correct. For a plain border you can
+leave it out — the shape just fills `rect`.
+
+`polygon` doesn't use `rectDifferences`: its outline is already given exactly by
+`vertices` (plus `rect`), so there's nothing to inset.
+
+## Line endings
+
+For `line` and `polyline`, `lineEndings` is `{ start, end }` where each is one of:
+
+`none`, `square`, `circle`, `diamond`, `open-arrow`, `closed-arrow`, `butt`,
+`r-open-arrow`, `r-closed-arrow`, `slash`.
+
+The `r-` variants are reversed. Omit `lineEndings` to leave both ends plain.

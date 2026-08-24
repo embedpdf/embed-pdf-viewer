@@ -1,0 +1,36 @@
+{
+  "name": "@embedpdf/example-cloud-dashboard",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "The CloudPDF product demo: upload documents, share them as different people with different scopes, open them in the cloud viewer, and watch every wire call in the inspector. No wasm in the bundle — rendering happens on the server.",
+  "scripts": {
+    "build:deps": "pnpm --filter @embedpdf/engine-core build && pnpm --filter @embedpdf/engine-services build && pnpm --filter @cloudpdf/contract build && pnpm --filter @cloudpdf/sdk build && pnpm --filter @cloudpdf/engine build && pnpm --filter @cloudpdf/server build",
+    "dev": "pnpm run build:deps && concurrently -k -n api,ui \"pnpm run dev:api\" \"pnpm run dev:ui\"",
+    "dev:api": "tsx server/dev-server.ts",
+    "dev:ui": "vite --host 127.0.0.1 --port 5178",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --host 127.0.0.1 --port 5178"
+  },
+  "dependencies": {
+    "@cloudpdf/sdk": "workspace:*",
+    "@cloudpdf/engine": "workspace:*",
+    "@cloudpdf/server": "workspace:*",
+    "@cloudpdf/viewer-react": "workspace:*",
+    "@embedpdf/engine-core": "workspace:*",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.1.18",
+    "@types/node": "^22.19.0",
+    "@types/react": "^18.3.0",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "concurrently": "^9.2.0",
+    "tailwindcss": "^4.1.18",
+    "tsx": "^4.19.0",
+    "typescript": "latest",
+    "vite": "^6.3.5"
+  }
+}

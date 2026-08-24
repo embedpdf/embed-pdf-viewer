@@ -1,4 +1,0 @@
-docker
-build/exported-functions.txt
-build/exported-runtime-methods.txt
-build/wasm

@@ -54,4 +54,11 @@ By participating in this project, you agree to abide by our Code of Conduct. Ple
 
 ## License
 
-By contributing, you agree that your contributions will be licensed under the MIT License.
+By contributing, you agree that your contributions are licensed under the
+[Apache License 2.0](LICENSE) (inbound = outbound).
+
+The one special case is `cloudpdf/server`, which is distributed under the Fair
+Core License (FCL-1.0-ALv2) — see [LICENSING.md](LICENSING.md). By contributing
+to `cloudpdf/server` you license your contribution to CloudPDF LTD under
+Apache-2.0 and agree that CloudPDF LTD may distribute it as part of the server
+under the FCL and under commercial license terms.

@@ -1,0 +1,22 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./out-tsc/app",
+    "lib": ["ES2022", "DOM", "DOM.Iterable", "WebWorker"]
+  },
+  "files": ["src/main.ts"],
+  "include": [
+    "src/**/*.d.ts",
+    "../../packages/core/geometry/src/**/*.ts",
+    "../../packages/core/main/src/**/*.ts",
+    "../../packages/core/stage/src/**/*.ts",
+    "../../packages/plugin/stage/src/**/*.ts",
+    "../../packages/plugin/render/src/**/*.ts",
+    "../../packages/plugin/interaction/src/**/*.ts",
+    "../../packages/engine/main/src/**/*.ts",
+    "../../packages/engine/core/src/**/*.ts",
+    "../../packages/engine/services/src/**/*.ts",
+    "../../packages/engine/runtime/src/**/*.ts"
+  ],
+  "exclude": ["../../packages/*/*/src/**/*.test.ts", "../../packages/*/*/src/**/*.spec.ts"]
+}

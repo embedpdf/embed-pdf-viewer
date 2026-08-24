@@ -1,0 +1,97 @@
+---
+title: Introduction
+description: The @cloudpdf/engine cloud client — open documents, render pages, read text, and manage annotations over HTTP with one Engine API.
+---
+
+import { Cards, Card } from '@/components/docs/cards';
+import { Callout } from '@/components/docs/callout';
+
+# The engine
+
+`@cloudpdf/engine` is the **cloud client** for CloudPDF. It implements the same
+`Engine` interface as the local WASM engine that powers EmbedPDF, but instead of
+running PDFium in a Web Worker it routes every call over HTTPS to a
+`@cloudpdf/server` deployment (self-hosted or CloudPDF SaaS).
+
+That means the same SDK code that drives a fully local viewer also drives a
+cloud-backed one — only the transport differs. You get document open, page
+rendering, text extraction, annotations, metadata, and security/access through a
+single, abortable, strongly-typed API.
+
+These pages assume a reachable CloudPDF deployment — the managed SaaS or your
+own `@cloudpdf/server` — and every example talks to it over HTTPS.
+
+<Callout type="info">
+  Prefer running fully in the browser, with no server at all? That's the
+  [local WASM engine](https://www.embedpdf.com/docs/engine) — the same
+  `Engine` API and the same plugins, powered by `@embedpdf/engine`.
+</Callout>
+
+<Callout type="info">
+  New here? Jump to the <a href="/docs/engine/getting-started/quick-start">Quick start</a> to
+  open a document and render its first page in a few lines of code.
+</Callout>
+
+## What the engine gives you
+
+- **One `Engine` contract** — `createCloudEngine(...)` returns an object with a
+  single `open()` method that resolves to a `DocumentHandle`.
+- **Document handles** — a `DocumentHandle` exposes `metadata`, `annotations`,
+  `pages`, `security`, and a `page(pon)` accessor for per-page work.
+- **Rendering** — request a page as an encoded image (`png`/`webp`) or raw RGBA,
+  at any scale or target rectangle.
+- **Text & geometry** — extract a page's plain text or geometry snapshot.
+- **Annotations** — list, create, update, delete, and reorder annotations.
+- **Security & access** — inspect encryption/permission state, unlock
+  password-protected documents, and read the caller's effective scope.
+- **Abortable everything** — every async call returns an `AbortablePromise` you
+  can cancel, with typed `EngineError`s on failure.
+
+## How it fits together
+
+```ts
+import { createCloudEngine } from '@cloudpdf/engine';
+
+const engine = createCloudEngine({
+  baseUrl: 'https://pdf.your-app.com',
+  token: () => getDocToken(), // doc-scoped JWT from your backend
+});
+
+const doc = await engine.open({ kind: 'token', token: () => getDocToken() });
+const page = doc.page(/* pageObjectNumber */ 4);
+const image = await page.render.image({ viewport: { kind: 'width', width: 1200 } });
+
+const { url, revoke } = await image.objectUrl();
+// …draw `url` into an <img>, then revoke() when done.
+
+await doc.close();
+await engine.destroy();
+```
+
+Your backend mints the short-lived, document-scoped JWT; the browser never sees
+storage credentials or your tenant secret.
+
+## Next steps
+
+<Cards>
+  <Card
+    title="Installation"
+    description="Add @cloudpdf/engine and point it at your server."
+    href="/docs/engine/getting-started/installation"
+  />
+  <Card
+    title="Quick start"
+    description="Open a document and render a page in minutes."
+    href="/docs/engine/getting-started/quick-start"
+  />
+  <Card
+    title="Authentication"
+    description="Doc-scoped tokens, public share tokens, opening by token vs. by id vs. by share."
+    href="/docs/engine/getting-started/authentication"
+  />
+  <Card
+    title="Engine & handles"
+    description="The Engine, DocumentHandle, and PageHandle model."
+    href="/docs/engine/core-concepts/engine-and-handles"
+  />
+</Cards>

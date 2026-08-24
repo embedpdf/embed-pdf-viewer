@@ -1,0 +1,36 @@
+---
+title: Engine
+description: The local PDF engine underneath the ready-made viewer and every headless integration.
+---
+
+# EmbedPDF Engine
+
+The Engine is the asynchronous PDF boundary shared by every EmbedPDF
+integration. It owns document I/O and PDF operations; Viewer and Headless add
+plugins, reactive state, and UI on top.
+
+Use `@embedpdf/engine` directly when you need to open, inspect, transform, or
+save documents without adopting a viewer UI.
+
+## What the Engine provides
+
+- **Document lifecycle** — open bytes, work through a typed document handle,
+  then close the document and destroy the engine.
+- **Page operations** — inspect page geometry and order, render pages, rotate,
+  move, insert, extract, and delete pages.
+- **Document features** — text and search, metadata, forms, annotations,
+  attachments, security, and downloads.
+- **Local execution** — PDFium runs through WebAssembly in a Web Worker, away
+  from the browser's main thread.
+
+## Where it fits
+
+The ready-made Viewer and Headless Components both depend on the same Engine
+contract. Choose those layers when you need UI; use the Engine directly for
+background processing, custom rendering pipelines, or non-UI workflows.
+
+```sh npm2yarn
+npm install @embedpdf/engine
+```
+
+[Create your first local engine](/docs/engine/getting-started).

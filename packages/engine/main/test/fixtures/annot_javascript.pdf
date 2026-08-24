@@ -1,0 +1,53 @@
+%PDF-1.7
+% ò¤ô
+1 0 obj <<
+  /Type /Catalog
+  /Pages 2 0 R
+  /AcroForm <<
+    /Fields [4 0 R]
+  >>
+>>
+endobj
+2 0 obj <<
+  /Type /Pages
+  /MediaBox [0 0 612 792]
+  /Kids [3 0 R]
+  /Count 1
+>>
+endobj
+3 0 obj <<
+  /Type /Page
+  /Parent 2 0 R
+  /MediaBox [0 0 612 792]
+  /Annots [4 0 R]
+>>
+endobj
+4 0 obj <<
+  /Type /Annot
+  /Subtype /Widget
+  /Rect [85 721 153 735]
+  /FT /Tx
+  /P 3 0 R
+  /T (Widget)
+  /AA <<
+    /F <<
+      /JS (AFDate_FormatEx\("yyyy-mm-dd"\);)
+      /S /JavaScript
+    >>
+  >>
+>>
+endobj
+xref
+0 5
+0000000000 65535 f 
+0000000015 00000 n 
+0000000108 00000 n 
+0000000197 00000 n 
+0000000292 00000 n 
+trailer <<
+  /Root 1 0 R
+  /Size 5
+>>
+startxref
+504
+%%EOF

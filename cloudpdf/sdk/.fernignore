@@ -1,0 +1,11 @@
+# Full-file ownership for the workflow layer around Fern's generated protocol.
+src/index.ts
+src/CloudPDFClient.ts
+src/uploads/**
+tests/uploads.test.ts
+README.md
+
+# Changesets is the sole owner of the published package changelog. The pinned
+# generator currently writes it despite this rule, so the TypeScript generation
+# wrapper also snapshots and restores the file around Fern.
+CHANGELOG.md

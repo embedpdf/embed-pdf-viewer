@@ -1,0 +1,82 @@
+@import 'tailwindcss';
+@config '../../tailwind.config.ts';
+/* Kit hook baselines (dk-dark-scroll et al) — see docs/kit/styles.css. */
+@import '@embedpdf/docs-kit/styles.css';
+
+html {
+  @apply text-base antialiased;
+  -webkit-tap-highlight-color: transparent;
+  scroll-behavior: smooth;
+}
+
+/* ---- @embedpdf/docs-kit token contract (docs/kit/src/tokens.ts) ----
+   CloudPDF brand values, mapped from the cp-* palette in tailwind.config. */
+:root {
+  --dk-accent: #1677ff;
+  --dk-heading: #0a1a4d;
+  --dk-muted: #5a6b92;
+  --dk-border: #e4eaf4;
+  --dk-accent-surface: #ecf2fe;
+}
+
+.sales-dialog::backdrop {
+  background: rgba(7, 32, 76, 0.52);
+  backdrop-filter: blur(6px);
+}
+
+/* Decorative dotted grid used across hero / docs / pricing */
+.cp-dots {
+  background-image: radial-gradient(circle, currentColor 3px, transparent 3.5px);
+  background-repeat: repeat;
+  background-size: 26px 26px;
+}
+.cp-dots-fine {
+  background-image: radial-gradient(circle, currentColor 4.5px, transparent 5px);
+  background-repeat: repeat;
+  background-size: 35px 35px;
+}
+
+/* ---- Code token colours (used by dangerouslySetInnerHTML snippets) ---- */
+.cp-code-pre .tk-kw {
+  color: #c792ea;
+}
+.cp-code-pre .tk-mod {
+  color: #82aaff;
+}
+.cp-code-pre .tk-tag {
+  color: #6fb3ff;
+}
+.cp-code-pre .tk-attr {
+  color: #c792ea;
+}
+.cp-code-pre .tk-str {
+  color: #95e1a8;
+}
+.cp-code-pre .tk-fn {
+  color: #82aaff;
+}
+.cp-code-pre .tk-num {
+  color: #f7a66b;
+}
+.cp-code-pre .tk-com {
+  color: #5e72a8;
+  font-style: italic;
+}
+.cp-code-pre .tk-pun {
+  color: #6b7a99;
+}
+
+/* ---- Docs prose typography (CloudPDF brand) ---- */
+.prose-cloudpdf :not(pre) > code {
+  border-radius: 6px;
+  background-color: #eef3fc;
+  border: 1px solid #e0e8f6;
+  padding: 0.125rem 0.4rem;
+  font-family: var(--font-mono, ui-monospace, Menlo, monospace);
+  font-size: 0.875em;
+  color: #2b53b8;
+  white-space: nowrap;
+}
+
+/* Fenced code blocks are styled by the <Pre> component (components/docs/pre.tsx).
+   Token colors come from shiki (material-theme-palenight) inline styles. */

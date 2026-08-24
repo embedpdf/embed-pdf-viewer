@@ -1,0 +1,132 @@
+@import 'tailwindcss';
+
+/* This sheet ships INSIDE the chrome package, so consumers importing it sit
+   outside Tailwind's automatic content detection (node_modules is ignored).
+   Point the scanner at our own sources explicitly — relative to this file. */
+@source './';
+
+/* Dark mode is class-driven (we toggle `.dark` on <html>), not media-driven,
+   so the `theme` preference is authoritative over the OS setting. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Semantic theme tokens — ported 1:1 from the snippet's light/dark themes
+   (viewers/snippet/src/config/theme.ts). Runtime CSS variables so the theme
+   switches with a class; `@theme inline` below turns each into a Tailwind
+   color utility (bg-surface, text-fg-muted, border-subtle, …). */
+/* `:host` alongside `:root`: inside the <embedpdf-viewer> shadow root there is
+   no :root match, so the host carries the base tokens. The dark override stays
+   a plain `.dark` class — the element applies it to its shadow WRAPPER (and
+   apps to <html>), so one selector serves both worlds. */
+:root,
+:host {
+  --ep-app: #f3f4f6;
+  --ep-surface: #ffffff;
+  --ep-surface-alt: #f1f3f5;
+  --ep-elevated: #ffffff;
+  --ep-fg: #111827;
+  --ep-fg-secondary: #374151;
+  --ep-fg-muted: #6b7280;
+  --ep-fg-disabled: #9ca3af;
+  --ep-on-accent: #ffffff;
+  --ep-border: #d1d5db;
+  --ep-border-subtle: #e5e7eb;
+  --ep-border-strong: #9ca3af;
+  --ep-accent: #3b82f6;
+  --ep-accent-hover: #2563eb;
+  --ep-accent-active: #1d4ed8;
+  --ep-accent-light: #eff6ff;
+  --ep-hover: #f3f4f6;
+  --ep-active: #e5e7eb;
+  --ep-selected: #eff6ff;
+  --ep-canvas: #f3f4f6;
+}
+
+.dark {
+  --ep-app: #111827;
+  --ep-surface: #1f2937;
+  --ep-surface-alt: #374151;
+  --ep-elevated: #1f2937;
+  --ep-fg: #f9fafb;
+  --ep-fg-secondary: #e5e7eb;
+  --ep-fg-muted: #9ca3af;
+  --ep-fg-disabled: #6b7280;
+  --ep-on-accent: #111827;
+  --ep-border: #4b5563;
+  --ep-border-subtle: #374151;
+  --ep-border-strong: #6b7280;
+  --ep-accent: #60a5fa;
+  --ep-accent-hover: #3b82f6;
+  --ep-accent-active: #2563eb;
+  --ep-accent-light: #1e3a5f;
+  --ep-hover: #374151;
+  --ep-active: #4b5563;
+  --ep-selected: #1e3a5f;
+  --ep-canvas: #0d1117;
+}
+
+@theme inline {
+  --color-app: var(--ep-app);
+  --color-surface: var(--ep-surface);
+  --color-surface-alt: var(--ep-surface-alt);
+  --color-elevated: var(--ep-elevated);
+  --color-fg: var(--ep-fg);
+  --color-fg-secondary: var(--ep-fg-secondary);
+  --color-fg-muted: var(--ep-fg-muted);
+  --color-fg-disabled: var(--ep-fg-disabled);
+  --color-on-accent: var(--ep-on-accent);
+  --color-border: var(--ep-border);
+  --color-border-subtle: var(--ep-border-subtle);
+  --color-border-strong: var(--ep-border-strong);
+  --color-accent: var(--ep-accent);
+  --color-accent-hover: var(--ep-accent-hover);
+  --color-accent-active: var(--ep-accent-active);
+  --color-accent-light: var(--ep-accent-light);
+  --color-hover: var(--ep-hover);
+  --color-active: var(--ep-active);
+  --color-selected: var(--ep-selected);
+  --color-canvas: var(--ep-canvas);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family:
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    Helvetica,
+    Arial,
+    sans-serif;
+  color: var(--ep-fg);
+  background: var(--ep-app);
+}
+
+/* The measurement layer in <Toolbar> is aria-hidden + visibility:hidden; make
+   doubly sure it never intercepts pointer events or shows a scrollbar. */
+[data-measure-layer] {
+  pointer-events: none;
+}
+
+/* Headless scrollbar theming. The component ships geometry + behavior only
+   (thumb drag, track paging, auto-hide → data-state); everything visual is
+   these few rules — restyle or replace them freely. */
+:root {
+  --epdf-scrollbar-thumb: rgba(17, 24, 39, 0.35);
+}
+.dark {
+  --epdf-scrollbar-thumb: rgba(249, 250, 251, 0.28);
+}
+[data-embedpdf-scrollbar-thumb] {
+  transition: background 150ms;
+}
+[data-embedpdf-scrollbar-thumb]:hover,
+[data-embedpdf-scrollbar][data-dragging] [data-embedpdf-scrollbar-thumb] {
+  background: var(--ep-fg-muted);
+}

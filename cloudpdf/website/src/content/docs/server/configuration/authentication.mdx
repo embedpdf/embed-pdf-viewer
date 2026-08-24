@@ -1,0 +1,128 @@
+---
+title: Authentication
+description: How the CloudPDF server authenticates requests with document-scoped and admin JWTs, and how to manage the signing secret.
+---
+
+import { Callout } from '@/components/docs/callout';
+import { Cards, Card } from '@/components/docs/cards';
+
+# Authentication
+
+The server trusts no request by default. Every document and admin route requires
+a valid **JWT**, signed with a secret shared between the server and the backend
+that mints tokens. Only the health probes (`/healthz`, `/readyz`) are public.
+
+## The signing secret
+
+One secret signs and verifies every token:
+
+```sh
+CLOUDPDF_JWT_SECRET=a-long-random-string
+```
+
+This is the single required setting. The server uses HS256, so the **same**
+secret must be configured on the server and used by your backend to sign tokens.
+
+```sh
+# Generate a strong secret
+openssl rand -hex 32
+```
+
+<Callout type="warn">
+  Treat the secret like a password. Keep it out of source control, inject it
+  through your secret manager (or Kubernetes Secret), and rotate it if it leaks.
+  Anyone with the secret can mint tokens for any document.
+</Callout>
+
+## Two kinds of token
+
+| Token | Who holds it | What it allows |
+| --- | --- | --- |
+| **Document-scoped** | The end user's browser, via `@cloudpdf/engine` | Acting on **one** document — render, read text, manage annotations — limited to the scope you encode. |
+| **Admin** | Your trusted backend | Managing documents — create, upload, and mint or revoke tokens — via `/v1/admin/*`. |
+
+The design principle: the browser only ever holds a **narrow, short-lived,
+single-document** token. Your tenant secret and storage credentials never leave
+the server side.
+
+## The token flow
+
+```
+User opens a doc
+      │
+      ▼
+Your backend  ──(verifies the user, then signs a doc-scoped JWT)──▶  JWT
+      │
+      ▼
+Frontend (@cloudpdf/engine)  ──Authorization: Bearer <JWT>──▶  CloudPDF server
+      │                                                              │
+      └──────────────── rendered pages, text, annotations ◀─────────┘
+```
+
+1. Your backend authenticates the user with your own auth system.
+2. It mints a short-lived JWT scoped to the document the user may access, signed
+   with `CLOUDPDF_JWT_SECRET`.
+3. The frontend passes that token to the engine, which sends it as a Bearer
+   token on every request.
+4. The server verifies the signature and scope, then serves the request.
+
+## Minting a token
+
+Use any JWT library. The token is signed with `CLOUDPDF_JWT_SECRET` and carries
+the document scope your server expects:
+
+```ts
+import { SignJWT } from 'jose';
+
+const secret = new TextEncoder().encode(process.env.CLOUDPDF_JWT_SECRET);
+
+export async function mintDocToken(documentId: string) {
+  return new SignJWT({ documentId /* + the scope your policy allows */ })
+    .setProtectedHeader({ alg: 'HS256' })
+    .setIssuedAt()
+    .setExpirationTime('5m') // keep it short
+    .sign(secret);
+}
+```
+
+Hand short-lived tokens to the engine through a **factory**, so they refresh
+transparently as your backend re-issues them:
+
+```ts
+import { createCloudEngine } from '@cloudpdf/engine';
+
+const engine = createCloudEngine({
+  baseUrl: 'https://pdf.your-app.com',
+  token: () => fetchFreshDocToken(), // called on every request
+});
+```
+
+<Callout type="info">
+  Prefer <strong>short</strong> expirations and a token <strong>factory</strong>
+  over long-lived tokens. The browser never needs a token that outlives the
+  current view. See the engine's
+  <a href="/docs/engine/getting-started/authentication">Authentication guide</a>
+  for opening by id vs. by token and the public-share flow.
+</Callout>
+
+## Revoking tokens
+
+For cases where you must cut off access before a token naturally expires, the
+admin API can revoke tokens. Combined with short expirations, this gives you
+both fast issuance and a hard kill switch. See the
+[CLI](/docs/server/operations/cli) and admin routes for details.
+
+## Next steps
+
+<Cards>
+  <Card
+    title="The engine client"
+    description="Drive the server with doc-scoped tokens from the frontend."
+    href="/docs/engine/getting-started/authentication"
+  />
+  <Card
+    title="Configuration reference"
+    description="Every setting, including the auth secret."
+    href="/docs/server/configuration"
+  />
+</Cards>

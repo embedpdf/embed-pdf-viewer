@@ -1,0 +1,343 @@
+name: Build PDF Runtime
+
+on:
+  workflow_dispatch:
+  workflow_call:
+  pull_request:
+    paths:
+      - 'packages/engine/runtime/**'
+      - '.github/workflows/build-engine-runtime.yml'
+  push:
+    # Every branch: payloads are published content-addressed (see payload-key
+    # job), so feature-branch runtime changes get fetchable payloads for
+    # Vercel previews and fresh checkouts without waiting for next/main.
+    branches: ['**']
+    paths:
+      - 'packages/engine/runtime/**'
+      - '.github/workflows/build-engine-runtime.yml'
+
+permissions:
+  contents: read
+
+# Finished payloads are published as releases on the dedicated public
+# artifacts repo — keeping the main repo's releases feed a status page for
+# humans, and keeping the publish token's blast radius to a shelf of
+# tarballs. Needs the RUNTIME_PAYLOADS_TOKEN secret: fine-grained, Contents
+# R/W on that one repo only. Absent (e.g. fork PRs) → builds run, publish
+# skips.
+env:
+  PAYLOAD_REPO: embedpdf/runtime-payloads
+  EMSDK_VERSION: 3.1.72
+
+jobs:
+  # Computes the canonical payload identity (runtime-payload-hash.sh — the
+  # same derivation fetch-payload.sh uses) and ensures the release exists.
+  # If every asset is already published for this hash, builds still run (the
+  # actions/cache makes them cheap) but publishing is skipped.
+  payload-key:
+    name: Payload key
+    runs-on: ubuntu-24.04
+    outputs:
+      hash: ${{ steps.key.outputs.hash }}
+      exists: ${{ steps.key.outputs.exists }}
+    env:
+      GH_TOKEN: ${{ secrets.RUNTIME_PAYLOADS_TOKEN }}
+    steps:
+      - uses: actions/checkout@v6
+      - id: key
+        shell: bash
+        run: |
+          HASH="$(bash packages/engine/runtime/scripts/runtime-payload-hash.sh)"
+          echo "hash=$HASH" >> "$GITHUB_OUTPUT"
+          if [[ -z "$GH_TOKEN" ]]; then
+            echo "RUNTIME_PAYLOADS_TOKEN not available — builds run, publishing skipped."
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if gh release view "runtime-payloads-$HASH" --repo "$PAYLOAD_REPO" --json assets --jq '[.assets[].name] | length' >/tmp/assets 2>/dev/null; then
+            # 9 targets x 2 files (tar.gz + sha256) = 18 when complete
+            if [[ "$(cat /tmp/assets)" -ge 18 ]]; then
+              echo "exists=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "exists=false" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            if [[ "${{ github.event_name }}" != "pull_request" ]]; then
+              gh release create "runtime-payloads-$HASH" \
+                --repo "$PAYLOAD_REPO" \
+                --title "Runtime payloads $HASH" \
+                --notes "Content-addressed finished runtime payloads (npm/<target>/lib). Fetched by packages/engine/runtime/scripts/fetch-payload.sh." \
+                --prerelease || true
+            fi
+          fi
+  linux:
+    name: Linux x64 + musl + WASM
+    runs-on: ubuntu-24.04
+    needs: payload-key
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [linux-x64, linuxmusl-x64, wasm32]
+    steps:
+      - uses: actions/checkout@v6
+      - name: Cache runtime payload
+        id: payload-cache
+        uses: actions/cache@v5
+        with:
+          path: packages/engine/runtime/npm/${{ matrix.target }}/lib
+          key: >-
+            engine-runtime-payload-${{ matrix.target }}-${{ hashFiles(
+            'packages/engine/runtime/engine-runtime-build.json',
+            'packages/engine/runtime/scripts/build-target.sh',
+            'packages/engine/runtime/scripts/fetch-libpdfium.sh',
+            'packages/engine/runtime/build/generate-functions.mjs',
+            'packages/engine/runtime/build/generate-runtime-methods.mjs',
+            'packages/engine/runtime/build/generate-napi-binding.mjs',
+            'packages/engine/runtime/build/CMakeLists.txt',
+            'packages/engine/runtime/build/compile.sh',
+            'packages/engine/runtime/build/compile.esm.sh'
+            ) }}
+      - if: ${{ steps.payload-cache.outputs.cache-hit != 'true' && !contains(matrix.target, 'linuxmusl') }}
+        uses: pnpm/action-setup@v5
+      - if: ${{ steps.payload-cache.outputs.cache-hit != 'true' && !contains(matrix.target, 'linuxmusl') }}
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+      - if: ${{ steps.payload-cache.outputs.cache-hit != 'true' && !contains(matrix.target, 'linuxmusl') }}
+        run: pnpm install --frozen-lockfile
+      - if: ${{ steps.payload-cache.outputs.cache-hit != 'true' && !contains(matrix.target, 'linuxmusl') }}
+        name: Install build tools
+        run: sudo apt-get update && sudo apt-get install -y cmake clang lld
+      - if: ${{ steps.payload-cache.outputs.cache-hit != 'true' && matrix.target == 'wasm32' }}
+        name: Install Emscripten
+        run: |
+          git clone https://github.com/emscripten-core/emsdk.git "$RUNNER_TEMP/emsdk"
+          "$RUNNER_TEMP/emsdk/emsdk" install "$EMSDK_VERSION"
+          "$RUNNER_TEMP/emsdk/emsdk" activate "$EMSDK_VERSION"
+          echo "$RUNNER_TEMP/emsdk/upstream/emscripten" >> "$GITHUB_PATH"
+          echo "$RUNNER_TEMP/emsdk/upstream/bin" >> "$GITHUB_PATH"
+      - if: ${{ steps.payload-cache.outputs.cache-hit != 'true' && !contains(matrix.target, 'linuxmusl') }}
+        name: Build target
+        env:
+          CC: clang
+          CXX: clang++
+          LDFLAGS: -fuse-ld=lld
+        run: pnpm --filter @embedpdf/engine-runtime build:target ${{ matrix.target }}
+      - if: ${{ steps.payload-cache.outputs.cache-hit != 'true' && contains(matrix.target, 'linuxmusl') }}
+        name: Build musl target in Alpine
+        run: |
+          docker run --rm \
+            -v "$GITHUB_WORKSPACE:/workspace" \
+            -w /workspace \
+            node:22-alpine \
+            sh -lc "apk add --no-cache bash cmake clang g++ make python3 curl tar git && corepack enable && pnpm install --frozen-lockfile && pnpm --filter @embedpdf/engine-runtime build:target ${{ matrix.target }}"
+      - name: Verify payload
+        shell: bash
+        run: bash packages/engine/runtime/scripts/verify-packages.sh ${{ matrix.target }}
+      - name: Publish payload
+        if: ${{ github.event_name != 'pull_request' && needs.payload-key.outputs.exists != 'true' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.RUNTIME_PAYLOADS_TOKEN }}
+        run: |
+          HASH="${{ needs.payload-key.outputs.hash }}"
+          ASSET="engine-runtime-payload-${{ matrix.target }}.tar.gz"
+          tar -czf "$ASSET" --exclude='.payload-source' -C "packages/engine/runtime/npm/${{ matrix.target }}/lib" .
+          if command -v sha256sum >/dev/null 2>&1; then sha256sum "$ASSET" > "$ASSET.sha256"; else shasum -a 256 "$ASSET" > "$ASSET.sha256"; fi
+          gh release upload "runtime-payloads-$HASH" --repo "$PAYLOAD_REPO" "$ASSET" "$ASSET.sha256" --clobber
+      - uses: actions/upload-artifact@v6
+        with:
+          name: engine-runtime-${{ matrix.target }}
+          path: packages/engine/runtime/npm/${{ matrix.target }}/
+
+  linux-arm:
+    name: Linux arm64 + musl
+    runs-on: ubuntu-24.04-arm
+    needs: payload-key
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [linux-arm64, linuxmusl-arm64]
+    steps:
+      - uses: actions/checkout@v6
+      - name: Cache runtime payload
+        id: payload-cache
+        uses: actions/cache@v5
+        with:
+          path: packages/engine/runtime/npm/${{ matrix.target }}/lib
+          key: >-
+            engine-runtime-payload-${{ matrix.target }}-${{ hashFiles(
+            'packages/engine/runtime/engine-runtime-build.json',
+            'packages/engine/runtime/scripts/build-target.sh',
+            'packages/engine/runtime/scripts/fetch-libpdfium.sh',
+            'packages/engine/runtime/build/generate-functions.mjs',
+            'packages/engine/runtime/build/generate-runtime-methods.mjs',
+            'packages/engine/runtime/build/generate-napi-binding.mjs',
+            'packages/engine/runtime/build/CMakeLists.txt',
+            'packages/engine/runtime/build/compile.sh',
+            'packages/engine/runtime/build/compile.esm.sh'
+            ) }}
+      - if: ${{ steps.payload-cache.outputs.cache-hit != 'true' && !contains(matrix.target, 'linuxmusl') }}
+        uses: pnpm/action-setup@v5
+      - if: ${{ steps.payload-cache.outputs.cache-hit != 'true' && !contains(matrix.target, 'linuxmusl') }}
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+      - if: ${{ steps.payload-cache.outputs.cache-hit != 'true' && !contains(matrix.target, 'linuxmusl') }}
+        run: pnpm install --frozen-lockfile
+      - if: ${{ steps.payload-cache.outputs.cache-hit != 'true' && !contains(matrix.target, 'linuxmusl') }}
+        name: Install build tools
+        run: sudo apt-get update && sudo apt-get install -y cmake clang lld
+      - if: ${{ steps.payload-cache.outputs.cache-hit != 'true' && !contains(matrix.target, 'linuxmusl') }}
+        name: Build target
+        env:
+          CC: clang
+          CXX: clang++
+          LDFLAGS: -fuse-ld=lld
+        run: pnpm --filter @embedpdf/engine-runtime build:target ${{ matrix.target }}
+      - if: ${{ steps.payload-cache.outputs.cache-hit != 'true' && contains(matrix.target, 'linuxmusl') }}
+        name: Build musl target in Alpine
+        run: |
+          docker run --rm \
+            -v "$GITHUB_WORKSPACE:/workspace" \
+            -w /workspace \
+            node:22-alpine \
+            sh -lc "apk add --no-cache bash cmake clang g++ make python3 curl tar git && corepack enable && pnpm install --frozen-lockfile && pnpm --filter @embedpdf/engine-runtime build:target ${{ matrix.target }}"
+      - name: Verify payload
+        shell: bash
+        run: bash packages/engine/runtime/scripts/verify-packages.sh ${{ matrix.target }}
+      - name: Publish payload
+        if: ${{ github.event_name != 'pull_request' && needs.payload-key.outputs.exists != 'true' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.RUNTIME_PAYLOADS_TOKEN }}
+        run: |
+          HASH="${{ needs.payload-key.outputs.hash }}"
+          ASSET="engine-runtime-payload-${{ matrix.target }}.tar.gz"
+          tar -czf "$ASSET" --exclude='.payload-source' -C "packages/engine/runtime/npm/${{ matrix.target }}/lib" .
+          if command -v sha256sum >/dev/null 2>&1; then sha256sum "$ASSET" > "$ASSET.sha256"; else shasum -a 256 "$ASSET" > "$ASSET.sha256"; fi
+          gh release upload "runtime-payloads-$HASH" --repo "$PAYLOAD_REPO" "$ASSET" "$ASSET.sha256" --clobber
+      - uses: actions/upload-artifact@v6
+        with:
+          name: engine-runtime-${{ matrix.target }}
+          path: packages/engine/runtime/npm/${{ matrix.target }}/
+
+  mac:
+    name: macOS
+    runs-on: macos-14
+    needs: payload-key
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [darwin-arm64, darwin-x64]
+    steps:
+      - uses: actions/checkout@v6
+      - name: Cache runtime payload
+        id: payload-cache
+        uses: actions/cache@v5
+        with:
+          path: packages/engine/runtime/npm/${{ matrix.target }}/lib
+          key: >-
+            engine-runtime-payload-${{ matrix.target }}-${{ hashFiles(
+            'packages/engine/runtime/engine-runtime-build.json',
+            'packages/engine/runtime/scripts/build-target.sh',
+            'packages/engine/runtime/scripts/fetch-libpdfium.sh',
+            'packages/engine/runtime/build/generate-functions.mjs',
+            'packages/engine/runtime/build/generate-runtime-methods.mjs',
+            'packages/engine/runtime/build/generate-napi-binding.mjs',
+            'packages/engine/runtime/build/CMakeLists.txt',
+            'packages/engine/runtime/build/compile.sh',
+            'packages/engine/runtime/build/compile.esm.sh'
+            ) }}
+      - if: steps.payload-cache.outputs.cache-hit != 'true'
+        uses: pnpm/action-setup@v5
+      - if: steps.payload-cache.outputs.cache-hit != 'true'
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+      - if: steps.payload-cache.outputs.cache-hit != 'true'
+        run: pnpm install --frozen-lockfile
+      - if: steps.payload-cache.outputs.cache-hit != 'true'
+        name: Build target
+        run: pnpm --filter @embedpdf/engine-runtime build:target ${{ matrix.target }}
+      - name: Verify payload
+        shell: bash
+        run: bash packages/engine/runtime/scripts/verify-packages.sh ${{ matrix.target }}
+      - name: Publish payload
+        if: ${{ github.event_name != 'pull_request' && needs.payload-key.outputs.exists != 'true' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.RUNTIME_PAYLOADS_TOKEN }}
+        run: |
+          HASH="${{ needs.payload-key.outputs.hash }}"
+          ASSET="engine-runtime-payload-${{ matrix.target }}.tar.gz"
+          tar -czf "$ASSET" --exclude='.payload-source' -C "packages/engine/runtime/npm/${{ matrix.target }}/lib" .
+          if command -v sha256sum >/dev/null 2>&1; then sha256sum "$ASSET" > "$ASSET.sha256"; else shasum -a 256 "$ASSET" > "$ASSET.sha256"; fi
+          gh release upload "runtime-payloads-$HASH" --repo "$PAYLOAD_REPO" "$ASSET" "$ASSET.sha256" --clobber
+      - uses: actions/upload-artifact@v6
+        with:
+          name: engine-runtime-${{ matrix.target }}
+          path: packages/engine/runtime/npm/${{ matrix.target }}/
+
+  win:
+    name: Windows
+    runs-on: windows-2022
+    needs: payload-key
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [win32-x64, win32-arm64]
+    steps:
+      - uses: actions/checkout@v6
+      - name: Cache runtime payload
+        id: payload-cache
+        uses: actions/cache@v5
+        with:
+          path: packages/engine/runtime/npm/${{ matrix.target }}/lib
+          key: >-
+            engine-runtime-payload-${{ matrix.target }}-${{ hashFiles(
+            'packages/engine/runtime/engine-runtime-build.json',
+            'packages/engine/runtime/scripts/build-target.sh',
+            'packages/engine/runtime/scripts/fetch-libpdfium.sh',
+            'packages/engine/runtime/build/generate-functions.mjs',
+            'packages/engine/runtime/build/generate-runtime-methods.mjs',
+            'packages/engine/runtime/build/generate-napi-binding.mjs',
+            'packages/engine/runtime/build/CMakeLists.txt',
+            'packages/engine/runtime/build/compile.sh',
+            'packages/engine/runtime/build/compile.esm.sh'
+            ) }}
+      - if: steps.payload-cache.outputs.cache-hit != 'true'
+        uses: pnpm/action-setup@v5
+      - if: steps.payload-cache.outputs.cache-hit != 'true'
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+      - if: steps.payload-cache.outputs.cache-hit != 'true'
+        run: pnpm install --frozen-lockfile
+      - if: steps.payload-cache.outputs.cache-hit != 'true'
+        name: Build target
+        shell: bash
+        run: pnpm --filter @embedpdf/engine-runtime build:target ${{ matrix.target }}
+      - name: Verify payload
+        shell: bash
+        run: bash packages/engine/runtime/scripts/verify-packages.sh ${{ matrix.target }}
+      - name: Publish payload
+        if: ${{ github.event_name != 'pull_request' && needs.payload-key.outputs.exists != 'true' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.RUNTIME_PAYLOADS_TOKEN }}
+        run: |
+          HASH="${{ needs.payload-key.outputs.hash }}"
+          ASSET="engine-runtime-payload-${{ matrix.target }}.tar.gz"
+          tar -czf "$ASSET" --exclude='.payload-source' -C "packages/engine/runtime/npm/${{ matrix.target }}/lib" .
+          if command -v sha256sum >/dev/null 2>&1; then sha256sum "$ASSET" > "$ASSET.sha256"; else shasum -a 256 "$ASSET" > "$ASSET.sha256"; fi
+          gh release upload "runtime-payloads-$HASH" --repo "$PAYLOAD_REPO" "$ASSET" "$ASSET.sha256" --clobber
+      - uses: actions/upload-artifact@v6
+        with:
+          name: engine-runtime-${{ matrix.target }}
+          path: packages/engine/runtime/npm/${{ matrix.target }}/

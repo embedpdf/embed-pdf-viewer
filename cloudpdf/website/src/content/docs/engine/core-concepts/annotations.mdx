@@ -1,0 +1,240 @@
+---
+title: Annotations
+description: Read, add, update, delete, and reorder annotations, plus styling and flags.
+---
+
+{/* Generated from docs/content — edit there, then `pnpm docs:sync`. */}
+
+import { Callout } from '@/components/docs/callout';
+import { Cards, Card } from '@/components/docs/cards';
+
+# Annotations
+
+You read and edit annotations through two services: the **document** service
+(`doc.annotations`) for cheap whole-document reads, and the **page** service
+(`doc.page(pon).annotations`) for typed reads and edits. The examples below assume
+you already opened a document (see [Quick start](/docs/engine/getting-started/quick-start)).
+
+## Reading annotations
+
+For a quick "what's where" overview, the document service has two fast read paths:
+
+```ts
+// Every page, cheapest read.
+const all = await doc.annotations.listRawAll();
+
+// A single page, by its page object number.
+const onePage = await doc.annotations.listRaw(pageObjectNumber);
+```
+
+To get the full, typed annotations on one page, use the page service:
+
+```ts
+const page = doc.page(pageObjectNumber);
+const { annotations } = await page.annotations.list();
+```
+
+## Adding an annotation
+
+Call `create()` with the annotation you want. Each kind has its own fields — see
+[Annotation types](/docs/engine/core-concepts/annotation-types) for the full list.
+Here's a highlight:
+
+```ts
+const page = doc.page(pageObjectNumber);
+
+const { created } = await page.annotations.create({
+  subtype: 'highlight',
+  color: { r: 255, g: 215, b: 0 },
+  opacity: 0.4,
+  quadPoints: [
+    { p1: { x: 72, y: 712 }, p2: { x: 272, y: 712 }, p3: { x: 72, y: 696 }, p4: { x: 272, y: 696 } },
+  ],
+});
+
+// `created` is the new annotation. Keep `created.ref` to edit it later.
+```
+
+## Updating and deleting
+
+You never build an identity by hand. Every annotation you read or create comes with a
+`ref` — pass that same `ref` back to `update`, `delete`, or `move`:
+
+```ts
+const { annotations } = await page.annotations.list();
+const note = annotations[0];
+
+// Change something. Repeat the `subtype` so the engine knows which fields are valid.
+await page.annotations.update(note.ref, { subtype: note.subtype, contents: 'edited note' });
+
+// Remove it.
+await page.annotations.delete(note.ref);
+```
+
+<Callout type="info">
+  Advanced: a `ref` points at an annotation in one of three ways — by PDF object
+  number (preferred, durable), by its `/NM` name, or by its position (array index).
+  You normally don't care which: just reuse the `ref` you were handed. Index refs are a
+  legacy escape hatch and need an edit session for structural edits (see below).
+</Callout>
+
+## Reordering
+
+`move()` changes annotation order on a page. Pass the annotations to move (a contiguous
+block; a single `ref` is the common case) and the position to insert them at:
+
+```ts
+await page.annotations.move([note.ref], 0); // move to the front
+```
+
+## Styling
+
+Most annotations share the same styling fields.
+
+**Color is RGB only** — `{ r, g, b }`, each `0`–`255`. Transparency is a separate
+`opacity` field (`0`–`1`), not part of the color:
+
+```ts
+await page.annotations.update(note.ref, {
+  subtype: note.subtype,
+  color: { r: 0, g: 120, b: 255 },
+  opacity: 0.6,
+});
+```
+
+| Field | What it is | Values |
+| :--- | :--- | :--- |
+| `color` | Stroke color (or highlight color) | `{ r, g, b }`, 0–255 |
+| `interiorColor` | Fill color for closed shapes | `{ r, g, b }` or `null` (no fill) |
+| `opacity` | Whole-annotation transparency | `0`–`1` |
+| `strokeWidth` | Line/border thickness in points | number, default `1` |
+| `borderStyle` | Border style | `'solid'`, `'dashed'`, `'beveled'`, `'inset'` |
+| `dashArray` | Dash pattern (with `'dashed'`) | array of numbers |
+
+When you omit a styling field, the engine uses a sensible default: a 1pt solid red
+stroke at full opacity.
+
+<Callout type="info">
+  Free text is the one exception to "`color` = stroke": there `color` is the border **and**
+  the text color, `interiorColor` is the box background, and an optional `fontColor`
+  overrides just the text. See
+  [Free text and callout](/docs/engine/core-concepts/annotation-types#free-text-and-callout).
+</Callout>
+
+## Flags
+
+Every annotation has the standard PDF flags. Set only the ones you care about — the rest
+keep their current value:
+
+```ts
+// On create: print, but don't show on screen.
+await page.annotations.create({
+  subtype: 'square',
+  rect: { left: 100, bottom: 600, right: 200, top: 680 },
+  color: { r: 0, g: 0, b: 0 },
+  flags: { print: true, noView: true },
+});
+
+// Later: lock from editing without touching any other flag.
+await page.annotations.update(note.ref, { subtype: note.subtype, flags: { readOnly: true } });
+```
+
+Available flags: `invisible`, `hidden`, `print`, `noZoom`, `noRotate`, `noView`,
+`readOnly`, `locked`, `toggleNoView`, `lockedContents`.
+
+## Rendering annotations
+
+Every annotation carries its visual as an appearance stream inside the PDF. To display
+them, batch-render a page's appearances into images:
+
+```ts
+const { appearances } = await page.annotations.renderAppearanceImages({ scale: 2 });
+
+for (const ap of appearances) {
+  // ap.ref   — which annotation this is
+  // ap.rect  — WHERE to place it (PDF points, y-up)
+  // ap.image — a lazy image handle; ap.image.objectUrl() gives you a blob: URL
+}
+```
+
+**One convention to know:** when an annotation's DTO carries **both** `rotation` and
+`unrotatedRect` (the box-family kinds — square, circle, free text, stamp), its
+appearance renders **rotation-stripped**: `ap.rect` is the logical `unrotatedRect` and
+the image is the flat content mapped into it. You re-apply that `rotation` as a
+transform about the box centre. Everything else — line, polyline, polygon, ink (their
+rotation is pre-baked into the geometry) and annotations from other tools — comes back
+as-is, placed by `ap.rect`, no transform needed.
+
+```tsx
+const { url } = await ap.image.objectUrl();
+// `annotation` is the matching entry from list() — ref, rotation, etc.
+const stripped = 'unrotatedRect' in annotation && annotation.unrotatedRect && annotation.rotation;
+<img
+  src={url}
+  style={{
+    position: 'absolute',
+    /* place by ap.rect, converted to your view coordinates */
+    transform: stripped ? `rotate(${annotation.rotation}deg)` : undefined,
+    transformOrigin: 'center',
+  }}
+/>;
+```
+
+This split is what makes interactions cheap:
+
+- **Rotating** an annotation never needs a re-render — the image is rotation-invariant;
+  only your transform changes.
+- **Moving** never needs a re-render — only the placement changes.
+- **Resizing** can stretch the existing image live during the gesture, then fetch once
+  after committing the new `rect` (the engine re-fits the appearance natively).
+
+Re-render appearances when the *content* changed — a committed geometry edit, a style
+patch, a replaced stamp `source` — or when your zoom level changes and you want a
+sharper raster (`scale`).
+
+<Callout type="info">
+  If you use the viewer packages (`plugin-annotation` + a framework adapter), all of
+  this is wired for you. This section is for rendering annotations yourself against the
+  raw engine.
+</Callout>
+
+## Edit sessions (cloud)
+
+On the cloud, structural edits addressed by **index** (a delete or move that shifts the
+array) need an active edit session. It proves you're the only one editing those pages — a
+guard against two clients shifting the same page at once.
+
+```ts
+const session = await doc.annotations.beginWeakEdit([pageObjectNumber]);
+
+try {
+  // …index-addressed structural edits on covered pages…
+  await session.heartbeat(); // keep the session alive
+} finally {
+  await session.release();
+}
+```
+
+<Callout type="info">
+  Edits that reuse a `ref` from `list()`/`create()` (object number or `/NM`) and
+  non-shifting updates don't need a session. You only need `beginWeakEdit` for
+  index-addressed structural edits. A conflicting edit fails with a
+  `WeakAnnotationSessionConflict` error.
+</Callout>
+
+<Callout type="warn">
+  Annotation writes are gated by the caller's scope on the cloud (for example
+  <code>doc.annotate.write</code> and collab scopes like
+  <code>annotations:update:self</code>). Insufficient scope fails with
+  <code>Forbidden</code>.
+</Callout>
+
+## Next
+
+<Cards>
+  <Card
+    title="Annotation types"
+    description="Every kind you can create and the exact fields each one takes."
+    href="/docs/engine/core-concepts/annotation-types"
+  />
+</Cards>

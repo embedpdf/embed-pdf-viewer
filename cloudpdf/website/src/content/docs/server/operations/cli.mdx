@@ -1,0 +1,125 @@
+---
+title: CLI reference
+description: Every cloudpdf-server command — serve, migrate, db doctor, and audit export — with flags and examples.
+---
+
+import { Callout } from '@/components/docs/callout';
+import { Cards, Card } from '@/components/docs/cards';
+
+# CLI reference
+
+The server is one binary, `cloudpdf-server`, with a handful of subcommands. It's
+the entrypoint of the [Docker image](/docs/server/deployment/docker) too, so
+every command below works the same whether you run it from npm or a container.
+
+```sh
+# npm
+cloudpdf-server <command> [args]
+
+# Docker (the binary is the entrypoint)
+docker run --rm ghcr.io/embedpdf/cloudpdf-server:latest <command> [args]
+```
+
+Run `cloudpdf-server --help` to print the commands and the full `CLOUDPDF_*`
+environment surface.
+
+## `serve`
+
+Starts the HTTP server. This is the **default** — `cloudpdf-server` with no
+arguments runs `serve`.
+
+```sh
+cloudpdf-server serve
+```
+
+Reads its entire configuration from the environment — see the
+[configuration reference](/docs/server/configuration). Listens on `PORT`
+(default `3000`) and exposes `/healthz`, `/readyz`, `/v1/docs/*`, and
+`/v1/admin/*`.
+
+## `migrate`
+
+Manage the database schema. See [Migrations](/docs/server/operations/migrations)
+for the recommended flow per deployment.
+
+| Command | What it does |
+| --- | --- |
+| `migrate status` | Show applied, pending, and drift state. |
+| `migrate up` | Apply all pending migrations. |
+| `migrate up --dry-run` | List what *would* be applied, without changing the database. |
+| `migrate validate` | Exit non-zero if drift is detected. |
+| `migrate validate --strict` | Treat pending migrations as drift too. |
+| `migrate down` | Roll back migrations (manual break-glass; destructive). |
+
+```sh
+cloudpdf-server migrate status
+cloudpdf-server migrate up
+```
+
+### Rolling back
+
+`migrate down` is a deliberate, destructive break-glass tool. It requires
+`--yes` because containers are non-interactive:
+
+| Flag | Effect |
+| --- | --- |
+| `--to NNN` | Roll back everything newer than version `NNN`. |
+| `--steps N` | Roll back the `N` highest applied (default `1`). |
+| `--all` | Roll back every applied migration. |
+| `--dry-run` | Preview the plan without touching the database. |
+| `--yes` | Required to actually run. |
+| `--force` | Roll back even if the up-checksum drifted from the code. |
+
+```sh
+# Preview first
+cloudpdf-server migrate down --steps 1 --dry-run
+
+# Then commit to it
+cloudpdf-server migrate down --steps 1 --yes
+```
+
+<Callout type="warn">
+  <code>migrate down</code> can drop data. Take a database backup first, and
+  prefer rolling forward with a corrective migration over rolling back in
+  production.
+</Callout>
+
+## `db doctor`
+
+Connects to the database, runs `validate`, and prints version information. A fast
+way to confirm credentials, connectivity, and schema health:
+
+```sh
+cloudpdf-server db doctor
+```
+
+## `audit export`
+
+Exports a closed day's `audit_log` rows to JSONL in the object store — useful for
+shipping audit records to long-term storage or a SIEM:
+
+```sh
+cloudpdf-server audit export --day yesterday
+```
+
+## Exit codes
+
+The commands use conventional exit codes (`0` success, non-zero on failure),
+which makes them safe to wire into CI, init containers, and Helm hooks. For
+example, `migrate validate` failing non-zero is exactly what lets a deploy refuse
+to proceed on a stale schema.
+
+## Next steps
+
+<Cards>
+  <Card
+    title="Migrations"
+    description="How schema changes flow through each deployment."
+    href="/docs/server/operations/migrations"
+  />
+  <Card
+    title="Health & scaling"
+    description="Probes, the worker pool, and replicas."
+    href="/docs/server/operations/health-and-scaling"
+  />
+</Cards>

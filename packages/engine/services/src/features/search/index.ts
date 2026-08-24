@@ -1,0 +1,1 @@
+export { SearchReader } from './SearchReader';

@@ -1,0 +1,81 @@
+---
+title: Fallback fonts
+description: Configure server-side fallback fonts so rendering and annotation appearances cover glyphs a document's own fonts are missing.
+---
+
+import { Callout } from '@/components/docs/callout';
+
+# Fallback fonts
+
+When a PDF references a font it doesn't embed, or a FreeText annotation needs a glyph its
+chosen font lacks, the server falls back to its own fonts to draw the missing characters.
+Out of the box that's the standard Latin set — to cover CJK, Cyrillic, Arabic, or any
+other script, configure **fallback fonts** on the server.
+
+This is a **server-side** decision on purpose. Cloud clients can't register fonts (the
+client `engine.fonts` API is local-engine only); the deployment owns the font policy and
+applies it uniformly to every render and every saved annotation appearance. The local
+engine has its own [Custom fonts](/docs/engine/core-concepts/custom-fonts) API for the
+in-browser case.
+
+## Configure with `CLOUDPDF_FALLBACK_FONTS`
+
+Set a JSON array of font descriptors. Each needs a stable `key` and a `path` to a TTF/OTF
+file readable by the server process:
+
+```sh
+CLOUDPDF_FALLBACK_FONTS='[
+  { "key": "noto-sc", "path": "/srv/fonts/NotoSansSC-Regular.otf", "familyName": "Noto Sans SC" },
+  { "key": "noto-arabic", "path": "/srv/fonts/NotoNaskhArabic-Regular.ttf" }
+]'
+```
+
+| Field | Required | Description |
+| --- | --- | --- |
+| `key` | yes | Stable id for the font. |
+| `path` | yes | Absolute path to a TTF/OTF file the server can read. |
+| `familyName` | no | Base font name; inferred from the file if omitted. |
+| `weight` | no | Style weight (100–900) for matching; inferred if omitted. |
+| `italic` | no | Italic flag for matching; inferred if omitted. |
+| `fallback` | no | Enroll for automatic missing-glyph fill. Defaults to `true`. |
+
+Order matters: fonts are tried as fallbacks in the order listed, so put your preferred
+faces first.
+
+<Callout type="info">
+  Fonts are loaded <strong>by path and range-read on demand</strong> — the bytes are never
+  held resident in memory. You can configure several large CJK families and each costs a
+  file handle, not RAM per font. Make sure the paths are present in your container image or
+  mounted volume and readable by the server user.
+</Callout>
+
+<Callout type="warn">
+  A font that can't be read or parsed <strong>fails worker startup</strong> — a bad font
+  config is a boot error, not a silent degrade. Check the path and the file on a startup
+  failure.
+</Callout>
+
+## How it applies
+
+Each PDFium worker thread registers the fallback fonts on startup, before it serves any
+request (the runtime is [thread-confined](/docs/server/getting-started/how-it-works), so
+every worker holds its own copy). From then on, any glyph a document's fonts can't draw —
+during page rendering or when generating an annotation's appearance on save — is filled
+from the first fallback font that covers it.
+
+## Embedding via `buildApp`
+
+If you embed the server with `buildApp` instead of running the CLI, pass the same
+descriptors programmatically:
+
+```ts
+import { buildApp, loadFallbackFontsFromEnv } from '@cloudpdf/server';
+
+const { app } = await buildApp({
+  workerEntry,
+  fallbackFonts: [
+    { key: 'noto-sc', path: '/srv/fonts/NotoSansSC-Regular.otf', familyName: 'Noto Sans SC' },
+  ],
+  // …or reuse the env convention: fallbackFonts: loadFallbackFontsFromEnv(),
+});
+```

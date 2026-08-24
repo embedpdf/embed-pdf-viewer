@@ -1,0 +1,71 @@
+{
+  "name": "@cloudpdf/engine",
+  "version": "3.0.0-next.7",
+  "private": false,
+  "description": "CloudPDF engine: the cloud client that speaks the Engine v3 interface over HTTPS to a @cloudpdf/server deployment (or CloudPDF SaaS). Same AbortablePromise-based, EngineError-coded contract as the local engine.",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.cts",
+  "exports": {
+    ".": {
+      "development": "./src/index.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "epdf-build",
+    "clean": "rimraf dist",
+    "lint": "eslint src --color",
+    "lint:fix": "eslint src --color --fix",
+    "test": "vitest run"
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/embedpdf/embed-pdf-viewer.git",
+    "directory": "cloudpdf/engine"
+  },
+  "homepage": "https://www.cloudpdf.com",
+  "bugs": {
+    "url": "https://github.com/embedpdf/embed-pdf-viewer/issues"
+  },
+  "keywords": [
+    "pdf",
+    "cloudpdf",
+    "engine",
+    "cloud"
+  ],
+  "license": "Apache-2.0",
+  "dependencies": {
+    "@embedpdf/engine-core": "workspace:*",
+    "@embedpdf/engine-services": "workspace:^"
+  },
+  "devDependencies": {
+    "@cloudpdf/server": "workspace:*",
+    "rimraf": "^5.0.0",
+    "typescript": "^5.0.0",
+    "vitest": "^2.1.0",
+    "@embedpdf/tooling-build": "workspace:*"
+  },
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": {
+        "import": "./dist/index.js",
+        "require": "./dist/index.cjs"
+      },
+      "./package.json": "./package.json"
+    }
+  },
+  "sideEffects": false,
+  "epdf": {
+    "devExports": "development"
+  }
+}
