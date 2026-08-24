@@ -8,7 +8,7 @@ import { PDFViewer } from '@embedpdf/viewer-react';
 export function LivePdfViewer() {
   return (
     <PDFViewer
-      src="/demo/sample.pdf"
+      src="/embedpdf-documents-belong-on-the-web.pdf"
       theme="light"
       style={{ display: 'block', height: '100%', width: '100%' }}
     />
