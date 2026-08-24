@@ -289,12 +289,24 @@ export function parseMeasurementInfo(value: unknown): MeasurementInfo | null {
   return out;
 }
 
-/** The `/IT` intent that belongs on a measurement of `mode` for `subtype`. */
+/**
+ * The `/IT` intent that belongs on a measurement, or `null` when the spec
+ * defines none for that shape.
+ *
+ * ISO 32000 defines measurement intents for Line, PolyLine and Polygon ONLY.
+ * Rectangle and ellipse areas (Square/Circle) are an EmbedPDF extension, so
+ * they deliberately carry NO `/IT`: stamping `PolygonDimension` on a Square
+ * would be inventing spec vocabulary, and a foreign viewer that trusted it
+ * would look for `/Vertices` that are not there. Those two are recognised as
+ * measurements the same way we recognise every measurement — by the
+ * calibration itself.
+ */
 export function measurementIntentFor(
   subtype: 'line' | 'polyline' | 'polygon' | 'circle' | 'square',
   mode: MeasurementMode,
-): MeasurementIntent {
+): MeasurementIntent | null {
   if (subtype === 'line') return 'LineDimension';
   if (subtype === 'polyline') return mode === 'area' ? 'PolygonDimension' : 'PolyLineDimension';
-  return 'PolygonDimension';
+  if (subtype === 'polygon') return 'PolygonDimension';
+  return null;
 }

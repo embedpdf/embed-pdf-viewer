@@ -40,6 +40,9 @@ or fractional precision, and an optional secondary unit — `10.0 m (32.81 ft)`.
   and writes the spec `/IT` intent (`LineDimension` / `PolyLineDimension` /
   `PolygonDimension`) so other viewers recognise the dimension. The intent is
   derived from the subtype and mode, so the two can never drift apart.
+  Rectangle and ellipse areas are an EmbedPDF extension — ISO 32000 defines
+  measurement intents for Line/PolyLine/Polygon only — so those two carry no
+  `/IT` and are recognised by the calibration alone.
 - `@embedpdf/core-annotation` gains the geometry half (`measureRawValue`,
   `measureText`, `measureLabelAnchor`, `hatchPath`) and paints the read-out
   through the shared `scene()`, so every framework renderer gets it for free.

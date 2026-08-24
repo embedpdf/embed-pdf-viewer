@@ -22,6 +22,11 @@ import { EMBD_METADATA_SCHEMA_VERSION } from './writeEmbedMetadata';
  * (`measurementIntentFor`), so a re-calibration that flips a polygon from area
  * to perimeter rewrites both together and they cannot drift apart.
  *
+ * The spec defines those intents for Line/PolyLine/Polygon only, so a Square or
+ * Circle area measurement writes the calibration and NO `/IT` — see
+ * `measurementIntentFor`. Those two are demoted by clearing the calibration
+ * alone; there is no intent on them to clear.
+ *
  * Tri-state, like every other patch field ("a patch touches what it states,
  * preserves what it omits"):
  *   - `undefined` → the keys are UNTOUCHED (a geometry-only patch on a
@@ -57,8 +62,10 @@ export function writeMeasurementMetadata(
   if (measurement === null) {
     fn.EPDFAnnot_ClearEmbedMetadataKey(annotPtr, KEY_MEASUREMENT);
     // Clearing `/IT` is an empty name: the annotation stops declaring itself a
-    // dimension, which is exactly what demoting it means.
-    setIntent(fn, annotPtr, '');
+    // dimension, which is exactly what demoting it means. Only for the shapes
+    // that could have had one — never touch a Square/Circle's `/IT`, which we
+    // did not write and may belong to whoever authored the annotation.
+    if (measurementIntentFor(subtype, 'distance') !== null) setIntent(fn, annotPtr, '');
     return;
   }
 
@@ -69,5 +76,6 @@ export function writeMeasurementMetadata(
   } finally {
     mem.free(ptr);
   }
-  setIntent(fn, annotPtr, measurementIntentFor(subtype, measurement.mode));
+  const intent = measurementIntentFor(subtype, measurement.mode);
+  if (intent) setIntent(fn, annotPtr, intent);
 }

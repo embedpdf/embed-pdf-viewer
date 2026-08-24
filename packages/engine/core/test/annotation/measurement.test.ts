@@ -175,7 +175,12 @@ describe('measurementIntentFor', () => {
     expect(measurementIntentFor('polyline', 'area')).toBe('PolygonDimension');
     expect(measurementIntentFor('polygon', 'area')).toBe('PolygonDimension');
     expect(measurementIntentFor('polygon', 'perimeter')).toBe('PolygonDimension');
-    expect(measurementIntentFor('circle', 'area')).toBe('PolygonDimension');
-    expect(measurementIntentFor('square', 'area')).toBe('PolygonDimension');
+  });
+
+  it('gives rect/ellipse areas NO intent — the spec defines none for them', () => {
+    // Stamping `PolygonDimension` on a Square would invent spec vocabulary, and
+    // a viewer that trusted it would look for `/Vertices` that are not there.
+    expect(measurementIntentFor('square', 'area')).toBeNull();
+    expect(measurementIntentFor('circle', 'area')).toBeNull();
   });
 });
