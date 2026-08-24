@@ -195,12 +195,19 @@ describe('repository — Replace Text authoring', () => {
   });
 
   it('a rotated caret emits the box-family transform pair', () => {
+    // The geom is bound separately and NARROWLY (not widened to `Geom` by the
+    // `Annot` annotation) so the upright variant below can read `.rect` off it.
+    const caretGeom = {
+      t: 'caret',
+      rect: { x: 94, y: 53, width: 6, height: 6 },
+      rot: 270,
+    } as const;
     const caret: Annot = {
       id: 'tmp:3',
       ref: null,
       pon: 1,
       subtype: 'caret',
-      geom: { t: 'caret', rect: { x: 94, y: 53, width: 6, height: 6 }, rot: 270 },
+      geom: caretGeom,
       style,
       flags: DRAWN_FLAGS,
       source: 'vector',
@@ -214,7 +221,7 @@ describe('repository — Replace Text authoring', () => {
       rect: { left: 94, right: 100, bottom: 741, top: 747 },
     });
 
-    const upright: Annot = { ...caret, geom: { t: 'caret', rect: caret.geom.rect } };
+    const upright: Annot = { ...caret, geom: { t: 'caret', rect: caretGeom.rect } };
     // Tri-state flatten: upright carets STATE null so a stale pair can't linger.
     expect(toCreateDraft(upright, CROP)).toMatchObject({
       rotation: null,
