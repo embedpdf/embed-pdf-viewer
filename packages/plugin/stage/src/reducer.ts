@@ -7,6 +7,7 @@ export const initialStageState = (config: StageConfig): StageState => {
   const { scheduler: _scheduler, responsive: _responsive, ...overrides } = config;
   return {
     camera: { x: 0, y: 0, zoom: 1 },
+    placed: false,
     cameraResting: true,
     vp: { width: 0, height: 0 },
     dpr: 1,
@@ -39,6 +40,8 @@ export const stageReducer = (state: StageState, a: StageAction): StageState => {
       return { ...state, camera: a.camera };
     case 'CAMERA_REST':
       return state.cameraResting === a.resting ? state : { ...state, cameraResting: a.resting };
+    case 'PLACED':
+      return state.placed ? state : { ...state, placed: true };
     case 'VP':
       return { ...state, vp: a.vp };
     case 'DPR':
