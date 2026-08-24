@@ -4,7 +4,7 @@ import { createStageCapability } from '../src/capability';
 import { initialStageState, stageReducer } from '../src/reducer';
 import { DEFAULT_SETTINGS, settingsEqual } from '../src/settings';
 import { stagePlugin } from '../src/stage.plugin';
-import type { StageAction, StageConfig, StageState } from '../src/types';
+import type { StageAction, StageCapability, StageConfig, StageState } from '../src/types';
 
 /**
  * Kernel-free harness: drive the real capability against the real reducer + real
@@ -29,6 +29,13 @@ function harness(
   // Test layout at 1:1 (world units = points) so absolute-size assertions read
   // cleanly; the 96/72 physical factor is exercised in the stage-core layout test.
   let state = initialStageState({ viewUnitsPerPoint: 1, ...config });
+  const transitions: Array<{
+    action: StageAction['type'];
+    pages: ReturnType<StageCapability['visiblePages']>;
+    pageScreenX: number | null;
+    metrics: ReturnType<StageCapability['scrollMetrics']>;
+  }> = [];
+  let stage!: StageCapability;
   const ctx = {
     id: 'stage',
     documentId: 'doc',
@@ -36,12 +43,20 @@ function harness(
     getState: () => state,
     dispatch: (a: StageAction) => {
       state = stageReducer(state, a);
+      if (stage) {
+        transitions.push({
+          action: a.type,
+          pages: stage.visiblePages(),
+          pageScreenX: stage.pageRect(1)?.screenX ?? null,
+          metrics: stage.scrollMetrics(),
+        });
+      }
     },
     subscribe: () => () => {},
     document: () => meta,
   } as unknown as PluginContext<StageState, StageAction>;
 
-  const stage = createStageCapability(ctx, config);
+  stage = createStageCapability(ctx, config);
   // Mirror the real lifecycle: the shell reports the viewport — initial placement
   // is level-triggered inside setViewport (no manual placeInitial; that's the fix
   // for the "page stuck at top-left until the first scroll" race).
@@ -50,13 +65,45 @@ function harness(
   // a page's rotation + bumping `revision` simulates a rotate/move/delete event,
   // exactly as the kernel's event→registry bridge would (which the stage effect
   // then turns into a `refit()`).
-  return { stage, meta };
+  return { stage, meta, transitions };
 }
 
 const PORTRAIT = Array.from({ length: 5 }, () => ({ width: 600, height: 800 }));
 const PAD = 24; // default StageSettings.padding — the fit inset + arrival gutter
 
 describe('initial placement is level-triggered (the new-pane / HMR race)', () => {
+  it('publishes screen geometry only on the final placement commit', () => {
+    const { stage, transitions } = harness(PORTRAIT, undefined, { skipViewport: true });
+    const pendingPages = stage.visiblePages();
+
+    expect(pendingPages).toEqual([]);
+    expect(stage.visiblePages()).toBe(pendingPages); // stable empty selector value
+    expect(stage.pageRect(1)).toBeNull();
+    expect(stage.scrollMetrics()).toEqual({
+      scrollLeft: 0,
+      scrollTop: 0,
+      scrollWidth: 0,
+      scrollHeight: 0,
+      clientWidth: 0,
+      clientHeight: 0,
+      scrollableX: false,
+      scrollableY: false,
+    });
+
+    stage.setViewport({ width: 1000, height: 700 });
+
+    const commit = transitions.findIndex((t) => t.action === 'PLACED');
+    expect(commit).toBeGreaterThan(0);
+    for (const transition of transitions.slice(0, commit)) {
+      expect(transition.pages).toBe(pendingPages);
+      expect(transition.pageScreenX).toBeNull();
+      expect(transition.metrics.scrollableX).toBe(false);
+      expect(transition.metrics.scrollableY).toBe(false);
+    }
+    expect(transitions[commit].pages.map((p) => p.pageIndex)).toContain(0);
+    expect(transitions[commit].pageScreenX).toBeCloseTo(200, 0);
+  });
+
   it('places the moment the viewport is reported — no effect/watch involved', () => {
     // The bug: placement hung off an edge-triggered width watch registered during
     // openDocument; if the viewport was already sized first, the edge never came and
@@ -72,11 +119,16 @@ describe('initial placement is level-triggered (the new-pane / HMR race)', () =>
   });
 
   it('a half-laid-out viewport (height 0) does not place; the real one does', () => {
-    const { stage } = harness(PORTRAIT, undefined, { skipViewport: true });
+    const { stage, transitions } = harness(PORTRAIT, undefined, { skipViewport: true });
+    const pendingPages = stage.visiblePages();
     stage.setViewport({ width: 1000, height: 0 }); // mid-layout flex collapse
     expect(stage.camera()).toEqual({ x: 0, y: 0, zoom: 1 }); // not placed yet
+    expect(stage.visiblePages()).toBe(pendingPages);
+    expect(stage.pageRect(1)).toBeNull();
+    expect(transitions.some((t) => t.action === 'PLACED')).toBe(false);
     stage.setViewport({ width: 1000, height: 700 }); // the real report
     expect(stage.camera()).not.toEqual({ x: 0, y: 0, zoom: 1 }); // placed now
+    expect(stage.visiblePages()).not.toBe(pendingPages);
     expect(stage.toScreen({ x: stage.pageRect(1)!.x, y: stage.pageRect(1)!.y }).y).toBeCloseTo(
       PAD,
       0,

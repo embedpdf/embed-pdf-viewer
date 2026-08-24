@@ -257,6 +257,13 @@ export interface VisiblePage extends PageBox {
 export interface StageState extends StageSettings {
   camera: Camera;
   /**
+   * One-way render-commit latch. False while the initial viewport-driven
+   * placement is unresolved; true only after its camera/settings writes have
+   * completed. Page/scroll screen-space selectors refuse to answer while
+   * false, so an adapter can never paint the placeholder camera at the origin.
+   */
+  placed: boolean;
+  /**
    * Names of the responsive rules currently matching the box, in source order.
    * State (not derived) so `matches()` is reactive through the ordinary
    * selector machinery in every framework.
@@ -291,6 +298,7 @@ export interface StageState extends StageSettings {
 export type StageAction =
   | { type: 'CAMERA'; camera: Camera }
   | { type: 'CAMERA_REST'; resting: boolean }
+  | { type: 'PLACED' }
   | { type: 'VP'; vp: Size }
   | { type: 'DPR'; dpr: number }
   | { type: 'CURSOR'; cursor: number }

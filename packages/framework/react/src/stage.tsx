@@ -9,7 +9,7 @@
 // One-line-per-feature: registration travels with the UI.
 export * from '@embedpdf/plugin-stage';
 import * as React from 'react';
-import { useEffect, useMemo, useRef } from 'react';
+import { useLayoutEffect, useMemo, useRef } from 'react';
 import { StageToken, createScrollHandler, settingsEqual } from '@embedpdf/plugin-stage';
 import type { StageCapability, VisiblePage } from '@embedpdf/plugin-stage';
 import type { CapabilityToken } from '@embedpdf/core';
@@ -252,7 +252,7 @@ export function Stage({
     [projector, pages],
   );
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const el = ref.current!;
     // The WHOLE browser binding — viewport/DPR reporting, sample normalization,
     // gesture controller — is the shared @embedpdf/web surface, so every

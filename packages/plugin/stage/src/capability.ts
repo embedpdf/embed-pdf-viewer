@@ -380,9 +380,11 @@ export function createStageCapability(
     direction: ctx.getState().direction,
   });
 
-  // Initial-view placement flag — declared up here so the rest detector can
-  // read it; the placement logic further down owns it.
-  let hasPlaced = false;
+  // Behavioral latch: flips when initial placement STARTS, while state.placed
+  // is the render-commit latch that flips only after placement finishes. The
+  // distinction keeps placement-time camera behavior unchanged while making
+  // partial geometry unobservable to renderers.
+  let placementStarted = false;
 
   // ── gesture transaction (touch pan/pinch) ───────────────────────────────────
   // While open: zoomAround defers its intent PATCH, and the rest countdown is
@@ -408,7 +410,7 @@ export function createStageCapability(
     // Initial placement snaps immediately (first paint is crisp), and an
     // environment without real frames keeps snapping always-on — rest-gating
     // is a live-gesture refinement, not a contract.
-    if (!canAnimate || !hasPlaced) return;
+    if (!canAnimate || !placementStarted) return;
     if (ctx.getState().cameraResting) ctx.dispatch({ type: 'CAMERA_REST', resting: false });
     if (restRaf) scheduler.caf(restRaf);
     let t0 = 0;
@@ -927,8 +929,19 @@ export function createStageCapability(
   // SAME bounds the pan clamp uses (stayBounds: the slice item in paged flow,
   // the scene in continuous). Memoized like visiblePages: a stable reference
   // until a field actually moves, so adapter selectors can use plain equality.
+  const EMPTY_SCROLL_METRICS: S.ScrollMetrics = {
+    scrollLeft: 0,
+    scrollTop: 0,
+    scrollWidth: 0,
+    scrollHeight: 0,
+    clientWidth: 0,
+    clientHeight: 0,
+    scrollableX: false,
+    scrollableY: false,
+  };
   let scrollMemo: S.ScrollMetrics | null = null;
   const scrollMetricsNow = (): S.ScrollMetrics => {
+    if (!ctx.getState().placed) return EMPTY_SCROLL_METRICS;
     const sc = buildScene();
     const m = S.scrollMetrics(
       cam(),
@@ -954,9 +967,11 @@ export function createStageCapability(
 
   // Memoized visiblePages -> stable reference (no useSyncExternalStore tearing loop).
   // Paged renders ONLY the slice's item; continuous renders the camera's query window.
+  const EMPTY_VISIBLE_PAGES: VisiblePage[] = [];
   let visSig = '';
   let vis: VisiblePage[] = [];
   const visiblePages = (): VisiblePage[] => {
+    if (!ctx.getState().placed) return EMPTY_VISIBLE_PAGES;
     const c = cam();
     const v = vp();
     const sc = buildScene();
@@ -1060,7 +1075,7 @@ export function createStageCapability(
 
   // Initial-view providers (storage restore, deep-link, an explicit prop…). One owner
   // (placeInitial) resolves them by priority — no effect-ordering races.
-  // (`hasPlaced` is declared above the camera-rest detector, which reads it.)
+  // (`placementStarted` is declared above the camera-rest detector, which reads it.)
   const initialViewProviders: Array<{ priority: number; fn: () => StageViewState | null }> = [];
 
   const api: StageCapability = {
@@ -1082,6 +1097,7 @@ export function createStageCapability(
         label: p.label ?? null,
       })),
     pageRect: (pon) => {
+      if (!ctx.getState().placed) return null;
       const meta = ctx.document();
       const index = meta ? meta.pages.findIndex((p) => p.pageObjectNumber === pon) : -1;
       if (index < 0) return null;
@@ -1177,7 +1193,7 @@ export function createStageCapability(
       // the initial view (storage/deep-link providers, else reset). Every report
       // re-checks the condition — no watch, no effect-registration race, no edge
       // to miss when the viewport was already sized before anyone listened.
-      if (!hasPlaced) {
+      if (!placementStarted) {
         ctx.dispatch({ type: 'VP', vp: v });
         syncResponsive(false); // rules see the box before placement resolves
         if (v.width > 0 && v.height > 0 && (ctx.document()?.pageCount ?? 0) > 0) {
@@ -1359,7 +1375,7 @@ export function createStageCapability(
       // re-place against the now-current scene, keeping the anchored page-point.
       // No-op until the first placement; the scene is re-keyed on the registry
       // revision, so `reapply` reads the rotated footprint.
-      if (!hasPlaced) return;
+      if (!placementStarted) return;
       cancelAnim();
       reapply(currentAnchor());
     },
@@ -1520,16 +1536,21 @@ export function createStageCapability(
       initialViewProviders.push({ priority, fn });
     },
     placeInitial: () => {
-      hasPlaced = true;
+      placementStarted = true;
       const sorted = [...initialViewProviders].sort((a, b) => b.priority - a.priority);
       for (const p of sorted) {
         const view = p.fn();
         if (view) {
           api.applyViewState(view);
+          ctx.dispatch({ type: 'PLACED' });
           return;
         }
       }
       api.resetView();
+      // Publish renderability LAST. The VP/responsive/camera writes above are
+      // still ordinary observable store updates, but page/scroll render-root
+      // selectors return stable empty values until this commit lands.
+      ctx.dispatch({ type: 'PLACED' });
     },
     // Home = page 0, a fresh arrival at arrivalAlign (the clamp collapses any
     // fitting axis to its fitAlign rest point).
