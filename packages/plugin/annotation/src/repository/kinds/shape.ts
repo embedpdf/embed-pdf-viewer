@@ -32,7 +32,10 @@ export function cloudyExtras(a: Annot): Wire {
 
 const ingest = (dto: AnnotationDTO, crop: PdfRect, ellipse: boolean) => {
   const d = dto as ShapeDTO;
-  return { geom: boxGeomFromDTO(d, d.rotation, d.unrotatedRect, crop, ellipse) };
+  return {
+    geom: boxGeomFromDTO(d, d.rotation, d.unrotatedRect, crop, ellipse),
+    ...(d.measurement ? { measure: d.measurement } : {}),
+  };
 };
 
 const projection = (ellipse: boolean): KindProjection => ({

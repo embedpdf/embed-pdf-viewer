@@ -56,6 +56,7 @@ const mainBar: BarSchema = {
           item('mode:view', { variants: ['label'], importance: 1 }),
           item('mode:annotate', { variants: ['label'], importance: 1 }),
           item('mode:shapes', { variants: ['label'], importance: 1 }),
+          item('mode:measure', { variants: ['label'], importance: 1 }),
           item('mode:insert', { variants: ['label'], importance: 1 }),
           item('mode:form', { variants: ['label'], importance: 1 }),
           item('mode:redact', { variants: ['label'], importance: 1 }),
@@ -102,6 +103,24 @@ const shapesBar: BarSchema = {
         'annotation:add-arrow',
       ]),
       group('polygons', { importance: 2 }, ['annotation:add-polygon', 'annotation:add-polyline']),
+      style,
+      history,
+    ],
+  },
+};
+
+// Measurement shares the shapes band's shape: the five tools, then the style
+// panel (whose Measurement control is where you calibrate) and history.
+const measureBar: BarSchema = {
+  id: 'measure',
+  sections: {
+    center: [
+      group('measure-linear', { importance: 4 }, ['measure:distance', 'measure:perimeter']),
+      group('measure-area', { importance: 3 }, [
+        'measure:area-rect',
+        'measure:area-ellipse',
+        'measure:area-polygon',
+      ]),
       style,
       history,
     ],
@@ -224,6 +243,7 @@ export const defaultChrome = defineChrome({
   modeBars: {
     'mode:annotate': annotateBar,
     'mode:shapes': shapesBar,
+    'mode:measure': measureBar,
     'mode:insert': insertBar,
     'mode:form': formBar,
     'mode:redact': redactBar,

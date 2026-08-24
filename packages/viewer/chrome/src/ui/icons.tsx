@@ -299,6 +299,34 @@ export const ICON_PATHS: Record<string, readonly PathSpec[]> = {
     'M3 16l5 -5c.928 -.893 2.072 -.893 3 0l5 5',
     'M14 14l1 -1c.928 -.893 2.072 -.893 3 0l3 3',
   ],
+  // ── measurement (hand-authored, Tabler-style) ─────────────────────────────
+  // A dimension line: the measured span with a tick at each end.
+  measureDistance: [
+    { d: 'M5 12h14', stroke: 'primary' },
+    { d: 'M5 8v8', stroke: 'primary' },
+    { d: 'M19 8v8', stroke: 'primary' },
+  ],
+  // A multi-segment path with its vertices marked — a measured perimeter.
+  measurePerimeter: [
+    { d: 'M3 17l5 -8l5 5l8 -10', stroke: 'primary' },
+    'M3 17m-1.4 0a1.4 1.4 0 1 0 2.8 0a1.4 1.4 0 1 0 -2.8 0',
+    'M21 4m-1.4 0a1.4 1.4 0 1 0 2.8 0a1.4 1.4 0 1 0 -2.8 0',
+  ],
+  // A filled polygon — the enclosed region an area measurement reports.
+  measureAreaPolygon: [
+    { d: 'M12 3l9 6.5l-3.5 10.5h-11l-3.5 -10.5z', stroke: 'primary', fill: 'secondary' },
+    'M12 9l3 2.5l-1.2 3.5h-3.6l-1.2 -3.5z',
+  ],
+  measureAreaRect: [
+    { d: 'M3 5h18v14h-18z', stroke: 'primary', fill: 'secondary' },
+    'M7 9l10 6',
+    'M7 15l10 -6',
+  ],
+  measureAreaEllipse: [
+    { d: 'M12 12m-9 0a9 7 0 1 0 18 0a9 7 0 1 0 -18 0', stroke: 'primary', fill: 'secondary' },
+    'M5 9l14 6',
+    'M5 15l14 -6',
+  ],
   // hand-added: the v2 file draws <line> primitives the extractor skips
   plus: ['M12 5l0 14', 'M5 12l14 0'],
   pointer: [

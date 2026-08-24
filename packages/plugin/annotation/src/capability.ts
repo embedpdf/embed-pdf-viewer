@@ -1116,14 +1116,12 @@ export function createAnnotationCapability(
       const resolved = buildToolRegistry([...configTools, def]).get(def.id);
       if (!resolved) throw new Error(`[annotation] could not resolve tool '${def.id}'`);
       registry.set(resolved.id, resolved);
-      const un = ctx
-        .tryGet(InteractionToken)
-        ?.registerTool({
-          id: resolved.id,
-          cursor: resolved.cursor,
-          enables: resolved.enables,
-          touchDirect: isTouchDirect(resolved.enables),
-        });
+      const un = ctx.tryGet(InteractionToken)?.registerTool({
+        id: resolved.id,
+        cursor: resolved.cursor,
+        enables: resolved.enables,
+        touchDirect: isTouchDirect(resolved.enables),
+      });
       if (resolved.defaults)
         apply({ t: 'setDefaults', subtype: resolved.preset, patch: resolved.defaults });
       return () => {
@@ -1407,6 +1405,28 @@ export function createAnnotationCapability(
     // line's (and the insert-caret tool reads the shared `caret` bag). Falls back
     // to the given id for a bare subtype.
     currentDefaults: (toolId) => defaultsFor(model(), registry.get(toolId)?.preset ?? toolId),
+    // Calibration is a DOCUMENT fact, so it fans out across every tool that
+    // authors a measurement — each keeping its own unit/precision. Reads the
+    // resolved defaults (not the raw tool table) so a tool an app already
+    // re-configured is re-calibrated, not reset.
+    setMeasurementScale: (scale) => {
+      for (const tool of registry.values()) {
+        const current = defaultsFor(model(), tool.preset).measurement;
+        if (!current) continue;
+        apply({
+          t: 'setDefaults',
+          subtype: tool.preset as Subtype,
+          patch: { measurement: { ...current, scale } },
+        });
+      }
+    },
+    measurementScale: () => {
+      for (const tool of registry.values()) {
+        const current = defaultsFor(model(), tool.preset).measurement;
+        if (current) return current.scale;
+      }
+      return null;
+    },
     // Live-adjustable snapping (a UI toggle); seeded by the registration config.
     setSnap: (patch) => apply({ t: 'setSnap', patch }),
     snapSettings: () => model().snap,

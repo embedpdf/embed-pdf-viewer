@@ -35,6 +35,10 @@ export const GENERIC_PROPS: Partial<Record<PropKey, (a: Annot) => Wire>> = {
   fontColor: (a) => ({ fontColor: cssToColor(textOf(a).fontColor) }),
   textAlign: (a) => ({ textAlign: textOf(a).textAlign }),
   icon: (a) => (a.icon !== undefined ? { icon: a.icon } : {}),
+  // TOTAL, like the cloudy tri-state: a non-measurement states `null` so
+  // demoting one back to an ordinary shape actually clears the stored
+  // calibration (omission would preserve it).
+  measurement: (a) => ({ measurement: a.measure ?? null }),
   // A non-link kind's `link` prop is NOT wire data on the parent: it
   // materializes as attached child annotations through the syncLink
   // reconciler. The link KIND overrides this with its own `/A` target.

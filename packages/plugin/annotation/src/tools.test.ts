@@ -43,6 +43,86 @@ describe('annotation tool registry', () => {
     });
   });
 
+  it('gives each measure tool the geometry of the tool it extends', () => {
+    const reg = buildToolRegistry();
+    expect(reg.get('measure-distance')?.subtype).toBe('line');
+    expect(reg.get('measure-perimeter')?.subtype).toBe('polyline');
+    expect(reg.get('measure-area-polygon')?.subtype).toBe('polygon');
+    expect(reg.get('measure-area-rect')?.subtype).toBe('square');
+    expect(reg.get('measure-area-ellipse')?.subtype).toBe('circle');
+  });
+
+  it('gives each measure tool the mode its geometry can actually report', () => {
+    const reg = buildToolRegistry();
+    const mode = (id: string) => reg.get(id)?.defaults?.measurement?.mode;
+    expect(mode('measure-distance')).toBe('distance');
+    expect(mode('measure-perimeter')).toBe('perimeter');
+    expect(mode('measure-area-polygon')).toBe('area');
+    expect(mode('measure-area-rect')).toBe('area');
+    expect(mode('measure-area-ellipse')).toBe('area');
+  });
+
+  it('keeps its own defaults key so calibrating one measure tool cannot leak', () => {
+    const reg = buildToolRegistry();
+    // Same subtype as the plain `line` tool, but a distinct preset — otherwise
+    // arming Distance would restyle every line the user draws.
+    expect(reg.get('measure-distance')?.preset).toBe('measure-distance');
+    expect(reg.get('line')?.defaults?.measurement).toBeUndefined();
+  });
+
+  it('makes measurements DRAWN, never click-placed at a default size', () => {
+    const reg = buildToolRegistry();
+    for (const id of [
+      'measure-distance',
+      'measure-perimeter',
+      'measure-area-polygon',
+      'measure-area-rect',
+      'measure-area-ellipse',
+    ]) {
+      // `false` is the explicit drag-only state (`capability.ts` gates the
+      // click path on falsiness), not an accidental absence.
+      expect(reg.get(id)?.clickCreate, id).toBe(false);
+    }
+    // The tool it extends DOES click-create — so this is a real override, not
+    // an accident of the base tool.
+    expect(reg.get('line')?.clickCreate).toBeDefined();
+  });
+
+  it('lets an embedder pre-calibrate a measure tool by extending it', () => {
+    const reg = buildToolRegistry([
+      {
+        id: 'measure-distance',
+        defaults: {
+          measurement: {
+            mode: 'distance',
+            scale: { value: 10, unit: 'ft', pagePoints: 72 },
+            unit: 'ft',
+            precision: { type: 'decimal', places: 1 },
+          },
+        },
+      },
+    ]);
+    expect(reg.get('measure-distance')?.defaults?.measurement).toMatchObject({
+      scale: { value: 10, unit: 'ft', pagePoints: 72 },
+      unit: 'ft',
+    });
+    // The inherited geometry survives the defaults-only override.
+    expect(reg.get('measure-distance')?.subtype).toBe('line');
+  });
+
+  it('rejects a measurement default on a kind that cannot carry one', () => {
+    expect(() =>
+      buildToolRegistry([
+        {
+          id: 'bad-ink',
+          subtype: 'ink',
+          // @ts-expect-error ink annotations cannot be measurements
+          defaults: { measurement: { mode: 'distance' } },
+        },
+      ]),
+    ).toThrow("tool 'bad-ink' does not support default 'measurement'");
+  });
+
   it('rejects unsupported defaults from untyped JavaScript/JSON configuration', () => {
     expect(() => buildToolRegistry([invalidCircleDefaults])).toThrow(
       "tool 'invalid-circle' does not support default 'lineEndings'",

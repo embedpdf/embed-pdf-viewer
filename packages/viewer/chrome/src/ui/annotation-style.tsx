@@ -29,6 +29,9 @@ import {
   type LineEnding,
   type LineEndings,
   type TextAlign,
+  type MeasurementInfo,
+  type MeasurementPrecision,
+  type MeasurementUnit,
 } from '@embedpdf/react/annotation';
 import { useTool } from '@embedpdf/react/interaction';
 import { useKernel, useOptionalCapability } from '@embedpdf/react/runtime';
@@ -55,6 +58,20 @@ const PRESET_COLORS = [
   '#a0522d',
   '#ffffff',
 ];
+
+// Measurement vocabulary. The units are the engine's; the fraction
+// denominators and decimal places are a viewer's choice of what to offer.
+const MEASUREMENT_UNIT_OPTIONS: { v: MeasurementUnit; label: string }[] = [
+  { v: 'mm', label: 'Millimetres (mm)' },
+  { v: 'cm', label: 'Centimetres (cm)' },
+  { v: 'm', label: 'Metres (m)' },
+  { v: 'in', label: 'Inches (in)' },
+  { v: 'ft', label: 'Feet (ft)' },
+  { v: 'yd', label: 'Yards (yd)' },
+  { v: 'pt', label: 'Points (pt)' },
+];
+const DECIMAL_PLACES = [0, 1, 2, 3, 4];
+const FRACTION_DENOMINATORS = [2, 4, 8, 16, 32];
 
 const FONT_OPTIONS: { v: string; label: string }[] = [
   { v: 'helvetica', label: 'Helvetica' },
@@ -657,6 +674,194 @@ function LinkTargetControl({
   );
 }
 
+/** A labelled dropdown over a fixed option list — the shape three of the
+ *  measurement selects share. */
+function MiniSelect<T extends string | number>({
+  value,
+  options,
+  onChange,
+}: {
+  value: T;
+  options: { v: T; label: string }[];
+  onChange: (v: T) => void;
+}) {
+  const current = options.find((o) => o.v === value);
+  return (
+    <DropdownShell trigger={<span className="text-fg text-sm">{current?.label ?? value}</span>}>
+      {(close) =>
+        options.map((o) => (
+          <OptionRow
+            key={String(o.v)}
+            selected={o.v === value}
+            onClick={() => {
+              onChange(o.v);
+              close();
+            }}
+          >
+            {o.label}
+          </OptionRow>
+        ))
+      }
+    </DropdownShell>
+  );
+}
+
+/**
+ * The measurement calibration editor — scale, display unit, rounding, and the
+ * optional secondary read-out.
+ *
+ * It renders for whatever declares the `measurement` PropSpec AND actually
+ * carries a value: a selected measurement annotation, or the armed measure
+ * tool's defaults. An ordinary square never has one, so its panel is unchanged
+ * — that is the whole gating rule, and it needs no subtype branching here.
+ *
+ * The scale reads as a SENTENCE ("1 in on the page = 10 ft") rather than as
+ * three abstract numbers, because that is the question the user is actually
+ * answering. `pagePoints` is stored in points but edited in the page unit the
+ * user picked, so nobody has to think in 1/72ths.
+ */
+function MeasurementControl({
+  label,
+  value,
+  mixed,
+  onChange,
+}: {
+  label: string;
+  value: MeasurementInfo | undefined;
+  mixed: boolean;
+  onChange: (patch: AnnotationPropsPatch) => void;
+}) {
+  // Not a measurement → no controls. (An ordinary shape declares the spec but
+  // carries no value; see the kind table's SHAPE_PROPS/LINE_PROPS.)
+  if (!value) return null;
+
+  const inputCls = 'border-border bg-surface text-fg w-full rounded border px-2 py-1.5 text-sm';
+  const set = (patch: Partial<MeasurementInfo>) =>
+    onChange({ measurement: { ...value, ...patch } });
+
+  // The page side of the scale, expressed in a unit a human picks (default
+  // inches), converted back to points on write.
+  const pageUnit: MeasurementUnit = 'in';
+  const ptPerPageUnit = 72;
+  const pageAmount = value.scale.pagePoints / ptPerPageUnit;
+
+  const precisionOptions: { v: string; label: string }[] = [
+    ...DECIMAL_PLACES.map((p) => ({ v: `d${p}`, label: p === 0 ? '1' : `1.${'0'.repeat(p)}` })),
+    ...FRACTION_DENOMINATORS.map((d) => ({ v: `f${d}`, label: `1/${d}` })),
+  ];
+  const precisionValue = (p: MeasurementPrecision) =>
+    p.type === 'decimal' ? `d${p.places}` : `f${p.denominator}`;
+  const parsePrecision = (v: string): MeasurementPrecision =>
+    v.startsWith('f')
+      ? { type: 'fraction', denominator: Number(v.slice(1)) }
+      : { type: 'decimal', places: Number(v.slice(1)) };
+
+  return (
+    <Field label={label} mixed={mixed}>
+      {/* Scale — "N in on the page = M <unit>". */}
+      <div className="mb-3">
+        <span className="text-fg-muted mb-1.5 block text-xs">Scale</span>
+        <div className="flex items-center gap-1.5">
+          <input
+            type="number"
+            min={0}
+            step="any"
+            className={inputCls}
+            value={pageAmount}
+            onChange={(e) => {
+              const n = parseFloat(e.target.value);
+              // A zero/negative page extent is not a calibration — ignore it
+              // rather than storing a scale that reads every value as 0.
+              if (Number.isFinite(n) && n > 0) {
+                set({ scale: { ...value.scale, pagePoints: n * ptPerPageUnit } });
+              }
+            }}
+          />
+          <span className="text-fg-muted shrink-0 text-sm">{pageUnit} =</span>
+          <input
+            type="number"
+            step="any"
+            className={inputCls}
+            value={value.scale.value}
+            onChange={(e) => {
+              const n = parseFloat(e.target.value);
+              if (Number.isFinite(n)) set({ scale: { ...value.scale, value: n } });
+            }}
+          />
+        </div>
+        <div className="mt-1.5">
+          <MiniSelect
+            value={value.scale.unit}
+            options={MEASUREMENT_UNIT_OPTIONS}
+            onChange={(unit) => set({ scale: { ...value.scale, unit } })}
+          />
+        </div>
+      </div>
+
+      {/* Display unit + rounding of the primary read-out. */}
+      <div className="mb-3">
+        <span className="text-fg-muted mb-1.5 block text-xs">Display in</span>
+        <MiniSelect
+          value={value.unit}
+          options={MEASUREMENT_UNIT_OPTIONS}
+          onChange={(unit) => set({ unit })}
+        />
+      </div>
+      <div className="mb-3">
+        <span className="text-fg-muted mb-1.5 block text-xs">Precision</span>
+        <MiniSelect
+          value={precisionValue(value.precision)}
+          options={precisionOptions}
+          onChange={(v) => set({ precision: parsePrecision(v) })}
+        />
+        {value.mode === 'area' && value.precision.type === 'fraction' && (
+          <p className="text-fg-muted mt-1 text-xs">Areas always display as decimals.</p>
+        )}
+      </div>
+
+      {/* Optional secondary read-out, shown in parentheses after the primary. */}
+      <div>
+        <label className="text-fg mb-1.5 flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            className="accent-accent"
+            checked={value.secondary != null}
+            onChange={(e) =>
+              onChange({
+                measurement: e.target.checked
+                  ? {
+                      ...value,
+                      secondary: { unit: 'ft', precision: { type: 'decimal', places: 2 } },
+                    }
+                  : // Drop the key rather than storing null: `secondary` is
+                    // optional, and absence is what "no second read-out" means.
+                    (({ secondary: _drop, ...rest }) => rest)(value),
+              })
+            }
+          />
+          Second unit
+        </label>
+        {value.secondary && (
+          <div className="flex flex-col gap-1.5">
+            <MiniSelect
+              value={value.secondary.unit}
+              options={MEASUREMENT_UNIT_OPTIONS}
+              onChange={(unit) => set({ secondary: { ...value.secondary!, unit } })}
+            />
+            <MiniSelect
+              value={precisionValue(value.secondary.precision)}
+              options={precisionOptions}
+              onChange={(v) =>
+                set({ secondary: { ...value.secondary!, precision: parsePrecision(v) } })
+              }
+            />
+          </div>
+        )}
+      </div>
+    </Field>
+  );
+}
+
 // ── one control per PropSpec — the entire surface an app customizes ──────────
 function PropControl({
   spec,
@@ -810,6 +1015,15 @@ function PropControl({
         <LinkTargetControl
           label={spec.label}
           value={(value as PdfLinkTarget | null) ?? null}
+          mixed={mixed}
+          onChange={onChange}
+        />
+      );
+    case 'measurement':
+      return (
+        <MeasurementControl
+          label={spec.label}
+          value={(value as MeasurementInfo | null) ?? undefined}
           mixed={mixed}
           onChange={onChange}
         />

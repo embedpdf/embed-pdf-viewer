@@ -21,6 +21,7 @@ import type {
   CreationDraftAnchor,
   Geom,
   Id,
+  MeasurementScale,
   Model,
   PropKey,
   PropSpec,
@@ -349,6 +350,24 @@ export interface AnnotationCapability {
   setDefaults(subtype: Subtype, patch: AnnotationPropsPatch): void;
   /** The RESOLVED full props bag a tool will use for new annotations. */
   currentDefaults(subtype: Subtype): AnnotationProps;
+  // ── measurement calibration ──
+  /**
+   * Re-calibrate EVERY measure tool at once — the "1 inch on this drawing is
+   * 10 feet" statement, which is a property of the DOCUMENT, not of whichever
+   * tool happens to be armed. Without this an app has to remember to patch all
+   * five tools and would silently drift the moment a sixth preset is added.
+   *
+   * Only the `scale` is touched: each tool keeps its own display unit and
+   * precision (a distance in feet, an area in square metres), and tools that
+   * carry no measurement are left alone. For finer control use
+   * {@link setDefaults} on one tool, and {@link updateSelection} with a
+   * `measurement` patch to re-calibrate annotations already on the page.
+   */
+  setMeasurementScale(scale: MeasurementScale): void;
+  /** The scale the measure tools currently author with, or `null` when no
+   *  tool carries a measurement. Reads from the SAME defaults
+   *  {@link setMeasurementScale} writes, so get/set can't disagree. */
+  measurementScale(): MeasurementScale | null;
   // ── snapping (alignment guides while moving + rotation snap) ──
   /** Live-adjust snapping — wire a UI toggle here (e.g.
    *  `setSnap({ guides: false })`). Initial values come from the plugin's

@@ -43,6 +43,11 @@ export type PropSpec =
   | { key: 'blendMode'; label: string }
   /** `/Name` icon picker for icon kinds; `options` are the legal names. */
   | { key: 'icon'; label: string; options: readonly string[] }
+  /** Measurement calibration editor (scale, unit, precision). Declared by the
+   *  five geometry kinds that can BE a measurement; the control only shows for
+   *  an annotation that actually carries one (`readProp` returns `undefined`
+   *  otherwise), so an ordinary square's sidebar is unchanged. */
+  | { key: 'measurement'; label: string }
   /** Link-target editor (URL / page destination). Declared by the link kind
    *  (its own target) and by every kind that may carry an ATTACHED link;
    *  kinds that omit it (widgets, caret, redact…) simply cannot be links —
@@ -149,9 +154,18 @@ const BLEND_MODE: PropSpec = { key: 'blendMode', label: 'Blend mode' };
  * file-attachment (its click means "open the attachment"), and redact.
  */
 const LINKABLE: PropSpec = { key: 'link', label: 'Link' };
+const MEASUREMENT: PropSpec = { key: 'measurement', label: 'Measurement' };
 
 /** Shapes with a fill + a (possibly cloudy) border: square / circle / polygon. */
-const SHAPE_PROPS: PropSpec[] = [STROKE, FILL, OPACITY, STROKE_WIDTH, BORDER_CLOUDY, LINKABLE];
+const SHAPE_PROPS: PropSpec[] = [
+  STROKE,
+  FILL,
+  OPACITY,
+  STROKE_WIDTH,
+  BORDER_CLOUDY,
+  MEASUREMENT,
+  LINKABLE,
+];
 
 // Widget-plane styling: every family has a box; text-bearing families add
 // the /DA vocabulary. Same flat keys as every other kind — the writer maps
@@ -181,6 +195,7 @@ const LINE_PROPS: PropSpec[] = [
   STROKE_WIDTH,
   BORDER_PLAIN,
   LINE_ENDINGS,
+  MEASUREMENT,
   LINKABLE,
 ];
 /** Text markup: colour/opacity plus its appearance-stream blend mode. */

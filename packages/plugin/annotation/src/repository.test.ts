@@ -172,9 +172,7 @@ describe('repository — Replace Text authoring', () => {
       intent: 'strikeout-text-edit',
       geom: {
         t: 'quads',
-        quads: [
-          textQuadFromRect({ x: 10, y: 20, width: 80, height: 15 }),
-        ],
+        quads: [textQuadFromRect({ x: 10, y: 20, width: 80, height: 15 })],
       },
       style,
       flags: DRAWN_FLAGS,
@@ -839,5 +837,81 @@ describe('repository — attached links (fold + desired state + link kind mappin
 
     const js = toPatch({ ...base, link: { kind: 'javascript' } }, CROP);
     expect(js && !('target' in js)).toBe(true); // geometry-only: foreign /A survives
+  });
+});
+
+/* ── measurement round-trip ────────────────────────────────────────────────
+ * The calibration is a projection of `data` like `style`: ingested off the DTO
+ * onto `Annot.measure`, and lowered back through the `measurement` prop key.
+ * The TOTAL lowering (states `null` when absent) is what lets a demote
+ * actually clear the stored calibration — omission would preserve it.
+ * ────────────────────────────────────────────────────────────────────────── */
+
+const MEASUREMENT = {
+  mode: 'area',
+  scale: { value: 10, unit: 'ft', pagePoints: 72 },
+  unit: 'ft',
+  precision: { type: 'decimal', places: 1 },
+} as const;
+
+const measuredSquareDTO = (): AnnotationDTO =>
+  ({ ...squareDTO(30), measurement: MEASUREMENT }) as AnnotationDTO;
+
+describe('repository — measurement projection', () => {
+  it('ingests the calibration off the DTO onto the model', () => {
+    expect(fromDTO(measuredSquareDTO(), CROP).measure).toEqual(MEASUREMENT);
+  });
+
+  it('leaves an ordinary shape with no calibration', () => {
+    expect(fromDTO(squareDTO(30), CROP).measure).toBeUndefined();
+  });
+
+  it('lowers the calibration back onto a full patch', () => {
+    const patch = toPatch(fromDTO(measuredSquareDTO(), CROP), CROP);
+    expect(patch && 'measurement' in patch && patch.measurement).toEqual(MEASUREMENT);
+  });
+
+  it('STATES null for a non-measurement, so a demote clears the stored scale', () => {
+    const demoted = { ...fromDTO(measuredSquareDTO(), CROP) };
+    delete demoted.measure;
+    const patch = toPatch(demoted, CROP);
+    expect(patch && 'measurement' in patch && patch.measurement).toBeNull();
+  });
+
+  it('emits the calibration on a create draft', () => {
+    const draft = toCreateDraft(fromDTO(measuredSquareDTO(), CROP), CROP);
+    expect(draft && 'measurement' in draft && draft.measurement).toEqual(MEASUREMENT);
+  });
+
+  it('scopes a measurement-only patch to just that key', () => {
+    const a = fromDTO(measuredSquareDTO(), CROP);
+    const patch = toScopedPatch(a, { kind: 'props', keys: ['measurement'] }, CROP);
+    expect(patch).toMatchObject({ subtype: 'square', measurement: MEASUREMENT });
+    // A geometry key would drag the whole rect group along; this must not.
+    expect(patch && 'rect' in patch).toBe(false);
+  });
+
+  it('does NOT restate the calibration on a geometry-only patch', () => {
+    const a = fromDTO(measuredSquareDTO(), CROP);
+    const patch = toScopedPatch(a, { kind: 'geometry' }, CROP);
+    // Omission PRESERVES — the engine keeps the calibration through a resize.
+    expect(patch && 'measurement' in patch).toBe(false);
+  });
+
+  it('round-trips through a line, which carries its own dto/draft/patch', () => {
+    const dto = {
+      ...squareDTO(31),
+      subtype: 'line',
+      linePoints: { start: { x: 100, y: 100 }, end: { x: 200, y: 100 } },
+      lineEndings: { start: 'none', end: 'none' },
+      measurement: { ...MEASUREMENT, mode: 'distance' },
+    } as unknown as AnnotationDTO;
+    const a = fromDTO(dto, CROP);
+    expect(a.measure?.mode).toBe('distance');
+    const patch = toPatch(a, CROP);
+    expect(patch && 'measurement' in patch && patch.measurement).toMatchObject({
+      mode: 'distance',
+      scale: { value: 10, unit: 'ft', pagePoints: 72 },
+    });
   });
 });

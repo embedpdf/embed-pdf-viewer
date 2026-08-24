@@ -1,67 +1,56 @@
 ---
-'@embedpdf/models': minor
-'@embedpdf/engines': minor
+'@embedpdf/engine-core': minor
+'@embedpdf/engine-services': minor
+'@embedpdf/core-annotation': minor
 '@embedpdf/plugin-annotation': minor
-'@embedpdf/snippet': minor
+'@embedpdf/react': minor
+'@embedpdf/viewer-chrome': minor
 ---
 
-Add measurement tools (distance, perimeter, area).
+Add measurement annotations — calibrated distance, perimeter and area read-outs
+drawn over ordinary geometry annotations.
 
-New annotation tools turn Line / Polyline / Polygon / Square / Circle annotations
-into calibrated measurements:
+Five new tools ship in `DEFAULT_TOOLS`, each a preset of the draw tool it
+extends, so they need no new gesture or subtype:
 
-- `measureDistance` (Line → distance)
-- `measurePerimeter` (Polyline → path length)
-- `measureAreaPolygon` (Polygon → area)
-- `measureAreaRect` (Square → rectangle area)
-- `measureAreaEllipse` (Circle → ellipse area)
+| Tool                   | Draws    | Reports                |
+| ---------------------- | -------- | ---------------------- |
+| `measure-distance`     | line     | straight-line distance |
+| `measure-perimeter`    | polyline | path length            |
+| `measure-area-polygon` | polygon  | area                   |
+| `measure-area-rect`    | square   | rectangle area         |
+| `measure-area-ellipse` | circle   | ellipse area           |
 
-Each tool draws a live, zoom-stable measurement label while drawing and on the
-committed annotation, across all four framework bindings (React, Preact, Vue,
-Svelte).
+What makes an annotation a measurement is a `measurement` calibration on it —
+a new entry in the flat props vocabulary, so it is set, edited and cleared
+through the same `setDefaults` / `updateSelection` paths as colour or opacity.
+Setting it promotes a shape into a dimension; `null` demotes it back.
 
-`@embedpdf/models` gains a measurement model (`PdfMeasurementUnit`,
-`PdfMeasurementScale`, `PdfMeasurementPrecision`, `PdfMeasurementInfo`, the
-`PdfMeasurementIntent` `/IT` values) and a pure calculation module
-(`scaleFactor`, `pointDistance`, `polygonArea`, `formatMeasurement`,
-`measurePagePtValue`, …) supporting mm/cm/m/in/ft/yd/pt, decimal or fractional
-precision, and an optional secondary unit.
+The read-out is DERIVED from the geometry on every render, so a later vertex
+drag or resize keeps the number honest, and it is drawn zoom-stably (a constant
+on-screen size) with a hatch fill for areas. Units: mm/cm/m/in/ft/yd/pt, decimal
+or fractional precision, and an optional secondary unit — `10.0 m (32.81 ft)`.
 
-The annotation plugin exposes `setMeasurementScale(scale)` / `getMeasurementScale()`
-to calibrate every measurement tool at once, or use the existing
-`setToolDefaults` API for finer control:
+- `@embedpdf/engine-core` gains the calibration vocabulary (`MeasurementInfo`,
+  `MeasurementScale`, `MeasurementUnit`, `MeasurementPrecision`) and the pure
+  unit math (`formatMeasurement`, `scaleFactor`, `toRealValue`,
+  `parseMeasurementInfo`). The five geometry kinds carry `measurement` on their
+  DTO/Draft/Patch, tri-state like every other patch field.
+- `@embedpdf/engine-services` persists it under `/EMBD_Metadata/Measurement`
+  and writes the spec `/IT` intent (`LineDimension` / `PolyLineDimension` /
+  `PolygonDimension`) so other viewers recognise the dimension. The intent is
+  derived from the subtype and mode, so the two can never drift apart.
+- `@embedpdf/core-annotation` gains the geometry half (`measureRawValue`,
+  `measureText`, `measureLabelAnchor`, `hatchPath`) and paints the read-out
+  through the shared `scene()`, so every framework renderer gets it for free.
+- `@embedpdf/plugin-annotation` adds `setMeasurementScale(scale)` /
+  `measurementScale()` to re-calibrate every measure tool at once — calibration
+  is a property of the document, not of whichever tool is armed.
+- `@embedpdf/viewer-chrome` adds a **Measure** mode with the five tools and a
+  Measurement section in the style panel (scale, display unit, precision,
+  second unit) that calibrates the armed tool or the selected measurement.
 
-```ts
-annotation.setMeasurementScale({
-  value: 10,
-  unit: PdfMeasurementUnit.FT,
-  pagePoints: 72, // 1 inch on the page = 10 ft
-});
-
-annotation.setToolDefaults('measureDistance', {
-  measurement: { unit: PdfMeasurementUnit.FT, precision: { type: 'decimal', places: 1 } },
-});
-```
-
-The `@embedpdf/snippet` viewer gains a **Measure** mode with a toolbar for the
-five tools, **draw-to-calibrate** (drag a line over a known distance, then the
-dialog opens prefilled with the page distance — type the real length and press
-Enter), and a measurement property panel (unit, precision, secondary unit,
-scale) shown when a measurement annotation is selected.
-
-Drawing also supports **hold-Shift to constrain** lines and polygon edges to
-15° angle increments. Measurements must be drawn (no click-to-place at a fixed
-default size), and the Perimeter/Polygon tools show an on-screen hint that they
-finish on double-click.
-
-Notes:
-- `setMeasurementScale` is the canonical scale source of truth and is projected
-  into the measure tools' defaults (fixes a prior get/set asymmetry).
-- Circle/Square area measurements are an EmbedPDF extension (the PDF spec
-  defines measurement intents only for Line/PolyLine/Polygon), so they carry no
-  `/IT` dimension intent — they're recognised via the `measurement` metadata.
-
-Measurement metadata is persisted via the annotation custom-data channel and the
-geometry annotation's `measurement` field, and the spec `/IT` intent is written
-so other viewers recognise the dimension. (A fully spec-compliant native
-`/Measure` dictionary for cross-viewer interop is a planned follow-up.)
+Note: measurement metadata rides in EmbedPDF's `/EMBD_Metadata` dictionary
+alongside the spec `/IT` intent. A fully spec-compliant native `/Measure`
+dictionary needs PDFium bindings that do not exist yet, and remains a
+follow-up for cross-viewer interop of the SCALE (the intent already travels).

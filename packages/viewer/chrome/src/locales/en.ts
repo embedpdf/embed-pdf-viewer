@@ -47,6 +47,7 @@ export const en: Locale = {
         view: 'View',
         annotate: 'Annotate',
         shapes: 'Shapes',
+        measure: 'Measure',
         insert: 'Insert',
         form: 'Form',
         redact: 'Redact',
@@ -82,6 +83,13 @@ export const en: Locale = {
         arrow: 'Arrow',
         polygon: 'Polygon',
         polyline: 'Polyline',
+      },
+      measure: {
+        distance: 'Distance',
+        perimeter: 'Perimeter',
+        areaPolygon: 'Polygon Area',
+        areaRect: 'Rectangle Area',
+        areaEllipse: 'Ellipse Area',
       },
       insert: {
         stamp: 'Rubber Stamp',

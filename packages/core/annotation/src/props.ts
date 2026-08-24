@@ -85,6 +85,8 @@ export function readProp<K extends PropKey>(a: Annot, key: K): AnnotationProps[K
         return a.icon;
       case 'link':
         return a.link;
+      case 'measurement':
+        return a.measure;
     }
   })();
   return out as AnnotationProps[K] | undefined;
@@ -143,6 +145,19 @@ export function applyProps(a: Annot, patch: AnnotationPropsPatch): Annot | null 
 
   if (patch.link !== undefined && takes.has('link')) {
     next = { ...next, link: patch.link };
+  }
+
+  // `null` DEMOTES a measurement back to an ordinary shape; the model drops the
+  // key entirely so `readProp` reports `undefined` (never a lingering `null`).
+  if (patch.measurement !== undefined && takes.has('measurement')) {
+    if (patch.measurement === null) {
+      if (next.measure !== undefined) {
+        const { measure: _drop, ...rest } = next;
+        next = rest as Annot;
+      }
+    } else {
+      next = { ...next, measure: patch.measurement };
+    }
   }
 
   if (next.text) {
