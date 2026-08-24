@@ -1,0 +1,142 @@
+name: SDK Release
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '.github/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sdk-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Release cloudpdf/sdk
+    if: github.event_name == 'workflow_dispatch' || vars.SDK_AUTO_PUBLISH_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          tools: composer
+
+      - name: Verify generated release version
+        id: version
+        run: |
+          php <<'PHP'
+          <?php
+          $manifest = json_decode(file_get_contents('composer.json'), true, flags: JSON_THROW_ON_ERROR);
+          $generation = json_decode(file_get_contents('cloudpdf-generation.json'), true, flags: JSON_THROW_ON_ERROR);
+          if ($generation['language'] !== 'php') {
+              throw new RuntimeException('generation language is not php');
+          }
+          if ($manifest['name'] !== 'cloudpdf/sdk') {
+              throw new RuntimeException("unexpected Composer package {$manifest['name']}");
+          }
+          if (array_key_exists('version', $manifest)) {
+              throw new RuntimeException('composer.json version must be derived from the release tag');
+          }
+          $client = file_get_contents('src/CloudPDFClient.php');
+          if (!str_contains($client, $generation['sdkVersion'])) {
+              throw new RuntimeException('generated client version does not match generation metadata');
+          }
+          $prerelease = str_contains($generation['canonicalVersion'], '-');
+          $output = fopen(getenv('GITHUB_OUTPUT'), 'a');
+          fwrite($output, "version={$generation['sdkVersion']}\n");
+          fwrite($output, "tag=v{$generation['sdkVersion']}\n");
+          fwrite($output, 'prerelease=' . ($prerelease ? 'true' : 'false') . "\n");
+          PHP
+
+      - name: Validate package and autoloading
+        run: |
+          find src -type f -name '*.php' -print0 | xargs -0 -P 4 -n1 php -l >/dev/null
+          composer validate --no-check-publish --no-interaction
+          composer dump-autoload --no-dev --no-interaction --optimize --strict-psr --quiet
+          php -r "require 'vendor/autoload.php'; if (!class_exists(CloudPDF\\CloudPDFClient::class)) { throw new RuntimeException('CloudPDF client autoload verification failed'); }"
+
+      - name: Protect immutable release tag
+        id: release-tag
+        env:
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          git fetch --force --tags origin
+          if git rev-parse --quiet --verify "refs/tags/$RELEASE_TAG" >/dev/null; then
+            tagged_commit="$(git rev-list -n 1 "$RELEASE_TAG")"
+            if [ "$tagged_commit" != "$GITHUB_SHA" ]; then
+              if git diff --quiet "$RELEASE_TAG" "$GITHUB_SHA" -- . ':(exclude).github/**'; then
+                echo "::notice::Reusing $RELEASE_TAG after a workflow-only change."
+              else
+                echo "::error::Release tag $RELEASE_TAG already points to different package source at $tagged_commit; bump the SDK version."
+                exit 1
+              fi
+            fi
+          else
+            git config user.name cloudpdf-sdk-bot
+            git config user.email hello@cloudpdf.com
+            git tag -a "$RELEASE_TAG" -m "CloudPDF PHP SDK $RELEASE_TAG"
+            git push origin "refs/tags/$RELEASE_TAG"
+            tagged_commit="$GITHUB_SHA"
+          fi
+          echo "commit=$tagged_commit" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+          PRERELEASE: ${{ steps.version.outputs.prerelease }}
+        run: |
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            exit 0
+          fi
+          args=(--verify-tag --generate-notes --title "CloudPDF PHP SDK $RELEASE_TAG")
+          if [ "$PRERELEASE" = 'true' ]; then args+=(--prerelease); fi
+          gh release create "$RELEASE_TAG" "${args[@]}"
+
+      - name: Wait for Packagist publication
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          TAGGED_COMMIT: ${{ steps.release-tag.outputs.commit }}
+          METADATA_FILE: ${{ runner.temp }}/cloudpdf-packagist-metadata.json
+        run: |
+          metadata_file="$METADATA_FILE"
+          for attempt in $(seq 1 60); do
+            http_status="$(curl --silent --show-error --location --output "$metadata_file" --write-out '%{http_code}' https://repo.packagist.org/p2/cloudpdf/sdk.json)"
+            if [ "$http_status" = '200' ]; then
+              if node <<'NODE'
+          const fs = require('node:fs');
+          const metadata = JSON.parse(fs.readFileSync(process.env.METADATA_FILE, 'utf8'));
+          const releases = metadata.packages?.['cloudpdf/sdk'] ?? [];
+          const acceptableVersions = new Set([process.env.VERSION, `v${process.env.VERSION}`]);
+          const release = releases.find((candidate) => acceptableVersions.has(candidate.version));
+          if (!release) process.exit(2);
+          if (release.source?.reference !== process.env.TAGGED_COMMIT) {
+            throw new Error(`Packagist ${process.env.VERSION} points to ${release.source?.reference}, expected ${process.env.TAGGED_COMMIT}`);
+          }
+          NODE
+              then
+                exit 0
+              else
+                node_status="$?"
+                if [ "$node_status" -ne 2 ]; then exit "$node_status"; fi
+              fi
+            elif [ "$http_status" != '404' ]; then
+              echo "::error::Packagist returned HTTP $http_status while checking cloudpdf/sdk $VERSION."
+              exit 1
+            fi
+            echo "Packagist has not indexed cloudpdf/sdk $VERSION yet (attempt $attempt/60)."
+            sleep 10
+          done
+          echo "::error::Packagist did not index cloudpdf/sdk $VERSION. Register the repository and enable its GitHub hook, then rerun."
+          exit 1

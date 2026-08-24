@@ -1,0 +1,26 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Engine v3 - pages reorder (LocalEngine, WASM)</title>
+  </head>
+  <body>
+    <h1>Engine v3 page reorder browser demo</h1>
+    <p>
+      Drives <code>doc.pages.list()</code> &rarr; single-page
+      <code>move()</code> (last &rarr; front) &rarr; multi-page
+      contiguous-block <code>move()</code> against
+      <code>/sample.pdf</code>, using
+      <code>createLocalEngineWithWorker</code> from
+      <code>@embedpdf/engine</code> with the WASM runtime in a Web
+      Worker. The output below shows every page's
+      <code>(pageObjectNumber, pageIndex, revision.generation)</code>
+      tuple before and after each move. Locked invariants:
+      per-page <code>revision.generation</code> values are <em>unchanged</em>
+      across page moves (so weak annotation refs survive a reorder),
+      the PON set is preserved, and <code>pageIndex</code> is dense in
+      <code>[0, count - 1]</code>.
+    </p>
+    <pre id="out">Loading...</pre>
+    <script type="module" src="/src/pages-browser.ts"></script>
+  </body>
+</html>

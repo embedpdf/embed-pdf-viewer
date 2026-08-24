@@ -1,0 +1,61 @@
+%PDF-1.7
+% ò¤ô
+1 0 obj <<
+  /Type /Catalog
+  /Pages 2 0 R
+>>
+endobj
+2 0 obj <<
+  /Type /Pages
+  /Kids [
+    3 0 R
+    4 0 R
+  ]
+  /Count 2
+>>
+endobj
+3 0 obj <<
+  /Type /Page
+  /Parent 2 0 R
+  /MediaBox [0 0 612 792]
+  /AA <<
+    /O <<
+      /F (\\\\127.0.0.1\\c$\\Program Files\\test.exe)
+      /D [1 /Fit]
+      /S /GoToE
+    >>
+  >>
+>>
+endobj
+4 0 obj <<
+  /Type /Page
+  /Parent 2 0 R
+  /MediaBox [0 0 612 792]
+  /AA <<
+    /O <<
+      /F (\\\\127.0.0.1\\c$\\Program Files\\test_page_two_open.exe)
+      /D [1 /Fit]
+      /S /GoToE
+    >>
+    /C <<
+      /F (\\\\127.0.0.1\\c$\\Program Files\\test_page_two_close.exe)
+      /D [1 /Fit]
+      /S /GoToE
+    >>
+  >>
+>>
+endobj
+xref
+0 5
+0000000000 65535 f 
+0000000015 00000 n 
+0000000068 00000 n 
+0000000149 00000 n 
+0000000345 00000 n 
+trailer <<
+  /Root 1 0 R
+  /Size 5
+>>
+startxref
+675
+%%EOF

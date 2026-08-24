@@ -1,0 +1,241 @@
+name: SDK Release
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '.github/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sdk-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Publish com.cloudpdf:sdk
+    if: github.event_name == 'workflow_dispatch' || vars.SDK_AUTO_PUBLISH_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Verify generated release version
+        id: version
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const generation = JSON.parse(fs.readFileSync('cloudpdf-generation.json', 'utf8'));
+          const build = fs.readFileSync('build.gradle', 'utf8');
+          if (generation.language !== 'java') throw new Error('generation language is not java');
+          const group = build.match(/^group = '([^']+)'$/m)?.[1];
+          const projectVersion = build.match(/^version = '([^']+)'$/m)?.[1];
+          const artifact = build.match(/^\s*artifactId = '([^']+)'$/m)?.[1];
+          if (group !== 'com.cloudpdf' || artifact !== 'sdk') {
+            throw new Error(`unexpected Maven coordinates ${group}:${artifact}`);
+          }
+          if (projectVersion !== generation.sdkVersion) {
+            throw new Error(`project version ${projectVersion} does not match generated version ${generation.sdkVersion}`);
+          }
+          const prerelease = generation.canonicalVersion.includes('-');
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `version=${projectVersion}\n`);
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `tag=v${projectVersion}\n`);
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `prerelease=${prerelease}\n`);
+          NODE
+
+      - name: Build signed Maven Central bundle
+        env:
+          MAVEN_GPG_PRIVATE_KEY: ${{ secrets.MAVEN_GPG_PRIVATE_KEY }}
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
+          VERSION: ${{ steps.version.outputs.version }}
+          CENTRAL_BUNDLE: ${{ runner.temp }}/cloudpdf-central-bundle.zip
+        run: |
+          ./gradlew clean test publishMavenPublicationToCentralStagingRepository --no-daemon
+          release_directory="build/central-staging/com/cloudpdf/sdk/$VERSION"
+          required_artifacts=(
+            "sdk-$VERSION.pom"
+            "sdk-$VERSION.jar"
+            "sdk-$VERSION-sources.jar"
+            "sdk-$VERSION-javadoc.jar"
+          )
+          for artifact in "${required_artifacts[@]}"; do
+            if [ ! -f "$release_directory/$artifact" ]; then
+              echo "::error::Maven Central bundle is missing $artifact."
+              exit 1
+            fi
+            if [ ! -f "$release_directory/$artifact.asc" ]; then
+              echo "::error::Maven artifact $artifact is not signed."
+              exit 1
+            fi
+          done
+
+          python3 <<'PY'
+          import os
+          import xml.etree.ElementTree as ET
+
+          version = os.environ['VERSION']
+          pom = ET.parse(f'build/central-staging/com/cloudpdf/sdk/{version}/sdk-{version}.pom').getroot()
+          namespace = {'m': 'http://maven.apache.org/POM/4.0.0'}
+          expected = {
+              'm:groupId': 'com.cloudpdf',
+              'm:artifactId': 'sdk',
+              'm:version': version,
+              'm:name': 'CloudPDF',
+              'm:url': 'https://www.cloudpdf.com',
+              'm:scm/m:url': 'https://github.com/embedpdf/cloudpdf-sdk-java',
+          }
+          for path, value in expected.items():
+              actual = pom.findtext(path, namespaces=namespace)
+              if actual != value:
+                  raise RuntimeError(f'POM {path} is {actual!r}, expected {value!r}')
+          PY
+
+          bundle_root="$RUNNER_TEMP/cloudpdf-central-bundle"
+          bundle_release="$bundle_root/com/cloudpdf/sdk/$VERSION"
+          mkdir -p "$bundle_release"
+          for artifact in "${required_artifacts[@]}"; do
+            cp "$release_directory/$artifact" "$bundle_release/$artifact"
+            cp "$release_directory/$artifact.asc" "$bundle_release/$artifact.asc"
+            md5sum "$release_directory/$artifact" | awk '{ print $1 }' > "$bundle_release/$artifact.md5"
+            sha1sum "$release_directory/$artifact" | awk '{ print $1 }' > "$bundle_release/$artifact.sha1"
+          done
+
+          cd "$bundle_root"
+          zip -q -r "$CENTRAL_BUNDLE" com
+
+      - name: Protect immutable release tag
+        id: release-tag
+        env:
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          git fetch --force --tags origin
+          if git rev-parse --quiet --verify "refs/tags/$RELEASE_TAG" >/dev/null; then
+            tagged_commit="$(git rev-list -n 1 "$RELEASE_TAG")"
+            if [ "$tagged_commit" != "$GITHUB_SHA" ]; then
+              if git diff --quiet "$RELEASE_TAG" "$GITHUB_SHA" -- . ':(exclude).github/**'; then
+                echo "::notice::Reusing $RELEASE_TAG after a workflow-only change."
+              else
+                echo "::error::Release tag $RELEASE_TAG already points to different package source at $tagged_commit; bump the SDK version."
+                exit 1
+              fi
+            fi
+            echo "existed=true" >> "$GITHUB_OUTPUT"
+          else
+            git config user.name cloudpdf-sdk-bot
+            git config user.email hello@cloudpdf.com
+            git tag -a "$RELEASE_TAG" -m "CloudPDF Java SDK $RELEASE_TAG"
+            git push origin "refs/tags/$RELEASE_TAG"
+            echo "existed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check Maven Central publication state
+        id: registry
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          TAG_EXISTED: ${{ steps.release-tag.outputs.existed }}
+        run: |
+          package_url="https://repo1.maven.org/maven2/com/cloudpdf/sdk/$VERSION/sdk-$VERSION.pom"
+          http_status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' "$package_url")"
+          case "$http_status" in
+            200)
+              if [ "$TAG_EXISTED" != 'true' ]; then
+                echo "::error::com.cloudpdf:sdk:$VERSION exists on Maven Central but its release tag did not exist."
+                exit 1
+              fi
+              echo "publish=false" >> "$GITHUB_OUTPUT"
+              ;;
+            404)
+              echo "publish=true" >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              echo "::error::Maven Central returned HTTP $http_status while checking com.cloudpdf:sdk:$VERSION."
+              exit 1
+              ;;
+          esac
+
+      - name: Upload to Maven Central
+        if: steps.registry.outputs.publish == 'true'
+        id: central
+        env:
+          MAVEN_CENTRAL_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          MAVEN_CENTRAL_PASSWORD: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+          CENTRAL_BUNDLE: ${{ runner.temp }}/cloudpdf-central-bundle.zip
+        run: |
+          central_auth="$(printf '%s:%s' "$MAVEN_CENTRAL_USERNAME" "$MAVEN_CENTRAL_PASSWORD" | base64 --wrap=0)"
+          echo "::add-mask::$central_auth"
+          deployment_id="$(curl --fail-with-body --silent --show-error \
+            --request POST \
+            --header "Authorization: Bearer $central_auth" \
+            --form "bundle=@$CENTRAL_BUNDLE;type=application/octet-stream" \
+            'https://central.sonatype.com/api/v1/publisher/upload?publishingType=AUTOMATIC')"
+          if ! printf '%s' "$deployment_id" | grep -Eq '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'; then
+            echo "::error::Maven Central returned an invalid deployment ID."
+            exit 1
+          fi
+          echo "deployment_id=$deployment_id" >> "$GITHUB_OUTPUT"
+
+      - name: Wait for Maven Central publication
+        if: steps.registry.outputs.publish == 'true'
+        env:
+          MAVEN_CENTRAL_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          MAVEN_CENTRAL_PASSWORD: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+          DEPLOYMENT_ID: ${{ steps.central.outputs.deployment_id }}
+        run: |
+          central_auth="$(printf '%s:%s' "$MAVEN_CENTRAL_USERNAME" "$MAVEN_CENTRAL_PASSWORD" | base64 --wrap=0)"
+          echo "::add-mask::$central_auth"
+          status_file="$(mktemp)"
+          for attempt in $(seq 1 120); do
+            curl --fail-with-body --silent --show-error \
+              --request POST \
+              --header "Authorization: Bearer $central_auth" \
+              --output "$status_file" \
+              "https://central.sonatype.com/api/v1/publisher/status?id=$DEPLOYMENT_ID"
+            deployment_state="$(jq --raw-output '.deploymentState' "$status_file")"
+            case "$deployment_state" in
+              PUBLISHED)
+                exit 0
+                ;;
+              FAILED)
+                cat "$status_file"
+                echo "::error::Maven Central rejected deployment $DEPLOYMENT_ID."
+                exit 1
+                ;;
+              PENDING|VALIDATING|VALIDATED|PUBLISHING)
+                echo "Maven Central deployment is $deployment_state (attempt $attempt/120)."
+                ;;
+              *)
+                cat "$status_file"
+                echo "::error::Maven Central returned unexpected deployment state $deployment_state."
+                exit 1
+                ;;
+            esac
+            sleep 10
+          done
+          echo "::error::Maven Central deployment $DEPLOYMENT_ID did not finish within 20 minutes."
+          exit 1
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+          PRERELEASE: ${{ steps.version.outputs.prerelease }}
+        run: |
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            exit 0
+          fi
+          args=(--verify-tag --generate-notes --title "CloudPDF Java SDK $RELEASE_TAG")
+          if [ "$PRERELEASE" = 'true' ]; then args+=(--prerelease); fi
+          gh release create "$RELEASE_TAG" "${args[@]}"

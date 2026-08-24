@@ -1,0 +1,46 @@
+@import 'tailwindcss';
+
+/**
+ * The CloudPDF brand surface, as Tailwind v4 theme tokens.
+ *
+ * Values are the ones `cloudpdf/website/tailwind.config.ts` ships (design system
+ * colors_and_type.css) — the marketing site and this dashboard are the same
+ * product, so they must not drift into two palettes.
+ */
+@theme {
+  --color-cp-blue: #1677ff;
+  --color-cp-blue-600: #0f62e0;
+  --color-cp-blue-700: #0b4fb8;
+  --color-cp-navy: #0a1a4d;
+  --color-cp-navy-deep: #031e50;
+  --color-cp-ink: #29375e;
+  --color-cp-muted: #5a6b92;
+  --color-cp-border: #e4eaf4;
+  --color-cp-border-soft: #eaf0fa;
+  --color-cp-violet: #7c5cfc;
+  --color-cp-violet-600: #6a4af0;
+  --color-cp-bg: #fbfcfe;
+  --color-cp-surface: #ecf2fe;
+
+  --font-display: 'Manrope', ui-sans-serif, system-ui, sans-serif;
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  @apply bg-cp-bg text-cp-ink font-sans antialiased;
+}
+
+/* The decorative dotted field behind empty states — same geometry as the
+   marketing site's hero, so the demo reads as part of the product. */
+.cp-dots {
+  background-image: radial-gradient(circle, currentColor 3px, transparent 3.5px);
+  background-repeat: repeat;
+  background-size: 26px 26px;
+}

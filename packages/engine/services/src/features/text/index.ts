@@ -1,0 +1,1 @@
+export { PageTextReader } from './PageTextReader';

@@ -1,0 +1,144 @@
+%PDF-1.7
+% ò¤ô
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R /AcroForm 11 0 R >>
+endobj
+2 0 obj
+<<
+  /Type /Pages
+  /Count 1
+  /Kids [3 0 R]
+  /MediaBox [0 0 200 200]
+  /Resources << /ExtGState << /GS0 << /Type /ExtGState /CA 1 >> >> >>
+>>
+endobj
+3 0 obj
+<<
+  /Type /Page
+  /Parent 2 0 R
+  /Contents 15 0 R
+  /Annots [4 0 R 5 0 R 6 0 R 9 0 R 13 0 R 16 0 R]
+>>
+endobj
+4 0 obj
+<<
+  /Type /Annot
+  /Subtype /Square
+  /Rect [10 10 40 40]
+  /F 4
+  /AP << /N 7 0 R >>
+>>
+endobj
+5 0 obj
+<<
+  /Type /Annot
+  /Subtype /Square
+  /Rect [50 10 80 40]
+  /F 2
+  /AP << /N 8 0 R >>
+>>
+endobj
+6 0 obj
+<<
+  /Type /Annot
+  /Subtype /Text
+  /Rect [90 10 120 40]
+>>
+endobj
+7 0 obj
+<< /Type /XObject /Subtype /Form /BBox [0 0 10 10] /Resources <<>> /Length 23 >>
+stream
+0 0 1 rg 0 0 10 10 re f
+endstream
+endobj
+8 0 obj
+<< /Type /XObject /Subtype /Form /BBox [0 0 10 10] /Resources <<>> /Length 23 >>
+stream
+1 0 0 rg 0 0 10 10 re f
+endstream
+endobj
+9 0 obj
+<<
+  /Type /Annot
+  /Subtype /Square
+  /Rect [130 10 160 40]
+  /F 1
+  /AP << /N 10 0 R >>
+>>
+endobj
+10 0 obj
+<< /Type /XObject /Subtype /Form /BBox [0 0 10 10] /Resources <<>> /Length 23 >>
+stream
+0 1 0 rg 0 0 10 10 re f
+endstream
+endobj
+11 0 obj
+<< /Fields [12 0 R] >>
+endobj
+12 0 obj
+<< /FT /Tx /T (Separate field) /Kids [13 0 R] >>
+endobj
+13 0 obj
+<<
+  /Type /Annot
+  /Subtype /Widget
+  /Parent 12 0 R
+  /Rect [10 60 80 85]
+  /F 4
+  /AP << /N 14 0 R >>
+>>
+endobj
+14 0 obj
+<< /Type /XObject /Subtype /Form /BBox [0 0 70 25] /Resources <<>> /Length 29 >>
+stream
+0.8 0.8 0.8 rg 0 0 70 25 re f
+endstream
+endobj
+15 0 obj
+<< /Length 13 >>
+stream
+0 0 m 1 1 l S
+endstream
+endobj
+16 0 obj
+<<
+  /Type /Annot
+  /Subtype /Square
+  /Rect [90 60 120 90]
+  /F 0
+  /AP << /N 17 0 R >>
+>>
+endobj
+17 0 obj
+<< /Type /XObject /Subtype /Form /BBox [0 0 10 10] /Resources <<>> /Length 23 >>
+stream
+0 1 1 rg 0 0 10 10 re f
+endstream
+endobj
+xref
+0 18
+0000000000 65535 f 
+0000000015 00000 n 
+0000000081 00000 n 
+0000000240 00000 n 
+0000000360 00000 n 
+0000000465 00000 n 
+0000000570 00000 n 
+0000000646 00000 n 
+0000000783 00000 n 
+0000000920 00000 n 
+0000001028 00000 n 
+0000001166 00000 n 
+0000001205 00000 n 
+0000001270 00000 n 
+0000001394 00000 n 
+0000001538 00000 n 
+0000001602 00000 n 
+0000001710 00000 n 
+trailer <<
+  /Root 1 0 R
+  /Size 18
+>>
+startxref
+1848
+%%EOF

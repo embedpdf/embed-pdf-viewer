@@ -1,0 +1,186 @@
+%PDF-1.7
+% ò¤ô
+1 0 obj <<
+  /Type /Catalog
+  /Pages 2 0 R
+  /AcroForm <<
+    /Fields [4 0 R 5 0 R 8 0 R 12 0 R 16 0 R]
+    /DR << /Font << /F1 15 0 R >> >>
+    /DA (0 g /F1 12 Tf)
+  >>
+>>
+endobj
+2 0 obj <<
+  /Type /Pages
+  /Count 1
+  /Kids [3 0 R]
+>>
+endobj
+3 0 obj <<
+  /Type /Page
+  /Parent 2 0 R
+  /MediaBox [0 0 300 300]
+  /Annots [4 0 R 6 0 R 7 0 R 9 0 R 10 0 R 11 0 R 12 0 R 17 0 R]
+>>
+endobj
+% Text field with a length limit.
+4 0 obj <<
+  /Type /Annot
+  /Subtype /Widget
+  /FT /Tx
+  /T (maxlen_text)
+  /V (abc)
+  /MaxLen 5
+  /DA (0 g /F1 12 Tf)
+  /Rect [20 250 280 280]
+>>
+endobj
+% Radio group with NoToggleToOff (Ff = radio 32768 + no-toggle-to-off 16384).
+5 0 obj <<
+  /FT /Btn
+  /T (ntto_radio)
+  /Ff 49152
+  /V /x
+  /DV /x
+  /Kids [6 0 R 7 0 R]
+>>
+endobj
+6 0 obj <<
+  /Type /Annot
+  /Subtype /Widget
+  /Parent 5 0 R
+  /AS /x
+  /Rect [20 200 40 220]
+  /AP << /N << /x 13 0 R /Off 14 0 R >> >>
+>>
+endobj
+7 0 obj <<
+  /Type /Annot
+  /Subtype /Widget
+  /Parent 5 0 R
+  /AS /Off
+  /Rect [60 200 80 220]
+  /AP << /N << /y 13 0 R /Off 14 0 R >> >>
+>>
+endobj
+% Radio group in unison (Ff = radio 32768 + radios-in-unison 33554432).
+% Two widgets share the on-state /u1 and must check together.
+8 0 obj <<
+  /FT /Btn
+  /T (unison_radio)
+  /Ff 33587200
+  /V /Off
+  /Kids [9 0 R 10 0 R 11 0 R]
+>>
+endobj
+9 0 obj <<
+  /Type /Annot
+  /Subtype /Widget
+  /Parent 8 0 R
+  /AS /Off
+  /Rect [20 150 40 170]
+  /AP << /N << /u1 13 0 R /Off 14 0 R >> >>
+>>
+endobj
+10 0 obj <<
+  /Type /Annot
+  /Subtype /Widget
+  /Parent 8 0 R
+  /AS /Off
+  /Rect [60 150 80 170]
+  /AP << /N << /u1 13 0 R /Off 14 0 R >> >>
+>>
+endobj
+11 0 obj <<
+  /Type /Annot
+  /Subtype /Widget
+  /Parent 8 0 R
+  /AS /Off
+  /Rect [100 150 120 170]
+  /AP << /N << /u2 13 0 R /Off 14 0 R >> >>
+>>
+endobj
+% Merged checkbox carrying /Opt: checking it must set /V to the control
+% index name ("0"), while its export value reads as "Alpha".
+12 0 obj <<
+  /Type /Annot
+  /Subtype /Widget
+  /FT /Btn
+  /T (opt_check)
+  /Opt [(Alpha)]
+  /V /Off
+  /AS /Off
+  /Rect [20 100 40 120]
+  /AP << /N << /On 13 0 R /Off 14 0 R >> >>
+>>
+endobj
+13 0 obj <<
+  /Type /XObject
+  /Subtype /Form
+  /BBox [0 0 20 20]
+  /Length 3
+>>
+stream
+q Q
+endstream
+endobj
+14 0 obj <<
+  /Type /XObject
+  /Subtype /Form
+  /BBox [0 0 20 20]
+  /Length 3
+>>
+stream
+q Q
+endstream
+endobj
+15 0 obj <<
+  /Type /Font
+  /Subtype /Type1
+  /BaseFont /Helvetica
+>>
+endobj
+% Hierarchical field: non-terminal parent "billing" with a merged
+% field/widget kid "name" - fully qualified name "billing.name".
+16 0 obj <<
+  /FT /Tx
+  /T (billing)
+  /Kids [17 0 R]
+>>
+endobj
+17 0 obj <<
+  /Type /Annot
+  /Subtype /Widget
+  /T (name)
+  /Parent 16 0 R
+  /DA (0 g /F1 12 Tf)
+  /Rect [20 40 280 70]
+>>
+endobj
+xref
+0 18
+0000000000 65535 f 
+0000000015 00000 n 
+0000000195 00000 n 
+0000000258 00000 n 
+0000000433 00000 n 
+0000000665 00000 n 
+0000000766 00000 n 
+0000000913 00000 n 
+0000001196 00000 n 
+0000001303 00000 n 
+0000001453 00000 n 
+0000001604 00000 n 
+0000001890 00000 n 
+0000002080 00000 n 
+0000002189 00000 n 
+0000002298 00000 n 
+0000002506 00000 n 
+0000002570 00000 n 
+trailer <<
+  /Root 1 0 R
+  /Size 18
+>>
+startxref
+2700
+%%EOF

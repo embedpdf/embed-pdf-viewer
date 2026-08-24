@@ -1,0 +1,97 @@
+{
+  "name": "@cloudpdf/server",
+  "version": "3.0.0-next.7",
+  "private": false,
+  "description": "Self-hostable CloudPDF document engine server: Fastify-based HTTP/REST API in front of a Node worker_thread pool running the native EmbedPDF Runtime (PDFium fork) via @embedpdf/engine-runtime. Uses the same engine-services code as the local browser engine.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./bin": {
+      "default": "./dist/bin/cloudpdf-server.js"
+    }
+  },
+  "bin": {
+    "cloudpdf-server": "./dist/bin/cloudpdf-server.js"
+  },
+  "scripts": {
+    "build": "tsup",
+    "clean": "rimraf dist",
+    "dev": "tsup --watch",
+    "start": "node dist/bin/cloudpdf-server.js",
+    "lint": "eslint src --color",
+    "lint:fix": "eslint src --color --fix",
+    "test": "vitest run"
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/embedpdf/embed-pdf-viewer.git",
+    "directory": "cloudpdf/server"
+  },
+  "homepage": "https://www.embedpdf.com",
+  "bugs": {
+    "url": "https://github.com/embedpdf/embed-pdf-viewer/issues"
+  },
+  "keywords": [
+    "pdf",
+    "cloudpdf",
+    "server",
+    "self-hosted"
+  ],
+  "license": "SEE LICENSE IN LICENSE",
+  "dependencies": {
+    "@cloudpdf/contract": "workspace:*",
+    "@embedpdf/engine-core": "workspace:*",
+    "@embedpdf/engine-runtime": "workspace:*",
+    "@embedpdf/engine-services": "workspace:*",
+    "@fastify/compress": "^8",
+    "@fastify/cors": "^11.3.0",
+    "@fastify/multipart": "^9.0.0",
+    "better-sqlite3": "^12.10.0",
+    "fastify": "^5.0.0",
+    "jose": "^6.2.3",
+    "kysely": "^0.29.0",
+    "pg": "^8.20.0",
+    "sharp": "^0.34.2",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@cloudpdf/sdk": "workspace:^",
+    "@smithy/util-stream": "^4.6.1",
+    "@testcontainers/postgresql": "^11.14.0",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "latest",
+    "@types/pg": "^8.20.0",
+    "aws-sdk-client-mock": "^4.1.0",
+    "rimraf": "^5.0.0",
+    "testcontainers": "^11.14.0",
+    "tsup": "^8.3.0",
+    "typescript": "^5.0.0",
+    "vitest": "^2.1.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "optionalDependencies": {
+    "@aws-sdk/client-kms": "^3.1045.0",
+    "@aws-sdk/client-s3": "^3.1045.0",
+    "@aws-sdk/client-secrets-manager": "^3.1045.0",
+    "@aws-sdk/s3-request-presigner": "^3.1045.0",
+    "@azure/identity": "^4.13.1",
+    "@azure/keyvault-keys": "^4.10.0",
+    "@azure/keyvault-secrets": "^4.11.2",
+    "@azure/storage-blob": "^12.28.0",
+    "@google-cloud/kms": "^5.5.0",
+    "@google-cloud/secret-manager": "^6.1.2",
+    "@google-cloud/storage": "^7.18.0"
+  }
+}

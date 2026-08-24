@@ -1,0 +1,135 @@
+---
+title: Quick start
+description: Open a document over HTTP and render its first page with @cloudpdf/engine in a few lines.
+---
+
+import { Callout } from '@/components/docs/callout';
+import { Cards, Card } from '@/components/docs/cards';
+
+# Quick start
+
+This walkthrough opens a document on your CloudPDF server, lists its pages, and
+renders the first one to an image — entirely from the client, using a
+document-scoped token your backend mints.
+
+## 1. Install and create an engine
+
+```sh npm2yarn
+npm install @cloudpdf/engine
+```
+
+```ts
+import { createCloudEngine } from '@cloudpdf/engine';
+
+const engine = createCloudEngine({
+  baseUrl: 'https://pdf.your-app.com',
+});
+```
+
+## 2. Open a document
+
+For share-link and embed flows, open with a **doc-scoped JWT**. The engine reads
+the `doc_id` claim from the token (without verifying it — the server is the
+verifier of record), then fetches the document head.
+
+```ts
+const doc = await engine.open({
+  kind: 'token',
+  token: () => fetchDocToken(), // your backend mints this
+});
+
+console.log(doc.id);
+```
+
+If your frontend already holds a tenant session and knows the document id, open
+by id instead:
+
+```ts
+const doc = await engine.open({ kind: 'id', id: 'doc_proposal_2026' });
+```
+
+<Callout type="info">
+  The two cloud open modes are <code>kind: 'token'</code> and
+  <code>kind: 'id'</code>. The local-engine modes (<code>'bytes'</code>,
+  <code>'layerBytes'</code>) are rejected — the cloud engine never receives raw
+  PDF bytes.
+</Callout>
+
+## 3. List pages and render the first one
+
+Pages are addressed by their durable **page object number**, never by index.
+`pages.list()` returns every page's geometry in display order, so grab the first
+one's `pageObjectNumber` and render it.
+
+```ts
+const { pages } = await doc.pages.list();
+const first = doc.page(pages[0].pageObjectNumber);
+
+const image = await first.render.image({
+  viewport: { kind: 'width', width: 1200 }, // 1200px wide, aspect preserved
+  format: 'webp',
+});
+
+const { url, revoke } = await image.objectUrl();
+document.querySelector('img')!.src = url;
+// Call revoke() once the <img> no longer needs the object URL.
+```
+
+`render.image()` returns a `PageImageHandle` describing the encoded result
+(`format`, `contentType`, `width`/`height`) plus an `objectUrl()` helper for the
+browser. For raw pixels (e.g. canvas compositing) use `first.render.raw()`,
+which returns an RGBA `PageRaster` — note this is **local-engine only**; the
+cloud engine serves encoded images, so use `render.image()` there.
+
+## 4. Read the page text (optional)
+
+```ts
+const { text, charCount } = await first.text.read();
+console.log(`page has ${charCount} characters`);
+```
+
+## 5. Clean up
+
+Close the handle when you're done with a document, and destroy the engine when
+your app shuts down.
+
+```ts
+await doc.close();
+await engine.destroy();
+```
+
+## Cancelling work
+
+Every async call returns an `AbortablePromise`. Calling `.abort()` rejects it
+with an `AbortError` and signals the in-flight request to stop.
+
+```ts
+const pending = first.render.image({ viewport: { kind: 'scale', scale: 2 } });
+// Changed your mind (user scrolled away)?
+pending.abort();
+```
+
+## Next steps
+
+<Cards>
+  <Card
+    title="Engine & handles"
+    description="The Engine, DocumentHandle, and PageHandle model."
+    href="/docs/engine/core-concepts/engine-and-handles"
+  />
+  <Card
+    title="Pages & rendering"
+    description="Viewports, targets, formats, and raw rasters."
+    href="/docs/engine/core-concepts/pages-and-rendering"
+  />
+  <Card
+    title="Security & access"
+    description="Unlock protected docs and read effective scope."
+    href="/docs/engine/core-concepts/security-and-access"
+  />
+  <Card
+    title="Async & errors"
+    description="AbortablePromise and typed EngineError handling."
+    href="/docs/engine/core-concepts/async-and-errors"
+  />
+</Cards>

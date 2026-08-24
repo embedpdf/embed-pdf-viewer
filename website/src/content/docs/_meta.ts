@@ -1,33 +1,15 @@
 export default {
-  react: {
-    title: 'React',
+  index: { title: 'Introduction', type: 'page' },
+  viewer: {
+    title: 'Viewer',
     type: 'page',
   },
-  vue: {
-    title: 'Vue',
+  headless: {
+    title: 'Headless',
     type: 'page',
   },
-  svelte: {
-    title: 'Svelte',
+  engine: {
+    title: 'Engine',
     type: 'page',
   },
-  snippet: {
-    title: 'EmbedPDF Snippet',
-    type: 'page',
-  },
-  engines: {
-    title: 'Engines',
-    type: 'page',
-  },
-  pdfium: {
-    title: 'PDFium JavaScript API',
-    type: 'page',
-  },
-  index: {
-    title: 'Introduction',
-    type: 'page',
-    theme: {
-      timestamp: false,
-    },
-  },
-}
+};

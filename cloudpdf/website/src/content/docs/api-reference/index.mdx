@@ -1,0 +1,83 @@
+---
+title: CloudPDF API reference
+description: Complete reference for the CloudPDF server API, with examples for all seven official SDKs.
+---
+
+import { Callout } from '@/components/docs/callout';
+
+# CloudPDF API reference
+
+The CloudPDF server API is what your **backend** calls: it gets documents in and
+mints the short-lived tokens your viewer opens with. The browser never talks to
+this API directly.
+
+Every operation below is generated from the same OpenAPI contract that generates
+the official SDKs, so the reference cannot drift from the wire.
+
+<Callout type="info">
+  The current API and SDK line is a preview. Endpoint pages display the exact canonical version,
+  and your SDK language is remembered across the whole reference — pick it once below.
+</Callout>
+
+## Install
+
+Seven official SDKs, all generated from the contract below. Your choice here is
+remembered for every example in the reference.
+
+<ApiInstall />
+
+## Get access
+
+<DeploymentTabs>
+  <DeploymentTab mode="saas">
+    On managed CloudPDF **your account is a tenant** — tenants and deployment
+    configuration are operated by the platform, so the sections marked
+    *Self-hosted* below don't apply to you.
+
+    Your API key from the [dashboard](https://app.cloudpdf.com) is a **tenant token**: it can manage
+    documents and mint document tokens under your account, and nothing else.
+    Use it as the `token` in every example in this reference.
+  </DeploymentTab>
+  <DeploymentTab mode="self-hosted">
+    On a self-hosted deployment **you are the operator**. Configure the root
+    credential on the server:
+
+    ```sh
+    CLOUDPDF_API_AUTH_TOKENS=<a-long-random-secret>
+    ```
+
+    The API token is valid on every surface — including creating the
+    [tenants](/docs/api-reference/tenants/create) that namespace your
+    customers' documents. Use it as the `token` in every example, or mint
+    scoped [tenant tokens](/docs/api-reference/authentication#tenant-tokens)
+    for your services.
+  </DeploymentTab>
+</DeploymentTabs>
+
+## Getting a document on screen
+
+Three steps, and only the last one runs in a browser.
+
+1. **[Initialize an upload](/docs/api-reference/documents/init)** — request upload
+   access, transfer the file using the returned instructions, then
+   [commit the upload](/docs/api-reference/documents/commit).
+2. **[Issue a document token](/docs/api-reference/tokens/issue)** — a short-lived JWT
+   pinned to one document, carrying exactly the capabilities that user should have.
+3. **Open it** — hand that token to the viewer or headless components. See
+   [Engine: getting started](/docs/engine/getting-started).
+
+Steps 1–2 are the API surface documented here. Step 3 is the client SDK.
+
+## Authentication
+
+Three credentials, and **authority mints only downward**. Each rung is weaker
+than the one above it, and only the last one ever reaches a browser.
+
+<ApiCredentials />
+
+[How authentication works →](/docs/api-reference/authentication) — minting,
+signing modes, revocation, and the full capability tables.
+
+## Resources
+
+<ApiResources />

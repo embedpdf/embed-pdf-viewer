@@ -1,0 +1,131 @@
+---
+title: Node / npm
+description: Install the @cloudpdf/server package from npm and run it with the cloudpdf-server CLI.
+---
+
+import { Callout } from '@/components/docs/callout';
+import { Cards, Card } from '@/components/docs/cards';
+
+# Run with Node / npm
+
+The server publishes to npm as **`@cloudpdf/server`** with a `cloudpdf-server`
+CLI. This is the most direct way to run it during development, and a good fit if
+you already operate Node services and want to manage the process yourself.
+
+## Requirements
+
+- **Node 22 or newer.**
+- A **glibc-based Linux or macOS** host. The server loads native modules
+  (PDFium, image processing, SQLite) that ship prebuilt for common platforms; on
+  exotic platforms a C/C++ toolchain may be needed to compile them.
+
+<Callout type="info">
+  Don't want native build steps or platform surprises? The
+  <a href="/docs/server/deployment/docker">Docker image</a> bakes all native
+  dependencies in and runs identically everywhere.
+</Callout>
+
+## Install
+
+```sh npm2yarn
+npm install @cloudpdf/server
+```
+
+This pulls in the native PDF runtime and the SQLite and image-processing
+libraries automatically. Cloud adapters (S3, GCS, Azure, KMS) are optional
+dependencies and install on supported platforms — you only use the ones you
+configure.
+
+## Run
+
+Start the server with the `serve` command:
+
+```sh
+CLOUDPDF_JWT_SECRET=dev-secret-change-me npx cloudpdf-server serve
+```
+
+With no other configuration, the server runs the zero-dependency profile:
+SQLite at `./data/cloudpdf.db`, files under `./data/objects`, and a cache in
+`./data/cache`. Verify it:
+
+```sh
+curl localhost:3000/healthz   # {"status":"ok"}
+```
+
+<Callout type="info">
+  <code>serve</code> is the default, so <code>cloudpdf-server</code> on its own
+  also starts the server. The CLI has more commands — migrations, diagnostics,
+  audit export — covered in the <a href="/docs/server/operations/cli">CLI
+  reference</a>.
+</Callout>
+
+## A production process
+
+For a real deployment, point the server at Postgres and a cloud bucket, run
+migrations explicitly, and set the worker pool to use your cores:
+
+```sh
+export CLOUDPDF_JWT_SECRET="$(openssl rand -hex 32)"
+export CLOUDPDF_DB_DRIVER=postgres
+export CLOUDPDF_DB_URL="postgres://user:pass@db.internal:5432/cloudpdf"
+export CLOUDPDF_STORAGE_KIND=s3
+export CLOUDPDF_STORAGE_S3_BUCKET=my-cloudpdf-bucket
+export CLOUDPDF_STORAGE_S3_REGION=eu-west-1
+export CLOUDPDF_WORKER_POOL_SIZE=max
+
+# Apply schema changes once, before starting (or rolling) the server:
+cloudpdf-server migrate up
+
+# Refuse to start if the schema is behind the code:
+CLOUDPDF_FAIL_ON_PENDING=1 cloudpdf-server serve
+```
+
+See the [configuration reference](/docs/server/configuration) for every setting,
+and [Migrations](/docs/server/operations/migrations) for the migration model.
+
+## Keep it running
+
+In production, run the server under a process manager — `systemd`, PM2, or your
+platform's supervisor — so it restarts on failure and starts on boot. The
+server logs to stdout and shuts down cleanly on `SIGTERM`/`SIGINT`, so it
+behaves well under any of them.
+
+A minimal `systemd` unit:
+
+```ini
+[Unit]
+Description=CloudPDF server
+After=network.target
+
+[Service]
+Environment=CLOUDPDF_JWT_SECRET=...
+Environment=CLOUDPDF_DB_DRIVER=postgres
+Environment=CLOUDPDF_DB_URL=postgres://...
+ExecStart=/usr/bin/cloudpdf-server serve
+Restart=always
+User=cloudpdf
+
+[Install]
+WantedBy=multi-user.target
+```
+
+<Callout type="warn">
+  Run only <strong>one</strong> instance against a SQLite database — SQLite has a
+  single writer. To run multiple instances of the server, move to
+  <a href="/docs/server/configuration/database">Postgres</a>.
+</Callout>
+
+## Next steps
+
+<Cards>
+  <Card
+    title="Configuration reference"
+    description="Every CLOUDPDF_* setting, with defaults."
+    href="/docs/server/configuration"
+  />
+  <Card
+    title="CLI reference"
+    description="serve, migrate, db doctor, audit export."
+    href="/docs/server/operations/cli"
+  />
+</Cards>

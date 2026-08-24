@@ -1,0 +1,174 @@
+---
+title: Pages & rendering
+description: List pages, render them to encoded images or raw rasters, and reorder them.
+---
+
+{/* Generated from docs/content — edit there, then `pnpm docs:sync`. */}
+
+import { Callout } from '@/components/docs/callout';
+
+# Pages & rendering
+
+Page work splits across two services: the document-scoped `pages` service for
+listing and reordering, and the per-page `render` service for producing pixels.
+
+## Listing pages
+
+`doc.pages.list()` returns a geometry snapshot of every page in display order.
+It never loads page content, so it's cheap.
+
+```ts
+const { pageCount, pages } = await doc.pages.list();
+
+for (const page of pages) {
+  console.log(page.index, page.pageObjectNumber, page.label, page.width, page.height, page.rotation);
+}
+```
+
+Each entry is a `PageLayout`: display `index`, durable `pageObjectNumber`,
+`label` (or `null`), un-rotated crop `width`/`height` in PDF points, `rotation`,
+`userUnit`, and the raw PDF `boxes` (`media`, `crop`, and any declared
+`bleed`/`trim`/`art`).
+
+<Callout type="info">
+  Sizes are <strong>un-rotated</strong>. For 90°/270° pages, swap width and
+  height yourself to get the on-screen dimensions — the display transform lives
+  in your code, not in the wire data.
+</Callout>
+
+## Rendering a page
+
+Get a `PageHandle` and call its `render` service. There are two methods:
+
+```ts
+interface PageRenderService {
+  image(options?: PageImageOptions): AbortablePromise<PageImageHandle>;
+  raw(options?: PageRenderOptions): AbortablePromise<PageRaster>;
+}
+```
+
+### Encoded images
+
+`render.image()` returns an encoded image (PNG or WebP) — ideal for `<img>`
+elements and HTTP caching.
+
+```ts
+const page = doc.page(pageObjectNumber);
+
+const image = await page.render.image({
+  viewport: { kind: 'width', width: 1400 },
+  format: 'webp',
+  quality: 0.9,
+  background: 'white',
+});
+
+const { url, revoke } = await image.objectUrl();
+imgEl.src = url;
+// later, when the image is no longer shown:
+revoke();
+```
+
+The returned `PageImageHandle` carries `format`, `contentType`, optional
+`width`/`height`, a `source` (`bytes` or `url`), and the `objectUrl()` helper
+that builds (and lets you revoke) a browser object URL.
+
+### Raw rasters (local engine only)
+
+For canvas compositing or custom pipelines, `render.raw()` returns a `PageRaster`
+with an RGBA `ArrayBuffer`. This is local/WASM only — the cloud engine serves
+encoded images, so use `render.image()` there.
+
+```ts
+const raster = await page.render.raw({ viewport: { kind: 'scale', scale: 2 } });
+// raster.width, raster.height, raster.stride, raster.data (ArrayBuffer, rgba8)
+const pixels = new Uint8ClampedArray(raster.data);
+```
+
+## Render options
+
+Both methods accept the same core options (`image()` adds `format` and
+`quality`):
+
+| Option | Type | Default | Notes |
+| --- | --- | --- | --- |
+| `viewport` | `{ kind: 'scale', scale? }` or `{ kind: 'width', width }` | scale `1` | `scale` renders one PDF point as N device pixels (fold in devicePixelRatio yourself); `width` sets an exact output width and preserves aspect. |
+| `target` | `{ kind: 'page' }` or `{ kind: 'rect', rect }` | whole page | Render a sub-rectangle in PDF user space (origin bottom-left, `top > bottom`). |
+| `rotation` | `0 \| 90 \| 180 \| 270` | page rotation | Extra rotation applied on top of the page's own. |
+| `background` | `'white' \| 'transparent'` | `'white'` | Use `transparent` with PNG/WebP for alpha. |
+| `includeAnnotations` | `boolean` | server default | Whether annotations are baked into the raster. |
+| `format` | `'png' \| 'webp' \| 'bmp'` | server default | `image()` only. Network endpoints serve `png`/`webp`. |
+| `quality` | `number` | — | `image()` only; lossy-format quality. |
+
+<Callout type="info">
+  Prefer <code>viewport: &#123; kind: 'width' &#125;</code> when you're filling a
+  known layout column — you get crisp output at exactly the pixel width you need,
+  and the result is cache-friendly on the server's CDN.
+</Callout>
+
+## Render policy
+
+`doc.render.policy()` answers what render parameters this deployment treats
+as first-class:
+
+```ts
+const policy = await doc.render.policy();
+// { kind: 'continuous' }  — or a lattice, see below
+```
+
+<Engine local>
+The local engine always answers `{ kind: 'continuous' }`: rendering happens
+in-process, there is no shared cache to protect, and any viewport renders
+exactly as requested. Exactness is the local product promise — the render
+plugin builds on it to keep resting pixels 1:1 with the screen.
+</Engine>
+
+<Engine cloud>
+A cloud deployment answers a **lattice**: a finite set of render points the
+server treats as durable, CDN-shared artifacts.
+
+```ts
+{
+  kind: 'lattice',
+  fullPage: { widths: [640, 1280, 2560] }, // full-page renders quantize on width
+  formats: ['webp', 'png'],
+  background: 'white',
+  enforced: true, // off-lattice render URLs are rejected with 400
+}
+```
+
+Full-page renders quantize on `viewport.width` — the bounded quantity is
+output pixels, never zoom (a scale lattice would bound artifact *count* but
+not *size*; a poster page at scale 1 is already enormous). The SDK never
+conforms a request implicitly — the same `render.image()` call must not
+return different pixels on local and cloud. Snap explicitly with the shared
+helper when you render by scale:
+
+```ts
+import { snapFullPageViewport } from '@cloudpdf/engine';
+
+const viewport = snapFullPageViewport(policy, { kind: 'scale', scale: 2 }, {
+  pageWidth: page.size.width,
+});
+await doc.page(pon).render.image({ viewport }); // always on the lattice
+```
+</Engine>
+
+The render plugin consumes this policy for you — it conforms every ask,
+caches by the resulting identity, and adds deep-zoom tiles past the ladder's
+top. If you render through the plugin (`<RenderLayer />`, `renderPage`), you
+never call `policy()` yourself. See the
+[Render plugin](/docs/headless/plugins/render) page.
+
+## Reordering pages
+
+`doc.pages.move(pageObjectNumbers, destIndex)` detaches the listed pages and
+re-inserts them as a contiguous block at `destIndex` (in the post-removal index
+space), preserving the order you pass them.
+
+```ts
+// Move pages 7 and 9 so they sit starting at display index 0.
+await doc.pages.move([7, 9], 0);
+```
+
+Per-page revision tokens survive a move, so index-based annotation references
+you're holding remain valid across a reorder.

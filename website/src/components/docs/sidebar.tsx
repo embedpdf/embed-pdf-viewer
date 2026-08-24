@@ -1,0 +1,119 @@
+'use client';
+
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import type { ReactNode } from 'react';
+
+import { pageSupportsEngine } from '@embedpdf/docs-kit';
+
+import { DOCS_SITE } from '@/docs-site';
+
+import { useConfig } from './config-provider';
+import { DocsProductSwitcher } from './docs-product-switcher';
+import { IntegrationSwitcher } from './integration';
+
+import { docsIntegrationFromPath, docsIntegrationHref } from '@/lib/docs-integrations';
+import { docsProductFromPath } from '@/lib/docs-products';
+
+type TreeItem = {
+  name: string;
+  route?: string;
+  title: ReactNode;
+  /** Page frontmatter; `engines:` declares engine-axis availability. */
+  frontMatter?: { engines?: string[] };
+  children?: TreeItem[];
+};
+
+function SidebarLink({ item, pathname }: { item: TreeItem; pathname: string }) {
+  if (!item.route) return null;
+  // Content routes are integration-less; rendered hrefs carry the active
+  // integration so every crawlable link is a concrete destination.
+  const integration = docsIntegrationFromPath(pathname);
+  const href = integration ? docsIntegrationHref(item.route, integration) : item.route;
+  const active = pathname === href;
+
+  return (
+    <Link
+      href={href}
+      className={`-ml-[1.5px] flex items-center border-l-[1.5px] py-2 pl-[17px] pr-3 font-sans text-[14.5px] font-medium leading-[1.3] no-underline transition-colors ${
+        active
+          ? 'border-ep-blue text-ep-blue font-bold'
+          : 'text-ep-soft hover:text-ep-navy border-transparent hover:border-[#C2CEE6]'
+      }`}
+    >
+      {item.title}
+    </Link>
+  );
+}
+
+function SidebarTree({ items, pathname }: { items: TreeItem[]; pathname: string }) {
+  // Rung 4 of the fork ladder: pages declaring `engines:` they don't
+  // support on this site simply don't exist in its navigation.
+  const visible = items.filter((item) => pageSupportsEngine(item.frontMatter, DOCS_SITE.engine));
+  return (
+    <>
+      {visible.map((item) => {
+        const hasChildren = Boolean(item.children && item.children.length > 0);
+
+        if (hasChildren) {
+          return (
+            <div
+              key={item.name}
+              className="mt-7 border-t border-[#EAEFF7] pt-6 first:mt-0 first:border-t-0 first:pt-0"
+            >
+              <p className="font-display text-ep-navy px-3 pb-3 text-[12px] font-extrabold uppercase tracking-[0.11em]">
+                {item.title}
+              </p>
+              <div className="ml-3 flex flex-col border-l-[1.5px] border-[#E7EDF6]">
+                <SidebarTree items={item.children ?? []} pathname={pathname} />
+              </div>
+            </div>
+          );
+        }
+
+        return <SidebarLink key={item.route ?? item.name} item={item} pathname={pathname} />;
+      })}
+    </>
+  );
+}
+
+/**
+ * Whether this route has docs navigation at all — false on standalone pages
+ * such as the /docs landing. The desktop rail and the mobile drawer must
+ * agree, so both ask this rather than re-deriving the rules.
+ */
+export function useHasDocsNav() {
+  const { docsDirectories, activeType } = useConfig();
+  const pathname = usePathname();
+
+  if (activeType === 'page') return false;
+  if (!docsProductFromPath(pathname)) return false;
+  return Boolean(docsDirectories && docsDirectories.length > 0);
+}
+
+/** The navigation itself, free of any rail chrome — shared by both layouts. */
+export function DocsNav() {
+  const { docsDirectories } = useConfig();
+  const pathname = usePathname();
+
+  return (
+    <>
+      <DocsProductSwitcher />
+      <IntegrationSwitcher />
+      <nav className="mt-7 flex flex-col border-t border-[#EAEFF7] pt-6">
+        <SidebarTree items={docsDirectories as TreeItem[]} pathname={pathname} />
+      </nav>
+    </>
+  );
+}
+
+export function Sidebar() {
+  const hasNav = useHasDocsNav();
+  if (!hasNav) return null;
+
+  return (
+    <aside className="sticky top-[84px] hidden h-[calc(100vh-84px)] w-[268px] shrink-0 overflow-y-auto pb-16 pr-3.5 pt-[52px] [scrollbar-color:#D5DEEF_transparent] [scrollbar-width:thin] md:block">
+      <DocsNav />
+    </aside>
+  );
+}

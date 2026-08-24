@@ -1,0 +1,97 @@
+---
+title: CDN, KMS & secrets
+description: Optional CloudPDF server adapters — CDN signing for fast delivery, KMS for encrypted documents, and pluggable secret sources.
+---
+
+import { Callout } from '@/components/docs/callout';
+import { Cards, Card } from '@/components/docs/cards';
+
+# CDN, KMS & secrets
+
+Beyond the database and object store, the server has three families of **optional
+adapters**. They're all off (or set to a safe default) until you opt in, and you
+only configure the one you need.
+
+<Callout type="info">
+  None of these are required to run the server. Start without them; add one when
+  you have the matching need — a CDN in front of delivery, encrypted PDFs, or a
+  central secret manager.
+</Callout>
+
+## CDN — signed delivery
+
+By default the server delivers bytes directly. To put a CDN in front and serve
+signed, time-limited URLs from the edge, set `CLOUDPDF_CDN_KIND`:
+
+```sh
+CLOUDPDF_CDN_KIND=cloudfront   # bunny | cloud-cdn | cloudfront | azure-fd | custom-hmac
+```
+
+| Value | Provider |
+| --- | --- |
+| `none` (default) | Direct delivery, no CDN signing. |
+| `bunny` | Bunny CDN. |
+| `cloud-cdn` | Google Cloud CDN. |
+| `cloudfront` | AWS CloudFront. |
+| `azure-fd` | Azure Front Door. |
+| `custom-hmac` | A generic HMAC-signed-URL scheme for your own edge. |
+
+Each provider has its own credentials and key settings; the server validates them
+on boot and tells you what's missing.
+
+## KMS — encrypted documents
+
+To work with password-protected or encrypted PDFs, the server needs a key source.
+`CLOUDPDF_KMS_KIND` selects it:
+
+```sh
+CLOUDPDF_KMS_KIND=aws-kms   # static | aws-kms | gcp-kms | azure-kv
+```
+
+| Value | Behaviour |
+| --- | --- |
+| `static` (default) | Keys from configuration — fine for development. |
+| `aws-kms` | AWS Key Management Service. |
+| `gcp-kms` | Google Cloud KMS. |
+| `azure-kv` | Azure Key Vault. |
+
+<Callout type="info">
+  KMS is only consulted for encrypted-document sessions. If you don't serve
+  encrypted PDFs, you never need to configure it.
+</Callout>
+
+## Secrets — where credentials come from
+
+The other adapters need credentials (bucket keys, KMS access, CDN signing keys).
+`CLOUDPDF_SECRETS_PROVIDERS` is a comma-separated registry of *where* the server
+reads those secrets:
+
+```sh
+CLOUDPDF_SECRETS_PROVIDERS=env          # default: read from environment variables
+CLOUDPDF_SECRETS_PROVIDERS=aws-sm,env   # try AWS Secrets Manager, then fall back to env
+```
+
+This lets enterprises keep secrets in a central manager (AWS Secrets Manager, GCP
+Secret Manager, Azure Key Vault) instead of in plain environment variables, while
+keeping `env` as a simple default for everyone else.
+
+<Callout type="info">
+  The provider SDKs are optional dependencies — installed with the npm package
+  and baked into the Docker image — so adding a provider is a configuration
+  change, not a new install.
+</Callout>
+
+## Next steps
+
+<Cards>
+  <Card
+    title="Storage"
+    description="The object store these adapters sign and protect."
+    href="/docs/server/configuration/storage"
+  />
+  <Card
+    title="Configuration reference"
+    description="The complete CLOUDPDF_* surface."
+    href="/docs/server/configuration"
+  />
+</Cards>

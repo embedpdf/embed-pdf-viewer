@@ -1,0 +1,121 @@
+---
+title: Getting Started
+description: Build your own PDF viewer UI with the EmbedPDF headless libraries.
+---
+
+# Getting Started
+
+The headless libraries give you the engine and the plugin system — you own
+every pixel of the UI. An app depends on two packages: the adapter for your
+framework, and an engine.
+
+## Installation
+
+<Fw only="react">
+<Engine local>
+```sh npm2yarn
+npm install @embedpdf/react @embedpdf/engine
+```
+</Engine>
+<Engine cloud>
+```sh npm2yarn
+npm install @embedpdf/react @cloudpdf/engine
+```
+</Engine>
+</Fw>
+
+<Fw only="vue">
+<Engine local>
+```sh npm2yarn
+npm install @embedpdf/vue @embedpdf/engine
+```
+</Engine>
+<Engine cloud>
+```sh npm2yarn
+npm install @embedpdf/vue @cloudpdf/engine
+```
+</Engine>
+</Fw>
+
+<Fw only="svelte">
+<Engine local>
+```sh npm2yarn
+npm install @embedpdf/svelte @embedpdf/engine
+```
+</Engine>
+<Engine cloud>
+```sh npm2yarn
+npm install @embedpdf/svelte @cloudpdf/engine
+```
+</Engine>
+</Fw>
+
+<Fw only="angular">
+<Engine local>
+```sh npm2yarn
+npm install @embedpdf/angular @embedpdf/engine
+```
+</Engine>
+<Engine cloud>
+```sh npm2yarn
+npm install @embedpdf/angular @cloudpdf/engine
+```
+</Engine>
+</Fw>
+
+<Fw only="react">
+  The React adapter exposes every feature as one import line per vertical —
+  registration, components, and hooks travel together, and deleting the line
+  removes the feature from your bundle.
+</Fw>
+
+<Fw only="vue">
+  The Vue adapter mirrors the React surface subpath-for-subpath — the same
+  verticals, exposed as components and composables.
+</Fw>
+
+<Fw only="svelte">
+  The Svelte adapter mirrors the React surface subpath-for-subpath — the same
+  verticals, exposed as components and stores.
+</Fw>
+
+<Fw only="angular">
+  The Angular adapter ships each vertical as a secondary entry point —
+  Angular's native library modularity — with inject functions instead of
+  hooks.
+</Fw>
+
+## Your first viewer
+
+<Engine local>
+`localEngine()` creates the engine — synchronously, allocating nothing until
+first use, so a module-scope `const engine = localEngine()` is safe (even under
+SSR). Hand it to `<Viewer>`: the viewer warms it up on mount and PDFium boots
+in a worker in the background, so the stage and render layer draw the pages the
+moment a document is ready — no worker wiring, no lifecycle to manage. This is
+the whole app:
+</Engine>
+
+<Engine cloud>
+`cloudEngine({ baseUrl })` creates the engine — synchronously and cheaply: it
+holds an HTTP client and nothing else, so a module-scope
+`const engine = cloudEngine({ baseUrl })` is safe (even under SSR). Hand it to
+`<Viewer>`; every open, render, and text call rides HTTPS to your CloudPDF
+deployment. This is the whole app:
+</Engine>
+
+<Example name="getting-started/basic" mode="open" />
+
+<Engine local>
+Prefer the viewer to own the engine's lifetime — created on mount, destroyed on
+unmount? Pass a thunk instead: `engine={() => localEngine()}`. See the
+[Engine getting started](/docs/engine/getting-started) for the ownership model,
+fallback fonts, cloud, and SSR.
+</Engine>
+
+<Engine cloud>
+Prefer the viewer to own the engine's lifetime — created on mount, destroyed on
+unmount? Pass a thunk instead: `engine={() => cloudEngine({ baseUrl })}`. See
+the [Engine getting started](/docs/engine/getting-started) for tokens, public
+shares, and the ownership model.
+</Engine>

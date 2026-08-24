@@ -1,0 +1,96 @@
+name: Engine v3 Conformance
+
+# Boots @cloudpdf/server in-process and runs the metadata conformance suite
+# against both engine-local (WASM) and the cloud engine (HTTP -> native PDFium).
+# Any divergence between the two implementations fails the job.
+
+on:
+  pull_request:
+    paths:
+      - 'packages/engine-core/**'
+      - 'packages/engine-services/**'
+      - 'packages/engine/**'
+      - 'cloudpdf/engine/**'
+      - 'cloudpdf/server/**'
+      - '.github/workflows/engine-conformance.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'packages/engine-core/**'
+      - 'packages/engine-services/**'
+      - 'packages/engine/**'
+      - 'cloudpdf/engine/**'
+      - 'cloudpdf/server/**'
+      - '.github/workflows/engine-conformance.yml'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: engine-conformance-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: true
+
+jobs:
+  build-runtime:
+    uses: ./.github/workflows/build-engine-runtime.yml
+    secrets: inherit
+
+  conformance:
+    name: local + cloud parity
+    needs: build-runtime
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v5
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Download engine-runtime artifacts (linux-x64 + wasm32)
+        uses: actions/download-artifact@v7
+        with:
+          pattern: engine-runtime-*
+          path: packages/engine/runtime/_artifacts
+
+      - name: Stage runtime payloads
+        shell: bash
+        run: |
+          shopt -s nullglob
+          for dir in packages/engine/runtime/_artifacts/engine-runtime-*; do
+            target="${dir##*/engine-runtime-}"
+            mkdir -p "packages/engine/runtime/npm/$target"
+            cp -R "$dir/." "packages/engine/runtime/npm/$target/"
+          done
+          rm -rf packages/engine/runtime/_artifacts
+
+      - name: Build engine packages
+        run: |
+          pnpm --filter @embedpdf/engine-runtime build
+          pnpm --filter @embedpdf/engine-core build
+          pnpm --filter @embedpdf/engine-services build
+          pnpm --filter @embedpdf/engine build
+          pnpm --filter @cloudpdf/contract build
+          pnpm --filter @cloudpdf/server build
+          pnpm --filter @cloudpdf/engine build
+
+      - name: engine-local conformance (WASM)
+        run: pnpm --filter @embedpdf/engine test
+
+      - name: cloud engine conformance (HTTP -> @cloudpdf/server, native)
+        run: pnpm --filter @cloudpdf/engine test
+
+      - name: CloudPDF license security
+        run: pnpm --filter @cloudpdf/server exec vitest run test/licensing.test.ts
+
+      - name: Engine v3 parity demo (local vs cloud)
+        run: pnpm --filter @embedpdf/example-engine-runtime-demo run engine:node

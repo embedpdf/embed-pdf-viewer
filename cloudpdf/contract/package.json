@@ -1,0 +1,79 @@
+{
+  "name": "@cloudpdf/contract",
+  "version": "3.0.0-next.7",
+  "private": false,
+  "description": "The CloudPDF engine contract: operation registry, Zod schemas, and OpenAPI emitter for every backend-callable surface — used by @cloudpdf/server and the generated @cloudpdf/sdk, and the source of the committed openapi.json.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "development": "./src/index.ts",
+      "default": "./dist/index.js"
+    },
+    "./openapi": {
+      "types": "./dist/openapi.d.ts",
+      "development": "./src/openapi.ts",
+      "default": "./dist/openapi.js"
+    },
+    "./openapi.json": "./openapi.json"
+  },
+  "scripts": {
+    "build": "tsup",
+    "clean": "rimraf dist",
+    "dev": "tsup --watch",
+    "emit:openapi": "tsup && node scripts/emit-openapi.mjs && prettier --write openapi.json",
+    "test": "vitest run",
+    "lint": "eslint src --color",
+    "lint:fix": "eslint src --color --fix"
+  },
+  "files": [
+    "dist",
+    "openapi.json",
+    "LICENSE",
+    "README.md"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/embedpdf/embed-pdf-viewer.git",
+    "directory": "cloudpdf/contract"
+  },
+  "homepage": "https://www.cloudpdf.com",
+  "bugs": {
+    "url": "https://github.com/embedpdf/embed-pdf-viewer/issues"
+  },
+  "keywords": [
+    "pdf",
+    "cloudpdf",
+    "contract",
+    "openapi"
+  ],
+  "license": "Apache-2.0",
+  "dependencies": {
+    "@embedpdf/engine-core": "workspace:*",
+    "zod": "^3.23.8",
+    "zod-to-json-schema": "^3.24.6"
+  },
+  "devDependencies": {
+    "@types/node": "latest",
+    "rimraf": "^5.0.0",
+    "tsup": "^8.3.0",
+    "typescript": "^5.0.0",
+    "vitest": "^2.1.0"
+  },
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "./openapi": {
+        "types": "./dist/openapi.d.ts",
+        "default": "./dist/openapi.js"
+      },
+      "./openapi.json": "./openapi.json"
+    }
+  }
+}

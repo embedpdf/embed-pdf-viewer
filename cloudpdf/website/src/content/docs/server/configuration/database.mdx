@@ -1,0 +1,99 @@
+---
+title: Database
+description: Configure the CloudPDF server's database — SQLite for a single instance, Postgres for production and multiple replicas.
+---
+
+import { Callout } from '@/components/docs/callout';
+import { Cards, Card } from '@/components/docs/cards';
+
+# Database
+
+The database holds everything *about* your documents — the document records,
+annotations, tokens, and the audit log. (The PDF bytes themselves live in the
+[object store](/docs/server/configuration/storage).) The server supports two
+drivers.
+
+| | SQLite | Postgres |
+| --- | --- | --- |
+| Setup | None — a single file | A running Postgres |
+| Replicas | One instance only | Many |
+| Best for | Dev, single host, low traffic | Production, high availability |
+
+## SQLite (default)
+
+SQLite needs nothing to set up — it's a single file on disk. This is the default,
+and it's what the [Quick start](/docs/server/getting-started/quick-start) uses.
+
+```sh
+CLOUDPDF_DB_DRIVER=sqlite
+CLOUDPDF_DB_SQLITE_PATH=/data/cloudpdf.db
+```
+
+<Callout type="warn">
+  SQLite has a <strong>single writer</strong>. Run exactly one server instance
+  against a SQLite database, and put the file on a persistent volume. To run more
+  than one instance, switch to Postgres.
+</Callout>
+
+## Postgres
+
+Postgres is the choice for production and the only way to run multiple replicas.
+Point the server at any Postgres 14+ database — managed (RDS, Cloud SQL, Neon,
+Supabase) or one you run yourself.
+
+```sh
+CLOUDPDF_DB_DRIVER=postgres
+CLOUDPDF_DB_URL=postgres://user:password@host:5432/cloudpdf
+```
+
+With Postgres, take migrations out of the boot path so replicas don't race —
+run them as an explicit step and refuse to serve on a stale schema:
+
+```sh
+CLOUDPDF_AUTO_MIGRATE=0
+CLOUDPDF_FAIL_ON_PENDING=1
+```
+
+See [Migrations](/docs/server/operations/migrations) for the recommended flow per
+deployment method.
+
+## Moving from SQLite to Postgres
+
+A common path is to prototype on SQLite and move to Postgres as you grow. The
+move is a configuration change plus a one-time data migration:
+
+1. Stand up a Postgres database.
+2. Point a server at it and run `cloudpdf-server migrate up` to create the schema.
+3. Migrate your existing rows (see `MIGRATIONS.md` in the server package for the
+   export/import procedure).
+4. Switch your running deployment's `CLOUDPDF_DB_DRIVER` and `CLOUDPDF_DB_URL`,
+   and scale up replicas.
+
+<Callout type="info">
+  Documents stored in a cloud bucket don't move during this — only the database
+  changes. Keeping bytes in object storage is what makes the database swap clean.
+</Callout>
+
+## Verify the connection
+
+`db doctor` connects, validates the schema, and prints version info — a quick way
+to confirm credentials and connectivity:
+
+```sh
+cloudpdf-server db doctor
+```
+
+## Next steps
+
+<Cards>
+  <Card
+    title="Storage"
+    description="Where the PDF bytes live."
+    href="/docs/server/configuration/storage"
+  />
+  <Card
+    title="Migrations"
+    description="Apply and validate schema changes safely."
+    href="/docs/server/operations/migrations"
+  />
+</Cards>
