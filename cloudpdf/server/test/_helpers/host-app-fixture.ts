@@ -70,6 +70,8 @@ export async function buildHostFixture(
   opts: {
     engineUnreadyAfterMs?: number;
     quarantine?: { enforce?: boolean; ttlHours?: number };
+    metrics?: boolean;
+    scheduling?: import('../../src/runtime/SchedulingEnginePool').EngineSchedulingConfig;
   } = {},
 ): Promise<HostFixture> {
   const storageRoot = await mkdtemp(join(tmpdir(), 'hostfx-store-'));
@@ -94,6 +96,8 @@ export async function buildHostFixture(
       ? { engineUnreadyAfterMs: opts.engineUnreadyAfterMs }
       : {}),
     ...(opts.quarantine ? { quarantine: opts.quarantine } : {}),
+    ...(opts.metrics ? { metrics: true } : {}),
+    ...(opts.scheduling ? { scheduling: opts.scheduling } : {}),
   });
   const addr = await bundle.app.listen({ host: '127.0.0.1', port: 0 });
   const baseUrl = typeof addr === 'string' ? addr : `http://127.0.0.1:${addr}`;

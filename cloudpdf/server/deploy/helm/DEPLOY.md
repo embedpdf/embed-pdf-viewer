@@ -22,10 +22,10 @@ network policy realities, and sizing.
 Two supported shapes, enforced at render time (`_helpers.tpl`,
 `cloudpdf-server.validate`):
 
-| Profile | DB / storage | Replicas | Migrations |
-| --- | --- | --- | --- |
-| Small footprint | sqlite + fs on a PVC (`persistence.enabled`) | exactly 1, `Recreate` | at boot (`CLOUDPDF_AUTO_MIGRATE=1`) |
-| Production | postgres + s3/gcs/azure-blob | 1..N + HPA | pre-upgrade hook Job (`migrations.enabled`) |
+| Profile         | DB / storage                                 | Replicas              | Migrations                                  |
+| --------------- | -------------------------------------------- | --------------------- | ------------------------------------------- |
+| Small footprint | sqlite + fs on a PVC (`persistence.enabled`) | exactly 1, `Recreate` | at boot (`CLOUDPDF_AUTO_MIGRATE=1`)         |
+| Production      | postgres + s3/gcs/azure-blob                 | 1..N + HPA            | pre-upgrade hook Job (`migrations.enabled`) |
 
 The gates fail `helm install`/`upgrade`/`template` on: scaling with
 sqlite/fs, scaling with a PVC, `CLOUDPDF_REALTIME=in-process` with >1
@@ -75,7 +75,7 @@ it when replica counts or per-document memory make duplication visible.
   `ingress.className: nginx`.
 - **`docAffinity.key: header`** (portable): consistent-hash the
   `X-CloudPDF-Doc` request header. nginx: `upstream-hash-by:
-  "$http_x_cloudpdf_doc"` (the chart renders this on a second
+"$http_x_cloudpdf_doc"` (the chart renders this on a second
   `/v1/docs`-prefix Ingress). Envoy/Gateway API: ring hash on the same
   header. HAProxy: `balance hdr(X-CloudPDF-Doc)`. Requires SDKs that
   send the header; requests without it hash to one bucket, so keep the
@@ -88,6 +88,42 @@ it when replica counts or per-document memory make duplication visible.
 - Never build ownership directories or session migration: warmth follows
   routing, never the reverse.
 
+### Scaling out (the N-replica picture)
+
+Four tiers route a request, same hash-family shape at each, and at every
+tier affinity is performance while correctness comes from the durable
+tier below:
+
+1. **LB → pod**: `docAffinity` (above, default off). Ship OFF; flip on
+   evidence: `cloudpdf_layer_write_conflicts_total` (cross-replica write
+   races paying rebase churn) and `cloudpdf_engine_doc_opens_total`
+   (cold-open work) climbing under multi-replica traffic are the signal.
+   N > 1 requires Postgres — realtime SSE fans out cross-replica through
+   the Postgres bus.
+2. **pod → engine host**: WS3 host isolation — a native crash costs one
+   sub-second engine respawn, never the pod. Shipped; the DEFAULT is
+   still in-process until the rollout's soak completes: enable today
+   with `CLOUDPDF_ENGINE_ISOLATION=host` (chart `extraEnv`).
+3. **host → shard** (PLANNED — WS3 Phase C3, not yet implemented; the
+   future `CLOUDPDF_ENGINE_SHARDS` dial has no effect today): the
+   blast-radius tier, to be built and left at 1 until memory/attribution
+   telemetry justifies turning it.
+4. **shard → worker thread**: sticky-by-docId with base-sha preference.
+
+Per-tier death: a pod goes unready → the LB rehashes its documents to
+healthy replicas (one cold open each); a shard dies → same story inside
+the pod; a worker dies → the host respawns in under a second.
+
+**Engine overload is a 503, not a hang**: admission control runs two
+lanes (interactive, and a capped `background` lane for thumbnail warms).
+Saturation sheds with `503 + Retry-After: 2` (`error.code:
+"EngineBusy"`) — retry cheaply. Tune `CLOUDPDF_ENGINE_MAX_IN_FLIGHT` /
+`CLOUDPDF_ENGINE_BG_MAX_IN_FLIGHT` against the
+`cloudpdf_engine_queue_depth` / `_sheds_total` / `_queue_wait_ms_*`
+gauges (all labelled by lane). Engine memory is observable via
+`cloudpdf_engine_host_rss_bytes` and the pod working-set gauges
+(`cloudpdf_container_memory_*`).
+
 ## NetworkPolicy
 
 `networkPolicy.enabled` renders a policy with allow-all placeholder
@@ -97,6 +133,20 @@ hostname; for connected licensing either use a CNI with FQDN policies
 (Cilium, Calico Enterprise), an egress gateway, a broad 443 allowance —
 or air-gapped licensing, which is the strict-egress answer by
 construction.
+
+## Runtime confinement
+
+The engine host is forked with a whitelisted env (no DB URL, JWT,
+license key, or storage credentials — test-asserted): credential-
+exposure REDUCTION, not a hard intra-pod boundary — the engine is a
+same-UID child, and `/proc`-based access to the API process depends on
+the node's ptrace policy (Yama). The pod runs non-root, read-only
+rootfs, all capabilities dropped, `RuntimeDefault` seccomp. A PDFium RCE
+is still native code in the pod; `runtimeClassName` (gVisor/Kata) adds
+kernel-exploit containment for the WHOLE pod (pod-to-node isolation — it
+does not separate engine from API within the pod) at syscall-emulation
+cost — measure with the drills before committing. Full threat model:
+`THREAD_CONFINED_RUNTIME.md`.
 
 ## Sizing
 

@@ -159,7 +159,12 @@ describe('encode-in-engine (WS3 Phase B)', () => {
   test('default path serves worker-encoded webp with dimension headers; png honored', async () => {
     const fx = await buildFx(undefined); // default = in-engine
     await seed(fx, 't1', 'docenc001');
-    const res = await get(fx, 't1', 'docenc001', '/render/pages/1/data?viewport.kind=scale&viewport.scale=1');
+    const res = await get(
+      fx,
+      't1',
+      'docenc001',
+      '/render/pages/1/data?viewport.kind=scale&viewport.scale=1',
+    );
     expect(res.status).toBe(200);
     expect(res.contentType).toContain('image/webp');
     expect(isWebp(res.body)).toBe(true);

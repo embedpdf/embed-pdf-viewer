@@ -144,9 +144,7 @@ describe('CrashJournal decision rules', () => {
         .select('op_kind')
         .where('base_sha', '=', 'Y')
         .execute();
-      expect(new Set(kinds.map((k) => k.op_kind))).toEqual(
-        new Set(['pages.render', 'pages.text']),
-      );
+      expect(new Set(kinds.map((k) => k.op_kind))).toEqual(new Set(['pages.render', 'pages.text']));
       // The X pair with a matching signature still works afterwards.
       await journal.recordCrash(crashEvent({ shas: ['X'], code: 70 }));
       expect((await quarantineRows(db)).map((r) => r.base_sha).sort()).toEqual(['X', 'Y']);
@@ -186,9 +184,7 @@ describe('CrashJournal decision rules', () => {
         DocumentQuarantinedError,
       );
       // A DIFFERENT running binary is not blocked (clean-slate law)…
-      await expect(
-        journal.assertNotQuarantined('X', '3.0.1:linux-x64'),
-      ).resolves.toBeUndefined();
+      await expect(journal.assertNotQuarantined('X', '3.0.1:linux-x64')).resolves.toBeUndefined();
       // …and an unknown build (host not ready) refuses nothing.
       await expect(journal.assertNotQuarantined('X', null)).resolves.toBeUndefined();
 
@@ -223,7 +219,6 @@ describe('CrashJournal decision rules', () => {
       await db.destroy();
     }
   });
-
 });
 
 describe('crash journal — round-2 hardening', () => {
@@ -282,19 +277,22 @@ describe('crash journal — round-2 hardening', () => {
     const inline = 'inline' as const;
     // Valid.
     expect(
-      resolveQuarantineConfig({ CLOUDPDF_QUARANTINE_ENFORCE: '1', CLOUDPDF_QUARANTINE_TTL_HOURS: '12' }, host),
+      resolveQuarantineConfig(
+        { CLOUDPDF_QUARANTINE_ENFORCE: '1', CLOUDPDF_QUARANTINE_TTL_HOURS: '12' },
+        host,
+      ),
     ).toEqual({ options: { enforce: true, ttlHours: 12 }, warnings: [] });
     expect(resolveQuarantineConfig({}, host)).toEqual({ warnings: [] });
     // Invalid TTLs fail loudly.
     for (const bad of ['NaN', '0', '-1', 'Infinity', 'soon']) {
-      expect(() =>
-        resolveQuarantineConfig({ CLOUDPDF_QUARANTINE_TTL_HOURS: bad }, host),
-      ).toThrow(/positive finite/);
+      expect(() => resolveQuarantineConfig({ CLOUDPDF_QUARANTINE_TTL_HOURS: bad }, host)).toThrow(
+        /positive finite/,
+      );
     }
     // Enforcement without host isolation would be silently inert → fail.
-    expect(() =>
-      resolveQuarantineConfig({ CLOUDPDF_QUARANTINE_ENFORCE: '1' }, inline),
-    ).toThrow(/requires CLOUDPDF_ENGINE_ISOLATION=host/);
+    expect(() => resolveQuarantineConfig({ CLOUDPDF_QUARANTINE_ENFORCE: '1' }, inline)).toThrow(
+      /requires CLOUDPDF_ENGINE_ISOLATION=host/,
+    );
     // TTL-only under inline: pointless, warned, not fatal.
     const warned = resolveQuarantineConfig({ CLOUDPDF_QUARANTINE_TTL_HOURS: '12' }, inline);
     expect(warned.options).toBeUndefined();
@@ -320,9 +318,9 @@ describe('crash journal — round-2 hardening', () => {
       cache: fakeCache as never,
       pool: quarantinedPool as never,
     });
-    await expect(
-      probeQ.probe({ key: 'k', expectedSha: 'sha-q' }),
-    ).rejects.toThrow(DocumentQuarantinedError);
+    await expect(probeQ.probe({ key: 'k', expectedSha: 'sha-q' })).rejects.toThrow(
+      DocumentQuarantinedError,
+    );
 
     const errors: unknown[] = [];
     const probeF = new DocumentSecurityProbe({

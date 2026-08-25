@@ -10,6 +10,7 @@ import { sql, type Kysely } from 'kysely';
 
 import type { AuthFailureLimiterOptions } from './auth-failure-limiter';
 import { DrainCoordinator } from './drain';
+import { createEngineCounters, type EngineCounters } from './engine-counters';
 import { registerJwtAuth, requireApiToken } from './jwt-plugin';
 import { registerMetrics } from './metrics';
 import { assertProductionSecret, requiresProductionSecrets, resolveSecret } from './secret-policy';
@@ -63,9 +64,15 @@ import { registerPageRoutes } from '../routes/pages';
 import { registerRedactionRoutes } from '../routes/redactions';
 import { registerSearchRoutes } from '../routes/search';
 import { registerShareSessionRoutes } from '../routes/share-sessions';
+import { readCgroupMemory } from '../runtime/cgroup-memory';
 import { EngineHostClient } from '../runtime/EngineHostClient';
 import type { EnginePool } from '../runtime/EnginePool';
 import { QuarantiningEnginePool } from '../runtime/QuarantiningEnginePool';
+import {
+  EngineBusyError,
+  SchedulingEnginePool,
+  type EngineSchedulingConfig,
+} from '../runtime/SchedulingEnginePool';
 import { WorkerThreadPool, type FallbackFontDescriptor } from '../runtime/WorkerThreadPool';
 import type { KmsKeyring } from '../security';
 import { CloudRevisionBridge } from '../services/CloudRevisionBridge';
@@ -326,6 +333,10 @@ export interface BuildAppOptions {
    *  raw rasters over the boundary + API-side sharp, exactly the
    *  pre-Phase-B pipeline. */
   encodeInEngine?: boolean;
+  /** C1 admission control (lanes + bounded queues + shed). Defaults are
+   *  computed from the pool's slot count; `false` disables the decorator
+   *  entirely (raw-pool tests). */
+  scheduling?: EngineSchedulingConfig | false;
   /** Extra execArgv for the forked engine host (tests: ['--import','tsx']). */
   engineHostExecArgv?: string[];
   /**
@@ -372,6 +383,10 @@ export interface AppBundle {
    * `hostPid()`/`engineBuildId()`.
    */
   engineHost?: EngineHostClient;
+  /** C1 decorator (present unless `scheduling: false`). */
+  engineScheduler?: SchedulingEnginePool;
+  /** C5 flip instruments (also readable in tests). */
+  engineCounters?: EngineCounters;
   /**
    * Flip `/readyz` to 503 and end every live SSE stream without closing
    * the listener. `shutdown()` calls this first; exposed for operators
@@ -427,6 +442,9 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
   // The cross-replica doorbell exists for the whole app lifetime: mutation
   // signals for SSE, revocation pushes for the auth guard + open streams.
   const realtimeBus = opts.realtimeBus ?? new InProcessRealtimeBus();
+  // C5 flip instruments — created unconditionally (cheap plain numbers);
+  // /metrics surfaces them when enabled.
+  const engineCounters = createEngineCounters();
   // Secret hygiene is license-keyed: development keys + the test gate keep
   // zero-config dev fallbacks; every other license refuses to boot on
   // missing / publicly-known / short secrets (fail closed).
@@ -632,6 +650,10 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
   };
 
   let pool: EnginePool | undefined;
+  let schedulingPool: SchedulingEnginePool | undefined;
+  const queueWaitObserver: {
+    current: ((lane: 'interactive' | 'background', waitMs: number) => void) | null;
+  } = { current: null };
   let crashJournal: CrashJournal | undefined;
   let engineHost: EngineHostClient | undefined;
   let engineRestartCount = 0;
@@ -688,6 +710,21 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
         fonts: opts.fallbackFonts,
       });
     }
+    // C1 — admission control wraps OUTERMOST (both isolation modes): lanes
+    // and shed decisions happen before quarantine checks or dispatch.
+    // `scheduling: false` disables (tests that assert raw pool behavior).
+    if (opts.scheduling !== false) {
+      const userHook = opts.scheduling ? opts.scheduling.onQueueWait : undefined;
+      const scheduler = new SchedulingEnginePool(pool, {
+        ...(opts.scheduling ?? {}),
+        onQueueWait: (lane, waitMs) => {
+          queueWaitObserver.current?.(lane, waitMs);
+          userHook?.(lane, waitMs);
+        },
+      });
+      schedulingPool = scheduler;
+      pool = scheduler;
+    }
   }
   const drainCoordinator = new DrainCoordinator();
 
@@ -721,11 +758,17 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
   };
 
   if (opts.metrics === true) {
+    const cgroupReadable = readCgroupMemory() !== null;
     registerMetrics(app, {
       pool,
       licenseGate: opts.licenseGate,
+      counters: engineCounters,
       ...(engineHost ? { engineRestarts: () => engineRestartCount } : {}),
+      ...(engineHost ? { engineMemory: () => engineHost.memory() } : {}),
       ...(crashJournal ? { crashJournal } : {}),
+      ...(cgroupReadable ? { cgroup: () => readCgroupMemory() } : {}),
+      ...(schedulingPool ? { scheduling: () => schedulingPool!.schedulingStats() } : {}),
+      ...(schedulingPool ? { queueWaitObserver } : {}),
     });
   }
 
@@ -1023,6 +1066,7 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
       const cdnAccessRequired = (opts.cdnSigner?.info.kind ?? 'none') !== 'none';
       documentService = new DocumentService({
         documents: new DocumentsRepo(opts.db),
+        counters: engineCounters,
         cache: baseFileCache,
         storage: opts.objectStore,
         pool,
@@ -1060,6 +1104,7 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
       layerService = new LayerService({
         db: opts.db,
         documents: new DocumentsRepo(opts.db),
+        counters: engineCounters,
         layerState: layerStateService,
         revisionBridge: cloudRevisionBridge,
         eventLog,
@@ -1131,6 +1176,14 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
   }
 
   app.setErrorHandler((err, req, reply) => {
+    if (err instanceof EngineBusyError) {
+      // Honest backpressure: retry cheaply instead of hanging. A shed
+      // interactive job is the overload signal (background sheds are
+      // swallowed by their callers by design).
+      reply.header('Retry-After', '2');
+      reply.code(503).send({ error: { code: err.code, message: err.message } });
+      return;
+    }
     if (err instanceof DocumentQuarantinedError) {
       reply.code(422).send({ error: { code: err.code, message: err.message } });
       return;
@@ -1240,6 +1293,8 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
     kms: opts.kms,
     ...(crashJournal ? { crashJournal } : {}),
     ...(engineHost ? { engineHost } : {}),
+    engineCounters,
+    ...(schedulingPool ? { engineScheduler: schedulingPool } : {}),
     beginDrain: () => drainCoordinator.begin(),
     shutdown,
   };

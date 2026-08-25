@@ -94,6 +94,10 @@ function harness(overrides: Partial<EngineHostClientOptions> = {}) {
   return { clientPromise, children, spawnedAt, crashes, restarts, evictions };
 }
 
+function children0Ready(h: ReturnType<typeof harness>): boolean {
+  return h.children.length === 1;
+}
+
 async function until(fn: () => boolean, ms = 2_000): Promise<void> {
   const deadline = Date.now() + ms;
   while (!fn()) {
@@ -223,6 +227,32 @@ describe('EngineHostClient lifecycle', () => {
     expect(children.length).toBe(count); // destroyed: no orphan respawns
   });
 
+  test('memory heartbeats are generation-scoped: cleared AT exit (backoff window), repopulated by the successor', async () => {
+    // Long respawn delay: the assertion below runs INSIDE the
+    // death→respawn gap, where a spawn-time-only reset would still be
+    // exporting the corpse's RSS.
+    const h = harness({ respawnBaseMs: 300, respawnMaxMs: 300 });
+    await until(() => children0Ready(h));
+    h.children[0]!.ready();
+    const client = await h.clientPromise;
+    expect(client.memory()).toBeNull();
+    h.children[0]!.emit('message', { t: 'memory', rssBytes: 123_000, heapUsedBytes: 45_000 });
+    const m = client.memory();
+    expect(m?.rssBytes).toBe(123_000);
+    expect(m?.heapUsedBytes).toBe(45_000);
+    expect(m!.ageMs).toBeGreaterThanOrEqual(0);
+
+    h.children[0]!.exit(139);
+    // Immediately after exit — no replacement child exists yet.
+    expect(h.children.length).toBe(1);
+    expect(client.memory()).toBeNull();
+    await until(() => h.children.length === 2);
+    h.children[1]!.ready();
+    h.children[1]!.emit('message', { t: 'memory', rssBytes: 9, heapUsedBytes: 4 });
+    expect(client.memory()?.rssBytes).toBe(9);
+    await client.destroy();
+  });
+
   test('a protocol mismatch is refused at create()', async () => {
     const { clientPromise, children } = harness();
     children[0]!.emit('message', { t: 'ready', protocol: 999, pid: 1, engineBuild: 'x' });
@@ -317,7 +347,9 @@ describe('EngineHostClient lifecycle', () => {
     await until(() => children[0]!.sent.filter((m) => m['t'] === 'dispatch').length === 2);
     children[0]!.exit(139);
     await call;
-    expect(crashes[0]!.suspects).toEqual([expect.objectContaining({ docId: 'doc-1', baseSha: null })]);
+    expect(crashes[0]!.suspects).toEqual([
+      expect.objectContaining({ docId: 'doc-1', baseSha: null }),
+    ]);
     await client.destroy();
   });
 

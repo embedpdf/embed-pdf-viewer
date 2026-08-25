@@ -18,6 +18,7 @@ import {
 import type { DocumentsRepo } from '../db/repos/documents.repo';
 import type { SharpImageEncoder } from '../render/SharpImageEncoder';
 import type { EnginePool } from '../runtime/EnginePool';
+import { EngineBusyError } from '../runtime/SchedulingEnginePool';
 import type { BaseFileCache } from '../storage/BaseFileCache';
 import { StorageKeys } from '../storage/keys';
 import type { ObjectStore } from '../storage/ObjectStore';
@@ -357,16 +358,20 @@ export class DerivedRenderService {
         let encoded: { bytes: Uint8Array; contentType: string };
         let pageObjectNumber: number;
         if (this.encodeInEngine) {
-          const payload = await pool.runAdHoc(input.baseSha, (jobId) =>
-            wirePack({
-              kind: 'document.renderPageFileEncoded' as const,
-              jobId,
-              path: handle.path,
-              password: null,
-              pageIndex: 0,
-              options: renderOptions,
-              encode: { format: 'webp' as const },
-            }),
+          const payload = await pool.runAdHoc(
+            input.baseSha,
+            (jobId) =>
+              wirePack({
+                kind: 'document.renderPageFileEncoded' as const,
+                jobId,
+                path: handle.path,
+                password: null,
+                pageIndex: 0,
+                options: renderOptions,
+                encode: { format: 'webp' as const },
+              }),
+            undefined,
+            { lane: 'background' },
           );
           if (payload.tag !== 'document.renderPageFileEncoded') {
             throw new EngineError(
@@ -377,15 +382,19 @@ export class DerivedRenderService {
           encoded = { bytes: payload.image.bytes, contentType: payload.image.contentType };
           pageObjectNumber = payload.pageObjectNumber;
         } else {
-          const payload = await pool.runAdHoc(input.baseSha, (jobId) =>
-            wirePack({
-              kind: 'document.renderPageFile' as const,
-              jobId,
-              path: handle.path,
-              password: null,
-              pageIndex: 0,
-              options: renderOptions,
-            }),
+          const payload = await pool.runAdHoc(
+            input.baseSha,
+            (jobId) =>
+              wirePack({
+                kind: 'document.renderPageFile' as const,
+                jobId,
+                path: handle.path,
+                password: null,
+                pageIndex: 0,
+                options: renderOptions,
+              }),
+            undefined,
+            { lane: 'background' },
           );
           if (payload.tag !== 'document.renderPageFile') {
             throw new EngineError(
@@ -406,6 +415,10 @@ export class DerivedRenderService {
         handle.release();
       }
     } catch (err) {
+      // A scheduler shed is a deliberate skip of a latency optimization,
+      // not an encoding failure: leave the thumbnail state RETRYABLE (the
+      // read-through is the system) instead of recording `failed`.
+      if (err instanceof EngineBusyError) return;
       this.onWarmError?.(err, { docId: input.docId, tenantId: input.tenantId });
       await this.documents
         ?.setThumbnail(input.docId, input.tenantId, 'failed')

@@ -26,6 +26,7 @@ import {
 import type { DocumentManifest, LayerScopes } from '@embedpdf/engine-core/wire';
 
 import type { LayerStateService } from './LayerStateService';
+import type { EngineCounters } from '../app/engine-counters';
 import { pinnedLayerName, type RequestJwtContext } from '../app/jwt-plugin';
 import type { DocumentsRepo, DocumentRow } from '../db/repos/documents.repo';
 import type {
@@ -91,6 +92,8 @@ export interface DocumentServiceOptions {
   storage: ObjectStore;
   pool: EnginePool;
   layerState: LayerStateService;
+  /** C5 flip instruments (metrics reads them via collect closures). */
+  counters?: EngineCounters;
   passwordVerifications?: PdfPasswordVerificationsRepo;
   passwordSessions?: PdfPasswordSessionsRepo;
   passwordSessionServerSecret?: { id: string; secret: string | Buffer };
@@ -223,8 +226,11 @@ export class DocumentService {
    */
   private readonly writeAlignGens = new Map<string, number>();
 
+  private readonly counters?: EngineCounters;
+
   constructor(opts: DocumentServiceOptions) {
     this.documents = opts.documents;
+    this.counters = opts.counters;
     this.cache = opts.cache;
     this.storage = opts.storage;
     this.pool = opts.pool;
@@ -422,6 +428,7 @@ export class DocumentService {
           password,
         });
       const result = await this.pool.runOpen(docId, baseSha, build);
+      if (this.counters) this.counters.docOpens += 1;
       if (result.tag !== 'open') {
         throw new EngineError(EngineErrorCode.WireFormat, `unexpected open payload: ${result.tag}`);
       }
@@ -1582,6 +1589,7 @@ export class DocumentService {
     };
     try {
       const result = await this.pool.run(docId, build);
+      if (this.counters) this.counters.docOpens += 1;
       if (result.tag !== 'open') {
         throw new EngineError(
           EngineErrorCode.WireFormat,

@@ -768,6 +768,39 @@ function requireAirGappedMode(): void {
   }
 }
 
+function schedulingEnv(): Record<string, number> | null {
+  const parse = (name: string): number | undefined => {
+    const raw = process.env[name];
+    if (raw === undefined || raw === '') return undefined;
+    const n = Number(raw);
+    if (!Number.isInteger(n) || n < 1) {
+      fail(2, `${name} must be a positive integer, got ${JSON.stringify(raw)}`);
+    }
+    return n;
+  };
+  const parseZeroOk = (name: string): number | undefined => {
+    const raw = process.env[name];
+    if (raw === undefined || raw === '') return undefined;
+    const n = Number(raw);
+    if (!Number.isInteger(n) || n < 0) {
+      fail(2, `${name} must be a non-negative integer, got ${JSON.stringify(raw)}`);
+    }
+    return n;
+  };
+  const cfg = {
+    maxInFlight: parse('CLOUDPDF_ENGINE_MAX_IN_FLIGHT'),
+    // 0 = strict disable (background sheds instantly).
+    backgroundMaxInFlight: parseZeroOk('CLOUDPDF_ENGINE_BG_MAX_IN_FLIGHT'),
+    backgroundMaxQueued: parseZeroOk('CLOUDPDF_ENGINE_BG_MAX_QUEUED'),
+    interactiveMaxQueued: parseZeroOk('CLOUDPDF_ENGINE_MAX_QUEUED'),
+    backgroundQueueTimeoutMs: parse('CLOUDPDF_ENGINE_BG_QUEUE_TIMEOUT_MS'),
+    interactiveQueueTimeoutMs: parse('CLOUDPDF_ENGINE_QUEUE_TIMEOUT_MS'),
+  };
+  const entries = Object.entries(cfg).filter((e): e is [string, number] => e[1] !== undefined);
+  if (entries.length === 0) return null;
+  return Object.fromEntries(entries);
+}
+
 async function cmdServe(): Promise<void> {
   const PORT = Number(process.env['PORT'] ?? 3000);
   const HOST = process.env['HOST'] ?? '0.0.0.0';
@@ -929,6 +962,9 @@ async function cmdServe(): Promise<void> {
   let bundle: Awaited<ReturnType<typeof buildApp>>;
   try {
     bundle = await buildApp({
+      // C1 admission tuning (defaults compute from the pool's slot count;
+      // queue caps/timeouts are buildApp options — see the Phase C plan).
+      ...(schedulingEnv() ? { scheduling: schedulingEnv()! } : {}),
       // WS3 Phase B escape hatch: '0'/'false' reverts to raw rasters over
       // the engine boundary + API-side sharp for one release.
       encodeInEngine:

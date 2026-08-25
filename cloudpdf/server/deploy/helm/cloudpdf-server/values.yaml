@@ -194,6 +194,13 @@ serviceAccount:
 podAnnotations: {}
 podLabels: {}
 
+# Optional sandboxed container runtime (gVisor: 'gvisor'/'runsc' per your
+# cluster's RuntimeClass; Kata similar). A PDFium RCE is native code in the
+# engine process — kernel-level confinement is the layer that actually
+# contains it. Trade: syscall-emulation overhead (measure with the
+# bench/drills before committing). Empty = the cluster default runtime.
+runtimeClassName: ''
+
 podSecurityContext:
   runAsNonRoot: true
   runAsUser: 1000

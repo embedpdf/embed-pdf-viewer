@@ -1,5 +1,6 @@
-import { Worker } from 'node:worker_threads';
 import { cpus } from 'node:os';
+import { Worker } from 'node:worker_threads';
+
 import {
   AbortError,
   EngineError,
@@ -12,7 +13,8 @@ import {
   type WorkerResponse,
   type WorkerResultPayload,
 } from '@embedpdf/engine-core/runtime';
-import type { EnginePool } from './EnginePool';
+
+import type { EnginePool, RunAdHocOptions } from './EnginePool';
 
 let _nextJobId = 1;
 function nextJobId(): WorkerJobId {
@@ -136,7 +138,6 @@ export interface WorkerThreadPoolOptions {
 }
 
 function defaultFatalWorkerExit(evt: { slot: number; code: number }): void {
-  // eslint-disable-next-line no-console
   console.error(
     `[cloudpdf-server] FATAL: worker thread ${evt.slot} exited unexpectedly ` +
       `(code ${evt.code}). Pool slots cannot be respawned in-process; exiting ` +
@@ -371,6 +372,7 @@ export class WorkerThreadPool implements EnginePool {
     baseSha: string | undefined,
     build: (jobId: WorkerJobId) => WirePack<WorkerRequest>,
     signal?: AbortSignal,
+    _opts?: RunAdHocOptions,
   ): Promise<WorkerResultPayload> {
     if (this.destroyed) throw new EngineError(EngineErrorCode.RuntimeUnavailable, 'pool destroyed');
     const slot = baseSha ? this.pickSlotForBase(baseSha) : this.pickLeastLoaded();

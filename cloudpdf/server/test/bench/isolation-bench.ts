@@ -470,7 +470,9 @@ async function main(): Promise<void> {
     const pons = list.snapshot.pages.slice(0, 8).map((p) => p.pageObjectNumber);
     e2ePon = pons[0]!;
     // eslint-disable-next-line no-console
-    console.log(`opened ${N_DOCS} docs, ${list.snapshot.pageCount} pages, using pons=${pons.join(',')}`);
+    console.log(
+      `opened ${N_DOCS} docs, ${list.snapshot.pageCount} pages, using pons=${pons.join(',')}`,
+    );
 
     // ---- render (large payloads)
     const renderIters = QUICK ? 40 : 300;

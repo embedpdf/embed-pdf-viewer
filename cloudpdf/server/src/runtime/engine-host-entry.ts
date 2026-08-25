@@ -114,6 +114,14 @@ const aborts = new Map<number, AbortController>();
     }
   }
 
+  // The memory heartbeat C2's recycle policy and the memory gauges read.
+  // unref()'d: it must never keep a shutting-down host alive.
+  const heartbeat = setInterval(() => {
+    const mu = process.memoryUsage();
+    send({ t: 'memory', rssBytes: mu.rss, heapUsedBytes: mu.heapUsed });
+  }, config.memoryHeartbeatMs ?? 5_000);
+  heartbeat.unref();
+
   send({
     t: 'ready',
     protocol: HOST_PROTOCOL_VERSION,

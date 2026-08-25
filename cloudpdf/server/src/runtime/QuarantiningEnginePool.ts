@@ -1,6 +1,6 @@
 import type { WorkerResultPayload } from '@embedpdf/engine-core/runtime';
 
-import type { BuildPack, EnginePool } from './EnginePool';
+import type { BuildPack, EnginePool, RunAdHocOptions } from './EnginePool';
 import type { CrashJournal } from '../services/CrashJournal';
 
 /**
@@ -50,11 +50,13 @@ export class QuarantiningEnginePool implements EnginePool {
     baseSha: string | undefined,
     build: BuildPack,
     signal?: AbortSignal,
+
+    opts?: RunAdHocOptions,
   ): Promise<WorkerResultPayload> {
     if (baseSha !== undefined) {
       await this.journal.assertNotQuarantined(baseSha, this.activeBuild());
     }
-    return this.inner.runAdHoc(baseSha, build, signal);
+    return this.inner.runAdHoc(baseSha, build, signal, opts);
   }
 
   async run(docId: string, build: BuildPack, signal?: AbortSignal): Promise<WorkerResultPayload> {

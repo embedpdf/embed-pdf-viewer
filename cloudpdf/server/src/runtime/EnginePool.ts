@@ -8,6 +8,17 @@ import type {
 export type BuildPack = (jobId: WorkerJobId) => WirePack<WorkerRequest>;
 
 /**
+ * Dispatch metadata for ad-hoc work. `lane: 'background'` marks
+ * known-DISPOSABLE work (today: exactly the thumbnail warm) for the C1
+ * scheduler's capped lane; everything else — including the ingestion
+ * security probe, which a user's commit waits on — defaults to
+ * interactive. Base pools ignore it; only `SchedulingEnginePool` reads it.
+ */
+export interface RunAdHocOptions {
+  lane?: 'background';
+}
+
+/**
  * The engine plane's entire surface. `WorkerThreadPool` (inline mode —
  * worker threads in this process) and `EngineHostClient` (host mode — a
  * supervised child process) both implement it; every service and route
@@ -27,6 +38,7 @@ export interface EnginePool {
     baseSha: string | undefined,
     build: BuildPack,
     signal?: AbortSignal,
+    opts?: RunAdHocOptions,
   ): Promise<WorkerResultPayload>;
   close(docId: string, signal?: AbortSignal): Promise<WorkerResultPayload | null>;
   destroy(): Promise<void>;

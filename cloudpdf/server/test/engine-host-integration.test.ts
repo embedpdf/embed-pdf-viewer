@@ -34,6 +34,14 @@ afterAll(async () => {
   await client?.destroy();
 });
 
+async function until(fn: () => boolean, ms = 5_000): Promise<void> {
+  const deadline = Date.now() + ms;
+  while (!fn()) {
+    if (Date.now() > deadline) throw new Error('until: condition not met in time');
+    await new Promise((r) => setTimeout(r, 20));
+  }
+}
+
 describe('engine host integration (real fork)', () => {
   test('dispatch → worker death inside the host → exit 70 → respawn → next call works', async () => {
     const crashes: HostCrashEvent[] = [];
@@ -85,7 +93,7 @@ describe('engine host integration (real fork)', () => {
   test('open/close round-trip against the stub WorkerHost surface', async () => {
     client = await EngineHostClient.create({
       hostEntry: HOST_ENTRY,
-      boot: { workerEntry: STUB_WORKER, poolSize: 1, fonts: [] },
+      boot: { workerEntry: STUB_WORKER, poolSize: 1, fonts: [], memoryHeartbeatMs: 100 },
       execArgv: ['--import', 'tsx'],
       readyTimeoutMs: 30_000,
       dispatchDeadlineMs: 30_000,
@@ -99,6 +107,9 @@ describe('engine host integration (real fork)', () => {
     expect(closed).toBeTruthy();
 
     // Graceful destroy: the REAL host answers the shutdown control.
+    // protocol v3: the real fork emits memory heartbeats.
+    await until(() => client.memory() !== null, 5_000);
+    expect(client.memory()!.rssBytes).toBeGreaterThan(1_000_000);
     await client.destroy();
     client = null;
   }, 60_000);

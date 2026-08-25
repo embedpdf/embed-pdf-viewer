@@ -3,11 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createPdfRuntime } from '@embedpdf/engine-runtime';
 import { WorkerHost, type WorkerImageEncoder } from '@embedpdf/engine-services';
-import type {
-  WirePack,
-  WorkerRequest,
-  WorkerResponse,
-} from '@embedpdf/engine-core/runtime';
+import type { WirePack, WorkerRequest, WorkerResponse } from '@embedpdf/engine-core/runtime';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { SharpImageEncoder } from '../src/render/SharpImageEncoder';
 
@@ -49,7 +45,15 @@ function minimalPdf(): Uint8Array {
 }
 
 const isWebp = (b: Uint8Array): boolean =>
-  b.length > 12 && b[0] === 0x52 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x46 && b[8] === 0x57 && b[9] === 0x45 && b[10] === 0x42 && b[11] === 0x50;
+  b.length > 12 &&
+  b[0] === 0x52 &&
+  b[1] === 0x49 &&
+  b[2] === 0x46 &&
+  b[3] === 0x46 &&
+  b[8] === 0x57 &&
+  b[9] === 0x45 &&
+  b[10] === 0x42 &&
+  b[11] === 0x50;
 const isPng = (b: Uint8Array): boolean =>
   b.length > 8 && b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47;
 
@@ -67,7 +71,9 @@ describe('encoded kinds through the real WorkerHost (native runtime + sharp)', (
     });
   }
 
-  async function resolved(req: WorkerRequest): Promise<{ result: unknown; transfer: readonly unknown[] }> {
+  async function resolved(
+    req: WorkerRequest,
+  ): Promise<{ result: unknown; transfer: readonly unknown[] }> {
     const pack = await dispatch(req);
     if (pack.payload.kind !== 'resolve') {
       throw new Error(`expected resolve, got: ${JSON.stringify(pack.payload)}`);

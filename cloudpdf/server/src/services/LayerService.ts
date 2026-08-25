@@ -65,6 +65,7 @@ import type { AuditEvent, EventLogService } from './EventLogService';
 import type { LayerStateService } from './LayerStateService';
 import type { MutationImpactKind } from './LayerStateService';
 import type { WeakAnnotationSessionService } from './WeakAnnotationSessionService';
+import type { EngineCounters } from '../app/engine-counters';
 import type { AuditMutationKind } from '../db/repos/audit_log.repo';
 import type { DocumentsRepo } from '../db/repos/documents.repo';
 import type { DurablePageRow, LayerRow } from '../db/repos/page_state.repo';
@@ -143,6 +144,8 @@ export interface LayerServiceOptions {
   storage?: ObjectStore;
   /** Cross-replica doorbell — rung after every mutation commit. */
   realtime?: RealtimeBus;
+  /** C5 flip instruments (metrics reads them via collect closures). */
+  counters?: EngineCounters;
 }
 
 export type LayerWriteContext = OpenContext;
@@ -182,8 +185,11 @@ export class LayerService {
    */
   private readonly pendingAttemptKeys = new Map<string, Set<string>>();
 
+  private readonly counters?: EngineCounters;
+
   constructor(opts: LayerServiceOptions) {
     this.db = opts.db;
+    this.counters = opts.counters;
     this.documents = opts.documents;
     this.layerState = opts.layerState;
     this.revisionBridge = opts.revisionBridge;
@@ -2871,6 +2877,10 @@ export class LayerService {
         return await op();
       } catch (err) {
         if (!(err instanceof LayerFenceConflict)) throw err;
+        // C5 instrument: one cross-replica write race per rebase. The
+        // rate of this counter at N>1 replicas is the docAffinity
+        // flip evidence.
+        if (this.counters) this.counters.layerWriteConflicts += 1;
         documentService.invalidateLayerSession(docId, layerName);
         return await op();
       }

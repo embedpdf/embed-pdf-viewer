@@ -166,7 +166,23 @@ export class EngineHostClient implements EnginePool {
 
   // ---------------------------------------------------------------- spawn
 
+  /** Latest child memory heartbeat (protocol v3); null until the current
+   *  generation's first beat — a respawn resets it, so a reading can never
+   *  describe a dead child. */
+  private lastMemory: { rssBytes: number; heapUsedBytes: number; at: number } | null = null;
+
+  /** Memory heartbeat of the CURRENT host generation, with its age. */
+  memory(): { rssBytes: number; heapUsedBytes: number; ageMs: number } | null {
+    if (!this.lastMemory) return null;
+    return {
+      rssBytes: this.lastMemory.rssBytes,
+      heapUsedBytes: this.lastMemory.heapUsedBytes,
+      ageMs: Date.now() - this.lastMemory.at,
+    };
+  }
+
   private spawn(): void {
+    this.lastMemory = null;
     if (this.state === 'destroyed') return;
     const gen = ++this.gen;
     this.state = 'starting';
@@ -234,6 +250,10 @@ export class EngineHostClient implements EnginePool {
   private onHostExit(code: number | null, signal: string | null): void {
     if (this.state === 'destroyed') return;
     this.child = null;
+    // A reading must never describe a dead child — clear HERE, not at
+    // respawn: during crash backoff (seconds) a spawn-time reset would
+    // keep exporting the corpse's RSS.
+    this.lastMemory = null;
     this.state = 'backoff';
     if (this.downSince === null) this.downSince = Date.now();
     if (this.healthyTimer) clearTimeout(this.healthyTimer);
@@ -337,6 +357,13 @@ export class EngineHostClient implements EnginePool {
       case 'evict':
         this.residency.delete(msg.docId);
         this.opts.onEvict?.({ docId: msg.docId, baseSha: msg.baseSha, slot: msg.slot });
+        return;
+      case 'memory':
+        this.lastMemory = {
+          rssBytes: msg.rssBytes,
+          heapUsedBytes: msg.heapUsedBytes,
+          at: Date.now(),
+        };
         return;
       default:
         return;

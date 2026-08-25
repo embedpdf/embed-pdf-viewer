@@ -22,7 +22,9 @@ import type { FallbackFontDescriptor } from './WorkerThreadPool';
 // child must speak — envelope AND the engine ops riding inside it — so a
 // custom `engineHostEntry` pointing at a pre-B dist fails the handshake
 // loudly instead of rejecting every encoded render as an unknown kind.
-export const HOST_PROTOCOL_VERSION = 2;
+// v3 (WS3 Phase C step 0): the host emits the `memory` heartbeat the
+// C2 recycle policy and the memory gauges read.
+export const HOST_PROTOCOL_VERSION = 3;
 
 /** Parent → host. */
 export type HostRequest =
@@ -52,7 +54,8 @@ export type HostMessage =
   | { t: 'result'; callId: number; result: WorkerResultPayload }
   | { t: 'control'; callId: number; control: HostControlResult }
   | { t: 'error'; callId: number; error: SerializedEngineError }
-  | { t: 'evict'; docId: string; baseSha: string; slot: number };
+  | { t: 'evict'; docId: string; baseSha: string; slot: number }
+  | { t: 'memory'; rssBytes: number; heapUsedBytes: number };
 
 /**
  * Host boot configuration, passed as ONE env var (JSON) — no argv
@@ -65,6 +68,8 @@ export interface HostBootConfig {
   poolSize?: number;
   maxDocsPerSlot?: number;
   fonts: ReadonlyArray<FallbackFontDescriptor>;
+  /** Memory-heartbeat interval (ms). Default 5000; tests shrink it. */
+  memoryHeartbeatMs?: number;
 }
 
 export const HOST_CONFIG_ENV = 'CLOUDPDF_ENGINE_HOST_CONFIG';
