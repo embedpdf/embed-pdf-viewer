@@ -26,9 +26,14 @@ all under the `/data` volume:
 ```sh
 docker run --rm --init -p 3000:3000 \
   -v cloudpdf-data:/data \
-  -e CLOUDPDF_JWT_SECRET=dev-secret-change-me \
+  -e CLOUDPDF_LICENSE_KEY="key/..." \
   ghcr.io/embedpdf/cloudpdf-server:latest
 ```
+
+The server is fail-closed on licensing: `CLOUDPDF_LICENSE_KEY` is **required**
+(a [development key](/docs/server/configuration/licensing) keeps everything
+else zero-config for local runs — even the JWT secret falls back to a dev
+default, with a warning).
 
 - `--init` gives the container correct signal and zombie handling. The server
   already handles `SIGTERM`/`SIGINT`, so it stops cleanly.
@@ -80,6 +85,7 @@ migrations out of the boot path, and let the pool use your cores:
 
 ```sh
 docker run -d --init -p 3000:3000 \
+  -e CLOUDPDF_LICENSE_KEY="key/..." \
   -e CLOUDPDF_JWT_SECRET="$(openssl rand -hex 32)" \
   -e CLOUDPDF_DB_DRIVER=postgres \
   -e CLOUDPDF_DB_URL="postgres://user:pass@db:5432/cloudpdf" \

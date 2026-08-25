@@ -20,8 +20,11 @@ One secret signs and verifies every token:
 CLOUDPDF_JWT_SECRET=a-long-random-string
 ```
 
-This is the single required setting. The server uses HS256, so the **same**
-secret must be configured on the server and used by your backend to sign tokens.
+Under a production license this is required (at least 32 bytes; the server
+refuses publicly-known dev fallbacks). The server uses HS256, so the **same**
+secret must be configured on the server and used by your backend to sign
+tokens. Development license keys allow a built-in dev fallback — with a loud
+warning — so local try-outs boot with zero configuration.
 
 ```sh
 # Generate a strong secret
@@ -66,10 +69,29 @@ Frontend (@cloudpdf/engine)  ──Authorization: Bearer <JWT>──▶  CloudPD
    token on every request.
 4. The server verifies the signature and scope, then serves the request.
 
+## API tokens (server-to-server)
+
+For trusted backends, CI, and operational tooling there is a second
+credential: **static API tokens**, configured as a comma-separated list:
+
+```sh
+CLOUDPDF_API_AUTH_TOKENS="$(openssl rand -hex 32)"
+```
+
+An API token is a root credential for the admin plane
+(`/v1/tenants/...` — uploads, listing, minting and revoking tokens, deployment
+status). It is what the quick start's `curl` calls use, and what you'd give a
+backfill script. Treat it like a database password: server-side only, never in
+a browser, at least 32 bytes under a production license. Document-plane routes
+still require document-scoped JWTs — an API token deliberately does not
+replace the per-document token flow.
+
 ## Minting a token
 
 Use any JWT library. The token is signed with `CLOUDPDF_JWT_SECRET` and carries
-the document scope your server expects:
+the document scope your server expects. (For local experiments, the npm
+package exports a `signDevToken` helper that produces a correctly-shaped
+token in one call.)
 
 ```ts
 import { SignJWT } from 'jose';

@@ -34,7 +34,9 @@ spec:
             console.log(path, res.status, body);
             if (!res.ok) throw new Error(path + ' -> ' + res.status);
           };
-          Promise.all([get('/healthz'), get('/readyz'), get('/v1/license/status')]).catch((err) => {
+          // The two public probes. (/v1/license/status needs a bearer;
+          // /readyz already carries the license summary publicly.)
+          Promise.all([get('/healthz'), get('/readyz')]).catch((err) => {
             console.error(err);
             process.exit(1);
           });

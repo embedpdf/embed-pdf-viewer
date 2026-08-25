@@ -34,6 +34,8 @@ Create the secrets the server needs, then install:
 ```sh
 kubectl create secret generic cloudpdf-secrets \
   --from-literal=CLOUDPDF_JWT_SECRET="$(openssl rand -hex 32)" \
+  --from-literal=CLOUDPDF_PASSWORD_VERIFICATION_HMAC_SECRET="$(openssl rand -hex 32)" \
+  --from-literal=CLOUDPDF_PASSWORD_SESSION_SERVER_SECRET="$(openssl rand -hex 32)" \
   --from-literal=CLOUDPDF_DB_URL="postgres://user:pass@db:5432/cloudpdf" \
   --from-literal=AWS_ACCESS_KEY_ID="..." \
   --from-literal=AWS_SECRET_ACCESS_KEY="..." \

@@ -22,13 +22,49 @@ RELEASE=cloudpdf
 
 log() { printf '\n== %s\n' "$*"; }
 
+# Pre-load the server image from the host's docker cache into the kind
+# cluster — each kind cluster has an isolated image store, so without
+# this every fresh cluster re-pulls ~1GB from GHCR (3-4 min). Best
+# effort: on failure the cluster pulls normally.
+preload_image() {
+  local img="ghcr.io/embedpdf/cloudpdf-server:$TAG"
+  docker pull "$img" >/dev/null 2>&1 || return 0
+  kind load docker-image "$img" --name "$CLUSTER" >/dev/null 2>&1 || true
+}
+
+
+# Abrupt-kill one pod's server process from the kind node. Inside a
+# container, pid 1 only receives signals it has handlers for — a
+# SIGSEGV sent to pid 1 is silently discarded by the kernel (this is
+# also why the Docker docs recommend --init, which demotes node off
+# pid 1). SIGKILL from the node's namespace is the reliable abrupt
+# death; to the supervisor it is indistinguishable from a native
+# crash. crictl scoping targets exactly one pod, never its siblings.
+kill_pod_process() { # <pod-name>
+  local node podid cid pid
+  node=$(kind get nodes --name "$CLUSTER" | head -1)
+  podid=$(docker exec "$node" crictl pods -q --name "$1")
+  cid=$(docker exec "$node" crictl ps -q --pod "$podid" | head -1)
+  pid=$(docker exec "$node" crictl inspect -o go-template --template '{{.info.pid}}' "$cid")
+  docker exec "$node" kill -9 "$pid"
+}
+
+
 log "kind cluster ($CLUSTER)"
 kind get clusters 2>/dev/null | grep -qx "$CLUSTER" || kind create cluster --name "$CLUSTER" --wait 120s
+preload_image
 if [[ "${KEEP:-0}" != "1" ]]; then
   trap 'kind delete cluster --name "$CLUSTER" >/dev/null 2>&1 || true' EXIT
 fi
 
-SECRET_ARGS=(--set "secrets.CLOUDPDF_JWT_SECRET=$(openssl rand -hex 32)")
+# Production-grade keys enforce secret hygiene on ALL three server
+# secrets (JWT + the two password-session HMACs) — set them all so the
+# smoke works with any key kind.
+SECRET_ARGS=(
+  --set "secrets.CLOUDPDF_JWT_SECRET=$(openssl rand -hex 32)"
+  --set "secrets.CLOUDPDF_PASSWORD_VERIFICATION_HMAC_SECRET=$(openssl rand -hex 32)"
+  --set "secrets.CLOUDPDF_PASSWORD_SESSION_SERVER_SECRET=$(openssl rand -hex 32)"
+)
 if [[ -n "${CLOUDPDF_LICENSE_KEY:-}" ]]; then
   SECRET_ARGS+=(--set "secrets.CLOUDPDF_LICENSE_KEY=${CLOUDPDF_LICENSE_KEY}")
 fi
@@ -48,10 +84,10 @@ if [[ -n "${CLOUDPDF_LICENSE_KEY:-}" ]]; then
   GEN_AFTER=$(kubectl -n "$NS" get deploy "$RELEASE-cloudpdf-server" -o jsonpath='{.metadata.generation}')
   [[ "$GEN_AFTER" -gt "$GEN_BEFORE" ]] || { echo "upgrade did not roll the deployment"; exit 1; }
 
-  log "crash drill: SIGSEGV pid 1 (byte-identical to a native PDFium crash for the supervisor)"
+  log "crash drill: abrupt process kill (supervision-equivalent to a native crash)"
   POD=$(kubectl -n "$NS" get pod -l "app.kubernetes.io/instance=$RELEASE" -o jsonpath='{.items[0].metadata.name}')
   T0=$(date +%s)
-  kubectl -n "$NS" exec "$POD" -- kill -SEGV 1 || true
+  kill_pod_process "$POD"
   sleep 3
   kubectl -n "$NS" wait --for=condition=ready "pod/$POD" --timeout=120s
   T1=$(date +%s)

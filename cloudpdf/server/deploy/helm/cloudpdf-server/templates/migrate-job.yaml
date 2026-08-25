@@ -32,8 +32,12 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      serviceAccountName: {{ include "cloudpdf-server.serviceAccountName" . }}
-      automountServiceAccountToken: {{ .Values.serviceAccount.automountServiceAccountToken }}
+      # No release ServiceAccount here: as a pre-install hook this Job
+      # runs BEFORE ordinary release resources (the SA included) exist —
+      # referencing it deadlocks first installs. The migrator needs no
+      # Kubernetes API access; the namespace default SA with no mounted
+      # token is exactly right.
+      automountServiceAccountToken: false
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:

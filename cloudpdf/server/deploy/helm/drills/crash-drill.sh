@@ -28,8 +28,37 @@ API_TOKEN=$(openssl rand -hex 32)
 
 log() { printf '\n== %s\n' "$*"; }
 
+# Pre-load the server image from the host's docker cache into the kind
+# cluster — each kind cluster has an isolated image store, so without
+# this every fresh cluster re-pulls ~1GB from GHCR (3-4 min). Best
+# effort: on failure the cluster pulls normally.
+preload_image() {
+  local img="ghcr.io/embedpdf/cloudpdf-server:$TAG"
+  docker pull "$img" >/dev/null 2>&1 || return 0
+  kind load docker-image "$img" --name "$CLUSTER" >/dev/null 2>&1 || true
+}
+
+
+# Abrupt-kill one pod's server process from the kind node. Inside a
+# container, pid 1 only receives signals it has handlers for — a
+# SIGSEGV sent to pid 1 is silently discarded by the kernel (this is
+# also why the Docker docs recommend --init, which demotes node off
+# pid 1). SIGKILL from the node's namespace is the reliable abrupt
+# death; to the supervisor it is indistinguishable from a native
+# crash. crictl scoping targets exactly one pod, never its siblings.
+kill_pod_process() { # <pod-name>
+  local node podid cid pid
+  node=$(kind get nodes --name "$CLUSTER" | head -1)
+  podid=$(docker exec "$node" crictl pods -q --name "$1")
+  cid=$(docker exec "$node" crictl ps -q --pod "$podid" | head -1)
+  pid=$(docker exec "$node" crictl inspect -o go-template --template '{{.info.pid}}' "$cid")
+  docker exec "$node" kill -9 "$pid"
+}
+
+
 log "kind cluster ($CLUSTER)"
 kind get clusters 2>/dev/null | grep -qx "$CLUSTER" || kind create cluster --name "$CLUSTER" --wait 120s
+preload_image
 if [[ "${KEEP:-0}" != "1" ]]; then
   trap 'kind delete cluster --name "$CLUSTER" >/dev/null 2>&1 || true' EXIT
 fi
@@ -116,7 +145,7 @@ helm upgrade --install "$RELEASE" "$CHART_DIR" -n "$NS" \
   --set config.CLOUDPDF_STORAGE_S3_BUCKET=cloudpdf \
   --set config.CLOUDPDF_STORAGE_S3_REGION=us-east-1 \
   --set config.CLOUDPDF_STORAGE_S3_ENDPOINT=http://drill-minio:9000 \
-  --set config.CLOUDPDF_AUTO_PROVISION_TENANT=1 \
+  --set-string config.CLOUDPDF_AUTO_PROVISION_TENANT=1 \
   --set config.CLOUDPDF_UPLOAD_PROXY_POLICY=allowed \
   --wait --timeout 8m
 
@@ -158,10 +187,10 @@ LOAD_LOG=$(mktemp)
 LOAD_PID=$!
 
 sleep 3
-log "CRASH: SIGSEGV pid 1 on one replica"
+log "CRASH: abrupt process kill on one replica (supervision-equivalent to a native crash)"
 POD=$(kubectl -n "$NS" get pod -l "app.kubernetes.io/instance=$RELEASE" -o jsonpath='{.items[0].metadata.name}')
 T0=$(date +%s)
-kubectl -n "$NS" exec "$POD" -- kill -SEGV 1 || true
+kill_pod_process "$POD"
 sleep 3
 kubectl -n "$NS" wait --for=condition=ready "pod/$POD" --timeout=180s
 T1=$(date +%s)
@@ -179,7 +208,7 @@ curl -sf -H "Authorization: Bearer $API_TOKEN" \
 cat <<TIMELINE
 
 ================ CRASH DRILL TIMELINE ================
-  crash (SIGSEGV, native-equivalent)   t+0s
+  crash (abrupt kill, native-equivalent) t+0s
   crashed pod ready again              t+$((T1 - T0))s   (restartCount=$RESTARTS)
   requests during window               $TOTAL total, $FAILS failed
   committed data after crash           intact (seed doc listed)
