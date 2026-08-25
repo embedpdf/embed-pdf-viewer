@@ -55,7 +55,7 @@ function bootstrapFontSpecs(): StartupFontSpec[] {
   // actual values flowing through today are `ArrayBuffer`s; we cast at
   // the boundary rather than cross-typing the whole engine-core surface
   // to a Node-specific list.
-  // WS3 Phase B — the injected encode capability behind the
+  // Injected encoding capability behind the
   // `*.renderEncoded` wire kinds: rasters are compressed HERE, in the
   // worker that produced them, so only compressed kilobytes cross the
   // engine boundary. `encodeToBuffer` copies sharp's output into a
@@ -65,7 +65,7 @@ function bootstrapFontSpecs(): StartupFontSpec[] {
   // sharp/libvips loads LAZILY on the first encoded request: with the
   // `CLOUDPDF_ENCODE_IN_ENGINE=0` escape hatch on, no encoded request
   // ever arrives, so the worker never initializes libvips at all — the
-  // hatch restores the exact pre-Phase-B worker, not just its routing.
+  // hatch restores the previous API-side encoding worker, not just its routing.
   // Cost: the first encode per worker pays a one-time dynamic import.
   let sharpEncoderPromise: Promise<{
     encodeToBuffer: (

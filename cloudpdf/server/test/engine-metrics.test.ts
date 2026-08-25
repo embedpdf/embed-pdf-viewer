@@ -10,7 +10,7 @@ import {
   tearDownHostFixture,
 } from './_helpers/host-app-fixture';
 
-/** WS3 Phase C step 0 — cgroup working-set reader + C5 flip instruments. */
+/** Cgroup working-set reader and engine operational metrics. */
 
 describe('readCgroupMemory', () => {
   const dirs: string[] = [];
@@ -54,7 +54,7 @@ describe('readCgroupMemory', () => {
   });
 });
 
-describe('C5 flip instruments over /metrics', () => {
+describe('engine operational counters over /metrics', () => {
   test('doc opens count and surface as monotonic totals; conflicts gauge present', async () => {
     const fx = await buildHostFixture({ metrics: true });
     try {

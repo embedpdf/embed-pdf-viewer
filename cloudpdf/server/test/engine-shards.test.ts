@@ -13,7 +13,7 @@ import {
   until,
 } from './_helpers/host-app-fixture';
 
-/** C3 — ShardedEnginePool: pick, remember, forget precisely. */
+/** ShardedEnginePool: pick, remember, and forget precisely. */
 
 const build: BuildPack = ((jobId: number) => ({
   payload: { kind: 'noop', jobId },

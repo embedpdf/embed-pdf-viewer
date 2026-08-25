@@ -2,7 +2,7 @@ import type { CgroupMemory } from './cgroup-memory';
 import type { EngineHostClient, RecycleReason } from './EngineHostClient';
 
 /**
- * C2 — the recycle POLICY (the mechanism lives in
+ * Engine recycle policy (the mechanism lives in
  * `EngineHostClient.recycle()`, which is a rehearsed crash: no journal
  * strike, no attribution, no backoff).
  *
@@ -15,7 +15,7 @@ import type { EngineHostClient, RecycleReason } from './EngineHostClient';
  *
  * OPT-IN: the recycler runs only when explicitly configured
  * (`CLOUDPDF_ENGINE_RECYCLE=1` or any knob env present). Telemetry
- * (heartbeat + gauges) ships regardless — that is step 0.
+ * (heartbeat + gauges) ships regardless of whether recycling is enabled.
  *
  * Honest limits: pressure includes the API process's own memory — if the
  * API alone exceeds the watermark, recycling engines cannot relieve it;
@@ -72,7 +72,7 @@ export class EngineRecycler {
   private readonly jitter: () => number;
 
   constructor(
-    /** The recyclable fleet — today `[engineHost]`; C3 slots in here. */
+    /** The recyclable engine-host fleet. */
     private readonly hosts: () => EngineHostClient[],
     private readonly cgroup: () => CgroupMemory | null,
     policy: EngineRecyclePolicy = {},

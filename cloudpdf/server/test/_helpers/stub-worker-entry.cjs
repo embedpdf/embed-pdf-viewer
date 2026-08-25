@@ -262,9 +262,9 @@ function layerArtifact(msg, sessionMeta) {
  * so lattice points produce distinguishable — and genuinely sharp-encodable
  * — bitmaps. Shape mirrors `PageRaster`: { width, height, data }.
  */
-// WS3 Phase B: the `*.renderEncoded` kinds use REAL sharp (a server
+// The `*.renderEncoded` kinds use real sharp (a server
 // dependency), so worker-side encodes are byte-identical to what the
-// API-side SharpImageEncoder produced pre-Phase-B — existing tests that
+// API-side SharpImageEncoder produced before in-engine encoding — existing tests that
 // assert response/artifact bytes keep passing across the flag.
 const sharp = require('sharp');
 

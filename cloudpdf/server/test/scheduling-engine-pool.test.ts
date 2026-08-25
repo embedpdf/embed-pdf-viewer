@@ -14,7 +14,7 @@ import {
   until,
 } from './_helpers/host-app-fixture';
 
-/** C1 — lanes, bounded queues, shed semantics. */
+/** Admission lanes, bounded queues, and shed semantics. */
 
 interface Job {
   resolve: (r: WorkerResultPayload) => void;
@@ -213,7 +213,7 @@ describe('overload over HTTP (host fixture, maxInFlight=1)', () => {
       const stalled = createAnnotation(fx, 'tenant-s', 'docsched1', 'alice', '__STALL__');
       await until(() => fx.bundle.engineScheduler!.schedulingStats().interactive.inFlight >= 1);
       // The probe uses a DIFFERENT document: a read of docsched1's own
-      // layer would park on the WS1 write marker (the dirty window)
+      // layer would park on the write-in-flight marker (the dirty window)
       // before ever reaching admission — correct, but not what this test
       // measures. docsched2 goes straight to the scheduler.
       const shed = await listAnnotations(fx, 'tenant-s', 'docsched2', 'alice');

@@ -4,7 +4,7 @@ import type { WorkerResultPayload } from '@embedpdf/engine-core/runtime';
 import type { BuildPack, EnginePool, RunAdHocOptions } from './EnginePool';
 
 /**
- * C1 — the engine plane's admission control, as a decorator at the ONE
+ * Engine-plane admission control, implemented as a decorator at the one
  * choke point every engine job passes (the parent dispatch path, which
  * sees all work with zero coordination — budgets fragment when split
  * across shards).

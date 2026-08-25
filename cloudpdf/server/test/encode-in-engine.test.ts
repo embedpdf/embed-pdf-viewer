@@ -16,7 +16,7 @@ import { buildAppForTesting } from '../src/app/buildApp';
 import { createValidTestLicenseGate } from '../src/licensing/testing';
 
 /**
- * WS3 Phase B — encode-in-engine.
+ * In-engine encoding.
  *
  * The stub worker implements the `*.renderEncoded` kinds with REAL sharp
  * (the same dependency the API-side `SharpImageEncoder` uses), so these
@@ -155,7 +155,7 @@ afterAll(async () => {
   }
 });
 
-describe('encode-in-engine (WS3 Phase B)', () => {
+describe('encode-in-engine', () => {
   test('default path serves worker-encoded webp with dimension headers; png honored', async () => {
     const fx = await buildFx(undefined); // default = in-engine
     await seed(fx, 't1', 'docenc001');

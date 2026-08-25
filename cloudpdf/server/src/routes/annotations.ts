@@ -65,7 +65,7 @@ interface AnnotationRouteDeps {
   layerService: LayerService;
   revisionBridge: CloudRevisionBridge;
   imageEncoder: SharpImageEncoder;
-  /** WS3 Phase B: encode appearance renders in the engine worker (default).
+  /** Encode appearance renders in the engine worker by default.
    *  `false` = the `CLOUDPDF_ENCODE_IN_ENGINE=0` escape hatch. */
   encodeInEngine?: boolean;
   weakAnnotationSessions?: WeakAnnotationSessionService;
@@ -758,7 +758,7 @@ async function renderAnnotationAppearances(input: {
     ...(derived !== undefined ? { maxOutputPixels: derived.maxRenderPixels } : {}),
   };
   // Both branches produce the same manifest ingredients. In-engine encode
-  // (WS3 Phase B, the default): the appearance raster BATCH never leaves
+  // With in-engine encoding (the default), the appearance raster batch never leaves
   // the worker — it crosses the engine boundary as compressed images.
   // The legacy branch (CLOUDPDF_ENCODE_IN_ENGINE=0) keeps API-side sharp
   // on the raw raster payload for one release.

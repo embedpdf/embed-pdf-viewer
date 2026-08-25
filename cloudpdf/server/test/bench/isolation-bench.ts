@@ -1,5 +1,5 @@
 /**
- * WS3 §8 — the perf + backpressure gate.
+ * Engine-isolation performance and backpressure benchmark.
  *
  * Compute-only boundary measurements: direct pool dispatches (no derived
  * read-through, no HTTP cache) so EVERY iteration crosses the engine
@@ -9,7 +9,7 @@
  *     test/bench/isolation-bench.ts --mode inline --json /tmp/inline.json
  *   (and again with --mode host)
  *
- * Gate (plan §8): cold compute-only host p95 ≤ 1.10 × inline p95 per op
+ * Acceptance gate: cold compute-only host p95 ≤ 1.10 × inline p95 per op
  * class at each concurrency level; no RSS pathology; no event-loop-delay
  * pathology. `--quick` shrinks iteration counts for smoke runs.
  *
@@ -498,7 +498,7 @@ async function main(): Promise<void> {
       printLevel('render', r);
     }
 
-    // ---- render-enc (WS3 Phase B): render + encode in ONE worker op —
+    // ---- render-enc: render + encode in one worker operation —
     // only the compressed webp crosses the boundary.
     results['render-enc'] = [];
     for (const conc of CONC_LEVELS) {

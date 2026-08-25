@@ -48,7 +48,7 @@ export interface EngineHostClientOptions {
   boot: HostBootConfig;
   /** Forwarded pool eviction — pinned-file release upstream depends on it. */
   onEvict?: (evt: { docId: string; baseSha: string; slot: number }) => void;
-  /** Called after EVERY host death, before respawn: forget-everything (§4 of the plan). */
+  /** Called after every host death, before respawn, to forget generation-owned state. */
   onHostRestart?: () => void;
   /** Crash journal hook. Must be cheap/synchronous-safe: called between
    *  in-flight rejection and respawn scheduling; durable work inside it
@@ -135,7 +135,7 @@ export class EngineHostClient implements EnginePool {
   private ready = deferred<void>();
   private nextCallId = 1;
   private readonly inFlight = new Map<number, PendingCall>();
-  /** docId → baseSha, so `run()` crashes attribute (plan §5.1). */
+  /** docId → baseSha, so `run()` crashes can be attributed to in-flight documents. */
   private readonly residency = new Map<string, string>();
   private downSince: number | null = Date.now();
   private engineBuild: string | null = null;
@@ -174,7 +174,7 @@ export class EngineHostClient implements EnginePool {
    *  describe a dead child. */
   private lastMemory: { rssBytes: number; heapUsedBytes: number; at: number } | null = null;
 
-  /** Non-null while a PLANNED exit is in progress (C2 recycle). The exit
+  /** Non-null while a controlled recycle exit is in progress. The exit
    *  handler consumes it: no crash-journal strike, no poison-document
    *  attribution, no respawn backoff — a recycle is a REHEARSED crash and
    *  must never look like an organic one to the supervision layers. */
@@ -204,7 +204,7 @@ export class EngineHostClient implements EnginePool {
   }
 
   /**
-   * C2 — a rehearsed crash: drain (graceful) or cut (hard), then the
+   * Controlled recycle: drain gracefully or cut immediately, then the
    * NORMAL death path minus journal/backoff. Returns false when the host
    * is not in a recyclable state (already down, restarting, destroyed) —
    * callers simply try again on a later tick.
@@ -212,7 +212,7 @@ export class EngineHostClient implements EnginePool {
    * Graceful: new dispatches PARK on the rotated ready promise (they
    * complete on the successor); in-flight work gets `settleWindowMs` to
    * finish, then the child is shut down anyway — a truncated write
-   * retries exactly like a crash-window write (the WS1 generation fence
+   * retries exactly like a crash-window write (the write-generation fence
    * makes truncation safe). Hard: SIGKILL now; whatever is in flight
    * rejects, exactly like a crash.
    */

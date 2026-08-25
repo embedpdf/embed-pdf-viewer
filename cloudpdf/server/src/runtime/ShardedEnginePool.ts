@@ -6,7 +6,7 @@ import type { EngineHostClient, HostCrashEvent } from './EngineHostClient';
 import type { BuildPack, EnginePool, RunAdHocOptions } from './EnginePool';
 
 /**
- * C3 — the blast-radius dial: K supervised engine hosts behind a routing
+ * Engine sharding: K supervised engine hosts behind a routing
  * veneer.
  *
  * THE LAW: this composite adds routing, never lifecycle. It has exactly
@@ -16,8 +16,7 @@ import type { BuildPack, EnginePool, RunAdHocOptions } from './EnginePool';
  * journal attribution all stay per-host in `EngineHostClient`; any diff
  * that teaches this class about them is wrong by construction.
  *
- * Routing decisions (plan `2026-08-26-ws3-c3-sharded-engine.md`, review
- * round 1):
+ * Routing decisions:
  *  - The isolation key is `docId` — resident isolation beats base
  *    sharing (a viral template must not collapse its thousands of
  *    documents onto one shard). A hot base may be parsed on up to K

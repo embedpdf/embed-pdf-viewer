@@ -18,7 +18,7 @@ import {
 } from '../src/services/CrashJournal';
 
 /**
- * The quarantine decision rules (WS3 Phase A §5.2). The load-bearing
+ * The quarantine decision rules. The load-bearing
  * negative tests come straight from the design review: singleton
  * cohort-intersection is DIAGNOSTICS ONLY (the A/B/C counterexample
  * must never quarantine innocent B), and one sole-suspect crash proves

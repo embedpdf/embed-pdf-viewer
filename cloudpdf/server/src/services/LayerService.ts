@@ -144,7 +144,7 @@ export interface LayerServiceOptions {
   storage?: ObjectStore;
   /** Cross-replica doorbell — rung after every mutation commit. */
   realtime?: RealtimeBus;
-  /** C5 flip instruments (metrics reads them via collect closures). */
+  /** Operational counters read by metrics collect closures. */
   counters?: EngineCounters;
 }
 
@@ -2888,7 +2888,7 @@ export class LayerService {
           err instanceof EngineError && err.code === EngineErrorCode.DocNotOpen;
         if (!(err instanceof LayerFenceConflict) && !parkedAcrossRespawn) throw err;
         if (err instanceof LayerFenceConflict) {
-          // C5 instrument: one cross-replica write race per rebase. The
+          // Count one cross-replica write race per rebase. The
           // rate of this counter at N>1 replicas is the docAffinity
           // flip evidence.
           if (this.counters) this.counters.layerWriteConflicts += 1;

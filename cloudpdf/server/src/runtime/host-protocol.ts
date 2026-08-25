@@ -17,13 +17,13 @@ import type { FallbackFontDescriptor } from './WorkerThreadPool';
  * payload's jobId before dispatch. Forwarding the client's id verbatim
  * would silently orphan every response.
  */
-// v2 (WS3 Phase B): the engine wire surface the host serves grew the
+// v2: the engine wire surface served by the host added the
 // `*.renderEncoded` kinds. The version covers the END-TO-END contract a
 // child must speak — envelope AND the engine ops riding inside it — so a
-// custom `engineHostEntry` pointing at a pre-B dist fails the handshake
+// custom `engineHostEntry` pointing at an older dist fails the handshake
 // loudly instead of rejecting every encoded render as an unknown kind.
-// v3 (WS3 Phase C step 0): the host emits the `memory` heartbeat the
-// C2 recycle policy and the memory gauges read.
+// v3: the host emits the `memory` heartbeat consumed by the recycle
+// policy and memory gauges.
 export const HOST_PROTOCOL_VERSION = 3;
 
 /** Parent → host. */

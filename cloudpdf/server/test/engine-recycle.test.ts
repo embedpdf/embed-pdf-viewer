@@ -12,7 +12,7 @@ import {
   until,
 } from './_helpers/host-app-fixture';
 
-/** C2 — recycle policy (the mechanism is covered in the lifecycle suite). */
+/** Recycle policy; the mechanism is covered in the lifecycle suite. */
 
 function fakeHost(rss: number | null, uptimeMs: number | null = 60_000): EngineHostClient {
   return {
@@ -105,7 +105,7 @@ describe('EngineRecycler policy', () => {
   });
 });
 
-describe('EngineRecycler fleet safety (C3 review)', () => {
+describe('EngineRecycler fleet safety', () => {
   test('NO second victim while the first successor is not ready — sustained hard pressure rolls serially, never concurrently', async () => {
     let aState: 'ready' | 'starting' = 'ready';
     let aRecycled = false;

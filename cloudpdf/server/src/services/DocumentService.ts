@@ -94,7 +94,7 @@ export interface DocumentServiceOptions {
   storage: ObjectStore;
   pool: EnginePool;
   layerState: LayerStateService;
-  /** C5 flip instruments (metrics reads them via collect closures). */
+  /** Operational counters read by metrics collect closures. */
   counters?: EngineCounters;
   passwordVerifications?: PdfPasswordVerificationsRepo;
   passwordSessions?: PdfPasswordSessionsRepo;
@@ -261,7 +261,7 @@ export class DocumentService {
    * `EnginePool` of their own. One reopen per request is the law: a
    * second DocNotOpen means the engine respawned twice inside one
    * request, and the error handler's 503 (`EngineRestarting`) is the
-   * honest answer. Mutations never use this — WS1's fence + rebase own
+   * honest answer. Mutations never use this — generation fencing and rebase own
    * their retry (see `LayerService.runWithRebase`); the password
    * bootstrap keeps its special reensure via `runReadWithReopen`.
    */
@@ -1373,7 +1373,7 @@ export class DocumentService {
    * The engine host died: every worker session, materialization, and
    * pinned handle it embodied is gone. Drop the engine-plane CACHES; the
    * next request lazily rebuilds from durable truth (DB + object store),
-   * which the WS1 fence makes correct by construction.
+   * which the write-generation fence makes correct by construction.
    *
    * Deliberately untouched:
    *  - `opens` / `layerOpens`: their in-flight promises are rejecting
@@ -1393,10 +1393,10 @@ export class DocumentService {
       this.releaseAllBaseHandles();
       return;
     }
-    // Scoped (C3): one shard died — forget exactly ITS residents, and
+    // Scoped by shard: one shard died — forget exactly its residents, and
     // touch exactly what the full clear touches, nothing more. `opens`/
     // `layerOpens` settle via compare-and-delete (clearing them re-opens
-    // the ABA window); `layerWritesInFlight` is API-side (WS1);
+    // the ABA window); `layerWritesInFlight` is API-side write state;
     // `writeAlignGens` stays — the fence fails CLOSED on a missing entry,
     // so leaving it is discipline, not necessity. Deliberately NOT
     // `forgetLayerSessions()`: that is evict-path behavior and deletes

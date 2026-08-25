@@ -10,7 +10,7 @@ export type BuildPack = (jobId: WorkerJobId) => WirePack<WorkerRequest>;
 
 /**
  * Dispatch metadata for ad-hoc work. `lane: 'background'` marks
- * known-DISPOSABLE work (today: exactly the thumbnail warm) for the C1
+ * known-disposable work (today: exactly the thumbnail warm) for the
  * scheduler's capped lane; everything else — including the ingestion
  * security probe, which a user's commit waits on — defaults to
  * interactive. Base pools ignore it; only `SchedulingEnginePool` reads it.
@@ -47,7 +47,7 @@ export interface EnginePool {
   stats(): { slots: number; docs: number; inFlight: number };
   /**
    * Monotonic engine generation: bumps on every engine (re)spawn. The
-   * WS1 write pipeline captures it at write-alignment time and refuses
+   * The write pipeline captures it at write-alignment time and refuses
    * to bless a session created under a LATER generation (see
    * `DocumentService.advanceLayerSession`). Inline pool: constant 0 —
    * the fence is vacuously satisfied and pre-host semantics are
@@ -55,8 +55,8 @@ export interface EnginePool {
    */
   generation(): number;
   /**
-   * The generation of THE SHARD SERVING THIS DOCUMENT — what the WS1
-   * write fence captures and re-checks (both fence sites use only this).
+   * The generation of the shard serving this document, which the write
+   * fence captures and re-checks (both fence sites use only this).
    * Single-engine pools ignore docId; the sharded composite returns the
    * resident shard's generation, or -1 when the doc is not resident (a
    * value no real generation takes, so a bless-time compare always
@@ -79,7 +79,7 @@ export interface EnginePool {
  * successor that no longer holds the document — the pre-dispatch ensure
  * ran against the old world. Re-ensure (the restart hook already cleared
  * the service caches, so this genuinely reopens) and retry ONCE.
- * Mutations never use this: their retry story is WS1's fence + rebase.
+ * Mutations never use this: their retry path uses generation fencing and rebase.
  */
 export async function runReadWithReopen(
   reensure: () => Promise<unknown>,

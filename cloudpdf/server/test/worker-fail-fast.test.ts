@@ -46,7 +46,7 @@ describe('WorkerThreadPool fail-fast', () => {
     }
   });
 
-  test('worker exits during destroy() are the plan, not a fatality', async () => {
+  test('worker exits during destroy() are expected, not a fatality', async () => {
     const onFatalWorkerExit = vi.fn();
     const pool = await WorkerThreadPool.create({
       workerEntry: CRASHING_ENTRY,

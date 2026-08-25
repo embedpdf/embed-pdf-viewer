@@ -53,7 +53,7 @@ export interface DerivedRenderServiceOptions {
    * computed but never persisted — no breakage, no storage-DoS surface.
    */
   enforce?: boolean;
-  /** WS3 Phase B: warm-path thumbnails render+encode in ONE worker op
+  /** Warm-path thumbnails render and encode in one worker operation
    *  (default). `false` = the `CLOUDPDF_ENCODE_IN_ENGINE=0` escape hatch
    *  (raw raster over the boundary + API-side sharp). */
   encodeInEngine?: boolean;
@@ -352,7 +352,7 @@ export class DerivedRenderService {
           ...pageRenderOptionsFromImageOptions(imageOptions, false),
           maxOutputPixels: this.maxPixels,
         };
-        // WS3 Phase B (default): render + encode in one worker op — the
+        // With in-engine encoding (the default), render and encode use one worker op — the
         // thumbnail raster never crosses the engine boundary. Escape
         // hatch keeps the raw-raster op + API-side sharp for one release.
         let encoded: { bytes: Uint8Array; contentType: string };

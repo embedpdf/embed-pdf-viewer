@@ -9,7 +9,7 @@ import { join } from 'node:path';
  * first, v1 fallback; `null` when no cgroup filesystem is readable
  * (macOS dev, bare processes).
  *
- * The C2 policy law this feeds: the CGROUP triggers, per-host RSS
+ * The recycle policy this feeds: the cgroup triggers, while per-host RSS
  * attributes. Individual process RSS double-counts shared pages and is
  * never the primary pressure signal.
  */

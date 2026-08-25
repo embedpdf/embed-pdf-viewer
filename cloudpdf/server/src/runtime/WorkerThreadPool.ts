@@ -266,7 +266,7 @@ export class WorkerThreadPool implements EnginePool {
   }
 
   /**
-   * A worker thread died. During `destroy()` that is the plan; during
+   * A worker thread died. During `destroy()` that is expected; during
    * boot the `waitForReady` rejection surfaces it as a create() error;
    * any other time the pool is unrecoverable (no in-process respawn) and
    * the configured fatal handler decides the blast response.

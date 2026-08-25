@@ -52,7 +52,7 @@ interface PageRouteDeps {
   documentService: DocumentService;
   layerService: LayerService;
   imageEncoder: SharpImageEncoder;
-  /** WS3 Phase B: encode renders in the engine worker (default). `false` is
+  /** Encode renders in the engine worker by default. `false` is
    *  the one-release escape hatch (`CLOUDPDF_ENCODE_IN_ENGINE=0`) that keeps
    *  API-side sharp on the raw raster kinds. */
   encodeInEngine?: boolean;
@@ -658,7 +658,7 @@ async function renderPageImage(input: {
     }
     return result.raster;
   };
-  // WS3 Phase B (the default): render + encode in ONE worker op — the
+  // With in-engine encoding (the default), render and encode use one worker op — the
   // raster never leaves the worker; only the compressed image crosses
   // the engine boundary.
   const renderEncoded = async () => {

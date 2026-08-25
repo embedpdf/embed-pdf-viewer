@@ -12,7 +12,7 @@ import {
 } from './_helpers/host-app-fixture';
 
 /**
- * Kill-at-every-boundary (plan §7.3): the WS1 fence under engine-host
+ * Kill at every write boundary to verify generation fencing under engine-host
  * death, asserted at the OBSERVABLE level — no interleaving may ever
  * let a session be blessed at a version it does not embody, readers
  * must park behind the surviving write marker, and durable truth is

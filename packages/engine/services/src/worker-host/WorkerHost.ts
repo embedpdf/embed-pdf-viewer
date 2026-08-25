@@ -962,7 +962,7 @@ export class WorkerHost {
     // order), so fanning every appearance into the process-wide encoder
     // pool at once would only let one big batch monopolize it and starve
     // the encodes of interleaved jobs. One at a time matches the
-    // pre-Phase-B API-side loop exactly and keeps the pool fair.
+    // previous API-side encoding loop exactly and keeps the pool fair.
     const encoded: EncodedAppearanceWire[] = [];
     for (const a of appearances) {
       encoded.push({

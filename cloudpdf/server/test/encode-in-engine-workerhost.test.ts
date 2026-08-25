@@ -8,7 +8,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { SharpImageEncoder } from '../src/render/SharpImageEncoder';
 
 /**
- * WS3 Phase B — the PRODUCTION encode path, in CI.
+ * Production in-engine encoding path exercised in CI.
  *
  * The route-level suite (`encode-in-engine.test.ts`) runs against the stub
  * worker, which reimplements the encoded kinds; this file dispatches them

@@ -95,7 +95,7 @@ interface CohortMemory {
 const MEMORY_COHORTS = 16;
 
 /**
- * The crash journal (plan §5): every engine-host death is recorded with
+ * Every engine-host death is recorded with
  * its attributable suspects (raw wire kinds — full forensic detail, no
  * taxonomy to maintain); quarantine happens ONLY on two independent
  * sole-suspect crashes sharing `(base_sha, engine_build,

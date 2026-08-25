@@ -1,4 +1,4 @@
--- Engine crash journal (WS3 Phase A §5): every engine-host death is
+-- Engine crash journal: every engine-host death is
 -- recorded with its in-flight suspects; quarantine decisions are rows
 -- too (written even in observe-only mode — enforcement is a read-side
 -- flag), so staging data validates attribution before any refusal.
