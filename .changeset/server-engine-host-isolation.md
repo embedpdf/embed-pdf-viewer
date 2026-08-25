@@ -1,0 +1,5 @@
+---
+'@cloudpdf/server': minor
+---
+
+Engine-host process isolation (opt-in via `CLOUDPDF_ENGINE_ISOLATION=host`): PDFium worker threads run in a supervised child process, so a native crash costs one sub-second engine respawn instead of the whole server — with a generation-fenced recovery path that preserves the multi-replica write guarantees, an environment whitelist keeping credentials out of the engine process, and `/readyz` reporting engine health behind a persistence threshold. Adds the engine crash journal (migration 028): every engine crash is recorded with its in-flight suspects; documents that repeatedly crash the engine as the sole suspect (same content hash, engine build, and exit signature, twice within the TTL) are quarantine-listed — observe-only by default, refusing with HTTP 422 `DocumentQuarantined` when `CLOUDPDF_QUARANTINE_ENFORCE=1`. New CLI verbs `quarantine list` and `quarantine clear <sha> --reason` (audited), new metrics for engine restarts and quarantined documents, and boot-time validation of quarantine configuration.

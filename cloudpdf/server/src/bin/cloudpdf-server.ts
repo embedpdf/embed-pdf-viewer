@@ -33,6 +33,7 @@ import type { KmsKeyring } from '../security/kms/KmsKeyring';
 import { loadSecretsConfigFromEnv } from '../security/secrets/config/loadSecretsConfigFromEnv';
 import { createSecretsProviderRegistry } from '../security/secrets/createSecretsProvider';
 import { createSecretResolver, type SecretResolver } from '../security/secrets/SecretResolver';
+import { resolveQuarantineConfig } from '../services/CrashJournal';
 import { EventLogService } from '../services/EventLogService';
 import { loadObjectStoreConfigFromEnv } from '../storage/config/loadObjectStoreConfigFromEnv';
 import { createObjectStore } from '../storage/createObjectStore';
@@ -303,6 +304,8 @@ function printHelp(): void {
       '  migrate up             Apply pending migrations',
       '  migrate up --dry-run   List what would be applied without changing the DB',
       '  migrate down           Roll back migrations (manual break-glass; destructive)',
+      '  quarantine list        Show engine-crash quarantined documents',
+      '  quarantine clear <sha> --reason "…"   Lift a quarantine (audited)',
       '    --to NNN               Roll back everything newer than version NNN',
       '    --steps N              Roll back the N highest applied (default 1)',
       '    --all                  Roll back every applied migration',
@@ -339,7 +342,9 @@ function printHelp(): void {
       '    CLOUDPDF_SHUTDOWN_TIMEOUT_MS  app.close() budget before teardown proceeds (default 30000)',
       '    CLOUDPDF_SHUTDOWN_DRAIN_MS    settle window after readiness flips 503 (default 0)',
       '    CLOUDPDF_METRICS       1 exposes an unauthenticated Prometheus /metrics endpoint',
-      "    CLOUDPDF_ENGINE_ISOLATION  inline (default) or host: run PDFium in a supervised child process",
+      '    CLOUDPDF_ENGINE_ISOLATION  inline (default) or host: run PDFium in a supervised child process',
+      '    CLOUDPDF_QUARANTINE_ENFORCE   1 refuses quarantined documents with 422 (default: observe-only journal)',
+      '    CLOUDPDF_QUARANTINE_TTL_HOURS quarantine/strike TTL (default 24)',
       '                           (set behind a LB so rate limits see real client IPs)',
       '    CLOUDPDF_AUTH_FAILURE_LIMIT      failed auths per IP per window; off to disable (default: 30)',
       '    CLOUDPDF_AUTH_FAILURE_WINDOW_MS  window for the failure limit (default: 60000)',
@@ -370,6 +375,51 @@ function printHelp(): void {
 }
 
 // ------- commands -------
+
+/**
+ * Operator surface for the engine crash quarantine (WS3 Phase A §5):
+ *   cloudpdf-server quarantine list
+ *   cloudpdf-server quarantine clear <base_sha> --reason "verified fixed"
+ * CLI-first on purpose — no contract/SDK churn; a dashboard op can
+ * follow when a UI needs it.
+ */
+async function cmdQuarantine(args: string[]): Promise<void> {
+  const { CrashJournal } = await import('../services/CrashJournal');
+  const sub = args[0];
+  const ctx = openDb();
+  try {
+    const journal = new CrashJournal({ db: ctx.db });
+    if (sub === 'list') {
+      const rows = await journal.listQuarantine();
+      if (rows.length === 0) {
+        console.log('no quarantined documents');
+        return;
+      }
+      for (const row of rows) {
+        const state = row.expires_at > Date.now() ? 'active' : 'expired';
+        console.log(
+          `${row.base_sha}  build=${row.engine_build}  reason=${row.reason}  ` +
+            `${state} until ${new Date(row.expires_at).toISOString()}`,
+        );
+      }
+      return;
+    }
+    if (sub === 'clear') {
+      const sha = args[1];
+      const reason = readFlagValue(args, '--reason');
+      if (!sha) fail(1, 'quarantine clear: missing <base_sha>');
+      if (!reason) {
+        fail(1, 'quarantine clear: --reason is required (it lands in the audit trail)');
+      }
+      const removed = await journal.clear(sha!, { actor: 'cli', reason: reason! });
+      console.log(`cleared ${removed} quarantine row(s) for ${sha} (audited)`);
+      return;
+    }
+    fail(1, `unknown quarantine subcommand: ${sub ?? '(none)'} (use: list | clear <sha> --reason)`);
+  } finally {
+    await ctx.db.destroy();
+  }
+}
 
 async function cmdMigrateStatus(): Promise<void> {
   const ctx = openDb();
@@ -756,6 +806,17 @@ async function cmdServe(): Promise<void> {
     fail(2, `CLOUDPDF_ENGINE_ISOLATION must be 'inline' or 'host' (got ${engineIsolationRaw})`);
   }
   const ENGINE_ISOLATION = engineIsolationRaw as 'inline' | 'host';
+  // Quarantine config fails boot on invalid or silently-inert settings
+  // (enforce without host isolation, non-positive TTL).
+  let quarantineConfig: ReturnType<typeof resolveQuarantineConfig>;
+  try {
+    quarantineConfig = resolveQuarantineConfig(process.env, ENGINE_ISOLATION);
+  } catch (err) {
+    fail(2, err instanceof Error ? err.message : String(err));
+  }
+  for (const warning of quarantineConfig!.warnings) {
+    console.warn(`[cloudpdf-server] WARNING: ${warning}`);
+  }
 
   // Database defaults to SQLite (see readDbConfig), so a bare `serve`
   // boots the full admin + document pipeline with zero external infra.
@@ -896,6 +957,7 @@ async function cmdServe(): Promise<void> {
       ...(process.env['CLOUDPDF_METRICS'] === '1' ? { metrics: true } : {}),
       engineIsolation: ENGINE_ISOLATION,
       engineHostEntry: ENGINE_HOST_ENTRY_URL,
+      ...(quarantineConfig.options ? { quarantine: quarantineConfig.options } : {}),
     });
   } catch (err) {
     // Config-shaped boot refusals (secret policy, migration drift) exit
@@ -975,6 +1037,9 @@ async function main(): Promise<void> {
     if (sub === 'down') return cmdMigrateDown(rest);
     if (sub === 'validate') return cmdMigrateValidate(rest);
     fail(2, `unknown subcommand: migrate ${sub ?? '(missing)'}\nrun: cloudpdf-server --help`);
+  }
+  if (args[0] === 'quarantine') {
+    return cmdQuarantine(args.slice(1));
   }
   if (args[0] === 'db') {
     const sub = args[1];

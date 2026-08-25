@@ -1,5 +1,6 @@
 import { EngineError, EngineErrorCode, wirePack } from '@embedpdf/engine-core/runtime';
 
+import { DocumentQuarantinedError } from './CrashJournal';
 import type { DocumentSecurityInfo } from '../db/repos/documents.repo';
 import type { EnginePool } from '../runtime/EnginePool';
 import type { BaseFileCache, LocalFileHandle } from '../storage/BaseFileCache';
@@ -68,6 +69,11 @@ export class DocumentSecurityProbe {
       }
       return { security: result.security };
     } catch (err) {
+      // A quarantine refusal is a VERDICT, not a probe failure: letting
+      // it degrade to security:'unknown' would admit an upload of a sha
+      // that repeatedly crashed the engine. Rethrow → the ingestion
+      // pipeline surfaces the 422; everything else stays best-effort.
+      if (err instanceof DocumentQuarantinedError) throw err;
       this.opts.onError?.(err, { key: input.key, sha: input.expectedSha });
       return { security: unknownSecurity() };
     } finally {

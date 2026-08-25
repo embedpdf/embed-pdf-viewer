@@ -92,7 +92,7 @@ describe('migrateDown [sqlite]', () => {
     }
   });
 
-  test('--to 010 reverts 011..027 in descending order, leaves 001-010', async () => {
+  test('--to 010 reverts everything above 010 in descending order, leaves 001-010', async () => {
     const db = createSqliteDb({ path: ':memory:' });
     try {
       await migrate(db, { source: { kind: 'inline', migrations: sqliteMigrations } });
@@ -102,26 +102,13 @@ describe('migrateDown [sqlite]', () => {
         to: '010',
         onRevert: (m) => order.push(m.version),
       });
-      expect(reverted.map((m) => m.version)).toEqual([
-        '027',
-        '026',
-        '025',
-        '024',
-        '023',
-        '022',
-        '021',
-        '020',
-        '019',
-        '018',
-        '017',
-        '016',
-        '015',
-        '014',
-        '013',
-        '012',
-        '011',
-      ]);
-      expect(order).toEqual(['027', '026', '025', '024', '023', '022', '021', '020', '019', '018', '017', '016', '015', '014', '013', '012', '011']); // descending
+      const expectedDesc = sqliteMigrations
+        .map((m) => m.version)
+        .filter((v) => v > '010')
+        .sort()
+        .reverse();
+      expect(reverted.map((m) => m.version)).toEqual(expectedDesc);
+      expect(order).toEqual(expectedDesc); // descending
       expect(await appliedVersions(db)).toEqual([
         '001',
         '002',
@@ -291,7 +278,7 @@ describe.runIf(RUN_PG)('migrateDown [postgres]', () => {
     }
   });
 
-  test('--to 010 reverts 011..027 descending', async () => {
+  test('--to 010 reverts everything above 010 descending', async () => {
     const db = await makeDb();
     try {
       await migrate(db, { source: { kind: 'inline', migrations: postgresMigrations } });
@@ -299,25 +286,12 @@ describe.runIf(RUN_PG)('migrateDown [postgres]', () => {
         source: { kind: 'inline', migrations: postgresMigrations },
         to: '010',
       });
-      expect(reverted.map((m) => m.version)).toEqual([
-        '027',
-        '026',
-        '025',
-        '024',
-        '023',
-        '022',
-        '021',
-        '020',
-        '019',
-        '018',
-        '017',
-        '016',
-        '015',
-        '014',
-        '013',
-        '012',
-        '011',
-      ]);
+      const expectedDesc = postgresMigrations
+        .map((m) => m.version)
+        .filter((v) => v > '010')
+        .sort()
+        .reverse();
+      expect(reverted.map((m) => m.version)).toEqual(expectedDesc);
       const applied = await appliedVersions(db);
       expect(applied[applied.length - 1]).toBe('010');
       expect(applied).not.toContain('011');

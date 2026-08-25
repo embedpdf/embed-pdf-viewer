@@ -587,6 +587,10 @@ parentPort.on('message', (msg) => {
       return;
     }
     case 'annotations.create': {
+      // Boundary-kill test hook: a draft with contents '__STALL__' never
+      // replies, deterministically parking the engine apply so a test
+      // can kill the host mid-operation.
+      if (msg.draft?.contents === '__STALL__') return;
       const meta = openDocs.get(sessionKey(msg));
       if (!meta) {
         rejectNotOpen(msg);

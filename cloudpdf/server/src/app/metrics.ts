@@ -3,10 +3,15 @@ import { collectDefaultMetrics, Gauge, Histogram, Registry } from 'prom-client';
 
 import type { LicenseGate } from '../licensing/LicenseRuntime';
 import type { EnginePool } from '../runtime/EnginePool';
+import type { CrashJournal } from '../services/CrashJournal';
 
 export interface MetricsOptions {
   pool?: EnginePool | undefined;
   licenseGate: LicenseGate;
+  /** Host mode: total engine-host restarts since boot. */
+  engineRestarts?: () => number;
+  /** Host mode with db: active quarantine count. */
+  crashJournal?: CrashJournal;
 }
 
 /**
@@ -53,6 +58,29 @@ export function registerMetrics(app: FastifyInstance, opts: MetricsOptions): voi
       this.set(opts.pool ? opts.pool.stats().inFlight : 0);
     },
   });
+  if (opts.engineRestarts) {
+    const engineRestarts = opts.engineRestarts;
+    new Gauge({
+      name: 'cloudpdf_engine_host_restarts_total',
+      help: 'Engine-host respawns since boot (host isolation mode)',
+      registers: [register],
+      collect() {
+        this.set(engineRestarts());
+      },
+    });
+  }
+  if (opts.crashJournal) {
+    const journal = opts.crashJournal;
+    new Gauge({
+      name: 'cloudpdf_quarantined_documents',
+      help: 'Documents currently quarantined by the engine crash journal',
+      registers: [register],
+      async collect() {
+        this.set(await journal.activeQuarantineCount());
+      },
+    });
+  }
+
   new Gauge({
     name: 'cloudpdf_license_access',
     help: '1 for the current license access level (label: access)',

@@ -587,4 +587,9 @@ export class EngineHostClient implements EnginePool {
   hostPid(): number | null {
     return this.child?.pid ?? null;
   }
+
+  /** The running engine's `version:target` identity (null before first ready). */
+  engineBuildId(): string | null {
+    return this.engineBuild;
+  }
 }

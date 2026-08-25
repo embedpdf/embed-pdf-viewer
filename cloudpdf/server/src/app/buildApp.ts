@@ -8,11 +8,10 @@ import multipart from '@fastify/multipart';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { sql, type Kysely } from 'kysely';
 
-import { DrainCoordinator } from './drain';
-import { registerMetrics } from './metrics';
-
 import type { AuthFailureLimiterOptions } from './auth-failure-limiter';
+import { DrainCoordinator } from './drain';
 import { registerJwtAuth, requireApiToken } from './jwt-plugin';
+import { registerMetrics } from './metrics';
 import { assertProductionSecret, requiresProductionSecrets, resolveSecret } from './secret-policy';
 import { DbJwksCacheStore } from '../auth/JwksCacheStore';
 import {
@@ -66,9 +65,11 @@ import { registerSearchRoutes } from '../routes/search';
 import { registerShareSessionRoutes } from '../routes/share-sessions';
 import { EngineHostClient } from '../runtime/EngineHostClient';
 import type { EnginePool } from '../runtime/EnginePool';
+import { QuarantiningEnginePool } from '../runtime/QuarantiningEnginePool';
 import { WorkerThreadPool, type FallbackFontDescriptor } from '../runtime/WorkerThreadPool';
 import type { KmsKeyring } from '../security';
 import { CloudRevisionBridge } from '../services/CloudRevisionBridge';
+import { CrashJournal, DocumentQuarantinedError } from '../services/CrashJournal';
 import { DerivedRenderService } from '../services/DerivedRenderService';
 import {
   DocumentLifecycleService,
@@ -321,6 +322,20 @@ export interface BuildAppOptions {
   engineHostEntry?: URL | string;
   /** Extra execArgv for the forked engine host (tests: ['--import','tsx']). */
   engineHostExecArgv?: string[];
+  /**
+   * How long the engine host may be down before `/readyz` fails
+   * (default 10s). A sub-second respawn must never flap the pod out of
+   * its load balancer — readiness reacts to PERSISTENT engine
+   * unavailability only; the health detail is always in the body.
+   */
+  engineUnreadyAfterMs?: number;
+  /**
+   * Crash-journal posture (host mode + db only). OBSERVE-ONLY by
+   * default: every engine-host death and its suspects are journaled and
+   * quarantine decisions are computed AND persisted — but nothing is
+   * refused until `enforce` is set. See the WS3 Phase A plan §5.
+   */
+  quarantine?: { enforce?: boolean; ttlHours?: number };
 }
 
 export interface AppBundle {
@@ -343,6 +358,14 @@ export interface AppBundle {
   baseFileCache?: BaseFileCache;
   /** Security substrate keyring, when configured by the caller. */
   kms?: KmsKeyring;
+  /** Present in host mode with a db: the engine crash journal. */
+  crashJournal?: CrashJournal;
+  /**
+   * Host mode only: the RAW EngineHostClient (bundle.pool may be the
+   * quarantine decorator). Drills and boundary tests need its
+   * `hostPid()`/`engineBuildId()`.
+   */
+  engineHost?: EngineHostClient;
   /**
    * Flip `/readyz` to 503 and end every live SSE stream without closing
    * the listener. `shutdown()` calls this first; exposed for operators
@@ -381,8 +404,7 @@ export async function buildAppForTesting(opts: BuildAppOptions): Promise<AppBund
   // suite against the child-process engine host (same tests, same
   // assertions — byte-identical results is the acceptance bar).
   const engineIsolation =
-    opts.engineIsolation ??
-    (process.env['CLOUDPDF_TEST_ISOLATION'] === 'host' ? 'host' : 'inline');
+    opts.engineIsolation ?? (process.env['CLOUDPDF_TEST_ISOLATION'] === 'host' ? 'host' : 'inline');
   if (engineIsolation === 'host') {
     return buildAppUnchecked({
       ...opts,
@@ -604,11 +626,24 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
   };
 
   let pool: EnginePool | undefined;
+  let crashJournal: CrashJournal | undefined;
+  let engineHost: EngineHostClient | undefined;
+  let engineRestartCount = 0;
   if (opts.workerEntry) {
     if (opts.engineIsolation === 'host') {
       if (!opts.engineHostEntry) {
         throw new Error("buildApp: engineIsolation 'host' requires engineHostEntry");
       }
+      crashJournal = opts.db
+        ? new CrashJournal({
+            db: opts.db,
+            enforce: opts.quarantine?.enforce ?? false,
+            ...(opts.quarantine?.ttlHours !== undefined
+              ? { ttlMs: opts.quarantine.ttlHours * 60 * 60 * 1_000 }
+              : {}),
+            log: (level, msg, meta) => app.log[level]({ ...meta }, msg),
+          })
+        : undefined;
       pool = await EngineHostClient.create({
         hostEntry: opts.engineHostEntry,
         boot: {
@@ -621,9 +656,23 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
         // Forget-everything on host death: WS1 makes the lazy rebuild
         // from durable truth safe; the generation fence closes the
         // mid-commit window (DocumentService.advanceLayerSession).
-        onHostRestart: () => documentService?.onHostRestart(),
+        onHostRestart: () => {
+          engineRestartCount += 1;
+          documentService?.onHostRestart();
+        },
+        // Fire-and-forget by design: journaling must never delay respawn.
+        ...(crashJournal
+          ? {
+              onHostCrash: (evt: Parameters<CrashJournal['recordCrash']>[0]) =>
+                void crashJournal!.recordCrash(evt),
+            }
+          : {}),
         ...(opts.engineHostExecArgv ? { execArgv: opts.engineHostExecArgv } : {}),
       });
+      engineHost = pool as EngineHostClient;
+      if (crashJournal) {
+        pool = new QuarantiningEnginePool(pool, crashJournal, () => engineHost!.engineBuildId());
+      }
     } else {
       pool = await WorkerThreadPool.create({
         size: opts.poolSize,
@@ -666,19 +715,31 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
   };
 
   if (opts.metrics === true) {
-    registerMetrics(app, { pool, licenseGate: opts.licenseGate });
+    registerMetrics(app, {
+      pool,
+      licenseGate: opts.licenseGate,
+      ...(engineHost ? { engineRestarts: () => engineRestartCount } : {}),
+      ...(crashJournal ? { crashJournal } : {}),
+    });
   }
 
   app.get('/healthz', async () => ({ status: 'ok' }));
+  const engineUnreadyAfterMs = opts.engineUnreadyAfterMs ?? 10_000;
   app.get('/readyz', async (_req, reply) => {
     const license = opts.licenseGate.getStatus();
+    const engine = pool?.health() ?? null;
     if (drainCoordinator.isDraining) {
-      return reply.code(503).send({ license, status: 'draining' });
+      return reply.code(503).send({ license, engine, status: 'draining' });
     }
     if (!(await dbReady())) {
-      return reply.code(503).send({ license, status: 'unready', reasons: ['database'] });
+      return reply.code(503).send({ license, engine, status: 'unready', reasons: ['database'] });
     }
-    return { license, status: 'ok' };
+    // Engine readiness with a persistence threshold: a sub-second host
+    // respawn must not amputate the pod from every balancer.
+    if (engine && engine.state !== 'ready' && (engine.downSinceMs ?? 0) >= engineUnreadyAfterMs) {
+      return reply.code(503).send({ license, engine, status: 'unready', reasons: ['engine'] });
+    }
+    return { license, engine, status: 'ok' };
   });
   app.get('/v1/license/status', async () => opts.licenseGate.getStatus());
   // Deployment surface: API token only — license state, reporting, and
@@ -1061,6 +1122,10 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
   }
 
   app.setErrorHandler((err, req, reply) => {
+    if (err instanceof DocumentQuarantinedError) {
+      reply.code(422).send({ error: { code: err.code, message: err.message } });
+      return;
+    }
     if (EngineError.is(err)) {
       const engineErr = err as EngineError;
       const code = mapToHttp(engineErr.code);
@@ -1164,6 +1229,8 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
     derivedRenders,
     baseFileCache,
     kms: opts.kms,
+    ...(crashJournal ? { crashJournal } : {}),
+    ...(engineHost ? { engineHost } : {}),
     beginDrain: () => drainCoordinator.begin(),
     shutdown,
   };
