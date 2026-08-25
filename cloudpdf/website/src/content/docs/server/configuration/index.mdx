@@ -44,6 +44,17 @@ See [Licensing](/docs/server/configuration/licensing).
 | `HOST` | `0.0.0.0` | Interface to bind. |
 | `CLOUDPDF_WORKER_POOL_SIZE` | `min(2, cpus)` | Native PDFium worker threads. Integer, or `max` to use all cores. See [Health & scaling](/docs/server/operations/health-and-scaling). |
 
+## Engine plane
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `CLOUDPDF_ENGINE_ISOLATION` | `inline` | `host` runs PDFium in a supervised child process: a native crash costs a sub-second engine respawn instead of the instance. See [Health & scaling](/docs/server/operations/health-and-scaling). |
+| `CLOUDPDF_ENGINE_SHARDS` | `1` | Host mode: split the engine into K child processes (worker total must divide evenly). One crash costs 1/K of open documents. |
+| `CLOUDPDF_ENGINE_MAX_IN_FLIGHT` | workers × 2 | Admission cap on concurrently dispatched engine jobs; beyond the bounded queue the server sheds with `503` + `Retry-After`. |
+| `CLOUDPDF_ENGINE_BG_MAX_IN_FLIGHT` | ⌊workers / 2⌋ | Of the cap, how much background work (thumbnail warming) may occupy. `0` disables the background lane entirely. |
+| `CLOUDPDF_ENGINE_RECYCLE` | off | `1` opts into memory-watermark engine recycling (host mode). Companion knobs: `_RECYCLE_SOFT_PCT` (70), `_RECYCLE_HARD_PCT` (85), `CLOUDPDF_ENGINE_MAX_RSS_MB`, `CLOUDPDF_ENGINE_MAX_LIFETIME_HOURS`. |
+| `CLOUDPDF_ENCODE_IN_ENGINE` | on | `0` reverts image encoding to the API process (one-release escape hatch; rasters cross the engine boundary raw). |
+
 ## Authentication
 
 | Variable | Default | Description |

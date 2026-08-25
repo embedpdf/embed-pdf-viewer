@@ -57,26 +57,96 @@ per-thread font/CMap duplication on top of your documents' working set. Watch fo
 restarts caused by hitting a memory limit and give the pool more headroom if you
 see them.
 
-## Resilience: run more than one replica
+## Crash isolation: the engine host
 
-<Callout type="warn">
-  The native runtime is <strong>thread-confined</strong>: a hard native crash
-  takes down the <strong>whole process</strong>, not just the one request that
-  triggered it. A single malformed document should never be able to take your
-  service offline.
+PDF parsing runs native code on hostile input, so the resilience story starts
+with one question: what does a native crash cost you?
+
+<Callout type="info">
+  With <code>CLOUDPDF_ENGINE_ISOLATION=host</code>, PDFium runs in a
+  <strong>supervised child process</strong>. A native crash costs one
+  sub-second engine respawn — in-flight engine calls fail with a retryable
+  error, the API process keeps serving, and open documents lazily reopen on
+  first touch. Without it (the current default, <code>inline</code>), the
+  engine shares the API process and a hard native crash restarts the whole
+  instance.
 </Callout>
 
-The answer is horizontal redundancy, not a bigger single instance:
+```sh
+CLOUDPDF_ENGINE_ISOLATION=host
+```
+
+Host mode also brings two protections that only exist behind a process
+boundary:
+
+- **Credential separation** — the engine child is started with a whitelisted
+  environment: it never sees your database URL, JWT secret, license key, or
+  storage credentials.
+- **Poison-document quarantine** — the server journals which documents were
+  in flight when the engine died. A document that repeatedly crashes the
+  engine (two independent sole-suspect crashes on the same content and
+  engine build) is refused with `422 DocumentQuarantined` instead of being
+  allowed to crash-loop your fleet. Inspect and release with the
+  [`quarantine` CLI](/docs/server/operations/cli).
+
+`/readyz` understands the engine: a sub-second respawn never flips readiness,
+while an engine that stays down past a threshold does — so your load balancer
+routes around a genuinely broken instance without flapping on routine
+recovery.
+
+## Backpressure: honest 503s instead of hangs
+
+Engine capacity is guarded by a two-lane scheduler: interactive work (what a
+user is waiting on) can use every worker; background work (thumbnail warming)
+is capped so it can never crowd requests out. Past the queues' bounds the
+server **sheds** with `503` + `Retry-After` and an `EngineBusy` error code —
+a fast, retryable answer instead of a 30-second hang.
+
+The `@cloudpdf/engine` client retries these automatically (they are safe by
+construction — a shed request never reached the engine), so overload and
+engine respawns are invisible to end users. Tune with
+`CLOUDPDF_ENGINE_MAX_IN_FLIGHT` and `CLOUDPDF_ENGINE_BG_MAX_IN_FLIGHT`
+against the queue metrics below.
+
+## Memory recycling (opt-in)
+
+Long-lived native processes slowly accumulate allocator and cache memory. In
+host mode you can opt into watermark recycling: the server watches the
+container's memory working set and gracefully replaces the engine process
+before the pod hits its limit — a controlled sawtooth instead of an OOMKill,
+with no crash-journal noise and no dropped requests for parked work.
+
+```sh
+CLOUDPDF_ENGINE_RECYCLE=1               # opt-in master switch
+CLOUDPDF_ENGINE_RECYCLE_SOFT_PCT=70     # graceful replace at 70% of the limit
+CLOUDPDF_ENGINE_RECYCLE_HARD_PCT=85     # immediate replace at 85%
+CLOUDPDF_ENGINE_MAX_LIFETIME_HOURS=24   # jittered lifetime cap (slow-leak hedge)
+```
+
+## Engine shards (blast-radius dial)
+
+At larger worker counts you can split the engine into `K` independent child
+processes with `CLOUDPDF_ENGINE_SHARDS` (host mode; the worker total must
+divide evenly). Documents are partitioned across shards, so one crash or
+recycle costs `1/K` of open documents — the others stay warm and never
+notice. Leave it at the default `1` until your crash/memory telemetry says
+otherwise; per-shard metrics (`cloudpdf_engine_shard_up`) expose a flapping
+shard the moment you turn it up.
+
+## Resilience: run more than one replica
+
+Process-level isolation shrinks the blast radius inside an instance;
+replicas remove the instance itself as a single point of failure:
 
 - **Run at least two replicas** (Docker Compose `--scale`, or Helm
-  `replicaCount`/HPA) so one crash never means zero capacity.
+  `replicaCount`/HPA) so one instance restarting never means zero capacity.
 - **Use a PodDisruptionBudget** (the Helm chart includes one) so node
   maintenance can't drain all replicas at once.
-- **Keep the worker pool sensible.** A larger pool means a crash takes more
-  in-flight requests down with the process — balance throughput against
-  blast radius.
-- **Let liveness restart crashed instances** and readiness keep traffic off them
-  until they're back.
+- **Let liveness restart crashed instances** and readiness keep traffic off
+  them until they're back.
+- With several replicas, consider the Helm chart's **document affinity**
+  option so one document's traffic lands on one warm replica — see
+  [Helm / Kubernetes](/docs/server/deployment/helm).
 
 ## Autoscaling
 
@@ -108,6 +178,8 @@ autoscaling:
 - A shared object store (S3 / GCS / Azure Blob).
 - At least two replicas, with `/readyz` and `/healthz` wired up.
 - `CLOUDPDF_WORKER_POOL_SIZE` and memory tuned together.
+- `CLOUDPDF_ENGINE_ISOLATION=host` so a malformed PDF costs an engine respawn,
+  never an instance restart.
 - A pinned image version or digest — never `:latest`.
 - `CLOUDPDF_JWT_SECRET` injected from a secret manager.
 

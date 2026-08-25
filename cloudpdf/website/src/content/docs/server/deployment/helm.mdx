@@ -141,13 +141,38 @@ The chart wires the probes and resilience primitives for you:
 - **PodDisruptionBudget** so rolling nodes never take all replicas at once.
 - Non-root `securityContext` by default.
 
-<Callout type="warn">
-  The native runtime is thread-confined — a hard crash takes a whole pod down.
-  Run <strong>at least two replicas</strong>, keep
-  <code>CLOUDPDF_WORKER_POOL_SIZE</code> in step with the CPU you give each pod,
-  and size memory for per-thread font and CMap duplication. Details in
-  <a href="/docs/server/operations/health-and-scaling">Health &amp; scaling</a>.
+<Callout type="info">
+  Set <code>CLOUDPDF_ENGINE_ISOLATION=host</code> (via <code>extraEnv</code>)
+  so a native PDF crash costs a sub-second engine respawn inside the pod
+  instead of a pod restart. Still run <strong>at least two replicas</strong>,
+  keep <code>CLOUDPDF_WORKER_POOL_SIZE</code> in step with the CPU you give
+  each pod, and size memory for per-thread font and CMap duplication. Details
+  in <a href="/docs/server/operations/health-and-scaling">Health &amp;
+  scaling</a>.
 </Callout>
+
+### Document affinity (multi-replica)
+
+With several replicas, `docAffinity.enabled: true` renders a second Ingress
+that consistent-hashes `/v1/docs` traffic so one document's requests land on
+one warm replica. Two modes:
+
+- `key: header` (preferred, portable): hashes the `X-CloudPDF-Doc` header —
+  sent by SDKs with `cloudEngine({ docAffinityHeader: true })` against a
+  server from the same release.
+- `key: uri` (nginx-only): extracts the document id from the path via a
+  `configuration-snippet` — note that many managed controllers ship
+  `allow-snippet-annotations=false`, which silently disables it.
+
+Any replica serves any document correctly either way — affinity is purely a
+warm-cache optimization. Leave it off until your replica count or
+per-document memory makes duplication visible.
+
+### Sandboxed runtimes
+
+`runtimeClassName` (empty by default) runs the pod under a sandboxed
+container runtime such as gVisor or Kata — kernel-level containment for the
+native engine, at syscall-emulation cost. Measure before committing.
 
 ## The small-footprint profile (SQLite)
 

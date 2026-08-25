@@ -94,6 +94,29 @@ HTTP responses from the server map onto these codes:
   which is part of the stable contract.
 </Callout>
 
+## Automatic backpressure retries
+
+Two server conditions are retried for you, inside the transport: an overload
+shed (`503` with code `EngineBusy`) and a request that raced an engine
+restart (`EngineRestarting`). Both are safe to retry by construction — they
+mean the server applied nothing — so the client waits out the server's
+`Retry-After` hint (with jitter, respecting your `AbortSignal`) and retries
+up to twice before surfacing the error. Reads *and* mutations get this; any
+other failure, including foreign 503s from proxies, surfaces immediately as
+usual.
+
+You never have to handle these yourself, but you can observe them:
+
+```ts
+const engine = createCloudEngine({
+  baseUrl,
+  token,
+  onRetry: ({ path, code, attempt, waitMs }) => {
+    console.debug(`retrying ${path} after ${code} (attempt ${attempt})`);
+  },
+});
+```
+
 ## Putting it together
 
 ```ts
