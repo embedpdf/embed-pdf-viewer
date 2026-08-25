@@ -145,6 +145,18 @@ function renderBuild(docId: string, pageObjectNumber: number, width: number): Bu
     });
 }
 
+function renderEncodedBuild(docId: string, pageObjectNumber: number, width: number): BuildPack {
+  return (jobId: WorkerJobId) =>
+    wirePack({
+      kind: 'pages.renderEncoded' as const,
+      jobId,
+      docId,
+      pageObjectNumber,
+      options: { viewport: { kind: 'width' as const, width }, includeAnnotations: false },
+      encode: { format: 'webp' as const },
+    });
+}
+
 function metadataBuild(docId: string): BuildPack {
   return (jobId: WorkerJobId) => wirePack({ kind: 'metadata.read' as const, jobId, docId });
 }
@@ -482,6 +494,24 @@ async function main(): Promise<void> {
       warm += renderIters;
       results['render'].push(r);
       printLevel('render', r);
+    }
+
+    // ---- render-enc (WS3 Phase B): render + encode in ONE worker op —
+    // only the compressed webp crosses the boundary.
+    results['render-enc'] = [];
+    for (const conc of CONC_LEVELS) {
+      const r = await runLevel(pool, conc, renderIters, async (i) => {
+        const docId = docIds[i % N_DOCS]!;
+        const res = await pool.run(
+          docId,
+          renderEncodedBuild(docId, pons[(i + warm) % pons.length]!, widthFor(i)),
+        );
+        if (res.tag !== 'pages.renderEncoded') throw new Error(`unexpected ${res.tag}`);
+        return res.image.bytes.byteLength;
+      });
+      warm += renderIters;
+      results['render-enc'].push(r);
+      printLevel('renderEnc', r);
     }
 
     // ---- metadata (tiny payloads: fixed per-call overhead)

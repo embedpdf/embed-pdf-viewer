@@ -929,6 +929,11 @@ async function cmdServe(): Promise<void> {
   let bundle: Awaited<ReturnType<typeof buildApp>>;
   try {
     bundle = await buildApp({
+      // WS3 Phase B escape hatch: '0'/'false' reverts to raw rasters over
+      // the engine boundary + API-side sharp for one release.
+      encodeInEngine:
+        process.env.CLOUDPDF_ENCODE_IN_ENGINE !== '0' &&
+        process.env.CLOUDPDF_ENCODE_IN_ENGINE !== 'false',
       licenseGate: licenseRuntime,
       ...(usageReporter ? { usageReporter } : {}),
       verifier: { mode: 'hs256', secret: JWT_SECRET },

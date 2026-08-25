@@ -16,6 +16,9 @@ on:
       - '.github/workflows/chart-ci.yml'
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 env:
   CHART: cloudpdf/server/deploy/helm/cloudpdf-server
 

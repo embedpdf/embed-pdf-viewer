@@ -320,6 +320,12 @@ export interface BuildAppOptions {
    * carrying a loader). Required when `engineIsolation: 'host'`.
    */
   engineHostEntry?: URL | string;
+  /** WS3 Phase B: encode renders inside the engine worker so only
+   *  compressed images cross the engine boundary (default true). `false`
+   *  is the one-release escape hatch (`CLOUDPDF_ENCODE_IN_ENGINE=0`):
+   *  raw rasters over the boundary + API-side sharp, exactly the
+   *  pre-Phase-B pipeline. */
+  encodeInEngine?: boolean;
   /** Extra execArgv for the forked engine host (tests: ['--import','tsx']). */
   engineHostExecArgv?: string[];
   /**
@@ -818,6 +824,7 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
         cache: baseFileCache,
         pool,
         encoder: new SharpImageEncoder(),
+        ...(opts.encodeInEngine !== undefined ? { encodeInEngine: opts.encodeInEngine } : {}),
         documents: new DocumentsRepo(opts.db),
         onWarmError: (err, ctx) =>
           app.log.warn({ err, ...ctx }, 'thumbnail warm failed; thumbnailState=failed'),
@@ -1076,6 +1083,7 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
         layerService,
         pool,
         imageEncoder: new SharpImageEncoder(),
+        ...(opts.encodeInEngine !== undefined ? { encodeInEngine: opts.encodeInEngine } : {}),
         ...(derivedRenders ? { derivedRenders } : {}),
       });
       await registerRedactionRoutes(app, { documentService, layerService });
@@ -1092,6 +1100,7 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
         pool,
         revisionBridge: cloudRevisionBridge,
         imageEncoder: new SharpImageEncoder(),
+        ...(opts.encodeInEngine !== undefined ? { encodeInEngine: opts.encodeInEngine } : {}),
         weakAnnotationSessions,
         ...(derivedRenders ? { derivedRenders } : {}),
       });
