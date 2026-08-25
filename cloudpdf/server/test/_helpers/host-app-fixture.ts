@@ -16,6 +16,7 @@ import {
 import { buildAppForTesting } from '../../src/app/buildApp';
 import { createValidTestLicenseGate } from '../../src/licensing/testing';
 import type { EngineHostClient } from '../../src/runtime/EngineHostClient';
+import { pickShard } from '../../src/runtime/ShardedEnginePool';
 import type { ObjectStoreWithInfo } from '../../src/storage/ObjectStore';
 
 /**
@@ -72,6 +73,8 @@ export async function buildHostFixture(
     quarantine?: { enforce?: boolean; ttlHours?: number };
     metrics?: boolean;
     scheduling?: import('../../src/runtime/SchedulingEnginePool').EngineSchedulingConfig;
+    shards?: number;
+    poolSize?: number;
   } = {},
 ): Promise<HostFixture> {
   const storageRoot = await mkdtemp(join(tmpdir(), 'hostfx-store-'));
@@ -84,7 +87,7 @@ export async function buildHostFixture(
     licenseGate: createValidTestLicenseGate(),
     verifier: { mode: 'hs256', secret: HOST_FIXTURE_SECRET },
     workerEntry: STUB_ENTRY,
-    poolSize: 1,
+    poolSize: opts.poolSize ?? 1,
     db,
     objectStore: store,
     autoProvisionTenant: true,
@@ -98,6 +101,7 @@ export async function buildHostFixture(
     ...(opts.quarantine ? { quarantine: opts.quarantine } : {}),
     ...(opts.metrics ? { metrics: true } : {}),
     ...(opts.scheduling ? { scheduling: opts.scheduling } : {}),
+    ...(opts.shards !== undefined ? { engineShards: opts.shards } : {}),
   });
   const addr = await bundle.app.listen({ host: '127.0.0.1', port: 0 });
   const baseUrl = typeof addr === 'string' ? addr : `http://127.0.0.1:${addr}`;
@@ -110,6 +114,15 @@ export async function buildHostFixture(
     gate,
     client: bundle.engineHost!,
   };
+}
+
+/** The EngineHostClient serving `docId` — shard-aware: under the
+ *  CLOUDPDF_TEST_SHARDS matrix leg a kill/recycle must target the
+ *  document's OWN shard, not blindly shard 0. K=1 → the single host. */
+export function clientFor(fx: HostFixture, docId: string): EngineHostClient {
+  const hosts = fx.bundle.engineHosts ?? [fx.client];
+  if (hosts.length === 1) return hosts[0]!;
+  return hosts[pickShard(docId, hosts.length)]!;
 }
 
 export async function tearDownHostFixture(fx: HostFixture | undefined): Promise<void> {

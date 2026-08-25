@@ -68,6 +68,8 @@ import { readCgroupMemory } from '../runtime/cgroup-memory';
 import { EngineHostClient } from '../runtime/EngineHostClient';
 import type { EnginePool } from '../runtime/EnginePool';
 import { EngineRecycler, type EngineRecyclePolicy } from '../runtime/EngineRecycler';
+import { ShardedEnginePool } from '../runtime/ShardedEnginePool';
+import { resolvePoolSize } from '../runtime/WorkerThreadPool';
 import { QuarantiningEnginePool } from '../runtime/QuarantiningEnginePool';
 import {
   EngineBusyError,
@@ -342,6 +344,10 @@ export interface BuildAppOptions {
    *  recycler). Host isolation required; validated at boot by
    *  `resolveRecycleConfig` in the bin. */
   recycle?: EngineRecyclePolicy;
+  /** C3 — engine shard count (host isolation only). Default 1 =
+   *  today's exact object graph; K > 1 requires the resolved worker
+   *  total to divide evenly (M % K === 0, validated here). */
+  engineShards?: number;
   /** Extra execArgv for the forked engine host (tests: ['--import','tsx']). */
   engineHostExecArgv?: string[];
   /**
@@ -388,6 +394,8 @@ export interface AppBundle {
    * `hostPid()`/`engineBuildId()`.
    */
   engineHost?: EngineHostClient;
+  /** All engine shards (host mode; length = engineShards, [engineHost] at K=1). */
+  engineHosts?: EngineHostClient[];
   /** C1 decorator (present unless `scheduling: false`). */
   engineScheduler?: SchedulingEnginePool;
   /** C5 flip instruments (also readable in tests). */
@@ -415,7 +423,33 @@ export interface AppBundle {
  * document routes when their adapters are configured. Caller is
  * responsible for `app.listen()`.
  */
+/** C3 validation FIRST — before ANY machinery (license gate included)
+ *  boots, so a bad shard config fails instantly with only this message.
+ *  Called by both public and testing entries. */
+function validateShardOptions(opts: BuildAppOptions): void {
+  const shardCount = opts.engineShards ?? 1;
+  if (!Number.isInteger(shardCount) || shardCount < 1) {
+    throw new Error(`buildApp: engineShards must be an integer ≥ 1, got ${shardCount}`);
+  }
+  if (shardCount > 1) {
+    if (opts.engineIsolation !== 'host') {
+      throw new Error("buildApp: engineShards > 1 requires engineIsolation 'host'");
+    }
+    const totalWorkers = resolvePoolSize(opts.poolSize);
+    if (shardCount > totalWorkers || totalWorkers % shardCount !== 0) {
+      const valid = Array.from({ length: totalWorkers }, (_, i) => i + 1).filter(
+        (k) => totalWorkers % k === 0,
+      );
+      throw new Error(
+        `buildApp: engineShards=${shardCount} needs the worker total (${totalWorkers}) to divide evenly — ` +
+          `valid shard counts here: ${valid.join(', ')} (unweighted routing cannot honor uneven capacity)`,
+      );
+    }
+  }
+}
+
 export async function buildApp(opts: BuildAppOptions): Promise<AppBundle> {
+  validateShardOptions(opts);
   if (!isLicenseGateTrusted(opts.licenseGate)) {
     throw new Error(
       'buildApp: licenseGate must be created by createLicenseRuntime from @cloudpdf/server',
@@ -431,10 +465,23 @@ export async function buildAppForTesting(opts: BuildAppOptions): Promise<AppBund
   // assertions — byte-identical results is the acceptance bar).
   const engineIsolation =
     opts.engineIsolation ?? (process.env['CLOUDPDF_TEST_ISOLATION'] === 'host' ? 'host' : 'inline');
+  const testShards = process.env['CLOUDPDF_TEST_SHARDS'];
+  const engineShards =
+    opts.engineShards ?? (testShards !== undefined ? Number(testShards) : undefined);
+  // Matrix-leg pragmatics: most fixtures pin poolSize 1, which cannot
+  // divide across K > 1 — round the worker total UP to a multiple of K
+  // so the alternate-topology leg boots (an intentional distortion:
+  // the leg tests K-topology behavior, not exact worker counts).
+  const poolSize =
+    engineShards !== undefined && engineShards > 1 && opts.engineIsolation !== 'inline'
+      ? Math.ceil((opts.poolSize ?? engineShards) / engineShards) * engineShards
+      : opts.poolSize;
   if (engineIsolation === 'host') {
     return buildAppUnchecked({
       ...opts,
       engineIsolation,
+      ...(engineShards !== undefined ? { engineShards } : {}),
+      ...(poolSize !== undefined ? { poolSize } : {}),
       engineHostEntry:
         opts.engineHostEntry ?? new URL('../runtime/engine-host-entry.ts', import.meta.url),
       engineHostExecArgv: opts.engineHostExecArgv ?? ['--import', 'tsx'],
@@ -444,6 +491,7 @@ export async function buildAppForTesting(opts: BuildAppOptions): Promise<AppBund
 }
 
 async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
+  validateShardOptions(opts);
   // The cross-replica doorbell exists for the whole app lifetime: mutation
   // signals for SSE, revocation pushes for the auth guard + open streams.
   const realtimeBus = opts.realtimeBus ?? new InProcessRealtimeBus();
@@ -662,6 +710,9 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
   } = { current: null };
   let crashJournal: CrashJournal | undefined;
   let engineHost: EngineHostClient | undefined;
+  let engineHosts: EngineHostClient[] = [];
+  let engineSharded: ShardedEnginePool | undefined;
+  const shardRestarts: number[] = [];
   let engineRestartCount = 0;
   if (opts.workerEntry) {
     if (opts.engineIsolation === 'host') {
@@ -678,32 +729,81 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
             log: (level, msg, meta) => app.log[level]({ ...meta }, msg),
           })
         : undefined;
-      pool = await EngineHostClient.create({
-        hostEntry: opts.engineHostEntry,
-        boot: {
-          workerEntry: String(opts.workerEntry),
-          ...(opts.poolSize !== undefined ? { poolSize: opts.poolSize } : {}),
-          ...(opts.maxDocsPerSlot !== undefined ? { maxDocsPerSlot: opts.maxDocsPerSlot } : {}),
-          fonts: opts.fallbackFonts ?? [],
-        },
-        onEvict: evictForward,
-        // Forget-everything on host death: WS1 makes the lazy rebuild
-        // from durable truth safe; the generation fence closes the
-        // mid-commit window (DocumentService.advanceLayerSession).
-        onHostRestart: () => {
-          engineRestartCount += 1;
-          documentService?.onHostRestart();
-        },
-        // Fire-and-forget by design: journaling must never delay respawn.
-        ...(crashJournal
-          ? {
-              onHostCrash: (evt: Parameters<CrashJournal['recordCrash']>[0]) =>
-                void crashJournal!.recordCrash(evt),
-            }
-          : {}),
-        ...(opts.engineHostExecArgv ? { execArgv: opts.engineHostExecArgv } : {}),
-      });
-      engineHost = pool as EngineHostClient;
+      const shardCount = opts.engineShards ?? 1;
+      if (shardCount === 1) {
+        // K = 1 is TODAY'S exact object graph — no composite exists.
+        pool = await EngineHostClient.create({
+          hostEntry: opts.engineHostEntry,
+          boot: {
+            workerEntry: String(opts.workerEntry),
+            ...(opts.poolSize !== undefined ? { poolSize: opts.poolSize } : {}),
+            ...(opts.maxDocsPerSlot !== undefined ? { maxDocsPerSlot: opts.maxDocsPerSlot } : {}),
+            fonts: opts.fallbackFonts ?? [],
+          },
+          onEvict: evictForward,
+          // Forget-everything on host death: WS1 makes the lazy rebuild
+          // from durable truth safe; the generation fence closes the
+          // mid-commit window (DocumentService.advanceLayerSession).
+          onHostRestart: () => {
+            engineRestartCount += 1;
+            documentService?.onHostRestart();
+          },
+          // Fire-and-forget by design: journaling must never delay respawn.
+          ...(crashJournal
+            ? {
+                onHostCrash: (evt: Parameters<CrashJournal['recordCrash']>[0]) =>
+                  void crashJournal!.recordCrash(evt),
+              }
+            : {}),
+          ...(opts.engineHostExecArgv ? { execArgv: opts.engineHostExecArgv } : {}),
+        });
+        engineHost = pool as EngineHostClient;
+        engineHosts = [engineHost];
+      } else {
+        // C3: the parent resolves the worker TOTAL once and splits it —
+        // children never self-resolve (the size env is not whitelisted,
+        // and K independent cpu-defaults would multiply the fleet).
+        const totalWorkers = resolvePoolSize(opts.poolSize);
+        const perShard = totalWorkers / shardCount;
+        for (let i = 0; i < shardCount; i++) shardRestarts.push(0);
+        engineSharded = await ShardedEnginePool.create({
+          count: shardCount,
+          spawn: (shard, hooks) =>
+            EngineHostClient.create({
+              hostEntry: opts.engineHostEntry!,
+              boot: {
+                workerEntry: String(opts.workerEntry),
+                poolSize: perShard,
+                ...(opts.maxDocsPerSlot !== undefined
+                  ? { maxDocsPerSlot: opts.maxDocsPerSlot }
+                  : {}),
+                fonts: opts.fallbackFonts ?? [],
+              },
+              onEvict: hooks.onEvict,
+              onHostRestart: hooks.onHostRestart,
+              ...(crashJournal ? { onHostCrash: hooks.onHostCrash } : {}),
+              ...(opts.engineHostExecArgv ? { execArgv: opts.engineHostExecArgv } : {}),
+            }),
+          onEvict: (evt) => evictForward(evt),
+          // Fire-and-forget by design; the journal is shard-agnostic
+          // (a shard is an intra-process replica).
+          onHostCrash: (evt) => {
+            if (crashJournal) void crashJournal.recordCrash(evt);
+          },
+          onHostRestart: (scope, shard) => {
+            engineRestartCount += 1;
+            shardRestarts[shard] += 1;
+            app.log.warn(
+              { shard, residents: scope.docIds.size },
+              'engine shard restarted (scoped forget)',
+            );
+            documentService?.onHostRestart(scope);
+          },
+        });
+        engineHosts = engineSharded.hosts();
+        engineHost = engineHosts[0]!;
+        pool = engineSharded;
+      }
       if (crashJournal) {
         pool = new QuarantiningEnginePool(pool, crashJournal, () => engineHost!.engineBuildId());
       }
@@ -737,9 +837,8 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
       );
     }
     if (opts.recycle && engineHost) {
-      const host = engineHost;
       engineRecycler = new EngineRecycler(
-        () => [host],
+        () => engineHosts,
         () => readCgroupMemory(),
         opts.recycle,
         (d) => app.log.info({ reason: d.reason, graceful: d.graceful }, 'engine host recycled'),
@@ -786,8 +885,33 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
       licenseGate: opts.licenseGate,
       counters: engineCounters,
       ...(engineHost ? { engineRestarts: () => engineRestartCount } : {}),
-      ...(engineHost ? { engineMemory: () => engineHost.memory() } : {}),
-      ...(engineHost ? { engineRecycles: () => engineHost.recycleStats() } : {}),
+      ...(engineHost
+        ? { engineMemory: () => (engineSharded ? engineSharded.memory() : engineHost!.memory()) }
+        : {}),
+      ...(engineHost
+        ? {
+            engineRecycles: () => {
+              const total: Record<string, number> = {};
+              for (const h of engineHosts) {
+                for (const [reason, n] of Object.entries(h.recycleStats())) {
+                  total[reason] = (total[reason] ?? 0) + n;
+                }
+              }
+              return total;
+            },
+          }
+        : {}),
+      ...(engineSharded
+        ? {
+            shards: () =>
+              engineHosts.map((h, shard) => ({
+                shard,
+                up: h.health().state === 'ready',
+                restarts: shardRestarts[shard] ?? 0,
+                recycles: h.recycleStats(),
+              })),
+          }
+        : {}),
       ...(crashJournal ? { crashJournal } : {}),
       ...(cgroupReadable ? { cgroup: () => readCgroupMemory() } : {}),
       ...(schedulingPool ? { scheduling: () => schedulingPool!.schedulingStats() } : {}),
@@ -1325,6 +1449,7 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
     ...(engineHost ? { engineHost } : {}),
     engineCounters,
     ...(schedulingPool ? { engineScheduler: schedulingPool } : {}),
+    ...(engineHosts.length > 0 ? { engineHosts } : {}),
     beginDrain: () => drainCoordinator.begin(),
     shutdown,
   };

@@ -28,6 +28,14 @@ export interface MetricsOptions {
   queueWaitObserver?: { current: ((lane: SchedulingLane, waitMs: number) => void) | null };
   /** C2: completed planned recycles by reason. */
   engineRecycles?: () => Record<string, number>;
+  /** C3: bounded per-shard telemetry (K ≤ cpus keeps cardinality trivial) —
+   *  without it a single flapping shard hides inside the aggregates. */
+  shards?: () => Array<{
+    shard: number;
+    up: boolean;
+    restarts: number;
+    recycles: Record<string, number>;
+  }>;
 }
 
 /**
@@ -90,7 +98,7 @@ export function registerMetrics(app: FastifyInstance, opts: MetricsOptions): voi
     const engineMemory = opts.engineMemory;
     new Gauge({
       name: 'cloudpdf_engine_host_rss_bytes',
-      help: 'Engine-host child RSS from the protocol-v3 memory heartbeat',
+      help: 'Engine RSS from the protocol-v3 memory heartbeat — the FLEET SUM across shards (single child at K=1); 0 while any reading is missing',
       registers: [register],
       collect() {
         this.set(engineMemory()?.rssBytes ?? 0);
@@ -98,7 +106,7 @@ export function registerMetrics(app: FastifyInstance, opts: MetricsOptions): voi
     });
     new Gauge({
       name: 'cloudpdf_engine_host_heap_used_bytes',
-      help: 'Engine-host child V8 heapUsed from the memory heartbeat',
+      help: 'Engine V8 heapUsed from the memory heartbeat — fleet sum across shards (single child at K=1)',
       registers: [register],
       collect() {
         this.set(engineMemory()?.heapUsedBytes ?? 0);
@@ -106,7 +114,7 @@ export function registerMetrics(app: FastifyInstance, opts: MetricsOptions): voi
     });
     new Gauge({
       name: 'cloudpdf_engine_host_memory_age_seconds',
-      help: 'Age of the newest heartbeat for the CURRENT host generation; -1 = no reading yet (booting or respawning) — distinguishes missing from zero RSS',
+      help: 'Age of the OLDEST heartbeat across current host generations (K>1: the stalest shard); -1 = at least one shard has no reading yet (booting or respawning) — distinguishes missing from zero RSS',
       registers: [register],
       collect() {
         const m = engineMemory();
@@ -164,6 +172,42 @@ export function registerMetrics(app: FastifyInstance, opts: MetricsOptions): voi
       collect() {
         this.reset();
         for (const [reason, n] of Object.entries(engineRecycles())) this.inc({ reason }, n);
+      },
+    });
+  }
+  if (opts.shards) {
+    const shards = opts.shards;
+    new Gauge({
+      name: 'cloudpdf_engine_shard_up',
+      help: 'Per-shard readiness (1 = ready)',
+      labelNames: ['shard'],
+      registers: [register],
+      collect() {
+        for (const s of shards()) this.set({ shard: String(s.shard) }, s.up ? 1 : 0);
+      },
+    });
+    new Counter({
+      name: 'cloudpdf_engine_shard_restarts_total',
+      help: 'Per-shard engine respawns since boot',
+      labelNames: ['shard'],
+      registers: [register],
+      collect() {
+        this.reset();
+        for (const s of shards()) this.inc({ shard: String(s.shard) }, s.restarts);
+      },
+    });
+    new Counter({
+      name: 'cloudpdf_engine_shard_recycles_total',
+      help: 'Per-shard completed planned recycles by reason',
+      labelNames: ['shard', 'reason'],
+      registers: [register],
+      collect() {
+        this.reset();
+        for (const s of shards()) {
+          for (const [reason, n] of Object.entries(s.recycles)) {
+            this.inc({ shard: String(s.shard), reason }, n);
+          }
+        }
       },
     });
   }

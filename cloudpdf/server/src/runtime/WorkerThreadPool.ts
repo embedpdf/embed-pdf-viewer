@@ -153,7 +153,7 @@ const DEFAULT_POOL_SIZE_CAP = 2;
  * Resolve the worker-thread count. See `WorkerThreadPoolOptions.size` for the
  * contract and resolution order (explicit -> env -> conservative default).
  */
-function resolvePoolSize(explicit: number | undefined): number {
+export function resolvePoolSize(explicit: number | undefined): number {
   const cpuCount = Math.max(1, cpus().length);
   if (explicit !== undefined) {
     return Math.max(1, Math.floor(explicit));
@@ -418,6 +418,10 @@ export class WorkerThreadPool implements EnginePool {
    * pre-host semantics are untouched.
    */
   generation(): number {
+    return 0;
+  }
+
+  generationFor(_docId: string): number {
     return 0;
   }
 

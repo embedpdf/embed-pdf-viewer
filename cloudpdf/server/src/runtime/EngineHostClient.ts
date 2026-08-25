@@ -9,7 +9,7 @@ import {
   type WorkerResultPayload,
 } from '@embedpdf/engine-core/runtime';
 
-import type { BuildPack, EnginePool } from './EnginePool';
+import type { BuildPack, EnginePool, RunAdHocOptions } from './EnginePool';
 import {
   HOST_PROTOCOL_VERSION,
   hostEnvWhitelist,
@@ -652,11 +652,12 @@ export class EngineHostClient implements EnginePool {
     baseSha: string | undefined,
     build: BuildPack,
     signal?: AbortSignal,
+    _opts?: RunAdHocOptions,
   ): Promise<WorkerResultPayload> {
     return this.dispatch('runAdHoc', undefined, baseSha, build, signal);
   }
 
-  async close(docId: string): Promise<WorkerResultPayload | null> {
+  async close(docId: string, _signal?: AbortSignal): Promise<WorkerResultPayload | null> {
     this.residency.delete(docId);
     if (this.state !== 'ready' || !this.child) {
       // A dead/absent host has no session to close; mirror the pool's
@@ -724,6 +725,10 @@ export class EngineHostClient implements EnginePool {
   }
 
   generation(): number {
+    return this.gen;
+  }
+
+  generationFor(_docId: string): number {
     return this.gen;
   }
 

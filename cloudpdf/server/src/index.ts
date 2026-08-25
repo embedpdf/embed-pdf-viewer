@@ -275,6 +275,13 @@ export const defaultEngineHostEntryUrl: URL = new URL(
 export type { BuildPack, EnginePool } from './runtime/EnginePool';
 export { EngineHostClient } from './runtime/EngineHostClient';
 export {
+  pickShard,
+  ShardedEnginePool,
+  shardScore,
+  type ShardedEnginePoolOptions,
+  type ShardHooks,
+} from './runtime/ShardedEnginePool';
+export {
   EngineRecycler,
   resolveRecycleConfig,
   type EngineRecyclePolicy,

@@ -345,6 +345,7 @@ function printHelp(): void {
       '    CLOUDPDF_SHUTDOWN_DRAIN_MS    settle window after readiness flips 503 (default 0)',
       '    CLOUDPDF_METRICS       1 exposes an unauthenticated Prometheus /metrics endpoint',
       '    CLOUDPDF_ENGINE_ISOLATION  inline (default) or host: run PDFium in a supervised child process',
+      '    CLOUDPDF_ENGINE_SHARDS     engine shard count (host mode; worker total must divide evenly; default 1)',
       '    CLOUDPDF_ENGINE_RECYCLE    1 enables engine recycling (host mode; opt-in until soak data)',
       '    CLOUDPDF_ENGINE_RECYCLE_SOFT_PCT / _HARD_PCT  container working-set watermarks (70 / 85)',
       '    CLOUDPDF_ENGINE_MAX_RSS_MB / CLOUDPDF_ENGINE_MAX_LIFETIME_HOURS  secondary recycle guards',
@@ -773,6 +774,19 @@ function requireAirGappedMode(): void {
   }
 }
 
+function engineShardsEnv(): number | undefined {
+  const raw = process.env['CLOUDPDF_ENGINE_SHARDS'];
+  if (raw === undefined || raw === '') return undefined;
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n < 1) {
+    fail(2, `CLOUDPDF_ENGINE_SHARDS must be a positive integer, got ${JSON.stringify(raw)}`);
+  }
+  if (n > 1 && process.env['CLOUDPDF_ENGINE_ISOLATION'] !== 'host') {
+    fail(2, 'CLOUDPDF_ENGINE_SHARDS > 1 requires CLOUDPDF_ENGINE_ISOLATION=host');
+  }
+  return n;
+}
+
 function schedulingEnv(): Record<string, number> | null {
   const parse = (name: string): number | undefined => {
     const raw = process.env[name];
@@ -976,6 +990,9 @@ async function cmdServe(): Promise<void> {
     bundle = await buildApp({
       // C2 recycling (opt-in; fail-fast validated above).
       ...(recycleConfig.enabled ? { recycle: recycleConfig.policy } : {}),
+      // C3 shard dial (buildApp validates divisibility against the
+      // resolved worker total; K > 1 requires host isolation).
+      ...(engineShardsEnv() !== undefined ? { engineShards: engineShardsEnv() } : {}),
       // C1 admission tuning (defaults compute from the pool's slot count;
       // queue caps/timeouts are buildApp options — see the Phase C plan).
       ...(schedulingEnv() ? { scheduling: schedulingEnv()! } : {}),

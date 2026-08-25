@@ -295,6 +295,10 @@ export class SchedulingEnginePool implements EnginePool {
     return this.inner.generation();
   }
 
+  generationFor(docId: string): number {
+    return this.inner.generationFor(docId);
+  }
+
   health(): { state: 'ready' | 'starting' | 'backoff'; downSinceMs: number | null } {
     return this.inner.health();
   }

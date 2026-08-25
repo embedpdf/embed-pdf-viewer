@@ -4,6 +4,7 @@ import type { EngineHostClient } from '../src/runtime/EngineHostClient';
 import { EngineRecycler, resolveRecycleConfig } from '../src/runtime/EngineRecycler';
 import {
   buildHostFixture,
+  clientFor,
   createAnnotation,
   listAnnotations,
   seedDocument,
@@ -17,6 +18,7 @@ function fakeHost(rss: number | null, uptimeMs: number | null = 60_000): EngineH
   return {
     memory: () => (rss === null ? null : { rssBytes: rss, heapUsedBytes: rss / 2, ageMs: 100 }),
     uptimeMs: () => uptimeMs,
+    health: () => ({ state: 'ready' as const, downSinceMs: null }),
     recycle: vi.fn(async () => true),
   } as unknown as EngineHostClient;
 }
@@ -100,6 +102,68 @@ describe('EngineRecycler policy', () => {
     expect(d).toEqual({ reason: 'lifetime', graceful: true });
     expect(old.recycle).toHaveBeenCalled();
     expect(young.recycle).not.toHaveBeenCalled();
+  });
+});
+
+describe('EngineRecycler fleet safety (C3 review)', () => {
+  test('NO second victim while the first successor is not ready — sustained hard pressure rolls serially, never concurrently', async () => {
+    let aState: 'ready' | 'starting' = 'ready';
+    let aRecycled = false;
+    const a = {
+      // A fresh successor comes back SMALL — after recovery, B is the
+      // largest and the roll moves on.
+      memory: () =>
+        aState === 'ready'
+          ? { rssBytes: aRecycled ? 100e6 : 900e6, heapUsedBytes: 1, ageMs: 1 }
+          : null,
+      uptimeMs: () => 60_000,
+      health: () => ({ state: aState, downSinceMs: aState === 'ready' ? null : 1_000 }),
+      recycle: vi.fn(async () => {
+        aState = 'starting'; // the kill leaves A mid-respawn, heartbeat gone
+        aRecycled = true;
+        return true;
+      }),
+    } as unknown as EngineHostClient;
+    const b = fakeHost(800e6);
+    const r = new EngineRecycler(() => [a, b], cg(900e6, 1000e6), { cooldownHardMs: 10_000 });
+
+    expect(await r.tick(1_000_000)).toEqual({ reason: 'hard-rss', graceful: false });
+    expect(a.recycle).toHaveBeenCalledTimes(1);
+    // Past the hard cooldown, pressure still hard, B has the only (and
+    // largest) reading — but A's successor is NOT ready: no decision.
+    expect(await r.tick(1_020_000)).toBeNull();
+    expect(await r.tick(1_040_000)).toBeNull();
+    expect(b.recycle).not.toHaveBeenCalled();
+
+    // A's successor comes up → the roll continues, one hole at a time.
+    aState = 'ready';
+    expect(await r.tick(1_060_000)).toEqual({ reason: 'hard-rss', graceful: false });
+    expect(b.recycle).toHaveBeenCalledTimes(1); // B is now the largest with a reading
+  });
+
+  test('the gate also holds for soft decisions', async () => {
+    let aReady = true;
+    const a = {
+      memory: () => (aReady ? { rssBytes: 500e6, heapUsedBytes: 1, ageMs: 1 } : null),
+      uptimeMs: () => 60_000,
+      health: () => ({
+        state: aReady ? ('ready' as const) : ('starting' as const),
+        downSinceMs: null,
+      }),
+      recycle: vi.fn(async () => {
+        aReady = false;
+        return true;
+      }),
+    } as unknown as EngineHostClient;
+    const b = fakeHost(400e6);
+    const r = new EngineRecycler(() => [a, b], cg(750e6, 1000e6), {
+      cooldownMs: 10_000,
+      cooldownHardMs: 1_000,
+    });
+    expect(await r.tick(1_000_000)).toEqual({ reason: 'soft-rss', graceful: true });
+    // Way past both cooldowns; A never recovered → nothing recycles.
+    expect(await r.tick(1_100_000)).toBeNull();
+    expect(b.recycle).not.toHaveBeenCalled();
   });
 });
 
@@ -205,11 +269,12 @@ describe('recycle through the full app (host fixture)', () => {
       // A write parked in the engine (never replies) — the recycle's
       // settle window expires and truncates it: the crash-window shape.
       const stalled = createAnnotation(fx, 'tenant-r', 'docrec001', 'alice', '__STALL__');
-      await until(() => fx.client.stats().inFlight >= 1);
+      const target = clientFor(fx, 'docrec001');
+      await until(() => target.stats().inFlight >= 1);
 
       // Reads issued DURING the graceful recycle park and complete on
       // the successor — the zero-5xx property for settled-or-parked work.
-      const recycled = fx.client.recycle('manual', { settleWindowMs: 250 });
+      const recycled = target.recycle('manual', { settleWindowMs: 250 });
       const during = listAnnotations(fx, 'tenant-r', 'docrec002', 'alice');
 
       expect(await recycled).toBe(true);
@@ -223,7 +288,7 @@ describe('recycle through the full app (host fixture)', () => {
         .select(fx.db.fn.countAll().as('n'))
         .executeTakeFirst();
       expect(Number(crashes?.n ?? 0)).toBe(0);
-      expect(fx.client.recycleStats().manual).toBe(1);
+      expect(target.recycleStats().manual).toBe(1);
 
       // The write retries cleanly against the successor.
       const retry = await createAnnotation(fx, 'tenant-r', 'docrec001', 'alice', 'after-recycle');

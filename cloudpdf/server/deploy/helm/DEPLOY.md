@@ -104,10 +104,17 @@ tier below:
    sub-second engine respawn, never the pod. Shipped; the DEFAULT is
    still in-process until the rollout's soak completes: enable today
    with `CLOUDPDF_ENGINE_ISOLATION=host` (chart `extraEnv`).
-3. **host → shard** (PLANNED — WS3 Phase C3, not yet implemented; the
-   future `CLOUDPDF_ENGINE_SHARDS` dial has no effect today): the
-   blast-radius tier, to be built and left at 1 until memory/attribution
-   telemetry justifies turning it.
+3. **host → shard** (`CLOUDPDF_ENGINE_SHARDS`, default 1): the
+   blast-radius dial — K supervised engine hosts, documents partitioned
+   by docId (rendezvous, SHA-256 scores). Requires host isolation and a
+   worker total that divides evenly (`M % K === 0` — boot-validated,
+   the error names your valid Ks). One shard's crash/recycle costs 1/K
+   of resident documents; siblings never notice; ANY shard persistently
+   down makes the pod unready (deterministic routing, no failover — the
+   LB reroutes those documents to healthy replicas). Leave at 1 until
+   memory/attribution telemetry justifies turning it; watch
+   `cloudpdf_engine_shard_up{shard}` and the per-shard
+   restart/recycle counters for flapping.
 4. **shard → worker thread**: sticky-by-docId with base-sha preference.
 
 Per-tier death: a pod goes unready → the LB rehashes its documents to

@@ -55,6 +55,16 @@ export interface EnginePool {
    */
   generation(): number;
   /**
+   * The generation of THE SHARD SERVING THIS DOCUMENT — what the WS1
+   * write fence captures and re-checks (both fence sites use only this).
+   * Single-engine pools ignore docId; the sharded composite returns the
+   * resident shard's generation, or -1 when the doc is not resident (a
+   * value no real generation takes, so a bless-time compare always
+   * refuses when the doc's shard died in the window). `generation()`
+   * stays as the max-across-shards diagnostics number.
+   */
+  generationFor(docId: string): number;
+  /**
    * Readiness detail for `/readyz`. Inline: always ready. Host mode:
    * `starting`/`backoff` with how long the engine has been unavailable —
    * readiness only fails past a persistence threshold so a sub-second

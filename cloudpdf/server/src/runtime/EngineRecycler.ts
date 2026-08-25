@@ -39,6 +39,10 @@ export interface EngineRecyclePolicy {
   intervalMs?: number; // default 10_000
   /** Minimum spacing between recycles — the thrash guard. */
   cooldownMs?: number; // default 60_000
+  /** Spacing for HARD (kill-now) decisions: sustained hard cgroup
+   *  pressure must not wait a full soft cooldown between shard kills —
+   *  re-evaluate shortly after each replacement is ready. */
+  cooldownHardMs?: number; // default 10_000
   /** Injectable jitter (tests); returns [0,1). */
   jitter?: () => number;
 }
@@ -51,6 +55,14 @@ export interface RecycleDecision {
 export class EngineRecycler {
   private timer: NodeJS.Timeout | undefined;
   private lastRecycleAt = 0;
+  /** The most recent victim. NO further decision of any kind until its
+   *  successor reports ready — otherwise, under sustained pressure, the
+   *  mid-respawn victim has no RSS reading, victim selection falls on a
+   *  SIBLING, and the recycler cascades holes through the fleet (one
+   *  concurrent hole is the whole contract). A crash-looping successor
+   *  deliberately pins recycling OFF — recycling beside a crash loop is
+   *  noise on top of an incident. */
+  private lastVictim: EngineHostClient | null = null;
   /** Per-host jittered lifetime deadline, keyed by client identity. */
   private readonly lifetimeFactor = new WeakMap<EngineHostClient, number>();
   private readonly cfg: Required<
@@ -74,6 +86,7 @@ export class EngineRecycler {
       settleWindowMs: policy.settleWindowMs ?? 3_000,
       intervalMs: policy.intervalMs ?? 10_000,
       cooldownMs: policy.cooldownMs ?? 60_000,
+      cooldownHardMs: policy.cooldownHardMs ?? 10_000,
       maxRssBytes: policy.maxRssBytes,
       maxLifetimeMs: policy.maxLifetimeMs,
     };
@@ -95,16 +108,29 @@ export class EngineRecycler {
 
   /** One evaluation; exposed for tests. At most ONE recycle per tick. */
   async tick(now = Date.now()): Promise<RecycleDecision | null> {
-    if (now - this.lastRecycleAt < this.cfg.cooldownMs) return null;
+    // Recovery gate FIRST: the previous victim's successor must be ready
+    // before ANY new decision (see `lastVictim`). recycle() refusing the
+    // same non-ready host is not enough — decide() would simply pick a
+    // sibling and open a second concurrent hole.
+    if (this.lastVictim !== null) {
+      if (this.lastVictim.health().state !== 'ready') return null;
+      this.lastVictim = null;
+    }
+    const sinceLast = now - this.lastRecycleAt;
+    if (sinceLast < this.cfg.cooldownHardMs) return null;
     const clients = this.hosts();
     const decision = this.decide(clients, now);
     if (!decision) return null;
+    // Soft/lifetime decisions respect the full cooldown; HARD pressure
+    // only waits the short one — plus the recovery gate above.
+    if (decision.graceful && sinceLast < this.cfg.cooldownMs) return null;
     const ok = await decision.victim.recycle(decision.reason, {
       graceful: decision.graceful,
       settleWindowMs: this.cfg.settleWindowMs,
     });
     if (!ok) return null; // host not recyclable right now — later tick retries
     this.lastRecycleAt = now;
+    this.lastVictim = decision.victim;
     const d = { reason: decision.reason, graceful: decision.graceful };
     this.onDecision?.(d);
     return d;

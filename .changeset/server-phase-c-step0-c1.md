@@ -34,3 +34,13 @@ boot-validated, host isolation required.
 read path (crash respawns included): a read parked across an engine
 respawn now re-ensures and retries once instead of surfacing a spurious
 DocNotOpen.
+
+C3: `ShardedEnginePool` — the blast-radius dial (`CLOUDPDF_ENGINE_SHARDS`,
+default 1 = today's exact object graph). K supervised engine hosts behind
+a routing veneer: documents partition by docId (rendezvous with SHA-256
+scores; ad-hoc work by baseSha), one shard's death costs 1/K of residents
+with SCOPED cache forgetting (siblings stay warm), the write fence went
+per-shard (`generationFor(docId)`), readiness fails when any shard is
+persistently down, and per-shard telemetry (`cloudpdf_engine_shard_up`,
+labelled restart/recycle counters) exposes flapping. Requires host
+isolation and an evenly-dividing worker total (boot-validated).

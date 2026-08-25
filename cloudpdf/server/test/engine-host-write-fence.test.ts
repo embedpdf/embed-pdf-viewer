@@ -1,6 +1,7 @@
 import { describe, expect, test, afterEach } from 'vitest';
 import {
   buildHostFixture,
+  clientFor,
   createAnnotation,
   listAnnotations,
   seedDocument,
@@ -42,16 +43,20 @@ describe('engine-host write fence (kill at every boundary)', () => {
     // '__STALL__' parks the stub's annotations.create forever: the write
     // is deterministically mid-APPLY when we kill.
     const stalled = createAnnotation(fx, 'tenant-s1', 'docfence001', 'alice', '__STALL__');
-    await until(() => fx.client.stats().inFlight >= 1);
+    await until(() => clientFor(fx, 'docfence001').stats().inFlight >= 1);
     await sleep(150); // let the pre-create opens complete; the stall remains
 
-    const genBefore = fx.client.generation();
-    process.kill(fx.client.hostPid()!, 'SIGKILL');
+    const genBefore = clientFor(fx, 'docfence001').generation();
+    process.kill(clientFor(fx, 'docfence001').hostPid()!, 'SIGKILL');
 
     const res = await stalled;
     expect(res.status).toBeGreaterThanOrEqual(500); // clean failure, not a hang
 
-    await until(() => fx.client.generation() > genBefore && fx.client.health().state === 'ready');
+    await until(
+      () =>
+        clientFor(fx, 'docfence001').generation() > genBefore &&
+        clientFor(fx, 'docfence001').health().state === 'ready',
+    );
 
     // Durable truth unchanged; the retry path is healthy.
     const empty = await listAnnotations(fx, 'tenant-s1', 'docfence001', 'alice');
@@ -79,9 +84,13 @@ describe('engine-host write fence (kill at every boundary)', () => {
     const write = createAnnotation(fx, 'tenant-s2', 'docfence002', 'alice', 'k2');
     await waitingP; // engine apply DONE, upload blocked — the mid-commit window
 
-    const genBefore = fx.client.generation();
-    process.kill(fx.client.hostPid()!, 'SIGKILL');
-    await until(() => fx.client.generation() > genBefore && fx.client.health().state === 'ready');
+    const genBefore = clientFor(fx, 'docfence002').generation();
+    process.kill(clientFor(fx, 'docfence002').hostPid()!, 'SIGKILL');
+    await until(
+      () =>
+        clientFor(fx, 'docfence002').generation() > genBefore &&
+        clientFor(fx, 'docfence002').health().state === 'ready',
+    );
 
     // A reader during the window must PARK behind the write marker —
     // it may not slip through and recreate a session the late commit
@@ -124,7 +133,7 @@ describe('engine-host write fence (kill at every boundary)', () => {
     const beforeBody = (await before.json()) as { engine: { state: string } };
     expect(beforeBody.engine.state).toBe('ready');
 
-    process.kill(fx.client.hostPid()!, 'SIGKILL');
+    process.kill(clientFor(fx, 'docfence001').hostPid()!, 'SIGKILL');
 
     // Threshold 0: while the host is down, readiness fails with the
     // engine reason. (Respawn takes a few hundred ms — poll for it.)
@@ -143,7 +152,7 @@ describe('engine-host write fence (kill at every boundary)', () => {
     expect(saw503).toBe(true);
 
     // Recovery: the respawned host restores readiness.
-    await until(() => fx.client.health().state === 'ready');
+    await until(() => clientFor(fx, 'docfence001').health().state === 'ready');
     const after = await fetch(`${fx.baseUrl}/readyz`);
     expect(after.status).toBe(200);
   }, 60_000);

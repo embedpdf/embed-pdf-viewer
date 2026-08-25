@@ -19,6 +19,8 @@ import {
 import { buildAppForTesting } from '../src/app/buildApp';
 import { createValidTestLicenseGate } from '../src/licensing/testing';
 
+const TEST_K = Number(process.env['CLOUDPDF_TEST_SHARDS'] ?? '1');
+
 const STUB_ENTRY = new URL('./_helpers/stub-worker-entry.cjs', import.meta.url);
 const SECRET = 'doc-routes-secret';
 
@@ -924,7 +926,9 @@ describe('Phase 3 doc routes — concurrency', () => {
     });
   });
 
-  test('pool eviction releases the pinned base-file handle', async () => {
+  // Topology-literal (exact slot count / same-worker eviction): the
+  // CLOUDPDF_TEST_SHARDS leg tests K-behavior, not single-host mechanics.
+  test.skipIf(TEST_K > 1)('pool eviction releases the pinned base-file handle', async () => {
     await tearDown(fx);
     fx = await buildFixture({ poolSize: 1, maxDocsPerSlot: 1 });
 

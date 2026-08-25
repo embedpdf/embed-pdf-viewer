@@ -697,7 +697,7 @@ export class DocumentService {
     // the then-current generation to refuse blessing a session that was
     // recreated on a NEW engine after this one died mid-commit.
     const recordAlignment = () => {
-      if (opts.forWrite) this.writeAlignGens.set(key, this.pool.generation());
+      if (opts.forWrite) this.writeAlignGens.set(key, this.pool.generationFor(docId));
     };
     const row = await this.requireReadyRow(ctx, docId);
     // Authorization must happen before the layer-session freshness cache
@@ -776,7 +776,7 @@ export class DocumentService {
     // committed version. Invalidate; the next touch reloads at the new
     // durable head. (Inline pool: generation is constant 0, this branch
     // is unreachable, pre-host semantics bit-identical.)
-    if (alignedGen === undefined || alignedGen !== this.pool.generation()) {
+    if (alignedGen === undefined || alignedGen !== this.pool.generationFor(docId)) {
       this.layerSessionVersions.delete(key);
       return;
     }
@@ -1385,10 +1385,33 @@ export class DocumentService {
    *  - `writeAlignGens`: the stale generation is the datum that lets
    *    `advanceLayerSession` refuse to bless a recreated session.
    */
-  onHostRestart(): void {
-    this.heads.clear();
-    this.layerSessionVersions.clear();
-    this.releaseAllBaseHandles();
+  onHostRestart(scope?: { docIds: ReadonlySet<string> }): void {
+    if (scope === undefined) {
+      // Full clear — the K=1 path and the always-safe fallback.
+      this.heads.clear();
+      this.layerSessionVersions.clear();
+      this.releaseAllBaseHandles();
+      return;
+    }
+    // Scoped (C3): one shard died — forget exactly ITS residents, and
+    // touch exactly what the full clear touches, nothing more. `opens`/
+    // `layerOpens` settle via compare-and-delete (clearing them re-opens
+    // the ABA window); `layerWritesInFlight` is API-side (WS1);
+    // `writeAlignGens` stays — the fence fails CLOSED on a missing entry,
+    // so leaving it is discipline, not necessity. Deliberately NOT
+    // `forgetLayerSessions()`: that is evict-path behavior and deletes
+    // `layerOpens`.
+    for (const docId of scope.docIds) {
+      this.heads.delete(docId);
+      this.releaseBaseHandle(docId);
+      const prefix = `${docId}::`;
+      for (const key of Array.from(this.layerSessionVersions.keys())) {
+        if (key.startsWith(prefix)) this.layerSessionVersions.delete(key);
+      }
+      for (const key of Array.from(this.layerArtifactHandles.keys())) {
+        if (key.startsWith(prefix)) this.releaseLayerArtifactHandle(key);
+      }
+    }
   }
 
   /**

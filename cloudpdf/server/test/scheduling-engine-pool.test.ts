@@ -5,6 +5,7 @@ import { DerivedRenderService } from '../src/services/DerivedRenderService';
 import type { WorkerResultPayload } from '@embedpdf/engine-core/runtime';
 import {
   buildHostFixture,
+  clientFor,
   createAnnotation,
   docToken,
   listAnnotations,
@@ -227,7 +228,7 @@ describe('overload over HTTP (host fixture, maxInFlight=1)', () => {
       // Unstick the parked engine call so teardown's app.close() can drain
       // its HTTP request: kill the host — the generation machinery rejects
       // the stalled dispatch (the boundary-kill mechanics).
-      process.kill(fx.client.hostPid()!, 'SIGKILL');
+      process.kill(clientFor(fx, 'docsched1').hostPid()!, 'SIGKILL');
       await stalled; // settles (error response) once the dispatch rejects
     } finally {
       await tearDownHostFixture(fx);
