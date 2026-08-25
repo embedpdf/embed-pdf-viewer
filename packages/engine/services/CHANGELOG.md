@@ -1,5 +1,16 @@
 # @embedpdf/engine-services
 
+## 3.0.0-next.8
+
+### Minor Changes
+
+- [#783](https://github.com/embedpdf/embed-pdf-viewer/pull/783) by [@bobsingor](https://github.com/bobsingor) – `WorkerHost` accepts an optional injected `WorkerImageEncoder` (third
+  constructor argument) and dispatches the new `*.renderEncoded` kinds
+  through it on a narrowly-scoped async path. No new dependencies: the
+  native encoder stays in the injecting package. Hosts without an encoder
+  (browser/local workers) reject those kinds with `NotImplemented`;
+  existing two-argument construction is unchanged.
+
 ## 3.0.0-next.7
 
 ## 3.0.0-next.6

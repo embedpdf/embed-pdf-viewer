@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/engine-core",
-  "version": "3.0.0-next.7",
+  "version": "3.0.0-next.8",
   "private": false,
   "description": "Engine v3 core: AbortablePromise, Engine/DocumentHandle interfaces, DTOs, wire schemas, error codes, and a transport-agnostic conformance harness shared by every Engine implementation.",
   "type": "module",

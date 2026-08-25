@@ -1,5 +1,20 @@
 # @embedpdf/engine-core
 
+## 3.0.0-next.8
+
+### Minor Changes
+
+- [#783](https://github.com/embedpdf/embed-pdf-viewer/pull/783) by [@bobsingor](https://github.com/bobsingor) – Add the `*.renderEncoded` wire kinds (`pages.renderEncoded`,
+  `document.renderPageFileEncoded`, `annotations.renderAppearancesEncoded`)
+  plus their `RenderEncode` / `EncodedImageWire` shapes — cloud-server
+  surface (types only): the raster is encoded where it is produced and only
+  the compressed image crosses the engine boundary.
+
+  Make document access endpoints document-scoped by changing
+  `wirePaths.access` to a `wirePaths.access(docId)` builder. Keep
+  `wirePaths.accessLegacy` for transitional clients and allow the scoped
+  endpoint to omit `docId` from the request body.
+
 ## 3.0.0-next.7
 
 ## 3.0.0-next.6

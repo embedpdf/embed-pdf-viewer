@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/plugin-stage",
-  "version": "3.0.0-next.7",
+  "version": "3.0.0-next.8",
   "private": false,
   "description": "The Stage plugin: one coordinate core (scroll + viewport + zoom + pan + spread) built on @embedpdf/core-stage. Pure intents & selectors; no DOM.",
   "type": "module",

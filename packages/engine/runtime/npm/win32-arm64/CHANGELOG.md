@@ -1,5 +1,7 @@
 # @embedpdf/engine-runtime-win32-arm64
 
+## 3.0.0-next.8
+
 ## 3.0.0-next.7
 
 ## 3.0.0-next.6
