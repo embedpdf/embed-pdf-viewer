@@ -83,10 +83,24 @@ See the [CLI reference](/docs/server/operations/cli) for all commands.
 For production, point the container at Postgres and a cloud bucket, take
 migrations out of the boot path, and let the pool use your cores:
 
+Generate the server secrets once and keep them in your secret manager — they
+must stay **stable across restarts** (see
+[Encrypted-PDF secrets](/docs/server/configuration/authentication#encrypted-pdf-secrets)
+for what the last two protect):
+
+```sh
+export CLOUDPDF_LICENSE_KEY="key/..."
+export CLOUDPDF_JWT_SECRET="$(openssl rand -hex 32)"
+export CLOUDPDF_PASSWORD_VERIFICATION_HMAC_SECRET="$(openssl rand -hex 32)"
+export CLOUDPDF_PASSWORD_SESSION_SERVER_SECRET="$(openssl rand -hex 32)"
+```
+
 ```sh
 docker run -d --init -p 3000:3000 \
-  -e CLOUDPDF_LICENSE_KEY="key/..." \
-  -e CLOUDPDF_JWT_SECRET="$(openssl rand -hex 32)" \
+  -e CLOUDPDF_LICENSE_KEY \
+  -e CLOUDPDF_JWT_SECRET \
+  -e CLOUDPDF_PASSWORD_VERIFICATION_HMAC_SECRET \
+  -e CLOUDPDF_PASSWORD_SESSION_SERVER_SECRET \
   -e CLOUDPDF_DB_DRIVER=postgres \
   -e CLOUDPDF_DB_URL="postgres://user:pass@db:5432/cloudpdf" \
   -e CLOUDPDF_STORAGE_KIND=s3 \

@@ -19,8 +19,12 @@ variables work whether you run it via [npm](/docs/server/deployment/npm),
   <strong><code>CLOUDPDF_LICENSE_KEY</code></strong> (see
   <a href="/docs/server/configuration/licensing">Licensing</a>). With a
   development key, everything else has a sensible default — a minimal server
-  runs with just that. Production keys additionally require the three auth
-  secrets below to be real, random values of at least 32 bytes.
+  runs with just that. Any other license kind also requires
+  <code>CLOUDPDF_JWT_SECRET</code> and
+  <code>CLOUDPDF_PASSWORD_VERIFICATION_HMAC_SECRET</code> (plus
+  <code>CLOUDPDF_PASSWORD_SESSION_SERVER_SECRET</code> when a KMS is
+  configured) to be real random values of at least 32 bytes — the server fails
+  closed at boot and names the variable it needs.
 </Callout>
 
 ## Licensing
@@ -46,10 +50,13 @@ See [Licensing](/docs/server/configuration/licensing).
 | --- | --- | --- |
 | `CLOUDPDF_JWT_SECRET` | dev fallback | HS256 secret used to verify document and admin tokens. Must match the secret your backend signs with. **Required (≥32 bytes) under a production license**; development keys fall back to a public dev value with a warning. |
 | `CLOUDPDF_API_AUTH_TOKENS` | — | Comma-separated static API tokens for trusted backends and tooling (root credential for the admin plane). ≥32 bytes each under a production license. |
-| `CLOUDPDF_PASSWORD_VERIFICATION_HMAC_SECRET` | dev fallback | HMAC pepper for encrypted-PDF password proofs. **Required (≥32 bytes) under a production license.** |
-| `CLOUDPDF_PASSWORD_SESSION_SERVER_SECRET` | dev fallback | Server key for encrypted-PDF password sessions. **Required (≥32 bytes) under a production license.** |
+| `CLOUDPDF_PASSWORD_VERIFICATION_HMAC_SECRET` | dev fallback | HMAC pepper for the encrypted-PDF password-verification cache — it keeps stored password proofs non-reversible. **Required (≥32 bytes) under a production license**, whether or not you open encrypted PDFs. |
+| `CLOUDPDF_PASSWORD_SESSION_SERVER_SECRET` | dev fallback | Server key material for encrypted-PDF unlock sessions. **Required (≥32 bytes) under a production license when a KMS is configured**; unused otherwise. |
+| `CLOUDPDF_PASSWORD_SESSION_SERVER_SECRET_ID` | `dev-v1` | Label for the active session secret, recorded on each session. Changing it (or the secret) invalidates existing sessions. |
 
-See [Authentication](/docs/server/configuration/authentication).
+See [Authentication](/docs/server/configuration/authentication), and
+[Encrypted-PDF secrets](/docs/server/configuration/authentication#encrypted-pdf-secrets)
+for what the last three protect.
 
 ## Database
 

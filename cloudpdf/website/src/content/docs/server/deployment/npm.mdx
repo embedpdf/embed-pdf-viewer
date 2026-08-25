@@ -71,6 +71,10 @@ migrations explicitly, and set the worker pool to use your cores:
 ```sh
 export CLOUDPDF_LICENSE_KEY="key/..."
 export CLOUDPDF_JWT_SECRET="$(openssl rand -hex 32)"
+# Protect the encrypted-PDF caches and sessions. Generate once, keep stable:
+# /docs/server/configuration/authentication#encrypted-pdf-secrets
+export CLOUDPDF_PASSWORD_VERIFICATION_HMAC_SECRET="$(openssl rand -hex 32)"
+export CLOUDPDF_PASSWORD_SESSION_SERVER_SECRET="$(openssl rand -hex 32)"
 export CLOUDPDF_DB_DRIVER=postgres
 export CLOUDPDF_DB_URL="postgres://user:pass@db.internal:5432/cloudpdf"
 export CLOUDPDF_STORAGE_KIND=s3
@@ -105,6 +109,8 @@ After=network.target
 [Service]
 Environment=CLOUDPDF_LICENSE_KEY=key/...
 Environment=CLOUDPDF_JWT_SECRET=...
+Environment=CLOUDPDF_PASSWORD_VERIFICATION_HMAC_SECRET=...
+Environment=CLOUDPDF_PASSWORD_SESSION_SERVER_SECRET=...
 Environment=CLOUDPDF_DB_DRIVER=postgres
 Environment=CLOUDPDF_DB_URL=postgres://...
 ExecStart=/usr/bin/cloudpdf-server serve
