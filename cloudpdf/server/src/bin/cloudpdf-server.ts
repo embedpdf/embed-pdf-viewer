@@ -26,6 +26,8 @@ import { ConnectedUsageReporter } from '../licensing/ConnectedUsageReporter';
 import { LicenseRuntime } from '../licensing/LicenseRuntime';
 import { UsageMeters } from '../licensing/UsageMeters';
 import { PostgresRealtimeBus } from '../realtime/PostgresRealtimeBus';
+import { resolveRecycleConfig } from '../runtime/EngineRecycler';
+import { readCgroupMemory } from '../runtime/cgroup-memory';
 import { loadFallbackFontsFromEnv } from '../runtime/loadFallbackFontsFromEnv';
 import { loadKmsConfigFromEnv } from '../security/kms/config/loadKmsConfigFromEnv';
 import { createKmsKeyring } from '../security/kms/createKmsKeyring';
@@ -343,6 +345,9 @@ function printHelp(): void {
       '    CLOUDPDF_SHUTDOWN_DRAIN_MS    settle window after readiness flips 503 (default 0)',
       '    CLOUDPDF_METRICS       1 exposes an unauthenticated Prometheus /metrics endpoint',
       '    CLOUDPDF_ENGINE_ISOLATION  inline (default) or host: run PDFium in a supervised child process',
+      '    CLOUDPDF_ENGINE_RECYCLE    1 enables engine recycling (host mode; opt-in until soak data)',
+      '    CLOUDPDF_ENGINE_RECYCLE_SOFT_PCT / _HARD_PCT  container working-set watermarks (70 / 85)',
+      '    CLOUDPDF_ENGINE_MAX_RSS_MB / CLOUDPDF_ENGINE_MAX_LIFETIME_HOURS  secondary recycle guards',
       '    CLOUDPDF_QUARANTINE_ENFORCE   1 refuses quarantined documents with 422 (default: observe-only journal)',
       '    CLOUDPDF_QUARANTINE_TTL_HOURS quarantine/strike TTL (default 24)',
       '                           (set behind a LB so rate limits see real client IPs)',
@@ -961,7 +966,16 @@ async function cmdServe(): Promise<void> {
 
   let bundle: Awaited<ReturnType<typeof buildApp>>;
   try {
+    let recycleConfig: ReturnType<typeof resolveRecycleConfig>;
+    try {
+      recycleConfig = resolveRecycleConfig(process.env, ENGINE_ISOLATION, readCgroupMemory);
+    } catch (err) {
+      fail(2, (err as Error).message);
+    }
+    for (const w of recycleConfig!.warnings) console.warn(`[cloudpdf] ${w}`);
     bundle = await buildApp({
+      // C2 recycling (opt-in; fail-fast validated above).
+      ...(recycleConfig.enabled ? { recycle: recycleConfig.policy } : {}),
       // C1 admission tuning (defaults compute from the pool's slot count;
       // queue caps/timeouts are buildApp options — see the Phase C plan).
       ...(schedulingEnv() ? { scheduling: schedulingEnv()! } : {}),

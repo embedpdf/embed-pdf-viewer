@@ -38,6 +38,7 @@ import {
   type SchemaLike,
 } from './_helpers';
 import { requireSharedDocRead } from './_planeGuard';
+import { runReadWithReopen } from '../runtime/EnginePool';
 import {
   requireLayerCapability,
   requireLayerDocAccessOnly,
@@ -661,7 +662,14 @@ async function renderPageImage(input: {
         pageObjectNumber: input.pageObjectNumber,
         options: preparedRenderOptions(),
       });
-    const result = await input.pool.run(input.scope.docId, build, input.signal);
+    const scope = input.scope;
+    const result = await runReadWithReopen(
+      () =>
+        scope.kind === 'layer'
+          ? input.documentService.ensureLayerOnPool(scope.ctx, scope.docId, scope.layerName)
+          : input.documentService.openOnPool(scope.ctx, scope.docId),
+      () => input.pool.run(input.scope.docId, build, input.signal),
+    );
     if (result.tag !== 'pages.render') {
       throw new EngineError(
         EngineErrorCode.WireFormat,
@@ -688,7 +696,14 @@ async function renderPageImage(input: {
           ...(imageOptions.quality !== undefined ? { quality: imageOptions.quality } : {}),
         },
       });
-    const result = await input.pool.run(input.scope.docId, build, input.signal);
+    const scope = input.scope;
+    const result = await runReadWithReopen(
+      () =>
+        scope.kind === 'layer'
+          ? input.documentService.ensureLayerOnPool(scope.ctx, scope.docId, scope.layerName)
+          : input.documentService.openOnPool(scope.ctx, scope.docId),
+      () => input.pool.run(input.scope.docId, build, input.signal),
+    );
     if (result.tag !== 'pages.renderEncoded') {
       throw new EngineError(
         EngineErrorCode.WireFormat,
@@ -798,7 +813,14 @@ async function readPageText(input: {
       ...(input.scope.kind === 'layer' ? { layerName: input.scope.layerName } : {}),
       pageObjectNumber: input.pageObjectNumber,
     });
-  const result = await input.pool.run(input.scope.docId, build, input.signal);
+  const scope = input.scope;
+  const result = await runReadWithReopen(
+    () =>
+      scope.kind === 'layer'
+        ? input.documentService.ensureLayerOnPool(scope.ctx, scope.docId, scope.layerName)
+        : input.documentService.openOnPool(scope.ctx, scope.docId),
+    () => input.pool.run(input.scope.docId, build, input.signal),
+  );
   if (result.tag !== 'pages.text') {
     throw new EngineError(
       EngineErrorCode.WireFormat,
@@ -853,7 +875,14 @@ async function readPageGeometry(input: {
       ...(input.scope.kind === 'layer' ? { layerName: input.scope.layerName } : {}),
       pageObjectNumber: input.pageObjectNumber,
     });
-  const result = await input.pool.run(input.scope.docId, build, input.signal);
+  const scope = input.scope;
+  const result = await runReadWithReopen(
+    () =>
+      scope.kind === 'layer'
+        ? input.documentService.ensureLayerOnPool(scope.ctx, scope.docId, scope.layerName)
+        : input.documentService.openOnPool(scope.ctx, scope.docId),
+    () => input.pool.run(input.scope.docId, build, input.signal),
+  );
   if (result.tag !== 'pages.geometry') {
     throw new EngineError(
       EngineErrorCode.WireFormat,

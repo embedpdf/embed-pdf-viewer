@@ -1,3 +1,4 @@
+import { EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
 import type {
   WirePack,
   WorkerJobId,
@@ -60,4 +61,25 @@ export interface EnginePool {
    * respawn never flaps the pod out of its load balancer.
    */
   health(): { state: 'ready' | 'starting' | 'backoff'; downSinceMs: number | null };
+}
+
+/**
+ * One-shot `DocNotOpen` recovery for READ dispatches. A read that PARKED
+ * across an engine respawn (crash or planned recycle) dispatches into a
+ * successor that no longer holds the document — the pre-dispatch ensure
+ * ran against the old world. Re-ensure (the restart hook already cleared
+ * the service caches, so this genuinely reopens) and retry ONCE.
+ * Mutations never use this: their retry story is WS1's fence + rebase.
+ */
+export async function runReadWithReopen(
+  reensure: () => Promise<unknown>,
+  dispatch: () => Promise<WorkerResultPayload>,
+): Promise<WorkerResultPayload> {
+  try {
+    return await dispatch();
+  } catch (err) {
+    if (!(err instanceof EngineError && err.code === EngineErrorCode.DocNotOpen)) throw err;
+    await reensure();
+    return dispatch();
+  }
 }

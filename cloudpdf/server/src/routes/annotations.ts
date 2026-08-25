@@ -54,6 +54,7 @@ import {
   type RequestJwtContext,
 } from '../app/jwt-plugin';
 import { SharpImageEncoder } from '../render/SharpImageEncoder';
+import { runReadWithReopen } from '../runtime/EnginePool';
 import type { EnginePool } from '../runtime/EnginePool';
 import type { CloudRevisionBridge } from '../services/CloudRevisionBridge';
 import type { DerivedRenderService } from '../services/DerivedRenderService';
@@ -795,7 +796,14 @@ async function renderAnnotationAppearances(input: {
             ...(imageOptions.quality !== undefined ? { quality: imageOptions.quality } : {}),
           },
         });
-      const payload = await input.pool.run(input.scope.docId, build, input.signal);
+      const scope = input.scope;
+      const payload = await runReadWithReopen(
+        () =>
+          scope.kind === 'layer'
+            ? input.documentService.ensureLayerOnPool(scope.ctx, scope.docId, scope.layerName)
+            : input.documentService.openOnPool(scope.ctx, scope.docId),
+        () => input.pool.run(input.scope.docId, build, input.signal),
+      );
       if (payload.tag !== 'annotations.renderAppearancesEncoded') {
         throw new EngineError(
           EngineErrorCode.WireFormat,
@@ -835,7 +843,14 @@ async function renderAnnotationAppearances(input: {
         pageObjectNumber: input.pageObjectNumber,
         options: renderOptions,
       });
-    const payload = await input.pool.run(input.scope.docId, build, input.signal);
+    const scope = input.scope;
+    const payload = await runReadWithReopen(
+      () =>
+        scope.kind === 'layer'
+          ? input.documentService.ensureLayerOnPool(scope.ctx, scope.docId, scope.layerName)
+          : input.documentService.openOnPool(scope.ctx, scope.docId),
+      () => input.pool.run(input.scope.docId, build, input.signal),
+    );
     if (payload.tag !== 'annotations.renderAppearances') {
       throw new EngineError(
         EngineErrorCode.WireFormat,
@@ -996,7 +1011,14 @@ async function readAnnotations(input: {
       ...(input.scope.kind === 'layer' ? { layerName: input.scope.layerName } : {}),
       pageObjectNumber: input.pageObjectNumber,
     });
-  const result = await input.pool.run(input.scope.docId, build, input.signal);
+  const scope = input.scope;
+  const result = await runReadWithReopen(
+    () =>
+      scope.kind === 'layer'
+        ? input.documentService.ensureLayerOnPool(scope.ctx, scope.docId, scope.layerName)
+        : input.documentService.openOnPool(scope.ctx, scope.docId),
+    () => input.pool.run(input.scope.docId, build, input.signal),
+  );
   if (result.tag !== 'annotations.listFullPage') {
     throw new EngineError(
       EngineErrorCode.WireFormat,

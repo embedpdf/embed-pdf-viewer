@@ -17,6 +17,7 @@ import {
   type PdfBits,
   type PdfSaveMode,
   type WorkerJobId,
+  type WorkerResultPayload,
   type EmbeddedFileItem,
   type EmbeddedFileRef,
   type AnnotationRef,
@@ -37,6 +38,7 @@ import type {
   PasswordVerificationRow,
   PdfPasswordVerificationsRepo,
 } from '../db/repos/pdf_password_verifications.repo';
+import { runReadWithReopen } from '../runtime/EnginePool';
 import type { EnginePool } from '../runtime/EnginePool';
 import { signPasswordGrant, verifyPasswordGrant, type PasswordSessionBinding } from '../security';
 import type { BaseFileCache, LocalFileHandle } from '../storage/BaseFileCache';
@@ -250,6 +252,28 @@ export class DocumentService {
    *
    * Concurrent first-callers share one open via singleflight.
    */
+  /**
+   * THE read-dispatch door (P1 #3, review round on C2): every read that
+   * dispatches against an ensured session goes through here, so the
+   * parked-across-respawn DocNotOpen recovery cannot be skipped by a
+   * future call site. Mutations never use this — WS1's fence + rebase
+   * own their retry (see `LayerService.runWithRebase`).
+   */
+  private runRead(
+    ctx: OpenContext,
+    docId: string,
+    layerName: string | undefined,
+    dispatch: () => Promise<WorkerResultPayload>,
+  ): Promise<WorkerResultPayload> {
+    return runReadWithReopen(
+      () =>
+        layerName !== undefined
+          ? this.ensureLayerOnPool(ctx, docId, layerName)
+          : this.openOnPool(ctx, docId),
+      dispatch,
+    );
+  }
+
   async openOnPool(
     ctx: OpenContext,
     docId: string,
@@ -569,7 +593,9 @@ export class DocumentService {
         docId,
         ...(layerName !== undefined ? { layerName } : {}),
       });
-    const result = await this.pool.run(docId, build, signal);
+    const result = await this.runRead(ctx, docId, layerName, () =>
+      this.pool.run(docId, build, signal),
+    );
     if (result.tag !== 'pages.list') {
       throw new EngineError(
         EngineErrorCode.WireFormat,
@@ -588,16 +614,18 @@ export class DocumentService {
   ): Promise<DocumentActionsSnapshot> {
     if (layerName !== undefined) await this.ensureLayerOnPool(ctx, docId, layerName);
     else await this.openOnPool(ctx, docId);
-    const result = await this.pool.run(
-      docId,
-      (jobId) =>
-        wirePack({
-          kind: 'actions.read' as const,
-          jobId,
-          docId,
-          ...(layerName !== undefined ? { layerName } : {}),
-        }),
-      signal,
+    const result = await this.runRead(ctx, docId, layerName, () =>
+      this.pool.run(
+        docId,
+        (jobId) =>
+          wirePack({
+            kind: 'actions.read' as const,
+            jobId,
+            docId,
+            ...(layerName !== undefined ? { layerName } : {}),
+          }),
+        signal,
+      ),
     );
     if (result.tag !== 'actions.read') {
       throw new EngineError(
@@ -809,7 +837,9 @@ export class DocumentService {
         docId,
         ...(layerName !== undefined ? { layerName } : {}),
       });
-    const result = await this.pool.run(docId, build, signal);
+    const result = await this.runRead(ctx, docId, layerName, () =>
+      this.pool.run(docId, build, signal),
+    );
     if (result.tag !== 'metadata.read') {
       throw new EngineError(
         EngineErrorCode.WireFormat,
@@ -1044,15 +1074,21 @@ export class DocumentService {
     mode: 'any' | 'owner',
     layerName?: string,
   ): Promise<{ probe: DocumentSecurityProbeInfo; facts: PasswordSessionFacts }> {
-    const result = await this.pool.run(row.id, (jobId) =>
-      wirePack({
-        kind: 'document.checkPasswordPermissions' as const,
-        jobId,
-        docId: row.id,
-        ...(layerName !== undefined ? { layerName } : {}),
-        password,
-        mode,
-      }),
+    const result = await runReadWithReopen(
+      // Re-establish the canonical session WITH the supplied password —
+      // the explicit-password bootstrap path — then re-check.
+      () => this.openOnPool(ctx, row.id, password),
+      () =>
+        this.pool.run(row.id, (jobId) =>
+          wirePack({
+            kind: 'document.checkPasswordPermissions' as const,
+            jobId,
+            docId: row.id,
+            ...(layerName !== undefined ? { layerName } : {}),
+            password,
+            mode,
+          }),
+        ),
     );
     if (result.tag !== 'document.checkPasswordPermissions') {
       throw new EngineError(
@@ -1297,7 +1333,9 @@ export class DocumentService {
           mode,
           path,
         });
-      const result = await this.pool.run(docId, build, signal);
+      const result = await this.runRead(ctx, docId, layerName, () =>
+        this.pool.run(docId, build, signal),
+      );
       if (result.tag !== 'document.saveFile') {
         throw new EngineError(EngineErrorCode.WireFormat, `unexpected save payload: ${result.tag}`);
       }
@@ -1394,7 +1432,9 @@ export class DocumentService {
         docId,
         ...(layerName !== undefined ? { layerName } : {}),
       });
-    const payload = await this.pool.run(docId, build, signal);
+    const payload = await this.runRead(ctx, docId, layerName, () =>
+      this.pool.run(docId, build, signal),
+    );
     if (payload.tag !== 'attachments.list') {
       throw new EngineError(
         EngineErrorCode.WireFormat,
@@ -1465,7 +1505,9 @@ export class DocumentService {
       // Attachment bytes use the file-backed extraction mode so the decoded
       // payload never crosses the worker boundary as an ArrayBuffer; Fastify
       // streams this completed temp file with backpressure.
-      const payload = await this.pool.run(docId, (jobId) => buildFor(jobId, path), signal);
+      const payload = await this.runRead(ctx, docId, layerName, () =>
+        this.pool.run(docId, (jobId) => buildFor(jobId, path), signal),
+      );
       if (payload.tag !== 'attachments.readFile' && payload.tag !== 'annotations.readFile') {
         throw new EngineError(
           EngineErrorCode.WireFormat,

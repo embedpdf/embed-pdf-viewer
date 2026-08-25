@@ -124,6 +124,33 @@ gauges (all labelled by lane). Engine memory is observable via
 `cloudpdf_engine_host_rss_bytes` and the pod working-set gauges
 (`cloudpdf_container_memory_*`).
 
+## Engine recycling (opt-in)
+
+Long-lived native processes ratchet (PDFium caches, allocator
+fragmentation). Recycling turns that into a controlled sawtooth instead
+of a pod OOMKill — a _rehearsed crash_: drain, respawn, no crash-journal
+strike, no quarantine attribution, no backoff. Host isolation required.
+
+- **Enable**: `CLOUDPDF_ENGINE_RECYCLE=1` (or any knob below). OFF by
+  default until your soak data justifies defaults.
+- **Watermarks** (`_RECYCLE_SOFT_PCT`/`_RECYCLE_HARD_PCT`, default
+  70/85): measured against THIS CONTAINER's cgroup working set over its
+  limit — which includes the API process's own memory. If the API alone
+  crosses the mark, recycling cannot relieve it; the ≥60s cooldown keeps
+  that from becoming a recycle storm, and
+  `cloudpdf_container_memory_working_set_bytes` makes it visible.
+- Soft = graceful (in-flight gets a ~3s settle window; new requests park
+  and complete on the successor). Hard = immediate kill (in-flight
+  rejects retryably). A soft recycle escalates to hard if pressure
+  crosses the hard mark mid-drain.
+- **Secondary guards**: `CLOUDPDF_ENGINE_MAX_RSS_MB` (> 0) per-host RSS
+  cap; `CLOUDPDF_ENGINE_MAX_LIFETIME_HOURS` jittered ±20% (the slow-leak
+  hedge). Without a readable cgroup limit these are the only pressure
+  sources — boot fails if none exists.
+- **Watch**: `cloudpdf_engine_recycles_total{reason}` (completed recycles
+  only), `cloudpdf_engine_host_rss_bytes` sawtooth, zero growth in
+  `cloudpdf_engine_host_restarts_total` beyond your recycles.
+
 ## NetworkPolicy
 
 `networkPolicy.enabled` renders a policy with allow-all placeholder

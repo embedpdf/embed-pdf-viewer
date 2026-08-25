@@ -26,6 +26,8 @@ export interface MetricsOptions {
   /** C1 queue-wait observation sink: metrics installs the histogram
    *  observer into this ref; the scheduler calls through it. */
   queueWaitObserver?: { current: ((lane: SchedulingLane, waitMs: number) => void) | null };
+  /** C2: completed planned recycles by reason. */
+  engineRecycles?: () => Record<string, number>;
 }
 
 /**
@@ -149,6 +151,19 @@ export function registerMetrics(app: FastifyInstance, opts: MetricsOptions): voi
       registers: [register],
       collect() {
         this.set(cgroup()?.limitBytes ?? 0);
+      },
+    });
+  }
+  if (opts.engineRecycles) {
+    const engineRecycles = opts.engineRecycles;
+    new Counter({
+      name: 'cloudpdf_engine_recycles_total',
+      help: 'Completed planned engine recycles (rehearsed crashes: no journal strike, no backoff)',
+      labelNames: ['reason'],
+      registers: [register],
+      collect() {
+        this.reset();
+        for (const [reason, n] of Object.entries(engineRecycles())) this.inc({ reason }, n);
       },
     });
   }

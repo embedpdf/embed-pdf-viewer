@@ -73,6 +73,7 @@ import {
   SchedulingEnginePool,
   type EngineSchedulingConfig,
 } from '../runtime/SchedulingEnginePool';
+import { EngineRecycler, type EngineRecyclePolicy } from '../runtime/EngineRecycler';
 import { WorkerThreadPool, type FallbackFontDescriptor } from '../runtime/WorkerThreadPool';
 import type { KmsKeyring } from '../security';
 import { CloudRevisionBridge } from '../services/CloudRevisionBridge';
@@ -337,6 +338,10 @@ export interface BuildAppOptions {
    *  computed from the pool's slot count; `false` disables the decorator
    *  entirely (raw-pool tests). */
   scheduling?: EngineSchedulingConfig | false;
+  /** C2 engine recycling policy — OPT-IN (absent = telemetry only, no
+   *  recycler). Host isolation required; validated at boot by
+   *  `resolveRecycleConfig` in the bin. */
+  recycle?: EngineRecyclePolicy;
   /** Extra execArgv for the forked engine host (tests: ['--import','tsx']). */
   engineHostExecArgv?: string[];
   /**
@@ -651,6 +656,7 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
 
   let pool: EnginePool | undefined;
   let schedulingPool: SchedulingEnginePool | undefined;
+  let engineRecycler: EngineRecycler | undefined;
   const queueWaitObserver: {
     current: ((lane: 'interactive' | 'background', waitMs: number) => void) | null;
   } = { current: null };
@@ -725,6 +731,22 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
       schedulingPool = scheduler;
       pool = scheduler;
     }
+    if (opts.recycle && !engineHost) {
+      throw new Error(
+        "buildApp: `recycle` requires engineIsolation 'host' — there is no child process to recycle inline",
+      );
+    }
+    if (opts.recycle && engineHost) {
+      const host = engineHost;
+      engineRecycler = new EngineRecycler(
+        () => [host],
+        () => readCgroupMemory(),
+        opts.recycle,
+        (d) => app.log.info({ reason: d.reason, graceful: d.graceful }, 'engine host recycled'),
+        (err) => app.log.warn({ err }, 'engine recycler tick failed'),
+      );
+      engineRecycler.start();
+    }
   }
   const drainCoordinator = new DrainCoordinator();
 
@@ -765,6 +787,7 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
       counters: engineCounters,
       ...(engineHost ? { engineRestarts: () => engineRestartCount } : {}),
       ...(engineHost ? { engineMemory: () => engineHost.memory() } : {}),
+      ...(engineHost ? { engineRecycles: () => engineHost.recycleStats() } : {}),
       ...(crashJournal ? { crashJournal } : {}),
       ...(cgroupReadable ? { cgroup: () => readCgroupMemory() } : {}),
       ...(schedulingPool ? { scheduling: () => schedulingPool!.schedulingStats() } : {}),
@@ -1188,6 +1211,15 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
       reply.code(422).send({ error: { code: err.code, message: err.message } });
       return;
     }
+    if (EngineError.is(err) && (err as EngineError).code === EngineErrorCode.DocNotOpen) {
+      // Server-side override of the generic mapping: DocNotOpen reaching
+      // HTTP is always pool state (post-retry: the engine respawned more
+      // than once inside one request) — a transient 503, never a 404
+      // (real document-absence surfaces as NotFound from the DB layer).
+      reply.header('Retry-After', '2');
+      reply.code(503).send({ error: { code: 'EngineRestarting', message: err.message } });
+      return;
+    }
     if (EngineError.is(err)) {
       const engineErr = err as EngineError;
       const code = mapToHttp(engineErr.code);
@@ -1232,6 +1264,7 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
   const shutdownTimeoutMs = opts.shutdownTimeoutMs ?? 30_000;
   const shutdownDrainMs = opts.shutdownDrainMs ?? 0;
   const shutdown = async () => {
+    engineRecycler?.stop();
     // 1. Fail readiness and end every live SSE stream. Hijacked streams
     //    are invisible to app.close() — with heartbeats keeping their
     //    sockets alive, one connected viewer would otherwise hold

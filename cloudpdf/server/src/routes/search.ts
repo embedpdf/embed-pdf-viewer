@@ -11,6 +11,7 @@ import {
 } from '@embedpdf/engine-core/runtime';
 import { decodeSearchToken, encodeSearchToken } from '@embedpdf/engine-core/wire';
 import { requireLayerDocAccessOnly, requireLayerResource } from '../app/jwt-plugin';
+import { runReadWithReopen } from '../runtime/EnginePool';
 import type { EnginePool } from '../runtime/EnginePool';
 import type { DocumentService, OpenContext } from '../services/DocumentService';
 import {
@@ -126,7 +127,10 @@ async function runSearchSlice(
         ...(state.budget !== undefined ? { budget: state.budget } : {}),
       },
     });
-  const result = await pool.run(docId, build, abortSignalFromRequest(req));
+  const result = await runReadWithReopen(
+    () => documentService.ensureLayerOnPool(ctx, docId, layerName),
+    () => pool.run(docId, build, abortSignalFromRequest(req)),
+  );
   if (result.tag !== 'search.query') {
     throw new EngineError(
       EngineErrorCode.WireFormat,

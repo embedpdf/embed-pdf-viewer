@@ -79,7 +79,10 @@ interface PendingCall {
   suspect: HostCrashSuspect | null;
 }
 
-type HostState = 'starting' | 'ready' | 'backoff' | 'destroyed';
+type HostState = 'starting' | 'ready' | 'backoff' | 'recycling' | 'destroyed';
+
+/** Why a planned recycle happened — the label on `cloudpdf_engine_recycles_total`. */
+export type RecycleReason = 'soft-rss' | 'hard-rss' | 'lifetime' | 'manual';
 
 interface Deferred<T> {
   promise: Promise<T>;
@@ -171,6 +174,110 @@ export class EngineHostClient implements EnginePool {
    *  describe a dead child. */
   private lastMemory: { rssBytes: number; heapUsedBytes: number; at: number } | null = null;
 
+  /** Non-null while a PLANNED exit is in progress (C2 recycle). The exit
+   *  handler consumes it: no crash-journal strike, no poison-document
+   *  attribution, no respawn backoff — a recycle is a REHEARSED crash and
+   *  must never look like an organic one to the supervision layers. */
+  private plannedExit: RecycleReason | null = null;
+  /** True only when WE issued the kill (hard recycle, shutdown-timeout
+   *  escalation) — the exit is planned regardless of its code/signal. A
+   *  graceful shutdown REQUEST is planned only if the child exits 0:
+   *  an organic crash inside the shutdown window must still journal. */
+  private plannedKill = false;
+  private readonly recycleCounts: Record<RecycleReason, number> = {
+    'soft-rss': 0,
+    'hard-rss': 0,
+    lifetime: 0,
+    manual: 0,
+  };
+  /** Wall-clock of the current generation's spawn (lifetime recycling). */
+  private spawnedAt = Date.now();
+
+  /** Completed planned recycles by reason (for /metrics). */
+  recycleStats(): Record<RecycleReason, number> {
+    return { ...this.recycleCounts };
+  }
+
+  /** Uptime of the CURRENT host generation; null unless ready. */
+  uptimeMs(): number | null {
+    return this.state === 'ready' ? Date.now() - this.spawnedAt : null;
+  }
+
+  /**
+   * C2 — a rehearsed crash: drain (graceful) or cut (hard), then the
+   * NORMAL death path minus journal/backoff. Returns false when the host
+   * is not in a recyclable state (already down, restarting, destroyed) —
+   * callers simply try again on a later tick.
+   *
+   * Graceful: new dispatches PARK on the rotated ready promise (they
+   * complete on the successor); in-flight work gets `settleWindowMs` to
+   * finish, then the child is shut down anyway — a truncated write
+   * retries exactly like a crash-window write (the WS1 generation fence
+   * makes truncation safe). Hard: SIGKILL now; whatever is in flight
+   * rejects, exactly like a crash.
+   */
+  async recycle(
+    reason: RecycleReason,
+    opts: { graceful?: boolean; settleWindowMs?: number } = {},
+  ): Promise<boolean> {
+    // A HARD decision may PREEMPT an in-progress graceful drain (memory
+    // crossed the hard watermark mid-settle): cut now, keep the planned
+    // classification, upgrade the recorded reason.
+    if (this.state === 'recycling' && opts.graceful === false && this.child) {
+      this.plannedExit = reason;
+      this.plannedKill = true;
+      this.child.kill('SIGKILL');
+      return true;
+    }
+    if (this.state !== 'ready' || !this.child) return false;
+    const child = this.child;
+    const gen = this.gen;
+    // Park new dispatches NOW: rotate ready + leave 'ready' state. From
+    // here the machine reads as a controlled respawn-in-progress.
+    // Deliberately NOT planned yet: an ORGANIC crash during the settle
+    // window must journal/attribute/backoff like any crash — the planned
+    // markers are set only at the moment WE issue termination.
+    this.state = 'recycling';
+    this.ready = deferred<void>();
+    if (this.downSince === null) this.downSince = Date.now();
+    if (opts.graceful !== false) {
+      // Default 3s: settle + bounded shutdown + successor boot must fit
+      // inside the parked-dispatch deadline (10s) AND the readiness
+      // persistence threshold (10s) — a longer drain would time parked
+      // work out and flap /readyz, contradicting the parked-work promise.
+      const deadline = Date.now() + (opts.settleWindowMs ?? 3_000);
+      while (this.inFlight.size > 0 && Date.now() < deadline && this.gen === gen) {
+        await new Promise((r) => setTimeout(r, 25));
+      }
+      // The child may have crashed organically mid-drain (journalled as a
+      // crash — correct) or destroy() may have run; nothing left to do.
+      // destroy() may have run while we slept — TS can't see the
+      // cross-await mutation, hence the widening.
+      if (this.gen !== gen || (this.state as HostState) === 'destroyed') return true;
+      this.plannedExit = reason;
+      // Bounded shutdown, then SIGKILL — the same posture as destroy(),
+      // except the exit flows into the normal respawn path.
+      const callId = this.nextCallId++;
+      const killTimer = setTimeout(() => {
+        if (this.gen === gen && this.child) {
+          this.plannedKill = true; // OUR escalation — still planned
+          this.child.kill('SIGKILL');
+        }
+      }, this.opts.shutdownTimeoutMs ?? 2_000);
+      killTimer.unref?.();
+      const sent = child.send({ t: 'shutdown', callId }, () => undefined);
+      if (!sent) {
+        this.plannedKill = true;
+        child.kill('SIGKILL');
+      }
+    } else {
+      this.plannedExit = reason;
+      this.plannedKill = true;
+      child.kill('SIGKILL');
+    }
+    return true;
+  }
+
   /** Memory heartbeat of the CURRENT host generation, with its age. */
   memory(): { rssBytes: number; heapUsedBytes: number; ageMs: number } | null {
     if (!this.lastMemory) return null;
@@ -183,6 +290,7 @@ export class EngineHostClient implements EnginePool {
 
   private spawn(): void {
     this.lastMemory = null;
+    this.spawnedAt = Date.now();
     if (this.state === 'destroyed') return;
     const gen = ++this.gen;
     this.state = 'starting';
@@ -249,6 +357,14 @@ export class EngineHostClient implements EnginePool {
 
   private onHostExit(code: number | null, signal: string | null): void {
     if (this.state === 'destroyed') return;
+    // Planned iff WE terminated it: a clean exit after our shutdown
+    // request, or any exit after our own SIGKILL. A nonzero/uninvited
+    // exit during the shutdown window is an ORGANIC crash — journal it.
+    const planned =
+      this.plannedExit !== null && (code === 0 || this.plannedKill) ? this.plannedExit : null;
+    this.plannedExit = null;
+    this.plannedKill = false;
+    if (planned) this.recycleCounts[planned] += 1; // count COMPLETED recycles
     this.child = null;
     // A reading must never describe a dead child — clear HERE, not at
     // respawn: during crash backoff (seconds) a spawn-time reset would
@@ -273,7 +389,9 @@ export class EngineHostClient implements EnginePool {
       .filter((p) => p.suspect !== null)
       .map((p) => p.suspect!);
     const err = unavailable(
-      `engine host died (code=${code} signal=${signal}); the request can be retried`,
+      planned
+        ? `engine host is recycling (${planned}); the request can be retried`
+        : `engine host died (code=${code} signal=${signal}); the request can be retried`,
     );
     for (const pending of this.inFlight.values()) {
       pending.cleanupAbort();
@@ -285,11 +403,16 @@ export class EngineHostClient implements EnginePool {
 
     // Journal first (needs the pre-clear suspect view), forget second,
     // respawn third. Journal/restart hooks must never block or throw
-    // their way out of supervision.
-    try {
-      this.opts.onHostCrash?.({ suspects, code, signal, engineBuild: this.engineBuild });
-    } catch {
-      /* journaling must never prevent recovery */
+    // their way out of supervision. A PLANNED exit skips the journal
+    // entirely (no strike, no attribution) and pays no backoff — but the
+    // forget-everything restart hook ALWAYS fires: the sessions died with
+    // the child either way.
+    if (!planned) {
+      try {
+        this.opts.onHostCrash?.({ suspects, code, signal, engineBuild: this.engineBuild });
+      } catch {
+        /* journaling must never prevent recovery */
+      }
     }
     try {
       this.opts.onHostRestart?.();
@@ -297,8 +420,10 @@ export class EngineHostClient implements EnginePool {
       /* ditto */
     }
 
-    const delay = this.respawnDelayMs;
-    this.respawnDelayMs = Math.min(this.respawnDelayMs * 2, this.opts.respawnMaxMs ?? 5_000);
+    const delay = planned ? 0 : this.respawnDelayMs;
+    if (!planned) {
+      this.respawnDelayMs = Math.min(this.respawnDelayMs * 2, this.opts.respawnMaxMs ?? 5_000);
+    }
     this.respawnTimer = setTimeout(() => this.spawn(), delay);
     this.respawnTimer.unref?.();
   }
@@ -603,7 +728,14 @@ export class EngineHostClient implements EnginePool {
   }
 
   health(): { state: 'ready' | 'starting' | 'backoff'; downSinceMs: number | null } {
-    const state = this.state === 'destroyed' ? 'backoff' : this.state;
+    // 'recycling' reads as 'starting': a controlled respawn-in-progress —
+    // the readiness persistence threshold treats both identically.
+    const state =
+      this.state === 'destroyed' || this.state === 'backoff'
+        ? ('backoff' as const)
+        : this.state === 'ready'
+          ? ('ready' as const)
+          : ('starting' as const);
     return {
       state,
       downSinceMs: this.downSince === null ? null : Date.now() - this.downSince,

@@ -2876,11 +2876,23 @@ export class LayerService {
       try {
         return await op();
       } catch (err) {
-        if (!(err instanceof LayerFenceConflict)) throw err;
-        // C5 instrument: one cross-replica write race per rebase. The
-        // rate of this counter at N>1 replicas is the docAffinity
-        // flip evidence.
-        if (this.counters) this.counters.layerWriteConflicts += 1;
+        // Two retryable-once shapes, same mechanical recovery (invalidate
+        // → re-prepare reloads durable truth → re-apply):
+        //  - LayerFenceConflict: a REMOTE replica committed in our window.
+        //  - DocNotOpen at APPLY: the op parked across an engine respawn
+        //    (crash or recycle) and dispatched into a successor without
+        //    the session. Nothing applied — no ghost — so the rerun is
+        //    exactly the fence-conflict recovery. (The read-path twin is
+        //    `runReadWithReopen`.)
+        const parkedAcrossRespawn =
+          err instanceof EngineError && err.code === EngineErrorCode.DocNotOpen;
+        if (!(err instanceof LayerFenceConflict) && !parkedAcrossRespawn) throw err;
+        if (err instanceof LayerFenceConflict) {
+          // C5 instrument: one cross-replica write race per rebase. The
+          // rate of this counter at N>1 replicas is the docAffinity
+          // flip evidence.
+          if (this.counters) this.counters.layerWriteConflicts += 1;
+        }
         documentService.invalidateLayerSession(docId, layerName);
         return await op();
       }

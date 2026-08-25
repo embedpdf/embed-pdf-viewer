@@ -253,6 +253,159 @@ describe('EngineHostClient lifecycle', () => {
     await client.destroy();
   });
 
+  test('graceful recycle: parks new work, drains, no journal strike, NO backoff', async () => {
+    // Backoff would be 5s — a planned exit must respawn immediately.
+    const h = harness({ respawnBaseMs: 5_000, respawnMaxMs: 5_000 });
+    await until(() => h.children.length === 1);
+    h.children[0]!.ready();
+    const client = await h.clientPromise;
+
+    // One in-flight job the drain must wait for.
+    const inflight = client.run('doc-a', build);
+    inflight.catch(() => undefined);
+    await until(() => h.children[0]!.sent.some((m) => (m as { t?: string }).t === 'dispatch'));
+
+    const recycled = client.recycle('manual', { settleWindowMs: 150 });
+    // New work parks (successor will serve it) instead of racing the corpse.
+    let parkedSettled = false;
+    const parked = client.run('doc-b', build).then(
+      (r) => {
+        parkedSettled = true;
+        return r;
+      },
+      (e) => {
+        parkedSettled = true;
+        throw e;
+      },
+    );
+    expect(client.health().state).toBe('starting'); // recycling reads as starting
+    await new Promise((r) => setTimeout(r, 60));
+    expect(parkedSettled).toBe(false);
+
+    // Window expires with the job still in flight → bounded shutdown sent.
+    await until(() => h.children[0]!.sent.some((m) => (m as { t?: string }).t === 'shutdown'));
+    h.children[0]!.exit(0);
+    await recycled;
+    // Immediate respawn despite the 5s backoff config = the planned path.
+    await until(() => h.children.length === 2, 500);
+    expect(h.crashes).toHaveLength(0); // NO journal strike
+    expect(h.restarts).toHaveLength(1); // forget-everything still fired
+    await expect(inflight).rejects.toThrow(/recycling/);
+    expect(client.recycleStats().manual).toBe(1);
+
+    h.children[1]!.ready();
+    await until(() => h.children[1]!.sent.some((m) => (m as { t?: string }).t === 'dispatch'));
+    const call = h.children[1]!.sent.find((m) => (m as { t?: string }).t === 'dispatch') as {
+      callId: number;
+    };
+    h.children[1]!.result(call.callId, { tag: 'ok' });
+    await parked; // the parked job completed on the successor
+    await client.destroy();
+  });
+
+  test('an ORGANIC crash during the settle window journals as a crash, not a recycle', async () => {
+    const h = harness();
+    await until(() => h.children.length === 1);
+    h.children[0]!.ready();
+    const client = await h.clientPromise;
+    const job = client.run('doc-a', build);
+    job.catch(() => undefined);
+    await until(() => h.children[0]!.sent.some((m) => m['t'] === 'dispatch'));
+    const recycled = client.recycle('soft-rss', { settleWindowMs: 5_000 });
+    // PDFium dies for real mid-drain — BEFORE any shutdown was issued.
+    h.children[0]!.exit(139, null);
+    await recycled;
+    await until(() => h.children.length === 2);
+    expect(h.crashes).toHaveLength(1); // journalled — attribution preserved
+    expect(client.recycleStats()['soft-rss']).toBe(0); // no completed recycle claimed
+    h.children[1]!.ready();
+    await client.destroy();
+  });
+
+  test('a nonzero exit AFTER the shutdown request still journals as a crash', async () => {
+    const h = harness();
+    await until(() => h.children.length === 1);
+    h.children[0]!.ready();
+    const client = await h.clientPromise;
+    const recycled = client.recycle('lifetime', { settleWindowMs: 50 });
+    await until(() => h.children[0]!.sent.some((m) => m['t'] === 'shutdown'));
+    // The child crashes while processing shutdown (organic, not our kill).
+    h.children[0]!.exit(134, null);
+    await recycled;
+    await until(() => h.children.length === 2);
+    expect(h.crashes).toHaveLength(1);
+    expect(client.recycleStats().lifetime).toBe(0);
+    h.children[1]!.ready();
+    await client.destroy();
+  });
+
+  test('a HARD decision preempts an in-progress graceful drain', async () => {
+    const h = harness();
+    await until(() => h.children.length === 1);
+    h.children[0]!.ready();
+    const client = await h.clientPromise;
+    const job = client.run('doc-a', build);
+    job.catch(() => undefined);
+    await until(() => h.children[0]!.sent.some((m) => m['t'] === 'dispatch'));
+    const soft = client.recycle('soft-rss', { settleWindowMs: 10_000 });
+    expect(client.health().state).toBe('starting');
+    // Memory crossed the hard watermark mid-settle: escalate NOW.
+    expect(await client.recycle('hard-rss', { graceful: false })).toBe(true);
+    expect(h.children[0]!.kills).toContain('SIGKILL');
+    h.children[0]!.exit(null, 'SIGKILL');
+    await soft;
+    await until(() => h.children.length === 2);
+    expect(h.crashes).toHaveLength(0); // OUR kill — planned
+    expect(client.recycleStats()['hard-rss']).toBe(1); // counted under the escalated reason
+    h.children[1]!.ready();
+    await client.destroy();
+  });
+
+  test('graceful recycle proceeds as soon as in-flight settles (no window wait)', async () => {
+    const h = harness();
+    await until(() => h.children.length === 1);
+    h.children[0]!.ready();
+    const client = await h.clientPromise;
+    const job = client.run('doc-a', build);
+    await until(() => h.children[0]!.sent.some((m) => (m as { t?: string }).t === 'dispatch'));
+    const recycled = client.recycle('soft-rss', { settleWindowMs: 10_000 });
+    const call = h.children[0]!.sent.find((m) => (m as { t?: string }).t === 'dispatch') as {
+      callId: number;
+    };
+    h.children[0]!.result(call.callId, { tag: 'ok' });
+    await job;
+    // Well before the 10s window: the drain loop sees zero in flight.
+    await until(
+      () => h.children[0]!.sent.some((m) => (m as { t?: string }).t === 'shutdown'),
+      2_000,
+    );
+    h.children[0]!.exit(0);
+    await recycled;
+    await until(() => h.children.length === 2);
+    expect(h.crashes).toHaveLength(0);
+    await client.destroy();
+  });
+
+  test('hard recycle kills immediately; recycle on a non-ready host is refused', async () => {
+    const h = harness();
+    await until(() => h.children.length === 1);
+    h.children[0]!.ready();
+    const client = await h.clientPromise;
+    const job = client.run('doc-a', build);
+    job.catch(() => undefined);
+    await until(() => h.children[0]!.sent.some((m) => (m as { t?: string }).t === 'dispatch'));
+    expect(await client.recycle('hard-rss', { graceful: false })).toBe(true);
+    expect(h.children[0]!.kills).toContain('SIGKILL');
+    h.children[0]!.exit(null, 'SIGKILL');
+    await expect(job).rejects.toThrow(/recycling/);
+    expect(h.crashes).toHaveLength(0);
+    // Mid-respawn: not recyclable.
+    expect(await client.recycle('manual')).toBe(false);
+    await until(() => h.children.length === 2);
+    h.children[1]!.ready();
+    await client.destroy();
+  });
+
   test('a protocol mismatch is refused at create()', async () => {
     const { clientPromise, children } = harness();
     children[0]!.emit('message', { t: 'ready', protocol: 999, pid: 1, engineBuild: 'x' });

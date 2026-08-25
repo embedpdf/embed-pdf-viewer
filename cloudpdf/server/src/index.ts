@@ -275,6 +275,11 @@ export const defaultEngineHostEntryUrl: URL = new URL(
 export type { BuildPack, EnginePool } from './runtime/EnginePool';
 export { EngineHostClient } from './runtime/EngineHostClient';
 export {
+  EngineRecycler,
+  resolveRecycleConfig,
+  type EngineRecyclePolicy,
+} from './runtime/EngineRecycler';
+export {
   EngineBusyError,
   SchedulingEnginePool,
   type EngineSchedulingConfig,

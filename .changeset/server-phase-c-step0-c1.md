@@ -3,8 +3,8 @@
 ---
 
 WS3 Phase C, step 0 + C1. Step 0: engine-host memory heartbeat (host
-protocol v3) with RSS/heap gauges, pod cgroup working-set gauges
-(kubelet's formula), and the C5 flip instruments
+protocol v3) with RSS/heap gauges, container cgroup working-set gauges
+(kubelet's formula; the pod's only while the server is its sole app container), and the C5 flip instruments
 (`cloudpdf_layer_write_conflicts_total`, `cloudpdf_engine_doc_opens_total`).
 C1: `SchedulingEnginePool` — two-lane admission control at the engine
 dispatch choke point (interactive default; explicit `background` opt-in,
@@ -19,3 +19,18 @@ retryable. All lane knobs are env-tunable
 totals as Counters. C4: `runtimeClassName` chart passthrough, the
 engine-plane threat model in THREAD_CONFINED_RUNTIME.md, and DEPLOY.md's
 "Scaling out" + "Runtime confinement" sections.
+
+C2: opt-in engine recycling — a rehearsed crash. `EngineHostClient.recycle()`
+adds the planned-exit lifecycle (drain → shutdown → immediate respawn: no
+crash-journal strike, no attribution, no backoff; new work parks and
+completes on the successor). `EngineRecycler` policy: the container
+cgroup working set triggers (soft 70% graceful / hard 85% kill), the RSS
+heartbeat picks the victim, jittered lifetime recycling and a per-host
+RSS cap as secondary guards, cooldown thrash-guard. Enable with
+`CLOUDPDF_ENGINE_RECYCLE=1` (+ `_SOFT_PCT`/`_HARD_PCT`,
+`CLOUDPDF_ENGINE_MAX_RSS_MB`, `CLOUDPDF_ENGINE_MAX_LIFETIME_HOURS`);
+boot-validated, host isolation required.
+`cloudpdf_engine_recycles_total{reason}` counts them. Also fixed on the
+read path (crash respawns included): a read parked across an engine
+respawn now re-ensures and retries once instead of surfacing a spurious
+DocNotOpen.
