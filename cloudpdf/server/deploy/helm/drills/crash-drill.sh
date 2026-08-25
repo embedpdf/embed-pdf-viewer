@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# The resilience drill (plan §5.3): 2 replicas on the Postgres +
+# Resilience drill: 2 replicas on the Postgres +
 # object-storage profile, live SSE listener + continuous render load,
 # then a native-crash simulation on one pod. Prints the recovery
 # timeline that backs the resilience claims:
 #   - no fleet-wide outage (the surviving replica absorbs)
-#   - zero committed-write loss (WS1)
+#   - zero committed-write loss through generation-fenced writes
 #   - crashed pod MTTR
 #
 # Self-contained: installs pinned postgres + MinIO manifests as DRILL

@@ -48,7 +48,7 @@ spec:
 {{/* Doc-affinity Ingress: consistent-hash /v1/docs traffic so one
      document's requests land on one replica while it stays warm. A
      PERFORMANCE layer only — any replica serves any document correctly
-     (the WS1 fence); this just maximizes warm worker sessions and
+     (the write-generation fence); this just maximizes warm worker sessions and
      de-duplicates resident memory. More-specific paths win in
      ingress-nginx, so this shadows the catch-all above for the
      prefix. */}}

@@ -1,7 +1,7 @@
 /**
  * Process-wide event counters surfaced by /metrics collect() closures —
- * the C5 flip instruments: the docAffinity decision ("turn it on when
- * measurements justify it") reads exactly these. Plain mutable numbers,
+ * the docAffinity decision ("turn it on when measurements justify it")
+ * reads exactly these operational counters. Plain mutable numbers,
  * dependency-injected: services stay prometheus-free and the counts
  * exist (cheaply) even when metrics are disabled.
  */

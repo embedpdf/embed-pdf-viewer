@@ -3,8 +3,8 @@ name: Server Test Matrix
 # The FULL @cloudpdf/server suite across all three engine topologies:
 # inline (worker threads in-process), host (supervised child process),
 # and host with K=2 shards. Until this workflow existed, CI ran only
-# test/licensing.test.ts — the WS3 isolation/scheduling/recycling/
-# sharding suites had no CI coverage at all (review round on C3).
+# test/licensing.test.ts; isolation, scheduling, recycling, and sharding
+# had no full-suite CI coverage.
 #
 # Needs the native engine runtime (the encode-in-engine and boundary
 # suites exercise real PDFium + sharp), so it reuses the same
@@ -80,11 +80,15 @@ jobs:
           done
           rm -rf packages/engine/runtime/_artifacts
 
-      - name: Build engine packages
+      # Every workspace dep the server consumes from dist, in dependency
+      # order (contract needs engine-core; the sdk is a test-time dep).
+      - name: Build workspace packages
         run: |
           pnpm --filter @embedpdf/engine-runtime build
           pnpm --filter @embedpdf/engine-core build
           pnpm --filter @embedpdf/engine-services build
+          pnpm --filter @cloudpdf/contract build
+          pnpm --filter @cloudpdf/sdk build
           pnpm --filter @cloudpdf/server build
 
       - name: Server suite (${{ matrix.leg.name }})

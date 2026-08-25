@@ -330,21 +330,21 @@ export interface BuildAppOptions {
    * carrying a loader). Required when `engineIsolation: 'host'`.
    */
   engineHostEntry?: URL | string;
-  /** WS3 Phase B: encode renders inside the engine worker so only
+  /** Encode renders inside the engine worker so only
    *  compressed images cross the engine boundary (default true). `false`
    *  is the one-release escape hatch (`CLOUDPDF_ENCODE_IN_ENGINE=0`):
    *  raw rasters over the boundary + API-side sharp, exactly the
-   *  pre-Phase-B pipeline. */
+   *  previous API-side encoding pipeline. */
   encodeInEngine?: boolean;
-  /** C1 admission control (lanes + bounded queues + shed). Defaults are
+  /** Admission control (lanes + bounded queues + shed). Defaults are
    *  computed from the pool's slot count; `false` disables the decorator
    *  entirely (raw-pool tests). */
   scheduling?: EngineSchedulingConfig | false;
-  /** C2 engine recycling policy — OPT-IN (absent = telemetry only, no
+  /** Engine recycling policy — OPT-IN (absent = telemetry only, no
    *  recycler). Host isolation required; validated at boot by
    *  `resolveRecycleConfig` in the bin. */
   recycle?: EngineRecyclePolicy;
-  /** C3 — engine shard count (host isolation only). Default 1 =
+  /** Engine shard count (host isolation only). Default 1 =
    *  today's exact object graph; K > 1 requires the resolved worker
    *  total to divide evenly (M % K === 0, validated here). */
   engineShards?: number;
@@ -361,7 +361,7 @@ export interface BuildAppOptions {
    * Crash-journal posture (host mode + db only). OBSERVE-ONLY by
    * default: every engine-host death and its suspects are journaled and
    * quarantine decisions are computed AND persisted — but nothing is
-   * refused until `enforce` is set. See the WS3 Phase A plan §5.
+   * refused until `enforce` is set.
    */
   quarantine?: { enforce?: boolean; ttlHours?: number };
 }
@@ -396,9 +396,9 @@ export interface AppBundle {
   engineHost?: EngineHostClient;
   /** All engine shards (host mode; length = engineShards, [engineHost] at K=1). */
   engineHosts?: EngineHostClient[];
-  /** C1 decorator (present unless `scheduling: false`). */
+  /** Admission-control decorator (present unless `scheduling: false`). */
   engineScheduler?: SchedulingEnginePool;
-  /** C5 flip instruments (also readable in tests). */
+  /** Operational counters used by metrics and tests. */
   engineCounters?: EngineCounters;
   /**
    * Flip `/readyz` to 503 and end every live SSE stream without closing
@@ -423,7 +423,7 @@ export interface AppBundle {
  * document routes when their adapters are configured. Caller is
  * responsible for `app.listen()`.
  */
-/** C3 validation FIRST — before ANY machinery (license gate included)
+/** Engine-shard validation runs before any machinery (license gate included)
  *  boots, so a bad shard config fails instantly with only this message.
  *  Called by both public and testing entries. */
 function validateShardOptions(opts: BuildAppOptions): void {
@@ -495,7 +495,7 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
   // The cross-replica doorbell exists for the whole app lifetime: mutation
   // signals for SSE, revocation pushes for the auth guard + open streams.
   const realtimeBus = opts.realtimeBus ?? new InProcessRealtimeBus();
-  // C5 flip instruments — created unconditionally (cheap plain numbers);
+  // Operational counters are created unconditionally (cheap plain numbers);
   // /metrics surfaces them when enabled.
   const engineCounters = createEngineCounters();
   // Secret hygiene is license-keyed: development keys + the test gate keep
@@ -741,8 +741,8 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
             fonts: opts.fallbackFonts ?? [],
           },
           onEvict: evictForward,
-          // Forget-everything on host death: WS1 makes the lazy rebuild
-          // from durable truth safe; the generation fence closes the
+          // Forget everything on host death: durable writes make the lazy
+          // rebuild from durable truth safe; the generation fence closes the
           // mid-commit window (DocumentService.advanceLayerSession).
           onHostRestart: () => {
             engineRestartCount += 1;
@@ -760,7 +760,7 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
         engineHost = pool as EngineHostClient;
         engineHosts = [engineHost];
       } else {
-        // C3: the parent resolves the worker TOTAL once and splits it —
+        // Sharding: the parent resolves the worker total once and splits it —
         // children never self-resolve (the size env is not whitelisted,
         // and K independent cpu-defaults would multiply the fleet).
         const totalWorkers = resolvePoolSize(opts.poolSize);
@@ -816,7 +816,7 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
         fonts: opts.fallbackFonts,
       });
     }
-    // C1 — admission control wraps OUTERMOST (both isolation modes): lanes
+    // Admission control wraps outermost in both isolation modes: lanes
     // and shed decisions happen before quarantine checks or dispatch.
     // `scheduling: false` disables (tests that assert raw pool behavior).
     if (opts.scheduling !== false) {

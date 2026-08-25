@@ -17,18 +17,18 @@ export interface MetricsOptions {
   crashJournal?: CrashJournal;
   /** Host mode: latest child memory heartbeat (protocol v3). */
   engineMemory?: () => { rssBytes: number; heapUsedBytes: number; ageMs: number } | null;
-  /** C5 flip instruments (monotonic totals via collect, like restarts). */
+  /** Operational counters (monotonic totals via collect, like restarts). */
   counters?: EngineCounters;
   /** Pod-level working set/limit; provided only when a cgroup is readable. */
   cgroup?: () => CgroupMemory | null;
-  /** C1 per-lane admission state. */
+  /** Per-lane admission state. */
   scheduling?: () => Record<SchedulingLane, LaneStats>;
-  /** C1 queue-wait observation sink: metrics installs the histogram
+  /** Queue-wait observation sink: metrics installs the histogram
    *  observer into this ref; the scheduler calls through it. */
   queueWaitObserver?: { current: ((lane: SchedulingLane, waitMs: number) => void) | null };
-  /** C2: completed planned recycles by reason. */
+  /** Completed controlled recycles by reason. */
   engineRecycles?: () => Record<string, number>;
-  /** C3: bounded per-shard telemetry (K ≤ cpus keeps cardinality trivial) —
+  /** Bounded per-shard telemetry (K ≤ cpus keeps cardinality trivial) —
    *  without it a single flapping shard hides inside the aggregates. */
   shards?: () => Array<{
     shard: number;

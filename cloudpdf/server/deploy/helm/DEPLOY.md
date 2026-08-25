@@ -100,7 +100,7 @@ tier below:
    (cold-open work) climbing under multi-replica traffic are the signal.
    N > 1 requires Postgres — realtime SSE fans out cross-replica through
    the Postgres bus.
-2. **pod → engine host**: WS3 host isolation — a native crash costs one
+2. **pod → engine host**: supervised host isolation — a native crash costs one
    sub-second engine respawn, never the pod. Shipped; the DEFAULT is
    still in-process until the rollout's soak completes: enable today
    with `CLOUDPDF_ENGINE_ISOLATION=host` (chart `extraEnv`).

@@ -383,7 +383,7 @@ function printHelp(): void {
 // ------- commands -------
 
 /**
- * Operator surface for the engine crash quarantine (WS3 Phase A §5):
+ * Operator surface for the engine crash quarantine:
  *   cloudpdf-server quarantine list
  *   cloudpdf-server quarantine clear <base_sha> --reason "verified fixed"
  * CLI-first on purpose — no contract/SDK churn; a dashboard op can
@@ -988,15 +988,15 @@ async function cmdServe(): Promise<void> {
     }
     for (const w of recycleConfig!.warnings) console.warn(`[cloudpdf] ${w}`);
     bundle = await buildApp({
-      // C2 recycling (opt-in; fail-fast validated above).
+      // Engine recycling (opt-in; fail-fast validated above).
       ...(recycleConfig.enabled ? { recycle: recycleConfig.policy } : {}),
-      // C3 shard dial (buildApp validates divisibility against the
+      // Engine shard dial (buildApp validates divisibility against the
       // resolved worker total; K > 1 requires host isolation).
       ...(engineShardsEnv() !== undefined ? { engineShards: engineShardsEnv() } : {}),
-      // C1 admission tuning (defaults compute from the pool's slot count;
-      // queue caps/timeouts are buildApp options — see the Phase C plan).
+      // Admission tuning (defaults compute from the pool's slot count;
+      // queue caps and timeouts are buildApp options).
       ...(schedulingEnv() ? { scheduling: schedulingEnv()! } : {}),
-      // WS3 Phase B escape hatch: '0'/'false' reverts to raw rasters over
+      // Encoding escape hatch: '0'/'false' reverts to raw rasters over
       // the engine boundary + API-side sharp for one release.
       encodeInEngine:
         process.env.CLOUDPDF_ENCODE_IN_ENGINE !== '0' &&

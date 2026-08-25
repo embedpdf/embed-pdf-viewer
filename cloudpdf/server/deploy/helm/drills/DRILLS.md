@@ -57,12 +57,11 @@ How to read it, honestly:
 - **No fleet-wide outage** — the surviving replica keeps serving; `F`
   counts only requests that were in flight on the dead pod or raced the
   LB's endpoint update. This is NOT "zero downtime" for those requests.
-- **Zero data loss** — committed writes are durable (the WS1 fence);
+- **Zero data loss** — committed writes are protected by the write-generation fence;
   the seed document survives every run.
-- **MTTR** — today a native crash costs one whole pod for ~15–45 s.
-  When engine-host isolation (WS3 Phase A) lands, this same drill is
-  the proof that the number drops to a sub-second engine respawn with
-  the API untouched — rerun it, diff the timeline.
+- **MTTR** — with engine-host isolation enabled, this drill verifies
+  that a native crash costs a sub-second engine respawn while the API
+  stays available — rerun it and compare the timeline.
 
 Postgres and MinIO here are pinned **drill dependencies**, not chart
 dependencies — the chart stays BYO-database, as documented.
