@@ -1,0 +1,26 @@
+apiVersion: v2
+name: cloudpdf-server
+description: >-
+  CloudPDF server — the self-hosted PDF document engine. Postgres +
+  object-storage profile scales horizontally; a single-replica SQLite/PVC
+  profile covers small footprints. Licensed under FCL-1.0-ALv2 (see
+  cloudpdf/server/LICENSE in the source repository).
+type: application
+# version/appVersion are stamped by the release workflow from
+# cloudpdf/server/package.json — the chart, the npm package, and the
+# Docker image share one version forever. The values below are
+# placeholders for local development (`helm template`/`lint`).
+version: 0.0.0-dev
+appVersion: 0.0.0-dev
+kubeVersion: '>=1.25.0-0'
+home: https://www.cloudpdf.com/docs/server/deployment/helm
+sources:
+  - https://github.com/embedpdf/embed-pdf-viewer
+maintainers:
+  - name: CloudPDF
+    url: https://www.cloudpdf.com
+keywords:
+  - pdf
+  - document
+  - rendering
+  - annotations

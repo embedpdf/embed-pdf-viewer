@@ -1,0 +1,26 @@
+# The small-footprint profile: one replica, SQLite + local objects on a
+# PersistentVolume. Matches the docs page example; mostly the chart's
+# defaults made explicit, plus the PVC.
+#
+#   helm install cloudpdf oci://ghcr.io/embedpdf/charts/cloudpdf-server \
+#     -f values-sqlite.yaml
+#
+# Bring your own secret (just CLOUDPDF_JWT_SECRET here):
+#   existingSecret: cloudpdf-secrets
+
+replicaCount: 1
+
+strategy:
+  type: Recreate # SQLite has a single writer — never run two pods at once
+
+persistence:
+  enabled: true
+  size: 20Gi
+
+config:
+  CLOUDPDF_DB_DRIVER: sqlite
+  CLOUDPDF_STORAGE_KIND: fs
+  CLOUDPDF_AUTO_MIGRATE: '1'
+
+autoscaling:
+  enabled: false

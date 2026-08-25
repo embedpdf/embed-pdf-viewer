@@ -336,6 +336,9 @@ function printHelp(): void {
       '    CLOUDPDF_PASSWORD_SESSION_SERVER_SECRET      >= 32 bytes (required with a production license + KMS)',
       '    CLOUDPDF_PASSWORD_SESSION_SERVER_SECRET_ID   secret rotation id (default: dev-v1)',
       '    CLOUDPDF_TRUST_PROXY   1|true, hop count, or CSV of proxy IPs/CIDRs',
+      '    CLOUDPDF_SHUTDOWN_TIMEOUT_MS  app.close() budget before teardown proceeds (default 30000)',
+      '    CLOUDPDF_SHUTDOWN_DRAIN_MS    settle window after readiness flips 503 (default 0)',
+      '    CLOUDPDF_METRICS       1 exposes an unauthenticated Prometheus /metrics endpoint',
       '                           (set behind a LB so rate limits see real client IPs)',
       '    CLOUDPDF_AUTH_FAILURE_LIMIT      failed auths per IP per window; off to disable (default: 30)',
       '    CLOUDPDF_AUTH_FAILURE_WINDOW_MS  window for the failure limit (default: 60000)',
@@ -392,6 +395,23 @@ async function cmdMigrateStatus(): Promise<void> {
   }
 }
 
+/**
+ * Progress logger for waits on the cross-migrator advisory lock —
+ * another replica, deploy hook, or CLI is migrating. Throttled so the
+ * 400ms poll doesn't flood the console.
+ */
+function makeLockWaitLogger(): (waitedMs: number) => void {
+  let lastLogAt = 0;
+  return (waitedMs) => {
+    if (waitedMs - lastLogAt < 5_000) return;
+    lastLogAt = waitedMs;
+    console.log(
+      `waiting for the migration lock (${Math.round(waitedMs / 1000)}s) — ` +
+        `another migrator is running`,
+    );
+  };
+}
+
 async function cmdMigrateUp(args: string[]): Promise<void> {
   const dryRun = args.includes('--dry-run');
   const ctx = openDb();
@@ -413,7 +433,9 @@ async function cmdMigrateUp(args: string[]): Promise<void> {
     }
     const applied = await migrate(ctx.db, {
       source: { kind: 'inline', migrations: ctx.migrations },
+      dialect: ctx.dialect,
       onApply: (m) => console.log(`applying ${m.version} ${m.name}`),
+      onLockWait: makeLockWaitLogger(),
     });
     if (applied.length === 0) {
       console.log('nothing to apply (db up to date)');
@@ -489,7 +511,9 @@ async function cmdMigrateDown(args: string[]): Promise<void> {
       ...(to !== undefined ? { to } : {}),
       ...(steps !== undefined ? { steps } : {}),
       force,
+      dialect: ctx.dialect,
       onRevert: (m) => console.log(`reverting ${m.version} ${m.name}`),
+      onLockWait: makeLockWaitLogger(),
     });
     console.log(`rolled back ${reverted.length} migration(s)`);
   } finally {
@@ -712,6 +736,14 @@ async function cmdServe(): Promise<void> {
   const CACHE_MAX_BYTES = process.env['CLOUDPDF_CACHE_MAX_BYTES']
     ? Number(process.env['CLOUDPDF_CACHE_MAX_BYTES'])
     : undefined;
+  // Shutdown posture: keep the app.close() budget BELOW the supervisor's
+  // kill deadline (k8s terminationGracePeriodSeconds, docker stop -t).
+  const SHUTDOWN_TIMEOUT_MS = process.env['CLOUDPDF_SHUTDOWN_TIMEOUT_MS']
+    ? Number(process.env['CLOUDPDF_SHUTDOWN_TIMEOUT_MS'])
+    : undefined;
+  const SHUTDOWN_DRAIN_MS = process.env['CLOUDPDF_SHUTDOWN_DRAIN_MS']
+    ? Number(process.env['CLOUDPDF_SHUTDOWN_DRAIN_MS'])
+    : undefined;
 
   const WORKER_ENTRY_URL = new URL('../runtime/worker-entry.js', import.meta.url);
 
@@ -728,7 +760,9 @@ async function cmdServe(): Promise<void> {
   if (autoMigrate) {
     const applied = await migrate(dbCtx.db, {
       source: { kind: 'inline', migrations: dbCtx.migrations },
+      dialect: dbCtx.dialect,
       onApply: (m) => console.log(`applying ${m.version} ${m.name}`),
+      onLockWait: makeLockWaitLogger(),
     });
     if (applied.length > 0) console.log(`auto-migrate: applied ${applied.length} migration(s)`);
   }
@@ -847,6 +881,9 @@ async function cmdServe(): Promise<void> {
       ...(realtimeBus ? { realtimeBus } : {}),
       ...(trustProxy !== undefined ? { trustProxy } : {}),
       ...(authFailureLimit !== undefined ? { authFailureLimit } : {}),
+      ...(SHUTDOWN_TIMEOUT_MS !== undefined ? { shutdownTimeoutMs: SHUTDOWN_TIMEOUT_MS } : {}),
+      ...(SHUTDOWN_DRAIN_MS !== undefined ? { shutdownDrainMs: SHUTDOWN_DRAIN_MS } : {}),
+      ...(process.env['CLOUDPDF_METRICS'] === '1' ? { metrics: true } : {}),
     });
   } catch (err) {
     // Config-shaped boot refusals (secret policy, migration drift) exit

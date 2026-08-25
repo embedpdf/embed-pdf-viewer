@@ -19,7 +19,7 @@ Two endpoints, both public (no token required):
 | Endpoint | Meaning | Use as |
 | --- | --- | --- |
 | `/healthz` | The process is alive. | Liveness probe — restart the instance if this fails. |
-| `/readyz` | The instance is ready to serve. | Readiness probe — route traffic only when this passes. |
+| `/readyz` | The instance can serve: the database answers and the server is not draining. Returns 503 with a reason (`draining`, or `unready` + `reasons`) otherwise. During shutdown it flips to 503 first, then live SSE streams are ended with a reconnect hint, then the listener closes. | Readiness probe — route traffic only when this passes. |
 
 ```sh
 curl localhost:3000/healthz   # {"status":"ok"}

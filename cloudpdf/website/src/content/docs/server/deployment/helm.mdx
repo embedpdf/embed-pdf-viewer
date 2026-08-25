@@ -36,21 +36,31 @@ kubectl create secret generic cloudpdf-secrets \
   --from-literal=CLOUDPDF_JWT_SECRET="$(openssl rand -hex 32)" \
   --from-literal=CLOUDPDF_DB_URL="postgres://user:pass@db:5432/cloudpdf" \
   --from-literal=AWS_ACCESS_KEY_ID="..." \
-  --from-literal=AWS_SECRET_ACCESS_KEY="..."
+  --from-literal=AWS_SECRET_ACCESS_KEY="..." \
+  --from-literal=CLOUDPDF_LICENSE_KEY="..."
 
 helm install cloudpdf \
   oci://ghcr.io/embedpdf/charts/cloudpdf-server \
-  --version 1.0.0 \
+  --version <version> \
   -f values.yaml
 ```
+
+<Callout type="warn">
+  The server is <strong>fail-closed on licensing</strong>: without a
+  `CLOUDPDF_LICENSE_KEY` (or an installed air-gapped certificate) pods
+  exit at boot. An expired license degrades to read-only instead — it
+  never restart-loops the fleet.
+</Callout>
 
 A `values.yaml` for the scalable profile (Postgres + S3, multiple replicas):
 
 ```yaml
 # values.yaml
-image:
-  repository: ghcr.io/embedpdf/cloudpdf-server
-  tag: '1.0.0'
+# image.tag defaults to the chart's own appVersion — every chart release
+# pulls the image it shipped with. For production, pin the digest you
+# tested instead:
+# image:
+#   digest: sha256:...
 
 replicaCount: 2
 
@@ -95,8 +105,16 @@ ingress:
 
 ```sh
 helm install cloudpdf oci://ghcr.io/embedpdf/charts/cloudpdf-server \
-  --version 1.0.0 -f values.yaml
+  --version <version> -f values.yaml
 ```
+
+<Callout type="info">
+  The chart <strong>refuses unsafe combinations at install time</strong>:
+  more than one replica requires Postgres and a shared object store; the
+  SQLite/PVC profile is pinned to a single pod; the migrate hook cannot
+  combine with SQLite or a PVC. A `values.schema.json` also rejects
+  unknown keys, so typos fail fast instead of deploying half-configured.
+</Callout>
 
 ## How migrations are handled
 
@@ -174,7 +192,7 @@ values in `values.yaml`.
 
 ```sh
 helm upgrade cloudpdf oci://ghcr.io/embedpdf/charts/cloudpdf-server \
-  --version 1.1.0 -f values.yaml
+  --version <new-version> -f values.yaml
 ```
 
 The pre-upgrade migration Job runs first; app pods roll only after it succeeds.

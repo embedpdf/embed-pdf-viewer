@@ -6,7 +6,10 @@ import compress from '@fastify/compress';
 import cors from '@fastify/cors';
 import multipart from '@fastify/multipart';
 import Fastify, { type FastifyInstance } from 'fastify';
-import type { Kysely } from 'kysely';
+import { sql, type Kysely } from 'kysely';
+
+import { DrainCoordinator } from './drain';
+import { registerMetrics } from './metrics';
 
 import type { AuthFailureLimiterOptions } from './auth-failure-limiter';
 import { registerJwtAuth, requireApiToken } from './jwt-plugin';
@@ -281,6 +284,26 @@ export interface BuildAppOptions {
     maxRenderPixels?: number;
     enforce?: boolean;
   };
+  /**
+   * Budget for `app.close()` inside `shutdown()` before teardown
+   * proceeds anyway (default 30s). Keep it BELOW the supervisor's kill
+   * deadline (Kubernetes `terminationGracePeriodSeconds`, `docker stop`
+   * timeout) so pool + cache teardown always runs before SIGKILL.
+   */
+  shutdownTimeoutMs?: number;
+  /**
+   * Settle window between failing readiness (+ ending SSE streams) and
+   * closing the listener (default 0). For probe-driven balancers that
+   * must observe `/readyz` 503 before the socket starts refusing;
+   * Kubernetes deployments use a preStop sleep instead.
+   */
+  shutdownDrainMs?: number;
+  /**
+   * Expose a Prometheus `/metrics` endpoint (`CLOUDPDF_METRICS=1`).
+   * Unauthenticated when enabled — scrape it inside the private
+   * network/cluster, like any /metrics.
+   */
+  metrics?: boolean;
 }
 
 export interface AppBundle {
@@ -303,6 +326,12 @@ export interface AppBundle {
   baseFileCache?: BaseFileCache;
   /** Security substrate keyring, when configured by the caller. */
   kms?: KmsKeyring;
+  /**
+   * Flip `/readyz` to 503 and end every live SSE stream without closing
+   * the listener. `shutdown()` calls this first; exposed for operators
+   * and tests that need the drain state without the teardown.
+   */
+  beginDrain: () => void;
   shutdown: () => Promise<void>;
 }
 
@@ -367,6 +396,11 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
   app.addHook('onRequest', async (request, reply) => {
     const pathname = request.url.split('?', 1)[0] ?? request.url;
     if (pathname === '/healthz' || pathname === '/readyz' || pathname === '/v1/license/status') {
+      return;
+    }
+    // Operational telemetry must stay scrapeable in restricted mode —
+    // observing a deployment is not protected functionality.
+    if (opts.metrics === true && pathname === '/metrics') {
       return;
     }
 
@@ -515,10 +549,16 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
     ...(opts.authFailureLimit !== undefined ? { authFailureLimit: opts.authFailureLimit } : {}),
     ...(suspendedTenantsGuard ? { suspendedTenants: suspendedTenantsGuard } : {}),
     // The exchange is the one public v1 surface: the grant row is the
-    // authorization, and the route carries its own limiters.
-    ...(signer && opts.db && opts.objectStore
-      ? { publicPaths: [adminWirePaths.shareSessions] }
-      : {}),
+    // authorization, and the route carries its own limiters. /metrics
+    // joins it when enabled (network-level protection, like any
+    // Prometheus target).
+    ...((): { publicPaths?: string[] } => {
+      const publicPaths = [
+        ...(signer && opts.db && opts.objectStore ? [adminWirePaths.shareSessions] : []),
+        ...(opts.metrics === true ? ['/metrics'] : []),
+      ];
+      return publicPaths.length > 0 ? { publicPaths } : {};
+    })(),
   });
 
   // `documentService` is allocated below, but the pool's onEvict
@@ -540,9 +580,50 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
         fonts: opts.fallbackFonts,
       })
     : undefined;
+  const drainCoordinator = new DrainCoordinator();
+
+  // Readiness = "safe to route traffic here": not draining, and the
+  // database answers. License-restricted mode stays ready on purpose —
+  // a lapsed license degrades to read-only; it must never restart-loop
+  // or pull the deployment out of every balancer. The object store is
+  // deliberately NOT probed: a transient bucket blip must not amputate
+  // the whole fleet's endpoints. The DB result is cached briefly so
+  // probe storms (N replicas × N balancers) cost ~one ping per window —
+  // including while the DB is down.
+  const DB_READY_TTL_MS = 5_000;
+  const DB_READY_TIMEOUT_MS = 2_000;
+  let dbReadyCache = { at: 0, ok: true };
+  const dbReady = async (): Promise<boolean> => {
+    if (!opts.db) return true;
+    if (Date.now() - dbReadyCache.at < DB_READY_TTL_MS) return dbReadyCache.ok;
+    const ping = sql`SELECT 1`.execute(opts.db).then(
+      () => true,
+      () => false,
+    );
+    let timer: NodeJS.Timeout | undefined;
+    const timeout = new Promise<boolean>((resolve) => {
+      timer = setTimeout(() => resolve(false), DB_READY_TIMEOUT_MS);
+      timer.unref?.();
+    });
+    const ok = await Promise.race([ping, timeout]);
+    if (timer) clearTimeout(timer);
+    dbReadyCache = { at: Date.now(), ok };
+    return ok;
+  };
+
+  if (opts.metrics === true) {
+    registerMetrics(app, { pool, licenseGate: opts.licenseGate });
+  }
+
   app.get('/healthz', async () => ({ status: 'ok' }));
-  app.get('/readyz', async () => {
+  app.get('/readyz', async (_req, reply) => {
     const license = opts.licenseGate.getStatus();
+    if (drainCoordinator.isDraining) {
+      return reply.code(503).send({ license, status: 'draining' });
+    }
+    if (!(await dbReady())) {
+      return reply.code(503).send({ license, status: 'unready', reasons: ['database'] });
+    }
     return { license, status: 'ok' };
   });
   app.get('/v1/license/status', async () => opts.licenseGate.getStatus());
@@ -887,6 +968,7 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
         db: opts.db,
         documentService,
         realtimeBus,
+        drain: drainCoordinator,
         ...(revokedJtisGuard ? { revocation: revokedJtisGuard } : {}),
       });
       await registerAnnotationRoutes(app, {
@@ -966,11 +1048,47 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
     reply.code(500).send({ error: { code: 'Unknown', message: e.message } });
   });
 
+  const shutdownTimeoutMs = opts.shutdownTimeoutMs ?? 30_000;
+  const shutdownDrainMs = opts.shutdownDrainMs ?? 0;
   const shutdown = async () => {
+    // 1. Fail readiness and end every live SSE stream. Hijacked streams
+    //    are invisible to app.close() — with heartbeats keeping their
+    //    sockets alive, one connected viewer would otherwise hold
+    //    shutdown open until the supervisor SIGKILLs, skipping the pool
+    //    and cache teardown below on every deploy.
+    drainCoordinator.begin();
+    // 2. Optional settle window for probe-driven balancers that need to
+    //    observe the 503 before the socket refuses (Kubernetes covers
+    //    this externally with endpoint removal + preStop).
+    if (shutdownDrainMs > 0) {
+      await new Promise((resolve) => setTimeout(resolve, shutdownDrainMs));
+    }
     if (sweeperTimer) clearInterval(sweeperTimer);
     await importWorker?.stop();
     try {
-      await app.close();
+      // 3. Bounded: in-flight HTTP gets shutdownTimeoutMs to finish and
+      //    then teardown proceeds anyway — cleanup must run before the
+      //    supervisor's kill deadline, not after it.
+      let timer: NodeJS.Timeout | undefined;
+      const timedOut = new Promise<'timeout'>((resolve) => {
+        timer = setTimeout(() => resolve('timeout'), shutdownTimeoutMs);
+        timer.unref?.();
+      });
+      const closed = app.close().then(
+        () => 'closed' as const,
+        (err: unknown) => {
+          app.log.error({ err }, 'app.close failed during shutdown; continuing teardown');
+          return 'closed' as const;
+        },
+      );
+      const outcome = await Promise.race([closed, timedOut]);
+      if (timer) clearTimeout(timer);
+      if (outcome === 'timeout') {
+        app.log.error(
+          { shutdownTimeoutMs },
+          'app.close did not finish within the shutdown budget; continuing teardown',
+        );
+      }
     } finally {
       try {
         if (pool) await pool.destroy();
@@ -992,6 +1110,7 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
     derivedRenders,
     baseFileCache,
     kms: opts.kms,
+    beginDrain: () => drainCoordinator.begin(),
     shutdown,
   };
 }

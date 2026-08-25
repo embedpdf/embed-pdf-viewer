@@ -104,6 +104,14 @@ See [Fallback fonts](/docs/server/configuration/fonts).
 
 See [Migrations](/docs/server/operations/migrations).
 
+## Shutdown & observability
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `CLOUDPDF_SHUTDOWN_TIMEOUT_MS` | `30000` | Budget for closing in-flight HTTP during shutdown before teardown proceeds anyway. Keep it below your orchestrator's kill deadline. |
+| `CLOUDPDF_SHUTDOWN_DRAIN_MS` | `0` | Settle window after `/readyz` flips to 503 (and SSE streams end) before the listener closes — for probe-driven load balancers. |
+| `CLOUDPDF_METRICS` | off | `1` exposes an unauthenticated Prometheus `/metrics` endpoint (scrape it inside your private network). |
+
 ## Optional adapters
 
 These are opt-in. You only need them for the corresponding feature.

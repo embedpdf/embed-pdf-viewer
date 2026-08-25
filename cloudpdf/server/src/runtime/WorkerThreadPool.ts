@@ -120,6 +120,28 @@ export interface WorkerThreadPoolOptions {
    * owned: clients never configure fonts on the cloud engine.
    */
   fonts?: ReadonlyArray<FallbackFontDescriptor>;
+  /**
+   * Invoked when a worker thread exits outside `destroy()` after the pool
+   * booted. Slots are never respawned in-process, so a dead worker is an
+   * unrecoverable pool state: without intervention its `docToSlot`
+   * bindings keep routing requests at a corpse while the process keeps
+   * passing health checks. The default posture is therefore fail-fast —
+   * log and `process.exit(70)` so the supervisor (docker `--init`,
+   * systemd, Kubernetes liveness) restarts the server into a clean pool.
+   * Injectable for tests and for engine-host supervision, which replaces
+   * exit-the-process with respawn-the-host.
+   */
+  onFatalWorkerExit?: (evt: { slot: number; code: number }) => void;
+}
+
+function defaultFatalWorkerExit(evt: { slot: number; code: number }): void {
+  // eslint-disable-next-line no-console
+  console.error(
+    `[cloudpdf-server] FATAL: worker thread ${evt.slot} exited unexpectedly ` +
+      `(code ${evt.code}). Pool slots cannot be respawned in-process; exiting ` +
+      `so the supervisor restarts the server into a clean pool.`,
+  );
+  process.exit(70); // EX_SOFTWARE
 }
 
 /** Conservative default worker count until the thread-confined gate is validated. */
@@ -180,6 +202,8 @@ export class WorkerThreadPool {
     | undefined;
   private accessTick = 0;
   private destroyed = false;
+  private bootCompleted = false;
+  private readonly onFatalWorkerExit: (evt: { slot: number; code: number }) => void;
 
   static async create(opts: WorkerThreadPoolOptions): Promise<WorkerThreadPool> {
     const pool = new WorkerThreadPool(opts);
@@ -225,15 +249,36 @@ export class WorkerThreadPool {
         for (const handler of slot.inFlight.values()) handler.reject(err);
         slot.inFlight.clear();
       });
+      worker.on('exit', (code) => pool.onWorkerExit(slot, code));
       pool.slots.push(slot);
     }
     await Promise.all(pool.slots.map((s) => s.ready));
+    pool.bootCompleted = true;
     return pool;
   }
 
   private constructor(opts?: WorkerThreadPoolOptions) {
     this.maxDocsPerSlot = opts?.maxDocsPerSlot ?? 64;
     this.onEvict = opts?.onEvict;
+    this.onFatalWorkerExit = opts?.onFatalWorkerExit ?? defaultFatalWorkerExit;
+  }
+
+  /**
+   * A worker thread died. During `destroy()` that is the plan; during
+   * boot the `waitForReady` rejection surfaces it as a create() error;
+   * any other time the pool is unrecoverable (no in-process respawn) and
+   * the configured fatal handler decides the blast response.
+   */
+  private onWorkerExit(slot: WorkerSlot, code: number): void {
+    if (this.destroyed) return;
+    const err = new EngineError(
+      EngineErrorCode.RuntimeUnavailable,
+      `worker slot ${slot.index} exited unexpectedly (code ${code})`,
+    );
+    for (const handler of slot.inFlight.values()) handler.reject(err);
+    slot.inFlight.clear();
+    if (!this.bootCompleted) return;
+    this.onFatalWorkerExit({ slot: slot.index, code });
   }
 
   /**
@@ -361,6 +406,17 @@ export class WorkerThreadPool {
       docIds: [...s.docIds],
       baseShas: [...s.baseShas.keys()],
     }));
+  }
+
+  /** Cheap occupancy counters for metrics scrapes. */
+  stats(): { slots: number; docs: number; inFlight: number } {
+    let docs = 0;
+    let inFlight = 0;
+    for (const s of this.slots) {
+      docs += s.docIds.size;
+      inFlight += s.inFlight.size;
+    }
+    return { slots: this.slots.length, docs, inFlight };
   }
 
   private releaseBinding(slot: WorkerSlot, docId: string): void {
@@ -503,17 +559,25 @@ export class WorkerThreadPool {
 
 function waitForReady(worker: Worker): Promise<void> {
   return new Promise<void>((resolve, reject) => {
+    // A worker that dies before its 'ready' handshake must reject —
+    // without the exit listener a clean-exit-without-error during init
+    // (e.g. process.exit in the entry) would hang create() forever.
+    const onExit = (code: number) =>
+      reject(new Error(`worker exited during initialization (code ${code})`));
     const onMsg = (msg: { kind?: string; error?: string }) => {
       if (!msg || typeof msg !== 'object') return;
       if (msg.kind === 'ready') {
         worker.off('message', onMsg);
+        worker.off('exit', onExit);
         resolve();
       } else if (msg.kind === 'init-error') {
         worker.off('message', onMsg);
+        worker.off('exit', onExit);
         reject(new Error(`worker failed to initialize: ${msg.error}`));
       }
     };
     worker.on('message', onMsg);
     worker.once('error', reject);
+    worker.once('exit', onExit);
   });
 }

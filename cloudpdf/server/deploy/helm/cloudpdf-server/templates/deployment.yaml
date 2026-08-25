@@ -1,0 +1,134 @@
+{{- include "cloudpdf-server.validate" . -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "cloudpdf-server.fullname" . }}
+  labels:
+    {{- include "cloudpdf-server.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  {{- with .Values.minReadySeconds }}
+  minReadySeconds: {{ . }}
+  {{- end }}
+  strategy:
+    {{- include "cloudpdf-server.strategy" . | nindent 4 }}
+  selector:
+    matchLabels:
+      {{- include "cloudpdf-server.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        {{- if .Values.config }}
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- end }}
+        {{- if and (not .Values.existingSecret) .Values.secrets }}
+        checksum/secrets: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+        {{- end }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "cloudpdf-server.selectorLabels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "cloudpdf-server.serviceAccountName" . }}
+      automountServiceAccountToken: {{ .Values.serviceAccount.automountServiceAccountToken }}
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
+      {{- with .Values.priorityClassName }}
+      priorityClassName: {{ . }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: cloudpdf-server
+          image: {{ include "cloudpdf-server.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args: ['serve']
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: 3000
+              protocol: TCP
+          envFrom:
+            {{- include "cloudpdf-server.envFrom" . | nindent 12 }}
+          env:
+            # fontconfig/sharp caches must land on a writable volume
+            # under readOnlyRootFilesystem.
+            - name: XDG_CACHE_HOME
+              value: /tmp/.cache
+            {{- if .Values.migrations.enabled }}
+            # The pre-upgrade hook Job owns migrations; pods must never
+            # race it and must refuse to serve on a stale schema.
+            # Explicit `env` wins over `envFrom`.
+            - name: CLOUDPDF_AUTO_MIGRATE
+              value: '0'
+            - name: CLOUDPDF_FAIL_ON_PENDING
+              value: '1'
+            {{- end }}
+            {{- if .Values.metrics.enabled }}
+            - name: CLOUDPDF_METRICS
+              value: '1'
+            {{- end }}
+            {{- with .Values.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          startupProbe:
+            {{- toYaml .Values.startupProbe | nindent 12 }}
+          livenessProbe:
+            {{- toYaml .Values.livenessProbe | nindent 12 }}
+          readinessProbe:
+            {{- toYaml .Values.readinessProbe | nindent 12 }}
+          {{- if gt (int .Values.preStopSleepSeconds) 0 }}
+          lifecycle:
+            preStop:
+              # Bridges endpoint-removal propagation: the LB keeps
+              # routing for a beat after pod deletion; SIGTERM (and the
+              # server's own drain) starts after this sleep.
+              exec:
+                command: ['sleep', {{ .Values.preStopSleepSeconds | quote }}]
+          {{- end }}
+          {{- with .Values.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: data
+          {{- if .Values.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ .Values.persistence.existingClaim | default (include "cloudpdf-server.fullname" .) }}
+          {{- else }}
+          emptyDir:
+            sizeLimit: {{ .Values.cache.sizeLimit }}
+          {{- end }}
+        - name: tmp
+          emptyDir: {}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

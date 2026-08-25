@@ -1,0 +1,43 @@
+{{- if .Values.tests.enabled }}
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ include "cloudpdf-server.fullname" . }}-test-ready
+  labels:
+    {{- include "cloudpdf-server.labels" . | nindent 4 }}
+    app.kubernetes.io/component: test
+  annotations:
+    helm.sh/hook: test
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  restartPolicy: Never
+  {{- with .Values.imagePullSecrets }}
+  imagePullSecrets:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  securityContext:
+    {{- toYaml .Values.podSecurityContext | nindent 4 }}
+  containers:
+    - name: readyz
+      # The server image doubles as the probe (node's fetch) — no
+      # third-party test image to pin or trust.
+      image: {{ include "cloudpdf-server.image" . }}
+      imagePullPolicy: {{ .Values.image.pullPolicy }}
+      command:
+        - node
+        - -e
+        - |
+          const base = 'http://{{ include "cloudpdf-server.fullname" . }}:{{ .Values.service.port }}';
+          const get = async (path) => {
+            const res = await fetch(base + path);
+            const body = await res.text();
+            console.log(path, res.status, body);
+            if (!res.ok) throw new Error(path + ' -> ' + res.status);
+          };
+          Promise.all([get('/healthz'), get('/readyz'), get('/v1/license/status')]).catch((err) => {
+            console.error(err);
+            process.exit(1);
+          });
+      securityContext:
+        {{- toYaml .Values.containerSecurityContext | nindent 8 }}
+{{- end }}

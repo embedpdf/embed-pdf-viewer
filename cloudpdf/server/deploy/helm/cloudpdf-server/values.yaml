@@ -1,0 +1,258 @@
+# Default values for cloudpdf-server.
+#
+# The zero-values install is the SMALL-FOOTPRINT profile: one replica,
+# SQLite + local objects under /data (an emptyDir unless you enable
+# `persistence`), auto-migrate at boot — the Kubernetes twin of
+# `docker run cloudpdf-server`. Production deployments use the
+# Postgres + object-storage profile (see the docs page and the example
+# below): `replicaCount >= 2`, `migrations.enabled: true`, no PVC.
+#
+# The chart REFUSES to render unsafe combinations (sqlite/fs storage
+# with more than one replica, the migrate hook against sqlite, a PVC
+# with multiple replicas). See `gates` at the bottom.
+
+image:
+  repository: ghcr.io/embedpdf/cloudpdf-server
+  # Empty tag = the chart's appVersion — every published chart pulls the
+  # image it was released with.
+  tag: ''
+  # Production doctrine (DOCKER.md): promote by digest. When set, digest
+  # wins over tag: `repository@sha256:...`.
+  digest: ''
+  pullPolicy: IfNotPresent
+imagePullSecrets: []
+
+nameOverride: ''
+fullnameOverride: ''
+commonLabels: {}
+
+replicaCount: 1
+
+# Deployment update strategy. Empty type = automatic: `Recreate` when
+# `persistence.enabled` (an RWO volume cannot be shared by old + new
+# pods), otherwise RollingUpdate with maxUnavailable 0 / maxSurge 1 so a
+# 2-replica deployment never drops below full capacity during a roll.
+strategy:
+  type: ''
+minReadySeconds: 10
+
+# --- Configuration ----------------------------------------------------
+
+# Non-secret configuration, rendered into a ConfigMap as-is. Every
+# CLOUDPDF_* env documented in the configuration reference is valid
+# here. This map is also what the chart's safety gates read: keep
+# CLOUDPDF_DB_DRIVER / CLOUDPDF_STORAGE_KIND here (not in extraEnv) so
+# misconfiguration fails at install time instead of in production.
+config: {}
+# config:
+#   CLOUDPDF_DB_DRIVER: postgres
+#   CLOUDPDF_STORAGE_KIND: s3
+#   CLOUDPDF_STORAGE_S3_BUCKET: my-cloudpdf-bucket
+#   CLOUDPDF_STORAGE_S3_REGION: eu-west-1
+#   CLOUDPDF_WORKER_POOL_SIZE: '2'
+
+# Reference an externally-managed Secret (External Secrets, Vault CSI,
+# sealed-secrets, `kubectl create secret`) exposed to the pods via
+# envFrom. Expected keys: CLOUDPDF_JWT_SECRET, CLOUDPDF_DB_URL (postgres),
+# storage credentials (e.g. AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY),
+# CLOUDPDF_LICENSE_KEY, CLOUDPDF_API_AUTH_TOKENS — whatever your
+# configuration needs. The chart never requires secret values inside
+# values files.
+existingSecret: ''
+
+# Inline secrets (dev/eval convenience only) — rendered into a chart
+# Secret when `existingSecret` is empty. Prefer `existingSecret`.
+secrets: {}
+
+# Extra environment (list of EnvVar) and env sources. NOTE: env supplied
+# here is INVISIBLE to the chart's safety gates — keep the database and
+# storage mode in `config`, or acknowledge with
+# `gates.allowExternalConfig`.
+extraEnv: []
+extraEnvFrom: []
+
+# --- Migrations -------------------------------------------------------
+
+# Run `migrate up` as a pre-install/pre-upgrade hook Job; app pods then
+# run with CLOUDPDF_AUTO_MIGRATE=0 + CLOUDPDF_FAIL_ON_PENDING=1, so
+# replicas never race migrations and a deploy that skips them fails
+# fast. REQUIRES a shared database (postgres) — the sqlite profile
+# migrates at boot instead (single writer). The migrator additionally
+# holds a Postgres advisory lock, so even out-of-band `migrate up` runs
+# serialize at the database.
+migrations:
+  enabled: false
+  backoffLimit: 1
+  activeDeadlineSeconds: 600
+  resources: {}
+
+# --- Scaling & resilience --------------------------------------------
+
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  # targetMemoryUtilizationPercentage: 80
+
+# PodDisruptionBudget — rendered whenever more than one replica is
+# configured, so node maintenance can never drain every replica at
+# once. (Voluntary disruptions only; crashes are covered by replicas,
+# rollouts by `strategy`.)
+pdb:
+  enabled: true
+  maxUnavailable: 1
+
+# Rule of thumb (THREAD_CONFINED_RUNTIME.md): ~1 CPU per worker thread;
+# memory = base + workers x font/CMap duplication + resident-document
+# working set. Start with pool 2 / 2Gi and tune with real documents.
+# Never CLOUDPDF_WORKER_POOL_SIZE=max without a CPU limit — inside a
+# pod, `max` sees the NODE's cores.
+resources: {}
+# resources:
+#   requests: { cpu: '1', memory: 1Gi }
+#   limits: { cpu: '2', memory: 2Gi }
+
+# --- Storage ----------------------------------------------------------
+
+# PersistentVolume for /data — the SQLite + local-objects profile.
+# Single-replica only (RWO), pairs with the automatic Recreate strategy.
+# Without persistence, /data is an emptyDir: fine for the Postgres
+# profile (cache only), EPHEMERAL for the sqlite default — the NOTES
+# warn loudly.
+persistence:
+  enabled: false
+  size: 20Gi
+  storageClass: ''
+  accessModes: [ReadWriteOnce]
+  existingClaim: ''
+  annotations: {}
+
+# emptyDir sizing when persistence is off. Must exceed
+# CLOUDPDF_CACHE_MAX_BYTES (default 4GiB) with headroom for uploads.
+cache:
+  sizeLimit: 8Gi
+
+# --- Networking -------------------------------------------------------
+
+service:
+  type: ClusterIP
+  port: 3000
+  annotations: {}
+
+ingress:
+  enabled: false
+  className: ''
+  annotations: {}
+  # SSE: the events stream heartbeats every 25s; idle timeouts must
+  # exceed 2x that. When className is nginx, the chart defaults
+  # proxy-read/send-timeout to 3600 (your `annotations` win on
+  # conflict). Other controllers: set the equivalent yourself.
+  nginxSseTimeouts: true
+  hosts: []
+  # hosts:
+  #   - host: pdf.your-app.com
+  #     paths:
+  #       - path: /
+  #         pathType: Prefix
+  tls: []
+
+# OPTIONAL consistent-hash routing of /v1/docs traffic so one document's
+# requests land on one replica while it stays warm (a performance layer
+# ONLY — any replica serves any document correctly). `header` hashes the
+# X-CloudPDF-Doc request header (portable across LBs; requires SDKs
+# that send it). `uri` extracts the docId from the path via an
+# ingress-nginx configuration-snippet — many managed controllers
+# disable snippet annotations, see NOTES. Renders a second Ingress for
+# `pathPrefix` when enabled.
+docAffinity:
+  enabled: false
+  key: header
+  header: X-CloudPDF-Doc
+  pathPrefix: /v1/docs
+
+# NetworkPolicy. DNS egress is always allowed when enabled; add your
+# database/object-store/licensing egress under `egress` (raw
+# NetworkPolicyEgressRule list; `ingress` likewise). NOTE: vanilla
+# NetworkPolicy cannot allow egress by HOSTNAME — connected-mode
+# licensing needs api.keygen.sh + api.cloudpdf.com (dynamic IPs): use a
+# CNI with FQDN policies, an egress gateway, allow 443 broadly, or run
+# air-gapped licensing (zero outbound, the strict-egress answer).
+networkPolicy:
+  enabled: false
+  ingress: []
+  egress: []
+
+# --- Pod settings -----------------------------------------------------
+
+serviceAccount:
+  create: true
+  name: ''
+  annotations: {}
+  automountServiceAccountToken: false
+
+podAnnotations: {}
+podLabels: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: [ALL]
+
+# Startup covers native worker boot (+ sqlite auto-migrate): 30 x 2s.
+startupProbe:
+  httpGet: { path: /healthz, port: http }
+  periodSeconds: 2
+  failureThreshold: 30
+livenessProbe:
+  httpGet: { path: /healthz, port: http }
+  periodSeconds: 10
+  failureThreshold: 3
+readinessProbe:
+  httpGet: { path: /readyz, port: http }
+  periodSeconds: 5
+  failureThreshold: 2
+
+# Shutdown: SIGTERM -> server fails /readyz, ends SSE streams, closes
+# within its internal budget (CLOUDPDF_SHUTDOWN_TIMEOUT_MS, default
+# 30s). preStop bridges endpoint-removal propagation; keep
+# terminationGracePeriodSeconds > preStop + the server budget.
+terminationGracePeriodSeconds: 60
+preStopSleepSeconds: 5
+
+priorityClassName: ''
+nodeSelector: {}
+tolerations: []
+affinity: {}
+topologySpreadConstraints: []
+
+# --- Operational endpoints -------------------------------------------
+
+# Prometheus /metrics (unauthenticated when enabled — scrape inside the
+# cluster; combine with networkPolicy).
+metrics:
+  enabled: false
+
+# `helm test` — probes /readyz from inside the cluster.
+tests:
+  enabled: true
+
+# --- Safety gates -----------------------------------------------------
+
+# The chart fails to render dangerous combinations, reading
+# `config.CLOUDPDF_DB_DRIVER` / `config.CLOUDPDF_STORAGE_KIND`. If your
+# database/storage env genuinely arrives outside `config` (external
+# secret managers injecting CLOUDPDF_DB_URL is fine and expected — the
+# gates only need the DRIVER and STORAGE KIND in `config`), set
+# allowExternalConfig to acknowledge you own those invariants.
+gates:
+  allowExternalConfig: false

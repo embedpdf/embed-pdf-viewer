@@ -1,0 +1,96 @@
+{{- if .Values.ingress.enabled }}
+{{- $fullname := include "cloudpdf-server.fullname" . -}}
+{{- $port := .Values.service.port -}}
+{{/* SSE: idle timeouts must exceed 2x the 25s heartbeat; when the
+     class is nginx we default read/send to 3600 (user annotations
+     win). */}}
+{{- $sseDefaults := dict -}}
+{{- if and (eq .Values.ingress.className "nginx") .Values.ingress.nginxSseTimeouts -}}
+{{- $_ := set $sseDefaults "nginx.ingress.kubernetes.io/proxy-read-timeout" "3600" -}}
+{{- $_ := set $sseDefaults "nginx.ingress.kubernetes.io/proxy-send-timeout" "3600" -}}
+{{- end -}}
+{{- $annotations := merge (deepCopy (.Values.ingress.annotations | default dict)) $sseDefaults -}}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ $fullname }}
+  labels:
+    {{- include "cloudpdf-server.labels" . | nindent 4 }}
+  {{- with $annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- with .Values.ingress.className }}
+  ingressClassName: {{ . }}
+  {{- end }}
+  {{- with .Values.ingress.tls }}
+  tls:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  rules:
+    {{- range .Values.ingress.hosts }}
+    - host: {{ .host | quote }}
+      http:
+        paths:
+          {{- range .paths }}
+          - path: {{ .path }}
+            pathType: {{ .pathType | default "Prefix" }}
+            backend:
+              service:
+                name: {{ $fullname }}
+                port:
+                  number: {{ $port }}
+          {{- end }}
+    {{- end }}
+{{- if .Values.docAffinity.enabled }}
+---
+{{/* Doc-affinity Ingress: consistent-hash /v1/docs traffic so one
+     document's requests land on one replica while it stays warm. A
+     PERFORMANCE layer only — any replica serves any document correctly
+     (the WS1 fence); this just maximizes warm worker sessions and
+     de-duplicates resident memory. More-specific paths win in
+     ingress-nginx, so this shadows the catch-all above for the
+     prefix. */}}
+{{- $affinityAnnotations := merge (dict) $sseDefaults -}}
+{{- if eq .Values.docAffinity.key "header" -}}
+{{- $var := printf "$http_%s" (.Values.docAffinity.header | lower | replace "-" "_") -}}
+{{- $_ := set $affinityAnnotations "nginx.ingress.kubernetes.io/upstream-hash-by" $var -}}
+{{- else -}}
+{{/* uri mode needs a configuration-snippet — disabled on many managed
+     controllers (allow-snippet-annotations=false). Prefer header mode
+     once your SDKs send X-CloudPDF-Doc. */}}
+{{- $_ := set $affinityAnnotations "nginx.ingress.kubernetes.io/configuration-snippet" "set $cloudpdf_doc $request_uri;\nif ($request_uri ~ \"^/v1/docs/([^/]+)\") { set $cloudpdf_doc $1; }\n" -}}
+{{- $_ := set $affinityAnnotations "nginx.ingress.kubernetes.io/upstream-hash-by" "$cloudpdf_doc" -}}
+{{- end -}}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ $fullname }}-docs
+  labels:
+    {{- include "cloudpdf-server.labels" . | nindent 4 }}
+  annotations:
+    {{- toYaml $affinityAnnotations | nindent 4 }}
+spec:
+  {{- with .Values.ingress.className }}
+  ingressClassName: {{ . }}
+  {{- end }}
+  {{- with .Values.ingress.tls }}
+  tls:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  rules:
+    {{- range .Values.ingress.hosts }}
+    - host: {{ .host | quote }}
+      http:
+        paths:
+          - path: {{ $.Values.docAffinity.pathPrefix }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $fullname }}
+                port:
+                  number: {{ $port }}
+    {{- end }}
+{{- end }}
+{{- end }}

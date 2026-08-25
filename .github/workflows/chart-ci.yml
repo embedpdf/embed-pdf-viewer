@@ -1,0 +1,109 @@
+# Helm chart CI: lint + template every profile, schema-validate the
+# rendered objects, prove the safety gates fire, and run the kind
+# install smoke. Fast checks on every chart PR; the full crash drill
+# (deploy/helm/drills/crash-drill.sh) is a manual/nightly exercise.
+name: Chart CI
+
+on:
+  pull_request:
+    paths:
+      - 'cloudpdf/server/deploy/helm/**'
+      - '.github/workflows/chart-ci.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'cloudpdf/server/deploy/helm/**'
+      - '.github/workflows/chart-ci.yml'
+  workflow_dispatch:
+
+env:
+  CHART: cloudpdf/server/deploy/helm/cloudpdf-server
+
+jobs:
+  lint-template-gates:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.16.4
+
+      - name: Lint (default / sqlite / postgres profiles)
+        run: |
+          helm lint "$CHART"
+          helm lint "$CHART" -f "$CHART/values-sqlite.yaml"
+          helm lint "$CHART" -f "$CHART/ci/postgres-values.yaml"
+
+      - name: Template (all profiles)
+        run: |
+          mkdir -p /tmp/rendered
+          helm template t "$CHART" > /tmp/rendered/default.yaml
+          helm template t "$CHART" -f "$CHART/values-sqlite.yaml" > /tmp/rendered/sqlite.yaml
+          helm template t "$CHART" -f "$CHART/ci/postgres-values.yaml" > /tmp/rendered/postgres.yaml
+
+      - name: Kubeconform (rendered objects vs Kubernetes schemas)
+        run: |
+          docker run --rm -v /tmp/rendered:/rendered \
+            ghcr.io/yannh/kubeconform:v0.6.7 \
+            -strict -summary -kubernetes-version 1.29.0 \
+            /rendered/default.yaml /rendered/sqlite.yaml /rendered/postgres.yaml
+
+      - name: Safety gates must refuse unsafe combinations
+        run: |
+          set -euo pipefail
+          expect_fail() {
+            local msg="$1"; shift
+            if helm template t "$CHART" "$@" > /dev/null 2>/tmp/err.txt; then
+              echo "EXPECTED FAILURE but rendered: $*"; exit 1
+            fi
+            grep -q "$msg" /tmp/err.txt || { echo "wrong gate message for: $*"; cat /tmp/err.txt; exit 1; }
+          }
+          expect_fail 'single-replica only' --set replicaCount=2
+          expect_fail 'single-replica only' --set autoscaling.enabled=true
+          expect_fail 'single-replica' --set replicaCount=2 --set persistence.enabled=true \
+            --set config.CLOUDPDF_DB_DRIVER=postgres --set config.CLOUDPDF_STORAGE_KIND=s3
+          expect_fail 'cross-replica SSE' --set replicaCount=2 \
+            --set config.CLOUDPDF_DB_DRIVER=postgres --set config.CLOUDPDF_STORAGE_KIND=s3 \
+            --set config.CLOUDPDF_REALTIME=in-process
+          expect_fail 'migrates at boot' --set migrations.enabled=true
+          expect_fail 'RWO volume' --set migrations.enabled=true --set persistence.enabled=true \
+            --set config.CLOUDPDF_DB_DRIVER=postgres
+          # The escape hatch and the documented profiles must render.
+          helm template t "$CHART" --set replicaCount=2 --set gates.allowExternalConfig=true > /dev/null
+          # values.schema.json catches the classic typo.
+          if helm template t "$CHART" --set replicas=2 > /dev/null 2>&1; then
+            echo 'schema should reject unknown top-level keys'; exit 1
+          fi
+
+  kind-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.16.4
+
+      - name: Create kind cluster
+        uses: helm/kind-action@v1.10.0
+        with:
+          cluster_name: cloudpdf-smoke
+          wait: 120s
+
+      # Without CLOUDPDF_DEV_LICENSE_KEY the smoke runs in
+      # license-boundary mode: full chart mechanics (empty-namespace
+      # install, image pull, env/secret wiring) + the fail-closed boot.
+      # Set the repo secret to exercise boot, helm test, upgrade, and
+      # the crash/restart drill.
+      - name: Smoke
+        env:
+          KEEP: '1' # the job teardown removes the runner; skip kind delete
+          CLOUDPDF_LICENSE_KEY: ${{ secrets.CLOUDPDF_DEV_LICENSE_KEY }}
+        run: cloudpdf/server/deploy/helm/drills/smoke.sh
