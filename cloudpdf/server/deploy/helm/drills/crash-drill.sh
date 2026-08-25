@@ -126,14 +126,23 @@ kubectl -n "$NS" run mc --rm -i --restart=Never --image=minio/mc:RELEASE.2024-11
   'mc alias set drill http://drill-minio:9000 drilldrill drill-only-secret && mc mb -p drill/cloudpdf'
 
 log "install cloudpdf: 2 replicas, postgres profile, migrate hook"
-kubectl -n "$NS" create secret generic cloudpdf-secrets \
-  --from-literal=CLOUDPDF_JWT_SECRET="$(openssl rand -hex 32)" \
-  --from-literal=CLOUDPDF_DB_URL='postgres://cloudpdf:drill-only@drill-postgres:5432/cloudpdf' \
-  --from-literal=AWS_ACCESS_KEY_ID=drilldrill \
-  --from-literal=AWS_SECRET_ACCESS_KEY=drill-only-secret \
-  --from-literal=CLOUDPDF_API_AUTH_TOKENS="$API_TOKEN" \
-  --from-literal=CLOUDPDF_LICENSE_KEY="$CLOUDPDF_LICENSE_KEY" \
-  --dry-run=client -o yaml | kubectl apply -f -
+# Create-once: rotating the secret on a warm re-run would desync running
+# pods (existingSecret changes cannot roll pods via checksum — the
+# operator caveat from DEPLOY.md, live). The token is always read back
+# from the cluster so re-runs use whatever the pods actually hold.
+if ! kubectl -n "$NS" get secret cloudpdf-secrets >/dev/null 2>&1; then
+  kubectl -n "$NS" create secret generic cloudpdf-secrets \
+    --from-literal=CLOUDPDF_JWT_SECRET="$(openssl rand -hex 32)" \
+    --from-literal=CLOUDPDF_PASSWORD_VERIFICATION_HMAC_SECRET="$(openssl rand -hex 32)" \
+    --from-literal=CLOUDPDF_PASSWORD_SESSION_SERVER_SECRET="$(openssl rand -hex 32)" \
+    --from-literal=CLOUDPDF_DB_URL='postgres://cloudpdf:drill-only@drill-postgres:5432/cloudpdf' \
+    --from-literal=AWS_ACCESS_KEY_ID=drilldrill \
+    --from-literal=AWS_SECRET_ACCESS_KEY=drill-only-secret \
+    --from-literal=CLOUDPDF_API_AUTH_TOKENS="$API_TOKEN" \
+    --from-literal=CLOUDPDF_LICENSE_KEY="$CLOUDPDF_LICENSE_KEY"
+fi
+API_TOKEN=$(kubectl -n "$NS" get secret cloudpdf-secrets \
+  -o jsonpath='{.data.CLOUDPDF_API_AUTH_TOKENS}' | base64 -d)
 
 helm upgrade --install "$RELEASE" "$CHART_DIR" -n "$NS" \
   --set image.tag="$TAG" \
@@ -148,6 +157,22 @@ helm upgrade --install "$RELEASE" "$CHART_DIR" -n "$NS" \
   --set-string config.CLOUDPDF_AUTO_PROVISION_TENANT=1 \
   --set config.CLOUDPDF_UPLOAD_PROXY_POLICY=allowed \
   --wait --timeout 8m
+
+# Self-heal a token/pod desync (a manually rotated secret cannot roll
+# pods): probe an authed endpoint; on 401, restart the deployment so
+# pods re-read the secret.
+# curl -w emits no trailing newline and kubectl's deletion notice lands
+# on the same stdout line — extract the leading 3-digit status.
+PROBE=$(kubectl -n "$NS" run drill-authprobe --rm -i --restart=Never \
+  --image=curlimages/curl:8.10.1 --env "TOKEN=$API_TOKEN" --command -- \
+  sh -c 'curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer $TOKEN" \
+    "http://'"$RELEASE"'-cloudpdf-server:3000/v1/tenants/drill/documents?limit=1"' 2>/dev/null \
+  | grep -oE '^[0-9]{3}' | head -1)
+if [ "$PROBE" = "401" ]; then
+  log "pods hold a stale token — rolling the deployment"
+  kubectl -n "$NS" rollout restart "deploy/$RELEASE-cloudpdf-server"
+  kubectl -n "$NS" rollout status "deploy/$RELEASE-cloudpdf-server" --timeout=300s
+fi
 
 log "port-forward + seed a document"
 kubectl -n "$NS" port-forward "svc/$RELEASE-cloudpdf-server" 3000:3000 >/dev/null 2>&1 &
@@ -176,17 +201,21 @@ curl -sf -X POST "$BASE/documents/$DOC/commit" "${AUTH[@]}" \
   -H 'content-type: application/json' -d "{\"sha256\":\"$SHA\"}" > /dev/null
 log "seeded document $DOC"
 
-log "load: continuous reads against the doc (background)"
-FAILS=0; TOTAL=0
-LOAD_LOG=$(mktemp)
-( while :; do
-    if curl -sf -o /dev/null -H "Authorization: Bearer $API_TOKEN" \
-        "$BASE/documents?limit=10"; then echo ok; else echo fail; fi
-    sleep 0.2
-  done > "$LOAD_LOG" ) &
-LOAD_PID=$!
-
+# Load runs IN-CLUSTER against the Service so kube-proxy does real
+# cross-replica routing — a host port-forward pins to one pod and dies
+# with it, which fakes both the failure count and any post-crash check.
+log "load: continuous in-cluster reads through the Service"
+kubectl -n "$NS" delete pod drill-load --ignore-not-found --wait=false >/dev/null 2>&1 || true
+kubectl -n "$NS" run drill-load --image=curlimages/curl:8.10.1 --restart=Never \
+  --env "TOKEN=$API_TOKEN" --env "SVC=$RELEASE-cloudpdf-server" --command -- sh -c \
+  'while true; do
+     if curl -sf -o /dev/null -m 2 -H "Authorization: Bearer $TOKEN" \
+       "http://$SVC:3000/v1/tenants/drill/documents?limit=10"; then echo ok; else echo fail; fi
+     sleep 0.2
+   done'
+kubectl -n "$NS" wait --for=condition=ready pod/drill-load --timeout=120s
 sleep 3
+
 log "CRASH: abrupt process kill on one replica (supervision-equivalent to a native crash)"
 POD=$(kubectl -n "$NS" get pod -l "app.kubernetes.io/instance=$RELEASE" -o jsonpath='{.items[0].metadata.name}')
 T0=$(date +%s)
@@ -195,13 +224,21 @@ sleep 3
 kubectl -n "$NS" wait --for=condition=ready "pod/$POD" --timeout=180s
 T1=$(date +%s)
 sleep 3
-kill $LOAD_PID >/dev/null 2>&1 || true
 
+LOAD_LOG=$(mktemp)
+kubectl -n "$NS" logs drill-load > "$LOAD_LOG" 2>/dev/null || true
+kubectl -n "$NS" delete pod drill-load --wait=false >/dev/null 2>&1 || true
 TOTAL=$(grep -c . "$LOAD_LOG" || true)
 FAILS=$(grep -c fail "$LOAD_LOG" || true)
 RESTARTS=$(kubectl -n "$NS" get pod "$POD" -o jsonpath='{.status.containerStatuses[0].restartCount}')
 
 log "post-crash consistency: the seeded document must still list"
+# Fresh tunnel — the seed-time port-forward may have been pinned to the
+# pod we just killed.
+kill $PF_PID >/dev/null 2>&1 || true
+kubectl -n "$NS" port-forward "svc/$RELEASE-cloudpdf-server" 3000:3000 >/dev/null 2>&1 &
+PF_PID=$!
+sleep 3
 curl -sf -H "Authorization: Bearer $API_TOKEN" \
   "$BASE/documents" | grep -q "$DOC" || { echo 'DOCUMENT LOST'; exit 1; }
 
