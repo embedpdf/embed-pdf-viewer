@@ -54,8 +54,6 @@ import {
   type RequestJwtContext,
 } from '../app/jwt-plugin';
 import { SharpImageEncoder } from '../render/SharpImageEncoder';
-import { runReadWithReopen } from '../runtime/EnginePool';
-import type { EnginePool } from '../runtime/EnginePool';
 import type { CloudRevisionBridge } from '../services/CloudRevisionBridge';
 import type { DerivedRenderService } from '../services/DerivedRenderService';
 import type { DocumentService, OpenContext } from '../services/DocumentService';
@@ -65,7 +63,6 @@ import type { WeakAnnotationSessionService } from '../services/WeakAnnotationSes
 interface AnnotationRouteDeps {
   documentService: DocumentService;
   layerService: LayerService;
-  pool: EnginePool;
   revisionBridge: CloudRevisionBridge;
   imageEncoder: SharpImageEncoder;
   /** WS3 Phase B: encode appearance renders in the engine worker (default).
@@ -87,7 +84,6 @@ export async function registerAnnotationRoutes(
   const {
     documentService,
     layerService,
-    pool,
     revisionBridge,
     imageEncoder,
     weakAnnotationSessions,
@@ -110,7 +106,6 @@ export async function registerAnnotationRoutes(
     ]);
     return readAnnotations({
       documentService,
-      pool,
       revisionBridge,
       reply,
       signal: abortSignalFromRequest(req),
@@ -134,7 +129,6 @@ export async function registerAnnotationRoutes(
       ]);
       return renderAnnotationAppearances({
         documentService,
-        pool,
         imageEncoder,
         encodeInEngine,
         ...(derivedRenders ? { derivedRenders } : {}),
@@ -166,7 +160,6 @@ export async function registerAnnotationRoutes(
       const ctx = requireLayerResource(req, docId, layerName, 'annotations-read', pdfBits);
       return readAnnotations({
         documentService,
-        pool,
         revisionBridge,
         reply,
         signal: abortSignalFromRequest(req),
@@ -192,7 +185,6 @@ export async function registerAnnotationRoutes(
     const ctx = requireLayerResource(req, docId, layerName, 'annotations-read', pdfBits);
     return readAnnotations({
       documentService,
-      pool,
       revisionBridge,
       reply,
       signal: abortSignalFromRequest(req),
@@ -222,7 +214,6 @@ export async function registerAnnotationRoutes(
       const ctx = requireLayerResource(req, docId, layerName, 'annotations-read', pdfBits);
       return renderAnnotationAppearances({
         documentService,
-        pool,
         imageEncoder,
         encodeInEngine,
         ...(derivedRenders ? { derivedRenders } : {}),
@@ -254,7 +245,6 @@ export async function registerAnnotationRoutes(
       const ctx = requireLayerResource(req, docId, layerName, 'annotations-read', pdfBits);
       return renderAnnotationAppearances({
         documentService,
-        pool,
         imageEncoder,
         encodeInEngine,
         ...(derivedRenders ? { derivedRenders } : {}),
@@ -693,7 +683,6 @@ function buildUpdateActor(
 
 async function renderAnnotationAppearances(input: {
   documentService: DocumentService;
-  pool: EnginePool;
   imageEncoder: SharpImageEncoder;
   encodeInEngine: boolean;
   derivedRenders?: DerivedRenderService;
@@ -797,12 +786,12 @@ async function renderAnnotationAppearances(input: {
           },
         });
       const scope = input.scope;
-      const payload = await runReadWithReopen(
-        () =>
-          scope.kind === 'layer'
-            ? input.documentService.ensureLayerOnPool(scope.ctx, scope.docId, scope.layerName)
-            : input.documentService.openOnPool(scope.ctx, scope.docId),
-        () => input.pool.run(input.scope.docId, build, input.signal),
+      const payload = await input.documentService.readOnPool(
+        scope.ctx,
+        scope.docId,
+        scope.kind === 'layer' ? scope.layerName : undefined,
+        build,
+        input.signal,
       );
       if (payload.tag !== 'annotations.renderAppearancesEncoded') {
         throw new EngineError(
@@ -844,12 +833,12 @@ async function renderAnnotationAppearances(input: {
         options: renderOptions,
       });
     const scope = input.scope;
-    const payload = await runReadWithReopen(
-      () =>
-        scope.kind === 'layer'
-          ? input.documentService.ensureLayerOnPool(scope.ctx, scope.docId, scope.layerName)
-          : input.documentService.openOnPool(scope.ctx, scope.docId),
-      () => input.pool.run(input.scope.docId, build, input.signal),
+    const payload = await input.documentService.readOnPool(
+      scope.ctx,
+      scope.docId,
+      scope.kind === 'layer' ? scope.layerName : undefined,
+      build,
+      input.signal,
     );
     if (payload.tag !== 'annotations.renderAppearances') {
       throw new EngineError(
@@ -972,7 +961,6 @@ function rejectQueryParamsOnTokenUrl(query: unknown): void {
 
 async function readAnnotations(input: {
   documentService: DocumentService;
-  pool: EnginePool;
   revisionBridge: CloudRevisionBridge;
   reply: { header(name: 'Cache-Control', value: string): unknown };
   signal: AbortSignal;
@@ -1012,12 +1000,12 @@ async function readAnnotations(input: {
       pageObjectNumber: input.pageObjectNumber,
     });
   const scope = input.scope;
-  const result = await runReadWithReopen(
-    () =>
-      scope.kind === 'layer'
-        ? input.documentService.ensureLayerOnPool(scope.ctx, scope.docId, scope.layerName)
-        : input.documentService.openOnPool(scope.ctx, scope.docId),
-    () => input.pool.run(input.scope.docId, build, input.signal),
+  const result = await input.documentService.readOnPool(
+    scope.ctx,
+    scope.docId,
+    scope.kind === 'layer' ? scope.layerName : undefined,
+    build,
+    input.signal,
   );
   if (result.tag !== 'annotations.listFullPage') {
     throw new EngineError(

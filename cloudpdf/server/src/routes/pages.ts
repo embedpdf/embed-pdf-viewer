@@ -38,14 +38,12 @@ import {
   type SchemaLike,
 } from './_helpers';
 import { requireSharedDocRead } from './_planeGuard';
-import { runReadWithReopen } from '../runtime/EnginePool';
 import {
   requireLayerCapability,
   requireLayerDocAccessOnly,
   requireLayerResource,
 } from '../app/jwt-plugin';
 import type { SharpImageEncoder } from '../render/SharpImageEncoder';
-import type { EnginePool } from '../runtime/EnginePool';
 import type { DerivedRenderService } from '../services/DerivedRenderService';
 import type { DocumentService, OpenContext } from '../services/DocumentService';
 import type { LayerService } from '../services/LayerService';
@@ -53,7 +51,6 @@ import type { LayerService } from '../services/LayerService';
 interface PageRouteDeps {
   documentService: DocumentService;
   layerService: LayerService;
-  pool: EnginePool;
   imageEncoder: SharpImageEncoder;
   /** WS3 Phase B: encode renders in the engine worker (default). `false` is
    *  the one-release escape hatch (`CLOUDPDF_ENCODE_IN_ENGINE=0`) that keeps
@@ -68,7 +65,7 @@ type ReadScope =
   | { kind: 'layer'; ctx: OpenContext; docId: string; layerName: string };
 
 export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDeps): Promise<void> {
-  const { documentService, layerService, pool, imageEncoder, derivedRenders } = deps;
+  const { documentService, layerService, imageEncoder, derivedRenders } = deps;
   const encodeInEngine = deps.encodeInEngine ?? true;
 
   // Doc-level SHARED routes (plane-scope model): served from the BASE worker
@@ -81,7 +78,6 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
     const ctx = await requireSharedDocRead(req, documentService, docId, 'page-text', ['content']);
     return readPageText({
       documentService,
-      pool,
       reply,
       signal: abortSignalFromRequest(req),
       scope: { kind: 'base', ctx, docId },
@@ -95,7 +91,6 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
     const ctx = await requireSharedDocRead(req, documentService, docId, 'page-text', ['content']);
     return readPageText({
       documentService,
-      pool,
       reply,
       signal: abortSignalFromRequest(req),
       scope: { kind: 'base', ctx, docId },
@@ -110,7 +105,6 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
     ]);
     return readPageGeometry({
       documentService,
-      pool,
       reply,
       signal: abortSignalFromRequest(req),
       scope: { kind: 'base', ctx, docId },
@@ -126,7 +120,6 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
     ]);
     return readPageGeometry({
       documentService,
-      pool,
       reply,
       signal: abortSignalFromRequest(req),
       scope: { kind: 'base', ctx, docId },
@@ -139,7 +132,6 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
     const ctx = await requireSharedDocRead(req, documentService, docId, 'page-render', ['content']);
     return renderPageImage({
       documentService,
-      pool,
       imageEncoder,
       encodeInEngine,
       ...(derivedRenders ? { derivedRenders } : {}),
@@ -158,7 +150,6 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
     const ctx = await requireSharedDocRead(req, documentService, docId, 'page-render', ['content']);
     return renderPageImage({
       documentService,
-      pool,
       imageEncoder,
       encodeInEngine,
       ...(derivedRenders ? { derivedRenders } : {}),
@@ -179,7 +170,6 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
     ]);
     return renderPageImage({
       documentService,
-      pool,
       imageEncoder,
       encodeInEngine,
       ...(derivedRenders ? { derivedRenders } : {}),
@@ -201,7 +191,6 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
     ]);
     return renderPageImage({
       documentService,
-      pool,
       imageEncoder,
       encodeInEngine,
       ...(derivedRenders ? { derivedRenders } : {}),
@@ -226,7 +215,6 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
     const ctx = requireLayerResource(req, docId, layerName, 'layer-page-text', pdfBits);
     return readPageText({
       documentService,
-      pool,
       reply,
       signal: abortSignalFromRequest(req),
       scope: { kind: 'layer', ctx, docId, layerName },
@@ -246,7 +234,6 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
     const ctx = requireLayerResource(req, docId, layerName, 'layer-page-text', pdfBits);
     return readPageText({
       documentService,
-      pool,
       reply,
       signal: abortSignalFromRequest(req),
       scope: { kind: 'layer', ctx, docId, layerName },
@@ -268,7 +255,6 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
       const ctx = requireLayerResource(req, docId, layerName, 'layer-page-geometry', pdfBits);
       return readPageGeometry({
         documentService,
-        pool,
         reply,
         signal: abortSignalFromRequest(req),
         scope: { kind: 'layer', ctx, docId, layerName },
@@ -289,7 +275,6 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
     const ctx = requireLayerResource(req, docId, layerName, 'layer-page-geometry', pdfBits);
     return readPageGeometry({
       documentService,
-      pool,
       reply,
       signal: abortSignalFromRequest(req),
       scope: { kind: 'layer', ctx, docId, layerName },
@@ -309,7 +294,6 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
     const ctx = requireLayerResource(req, docId, layerName, 'layer-page-render', pdfBits);
     return renderPageImage({
       documentService,
-      pool,
       imageEncoder,
       encodeInEngine,
       ...(derivedRenders ? { derivedRenders } : {}),
@@ -334,7 +318,6 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
     const ctx = requireLayerResource(req, docId, layerName, 'layer-page-render', pdfBits);
     return renderPageImage({
       documentService,
-      pool,
       imageEncoder,
       encodeInEngine,
       ...(derivedRenders ? { derivedRenders } : {}),
@@ -367,7 +350,6 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
       );
       return renderPageImage({
         documentService,
-        pool,
         imageEncoder,
         encodeInEngine,
         ...(derivedRenders ? { derivedRenders } : {}),
@@ -401,7 +383,6 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
       );
       return renderPageImage({
         documentService,
-        pool,
         imageEncoder,
         encodeInEngine,
         ...(derivedRenders ? { derivedRenders } : {}),
@@ -536,7 +517,6 @@ function rejectQueryParamsOnTokenUrl(query: unknown): void {
 
 async function renderPageImage(input: {
   documentService: DocumentService;
-  pool: EnginePool;
   imageEncoder: SharpImageEncoder;
   encodeInEngine: boolean;
   derivedRenders?: DerivedRenderService;
@@ -663,12 +643,12 @@ async function renderPageImage(input: {
         options: preparedRenderOptions(),
       });
     const scope = input.scope;
-    const result = await runReadWithReopen(
-      () =>
-        scope.kind === 'layer'
-          ? input.documentService.ensureLayerOnPool(scope.ctx, scope.docId, scope.layerName)
-          : input.documentService.openOnPool(scope.ctx, scope.docId),
-      () => input.pool.run(input.scope.docId, build, input.signal),
+    const result = await input.documentService.readOnPool(
+      scope.ctx,
+      scope.docId,
+      scope.kind === 'layer' ? scope.layerName : undefined,
+      build,
+      input.signal,
     );
     if (result.tag !== 'pages.render') {
       throw new EngineError(
@@ -697,12 +677,12 @@ async function renderPageImage(input: {
         },
       });
     const scope = input.scope;
-    const result = await runReadWithReopen(
-      () =>
-        scope.kind === 'layer'
-          ? input.documentService.ensureLayerOnPool(scope.ctx, scope.docId, scope.layerName)
-          : input.documentService.openOnPool(scope.ctx, scope.docId),
-      () => input.pool.run(input.scope.docId, build, input.signal),
+    const result = await input.documentService.readOnPool(
+      scope.ctx,
+      scope.docId,
+      scope.kind === 'layer' ? scope.layerName : undefined,
+      build,
+      input.signal,
     );
     if (result.tag !== 'pages.renderEncoded') {
       throw new EngineError(
@@ -775,7 +755,6 @@ async function renderPageImage(input: {
 
 async function readPageText(input: {
   documentService: DocumentService;
-  pool: EnginePool;
   reply: { header(name: 'Cache-Control', value: string): unknown };
   signal: AbortSignal;
   scope: ReadScope;
@@ -814,12 +793,12 @@ async function readPageText(input: {
       pageObjectNumber: input.pageObjectNumber,
     });
   const scope = input.scope;
-  const result = await runReadWithReopen(
-    () =>
-      scope.kind === 'layer'
-        ? input.documentService.ensureLayerOnPool(scope.ctx, scope.docId, scope.layerName)
-        : input.documentService.openOnPool(scope.ctx, scope.docId),
-    () => input.pool.run(input.scope.docId, build, input.signal),
+  const result = await input.documentService.readOnPool(
+    scope.ctx,
+    scope.docId,
+    scope.kind === 'layer' ? scope.layerName : undefined,
+    build,
+    input.signal,
   );
   if (result.tag !== 'pages.text') {
     throw new EngineError(
@@ -837,7 +816,6 @@ async function readPageText(input: {
 
 async function readPageGeometry(input: {
   documentService: DocumentService;
-  pool: EnginePool;
   reply: { header(name: 'Cache-Control', value: string): unknown };
   signal: AbortSignal;
   scope: ReadScope;
@@ -876,12 +854,12 @@ async function readPageGeometry(input: {
       pageObjectNumber: input.pageObjectNumber,
     });
   const scope = input.scope;
-  const result = await runReadWithReopen(
-    () =>
-      scope.kind === 'layer'
-        ? input.documentService.ensureLayerOnPool(scope.ctx, scope.docId, scope.layerName)
-        : input.documentService.openOnPool(scope.ctx, scope.docId),
-    () => input.pool.run(input.scope.docId, build, input.signal),
+  const result = await input.documentService.readOnPool(
+    scope.ctx,
+    scope.docId,
+    scope.kind === 'layer' ? scope.layerName : undefined,
+    build,
+    input.signal,
   );
   if (result.tag !== 'pages.geometry') {
     throw new EngineError(

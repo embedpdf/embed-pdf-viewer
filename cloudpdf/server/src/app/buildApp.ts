@@ -67,13 +67,13 @@ import { registerShareSessionRoutes } from '../routes/share-sessions';
 import { readCgroupMemory } from '../runtime/cgroup-memory';
 import { EngineHostClient } from '../runtime/EngineHostClient';
 import type { EnginePool } from '../runtime/EnginePool';
+import { EngineRecycler, type EngineRecyclePolicy } from '../runtime/EngineRecycler';
 import { QuarantiningEnginePool } from '../runtime/QuarantiningEnginePool';
 import {
   EngineBusyError,
   SchedulingEnginePool,
   type EngineSchedulingConfig,
 } from '../runtime/SchedulingEnginePool';
-import { EngineRecycler, type EngineRecyclePolicy } from '../runtime/EngineRecycler';
 import { WorkerThreadPool, type FallbackFontDescriptor } from '../runtime/WorkerThreadPool';
 import type { KmsKeyring } from '../security';
 import { CloudRevisionBridge } from '../services/CloudRevisionBridge';
@@ -1149,7 +1149,6 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
       await registerPageRoutes(app, {
         documentService,
         layerService,
-        pool,
         imageEncoder: new SharpImageEncoder(),
         ...(opts.encodeInEngine !== undefined ? { encodeInEngine: opts.encodeInEngine } : {}),
         ...(derivedRenders ? { derivedRenders } : {}),
@@ -1165,7 +1164,6 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
       await registerAnnotationRoutes(app, {
         documentService,
         layerService,
-        pool,
         revisionBridge: cloudRevisionBridge,
         imageEncoder: new SharpImageEncoder(),
         ...(opts.encodeInEngine !== undefined ? { encodeInEngine: opts.encodeInEngine } : {}),
@@ -1182,7 +1180,6 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
       });
       await registerSearchRoutes(app, {
         documentService,
-        pool,
       });
     }
 

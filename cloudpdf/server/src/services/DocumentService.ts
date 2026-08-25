@@ -38,7 +38,7 @@ import type {
   PasswordVerificationRow,
   PdfPasswordVerificationsRepo,
 } from '../db/repos/pdf_password_verifications.repo';
-import { runReadWithReopen } from '../runtime/EnginePool';
+import { runReadWithReopen, type BuildPack } from '../runtime/EnginePool';
 import type { EnginePool } from '../runtime/EnginePool';
 import { signPasswordGrant, verifyPasswordGrant, type PasswordSessionBinding } from '../security';
 import type { BaseFileCache, LocalFileHandle } from '../storage/BaseFileCache';
@@ -253,24 +253,32 @@ export class DocumentService {
    * Concurrent first-callers share one open via singleflight.
    */
   /**
-   * THE read-dispatch door (P1 #3, review round on C2): every read that
-   * dispatches against an ensured session goes through here, so the
-   * parked-across-respawn DocNotOpen recovery cannot be skipped by a
-   * future call site. Mutations never use this — WS1's fence + rebase
-   * own their retry (see `LayerService.runWithRebase`).
+   * THE read-dispatch door: ensure (layer or base) → dispatch → ONE
+   * reopen-retry when the session vanished between ensure and dispatch
+   * (a read parked across an engine respawn). Every engine read —
+   * service-internal AND route-level — goes through this verb, so the
+   * recovery cannot be skipped by a future call site, and routes need no
+   * `EnginePool` of their own. One reopen per request is the law: a
+   * second DocNotOpen means the engine respawned twice inside one
+   * request, and the error handler's 503 (`EngineRestarting`) is the
+   * honest answer. Mutations never use this — WS1's fence + rebase own
+   * their retry (see `LayerService.runWithRebase`); the password
+   * bootstrap keeps its special reensure via `runReadWithReopen`.
    */
-  private runRead(
+  readOnPool(
     ctx: OpenContext,
     docId: string,
+    /** undefined = the BASE view (shared reads use no layer session). */
     layerName: string | undefined,
-    dispatch: () => Promise<WorkerResultPayload>,
+    build: BuildPack,
+    signal?: AbortSignal,
   ): Promise<WorkerResultPayload> {
     return runReadWithReopen(
       () =>
         layerName !== undefined
           ? this.ensureLayerOnPool(ctx, docId, layerName)
           : this.openOnPool(ctx, docId),
-      dispatch,
+      () => this.pool.run(docId, build, signal),
     );
   }
 
@@ -474,7 +482,7 @@ export class DocumentService {
   async getManifest(ctx: OpenContext, docId: string): Promise<DocumentManifest> {
     const head = await this.openOnPool(ctx, docId);
     const pages = await this.layerState.ensureBasePages(docId, () =>
-      this.loadDurableBasePageStates(docId),
+      this.loadDurableBasePageStates(ctx, docId),
     );
     return this.layerState.buildBaseManifest(head, pages);
   }
@@ -520,7 +528,7 @@ export class DocumentService {
     const layer = await this.layerState.repos.layers.findByDocAndName(docId, layerName);
     if (!layer) {
       const pages = await this.layerState.ensureBasePages(docId, () =>
-        this.loadDurableBasePageStates(docId),
+        this.loadDurableBasePageStates(ctx, docId),
       );
       // No layer row yet -> immutable base view: docVersion from head, the
       // geometry pointer at its initial epoch (1) — and every plane
@@ -543,7 +551,7 @@ export class DocumentService {
     }
 
     const basePages = await this.layerState.ensureBasePages(docId, () =>
-      this.loadDurableBasePageStates(docId),
+      this.loadDurableBasePageStates(ctx, docId),
     );
     const pages = await this.layerState.ensureLayerPagesFromBase({ layerId: layer.id, docId });
     // Plane scopes: annotation writes own `annotations` only (renders/
@@ -593,9 +601,7 @@ export class DocumentService {
         docId,
         ...(layerName !== undefined ? { layerName } : {}),
       });
-    const result = await this.runRead(ctx, docId, layerName, () =>
-      this.pool.run(docId, build, signal),
-    );
+    const result = await this.readOnPool(ctx, docId, layerName, build, signal);
     if (result.tag !== 'pages.list') {
       throw new EngineError(
         EngineErrorCode.WireFormat,
@@ -614,18 +620,18 @@ export class DocumentService {
   ): Promise<DocumentActionsSnapshot> {
     if (layerName !== undefined) await this.ensureLayerOnPool(ctx, docId, layerName);
     else await this.openOnPool(ctx, docId);
-    const result = await this.runRead(ctx, docId, layerName, () =>
-      this.pool.run(
-        docId,
-        (jobId) =>
-          wirePack({
-            kind: 'actions.read' as const,
-            jobId,
-            docId,
-            ...(layerName !== undefined ? { layerName } : {}),
-          }),
-        signal,
-      ),
+    const result = await this.readOnPool(
+      ctx,
+      docId,
+      layerName,
+      (jobId) =>
+        wirePack({
+          kind: 'actions.read' as const,
+          jobId,
+          docId,
+          ...(layerName !== undefined ? { layerName } : {}),
+        }),
+      signal,
     );
     if (result.tag !== 'actions.read') {
       throw new EngineError(
@@ -837,9 +843,7 @@ export class DocumentService {
         docId,
         ...(layerName !== undefined ? { layerName } : {}),
       });
-    const result = await this.runRead(ctx, docId, layerName, () =>
-      this.pool.run(docId, build, signal),
-    );
+    const result = await this.readOnPool(ctx, docId, layerName, build, signal);
     if (result.tag !== 'metadata.read') {
       throw new EngineError(
         EngineErrorCode.WireFormat,
@@ -1333,9 +1337,7 @@ export class DocumentService {
           mode,
           path,
         });
-      const result = await this.runRead(ctx, docId, layerName, () =>
-        this.pool.run(docId, build, signal),
-      );
+      const result = await this.readOnPool(ctx, docId, layerName, build, signal);
       if (result.tag !== 'document.saveFile') {
         throw new EngineError(EngineErrorCode.WireFormat, `unexpected save payload: ${result.tag}`);
       }
@@ -1432,9 +1434,7 @@ export class DocumentService {
         docId,
         ...(layerName !== undefined ? { layerName } : {}),
       });
-    const payload = await this.runRead(ctx, docId, layerName, () =>
-      this.pool.run(docId, build, signal),
-    );
+    const payload = await this.readOnPool(ctx, docId, layerName, build, signal);
     if (payload.tag !== 'attachments.list') {
       throw new EngineError(
         EngineErrorCode.WireFormat,
@@ -1505,8 +1505,12 @@ export class DocumentService {
       // Attachment bytes use the file-backed extraction mode so the decoded
       // payload never crosses the worker boundary as an ArrayBuffer; Fastify
       // streams this completed temp file with backpressure.
-      const payload = await this.runRead(ctx, docId, layerName, () =>
-        this.pool.run(docId, (jobId) => buildFor(jobId, path), signal),
+      const payload = await this.readOnPool(
+        ctx,
+        docId,
+        layerName,
+        (jobId) => buildFor(jobId, path),
+        signal,
       );
       if (payload.tag !== 'attachments.readFile' && payload.tag !== 'annotations.readFile') {
         throw new EngineError(
@@ -1578,10 +1582,10 @@ export class DocumentService {
     };
   }
 
-  private async loadDurableBasePageStates(docId: string): Promise<PageState[]> {
+  private async loadDurableBasePageStates(ctx: OpenContext, docId: string): Promise<PageState[]> {
     const annotationsBuild = (jobId: WorkerJobId) =>
       wirePack({ kind: 'annotations.listRawAll' as const, jobId, docId });
-    const annotationsResult = await this.pool.run(docId, annotationsBuild);
+    const annotationsResult = await this.readOnPool(ctx, docId, undefined, annotationsBuild);
     if (annotationsResult.tag !== 'annotations.listRawAll') {
       throw new EngineError(
         EngineErrorCode.WireFormat,
