@@ -1,3 +1,4 @@
+import { wirePaths } from '@embedpdf/engine-core/wire';
 import { mkdtemp, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -1791,7 +1792,7 @@ function buildHead(row: DocumentRow, cdnAccessRequired: boolean): DocumentHead {
     access: {
       required: reasons.length > 0,
       reasons,
-      ...(reasons.length > 0 ? { endpoint: '/v1/access' } : {}),
+      ...(reasons.length > 0 ? { endpoint: wirePaths.access(row.id) } : {}),
     },
   };
 }

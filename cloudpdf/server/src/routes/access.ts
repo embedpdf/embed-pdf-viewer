@@ -14,7 +14,7 @@ import {
   type LayerScopes,
   type RenderPolicy,
 } from '@embedpdf/engine-core/wire';
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 
 import { setNoStore } from './_helpers';
 import { requireLayerDocAccessOnly, type RequestJwtContext } from '../app/jwt-plugin';
@@ -39,7 +39,11 @@ export async function registerAccessRoutes(
 ): Promise<void> {
   const { service, cdnSigner, derivedRenders, usageMeters, tenantUsage } = deps;
 
-  app.post(wirePaths.access, async (req, reply) => {
+  const handleAccess = async (
+    req: FastifyRequest,
+    reply: FastifyReply,
+    pathDocId: string | undefined,
+  ) => {
     const parsed = AccessRequestSchema.safeParse(req.body ?? {});
     if (!parsed.success) {
       throw new EngineError(
@@ -48,9 +52,23 @@ export async function registerAccessRoutes(
       );
     }
     const body = parsed.data;
+    // Doc-scoped BY PATH (the affinity tier routes on it); the legacy
+    // alias still takes the id from the body. When both are present
+    // they must agree — a mismatch is malformed, never a silent
+    // preference.
+    const docId = pathDocId ?? body.docId;
+    if (docId === undefined) {
+      throw new EngineError(EngineErrorCode.InvalidArg, 'access request needs a document id');
+    }
+    if (pathDocId !== undefined && body.docId !== undefined && body.docId !== pathDocId) {
+      throw new EngineError(
+        EngineErrorCode.InvalidArg,
+        `access request docId mismatch: path=${pathDocId} body=${body.docId}`,
+      );
+    }
     const layerName = body.layerName ?? 'default';
-    const ctx = requireLayerDocAccessOnly(req, body.docId, layerName);
-    const unlocked = await service.unlockLayerAccess(ctx, body.docId, layerName, {
+    const ctx = requireLayerDocAccessOnly(req, docId, layerName);
+    const unlocked = await service.unlockLayerAccess(ctx, docId, layerName, {
       password: body.password ?? null,
       passwordGrant: body.passwordGrant ?? null,
       mode: body.mode ?? 'any',
@@ -68,14 +86,14 @@ export async function registerAccessRoutes(
     // pinned layer — the SAME scopes the manifest advertises and the origin
     // guards enforce (the origin is the truth; this grant is the
     // optimization, TTL-bounded by `expiresAt` after a divergence flip).
-    const layerScopes = await service.getLayerScopes(body.docId, layerName);
+    const layerScopes = await service.getLayerScopes(docId, layerName);
     const access = buildAccessResponse(
       unlocked,
       ctx.jwt,
       pdfBits,
       cdnSigner,
       ctx.tenantId,
-      body.docId,
+      docId,
       layerName,
       `${req.protocol}://${req.hostname}`,
       derivedRenders?.policy(),
@@ -95,7 +113,16 @@ export async function registerAccessRoutes(
       security: unlocked.security,
       ...access,
     };
+  };
+
+  // Fastify pattern literal (the same shape wirePaths.access(docId)
+  // builds — the builder percent-encodes, so it cannot express ':docId').
+  app.post('/v1/docs/:docId/access', async (req, reply) => {
+    const { docId } = req.params as { docId: string };
+    return handleAccess(req, reply, docId);
   });
+  // Deprecated alias (one prerelease cycle): docId from the body.
+  app.post(wirePaths.accessLegacy, async (req, reply) => handleAccess(req, reply, undefined));
 }
 
 function buildAccessResponse(

@@ -563,7 +563,25 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
     await app.register(cors, {
       origin: opts.corsOrigins === '*' ? true : [...opts.corsOrigins],
       methods: ['GET', 'POST', 'PATCH', 'DELETE'],
-      allowedHeaders: ['authorization', 'content-type', 'x-engine-session-id', 'last-event-id'],
+      allowedHeaders: [
+        'authorization',
+        'content-type',
+        'x-engine-session-id',
+        'last-event-id',
+        // Document affinity: SDKs may send the document routing key; the server
+        // never parses it, but the preflight must allow it.
+        'x-cloudpdf-doc',
+      ],
+      // Response headers cross-origin JS may READ (nothing is safelisted
+      // beyond the basics): the backpressure hint + the advisory
+      // dimension/file headers clients already consume.
+      exposedHeaders: [
+        'retry-after',
+        'x-embedpdf-image-width',
+        'x-embedpdf-image-height',
+        'x-embedpdf-appearance-count',
+        'x-embedpdf-file-name',
+      ],
       credentials: false,
       maxAge: 86_400,
     });

@@ -257,7 +257,11 @@ describe('Phase 3 doc routes — GET /v1/docs/:docId/head', () => {
         securityHandlerRevision: null,
         canUpgradeToOwner: false,
       },
-      access: { required: true, reasons: ['permissions-unknown'], endpoint: '/v1/access' },
+      access: {
+        required: true,
+        reasons: ['permissions-unknown'],
+        endpoint: `/v1/docs/${docId}/access`,
+      },
     });
   });
 
@@ -501,6 +505,69 @@ describe('Phase 3 doc routes — POST /v1/warm', () => {
       body: JSON.stringify({ docId: 'docwbd222' }),
     });
     expect(res.status).toBe(403);
+  });
+});
+
+describe('access route — doc-scoped path with document affinity', () => {
+  let fx: Fixture;
+  beforeEach(async () => {
+    fx = await buildFixture();
+  });
+  afterEach(async () => {
+    await tearDown(fx);
+  });
+
+  const seedPlain = async (tenantId: string, docId: string): Promise<void> => {
+    await seedDocument(fx, tenantId, docId, {
+      security: {
+        encryptionState: 'none',
+        encryptionRequiresPassword: false,
+        pdfPermissionsBits: 0xfffffffc,
+        pdfPermissionsAllAllowed: true,
+        pdfOpenedAs: 'none',
+      },
+    });
+  };
+  const auth = (tenantId: string, docId: string): Record<string, string> => ({
+    Authorization: `Bearer ${docToken(tenantId, docId, {
+      layer: 'default',
+      scope: ['doc.open', 'doc.render'],
+    })}`,
+    'Content-Type': 'application/json',
+  });
+
+  test('the path carries the docId — no body docId needed (the affinity tier routes on the URL)', async () => {
+    await seedPlain('tenant-acc2', 'docacc201');
+    const res = await fetch(`${fx.baseUrl}/v1/docs/docacc201/access`, {
+      method: 'POST',
+      headers: auth('tenant-acc2', 'docacc201'),
+      body: JSON.stringify({ layerName: 'default' }),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { security: { encryption: { state: string } } };
+    expect(body.security.encryption.state).toBe('none');
+  });
+
+  test('path/body docId mismatch is malformed, never a silent preference', async () => {
+    await seedPlain('tenant-acc2', 'docacc202');
+    const res = await fetch(`${fx.baseUrl}/v1/docs/docacc202/access`, {
+      method: 'POST',
+      headers: auth('tenant-acc2', 'docacc202'),
+      body: JSON.stringify({ docId: 'docacc999', layerName: 'default' }),
+    });
+    expect(res.status).toBe(400);
+    expect(await res.text()).toContain('mismatch');
+  });
+
+  test('the legacy alias still needs a body docId', async () => {
+    await seedPlain('tenant-acc2', 'docacc203');
+    const res = await fetch(`${fx.baseUrl}/v1/access`, {
+      method: 'POST',
+      headers: auth('tenant-acc2', 'docacc203'),
+      body: JSON.stringify({ layerName: 'default' }),
+    });
+    expect(res.status).toBe(400);
+    expect(await res.text()).toContain('needs a document id');
   });
 });
 

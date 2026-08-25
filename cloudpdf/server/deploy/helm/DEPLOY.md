@@ -73,8 +73,12 @@ it when replica counts or per-document memory make duplication visible.
 - **SSE timeout rule (every LB):** idle/read timeout ≥ 2× the 25 s
   heartbeat. The chart sets nginx `proxy-read/send-timeout: 3600` when
   `ingress.className: nginx`.
-- **`docAffinity.key: header`** (portable): consistent-hash the
-  `X-CloudPDF-Doc` request header. nginx: `upstream-hash-by:
+- **`docAffinity.key: header`** (portable, PREFERRED): consistent-hash
+  the `X-CloudPDF-Doc` request header. SDKs send it with
+  `cloudEngine({ docAffinityHeader: true })` (opt-in for one cycle;
+  requires a server from the same release — its CORS allowlist names the
+  header). The doc-scoped access bootstrap (`POST /v1/docs/:id/access`)
+  rides the same key, so sessions pin from their very first request. nginx: `upstream-hash-by:
 "$http_x_cloudpdf_doc"` (the chart renders this on a second
   `/v1/docs`-prefix Ingress). Envoy/Gateway API: ring hash on the same
   header. HAProxy: `balance hdr(X-CloudPDF-Doc)`. Requires SDKs that
