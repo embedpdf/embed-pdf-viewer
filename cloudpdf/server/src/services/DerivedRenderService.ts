@@ -17,7 +17,7 @@ import {
 
 import type { DocumentsRepo } from '../db/repos/documents.repo';
 import type { SharpImageEncoder } from '../render/SharpImageEncoder';
-import type { WorkerThreadPool } from '../runtime/WorkerThreadPool';
+import type { EnginePool } from '../runtime/EnginePool';
 import type { BaseFileCache } from '../storage/BaseFileCache';
 import { StorageKeys } from '../storage/keys';
 import type { ObjectStore } from '../storage/ObjectStore';
@@ -54,7 +54,7 @@ export interface DerivedRenderServiceOptions {
   enforce?: boolean;
   /** Warm-path deps; optional so route-only tests can skip them. */
   cache?: BaseFileCache;
-  pool?: WorkerThreadPool;
+  pool?: EnginePool;
   encoder?: SharpImageEncoder;
   documents?: DocumentsRepo;
   /**
@@ -107,7 +107,7 @@ export class DerivedRenderService {
   private readonly enforce: boolean;
   private readonly maxPixels: number;
   private readonly cache?: BaseFileCache;
-  private readonly pool?: WorkerThreadPool;
+  private readonly pool?: EnginePool;
   private readonly encoder?: SharpImageEncoder;
   private readonly documents?: DocumentsRepo;
   private readonly onWarmError?: (err: unknown, ctx: { docId: string; tenantId: string }) => void;

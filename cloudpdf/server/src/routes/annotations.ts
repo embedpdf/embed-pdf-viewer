@@ -54,7 +54,7 @@ import {
   type RequestJwtContext,
 } from '../app/jwt-plugin';
 import { SharpImageEncoder } from '../render/SharpImageEncoder';
-import type { WorkerThreadPool } from '../runtime/WorkerThreadPool';
+import type { EnginePool } from '../runtime/EnginePool';
 import type { CloudRevisionBridge } from '../services/CloudRevisionBridge';
 import type { DerivedRenderService } from '../services/DerivedRenderService';
 import type { DocumentService, OpenContext } from '../services/DocumentService';
@@ -64,7 +64,7 @@ import type { WeakAnnotationSessionService } from '../services/WeakAnnotationSes
 interface AnnotationRouteDeps {
   documentService: DocumentService;
   layerService: LayerService;
-  pool: WorkerThreadPool;
+  pool: EnginePool;
   revisionBridge: CloudRevisionBridge;
   imageEncoder: SharpImageEncoder;
   weakAnnotationSessions?: WeakAnnotationSessionService;
@@ -685,7 +685,7 @@ function buildUpdateActor(
 
 async function renderAnnotationAppearances(input: {
   documentService: DocumentService;
-  pool: WorkerThreadPool;
+  pool: EnginePool;
   imageEncoder: SharpImageEncoder;
   derivedRenders?: DerivedRenderService;
   reply: FastifyReply;
@@ -891,7 +891,7 @@ function rejectQueryParamsOnTokenUrl(query: unknown): void {
 
 async function readAnnotations(input: {
   documentService: DocumentService;
-  pool: WorkerThreadPool;
+  pool: EnginePool;
   revisionBridge: CloudRevisionBridge;
   reply: { header(name: 'Cache-Control', value: string): unknown };
   signal: AbortSignal;

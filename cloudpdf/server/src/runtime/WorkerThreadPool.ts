@@ -12,6 +12,7 @@ import {
   type WorkerResponse,
   type WorkerResultPayload,
 } from '@embedpdf/engine-core/runtime';
+import type { EnginePool } from './EnginePool';
 
 let _nextJobId = 1;
 function nextJobId(): WorkerJobId {
@@ -193,7 +194,7 @@ function resolvePoolSize(explicit: number | undefined): number {
  * an abort fires the pool still rejects with AbortError when the
  * worker eventually replies.
  */
-export class WorkerThreadPool {
+export class WorkerThreadPool implements EnginePool {
   private readonly slots: WorkerSlot[] = [];
   private readonly docToSlot = new Map<string, number>();
   private readonly maxDocsPerSlot: number;
@@ -406,6 +407,21 @@ export class WorkerThreadPool {
       docIds: [...s.docIds],
       baseShas: [...s.baseShas.keys()],
     }));
+  }
+
+  /**
+   * Inline mode has one engine generation forever: the workers live and
+   * die with this process, so the write-generation fence
+   * (`DocumentService.advanceLayerSession`) is vacuously satisfied and
+   * pre-host semantics are untouched.
+   */
+  generation(): number {
+    return 0;
+  }
+
+  /** Inline mode: the engine is this process — ready iff we are. */
+  health(): { state: 'ready' | 'starting' | 'backoff'; downSinceMs: number | null } {
+    return { state: 'ready', downSinceMs: null };
   }
 
   /** Cheap occupancy counters for metrics scrapes. */

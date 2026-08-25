@@ -265,3 +265,18 @@ export type {
  * the dist root, regardless of how shared code is factored out).
  */
 export const defaultWorkerEntryUrl: URL = new URL('./runtime/worker-entry.js', import.meta.url);
+
+/** Engine-host child entry (engineIsolation: 'host'); dist sibling of the worker entry. */
+export const defaultEngineHostEntryUrl: URL = new URL(
+  './runtime/engine-host-entry.js',
+  import.meta.url,
+);
+
+export type { BuildPack, EnginePool } from './runtime/EnginePool';
+export { EngineHostClient } from './runtime/EngineHostClient';
+export type {
+  EngineHostClientOptions,
+  HostCrashEvent,
+  HostCrashSuspect,
+} from './runtime/EngineHostClient';
+export type { HostBootConfig } from './runtime/host-protocol';

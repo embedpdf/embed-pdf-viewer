@@ -11,7 +11,7 @@ import {
 } from '@embedpdf/engine-core/runtime';
 import { decodeSearchToken, encodeSearchToken } from '@embedpdf/engine-core/wire';
 import { requireLayerDocAccessOnly, requireLayerResource } from '../app/jwt-plugin';
-import type { WorkerThreadPool } from '../runtime/WorkerThreadPool';
+import type { EnginePool } from '../runtime/EnginePool';
 import type { DocumentService, OpenContext } from '../services/DocumentService';
 import {
   abortSignalFromRequest,
@@ -22,7 +22,7 @@ import {
 
 interface SearchRouteDeps {
   documentService: DocumentService;
-  pool: WorkerThreadPool;
+  pool: EnginePool;
 }
 
 /** Decoded state of one search GET — the whole cache key minus the mode. */

@@ -70,7 +70,7 @@ import type { DocumentsRepo } from '../db/repos/documents.repo';
 import type { DurablePageRow, LayerRow } from '../db/repos/page_state.repo';
 import type { Database as Schema } from '../db/schema';
 import type { RealtimeBus } from '../realtime/RealtimeBus';
-import type { WorkerThreadPool } from '../runtime/WorkerThreadPool';
+import type { EnginePool } from '../runtime/EnginePool';
 import { StorageKeys } from '../storage/keys';
 import type { ObjectStore } from '../storage/ObjectStore';
 
@@ -139,7 +139,7 @@ export interface LayerServiceOptions {
   documentService?: DocumentService;
   eventLog?: EventLogService;
   weakAnnotationSessions?: WeakAnnotationSessionService;
-  pool?: WorkerThreadPool;
+  pool?: EnginePool;
   storage?: ObjectStore;
   /** Cross-replica doorbell — rung after every mutation commit. */
   realtime?: RealtimeBus;
@@ -168,7 +168,7 @@ export class LayerService {
   private readonly documentService?: DocumentService;
   private readonly eventLog?: EventLogService;
   private readonly weakAnnotationSessions?: WeakAnnotationSessionService;
-  private readonly pool?: WorkerThreadPool;
+  private readonly pool?: EnginePool;
   private readonly storage?: ObjectStore;
   private readonly realtime?: RealtimeBus;
   private readonly layerWriteQueues = new Map<string, Promise<unknown>>();
@@ -1495,6 +1495,11 @@ export class LayerService {
       docId,
       layerName,
       materialized.layer.currentVersion,
+      null,
+      // Write alignment: records the engine generation this session lives
+      // under, so a mid-commit engine respawn can never get a recreated
+      // session blessed with the committed version (advanceLayerSession).
+      { forWrite: true },
     );
     return materialized;
   }
@@ -2928,7 +2933,7 @@ export class LayerService {
     return this.revisionBridge;
   }
 
-  private requirePool(): WorkerThreadPool {
+  private requirePool(): EnginePool {
     if (!this.pool) {
       throw new EngineError(
         EngineErrorCode.NotImplemented,

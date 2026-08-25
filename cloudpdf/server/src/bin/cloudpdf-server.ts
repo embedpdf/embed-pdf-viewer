@@ -339,6 +339,7 @@ function printHelp(): void {
       '    CLOUDPDF_SHUTDOWN_TIMEOUT_MS  app.close() budget before teardown proceeds (default 30000)',
       '    CLOUDPDF_SHUTDOWN_DRAIN_MS    settle window after readiness flips 503 (default 0)',
       '    CLOUDPDF_METRICS       1 exposes an unauthenticated Prometheus /metrics endpoint',
+      "    CLOUDPDF_ENGINE_ISOLATION  inline (default) or host: run PDFium in a supervised child process",
       '                           (set behind a LB so rate limits see real client IPs)',
       '    CLOUDPDF_AUTH_FAILURE_LIMIT      failed auths per IP per window; off to disable (default: 30)',
       '    CLOUDPDF_AUTH_FAILURE_WINDOW_MS  window for the failure limit (default: 60000)',
@@ -746,6 +747,15 @@ async function cmdServe(): Promise<void> {
     : undefined;
 
   const WORKER_ENTRY_URL = new URL('../runtime/worker-entry.js', import.meta.url);
+  const ENGINE_HOST_ENTRY_URL = new URL('../runtime/engine-host-entry.js', import.meta.url);
+  // Engine plane placement: 'inline' (worker threads in this process,
+  // default) or 'host' (supervised child process — a native PDFium crash
+  // costs one sub-second engine respawn, never the API).
+  const engineIsolationRaw = process.env['CLOUDPDF_ENGINE_ISOLATION'] ?? 'inline';
+  if (engineIsolationRaw !== 'inline' && engineIsolationRaw !== 'host') {
+    fail(2, `CLOUDPDF_ENGINE_ISOLATION must be 'inline' or 'host' (got ${engineIsolationRaw})`);
+  }
+  const ENGINE_ISOLATION = engineIsolationRaw as 'inline' | 'host';
 
   // Database defaults to SQLite (see readDbConfig), so a bare `serve`
   // boots the full admin + document pipeline with zero external infra.
@@ -884,6 +894,8 @@ async function cmdServe(): Promise<void> {
       ...(SHUTDOWN_TIMEOUT_MS !== undefined ? { shutdownTimeoutMs: SHUTDOWN_TIMEOUT_MS } : {}),
       ...(SHUTDOWN_DRAIN_MS !== undefined ? { shutdownDrainMs: SHUTDOWN_DRAIN_MS } : {}),
       ...(process.env['CLOUDPDF_METRICS'] === '1' ? { metrics: true } : {}),
+      engineIsolation: ENGINE_ISOLATION,
+      engineHostEntry: ENGINE_HOST_ENTRY_URL,
     });
   } catch (err) {
     // Config-shaped boot refusals (secret policy, migration drift) exit

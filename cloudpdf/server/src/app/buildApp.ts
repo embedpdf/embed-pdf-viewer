@@ -64,6 +64,8 @@ import { registerPageRoutes } from '../routes/pages';
 import { registerRedactionRoutes } from '../routes/redactions';
 import { registerSearchRoutes } from '../routes/search';
 import { registerShareSessionRoutes } from '../routes/share-sessions';
+import { EngineHostClient } from '../runtime/EngineHostClient';
+import type { EnginePool } from '../runtime/EnginePool';
 import { WorkerThreadPool, type FallbackFontDescriptor } from '../runtime/WorkerThreadPool';
 import type { KmsKeyring } from '../security';
 import { CloudRevisionBridge } from '../services/CloudRevisionBridge';
@@ -304,12 +306,27 @@ export interface BuildAppOptions {
    * network/cluster, like any /metrics.
    */
   metrics?: boolean;
+  /**
+   * Engine plane placement. `inline` (default): PDFium worker threads in
+   * THIS process — a native crash costs the process. `host`: a
+   * supervised child process — a native crash costs one engine respawn
+   * (in-flight engine calls reject `RuntimeUnavailable`), never the API.
+   */
+  engineIsolation?: 'inline' | 'host';
+  /**
+   * Entry script for the engine-host child (host mode). The CLI passes
+   * its dist URL; tests pass the TS source (with `engineHostExecArgv`
+   * carrying a loader). Required when `engineIsolation: 'host'`.
+   */
+  engineHostEntry?: URL | string;
+  /** Extra execArgv for the forked engine host (tests: ['--import','tsx']). */
+  engineHostExecArgv?: string[];
 }
 
 export interface AppBundle {
   app: FastifyInstance;
   /** Present only when `workerEntry` was supplied. */
-  pool?: WorkerThreadPool;
+  pool?: EnginePool;
   /** Present only when `db` + `objectStore` were configured. */
   lifecycle?: DocumentLifecycleService;
   /** The derived-artifact plane for renders (cacheRoot + pool + db). */
@@ -360,7 +377,22 @@ export async function buildApp(opts: BuildAppOptions): Promise<AppBundle> {
 
 /** Internal test-only construction seam. Not exported by the npm package. */
 export async function buildAppForTesting(opts: BuildAppOptions): Promise<AppBundle> {
-  return buildAppUnchecked(opts);
+  // The isolation matrix: CLOUDPDF_TEST_ISOLATION=host runs the whole
+  // suite against the child-process engine host (same tests, same
+  // assertions — byte-identical results is the acceptance bar).
+  const engineIsolation =
+    opts.engineIsolation ??
+    (process.env['CLOUDPDF_TEST_ISOLATION'] === 'host' ? 'host' : 'inline');
+  if (engineIsolation === 'host') {
+    return buildAppUnchecked({
+      ...opts,
+      engineIsolation,
+      engineHostEntry:
+        opts.engineHostEntry ?? new URL('../runtime/engine-host-entry.ts', import.meta.url),
+      engineHostExecArgv: opts.engineHostExecArgv ?? ['--import', 'tsx'],
+    });
+  }
+  return buildAppUnchecked({ ...opts, engineIsolation });
 }
 
 async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
@@ -571,15 +603,37 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
     documentService?.onPoolEvict(evt);
   };
 
-  const pool: WorkerThreadPool | undefined = opts.workerEntry
-    ? await WorkerThreadPool.create({
+  let pool: EnginePool | undefined;
+  if (opts.workerEntry) {
+    if (opts.engineIsolation === 'host') {
+      if (!opts.engineHostEntry) {
+        throw new Error("buildApp: engineIsolation 'host' requires engineHostEntry");
+      }
+      pool = await EngineHostClient.create({
+        hostEntry: opts.engineHostEntry,
+        boot: {
+          workerEntry: String(opts.workerEntry),
+          ...(opts.poolSize !== undefined ? { poolSize: opts.poolSize } : {}),
+          ...(opts.maxDocsPerSlot !== undefined ? { maxDocsPerSlot: opts.maxDocsPerSlot } : {}),
+          fonts: opts.fallbackFonts ?? [],
+        },
+        onEvict: evictForward,
+        // Forget-everything on host death: WS1 makes the lazy rebuild
+        // from durable truth safe; the generation fence closes the
+        // mid-commit window (DocumentService.advanceLayerSession).
+        onHostRestart: () => documentService?.onHostRestart(),
+        ...(opts.engineHostExecArgv ? { execArgv: opts.engineHostExecArgv } : {}),
+      });
+    } else {
+      pool = await WorkerThreadPool.create({
         size: opts.poolSize,
         workerEntry: opts.workerEntry,
         maxDocsPerSlot: opts.maxDocsPerSlot,
         onEvict: evictForward,
         fonts: opts.fallbackFonts,
-      })
-    : undefined;
+      });
+    }
+  }
   const drainCoordinator = new DrainCoordinator();
 
   // Readiness = "safe to route traffic here": not draining, and the

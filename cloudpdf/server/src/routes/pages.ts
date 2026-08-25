@@ -32,7 +32,7 @@ import {
   requireLayerResource,
 } from '../app/jwt-plugin';
 import { requireSharedDocRead } from './_planeGuard';
-import type { WorkerThreadPool } from '../runtime/WorkerThreadPool';
+import type { EnginePool } from '../runtime/EnginePool';
 import type { DerivedRenderService } from '../services/DerivedRenderService';
 import type { DocumentService, OpenContext } from '../services/DocumentService';
 import type { LayerService } from '../services/LayerService';
@@ -50,7 +50,7 @@ import {
 interface PageRouteDeps {
   documentService: DocumentService;
   layerService: LayerService;
-  pool: WorkerThreadPool;
+  pool: EnginePool;
   imageEncoder: SharpImageEncoder;
   /** The derived-artifact plane for renders (absent = legacy compute-only). */
   derivedRenders?: DerivedRenderService;
@@ -520,7 +520,7 @@ function rejectQueryParamsOnTokenUrl(query: unknown): void {
 
 async function renderPageImage(input: {
   documentService: DocumentService;
-  pool: WorkerThreadPool;
+  pool: EnginePool;
   imageEncoder: SharpImageEncoder;
   derivedRenders?: DerivedRenderService;
   reply: FastifyReply;
@@ -700,7 +700,7 @@ async function renderPageImage(input: {
 
 async function readPageText(input: {
   documentService: DocumentService;
-  pool: WorkerThreadPool;
+  pool: EnginePool;
   reply: { header(name: 'Cache-Control', value: string): unknown };
   signal: AbortSignal;
   scope: ReadScope;
@@ -755,7 +755,7 @@ async function readPageText(input: {
 
 async function readPageGeometry(input: {
   documentService: DocumentService;
-  pool: WorkerThreadPool;
+  pool: EnginePool;
   reply: { header(name: 'Cache-Control', value: string): unknown };
   signal: AbortSignal;
   scope: ReadScope;

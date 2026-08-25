@@ -1,7 +1,7 @@
 import { EngineError, EngineErrorCode, wirePack } from '@embedpdf/engine-core/runtime';
 
 import type { DocumentSecurityInfo } from '../db/repos/documents.repo';
-import type { WorkerThreadPool } from '../runtime/WorkerThreadPool';
+import type { EnginePool } from '../runtime/EnginePool';
 import type { BaseFileCache, LocalFileHandle } from '../storage/BaseFileCache';
 
 export interface DocumentSecurityProbeInput {
@@ -17,7 +17,7 @@ export interface DocumentSecurityProbeResult {
 
 export interface DocumentSecurityProbeOptions {
   cache?: BaseFileCache;
-  pool?: WorkerThreadPool;
+  pool?: EnginePool;
   /**
    * Called when a probe attempt fails before the security state is
    * recorded as `unknown`. The probe is deliberately best-effort — it

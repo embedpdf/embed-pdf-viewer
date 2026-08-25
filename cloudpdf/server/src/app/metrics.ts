@@ -2,10 +2,10 @@ import type { FastifyInstance } from 'fastify';
 import { collectDefaultMetrics, Gauge, Histogram, Registry } from 'prom-client';
 
 import type { LicenseGate } from '../licensing/LicenseRuntime';
-import type { WorkerThreadPool } from '../runtime/WorkerThreadPool';
+import type { EnginePool } from '../runtime/EnginePool';
 
 export interface MetricsOptions {
-  pool?: WorkerThreadPool | undefined;
+  pool?: EnginePool | undefined;
   licenseGate: LicenseGate;
 }
 

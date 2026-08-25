@@ -36,7 +36,7 @@ import type {
   PasswordVerificationRow,
   PdfPasswordVerificationsRepo,
 } from '../db/repos/pdf_password_verifications.repo';
-import type { WorkerThreadPool } from '../runtime/WorkerThreadPool';
+import type { EnginePool } from '../runtime/EnginePool';
 import { signPasswordGrant, verifyPasswordGrant, type PasswordSessionBinding } from '../security';
 import type { BaseFileCache, LocalFileHandle } from '../storage/BaseFileCache';
 import { StorageKeys } from '../storage/keys';
@@ -89,7 +89,7 @@ export interface DocumentServiceOptions {
   documents: DocumentsRepo;
   cache: BaseFileCache;
   storage: ObjectStore;
-  pool: WorkerThreadPool;
+  pool: EnginePool;
   layerState: LayerStateService;
   passwordVerifications?: PdfPasswordVerificationsRepo;
   passwordSessions?: PdfPasswordSessionsRepo;
@@ -158,7 +158,7 @@ export interface UnlockLayerAccessResult {
  *   2. Acquire a refcounted file handle from `BaseFileCache`.
  *      Concurrent acquirers of the same `base_sha` share one
  *      materialisation; concurrent acquirers of the same `docId` share
- *      one `WorkerThreadPool.runOpen` via this service's own
+ *      one `EnginePool.runOpen` via this service's own
  *      singleflight map.
  *   3. Pass the materialised path to the worker via `pool.runOpen`
  *      with sticky-by-baseSha routing. The worker opens PDFium through
@@ -176,7 +176,7 @@ export class DocumentService {
   private readonly documents: DocumentsRepo;
   private readonly cache: BaseFileCache;
   private readonly storage: ObjectStore;
-  private readonly pool: WorkerThreadPool;
+  private readonly pool: EnginePool;
   private readonly layerState: LayerStateService;
   private readonly passwordVerifications: PdfPasswordVerificationsRepo | null;
   private readonly passwordSessions: PdfPasswordSessionsRepo | null;
@@ -209,6 +209,19 @@ export class DocumentService {
    * the write finishes either way.
    */
   private readonly layerWritesInFlight = new Map<string, Promise<void>>();
+  /**
+   * Engine generation captured at WRITE-alignment time (the
+   * `forWrite` door of {@link ensureLayerFreshOnPool}), consumed by
+   * {@link advanceLayerSession}. Correct without per-write threading
+   * because the layer write queue (`enqueueLayerWrite`) serializes
+   * writes per sessionKey IN-PROCESS — at most one write sits between
+   * alignment and commit at any time, so the stored generation always
+   * belongs to THE write that is committing. Survives host restarts on
+   * purpose: the stale generation is exactly the datum that detects a
+   * session recreated by a reader on a NEW engine after the aligned
+   * engine died.
+   */
+  private readonly writeAlignGens = new Map<string, number>();
 
   constructor(opts: DocumentServiceOptions) {
     this.documents = opts.documents;
@@ -635,8 +648,16 @@ export class DocumentService {
     layerName: string,
     currentVersion: number,
     password: string | null = null,
+    opts: { forWrite?: boolean } = {},
   ): Promise<void> {
     const key = layerSessionKey(docId, layerName);
+    // Write alignment records the engine generation the aligned session
+    // lives under — the datum advanceLayerSession later compares against
+    // the then-current generation to refuse blessing a session that was
+    // recreated on a NEW engine after this one died mid-commit.
+    const recordAlignment = () => {
+      if (opts.forWrite) this.writeAlignGens.set(key, this.pool.generation());
+    };
     const row = await this.requireReadyRow(ctx, docId);
     // Authorization must happen before the layer-session freshness cache
     // can return. A fresh worker session belongs to the document, not to
@@ -645,8 +666,12 @@ export class DocumentService {
     // Let any in-flight open/reload settle before judging freshness.
     const existing = this.layerOpens.get(key);
     if (existing) await existing.catch(() => undefined);
-    if (this.layerSessionVersions.get(key) === currentVersion) return;
+    if (this.layerSessionVersions.get(key) === currentVersion) {
+      recordAlignment();
+      return;
+    }
     await this.reloadLayerOnPool(ctx, docId, layerName, openPassword);
+    recordAlignment();
   }
 
   /** Mark a layer session stale: the next fresh-ensure reloads it. */
@@ -698,9 +723,23 @@ export class DocumentService {
    */
   advanceLayerSession(docId: string, layerName: string, version: number): void {
     const key = layerSessionKey(docId, layerName);
-    if (this.layerSessionVersions.has(key)) {
-      this.layerSessionVersions.set(key, version);
+    const alignedGen = this.writeAlignGens.get(key);
+    this.writeAlignGens.delete(key);
+    // Existing law: if the pool evicted the doc mid-commit, the worker
+    // session is gone and must not be resurrected as "fresh".
+    if (!this.layerSessionVersions.has(key)) return;
+    // Completed law (host mode): the session that APPLIED this write
+    // lived under `alignedGen`. If the engine has respawned since, any
+    // session that exists now was opened from the PRE-commit artifact —
+    // a reader recreating the entry must not get it blessed with the
+    // committed version. Invalidate; the next touch reloads at the new
+    // durable head. (Inline pool: generation is constant 0, this branch
+    // is unreachable, pre-host semantics bit-identical.)
+    if (alignedGen === undefined || alignedGen !== this.pool.generation()) {
+      this.layerSessionVersions.delete(key);
+      return;
     }
+    this.layerSessionVersions.set(key, version);
   }
 
   /** Close-then-reopen a layer session at the current durable artifact. */
@@ -1284,7 +1323,29 @@ export class DocumentService {
   }
 
   /**
-   * Pool-eviction callback. Wired into `WorkerThreadPool.onEvict`;
+   * The engine host died: every worker session, materialization, and
+   * pinned handle it embodied is gone. Drop the engine-plane CACHES; the
+   * next request lazily rebuilds from durable truth (DB + object store),
+   * which the WS1 fence makes correct by construction.
+   *
+   * Deliberately untouched:
+   *  - `opens` / `layerOpens`: their in-flight promises are rejecting
+   *    right now and their own settle paths remove their own entries —
+   *    clearing here would ABA-delete a NEXT flight that reused the key.
+   *  - `layerWritesInFlight`: the durable-commit window is API-side work
+   *    that SURVIVES host death; readers must keep parking behind it
+   *    until the owning pipeline settles it (it always settles).
+   *  - `writeAlignGens`: the stale generation is the datum that lets
+   *    `advanceLayerSession` refuse to bless a recreated session.
+   */
+  onHostRestart(): void {
+    this.heads.clear();
+    this.layerSessionVersions.clear();
+    this.releaseAllBaseHandles();
+  }
+
+  /**
+   * Pool-eviction callback. Wired into `EnginePool.onEvict`;
    * when the pool drops a doc from a slot, the cached head is no
    * longer authoritative (the next request must trigger a re-open).
    */
