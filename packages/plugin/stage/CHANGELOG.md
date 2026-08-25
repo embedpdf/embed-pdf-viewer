@@ -1,5 +1,11 @@
 # @embedpdf/plugin-stage
 
+## 3.0.0-next.8
+
+### Patch Changes
+
+- [#779](https://github.com/embedpdf/embed-pdf-viewer/pull/779) by [@bobsingor](https://github.com/bobsingor) – Keep page and scrollbar screen geometry hidden until initial viewport placement commits. Stage consumers no longer receive origin-based placeholder geometry while viewport, responsive settings, and camera state are being initialized, preventing pages from rendering at the top-left before their final placement.
+
 ## 3.0.0-next.7
 
 ### Minor Changes

@@ -1,5 +1,11 @@
 # @embedpdf/react
 
+## 3.0.0-next.8
+
+### Patch Changes
+
+- [#779](https://github.com/embedpdf/embed-pdf-viewer/pull/779) by [@bobsingor](https://github.com/bobsingor) – Bind Stage surface measurement before browser paint so the initial viewport and camera placement settle before page surfaces become visible. React viewers no longer show a transient incorrectly positioned page while a document opens.
+
 ## 3.0.0-next.7
 
 ### Minor Changes

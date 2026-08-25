@@ -1,6 +1,6 @@
 {
   "name": "@cloudpdf/viewer",
-  "version": "3.0.0-next.7",
+  "version": "3.0.0-next.8",
   "private": false,
   "description": "The full viewer wired to the CloudPDF engine: one CDN artifact (cloudpdf.js) exposing CloudPDF.init(). A thin EE wrapper over the Apache-2.0 @embedpdf/viewer — no wasm, no workers: rendering happens on a @cloudpdf/server deployment (or CloudPDF SaaS) over HTTPS.",
   "type": "module",

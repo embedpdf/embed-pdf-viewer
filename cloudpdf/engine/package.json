@@ -1,6 +1,6 @@
 {
   "name": "@cloudpdf/engine",
-  "version": "3.0.0-next.7",
+  "version": "3.0.0-next.8",
   "private": false,
   "description": "CloudPDF engine: the cloud client that speaks the Engine v3 interface over HTTPS to a @cloudpdf/server deployment (or CloudPDF SaaS). Same AbortablePromise-based, EngineError-coded contract as the local engine.",
   "type": "module",

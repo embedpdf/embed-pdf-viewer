@@ -1,5 +1,14 @@
 # @cloudpdf/engine
 
+## 3.0.0-next.8
+
+### Minor Changes
+
+- [#783](https://github.com/embedpdf/embed-pdf-viewer/pull/783) by [@bobsingor](https://github.com/bobsingor) – Use the document-scoped access endpoint for unlock requests. Add an
+  opt-in `docAffinityHeader` option for routing document requests and
+  bounded retries for server `EngineBusy` and `EngineRestarting`
+  responses, including `Retry-After` handling and an `onRetry` callback.
+
 ## 3.0.0-next.7
 
 ## 3.0.0-next.6
