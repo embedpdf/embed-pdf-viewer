@@ -25,6 +25,7 @@
     "start": "node dist/bin/cloudpdf-server.js",
     "lint": "eslint src --color",
     "lint:fix": "eslint src --color --fix",
+    "bench:isolation": "node --import tsx --import ./test/bench/register-sql-loader.mjs test/bench/isolation-bench.ts",
     "test": "vitest run"
   },
   "files": [
