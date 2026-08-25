@@ -1,0 +1,49 @@
+# CI/template-check profile: the docs page's scalable example, minus
+# real credentials. Renders every conditional template (migrate hook,
+# HPA, PDB, ingress incl. doc-affinity, network policy, metrics).
+replicaCount: 2
+
+existingSecret: cloudpdf-secrets
+
+config:
+  CLOUDPDF_DB_DRIVER: postgres
+  CLOUDPDF_STORAGE_KIND: s3
+  CLOUDPDF_STORAGE_S3_BUCKET: my-cloudpdf-bucket
+  CLOUDPDF_STORAGE_S3_REGION: eu-west-1
+  CLOUDPDF_WORKER_POOL_SIZE: '2'
+
+migrations:
+  enabled: true
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+
+resources:
+  requests:
+    cpu: '1'
+    memory: 1Gi
+  limits:
+    cpu: '2'
+    memory: 2Gi
+
+ingress:
+  enabled: true
+  className: nginx
+  hosts:
+    - host: pdf.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+
+docAffinity:
+  enabled: true
+  key: header
+
+networkPolicy:
+  enabled: true
+
+metrics:
+  enabled: true

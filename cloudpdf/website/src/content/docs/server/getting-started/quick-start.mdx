@@ -1,16 +1,18 @@
 ---
 title: Quick start
-description: Run a CloudPDF server locally in about a minute, verify it's healthy, and make your first authenticated request.
+description: Run a CloudPDF server locally in about a minute, upload a PDF, and see it render — end to end.
 ---
 
 import { Callout } from '@/components/docs/callout';
 import { Cards, Card } from '@/components/docs/cards';
+import { LicenseCta } from '@/components/docs/license-cta';
 
 # Quick start
 
 This gets a server running on your machine with **zero external services** —
-SQLite, the local disk, and a local cache, all under one volume. It's the
-fastest way to see the server work end to end.
+SQLite, the local disk, and a local cache, all under one volume — then uploads
+a real PDF and renders its first page. It's the fastest way to see the server
+work end to end.
 
 <Callout type="info">
   Prefer the npm package or a production-grade install? Jump to
@@ -18,12 +20,27 @@ fastest way to see the server work end to end.
   because it needs nothing installed but Docker itself.
 </Callout>
 
-## 1. Run the server
+## 1. Get a development license key
+
+Every self-hosted server runs on a license key — the server refuses to boot
+without one. A **development key** is made for exactly this page: with it, the
+server boots with zero further configuration (dev fallbacks, loud warnings,
+development-scale limits). How the model works — connected vs air-gapped,
+what an expired license does — is on [Licensing](/docs/server/configuration/licensing).
+
+<LicenseCta placement="docs-quick-start" title="Get a development key">
+  Free for local development and evaluation — one click, and it works for your
+  whole team.
+</LicenseCta>
+
+## 2. Run the server
 
 ```sh
 docker run --rm --init -p 3000:3000 \
   -v cloudpdf-data:/data \
-  -e CLOUDPDF_JWT_SECRET=dev-secret-change-me \
+  -e CLOUDPDF_LICENSE_KEY="key/..." \
+  -e CLOUDPDF_API_AUTH_TOKENS=dev-api-token-00000000000000000000 \
+  -e CLOUDPDF_AUTO_PROVISION_TENANT=1 \
   ghcr.io/embedpdf/cloudpdf-server:latest
 ```
 
@@ -31,42 +48,87 @@ That's the whole install. The image bakes in everything the server needs —
 the Node runtime, native PDFium, image processing, and fonts — so there is no
 toolchain to set up.
 
-- `-p 3000:3000` exposes the API on `localhost:3000`.
-- `-v cloudpdf-data:/data` keeps your documents across restarts.
-- `--init` gives the container clean signal handling.
-- `CLOUDPDF_JWT_SECRET` signs and verifies tokens. **Required.**
+- `CLOUDPDF_LICENSE_KEY` — your development key from step 1. **Required.**
+- `CLOUDPDF_API_AUTH_TOKENS` — a static admin credential for this walkthrough's
+  `curl` calls (any long random string).
+- `CLOUDPDF_AUTO_PROVISION_TENANT=1` — creates tenants on first use. Dev
+  convenience; leave it off in production.
+- `-v cloudpdf-data:/data` keeps your documents across restarts; `--init`
+  gives the container clean signal handling.
 
 <Callout type="warn">
-  <code>dev-secret-change-me</code> is fine for your laptop. In production, set a
-  long random secret and keep it out of source control — see
+  A development key deliberately permits insecure dev fallbacks (like the
+  built-in JWT secret) so this one command works. Production keys refuse
+  them: you'll set a real <code>CLOUDPDF_JWT_SECRET</code> and secrets of at
+  least 32 bytes — see
   <a href="/docs/server/configuration/authentication">Authentication</a>.
 </Callout>
 
-## 2. Confirm it's healthy
+## 3. Confirm it's healthy
 
 ```sh
 curl localhost:3000/healthz
 # {"status":"ok"}
 
 curl localhost:3000/readyz
-# {"status":"ok"}
+# {"license":{...},"status":"ok"}
 ```
 
-`/healthz` means the process is alive; `/readyz` means it's ready to serve
-traffic. Both are public — everything else requires a token:
+`/healthz` means the process is alive; `/readyz` means it can serve (the
+database answers, not draining). Both are public — everything else requires a
+credential:
 
 ```sh
-curl -i localhost:3000/v1/admin/documents
+curl -i localhost:3000/v1/tenants/default/documents
 # HTTP/1.1 401 Unauthorized
 ```
 
 A `401` here is the server working correctly: it refuses unauthenticated
 requests.
 
-## 3. Talk to it from your app
+## 4. Upload a PDF and render it
 
-Your frontend uses [`@cloudpdf/engine`](/docs/engine), pointed at the server you
-just started:
+Uploads are a three-step protocol — announce, send bytes, commit — because in
+production the bytes go **straight to your object store** on a presigned URL
+and never pass through the API. Locally the server proxies them, and the SDKs
+wrap all three steps in one call; here it's three `curl`s:
+
+```sh
+API_TOKEN=dev-api-token-00000000000000000000
+PDF=./my-document.pdf
+SHA=$(shasum -a 256 "$PDF" | cut -d' ' -f1)
+
+# 1. announce the upload
+DOC=$(curl -s -X POST localhost:3000/v1/tenants/default/documents/init \
+  -H "Authorization: Bearer $API_TOKEN" -H 'content-type: application/json' \
+  -d "{\"contentLength\":$(wc -c < "$PDF"),\"contentSha256\":\"$SHA\",\"uploadPreference\":\"proxy\"}" \
+  | sed -n 's/.*"id":"\([^"]*\)".*/\1/p' | head -1)
+
+# 2. send the bytes
+curl -s -X POST "localhost:3000/v1/tenants/default/documents/$DOC/upload-proxy" \
+  -H "Authorization: Bearer $API_TOKEN" \
+  -F "file=@$PDF;type=application/pdf" > /dev/null
+
+# 3. commit (the server verifies the SHA-256)
+curl -s -X POST "localhost:3000/v1/tenants/default/documents/$DOC/commit" \
+  -H "Authorization: Bearer $API_TOKEN" -H 'content-type: application/json' \
+  -d "{\"sha256\":\"$SHA\"}"
+```
+
+Now render its first page:
+
+```sh
+curl -s "localhost:3000/v1/tenants/default/documents/$DOC/thumbnail" \
+  -H "Authorization: Bearer $API_TOKEN" -o first-page.webp && open first-page.webp
+```
+
+That WebP came out of the same render pipeline your users will hit — native
+PDFium, rendered on demand and cached as an immutable artifact.
+
+## 5. Talk to it from your app
+
+Your frontend uses [`@cloudpdf/engine`](/docs/engine), pointed at the server
+you just started:
 
 ```ts
 import { createCloudEngine } from '@cloudpdf/engine';
@@ -76,17 +138,18 @@ const engine = createCloudEngine({
   token: () => getDocToken(), // doc-scoped JWT minted by your backend
 });
 
-const doc = await engine.open({ kind: 'id', id: 'doc_welcome' });
+const doc = await engine.open({ kind: 'id', id: docId });
 const page = doc.page(1);
 const image = await page.render.image({ viewport: { kind: 'width', width: 1200 } });
 ```
 
-Your backend mints the `getDocToken()` JWT with the same
-`CLOUDPDF_JWT_SECRET`. See [Authentication](/docs/server/configuration/authentication)
-for the token shape, and the [engine docs](/docs/engine/getting-started/quick-start)
-for rendering a page into the DOM.
+Your backend mints the `getDocToken()` JWT — see
+[Authentication](/docs/server/configuration/authentication) for the token
+shape (and the `signDevToken` helper for local experiments), and the
+[engine docs](/docs/engine/getting-started/quick-start) for rendering a page
+into the DOM.
 
-## 4. Stop it
+## 6. Stop it
 
 ```sh
 docker stop $(docker ps -q --filter ancestor=ghcr.io/embedpdf/cloudpdf-server:latest)
@@ -99,6 +162,11 @@ Your data stays in the `cloudpdf-data` volume, ready for the next run.
 You ran the simplest possible configuration. To take it further:
 
 <Cards>
+  <Card
+    title="Licensing"
+    description="Connected vs air-gapped, key kinds, and what a lapsed license does."
+    href="/docs/server/configuration/licensing"
+  />
   <Card
     title="Choose a deployment"
     description="npm, Docker, Compose, or Helm — and the trade-offs of each."
@@ -113,10 +181,5 @@ You ran the simplest possible configuration. To take it further:
     title="Authentication"
     description="Mint document-scoped tokens from your backend."
     href="/docs/server/configuration/authentication"
-  />
-  <Card
-    title="Full configuration"
-    description="Every setting the server understands."
-    href="/docs/server/configuration"
   />
 </Cards>

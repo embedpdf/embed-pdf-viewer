@@ -6,10 +6,13 @@ import compress from '@fastify/compress';
 import cors from '@fastify/cors';
 import multipart from '@fastify/multipart';
 import Fastify, { type FastifyInstance } from 'fastify';
-import type { Kysely } from 'kysely';
+import { sql, type Kysely } from 'kysely';
 
 import type { AuthFailureLimiterOptions } from './auth-failure-limiter';
+import { DrainCoordinator } from './drain';
+import { createEngineCounters, type EngineCounters } from './engine-counters';
 import { registerJwtAuth, requireApiToken } from './jwt-plugin';
+import { registerMetrics } from './metrics';
 import { assertProductionSecret, requiresProductionSecrets, resolveSecret } from './secret-policy';
 import { DbJwksCacheStore } from '../auth/JwksCacheStore';
 import {
@@ -61,9 +64,22 @@ import { registerPageRoutes } from '../routes/pages';
 import { registerRedactionRoutes } from '../routes/redactions';
 import { registerSearchRoutes } from '../routes/search';
 import { registerShareSessionRoutes } from '../routes/share-sessions';
+import { readCgroupMemory } from '../runtime/cgroup-memory';
+import { EngineHostClient } from '../runtime/EngineHostClient';
+import type { EnginePool } from '../runtime/EnginePool';
+import { EngineRecycler, type EngineRecyclePolicy } from '../runtime/EngineRecycler';
+import { ShardedEnginePool } from '../runtime/ShardedEnginePool';
+import { resolvePoolSize } from '../runtime/WorkerThreadPool';
+import { QuarantiningEnginePool } from '../runtime/QuarantiningEnginePool';
+import {
+  EngineBusyError,
+  SchedulingEnginePool,
+  type EngineSchedulingConfig,
+} from '../runtime/SchedulingEnginePool';
 import { WorkerThreadPool, type FallbackFontDescriptor } from '../runtime/WorkerThreadPool';
 import type { KmsKeyring } from '../security';
 import { CloudRevisionBridge } from '../services/CloudRevisionBridge';
+import { CrashJournal, DocumentQuarantinedError } from '../services/CrashJournal';
 import { DerivedRenderService } from '../services/DerivedRenderService';
 import {
   DocumentLifecycleService,
@@ -281,12 +297,79 @@ export interface BuildAppOptions {
     maxRenderPixels?: number;
     enforce?: boolean;
   };
+  /**
+   * Budget for `app.close()` inside `shutdown()` before teardown
+   * proceeds anyway (default 30s). Keep it BELOW the supervisor's kill
+   * deadline (Kubernetes `terminationGracePeriodSeconds`, `docker stop`
+   * timeout) so pool + cache teardown always runs before SIGKILL.
+   */
+  shutdownTimeoutMs?: number;
+  /**
+   * Settle window between failing readiness (+ ending SSE streams) and
+   * closing the listener (default 0). For probe-driven balancers that
+   * must observe `/readyz` 503 before the socket starts refusing;
+   * Kubernetes deployments use a preStop sleep instead.
+   */
+  shutdownDrainMs?: number;
+  /**
+   * Expose a Prometheus `/metrics` endpoint (`CLOUDPDF_METRICS=1`).
+   * Unauthenticated when enabled — scrape it inside the private
+   * network/cluster, like any /metrics.
+   */
+  metrics?: boolean;
+  /**
+   * Engine plane placement. `inline` (default): PDFium worker threads in
+   * THIS process — a native crash costs the process. `host`: a
+   * supervised child process — a native crash costs one engine respawn
+   * (in-flight engine calls reject `RuntimeUnavailable`), never the API.
+   */
+  engineIsolation?: 'inline' | 'host';
+  /**
+   * Entry script for the engine-host child (host mode). The CLI passes
+   * its dist URL; tests pass the TS source (with `engineHostExecArgv`
+   * carrying a loader). Required when `engineIsolation: 'host'`.
+   */
+  engineHostEntry?: URL | string;
+  /** Encode renders inside the engine worker so only
+   *  compressed images cross the engine boundary (default true). `false`
+   *  is the one-release escape hatch (`CLOUDPDF_ENCODE_IN_ENGINE=0`):
+   *  raw rasters over the boundary + API-side sharp, exactly the
+   *  previous API-side encoding pipeline. */
+  encodeInEngine?: boolean;
+  /** Admission control (lanes + bounded queues + shed). Defaults are
+   *  computed from the pool's slot count; `false` disables the decorator
+   *  entirely (raw-pool tests). */
+  scheduling?: EngineSchedulingConfig | false;
+  /** Engine recycling policy — OPT-IN (absent = telemetry only, no
+   *  recycler). Host isolation required; validated at boot by
+   *  `resolveRecycleConfig` in the bin. */
+  recycle?: EngineRecyclePolicy;
+  /** Engine shard count (host isolation only). Default 1 =
+   *  today's exact object graph; K > 1 requires the resolved worker
+   *  total to divide evenly (M % K === 0, validated here). */
+  engineShards?: number;
+  /** Extra execArgv for the forked engine host (tests: ['--import','tsx']). */
+  engineHostExecArgv?: string[];
+  /**
+   * How long the engine host may be down before `/readyz` fails
+   * (default 10s). A sub-second respawn must never flap the pod out of
+   * its load balancer — readiness reacts to PERSISTENT engine
+   * unavailability only; the health detail is always in the body.
+   */
+  engineUnreadyAfterMs?: number;
+  /**
+   * Crash-journal posture (host mode + db only). OBSERVE-ONLY by
+   * default: every engine-host death and its suspects are journaled and
+   * quarantine decisions are computed AND persisted — but nothing is
+   * refused until `enforce` is set.
+   */
+  quarantine?: { enforce?: boolean; ttlHours?: number };
 }
 
 export interface AppBundle {
   app: FastifyInstance;
   /** Present only when `workerEntry` was supplied. */
-  pool?: WorkerThreadPool;
+  pool?: EnginePool;
   /** Present only when `db` + `objectStore` were configured. */
   lifecycle?: DocumentLifecycleService;
   /** The derived-artifact plane for renders (cacheRoot + pool + db). */
@@ -303,6 +386,26 @@ export interface AppBundle {
   baseFileCache?: BaseFileCache;
   /** Security substrate keyring, when configured by the caller. */
   kms?: KmsKeyring;
+  /** Present in host mode with a db: the engine crash journal. */
+  crashJournal?: CrashJournal;
+  /**
+   * Host mode only: the RAW EngineHostClient (bundle.pool may be the
+   * quarantine decorator). Drills and boundary tests need its
+   * `hostPid()`/`engineBuildId()`.
+   */
+  engineHost?: EngineHostClient;
+  /** All engine shards (host mode; length = engineShards, [engineHost] at K=1). */
+  engineHosts?: EngineHostClient[];
+  /** Admission-control decorator (present unless `scheduling: false`). */
+  engineScheduler?: SchedulingEnginePool;
+  /** Operational counters used by metrics and tests. */
+  engineCounters?: EngineCounters;
+  /**
+   * Flip `/readyz` to 503 and end every live SSE stream without closing
+   * the listener. `shutdown()` calls this first; exposed for operators
+   * and tests that need the drain state without the teardown.
+   */
+  beginDrain: () => void;
   shutdown: () => Promise<void>;
 }
 
@@ -320,7 +423,33 @@ export interface AppBundle {
  * document routes when their adapters are configured. Caller is
  * responsible for `app.listen()`.
  */
+/** Engine-shard validation runs before any machinery (license gate included)
+ *  boots, so a bad shard config fails instantly with only this message.
+ *  Called by both public and testing entries. */
+function validateShardOptions(opts: BuildAppOptions): void {
+  const shardCount = opts.engineShards ?? 1;
+  if (!Number.isInteger(shardCount) || shardCount < 1) {
+    throw new Error(`buildApp: engineShards must be an integer ≥ 1, got ${shardCount}`);
+  }
+  if (shardCount > 1) {
+    if (opts.engineIsolation !== 'host') {
+      throw new Error("buildApp: engineShards > 1 requires engineIsolation 'host'");
+    }
+    const totalWorkers = resolvePoolSize(opts.poolSize);
+    if (shardCount > totalWorkers || totalWorkers % shardCount !== 0) {
+      const valid = Array.from({ length: totalWorkers }, (_, i) => i + 1).filter(
+        (k) => totalWorkers % k === 0,
+      );
+      throw new Error(
+        `buildApp: engineShards=${shardCount} needs the worker total (${totalWorkers}) to divide evenly — ` +
+          `valid shard counts here: ${valid.join(', ')} (unweighted routing cannot honor uneven capacity)`,
+      );
+    }
+  }
+}
+
 export async function buildApp(opts: BuildAppOptions): Promise<AppBundle> {
+  validateShardOptions(opts);
   if (!isLicenseGateTrusted(opts.licenseGate)) {
     throw new Error(
       'buildApp: licenseGate must be created by createLicenseRuntime from @cloudpdf/server',
@@ -331,13 +460,44 @@ export async function buildApp(opts: BuildAppOptions): Promise<AppBundle> {
 
 /** Internal test-only construction seam. Not exported by the npm package. */
 export async function buildAppForTesting(opts: BuildAppOptions): Promise<AppBundle> {
-  return buildAppUnchecked(opts);
+  // The isolation matrix: CLOUDPDF_TEST_ISOLATION=host runs the whole
+  // suite against the child-process engine host (same tests, same
+  // assertions — byte-identical results is the acceptance bar).
+  const engineIsolation =
+    opts.engineIsolation ?? (process.env['CLOUDPDF_TEST_ISOLATION'] === 'host' ? 'host' : 'inline');
+  const testShards = process.env['CLOUDPDF_TEST_SHARDS'];
+  const engineShards =
+    opts.engineShards ?? (testShards !== undefined ? Number(testShards) : undefined);
+  // Matrix-leg pragmatics: most fixtures pin poolSize 1, which cannot
+  // divide across K > 1 — round the worker total UP to a multiple of K
+  // so the alternate-topology leg boots (an intentional distortion:
+  // the leg tests K-topology behavior, not exact worker counts).
+  const poolSize =
+    engineShards !== undefined && engineShards > 1 && opts.engineIsolation !== 'inline'
+      ? Math.ceil((opts.poolSize ?? engineShards) / engineShards) * engineShards
+      : opts.poolSize;
+  if (engineIsolation === 'host') {
+    return buildAppUnchecked({
+      ...opts,
+      engineIsolation,
+      ...(engineShards !== undefined ? { engineShards } : {}),
+      ...(poolSize !== undefined ? { poolSize } : {}),
+      engineHostEntry:
+        opts.engineHostEntry ?? new URL('../runtime/engine-host-entry.ts', import.meta.url),
+      engineHostExecArgv: opts.engineHostExecArgv ?? ['--import', 'tsx'],
+    });
+  }
+  return buildAppUnchecked({ ...opts, engineIsolation });
 }
 
 async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
+  validateShardOptions(opts);
   // The cross-replica doorbell exists for the whole app lifetime: mutation
   // signals for SSE, revocation pushes for the auth guard + open streams.
   const realtimeBus = opts.realtimeBus ?? new InProcessRealtimeBus();
+  // Operational counters are created unconditionally (cheap plain numbers);
+  // /metrics surfaces them when enabled.
+  const engineCounters = createEngineCounters();
   // Secret hygiene is license-keyed: development keys + the test gate keep
   // zero-config dev fallbacks; every other license refuses to boot on
   // missing / publicly-known / short secrets (fail closed).
@@ -369,6 +529,11 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
     if (pathname === '/healthz' || pathname === '/readyz' || pathname === '/v1/license/status') {
       return;
     }
+    // Operational telemetry must stay scrapeable in restricted mode —
+    // observing a deployment is not protected functionality.
+    if (opts.metrics === true && pathname === '/metrics') {
+      return;
+    }
 
     const license = opts.licenseGate.getStatus();
     if (license.code !== 'VALID' && license.code !== 'VALID_TEST_LICENSE') {
@@ -398,7 +563,25 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
     await app.register(cors, {
       origin: opts.corsOrigins === '*' ? true : [...opts.corsOrigins],
       methods: ['GET', 'POST', 'PATCH', 'DELETE'],
-      allowedHeaders: ['authorization', 'content-type', 'x-engine-session-id', 'last-event-id'],
+      allowedHeaders: [
+        'authorization',
+        'content-type',
+        'x-engine-session-id',
+        'last-event-id',
+        // Document affinity: SDKs may send the document routing key; the server
+        // never parses it, but the preflight must allow it.
+        'x-cloudpdf-doc',
+      ],
+      // Response headers cross-origin JS may READ (nothing is safelisted
+      // beyond the basics): the backpressure hint + the advisory
+      // dimension/file headers clients already consume.
+      exposedHeaders: [
+        'retry-after',
+        'x-embedpdf-image-width',
+        'x-embedpdf-image-height',
+        'x-embedpdf-appearance-count',
+        'x-embedpdf-file-name',
+      ],
       credentials: false,
       maxAge: 86_400,
     });
@@ -515,10 +698,16 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
     ...(opts.authFailureLimit !== undefined ? { authFailureLimit: opts.authFailureLimit } : {}),
     ...(suspendedTenantsGuard ? { suspendedTenants: suspendedTenantsGuard } : {}),
     // The exchange is the one public v1 surface: the grant row is the
-    // authorization, and the route carries its own limiters.
-    ...(signer && opts.db && opts.objectStore
-      ? { publicPaths: [adminWirePaths.shareSessions] }
-      : {}),
+    // authorization, and the route carries its own limiters. /metrics
+    // joins it when enabled (network-level protection, like any
+    // Prometheus target).
+    ...((): { publicPaths?: string[] } => {
+      const publicPaths = [
+        ...(signer && opts.db && opts.objectStore ? [adminWirePaths.shareSessions] : []),
+        ...(opts.metrics === true ? ['/metrics'] : []),
+      ];
+      return publicPaths.length > 0 ? { publicPaths } : {};
+    })(),
   });
 
   // `documentService` is allocated below, but the pool's onEvict
@@ -531,19 +720,240 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
     documentService?.onPoolEvict(evt);
   };
 
-  const pool: WorkerThreadPool | undefined = opts.workerEntry
-    ? await WorkerThreadPool.create({
+  let pool: EnginePool | undefined;
+  let schedulingPool: SchedulingEnginePool | undefined;
+  let engineRecycler: EngineRecycler | undefined;
+  const queueWaitObserver: {
+    current: ((lane: 'interactive' | 'background', waitMs: number) => void) | null;
+  } = { current: null };
+  let crashJournal: CrashJournal | undefined;
+  let engineHost: EngineHostClient | undefined;
+  let engineHosts: EngineHostClient[] = [];
+  let engineSharded: ShardedEnginePool | undefined;
+  const shardRestarts: number[] = [];
+  let engineRestartCount = 0;
+  if (opts.workerEntry) {
+    if (opts.engineIsolation === 'host') {
+      if (!opts.engineHostEntry) {
+        throw new Error("buildApp: engineIsolation 'host' requires engineHostEntry");
+      }
+      crashJournal = opts.db
+        ? new CrashJournal({
+            db: opts.db,
+            enforce: opts.quarantine?.enforce ?? false,
+            ...(opts.quarantine?.ttlHours !== undefined
+              ? { ttlMs: opts.quarantine.ttlHours * 60 * 60 * 1_000 }
+              : {}),
+            log: (level, msg, meta) => app.log[level]({ ...meta }, msg),
+          })
+        : undefined;
+      const shardCount = opts.engineShards ?? 1;
+      if (shardCount === 1) {
+        // K = 1 is TODAY'S exact object graph — no composite exists.
+        pool = await EngineHostClient.create({
+          hostEntry: opts.engineHostEntry,
+          boot: {
+            workerEntry: String(opts.workerEntry),
+            ...(opts.poolSize !== undefined ? { poolSize: opts.poolSize } : {}),
+            ...(opts.maxDocsPerSlot !== undefined ? { maxDocsPerSlot: opts.maxDocsPerSlot } : {}),
+            fonts: opts.fallbackFonts ?? [],
+          },
+          onEvict: evictForward,
+          // Forget everything on host death: durable writes make the lazy
+          // rebuild from durable truth safe; the generation fence closes the
+          // mid-commit window (DocumentService.advanceLayerSession).
+          onHostRestart: () => {
+            engineRestartCount += 1;
+            documentService?.onHostRestart();
+          },
+          // Fire-and-forget by design: journaling must never delay respawn.
+          ...(crashJournal
+            ? {
+                onHostCrash: (evt: Parameters<CrashJournal['recordCrash']>[0]) =>
+                  void crashJournal!.recordCrash(evt),
+              }
+            : {}),
+          ...(opts.engineHostExecArgv ? { execArgv: opts.engineHostExecArgv } : {}),
+        });
+        engineHost = pool as EngineHostClient;
+        engineHosts = [engineHost];
+      } else {
+        // Sharding: the parent resolves the worker total once and splits it —
+        // children never self-resolve (the size env is not whitelisted,
+        // and K independent cpu-defaults would multiply the fleet).
+        const totalWorkers = resolvePoolSize(opts.poolSize);
+        const perShard = totalWorkers / shardCount;
+        for (let i = 0; i < shardCount; i++) shardRestarts.push(0);
+        engineSharded = await ShardedEnginePool.create({
+          count: shardCount,
+          spawn: (shard, hooks) =>
+            EngineHostClient.create({
+              hostEntry: opts.engineHostEntry!,
+              boot: {
+                workerEntry: String(opts.workerEntry),
+                poolSize: perShard,
+                ...(opts.maxDocsPerSlot !== undefined
+                  ? { maxDocsPerSlot: opts.maxDocsPerSlot }
+                  : {}),
+                fonts: opts.fallbackFonts ?? [],
+              },
+              onEvict: hooks.onEvict,
+              onHostRestart: hooks.onHostRestart,
+              ...(crashJournal ? { onHostCrash: hooks.onHostCrash } : {}),
+              ...(opts.engineHostExecArgv ? { execArgv: opts.engineHostExecArgv } : {}),
+            }),
+          onEvict: (evt) => evictForward(evt),
+          // Fire-and-forget by design; the journal is shard-agnostic
+          // (a shard is an intra-process replica).
+          onHostCrash: (evt) => {
+            if (crashJournal) void crashJournal.recordCrash(evt);
+          },
+          onHostRestart: (scope, shard) => {
+            engineRestartCount += 1;
+            shardRestarts[shard] += 1;
+            app.log.warn(
+              { shard, residents: scope.docIds.size },
+              'engine shard restarted (scoped forget)',
+            );
+            documentService?.onHostRestart(scope);
+          },
+        });
+        engineHosts = engineSharded.hosts();
+        engineHost = engineHosts[0]!;
+        pool = engineSharded;
+      }
+      if (crashJournal) {
+        pool = new QuarantiningEnginePool(pool, crashJournal, () => engineHost!.engineBuildId());
+      }
+    } else {
+      pool = await WorkerThreadPool.create({
         size: opts.poolSize,
         workerEntry: opts.workerEntry,
         maxDocsPerSlot: opts.maxDocsPerSlot,
         onEvict: evictForward,
         fonts: opts.fallbackFonts,
-      })
-    : undefined;
+      });
+    }
+    // Admission control wraps outermost in both isolation modes: lanes
+    // and shed decisions happen before quarantine checks or dispatch.
+    // `scheduling: false` disables (tests that assert raw pool behavior).
+    if (opts.scheduling !== false) {
+      const userHook = opts.scheduling ? opts.scheduling.onQueueWait : undefined;
+      const scheduler = new SchedulingEnginePool(pool, {
+        ...(opts.scheduling ?? {}),
+        onQueueWait: (lane, waitMs) => {
+          queueWaitObserver.current?.(lane, waitMs);
+          userHook?.(lane, waitMs);
+        },
+      });
+      schedulingPool = scheduler;
+      pool = scheduler;
+    }
+    if (opts.recycle && !engineHost) {
+      throw new Error(
+        "buildApp: `recycle` requires engineIsolation 'host' — there is no child process to recycle inline",
+      );
+    }
+    if (opts.recycle && engineHost) {
+      engineRecycler = new EngineRecycler(
+        () => engineHosts,
+        () => readCgroupMemory(),
+        opts.recycle,
+        (d) => app.log.info({ reason: d.reason, graceful: d.graceful }, 'engine host recycled'),
+        (err) => app.log.warn({ err }, 'engine recycler tick failed'),
+      );
+      engineRecycler.start();
+    }
+  }
+  const drainCoordinator = new DrainCoordinator();
+
+  // Readiness = "safe to route traffic here": not draining, and the
+  // database answers. License-restricted mode stays ready on purpose —
+  // a lapsed license degrades to read-only; it must never restart-loop
+  // or pull the deployment out of every balancer. The object store is
+  // deliberately NOT probed: a transient bucket blip must not amputate
+  // the whole fleet's endpoints. The DB result is cached briefly so
+  // probe storms (N replicas × N balancers) cost ~one ping per window —
+  // including while the DB is down.
+  const DB_READY_TTL_MS = 5_000;
+  const DB_READY_TIMEOUT_MS = 2_000;
+  let dbReadyCache = { at: 0, ok: true };
+  const dbReady = async (): Promise<boolean> => {
+    if (!opts.db) return true;
+    if (Date.now() - dbReadyCache.at < DB_READY_TTL_MS) return dbReadyCache.ok;
+    const ping = sql`SELECT 1`.execute(opts.db).then(
+      () => true,
+      () => false,
+    );
+    let timer: NodeJS.Timeout | undefined;
+    const timeout = new Promise<boolean>((resolve) => {
+      timer = setTimeout(() => resolve(false), DB_READY_TIMEOUT_MS);
+      timer.unref?.();
+    });
+    const ok = await Promise.race([ping, timeout]);
+    if (timer) clearTimeout(timer);
+    dbReadyCache = { at: Date.now(), ok };
+    return ok;
+  };
+
+  if (opts.metrics === true) {
+    const cgroupReadable = readCgroupMemory() !== null;
+    registerMetrics(app, {
+      pool,
+      licenseGate: opts.licenseGate,
+      counters: engineCounters,
+      ...(engineHost ? { engineRestarts: () => engineRestartCount } : {}),
+      ...(engineHost
+        ? { engineMemory: () => (engineSharded ? engineSharded.memory() : engineHost!.memory()) }
+        : {}),
+      ...(engineHost
+        ? {
+            engineRecycles: () => {
+              const total: Record<string, number> = {};
+              for (const h of engineHosts) {
+                for (const [reason, n] of Object.entries(h.recycleStats())) {
+                  total[reason] = (total[reason] ?? 0) + n;
+                }
+              }
+              return total;
+            },
+          }
+        : {}),
+      ...(engineSharded
+        ? {
+            shards: () =>
+              engineHosts.map((h, shard) => ({
+                shard,
+                up: h.health().state === 'ready',
+                restarts: shardRestarts[shard] ?? 0,
+                recycles: h.recycleStats(),
+              })),
+          }
+        : {}),
+      ...(crashJournal ? { crashJournal } : {}),
+      ...(cgroupReadable ? { cgroup: () => readCgroupMemory() } : {}),
+      ...(schedulingPool ? { scheduling: () => schedulingPool!.schedulingStats() } : {}),
+      ...(schedulingPool ? { queueWaitObserver } : {}),
+    });
+  }
+
   app.get('/healthz', async () => ({ status: 'ok' }));
-  app.get('/readyz', async () => {
+  const engineUnreadyAfterMs = opts.engineUnreadyAfterMs ?? 10_000;
+  app.get('/readyz', async (_req, reply) => {
     const license = opts.licenseGate.getStatus();
-    return { license, status: 'ok' };
+    const engine = pool?.health() ?? null;
+    if (drainCoordinator.isDraining) {
+      return reply.code(503).send({ license, engine, status: 'draining' });
+    }
+    if (!(await dbReady())) {
+      return reply.code(503).send({ license, engine, status: 'unready', reasons: ['database'] });
+    }
+    // Engine readiness with a persistence threshold: a sub-second host
+    // respawn must not amputate the pod from every balancer.
+    if (engine && engine.state !== 'ready' && (engine.downSinceMs ?? 0) >= engineUnreadyAfterMs) {
+      return reply.code(503).send({ license, engine, status: 'unready', reasons: ['engine'] });
+    }
+    return { license, engine, status: 'ok' };
   });
   app.get('/v1/license/status', async () => opts.licenseGate.getStatus());
   // Deployment surface: API token only — license state, reporting, and
@@ -622,6 +1032,7 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
         cache: baseFileCache,
         pool,
         encoder: new SharpImageEncoder(),
+        ...(opts.encodeInEngine !== undefined ? { encodeInEngine: opts.encodeInEngine } : {}),
         documents: new DocumentsRepo(opts.db),
         onWarmError: (err, ctx) =>
           app.log.warn({ err, ...ctx }, 'thumbnail warm failed; thumbnailState=failed'),
@@ -820,6 +1231,7 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
       const cdnAccessRequired = (opts.cdnSigner?.info.kind ?? 'none') !== 'none';
       documentService = new DocumentService({
         documents: new DocumentsRepo(opts.db),
+        counters: engineCounters,
         cache: baseFileCache,
         storage: opts.objectStore,
         pool,
@@ -857,6 +1269,7 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
       layerService = new LayerService({
         db: opts.db,
         documents: new DocumentsRepo(opts.db),
+        counters: engineCounters,
         layerState: layerStateService,
         revisionBridge: cloudRevisionBridge,
         eventLog,
@@ -878,8 +1291,8 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
       await registerPageRoutes(app, {
         documentService,
         layerService,
-        pool,
         imageEncoder: new SharpImageEncoder(),
+        ...(opts.encodeInEngine !== undefined ? { encodeInEngine: opts.encodeInEngine } : {}),
         ...(derivedRenders ? { derivedRenders } : {}),
       });
       await registerRedactionRoutes(app, { documentService, layerService });
@@ -887,14 +1300,15 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
         db: opts.db,
         documentService,
         realtimeBus,
+        drain: drainCoordinator,
         ...(revokedJtisGuard ? { revocation: revokedJtisGuard } : {}),
       });
       await registerAnnotationRoutes(app, {
         documentService,
         layerService,
-        pool,
         revisionBridge: cloudRevisionBridge,
         imageEncoder: new SharpImageEncoder(),
+        ...(opts.encodeInEngine !== undefined ? { encodeInEngine: opts.encodeInEngine } : {}),
         weakAnnotationSessions,
         ...(derivedRenders ? { derivedRenders } : {}),
       });
@@ -908,7 +1322,6 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
       });
       await registerSearchRoutes(app, {
         documentService,
-        pool,
       });
     }
 
@@ -925,6 +1338,27 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
   }
 
   app.setErrorHandler((err, req, reply) => {
+    if (err instanceof EngineBusyError) {
+      // Honest backpressure: retry cheaply instead of hanging. A shed
+      // interactive job is the overload signal (background sheds are
+      // swallowed by their callers by design).
+      reply.header('Retry-After', '2');
+      reply.code(503).send({ error: { code: err.code, message: err.message } });
+      return;
+    }
+    if (err instanceof DocumentQuarantinedError) {
+      reply.code(422).send({ error: { code: err.code, message: err.message } });
+      return;
+    }
+    if (EngineError.is(err) && (err as EngineError).code === EngineErrorCode.DocNotOpen) {
+      // Server-side override of the generic mapping: DocNotOpen reaching
+      // HTTP is always pool state (post-retry: the engine respawned more
+      // than once inside one request) — a transient 503, never a 404
+      // (real document-absence surfaces as NotFound from the DB layer).
+      reply.header('Retry-After', '2');
+      reply.code(503).send({ error: { code: 'EngineRestarting', message: err.message } });
+      return;
+    }
     if (EngineError.is(err)) {
       const engineErr = err as EngineError;
       const code = mapToHttp(engineErr.code);
@@ -966,11 +1400,48 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
     reply.code(500).send({ error: { code: 'Unknown', message: e.message } });
   });
 
+  const shutdownTimeoutMs = opts.shutdownTimeoutMs ?? 30_000;
+  const shutdownDrainMs = opts.shutdownDrainMs ?? 0;
   const shutdown = async () => {
+    engineRecycler?.stop();
+    // 1. Fail readiness and end every live SSE stream. Hijacked streams
+    //    are invisible to app.close() — with heartbeats keeping their
+    //    sockets alive, one connected viewer would otherwise hold
+    //    shutdown open until the supervisor SIGKILLs, skipping the pool
+    //    and cache teardown below on every deploy.
+    drainCoordinator.begin();
+    // 2. Optional settle window for probe-driven balancers that need to
+    //    observe the 503 before the socket refuses (Kubernetes covers
+    //    this externally with endpoint removal + preStop).
+    if (shutdownDrainMs > 0) {
+      await new Promise((resolve) => setTimeout(resolve, shutdownDrainMs));
+    }
     if (sweeperTimer) clearInterval(sweeperTimer);
     await importWorker?.stop();
     try {
-      await app.close();
+      // 3. Bounded: in-flight HTTP gets shutdownTimeoutMs to finish and
+      //    then teardown proceeds anyway — cleanup must run before the
+      //    supervisor's kill deadline, not after it.
+      let timer: NodeJS.Timeout | undefined;
+      const timedOut = new Promise<'timeout'>((resolve) => {
+        timer = setTimeout(() => resolve('timeout'), shutdownTimeoutMs);
+        timer.unref?.();
+      });
+      const closed = app.close().then(
+        () => 'closed' as const,
+        (err: unknown) => {
+          app.log.error({ err }, 'app.close failed during shutdown; continuing teardown');
+          return 'closed' as const;
+        },
+      );
+      const outcome = await Promise.race([closed, timedOut]);
+      if (timer) clearTimeout(timer);
+      if (outcome === 'timeout') {
+        app.log.error(
+          { shutdownTimeoutMs },
+          'app.close did not finish within the shutdown budget; continuing teardown',
+        );
+      }
     } finally {
       try {
         if (pool) await pool.destroy();
@@ -992,6 +1463,12 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
     derivedRenders,
     baseFileCache,
     kms: opts.kms,
+    ...(crashJournal ? { crashJournal } : {}),
+    ...(engineHost ? { engineHost } : {}),
+    engineCounters,
+    ...(schedulingPool ? { engineScheduler: schedulingPool } : {}),
+    ...(engineHosts.length > 0 ? { engineHosts } : {}),
+    beginDrain: () => drainCoordinator.begin(),
     shutdown,
   };
 }

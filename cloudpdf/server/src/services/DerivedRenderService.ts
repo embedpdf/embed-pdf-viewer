@@ -17,7 +17,8 @@ import {
 
 import type { DocumentsRepo } from '../db/repos/documents.repo';
 import type { SharpImageEncoder } from '../render/SharpImageEncoder';
-import type { WorkerThreadPool } from '../runtime/WorkerThreadPool';
+import type { EnginePool } from '../runtime/EnginePool';
+import { EngineBusyError } from '../runtime/SchedulingEnginePool';
 import type { BaseFileCache } from '../storage/BaseFileCache';
 import { StorageKeys } from '../storage/keys';
 import type { ObjectStore } from '../storage/ObjectStore';
@@ -52,9 +53,13 @@ export interface DerivedRenderServiceOptions {
    * computed but never persisted — no breakage, no storage-DoS surface.
    */
   enforce?: boolean;
+  /** Warm-path thumbnails render and encode in one worker operation
+   *  (default). `false` = the `CLOUDPDF_ENCODE_IN_ENGINE=0` escape hatch
+   *  (raw raster over the boundary + API-side sharp). */
+  encodeInEngine?: boolean;
   /** Warm-path deps; optional so route-only tests can skip them. */
   cache?: BaseFileCache;
-  pool?: WorkerThreadPool;
+  pool?: EnginePool;
   encoder?: SharpImageEncoder;
   documents?: DocumentsRepo;
   /**
@@ -107,8 +112,9 @@ export class DerivedRenderService {
   private readonly enforce: boolean;
   private readonly maxPixels: number;
   private readonly cache?: BaseFileCache;
-  private readonly pool?: WorkerThreadPool;
+  private readonly pool?: EnginePool;
   private readonly encoder?: SharpImageEncoder;
+  private readonly encodeInEngine: boolean;
   private readonly documents?: DocumentsRepo;
   private readonly onWarmError?: (err: unknown, ctx: { docId: string; tenantId: string }) => void;
   private readonly inFlight = new Map<string, Promise<DerivedRenderResult>>();
@@ -122,6 +128,7 @@ export class DerivedRenderService {
     this.cache = opts.cache;
     this.pool = opts.pool;
     this.encoder = opts.encoder;
+    this.encodeInEngine = opts.encodeInEngine ?? true;
     this.documents = opts.documents;
     this.onWarmError = opts.onWarmError;
   }
@@ -341,32 +348,64 @@ export class DerivedRenderService {
         // arriving in that sub-window may render the same point once more
         // (same acceptance as cross-replica duplicates); the store and the
         // per-key flight converge on one artifact either way.
-        const payload = await pool.runAdHoc(input.baseSha, (jobId) =>
-          wirePack({
-            kind: 'document.renderPageFile' as const,
-            jobId,
-            path: handle.path,
-            password: null,
-            pageIndex: 0,
-            options: {
-              ...pageRenderOptionsFromImageOptions(imageOptions, false),
-              maxOutputPixels: this.maxPixels,
-            },
-          }),
-        );
-        if (payload.tag !== 'document.renderPageFile') {
-          throw new EngineError(
-            EngineErrorCode.WireFormat,
-            `unexpected renderPageFile payload: ${payload.tag}`,
+        const renderOptions = {
+          ...pageRenderOptionsFromImageOptions(imageOptions, false),
+          maxOutputPixels: this.maxPixels,
+        };
+        // With in-engine encoding (the default), render and encode use one worker op — the
+        // thumbnail raster never crosses the engine boundary. Escape
+        // hatch keeps the raw-raster op + API-side sharp for one release.
+        let encoded: { bytes: Uint8Array; contentType: string };
+        let pageObjectNumber: number;
+        if (this.encodeInEngine) {
+          const payload = await pool.runAdHoc(
+            input.baseSha,
+            (jobId) =>
+              wirePack({
+                kind: 'document.renderPageFileEncoded' as const,
+                jobId,
+                path: handle.path,
+                password: null,
+                pageIndex: 0,
+                options: renderOptions,
+                encode: { format: 'webp' as const },
+              }),
+            undefined,
+            { lane: 'background' },
           );
+          if (payload.tag !== 'document.renderPageFileEncoded') {
+            throw new EngineError(
+              EngineErrorCode.WireFormat,
+              `unexpected renderPageFileEncoded payload: ${payload.tag}`,
+            );
+          }
+          encoded = { bytes: payload.image.bytes, contentType: payload.image.contentType };
+          pageObjectNumber = payload.pageObjectNumber;
+        } else {
+          const payload = await pool.runAdHoc(
+            input.baseSha,
+            (jobId) =>
+              wirePack({
+                kind: 'document.renderPageFile' as const,
+                jobId,
+                path: handle.path,
+                password: null,
+                pageIndex: 0,
+                options: renderOptions,
+              }),
+            undefined,
+            { lane: 'background' },
+          );
+          if (payload.tag !== 'document.renderPageFile') {
+            throw new EngineError(
+              EngineErrorCode.WireFormat,
+              `unexpected renderPageFile payload: ${payload.tag}`,
+            );
+          }
+          encoded = await encoder.encodeToBuffer(payload.raster, { format: 'webp' });
+          pageObjectNumber = payload.pageObjectNumber;
         }
-        const encoded = await encoder.encodeToBuffer(payload.raster, { format: 'webp' });
-        const finalKey = this.baseKey(
-          input.tenantId,
-          input.baseSha,
-          payload.pageObjectNumber,
-          token,
-        );
+        const finalKey = this.baseKey(input.tenantId, input.baseSha, pageObjectNumber, token);
         await this.getOrRender(finalKey, async () => ({
           bytes: encoded.bytes,
           contentType: encoded.contentType,
@@ -376,6 +415,10 @@ export class DerivedRenderService {
         handle.release();
       }
     } catch (err) {
+      // A scheduler shed is a deliberate skip of a latency optimization,
+      // not an encoding failure: leave the thumbnail state RETRYABLE (the
+      // read-through is the system) instead of recording `failed`.
+      if (err instanceof EngineBusyError) return;
       this.onWarmError?.(err, { docId: input.docId, tenantId: input.tenantId });
       await this.documents
         ?.setThumbnail(input.docId, input.tenantId, 'failed')

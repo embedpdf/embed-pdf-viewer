@@ -1,5 +1,6 @@
 export default {
   index: 'Reference',
+  licensing: 'Licensing',
   database: 'Database',
   storage: 'Storage',
   imports: 'Imports',

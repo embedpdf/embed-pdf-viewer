@@ -1,0 +1,37 @@
+{{- if .Values.networkPolicy.enabled }}
+# NOTE: vanilla NetworkPolicy cannot allow egress by HOSTNAME.
+# Connected-mode licensing needs api.keygen.sh + api.cloudpdf.com
+# (dynamic IPs): use a CNI with FQDN policies, an egress gateway, allow
+# 443 broadly — or run air-gapped licensing (zero outbound). Empty
+# ingress/egress lists below default to allow-all, so an enabled policy
+# is never accidentally a total blackout; narrow deliberately.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "cloudpdf-server.fullname" . }}
+  labels:
+    {{- include "cloudpdf-server.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "cloudpdf-server.selectorLabels" . | nindent 6 }}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    {{- if .Values.networkPolicy.ingress }}
+    {{- toYaml .Values.networkPolicy.ingress | nindent 4 }}
+    {{- else }}
+    - {}
+    {{- end }}
+  egress:
+    {{- if .Values.networkPolicy.egress }}
+    # DNS stays open alongside your rules.
+    - ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    {{- toYaml .Values.networkPolicy.egress | nindent 4 }}
+    {{- else }}
+    - {}
+    {{- end }}
+{{- end }}

@@ -1,0 +1,125 @@
+---
+title: Licensing
+description: How CloudPDF server licensing works — connected and air-gapped modes, key kinds, read-only degradation, usage reporting, and exactly what leaves your network.
+---
+
+import { Callout } from '@/components/docs/callout';
+import { Cards, Card } from '@/components/docs/cards';
+import { LicenseCta } from '@/components/docs/license-cta';
+
+# Licensing
+
+The self-hosted server runs under the [Fair Core License](https://fair.io/)
+(FCL-1.0-ALv2 — source-available, converts to Apache-2.0 two years after each
+release) and requires a **license key**. The server is fail-closed: with no key
+and no air-gapped certificate it refuses to boot. Everything else about
+licensing is designed to degrade gracefully — an expired or unreachable license
+never takes a running deployment down.
+
+<LicenseCta placement="docs-licensing" />
+
+## Configuration
+
+```sh
+CLOUDPDF_LICENSE_KEY=key/...        # supports secret:// references too
+CLOUDPDF_LICENSE_MODE=connected     # or air-gapped; defaults to connected
+                                    # when a key is set
+```
+
+The key belongs in your secret manager like any credential —
+`CLOUDPDF_LICENSE_KEY=secret://provider/path` resolves through the
+[secrets providers](/docs/server/configuration/adapters), and the Helm chart's
+`existingSecret` carries it as a normal Secret key.
+
+## Key kinds
+
+| Kind | For | Behavior |
+| --- | --- | --- |
+| **Development** | Laptops, CI, try-it-out | Zero-config boots are allowed: dev fallback secrets work (with loud warnings), development-scale usage limits apply. |
+| **Subscription / evaluation** | Real deployments | Production secret hygiene is enforced at boot: `CLOUDPDF_JWT_SECRET` and friends must be real secrets of at least 32 bytes — the server refuses to start on the publicly-known dev fallbacks. |
+
+## Connected mode
+
+The default when a key is present. The server validates the key against the
+licensing service at boot and re-checks every 5 minutes in the background.
+
+- **Offline grace**: if validation is unreachable, the server keeps full access
+  for the grace window embedded in your license (72 hours by default), then
+  degrades to read-only — it does not crash and does not restart-loop.
+- **Clock rollback** is detected and degrades access rather than extending it.
+- **Egress to allow** (for strict firewalls): `api.keygen.sh` (validation) and
+  `api.cloudpdf.com` (usage reporting). If you cannot allow these, use
+  air-gapped mode.
+
+## Air-gapped mode
+
+For networks with zero outbound connectivity. Instead of online validation you
+install a signed certificate, issued for your specific deployment:
+
+```sh
+cloudpdf-server license request     # prints a request bound to this deployment
+# send the request to CloudPDF; you receive a signed certificate back
+cloudpdf-server license install <certificate>
+cloudpdf-server license status
+```
+
+- Verification is a local Ed25519 signature check — **no network calls, ever**,
+  and no usage reporting.
+- The certificate is bound to the deployment's identity, which lives in your
+  database — pods, containers, and hosts can restart or rescale freely.
+- Enforcement happens at certificate expiry: an expired certificate degrades to
+  read-only (if a valid one was previously installed), and you install a
+  renewed certificate to restore full access.
+
+## What happens when a license lapses
+
+Access degrades in one direction and never explodes:
+
+| State | Effect |
+| --- | --- |
+| Valid | Everything works. |
+| **Restricted** (expired, grace exhausted, suspended) | **Read-only**: GET/HEAD requests, `POST /v1/access`, `/v1/warm`, and share-session exchange keep working — your users can still view every document. Writes return `403` with an explanatory code. |
+| None (no key/certificate at all) | The server refuses to boot. |
+
+Operational surfaces:
+
+- `/healthz` and `/readyz` **stay healthy in restricted mode** — a lapsed
+  license must never cause a restart loop or pull your deployment out of the
+  load balancer. `/readyz` includes the current license summary.
+- Every response in a non-valid state carries an `X-CloudPDF-License-Status`
+  header, `GET /v1/license/status` returns the license state for
+  authenticated callers, and the admin `deployment.licenseStatus` operation
+  adds reporting state and usage meters.
+
+## Usage reporting (connected mode only)
+
+When your license's telemetry profile is aggregated usage, the server reports
+once every 5 minutes to `api.cloudpdf.com`: an installation id, aggregate
+usage counters for the reporting period, and a sequence number. Documents,
+document content, names, and user data are never part of the payload. The
+report authenticates with a credential *derived* from your license key — the
+key itself is never sent. In multi-replica deployments one replica reports (a
+database lease coordinates this). Air-gapped deployments report nothing.
+
+## Usage limits
+
+License metadata can carry usage meters (e.g. document or view counts per
+period) with one of three enforcement modes: `hard-limit` (requests over the
+limit are refused with `403`), `soft-limit`, or `notify-only`. Counters live in
+your own database and are enforced consistently across replicas. The admin
+`deployment.licenseStatus` operation shows where you stand.
+
+## Where to go next
+
+<Cards>
+  <Card
+    title="Authentication"
+    description="JWT secrets, API tokens, and the token flow."
+    href="/docs/server/configuration/authentication"
+  />
+  <Card
+    title="Helm / Kubernetes"
+    description="Carry the license key in your existingSecret."
+    href="/docs/server/deployment/helm"
+  />
+</Cards>

@@ -432,6 +432,45 @@ export interface LicenseOperationLeaseTable {
  * against. Each table maps to a single TypeScript shape; Kysely handles
  * INSERT/SELECT differences via the `Generated<T>` brand.
  */
+
+export interface EngineCrashesTable {
+  id: string;
+  at: number;
+  exit_code: number | null;
+  exit_signal: string | null;
+  engine_build: string;
+  suspect_count: number;
+  /** JSON string[] — pairwise singleton-intersection candidates (operator diagnostics, never enforcement). */
+  likely_candidates: string | null;
+}
+
+export interface EngineCrashSuspectsTable {
+  crash_id: string;
+  base_sha: string;
+  /** The raw wire kind the suspect was running — forensics, not a pairing key. */
+  op_kind: string;
+  doc_id: string | null;
+}
+
+export interface EngineQuarantineTable {
+  base_sha: string;
+  engine_build: string;
+  reason: string;
+  quarantined_at: number;
+  expires_at: number;
+  /** JSON string[] — the two sole-suspect crash ids that justified it. */
+  sole_suspect_crash_ids: string | null;
+}
+
+export interface EngineQuarantineAuditTable {
+  id: string;
+  cleared_at: number;
+  base_sha: string;
+  engine_build: string | null;
+  actor: string;
+  reason: string;
+}
+
 export interface Database {
   tenants: TenantsTable & {
     created_at: Generated<number>;
@@ -456,6 +495,10 @@ export interface Database {
   share_grants: ShareGrantsTable;
   document_imports: DocumentImportsTable;
   tenant_usage_counter: TenantUsageCounterTable;
+  engine_crashes: EngineCrashesTable;
+  engine_crash_suspects: EngineCrashSuspectsTable;
+  engine_quarantine: EngineQuarantineTable;
+  engine_quarantine_audit: EngineQuarantineAuditTable;
   schema_migrations: SchemaMigrationsTable;
   revoked_jtis: RevokedJtisTable;
   jwks_cache: JwksCacheTable;

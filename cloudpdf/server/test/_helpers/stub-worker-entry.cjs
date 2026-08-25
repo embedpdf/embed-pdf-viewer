@@ -262,6 +262,37 @@ function layerArtifact(msg, sessionMeta) {
  * so lattice points produce distinguishable — and genuinely sharp-encodable
  * — bitmaps. Shape mirrors `PageRaster`: { width, height, data }.
  */
+// The `*.renderEncoded` kinds use real sharp (a server
+// dependency), so worker-side encodes are byte-identical to what the
+// API-side SharpImageEncoder produced before in-engine encoding — existing tests that
+// assert response/artifact bytes keep passing across the flag.
+const sharp = require('sharp');
+
+async function encodeStubRaster(raster, encode) {
+  const image = sharp(Buffer.from(raster.data), {
+    raw: { width: raster.width, height: raster.height, channels: 4 },
+  });
+  const stream =
+    encode.format === 'webp'
+      ? image.webp(encode.quality === undefined ? {} : { quality: encode.quality })
+      : image.png();
+  const bytes = new Uint8Array(await stream.toBuffer());
+  return {
+    contentType: encode.format === 'webp' ? 'image/webp' : 'image/png',
+    width: raster.width,
+    height: raster.height,
+    bytes,
+  };
+}
+
+function rejectEncodeError(msg, err) {
+  parentPort.postMessage({
+    kind: 'reject',
+    jobId: msg.jobId,
+    error: { name: 'EngineError', message: String((err && err.message) || err), code: 'Unknown' },
+  });
+}
+
 function stubRaster(options) {
   const scale =
     options && options.viewport && options.viewport.kind === 'scale' && options.viewport.scale
@@ -587,6 +618,10 @@ parentPort.on('message', (msg) => {
       return;
     }
     case 'annotations.create': {
+      // Boundary-kill test hook: a draft with contents '__STALL__' never
+      // replies, deterministically parking the engine apply so a test
+      // can kill the host mid-operation.
+      if (msg.draft?.contents === '__STALL__') return;
       const meta = openDocs.get(sessionKey(msg));
       if (!meta) {
         rejectNotOpen(msg);
@@ -811,6 +846,21 @@ parentPort.on('message', (msg) => {
       );
       return;
     }
+    case 'pages.renderEncoded': {
+      const meta = openDocs.get(sessionKey(msg));
+      if (!meta) {
+        rejectNotOpen(msg);
+        return;
+      }
+      const raster = stubRaster(msg.options);
+      encodeStubRaster(raster, msg.encode).then((image) => {
+        parentPort.postMessage(
+          { kind: 'resolve', jobId: msg.jobId, result: { tag: 'pages.renderEncoded', image } },
+          [image.bytes.buffer],
+        );
+      }, (err) => rejectEncodeError(msg, err));
+      return;
+    }
     case 'annotations.renderAppearances': {
       const meta = openDocs.get(sessionKey(msg));
       if (!meta) {
@@ -872,6 +922,67 @@ parentPort.on('message', (msg) => {
       );
       return;
     }
+    case 'annotations.renderAppearancesEncoded': {
+      const meta = openDocs.get(sessionKey(msg));
+      if (!meta) {
+        rejectNotOpen(msg);
+        return;
+      }
+      const pon = msg.pageObjectNumber;
+      if (pon < 1 || pon > meta.pageCount) {
+        parentPort.postMessage({
+          kind: 'reject',
+          jobId: msg.jobId,
+          error: {
+            name: 'EngineError',
+            message: `no page with object number ${pon}`,
+            code: 'NotFound',
+          },
+        });
+        return;
+      }
+      const options = msg.options || {};
+      const scale = typeof options.scale === 'number' && options.scale > 0 ? options.scale : 1;
+      const side = Math.max(1, Math.round(8 * scale));
+      if (options.maxOutputPixels !== undefined && side * side > options.maxOutputPixels) {
+        parentPort.postMessage({
+          kind: 'reject',
+          jobId: msg.jobId,
+          error: {
+            name: 'EngineError',
+            message: `render output ${side}x${side} exceeds the ${options.maxOutputPixels}-pixel budget — request a smaller scale`,
+            code: 'InvalidArg',
+          },
+        });
+        return;
+      }
+      const data = new Uint8Array(side * side * 4).fill(0x77);
+      const raster = { width: side, height: side, data: data.buffer };
+      encodeStubRaster(raster, msg.encode).then((image) => {
+        parentPort.postMessage(
+          {
+            kind: 'resolve',
+            jobId: msg.jobId,
+            result: {
+              tag: 'annotations.renderAppearancesEncoded',
+              result: {
+                pageState: pageState(pon),
+                appearances: [
+                  {
+                    ref: { kind: 'objectNumber', pageObjectNumber: pon, annotObjectNumber: 9001 },
+                    mode: 'normal',
+                    rect: { left: 0, bottom: 0, right: 8, top: 8 },
+                    image,
+                  },
+                ],
+              },
+            },
+          },
+          [image.bytes.buffer],
+        );
+      }, (err) => rejectEncodeError(msg, err));
+      return;
+    }
     case 'document.renderPageFile': {
       // Ad-hoc file render (the warm path): no session involved. Byte0 of
       // the file encodes the page count, mirroring the open stubs.
@@ -903,6 +1014,39 @@ parentPort.on('message', (msg) => {
         },
         [raster.data],
       );
+      return;
+    }
+    case 'document.renderPageFileEncoded': {
+      const bytes = msg.path ? readFileSync(msg.path) : Buffer.alloc(0);
+      const pageCount = bytes.byteLength > 0 ? bytes[0] : 0;
+      if (msg.pageIndex >= pageCount) {
+        parentPort.postMessage({
+          kind: 'reject',
+          jobId: msg.jobId,
+          error: {
+            name: 'EngineError',
+            message: `no page at index ${msg.pageIndex}`,
+            code: 'NotFound',
+          },
+        });
+        return;
+      }
+      const raster = stubRaster(msg.options);
+      encodeStubRaster(raster, msg.encode).then((image) => {
+        parentPort.postMessage(
+          {
+            kind: 'resolve',
+            jobId: msg.jobId,
+            result: {
+              tag: 'document.renderPageFileEncoded',
+              pageObjectNumber: msg.pageIndex + 1,
+              pageCount,
+              image,
+            },
+          },
+          [image.bytes.buffer],
+        );
+      }, (err) => rejectEncodeError(msg, err));
       return;
     }
     case 'attachments.list': {

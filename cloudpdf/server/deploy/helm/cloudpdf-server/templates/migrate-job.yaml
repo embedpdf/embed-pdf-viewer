@@ -1,0 +1,62 @@
+{{- if .Values.migrations.enabled }}
+{{- include "cloudpdf-server.validate" . -}}
+# Schema migrations as a pre-install/pre-upgrade hook: `migrate up` runs
+# to completion BEFORE any app pod rolls; app pods run with
+# CLOUDPDF_AUTO_MIGRATE=0 + CLOUDPDF_FAIL_ON_PENDING=1 (set by the
+# Deployment when migrations.enabled). Successful Jobs are deleted;
+# failed Jobs are kept for forensics. The migrator itself also holds a
+# Postgres advisory lock, so even a concurrent out-of-band `migrate up`
+# serializes at the database — the hook is rollout ORDERING, the lock is
+# the correctness boundary.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "cloudpdf-server.fullname" . }}-migrate
+  labels:
+    {{- include "cloudpdf-server.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: '-5'
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: {{ .Values.migrations.backoffLimit }}
+  activeDeadlineSeconds: {{ .Values.migrations.activeDeadlineSeconds }}
+  template:
+    metadata:
+      labels:
+        {{- include "cloudpdf-server.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: migrate
+    spec:
+      restartPolicy: Never
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      # No release ServiceAccount here: as a pre-install hook this Job
+      # runs BEFORE ordinary release resources (the SA included) exist —
+      # referencing it deadlocks first installs. The migrator needs no
+      # Kubernetes API access; the namespace default SA with no mounted
+      # token is exactly right.
+      automountServiceAccountToken: false
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: migrate
+          image: {{ include "cloudpdf-server.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args: ['migrate', 'up']
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          envFrom:
+            {{- include "cloudpdf-server.migrateEnvFrom" . | nindent 12 }}
+          {{- with .Values.migrations.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+{{- end }}

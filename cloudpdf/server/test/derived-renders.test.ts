@@ -506,7 +506,8 @@ function spyPagesRenderCount(fx: Fixture): { count: () => number } {
   pool.run = async (docId, build, s) => {
     const wrapped = (id: number) => {
       const pack = build(id);
-      if (pack.payload.kind === 'pages.render') renders += 1;
+      if (pack.payload.kind === 'pages.render' || pack.payload.kind === 'pages.renderEncoded')
+        renders += 1;
       return pack;
     };
     return original(docId, wrapped as never, s as never);

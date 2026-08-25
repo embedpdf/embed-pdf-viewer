@@ -24,6 +24,19 @@
         "types": "./dist/index.d.ts",
         "default": "./dist/index.browser.js"
       }
+    },
+    "./build-id": {
+      "types": "./dist/build-id.d.ts",
+      "node": {
+        "import": {
+          "types": "./dist/build-id.d.ts",
+          "default": "./dist/build-id.js"
+        },
+        "require": {
+          "types": "./dist/build-id.d.cts",
+          "default": "./dist/build-id.cjs"
+        }
+      }
     }
   },
   "repository": {

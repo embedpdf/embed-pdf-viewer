@@ -2,6 +2,7 @@ import type { AstNode } from '@embedpdf/docs-kit';
 
 import { projectApiReferenceComponent } from './api-reference-markdown';
 import { projectDocsLanding } from './docs-landing-markdown';
+import { projectLicenseCta } from './license-cta-markdown';
 
 /**
  * This site's `projectComponent` hook: a thin dispatcher over the domain
@@ -18,5 +19,6 @@ export function projectCloudPdfComponent(
   },
 ): AstNode[] | null | undefined {
   if (node.name === 'DocsLanding') return projectDocsLanding(helpers.absoluteContentUrl);
+  if (node.name === 'LicenseCta') return projectLicenseCta(node, helpers);
   return projectApiReferenceComponent(node, helpers);
 }

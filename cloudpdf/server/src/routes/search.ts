@@ -11,7 +11,6 @@ import {
 } from '@embedpdf/engine-core/runtime';
 import { decodeSearchToken, encodeSearchToken } from '@embedpdf/engine-core/wire';
 import { requireLayerDocAccessOnly, requireLayerResource } from '../app/jwt-plugin';
-import type { WorkerThreadPool } from '../runtime/WorkerThreadPool';
 import type { DocumentService, OpenContext } from '../services/DocumentService';
 import {
   abortSignalFromRequest,
@@ -22,7 +21,6 @@ import {
 
 interface SearchRouteDeps {
   documentService: DocumentService;
-  pool: WorkerThreadPool;
 }
 
 /** Decoded state of one search GET — the whole cache key minus the mode. */
@@ -89,7 +87,7 @@ async function runSearchSlice(
   state: SearchGetState,
   versioned: boolean,
 ) {
-  const { documentService, pool } = deps;
+  const { documentService } = deps;
   const { docId, layerName } = req.params as { docId: string; layerName: string };
   const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
   const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
@@ -126,7 +124,13 @@ async function runSearchSlice(
         ...(state.budget !== undefined ? { budget: state.budget } : {}),
       },
     });
-  const result = await pool.run(docId, build, abortSignalFromRequest(req));
+  const result = await documentService.readOnPool(
+    ctx,
+    docId,
+    layerName,
+    build,
+    abortSignalFromRequest(req),
+  );
   if (result.tag !== 'search.query') {
     throw new EngineError(
       EngineErrorCode.WireFormat,

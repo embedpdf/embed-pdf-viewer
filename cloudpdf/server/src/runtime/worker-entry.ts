@@ -8,9 +8,15 @@
  * terminate cleanly.
  */
 import { parentPort, workerData } from 'node:worker_threads';
-import { createPdfRuntime } from '@embedpdf/engine-runtime';
-import { WorkerHost, type StartupFontSpec } from '@embedpdf/engine-services';
+
 import type { WirePack, WorkerRequest, WorkerResponse } from '@embedpdf/engine-core/runtime';
+import { createPdfRuntime } from '@embedpdf/engine-runtime';
+import {
+  WorkerHost,
+  type StartupFontSpec,
+  type WorkerImageEncoder,
+} from '@embedpdf/engine-services';
+
 import type { WorkerBootstrapData } from './WorkerThreadPool';
 
 if (!parentPort) {
@@ -49,9 +55,39 @@ function bootstrapFontSpecs(): StartupFontSpec[] {
   // actual values flowing through today are `ArrayBuffer`s; we cast at
   // the boundary rather than cross-typing the whole engine-core surface
   // to a Node-specific list.
-  const host = new WorkerHost(runtime, (pack: WirePack<WorkerResponse>) => {
-    port.postMessage(pack.payload, pack.transfer as readonly ArrayBuffer[]);
-  });
+  // Injected encoding capability behind the
+  // `*.renderEncoded` wire kinds: rasters are compressed HERE, in the
+  // worker that produced them, so only compressed kilobytes cross the
+  // engine boundary. `encodeToBuffer` copies sharp's output into a
+  // fresh Uint8Array — the buffer OWNERSHIP the transfer manifest
+  // requires (a pooled Buffer slab view must never be transferred).
+  //
+  // sharp/libvips loads LAZILY on the first encoded request: with the
+  // `CLOUDPDF_ENCODE_IN_ENGINE=0` escape hatch on, no encoded request
+  // ever arrives, so the worker never initializes libvips at all — the
+  // hatch restores the previous API-side encoding worker, not just its routing.
+  // Cost: the first encode per worker pays a one-time dynamic import.
+  let sharpEncoderPromise: Promise<{
+    encodeToBuffer: (
+      raster: Parameters<WorkerImageEncoder['encode']>[0],
+      opts: Parameters<WorkerImageEncoder['encode']>[1],
+    ) => ReturnType<WorkerImageEncoder['encode']>;
+  }> | null = null;
+  const imageEncoder: WorkerImageEncoder = {
+    encode: async (raster, opts) => {
+      sharpEncoderPromise ??= import('../render/SharpImageEncoder').then(
+        (m) => new m.SharpImageEncoder(),
+      );
+      return (await sharpEncoderPromise).encodeToBuffer(raster, opts);
+    },
+  };
+  const host = new WorkerHost(
+    runtime,
+    (pack: WirePack<WorkerResponse>) => {
+      port.postMessage(pack.payload, pack.transfer as readonly ArrayBuffer[]);
+    },
+    { imageEncoder },
+  );
 
   // Seed this thread's runtime fonts before reporting ready, so the first
   // request already has the deployment's fallback fonts available.

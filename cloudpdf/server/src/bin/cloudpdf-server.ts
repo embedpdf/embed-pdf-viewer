@@ -26,6 +26,8 @@ import { ConnectedUsageReporter } from '../licensing/ConnectedUsageReporter';
 import { LicenseRuntime } from '../licensing/LicenseRuntime';
 import { UsageMeters } from '../licensing/UsageMeters';
 import { PostgresRealtimeBus } from '../realtime/PostgresRealtimeBus';
+import { resolveRecycleConfig } from '../runtime/EngineRecycler';
+import { readCgroupMemory } from '../runtime/cgroup-memory';
 import { loadFallbackFontsFromEnv } from '../runtime/loadFallbackFontsFromEnv';
 import { loadKmsConfigFromEnv } from '../security/kms/config/loadKmsConfigFromEnv';
 import { createKmsKeyring } from '../security/kms/createKmsKeyring';
@@ -33,6 +35,7 @@ import type { KmsKeyring } from '../security/kms/KmsKeyring';
 import { loadSecretsConfigFromEnv } from '../security/secrets/config/loadSecretsConfigFromEnv';
 import { createSecretsProviderRegistry } from '../security/secrets/createSecretsProvider';
 import { createSecretResolver, type SecretResolver } from '../security/secrets/SecretResolver';
+import { resolveQuarantineConfig } from '../services/CrashJournal';
 import { EventLogService } from '../services/EventLogService';
 import { loadObjectStoreConfigFromEnv } from '../storage/config/loadObjectStoreConfigFromEnv';
 import { createObjectStore } from '../storage/createObjectStore';
@@ -303,6 +306,8 @@ function printHelp(): void {
       '  migrate up             Apply pending migrations',
       '  migrate up --dry-run   List what would be applied without changing the DB',
       '  migrate down           Roll back migrations (manual break-glass; destructive)',
+      '  quarantine list        Show engine-crash quarantined documents',
+      '  quarantine clear <sha> --reason "…"   Lift a quarantine (audited)',
       '    --to NNN               Roll back everything newer than version NNN',
       '    --steps N              Roll back the N highest applied (default 1)',
       '    --all                  Roll back every applied migration',
@@ -336,6 +341,16 @@ function printHelp(): void {
       '    CLOUDPDF_PASSWORD_SESSION_SERVER_SECRET      >= 32 bytes (required with a production license + KMS)',
       '    CLOUDPDF_PASSWORD_SESSION_SERVER_SECRET_ID   secret rotation id (default: dev-v1)',
       '    CLOUDPDF_TRUST_PROXY   1|true, hop count, or CSV of proxy IPs/CIDRs',
+      '    CLOUDPDF_SHUTDOWN_TIMEOUT_MS  app.close() budget before teardown proceeds (default 30000)',
+      '    CLOUDPDF_SHUTDOWN_DRAIN_MS    settle window after readiness flips 503 (default 0)',
+      '    CLOUDPDF_METRICS       1 exposes an unauthenticated Prometheus /metrics endpoint',
+      '    CLOUDPDF_ENGINE_ISOLATION  inline (default) or host: run PDFium in a supervised child process',
+      '    CLOUDPDF_ENGINE_SHARDS     engine shard count (host mode; worker total must divide evenly; default 1)',
+      '    CLOUDPDF_ENGINE_RECYCLE    1 enables engine recycling (host mode; opt-in until soak data)',
+      '    CLOUDPDF_ENGINE_RECYCLE_SOFT_PCT / _HARD_PCT  container working-set watermarks (70 / 85)',
+      '    CLOUDPDF_ENGINE_MAX_RSS_MB / CLOUDPDF_ENGINE_MAX_LIFETIME_HOURS  secondary recycle guards',
+      '    CLOUDPDF_QUARANTINE_ENFORCE   1 refuses quarantined documents with 422 (default: observe-only journal)',
+      '    CLOUDPDF_QUARANTINE_TTL_HOURS quarantine/strike TTL (default 24)',
       '                           (set behind a LB so rate limits see real client IPs)',
       '    CLOUDPDF_AUTH_FAILURE_LIMIT      failed auths per IP per window; off to disable (default: 30)',
       '    CLOUDPDF_AUTH_FAILURE_WINDOW_MS  window for the failure limit (default: 60000)',
@@ -367,6 +382,51 @@ function printHelp(): void {
 
 // ------- commands -------
 
+/**
+ * Operator surface for the engine crash quarantine:
+ *   cloudpdf-server quarantine list
+ *   cloudpdf-server quarantine clear <base_sha> --reason "verified fixed"
+ * CLI-first on purpose — no contract/SDK churn; a dashboard op can
+ * follow when a UI needs it.
+ */
+async function cmdQuarantine(args: string[]): Promise<void> {
+  const { CrashJournal } = await import('../services/CrashJournal');
+  const sub = args[0];
+  const ctx = openDb();
+  try {
+    const journal = new CrashJournal({ db: ctx.db });
+    if (sub === 'list') {
+      const rows = await journal.listQuarantine();
+      if (rows.length === 0) {
+        console.log('no quarantined documents');
+        return;
+      }
+      for (const row of rows) {
+        const state = row.expires_at > Date.now() ? 'active' : 'expired';
+        console.log(
+          `${row.base_sha}  build=${row.engine_build}  reason=${row.reason}  ` +
+            `${state} until ${new Date(row.expires_at).toISOString()}`,
+        );
+      }
+      return;
+    }
+    if (sub === 'clear') {
+      const sha = args[1];
+      const reason = readFlagValue(args, '--reason');
+      if (!sha) fail(1, 'quarantine clear: missing <base_sha>');
+      if (!reason) {
+        fail(1, 'quarantine clear: --reason is required (it lands in the audit trail)');
+      }
+      const removed = await journal.clear(sha!, { actor: 'cli', reason: reason! });
+      console.log(`cleared ${removed} quarantine row(s) for ${sha} (audited)`);
+      return;
+    }
+    fail(1, `unknown quarantine subcommand: ${sub ?? '(none)'} (use: list | clear <sha> --reason)`);
+  } finally {
+    await ctx.db.destroy();
+  }
+}
+
 async function cmdMigrateStatus(): Promise<void> {
   const ctx = openDb();
   try {
@@ -392,6 +452,23 @@ async function cmdMigrateStatus(): Promise<void> {
   }
 }
 
+/**
+ * Progress logger for waits on the cross-migrator advisory lock —
+ * another replica, deploy hook, or CLI is migrating. Throttled so the
+ * 400ms poll doesn't flood the console.
+ */
+function makeLockWaitLogger(): (waitedMs: number) => void {
+  let lastLogAt = 0;
+  return (waitedMs) => {
+    if (waitedMs - lastLogAt < 5_000) return;
+    lastLogAt = waitedMs;
+    console.log(
+      `waiting for the migration lock (${Math.round(waitedMs / 1000)}s) — ` +
+        `another migrator is running`,
+    );
+  };
+}
+
 async function cmdMigrateUp(args: string[]): Promise<void> {
   const dryRun = args.includes('--dry-run');
   const ctx = openDb();
@@ -413,7 +490,9 @@ async function cmdMigrateUp(args: string[]): Promise<void> {
     }
     const applied = await migrate(ctx.db, {
       source: { kind: 'inline', migrations: ctx.migrations },
+      dialect: ctx.dialect,
       onApply: (m) => console.log(`applying ${m.version} ${m.name}`),
+      onLockWait: makeLockWaitLogger(),
     });
     if (applied.length === 0) {
       console.log('nothing to apply (db up to date)');
@@ -489,7 +568,9 @@ async function cmdMigrateDown(args: string[]): Promise<void> {
       ...(to !== undefined ? { to } : {}),
       ...(steps !== undefined ? { steps } : {}),
       force,
+      dialect: ctx.dialect,
       onRevert: (m) => console.log(`reverting ${m.version} ${m.name}`),
+      onLockWait: makeLockWaitLogger(),
     });
     console.log(`rolled back ${reverted.length} migration(s)`);
   } finally {
@@ -693,6 +774,52 @@ function requireAirGappedMode(): void {
   }
 }
 
+function engineShardsEnv(): number | undefined {
+  const raw = process.env['CLOUDPDF_ENGINE_SHARDS'];
+  if (raw === undefined || raw === '') return undefined;
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n < 1) {
+    fail(2, `CLOUDPDF_ENGINE_SHARDS must be a positive integer, got ${JSON.stringify(raw)}`);
+  }
+  if (n > 1 && process.env['CLOUDPDF_ENGINE_ISOLATION'] !== 'host') {
+    fail(2, 'CLOUDPDF_ENGINE_SHARDS > 1 requires CLOUDPDF_ENGINE_ISOLATION=host');
+  }
+  return n;
+}
+
+function schedulingEnv(): Record<string, number> | null {
+  const parse = (name: string): number | undefined => {
+    const raw = process.env[name];
+    if (raw === undefined || raw === '') return undefined;
+    const n = Number(raw);
+    if (!Number.isInteger(n) || n < 1) {
+      fail(2, `${name} must be a positive integer, got ${JSON.stringify(raw)}`);
+    }
+    return n;
+  };
+  const parseZeroOk = (name: string): number | undefined => {
+    const raw = process.env[name];
+    if (raw === undefined || raw === '') return undefined;
+    const n = Number(raw);
+    if (!Number.isInteger(n) || n < 0) {
+      fail(2, `${name} must be a non-negative integer, got ${JSON.stringify(raw)}`);
+    }
+    return n;
+  };
+  const cfg = {
+    maxInFlight: parse('CLOUDPDF_ENGINE_MAX_IN_FLIGHT'),
+    // 0 = strict disable (background sheds instantly).
+    backgroundMaxInFlight: parseZeroOk('CLOUDPDF_ENGINE_BG_MAX_IN_FLIGHT'),
+    backgroundMaxQueued: parseZeroOk('CLOUDPDF_ENGINE_BG_MAX_QUEUED'),
+    interactiveMaxQueued: parseZeroOk('CLOUDPDF_ENGINE_MAX_QUEUED'),
+    backgroundQueueTimeoutMs: parse('CLOUDPDF_ENGINE_BG_QUEUE_TIMEOUT_MS'),
+    interactiveQueueTimeoutMs: parse('CLOUDPDF_ENGINE_QUEUE_TIMEOUT_MS'),
+  };
+  const entries = Object.entries(cfg).filter((e): e is [string, number] => e[1] !== undefined);
+  if (entries.length === 0) return null;
+  return Object.fromEntries(entries);
+}
+
 async function cmdServe(): Promise<void> {
   const PORT = Number(process.env['PORT'] ?? 3000);
   const HOST = process.env['HOST'] ?? '0.0.0.0';
@@ -712,8 +839,36 @@ async function cmdServe(): Promise<void> {
   const CACHE_MAX_BYTES = process.env['CLOUDPDF_CACHE_MAX_BYTES']
     ? Number(process.env['CLOUDPDF_CACHE_MAX_BYTES'])
     : undefined;
+  // Shutdown posture: keep the app.close() budget BELOW the supervisor's
+  // kill deadline (k8s terminationGracePeriodSeconds, docker stop -t).
+  const SHUTDOWN_TIMEOUT_MS = process.env['CLOUDPDF_SHUTDOWN_TIMEOUT_MS']
+    ? Number(process.env['CLOUDPDF_SHUTDOWN_TIMEOUT_MS'])
+    : undefined;
+  const SHUTDOWN_DRAIN_MS = process.env['CLOUDPDF_SHUTDOWN_DRAIN_MS']
+    ? Number(process.env['CLOUDPDF_SHUTDOWN_DRAIN_MS'])
+    : undefined;
 
   const WORKER_ENTRY_URL = new URL('../runtime/worker-entry.js', import.meta.url);
+  const ENGINE_HOST_ENTRY_URL = new URL('../runtime/engine-host-entry.js', import.meta.url);
+  // Engine plane placement: 'inline' (worker threads in this process,
+  // default) or 'host' (supervised child process — a native PDFium crash
+  // costs one sub-second engine respawn, never the API).
+  const engineIsolationRaw = process.env['CLOUDPDF_ENGINE_ISOLATION'] ?? 'inline';
+  if (engineIsolationRaw !== 'inline' && engineIsolationRaw !== 'host') {
+    fail(2, `CLOUDPDF_ENGINE_ISOLATION must be 'inline' or 'host' (got ${engineIsolationRaw})`);
+  }
+  const ENGINE_ISOLATION = engineIsolationRaw as 'inline' | 'host';
+  // Quarantine config fails boot on invalid or silently-inert settings
+  // (enforce without host isolation, non-positive TTL).
+  let quarantineConfig: ReturnType<typeof resolveQuarantineConfig>;
+  try {
+    quarantineConfig = resolveQuarantineConfig(process.env, ENGINE_ISOLATION);
+  } catch (err) {
+    fail(2, err instanceof Error ? err.message : String(err));
+  }
+  for (const warning of quarantineConfig!.warnings) {
+    console.warn(`[cloudpdf-server] WARNING: ${warning}`);
+  }
 
   // Database defaults to SQLite (see readDbConfig), so a bare `serve`
   // boots the full admin + document pipeline with zero external infra.
@@ -728,7 +883,9 @@ async function cmdServe(): Promise<void> {
   if (autoMigrate) {
     const applied = await migrate(dbCtx.db, {
       source: { kind: 'inline', migrations: dbCtx.migrations },
+      dialect: dbCtx.dialect,
       onApply: (m) => console.log(`applying ${m.version} ${m.name}`),
+      onLockWait: makeLockWaitLogger(),
     });
     if (applied.length > 0) console.log(`auto-migrate: applied ${applied.length} migration(s)`);
   }
@@ -823,7 +980,27 @@ async function cmdServe(): Promise<void> {
 
   let bundle: Awaited<ReturnType<typeof buildApp>>;
   try {
+    let recycleConfig: ReturnType<typeof resolveRecycleConfig>;
+    try {
+      recycleConfig = resolveRecycleConfig(process.env, ENGINE_ISOLATION, readCgroupMemory);
+    } catch (err) {
+      fail(2, (err as Error).message);
+    }
+    for (const w of recycleConfig!.warnings) console.warn(`[cloudpdf] ${w}`);
     bundle = await buildApp({
+      // Engine recycling (opt-in; fail-fast validated above).
+      ...(recycleConfig.enabled ? { recycle: recycleConfig.policy } : {}),
+      // Engine shard dial (buildApp validates divisibility against the
+      // resolved worker total; K > 1 requires host isolation).
+      ...(engineShardsEnv() !== undefined ? { engineShards: engineShardsEnv() } : {}),
+      // Admission tuning (defaults compute from the pool's slot count;
+      // queue caps and timeouts are buildApp options).
+      ...(schedulingEnv() ? { scheduling: schedulingEnv()! } : {}),
+      // Encoding escape hatch: '0'/'false' reverts to raw rasters over
+      // the engine boundary + API-side sharp for one release.
+      encodeInEngine:
+        process.env.CLOUDPDF_ENCODE_IN_ENGINE !== '0' &&
+        process.env.CLOUDPDF_ENCODE_IN_ENGINE !== 'false',
       licenseGate: licenseRuntime,
       ...(usageReporter ? { usageReporter } : {}),
       verifier: { mode: 'hs256', secret: JWT_SECRET },
@@ -847,6 +1024,12 @@ async function cmdServe(): Promise<void> {
       ...(realtimeBus ? { realtimeBus } : {}),
       ...(trustProxy !== undefined ? { trustProxy } : {}),
       ...(authFailureLimit !== undefined ? { authFailureLimit } : {}),
+      ...(SHUTDOWN_TIMEOUT_MS !== undefined ? { shutdownTimeoutMs: SHUTDOWN_TIMEOUT_MS } : {}),
+      ...(SHUTDOWN_DRAIN_MS !== undefined ? { shutdownDrainMs: SHUTDOWN_DRAIN_MS } : {}),
+      ...(process.env['CLOUDPDF_METRICS'] === '1' ? { metrics: true } : {}),
+      engineIsolation: ENGINE_ISOLATION,
+      engineHostEntry: ENGINE_HOST_ENTRY_URL,
+      ...(quarantineConfig.options ? { quarantine: quarantineConfig.options } : {}),
     });
   } catch (err) {
     // Config-shaped boot refusals (secret policy, migration drift) exit
@@ -926,6 +1109,9 @@ async function main(): Promise<void> {
     if (sub === 'down') return cmdMigrateDown(rest);
     if (sub === 'validate') return cmdMigrateValidate(rest);
     fail(2, `unknown subcommand: migrate ${sub ?? '(missing)'}\nrun: cloudpdf-server --help`);
+  }
+  if (args[0] === 'quarantine') {
+    return cmdQuarantine(args.slice(1));
   }
   if (args[0] === 'db') {
     const sub = args[1];

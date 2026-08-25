@@ -1,0 +1,5 @@
+# Patterns to ignore when building the chart package.
+.DS_Store
+*.swp
+*.tmp
+.git/

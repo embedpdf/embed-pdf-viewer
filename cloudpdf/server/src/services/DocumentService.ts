@@ -1,3 +1,4 @@
+import { wirePaths } from '@embedpdf/engine-core/wire';
 import { mkdtemp, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -17,6 +18,7 @@ import {
   type PdfBits,
   type PdfSaveMode,
   type WorkerJobId,
+  type WorkerResultPayload,
   type EmbeddedFileItem,
   type EmbeddedFileRef,
   type AnnotationRef,
@@ -26,6 +28,7 @@ import {
 import type { DocumentManifest, LayerScopes } from '@embedpdf/engine-core/wire';
 
 import type { LayerStateService } from './LayerStateService';
+import type { EngineCounters } from '../app/engine-counters';
 import { pinnedLayerName, type RequestJwtContext } from '../app/jwt-plugin';
 import type { DocumentsRepo, DocumentRow } from '../db/repos/documents.repo';
 import type {
@@ -36,7 +39,8 @@ import type {
   PasswordVerificationRow,
   PdfPasswordVerificationsRepo,
 } from '../db/repos/pdf_password_verifications.repo';
-import type { WorkerThreadPool } from '../runtime/WorkerThreadPool';
+import { runReadWithReopen, type BuildPack } from '../runtime/EnginePool';
+import type { EnginePool } from '../runtime/EnginePool';
 import { signPasswordGrant, verifyPasswordGrant, type PasswordSessionBinding } from '../security';
 import type { BaseFileCache, LocalFileHandle } from '../storage/BaseFileCache';
 import { StorageKeys } from '../storage/keys';
@@ -89,8 +93,10 @@ export interface DocumentServiceOptions {
   documents: DocumentsRepo;
   cache: BaseFileCache;
   storage: ObjectStore;
-  pool: WorkerThreadPool;
+  pool: EnginePool;
   layerState: LayerStateService;
+  /** Operational counters read by metrics collect closures. */
+  counters?: EngineCounters;
   passwordVerifications?: PdfPasswordVerificationsRepo;
   passwordSessions?: PdfPasswordSessionsRepo;
   passwordSessionServerSecret?: { id: string; secret: string | Buffer };
@@ -158,7 +164,7 @@ export interface UnlockLayerAccessResult {
  *   2. Acquire a refcounted file handle from `BaseFileCache`.
  *      Concurrent acquirers of the same `base_sha` share one
  *      materialisation; concurrent acquirers of the same `docId` share
- *      one `WorkerThreadPool.runOpen` via this service's own
+ *      one `EnginePool.runOpen` via this service's own
  *      singleflight map.
  *   3. Pass the materialised path to the worker via `pool.runOpen`
  *      with sticky-by-baseSha routing. The worker opens PDFium through
@@ -176,7 +182,7 @@ export class DocumentService {
   private readonly documents: DocumentsRepo;
   private readonly cache: BaseFileCache;
   private readonly storage: ObjectStore;
-  private readonly pool: WorkerThreadPool;
+  private readonly pool: EnginePool;
   private readonly layerState: LayerStateService;
   private readonly passwordVerifications: PdfPasswordVerificationsRepo | null;
   private readonly passwordSessions: PdfPasswordSessionsRepo | null;
@@ -209,9 +215,25 @@ export class DocumentService {
    * the write finishes either way.
    */
   private readonly layerWritesInFlight = new Map<string, Promise<void>>();
+  /**
+   * Engine generation captured at WRITE-alignment time (the
+   * `forWrite` door of {@link ensureLayerFreshOnPool}), consumed by
+   * {@link advanceLayerSession}. Correct without per-write threading
+   * because the layer write queue (`enqueueLayerWrite`) serializes
+   * writes per sessionKey IN-PROCESS — at most one write sits between
+   * alignment and commit at any time, so the stored generation always
+   * belongs to THE write that is committing. Survives host restarts on
+   * purpose: the stale generation is exactly the datum that detects a
+   * session recreated by a reader on a NEW engine after the aligned
+   * engine died.
+   */
+  private readonly writeAlignGens = new Map<string, number>();
+
+  private readonly counters?: EngineCounters;
 
   constructor(opts: DocumentServiceOptions) {
     this.documents = opts.documents;
+    this.counters = opts.counters;
     this.cache = opts.cache;
     this.storage = opts.storage;
     this.pool = opts.pool;
@@ -231,6 +253,36 @@ export class DocumentService {
    *
    * Concurrent first-callers share one open via singleflight.
    */
+  /**
+   * THE read-dispatch door: ensure (layer or base) → dispatch → ONE
+   * reopen-retry when the session vanished between ensure and dispatch
+   * (a read parked across an engine respawn). Every engine read —
+   * service-internal AND route-level — goes through this verb, so the
+   * recovery cannot be skipped by a future call site, and routes need no
+   * `EnginePool` of their own. One reopen per request is the law: a
+   * second DocNotOpen means the engine respawned twice inside one
+   * request, and the error handler's 503 (`EngineRestarting`) is the
+   * honest answer. Mutations never use this — generation fencing and rebase own
+   * their retry (see `LayerService.runWithRebase`); the password
+   * bootstrap keeps its special reensure via `runReadWithReopen`.
+   */
+  readOnPool(
+    ctx: OpenContext,
+    docId: string,
+    /** undefined = the BASE view (shared reads use no layer session). */
+    layerName: string | undefined,
+    build: BuildPack,
+    signal?: AbortSignal,
+  ): Promise<WorkerResultPayload> {
+    return runReadWithReopen(
+      () =>
+        layerName !== undefined
+          ? this.ensureLayerOnPool(ctx, docId, layerName)
+          : this.openOnPool(ctx, docId),
+      () => this.pool.run(docId, build, signal),
+    );
+  }
+
   async openOnPool(
     ctx: OpenContext,
     docId: string,
@@ -409,6 +461,7 @@ export class DocumentService {
           password,
         });
       const result = await this.pool.runOpen(docId, baseSha, build);
+      if (this.counters) this.counters.docOpens += 1;
       if (result.tag !== 'open') {
         throw new EngineError(EngineErrorCode.WireFormat, `unexpected open payload: ${result.tag}`);
       }
@@ -430,7 +483,7 @@ export class DocumentService {
   async getManifest(ctx: OpenContext, docId: string): Promise<DocumentManifest> {
     const head = await this.openOnPool(ctx, docId);
     const pages = await this.layerState.ensureBasePages(docId, () =>
-      this.loadDurableBasePageStates(docId),
+      this.loadDurableBasePageStates(ctx, docId),
     );
     return this.layerState.buildBaseManifest(head, pages);
   }
@@ -476,7 +529,7 @@ export class DocumentService {
     const layer = await this.layerState.repos.layers.findByDocAndName(docId, layerName);
     if (!layer) {
       const pages = await this.layerState.ensureBasePages(docId, () =>
-        this.loadDurableBasePageStates(docId),
+        this.loadDurableBasePageStates(ctx, docId),
       );
       // No layer row yet -> immutable base view: docVersion from head, the
       // geometry pointer at its initial epoch (1) — and every plane
@@ -499,7 +552,7 @@ export class DocumentService {
     }
 
     const basePages = await this.layerState.ensureBasePages(docId, () =>
-      this.loadDurableBasePageStates(docId),
+      this.loadDurableBasePageStates(ctx, docId),
     );
     const pages = await this.layerState.ensureLayerPagesFromBase({ layerId: layer.id, docId });
     // Plane scopes: annotation writes own `annotations` only (renders/
@@ -549,7 +602,7 @@ export class DocumentService {
         docId,
         ...(layerName !== undefined ? { layerName } : {}),
       });
-    const result = await this.pool.run(docId, build, signal);
+    const result = await this.readOnPool(ctx, docId, layerName, build, signal);
     if (result.tag !== 'pages.list') {
       throw new EngineError(
         EngineErrorCode.WireFormat,
@@ -568,8 +621,10 @@ export class DocumentService {
   ): Promise<DocumentActionsSnapshot> {
     if (layerName !== undefined) await this.ensureLayerOnPool(ctx, docId, layerName);
     else await this.openOnPool(ctx, docId);
-    const result = await this.pool.run(
+    const result = await this.readOnPool(
+      ctx,
       docId,
+      layerName,
       (jobId) =>
         wirePack({
           kind: 'actions.read' as const,
@@ -635,8 +690,16 @@ export class DocumentService {
     layerName: string,
     currentVersion: number,
     password: string | null = null,
+    opts: { forWrite?: boolean } = {},
   ): Promise<void> {
     const key = layerSessionKey(docId, layerName);
+    // Write alignment records the engine generation the aligned session
+    // lives under — the datum advanceLayerSession later compares against
+    // the then-current generation to refuse blessing a session that was
+    // recreated on a NEW engine after this one died mid-commit.
+    const recordAlignment = () => {
+      if (opts.forWrite) this.writeAlignGens.set(key, this.pool.generationFor(docId));
+    };
     const row = await this.requireReadyRow(ctx, docId);
     // Authorization must happen before the layer-session freshness cache
     // can return. A fresh worker session belongs to the document, not to
@@ -645,8 +708,12 @@ export class DocumentService {
     // Let any in-flight open/reload settle before judging freshness.
     const existing = this.layerOpens.get(key);
     if (existing) await existing.catch(() => undefined);
-    if (this.layerSessionVersions.get(key) === currentVersion) return;
+    if (this.layerSessionVersions.get(key) === currentVersion) {
+      recordAlignment();
+      return;
+    }
     await this.reloadLayerOnPool(ctx, docId, layerName, openPassword);
+    recordAlignment();
   }
 
   /** Mark a layer session stale: the next fresh-ensure reloads it. */
@@ -698,9 +765,23 @@ export class DocumentService {
    */
   advanceLayerSession(docId: string, layerName: string, version: number): void {
     const key = layerSessionKey(docId, layerName);
-    if (this.layerSessionVersions.has(key)) {
-      this.layerSessionVersions.set(key, version);
+    const alignedGen = this.writeAlignGens.get(key);
+    this.writeAlignGens.delete(key);
+    // Existing law: if the pool evicted the doc mid-commit, the worker
+    // session is gone and must not be resurrected as "fresh".
+    if (!this.layerSessionVersions.has(key)) return;
+    // Completed law (host mode): the session that APPLIED this write
+    // lived under `alignedGen`. If the engine has respawned since, any
+    // session that exists now was opened from the PRE-commit artifact —
+    // a reader recreating the entry must not get it blessed with the
+    // committed version. Invalidate; the next touch reloads at the new
+    // durable head. (Inline pool: generation is constant 0, this branch
+    // is unreachable, pre-host semantics bit-identical.)
+    if (alignedGen === undefined || alignedGen !== this.pool.generationFor(docId)) {
+      this.layerSessionVersions.delete(key);
+      return;
     }
+    this.layerSessionVersions.set(key, version);
   }
 
   /** Close-then-reopen a layer session at the current durable artifact. */
@@ -763,7 +844,7 @@ export class DocumentService {
         docId,
         ...(layerName !== undefined ? { layerName } : {}),
       });
-    const result = await this.pool.run(docId, build, signal);
+    const result = await this.readOnPool(ctx, docId, layerName, build, signal);
     if (result.tag !== 'metadata.read') {
       throw new EngineError(
         EngineErrorCode.WireFormat,
@@ -998,15 +1079,21 @@ export class DocumentService {
     mode: 'any' | 'owner',
     layerName?: string,
   ): Promise<{ probe: DocumentSecurityProbeInfo; facts: PasswordSessionFacts }> {
-    const result = await this.pool.run(row.id, (jobId) =>
-      wirePack({
-        kind: 'document.checkPasswordPermissions' as const,
-        jobId,
-        docId: row.id,
-        ...(layerName !== undefined ? { layerName } : {}),
-        password,
-        mode,
-      }),
+    const result = await runReadWithReopen(
+      // Re-establish the canonical session WITH the supplied password —
+      // the explicit-password bootstrap path — then re-check.
+      () => this.openOnPool(ctx, row.id, password),
+      () =>
+        this.pool.run(row.id, (jobId) =>
+          wirePack({
+            kind: 'document.checkPasswordPermissions' as const,
+            jobId,
+            docId: row.id,
+            ...(layerName !== undefined ? { layerName } : {}),
+            password,
+            mode,
+          }),
+        ),
     );
     if (result.tag !== 'document.checkPasswordPermissions') {
       throw new EngineError(
@@ -1251,7 +1338,7 @@ export class DocumentService {
           mode,
           path,
         });
-      const result = await this.pool.run(docId, build, signal);
+      const result = await this.readOnPool(ctx, docId, layerName, build, signal);
       if (result.tag !== 'document.saveFile') {
         throw new EngineError(EngineErrorCode.WireFormat, `unexpected save payload: ${result.tag}`);
       }
@@ -1284,7 +1371,52 @@ export class DocumentService {
   }
 
   /**
-   * Pool-eviction callback. Wired into `WorkerThreadPool.onEvict`;
+   * The engine host died: every worker session, materialization, and
+   * pinned handle it embodied is gone. Drop the engine-plane CACHES; the
+   * next request lazily rebuilds from durable truth (DB + object store),
+   * which the write-generation fence makes correct by construction.
+   *
+   * Deliberately untouched:
+   *  - `opens` / `layerOpens`: their in-flight promises are rejecting
+   *    right now and their own settle paths remove their own entries —
+   *    clearing here would ABA-delete a NEXT flight that reused the key.
+   *  - `layerWritesInFlight`: the durable-commit window is API-side work
+   *    that SURVIVES host death; readers must keep parking behind it
+   *    until the owning pipeline settles it (it always settles).
+   *  - `writeAlignGens`: the stale generation is the datum that lets
+   *    `advanceLayerSession` refuse to bless a recreated session.
+   */
+  onHostRestart(scope?: { docIds: ReadonlySet<string> }): void {
+    if (scope === undefined) {
+      // Full clear — the K=1 path and the always-safe fallback.
+      this.heads.clear();
+      this.layerSessionVersions.clear();
+      this.releaseAllBaseHandles();
+      return;
+    }
+    // Scoped by shard: one shard died — forget exactly its residents, and
+    // touch exactly what the full clear touches, nothing more. `opens`/
+    // `layerOpens` settle via compare-and-delete (clearing them re-opens
+    // the ABA window); `layerWritesInFlight` is API-side write state;
+    // `writeAlignGens` stays — the fence fails CLOSED on a missing entry,
+    // so leaving it is discipline, not necessity. Deliberately NOT
+    // `forgetLayerSessions()`: that is evict-path behavior and deletes
+    // `layerOpens`.
+    for (const docId of scope.docIds) {
+      this.heads.delete(docId);
+      this.releaseBaseHandle(docId);
+      const prefix = `${docId}::`;
+      for (const key of Array.from(this.layerSessionVersions.keys())) {
+        if (key.startsWith(prefix)) this.layerSessionVersions.delete(key);
+      }
+      for (const key of Array.from(this.layerArtifactHandles.keys())) {
+        if (key.startsWith(prefix)) this.releaseLayerArtifactHandle(key);
+      }
+    }
+  }
+
+  /**
+   * Pool-eviction callback. Wired into `EnginePool.onEvict`;
    * when the pool drops a doc from a slot, the cached head is no
    * longer authoritative (the next request must trigger a re-open).
    */
@@ -1326,7 +1458,7 @@ export class DocumentService {
         docId,
         ...(layerName !== undefined ? { layerName } : {}),
       });
-    const payload = await this.pool.run(docId, build, signal);
+    const payload = await this.readOnPool(ctx, docId, layerName, build, signal);
     if (payload.tag !== 'attachments.list') {
       throw new EngineError(
         EngineErrorCode.WireFormat,
@@ -1397,7 +1529,13 @@ export class DocumentService {
       // Attachment bytes use the file-backed extraction mode so the decoded
       // payload never crosses the worker boundary as an ArrayBuffer; Fastify
       // streams this completed temp file with backpressure.
-      const payload = await this.pool.run(docId, (jobId) => buildFor(jobId, path), signal);
+      const payload = await this.readOnPool(
+        ctx,
+        docId,
+        layerName,
+        (jobId) => buildFor(jobId, path),
+        signal,
+      );
       if (payload.tag !== 'attachments.readFile' && payload.tag !== 'annotations.readFile') {
         throw new EngineError(
           EngineErrorCode.WireFormat,
@@ -1468,10 +1606,10 @@ export class DocumentService {
     };
   }
 
-  private async loadDurableBasePageStates(docId: string): Promise<PageState[]> {
+  private async loadDurableBasePageStates(ctx: OpenContext, docId: string): Promise<PageState[]> {
     const annotationsBuild = (jobId: WorkerJobId) =>
       wirePack({ kind: 'annotations.listRawAll' as const, jobId, docId });
-    const annotationsResult = await this.pool.run(docId, annotationsBuild);
+    const annotationsResult = await this.readOnPool(ctx, docId, undefined, annotationsBuild);
     if (annotationsResult.tag !== 'annotations.listRawAll') {
       throw new EngineError(
         EngineErrorCode.WireFormat,
@@ -1521,6 +1659,7 @@ export class DocumentService {
     };
     try {
       const result = await this.pool.run(docId, build);
+      if (this.counters) this.counters.docOpens += 1;
       if (result.tag !== 'open') {
         throw new EngineError(
           EngineErrorCode.WireFormat,
@@ -1653,7 +1792,7 @@ function buildHead(row: DocumentRow, cdnAccessRequired: boolean): DocumentHead {
     access: {
       required: reasons.length > 0,
       reasons,
-      ...(reasons.length > 0 ? { endpoint: '/v1/access' } : {}),
+      ...(reasons.length > 0 ? { endpoint: wirePaths.access(row.id) } : {}),
     },
   };
 }

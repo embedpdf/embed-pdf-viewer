@@ -1,0 +1,63 @@
+{{- $cfg := .Values.config | default dict -}}
+{{- $driver := (get $cfg "CLOUDPDF_DB_DRIVER") | default "sqlite" -}}
+{{- $fullname := include "cloudpdf-server.fullname" . -}}
+CloudPDF server {{ .Chart.AppVersion }} deployed as {{ $fullname }} ({{ $driver }} profile).
+
+Reach it:
+{{- if .Values.ingress.enabled }}
+{{- range .Values.ingress.hosts }}
+  https://{{ .host }}
+{{- end }}
+{{- else }}
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ $fullname }} 3000:{{ .Values.service.port }}
+  curl localhost:3000/readyz
+{{- end }}
+
+Verify:
+  helm test {{ .Release.Name }} -n {{ .Release.Namespace }}
+  kubectl -n {{ .Release.Namespace }} get pods -l app.kubernetes.io/instance={{ .Release.Name }}
+
+{{- if and (eq $driver "sqlite") (not .Values.persistence.enabled) }}
+
+!! DATA IS EPHEMERAL: this install runs SQLite + local objects on an
+!! emptyDir — every pod restart erases all documents. For anything
+!! beyond a quick evaluation set `persistence.enabled=true`
+!! (values-sqlite.yaml) or move to the Postgres + object-storage
+!! profile: https://www.cloudpdf.com/docs/server/deployment/helm
+{{- end }}
+{{- if and (eq $driver "postgres") (not .Values.migrations.enabled) (not (hasKey $cfg "CLOUDPDF_AUTO_MIGRATE")) }}
+
+!! MIGRATIONS UNMANAGED: Postgres profile without `migrations.enabled`
+!! and without config.CLOUDPDF_AUTO_MIGRATE — pods will neither migrate
+!! nor refuse a stale schema. Recommended: `migrations.enabled=true`
+!! (pre-upgrade hook Job; pods then enforce FAIL_ON_PENDING), or run
+!! `migrate up` in your own pipeline and set CLOUDPDF_FAIL_ON_PENDING=1.
+{{- end }}
+{{- if .Values.migrations.enabled }}
+
+Migrations run as a pre-install/pre-upgrade hook Job before pods roll;
+app pods enforce CLOUDPDF_AUTO_MIGRATE=0 + CLOUDPDF_FAIL_ON_PENDING=1.
+A failed migrate Job is kept for inspection:
+  kubectl -n {{ .Release.Namespace }} logs job/{{ $fullname }}-migrate
+{{- end }}
+{{- if and .Values.docAffinity.enabled (eq .Values.docAffinity.key "uri") }}
+
+NOTE: docAffinity key=uri relies on an ingress-nginx
+configuration-snippet; many managed controllers ship
+allow-snippet-annotations=false, which silently disables it. Prefer
+key=header once your SDKs send {{ .Values.docAffinity.header }}.
+{{- end }}
+{{- if .Values.metrics.enabled }}
+
+/metrics is enabled and UNAUTHENTICATED — scrape it inside the
+cluster and keep it off any public Ingress path (pair with
+networkPolicy).
+{{- end }}
+{{- if not .Values.existingSecret }}
+{{- if not .Values.secrets }}
+
+!! NO SECRETS CONFIGURED: the server is running on its insecure dev
+!! JWT secret. Create a Secret with CLOUDPDF_JWT_SECRET (and your DB /
+!! storage / license credentials) and set `existingSecret`.
+{{- end }}
+{{- end }}

@@ -29,6 +29,18 @@ export interface HttpClientOptions {
   sessionId?: string;
   /** Replace the global fetch (e.g. in Node tests with undici). */
   fetch?: typeof globalThis.fetch;
+  /**
+   * Document affinity (opt-in; requires a server whose CORS
+   * allowlist includes the header): send `X-CloudPDF-Doc` on
+   * origin-bound doc requests so consistent-hash load balancers pin a
+   * document's traffic to one warm replica. Derived from the request
+   * path (`/v1/docs/:docId/…` — the same extraction the Helm chart's
+   * uri-mode fallback uses); never sent on CDN-rewritten requests.
+   */
+  docAffinityHeader?: boolean;
+  /** Observability: fired once per transport-level retry (engine busy /
+   *  restarting). Lets apps count sheds without wrapping every call. */
+  onRetry?: (info: { path: string; code: string; attempt: number; waitMs: number }) => void;
 }
 
 /**
@@ -62,6 +74,12 @@ export class HttpClient {
   private readonly base: string;
   private readonly tokenFn: (() => string | Promise<string>) | null;
   private readonly fetchFn: typeof globalThis.fetch;
+  private readonly docAffinityHeader: boolean;
+  private readonly onRetry: HttpClientOptions['onRetry'];
+
+  private static readonly MAX_RETRIES = 2;
+  private static readonly RETRY_AFTER_CAP_MS = 5_000;
+  private static readonly RETRY_AFTER_DEFAULT_MS = 1_000;
   private readonly sessionId: string | null;
   private cdnBinding: CdnBinding | null = null;
 
@@ -71,6 +89,8 @@ export class HttpClient {
     this.tokenFn = token === undefined ? null : typeof token === 'function' ? token : () => token;
     this.sessionId = opts.sessionId ?? null;
     this.fetchFn = opts.fetch ?? globalThis.fetch.bind(globalThis);
+    this.docAffinityHeader = opts.docAffinityHeader ?? false;
+    this.onRetry = opts.onRetry;
   }
 
   /** Normalized server base URL (no trailing slash). */
@@ -398,7 +418,7 @@ export class HttpClient {
   }
 
   private async request(path: string, init: RequestInit): Promise<Response> {
-    const { url, extraHeader } = this.resolveOutgoing(path);
+    const { url, extraHeader, routedToCdn } = this.resolveOutgoing(path);
     const headers = new Headers(init.headers ?? {});
     if (this.tokenFn) {
       const token = await this.tokenFn();
@@ -407,8 +427,42 @@ export class HttpClient {
     if (!headers.has('Accept')) headers.set('Accept', 'application/json');
     if (this.sessionId) headers.set('X-Engine-Session-Id', this.sessionId);
     if (extraHeader) headers.set(extraHeader.name, extraHeader.value);
+    // Document affinity key: origin-bound doc requests only (a CDN GET is a
+    // "simple" request today — a custom header would create preflights
+    // for zero routing value). Same extraction as the chart's uri-mode
+    // regex, so the header tier and the ingress fallback cannot disagree.
+    if (this.docAffinityHeader && !routedToCdn) {
+      const doc = /^\/v1\/docs\/([^/]+)\//.exec(path);
+      if (doc) headers.set('X-CloudPDF-Doc', decodeURIComponent(doc[1]!));
+    }
+    // Code-keyed backpressure retry: ONLY our own 503s (`EngineBusy` =
+    // shed before dispatch, `EngineRestarting` = the apply never landed)
+    // — both mean NOTHING HAPPENED, so retrying is method-agnostic-safe,
+    // mutations included. A foreign 503 keeps today's semantics.
+    for (let attempt = 0; ; attempt++) {
+      const res = await this.execute(url, { ...init, headers });
+      if (
+        res.status !== 503 ||
+        attempt >= HttpClient.MAX_RETRIES ||
+        isStreamBody(init.body ?? null)
+      ) {
+        return res;
+      }
+      const code = await peekErrorCode(res);
+      if (code === null || !RETRYABLE_503.has(code)) return res;
+      const hinted = Number(res.headers.get('retry-after'));
+      const base = Number.isFinite(hinted)
+        ? Math.min(Math.max(hinted, 0) * 1000, HttpClient.RETRY_AFTER_CAP_MS)
+        : HttpClient.RETRY_AFTER_DEFAULT_MS;
+      const waitMs = base * (0.9 + 0.2 * Math.random());
+      this.onRetry?.({ path, code, attempt, waitMs });
+      await sleepRacingAbort(waitMs, init.signal ?? null);
+    }
+  }
+
+  private async execute(url: string, init: RequestInit): Promise<Response> {
     try {
-      return await this.fetchFn(url, { ...init, headers });
+      return await this.fetchFn(url, init);
     } catch (err) {
       // undici's fetch propagates whatever was passed to AbortController.abort().
       // Anything that arrives while signal.aborted is true is an abort, regardless
@@ -455,9 +509,10 @@ export class HttpClient {
   private resolveOutgoing(path: string): {
     url: string;
     extraHeader: { name: string; value: string } | null;
+    routedToCdn: boolean;
   } {
     if (!this.cdnBinding || !this.cdnBinding.cdn) {
-      return { url: `${this.baseUrl}${path}`, extraHeader: null };
+      return { url: `${this.baseUrl}${path}`, extraHeader: null, routedToCdn: false };
     }
     const applied = applyCdnAccess({
       path,
@@ -469,6 +524,7 @@ export class HttpClient {
     return {
       url: applied.url,
       extraHeader: applied.routedToCdn && applied.authHeader ? applied.authHeader : null,
+      routedToCdn: applied.routedToCdn,
     };
   }
 
@@ -508,4 +564,39 @@ function mapStatusToCode(status: number): EngineErrorCode {
 function trySerialized(value: unknown): SerializedEngineError | null {
   const result = EngineErrorPayloadSchema.safeParse(value);
   return result.success ? result.data : null;
+}
+
+const RETRYABLE_503 = new Set(['EngineBusy', 'EngineRestarting']);
+
+function isStreamBody(body: BodyInit | null): boolean {
+  return typeof ReadableStream !== 'undefined' && body instanceof ReadableStream;
+}
+
+/** Read the error code from a 503 body without consuming the response. */
+async function peekErrorCode(res: Response): Promise<string | null> {
+  try {
+    const payload = (await res.clone().json()) as { error?: { code?: unknown } } | null;
+    const code = payload?.error?.code;
+    return typeof code === 'string' ? code : null;
+  } catch {
+    return null;
+  }
+}
+
+function sleepRacingAbort(ms: number, signal: AbortSignal | null): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new AbortError(signal.reason ?? 'aborted'));
+      return;
+    }
+    const timer = setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort);
+      resolve();
+    }, ms);
+    const onAbort = (): void => {
+      clearTimeout(timer);
+      reject(new AbortError(signal?.reason ?? 'aborted'));
+    };
+    signal?.addEventListener('abort', onAbort, { once: true });
+  });
 }

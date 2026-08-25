@@ -20,8 +20,11 @@ One secret signs and verifies every token:
 CLOUDPDF_JWT_SECRET=a-long-random-string
 ```
 
-This is the single required setting. The server uses HS256, so the **same**
-secret must be configured on the server and used by your backend to sign tokens.
+Under a production license this is required (at least 32 bytes; the server
+refuses publicly-known dev fallbacks). The server uses HS256, so the **same**
+secret must be configured on the server and used by your backend to sign
+tokens. Development license keys allow a built-in dev fallback — with a loud
+warning — so local try-outs boot with zero configuration.
 
 ```sh
 # Generate a strong secret
@@ -66,10 +69,80 @@ Frontend (@cloudpdf/engine)  ──Authorization: Bearer <JWT>──▶  CloudPD
    token on every request.
 4. The server verifies the signature and scope, then serves the request.
 
+## API tokens (server-to-server)
+
+For trusted backends, CI, and operational tooling there is a second
+credential: **static API tokens**, configured as a comma-separated list:
+
+```sh
+CLOUDPDF_API_AUTH_TOKENS="$(openssl rand -hex 32)"
+```
+
+An API token is a root credential for the admin plane
+(`/v1/tenants/...` — uploads, listing, minting and revoking tokens, deployment
+status). It is what the quick start's `curl` calls use, and what you'd give a
+backfill script. Treat it like a database password: server-side only, never in
+a browser, at least 32 bytes under a production license. Document-plane routes
+still require document-scoped JWTs — an API token deliberately does not
+replace the per-document token flow.
+
+## Encrypted-PDF secrets
+
+Two further server-side secrets exist, and they are easy to miss because they
+have nothing to do with authenticating your API: they protect what the server
+remembers **after a user unlocks a password-protected PDF**.
+
+| Variable | What it protects | Required when |
+| --- | --- | --- |
+| `CLOUDPDF_PASSWORD_VERIFICATION_HMAC_SECRET` | The password-verification cache | Always, under a non-development license |
+| `CLOUDPDF_PASSWORD_SESSION_SERVER_SECRET` | Encrypted-PDF unlock sessions | Under a non-development license, when a [KMS](/docs/server/configuration/adapters) is configured |
+
+### The verification secret
+
+Checking a PDF password is expensive, and the answer — which permissions that
+password unlocks — is worth caching. The server never stores the password
+itself: it stores an **HMAC proof** of it, keyed by this secret. The secret is
+the pepper that keeps those proofs non-reversible. With a weak or
+publicly-known value, a leaked database becomes an offline dictionary attack
+against your customers' document passwords, which is why the server refuses to
+boot without a strong one under a production license — even if you never open
+an encrypted PDF.
+
+Rotating it is safe: existing proofs stop matching and are simply re-verified
+on next use. It is a cache, not a source of truth.
+
+### The session secret
+
+When a viewer unlocks an encrypted document, the server can keep that unlock
+alive for the session instead of prompting on every request. This secret signs
+the session renewal grants and feeds the key derivation that protects the
+stored unlock key — together with your KMS, which is why it is only used, and
+only enforced, when one is configured.
+
+`CLOUDPDF_PASSWORD_SESSION_SERVER_SECRET_ID` (default `dev-v1`) labels the
+active secret and is recorded on every session. Changing either the secret or
+its id invalidates existing sessions: viewers re-enter their password once.
+
+Generate both the same way as the JWT secret:
+
+```sh
+openssl rand -hex 32
+```
+
+<Callout type="info">
+  A <strong>development</strong> license lets all three secrets fall back to
+  publicly-known dev values, so local runs need no configuration. Every other
+  license kind requires real ones of at least 32 bytes and the server
+  <strong>fails closed at boot</strong> — the error names the exact variable to
+  set. See <a href="/docs/server/configuration/licensing">Licensing</a>.
+</Callout>
+
 ## Minting a token
 
 Use any JWT library. The token is signed with `CLOUDPDF_JWT_SECRET` and carries
-the document scope your server expects:
+the document scope your server expects. (For local experiments, the npm
+package exports a `signDevToken` helper that produces a correctly-shaped
+token in one call.)
 
 ```ts
 import { SignJWT } from 'jose';
