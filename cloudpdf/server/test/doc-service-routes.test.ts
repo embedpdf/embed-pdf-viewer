@@ -260,7 +260,7 @@ describe('Phase 3 doc routes — GET /v1/docs/:docId/head', () => {
       access: {
         required: true,
         reasons: ['permissions-unknown'],
-        endpoint: `/v1/docs/${docId}/access`,
+        endpoint: `/v1/docs/${docId}/layers/default/access`,
       },
     });
   });
@@ -508,7 +508,7 @@ describe('Phase 3 doc routes — POST /v1/warm', () => {
   });
 });
 
-describe('access route — doc-scoped path with document affinity', () => {
+describe('access route — layer-tier path with document affinity', () => {
   let fx: Fixture;
   beforeEach(async () => {
     fx = await buildFixture();
@@ -536,9 +536,9 @@ describe('access route — doc-scoped path with document affinity', () => {
     'Content-Type': 'application/json',
   });
 
-  test('the path carries the docId — no body docId needed (the affinity tier routes on the URL)', async () => {
+  test('the path carries doc AND layer — no body identity needed (the affinity tier routes on the URL)', async () => {
     await seedPlain('tenant-acc2', 'docacc201');
-    const res = await fetch(`${fx.baseUrl}/v1/docs/docacc201/access`, {
+    const res = await fetch(`${fx.baseUrl}/v1/docs/docacc201/layers/default/access`, {
       method: 'POST',
       headers: auth('tenant-acc2', 'docacc201'),
       body: JSON.stringify({ layerName: 'default' }),
@@ -550,13 +550,34 @@ describe('access route — doc-scoped path with document affinity', () => {
 
   test('path/body docId mismatch is malformed, never a silent preference', async () => {
     await seedPlain('tenant-acc2', 'docacc202');
-    const res = await fetch(`${fx.baseUrl}/v1/docs/docacc202/access`, {
+    const res = await fetch(`${fx.baseUrl}/v1/docs/docacc202/layers/default/access`, {
       method: 'POST',
       headers: auth('tenant-acc2', 'docacc202'),
       body: JSON.stringify({ docId: 'docacc999', layerName: 'default' }),
     });
     expect(res.status).toBe(400);
     expect(await res.text()).toContain('mismatch');
+  });
+
+  test('path/body LAYER mismatch is equally malformed', async () => {
+    await seedPlain('tenant-acc2', 'docacc204');
+    const res = await fetch(`${fx.baseUrl}/v1/docs/docacc204/layers/default/access`, {
+      method: 'POST',
+      headers: auth('tenant-acc2', 'docacc204'),
+      body: JSON.stringify({ layerName: 'other' }),
+    });
+    expect(res.status).toBe(400);
+    expect(await res.text()).toContain('layer mismatch');
+  });
+
+  test('the doc-tier alias (2026-08-26 prerelease builds) still works, layer from body/default', async () => {
+    await seedPlain('tenant-acc2', 'docacc205');
+    const res = await fetch(`${fx.baseUrl}/v1/docs/docacc205/access`, {
+      method: 'POST',
+      headers: auth('tenant-acc2', 'docacc205'),
+      body: JSON.stringify({ layerName: 'default', mode: 'any' }),
+    });
+    expect(res.status).toBe(200);
   });
 
   test('the legacy alias still needs a body docId', async () => {

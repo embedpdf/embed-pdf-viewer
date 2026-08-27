@@ -717,7 +717,11 @@ function fallbackUnknownHead(id: string): DocumentHead {
       securityHandlerRevision: null,
       canUpgradeToOwner: false,
     },
-    access: { required: true, reasons: ['permissions-unknown'], endpoint: wirePaths.access(id) },
+    access: {
+      required: true,
+      reasons: ['permissions-unknown'],
+      endpoint: wirePaths.access(id, DEFAULT_LAYER_NAME),
+    },
   };
 }
 

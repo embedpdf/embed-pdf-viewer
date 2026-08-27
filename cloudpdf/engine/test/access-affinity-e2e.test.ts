@@ -57,7 +57,7 @@ describe('doc-scoped access + affinity header (real server)', () => {
     const accessCall = seen.find((c) => c.url.endsWith('/access'));
     expect(accessCall).toBeDefined();
     // The NEW grammar: docId in the path, no legacy /v1/access.
-    expect(accessCall!.url).toContain(`/v1/docs/${DOC_ID}/access`);
+    expect(accessCall!.url).toContain(`/v1/docs/${DOC_ID}/layers/default/access`);
     // And the affinity key rides it — the session bootstrap pins to the
     // document's pod from the very first request.
     expect(accessCall!.doc).toBe(DOC_ID);

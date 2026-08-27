@@ -157,9 +157,11 @@ With several replicas, `docAffinity.enabled: true` renders a second Ingress
 that consistent-hashes `/v1/docs` traffic so one document's requests land on
 one warm replica. Two modes:
 
-- `key: header` (preferred, portable): hashes the `X-CloudPDF-Doc` header —
-  sent by SDKs with `cloudEngine({ docAffinityHeader: true })` against a
-  server from the same release.
+- `key: header` (preferred, portable): hashes the `X-CloudPDF-Doc` header,
+  which SDKs from this release send automatically (the server's CORS
+  allowlist includes it from the same release; `docAffinityHeader: false`
+  exists as an escape hatch for stale servers or proxies that reject
+  unknown headers).
 - `key: uri` (nginx-only): extracts the document id from the path via a
   `configuration-snippet` — note that many managed controllers ship
   `allow-snippet-annotations=false`, which silently disables it.
