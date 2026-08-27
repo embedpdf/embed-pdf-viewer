@@ -180,6 +180,43 @@ export function runAdminE2e(dialect: AdminE2eDialectFixture): void {
       ).rejects.toMatchObject({ status: 409 });
     });
 
+    test('an explicit docId collision is a 409 with guidance, never a raw 500', async () => {
+      const admin = createCloudAdmin({
+        baseUrl: fx.baseUrl,
+        tenantToken: adminToken('tenant-dup-id'),
+      }).tenant('tenant-dup-id');
+      const docId = 'dup-doc-1';
+      await admin.documents.create({ bytes: fakePdf(30, 1024), docId });
+
+      // Naive retry: same docId, no idempotency key.
+      await expect(
+        admin.documents.create({ bytes: fakePdf(30, 1024), docId }),
+      ).rejects.toMatchObject({ status: 409 });
+
+      // The classic client mistake: a FRESH key per attempt. Still a
+      // clean 409 — the key lookup misses, the pkey collision must not
+      // escape as a driver error.
+      await expect(
+        admin.documents.create({ bytes: fakePdf(30, 1024), docId, idempotencyKey: 'attempt-2' }),
+      ).rejects.toMatchObject({ status: 409 });
+    });
+
+    test('a docId owned by another tenant answers 403 on create', async () => {
+      const a = createCloudAdmin({
+        baseUrl: fx.baseUrl,
+        tenantToken: adminToken('tenant-dup-a'),
+      }).tenant('tenant-dup-a');
+      const b = createCloudAdmin({
+        baseUrl: fx.baseUrl,
+        tenantToken: adminToken('tenant-dup-b'),
+      }).tenant('tenant-dup-b');
+      const docId = 'cross-tenant-doc-1';
+      await a.documents.create({ bytes: fakePdf(31, 1024), docId });
+      await expect(b.documents.create({ bytes: fakePdf(32, 1024), docId })).rejects.toMatchObject({
+        status: 403,
+      });
+    });
+
     test('dedupMode reuse-existing returns the prior doc when content sha matches', async () => {
       const admin = createCloudAdmin({
         baseUrl: fx.baseUrl,

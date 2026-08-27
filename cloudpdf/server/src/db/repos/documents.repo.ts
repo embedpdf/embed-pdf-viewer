@@ -137,6 +137,31 @@ export class DocumentsRepo {
         const existing = await this.findByIdempotencyKey(input.tenantId, input.idempotencyKey);
         if (existing) return { row: existing, created: false };
       }
+      if (isUniqueViolation(err)) {
+        // The remaining unique surface is the PRIMARY KEY: the caller
+        // reused an explicit docId — a double submit, a retry without
+        // an idempotencyKey, or a fresh key minted per attempt. That
+        // is a client error with a clear remedy, never a raw driver
+        // 500. docId is identity of the RECORD, not of the operation:
+        // resume is asked for with a stable idempotencyKey, so an
+        // accidental id reuse must surface, not silently fold.
+        const taken = await this.findById(input.id);
+        if (taken) {
+          if (taken.tenantId !== input.tenantId) {
+            // Ids are global; existence across the tenant boundary
+            // answers 403, mirroring the delete() convention.
+            throwError('Forbidden', `document does not belong to tenant: ${input.id}`);
+          }
+          const e = new Error(
+            `document '${input.id}' already exists (state: ${taken.state}). ` +
+              `To resume an interrupted upload or import, retry with the same idempotencyKey it was created with; ` +
+              `to replace it, delete the document first; to create a new document, use a different docId or omit it.`,
+          ) as Error & { code: string; status: number };
+          e.code = 'Conflict';
+          e.status = 409;
+          throw e;
+        }
+      }
       throw err;
     }
     const row = await this.findById(input.id);

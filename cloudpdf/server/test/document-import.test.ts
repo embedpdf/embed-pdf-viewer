@@ -286,6 +286,25 @@ describe('documents.importFrom E2E', () => {
     expect(res.body).toContain('expected.sha256');
   });
 
+  test('re-importing an existing docId without an idempotencyKey is an actionable 409', async () => {
+    const first = await importDoc({
+      source: { kind: 'url', url: srcUrl('/ok') },
+      docId: 'imp-dup-id',
+    });
+    expect(first.statusCode, first.body).toBe(200);
+
+    const retry = await importDoc({
+      source: { kind: 'url', url: srcUrl('/ok') },
+      docId: 'imp-dup-id',
+    });
+    expect(retry.statusCode, retry.body).toBe(409);
+    const body = JSON.parse(retry.body) as { error: { code: string; message: string } };
+    expect(body.error.code).toBe('Conflict');
+    expect(body.error.message).toContain("document 'imp-dup-id' already exists");
+    expect(body.error.message).toContain('idempotencyKey');
+    expect(body.error.message).not.toContain('constraint');
+  });
+
   test('a malformed body is a 400 with the schema error envelope', async () => {
     const res = await importDoc({ source: { kind: 'ftp', url: 'x' } });
     expect(res.statusCode, res.body).toBe(400);
