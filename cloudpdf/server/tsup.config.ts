@@ -5,6 +5,7 @@ export default defineConfig({
     index: 'src/index.ts',
     'bin/cloudpdf-server': 'src/bin/cloudpdf-server.ts',
     'runtime/worker-entry': 'src/runtime/worker-entry.ts',
+    'runtime/engine-host-entry': 'src/runtime/engine-host-entry.ts',
   },
   format: ['esm'],
   target: 'node20',

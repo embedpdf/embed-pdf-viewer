@@ -236,10 +236,13 @@ export interface SelectionHostCapability extends SelectionCapability {
   /** Begin a caret selection at a page point. Returns false if not near any
    *  text — the caller deselects instead of capturing. */
   beginAt(pon: PageObjectNumber, point: Point): boolean;
-  /** Double-click: select the word around the point. */
-  selectWordAt(pon: PageObjectNumber, point: Point): void;
-  /** Triple-click: select the whole visual line around the point. */
-  selectLineAt(pon: PageObjectNumber, point: Point): void;
+  /** Double-click / touch long-press: select the word around the point.
+   *  Returns false when the point has no selectable text (geometry not
+   *  loaded, or no glyph there) — nothing was selected. */
+  selectWordAt(pon: PageObjectNumber, point: Point): boolean;
+  /** Triple-click: select the whole visual line around the point. Same
+   *  success contract as {@link selectWordAt}. */
+  selectLineAt(pon: PageObjectNumber, point: Point): boolean;
   /** Extend the current selection to a page point (drag). */
   extendTo(pon: PageObjectNumber, point: Point): void;
   /** The gesture ended (pointer-up) → notify `onCommit` consumers. */

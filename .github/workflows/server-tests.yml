@@ -1,0 +1,95 @@
+name: Server Test Matrix
+
+# The FULL @cloudpdf/server suite across all three engine topologies:
+# inline (worker threads in-process), host (supervised child process),
+# and host with K=2 shards. Until this workflow existed, CI ran only
+# test/licensing.test.ts; isolation, scheduling, recycling, and sharding
+# had no full-suite CI coverage.
+#
+# Needs the native engine runtime (the encode-in-engine and boundary
+# suites exercise real PDFium + sharp), so it reuses the same
+# build-runtime artifacts as engine-conformance.
+
+on:
+  pull_request:
+    paths:
+      - 'packages/engine/**'
+      - 'cloudpdf/server/**'
+      - '.github/workflows/server-tests.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'packages/engine/**'
+      - 'cloudpdf/server/**'
+      - '.github/workflows/server-tests.yml'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: server-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: true
+
+jobs:
+  build-runtime:
+    uses: ./.github/workflows/build-engine-runtime.yml
+    secrets: inherit
+
+  suite:
+    name: ${{ matrix.leg.name }}
+    needs: build-runtime
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        leg:
+          - { name: inline, env: '' }
+          - { name: host, env: 'CLOUDPDF_TEST_ISOLATION=host' }
+          - { name: 'host K=2', env: 'CLOUDPDF_TEST_ISOLATION=host CLOUDPDF_TEST_SHARDS=2' }
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v5
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Download engine-runtime artifacts (linux-x64 + wasm32)
+        uses: actions/download-artifact@v7
+        with:
+          pattern: engine-runtime-*
+          path: packages/engine/runtime/_artifacts
+
+      - name: Stage runtime payloads
+        shell: bash
+        run: |
+          shopt -s nullglob
+          for dir in packages/engine/runtime/_artifacts/engine-runtime-*; do
+            target="${dir##*/engine-runtime-}"
+            mkdir -p "packages/engine/runtime/npm/$target"
+            cp -R "$dir/." "packages/engine/runtime/npm/$target/"
+          done
+          rm -rf packages/engine/runtime/_artifacts
+
+      # Every workspace dep the server consumes from dist, in dependency
+      # order (contract needs engine-core; the sdk is a test-time dep).
+      - name: Build workspace packages
+        run: |
+          pnpm --filter @embedpdf/engine-runtime build
+          pnpm --filter @embedpdf/engine-core build
+          pnpm --filter @embedpdf/engine-services build
+          pnpm --filter @cloudpdf/contract build
+          pnpm --filter @cloudpdf/sdk build
+          pnpm --filter @cloudpdf/server build
+
+      - name: Server suite (${{ matrix.leg.name }})
+        run: env ${{ matrix.leg.env }} pnpm --filter @cloudpdf/server exec vitest run

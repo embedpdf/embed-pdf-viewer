@@ -68,4 +68,30 @@ export default [
     plugins: [dts()],
     output: { file: `${DIST}/index.d.cts`, format: 'es' },
   },
+  // The side-effect-free build-identity subpath (node-only): version +
+  // resolved native target, importable without touching addon loading.
+  {
+    input: `${SRC}/build-id.ts`,
+    external: nodeExternal,
+    plugins: plugins(),
+    output: { file: `${DIST}/build-id.js`, format: 'esm', sourcemap: true },
+  },
+  {
+    input: `${SRC}/build-id.ts`,
+    external: nodeExternal,
+    plugins: [...plugins(), commonjs({ strictRequires: true })],
+    output: { file: `${DIST}/build-id.cjs`, format: 'cjs', exports: 'named', sourcemap: true },
+  },
+  {
+    input: `${SRC}/build-id.ts`,
+    external: nodeExternal,
+    plugins: [dts()],
+    output: { file: `${DIST}/build-id.d.ts`, format: 'es' },
+  },
+  {
+    input: `${SRC}/build-id.ts`,
+    external: nodeExternal,
+    plugins: [dts()],
+    output: { file: `${DIST}/build-id.d.cts`, format: 'es' },
+  },
 ];

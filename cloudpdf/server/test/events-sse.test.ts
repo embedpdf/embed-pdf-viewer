@@ -1,3 +1,4 @@
+import { connect } from 'node:net';
 import { createHash, randomBytes } from 'node:crypto';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -344,6 +345,105 @@ describe('GET /events — the SSE half of the document event stream', () => {
     );
     expect(after.status).toBe(200);
     expect(((await after.json()) as { auditHead: number }).auditHead).toBe(1);
+  });
+});
+
+describe('drain + readiness — shutdown ends streams instead of hanging on them', () => {
+  let fx: Fixture;
+
+  beforeEach(async () => {
+    fx = await buildFixture();
+  });
+
+  afterEach(async () => {
+    await tearDown(fx);
+  });
+
+  async function openStream(tenantId: string, docId: string, layerName: string) {
+    await seedDocument(fx, tenantId, docId, { pageCount: 1 });
+    const sse = new SseCollector();
+    await sse.open(
+      `${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/events`,
+      docToken(tenantId, docId, layerName),
+    );
+    return sse;
+  }
+
+  test('beginDrain flips /readyz to 503 and ends live SSE streams', async () => {
+    const sse = await openStream('tenant-drain', 'docdrain01', 'alice');
+
+    const before = await fetch(`${fx.baseUrl}/readyz`);
+    expect(before.status).toBe(200);
+
+    fx.bundle.beginDrain();
+
+    const after = await fetch(`${fx.baseUrl}/readyz`);
+    expect(after.status).toBe(503);
+    expect(((await after.json()) as { status: string }).status).toBe('draining');
+
+    // The server ended the hijacked stream deliberately (previously it
+    // lived until the client or the supervisor killed the socket).
+    await sse.waitForEnd();
+  });
+
+  test('shutdown() completes within its budget with a connected SSE viewer', async () => {
+    const sse = await openStream('tenant-drain2', 'docdrain02', 'alice');
+
+    // THE regression this feature exists for: with a live SSE socket,
+    // app.close() used to wait forever (heartbeats keep it alive) and
+    // the supervisor's SIGKILL preempted pool/cache teardown.
+    const started = Date.now();
+    await fx.bundle.shutdown();
+    expect(Date.now() - started).toBeLessThan(10_000);
+    await sse.waitForEnd();
+  });
+
+  test('teardown stays far inside the runner hook budget when a request is stuck', async () => {
+    // The defect this locks: buildApp's production `shutdownTimeoutMs`
+    // (30s — the budget real in-flight traffic gets before a supervisor
+    // kill) is EXACTLY vitest's `hookTimeout`, so one stuck connection
+    // at teardown consumed the entire hook budget and surfaced as
+    // "Hook timed out in 30000ms" — a phantom flake that looked like
+    // load. `buildAppForTesting` bounds it to 2s; if anyone restores the
+    // production default for tests, this test times out first and says
+    // why.
+    const port = Number(new URL(fx.baseUrl).port);
+    const socket = connect(port, '127.0.0.1');
+    await new Promise((resolve) => socket.once('connect', resolve));
+    // Headers promise 500 bytes of body; we send 5 and stop, so the
+    // request never completes and app.close() cannot settle on its own.
+    socket.write(
+      'POST /v1/docs/x/access HTTP/1.1\r\nHost: localhost\r\n' +
+        'Content-Type: application/json\r\nContent-Length: 500\r\n\r\n{"a":',
+    );
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    const started = Date.now();
+    await fx.bundle.shutdown();
+    const elapsed = Date.now() - started;
+    socket.destroy();
+    expect(elapsed).toBeLessThan(10_000);
+  });
+
+  test('a stream connecting mid-drain is ended immediately', async () => {
+    await seedDocument(fx, 'tenant-drain3', 'docdrain03', { pageCount: 1 });
+    fx.bundle.beginDrain();
+
+    const sse = new SseCollector();
+    await sse.open(
+      `${fx.baseUrl}/v1/docs/docdrain03/layers/alice/events`,
+      docToken('tenant-drain3', 'docdrain03', 'alice'),
+    );
+    await sse.waitForEnd(); // closed by the register-while-draining path
+  });
+
+  test('/readyz reports database unreadiness as 503', async () => {
+    await fx.db.destroy();
+    const res = await fetch(`${fx.baseUrl}/readyz`);
+    expect(res.status).toBe(503);
+    const body = (await res.json()) as { status: string; reasons?: string[] };
+    expect(body.status).toBe('unready');
+    expect(body.reasons).toContain('database');
   });
 });
 

@@ -578,14 +578,17 @@ export interface AnnotationHostCapability extends AnnotationCapability {
   /** Enter text-edit on a free-text annotation (focus its editable element). */
   beginTextEdit(ref: AnnotationRef): void;
   /** Enter text-edit on whatever free-text box is under a content point — wired
-   *  to a double-click by the interaction edit handler. */
+   *  to a double-click / long-press by the interaction edit handler. Returns
+   *  whether an editable free-text was actually found and opened; false lets
+   *  the caller fall through to a normal press (so a long-press on a highlight
+   *  selects it instead of being swallowed by a no-op edit attempt). */
   beginTextEditAt(
     pon: PageObjectNumber,
     point: Vec,
     scale?: number,
     rotation?: PageRotation,
     zoom?: number,
-  ): void;
+  ): boolean;
   /** Apply the editor's plain text — optimistic locally, debounced to the engine. */
   setContents(ref: AnnotationRef, text: string): void;
   /** Leave text-edit (flush any pending write). */
@@ -602,7 +605,25 @@ export interface AnnotationHostCapability extends AnnotationCapability {
     scale?: number,
     rotation?: PageRotation,
     zoom?: number,
+    /** Widen grab zones to finger-sized targets (pass `pointerType === 'touch'`). */
+    touch?: boolean,
   ): 'handle' | 'rotate' | 'group-handle' | 'annot' | 'empty';
+  /**
+   * TOUCH CONSENT (the interaction hub's `claimsTouch` predicate): should a
+   * finger landing here own a TOOL gesture instead of navigating? True over
+   * the selection's chrome (resize handles, rotate knob, group box) and over
+   * the body of an already-SELECTED, transformable annotation — never over an
+   * unselected one, so annotation-dense pages still scroll; tap-select first
+   * is the platform convention (Apple Markup). Uses finger-sized grab zones.
+   * Pure read.
+   */
+  claimsTouchAt(
+    pon: PageObjectNumber,
+    point: Vec,
+    scale?: number,
+    rotation?: PageRotation,
+    zoom?: number,
+  ): boolean;
   /** The cursor to show at a content point (resize over a handle, move/pointer over a body, else null). */
   cursorAt(
     pon: PageObjectNumber,
@@ -650,6 +671,10 @@ export interface AnnotationHostCapability extends AnnotationCapability {
     scale?: number,
     rotation?: PageRotation,
     zoom?: number,
+    /** Finger-sized grab zones for the gesture's own hit resolution — pass the
+     *  sample's `pointerType === 'touch'` so the gesture grabs exactly what
+     *  {@link claimsTouchAt} claimed. */
+    touch?: boolean,
   ): void;
   marqueePointer(
     phase: 'down' | 'move' | 'up',
@@ -766,4 +791,6 @@ export interface AnnotationHostCapability extends AnnotationCapability {
  * here (the package internals + the `/internal` entry use this view). The package
  * root re-exports the SAME token narrowed to {@link AnnotationCapability}.
  */
-export const AnnotationToken = createCapabilityToken<AnnotationHostCapability>('annotation');
+export const AnnotationToken = createCapabilityToken<AnnotationHostCapability>('annotation', {
+  hint: `add annotationPlugin() from '@embedpdf/plugin-annotation' to your plugins list`,
+});

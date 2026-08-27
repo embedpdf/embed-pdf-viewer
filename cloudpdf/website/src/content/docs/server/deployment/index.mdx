@@ -51,11 +51,13 @@ No matter how you deploy, the server needs:
 4. **Persistent volumes** for `/data` when you use SQLite, local storage, or the
    local cache.
 
-<Callout type="warn">
-  The native PDF runtime is thread-confined — a hard crash takes the whole
-  process down. For anything customer-facing, run <strong>more than one
-  replica</strong> (Compose or Helm) so a single failure can't take you offline.
-  Details in <a href="/docs/server/operations/health-and-scaling">Health &amp; scaling</a>.
+<Callout type="info">
+  For anything customer-facing: set
+  <code>CLOUDPDF_ENGINE_ISOLATION=host</code> so a native PDF crash costs a
+  sub-second engine respawn instead of the instance, and run <strong>more
+  than one replica</strong> (Compose or Helm) so a single failure can't take
+  you offline. Details in
+  <a href="/docs/server/operations/health-and-scaling">Health &amp; scaling</a>.
 </Callout>
 
 ## Pick your path

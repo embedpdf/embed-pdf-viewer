@@ -16,9 +16,25 @@ variables work whether you run it via [npm](/docs/server/deployment/npm),
 
 <Callout type="info">
   Only one variable is strictly required:
-  <strong><code>CLOUDPDF_JWT_SECRET</code></strong>. Everything else has a
-  sensible default, so a minimal server runs with just that.
+  <strong><code>CLOUDPDF_LICENSE_KEY</code></strong> (see
+  <a href="/docs/server/configuration/licensing">Licensing</a>). With a
+  development key, everything else has a sensible default — a minimal server
+  runs with just that. Any other license kind also requires
+  <code>CLOUDPDF_JWT_SECRET</code> and
+  <code>CLOUDPDF_PASSWORD_VERIFICATION_HMAC_SECRET</code> (plus
+  <code>CLOUDPDF_PASSWORD_SESSION_SERVER_SECRET</code> when a KMS is
+  configured) to be real random values of at least 32 bytes — the server fails
+  closed at boot and names the variable it needs.
 </Callout>
+
+## Licensing
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `CLOUDPDF_LICENSE_KEY` | — | **Required.** Your license key; `secret://` references resolve through the secrets providers. |
+| `CLOUDPDF_LICENSE_MODE` | `connected` when a key is set | `connected` or `air-gapped`. |
+
+See [Licensing](/docs/server/configuration/licensing).
 
 ## Process
 
@@ -28,13 +44,30 @@ variables work whether you run it via [npm](/docs/server/deployment/npm),
 | `HOST` | `0.0.0.0` | Interface to bind. |
 | `CLOUDPDF_WORKER_POOL_SIZE` | `min(2, cpus)` | Native PDFium worker threads. Integer, or `max` to use all cores. See [Health & scaling](/docs/server/operations/health-and-scaling). |
 
+## Engine plane
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `CLOUDPDF_ENGINE_ISOLATION` | `inline` | `host` runs PDFium in a supervised child process: a native crash costs a sub-second engine respawn instead of the instance. See [Health & scaling](/docs/server/operations/health-and-scaling). |
+| `CLOUDPDF_ENGINE_SHARDS` | `1` | Host mode: split the engine into K child processes (worker total must divide evenly). One crash costs 1/K of open documents. |
+| `CLOUDPDF_ENGINE_MAX_IN_FLIGHT` | workers × 2 | Admission cap on concurrently dispatched engine jobs; beyond the bounded queue the server sheds with `503` + `Retry-After`. |
+| `CLOUDPDF_ENGINE_BG_MAX_IN_FLIGHT` | ⌊workers / 2⌋ | Of the cap, how much background work (thumbnail warming) may occupy. `0` disables the background lane entirely. |
+| `CLOUDPDF_ENGINE_RECYCLE` | off | `1` opts into memory-watermark engine recycling (host mode). Companion knobs: `_RECYCLE_SOFT_PCT` (70), `_RECYCLE_HARD_PCT` (85), `CLOUDPDF_ENGINE_MAX_RSS_MB`, `CLOUDPDF_ENGINE_MAX_LIFETIME_HOURS`. |
+| `CLOUDPDF_ENCODE_IN_ENGINE` | on | `0` reverts image encoding to the API process (one-release escape hatch; rasters cross the engine boundary raw). |
+
 ## Authentication
 
 | Variable | Default | Description |
 | --- | --- | --- |
-| `CLOUDPDF_JWT_SECRET` | — | **Required in production.** HS256 secret used to verify document and admin tokens. Must match the secret your backend signs with. |
+| `CLOUDPDF_JWT_SECRET` | dev fallback | HS256 secret used to verify document and admin tokens. Must match the secret your backend signs with. **Required (≥32 bytes) under a production license**; development keys fall back to a public dev value with a warning. |
+| `CLOUDPDF_API_AUTH_TOKENS` | — | Comma-separated static API tokens for trusted backends and tooling (root credential for the admin plane). ≥32 bytes each under a production license. |
+| `CLOUDPDF_PASSWORD_VERIFICATION_HMAC_SECRET` | dev fallback | HMAC pepper for the encrypted-PDF password-verification cache — it keeps stored password proofs non-reversible. **Required (≥32 bytes) under a production license**, whether or not you open encrypted PDFs. |
+| `CLOUDPDF_PASSWORD_SESSION_SERVER_SECRET` | dev fallback | Server key material for encrypted-PDF unlock sessions. **Required (≥32 bytes) under a production license when a KMS is configured**; unused otherwise. |
+| `CLOUDPDF_PASSWORD_SESSION_SERVER_SECRET_ID` | `dev-v1` | Label for the active session secret, recorded on each session. Changing it (or the secret) invalidates existing sessions. |
 
-See [Authentication](/docs/server/configuration/authentication).
+See [Authentication](/docs/server/configuration/authentication), and
+[Encrypted-PDF secrets](/docs/server/configuration/authentication#encrypted-pdf-secrets)
+for what the last three protect.
 
 ## Database
 
@@ -103,6 +136,14 @@ See [Fallback fonts](/docs/server/configuration/fonts).
 | `CLOUDPDF_AUTO_PROVISION_TENANT` | off | Lazily create tenant rows. Dev convenience — leave off in production. |
 
 See [Migrations](/docs/server/operations/migrations).
+
+## Shutdown & observability
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `CLOUDPDF_SHUTDOWN_TIMEOUT_MS` | `30000` | Budget for closing in-flight HTTP during shutdown before teardown proceeds anyway. Keep it below your orchestrator's kill deadline. |
+| `CLOUDPDF_SHUTDOWN_DRAIN_MS` | `0` | Settle window after `/readyz` flips to 503 (and SSE streams end) before the listener closes — for probe-driven load balancers. |
+| `CLOUDPDF_METRICS` | off | `1` exposes an unauthenticated Prometheus `/metrics` endpoint (scrape it inside your private network). |
 
 ## Optional adapters
 

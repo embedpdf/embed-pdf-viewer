@@ -1,5 +1,13 @@
 # @embedpdf/angular
 
+## 3.0.0-next.8
+
+## 3.0.0-next.7
+
+### Minor Changes
+
+- [#775](https://github.com/embedpdf/embed-pdf-viewer/pull/775) by [@bobsingor](https://github.com/bobsingor) – Move Angular Stage input handling to the shared web surface controller, with lens-scoped interaction and native touch pan, pinch, fling, double-tap, and long-press gestures. Interaction now defaults on when the hub is present and can be disabled for secondary lenses.
+
 ## 3.0.0-next.6
 
 ## 3.0.0-next.5

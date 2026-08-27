@@ -1,5 +1,13 @@
 # @embedpdf/viewer-chrome
 
+## 3.0.0-next.8
+
+## 3.0.0-next.7
+
+### Minor Changes
+
+- [#775](https://github.com/embedpdf/embed-pdf-viewer/pull/775) by [@bobsingor](https://github.com/bobsingor) – Enable draggable touch selection handles and register vibration feedback by default when the platform supports it.
+
 ## 3.0.0-next.6
 
 ### Patch Changes

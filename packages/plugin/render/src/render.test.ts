@@ -113,6 +113,13 @@ describe('effects + capability wired together', () => {
     };
   }
 
+  it('tilesFor binds the view once: stable per view, distinct across views', () => {
+    const h = harness();
+    const main = h.capability.tilesFor('stage');
+    expect(h.capability.tilesFor('stage')).toBe(main); // reference-stable (hook dep)
+    expect(h.capability.tilesFor('stage-thumbs')).not.toBe(main); // its own state
+  });
+
   it('a confirmed annotation event bumps renderEpoch for that page only', () => {
     const h = harness();
     expect(h.capability.renderEpoch(22)).toBe(0);

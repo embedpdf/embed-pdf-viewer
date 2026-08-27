@@ -9,6 +9,7 @@ import type {
 } from '../annotation/kinds';
 import type { AnnotationActor } from '../auth/scope';
 import type {
+  AnnotationAppearanceMode,
   AnnotationAppearanceRenderOptions,
   AnnotationAppearancesResult,
 } from '../dto/AnnotationRender';
@@ -18,7 +19,7 @@ import type { MetadataPatch } from '../dto/MetadataPatch';
 import type { PageGeometrySnapshot } from '../dto/PageGeometrySnapshot';
 import type { PageRotation } from '../dto/PageLayout';
 import type { PageListSnapshot } from '../dto/PageListSnapshot';
-import type { PageRaster, PageRenderOptions } from '../dto/PageRender';
+import type { PageNetworkRenderFormat, PageRaster, PageRenderOptions } from '../dto/PageRender';
 import type { PageTextSnapshot } from '../dto/PageTextSnapshot';
 import type { DocumentActionsSnapshot } from '../dto/PdfAction';
 import type { PdfSaveMode } from '../dto/PdfSaveMode';
@@ -29,7 +30,7 @@ import type { FormEffect, FormEffectsResult } from '../forms/effects';
 import type { FormFieldPatch } from '../forms/patch';
 import type { FormSnapshot } from '../forms/snapshot';
 import type { FormDataFormat, FormFieldValue } from '../forms/value';
-import type { PdfSize } from '../geometry/primitives';
+import type { PdfSize, PdfRect } from '../geometry/primitives';
 import type { AnnotationRef } from '../identity/AnnotationRef';
 import type { FormFieldRef, FormWidgetRef } from '../identity/FormFieldRef';
 import type { PageObjectNumber } from '../identity/PageObjectNumber';
@@ -55,11 +56,12 @@ import type {
 import type { MetadataUpdateResult } from '../mutation/MetadataUpdateResult';
 import type { PageDeleteResult } from '../mutation/PageDeleteResult';
 import type { PageFlattenResult, PageFlattenUsage } from '../mutation/PageFlattenResult';
-import type { RedactionApplyResult, RedactionApplyScope } from '../mutation/RedactionApplyResult';
 import type { PageInsertResult } from '../mutation/PageInsertResult';
 import type { PageMoveResult } from '../mutation/PageMoveResult';
 import type { PageRotateResult } from '../mutation/PageRotateResult';
+import type { RedactionApplyResult, RedactionApplyScope } from '../mutation/RedactionApplyResult';
 import type { WireResourceMap } from '../resource/BinarySource';
+import type { PageState } from '../revision/PageState';
 import type { SearchRequest, SearchSlice } from '../search/types';
 
 /**
@@ -441,6 +443,80 @@ export interface DocumentRenderPageFileWorkerRequest {
   options?: PageRenderOptions;
 }
 
+/**
+ * Encode instruction for the `*.renderEncoded` request family. CLOUD-SERVER
+ * surface (like the file-path ops): the server worker injects an image
+ * encoder into its `WorkerHost`, so the raster is encoded WHERE IT IS
+ * PRODUCED and only the compressed image crosses the engine boundary —
+ * kilobytes over the host IPC pipe instead of a megabytes-scale rgba
+ * copy. Engines without an injected encoder (browser/local workers, which
+ * encode via canvas instead) reject these kinds with `NotImplemented`.
+ * Policy stays caller-side: format and quality always arrive in the
+ * request; the engine plane holds no image-policy defaults.
+ */
+export interface RenderEncode {
+  format: PageNetworkRenderFormat;
+  quality?: number;
+}
+
+/** An encoded render result. `width`/`height` are the source raster's output
+ *  dimensions (they feed the advisory image-dimension headers). `bytes` must
+ *  OWN its buffer — it rides the transfer manifest zero-copy, so a pooled
+ *  view (e.g. a Node `Buffer` slab slice) would detach unrelated data. */
+export interface EncodedImageWire {
+  contentType: string;
+  width: number;
+  height: number;
+  bytes: Uint8Array;
+}
+
+export interface PagesRenderEncodedWorkerRequest {
+  kind: 'pages.renderEncoded';
+  jobId: WorkerJobId;
+  docId: string;
+  layerName?: string;
+  pageObjectNumber: PageObjectNumber;
+  options?: PageRenderOptions;
+  encode: RenderEncode;
+}
+
+/** `document.renderPageFile` + in-worker encode — same one-shot transient
+ *  session semantics; see that request's docs. */
+export interface DocumentRenderPageFileEncodedWorkerRequest {
+  kind: 'document.renderPageFileEncoded';
+  jobId: WorkerJobId;
+  path: string;
+  password: string | null;
+  /** Display index (0-based) — ingest knows "first page", not object numbers. */
+  pageIndex: number;
+  options?: PageRenderOptions;
+  encode: RenderEncode;
+}
+
+export interface AnnotationsRenderAppearancesEncodedWorkerRequest {
+  kind: 'annotations.renderAppearancesEncoded';
+  jobId: WorkerJobId;
+  docId: string;
+  layerName?: string;
+  pageObjectNumber: PageObjectNumber;
+  options?: AnnotationAppearanceRenderOptions;
+  encode: RenderEncode;
+}
+
+/** Encoded counterpart of `AnnotationAppearanceRaster`: same identity and
+ *  placement metadata, image instead of raster. */
+export interface EncodedAppearanceWire {
+  ref: AnnotationRef;
+  mode: AnnotationAppearanceMode;
+  rect: PdfRect;
+  image: EncodedImageWire;
+}
+
+export interface AnnotationAppearancesEncodedResultWire {
+  pageState: PageState;
+  appearances: EncodedAppearanceWire[];
+}
+
 export interface PagesMoveWorkerRequest {
   kind: 'pages.move';
   jobId: WorkerJobId;
@@ -796,6 +872,7 @@ export type WorkerRequest =
   | AnnotationsListRawPageWorkerRequest
   | AnnotationsListFullPageWorkerRequest
   | AnnotationsRenderAppearancesWorkerRequest
+  | AnnotationsRenderAppearancesEncodedWorkerRequest
   | AnnotationsCreateWorkerRequest
   | AnnotationsUpdateWorkerRequest
   | AnnotationsDeleteWorkerRequest
@@ -833,12 +910,14 @@ export type WorkerRequest =
   | PagesTextWorkerRequest
   | PagesGeometryWorkerRequest
   | PagesRenderWorkerRequest
+  | PagesRenderEncodedWorkerRequest
   | SearchQueryWorkerRequest
   | DocumentSaveBufferWorkerRequest
   | DocumentSaveFileWorkerRequest
   | DocumentSaveLayerBufferWorkerRequest
   | DocumentProbeSecurityFileWorkerRequest
   | DocumentRenderPageFileWorkerRequest
+  | DocumentRenderPageFileEncodedWorkerRequest
   | DocumentCheckPasswordPermissionsWorkerRequest
   | FontsRegisterWorkerRequest
   | FontsAddFallbackWorkerRequest
@@ -863,6 +942,7 @@ export type WorkerResultPayload =
   | { tag: 'annotations.listRawPage'; snapshot: AnnotationListPageSnapshot }
   | { tag: 'annotations.listFullPage'; snapshot: AnnotationListPageSnapshot }
   | { tag: 'annotations.renderAppearances'; result: AnnotationAppearancesResult }
+  | { tag: 'annotations.renderAppearancesEncoded'; result: AnnotationAppearancesEncodedResultWire }
   | {
       tag: 'annotations.create';
       result: AnnotationCreateResult;
@@ -1023,6 +1103,7 @@ export type WorkerResultPayload =
   | { tag: 'pages.text'; snapshot: PageTextSnapshot }
   | { tag: 'pages.geometry'; snapshot: PageGeometrySnapshot }
   | { tag: 'pages.render'; raster: PageRaster }
+  | { tag: 'pages.renderEncoded'; image: EncodedImageWire }
   | { tag: 'search.query'; slice: SearchSlice }
   | { tag: 'document.saveBuffer'; bytes: ArrayBuffer; size: number }
   | { tag: 'document.saveLayerBuffer'; bytes: ArrayBuffer; size: number }
@@ -1034,6 +1115,13 @@ export type WorkerResultPayload =
       pageObjectNumber: PageObjectNumber;
       pageCount: number;
       raster: PageRaster;
+    }
+  | {
+      tag: 'document.renderPageFileEncoded';
+      /** Durable page identity of the rendered index — the artifact key's pon. */
+      pageObjectNumber: PageObjectNumber;
+      pageCount: number;
+      image: EncodedImageWire;
     }
   | { tag: 'document.checkPasswordPermissions'; security: DocumentSecurityProbeInfo }
   | { tag: 'fonts.register'; fontKey: string }

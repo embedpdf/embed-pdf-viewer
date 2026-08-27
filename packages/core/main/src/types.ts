@@ -81,6 +81,13 @@ export const CORE_DOCUMENT_OPEN_FAILED = '@@core/document-open-failed';
 /** A typed handle to a capability — typed resolution, no string casts. */
 export interface CapabilityToken<T> {
   readonly name: string;
+  /**
+   * Authored remedy shown when a plugin `requires` this capability and no
+   * plugin provides it — the missing-dependency error should contain its own
+   * fix (e.g. "add interactionPlugin() from '@embedpdf/plugin-interaction' to
+   * your plugins list").
+   */
+  readonly hint?: string;
   /** phantom — never present at runtime */
   readonly __type?: T;
 }

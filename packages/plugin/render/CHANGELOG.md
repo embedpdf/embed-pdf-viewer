@@ -1,5 +1,13 @@
 # @embedpdf/plugin-render
 
+## 3.0.0-next.8
+
+## 3.0.0-next.7
+
+### Minor Changes
+
+- [#777](https://github.com/embedpdf/embed-pdf-viewer/pull/777) by [@bobsingor](https://github.com/bobsingor) – Scope tile state by view and page so multiple views of the same page can plan rasters independently without invalidating each other. Replace the flat tile methods with a reference-stable `render.tilesFor(view)` handle that binds the view identity for planning, paint reporting, and release.
+
 ## 3.0.0-next.6
 
 ### Minor Changes

@@ -9,8 +9,8 @@
 // One-line-per-feature: registration travels with the UI.
 export * from '@embedpdf/plugin-stage';
 import * as React from 'react';
-import { useEffect, useMemo, useRef } from 'react';
-import { StageToken, settingsEqual, wheelZoomFactor } from '@embedpdf/plugin-stage';
+import { useLayoutEffect, useMemo, useRef } from 'react';
+import { StageToken, createScrollHandler, settingsEqual } from '@embedpdf/plugin-stage';
 import type { StageCapability, VisiblePage } from '@embedpdf/plugin-stage';
 import type { CapabilityToken } from '@embedpdf/core';
 
@@ -19,9 +19,8 @@ import type { CapabilityToken } from '@embedpdf/core';
 export type StageTokenProp = CapabilityToken<StageCapability>;
 import type { PageFrame } from '@embedpdf/core-geometry';
 import { InteractionToken } from '@embedpdf/plugin-interaction';
-import type { PointerSample } from '@embedpdf/plugin-interaction';
+import { createStageSurface } from '@embedpdf/web';
 import { ProjectorProvider, type ProjectorBinding, type ViewProjector } from './anchored';
-import { createClickCounter } from './interaction';
 import {
   makePageContext,
   PageProvider,
@@ -78,6 +77,9 @@ function PageSurface({
     () =>
       makePageContext(
         documentId,
+        // the hosting lens — per-view raster planning keys tile state by it,
+        // so a thumbnail rail and the main view never fight over one plan
+        stage.lensId(),
         page.pon,
         page.pageIndex,
         frame,
@@ -108,7 +110,8 @@ function PageSurface({
             top: frame.top,
             width: t.viewWidth,
             height: t.viewHeight,
-            boxShadow: '0 6px 18px rgba(0,0,0,.18)',
+            // themeable: override via the CSS variable (app stylesheet), no props
+            boxShadow: 'var(--epdf-page-shadow, 0 6px 18px rgba(0,0,0,.18))',
           }}
         />
         {/* the page: white backing + bitmap as ONE rasterized box, so there is no
@@ -162,11 +165,24 @@ export interface StageProps {
   overlay?: React.ReactNode;
   /**
    * Route this Stage's pointer events to the interaction hub (page-resolved via
-   * `pageAt`) instead of the built-in drag-to-pan. Pan then becomes the `pan`
-   * tool's job and dragging in `pointer` mode selects text (incl. across pages).
-   * Pair with `stagePlugin({ interaction: true })`. Default false (built-in pan).
+   * `pageAt`) — AND register this lens's tool-gated pan-scroll handler with it
+   * (lens-scoped, so multiple stages on one document never pan each other).
+   * Pan is then the `pan` tool's job and dragging in `pointer` mode selects
+   * text (incl. across pages).
+   *
+   * Default TRUE: registering `interactionPlugin()` is the one opt-in — tools
+   * just work; without the hub this is inert and the stage falls back to
+   * built-in drag-to-pan, so a hub-less setup costs nothing. Set `false` on
+   * SECONDARY lenses (a thumbnail rail) that should stay click-to-navigate
+   * instead of feeding the document's tools.
    */
   interaction?: boolean;
+  /**
+   * With {@link interaction}: let drags over page GAPS pan regardless of the
+   * active tool (and show a grab cursor there) — the gutter always pans; there
+   * is nothing to draw/select outside a page. Default true.
+   */
+  panFallback?: boolean;
   /**
    * Ambient ZOOM gestures on this stage: ctrl/cmd+wheel and trackpad pinch
    * (Safari gesture events included). Default true. Turn OFF for follower
@@ -185,7 +201,8 @@ export function Stage({
   children,
   pageChrome,
   overlay,
-  interaction = false,
+  interaction = true,
+  panFallback = true,
   zoomGestures = true,
   token = StageToken,
   className,
@@ -235,162 +252,31 @@ export function Stage({
     [projector, pages],
   );
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const el = ref.current!;
-    // Only report the viewport size. Initial placement (home) is the Stage plugin's
-    // job — it watches the viewport and homes once it's ready (and a higher-priority
-    // initial-view provider can override that). The shell stays dumb.
-    const setVp = () => stage.setViewport({ width: el.clientWidth, height: el.clientHeight });
-    const ro = new ResizeObserver(setVp);
-    ro.observe(el);
-    setVp();
-
-    // Report the device pixel ratio so page transforms render crisp. dppx changes
-    // (zoom, dragging between monitors) fire the media query; re-subscribe each
-    // time since the query value itself moves.
-    let mq: MediaQueryList | null = null;
-    const reportDpr = () => {
-      stage.setDevicePixelRatio(window.devicePixelRatio || 1);
-      mq?.removeEventListener('change', reportDpr);
-      mq = window.matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`);
-      mq.addEventListener('change', reportDpr);
-    };
-    reportDpr();
-
-    // Wheel is ambient navigation in BOTH modes: ctrl/meta zooms (classified
-    // per input — synthesized pinch, mouse notch, cmd-scroll scrub — by
-    // wheelZoomFactor), else scrolls. With zoom gestures off, a zoom-wheel
-    // falls through to ordinary pan (a cmd+scroll over a thumbnail rail
-    // scrolls the rail).
-    const onWheel = (e: WheelEvent) => {
-      e.preventDefault();
-      const r = el.getBoundingClientRect();
-      if (zoomGestures && (e.ctrlKey || e.metaKey)) {
-        stage.zoomAround({ x: e.clientX - r.left, y: e.clientY - r.top }, wheelZoomFactor(e));
-      } else {
-        const dx = e.shiftKey ? e.deltaY : e.deltaX;
-        const dy = e.shiftKey ? e.deltaX : e.deltaY;
-        stage.panBy(-dx, -dy);
-      }
-    };
-    el.addEventListener('wheel', onWheel, { passive: false });
-
-    // Safari never synthesizes ctrl+wheel for trackpad pinch — it fires
-    // proprietary gesture events carrying an ABSOLUTE scale; convert to the
-    // per-event ratio the camera physics wants. Feature-detected: Chrome and
-    // Firefox don't have GestureEvent, so this wiring costs them nothing.
-    // preventDefault runs even with zoom gestures off — a pinch over the
-    // stage must never zoom the page itself.
-    let lastScale = 1;
-    const onGestureStart = (e: Event) => {
-      e.preventDefault();
-      lastScale = (e as unknown as { scale?: number }).scale ?? 1;
-    };
-    const onGestureChange = (e: Event) => {
-      e.preventDefault();
-      const g = e as unknown as { scale?: number; clientX: number; clientY: number };
-      const scale = g.scale ?? 1;
-      if (zoomGestures && scale > 0) {
-        const r = el.getBoundingClientRect();
-        stage.zoomAround({ x: g.clientX - r.left, y: g.clientY - r.top }, scale / lastScale);
-      }
-      lastScale = scale;
-    };
-    const hasGestureEvents = 'GestureEvent' in window;
-    if (hasGestureEvents) {
-      el.addEventListener('gesturestart', onGestureStart);
-      el.addEventListener('gesturechange', onGestureChange);
-      el.addEventListener('gestureend', onGestureStart); // reset the base
-    }
-
-    const cleanups: Array<() => void> = [];
-    if (useHub && ix) {
-      // Forward to the hub: pan/select/etc. become tool-gated handlers. `pageAt`
-      // resolves the page per event, so a drag can cross pages (text selection).
-      const clicks = createClickCounter();
-      const forward = (phase: PointerSample['phase'], e: PointerEvent, clickCount = 1) => {
-        const r = el.getBoundingClientRect();
-        const vpt = { x: e.clientX - r.left, y: e.clientY - r.top };
-        ix.dispatch({
-          phase,
-          viewport: vpt,
-          page: stage.pageAt(vpt) ?? undefined,
-          // Page-anchored gestures (annotation move/resize) track the origin
-          // page's frame through this even when the cursor is off that page.
-          project: (pon) => stage.pointOnPage(pon, vpt),
-          modifiers: { shift: e.shiftKey, alt: e.altKey, ctrl: e.ctrlKey, meta: e.metaKey },
-          clickCount,
-        });
-      };
-      let dragging = false;
-      const down = (e: PointerEvent) => {
-        if (e.button !== 0) return;
-        dragging = true;
-        forward('down', e, clicks(Date.now(), e.clientX, e.clientY));
-      };
-      const hover = (e: PointerEvent) => {
-        if (!dragging) forward('move', e); // cursor feedback, no gesture
-      };
-      const winMove = (e: PointerEvent) => {
-        if (dragging) forward('move', e);
-      };
-      const up = (e: PointerEvent) => {
-        if (!dragging) return;
-        dragging = false;
-        forward('up', e);
-      };
-      el.addEventListener('pointerdown', down);
-      el.addEventListener('pointermove', hover);
-      window.addEventListener('pointermove', winMove);
-      window.addEventListener('pointerup', up);
-      cleanups.push(() => {
-        el.removeEventListener('pointerdown', down);
-        el.removeEventListener('pointermove', hover);
-        window.removeEventListener('pointermove', winMove);
-        window.removeEventListener('pointerup', up);
-      });
-    } else {
-      // Built-in drag-to-pan (no interaction hub) — unchanged behaviour.
-      let dragging = false;
-      let lx = 0;
-      let ly = 0;
-      const down = (e: PointerEvent) => {
-        if (e.button !== 0) return;
-        dragging = true;
-        lx = e.clientX;
-        ly = e.clientY;
-      };
-      const move = (e: PointerEvent) => {
-        if (!dragging) return;
-        stage.panBy(e.clientX - lx, e.clientY - ly);
-        lx = e.clientX;
-        ly = e.clientY;
-      };
-      const up = () => {
-        dragging = false;
-      };
-      el.addEventListener('pointerdown', down);
-      window.addEventListener('pointermove', move);
-      window.addEventListener('pointerup', up);
-      cleanups.push(() => {
-        el.removeEventListener('pointerdown', down);
-        window.removeEventListener('pointermove', move);
-        window.removeEventListener('pointerup', up);
-      });
-    }
+    // The WHOLE browser binding — viewport/DPR reporting, sample normalization,
+    // gesture controller — is the shared @embedpdf/web surface, so every
+    // framework adapter has one feel. This component keeps only React glue.
+    const detachSurface = createStageSurface(el, stage, {
+      hub: useHub ? ix : null,
+      source: stage.lensId(),
+      zoomGestures,
+    });
+    // Interaction opt-in lives WITH the sample source: the same knob that
+    // forwards this lens's samples also registers its pan-scroll handler,
+    // lens-scoped — two stages on one document can never pan each other.
+    const offScroll =
+      useHub && ix
+        ? ix.registerHandler(createScrollHandler(stage, ix, { panFallback }), {
+            source: stage.lensId(),
+          })
+        : null;
 
     return () => {
-      ro.disconnect();
-      mq?.removeEventListener('change', reportDpr);
-      el.removeEventListener('wheel', onWheel);
-      if (hasGestureEvents) {
-        el.removeEventListener('gesturestart', onGestureStart);
-        el.removeEventListener('gesturechange', onGestureChange);
-        el.removeEventListener('gestureend', onGestureStart);
-      }
-      cleanups.forEach((fn) => fn());
+      offScroll?.();
+      detachSurface();
     };
-  }, [stage, ix, useHub, zoomGestures]);
+  }, [stage, ix, useHub, zoomGestures, panFallback]);
 
   return (
     <div
@@ -406,7 +292,7 @@ export function Stage({
     >
       {pages.map((p) => (
         <PageSurface
-          key={p.pageIndex}
+          key={p.pon} // durable page identity — survives move/delete (matches Angular's `track p.pon`)
           documentId={docId ?? ''}
           page={p}
           frame={frame}

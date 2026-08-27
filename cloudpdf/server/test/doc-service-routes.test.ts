@@ -19,6 +19,8 @@ import {
 import { buildAppForTesting } from '../src/app/buildApp';
 import { createValidTestLicenseGate } from '../src/licensing/testing';
 
+const TEST_K = Number(process.env['CLOUDPDF_TEST_SHARDS'] ?? '1');
+
 const STUB_ENTRY = new URL('./_helpers/stub-worker-entry.cjs', import.meta.url);
 const SECRET = 'doc-routes-secret';
 
@@ -255,7 +257,11 @@ describe('Phase 3 doc routes — GET /v1/docs/:docId/head', () => {
         securityHandlerRevision: null,
         canUpgradeToOwner: false,
       },
-      access: { required: true, reasons: ['permissions-unknown'], endpoint: '/v1/access' },
+      access: {
+        required: true,
+        reasons: ['permissions-unknown'],
+        endpoint: `/v1/docs/${docId}/layers/default/access`,
+      },
     });
   });
 
@@ -499,6 +505,90 @@ describe('Phase 3 doc routes — POST /v1/warm', () => {
       body: JSON.stringify({ docId: 'docwbd222' }),
     });
     expect(res.status).toBe(403);
+  });
+});
+
+describe('access route — layer-tier path with document affinity', () => {
+  let fx: Fixture;
+  beforeEach(async () => {
+    fx = await buildFixture();
+  });
+  afterEach(async () => {
+    await tearDown(fx);
+  });
+
+  const seedPlain = async (tenantId: string, docId: string): Promise<void> => {
+    await seedDocument(fx, tenantId, docId, {
+      security: {
+        encryptionState: 'none',
+        encryptionRequiresPassword: false,
+        pdfPermissionsBits: 0xfffffffc,
+        pdfPermissionsAllAllowed: true,
+        pdfOpenedAs: 'none',
+      },
+    });
+  };
+  const auth = (tenantId: string, docId: string): Record<string, string> => ({
+    Authorization: `Bearer ${docToken(tenantId, docId, {
+      layer: 'default',
+      scope: ['doc.open', 'doc.render'],
+    })}`,
+    'Content-Type': 'application/json',
+  });
+
+  test('the path carries doc AND layer — no body identity needed (the affinity tier routes on the URL)', async () => {
+    await seedPlain('tenant-acc2', 'docacc201');
+    const res = await fetch(`${fx.baseUrl}/v1/docs/docacc201/layers/default/access`, {
+      method: 'POST',
+      headers: auth('tenant-acc2', 'docacc201'),
+      body: JSON.stringify({ layerName: 'default' }),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { security: { encryption: { state: string } } };
+    expect(body.security.encryption.state).toBe('none');
+  });
+
+  test('path/body docId mismatch is malformed, never a silent preference', async () => {
+    await seedPlain('tenant-acc2', 'docacc202');
+    const res = await fetch(`${fx.baseUrl}/v1/docs/docacc202/layers/default/access`, {
+      method: 'POST',
+      headers: auth('tenant-acc2', 'docacc202'),
+      body: JSON.stringify({ docId: 'docacc999', layerName: 'default' }),
+    });
+    expect(res.status).toBe(400);
+    expect(await res.text()).toContain('mismatch');
+  });
+
+  test('path/body LAYER mismatch is equally malformed', async () => {
+    await seedPlain('tenant-acc2', 'docacc204');
+    const res = await fetch(`${fx.baseUrl}/v1/docs/docacc204/layers/default/access`, {
+      method: 'POST',
+      headers: auth('tenant-acc2', 'docacc204'),
+      body: JSON.stringify({ layerName: 'other' }),
+    });
+    expect(res.status).toBe(400);
+    expect(await res.text()).toContain('layer mismatch');
+  });
+
+  test('the doc-tier alias (2026-08-26 prerelease builds) still works, layer from body/default', async () => {
+    await seedPlain('tenant-acc2', 'docacc205');
+    const res = await fetch(`${fx.baseUrl}/v1/docs/docacc205/access`, {
+      method: 'POST',
+      headers: auth('tenant-acc2', 'docacc205'),
+      body: JSON.stringify({ layerName: 'default', mode: 'any' }),
+    });
+    expect(res.status).toBe(200);
+  });
+
+  test('the legacy alias still needs a body docId', async () => {
+    await seedPlain('tenant-acc2', 'docacc203');
+    const res = await fetch(`${fx.baseUrl}/v1/access`, {
+      method: 'POST',
+      headers: auth('tenant-acc2', 'docacc203'),
+      body: JSON.stringify({ layerName: 'default' }),
+    });
+    expect(res.status).toBe(400);
+    expect(await res.text()).toContain('needs a document id');
   });
 });
 
@@ -924,7 +1014,9 @@ describe('Phase 3 doc routes — concurrency', () => {
     });
   });
 
-  test('pool eviction releases the pinned base-file handle', async () => {
+  // Topology-literal (exact slot count / same-worker eviction): the
+  // CLOUDPDF_TEST_SHARDS leg tests K-behavior, not single-host mechanics.
+  test.skipIf(TEST_K > 1)('pool eviction releases the pinned base-file handle', async () => {
     await tearDown(fx);
     fx = await buildFixture({ poolSize: 1, maxDocsPerSlot: 1 });
 

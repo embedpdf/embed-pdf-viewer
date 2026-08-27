@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
-  "canonicalVersion": "3.0.0-next.6",
-  "openapiSha256": "9c68b27924a6a71a1306b7fcdd6011682061b84ea6c4576da2cc4ef406ab1db1",
+  "canonicalVersion": "3.0.0-next.8",
+  "openapiSha256": "e997d51317662fe0666e6582916ded9b17a8bcd225c178548e1ff226e4d01c6d",
   "languages": {
     "typescript": {
       "label": "TypeScript",

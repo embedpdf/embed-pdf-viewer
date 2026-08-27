@@ -58,7 +58,15 @@ import {
   type PieceInfoClearWorkerRequest,
   type PieceInfoReadWorkerRequest,
   type PieceInfoUpdateWorkerRequest,
+  type PageNetworkRenderFormat,
+  type PageRaster,
   type PagesRenderWorkerRequest,
+  type PagesRenderEncodedWorkerRequest,
+  type DocumentRenderPageFileEncodedWorkerRequest,
+  type AnnotationsRenderAppearancesEncodedWorkerRequest,
+  type EncodedAppearanceWire,
+  type EncodedImageWire,
+  type RenderEncode,
   type PagesTextWorkerRequest,
   type SearchQueryWorkerRequest,
   type FormsApplyEffectsWorkerRequest,
@@ -107,6 +115,32 @@ import { SecurityReader } from '../features/security';
 import { PageTextReader } from '../features/text';
 import { ensureInitialized, destroyLibrary } from '../runtime/lifecycle/bootstrap';
 
+/** The image a {@link WorkerImageEncoder} produced. `bytes` must OWN its
+ *  buffer (a fresh allocation, not a pooled `Buffer` slab view) — it is
+ *  placed on the transfer manifest and moved zero-copy. */
+export interface WorkerEncodedImage {
+  contentType: string;
+  bytes: Uint8Array;
+}
+
+/**
+ * Injected image-encode capability for the `*.renderEncoded` wire kinds.
+ * Dependency inversion keeps the native encoder OUT of this shared
+ * package: the cloud server's worker entry injects a sharp/libvips
+ * implementation; browser/local entries inject nothing (they encode via
+ * canvas) and the encoded kinds reject with `NotImplemented`.
+ */
+export interface WorkerImageEncoder {
+  encode(
+    raster: PageRaster,
+    opts: { format: PageNetworkRenderFormat; quality?: number },
+  ): Promise<WorkerEncodedImage>;
+}
+
+export interface WorkerHostOptions {
+  imageEncoder?: WorkerImageEncoder;
+}
+
 /**
  * The piece that runs "inside the worker": owns runtime, manages document
  * sessions, dispatches requests to the engine-services synchronous code.
@@ -142,6 +176,8 @@ export class WorkerHost {
      * runs in.
      */
     private readonly post: (pack: WirePack<WorkerResponse>) => void,
+    /** Optional capabilities. See {@link WorkerHostOptions}. */
+    private readonly options: WorkerHostOptions = {},
   ) {
     ensureInitialized(this.runtime);
     this.baseDocuments = new BaseDocumentRegistry(this.runtime);
@@ -162,6 +198,21 @@ export class WorkerHost {
   receive(msg: WorkerRequest): void {
     if (msg.kind === 'abort') {
       this.aborts.get(msg.jobId)?.abort();
+      return;
+    }
+
+    // The encoded render kinds are the protocol's ONLY async ops: their
+    // raster comes from the SAME sync handlers as the raw kinds (all
+    // session/registry use completes before the first await), and only
+    // the injected image encode awaits. They run on a parallel async
+    // path with identical resolve/reject/abort bookkeeping; everything
+    // else stays on the synchronous switch below, unchanged.
+    if (
+      msg.kind === 'pages.renderEncoded' ||
+      msg.kind === 'document.renderPageFileEncoded' ||
+      msg.kind === 'annotations.renderAppearancesEncoded'
+    ) {
+      void this.receiveEncoded(msg);
       return;
     }
 
@@ -791,6 +842,154 @@ export class WorkerHost {
     const reader = new PageRenderReader(this.runtime, session);
     const raster = reader.render(req.pageObjectNumber, req.options ?? {}, signal);
     return wirePack({ tag: 'pages.render', raster }, [raster.data]);
+  }
+
+  private async receiveEncoded(
+    msg:
+      | PagesRenderEncodedWorkerRequest
+      | DocumentRenderPageFileEncodedWorkerRequest
+      | AnnotationsRenderAppearancesEncodedWorkerRequest,
+  ): Promise<void> {
+    // Fail-fast BEFORE any native work: a host without an injected
+    // encoder (browser/local workers) rejects the job without paying for
+    // a raster it could never encode.
+    if (!this.options.imageEncoder) {
+      this.post(
+        wirePack(
+          {
+            kind: 'reject',
+            jobId: msg.jobId,
+            error: serializeError(
+              new EngineError(
+                EngineErrorCode.NotImplemented,
+                'this engine has no image encoder (the *.renderEncoded kinds are cloud-server surface)',
+              ),
+            ),
+          },
+          EMPTY_TRANSFER,
+        ),
+      );
+      return;
+    }
+    const ctrl = new AbortController();
+    this.aborts.set(msg.jobId, ctrl);
+    try {
+      let resultPack: WirePack<WorkerResultPayload>;
+      switch (msg.kind) {
+        case 'pages.renderEncoded':
+          resultPack = await this.handlePagesRenderEncoded(msg, ctrl.signal);
+          break;
+        case 'document.renderPageFileEncoded':
+          resultPack = await this.handleDocumentRenderPageFileEncoded(msg, ctrl.signal);
+          break;
+        case 'annotations.renderAppearancesEncoded':
+          resultPack = await this.handleAnnotationsRenderAppearancesEncoded(msg, ctrl.signal);
+          break;
+      }
+      this.post(
+        wirePack(
+          { kind: 'resolve', jobId: msg.jobId, result: resultPack.payload },
+          resultPack.transfer,
+        ),
+      );
+    } catch (err) {
+      this.post(
+        wirePack({ kind: 'reject', jobId: msg.jobId, error: serializeError(err) }, EMPTY_TRANSFER),
+      );
+    } finally {
+      this.aborts.delete(msg.jobId);
+    }
+  }
+
+  private async encodeRaster(
+    raster: PageRaster,
+    encode: RenderEncode,
+    signal: AbortSignal,
+  ): Promise<EncodedImageWire> {
+    const encoder = this.options.imageEncoder;
+    if (!encoder) {
+      throw new EngineError(
+        EngineErrorCode.NotImplemented,
+        'this engine has no image encoder (the *.renderEncoded kinds are cloud-server surface)',
+      );
+    }
+    const { bytes, contentType } = await encoder.encode(raster, encode);
+    // The encoder is not abortable; honor a cancellation that arrived
+    // while it ran by rejecting instead of resolving a dead job.
+    if (signal.aborted) {
+      throw new EngineError(EngineErrorCode.Aborted, 'aborted during image encode');
+    }
+    return { contentType, width: raster.width, height: raster.height, bytes };
+  }
+
+  private async handlePagesRenderEncoded(
+    req: PagesRenderEncodedWorkerRequest,
+    signal: AbortSignal,
+  ): Promise<WirePack<WorkerResultPayload>> {
+    const inner = this.handlePagesRender({ ...req, kind: 'pages.render' }, signal);
+    if (inner.payload.tag !== 'pages.render') {
+      throw new EngineError(EngineErrorCode.WireFormat, `unexpected ${inner.payload.tag}`);
+    }
+    const image = await this.encodeRaster(inner.payload.raster, req.encode, signal);
+    return wirePack({ tag: 'pages.renderEncoded', image }, [image.bytes.buffer]);
+  }
+
+  private async handleDocumentRenderPageFileEncoded(
+    req: DocumentRenderPageFileEncodedWorkerRequest,
+    signal: AbortSignal,
+  ): Promise<WirePack<WorkerResultPayload>> {
+    // The transient session closes inside the sync handler's finally —
+    // the raster owns its pixels, so encoding after close is sound.
+    const inner = this.handleDocumentRenderPageFile(
+      { ...req, kind: 'document.renderPageFile' },
+      signal,
+    );
+    if (inner.payload.tag !== 'document.renderPageFile') {
+      throw new EngineError(EngineErrorCode.WireFormat, `unexpected ${inner.payload.tag}`);
+    }
+    const image = await this.encodeRaster(inner.payload.raster, req.encode, signal);
+    return wirePack(
+      {
+        tag: 'document.renderPageFileEncoded',
+        pageObjectNumber: inner.payload.pageObjectNumber,
+        pageCount: inner.payload.pageCount,
+        image,
+      },
+      [image.bytes.buffer],
+    );
+  }
+
+  private async handleAnnotationsRenderAppearancesEncoded(
+    req: AnnotationsRenderAppearancesEncodedWorkerRequest,
+    signal: AbortSignal,
+  ): Promise<WirePack<WorkerResultPayload>> {
+    const inner = this.handleAnnotationsRenderAppearances(
+      { ...req, kind: 'annotations.renderAppearances' },
+      signal,
+    );
+    if (inner.payload.tag !== 'annotations.renderAppearances') {
+      throw new EngineError(EngineErrorCode.WireFormat, `unexpected ${inner.payload.tag}`);
+    }
+    const { pageState, appearances } = inner.payload.result;
+    // SEQUENTIAL encode, deliberately: the whole raster batch already
+    // exists in `inner` (peak memory is set by the render, not by encode
+    // order), so fanning every appearance into the process-wide encoder
+    // pool at once would only let one big batch monopolize it and starve
+    // the encodes of interleaved jobs. One at a time matches the
+    // previous API-side encoding loop exactly and keeps the pool fair.
+    const encoded: EncodedAppearanceWire[] = [];
+    for (const a of appearances) {
+      encoded.push({
+        ref: a.ref,
+        mode: a.mode,
+        rect: a.rect,
+        image: await this.encodeRaster(a.raster, req.encode, signal),
+      });
+    }
+    return wirePack(
+      { tag: 'annotations.renderAppearancesEncoded', result: { pageState, appearances: encoded } },
+      encoded.map((e) => e.image.bytes.buffer),
+    );
   }
 
   private handleDocumentSaveBuffer(

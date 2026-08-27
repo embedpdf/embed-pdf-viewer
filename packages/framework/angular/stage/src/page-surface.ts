@@ -47,7 +47,7 @@ import type { EpdfPageTemplateContext } from './templates';
          transparent fill so it can never peek out behind the bitmap, and it
          stays put under rotation. -->
     <div
-      style="position: absolute; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);"
+      style="position: absolute; box-shadow: var(--epdf-page-shadow, 0 6px 18px rgba(0, 0, 0, 0.18));"
       [style.left.px]="frame().left"
       [style.top.px]="frame().top"
       [style.width.px]="t().viewWidth"

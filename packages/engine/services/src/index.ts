@@ -64,4 +64,9 @@ export * from './features/search';
 export * from './features/actions';
 
 // Tier 4: worker host
-export { WorkerHost } from './worker-host/WorkerHost';
+export {
+  WorkerHost,
+  type WorkerEncodedImage,
+  type WorkerHostOptions,
+  type WorkerImageEncoder,
+} from './worker-host/WorkerHost';

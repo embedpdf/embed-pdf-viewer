@@ -10,7 +10,7 @@
  * and clipping-immune.
  */
 import * as React from 'react';
-import { useMemo, useRef } from 'react';
+import { useId, useMemo, useRef } from 'react';
 import { NO_FRAME, pageTransform, type PageFrame } from '@embedpdf/core-geometry';
 import { observeClientGeometry } from '@embedpdf/web';
 import { ProjectorProvider, type ProjectorBinding, type ViewProjector } from './anchored';
@@ -75,12 +75,21 @@ export function PageView({
       }),
     [base?.size.width, base?.size.height, base?.userUnit, rotation, width, dpr],
   );
+  // This instance's VIEW identity: two PageViews of the same page (a compare
+  // strip) must plan rasters independently, like two stage lenses do.
+  const viewId = useId();
   const ctx = useMemo(
     () =>
-      makePageContext(docId ?? '', pon, page, pageFrame, transform, () =>
-        ref.current!.getBoundingClientRect(),
+      makePageContext(
+        docId ?? '',
+        `page-view:${viewId}`,
+        pon,
+        page,
+        pageFrame,
+        transform,
+        () => ref.current!.getBoundingClientRect(),
       ),
-    [docId, pon, page, pageFrame, transform],
+    [docId, pon, page, pageFrame, transform, viewId],
   );
   // The PageView's ViewProjector: no camera, so anchored UI positions by
   // MEASURING the DOM (client space → portal + position:fixed, immune to
@@ -129,7 +138,7 @@ export function PageView({
               top: pageFrame.top,
               width: t.viewWidth,
               height: t.viewHeight,
-              boxShadow: '0 6px 18px rgba(0,0,0,.18)',
+              boxShadow: 'var(--epdf-page-shadow, 0 6px 18px rgba(0,0,0,.18))',
             }}
           />
           {/* white backing + content as ONE box; rotation 0 carries no transform */}

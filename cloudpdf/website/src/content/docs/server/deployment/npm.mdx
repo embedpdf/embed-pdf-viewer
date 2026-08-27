@@ -41,8 +41,12 @@ configure.
 Start the server with the `serve` command:
 
 ```sh
-CLOUDPDF_JWT_SECRET=dev-secret-change-me npx cloudpdf-server serve
+CLOUDPDF_LICENSE_KEY="key/..." npx cloudpdf-server serve
 ```
+
+`CLOUDPDF_LICENSE_KEY` is **required** — the server refuses to boot without
+it. A [development key](/docs/server/configuration/licensing) keeps everything
+else zero-config locally (dev-fallback secrets, with warnings).
 
 With no other configuration, the server runs the zero-dependency profile:
 SQLite at `./data/cloudpdf.db`, files under `./data/objects`, and a cache in
@@ -65,7 +69,12 @@ For a real deployment, point the server at Postgres and a cloud bucket, run
 migrations explicitly, and set the worker pool to use your cores:
 
 ```sh
+export CLOUDPDF_LICENSE_KEY="key/..."
 export CLOUDPDF_JWT_SECRET="$(openssl rand -hex 32)"
+# Protect the encrypted-PDF caches and sessions. Generate once, keep stable:
+# /docs/server/configuration/authentication#encrypted-pdf-secrets
+export CLOUDPDF_PASSWORD_VERIFICATION_HMAC_SECRET="$(openssl rand -hex 32)"
+export CLOUDPDF_PASSWORD_SESSION_SERVER_SECRET="$(openssl rand -hex 32)"
 export CLOUDPDF_DB_DRIVER=postgres
 export CLOUDPDF_DB_URL="postgres://user:pass@db.internal:5432/cloudpdf"
 export CLOUDPDF_STORAGE_KIND=s3
@@ -98,7 +107,10 @@ Description=CloudPDF server
 After=network.target
 
 [Service]
+Environment=CLOUDPDF_LICENSE_KEY=key/...
 Environment=CLOUDPDF_JWT_SECRET=...
+Environment=CLOUDPDF_PASSWORD_VERIFICATION_HMAC_SECRET=...
+Environment=CLOUDPDF_PASSWORD_SESSION_SERVER_SECRET=...
 Environment=CLOUDPDF_DB_DRIVER=postgres
 Environment=CLOUDPDF_DB_URL=postgres://...
 ExecStart=/usr/bin/cloudpdf-server serve

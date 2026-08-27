@@ -102,6 +102,23 @@ shipping audit records to long-term storage or a SIEM:
 cloudpdf-server audit export --day yesterday
 ```
 
+## `quarantine`
+
+Host-isolation deployments journal engine crashes and refuse documents that
+repeatedly crash the engine (`422 DocumentQuarantined`). Inspect and release
+them:
+
+```sh
+# What is quarantined right now, and why
+cloudpdf-server quarantine list
+
+# Release one document (audited, with a reason)
+cloudpdf-server quarantine clear <base-sha> --reason "vendor fixed the file"
+```
+
+A quarantine expires on its own after its TTL; `clear` is for releasing one
+early after you've verified the document (or upgraded the engine).
+
 ## Exit codes
 
 The commands use conventional exit codes (`0` success, non-zero on failure),

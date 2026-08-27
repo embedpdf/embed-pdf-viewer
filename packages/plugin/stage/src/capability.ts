@@ -11,10 +11,13 @@ import {
 } from '@embedpdf/core-geometry';
 import type { Rect } from '@embedpdf/core-geometry';
 import type { PluginContext } from '@embedpdf/core';
-import { SETTINGS_EFFECT, SETTING_KEYS } from './settings';
+import { FLING_STOP, easeOutCubic, glideStep, rubberIn, rubberOut, springStep, zoomLerp } from './motion';
+import { boxOf, eqSetting, mergeSettings, resolveResponsive } from './responsive';
+import { DEFAULT_RESPONSIVE, SETTINGS_EFFECT, SETTING_KEYS } from './settings';
 import type { SettingEffect } from './settings';
 import type {
   GoToOptions,
+  ResponsiveRule,
   RevealAnchorValue,
   RevealOptions,
   Scheduler,
@@ -34,8 +37,9 @@ import type {
  * Layering, stated honestly:
  *   • stage-core — PURE spatial math (no DOM, no time). Ports to Rust later.
  *   • this capability — the IMPURE platform shell. It dispatches, caches, and owns
- *     the camera tween. It is NOT pure; the one host dependency it has (frame
- *     timing) enters through an injected Scheduler, never a hidden global.
+ *     the camera tween. It is NOT pure; its one host dependency (frame timing)
+ *     enters through the Scheduler seam — injectable, defaulting to the host's
+ *     own frame clock when one exists (see the seam below).
  *
  * The model: EVERY camera move is defined by what it holds fixed.
  *   • gestures (pan/pinch/wheel)  — the content under the pointer. Physics, no setting.
@@ -62,7 +66,11 @@ export function createStageCapability(
   ctx: PluginContext<StageState, StageAction>,
   config: StageConfig = {},
 ): StageCapability {
-  // ── host timing seam (the only host dependency) ──────────────────────────────
+  // ── host timing seam ─────────────────────────────────────────────────────────
+  // Frame timing enters through the Scheduler seam. By DEFAULT the seam binds
+  // to the host's own frame clock (globalThis.requestAnimationFrame) when one
+  // exists — inject to override (tests do); a frameless host degrades to
+  // instant navigation, no animation.
   const host = globalThis as {
     requestAnimationFrame?: (cb: (t: number) => void) => number;
     cancelAnimationFrame?: (handle: number) => void;
@@ -372,9 +380,22 @@ export function createStageCapability(
     direction: ctx.getState().direction,
   });
 
-  // Initial-view placement flag — declared up here so the rest detector can
-  // read it; the placement logic further down owns it.
-  let hasPlaced = false;
+  // Behavioral latch: flips when initial placement STARTS, while state.placed
+  // is the render-commit latch that flips only after placement finishes. The
+  // distinction keeps placement-time camera behavior unchanged while making
+  // partial geometry unobservable to renderers.
+  let placementStarted = false;
+
+  // ── gesture transaction (touch pan/pinch) ───────────────────────────────────
+  // While open: zoomAround defers its intent PATCH, and the rest countdown is
+  // held — a hesitation inside a pinch is not "at rest". Depth-counted so
+  // nested brackets compose. An ELASTIC gesture may additionally hold the
+  // camera past the clamp (rubber-band); `gestureRaw` is its unclamped,
+  // finger-integrated camera — the resistance curve maps it to what renders.
+  let gestureDepth = 0;
+  let gestureZoomed = false;
+  let gestureElastic = false;
+  let gestureRaw: S.Camera | null = null;
 
   // ── camera-rest detector ────────────────────────────────────────────────────
   // A continuous zoom and a device-snapped origin cannot coexist without the
@@ -389,7 +410,7 @@ export function createStageCapability(
     // Initial placement snaps immediately (first paint is crisp), and an
     // environment without real frames keeps snapping always-on — rest-gating
     // is a live-gesture refinement, not a contract.
-    if (!canAnimate || !hasPlaced) return;
+    if (!canAnimate || !placementStarted) return;
     if (ctx.getState().cameraResting) ctx.dispatch({ type: 'CAMERA_REST', resting: false });
     if (restRaf) scheduler.caf(restRaf);
     let t0 = 0;
@@ -409,9 +430,78 @@ export function createStageCapability(
   // it never touches the cursor (see syncCursorFromCamera for the policy).
   const setCam = (next: S.Camera, bounds: S.Rect = stayBounds()) => {
     const clamped = S.clampCamera(next, bounds, vp(), constraint());
-    if (clamped.zoom !== cam().zoom) armRest();
+    if (clamped.zoom !== cam().zoom) {
+      if (gestureDepth > 0) {
+        // Mid-gesture: un-rest immediately (fractional placement) but hold the
+        // 150 ms countdown — rest is declared at endGesture, not at a pinch
+        // hesitation.
+        gestureZoomed = true;
+        if (ctx.getState().cameraResting) ctx.dispatch({ type: 'CAMERA_REST', resting: false });
+        if (restRaf) {
+          scheduler.caf(restRaf);
+          restRaf = 0;
+        }
+      } else {
+        armRest();
+      }
+    }
     ctx.dispatch({ type: 'CAMERA', camera: clamped });
   };
+
+  // ── rubber-band (elastic overscroll) ────────────────────────────────────────
+  // The curve pair lives in motion.ts; these are its STATE adapters. One rule
+  // governs where the rubber exists at all: it softens only the edges of a
+  // scroll RANGE. An axis whose content FITS the viewport has no travel — the
+  // clamp holds it at its fitAlign rest, and it stays rigid however hard the
+  // finger tugs (the UIScrollView default: bouncing exists only where content
+  // exceeds bounds).
+  const axisTravels = (origin: number, content: number, view: number, zoom: number): boolean =>
+    !S.travelRange(origin, content, view, zoom, constraint().padding).fits;
+  /** Unclamped finger-integrated camera → the DISPLAYED camera: clamp, then
+   *  re-apply the overshoot through the resistance curve, per travelling axis.
+   *  Inside the bounds this is exactly the clamp (rubber of zero is zero);
+   *  on a fitting axis it is exactly the clamp ALWAYS. */
+  const rubberize = (raw: S.Camera): S.Camera => {
+    const clamped = S.clampCamera(raw, stayBounds(), vp(), constraint());
+    const v = vp();
+    const b = stayBounds();
+    const axis = (rawA: number, clampedA: number, dim: number, travels: boolean): number => {
+      if (!travels) return clampedA;
+      const dWorld = rawA - clampedA;
+      if (dWorld === 0) return clampedA;
+      const out = rubberOut(Math.abs(dWorld) * raw.zoom, Math.max(1, dim));
+      return clampedA + (Math.sign(dWorld) * out) / raw.zoom;
+    };
+    return {
+      zoom: raw.zoom,
+      x: axis(raw.x, clamped.x, v.width, axisTravels(b.x, b.width, v.width, raw.zoom)),
+      y: axis(raw.y, clamped.y, v.height, axisTravels(b.y, b.height, v.height, raw.zoom)),
+    };
+  };
+  /** Displayed camera → the raw position `rubberize` would have produced it
+   *  from. Overshoot is capped just under the asymptote so the inverse stays
+   *  finite whatever state a catch finds the camera in. */
+  const unrubberize = (displayed: S.Camera): S.Camera => {
+    const clamped = S.clampCamera(displayed, stayBounds(), vp(), constraint());
+    const v = vp();
+    const b = stayBounds();
+    const axis = (dispA: number, clampedA: number, dim: number, travels: boolean): number => {
+      if (!travels) return clampedA;
+      const dWorld = dispA - clampedA;
+      if (dWorld === 0) return clampedA;
+      const d = Math.max(1, dim);
+      const out = Math.min(Math.abs(dWorld) * displayed.zoom, d - 1);
+      return clampedA + (Math.sign(dWorld) * rubberIn(out, d)) / displayed.zoom;
+    };
+    return {
+      zoom: displayed.zoom,
+      x: axis(displayed.x, clamped.x, v.width, axisTravels(b.x, b.width, v.width, displayed.zoom)),
+      y: axis(displayed.y, clamped.y, v.height, axisTravels(b.y, b.height, v.height, displayed.zoom)),
+    };
+  };
+  // The elastic write path: NO clamp — used only by the elastic pan and the
+  // edge spring, whose math guarantees every trajectory terminates clamped.
+  const setCamRaw = (c: S.Camera) => ctx.dispatch({ type: 'CAMERA', camera: c });
 
   /**
    * Cursor reconciliation, one direction per interaction:
@@ -449,7 +539,6 @@ export function createStageCapability(
     }
     cancelAnim();
     const from = cam();
-    const ease = (t: number) => 1 - Math.pow(1 - t, 3);
     let started = false;
     let t0 = 0;
     const tick = (now: number) => {
@@ -457,7 +546,7 @@ export function createStageCapability(
         started = true;
         t0 = now; // anchor to the first real timestamp (works even when now === 0)
       }
-      const k = ease(Math.min(1, (now - t0) / ms));
+      const k = easeOutCubic(Math.min(1, (now - t0) / ms));
       setCam(
         {
           x: lerp(from.x, target.x, k),
@@ -472,6 +561,153 @@ export function createStageCapability(
         raf = 0;
         then?.();
       }
+    };
+    raf = scheduler.raf(tick);
+  };
+
+  /**
+   * Zoom-anchored tween — animates THE INVARIANT, not the coordinates. A
+   * camera move is defined by what it holds fixed; for an anchored zoom that
+   * is "the focal page-point stays at `pt` while scale changes". Lerping
+   * x/y/zoom independently (the plain tween) breaks that mid-flight: holding
+   * a screen point requires `x(t) = focal.x − pt.x / zoom(t)` — hyperbolic in
+   * the zoom — so linear coordinates swing the tapped point along a curved
+   * path (the visible "dip"). Here the zoom interpolates GEOMETRICALLY
+   * (constant rate — zoom is multiplicative) and each frame's camera derives
+   * from the anchor at that zoom, then clamps: the focal point is stationary
+   * by construction, and a zoom-out rails into its fit progressively as the
+   * shrinking travel range lets the clamp take over.
+   */
+  const animateZoomAnchored = (
+    focal: S.Anchor,
+    pt: S.Point,
+    targetZoom: number,
+    ms = 240,
+    then?: () => void,
+  ) => {
+    if (!canAnimate) {
+      const sc = buildScene();
+      if (sc.itemCount) setCam(S.cameraForAnchorAtScreen(focal, sc, pt, targetZoom));
+      then?.();
+      return;
+    }
+    cancelAnim();
+    const z0 = cam().zoom;
+    let started = false;
+    let t0 = 0;
+    const tick = (now: number) => {
+      if (!started) {
+        started = true;
+        t0 = now;
+      }
+      const k = easeOutCubic(Math.min(1, (now - t0) / ms));
+      const z = zoomLerp(z0, targetZoom, k);
+      const sc = buildScene();
+      if (sc.itemCount) setCam(S.cameraForAnchorAtScreen(focal, sc, pt, z));
+      if (k < 1) {
+        raf = scheduler.raf(tick);
+      } else {
+        raf = 0;
+        then?.();
+      }
+    };
+    raf = scheduler.raf(tick);
+  };
+
+  // Momentum + edge physics — the driver over motion.ts's per-axis laws:
+  //   glide  — the touch fling, decaying on UIScrollView's curve across free
+  //            travel;
+  //   spring — a critically-damped return to the clamp, entered when a glide
+  //            reaches a content edge (remaining velocity becomes the bounce)
+  //            or when the motion STARTS displaced (release while stretched).
+  // Axes are independent (a diagonal fling can bounce off the bottom while
+  // still gliding horizontally). Every trajectory terminates ON the clamp.
+  // Shares the `raf` handle with the tween, so cancelAnim() — every verb's
+  // first act — is also "catch": catching mid-bounce holds the stretch.
+  const startCameraPhysics = (vxFinger: number, vyFinger: number) => {
+    if (!canAnimate) {
+      setCam(cam()); // no host frames: snap straight into bounds
+      return;
+    }
+    cancelAnim();
+    const zoom = cam().zoom;
+    // Per-axis state in camera-space SCREEN px (the camera moves OPPOSITE the
+    // finger; positions scale by zoom once, here, so the laws read in px).
+    interface AxisState {
+      p: number;
+      v: number;
+      springing: boolean;
+      done: boolean;
+    }
+    const c0 = cam();
+    const cl0 = S.clampCamera(c0, stayBounds(), vp(), constraint());
+    const b0 = stayBounds();
+    const v0 = vp();
+    const mk = (camA: number, clampedA: number, fingerV: number): AxisState => ({
+      p: camA * zoom,
+      v: -fingerV / 1000,
+      springing: camA !== clampedA,
+      done: false,
+    });
+    // A fitting axis takes no ballistic motion: no travel to glide across and
+    // no bounce (rigid, like the platform) — release velocity is discarded.
+    // The spring stays armed for a DISPLACED fitting axis (repair to rest).
+    const ax = mk(c0.x, cl0.x, axisTravels(b0.x, b0.width, v0.width, zoom) ? vxFinger : 0);
+    const ay = mk(c0.y, cl0.y, axisTravels(b0.y, b0.height, v0.height, zoom) ? vyFinger : 0);
+    if (!ax.springing && !ay.springing && Math.hypot(ax.v, ay.v) < FLING_STOP) return;
+    let started = false;
+    let last = 0;
+    const tick = (now: number) => {
+      raf = 0;
+      // First frame assumes one 60Hz step (anchoring like the tween — works
+      // even when the first timestamp is 0).
+      const dt = started ? Math.min(64, Math.max(1, now - last)) : 16;
+      started = true;
+      last = now;
+      // The clamp of the CURRENT position is each axis's home this frame: for
+      // a stretched axis it is the edge; for a fitting axis, its rest point.
+      const cl = S.clampCamera(
+        { x: ax.p / zoom, y: ay.p / zoom, zoom },
+        stayBounds(),
+        vp(),
+        constraint(),
+      );
+      const step = (a: AxisState, edgeWorld: number) => {
+        if (a.done) return;
+        const r = a.springing
+          ? springStep(a.p, a.v, edgeWorld * zoom, dt)
+          : glideStep(a.p, a.v, dt);
+        a.p = r.p;
+        a.v = r.v;
+        a.done = r.done;
+      };
+      step(ax, cl.x);
+      step(ay, cl.y);
+      // A glide that left the travel range converts to a spring AT the edge —
+      // the incoming velocity carries in, so the bounce grows out of physics
+      // rather than a scripted overshoot.
+      const ncl = S.clampCamera(
+        { x: ax.p / zoom, y: ay.p / zoom, zoom },
+        stayBounds(),
+        vp(),
+        constraint(),
+      );
+      const convert = (a: AxisState, clampedA: number) => {
+        if (!a.springing && Math.abs(clampedA * zoom - a.p) > 1e-6) {
+          a.p = clampedA * zoom;
+          a.springing = true;
+          a.done = false;
+        }
+      };
+      convert(ax, ncl.x);
+      convert(ay, ncl.y);
+      setCamRaw({ x: ax.p / zoom, y: ay.p / zoom, zoom });
+      syncCursorFromCamera();
+      if (ax.done && ay.done) {
+        setCam(cam()); // exact landing: clamped, snapped, settled
+        return;
+      }
+      raf = scheduler.raf(tick);
     };
     raf = scheduler.raf(tick);
   };
@@ -693,8 +929,19 @@ export function createStageCapability(
   // SAME bounds the pan clamp uses (stayBounds: the slice item in paged flow,
   // the scene in continuous). Memoized like visiblePages: a stable reference
   // until a field actually moves, so adapter selectors can use plain equality.
+  const EMPTY_SCROLL_METRICS: S.ScrollMetrics = {
+    scrollLeft: 0,
+    scrollTop: 0,
+    scrollWidth: 0,
+    scrollHeight: 0,
+    clientWidth: 0,
+    clientHeight: 0,
+    scrollableX: false,
+    scrollableY: false,
+  };
   let scrollMemo: S.ScrollMetrics | null = null;
   const scrollMetricsNow = (): S.ScrollMetrics => {
+    if (!ctx.getState().placed) return EMPTY_SCROLL_METRICS;
     const sc = buildScene();
     const m = S.scrollMetrics(
       cam(),
@@ -720,9 +967,11 @@ export function createStageCapability(
 
   // Memoized visiblePages -> stable reference (no useSyncExternalStore tearing loop).
   // Paged renders ONLY the slice's item; continuous renders the camera's query window.
+  const EMPTY_VISIBLE_PAGES: VisiblePage[] = [];
   let visSig = '';
   let vis: VisiblePage[] = [];
   const visiblePages = (): VisiblePage[] => {
+    if (!ctx.getState().placed) return EMPTY_VISIBLE_PAGES;
     const c = cam();
     const v = vp();
     const sc = buildScene();
@@ -743,9 +992,90 @@ export function createStageCapability(
   };
   const snapshotSettings = (): StageSettings => pickSettings(ctx.getState());
 
+  /**
+   * Settings change, reacted per the registry — the strongest effect among the
+   * touched settings wins: 'reflow' ⊃ 'scene'/'refit' ⊃ 'reclamp' ⊃ 'none'.
+   * The ONE reactive applier: the public `update()` and the responsive driver
+   * both land here, so a breakpoint crossing gets exactly the invariant a
+   * hand-written update would.
+   */
+  const applySettings = (patch: Partial<StageSettings>) => {
+    cancelAnim();
+    const touched = (effect: SettingEffect) =>
+      SETTING_KEYS.some((k) => patch[k] !== undefined && SETTINGS_EFFECT[k] === effect);
+    // The change's INVARIANT point: a pure zoom-intent change ('refit' alone)
+    // holds the zoomAlign focal point — zoomTo/fit-mode switches magnify
+    // around the same spot the zoom buttons do; every other reframe holds
+    // the anchorAlign reference. Resolved once, used for capture AND restore.
+    const align =
+      touched('refit') && !touched('scene') && !touched('reflow')
+        ? ctx.getState().zoomAlign
+        : ctx.getState().anchorAlign;
+    const anchor = anchorAt(alignPoint(align, vp())); // capture against the current scene
+    ctx.dispatch({ type: 'PATCH', patch });
+    if (touched('scene')) sceneCache = null;
+    if (touched('reflow')) {
+      // flow toggled: re-place onto the cursor's page under the new flow's scene
+      // (the camera's coordinates are meaningless across the flow boundary).
+      goToTarget(ctx.getState().cursor, { behavior: 'instant' });
+    } else if (touched('scene') || touched('refit')) {
+      reapply(anchor, align); // rebuild + keep page + re-fit (fit-all: re-place the scene)
+    } else if (touched('reclamp')) {
+      setCam(cam()); // clamp policy changed: just re-clamp the current camera
+    }
+    // 'none' (arrivalAlign, zoomAlign, anchorAlign, scrollBehavior): future verbs only
+  };
+
+  // ── responsive settings (container queries for the settings bag) ─────────────
+  // BASE (config + runtime setters) ⊕ matching rules' patches = the EFFECTIVE
+  // settings the reducer holds. Rules assert at TRANSITIONS — box, base, or
+  // rules changes — which is why the sync diffs against the last EFFECTIVE
+  // resolution, never against live state: between crossings interaction owns
+  // the state (a pinch-zoomed level survives a resize unless a rule actually
+  // flips), and keys the rules don't touch never get re-asserted.
+  let base = snapshotSettings();
+  let rules: readonly ResponsiveRule[] = config.responsive ?? DEFAULT_RESPONSIVE;
+  let lastEffective = base; // rules first assert when a real box arrives
+  const publishActive = (active: readonly string[]) => {
+    const prev = ctx.getState().activeRules;
+    if (prev.length !== active.length || active.some((n, i) => n !== prev[i])) {
+      ctx.dispatch({ type: 'RESPONSIVE', active });
+    }
+  };
+  /**
+   * Re-resolve and apply what CHANGED since the last resolution. `react: true`
+   * routes the patch through `applySettings` (full anchor-preserving update);
+   * `react: false` (inside `setViewport`, whose caller runs its own reframe)
+   * just lands the patch + cache invalidation and reports the strongest
+   * effect so the caller can escalate a rule-driven flow flip.
+   */
+  const syncResponsive = (react: boolean): SettingEffect => {
+    const { effective, active } = resolveResponsive(base, rules, boxOf(vp()));
+    const patch: Partial<StageSettings> = {};
+    for (const k of SETTING_KEYS) {
+      if (!eqSetting(effective[k], lastEffective[k])) {
+        Object.assign(patch, { [k]: effective[k] });
+      }
+    }
+    lastEffective = effective;
+    publishActive(active);
+    const keys = Object.keys(patch) as Array<keyof StageSettings>;
+    if (keys.length === 0) return 'none';
+    if (react) {
+      applySettings(patch);
+      return 'none'; // reacted in full — nothing left for the caller
+    }
+    ctx.dispatch({ type: 'PATCH', patch });
+    const rank: Record<SettingEffect, number> = { none: 0, reclamp: 1, refit: 2, scene: 3, reflow: 4 };
+    let strongest: SettingEffect = 'none';
+    for (const k of keys) if (rank[SETTINGS_EFFECT[k]] > rank[strongest]) strongest = SETTINGS_EFFECT[k];
+    if (strongest === 'scene' || strongest === 'reflow') sceneCache = null;
+    return strongest;
+  };
+
   // Initial-view providers (storage restore, deep-link, an explicit prop…). One owner
   // (placeInitial) resolves them by priority — no effect-ordering races.
-  // (`hasPlaced` is declared above the camera-rest detector, which reads it.)
+  // (`placementStarted` is declared above the camera-rest detector, which reads it.)
   const initialViewProviders: Array<{ priority: number; fn: () => StageViewState | null }> = [];
 
   const api: StageCapability = {
@@ -767,6 +1097,7 @@ export function createStageCapability(
         label: p.label ?? null,
       })),
     pageRect: (pon) => {
+      if (!ctx.getState().placed) return null;
       const meta = ctx.document();
       const index = meta ? meta.pages.findIndex((p) => p.pageObjectNumber === pon) : -1;
       if (index < 0) return null;
@@ -862,8 +1193,9 @@ export function createStageCapability(
       // the initial view (storage/deep-link providers, else reset). Every report
       // re-checks the condition — no watch, no effect-registration race, no edge
       // to miss when the viewport was already sized before anyone listened.
-      if (!hasPlaced) {
+      if (!placementStarted) {
         ctx.dispatch({ type: 'VP', vp: v });
+        syncResponsive(false); // rules see the box before placement resolves
         if (v.width > 0 && v.height > 0 && (ctx.document()?.pageCount ?? 0) > 0) {
           api.placeInitial();
         }
@@ -873,7 +1205,16 @@ export function createStageCapability(
       cancelAnim();
       const anchor = currentAnchor(); // measured against the OLD viewport
       ctx.dispatch({ type: 'VP', vp: v }); // new viewport
-      reapply(anchor);
+      // A breakpoint crossing rides the SAME reframe: the rule patch lands
+      // before the anchor is re-applied, so the restore resolves under the
+      // new settings. Only a rule-driven FLOW flip escalates past reapply
+      // (camera coordinates are meaningless across the flow boundary).
+      const fx = syncResponsive(false);
+      if (fx === 'reflow') {
+        goToTarget(ctx.getState().cursor, { behavior: 'instant' });
+      } else {
+        reapply(anchor);
+      }
     },
     setDevicePixelRatio: (ratio) => {
       // Pure device-resolution change: it only affects each page transform's
@@ -888,7 +1229,15 @@ export function createStageCapability(
     },
     panBy: (dx, dy) => {
       cancelAnim();
-      setCam(S.panByScreen(cam(), dx, dy));
+      if (gestureDepth > 0 && gestureElastic) {
+        // Elastic: integrate the finger on the UNCLAMPED camera and display it
+        // through the resistance curve. Initialized from the displayed camera's
+        // inverse, so catching a mid-bounce stretch continues seamlessly.
+        gestureRaw = S.panByScreen(gestureRaw ?? unrubberize(cam()), dx, dy);
+        setCamRaw(rubberize(gestureRaw));
+      } else {
+        setCam(S.panByScreen(cam(), dx, dy));
+      }
       syncCursorFromCamera();
     },
     scrollTo: (opts) => {
@@ -917,8 +1266,12 @@ export function createStageCapability(
       // page-relative focal point: the durable identity of "what's under the cursor"
       const focal = before.itemCount ? S.anchorAtPoint(before, S.toWorld(cam(), pt)) : null;
       setCam(S.zoomAround(cam(), pt, factor));
-      // record the resulting fixed level as the zoom intent — focal, so no re-anchor…
-      ctx.dispatch({ type: 'PATCH', patch: { zoom: { level: cam().zoom } } });
+      // record the resulting fixed level as the zoom intent — focal, so no
+      // re-anchor… deferred to endGesture inside a gesture bracket (one PATCH
+      // per pinch instead of one per event).
+      if (gestureDepth === 0) {
+        ctx.dispatch({ type: 'PATCH', patch: { zoom: { level: cam().zoom } } });
+      }
       // …UNLESS zoom is a LAYOUT INPUT (wrapped grid) and the scene just re-wrapped
       // underneath the camera. The old world point is stale then — re-pin the SAME
       // page-point under the cursor and clamp against the new geometry. In every
@@ -927,7 +1280,85 @@ export function createStageCapability(
       if (after !== before && focal && after.itemCount) {
         setCam(S.cameraForAnchorAtScreen(focal, after, pt, cam().zoom));
       }
+      // A zoom write mid-elastic-gesture (pinch) re-bases the pan integrator:
+      // bounds just changed shape under the stretch, so the displayed camera
+      // becomes the new reference and resistance re-accumulates from here.
+      if (gestureDepth > 0 && gestureElastic) gestureRaw = unrubberize(cam());
       syncCursorFromCamera();
+    },
+    beginGesture: (options) => {
+      gestureDepth++;
+      if (gestureDepth === 1) {
+        cancelAnim(); // catch: the next touch-down stops any tween or fling
+        gestureZoomed = false;
+        gestureElastic = options?.elastic === true;
+        gestureRaw = null;
+      }
+    },
+    endGesture: () => {
+      if (gestureDepth === 0) return;
+      gestureDepth--;
+      if (gestureDepth > 0) return;
+      gestureRaw = null;
+      const wasElastic = gestureElastic;
+      gestureElastic = false;
+      if (gestureZoomed) {
+        gestureZoomed = false;
+        // The deferred zoom intent: ONE patch for the whole gesture. (In a
+        // wrapped grid this may re-wrap the scene; the next reframe
+        // re-anchors through the normal update path.)
+        ctx.dispatch({ type: 'PATCH', patch: { zoom: { level: cam().zoom } } });
+        armRest(); // the gesture is over — NOW the 150 ms rest countdown runs
+      }
+      syncCursorFromCamera();
+      if (wasElastic) {
+        // Released while stretched → spring home. A fling() arriving right
+        // after simply re-enters the same physics with the release velocity.
+        const c = cam();
+        const cl = S.clampCamera(c, stayBounds(), vp(), constraint());
+        if (cl.x !== c.x || cl.y !== c.y) startCameraPhysics(0, 0);
+      }
+    },
+    fling: (vx, vy) => startCameraPhysics(vx, vy),
+    cameraInMotion: () => raf !== 0,
+    doubleTapZoom: (pt) => {
+      cancelAnim();
+      const sc0 = buildScene();
+      if (!sc0.itemCount) return;
+      const item = paged() ? sc0.items[0] : sc0.items[itemIndexOfPage(ctx.getState().cursor)];
+      // The ladder (the platform convention): ascending READING POSTURES, each
+      // derived from a zoom intent — see the page (automatic), read the text
+      // (fit-width), inspect (2.5× the automatic fit). Stops within 10% of a
+      // neighbor collapse — on phones automatic IS fit-width, so the ladder
+      // degenerates to the familiar two-state toggle.
+      //
+      // The rule (iOS's): the ladder ascends only from ON a rung — a tap at a
+      // posture moves to the next, wrapping past the top. A pinch to any
+      // OTHER level is leaving the ladder, and double-tap there is a RESET to
+      // the base fit ("take me back to reading"), never a further zoom-in.
+      const fit = fitBox(item);
+      const auto = S.resolveZoom({ mode: S.ZoomMode.Automatic }, fit, vp(), pad());
+      const fitW = S.resolveZoom({ mode: S.ZoomMode.FitWidth }, fit, vp(), pad());
+      const stops = [auto, fitW, Math.min(auto * 2.5, S.ZOOM_MAX)]
+        .sort((a, b) => a - b)
+        .filter((z, i, all) => i === 0 || z > all[i - 1] * 1.1);
+      // the same ±10% band the dedupe uses: "at a posture" tolerates fit drift
+      const near = (z: number, stop: number) => z > stop / 1.1 && z < stop * 1.1;
+      const onRung = stops.findIndex((s) => near(cam().zoom, s));
+      const target = onRung >= 0 ? stops[(onRung + 1) % stops.length] : stops[0];
+      // The INTENT commits UP FRONT (the `reveal` precedent): a caught tween
+      // must never leave the camera on some intermediate zoom while the stored
+      // intent still says "fit" — the next refit would snap somewhere the user
+      // didn't ask for. Interrupted or not, the record says where we were going.
+      ctx.dispatch({ type: 'PATCH', patch: { zoom: { level: target } } });
+      // Wrapped grids re-layout on the intent change — anchor the focal point
+      // against the scene that will actually be on screen.
+      const sc = buildScene();
+      if (!sc.itemCount) return;
+      const focal = S.anchorAtPoint(sc, S.toWorld(cam(), pt));
+      // The focal-anchored tween: the tapped point holds still by construction
+      // (linear coordinate lerps would swing it mid-flight — the "dip").
+      animateZoomAnchored(focal, pt, target, 240, syncCursorFromCamera);
     },
     // Pointer-less zooms magnify around the zoomAlign focal point (pinch and
     // wheel pass their own pointer to zoomAround — physics beats policy).
@@ -944,7 +1375,7 @@ export function createStageCapability(
       // re-place against the now-current scene, keeping the anchored page-point.
       // No-op until the first placement; the scene is re-keyed on the registry
       // revision, so `reapply` reads the rotated footprint.
-      if (!hasPlaced) return;
+      if (!placementStarted) return;
       cancelAnim();
       reapply(currentAnchor());
     },
@@ -1055,34 +1486,20 @@ export function createStageCapability(
     },
     next: (opts) => step(1, opts),
     prev: (opts) => step(-1, opts),
+    lensId: () => ctx.id,
     update: (patch) => {
-      cancelAnim();
-      // React per the registry — the strongest effect among the touched settings
-      // wins: 'reflow' ⊃ 'scene'/'refit' ⊃ 'reclamp' ⊃ 'none'.
-      const touched = (effect: SettingEffect) =>
-        SETTING_KEYS.some((k) => patch[k] !== undefined && SETTINGS_EFFECT[k] === effect);
-      // The change's INVARIANT point: a pure zoom-intent change ('refit' alone)
-      // holds the zoomAlign focal point — zoomTo/fit-mode switches magnify
-      // around the same spot the zoom buttons do; every other reframe holds
-      // the anchorAlign reference. Resolved once, used for capture AND restore.
-      const align =
-        touched('refit') && !touched('scene') && !touched('reflow')
-          ? ctx.getState().zoomAlign
-          : ctx.getState().anchorAlign;
-      const anchor = anchorAt(alignPoint(align, vp())); // capture against the current scene
-      ctx.dispatch({ type: 'PATCH', patch });
-      if (touched('scene')) sceneCache = null;
-      if (touched('reflow')) {
-        // flow toggled: re-place onto the cursor's page under the new flow's scene
-        // (the camera's coordinates are meaningless across the flow boundary).
-        goToTarget(ctx.getState().cursor, { behavior: 'instant' });
-      } else if (touched('scene') || touched('refit')) {
-        reapply(anchor, align); // rebuild + keep page + re-fit (fit-all: re-place the scene)
-      } else if (touched('reclamp')) {
-        setCam(cam()); // clamp policy changed: just re-clamp the current camera
-      }
-      // 'none' (arrivalAlign, zoomAlign, anchorAlign, scrollBehavior): future verbs only
+      // Writes the responsive BASE; the resolver decides what actually lands
+      // (a matching rule's key wins until its rule stops matching). With no
+      // rules in play this degenerates to exactly the old direct update.
+      base = mergeSettings(base, patch);
+      syncResponsive(true);
     },
+    setResponsive: (next) => {
+      rules = next;
+      syncResponsive(true);
+    },
+    matches: (name) => ctx.getState().activeRules.includes(name),
+    activeRules: () => ctx.getState().activeRules,
     setFlow: (flow) => api.update({ flow }),
     setLayout: (layout) => api.update({ layout }),
     setSpread: (spread) => api.update({ spread }),
@@ -1103,7 +1520,14 @@ export function createStageCapability(
     setScrollBehavior: (behavior) => api.update({ scrollBehavior: behavior }),
     applyViewState: (view) => {
       cancelAnim();
-      ctx.dispatch({ type: 'PATCH', patch: pickSettings(view) });
+      // A restored view is app-level state: it writes the BASE, and the rules
+      // re-assert on top — so a snapshot saved on a desktop restores compact
+      // padding on a phone. One PATCH carries the full effective result.
+      base = mergeSettings(base, pickSettings(view));
+      const { effective, active } = resolveResponsive(base, rules, boxOf(vp()));
+      lastEffective = effective;
+      publishActive(active);
+      ctx.dispatch({ type: 'PATCH', patch: effective });
       ctx.dispatch({ type: 'CURSOR', cursor: view.cursor ?? 0 });
       sceneCache = null;
       applyAnchor(view.anchor);
@@ -1112,16 +1536,21 @@ export function createStageCapability(
       initialViewProviders.push({ priority, fn });
     },
     placeInitial: () => {
-      hasPlaced = true;
+      placementStarted = true;
       const sorted = [...initialViewProviders].sort((a, b) => b.priority - a.priority);
       for (const p of sorted) {
         const view = p.fn();
         if (view) {
           api.applyViewState(view);
+          ctx.dispatch({ type: 'PLACED' });
           return;
         }
       }
       api.resetView();
+      // Publish renderability LAST. The VP/responsive/camera writes above are
+      // still ordinary observable store updates, but page/scroll render-root
+      // selectors return stable empty values until this commit lands.
+      ctx.dispatch({ type: 'PLACED' });
     },
     // Home = page 0, a fresh arrival at arrivalAlign (the clamp collapses any
     // fitting axis to its fitAlign rest point).

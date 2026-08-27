@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/plugin-page-edit",
-  "version": "3.0.0-next.6",
+  "version": "3.0.0-next.8",
   "private": false,
   "description": "Document-scoped page-edit capability: PON-addressed rotate/move/delete over the engine DocumentHandle. Owns relative→absolute rotation so framework adapters never re-derive it; the home for pending/undo/gating state.",
   "type": "module",

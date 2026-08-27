@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { wheelZoomFactor } from '../src/wheel';
+import { wheelZoomFactor } from './wheel';
 
 const px = (deltaY: number, mods: { ctrl?: boolean; meta?: boolean } = {}) => ({
   deltaY,

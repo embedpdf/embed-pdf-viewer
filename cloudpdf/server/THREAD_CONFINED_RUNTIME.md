@@ -110,3 +110,54 @@ matters — see below).
   a process pool (multiple single-thread pods) over a large in-process pool.
 - Keep `pdf_use_partition_alloc=false` (or make `g_allocators` thread_local if
   it is ever re-enabled).
+
+## Threat model: what a compromised engine can reach
+
+PDFium parses attacker-controlled bytes; assume an eventual RCE in the
+engine process and design for containment, honestly labelled.
+
+**Credential-exposure reduction (built, test-asserted — honestly scoped):**
+
+- The host child is forked with a whitelisted env — no `CLOUDPDF_DB_URL`,
+  no JWT secret, no license key, no object-store credentials
+  (`hostEnvWhitelist`; the integration suite asserts the child's env
+  snapshot), and `NODE_OPTIONS` is stripped so an inherited `--inspect`
+  cannot open a debug port in the engine process. The engine cannot
+  authenticate with credentials inherited through its OWN environment.
+- This is exposure REDUCTION, not a hard boundary: the engine is a
+  same-container, same-UID child. Whether it can read the API process's
+  memory or `/proc/<pid>/environ` is gated by the kernel's ptrace access
+  policy (`kernel.yama.ptrace_scope`, a NODE-level sysctl in
+  Kubernetes) — commonly restrictive, not guaranteed. `HOME` and the
+  container filesystem remain shared. A documented follow-up hardening
+  is marking the API process non-dumpable (`PR_SET_DUMPABLE=0`), which
+  closes same-UID `/proc` access regardless of Yama policy.
+- Durable state integrity IS a hard property: a lying engine can corrupt
+  its own outputs, but the write pipeline's generation fence and version
+  CAS mean it cannot silently bless stale state as committed.
+
+**What it CAN reach (containment is the deployment's job):**
+
+- The pod network (NetworkPolicy narrows it; in-pod it can reach the API
+  process's ports).
+- The base/layer cache files it renders from (read), and its IPC channel
+  to the parent (it can lie in results — clients must treat rendered
+  output as untrusted content, which browsers do by construction).
+- The kernel syscall surface, minus seccomp `RuntimeDefault`. A sandbox
+  runtime (`runtimeClassName`: gVisor/Kata) adds kernel-exploit
+  containment at syscall-emulation cost — scoped honestly: RuntimeClass
+  applies to the POD's containers, strengthening pod-to-node isolation;
+  it does not separate the engine from the API process inside the pod.
+
+**Honest non-layers:** in-process Node sandboxing (permission model,
+frozen intrinsics) is theater against native code and is not used as a
+security boundary. A sidecar-container split was evaluated and NOT
+built: Kubernetes NetworkPolicy cannot distinguish containers within a
+pod, so the network edge it intuitively promises is not delivered; the
+env whitelist already provides the secrets boundary. Revisit on
+enterprise pull.
+
+**Blast-radius mechanics (built):** a crash costs one engine respawn
+(sub-second, backoff-capped); repeat crashers are quarantined by
+`(base_sha, engine_build)` with sole-suspect attribution; admission
+control sheds overload as 503s instead of queueing unboundedly.

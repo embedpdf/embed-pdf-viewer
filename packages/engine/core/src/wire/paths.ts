@@ -63,8 +63,23 @@ import {
 export const DEFAULT_LAYER_NAME = 'default';
 
 export const wirePaths = {
-  /** POST: grant document access/caching credentials for the current bearer. */
-  access: '/v1/access',
+  /**
+   * POST: grant access/caching credentials for the current bearer on
+   * the document + layer namespace the path names (cross-checked
+   * against the token like every layer route — the grant is
+   * layer-scoped in substance: CDN coverage, scopes, and the client's
+   * binding all carry the layer). Path-addressed so the affinity tier —
+   * the `X-CloudPDF-Doc` header derivation AND the chart's uri-mode
+   * regex — pins the session bootstrap to the document's pod from the
+   * very first request. Default-layer callers spell `layers/default/`,
+   * same as every other layer route.
+   */
+  access: (docId: string, layerName: string) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/access`,
+
+  /** Deprecated alias (docId in the BODY) — served for one prerelease
+   *  cycle so pre-rename clients keep working; remove after. */
+  accessLegacy: '/v1/access',
 
   /**
    * GET: open the document referenced by the doc-scoped JWT and

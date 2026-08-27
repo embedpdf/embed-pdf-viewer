@@ -167,3 +167,110 @@ describe('annotation draw handler — grouped ink', () => {
     }
   });
 });
+
+describe('annotation edit handler — touch consent + cancel', () => {
+  it('claimsTouch delegates to the capability predicate, page-gated', () => {
+    const asked: Array<{ pon: number; point: Vec }> = [];
+    const anno = {
+      claimsTouchAt: (pon: number, point: Vec) => {
+        asked.push({ pon, point });
+        return true;
+      },
+    } as unknown as AnnotationHostCapability;
+    const h = createEditHandler(anno, interaction);
+    expect(h.claimsTouch?.(sample({ phase: 'down' }))).toBe(false); // no page → never
+    expect(asked.length).toBe(0);
+    expect(
+      h.claimsTouch?.(sample({ phase: 'down', page: { pon: PAGE_1, point: { x: 5, y: 6 } } })),
+    ).toBe(true);
+    expect(asked).toEqual([{ pon: PAGE_1, point: { x: 5, y: 6 } }]);
+  });
+
+  it('onCancel REVERTS to the down point and closes there (no half-moved commit)', () => {
+    const { anno, calls } = makeAnno();
+    const h = createEditHandler(anno, interaction);
+    h.onDown(down()); // down at (300, 730)
+    h.onMove?.(sample({ page: { pon: PAGE_1, point: { x: 350, y: 780 } } }));
+    h.onCancel?.(sample({ phase: 'cancel' }));
+    // the replay: move back to the origin, then up at the origin
+    expect(calls.slice(-2)).toEqual([
+      { phase: 'move', pon: PAGE_1, point: { x: 300, y: 730 } },
+      { phase: 'up', pon: PAGE_1, point: { x: 300, y: 730 } },
+    ]);
+    // and the gesture is CLOSED: further moves route nothing
+    const n = calls.length;
+    h.onMove?.(sample({ page: { pon: PAGE_1, point: { x: 1, y: 1 } } }));
+    expect(calls.length).toBe(n);
+  });
+});
+
+describe('annotation draw handler — cancel discards the draft', () => {
+  function makeDrawAnno() {
+    const calls: Array<{ fn: string; args: unknown[] }> = [];
+    const anno = {
+      toolSubtype: () => 'square',
+      tool: () => undefined,
+      createPointer: (...args: unknown[]) => calls.push({ fn: 'createPointer', args }),
+      cancelCreationDraft: () => calls.push({ fn: 'cancelCreationDraft', args: [] }),
+      finishInkDraft: () => calls.push({ fn: 'finishInkDraft', args: [] }),
+    } as unknown as AnnotationHostCapability;
+    return { anno, calls };
+  }
+  const drawInteraction = {
+    activeToolId: () => 'square',
+    onToolChange: () => () => {},
+  } as unknown as InteractionCapability;
+
+  it('onCancel drops the draft — no up, no commit at the cancelling finger', () => {
+    const { anno, calls } = makeDrawAnno();
+    const h = createDrawHandler(anno, drawInteraction);
+    expect(h.onDown(down())).toBe(true);
+    h.onMove?.(sample({ page: { pon: PAGE_1, point: { x: 350, y: 780 } } }));
+    // the cancel sample carries the SECOND finger's position — it must never
+    // become the shape's final point
+    h.onCancel?.(sample({ phase: 'cancel', page: { pon: PAGE_1, point: { x: 40, y: 40 } } }));
+    expect(calls.at(-1)?.fn).toBe('cancelCreationDraft');
+    expect(calls.filter((c) => c.fn === 'createPointer' && c.args[1] === 'up')).toHaveLength(0);
+    // gesture is closed: further moves route nothing
+    const n = calls.length;
+    h.onMove?.(sample({ page: { pon: PAGE_1, point: { x: 1, y: 1 } } }));
+    expect(calls.length).toBe(n);
+  });
+});
+
+describe('annotation edit handler — double-click / long-press routing', () => {
+  function makeEditAnno(freeText: boolean) {
+    const calls: string[] = [];
+    const anno = {
+      currentEditing: () => null,
+      endTextEdit: () => {},
+      hitKind: () => 'annot',
+      deselect: () => {},
+      beginTextEditAt: () => {
+        calls.push('beginTextEditAt');
+        return freeText;
+      },
+      cursorAt: () => null,
+      editPointer: (phase: string) => calls.push(`edit:${phase}`),
+    } as unknown as AnnotationHostCapability;
+    return { anno, calls };
+  }
+
+  it('over a FREE-TEXT box: enters text edit, no move armed', () => {
+    const { anno, calls } = makeEditAnno(true);
+    const h = createEditHandler(anno, interaction);
+    expect(
+      h.onDown(sample({ phase: 'down', clickCount: 2, page: { pon: PAGE_1, point: { x: 1, y: 2 } } })),
+    ).toBe(true);
+    expect(calls).toEqual(['beginTextEditAt']);
+  });
+
+  it('over any OTHER annotation: falls through to a normal press (select/move), not a swallowed no-op', () => {
+    const { anno, calls } = makeEditAnno(false);
+    const h = createEditHandler(anno, interaction);
+    expect(
+      h.onDown(sample({ phase: 'down', clickCount: 2, page: { pon: PAGE_1, point: { x: 1, y: 2 } } })),
+    ).toBe(true);
+    expect(calls).toEqual(['beginTextEditAt', 'edit:down']); // the press proceeded
+  });
+});

@@ -54,7 +54,6 @@ import {
   type RequestJwtContext,
 } from '../app/jwt-plugin';
 import { SharpImageEncoder } from '../render/SharpImageEncoder';
-import type { WorkerThreadPool } from '../runtime/WorkerThreadPool';
 import type { CloudRevisionBridge } from '../services/CloudRevisionBridge';
 import type { DerivedRenderService } from '../services/DerivedRenderService';
 import type { DocumentService, OpenContext } from '../services/DocumentService';
@@ -64,9 +63,11 @@ import type { WeakAnnotationSessionService } from '../services/WeakAnnotationSes
 interface AnnotationRouteDeps {
   documentService: DocumentService;
   layerService: LayerService;
-  pool: WorkerThreadPool;
   revisionBridge: CloudRevisionBridge;
   imageEncoder: SharpImageEncoder;
+  /** Encode appearance renders in the engine worker by default.
+   *  `false` = the `CLOUDPDF_ENCODE_IN_ENGINE=0` escape hatch. */
+  encodeInEngine?: boolean;
   weakAnnotationSessions?: WeakAnnotationSessionService;
   /** Render-lattice policy plane (absent = legacy compute-only). */
   derivedRenders?: DerivedRenderService;
@@ -83,12 +84,12 @@ export async function registerAnnotationRoutes(
   const {
     documentService,
     layerService,
-    pool,
     revisionBridge,
     imageEncoder,
     weakAnnotationSessions,
     derivedRenders,
   } = deps;
+  const encodeInEngine = deps.encodeInEngine ?? true;
 
   // ── Plane-scoped doc-level reads: a base's own annotations —
   //    weak-identity ones included — are simply VISIBLE through every
@@ -105,7 +106,6 @@ export async function registerAnnotationRoutes(
     ]);
     return readAnnotations({
       documentService,
-      pool,
       revisionBridge,
       reply,
       signal: abortSignalFromRequest(req),
@@ -129,8 +129,8 @@ export async function registerAnnotationRoutes(
       ]);
       return renderAnnotationAppearances({
         documentService,
-        pool,
         imageEncoder,
+        encodeInEngine,
         ...(derivedRenders ? { derivedRenders } : {}),
         reply,
         signal: abortSignalFromRequest(req),
@@ -160,7 +160,6 @@ export async function registerAnnotationRoutes(
       const ctx = requireLayerResource(req, docId, layerName, 'annotations-read', pdfBits);
       return readAnnotations({
         documentService,
-        pool,
         revisionBridge,
         reply,
         signal: abortSignalFromRequest(req),
@@ -186,7 +185,6 @@ export async function registerAnnotationRoutes(
     const ctx = requireLayerResource(req, docId, layerName, 'annotations-read', pdfBits);
     return readAnnotations({
       documentService,
-      pool,
       revisionBridge,
       reply,
       signal: abortSignalFromRequest(req),
@@ -216,8 +214,8 @@ export async function registerAnnotationRoutes(
       const ctx = requireLayerResource(req, docId, layerName, 'annotations-read', pdfBits);
       return renderAnnotationAppearances({
         documentService,
-        pool,
         imageEncoder,
+        encodeInEngine,
         ...(derivedRenders ? { derivedRenders } : {}),
         reply,
         signal: abortSignalFromRequest(req),
@@ -247,8 +245,8 @@ export async function registerAnnotationRoutes(
       const ctx = requireLayerResource(req, docId, layerName, 'annotations-read', pdfBits);
       return renderAnnotationAppearances({
         documentService,
-        pool,
         imageEncoder,
+        encodeInEngine,
         ...(derivedRenders ? { derivedRenders } : {}),
         reply,
         signal: abortSignalFromRequest(req),
@@ -685,8 +683,8 @@ function buildUpdateActor(
 
 async function renderAnnotationAppearances(input: {
   documentService: DocumentService;
-  pool: WorkerThreadPool;
   imageEncoder: SharpImageEncoder;
+  encodeInEngine: boolean;
   derivedRenders?: DerivedRenderService;
   reply: FastifyReply;
   signal: AbortSignal;
@@ -759,61 +757,133 @@ async function renderAnnotationAppearances(input: {
     ...annotationRenderOptionsFromImageOptions(imageOptions),
     ...(derived !== undefined ? { maxOutputPixels: derived.maxRenderPixels } : {}),
   };
-  const build = (jobId: WorkerJobId) =>
-    wirePack({
-      kind: 'annotations.renderAppearances' as const,
-      jobId,
-      docId: input.scope.docId,
-      ...(input.scope.kind === 'layer' ? { layerName: input.scope.layerName } : {}),
-      pageObjectNumber: input.pageObjectNumber,
-      options: renderOptions,
-    });
-  const payload = await input.pool.run(input.scope.docId, build, input.signal);
-  if (payload.tag !== 'annotations.renderAppearances') {
-    throw new EngineError(
-      EngineErrorCode.WireFormat,
-      `unexpected annotations.renderAppearances payload: ${payload.tag}`,
-    );
-  }
-  // The worker payload nests the render result under `.result`
-  // (`{ tag, result: { pageState, appearances } }`), unlike the flat
-  // `pages.render` payload — unwrap it before consuming.
-  const result = payload.result;
-
-  // Encode each appearance to the requested format. Every annotation with an
-  // appearance stream is emitted — including weak (index-only) ones: the client
-  // addresses the image by `part` name and identifies the annotation by `ref`.
-  const entries: AnnotationAppearanceManifestEntry[] = [];
-  const parts: MultipartPart[] = [];
-  let i = 0;
-  for (const appearance of result.appearances) {
-    const encoded = input.imageEncoder.encode(appearance.raster, {
-      format,
-      ...(imageOptions.quality !== undefined ? { quality: imageOptions.quality } : {}),
-    });
-    const body = await encoded.stream.toBuffer();
-    const partName = `appearance-${i++}`;
+  // Both branches produce the same manifest ingredients. In-engine encode
+  // With in-engine encoding (the default), the appearance raster batch never leaves
+  // the worker — it crosses the engine boundary as compressed images.
+  // The legacy branch (CLOUDPDF_ENCODE_IN_ENGINE=0) keeps API-side sharp
+  // on the raw raster payload for one release.
+  const collect = async (): Promise<{
+    pageState: AnnotationAppearanceManifest['pageState'];
+    entries: AnnotationAppearanceManifestEntry[];
+    parts: MultipartPart[];
+  }> => {
+    const entries: AnnotationAppearanceManifestEntry[] = [];
+    const parts: MultipartPart[] = [];
     const ext = format === 'webp' ? 'webp' : 'png';
-    entries.push({
-      part: partName,
-      ref: appearance.ref,
-      mode: appearance.mode,
-      rect: appearance.rect,
-      width: appearance.raster.width,
-      height: appearance.raster.height,
-      format,
-      contentType: encoded.contentType,
-    });
-    parts.push({
-      name: partName,
-      filename: `${partName}.${ext}`,
-      contentType: encoded.contentType,
-      body,
-    });
-  }
+    let i = 0;
+    if (input.encodeInEngine) {
+      const build = (jobId: WorkerJobId) =>
+        wirePack({
+          kind: 'annotations.renderAppearancesEncoded' as const,
+          jobId,
+          docId: input.scope.docId,
+          ...(input.scope.kind === 'layer' ? { layerName: input.scope.layerName } : {}),
+          pageObjectNumber: input.pageObjectNumber,
+          options: renderOptions,
+          encode: {
+            format,
+            ...(imageOptions.quality !== undefined ? { quality: imageOptions.quality } : {}),
+          },
+        });
+      const scope = input.scope;
+      const payload = await input.documentService.readOnPool(
+        scope.ctx,
+        scope.docId,
+        scope.kind === 'layer' ? scope.layerName : undefined,
+        build,
+        input.signal,
+      );
+      if (payload.tag !== 'annotations.renderAppearancesEncoded') {
+        throw new EngineError(
+          EngineErrorCode.WireFormat,
+          `unexpected annotations.renderAppearancesEncoded payload: ${payload.tag}`,
+        );
+      }
+      // Every annotation with an appearance stream is emitted — including
+      // weak (index-only) ones: the client addresses the image by `part`
+      // name and identifies the annotation by `ref`.
+      for (const appearance of payload.result.appearances) {
+        const partName = `appearance-${i++}`;
+        entries.push({
+          part: partName,
+          ref: appearance.ref,
+          mode: appearance.mode,
+          rect: appearance.rect,
+          width: appearance.image.width,
+          height: appearance.image.height,
+          format,
+          contentType: appearance.image.contentType,
+        });
+        parts.push({
+          name: partName,
+          filename: `${partName}.${ext}`,
+          contentType: appearance.image.contentType,
+          body: Buffer.from(appearance.image.bytes),
+        });
+      }
+      return { pageState: payload.result.pageState, entries, parts };
+    }
+    const build = (jobId: WorkerJobId) =>
+      wirePack({
+        kind: 'annotations.renderAppearances' as const,
+        jobId,
+        docId: input.scope.docId,
+        ...(input.scope.kind === 'layer' ? { layerName: input.scope.layerName } : {}),
+        pageObjectNumber: input.pageObjectNumber,
+        options: renderOptions,
+      });
+    const scope = input.scope;
+    const payload = await input.documentService.readOnPool(
+      scope.ctx,
+      scope.docId,
+      scope.kind === 'layer' ? scope.layerName : undefined,
+      build,
+      input.signal,
+    );
+    if (payload.tag !== 'annotations.renderAppearances') {
+      throw new EngineError(
+        EngineErrorCode.WireFormat,
+        `unexpected annotations.renderAppearances payload: ${payload.tag}`,
+      );
+    }
+    // The worker payload nests the render result under `.result`
+    // (`{ tag, result: { pageState, appearances } }`), unlike the flat
+    // `pages.render` payload — unwrap it before consuming.
+    const result = payload.result;
+
+    // Encode each appearance to the requested format. Every annotation with an
+    // appearance stream is emitted — including weak (index-only) ones: the client
+    // addresses the image by `part` name and identifies the annotation by `ref`.
+    for (const appearance of result.appearances) {
+      const encoded = input.imageEncoder.encode(appearance.raster, {
+        format,
+        ...(imageOptions.quality !== undefined ? { quality: imageOptions.quality } : {}),
+      });
+      const body = await encoded.stream.toBuffer();
+      const partName = `appearance-${i++}`;
+      entries.push({
+        part: partName,
+        ref: appearance.ref,
+        mode: appearance.mode,
+        rect: appearance.rect,
+        width: appearance.raster.width,
+        height: appearance.raster.height,
+        format,
+        contentType: encoded.contentType,
+      });
+      parts.push({
+        name: partName,
+        filename: `${partName}.${ext}`,
+        contentType: encoded.contentType,
+        body,
+      });
+    }
+    return { pageState: result.pageState, entries, parts };
+  };
+  const { pageState, entries, parts } = await collect();
 
   const manifest: AnnotationAppearanceManifest = {
-    pageState: result.pageState,
+    pageState,
     appearances: entries,
   };
 
@@ -891,7 +961,6 @@ function rejectQueryParamsOnTokenUrl(query: unknown): void {
 
 async function readAnnotations(input: {
   documentService: DocumentService;
-  pool: WorkerThreadPool;
   revisionBridge: CloudRevisionBridge;
   reply: { header(name: 'Cache-Control', value: string): unknown };
   signal: AbortSignal;
@@ -930,7 +999,14 @@ async function readAnnotations(input: {
       ...(input.scope.kind === 'layer' ? { layerName: input.scope.layerName } : {}),
       pageObjectNumber: input.pageObjectNumber,
     });
-  const result = await input.pool.run(input.scope.docId, build, input.signal);
+  const scope = input.scope;
+  const result = await input.documentService.readOnPool(
+    scope.ctx,
+    scope.docId,
+    scope.kind === 'layer' ? scope.layerName : undefined,
+    build,
+    input.signal,
+  );
   if (result.tag !== 'annotations.listFullPage') {
     throw new EngineError(
       EngineErrorCode.WireFormat,

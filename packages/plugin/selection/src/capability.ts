@@ -298,17 +298,21 @@ export function createSelectionCapability(
   // Set the selection to a flat [from,to] glyph span on one page (word/line).
   // These are GESTURE vocabulary (double-/triple-click) — the commit arrives
   // at the pointer-up that follows, so the span counts as in-flight until then.
-  function selectSpanAt(pon: PageObjectNumber, point: Point, expand: 'word' | 'line'): void {
+  // Returns whether a span actually engaged (geometry present AND a glyph
+  // under the point) — the fact haptics and other success-gated feedback key
+  // on, so nothing ever buzzes over blank space.
+  function selectSpanAt(pon: PageObjectNumber, point: Point, expand: 'word' | 'line'): boolean {
     const geom = geometryFor(pon);
-    if (!geom) return;
+    if (!geom) return false;
     const i = glyphAt(geom, point);
-    if (i == null) return;
+    if (i == null) return false;
     const [from, to] =
       expand === 'word'
         ? expandTextRangeToWord(geom.layout, i)
         : expandTextRangeToLine(geom.layout, i);
     setSelecting(true);
     recompute({ anchor: { pon, glyph: from }, focus: { pon, glyph: to } });
+    return true;
   }
 
   function assertCanSelect(context: string): void {

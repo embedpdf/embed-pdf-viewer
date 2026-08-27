@@ -1,5 +1,13 @@
 # @embedpdf/engine
 
+## 3.0.0-next.8
+
+## 3.0.0-next.7
+
+### Patch Changes
+
+- [#775](https://github.com/embedpdf/embed-pdf-viewer/pull/775) by [@bobsingor](https://github.com/bobsingor) – Update the generated default WASM URL to use the current engine runtime release instead of the previous prerelease.
+
 ## 3.0.0-next.6
 
 ### Patch Changes

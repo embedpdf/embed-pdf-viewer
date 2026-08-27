@@ -5,6 +5,8 @@ description: Add visual and programmatic text selection without requiring a DOM 
 
 {/* Generated from docs/content — edit there, then `pnpm docs:sync`. */}
 
+import { Cards, Card } from '@/components/docs/cards';
+
 # Selection
 
 The Selection plugin lets people select text with the pointer, and lets your
@@ -23,15 +25,13 @@ Register the interaction, selection, Stage, and render plugins. Then add a
 <Example name="selection/basic" mode="open" />
 
 > **Try it:** drag over text, double-click a word, or triple-click a line. A
-> selection can continue from one page to another.
+> selection can continue from one page to another. On a touch screen,
+> long-press a word and drag the handles.
 
-There are two small but important pieces in the example:
-
-- `stagePlugin({ interaction: true })` connects the Stage to the shared
-  interaction system.
-- `<Stage interaction>` sends pointer events through that system. The
-  Selection plugin handles them, while `<SelectionLayer>` only draws the
-  result.
+Registering `interactionPlugin()` is the whole wiring. It is the shared input
+system every tool speaks through: the Stage sends its pointer events there,
+the Selection plugin handles them, and `<SelectionLayer>` only draws the
+result.
 
 This keeps input, selection state, and rendering separate. You can replace the
 highlight layer without changing how selection works.
@@ -176,6 +176,68 @@ to the selected text while the user scrolls or zooms.
 The menu only handles placement. Its contents are yours: copy, comment,
 highlight, redact, or any action your product supports.
 
+## Selection on touch
+
+A finger has no caret to drag, so touch selection works the way it does
+everywhere else on a phone: **long-press a word to select it, then drag the
+handles to grow the selection.** Add `<SelectionHandles>` next to your menu in
+the Stage's `overlay`:
+
+```tsx
+import { SelectionHandles, SelectionLayer } from '@embedpdf/react/selection';
+
+<Stage
+  overlay={
+    <>
+      <SelectionMenu>
+        <CopyButton />
+      </SelectionMenu>
+      <SelectionHandles />
+    </>
+  }
+>
+  {() => (
+    <>
+      <RenderLayer />
+      <SelectionLayer />
+    </>
+  )}
+</Stage>;
+```
+
+Each handle is a caret bar that forms the selection's own edge, capped by a
+circle above the first line and below the last. The bar scales with zoom like
+the text; the circle stays the same size on screen. Dragging one extends from
+the *opposite* end, snapping to glyphs and crossing pages just like a pointer
+drag — the same `onChange` and `onCommit` signals fire.
+
+Grabbing a handle never pans the Stage, and everywhere else a finger still
+scrolls and pinch-zooms normally. Pass `color` to match your theme, and
+`token` when the selection belongs to a secondary Stage.
+
+## Haptic feedback
+
+Register a feedback provider and a touch long-press that lands on a word gives
+the small tick people expect from a native selection:
+
+```tsx
+import { feedbackPlugin, vibrationFeedback } from '@embedpdf/react/interaction';
+
+const plugins = [
+  // …
+  interactionPlugin(),
+  feedbackPlugin({ provider: vibrationFeedback }),
+  selectionPlugin(),
+];
+```
+
+It is optional and safe to leave in: without a provider nothing buzzes, and
+`vibrationFeedback` is a silent no-op wherever the Vibration API is missing —
+iOS Safari included, until Apple ships a web haptics API. Long-pressing blank
+space never fires, and a mouse double-click never does either. In a native
+shell, install a message handler and pass `wkFeedback('yourHandlerName')`
+instead.
+
 ## Selection and copy permissions
 
 Selection geometry and literal text are separate resources:
@@ -237,3 +299,28 @@ Application code should import this public surface from
 `@embedpdf/plugin-selection` or its framework adapter. The `/internal` entry
 point is for framework and plugin integration and is not a public application
 contract.
+
+## Next steps
+
+<Cards>
+  <Card
+    title="Text"
+    description="The engine side of text: extraction, search, and the character geometry selection is built on."
+    href="/docs/engine/core-concepts/text"
+  />
+  <Card
+    title="Render"
+    description="How the pages under your selection layer get their pixels."
+    href="./render"
+  />
+  <Card
+    title="Stage"
+    description="Layout, zoom, and navigation — the view your selection lives in."
+    href="./stage"
+  />
+  <Card
+    title="All plugins"
+    description="The rest of the capabilities you can register."
+    href="../plugins"
+  />
+</Cards>

@@ -407,6 +407,43 @@ jobs:
       - name: Verify manifest
         run: docker buildx imagetools inspect 'ghcr.io/embedpdf/cloudpdf-server:${{ steps.ver.outputs.version }}'
 
+  # The Helm chart ships as an OCI artifact in the same registry, version-
+  # locked to the npm package and the image. It publishes only after
+  # merge-image verified the image manifest, so an installable chart's
+  # default image (tag = appVersion) always exists. Helm treats `-next.N`
+  # versions as prereleases — invisible to a bare `helm install` until GA,
+  # exactly like the npm `next` dist-tag. One-time setup: flip the
+  # `charts/cloudpdf-server` GHCR package to public, like the image.
+  publish-chart:
+    needs: [release, merge-image]
+    if: needs.release.outputs.did_publish == 'true' && contains(needs.release.outputs.published, '@cloudpdf/server')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.16.4
+
+      - name: Package and push the chart
+        run: |
+          VER="$(jq -r .version cloudpdf/server/package.json)"
+          helm package cloudpdf/server/deploy/helm/cloudpdf-server \
+            --version "$VER" --app-version "$VER"
+          helm registry login ghcr.io -u '${{ github.actor }}' --password-stdin \
+            <<< '${{ secrets.GITHUB_TOKEN }}'
+          helm push "cloudpdf-server-$VER.tgz" oci://ghcr.io/embedpdf/charts
+
+      - name: Verify the pushed chart resolves
+        run: |
+          VER="$(jq -r .version cloudpdf/server/package.json)"
+          helm show chart oci://ghcr.io/embedpdf/charts/cloudpdf-server --version "$VER"
+
   # Generated SDK source is synchronized only after the exact server image is
   # available and verified. The called workflow still does not publish to any
   # package registry; it opens one generated-source PR per language repository.

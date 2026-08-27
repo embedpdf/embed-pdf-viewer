@@ -67,12 +67,13 @@ import type { AuditEvent, EventLogService } from './EventLogService';
 import type { LayerStateService } from './LayerStateService';
 import type { MutationImpactKind } from './LayerStateService';
 import type { WeakAnnotationSessionService } from './WeakAnnotationSessionService';
+import type { EngineCounters } from '../app/engine-counters';
 import type { AuditMutationKind } from '../db/repos/audit_log.repo';
 import type { DocumentsRepo } from '../db/repos/documents.repo';
 import type { DurablePageRow, LayerRow } from '../db/repos/page_state.repo';
 import type { Database as Schema } from '../db/schema';
 import type { RealtimeBus } from '../realtime/RealtimeBus';
-import type { WorkerThreadPool } from '../runtime/WorkerThreadPool';
+import type { EnginePool } from '../runtime/EnginePool';
 import { StorageKeys } from '../storage/keys';
 import type { ObjectStore } from '../storage/ObjectStore';
 
@@ -141,10 +142,12 @@ export interface LayerServiceOptions {
   documentService?: DocumentService;
   eventLog?: EventLogService;
   weakAnnotationSessions?: WeakAnnotationSessionService;
-  pool?: WorkerThreadPool;
+  pool?: EnginePool;
   storage?: ObjectStore;
   /** Cross-replica doorbell — rung after every mutation commit. */
   realtime?: RealtimeBus;
+  /** Operational counters read by metrics collect closures. */
+  counters?: EngineCounters;
 }
 
 export type LayerWriteContext = OpenContext;
@@ -170,7 +173,7 @@ export class LayerService {
   private readonly documentService?: DocumentService;
   private readonly eventLog?: EventLogService;
   private readonly weakAnnotationSessions?: WeakAnnotationSessionService;
-  private readonly pool?: WorkerThreadPool;
+  private readonly pool?: EnginePool;
   private readonly storage?: ObjectStore;
   private readonly realtime?: RealtimeBus;
   private readonly layerWriteQueues = new Map<string, Promise<unknown>>();
@@ -184,8 +187,11 @@ export class LayerService {
    */
   private readonly pendingAttemptKeys = new Map<string, Set<string>>();
 
+  private readonly counters?: EngineCounters;
+
   constructor(opts: LayerServiceOptions) {
     this.db = opts.db;
+    this.counters = opts.counters;
     this.documents = opts.documents;
     this.layerState = opts.layerState;
     this.revisionBridge = opts.revisionBridge;
@@ -1583,6 +1589,11 @@ export class LayerService {
       docId,
       layerName,
       materialized.layer.currentVersion,
+      null,
+      // Write alignment: records the engine generation this session lives
+      // under, so a mid-commit engine respawn can never get a recreated
+      // session blessed with the committed version (advanceLayerSession).
+      { forWrite: true },
     );
     return materialized;
   }
@@ -3112,7 +3123,23 @@ export class LayerService {
       try {
         return await op();
       } catch (err) {
-        if (!(err instanceof LayerFenceConflict)) throw err;
+        // Two retryable-once shapes, same mechanical recovery (invalidate
+        // → re-prepare reloads durable truth → re-apply):
+        //  - LayerFenceConflict: a REMOTE replica committed in our window.
+        //  - DocNotOpen at APPLY: the op parked across an engine respawn
+        //    (crash or recycle) and dispatched into a successor without
+        //    the session. Nothing applied — no ghost — so the rerun is
+        //    exactly the fence-conflict recovery. (The read-path twin is
+        //    `runReadWithReopen`.)
+        const parkedAcrossRespawn =
+          err instanceof EngineError && err.code === EngineErrorCode.DocNotOpen;
+        if (!(err instanceof LayerFenceConflict) && !parkedAcrossRespawn) throw err;
+        if (err instanceof LayerFenceConflict) {
+          // Count one cross-replica write race per rebase. The
+          // rate of this counter at N>1 replicas is the docAffinity
+          // flip evidence.
+          if (this.counters) this.counters.layerWriteConflicts += 1;
+        }
         documentService.invalidateLayerSession(docId, layerName);
         return await op();
       }
@@ -3175,7 +3202,7 @@ export class LayerService {
     return this.revisionBridge;
   }
 
-  private requirePool(): WorkerThreadPool {
+  private requirePool(): EnginePool {
     if (!this.pool) {
       throw new EngineError(
         EngineErrorCode.NotImplemented,

@@ -259,6 +259,32 @@ describe('DocumentSession open ownership', () => {
     expect(runtime.calls.order).toEqual(['document', 'file-access', 'base-handle']);
   });
 
+  test('renderEncoded kinds fail fast with NotImplemented on hosts without an injected encoder', () => {
+    // The `*.renderEncoded` wire kinds are cloud-server surface: the server
+    // worker injects a sharp-backed encoder; browser/local hosts (this
+    // two-argument construction) must reject WITHOUT paying for a render.
+    const runtime = createFakeRuntime();
+    const responses: WorkerResponse[] = [];
+    const host = new WorkerHost(runtime, (pack) => responses.push(pack.payload));
+
+    host.receive({
+      kind: 'pages.renderEncoded',
+      jobId: 9,
+      docId: 'doc-never-opened',
+      pageObjectNumber: 1,
+      encode: { format: 'webp' },
+    });
+
+    expect(responses).toHaveLength(1);
+    const r = responses[0]!;
+    expect(r.kind).toBe('reject');
+    if (r.kind === 'reject') {
+      expect(r.error.code).toBe('NotImplemented');
+      // Fail-fast means no runtime work happened at all.
+      expect(runtime.calls.closeDocuments).toEqual([]);
+    }
+  });
+
   test('worker routes base and layer sessions independently for one docId', () => {
     const runtime = createFakeRuntime();
     const responses: WorkerResponse[] = [];

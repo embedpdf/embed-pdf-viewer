@@ -318,6 +318,19 @@ const DRAW_TAGS = ['annotation-draw', 'annotation-edit'];
 const MARKUP_TAGS = ['text-select', 'annotation-edit'];
 
 /**
+ * Whether arming this ANNOTATION tool is touch consent (`Tool.touchDirect`):
+ * drag-CREATE tools — shape/ink draw and text-markup select — take
+ * single-finger touch wholesale (finger draws/marks, two fingers navigate:
+ * the drawing-app convention). Click-to-PLACE tools (stamp, note) do not: a
+ * tap places without any claim, and drags keep scrolling. Derived from the
+ * gesture tags, so custom registered tools inherit the right behavior. Only
+ * annotation-owned tools run through this — the built-in `pointer` tool also
+ * enables `text-select`, but it is registered by the hub, not here.
+ */
+export const isTouchDirect = (enables: ReadonlySet<string>): boolean =>
+  enables.has('annotation-draw') || enables.has('text-select');
+
+/**
  * The built-in tools — a data mirror of v2's registrations (shapes + lines + ink
  * + free text in the draw channel, text markup + caret behind text selection, and
  * the click-to-place stamp). Order is display-neutral; the toolbar owns layout.

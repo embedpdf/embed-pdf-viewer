@@ -14,7 +14,7 @@ import {
   type LayerScopes,
   type RenderPolicy,
 } from '@embedpdf/engine-core/wire';
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 
 import { setNoStore } from './_helpers';
 import { requireLayerDocAccessOnly, type RequestJwtContext } from '../app/jwt-plugin';
@@ -39,7 +39,12 @@ export async function registerAccessRoutes(
 ): Promise<void> {
   const { service, cdnSigner, derivedRenders, usageMeters, tenantUsage } = deps;
 
-  app.post(wirePaths.access, async (req, reply) => {
+  const handleAccess = async (
+    req: FastifyRequest,
+    reply: FastifyReply,
+    pathDocId: string | undefined,
+    pathLayerName: string | undefined,
+  ) => {
     const parsed = AccessRequestSchema.safeParse(req.body ?? {});
     if (!parsed.success) {
       throw new EngineError(
@@ -48,9 +53,34 @@ export async function registerAccessRoutes(
       );
     }
     const body = parsed.data;
-    const layerName = body.layerName ?? 'default';
-    const ctx = requireLayerDocAccessOnly(req, body.docId, layerName);
-    const unlocked = await service.unlockLayerAccess(ctx, body.docId, layerName, {
+    // Identity rides the PATH — doc AND layer, like every layer route
+    // (the affinity tier routes on the doc segment); the legacy alias
+    // still takes both from the body. When path and body are both
+    // present they must agree — a mismatch is malformed, never a
+    // silent preference.
+    const docId = pathDocId ?? body.docId;
+    if (docId === undefined) {
+      throw new EngineError(EngineErrorCode.InvalidArg, 'access request needs a document id');
+    }
+    if (pathDocId !== undefined && body.docId !== undefined && body.docId !== pathDocId) {
+      throw new EngineError(
+        EngineErrorCode.InvalidArg,
+        `access request docId mismatch: path=${pathDocId} body=${body.docId}`,
+      );
+    }
+    if (
+      pathLayerName !== undefined &&
+      body.layerName !== undefined &&
+      body.layerName !== pathLayerName
+    ) {
+      throw new EngineError(
+        EngineErrorCode.InvalidArg,
+        `access request layer mismatch: path=${pathLayerName} body=${body.layerName}`,
+      );
+    }
+    const layerName = pathLayerName ?? body.layerName ?? 'default';
+    const ctx = requireLayerDocAccessOnly(req, docId, layerName);
+    const unlocked = await service.unlockLayerAccess(ctx, docId, layerName, {
       password: body.password ?? null,
       passwordGrant: body.passwordGrant ?? null,
       mode: body.mode ?? 'any',
@@ -68,14 +98,14 @@ export async function registerAccessRoutes(
     // pinned layer — the SAME scopes the manifest advertises and the origin
     // guards enforce (the origin is the truth; this grant is the
     // optimization, TTL-bounded by `expiresAt` after a divergence flip).
-    const layerScopes = await service.getLayerScopes(body.docId, layerName);
+    const layerScopes = await service.getLayerScopes(docId, layerName);
     const access = buildAccessResponse(
       unlocked,
       ctx.jwt,
       pdfBits,
       cdnSigner,
       ctx.tenantId,
-      body.docId,
+      docId,
       layerName,
       `${req.protocol}://${req.hostname}`,
       derivedRenders?.policy(),
@@ -95,6 +125,28 @@ export async function registerAccessRoutes(
       security: unlocked.security,
       ...access,
     };
+  };
+
+  // Fastify pattern literal (the same shape wirePaths.access(docId)
+  // builds — the builder percent-encodes, so it cannot express ':docId').
+  // Literal pattern, not wirePaths.access(':docId', ':layerName') — the
+  // path builder percent-encodes the colons.
+  app.post('/v1/docs/:docId/layers/:layerName/access', async (req, reply) => {
+    const { docId, layerName } = req.params as { docId: string; layerName: string };
+    return handleAccess(req, reply, docId, layerName);
+  });
+  // Deprecated alias #1 (one prerelease cycle): the original body-addressed
+  // form — both ids from the body.
+  app.post(wirePaths.accessLegacy, async (req, reply) =>
+    handleAccess(req, reply, undefined, undefined),
+  );
+  // Deprecated alias #2 (same removal window): the short-lived doc-tier
+  // form (`/v1/docs/:docId/access`, layer from body/default) that
+  // prerelease builds from 2026-08-26 called before access moved to the
+  // layer tier. Remove both aliases together before GA.
+  app.post('/v1/docs/:docId/access', async (req, reply) => {
+    const { docId } = req.params as { docId: string };
+    return handleAccess(req, reply, docId, undefined);
   });
 }
 

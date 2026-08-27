@@ -5,6 +5,7 @@ import { AuditLogRepo } from '../db/repos/audit_log.repo';
 import { toJsonlEvent } from '../services/EventLogService';
 import type { DocumentService } from '../services/DocumentService';
 import type { RealtimeBus } from '../realtime/RealtimeBus';
+import type { DrainCoordinator } from '../app/drain';
 import { requireLayerCapability, requireLayerDocAccessOnly } from '../app/jwt-plugin';
 import type { RevocationCheck } from '../auth/JwtVerifier';
 
@@ -29,6 +30,9 @@ export interface EventsRoutesOptions {
    *  revalidate against it — the belt-and-braces for a replica whose
    *  revocation-push subscription is down. */
   revocation?: RevocationCheck;
+  /** Shutdown registry: every live stream registers a closer so
+   *  `shutdown()` can end it instead of hanging on the open socket. */
+  drain: DrainCoordinator;
 }
 
 /**
@@ -179,6 +183,7 @@ export async function registerEventsRoutes(
     // Expiry close, re-armed in slices (see MAX_TIMER_MS).
     let expTimer: ReturnType<typeof setTimeout> | null = null;
     const armExpClose = () => {
+      if (closed) return; // e.g. drained synchronously at register time
       const exp = ctx.jwt.exp;
       if (exp === null) return; // non-expiring token: bounded by idle/network
       const msLeft = exp * 1000 - Date.now() - EXP_GRACE_MS;
@@ -191,14 +196,29 @@ export async function registerEventsRoutes(
       expTimer = setTimeout(armExpClose, Math.min(msLeft, MAX_TIMER_MS));
     };
 
+    let unregisterDrain: () => void = () => undefined;
     const cleanup = () => {
       if (closed) return;
       closed = true;
+      unregisterDrain();
       unsubscribe();
       unsubscribeRevocation();
       clearInterval(heartbeat);
       if (expTimer) clearTimeout(expTimer);
     };
+
+    // Server drain: shutdown ends every live stream deliberately — a
+    // hijacked SSE response is invisible to app.close(), which would
+    // otherwise wait on this socket until the supervisor SIGKILLs. The
+    // retry hint makes EventSource reconnect promptly, through the LB,
+    // onto a surviving replica. (If the server is already draining,
+    // register() runs the closer synchronously.)
+    unregisterDrain = opts.drain.register(() => {
+      if (closed) return;
+      raw.write(':server-drain\nretry: 1000\n\n');
+      cleanup();
+      raw.end();
+    });
 
     req.raw.on('close', cleanup);
     armExpClose();

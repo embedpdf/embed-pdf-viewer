@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { sql, type Kysely } from 'kysely';
+import { PostgresAdapter, sql, type Kysely } from 'kysely';
 import type { Database as Schema } from '../schema';
 
 /**
@@ -39,6 +39,99 @@ export interface MigrateOptions {
   source: MigrateInput;
   /** Called once per migration before it is applied. */
   onApply?: (m: MigrationSource) => void;
+  /**
+   * Dialect hint for cross-migrator serialization. On `postgres` the
+   * whole run (discovery **and** execution) holds a session advisory
+   * lock, so concurrent migrators — replicas racing auto-migrate, a
+   * deploy hook plus a manual `migrate up`, two releases sharing one
+   * database — serialize at the database instead of relying on the
+   * deploy tool. Omitted, the dialect is sniffed from the Kysely
+   * adapter; `sqlite` (single-writer file lock) never needs the lock.
+   */
+  dialect?: 'postgres' | 'sqlite';
+  /** Max time to wait for the migration lock (default 10 minutes). */
+  lockTimeoutMs?: number;
+  /** Called periodically while waiting on another migrator's lock. */
+  onLockWait?: (waitedMs: number) => void;
+}
+
+/**
+ * Advisory lock identity for schema migrations, as the (int, int) form
+ * of `pg_try_advisory_lock`. Derived once from
+ * sha256("cloudpdf:schema_migrations") bytes 0-7 — a fixed constant so
+ * every migrator build agrees forever. Session-scoped (not
+ * transaction-scoped) on purpose: the run spans one transaction per
+ * migration plus `-- pragma: no-transaction` migrations, and the lock
+ * must cover all of them.
+ */
+export const MIGRATION_LOCK_HI = -1470979471;
+export const MIGRATION_LOCK_LO = -1221374989;
+
+interface LockOptions {
+  dialect?: 'postgres' | 'sqlite';
+  lockTimeoutMs?: number;
+  onLockWait?: (waitedMs: number) => void;
+}
+
+function isPostgresKysely(db: Kysely<Schema>): boolean {
+  try {
+    const executor = (
+      db as unknown as { getExecutor?: () => { adapter?: unknown } }
+    ).getExecutor?.();
+    return executor?.adapter instanceof PostgresAdapter;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Run `body` while holding the Postgres migration advisory lock on a
+ * dedicated connection; on SQLite (or when detection fails) run it
+ * unlocked. The lock is acquired with a `pg_try_advisory_lock` poll
+ * rather than the blocking form because every pooled connection carries
+ * `statement_timeout` (30s default) — a blocking wait behind a slow
+ * migration would be cancelled by its own session setting. `body`
+ * receives a Kysely bound to the lock's connection, so discovery,
+ * per-migration transactions, and no-transaction statements all share
+ * the session that holds the lock.
+ */
+async function withMigrationLock<T>(
+  db: Kysely<Schema>,
+  opts: LockOptions,
+  body: (db: Kysely<Schema>) => Promise<T>,
+): Promise<T> {
+  const isPg = opts.dialect !== undefined ? opts.dialect === 'postgres' : isPostgresKysely(db);
+  if (!isPg) return body(db);
+
+  return db.connection().execute(async (locked) => {
+    const timeoutMs = opts.lockTimeoutMs ?? 600_000;
+    const started = Date.now();
+    for (;;) {
+      const res = await sql<{ ok: boolean }>`
+        SELECT pg_try_advisory_lock(${MIGRATION_LOCK_HI}, ${MIGRATION_LOCK_LO}) AS ok
+      `.execute(locked);
+      if (res.rows[0]?.ok) break;
+      const waited = Date.now() - started;
+      if (waited >= timeoutMs) {
+        throw new Error(
+          `migrator: timed out after ${Math.round(waited / 1000)}s waiting for the ` +
+            `migration lock — another migrator (replica, deploy hook, or CLI) holds it`,
+        );
+      }
+      opts.onLockWait?.(waited);
+      await new Promise((r) => setTimeout(r, 400));
+    }
+    try {
+      return await body(locked);
+    } finally {
+      // Best-effort: if the session died the lock is already gone.
+      await sql`
+        SELECT pg_advisory_unlock(${MIGRATION_LOCK_HI}, ${MIGRATION_LOCK_LO})
+      `
+        .execute(locked)
+        .catch(() => {});
+    }
+  });
 }
 
 /** A single line of the `migrate status` table. */
@@ -83,20 +176,22 @@ export async function migrate(
   db: Kysely<Schema>,
   opts: MigrateOptions,
 ): Promise<MigrationSource[]> {
-  await ensureMigrationsTable(db);
-  const migrations =
-    opts.source.kind === 'inline'
-      ? sortByVersion([...opts.source.migrations])
-      : await discoverMigrations(opts.source.dir);
-  const applied = await listApplied(db);
-  validateRenames(migrations, applied);
+  return withMigrationLock(db, opts, async (run) => {
+    await ensureMigrationsTable(run);
+    const migrations =
+      opts.source.kind === 'inline'
+        ? sortByVersion([...opts.source.migrations])
+        : await discoverMigrations(opts.source.dir);
+    const applied = await listApplied(run);
+    validateRenames(migrations, applied);
 
-  const pending = migrations.filter((m) => !applied.has(m.version));
-  for (const m of pending) {
-    opts.onApply?.(m);
-    await applyOne(db, m);
-  }
-  return pending;
+    const pending = migrations.filter((m) => !applied.has(m.version));
+    for (const m of pending) {
+      opts.onApply?.(m);
+      await applyOne(run, m);
+    }
+    return pending;
+  });
 }
 
 export interface MigrateDownOptions {
@@ -124,6 +219,12 @@ export interface MigrateDownOptions {
   force?: boolean;
   /** Called once per migration just before its `down` SQL runs. */
   onRevert?: (m: MigrationSource) => void;
+  /** Same cross-migrator serialization contract as {@link MigrateOptions.dialect}. */
+  dialect?: 'postgres' | 'sqlite';
+  /** Max time to wait for the migration lock (default 10 minutes). */
+  lockTimeoutMs?: number;
+  /** Called periodically while waiting on another migrator's lock. */
+  onLockWait?: (waitedMs: number) => void;
 }
 
 /**
@@ -145,6 +246,13 @@ export interface MigrateDownOptions {
  * Returns the migrations that were reverted (newest first).
  */
 export async function migrateDown(
+  db: Kysely<Schema>,
+  opts: MigrateDownOptions,
+): Promise<MigrationSource[]> {
+  return withMigrationLock(db, opts, (run) => migrateDownLocked(run, opts));
+}
+
+async function migrateDownLocked(
   db: Kysely<Schema>,
   opts: MigrateDownOptions,
 ): Promise<MigrationSource[]> {

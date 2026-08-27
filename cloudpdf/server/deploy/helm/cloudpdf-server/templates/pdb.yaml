@@ -1,0 +1,16 @@
+{{- if and .Values.pdb.enabled (include "cloudpdf-server.scaled" .) }}
+# Voluntary-disruption budget: node drains and maintenance can never
+# take every replica at once. (Crashes are covered by replicas;
+# rollouts by the Deployment strategy.)
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "cloudpdf-server.fullname" . }}
+  labels:
+    {{- include "cloudpdf-server.labels" . | nindent 4 }}
+spec:
+  maxUnavailable: {{ .Values.pdb.maxUnavailable }}
+  selector:
+    matchLabels:
+      {{- include "cloudpdf-server.selectorLabels" . | nindent 6 }}
+{{- end }}

@@ -67,12 +67,14 @@ The pool size is controlled by
 default is conservative — `min(2, cpu count)` — and you raise it as you give the
 process more cores and memory.
 
-<Callout type="warn">
-  The native runtime is <strong>thread-confined</strong>: a hard native crash
-  takes down the whole process, not just one request. You get resilience by
-  running <strong>multiple replicas</strong> (Compose or Kubernetes) and keeping
-  the pool size sensible, so one bad document can't take your service offline.
-  See <a href="/docs/server/operations/health-and-scaling">Health &amp; scaling</a>.
+<Callout type="info">
+  Native code parsing hostile PDFs will eventually crash. Two layers keep that
+  survivable: set <code>CLOUDPDF_ENGINE_ISOLATION=host</code> so a crash costs
+  a <strong>sub-second engine respawn</strong> inside the instance (documents
+  that repeatedly crash the engine are quarantined automatically), and run
+  <strong>multiple replicas</strong> so even an instance restart never means
+  zero capacity. See
+  <a href="/docs/server/operations/health-and-scaling">Health &amp; scaling</a>.
 </Callout>
 
 ## Storage: database + object store

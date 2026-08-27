@@ -167,7 +167,10 @@ export const DocumentHeadSchema = z.object({
 export type DocumentHead = z.infer<typeof DocumentHeadSchema>;
 
 export const AccessRequestSchema = z.object({
-  docId: z.string().min(1),
+  /** Deprecated: identity now rides the PATH
+   *  (`/v1/docs/:docId/layers/:layerName/access`). Kept optional for the
+   *  legacy `/v1/access` alias, which requires `docId` in the body. */
+  docId: z.string().min(1).optional(),
   layerName: z.string().min(1).optional(),
   password: z.string().optional(),
   passwordGrant: z.string().optional(),

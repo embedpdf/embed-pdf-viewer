@@ -140,11 +140,16 @@ function TilePlane({ annotations, fadeMs }: { annotations: boolean; fadeMs: numb
   const demand: PageViewDemand = page.getViewDemand?.() ?? {
     desiredDeviceWidth: page.transform.deviceWidth,
   };
-  const plan = useSelector(RenderToken, (c) =>
-    c.tilePlan(page.pon, demand, { includeAnnotations: annotations }),
+  // THIS view's tile surface: state is per view × page, so a thumbnail
+  // rail's never-engaging demand cannot disturb the main lens's plan (shared
+  // state made the main view lose its tiles whenever a rail opened). The
+  // handle is reference-stable per view — a clean dependency.
+  const tiles = render.tilesFor(page.view);
+  const plan = useSelector(RenderToken, () =>
+    tiles.plan(page.pon, demand, { includeAnnotations: annotations }),
   );
-  // Lens unmounted: stop in-flight tile fetches; resolved bytes stay cached.
-  useEffect(() => () => render.releaseTiles(page.pon), [render, page.pon]);
+  // View unmounted its plane: stop in-flight fetches; resolved bytes stay cached.
+  useEffect(() => () => tiles.release(page.pon), [tiles, page.pon]);
   if (plan.paint.length === 0) return null;
   const t = page.transform;
   const s = t.viewScale;
@@ -181,8 +186,8 @@ function TilePlane({ annotations, fadeMs }: { annotations: boolean; fadeMs: numb
             height: source.rect.height * s,
           }}
           fadeMs={fadeMs}
-          onPainted={() => render.tilePainted(page.pon, source.key)}
-          onUnpainted={() => render.tileUnpainted(page.pon, source.key)}
+          onPainted={() => tiles.painted(page.pon, source.key)}
+          onUnpainted={() => tiles.unpainted(page.pon, source.key)}
         />
       ))}
     </div>

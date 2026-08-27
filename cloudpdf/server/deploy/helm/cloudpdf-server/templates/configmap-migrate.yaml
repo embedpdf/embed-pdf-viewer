@@ -1,0 +1,23 @@
+{{- if and .Values.migrations.enabled .Values.config }}
+# Hook-scoped copy of the release configuration for the migrate Job.
+# Helm creates pre-install hooks BEFORE ordinary release resources
+# exist, and runs pre-upgrade hooks BEFORE the release ConfigMap is
+# updated — referencing the release ConfigMap from the Job would fail on
+# first install and migrate against the PREVIOUS release's config on
+# upgrades. This copy is recreated (before-hook-creation) at weight -10,
+# so the Job always sees exactly this operation's values.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "cloudpdf-server.fullname" . }}-migrate
+  labels:
+    {{- include "cloudpdf-server.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: '-10'
+    helm.sh/hook-delete-policy: before-hook-creation
+data:
+  {{- range $key, $value := .Values.config }}
+  {{ $key }}: {{ $value | quote }}
+  {{- end }}
+{{- end }}

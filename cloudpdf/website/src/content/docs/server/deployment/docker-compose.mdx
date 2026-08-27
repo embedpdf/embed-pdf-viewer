@@ -26,6 +26,7 @@ services:
     ports:
       - '3000:3000'
     environment:
+      CLOUDPDF_LICENSE_KEY: ${CLOUDPDF_LICENSE_KEY:?set CLOUDPDF_LICENSE_KEY in .env}
       CLOUDPDF_JWT_SECRET: ${CLOUDPDF_JWT_SECRET:?set CLOUDPDF_JWT_SECRET in .env}
     volumes:
       - cloudpdf-data:/data
@@ -39,6 +40,10 @@ Put your secret in a `.env` file next to it:
 
 ```sh
 # .env
+# Required — the server refuses to boot without a license key.
+# A development key keeps everything else zero-config:
+# /docs/server/configuration/licensing
+CLOUDPDF_LICENSE_KEY=key/...
 CLOUDPDF_JWT_SECRET=replace-with-a-long-random-string
 ```
 
@@ -114,7 +119,13 @@ services:
     ports:
       - '3000:3000'
     environment:
+      CLOUDPDF_LICENSE_KEY: ${CLOUDPDF_LICENSE_KEY:?set CLOUDPDF_LICENSE_KEY}
+      # Auth + encrypted-PDF secrets. All three are required under a
+      # production license and must stay stable across restarts:
+      # /docs/server/configuration/authentication#encrypted-pdf-secrets
       CLOUDPDF_JWT_SECRET: ${CLOUDPDF_JWT_SECRET:?set CLOUDPDF_JWT_SECRET}
+      CLOUDPDF_PASSWORD_VERIFICATION_HMAC_SECRET: ${CLOUDPDF_PASSWORD_VERIFICATION_HMAC_SECRET:?set it in .env}
+      CLOUDPDF_PASSWORD_SESSION_SERVER_SECRET: ${CLOUDPDF_PASSWORD_SESSION_SERVER_SECRET:?set it in .env}
       # Database
       CLOUDPDF_DB_DRIVER: postgres
       CLOUDPDF_DB_URL: postgres://cloudpdf:${POSTGRES_PASSWORD}@postgres:5432/cloudpdf
@@ -148,8 +159,11 @@ volumes:
 ```
 
 ```sh
-# .env
+# .env — generate each secret with: openssl rand -hex 32
+CLOUDPDF_LICENSE_KEY=key/...
 CLOUDPDF_JWT_SECRET=replace-with-a-long-random-string
+CLOUDPDF_PASSWORD_VERIFICATION_HMAC_SECRET=replace-with-a-long-random-string
+CLOUDPDF_PASSWORD_SESSION_SERVER_SECRET=replace-with-a-long-random-string
 POSTGRES_PASSWORD=replace-with-a-strong-password
 S3_ACCESS_KEY_ID=cloudpdf
 S3_SECRET_ACCESS_KEY=replace-with-a-strong-password
