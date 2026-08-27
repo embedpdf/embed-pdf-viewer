@@ -7,6 +7,11 @@ import {
   AnnotationPatchBaseShape,
   LineEndingsSchema,
 } from '../../base.schema';
+import {
+  MeasurementDTOShape,
+  MeasurementDraftShape,
+  MeasurementPatchShape,
+} from '../measurement.shared';
 import { FilledStyleDTOShape, FilledStyleDraftShape, FilledStylePatchShape } from '../style.shared';
 import type { LineDraft } from './draft';
 import type { LineAnnotationDTO } from './dto';
@@ -15,6 +20,7 @@ import type { LinePatch } from './patch';
 export const LineDTOSchema: z.ZodType<LineAnnotationDTO> = z.object({
   ...AnnotationBaseShape,
   ...FilledStyleDTOShape,
+  ...MeasurementDTOShape,
   linePoints: LinePointsSchema,
   lineEndings: LineEndingsSchema,
   rotation: z.number().optional(),
@@ -24,6 +30,7 @@ export const LineDTOSchema: z.ZodType<LineAnnotationDTO> = z.object({
 export const LineDraftSchema: z.ZodType<LineDraft> = z.object({
   ...FilledStyleDraftShape,
   ...AnnotationDraftBaseShape,
+  ...MeasurementDraftShape,
   linePoints: LinePointsSchema,
   rect: PdfRectSchema,
   lineEndings: LineEndingsSchema.optional(),
@@ -34,6 +41,7 @@ export const LineDraftSchema: z.ZodType<LineDraft> = z.object({
 export const LinePatchSchema: z.ZodType<LinePatch> = z.object({
   ...FilledStylePatchShape,
   ...AnnotationPatchBaseShape,
+  ...MeasurementPatchShape,
   linePoints: LinePointsSchema.optional(),
   rect: PdfRectSchema.optional(),
   lineEndings: LineEndingsSchema.optional(),

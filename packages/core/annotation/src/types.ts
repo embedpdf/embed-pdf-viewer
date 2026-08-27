@@ -7,16 +7,12 @@ import type {
   InkIntent,
   LineEnding,
   LineEndings,
+  MeasurementInfo,
   PdfLinkTarget,
   StrikeoutIntent,
 } from '@embedpdf/engine-core/runtime';
 import type { PageObjectNumber } from '@embedpdf/core';
-import type {
-  PageRotation,
-  Point,
-  Rect as GeometryRect,
-  TextQuad,
-} from '@embedpdf/core-geometry';
+import type { PageRotation, Point, Rect as GeometryRect, TextQuad } from '@embedpdf/core-geometry';
 
 export type { TextQuad } from '@embedpdf/core-geometry';
 
@@ -198,6 +194,14 @@ export interface AnnotationProps extends Style, TextStyle {
    * the ONE `syncLink` seam.
    */
   link?: PdfLinkTarget | null;
+  /**
+   * Measurement calibration of a geometry annotation, or `null` for none.
+   * Optional in the bag like `icon`: reading it back is `undefined` on an
+   * ordinary shape, which is how a sidebar knows to hide the read-out
+   * controls. Setting it PROMOTES a plain shape into a measurement (and
+   * `null` demotes it) — the same one-key-two-meanings routing `link` uses.
+   */
+  measurement?: MeasurementInfo | null;
 }
 
 export type PropKey = keyof AnnotationProps;
@@ -234,6 +238,14 @@ export interface Annot {
   /** `/Name` icon — present only for icon kinds (text note, file attachment).
    *  Like `style`, a projection of `data`, editable via `setProps`. */
   icon?: string;
+  /**
+   * Measurement calibration — present only when this geometry annotation IS a
+   * measurement. Like `style`, a projection of `data` (the engine DTO's
+   * `measurement`), editable via `setProps`; the read-out itself is DERIVED
+   * from it plus `geom` on every render, so it can never go stale against a
+   * resize or a vertex drag.
+   */
+  measure?: MeasurementInfo;
   /**
    * The `/F` annotation flags, verbatim from the DTO (freshly drawn annotations
    * start at {@link DRAWN_FLAGS} — `print` set). NEVER read individual keys to
@@ -732,6 +744,24 @@ export type Effect =
   | { fx: 'delete'; ref: AnnotationRef };
 
 /** Per-annotation render data — its content geometry + style + live state. */
+/**
+ * A measurement read-out, resolved for ONE view. The core does the unit math and
+ * the geometry; the sizes are already divided by zoom so the label and hatch
+ * hold a constant on-screen size while living in content-space coordinates —
+ * the painter stays the same dumb SceneNode loop.
+ */
+export interface MeasureRender {
+  /** The formatted read-out, e.g. `"12.5 cm"` or `"3.2 m² (34.4 ft²)"`. */
+  text: string;
+  /** Label centre, content units. */
+  at: Vec;
+  /** Label font size, CONTENT units (screen px ÷ zoom). */
+  fontSize: number;
+  /** Perpendicular hatch spacing, content units; 0 = no hatch (a linear mode,
+   *  or a geometry that encloses nothing). */
+  hatch: number;
+}
+
 export interface RenderItem {
   id: Id;
   ref: AnnotationRef | null;
@@ -769,6 +799,9 @@ export interface RenderItem {
   hovered?: boolean;
   /** Redaction label projection (redact kind only) — see {@link Annot.label}. */
   label?: { text: string; repeat: boolean };
+  /** Measurement read-out to paint over this annotation, already resolved
+   *  against the view (see {@link MeasureRender}). Absent = not a measurement. */
+  measure?: MeasureRender;
   /**
    * Applied rotation (deg, CW), or 0/undefined. For BOX kinds (`rect`/`text`)
    * `box` is the UNROTATED visual box and the renderer applies this rotation

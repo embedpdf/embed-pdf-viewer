@@ -16,6 +16,7 @@ import {
 import { applyAnnotationBaseDraft, applyAnnotationBasePatch } from './writeAnnotationBase';
 import { applyFilledStyleDraft, applyFilledStylePatch } from './writeStyle';
 import { writeBoxTransformMetadata } from './writeAnnotationTransformMetadata';
+import { writeMeasurementMetadata } from './writeMeasurementMetadata';
 
 export type ShapeDraft = CircleDraft | SquareDraft;
 export type ShapePatch = CirclePatch | SquarePatch;
@@ -52,6 +53,7 @@ export function applyShapeDraft(
     rotation: draft.rotation,
     unrotatedRect: draft.unrotatedRect,
   });
+  writeMeasurementMetadata(fn, mem, annotPtr, draft.subtype, draft.measurement);
 }
 
 /**
@@ -94,6 +96,7 @@ export function applyShapePatch(
   } else if (patch.rectDifferences !== undefined) {
     setRectangleDifferences(fn, annotPtr, patch.rectDifferences);
   }
+  writeMeasurementMetadata(fn, mem, annotPtr, patch.subtype, patch.measurement);
 }
 
 /**

@@ -11,8 +11,10 @@
  */
 import { textQuadBounds, textQuadRing } from '@embedpdf/core-geometry';
 import { geomScene } from './geometry';
+import { hatchPath } from './measure';
 import type {
   Geom,
+  MeasureRender,
   Paint,
   Rect,
   RenderItem,
@@ -238,6 +240,98 @@ function redactScene(item: RenderItem): SceneNode[] {
   return nodes;
 }
 
+/* ────────────────────────────────────────────────────────────────────────────
+ * Measurement read-out
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+/** Average glyph advance as a fraction of font size, for the pill sizing. The
+ *  label is a short numeric string in the UI sans-serif; the same estimate sizes
+ *  the pill AND places the text, so the two agree even where it is imprecise. */
+const LABEL_CHAR_RATIO = 0.6;
+/** Pill padding, as a fraction of the font size (so it scales with the label). */
+const LABEL_PAD_X = 0.42;
+const LABEL_PAD_Y = 0.25;
+
+/** Opacity of the area hatch — a hint that the region is what is measured,
+ *  never so strong that it competes with the page underneath. */
+const HATCH_OPACITY = 0.4;
+/** Hatch line width as a fraction of the spacing: a hairline at any zoom. */
+const HATCH_WIDTH_RATIO = 1 / 7;
+
+/**
+ * The hatch that fills an area measurement, UNDER the annotation's own paint.
+ * Emitted as a single multi-segment path, already clipped to the outline by
+ * `hatchPath` — the SceneNode vocabulary has no patterns or clip paths, and it
+ * does not need them.
+ */
+function measureHatch(geom: Geom, style: Style, m: MeasureRender): SceneNode[] {
+  if (!(m.hatch > 0)) return [];
+  const d = hatchPath(geom, m.hatch);
+  if (!d) return [];
+  return [
+    {
+      kind: 'path',
+      d,
+      paint: {
+        stroke: style.color,
+        width: m.hatch * HATCH_WIDTH_RATIO,
+        opacity: HATCH_OPACITY,
+      },
+    },
+  ];
+}
+
+/**
+ * The read-out pill: a rounded-ish plate behind the value so it stays legible
+ * over any page content, plus the value itself. Drawn LAST so nothing paints
+ * over the number. `at` is the pill CENTRE; the text node wants a baseline
+ * start, so both are derived from the same estimated text width.
+ */
+function measureLabel(m: MeasureRender, style: Style): SceneNode[] {
+  if (!m.text) return [];
+  const fs = m.fontSize;
+  const padX = fs * LABEL_PAD_X;
+  const padY = fs * LABEL_PAD_Y;
+  const textW = m.text.length * fs * LABEL_CHAR_RATIO;
+  const boxW = textW + padX * 2;
+  const boxH = fs + padY * 2;
+  return [
+    {
+      kind: 'rect',
+      rect: { x: m.at.x - boxW / 2, y: m.at.y - boxH / 2, width: boxW, height: boxH },
+      paint: { fill: style.color, opacity: 0.92 },
+    },
+    {
+      kind: 'text',
+      // Baseline start: left edge of the estimated run, then down from the
+      // pill centre by roughly half the cap height.
+      at: { x: m.at.x - textW / 2, y: m.at.y + fs * 0.35 },
+      text: m.text,
+      fontSize: fs,
+      paint: { fill: '#ffffff', opacity: 1 },
+    },
+  ];
+}
+
+/**
+ * JUST the measurement read-out (hatch + label) for an item, or `[]` when it is
+ * not a measurement.
+ *
+ * `scene()` layers these around the annotation's own paint for a VECTOR item.
+ * A committed annotation, though, renders as the engine's baked `/AP` raster —
+ * and the engine cannot bake a read-out (there is no `/Measure` appearance to
+ * bake). So the painter draws this overlay on top of the raster instead, which
+ * is why the two halves are exposed separately. The hatch is translucent, so
+ * riding above the raster rather than beneath the stroke is indistinguishable.
+ */
+export function measureScene(item: RenderItem): SceneNode[] {
+  if (!item.measure) return [];
+  return [
+    ...measureHatch(item.geom, item.style, item.measure),
+    ...measureLabel(item.measure, item.style),
+  ];
+}
+
 /** The full painted scene for one annotation. */
 export function scene(item: RenderItem): SceneNode[] {
   // Links paint NOTHING: an invisible hit rectangle is the norm (any visible
@@ -258,7 +352,7 @@ export function scene(item: RenderItem): SceneNode[] {
     })) as SceneNode[];
   }
   const ink = item.geom.t === 'ink'; // freehand: round the pen-stroke ends (caps)
-  return geomScene(item.geom, item.style.strokeWidth, item.style.border).map((n) => {
+  const body = geomScene(item.geom, item.style.strokeWidth, item.style.border).map((n) => {
     const closed =
       n.kind === 'rect' ||
       n.kind === 'ellipse' ||
@@ -270,4 +364,12 @@ export function scene(item: RenderItem): SceneNode[] {
     // stay crisp.
     return { ...n, paint: ink ? { ...paint, cap: 'round', join: 'round' } : paint } as SceneNode;
   });
+  // A measurement layers its hatch UNDER the shape and its read-out OVER it, so
+  // the stroke stays crisp and the number is never occluded.
+  if (!item.measure) return body;
+  return [
+    ...measureHatch(item.geom, item.style, item.measure),
+    ...body,
+    ...measureLabel(item.measure, item.style),
+  ];
 }

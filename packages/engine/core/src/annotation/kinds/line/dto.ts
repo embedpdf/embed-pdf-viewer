@@ -1,6 +1,7 @@
 import type { LinePoints } from '../../../geometry/primitives';
 import type { AnnotationBase } from '../../base';
 import type { LineEndings } from '../../primitives';
+import type { MeasurementAnnotationFields } from '../measurement.shared';
 import type { FilledStyleFields } from '../style.shared';
 
 export type LineAnnotationDTO = AnnotationBase & {
@@ -12,4 +13,5 @@ export type LineAnnotationDTO = AnnotationBase & {
   /** `/EMBD_Metadata/Rotation` — advisory rotation (deg); the endpoints are
    *  already rotated. No `unrotatedRect`, so it is inert for AP. */
   rotation?: number;
-} & FilledStyleFields;
+} & FilledStyleFields &
+  MeasurementAnnotationFields;

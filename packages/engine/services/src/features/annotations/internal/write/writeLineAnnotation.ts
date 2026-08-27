@@ -5,6 +5,7 @@ import { setAnnotRect, setLine, setLineEndings } from './annotationWritePrimitiv
 import { applyAnnotationBaseDraft, applyAnnotationBasePatch } from './writeAnnotationBase';
 import { applyFilledStyleDraft, applyFilledStylePatch } from './writeStyle';
 import { writeVertexTransformMetadata } from './writeAnnotationTransformMetadata';
+import { writeMeasurementMetadata } from './writeMeasurementMetadata';
 
 /** Default line endings when a line draft omits them. */
 const DEFAULT_LINE_ENDINGS = { start: 'none', end: 'none' } as const;
@@ -30,6 +31,7 @@ export function applyLineDraft(
   setLineEndings(fn, annotPtr, draft.lineEndings ?? DEFAULT_LINE_ENDINGS);
   // Advisory rotation: the endpoints are already rotated; this just records θ.
   writeVertexTransformMetadata(fn, annotPtr, { rotation: draft.rotation });
+  writeMeasurementMetadata(fn, mem, annotPtr, 'line', draft.measurement);
 }
 
 export function applyLinePatch(
@@ -48,6 +50,7 @@ export function applyLinePatch(
   }
   // Advisory rotation is tri-state (undefined preserves, null/0 clears).
   writeVertexTransformMetadata(fn, annotPtr, { rotation: patch.rotation });
+  writeMeasurementMetadata(fn, mem, annotPtr, 'line', patch.measurement);
   if (patch.lineEndings !== undefined) {
     setLineEndings(fn, annotPtr, patch.lineEndings);
   }

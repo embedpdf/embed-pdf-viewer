@@ -16,6 +16,14 @@ import type {
   StrikeoutIntent,
   TextAlignment,
 } from './primitives';
+import type {
+  MeasurementInfo,
+  MeasurementIntent,
+  MeasurementPrecision,
+  MeasurementScale,
+  MeasurementSecondary,
+  MeasurementUnit,
+} from './measurement';
 import { PdfPointSchema, PdfRectSchema, PdfQuadSchema } from '../geometry/schemas';
 import type { AnnotationRef } from '../identity/AnnotationRef';
 import type { AnnotationStableId } from '../identity/AnnotationStableId';
@@ -94,6 +102,47 @@ export const CaretIntentSchema: z.ZodType<CaretIntent> = z.literal('replace');
 export const StrikeoutIntentSchema: z.ZodType<StrikeoutIntent> = z.literal('strikeout-text-edit');
 
 export const InkIntentSchema: z.ZodType<InkIntent> = z.literal('ink-highlight');
+
+export const MeasurementIntentSchema: z.ZodType<MeasurementIntent> = z.enum([
+  'LineDimension',
+  'PolyLineDimension',
+  'PolygonDimension',
+]);
+
+export const MeasurementUnitSchema: z.ZodType<MeasurementUnit> = z.enum([
+  'pt',
+  'mm',
+  'cm',
+  'm',
+  'in',
+  'ft',
+  'yd',
+]);
+
+export const MeasurementPrecisionSchema: z.ZodType<MeasurementPrecision> = z.union([
+  z.object({ type: z.literal('decimal'), places: z.number().int().min(0).max(6) }),
+  z.object({ type: z.literal('fraction'), denominator: z.number().int().min(1) }),
+]);
+
+/** `pagePoints` must be positive: a zero page extent is not a calibration. */
+export const MeasurementScaleSchema: z.ZodType<MeasurementScale> = z.object({
+  value: z.number().finite(),
+  unit: MeasurementUnitSchema,
+  pagePoints: z.number().positive(),
+});
+
+export const MeasurementSecondarySchema: z.ZodType<MeasurementSecondary> = z.object({
+  unit: MeasurementUnitSchema,
+  precision: MeasurementPrecisionSchema,
+});
+
+export const MeasurementInfoSchema: z.ZodType<MeasurementInfo> = z.object({
+  mode: z.enum(['distance', 'perimeter', 'area']),
+  scale: MeasurementScaleSchema,
+  unit: MeasurementUnitSchema,
+  precision: MeasurementPrecisionSchema,
+  secondary: MeasurementSecondarySchema.optional(),
+});
 
 export const BlendModeSchema: z.ZodType<BlendMode> = z.enum([
   'normal',

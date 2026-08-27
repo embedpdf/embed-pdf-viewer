@@ -50,6 +50,7 @@ export const es: Locale = {
         view: 'Ver',
         annotate: 'Anotar',
         shapes: 'Formas',
+        measure: 'Medir',
         insert: 'Insertar',
         form: 'Formulario',
         redact: 'Redactar',
@@ -85,6 +86,13 @@ export const es: Locale = {
         arrow: 'Flecha',
         polygon: 'Polígono',
         polyline: 'Polilínea',
+      },
+      measure: {
+        distance: 'Distancia',
+        perimeter: 'Perímetro',
+        areaPolygon: 'Área de polígono',
+        areaRect: 'Área de rectángulo',
+        areaEllipse: 'Área de elipse',
       },
       insert: {
         attachment: 'Adjuntar archivo',

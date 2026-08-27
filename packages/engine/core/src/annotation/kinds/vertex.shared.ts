@@ -8,6 +8,14 @@ import {
   type FilledStyleFields,
   type FilledStylePatchFields,
 } from './style.shared';
+import {
+  MeasurementDTOShape,
+  MeasurementDraftShape,
+  MeasurementPatchShape,
+  type MeasurementAnnotationFields,
+  type MeasurementDraftFields,
+  type MeasurementPatchFields,
+} from './measurement.shared';
 import type { PdfPoint, PdfRect } from '../../geometry/primitives';
 import { PdfPointSchema } from '../../geometry/schemas';
 import { PdfRectSchema } from '../../geometry/schemas';
@@ -28,7 +36,7 @@ import { AnnotationBaseShape } from '../base.schema';
  * faithful persistence layer); the DTO inherits `rect` from
  * `AnnotationBase`.
  */
-export interface VertexAnnotationFields extends FilledStyleFields {
+export interface VertexAnnotationFields extends FilledStyleFields, MeasurementAnnotationFields {
   /** `/Vertices` — the ordered point list (PDF user space, y-up). */
   vertices: PdfPoint[];
   /**
@@ -41,7 +49,7 @@ export interface VertexAnnotationFields extends FilledStyleFields {
   rotation?: number;
 }
 
-export interface VertexDraftFields extends FilledStyleDraftFields {
+export interface VertexDraftFields extends FilledStyleDraftFields, MeasurementDraftFields {
   /** `/Vertices` geometry — required (vertex annotations are not derived). */
   vertices: PdfPoint[];
   /** `/Rect` bounding box — required (computed by the caller/plugin). */
@@ -50,7 +58,7 @@ export interface VertexDraftFields extends FilledStyleDraftFields {
   rotation?: number | null;
 }
 
-export interface VertexPatchFields extends FilledStylePatchFields {
+export interface VertexPatchFields extends FilledStylePatchFields, MeasurementPatchFields {
   vertices?: PdfPoint[];
   rect?: PdfRect;
   /** Tri-state: omitted preserves, `null`/`0` clears the advisory scalar. */
@@ -60,12 +68,14 @@ export interface VertexPatchFields extends FilledStylePatchFields {
 export const VertexDTOShape = {
   ...AnnotationBaseShape,
   ...FilledStyleDTOShape,
+  ...MeasurementDTOShape,
   vertices: z.array(PdfPointSchema),
   rotation: z.number().optional(),
 } as const;
 
 export const VertexDraftShape = {
   ...FilledStyleDraftShape,
+  ...MeasurementDraftShape,
   vertices: z.array(PdfPointSchema),
   rect: PdfRectSchema,
   rotation: z.number().nullable().optional(),
@@ -73,6 +83,7 @@ export const VertexDraftShape = {
 
 export const VertexPatchShape = {
   ...FilledStylePatchShape,
+  ...MeasurementPatchShape,
   vertices: z.array(PdfPointSchema).optional(),
   rect: PdfRectSchema.optional(),
   rotation: z.number().nullable().optional(),

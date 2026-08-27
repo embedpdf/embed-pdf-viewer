@@ -363,6 +363,7 @@ export const defaultCommands: CommandDef[] = [
   },
   modeCommand('mode:annotate', 'commands.mode.annotate'),
   modeCommand('mode:shapes', 'commands.mode.shapes'),
+  modeCommand('mode:measure', 'commands.mode.measure'),
   modeCommand('mode:insert', 'commands.mode.insert'),
   modeCommand('mode:form', 'commands.mode.form', 'form-edit'),
   modeCommand('mode:redact', 'commands.mode.redact'),
@@ -437,6 +438,36 @@ export const defaultCommands: CommandDef[] = [
   tool('annotation:add-polyline', 'polyline', 'commands.shapes.polyline', 'zigzag', {
     primary: 'color',
   }),
+
+  // ── measurement tools ───────────────────────────────────────────────────
+  // Ordinary draw tools whose defaults carry a calibration (see the plugin's
+  // DEFAULT_TOOLS): the same gesture, a read-out on top. The style panel's
+  // Measurement control edits the armed tool's scale/unit/precision, so
+  // calibrating is just editing the tool's defaults.
+  tool('measure:distance', 'measure-distance', 'commands.measure.distance', 'measureDistance', {
+    primary: 'color',
+  }),
+  tool('measure:perimeter', 'measure-perimeter', 'commands.measure.perimeter', 'measurePerimeter', {
+    primary: 'color',
+  }),
+  tool(
+    'measure:area-polygon',
+    'measure-area-polygon',
+    'commands.measure.areaPolygon',
+    'measureAreaPolygon',
+    { primary: 'color', secondary: 'interiorColor' },
+  ),
+  tool('measure:area-rect', 'measure-area-rect', 'commands.measure.areaRect', 'measureAreaRect', {
+    primary: 'color',
+    secondary: 'interiorColor',
+  }),
+  tool(
+    'measure:area-ellipse',
+    'measure-area-ellipse',
+    'commands.measure.areaEllipse',
+    'measureAreaEllipse',
+    { primary: 'color', secondary: 'interiorColor' },
+  ),
 
   // ── insert tools (stamp/attachment real; signature/image inert) ─────────
   tool('insert:add-stamp', 'stamp', 'commands.insert.stamp', 'rubberStamp'),
@@ -625,6 +656,7 @@ export const defaultCommands: CommandDef[] = [
 export const MODE_SURFACES = [
   'mode:annotate',
   'mode:shapes',
+  'mode:measure',
   'mode:insert',
   'mode:form',
   'mode:redact',

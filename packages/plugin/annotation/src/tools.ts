@@ -19,7 +19,13 @@ import type {
   PropKey,
   Subtype,
 } from '@embedpdf/core-annotation';
-import type { BinarySource, InkIntent } from '@embedpdf/engine-core/runtime';
+import { DEFAULT_MEASUREMENT_SCALE } from '@embedpdf/engine-core/runtime';
+import type {
+  BinarySource,
+  InkIntent,
+  MeasurementInfo,
+  MeasurementMode,
+} from '@embedpdf/engine-core/runtime';
 
 /**
  * How a stamp-family tool resolves the image bytes it places — pure DATA, so a
@@ -77,11 +83,27 @@ export interface InkAuthoringOptions {
  * edits can keep using `AnnotationPropsPatch`.
  */
 export const TOOL_DEFAULT_KEYS = {
-  square: ['color', 'interiorColor', 'opacity', 'strokeWidth', 'border'],
-  circle: ['color', 'interiorColor', 'opacity', 'strokeWidth', 'border'],
-  line: ['color', 'interiorColor', 'opacity', 'strokeWidth', 'border', 'lineEndings'],
-  polygon: ['color', 'interiorColor', 'opacity', 'strokeWidth', 'border'],
-  polyline: ['color', 'interiorColor', 'opacity', 'strokeWidth', 'border', 'lineEndings'],
+  square: ['color', 'interiorColor', 'opacity', 'strokeWidth', 'border', 'measurement'],
+  circle: ['color', 'interiorColor', 'opacity', 'strokeWidth', 'border', 'measurement'],
+  line: [
+    'color',
+    'interiorColor',
+    'opacity',
+    'strokeWidth',
+    'border',
+    'lineEndings',
+    'measurement',
+  ],
+  polygon: ['color', 'interiorColor', 'opacity', 'strokeWidth', 'border', 'measurement'],
+  polyline: [
+    'color',
+    'interiorColor',
+    'opacity',
+    'strokeWidth',
+    'border',
+    'lineEndings',
+    'measurement',
+  ],
   ink: ['color', 'opacity', 'strokeWidth', 'blendMode'],
   'free-text': [
     'fontFamily',
@@ -257,6 +279,11 @@ export interface BuiltinToolKindMap {
   note: 'text';
   attachment: 'file-attachment';
   link: 'link';
+  'measure-distance': 'line';
+  'measure-perimeter': 'polyline';
+  'measure-area-polygon': 'polygon';
+  'measure-area-rect': 'square';
+  'measure-area-ellipse': 'circle';
 }
 
 type DirectToolDef = {
@@ -329,6 +356,21 @@ const MARKUP_TAGS = ['text-select', 'annotation-edit'];
  */
 export const isTouchDirect = (enables: ReadonlySet<string>): boolean =>
   enables.has('annotation-draw') || enables.has('text-select');
+
+/** Measurement stroke: a saturated blue that reads as instrumentation rather
+ *  than as markup, so a dimension is distinguishable from a drawn shape. */
+const MEASURE_STROKE = '#2962ff';
+const MEASURE_STYLE = { color: MEASURE_STROKE, strokeWidth: 2, opacity: 1 } as const;
+
+/** The seed calibration a measure tool starts from: the identity scale, read
+ *  out in points to two decimals. `setToolDefaults` (or the viewer's calibrate
+ *  flow) replaces `scale` once the user tells us what the page represents. */
+const measurementDefaults = (mode: MeasurementMode): MeasurementInfo => ({
+  mode,
+  scale: DEFAULT_MEASUREMENT_SCALE,
+  unit: 'pt',
+  precision: { type: 'decimal', places: 2 },
+});
 
 /**
  * The built-in tools — a data mirror of v2's registrations (shapes + lines + ink
@@ -545,6 +587,51 @@ export const DEFAULT_TOOLS: AnnotationToolInput[] = [
     flags: { noZoom: true, noRotate: true },
     upright: true,
     ghost: { mode: 'footprint' },
+  },
+  /* ── measurement ───────────────────────────────────────────────────────────
+   * A measurement tool is an ORDINARY geometry tool with a `measurement`
+   * default — which is exactly why it needs no new gesture, handler, or
+   * subtype: `extends` inherits the draw behaviour, and the calibration in
+   * `defaults` is what promotes what it draws into a dimension. The read-out
+   * derives from the geometry on every render (`view.ts`), so a later vertex
+   * drag or resize keeps the number honest.
+   *
+   * `clickCreate: false` on all five: a fixed-size shape from a bare click
+   * would be a measurement of nothing the user chose. Measurements are DRAWN.
+   *
+   * The shared default calibration is the identity (1 page point = 1 pt) — an
+   * honest "uncalibrated" read-out. An app calls `setToolDefaults` (or the
+   * viewer's calibrate flow) to set the real scale.
+   */
+  {
+    id: 'measure-distance',
+    extends: 'line',
+    defaults: { ...MEASURE_STYLE, measurement: measurementDefaults('distance') },
+    clickCreate: false,
+  },
+  {
+    id: 'measure-perimeter',
+    extends: 'polyline',
+    defaults: { ...MEASURE_STYLE, measurement: measurementDefaults('perimeter') },
+    clickCreate: false,
+  },
+  {
+    id: 'measure-area-polygon',
+    extends: 'polygon',
+    defaults: { ...MEASURE_STYLE, measurement: measurementDefaults('area') },
+    clickCreate: false,
+  },
+  {
+    id: 'measure-area-rect',
+    extends: 'square',
+    defaults: { ...MEASURE_STYLE, measurement: measurementDefaults('area') },
+    clickCreate: false,
+  },
+  {
+    id: 'measure-area-ellipse',
+    extends: 'circle',
+    defaults: { ...MEASURE_STYLE, measurement: measurementDefaults('area') },
+    clickCreate: false,
   },
 ];
 

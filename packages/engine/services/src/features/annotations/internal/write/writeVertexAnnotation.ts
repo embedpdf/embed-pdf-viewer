@@ -16,6 +16,7 @@ import {
 import { applyAnnotationBaseDraft, applyAnnotationBasePatch } from './writeAnnotationBase';
 import { applyFilledStyleDraft, applyFilledStylePatch } from './writeStyle';
 import { writeVertexTransformMetadata } from './writeAnnotationTransformMetadata';
+import { writeMeasurementMetadata } from './writeMeasurementMetadata';
 
 export type VertexDraft = PolygonDraft | PolylineDraft;
 export type VertexPatch = PolygonPatch | PolylinePatch;
@@ -51,6 +52,7 @@ export function applyPolygonDraft(
   }
   // Advisory rotation: the vertices are already rotated; this just records θ.
   writeVertexTransformMetadata(fn, annotPtr, { rotation: draft.rotation });
+  writeMeasurementMetadata(fn, mem, annotPtr, 'polygon', draft.measurement);
 }
 
 export function applyPolygonPatch(
@@ -69,6 +71,7 @@ export function applyPolygonPatch(
   }
   // Advisory rotation is tri-state (undefined preserves, null/0 clears).
   writeVertexTransformMetadata(fn, annotPtr, { rotation: patch.rotation });
+  writeMeasurementMetadata(fn, mem, annotPtr, 'polygon', patch.measurement);
   if (patch.cloudyIntensity !== undefined) {
     if (patch.cloudyIntensity !== null && patch.cloudyIntensity > 0) {
       setBorderEffect(fn, annotPtr, patch.cloudyIntensity);
@@ -102,6 +105,7 @@ export function applyPolylineDraft(
   setLineEndings(fn, annotPtr, draft.lineEndings ?? DEFAULT_LINE_ENDINGS);
   // Advisory rotation: the vertices are already rotated; this just records θ.
   writeVertexTransformMetadata(fn, annotPtr, { rotation: draft.rotation });
+  writeMeasurementMetadata(fn, mem, annotPtr, 'polyline', draft.measurement);
 }
 
 export function applyPolylinePatch(
@@ -120,6 +124,7 @@ export function applyPolylinePatch(
   }
   // Advisory rotation is tri-state (undefined preserves, null/0 clears).
   writeVertexTransformMetadata(fn, annotPtr, { rotation: patch.rotation });
+  writeMeasurementMetadata(fn, mem, annotPtr, 'polyline', patch.measurement);
   if (patch.lineEndings !== undefined) {
     setLineEndings(fn, annotPtr, patch.lineEndings);
   }

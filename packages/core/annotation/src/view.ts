@@ -37,13 +37,56 @@ import {
   type ViewEnv,
 } from './anchor';
 import { blendFor } from './scene';
+import { measureLabelAnchor, measureText } from './measure';
 import { styleFromProps } from './props';
 import { calloutBox, calloutUprightRot, defaultsFor, rotateDraftDelta } from './update';
-import type { Annot, ChromeNode, Geom, Id, Model, Rect, RenderItem, Style, Vec } from './types';
+import type {
+  Annot,
+  ChromeNode,
+  Geom,
+  Id,
+  MeasureRender,
+  Model,
+  Rect,
+  RenderItem,
+  Style,
+  Vec,
+} from './types';
+import type { MeasurementInfo } from '@embedpdf/engine-core/runtime';
 import type { CreationDraftAnchor } from './types';
 
 const DRAFT_ID = '__draft__';
 const PREVIEW_ID = '__markup_preview__';
+
+/* Measurement read-out sizing, in SCREEN pixels — divided by the view zoom
+ * below so the label and hatch hold a constant on-screen size while living in
+ * content-space coordinates. Unlike a `noZoom` body there is no Adobe-style
+ * ≤100% clamp: a read-out is chrome, and must stay legible when zoomed out. */
+const MEASURE_LABEL_PX = 12;
+const MEASURE_HATCH_PX = 7;
+/** How far a line's label sits off the stroke it describes. */
+const MEASURE_OFFSET_PX = 14;
+
+/**
+ * Resolve a measurement into its render form for ONE view: the formatted text,
+ * where it sits, and the zoom-compensated sizes. Derived from the EFFECTIVE
+ * geometry, so a live vertex drag or resize updates the number as it happens —
+ * the read-out can never disagree with the shape it labels.
+ */
+function measureRenderFor(
+  geom: Geom,
+  info: MeasurementInfo,
+  view: ViewEnv | undefined,
+): MeasureRender {
+  const zoom = view && view.zoom > 0 && Number.isFinite(view.zoom) ? view.zoom : 1;
+  return {
+    text: measureText(geom, info),
+    at: measureLabelAnchor(geom, MEASURE_OFFSET_PX / zoom),
+    fontSize: MEASURE_LABEL_PX / zoom,
+    // Only an AREA reads as a filled region; a distance or perimeter is a line.
+    hatch: info.mode === 'area' ? MEASURE_HATCH_PX / zoom : 0,
+  };
+}
 
 const polyPreviewPoints = (points: Vec[], cur: Vec): Vec[] => {
   const last = points[points.length - 1];
@@ -174,6 +217,7 @@ export function pageItems(m: Model, pon: number, view?: ViewEnv): RenderItem[] {
       style,
       ...(a.text ? { text: a.text } : {}),
       ...(a.label ? { label: a.label } : {}),
+      ...(a.measure ? { measure: measureRenderFor(geom, a.measure, view) } : {}),
       source: effSource(m, id),
       selected: m.selected.includes(id),
       ...(m.hovered === id ? { hovered: true } : {}),
@@ -222,6 +266,9 @@ export function pageItems(m: Model, pon: number, view?: ViewEnv): RenderItem[] {
         style,
         source: 'ghost',
         selected: false,
+        // A measure tool reads out LIVE while you draw — same projection the
+        // committed annotation will use, so the ghost is a true preview.
+        ...(def.measurement ? { measure: measureRenderFor(geom, def.measurement, view) } : {}),
       });
   }
   // Callout creation ghost: the in-progress leader (tip → cur, then tip → knee →

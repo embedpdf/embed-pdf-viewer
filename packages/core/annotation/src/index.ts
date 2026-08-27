@@ -133,9 +133,29 @@ export {
   groupResizeFactors,
 } from './geometry';
 export { cloudyPath, cloudyBorderExtent } from './cloudy';
-export { scene } from './scene';
+export { scene, measureScene } from './scene';
+export {
+  ellipseArea,
+  hatchPath,
+  measureLabelAnchor,
+  measureRawValue,
+  measureText,
+  pointDistance,
+  polygonArea,
+  polygonPerimeter,
+  polylineLength,
+  rectArea,
+} from './measure';
 export { straightenInkStroke } from './ink';
-export type { BlendMode } from '@embedpdf/engine-core/runtime';
+export type {
+  BlendMode,
+  MeasurementInfo,
+  MeasurementMode,
+  MeasurementPrecision,
+  MeasurementScale,
+  MeasurementSecondary,
+  MeasurementUnit,
+} from '@embedpdf/engine-core/runtime';
 export type {
   Annot,
   AnnotationProps,
@@ -153,6 +173,7 @@ export type {
   Handle,
   Id,
   InkStraightenOptions,
+  MeasureRender,
   Model,
   Msg,
   ClickCreate,

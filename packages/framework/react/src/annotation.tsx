@@ -29,12 +29,14 @@ import { pickFile } from '@embedpdf/web';
 import { AnnotationToken as AnnotationHostToken } from '@embedpdf/plugin-annotation/internal';
 import {
   scene,
+  measureScene,
   MITER_LIMIT,
   type AnnotationProps,
   type CreationDraftAnchor,
   type Paint,
   type Rect,
   type RenderItem,
+  type SceneNode,
   type Vec,
 } from '@embedpdf/core-annotation';
 
@@ -53,6 +55,13 @@ export type {
   PropSpec,
   TextAlign,
   TextStyle,
+  MeasureRender,
+  MeasurementInfo,
+  MeasurementMode,
+  MeasurementPrecision,
+  MeasurementScale,
+  MeasurementSecondary,
+  MeasurementUnit,
 } from '@embedpdf/core-annotation';
 export type { SelectionFlags, SelectionProps } from '@embedpdf/plugin-annotation';
 import {
@@ -186,9 +195,47 @@ function Shape({ item, page }: { item: RenderItem; page: PageContextValue }) {
   );
 }
 
+/**
+ * The measurement read-out over a BAKED annotation. The engine's raster is the
+ * annotation's real appearance; the read-out is EmbedPDF chrome the engine has
+ * no way to bake (there is no `/Measure` appearance), so it is painted here on
+ * top. A VECTOR item needs none of this — `scene()` already layers the same
+ * nodes around its paint.
+ *
+ * Sized to `item.box` with `overflow: visible`, because a line's label sits
+ * OFF the stroke (see `measureLabelAnchor`) and would otherwise be clipped.
+ */
+function MeasureOverlay({ item, page }: { item: RenderItem; page: PageContextValue }) {
+  const nodes = measureScene(item);
+  if (!nodes.length || item.box.width <= 0 || item.box.height <= 0) return null;
+  const { left, top, width, height } = boxOf(item.box, page);
+  const vb = `${item.box.x} ${item.box.y} ${item.box.width} ${item.box.height}`;
+  return (
+    <svg
+      viewBox={vb}
+      style={{
+        position: 'absolute',
+        left,
+        top,
+        width,
+        height,
+        overflow: 'visible',
+        pointerEvents: 'none',
+      }}
+    >
+      {svgNodes(nodes)}
+    </svg>
+  );
+}
+
 /** Map a core scene to SVG children. */
 function sceneNodes(item: RenderItem): React.ReactNode[] {
-  return scene(item).map((n, i) => {
+  return svgNodes(scene(item));
+}
+
+/** Map a list of painted scene nodes to SVG children. */
+function svgNodes(nodes: SceneNode[]): React.ReactNode[] {
+  return nodes.map((n, i) => {
     const a = paintAttrs(n.paint);
     if (n.kind === 'rect')
       return (
@@ -782,13 +829,18 @@ export function AnnotationLayer({ renderers }: AnnotationLayerProps = {}) {
         const native: React.ReactNode =
           item.source === 'baked' ? (
             baked ? (
-              <BakedImage
-                box={item.apBox ?? baked.box}
-                url={baked.url}
-                page={page}
-                blend={item.blend}
-                rot={item.apRot}
-              />
+              <>
+                <BakedImage
+                  box={item.apBox ?? baked.box}
+                  url={baked.url}
+                  page={page}
+                  blend={item.blend}
+                  rot={item.apRot}
+                />
+                {/* The engine cannot bake a measurement read-out, so it rides
+                    over the raster. No-op for everything else. */}
+                <MeasureOverlay item={item} page={page} />
+              </>
             ) : null
           ) : (
             <Shape item={item} page={page} /> // shapes, cloudy, markup — all painted via scene()
@@ -977,4 +1029,3 @@ export function sameCreationDraftAnchor(
     a.bounds.height === b.bounds.height
   );
 }
-

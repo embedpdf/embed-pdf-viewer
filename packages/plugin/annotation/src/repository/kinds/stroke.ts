@@ -64,6 +64,7 @@ export const line: KindProjection = {
         ends: d.lineEndings,
         ...rotFromDTO(d.rotation),
       },
+      ...(d.measurement ? { measure: d.measurement } : {}),
     };
   },
   geometry: (a, crop) => {
@@ -89,6 +90,7 @@ const polyProjection = (closed: boolean): KindProjection => ({
         ...('lineEndings' in d ? { ends: d.lineEndings } : {}),
         ...rotFromDTO(d.rotation),
       },
+      ...(d.measurement ? { measure: d.measurement } : {}),
     };
   },
   geometry: (a, crop) => {

@@ -1,5 +1,13 @@
 import { z } from 'zod';
 
+import {
+  MeasurementDTOShape,
+  MeasurementDraftShape,
+  MeasurementPatchShape,
+  type MeasurementAnnotationFields,
+  type MeasurementDraftFields,
+  type MeasurementPatchFields,
+} from './measurement.shared';
 import type { PdfRect } from '../../geometry/primitives';
 import { PdfRectSchema } from '../../geometry/schemas';
 import type { AnnotationBase } from '../base';
@@ -32,7 +40,7 @@ import {
  * logical (pre-rotation) box. Together they drive PDFium's `/EMBD_Metadata`
  * AP rotation (`/Matrix` + `/BBox`); `/Rect` stays the rotated visual AABB.
  */
-export interface ShapeAnnotationFields extends FilledStyleFields {
+export interface ShapeAnnotationFields extends FilledStyleFields, MeasurementAnnotationFields {
   /** `/BE` cloudy border intensity; `null` when the border carries no effect. */
   cloudyIntensity: number | null;
   /** `/RD` rectangle differences (inset of drawn geometry from `/Rect`); `null` when absent. */
@@ -43,7 +51,7 @@ export interface ShapeAnnotationFields extends FilledStyleFields {
   unrotatedRect?: PdfRect;
 }
 
-export interface ShapeDraftFields extends FilledStyleDraftFields {
+export interface ShapeDraftFields extends FilledStyleDraftFields, MeasurementDraftFields {
   /** `/Rect` geometry — required for shapes (they are not derived from quads). */
   rect: PdfRect;
   cloudyIntensity?: number | null;
@@ -52,7 +60,7 @@ export interface ShapeDraftFields extends FilledStyleDraftFields {
   unrotatedRect?: PdfRect | null;
 }
 
-export interface ShapePatchFields extends FilledStylePatchFields {
+export interface ShapePatchFields extends FilledStylePatchFields, MeasurementPatchFields {
   rect?: PdfRect;
   /** Tri-state (as `interiorColor`): omitted preserves, a value sets, `null` removes `/BE`. */
   cloudyIntensity?: number | null;
@@ -67,6 +75,7 @@ export interface ShapePatchFields extends FilledStylePatchFields {
 export const ShapeDTOShape = {
   ...AnnotationBaseShape,
   ...FilledStyleDTOShape,
+  ...MeasurementDTOShape,
   cloudyIntensity: z.number().positive().nullable(),
   rectDifferences: PdfRectDifferencesSchema.nullable(),
   rotation: z.number().optional(),
@@ -75,6 +84,7 @@ export const ShapeDTOShape = {
 
 export const ShapeDraftShape = {
   ...FilledStyleDraftShape,
+  ...MeasurementDraftShape,
   rect: PdfRectSchema,
   cloudyIntensity: z.number().positive().nullable().optional(),
   rectDifferences: PdfRectDifferencesSchema.nullable().optional(),
@@ -84,6 +94,7 @@ export const ShapeDraftShape = {
 
 export const ShapePatchShape = {
   ...FilledStylePatchShape,
+  ...MeasurementPatchShape,
   rect: PdfRectSchema.optional(),
   cloudyIntensity: z.number().positive().nullable().optional(),
   rectDifferences: PdfRectDifferencesSchema.nullable().optional(),

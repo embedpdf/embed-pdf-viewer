@@ -12,6 +12,7 @@ import {
   readAnnotationRotation,
   readAnnotationUnrotatedRect,
 } from './readAnnotationTransformMetadata';
+import { readMeasurementMetadata } from './readMeasurementMetadata';
 
 /**
  * Shared reader for the two shape subtypes. Materialises the common
@@ -36,6 +37,7 @@ export function readShapeExtras(
     rectDifferences,
     ...(rotation != null ? { rotation } : {}),
     ...(unrotatedRect ? { unrotatedRect } : {}),
+    measurement: readMeasurementMetadata(fn, mem, annotPtr),
   };
 }
 

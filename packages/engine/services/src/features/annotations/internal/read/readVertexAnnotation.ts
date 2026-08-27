@@ -9,6 +9,7 @@ import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runti
 import { readBorderEffect, readLineEndings, readVertices } from './annotationReadPrimitives';
 import { readFilledStyleExtras } from './readStyle';
 import { readAnnotationRotation } from './readAnnotationTransformMetadata';
+import { readMeasurementMetadata } from './readMeasurementMetadata';
 
 /**
  * Shared reader for the two vertex subtypes (polygon/polyline). Reads the
@@ -26,6 +27,9 @@ export function readVertexExtras(
     ...readFilledStyleExtras(fn, mem, annotPtr),
     vertices: readVertices(fn, mem, annotPtr),
     ...(rotation != null ? { rotation } : {}),
+    // Absent (or unreadable) calibration reads as explicit `null`, so a read
+    // DTO compares structurally against a demoting patch.
+    measurement: readMeasurementMetadata(fn, mem, annotPtr),
   };
 }
 

@@ -152,6 +152,29 @@ export type {
 } from './annotation/primitives';
 export { NO_ANNOTATION_FLAGS } from './annotation/primitives';
 
+export type {
+  MeasurementInfo,
+  MeasurementIntent,
+  MeasurementMode,
+  MeasurementPrecision,
+  MeasurementScale,
+  MeasurementSecondary,
+  MeasurementUnit,
+} from './annotation/measurement';
+export {
+  DEFAULT_MEASUREMENT_SCALE,
+  MEASUREMENT_UNITS,
+  convertUnit,
+  formatMeasurement,
+  formatNumber,
+  isAreaMode,
+  measurementIntentFor,
+  parseMeasurementInfo,
+  scaleFactor,
+  scaleFromPagePoints,
+  toRealValue,
+  unitLabel,
+} from './annotation/measurement';
 export type { AnnotationBase } from './annotation/base';
 export type { AnnotationDraftBase } from './annotation/draft-base';
 export type { AnnotationPatchBase } from './annotation/patch-base';
