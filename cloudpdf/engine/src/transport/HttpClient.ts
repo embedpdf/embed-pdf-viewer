@@ -30,12 +30,19 @@ export interface HttpClientOptions {
   /** Replace the global fetch (e.g. in Node tests with undici). */
   fetch?: typeof globalThis.fetch;
   /**
-   * Document affinity (opt-in; requires a server whose CORS
-   * allowlist includes the header): send `X-CloudPDF-Doc` on
-   * origin-bound doc requests so consistent-hash load balancers pin a
-   * document's traffic to one warm replica. Derived from the request
-   * path (`/v1/docs/:docId/…` — the same extraction the Helm chart's
-   * uri-mode fallback uses); never sent on CDN-rewritten requests.
+   * Document affinity key: `X-CloudPDF-Doc` is sent BY DEFAULT on
+   * origin-bound doc requests so consistent-hash load balancers can pin
+   * a document's traffic to one warm replica. Routing hints are
+   * unconditional client behavior — whether they are USED is the
+   * operator's choice at the load balancer, never the app's. Derived
+   * from the request path (`/v1/docs/:docId/…` — the same extraction
+   * the Helm chart's uri-mode fallback uses); never sent on
+   * CDN-rewritten requests.
+   *
+   * `false` is an ESCAPE HATCH, not a feature toggle: use it only
+   * against a stale server whose CORS allowlist predates the header
+   * (browser preflights would fail) or behind a proxy that rejects
+   * unknown request headers.
    */
   docAffinityHeader?: boolean;
   /** Observability: fired once per transport-level retry (engine busy /
@@ -89,7 +96,7 @@ export class HttpClient {
     this.tokenFn = token === undefined ? null : typeof token === 'function' ? token : () => token;
     this.sessionId = opts.sessionId ?? null;
     this.fetchFn = opts.fetch ?? globalThis.fetch.bind(globalThis);
-    this.docAffinityHeader = opts.docAffinityHeader ?? false;
+    this.docAffinityHeader = opts.docAffinityHeader ?? true;
     this.onRetry = opts.onRetry;
   }
 

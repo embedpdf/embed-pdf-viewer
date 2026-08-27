@@ -154,11 +154,11 @@ export class CloudDocumentSecurityService implements DocumentSecurityService {
     body: { password?: string; mode: 'any' | 'owner' },
   ): Promise<DocumentUnlockResult> {
     const response = await this.http.postJson(
-      // Doc-scoped BY PATH: the affinity tier pins the session bootstrap
-      // to the document's pod from the very first request.
-      wirePaths.access(this.docId),
+      // Identity rides the PATH — doc and layer, like every layer route;
+      // the affinity tier pins the session bootstrap to the document's
+      // pod from the very first request.
+      wirePaths.access(this.docId, this.layerName),
       {
-        layerName: this.layerName,
         ...(body.password ? { password: body.password } : {}),
         mode: body.mode,
       },

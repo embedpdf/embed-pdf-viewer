@@ -118,26 +118,35 @@ describe('code-keyed 503 retry', () => {
   });
 });
 
-describe('X-CloudPDF-Doc emission (opt-in)', () => {
-  test('default OFF: no header', async () => {
+describe("X-CloudPDF-Doc emission (default ON — routing hints are client behavior, using them is the LB operator's call)", () => {
+  test('by DEFAULT: doc paths carry the docId; non-doc paths do not', async () => {
     const { fetch, calls } = scriptedFetch([{ status: 200, body: {} }]);
-    await client(fetch).getJson('/v1/docs/docZ/head', (raw) => raw, signal());
-    expect(new Headers(calls[0]!.init.headers).get('x-cloudpdf-doc')).toBeNull();
-  });
-
-  test('enabled: doc paths carry the docId; non-doc paths do not', async () => {
-    const { fetch, calls } = scriptedFetch([{ status: 200, body: {} }]);
-    const http = client(fetch, { docAffinityHeader: true });
+    const http = client(fetch);
     await http.getJson('/v1/docs/docZ/head', (raw) => raw, signal());
     expect(new Headers(calls[0]!.init.headers).get('x-cloudpdf-doc')).toBe('docZ');
     await http.getJson('/healthz', (raw) => raw, signal());
     expect(new Headers(calls[1]!.init.headers).get('x-cloudpdf-doc')).toBeNull();
   });
 
-  test('the access bootstrap carries it via its PATH — no hint machinery', async () => {
+  test('docAffinityHeader: false is the escape hatch (stale-CORS server / strict proxy)', async () => {
     const { fetch, calls } = scriptedFetch([{ status: 200, body: {} }]);
-    const http = client(fetch, { docAffinityHeader: true });
-    await http.postJson('/v1/docs/docZ/access', { layerName: 'default' }, (raw) => raw, signal());
+    await client(fetch, { docAffinityHeader: false }).getJson(
+      '/v1/docs/docZ/head',
+      (raw) => raw,
+      signal(),
+    );
+    expect(new Headers(calls[0]!.init.headers).get('x-cloudpdf-doc')).toBeNull();
+  });
+
+  test('the access bootstrap carries it via its PATH — doc and layer both path-addressed', async () => {
+    const { fetch, calls } = scriptedFetch([{ status: 200, body: {} }]);
+    const http = client(fetch);
+    await http.postJson(
+      '/v1/docs/docZ/layers/default/access',
+      { mode: 'any' },
+      (raw) => raw,
+      signal(),
+    );
     expect(new Headers(calls[0]!.init.headers).get('x-cloudpdf-doc')).toBe('docZ');
   });
 });
