@@ -1,3 +1,4 @@
+import { connect } from 'node:net';
 import { createHash, randomBytes } from 'node:crypto';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -395,6 +396,33 @@ describe('drain + readiness — shutdown ends streams instead of hanging on them
     await fx.bundle.shutdown();
     expect(Date.now() - started).toBeLessThan(10_000);
     await sse.waitForEnd();
+  });
+
+  test('teardown stays far inside the runner hook budget when a request is stuck', async () => {
+    // The defect this locks: buildApp's production `shutdownTimeoutMs`
+    // (30s — the budget real in-flight traffic gets before a supervisor
+    // kill) is EXACTLY vitest's `hookTimeout`, so one stuck connection
+    // at teardown consumed the entire hook budget and surfaced as
+    // "Hook timed out in 30000ms" — a phantom flake that looked like
+    // load. `buildAppForTesting` bounds it to 2s; if anyone restores the
+    // production default for tests, this test times out first and says
+    // why.
+    const port = Number(new URL(fx.baseUrl).port);
+    const socket = connect(port, '127.0.0.1');
+    await new Promise((resolve) => socket.once('connect', resolve));
+    // Headers promise 500 bytes of body; we send 5 and stop, so the
+    // request never completes and app.close() cannot settle on its own.
+    socket.write(
+      'POST /v1/docs/x/access HTTP/1.1\r\nHost: localhost\r\n' +
+        'Content-Type: application/json\r\nContent-Length: 500\r\n\r\n{"a":',
+    );
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    const started = Date.now();
+    await fx.bundle.shutdown();
+    const elapsed = Date.now() - started;
+    socket.destroy();
+    expect(elapsed).toBeLessThan(10_000);
   });
 
   test('a stream connecting mid-drain is ended immediately', async () => {

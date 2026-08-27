@@ -50,6 +50,15 @@ type S3Module = typeof import('@aws-sdk/client-s3');
 type PresignerModule = typeof import('@aws-sdk/s3-request-presigner');
 type S3Client = InstanceType<S3Module['S3Client']>;
 
+/**
+ * S3's aws-chunked checksum framing requires every non-final data chunk to
+ * contain at least 8 KiB. Import sources may emit arbitrarily small chunks,
+ * so let the SDK coalesce them before its checksum middleware sees them.
+ * 64 KiB is the SDK's documented example and remains bounded per in-flight
+ * streaming request.
+ */
+const REQUEST_STREAM_BUFFER_SIZE = 64 * 1024;
+
 interface S3Deps {
   client: S3Client;
   /** Command constructors, captured from the lazily-imported module. */
@@ -107,6 +116,7 @@ export class S3ObjectStore implements ObjectStore {
       opts.client ??
       new cmd.S3Client({
         region: opts.region,
+        requestStreamBufferSize: REQUEST_STREAM_BUFFER_SIZE,
         ...(opts.endpoint ? { endpoint: opts.endpoint, forcePathStyle: true } : {}),
       });
     return { client, cmd, getSignedUrl: presigner.getSignedUrl };
