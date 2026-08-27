@@ -1314,6 +1314,40 @@ export class DocumentService {
     return row;
   }
 
+  /**
+   * Export the listed pages, in caller order, as a standalone PDF. A READ
+   * over the current layer state (the worker's `pages.extract` is a scratch
+   * copy — the source document is untouched), so there is no write queue,
+   * no artifact, and no audit row. Extracted subsets are bounded by the
+   * page selection, so the bytes cross the worker boundary directly rather
+   * than through the file-backed download path.
+   */
+  async extractLayerPages(
+    ctx: OpenContext,
+    docId: string,
+    layerName: string,
+    pageObjectNumbers: number[],
+    signal?: AbortSignal,
+  ): Promise<Uint8Array> {
+    await this.ensureLayerOnPool(ctx, docId, layerName);
+    const build = (jobId: WorkerJobId) =>
+      wirePack({
+        kind: 'pages.extract' as const,
+        jobId,
+        docId,
+        layerName,
+        pageObjectNumbers,
+      });
+    const result = await this.pool.run(docId, build, signal);
+    if (result.tag !== 'pages.extract') {
+      throw new EngineError(
+        EngineErrorCode.WireFormat,
+        `unexpected pages.extract payload: ${result.tag}`,
+      );
+    }
+    return new Uint8Array(result.bytes);
+  }
+
   async saveLayerDownloadToTemp(
     ctx: OpenContext,
     docId: string,

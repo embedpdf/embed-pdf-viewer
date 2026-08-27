@@ -75,6 +75,10 @@ export interface ManifestAccessor {
   /** Same advance for a page delete, additionally dropping the deleted
    *  pages' manifest rows so per-page leaf URLs stop resolving locally. */
   applyPageDelete(cache: PageStructureCache, deletedPages: PageObjectNumber[]): void;
+  /** Page insert: the cached manifest has no rows for the fresh PONs (the
+   *  result carries only their object numbers), so the absorb drops the
+   *  cache for a lazy refetch instead of patching. */
+  applyPageInsert(cache: PageStructureCache): void;
   /** Advance the cached manifest's docVersion + metadataVersion after a metadata write. */
   applyMetadata(cache: MetadataCache): void;
   /** Advance the cached manifest's docVersion + attachmentsVersion after an
@@ -206,6 +210,7 @@ export class CloudDocumentHandle implements DocumentHandle {
       apply: (meta, owns) => this.absorbMutation(meta, owns),
       applyPageStructure: (cache) => this.absorbPageStructure(cache),
       applyPageDelete: (cache, deletedPages) => this.absorbPageDelete(cache, deletedPages),
+      applyPageInsert: (cache) => this.absorbPageInsert(cache),
       applyMetadata: (cache) => this.absorbMetadata(cache),
       applyAttachments: (cache) => this.absorbAttachments(cache),
     };
@@ -472,6 +477,24 @@ export class CloudDocumentHandle implements DocumentHandle {
   }
 
   /**
+   * Patch bookkeeping after a page insert — the mirror of
+   * {@link absorbPageDelete}, with one asymmetry: delete can patch the
+   * cached manifest losslessly (it only REMOVES rows), but an insert needs
+   * manifest rows for the fresh PONs and the result doesn't carry them. So
+   * this absorb flips the planes (insert changes the page SET, so like
+   * delete it owns content + annotations alongside layout), raises the
+   * version floor, and DROPS the cache — the next read refetches a manifest
+   * that includes the new pages' rows. The UI never waits on that refetch:
+   * the mutation result / event already carries the full new layout.
+   */
+  private absorbPageInsert(cache: PageStructureCache): void {
+    this.flipScopes(['layout', 'content', 'annotations']);
+    this.manifestFloorVersion = Math.max(this.manifestFloorVersion, cache.docVersion);
+    this.inflightManifest = null;
+    this.manifestCache = null;
+  }
+
+  /**
    * Patch the cached manifest after a metadata write. Symmetric with
    * {@link absorbPageMove}: a metadata edit advances `docVersion` (so leaf
    * URLs re-resolve) and `metadataVersion` (so the /metadata leaf re-fetches),
@@ -661,6 +684,9 @@ export class CloudDocumentHandle implements DocumentHandle {
         return;
       case 'pages.deleted':
         if (event.cache) this.absorbPageDelete(event.cache, event.pageObjectNumbers);
+        return;
+      case 'pages.inserted':
+        if (event.cache) this.absorbPageInsert(event.cache);
         return;
       case 'metadata.updated':
         if (event.cache) this.absorbMetadata(event.cache);

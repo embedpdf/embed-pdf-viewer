@@ -45,6 +45,7 @@ import {
   type PagesRotateWorkerRequest,
   type PagesDeleteWorkerRequest,
   type PagesExtractWorkerRequest,
+  type PagesInsertBlankWorkerRequest,
   type PagesInsertWorkerRequest,
   type AttachmentsListWorkerRequest,
   type AttachmentsReadFileWorkerRequest,
@@ -323,6 +324,9 @@ export class WorkerHost {
           break;
         case 'pages.insert':
           resultPack = this.handlePagesInsert(msg, ctrl.signal);
+          break;
+        case 'pages.insertBlank':
+          resultPack = this.handlePagesInsertBlank(msg, ctrl.signal);
           break;
         case 'attachments.list':
           resultPack = this.handleAttachmentsList(msg, ctrl.signal);
@@ -681,6 +685,16 @@ export class WorkerHost {
     const inserter = new PagesInserter(this.runtime, session);
     const result = inserter.insert(req.bytes, req.destIndex, signal);
     return this.finishMutation(session, { tag: 'pages.insert', result }, req.artifactPath);
+  }
+
+  private handlePagesInsertBlank(
+    req: PagesInsertBlankWorkerRequest,
+    signal: AbortSignal,
+  ): WirePack<WorkerResultPayload> {
+    const session = this.requireSession(req);
+    const inserter = new PagesInserter(this.runtime, session);
+    const result = inserter.insertBlank({ size: req.size, count: req.count }, req.destIndex, signal);
+    return this.finishMutation(session, { tag: 'pages.insertBlank', result }, req.artifactPath);
   }
 
   private handleAttachmentsList(

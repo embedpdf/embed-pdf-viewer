@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "canonicalVersion": "3.0.0-next.8",
-  "openapiSha256": "e997d51317662fe0666e6582916ded9b17a8bcd225c178548e1ff226e4d01c6d",
+  "openapiSha256": "4e71f8bde5d67158810e55af856f72c9bcaeb3c420a087c91dbb0565d285c8fe",
   "languages": {
     "typescript": {
       "label": "TypeScript",
@@ -616,6 +616,43 @@
         "frameLines": 7
       }
     },
+    "doc.pages.extract": {
+      "typescript": {
+        "status": "available",
+        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.doc.pages.extract({\n  docId: \"docId\",\n  layerName: \"layerName\",\n  body: {\n    \"string\": {\n      \"key\": \"value\"\n    }\n  }\n});",
+        "frameLines": 7
+      },
+      "python": {
+        "status": "available",
+        "source": "from cloudpdf import CloudPDFClient\n\nclient = CloudPDFClient(\n    token=\"<token>\",\n    base_url=\"https://yourhost.com/path/to/api\",\n)\n\nclient.doc.pages.extract(\n    doc_id=\"docId\",\n    layer_name=\"layerName\",\n    request={\n        \"string\": {\"key\": \"value\"}\n    },\n)",
+        "frameLines": 7
+      },
+      "php": {
+        "status": "available",
+        "source": "use CloudPDF\\CloudPDFClient;\n\n$client = new CloudPDFClient(\n    token: '<token>',\n    options: ['baseUrl' => 'https://yourhost.com/path/to/api'],\n);\n\n$client->doc->pages->extract(\n    'docId',\n    'layerName',\n    new ExtractPagesRequest([\n        'body' => [\n            'string' => [\n                'key' => \"value\",\n            ],\n        ],\n    ]),\n);",
+        "frameLines": 7
+      },
+      "csharp": {
+        "status": "available",
+        "source": "using CloudPDF;\n\nvar client = new CloudPDFClient(\n    \"<token>\",\n    new ClientOptions { BaseUrl = \"https://yourhost.com/path/to/api\" }\n);\n\nawait client.Doc.Pages.ExtractAsync(\n    new ExtractPagesRequest\n    {\n        DocId = \"docId\",\n        LayerName = \"layerName\",\n        Body = new Dictionary<string, object?>()\n        {\n            {\n                \"string\",\n                new Dictionary<object, object?>() { { \"key\", \"value\" } }\n            },\n        },\n    }\n);",
+        "frameLines": 7
+      },
+      "go": {
+        "status": "available",
+        "source": "import (\n    \"context\"\n\n    client \"github.com/embedpdf/cloudpdf-sdk-go/v3/client\"\n    option \"github.com/embedpdf/cloudpdf-sdk-go/v3/option\"\n)\n\nclient := client.NewClient(\n    option.WithToken(\"<token>\"),\n    option.WithBaseURL(\"https://yourhost.com/path/to/api\"),\n)\n\nrequest := &doc.ExtractPagesRequest{\n    DocID: \"docId\",\n    LayerName: \"layerName\",\n    Body: map[string]any{\n        \"string\": map[string]any{\n            \"key\": \"value\",\n        },\n    },\n}\nclient.Doc.Pages.Extract(\n    context.TODO(),\n    request,\n)",
+        "frameLines": 12
+      },
+      "java": {
+        "status": "available",
+        "source": "import com.cloudpdf.api.CloudPDFClient;\n\nCloudPDFClient client = CloudPDFClient\n    .builder()\n    .token(\"<token>\")\n    .url(\"https://yourhost.com/path/to/api\")\n    .build();\n\nclient.doc().pages().extract(\n    \"docId\",\n    \"layerName\",\n    ExtractPagesRequest\n        .builder()\n        .body(\n            new HashMap<String, Object>() {{\n                put(\"string\", new\n                HashMap<String, Object>() {{put(\"key\", \"value\");\n                }});\n            }}\n        )\n        .build()\n);",
+        "frameLines": 8
+      },
+      "ruby": {
+        "status": "available",
+        "source": "require \"cloudpdf\"\n\nclient = CloudPDF::Client.new(\n  token: \"<token>\",\n  base_url: \"https://yourhost.com/path/to/api\"\n)\n\nclient.doc.pages.extract(\n  doc_id: \"docId\",\n  layer_name: \"layerName\",\n  request: {\n    string: {\n      key: \"value\"\n    }\n  }\n)",
+        "frameLines": 7
+      }
+    },
     "doc.pages.flatten": {
       "typescript": {
         "status": "available",
@@ -650,6 +687,80 @@
       "ruby": {
         "status": "available",
         "source": "require \"cloudpdf\"\n\nclient = CloudPDF::Client.new(\n  token: \"<token>\",\n  base_url: \"https://yourhost.com/path/to/api\"\n)\n\nclient.doc.pages.flatten(\n  doc_id: \"docId\",\n  layer_name: \"layerName\",\n  request: {\n    key: \"value\"\n  }\n)",
+        "frameLines": 7
+      }
+    },
+    "doc.pages.insert": {
+      "typescript": {
+        "status": "available",
+        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.doc.pages.insert({\n  file: fs.createReadStream(\"/path/to/your/file\"),\n  docId: \"docId\",\n  layerName: \"layerName\"\n});",
+        "frameLines": 7
+      },
+      "python": {
+        "status": "available",
+        "source": "from cloudpdf import CloudPDFClient\n\nclient = CloudPDFClient(\n    token=\"<token>\",\n    base_url=\"https://yourhost.com/path/to/api\",\n)\n\nclient.doc.pages.insert(\n    doc_id=\"docId\",\n    layer_name=\"layerName\",\n    file=\"example_file\",\n)",
+        "frameLines": 7
+      },
+      "php": {
+        "status": "available",
+        "source": "use CloudPDF\\CloudPDFClient;\n\n$client = new CloudPDFClient(\n    token: '<token>',\n    options: ['baseUrl' => 'https://yourhost.com/path/to/api'],\n);\n\n$client->doc->pages->insert(\n    'docId',\n    'layerName',\n    new InsertPagesRequest([\n        'file' => File::createFromString(\"example_file\", \"example_file\"),\n    ]),\n);",
+        "frameLines": 7
+      },
+      "csharp": {
+        "status": "available",
+        "source": "using CloudPDF;\n\nvar client = new CloudPDFClient(\n    \"<token>\",\n    new ClientOptions { BaseUrl = \"https://yourhost.com/path/to/api\" }\n);\n\nawait client.Doc.Pages.InsertAsync(\n    new InsertPagesRequest { DocId = \"docId\", LayerName = \"layerName\" }\n);",
+        "frameLines": 7
+      },
+      "go": {
+        "status": "available",
+        "source": "import (\n    \"context\"\n\n    client \"github.com/embedpdf/cloudpdf-sdk-go/v3/client\"\n    option \"github.com/embedpdf/cloudpdf-sdk-go/v3/option\"\n)\n\nclient := client.NewClient(\n    option.WithToken(\"<token>\"),\n    option.WithBaseURL(\"https://yourhost.com/path/to/api\"),\n)\n\nrequest := &doc.InsertPagesRequest{\n    DocID: \"docId\",\n    LayerName: \"layerName\",\n    File: strings.NewReader(\n        \"\",\n    ),\n}\nclient.Doc.Pages.Insert(\n    context.TODO(),\n    request,\n)",
+        "frameLines": 12
+      },
+      "java": {
+        "status": "available",
+        "source": "import com.cloudpdf.api.CloudPDFClient;\n\nCloudPDFClient client = CloudPDFClient\n    .builder()\n    .token(\"<token>\")\n    .url(\"https://yourhost.com/path/to/api\")\n    .build();\n\nclient.doc().pages().insert(\n    \"docId\",\n    \"layerName\",\n    null,\n    InsertPagesRequest\n        .builder()\n        .build()\n);",
+        "frameLines": 8
+      },
+      "ruby": {
+        "status": "available",
+        "source": "require \"cloudpdf\"\n\nclient = CloudPDF::Client.new(\n  token: \"<token>\",\n  base_url: \"https://yourhost.com/path/to/api\"\n)\n\nclient.doc.pages.insert(\n  doc_id: \"docId\",\n  layer_name: \"layerName\"\n)",
+        "frameLines": 7
+      }
+    },
+    "doc.pages.insertBlank": {
+      "typescript": {
+        "status": "available",
+        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.doc.pages.insertBlank({\n  docId: \"docId\",\n  layerName: \"layerName\",\n  body: {\n    \"key\": \"value\"\n  }\n});",
+        "frameLines": 7
+      },
+      "python": {
+        "status": "available",
+        "source": "from cloudpdf import CloudPDFClient\n\nclient = CloudPDFClient(\n    token=\"<token>\",\n    base_url=\"https://yourhost.com/path/to/api\",\n)\n\nclient.doc.pages.insert_blank(\n    doc_id=\"docId\",\n    layer_name=\"layerName\",\n    request={\n        \"key\": \"value\"\n    },\n)",
+        "frameLines": 7
+      },
+      "php": {
+        "status": "available",
+        "source": "use CloudPDF\\CloudPDFClient;\n\n$client = new CloudPDFClient(\n    token: '<token>',\n    options: ['baseUrl' => 'https://yourhost.com/path/to/api'],\n);\n\n$client->doc->pages->insertBlank(\n    'docId',\n    'layerName',\n    new InsertBlankPagesRequest([\n        'body' => [\n            'key' => \"value\",\n        ],\n    ]),\n);",
+        "frameLines": 7
+      },
+      "csharp": {
+        "status": "available",
+        "source": "using CloudPDF;\n\nvar client = new CloudPDFClient(\n    \"<token>\",\n    new ClientOptions { BaseUrl = \"https://yourhost.com/path/to/api\" }\n);\n\nawait client.Doc.Pages.InsertBlankAsync(\n    new InsertBlankPagesRequest\n    {\n        DocId = \"docId\",\n        LayerName = \"layerName\",\n        Body = new Dictionary<string, object?>() { { \"key\", \"value\" } },\n    }\n);",
+        "frameLines": 7
+      },
+      "go": {
+        "status": "available",
+        "source": "import (\n    \"context\"\n\n    client \"github.com/embedpdf/cloudpdf-sdk-go/v3/client\"\n    option \"github.com/embedpdf/cloudpdf-sdk-go/v3/option\"\n)\n\nclient := client.NewClient(\n    option.WithToken(\"<token>\"),\n    option.WithBaseURL(\"https://yourhost.com/path/to/api\"),\n)\n\nrequest := &doc.InsertBlankPagesRequest{\n    DocID: \"docId\",\n    LayerName: \"layerName\",\n    Body: map[string]any{\n        \"key\": \"value\",\n    },\n}\nclient.Doc.Pages.InsertBlank(\n    context.TODO(),\n    request,\n)",
+        "frameLines": 12
+      },
+      "java": {
+        "status": "available",
+        "source": "import com.cloudpdf.api.CloudPDFClient;\n\nCloudPDFClient client = CloudPDFClient\n    .builder()\n    .token(\"<token>\")\n    .url(\"https://yourhost.com/path/to/api\")\n    .build();\n\nclient.doc().pages().insertBlank(\n    \"docId\",\n    \"layerName\",\n    InsertBlankPagesRequest\n        .builder()\n        .body(\n            new HashMap<String, Object>() {{\n                put(\"key\", \"value\");\n            }}\n        )\n        .build()\n);",
+        "frameLines": 8
+      },
+      "ruby": {
+        "status": "available",
+        "source": "require \"cloudpdf\"\n\nclient = CloudPDF::Client.new(\n  token: \"<token>\",\n  base_url: \"https://yourhost.com/path/to/api\"\n)\n\nclient.doc.pages.insert_blank(\n  doc_id: \"docId\",\n  layer_name: \"layerName\",\n  request: {\n    key: \"value\"\n  }\n)",
         "frameLines": 7
       }
     },

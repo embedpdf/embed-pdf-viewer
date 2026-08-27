@@ -1342,6 +1342,108 @@
         }
       }
     },
+    "/v1/docs/{docId}/layers/{layerName}/pages/extract": {
+      "post": {
+        "operationId": "doc.pages.extract",
+        "x-fern-sdk-group-name": ["doc", "pages"],
+        "x-fern-sdk-method-name": "extract",
+        "x-docs-title": "Extract pages",
+        "summary": "Export the listed pages, in order, as a standalone PDF.",
+        "description": "A read, not a mutation: the source document is untouched and no event is published. Body is `{\"pageObjectNumbers\": number[]}`; the response body is the new PDF.",
+        "security": [
+          {
+            "apiToken": []
+          },
+          {
+            "docToken": []
+          }
+        ],
+        "x-required-scope": [],
+        "x-required-capability": ["doc.download"],
+        "parameters": [
+          {
+            "name": "docId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]+$"
+            }
+          },
+          {
+            "name": "layerName",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "X-Document-Password",
+            "in": "header",
+            "required": false,
+            "description": "Base64-encoded password for an encrypted document. Valid only with the API token (403 anywhere else). An encrypted document answers 422 DocPasswordRequired when the header is absent. Viewer doc JWTs use the SDK password-session flow instead.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DocPagesExtractRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/pdf": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocPagesExtract400Response"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocPagesExtract404Response"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EngineErrorPayload"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/docs/{docId}/layers/{layerName}/pages/flatten": {
       "post": {
         "operationId": "doc.pages.flatten",
@@ -1425,6 +1527,215 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/DocPagesFlatten404Response"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EngineErrorPayload"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/docs/{docId}/layers/{layerName}/pages/insert": {
+      "post": {
+        "operationId": "doc.pages.insert",
+        "x-fern-sdk-group-name": ["doc", "pages"],
+        "x-fern-sdk-method-name": "insert",
+        "x-docs-title": "Insert pages from a PDF",
+        "summary": "Copy every page of an uploaded PDF into the document at an index.",
+        "description": "Multipart mutation envelope: a `body` field holding `{\"destIndex\"?: number}` (omitted → append) plus a `resource:source` file part carrying the standalone PDF whose pages are copied in. The inserted copies get fresh page object numbers, returned in insertion order.",
+        "security": [
+          {
+            "apiToken": []
+          },
+          {
+            "docToken": []
+          }
+        ],
+        "x-required-scope": [],
+        "x-required-capability": ["doc.pages.assemble"],
+        "parameters": [
+          {
+            "name": "docId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]+$"
+            }
+          },
+          {
+            "name": "layerName",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "X-Document-Password",
+            "in": "header",
+            "required": false,
+            "description": "Base64-encoded password for an encrypted document. Valid only with the API token (403 anywhere else). An encrypted document answers 422 DocPasswordRequired when the header is absent. Viewer doc JWTs use the SDK password-session flow instead.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                },
+                "required": ["file"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocPagesInsert200Response"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocPagesInsert400Response"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocPagesInsert404Response"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EngineErrorPayload"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/docs/{docId}/layers/{layerName}/pages/insert-blank": {
+      "post": {
+        "operationId": "doc.pages.insertBlank",
+        "x-fern-sdk-group-name": ["doc", "pages"],
+        "x-fern-sdk-method-name": "insertBlank",
+        "x-docs-title": "Insert blank pages",
+        "summary": "Create blank pages of an explicit size at an index.",
+        "description": "Body is `{\"size\": {\"width\", \"height\"}, \"count\"?, \"destIndex\"?}` — size in PDF points, count in [1, 100], destIndex omitted → append.",
+        "security": [
+          {
+            "apiToken": []
+          },
+          {
+            "docToken": []
+          }
+        ],
+        "x-required-scope": [],
+        "x-required-capability": ["doc.pages.assemble"],
+        "parameters": [
+          {
+            "name": "docId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]+$"
+            }
+          },
+          {
+            "name": "layerName",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "X-Document-Password",
+            "in": "header",
+            "required": false,
+            "description": "Base64-encoded password for an encrypted document. Valid only with the API token (403 anywhere else). An encrypted document answers 422 DocPasswordRequired when the header is absent. Viewer doc JWTs use the SDK password-session flow instead.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DocPagesInsertBlankRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocPagesInsertBlank200Response"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocPagesInsertBlank400Response"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocPagesInsertBlank404Response"
                 }
               }
             }
@@ -12682,6 +12993,520 @@
         "additionalProperties": false
       },
       "DocPagesFlatten404Response": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "enum": ["EngineError"]
+          },
+          "code": {
+            "type": "string",
+            "enum": [
+              "Unknown",
+              "InvalidArg",
+              "DocNotOpen",
+              "DocOpenFailed",
+              "DocPasswordRequired",
+              "DocPasswordIncorrect",
+              "SharePasswordRequired",
+              "Aborted",
+              "Network",
+              "Unauthenticated",
+              "Forbidden",
+              "NotFound",
+              "WireFormat",
+              "RuntimeUnavailable",
+              "InvalidReference",
+              "WeakAnnotationSessionConflict",
+              "LayerVersionConflict",
+              "NotImplemented",
+              "MalformedPdf"
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "details": {
+            "type": "object",
+            "additionalProperties": {}
+          }
+        },
+        "required": ["name", "code", "message"],
+        "additionalProperties": false
+      },
+      "DocPagesInsert200Response": {
+        "type": "object",
+        "properties": {
+          "meta": {
+            "type": "object",
+            "properties": {
+              "affectedPages": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "pageObjectNumber": {
+                      "type": "integer",
+                      "exclusiveMinimum": true,
+                      "minimum": 0
+                    },
+                    "revision": {
+                      "type": "object",
+                      "properties": {
+                        "docSessionId": {
+                          "type": "string"
+                        },
+                        "pageObjectNumber": {
+                          "type": "integer",
+                          "exclusiveMinimum": true,
+                          "minimum": 0
+                        },
+                        "generation": {
+                          "type": "integer",
+                          "minimum": 0
+                        }
+                      },
+                      "required": ["docSessionId", "pageObjectNumber", "generation"],
+                      "additionalProperties": false
+                    },
+                    "weakAnnotationState": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": ["unknown"]
+                            }
+                          },
+                          "required": ["kind"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": ["known"]
+                            },
+                            "hasAnyWeakAnnotations": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": ["kind", "hasAnyWeakAnnotations"],
+                          "additionalProperties": false
+                        }
+                      ]
+                    }
+                  },
+                  "required": ["pageObjectNumber", "revision", "weakAnnotationState"],
+                  "additionalProperties": false
+                }
+              },
+              "cacheDelta": {
+                "type": "object",
+                "properties": {
+                  "previousDocVersion": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "minimum": 0
+                  },
+                  "docVersion": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "minimum": 0
+                  },
+                  "pages": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "pageObjectNumber": {
+                          "type": "integer",
+                          "exclusiveMinimum": true,
+                          "minimum": 0
+                        },
+                        "cache": {
+                          "type": "object",
+                          "properties": {
+                            "contentVersion": {
+                              "type": "integer",
+                              "exclusiveMinimum": true,
+                              "minimum": 0
+                            },
+                            "annotationVersion": {
+                              "type": "integer",
+                              "exclusiveMinimum": true,
+                              "minimum": 0
+                            }
+                          },
+                          "required": ["contentVersion", "annotationVersion"],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": ["pageObjectNumber", "cache"],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": ["previousDocVersion", "docVersion", "pages"],
+                "additionalProperties": false,
+                "nullable": true
+              }
+            },
+            "required": ["affectedPages", "cacheDelta"],
+            "additionalProperties": false
+          }
+        },
+        "required": ["meta"],
+        "additionalProperties": true
+      },
+      "DocPagesInsert400Response": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "enum": ["EngineError"]
+          },
+          "code": {
+            "type": "string",
+            "enum": [
+              "Unknown",
+              "InvalidArg",
+              "DocNotOpen",
+              "DocOpenFailed",
+              "DocPasswordRequired",
+              "DocPasswordIncorrect",
+              "SharePasswordRequired",
+              "Aborted",
+              "Network",
+              "Unauthenticated",
+              "Forbidden",
+              "NotFound",
+              "WireFormat",
+              "RuntimeUnavailable",
+              "InvalidReference",
+              "WeakAnnotationSessionConflict",
+              "LayerVersionConflict",
+              "NotImplemented",
+              "MalformedPdf"
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "details": {
+            "type": "object",
+            "additionalProperties": {}
+          }
+        },
+        "required": ["name", "code", "message"],
+        "additionalProperties": false
+      },
+      "DocPagesInsert404Response": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "enum": ["EngineError"]
+          },
+          "code": {
+            "type": "string",
+            "enum": [
+              "Unknown",
+              "InvalidArg",
+              "DocNotOpen",
+              "DocOpenFailed",
+              "DocPasswordRequired",
+              "DocPasswordIncorrect",
+              "SharePasswordRequired",
+              "Aborted",
+              "Network",
+              "Unauthenticated",
+              "Forbidden",
+              "NotFound",
+              "WireFormat",
+              "RuntimeUnavailable",
+              "InvalidReference",
+              "WeakAnnotationSessionConflict",
+              "LayerVersionConflict",
+              "NotImplemented",
+              "MalformedPdf"
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "details": {
+            "type": "object",
+            "additionalProperties": {}
+          }
+        },
+        "required": ["name", "code", "message"],
+        "additionalProperties": false
+      },
+      "DocPagesInsertBlankRequest": {
+        "type": "object",
+        "additionalProperties": {}
+      },
+      "DocPagesInsertBlank200Response": {
+        "type": "object",
+        "properties": {
+          "meta": {
+            "type": "object",
+            "properties": {
+              "affectedPages": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "pageObjectNumber": {
+                      "type": "integer",
+                      "exclusiveMinimum": true,
+                      "minimum": 0
+                    },
+                    "revision": {
+                      "type": "object",
+                      "properties": {
+                        "docSessionId": {
+                          "type": "string"
+                        },
+                        "pageObjectNumber": {
+                          "type": "integer",
+                          "exclusiveMinimum": true,
+                          "minimum": 0
+                        },
+                        "generation": {
+                          "type": "integer",
+                          "minimum": 0
+                        }
+                      },
+                      "required": ["docSessionId", "pageObjectNumber", "generation"],
+                      "additionalProperties": false
+                    },
+                    "weakAnnotationState": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": ["unknown"]
+                            }
+                          },
+                          "required": ["kind"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": ["known"]
+                            },
+                            "hasAnyWeakAnnotations": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": ["kind", "hasAnyWeakAnnotations"],
+                          "additionalProperties": false
+                        }
+                      ]
+                    }
+                  },
+                  "required": ["pageObjectNumber", "revision", "weakAnnotationState"],
+                  "additionalProperties": false
+                }
+              },
+              "cacheDelta": {
+                "type": "object",
+                "properties": {
+                  "previousDocVersion": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "minimum": 0
+                  },
+                  "docVersion": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "minimum": 0
+                  },
+                  "pages": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "pageObjectNumber": {
+                          "type": "integer",
+                          "exclusiveMinimum": true,
+                          "minimum": 0
+                        },
+                        "cache": {
+                          "type": "object",
+                          "properties": {
+                            "contentVersion": {
+                              "type": "integer",
+                              "exclusiveMinimum": true,
+                              "minimum": 0
+                            },
+                            "annotationVersion": {
+                              "type": "integer",
+                              "exclusiveMinimum": true,
+                              "minimum": 0
+                            }
+                          },
+                          "required": ["contentVersion", "annotationVersion"],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": ["pageObjectNumber", "cache"],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": ["previousDocVersion", "docVersion", "pages"],
+                "additionalProperties": false,
+                "nullable": true
+              }
+            },
+            "required": ["affectedPages", "cacheDelta"],
+            "additionalProperties": false
+          }
+        },
+        "required": ["meta"],
+        "additionalProperties": true
+      },
+      "DocPagesInsertBlank400Response": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "enum": ["EngineError"]
+          },
+          "code": {
+            "type": "string",
+            "enum": [
+              "Unknown",
+              "InvalidArg",
+              "DocNotOpen",
+              "DocOpenFailed",
+              "DocPasswordRequired",
+              "DocPasswordIncorrect",
+              "SharePasswordRequired",
+              "Aborted",
+              "Network",
+              "Unauthenticated",
+              "Forbidden",
+              "NotFound",
+              "WireFormat",
+              "RuntimeUnavailable",
+              "InvalidReference",
+              "WeakAnnotationSessionConflict",
+              "LayerVersionConflict",
+              "NotImplemented",
+              "MalformedPdf"
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "details": {
+            "type": "object",
+            "additionalProperties": {}
+          }
+        },
+        "required": ["name", "code", "message"],
+        "additionalProperties": false
+      },
+      "DocPagesInsertBlank404Response": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "enum": ["EngineError"]
+          },
+          "code": {
+            "type": "string",
+            "enum": [
+              "Unknown",
+              "InvalidArg",
+              "DocNotOpen",
+              "DocOpenFailed",
+              "DocPasswordRequired",
+              "DocPasswordIncorrect",
+              "SharePasswordRequired",
+              "Aborted",
+              "Network",
+              "Unauthenticated",
+              "Forbidden",
+              "NotFound",
+              "WireFormat",
+              "RuntimeUnavailable",
+              "InvalidReference",
+              "WeakAnnotationSessionConflict",
+              "LayerVersionConflict",
+              "NotImplemented",
+              "MalformedPdf"
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "details": {
+            "type": "object",
+            "additionalProperties": {}
+          }
+        },
+        "required": ["name", "code", "message"],
+        "additionalProperties": false
+      },
+      "DocPagesExtractRequest": {
+        "type": "object",
+        "additionalProperties": {}
+      },
+      "DocPagesExtract400Response": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "enum": ["EngineError"]
+          },
+          "code": {
+            "type": "string",
+            "enum": [
+              "Unknown",
+              "InvalidArg",
+              "DocNotOpen",
+              "DocOpenFailed",
+              "DocPasswordRequired",
+              "DocPasswordIncorrect",
+              "SharePasswordRequired",
+              "Aborted",
+              "Network",
+              "Unauthenticated",
+              "Forbidden",
+              "NotFound",
+              "WireFormat",
+              "RuntimeUnavailable",
+              "InvalidReference",
+              "WeakAnnotationSessionConflict",
+              "LayerVersionConflict",
+              "NotImplemented",
+              "MalformedPdf"
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "details": {
+            "type": "object",
+            "additionalProperties": {}
+          }
+        },
+        "required": ["name", "code", "message"],
+        "additionalProperties": false
+      },
+      "DocPagesExtract404Response": {
         "type": "object",
         "properties": {
           "name": {

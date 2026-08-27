@@ -67,6 +67,8 @@ import type { MetadataUpdateResult } from '../mutation/MetadataUpdateResult';
 import type { CacheDelta, MutationMeta } from '../mutation/MutationMeta';
 import type { PageDeleteInput } from '../mutation/PageDeleteInput';
 import type { PageDeleteResult } from '../mutation/PageDeleteResult';
+import { PAGE_INSERT_BLANK_MAX_COUNT } from '../mutation/PageInsertBlankInput';
+import type { PageInsertResult } from '../mutation/PageInsertResult';
 import type { PageFlattenInput, PageFlattenResult } from '../mutation/PageFlattenResult';
 import type { RedactionApplyResult, RedactionApplyScope } from '../mutation/RedactionApplyResult';
 import type { PageMoveInput } from '../mutation/PageMoveInput';
@@ -1090,6 +1092,49 @@ export const PageDeleteInputSchema: z.ZodType<PageDeleteInput> = z.object({
  * pages keep identity + revisions (see `PageDeleteResult`).
  */
 export const PageDeleteResultSchema: z.ZodType<PageDeleteResult> = z.object({
+  layout: PageListSnapshotSchema,
+  cache: PageStructureCacheSchema.nullable(),
+});
+
+/**
+ * Page insert (bytes) input — the JSON `body` part of the multipart
+ * mutation envelope; the PDF itself rides the `resource:source` part.
+ * `destIndex` omitted → append.
+ */
+export const PageInsertInputSchema: z.ZodType<{ destIndex?: number }> = z.object({
+  destIndex: z.number().int().nonnegative().optional(),
+});
+
+/**
+ * Blank-page insert input — plain JSON, pages.insert minus the bytes.
+ * `size` is in PDF points (un-rotated); `count` shares the contract cap
+ * with the worker so a request the schema accepts cannot then fail the
+ * worker's own guard.
+ */
+export const PageInsertBlankInputSchema: z.ZodType<{
+  size: { width: number; height: number };
+  count?: number;
+  destIndex?: number;
+}> = z.object({
+  size: z.object({
+    width: z.number().positive().finite(),
+    height: z.number().positive().finite(),
+  }),
+  count: z.number().int().min(1).max(PAGE_INSERT_BLANK_MAX_COUNT).optional(),
+  destIndex: z.number().int().nonnegative().optional(),
+});
+
+/** Page extract input: the pages to export, in the order they should appear. */
+export const PageExtractInputSchema: z.ZodType<{ pageObjectNumbers: number[] }> = z.object({
+  pageObjectNumbers: z.array(z.number().int().positive()).min(1),
+});
+
+/**
+ * Page insert result — shared by bytes-insert and blank-insert: the fresh
+ * PONs in insertion order plus the full new layout (see `PageInsertResult`).
+ */
+export const PageInsertResultSchema: z.ZodType<PageInsertResult> = z.object({
+  insertedPageObjectNumbers: z.array(z.number().int().positive()),
   layout: PageListSnapshotSchema,
   cache: PageStructureCacheSchema.nullable(),
 });

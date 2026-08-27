@@ -119,6 +119,32 @@ export function runDocumentEventsConformance(
       }
     });
 
+    test('pages.inserted rides verbatim', async () => {
+      const doc = await openFixture(engine, opts);
+      try {
+        // insertBlank needs no source bytes, so it is the fixture-free way
+        // to exercise the event.
+        const events: DocumentEvent[] = [];
+        doc.events.subscribe((event) => events.push(event));
+
+        const inserted = await doc.pages.insertBlank({ size: { width: 396, height: 612 } }, 0);
+
+        expect(events.map((event) => event.type)).toEqual(['pages.inserted']);
+        const [evInserted] = events;
+        if (evInserted.type === 'pages.inserted') {
+          expect(evInserted.insertedPageObjectNumbers).toEqual(
+            inserted.insertedPageObjectNumbers,
+          );
+          expect(evInserted.layout).toEqual(inserted.layout);
+          expect(evInserted.cache).toEqual(inserted.cache);
+          expect(evInserted.destIndex).toBe(0);
+          expect(evInserted.origin.kind).toBe('local');
+        }
+      } finally {
+        await doc.close();
+      }
+    });
+
     test('a FAILED mutation publishes nothing (events are ground truth)', async () => {
       const doc = await openFixture(engine, opts);
       try {

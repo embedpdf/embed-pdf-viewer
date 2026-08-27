@@ -17,7 +17,10 @@ import {
   decodeRenderToken,
   pageRenderOptionsFromImageOptions,
   PageDeleteInputSchema,
+  PageExtractInputSchema,
   PageFlattenInputSchema,
+  PageInsertBlankInputSchema,
+  PageInsertInputSchema,
   PageMoveInputSchema,
   PageNetworkRenderFormatSchema,
   PageRotateInputSchema,
@@ -28,6 +31,18 @@ import {
 } from '@embedpdf/engine-core/wire';
 import type { FastifyInstance, FastifyReply } from 'fastify';
 
+import { readMutationEnvelope } from './_mutationEnvelope';
+import {
+  requireLayerCapability,
+  requireLayerDocAccessOnly,
+  requireLayerResource,
+} from '../app/jwt-plugin';
+import { requireSharedDocRead } from './_planeGuard';
+import type { WorkerThreadPool } from '../runtime/WorkerThreadPool';
+import type { DerivedRenderService } from '../services/DerivedRenderService';
+import type { DocumentService, OpenContext } from '../services/DocumentService';
+import type { LayerService } from '../services/LayerService';
+import type { SharpImageEncoder } from '../render/SharpImageEncoder';
 import {
   abortSignalFromRequest,
   parseOrInvalidArg,
@@ -474,6 +489,111 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
       },
       abortSignalFromRequest(req),
     );
+  });
+
+  app.post('/v1/docs/:docId/layers/:layerName/pages/insert', async (req, reply) => {
+    const { docId, layerName } = req.params as {
+      docId: string;
+      layerName: string;
+    };
+    const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
+    const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
+    const ctx = requireLayerCapability(req, docId, layerName, 'doc.pages.assemble', pdfBits);
+    // Multipart mutation envelope: `body` JSON part + a `resource:source`
+    // part carrying the standalone PDF. Policy 'any', NOT the strict sniff:
+    // the worker's FPDF_LoadMemDocument is the real gate here, and the
+    // conformance contract wants malformed source bytes to surface as
+    // MalformedPdf (the parser's verdict), never the envelope's InvalidArg.
+    const envelope = await readMutationEnvelope(req, () => 'any');
+    const body = parseOrInvalidArg<{ destIndex?: number }>(
+      PageInsertInputSchema as unknown as SchemaLike<{ destIndex?: number }>,
+      envelope.body,
+      'request body',
+    );
+    const source = envelope.resources?.['source'];
+    if (!source) {
+      throw new EngineError(
+        EngineErrorCode.InvalidArg,
+        `pages.insert requires a multipart 'resource:source' part carrying the source PDF`,
+      );
+    }
+
+    setNoStore(reply);
+    return layerService.insertPages(
+      ctx,
+      {
+        docId,
+        layerName,
+        bytes: source.bytes,
+        ...(body.destIndex !== undefined ? { destIndex: body.destIndex } : {}),
+      },
+      abortSignalFromRequest(req),
+    );
+  });
+
+  app.post('/v1/docs/:docId/layers/:layerName/pages/insert-blank', async (req, reply) => {
+    const { docId, layerName } = req.params as {
+      docId: string;
+      layerName: string;
+    };
+    const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
+    const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
+    const ctx = requireLayerCapability(req, docId, layerName, 'doc.pages.assemble', pdfBits);
+    const body = parseOrInvalidArg<{
+      size: { width: number; height: number };
+      count?: number;
+      destIndex?: number;
+    }>(
+      PageInsertBlankInputSchema as unknown as SchemaLike<{
+        size: { width: number; height: number };
+        count?: number;
+        destIndex?: number;
+      }>,
+      req.body,
+      'request body',
+    );
+
+    setNoStore(reply);
+    return layerService.insertBlankPages(
+      ctx,
+      {
+        docId,
+        layerName,
+        size: body.size,
+        ...(body.count !== undefined ? { count: body.count } : {}),
+        ...(body.destIndex !== undefined ? { destIndex: body.destIndex } : {}),
+      },
+      abortSignalFromRequest(req),
+    );
+  });
+
+  app.post('/v1/docs/:docId/layers/:layerName/pages/extract', async (req, reply) => {
+    const { docId, layerName } = req.params as {
+      docId: string;
+      layerName: string;
+    };
+    const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
+    const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
+    // Extract egresses content bytes (a partial download) — gated by
+    // `doc.download` like /download, NOT `doc.pages.assemble`: it reads,
+    // never restructures. Mirrors the local engine's gate exactly.
+    const ctx = requireLayerCapability(req, docId, layerName, 'doc.download', pdfBits);
+    const body = parseOrInvalidArg<{ pageObjectNumbers: number[] }>(
+      PageExtractInputSchema as unknown as SchemaLike<{ pageObjectNumbers: number[] }>,
+      req.body,
+      'request body',
+    );
+
+    const bytes = await documentService.extractLayerPages(
+      ctx,
+      docId,
+      layerName,
+      body.pageObjectNumbers,
+      abortSignalFromRequest(req),
+    );
+    setNoStore(reply);
+    reply.type('application/pdf');
+    return reply.send(Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength));
   });
 
   app.post('/v1/docs/:docId/layers/:layerName/pages/flatten', async (req, reply) => {

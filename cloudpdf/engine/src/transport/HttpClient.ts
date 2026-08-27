@@ -366,6 +366,13 @@ export class HttpClient {
     return await this.parseJsonResponse(res, parser);
   }
 
+  /** POST a JSON body and return the raw binary response (pages.extract). */
+  async postJsonBytes(path: string, body: unknown, signal: AbortSignal): Promise<Uint8Array> {
+    const res = await this.requestJson(path, 'POST', body, signal);
+    if (!res.ok) await this.throwFromBody(res);
+    return new Uint8Array(await res.arrayBuffer());
+  }
+
   /** POST a raw binary body (FDF/XFDF import) and parse the JSON response. */
   async postBytesJson<T>(
     path: string,

@@ -30,7 +30,7 @@ import type { FormEffect, FormEffectsResult } from '../forms/effects';
 import type { FormFieldPatch } from '../forms/patch';
 import type { FormSnapshot } from '../forms/snapshot';
 import type { FormDataFormat, FormFieldValue } from '../forms/value';
-import type { PdfRect } from '../geometry/primitives';
+import type { PdfSize, PdfRect } from '../geometry/primitives';
 import type { AnnotationRef } from '../identity/AnnotationRef';
 import type { FormFieldRef, FormWidgetRef } from '../identity/FormFieldRef';
 import type { PageObjectNumber } from '../identity/PageObjectNumber';
@@ -659,6 +659,21 @@ export interface PagesInsertWorkerRequest {
   artifactPath?: string;
 }
 
+/** Create `count` (default 1) blank pages of `size` (PDF points) at
+ *  `destIndex` (omitted → append). A structural MUTATION exactly like
+ *  `pages.insert`, minus the bytes: pure parameters, so nothing transfers;
+ *  layer sessions persist an artifact identically. */
+export interface PagesInsertBlankWorkerRequest {
+  kind: 'pages.insertBlank';
+  jobId: WorkerJobId;
+  docId: string;
+  layerName?: string;
+  size: PdfSize;
+  count?: number;
+  destIndex?: number;
+  artifactPath?: string;
+}
+
 /**
  * `/PieceInfo` private application data (ISO 32000 §14.5). One job family
  * serves both levels: `pageObjectNumber` present → the page's `/PieceInfo`,
@@ -882,6 +897,7 @@ export type WorkerRequest =
   | RedactionApplyWorkerRequest
   | PagesExtractWorkerRequest
   | PagesInsertWorkerRequest
+  | PagesInsertBlankWorkerRequest
   | AttachmentsListWorkerRequest
   | AttachmentsReadFileWorkerRequest
   | AttachmentsCreateWorkerRequest
@@ -1062,6 +1078,12 @@ export type WorkerResultPayload =
   | { tag: 'annotations.readFile'; content: AttachmentFileWorkerPayload }
   | {
       tag: 'pages.insert';
+      result: PageInsertResult;
+      artifact?: LayerArtifactWorkerPayload;
+      artifactFile?: LayerArtifactFileWorkerPayload;
+    }
+  | {
+      tag: 'pages.insertBlank';
       result: PageInsertResult;
       artifact?: LayerArtifactWorkerPayload;
       artifactFile?: LayerArtifactFileWorkerPayload;
