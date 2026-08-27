@@ -5,7 +5,7 @@ import { EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
 import compress from '@fastify/compress';
 import cors from '@fastify/cors';
 import multipart from '@fastify/multipart';
-import Fastify, { type FastifyInstance } from 'fastify';
+import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from 'fastify';
 import { sql, type Kysely } from 'kysely';
 
 import type { AuthFailureLimiterOptions } from './auth-failure-limiter';
@@ -476,10 +476,21 @@ export async function buildAppForTesting(opts: BuildAppOptions): Promise<AppBund
     engineShards !== undefined && engineShards > 1 && opts.engineIsolation !== 'inline'
       ? Math.ceil((opts.poolSize ?? engineShards) / engineShards) * engineShards
       : opts.poolSize;
+  // Teardown must fit INSIDE the runner's hook budget, with margin. The
+  // production default (30s) exists so real in-flight traffic can finish
+  // before a supervisor's kill deadline — but it happens to equal
+  // vitest's `hookTimeout`, so a single stuck connection at teardown
+  // burns the whole budget and the hook fails with "Hook timed out in
+  // 30000ms" instead of costing a blink. Proven: one never-finishing
+  // request makes `shutdown()` take exactly 30.0s. Tests have no
+  // supervisor and no long-running traffic, so bound it hard here;
+  // a fixture that genuinely needs longer passes its own value.
+  const shutdownTimeoutMs = opts.shutdownTimeoutMs ?? 2_000;
   if (engineIsolation === 'host') {
     return buildAppUnchecked({
       ...opts,
       engineIsolation,
+      shutdownTimeoutMs,
       ...(engineShards !== undefined ? { engineShards } : {}),
       ...(poolSize !== undefined ? { poolSize } : {}),
       engineHostEntry:
@@ -487,7 +498,7 @@ export async function buildAppForTesting(opts: BuildAppOptions): Promise<AppBund
       engineHostExecArgv: opts.engineHostExecArgv ?? ['--import', 'tsx'],
     });
   }
-  return buildAppUnchecked({ ...opts, engineIsolation });
+  return buildAppUnchecked({ ...opts, engineIsolation, shutdownTimeoutMs });
 }
 
 async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
@@ -1337,68 +1348,7 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
     }
   }
 
-  app.setErrorHandler((err, req, reply) => {
-    if (err instanceof EngineBusyError) {
-      // Honest backpressure: retry cheaply instead of hanging. A shed
-      // interactive job is the overload signal (background sheds are
-      // swallowed by their callers by design).
-      reply.header('Retry-After', '2');
-      reply.code(503).send({ error: { code: err.code, message: err.message } });
-      return;
-    }
-    if (err instanceof DocumentQuarantinedError) {
-      reply.code(422).send({ error: { code: err.code, message: err.message } });
-      return;
-    }
-    if (EngineError.is(err) && (err as EngineError).code === EngineErrorCode.DocNotOpen) {
-      // Server-side override of the generic mapping: DocNotOpen reaching
-      // HTTP is always pool state (post-retry: the engine respawned more
-      // than once inside one request) — a transient 503, never a 404
-      // (real document-absence surfaces as NotFound from the DB layer).
-      reply.header('Retry-After', '2');
-      reply.code(503).send({ error: { code: 'EngineRestarting', message: err.message } });
-      return;
-    }
-    if (EngineError.is(err)) {
-      const engineErr = err as EngineError;
-      const code = mapToHttp(engineErr.code);
-      // The `name: 'EngineError'` discriminator is required by
-      // EngineErrorPayloadSchema on the client side; without it the
-      // typed code/message/details get dropped and clients see a
-      // status-only InvalidArg fallback.
-      reply.code(code).send({
-        error: {
-          name: 'EngineError',
-          code: engineErr.code,
-          message: engineErr.message,
-          details: engineErr.details,
-        },
-      });
-      return;
-    }
-    const e = err as Error & { code?: string; status?: number; statusCode?: number };
-    if (e.status && typeof e.status === 'number') {
-      reply.code(e.status).send({ error: { code: e.code ?? 'Unknown', message: e.message } });
-      return;
-    }
-    // Fastify's own errors (body parsing, payload limits, validation) carry
-    // `statusCode`, not `status`. Pass 4xx through as the client errors they
-    // are; 5xx still falls to the unhandled branch below so it gets logged.
-    if (typeof e.statusCode === 'number' && e.statusCode >= 400 && e.statusCode < 500) {
-      reply.code(e.statusCode).send({ error: { code: e.code ?? 'Unknown', message: e.message } });
-      return;
-    }
-    if (e.code === 'NotFound') {
-      reply.code(404).send({ error: { code: 'NotFound', message: e.message } });
-      return;
-    }
-    if (e.code === 'Forbidden') {
-      reply.code(403).send({ error: { code: 'Forbidden', message: e.message } });
-      return;
-    }
-    req.log.error({ err: e }, 'unhandled error');
-    reply.code(500).send({ error: { code: 'Unknown', message: e.message } });
-  });
+  app.setErrorHandler(handleAppError);
 
   const shutdownTimeoutMs = opts.shutdownTimeoutMs ?? 30_000;
   const shutdownDrainMs = opts.shutdownDrainMs ?? 0;
@@ -1471,6 +1421,86 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
     beginDrain: () => drainCoordinator.begin(),
     shutdown,
   };
+}
+
+/**
+ * Preserve the distinction between an expected client rejection and a server
+ * failure while ensuring that handled 5xx responses do not disappear from
+ * the structured logs. Fastify will still write its normal `request
+ * completed` record; the additional error record carries the error itself
+ * and inherits the request logger's reqId.
+ */
+export function handleAppError(err: unknown, req: FastifyRequest, reply: FastifyReply): void {
+  if (err instanceof EngineBusyError) {
+    // Honest backpressure: retry cheaply instead of hanging. A shed
+    // interactive job is the overload signal (background sheds are
+    // swallowed by their callers by design).
+    logHandledServerError(req, err, 503);
+    reply.header('Retry-After', '2');
+    reply.code(503).send({ error: { code: err.code, message: err.message } });
+    return;
+  }
+  if (err instanceof DocumentQuarantinedError) {
+    reply.code(422).send({ error: { code: err.code, message: err.message } });
+    return;
+  }
+  if (EngineError.is(err) && (err as EngineError).code === EngineErrorCode.DocNotOpen) {
+    // Server-side override of the generic mapping: DocNotOpen reaching
+    // HTTP is always pool state (post-retry: the engine respawned more
+    // than once inside one request) — a transient 503, never a 404
+    // (real document-absence surfaces as NotFound from the DB layer).
+    logHandledServerError(req, err, 503);
+    reply.header('Retry-After', '2');
+    reply.code(503).send({ error: { code: 'EngineRestarting', message: err.message } });
+    return;
+  }
+  if (EngineError.is(err)) {
+    const engineErr = err as EngineError;
+    const code = mapToHttp(engineErr.code);
+    logHandledServerError(req, engineErr, code);
+    // The `name: 'EngineError'` discriminator is required by
+    // EngineErrorPayloadSchema on the client side; without it the
+    // typed code/message/details get dropped and clients see a
+    // status-only InvalidArg fallback.
+    reply.code(code).send({
+      error: {
+        name: 'EngineError',
+        code: engineErr.code,
+        message: engineErr.message,
+        details: engineErr.details,
+      },
+    });
+    return;
+  }
+  const e = err as Error & { code?: string; status?: number; statusCode?: number };
+  if (e.status && typeof e.status === 'number') {
+    logHandledServerError(req, e, e.status);
+    reply.code(e.status).send({ error: { code: e.code ?? 'Unknown', message: e.message } });
+    return;
+  }
+  // Fastify's own errors (body parsing, payload limits, validation) carry
+  // `statusCode`, not `status`. Pass 4xx through as the client errors they
+  // are; 5xx still falls to the unhandled branch below so it gets logged.
+  if (typeof e.statusCode === 'number' && e.statusCode >= 400 && e.statusCode < 500) {
+    reply.code(e.statusCode).send({ error: { code: e.code ?? 'Unknown', message: e.message } });
+    return;
+  }
+  if (e.code === 'NotFound') {
+    reply.code(404).send({ error: { code: 'NotFound', message: e.message } });
+    return;
+  }
+  if (e.code === 'Forbidden') {
+    reply.code(403).send({ error: { code: 'Forbidden', message: e.message } });
+    return;
+  }
+  req.log.error({ err: e, statusCode: 500 }, 'unhandled error');
+  reply.code(500).send({ error: { code: 'Unknown', message: e.message } });
+}
+
+function logHandledServerError(req: FastifyRequest, err: unknown, statusCode: number): void {
+  if (statusCode >= 500) {
+    req.log.error({ err, statusCode }, 'request failed');
+  }
 }
 
 /**
