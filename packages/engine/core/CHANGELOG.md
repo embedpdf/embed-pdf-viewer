@@ -1,5 +1,14 @@
 # @embedpdf/engine-core
 
+## 3.0.0-next.9
+
+### Minor Changes
+
+- [#772](https://github.com/embedpdf/embed-pdf-viewer/pull/772) by [@bobsingor](https://github.com/bobsingor) – Add the required `pages.insertBlank(spec, destIndex?)` document operation
+  and make `pages.insert` and `pages.extract` required across engine
+  implementations. Add the blank-page input types, wire protocol, HTTP paths
+  and schemas, conformance coverage, and `pages.inserted` event assertions.
+
 ## 3.0.0-next.8
 
 ### Minor Changes

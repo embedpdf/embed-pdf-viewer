@@ -1,5 +1,13 @@
 # @embedpdf/plugin-page-edit
 
+## 3.0.0-next.9
+
+### Minor Changes
+
+- [#772](https://github.com/embedpdf/embed-pdf-viewer/pull/772) by [@bobsingor](https://github.com/bobsingor) – Add `addBlank()` and `insert()` to the page-edit capability. New pages can be
+  placed by page-object-number anchors or absolute index, and blank pages
+  default to the size of the neighboring page.
+
 ## 3.0.0-next.8
 
 ## 3.0.0-next.7

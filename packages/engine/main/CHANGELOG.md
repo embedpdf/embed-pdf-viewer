@@ -1,5 +1,13 @@
 # @embedpdf/engine
 
+## 3.0.0-next.9
+
+### Minor Changes
+
+- [#772](https://github.com/embedpdf/embed-pdf-viewer/pull/772) by [@bobsingor](https://github.com/bobsingor) – Implement `pages.insertBlank` in the local document pages service. Blank-page
+  requests use the worker protocol, enforce the page-assembly capability, and
+  publish the resulting `pages.inserted` document event.
+
 ## 3.0.0-next.8
 
 ## 3.0.0-next.7

@@ -1,5 +1,7 @@
 # @embedpdf/react
 
+## 3.0.0-next.9
+
 ## 3.0.0-next.8
 
 ### Patch Changes

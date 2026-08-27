@@ -1,5 +1,13 @@
 # @embedpdf/plugin-stamp
 
+## 3.0.0-next.9
+
+### Patch Changes
+
+- [#772](https://github.com/embedpdf/embed-pdf-viewer/pull/772) by [@bobsingor](https://github.com/bobsingor) – Update canonical stamp-library import and append flows for the required
+  `pages.insert` and `pages.extract` engine operations, removing obsolete
+  optional-feature checks.
+
 ## 3.0.0-next.8
 
 ## 3.0.0-next.7

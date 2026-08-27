@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/plugin-link",
-  "version": "3.0.0-next.8",
+  "version": "3.0.0-next.9",
   "private": false,
   "description": "The navigation plane for PDF link annotations: per-page clickable link areas + one activate() entry point (GoTo → stage reveal, URI → framework opener). Works standalone in viewer deployments; with the annotation plugin present it reads the folded model (no double fetch) and a Behavior hands links to the editing plane when the link tool is active.",
   "type": "module",
