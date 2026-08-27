@@ -1,5 +1,12 @@
 # @embedpdf/core
 
+## 3.0.0-next.9
+
+### Minor Changes
+
+- [#772](https://github.com/embedpdf/embed-pdf-viewer/pull/772) by [@bobsingor](https://github.com/bobsingor) – Export `PageInsertResult`, `PageInsertBlankSpec`, and `PdfSize` from the main
+  package so applications and plugins can type page-creation operations.
+
 ## 3.0.0-next.8
 
 ## 3.0.0-next.7

@@ -1,5 +1,19 @@
 # @cloudpdf/server
 
+## 3.0.0-next.9
+
+### Minor Changes
+
+- [#772](https://github.com/embedpdf/embed-pdf-viewer/pull/772) by [@bobsingor](https://github.com/bobsingor) – Add document routes for inserting PDF pages, creating blank pages, and
+  extracting selected pages. Insert mutations persist the new page set and
+  versions atomically and publish audit events for realtime collaborators.
+
+### Patch Changes
+
+- [#787](https://github.com/embedpdf/embed-pdf-viewer/pull/787) by [@bobsingor](https://github.com/bobsingor) – Reusing an explicit `docId` on `documents.init` or `documents.import` now answers a clean `409 Conflict` explaining how to proceed (retry with the same `idempotencyKey` to resume, delete the document to replace it, or use a different/omitted `docId`) instead of surfacing the raw database unique-constraint error as a 500 — including the case where a retry mints a fresh idempotency key per attempt. A `docId` already owned by another tenant answers `403`, mirroring the existing delete semantics.
+
+- [#785](https://github.com/embedpdf/embed-pdf-viewer/pull/785) by [@bobsingor](https://github.com/bobsingor) – Fix AWS S3-backed streaming uploads by buffering small source chunks before the SDK applies checksum framing, preventing `InvalidChunkSizeError` during document imports and other streamed writes. Handled 5xx responses now also emit structured error logs with the request ID and HTTP status.
+
 ## 3.0.0-next.8
 
 ### Minor Changes

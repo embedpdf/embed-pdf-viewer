@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/plugin-stamp",
-  "version": "3.0.0-next.8",
+  "version": "3.0.0-next.9",
   "private": false,
   "description": "Stamp asset libraries: retain imported PDFs as canonical PieceInfo-backed libraries, derive per-page vector assets and previews, materialize opt-in dynamic stamps, and place them through the annotation plugin's armed-stamp flow.",
   "type": "module",
