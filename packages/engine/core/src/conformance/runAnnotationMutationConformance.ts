@@ -18,6 +18,8 @@ import type {
   RedactDraft,
   SquareDraft,
   StrikeoutDraft,
+  TextDraft,
+  TextPatch,
 } from '../annotation/kinds';
 import type { WeakAnnotationEditSession } from '../engine/DocumentAnnotationsService';
 import type { DocumentHandle } from '../engine/DocumentHandle';
@@ -2196,6 +2198,180 @@ export function runAnnotationMutationConformance(
           caught = err;
         }
         expect(EngineError.is(caught, EngineErrorCode.InvalidArg)).toBe(true);
+      } finally {
+        await doc.close();
+      }
+    });
+
+    // ─────────────────────────────────────────────────────────────────
+    //  /State + /StateModel (review status, ISO 32000 §12.5.6.3) and
+    //  /Subj. Locked rules:
+    //  - A status change is a NEW text annotation replying to its target
+    //    via /IRT; the target annotation itself is never modified.
+    //  - Faithful reads: `state` / `stateModel` / `subject` are null iff
+    //    the PDF entry is absent — a null after a null-clear patch proves
+    //    TRUE key removal (EPDFAnnot_RemoveKey), not an empty-string
+    //    write.
+    //  - Known review/marked values are wire-normalized to lowercase;
+    //    custom Acrobat state models round-trip verbatim.
+    //  - A draft `state` without `stateModel` is rejected with InvalidArg
+    //    (ISO Table 175: StateModel is required when State is present).
+    //  - State entries are appearance-inert: they never repaint anything.
+    // ─────────────────────────────────────────────────────────────────
+
+    test('a review-status reply round-trips /State + /StateModel + /Subj', async () => {
+      const doc = await openFixture(engine, opts);
+      try {
+        const page = doc.page(fix.pageObjectNumber);
+        const target = await page.annotations.create({
+          subtype: 'highlight',
+          contents: 'status target',
+          subject: 'Pricing question',
+          quadPoints: quad,
+        } satisfies HighlightDraft);
+        expect(target.created.subject).toBe('Pricing question');
+
+        const status = await page.annotations.create({
+          subtype: 'text',
+          rect: shapeRect,
+          inReplyTo: target.created.ref,
+          state: 'accepted',
+          stateModel: 'review',
+        } satisfies TextDraft);
+        expect(AnnotationCreateResultSchema.safeParse(status).success).toBe(true);
+        expect(status.created.subtype).toBe('text');
+        if (status.created.subtype !== 'text') return;
+        expect(status.created.state).toBe('accepted');
+        expect(status.created.stateModel).toBe('review');
+        // A state annotation is a reply like any other.
+        expect(status.created.replyType).toBe('reply');
+
+        // The entries survive a fresh read.
+        const after = await page.annotations.list();
+        const read = after.annotations.find(
+          (a) =>
+            a.ref.kind === 'objectNumber' &&
+            status.created.ref.kind === 'objectNumber' &&
+            a.ref.annotObjectNumber === status.created.ref.annotObjectNumber,
+        );
+        expect(read?.subtype).toBe('text');
+        if (read?.subtype === 'text') {
+          expect(read.state).toBe('accepted');
+          expect(read.stateModel).toBe('review');
+        }
+      } finally {
+        await doc.close();
+      }
+    });
+
+    test('a draft /State without /StateModel is rejected with InvalidArg', async () => {
+      const doc = await openFixture(engine, opts);
+      try {
+        const page = doc.page(fix.pageObjectNumber);
+        let caught: unknown;
+        try {
+          await page.annotations.create({
+            subtype: 'text',
+            rect: shapeRect,
+            state: 'accepted',
+          } satisfies TextDraft);
+        } catch (err) {
+          caught = err;
+        }
+        expect(EngineError.is(caught, EngineErrorCode.InvalidArg)).toBe(true);
+      } finally {
+        await doc.close();
+      }
+    });
+
+    test('null-clear patches truly remove /State, /StateModel, /Subj and /Contents', async () => {
+      const doc = await openFixture(engine, opts);
+      try {
+        const page = doc.page(fix.pageObjectNumber);
+        const note = await page.annotations.create({
+          subtype: 'text',
+          rect: shapeRect,
+          contents: 'work in progress',
+          subject: 'Draft',
+          state: 'none',
+          stateModel: 'review',
+        } satisfies TextDraft);
+
+        // Cycle the state alone — the model already on the annotation
+        // stays; state entries never touch the appearance.
+        const cycled = await page.annotations.update(note.created.ref, {
+          subtype: 'text',
+          state: 'rejected',
+        } satisfies TextPatch);
+        expect(cycled.appearance.changed).toBe(false);
+        expect(cycled.updated.subtype).toBe('text');
+        if (cycled.updated.subtype === 'text') {
+          expect(cycled.updated.state).toBe('rejected');
+          expect(cycled.updated.stateModel).toBe('review');
+        }
+
+        const cleared = await page.annotations.update(note.created.ref, {
+          subtype: 'text',
+          contents: null,
+          subject: null,
+          state: null,
+          stateModel: null,
+        } satisfies TextPatch);
+        expect(cleared.appearance.changed).toBe(false);
+        expect(cleared.updated.contents).toBe(null);
+        expect(cleared.updated.subject).toBe(null);
+        if (cleared.updated.subtype === 'text') {
+          expect(cleared.updated.state).toBe(null);
+          expect(cleared.updated.stateModel).toBe(null);
+        }
+
+        // Faithful read: null distinguishes absent from ''. Null here
+        // proves the entries were REMOVED, not overwritten with an empty
+        // string.
+        const after = await page.annotations.list();
+        const read = after.annotations.find(
+          (a) =>
+            a.ref.kind === 'objectNumber' &&
+            note.created.ref.kind === 'objectNumber' &&
+            a.ref.annotObjectNumber === note.created.ref.annotObjectNumber,
+        );
+        expect(read?.contents).toBe(null);
+        expect(read?.subject).toBe(null);
+        if (read?.subtype === 'text') {
+          expect(read.state).toBe(null);
+          expect(read.stateModel).toBe(null);
+        }
+      } finally {
+        await doc.close();
+      }
+    });
+
+    test('custom state models round-trip verbatim', async () => {
+      const doc = await openFixture(engine, opts);
+      try {
+        const page = doc.page(fix.pageObjectNumber);
+        const custom = await page.annotations.create({
+          subtype: 'text',
+          rect: shapeRect,
+          state: 'in-progress',
+          stateModel: 'X-ReviewWorkflow',
+        } satisfies TextDraft);
+        expect(custom.created.subtype).toBe('text');
+        if (custom.created.subtype !== 'text') return;
+        expect(custom.created.state).toBe('in-progress');
+        expect(custom.created.stateModel).toBe('X-ReviewWorkflow');
+
+        const after = await page.annotations.list();
+        const read = after.annotations.find(
+          (a) =>
+            a.ref.kind === 'objectNumber' &&
+            custom.created.ref.kind === 'objectNumber' &&
+            a.ref.annotObjectNumber === custom.created.ref.annotObjectNumber,
+        );
+        if (read?.subtype === 'text') {
+          expect(read.state).toBe('in-progress');
+          expect(read.stateModel).toBe('X-ReviewWorkflow');
+        }
       } finally {
         await doc.close();
       }

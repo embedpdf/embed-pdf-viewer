@@ -25,6 +25,11 @@ export const TextDTOSchema: z.ZodType<TextAnnotationDTO> = z.object({
   ...AnnotationBaseShape,
   ...ColorStyleDTOShape,
   icon: NoteIconSchema,
+  // /State + /StateModel are open strings on the wire: the standard
+  // review/marked vocabulary is normalized to lowercase, custom Acrobat
+  // state models pass through verbatim.
+  state: z.string().nullable(),
+  stateModel: z.string().nullable(),
   subtype: z.literal('text'),
 }) as unknown as z.ZodType<TextAnnotationDTO>;
 
@@ -33,6 +38,8 @@ export const TextDraftSchema: z.ZodType<TextDraft> = z.object({
   ...AnnotationDraftBaseShape,
   rect: PdfRectSchema,
   icon: NoteIconSchema.optional(),
+  state: z.string().min(1).optional(),
+  stateModel: z.string().min(1).optional(),
   subtype: z.literal('text'),
 });
 
@@ -41,5 +48,7 @@ export const TextPatchSchema: z.ZodType<TextPatch> = z.object({
   ...AnnotationPatchBaseShape,
   rect: PdfRectSchema.optional(),
   icon: NoteIconSchema.optional(),
+  state: z.string().min(1).nullable().optional(),
+  stateModel: z.string().min(1).nullable().optional(),
   subtype: z.literal('text'),
 });

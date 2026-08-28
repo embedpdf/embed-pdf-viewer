@@ -112,6 +112,48 @@ export function setAnnotRect(
 }
 
 /**
+ * Write a UTF-16 string entry into an annotation dictionary. The write
+ * side of `readAnnotString`.
+ */
+export function writeAnnotString(
+  fn: PdfFunctions,
+  mem: PdfRuntimeMemory,
+  annotPtr: Ptr,
+  key: string,
+  value: string,
+): void {
+  const ptr = mem.writeU16String(value);
+  try {
+    fn.FPDFAnnot_SetStringValue(annotPtr, key, ptr);
+  } finally {
+    mem.free(ptr);
+  }
+}
+
+/**
+ * Three-state string write: `null` REMOVES the dictionary entry.
+ *
+ * Clearing goes through `EPDFAnnot_RemoveKey` because
+ * `FPDFAnnot_SetStringValue` with a NULL value writes an EMPTY string —
+ * it never removes. True removal is what keeps the read side honest:
+ * `readAnnotString` returns `null` iff the key is absent, so a cleared
+ * field reads back as `null`, not `''`.
+ */
+export function writeAnnotStringOrClear(
+  fn: PdfFunctions,
+  mem: PdfRuntimeMemory,
+  annotPtr: Ptr,
+  key: string,
+  value: string | null,
+): void {
+  if (value === null) {
+    fn.EPDFAnnot_RemoveKey(annotPtr, key);
+    return;
+  }
+  writeAnnotString(fn, mem, annotPtr, key, value);
+}
+
+/**
  * Set `/BS /S` (border style code) and `/BS /W` (width) in one call via
  * `EPDFAnnot_SetBorderStyle`. `styleCode` is a raw
  * `FPDF_ANNOT_BORDER_STYLE` enum value — the string<->code mapping lives

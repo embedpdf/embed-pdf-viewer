@@ -41,6 +41,7 @@ const base = (annotObjectNumber: number) => ({
   nm: null,
   flags: NO_FLAGS,
   contents: null,
+  subject: null,
   author: null,
   created: null,
   modified: null,

@@ -105,6 +105,7 @@ describe('repository — Ink Highlight intent and blend', () => {
     flags: NO_FLAGS,
     rect: { left: 10, bottom: 740, right: 120, top: 760 },
     contents: null,
+    subject: null,
     author: null,
     created: null,
     modified: null,

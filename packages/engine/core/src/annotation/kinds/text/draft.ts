@@ -1,5 +1,6 @@
 import type { PdfRect } from '../../../geometry/primitives';
 import type { AnnotationDraftBase } from '../../draft-base';
+import type { AnnotationState, AnnotationStateModel } from '../../primitives';
 import type { ColorStyleDraftFields } from '../style.shared';
 
 /**
@@ -29,4 +30,14 @@ export interface TextDraft extends AnnotationDraftBase, ColorStyleDraftFields {
   rect: PdfRect;
   /** `/Name` icon. Default `'note'` (the ISO 32000 default). */
   icon?: NoteIcon;
+  /**
+   * Write `/State` + `/StateModel`, making this draft an ISO 32000
+   * §12.5.6.3 review-status reply (pair with `inReplyTo` → the annotation
+   * under review). `state` requires `stateModel` — the engine throws
+   * `InvalidArg` otherwise. `stateModel` alone is valid: the model's
+   * default state applies (`none` for review, `unmarked` for marked).
+   */
+  state?: AnnotationState;
+  /** See {@link state}. */
+  stateModel?: AnnotationStateModel;
 }

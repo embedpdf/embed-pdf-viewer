@@ -24,6 +24,13 @@ export interface AnnotationBase {
   rect: PdfRect;
   /** /Contents text. */
   contents: string | null;
+  /**
+   * `/Subj` — short subject line of a markup annotation (ISO 32000
+   * §12.5.6.2, Table 172). Normalized onto the base like `contents` /
+   * `author`: non-markup subtypes simply read `null`. Faithful read:
+   * `null` iff the key is absent (a present-but-empty `/Subj` reads `''`).
+   */
+  subject: string | null;
   /** /T author. */
   author: string | null;
   /** ISO 8601 from /CreationDate. */

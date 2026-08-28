@@ -102,6 +102,7 @@ export interface PdfFunctions {
   EPDFAnnot_HasEmbedMetadata: (arg0: Ptr) => boolean;
   EPDFAnnot_RemoveAction: (arg0: Ptr) => boolean;
   EPDFAnnot_RemoveDest: (arg0: Ptr) => boolean;
+  EPDFAnnot_RemoveKey: (arg0: Ptr, arg1: string) => boolean;
   EPDFAnnot_SetAction: (arg0: Ptr, arg1: Ptr) => boolean;
   EPDFAnnot_SetAPMatrix: (arg0: Ptr, arg1: number, arg2: Ptr) => boolean;
   EPDFAnnot_SetAppearanceFromPage: (arg0: Ptr, arg1: Ptr, arg2: number) => boolean;
@@ -874,6 +875,7 @@ export const pdfFunctionSignatures = {
   EPDFAnnot_HasEmbedMetadata: { params: [{"ts":"Ptr","wasm":{"kind":"pointer","cwrap":"number"},"native":{"kind":"pointer","cwrap":"bigint"}}], result: {"ts":"boolean","wasm":{"kind":"bool","cwrap":"boolean"},"native":{"kind":"bool","cwrap":"boolean"}} },
   EPDFAnnot_RemoveAction: { params: [{"ts":"Ptr","wasm":{"kind":"pointer","cwrap":"number"},"native":{"kind":"pointer","cwrap":"bigint"}}], result: {"ts":"boolean","wasm":{"kind":"bool","cwrap":"boolean"},"native":{"kind":"bool","cwrap":"boolean"}} },
   EPDFAnnot_RemoveDest: { params: [{"ts":"Ptr","wasm":{"kind":"pointer","cwrap":"number"},"native":{"kind":"pointer","cwrap":"bigint"}}], result: {"ts":"boolean","wasm":{"kind":"bool","cwrap":"boolean"},"native":{"kind":"bool","cwrap":"boolean"}} },
+  EPDFAnnot_RemoveKey: { params: [{"ts":"Ptr","wasm":{"kind":"pointer","cwrap":"number"},"native":{"kind":"pointer","cwrap":"bigint"}},{"ts":"string","wasm":{"kind":"cstring","cwrap":"string"},"native":{"kind":"cstring","cwrap":"string"}}], result: {"ts":"boolean","wasm":{"kind":"bool","cwrap":"boolean"},"native":{"kind":"bool","cwrap":"boolean"}} },
   EPDFAnnot_SetAction: { params: [{"ts":"Ptr","wasm":{"kind":"pointer","cwrap":"number"},"native":{"kind":"pointer","cwrap":"bigint"}},{"ts":"Ptr","wasm":{"kind":"pointer","cwrap":"number"},"native":{"kind":"pointer","cwrap":"bigint"}}], result: {"ts":"boolean","wasm":{"kind":"bool","cwrap":"boolean"},"native":{"kind":"bool","cwrap":"boolean"}} },
   EPDFAnnot_SetAPMatrix: { params: [{"ts":"Ptr","wasm":{"kind":"pointer","cwrap":"number"},"native":{"kind":"pointer","cwrap":"bigint"}},{"ts":"number","wasm":{"kind":"i32","cwrap":"number"},"native":{"kind":"i32","cwrap":"number"}},{"ts":"Ptr","wasm":{"kind":"pointer","cwrap":"number"},"native":{"kind":"pointer","cwrap":"bigint"}}], result: {"ts":"boolean","wasm":{"kind":"bool","cwrap":"boolean"},"native":{"kind":"bool","cwrap":"boolean"}} },
   EPDFAnnot_SetAppearanceFromPage: { params: [{"ts":"Ptr","wasm":{"kind":"pointer","cwrap":"number"},"native":{"kind":"pointer","cwrap":"bigint"}},{"ts":"Ptr","wasm":{"kind":"pointer","cwrap":"number"},"native":{"kind":"pointer","cwrap":"bigint"}},{"ts":"number","wasm":{"kind":"i32","cwrap":"number"},"native":{"kind":"i32","cwrap":"number"}}], result: {"ts":"boolean","wasm":{"kind":"bool","cwrap":"boolean"},"native":{"kind":"bool","cwrap":"boolean"}} },

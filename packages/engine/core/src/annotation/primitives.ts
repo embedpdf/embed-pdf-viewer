@@ -177,6 +177,47 @@ export interface PdfRectDifferences {
  */
 export type AnnotationReplyType = 'reply' | 'group';
 
+/** The two ISO 32000 §12.5.6.3 standard state models (Table 174). */
+export type KnownAnnotationStateModel = 'review' | 'marked';
+
+/**
+ * The `/StateModel` of an annotation-state text annotation — ISO 32000
+ * §12.5.6.3. The standard models are `'review'` and `'marked'`, but the
+ * PDF stores the entry as a free text string and Acrobat supports
+ * registering custom state models, so the type stays open. The
+ * `(string & {})` arm keeps the standard literals auto-completing while
+ * accepting any custom model (the {@link FreeTextFont} pattern).
+ *
+ * Known values are wire-stable lowercase; the engine maps them onto the
+ * capitalized PDF spellings (`Review`, `Marked`) at read/write time.
+ * Unknown values round-trip verbatim in both directions.
+ */
+export type AnnotationStateModel = KnownAnnotationStateModel | (string & {});
+
+/** The ISO 32000 §12.5.6.3 standard states (Table 174). */
+export type KnownAnnotationState =
+  | 'accepted'
+  | 'rejected'
+  | 'cancelled'
+  | 'completed'
+  | 'none'
+  | 'marked'
+  | 'unmarked';
+
+/**
+ * The `/State` an annotation-state text annotation sets — ISO 32000
+ * §12.5.6.3. `'accepted' | 'rejected' | 'cancelled' | 'completed' |
+ * 'none'` belong to the `'review'` model; `'marked' | 'unmarked'` to the
+ * `'marked'` model. Open for the same reason as
+ * {@link AnnotationStateModel}: custom models bring custom states.
+ *
+ * States are PER USER and live on separate text annotations replying
+ * (`/IRT`) to their target — never on the target itself. The `/T` of the
+ * state annotation names who set it; later changes by the same user
+ * chain as replies to their previous state annotation, latest wins.
+ */
+export type AnnotationState = KnownAnnotationState | (string & {});
+
 /**
  * Bitset wrapper for the `/F` (Annotation Flags) PDF entry. We expose each
  * bit as its own boolean so callers don't have to know the bit positions.

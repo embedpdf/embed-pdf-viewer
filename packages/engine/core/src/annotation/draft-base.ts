@@ -19,6 +19,8 @@ import type { AnnotationRef } from '../identity/AnnotationRef';
  */
 export interface AnnotationDraftBase {
   contents?: string | null;
+  /** `/Subj` — short subject line (ISO 32000 §12.5.6.2, markup annotations). */
+  subject?: string | null;
   /** Blend mode to bake into the normal appearance. Omit for the subtype default. */
   blendMode?: BlendMode;
   /** Optional /NM the caller wants to assign on creation. */

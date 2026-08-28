@@ -52,7 +52,9 @@ const EPSILON = 1e-3;
 
 /**
  * Keys that never affect `/AP` on any kind: the discriminator, behavioral
- * flags, reply relationships, and grouping.
+ * flags, reply relationships, grouping, and the conversation-plane
+ * entries (`/Subj` subject line, `/State` + `/StateModel` review status —
+ * dictionary-only per ISO 32000 §12.5.6.3, never painted).
  */
 const INERT_KEYS: ReadonlySet<string> = new Set([
   'subtype',
@@ -60,6 +62,9 @@ const INERT_KEYS: ReadonlySet<string> = new Set([
   'inReplyTo',
   'replyType',
   'groupId',
+  'subject',
+  'state',
+  'stateModel',
 ]);
 
 /**
