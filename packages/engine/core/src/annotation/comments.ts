@@ -66,6 +66,13 @@ export interface CommentThreadReview {
   lastChange: ReviewStatus | null;
   /** Reviewer keys whose latest Marked-model status is `'marked'`. */
   markedBy: string[];
+  /**
+   * Every state annotation in the thread's subtree (both axes, all
+   * reviewers, chronological) — thread MEMBERSHIP, not status history:
+   * deleting a whole thread must delete its state annotations too, and
+   * the classified summaries above deliberately drop superseded refs.
+   */
+  statusRefs: AnnotationRef[];
   /** `byReviewer[currentUserId]`; only set when the option was given. */
   mine?: ReviewStatus | null;
 }
@@ -231,7 +238,12 @@ function computeReview(
     .filter((key) => markedLatest[key]!.state === 'marked')
     .sort();
 
-  const review: CommentThreadReview = { byReviewer, lastChange, markedBy };
+  const review: CommentThreadReview = {
+    byReviewer,
+    lastChange,
+    markedBy,
+    statusRefs: states.map((a) => a.ref),
+  };
   if (opts.currentUserId !== undefined) {
     review.mine = byReviewer[opts.currentUserId] ?? null;
   }

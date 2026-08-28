@@ -7,9 +7,11 @@ import {
 } from '@embedpdf/core';
 import type { PageRotation } from '@embedpdf/core-geometry';
 import {
+  buildCommentThreads,
   encodeStableIdKey,
   resolveBinarySource,
   sniffBinaryMetadata,
+  type CommentThread,
   type AnnotationDraft,
   type AnnotationDTO,
   type AnnotationPatch,
@@ -83,6 +85,9 @@ import type {
   AnnotationHydration,
   AnnotationState,
   ArmedStampPreview,
+  CommentPermissions,
+  CommentsApi,
+  ThreadDeleteResult,
   Behavior,
   ChromeSettings,
   SelectionFlags,
@@ -993,6 +998,230 @@ export function createAnnotationCapability(
     }
   };
 
+  // ── the comments lens (the conversation plane's surface) ──────────────
+  // A derived, memoized threads index over the substrate. Because every
+  // path — optimistic writes, engine confirms, remote events, hydration —
+  // lands in the model, the sidebar updates with zero extra wiring. The
+  // memo keys on the model's annotation content (byId/order — hover and
+  // drafts don't invalidate) PLUS the layout (display order is computed
+  // fresh against the live pages) and the session identity.
+
+  const currentUserId = (): string | undefined => ctx.doc?.security.identity?.user_id;
+
+  interface ThreadsIndex {
+    threads: CommentThread[];
+    byMember: Map<Id, CommentThread>;
+  }
+  let threadsMemo:
+    | (ThreadsIndex & {
+        byId: Model['byId'];
+        order: Model['order'];
+        layout: string;
+        userId: string | undefined;
+      })
+    | null = null;
+
+  /** Value-stable layout key: display order is all the sort consumes, so
+   *  the memo must survive hosts that rebuild the pages array per read. */
+  const layoutSignature = (): string =>
+    (ctx.document()?.pages ?? []).map((p) => p.pageObjectNumber).join(',');
+
+  const computeThreadsIndex = (): ThreadsIndex => {
+    const m = model();
+    // Committed truth only: optimistic tmp drafts have no DTO yet and join
+    // the index when their create confirms.
+    const dtos: AnnotationDTO[] = [];
+    for (const id of m.order) {
+      const data = m.byId[id]?.data;
+      if (data) dtos.push(data);
+    }
+    const threads = buildCommentThreads(dtos, { currentUserId: currentUserId() });
+
+    // Display order: page position first (live layout), then top of page
+    // (PDF user space is y-up — larger `top` sits higher), then creation.
+    const pages = ctx.document()?.pages ?? [];
+    const displayIndex = new Map(pages.map((p, i) => [p.pageObjectNumber, i]));
+    threads.sort((a, b) => {
+      const pa = displayIndex.get(a.pageObjectNumber) ?? Number.MAX_SAFE_INTEGER;
+      const pb = displayIndex.get(b.pageObjectNumber) ?? Number.MAX_SAFE_INTEGER;
+      if (pa !== pb) return pa - pb;
+      if (a.root.rect.top !== b.root.rect.top) return b.root.rect.top - a.root.rect.top;
+      const ca = a.root.created ?? '';
+      const cb = b.root.created ?? '';
+      return ca < cb ? -1 : ca > cb ? 1 : 0;
+    });
+
+    const byMember = new Map<Id, CommentThread>();
+    for (const t of threads) {
+      byMember.set(refKey(t.root.ref), t);
+      for (const r of t.replies) byMember.set(refKey(r.ref), t);
+      for (const g of t.groupedParts) byMember.set(refKey(g.ref), t);
+      for (const s of t.review.statusRefs) byMember.set(refKey(s), t);
+    }
+    return { threads, byMember };
+  };
+
+  const threadsIndex = (): ThreadsIndex => {
+    const m = model();
+    const layout = layoutSignature();
+    const userId = currentUserId();
+    if (
+      threadsMemo &&
+      threadsMemo.byId === m.byId &&
+      threadsMemo.order === m.order &&
+      threadsMemo.layout === layout &&
+      threadsMemo.userId === userId
+    ) {
+      return threadsMemo;
+    }
+    threadsMemo = { ...computeThreadsIndex(), byId: m.byId, order: m.order, layout, userId };
+    return threadsMemo;
+  };
+
+  const threadOf = (ref: AnnotationRef): CommentThread => {
+    const t = threadsIndex().byMember.get(refKey(ref));
+    if (!t) throw new Error('[annotation] no comment thread contains this ref');
+    return t;
+  };
+
+  /** Engine create + model sync for conversation-plane annotations (they
+   *  never paint, so the render source is immaterial — 'baked' avoids any
+   *  vector-scene work). */
+  const createConversationAnnot = async (
+    pon: number,
+    draft: AnnotationDraft,
+  ): Promise<AnnotationDTO> => {
+    const doc = ctx.doc;
+    if (!doc) throw new Error('[annotation] no document bound');
+    const res = await doc.page(pon).annotations.create(draft);
+    syncDTO(res.created, 'baked');
+    return res.created;
+  };
+
+  const deleteOne = async (ref: AnnotationRef): Promise<void> => {
+    const doc = ctx.doc;
+    if (!doc) throw new Error('[annotation] no document bound');
+    await doc.page(ref.pageObjectNumber).annotations.delete(ref);
+    apply({ t: 'remove', ids: [refKey(ref)] });
+  };
+
+  // Screen-anchored like a sticky note; `print` for Acrobat parity.
+  const REPLY_FLAGS = { print: true, noZoom: true, noRotate: true };
+  // Status annotations are metadata: hidden everywhere (our paint plane
+  // culls them regardless; `hidden` keeps foreign viewers from drawing an
+  // icon). Phase 0 golden fixtures may refine this convention.
+  const STATUS_FLAGS = { hidden: true, noZoom: true, noRotate: true };
+
+  /** Coarse authority mirror (doc.annotate.modify) — B3 replaces this with
+   *  the collab-scope mirrors; the FLAG split is already the real rule. */
+  const coarseAuthority = (): boolean => ctx.doc?.security.allows(ANNOTATE_MODIFY) ?? false;
+  const deletableOne = (ref: AnnotationRef): boolean =>
+    coarseAuthority() && !(model().byId[refKey(ref)]?.flags.locked ?? false);
+  const threadMemberRefs = (t: CommentThread): AnnotationRef[] => [
+    ...t.replies.map((r) => r.ref),
+    ...t.groupedParts.map((g) => g.ref),
+    ...t.review.statusRefs,
+    t.root.ref, // root LAST — children first keeps foreign readers coherent
+  ];
+
+  const comments: CommentsApi = {
+    threads: () => threadsIndex().threads,
+    thread: (ref) => threadsIndex().byMember.get(refKey(ref)) ?? null,
+    hydration: () => ctx.getState().hydration,
+    rehydrate,
+
+    reply: async (ref, text) => {
+      const t = threadOf(ref);
+      const created = await createConversationAnnot(t.pageObjectNumber, {
+        subtype: 'text',
+        rect: t.root.rect,
+        icon: 'comment',
+        contents: text,
+        inReplyTo: t.root.ref,
+        flags: { ...REPLY_FLAGS },
+      } as AnnotationDraft);
+      return created.ref;
+    },
+
+    edit: async (ref, text) => {
+      const subtype = model().byId[refKey(ref)]?.data?.subtype;
+      if (!subtype) throw new Error('[annotation] cannot edit an uncommitted annotation');
+      await updateOne(ref, { subtype, contents: text } as AnnotationPatch);
+    },
+
+    setStatus: async (ref, state) => {
+      const t = threadOf(ref);
+      const userId = currentUserId();
+      // ISO chain: reply to the caller's previous state annotation when one
+      // exists, else to the root. Readers everywhere (ours included) accept
+      // both shapes.
+      const previous = userId ? t.review.byReviewer[userId] : undefined;
+      await createConversationAnnot(t.pageObjectNumber, {
+        subtype: 'text',
+        rect: t.root.rect,
+        inReplyTo: previous?.ref ?? t.root.ref,
+        state,
+        stateModel: 'review',
+        flags: { ...STATUS_FLAGS },
+      } as AnnotationDraft);
+    },
+
+    setMarked: async (ref, marked) => {
+      const t = threadOf(ref);
+      await createConversationAnnot(t.pageObjectNumber, {
+        subtype: 'text',
+        rect: t.root.rect,
+        inReplyTo: t.root.ref,
+        state: marked ? 'marked' : 'unmarked',
+        stateModel: 'marked',
+        flags: { ...STATUS_FLAGS },
+      } as AnnotationDraft);
+    },
+
+    remove: deleteOne,
+
+    removeThread: async (ref): Promise<ThreadDeleteResult> => {
+      const t = threadOf(ref);
+      const members = threadMemberRefs(t);
+      // Preflight: all-or-nothing. A blocked member means NOTHING deletes —
+      // a half-deleted thread orphans replies in every other viewer.
+      const blocked = members.filter((r) => !deletableOne(r));
+      if (blocked.length > 0) {
+        return {
+          deleted: [],
+          failed: blocked.map((r) => ({ ref: r, error: new Error('delete not permitted') })),
+        };
+      }
+      const deleted: AnnotationRef[] = [];
+      const failed: ThreadDeleteResult['failed'] = [];
+      for (const member of members) {
+        // A child failure (a race: someone else acted first) stops the
+        // cascade before the root, so nothing orphans.
+        if (failed.length > 0) break;
+        try {
+          await deleteOne(member);
+          deleted.push(member);
+        } catch (error) {
+          failed.push({ ref: member, error });
+        }
+      }
+      return { deleted, failed };
+    },
+
+    permissionsFor: (ref): CommentPermissions => {
+      const authority = coarseAuthority();
+      const flags = model().byId[refKey(ref)]?.flags;
+      const t = threadsIndex().byMember.get(refKey(ref)) ?? null;
+      return {
+        canReply: authority,
+        canSetStatus: authority,
+        canEditText: authority && !(flags?.lockedContents ?? false),
+        canDelete: deletableOne(ref),
+        canDeleteThread: t !== null && threadMemberRefs(t).every(deletableOne),
+      };
+    },
+  };
+
   /**
    * Per-parent serialization of attached-link reconciles: rapid edits chain
    * instead of interleaving (two overlapping runs could double-create
@@ -1338,6 +1567,8 @@ export function createAnnotationCapability(
     canCreate: () => ctx.doc?.security.allows(ANNOTATE_MODIFY) ?? false,
     canEdit: () => ctx.doc?.security.allows(ANNOTATE_MODIFY) ?? false,
     canDelete: () => ctx.doc?.security.allows(ANNOTATE_MODIFY) ?? false,
+
+    comments,
 
     getSelection: (): AnnotationRef[] => {
       const m = model();

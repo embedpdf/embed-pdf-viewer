@@ -13,6 +13,7 @@ import { annotationReducer, initialAnnotationState } from './reducer';
 import type { AnnotationAction, AnnotationState } from './types';
 
 const PON = 1;
+const PON2 = 2;
 const CROP = { left: 0, bottom: 0, right: 600, top: 800 };
 const NO_FLAGS: AnnotationFlags = {
   invisible: false,
@@ -85,7 +86,7 @@ function harness() {
   let state = initialAnnotationState();
   const create = vi.fn();
   const update = vi.fn();
-  const remove = vi.fn(async () => ({}));
+  const remove = vi.fn(async (_ref: AnnotationRef) => ({}));
   const list = vi.fn();
   const listRawAll = vi.fn();
   const ctx = {
@@ -93,10 +94,16 @@ function harness() {
     dispatch: (action: AnnotationAction) => {
       state = annotationReducer(state, action);
     },
-    document: () => ({ pages: [{ pageObjectNumber: PON, boxes: { crop: CROP } }] }),
+    document: () => ({
+      pages: [
+        { pageObjectNumber: PON, boxes: { crop: CROP } },
+        { pageObjectNumber: PON2, boxes: { crop: CROP } },
+      ],
+    }),
     doc: {
       page: () => ({ annotations: { create, update, delete: remove, list } }),
       annotations: { listRawAll },
+      security: { allows: () => true, identity: { user_id: 'me' } },
     },
     tryGet: () => null,
   } as unknown as PluginContext<AnnotationState, AnnotationAction>;
@@ -440,6 +447,209 @@ describe('conversation plane at the capability boundary', () => {
     // the page is untouched despite the created-event's bake-fetch default.
     expect(h.capability.pageItems(PON).map((i) => i.id)).toEqual(['obj:80']);
     expect(h.capability.appearanceEpoch(PON)).toBe(epochBefore);
+  });
+});
+
+describe('the comments lens', () => {
+  const NOTE_RECT = { left: 100, bottom: 700, right: 120, top: 720 };
+  const textDto = (n: number, over: Record<string, unknown>): AnnotationDTO =>
+    ({
+      ...base(n),
+      subtype: 'text',
+      rect: NOTE_RECT,
+      color: { r: 255, g: 255, b: 0 },
+      opacity: 1,
+      icon: 'note',
+      state: null,
+      stateModel: null,
+      inReplyTo: null,
+      replyType: null,
+      ...over,
+    }) as unknown as AnnotationDTO;
+  const rootAt = (n: number, top: number): AnnotationDTO =>
+    ({ ...hydrationSquare(n), rect: { left: 100, bottom: top - 60, right: 180, top } }) as AnnotationDTO;
+  const page2Root = (n: number): AnnotationDTO =>
+    ({
+      ...hydrationSquare(n),
+      ref: { kind: 'objectNumber', pageObjectNumber: PON2, annotObjectNumber: n },
+      pageObjectNumber: PON2,
+    }) as AnnotationDTO;
+
+  /** Seed: two threads on page 1 (root 20 high, root 25 lower — 20's thread
+   *  has a reply and alice's accepted status), one thread on page 2. */
+  const seed = async (h: ReturnType<typeof harness>) => {
+    h.list.mockResolvedValueOnce({
+      annotations: [
+        rootAt(25, 500),
+        rootAt(20, 760),
+        textDto(21, { inReplyTo: ref(20), replyType: 'reply', contents: 'a reply' }),
+        textDto(22, {
+          inReplyTo: ref(20),
+          replyType: 'reply',
+          state: 'accepted',
+          stateModel: 'review',
+          userId: 'alice',
+          modified: '2026-08-29T10:00:00Z',
+        }),
+      ],
+    });
+    await h.capability.reloadPage(PON);
+    h.list.mockResolvedValueOnce({ annotations: [page2Root(30)] });
+    await h.capability.reloadPage(PON2);
+  };
+
+  it('composes display-ordered threads and resolves any member to its thread', async () => {
+    const h = harness();
+    await seed(h);
+    const threads = h.capability.comments.threads();
+    // Page 1 first (top-of-page before lower), then page 2.
+    expect(threads.map((t) => (t.root.ref.kind === 'objectNumber' ? t.root.ref.annotObjectNumber : -1))).toEqual([
+      20, 25, 30,
+    ]);
+    const t20 = threads[0]!;
+    expect(t20.replies).toHaveLength(1);
+    expect(t20.review.byReviewer['alice']?.state).toBe('accepted');
+    expect(t20.review.mine).toBe(null); // session user 'me' has no status
+    // Any member resolves: the reply AND the state annotation.
+    expect(h.capability.comments.thread(ref(21))).toBe(t20);
+    expect(h.capability.comments.thread(ref(22))).toBe(t20);
+    // Memoized: same inputs, same array.
+    expect(h.capability.comments.threads()).toBe(threads);
+  });
+
+  it('reply writes FLAT to the root, whatever member was passed', async () => {
+    const h = harness();
+    await seed(h);
+    h.create.mockResolvedValueOnce({
+      created: textDto(40, { inReplyTo: ref(20), replyType: 'reply', contents: 'agreed' }),
+    });
+    const created = await h.capability.comments.reply(ref(21), 'agreed'); // via the REPLY
+    expect(h.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        subtype: 'text',
+        contents: 'agreed',
+        icon: 'comment',
+        inReplyTo: ref(20), // the ROOT, not the reply
+        flags: { print: true, noZoom: true, noRotate: true },
+      }),
+    );
+    expect(created).toEqual(ref(40));
+    expect(h.state().model.byId['obj:40']).toBeDefined();
+  });
+
+  it('setStatus chains: first to the root, the next to my previous status', async () => {
+    const h = harness();
+    await seed(h);
+    h.create.mockResolvedValueOnce({
+      created: textDto(41, {
+        inReplyTo: ref(20),
+        replyType: 'reply',
+        state: 'accepted',
+        stateModel: 'review',
+        userId: 'me',
+        modified: '2026-08-29T11:00:00Z',
+      }),
+    });
+    await h.capability.comments.setStatus(ref(20), 'accepted');
+    expect(h.create).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        state: 'accepted',
+        stateModel: 'review',
+        inReplyTo: ref(20),
+        flags: { hidden: true, noZoom: true, noRotate: true },
+      }),
+    );
+    expect(h.capability.comments.thread(ref(20))!.review.mine?.state).toBe('accepted');
+
+    h.create.mockResolvedValueOnce({
+      created: textDto(42, {
+        inReplyTo: ref(41),
+        replyType: 'reply',
+        state: 'rejected',
+        stateModel: 'review',
+        userId: 'me',
+        modified: '2026-08-29T12:00:00Z',
+      }),
+    });
+    await h.capability.comments.setStatus(ref(20), 'rejected');
+    expect(h.create).toHaveBeenLastCalledWith(
+      expect.objectContaining({ state: 'rejected', inReplyTo: ref(41) }), // the ISO chain
+    );
+    expect(h.capability.comments.thread(ref(20))!.review.mine?.state).toBe('rejected');
+  });
+
+  it('edit patches contents with the wire subtype', async () => {
+    const h = harness();
+    await seed(h);
+    h.update.mockResolvedValueOnce({ updated: rootAt(20, 760) });
+    await h.capability.comments.edit(ref(20), 'new text');
+    expect(h.update).toHaveBeenCalledWith(
+      ref(20),
+      expect.objectContaining({ subtype: 'square', contents: 'new text' }),
+    );
+  });
+
+  it('removeThread deletes children first, root last', async () => {
+    const h = harness();
+    await seed(h);
+    const result = await h.capability.comments.removeThread(ref(20));
+    expect(result.failed).toEqual([]);
+    expect(result.deleted).toEqual([ref(21), ref(22), ref(20)]);
+    expect(h.remove.mock.calls.map((c) => c[0])).toEqual([ref(21), ref(22), ref(20)]);
+    expect(h.capability.comments.thread(ref(20))).toBe(null);
+  });
+
+  it('removeThread preflight: one locked member blocks the whole cascade', async () => {
+    const h = harness();
+    h.list.mockResolvedValueOnce({
+      annotations: [
+        rootAt(20, 760),
+        {
+          ...textDto(21, { inReplyTo: ref(20), replyType: 'reply' }),
+          flags: { ...NO_FLAGS, locked: true },
+        } as unknown as AnnotationDTO,
+      ],
+    });
+    await h.capability.reloadPage(PON);
+    const result = await h.capability.comments.removeThread(ref(20));
+    expect(result.deleted).toEqual([]);
+    expect(result.failed.map((f) => f.ref)).toEqual([ref(21)]);
+    expect(h.remove).not.toHaveBeenCalled();
+  });
+
+  it('permissionsFor splits the two lock flags and aggregates the thread gate', async () => {
+    const h = harness();
+    h.list.mockResolvedValueOnce({
+      annotations: [
+        {
+          ...rootAt(20, 760),
+          flags: { ...NO_FLAGS, lockedContents: true },
+        } as unknown as AnnotationDTO,
+        textDto(21, { inReplyTo: ref(20), replyType: 'reply' }),
+      ],
+    });
+    await h.capability.reloadPage(PON);
+    const perms = h.capability.comments.permissionsFor(ref(20));
+    expect(perms.canEditText).toBe(false); // lockedContents gates text
+    expect(perms.canDelete).toBe(true); // …but NOT deletion
+    expect(perms.canReply).toBe(true);
+    expect(perms.canSetStatus).toBe(true);
+    expect(perms.canDeleteThread).toBe(true);
+
+    // Lock the REPLY: the thread gate flips, single-delete of root stays.
+    h.list.mockResolvedValueOnce({
+      annotations: [
+        rootAt(20, 760),
+        {
+          ...textDto(21, { inReplyTo: ref(20), replyType: 'reply' }),
+          flags: { ...NO_FLAGS, locked: true },
+        } as unknown as AnnotationDTO,
+      ],
+    });
+    await h.capability.reloadPage(PON);
+    const perms2 = h.capability.comments.permissionsFor(ref(20));
+    expect(perms2.canDelete).toBe(true);
+    expect(perms2.canDeleteThread).toBe(false);
   });
 });
 

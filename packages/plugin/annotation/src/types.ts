@@ -13,6 +13,7 @@ import type {
   AttachmentContent,
   AttachmentFileSource,
   BinarySource,
+  CommentThread,
   PdfLinkTarget,
   PdfRect,
 } from '@embedpdf/engine-core/runtime';
@@ -269,6 +270,86 @@ export interface TextItem {
  * object — two typed lenses on one token — so app code simply can't see the host
  * methods.
  */
+/**
+ * Per-thread action gates, composed from two axes: authority (may this
+ * session act — B2 ships the coarse `doc.annotate.modify` mirror; B3
+ * swaps in the collab-scope mirrors) and PDF state (the two lock flags
+ * gate DIFFERENT aspects, ISO 32000 Table 167: `lockedContents` blocks
+ * text edits, `locked` blocks deletion). A courtesy, not the guard — the
+ * engine independently enforces every write.
+ */
+export interface CommentPermissions {
+  /** A reply is an annotation CREATE. */
+  canReply: boolean;
+  /** Editing this comment's text (`contents`) — gated by `lockedContents`. */
+  canEditText: boolean;
+  /** Deleting this one annotation — gated by `locked`. */
+  canDelete: boolean;
+  /** A status change is a NEW hidden annotation — create authority only,
+   *  never edit rights on someone else's comment. */
+  canSetStatus: boolean;
+  /** `canDelete` over EVERY thread member (root, replies, grouped parts,
+   *  state annotations) — the whole-thread preflight. */
+  canDeleteThread: boolean;
+}
+
+export interface ThreadDeleteResult {
+  deleted: AnnotationRef[];
+  failed: Array<{ ref: AnnotationRef; error: unknown }>;
+}
+
+/**
+ * The conversation plane's surface: a derived, memoized threads index over
+ * the annotation substrate, plus the ISO-native verbs. Every verb compiles
+ * down to plain annotation creates/patches/deletes — one optimistic
+ * pipeline, no second write path — so remote SSE events, own edits, and
+ * hydration all update `threads()` for free.
+ *
+ * Threads carry `pageObjectNumber` (identity is PON, like everything
+ * else); DISPLAY order is a behavior of `threads()` (sorted against the
+ * live layout at computation time), and display labels (`pageIndex`) are a
+ * framework-hook enrichment — the layer that watches both stores.
+ */
+export interface CommentsApi {
+  /** Every comment thread in the document, display-ordered, memoized. */
+  threads(): CommentThread[];
+  /** The thread containing ANY member ref (root, reply, grouped part, or
+   *  state annotation), or null. */
+  thread(ref: AnnotationRef): CommentThread | null;
+  /** Whole-document hydration status (the sidebar's honest loading state). */
+  hydration(): AnnotationHydration;
+  /** Re-run whole-document hydration (desync recovery / manual refresh). */
+  rehydrate(): Promise<void>;
+
+  /** Reply to a thread. Writes FLAT (`/IRT` → the thread root, ISO reply
+   *  type), whatever member was passed — presentation stays one level. */
+  reply(ref: AnnotationRef, text: string): Promise<AnnotationRef>;
+  /** Edit a comment's text. Appearance-inert for every kind except
+   *  free-text and redaction (whose `/AP` paints `/Contents`). */
+  edit(ref: AnnotationRef, text: string): Promise<void>;
+  /**
+   * Set this session's review status on the thread (ISO 32000 §12.5.6.3):
+   * creates a hidden state annotation chained to the caller's previous
+   * status when one exists, else to the root. The target annotation is
+   * never modified. Known states: accepted / rejected / cancelled /
+   * completed / none (custom vocabularies ride the raw create API).
+   */
+  setStatus(ref: AnnotationRef, state: string): Promise<void>;
+  /** Toggle this session's Marked-model checkmark on the thread. */
+  setMarked(ref: AnnotationRef, marked: boolean): Promise<void>;
+  /** Delete exactly ONE annotation (a reply, a status, or a bare root). */
+  remove(ref: AnnotationRef): Promise<void>;
+  /**
+   * Delete a WHOLE thread, children first. Preflighted: when any member
+   * fails the delete gate the call returns every blocked ref as `failed`
+   * and deletes nothing; mid-flight races surface the same way.
+   */
+  removeThread(ref: AnnotationRef): Promise<ThreadDeleteResult>;
+
+  /** Truthful per-thread action gates for the ref's thread. */
+  permissionsFor(ref: AnnotationRef): CommentPermissions;
+}
+
 export interface AnnotationCapability {
   // ── data API: the mutation vocabulary (engine-core types, addressable by ref) ──
   /**
@@ -329,6 +410,9 @@ export interface AnnotationCapability {
   canCreate(): boolean;
   canEdit(ref: AnnotationRef): boolean;
   canDelete(ref: AnnotationRef): boolean;
+
+  /** The conversation plane's read/write surface — see {@link CommentsApi}. */
+  comments: CommentsApi;
 
   // ── reads (canonical engine DTOs) ──
   /** The annotation for a ref, or null if unknown / not yet committed. */
