@@ -20,6 +20,12 @@ export const AnnotationTokenSchema = {
   fields: ['annotationVersion'],
 } as const satisfies TokenSchema;
 
+/** Doc-level bulk annotations listing pin (plural, vs the per-page
+ *  `annotationVersion` token above). */
+export const AnnotationsAllTokenSchema = {
+  fields: ['annotationsVersion'],
+} as const satisfies TokenSchema;
+
 export const ActionsTokenSchema = {
   fields: ['actionsVersion'],
 } as const satisfies TokenSchema;

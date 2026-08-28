@@ -103,6 +103,8 @@ interface CommittedAnnotationMutation {
   weakRefsInvalidated: boolean;
   previousLayerDocVersion: number;
   layerDocVersion: number;
+  /** The new bulk-annotations pin this mutation committed. */
+  annotationsVersion: number;
 }
 
 /**
@@ -116,6 +118,21 @@ interface FormPageImpact {
   pageObjectNumber: number;
   kind: MutationImpactKind;
 }
+
+/**
+ * Form audit kinds that change annotation list BODIES (field/widget
+ * structure) and therefore bump the bulk `annotations_version` pin.
+ * Value writes, effects, import and repair only re-bake `/AP` rasters —
+ * the per-page `annotationVersion` covers those; the bulk pin stays put
+ * so hydration caches survive form-filling sessions.
+ */
+const FORM_STRUCTURE_AUDIT_KINDS: ReadonlySet<string> = new Set([
+  'form.createField',
+  'form.updateField',
+  'form.deleteField',
+  'form.attachWidget',
+  'form.detachWidget',
+]);
 
 /** The durable state a form commit produced inside its transaction. Forms
  *  are document-scoped, so 0..N pages may have been touched. */
@@ -359,10 +376,11 @@ export class LayerService {
    * call this BEFORE the mutation so `requireLayerCollabAction` can
    * deny with 403 without ever issuing a write.
    *
-   * V1 implementation: page-fetch + filter. Reuses the existing
-   * `annotations.listFullPage` worker job (the only annotation read
-   * path the worker currently exposes) and finds the row matching
-   * the ref. Returns an empty `{}` if the annotation can't be
+   * V1 implementation: page-fetch + filter. Uses the RAW
+   * `annotations.listRawPage` worker job (docPtr dictionary walk — no
+   * FPDF_LoadPage; wire-identical DTOs, and this runs on EVERY
+   * PATCH/DELETE, so it is the mutation hot path) and finds the row
+   * matching the ref. Returns an empty `{}` if the annotation can't be
    * located — the route guard then evaluates the collab filter against
    * an unstamped target, which denies self/group filters and allows
    * `all`. If the annotation truly doesn't exist, the subsequent
@@ -387,17 +405,17 @@ export class LayerService {
 
     const build = (jobId: WorkerJobId) =>
       wirePack({
-        kind: 'annotations.listFullPage' as const,
+        kind: 'annotations.listRawPage' as const,
         jobId,
         docId,
         layerName,
         pageObjectNumber,
       });
     const payload = await this.requirePool().run(docId, build, signal);
-    if (payload.tag !== 'annotations.listFullPage') {
+    if (payload.tag !== 'annotations.listRawPage') {
       throw new EngineError(
         EngineErrorCode.WireFormat,
-        `unexpected annotations.listFullPage payload while resolving collab target: ${payload.tag}`,
+        `unexpected annotations.listRawPage payload while resolving collab target: ${payload.tag}`,
       );
     }
     const annotations = payload.snapshot.annotations;
@@ -1549,7 +1567,21 @@ export class LayerService {
         });
         const auditId = (await this.eventLog?.appendDb(trx, auditEvent)) ?? 0;
 
-        await this.writeLayerAdvance(trx, input, { doc_version: layerDocVersion }, auditId, now);
+        await this.writeLayerAdvance(
+          trx,
+          input,
+          {
+            doc_version: layerDocVersion,
+            // Structural form ops change the widget population / DTOs;
+            // clients re-pin the bulk leaf via the 404-refresh rail (the
+            // form cacheDelta does not carry the pin).
+            ...(FORM_STRUCTURE_AUDIT_KINDS.has(input.kind)
+              ? { annotations_version: Number(currentLayer.annotations_version ?? 1) + 1 }
+              : {}),
+          },
+          auditId,
+          now,
+        );
 
         for (const page of nextPages) {
           await trx
@@ -1659,6 +1691,7 @@ export class LayerService {
       layerName,
       previousDocVersion: durable.previousLayerDocVersion,
       docVersion: durable.layerDocVersion,
+      annotationsVersion: durable.annotationsVersion,
       pages: [durable.page],
     });
     const pageState = this.layerState.decorateLayerPageState(docId, layerName, durable.page);
@@ -1976,19 +2009,21 @@ export class LayerService {
     pageObjectNumber: PageObjectNumber,
     signal?: AbortSignal,
   ): Promise<PageState> {
+    // RAW read: only `pageState` is consumed here — the cheapest possible
+    // way to learn the worker's revision state for this page.
     const build = (jobId: WorkerJobId) =>
       wirePack({
-        kind: 'annotations.listFullPage' as const,
+        kind: 'annotations.listRawPage' as const,
         jobId,
         docId,
         layerName,
         pageObjectNumber,
       });
     const payload = await this.requirePool().run(docId, build, signal);
-    if (payload.tag !== 'annotations.listFullPage') {
+    if (payload.tag !== 'annotations.listRawPage') {
       throw new EngineError(
         EngineErrorCode.WireFormat,
-        `unexpected annotations.listFullPage payload while rewriting index ref: ${payload.tag}`,
+        `unexpected annotations.listRawPage payload while rewriting index ref: ${payload.tag}`,
       );
     }
     return payload.snapshot.pageState;
@@ -2069,7 +2104,7 @@ export class LayerService {
         // transactions can both pass a read-then-check).
         const currentLayer = await trx
           .selectFrom('layers')
-          .select(['current_version', 'doc_version'])
+          .select(['current_version', 'doc_version', 'annotations_version'])
           .where('id', '=', input.layer.id)
           .executeTakeFirst();
         if (!currentLayer) {
@@ -2105,12 +2140,17 @@ export class LayerService {
 
         const previousLayerDocVersion = Number(currentLayer.doc_version);
         const layerDocVersion = previousLayerDocVersion + (bumps.bumpLayerDocVersion ? 1 : 0);
+        // Every annotation CRUD kind changes list bodies, so the bulk pin
+        // advances in lockstep with the per-page annotationVersion.
+        const annotationsVersion =
+          Number(currentLayer.annotations_version ?? 1) + (bumps.bumpAnnotationVersion ? 1 : 0);
 
         const durable: CommittedAnnotationMutation = {
           page: nextPage,
           weakRefsInvalidated: bumps.weakRefsInvalidated,
           previousLayerDocVersion,
           layerDocVersion,
+          annotationsVersion,
         };
         // Finalize BEFORE the audit append so the row stores exactly what the
         // caller will receive (cloud-stable tokens + real cacheDelta), never
@@ -2136,6 +2176,7 @@ export class LayerService {
 
         await this.guardedVersionBump(trx, input.layer, {
           doc_version: layerDocVersion,
+          annotations_version: annotationsVersion,
           current_version: input.nextVersion,
           current_artifact_key: input.artifactKey,
           current_artifact_sha: input.artifactSha,
@@ -2373,7 +2414,14 @@ export class LayerService {
         await this.writeLayerAdvance(
           trx,
           input,
-          { doc_version: versions.docVersion, layout_version: versions.layoutVersion },
+          {
+            doc_version: versions.docVersion,
+            layout_version: versions.layoutVersion,
+            // The page SET shrank — the bulk annotation corpus changed.
+            // Clients re-pin via the 404-refresh rail (PageStructureCache
+            // carries no annotationsVersion).
+            annotations_version: Number(currentLayer.annotations_version ?? 1) + 1,
+          },
           auditId,
           now,
         );
@@ -2501,7 +2549,14 @@ export class LayerService {
         await this.writeLayerAdvance(
           trx,
           input,
-          { doc_version: versions.docVersion, layout_version: versions.layoutVersion },
+          {
+            doc_version: versions.docVersion,
+            layout_version: versions.layoutVersion,
+            // The page SET grew — the bulk annotation corpus changed.
+            // Clients re-pin via the 404-refresh rail (PageStructureCache
+            // carries no annotationsVersion).
+            annotations_version: Number(currentLayer.annotations_version ?? 1) + 1,
+          },
           auditId,
           now,
         );
@@ -2575,6 +2630,8 @@ export class LayerService {
         }
 
         const previousLayerDocVersion = Number(currentLayer.doc_version);
+        // Flatten bakes annotations into content — list bodies change.
+        const annotationsVersion = Number(currentLayer.annotations_version ?? 1) + 1;
         const durable: CommittedPageFlatten = {
           pages: nextPages,
           previousLayerDocVersion,
@@ -2592,6 +2649,7 @@ export class LayerService {
               layerName: input.layerName,
               previousDocVersion: durable.previousLayerDocVersion,
               docVersion: durable.layerDocVersion,
+              annotationsVersion,
               pages: nextPages,
             }),
           },
@@ -2617,7 +2675,7 @@ export class LayerService {
         await this.writeLayerAdvance(
           trx,
           input,
-          { doc_version: durable.layerDocVersion },
+          { doc_version: durable.layerDocVersion, annotations_version: annotationsVersion },
           auditId,
           now,
         );
@@ -2702,6 +2760,9 @@ export class LayerService {
 
         const previousLayerDocVersion = Number(currentLayer.doc_version);
         const layerDocVersion = previousLayerDocVersion + 1;
+        // Redaction consumes the marks and rewrites annotations — list
+        // bodies change.
+        const annotationsVersion = Number(currentLayer.annotations_version ?? 1) + 1;
         const result: RedactionApplyResult = {
           ...input.raw,
           meta: {
@@ -2714,6 +2775,7 @@ export class LayerService {
               layerName: input.layerName,
               previousDocVersion: previousLayerDocVersion,
               docVersion: layerDocVersion,
+              annotationsVersion,
               pages: nextPages,
             }),
           },
@@ -2736,7 +2798,13 @@ export class LayerService {
         });
         const auditId = (await this.eventLog?.appendDb(trx, auditEvent)) ?? 0;
 
-        await this.writeLayerAdvance(trx, input, { doc_version: layerDocVersion }, auditId, now);
+        await this.writeLayerAdvance(
+          trx,
+          input,
+          { doc_version: layerDocVersion, annotations_version: annotationsVersion },
+          auditId,
+          now,
+        );
         for (const page of nextPages) {
           await trx
             .updateTable('layer_pages')
@@ -2762,12 +2830,16 @@ export class LayerService {
   private async readLayerForCommit(
     trx: Transaction<Schema>,
     layer: LayerRow,
-  ): Promise<{ doc_version: number | bigint; layout_version: number | bigint }> {
+  ): Promise<{
+    doc_version: number | bigint;
+    layout_version: number | bigint;
+    annotations_version: number | bigint;
+  }> {
     // Plain read — values feed the next-version computation. The FENCE is
     // the guarded UPDATE (see guardedVersionBump), never a SELECT check.
     const currentLayer = await trx
       .selectFrom('layers')
-      .select(['current_version', 'doc_version', 'layout_version'])
+      .select(['current_version', 'doc_version', 'layout_version', 'annotations_version'])
       .where('id', '=', layer.id)
       .executeTakeFirst();
     if (!currentLayer) {
@@ -2830,6 +2902,7 @@ export class LayerService {
       layout_version?: number;
       metadata_version?: number;
       attachments_version?: number;
+      annotations_version?: number;
     },
     lastAuditId: number,
     now: number,

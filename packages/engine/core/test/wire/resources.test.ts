@@ -380,9 +380,19 @@ describe('cdnCoverageForScope', () => {
         pathPrefix: '/v1/docs/doc_1/annotations/pages/',
       },
       {
+        resourceId: 'annotations-all',
+        pathPattern: '/v1/docs/doc_1/annotations/items@*',
+        pathPrefix: '/v1/docs/doc_1/annotations/items@',
+      },
+      {
         resourceId: 'annotations-read',
         pathPattern: '/v1/docs/doc_1/layers/myLayer/annotations/pages/*/items@*',
         pathPrefix: '/v1/docs/doc_1/layers/myLayer/annotations/pages/',
+      },
+      {
+        resourceId: 'layer-annotations-all',
+        pathPattern: '/v1/docs/doc_1/layers/myLayer/annotations/items@*',
+        pathPrefix: '/v1/docs/doc_1/layers/myLayer/annotations/items@',
       },
     ]);
   });
@@ -396,9 +406,19 @@ describe('cdnCoverageForScope', () => {
         pathPrefix: '/v1/docs/doc_1/annotations/pages/',
       },
       {
+        resourceId: 'annotations-all',
+        pathPattern: '/v1/docs/doc_1/annotations/items@*',
+        pathPrefix: '/v1/docs/doc_1/annotations/items@',
+      },
+      {
         resourceId: 'annotations-read',
         pathPattern: '/v1/docs/doc_1/layers/default/annotations/pages/*/items@*',
         pathPrefix: '/v1/docs/doc_1/layers/default/annotations/pages/',
+      },
+      {
+        resourceId: 'layer-annotations-all',
+        pathPattern: '/v1/docs/doc_1/layers/default/annotations/items@*',
+        pathPrefix: '/v1/docs/doc_1/layers/default/annotations/items@',
       },
     ]);
   });
@@ -428,7 +448,9 @@ describe('cdnCoverageForScope', () => {
         'layer-search-rects',
         'layer-search-full',
         'page-annotations',
+        'annotations-all',
         'annotations-read',
+        'layer-annotations-all',
         // doc.open (session establishment) also covers the doc-level shared
         // families (plane-scope model); attachment BYTES stay behind
         // doc.download.

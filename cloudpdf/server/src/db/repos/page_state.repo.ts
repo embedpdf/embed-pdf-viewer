@@ -134,6 +134,8 @@ export interface LayerRow {
   layoutVersion: number;
   metadataVersion: number;
   attachmentsVersion: number;
+  /** Bulk-annotations pointer — see `LayersTable.annotations_version`. */
+  annotationsVersion: number;
   /** Audit-log head at this layer's state — the manifest's `auditHead`. */
   lastAuditId: number;
   currentVersion: number;
@@ -175,6 +177,7 @@ export class LayersRepo {
         name: input.name,
         doc_version: 1,
         attachments_version: 1,
+        annotations_version: 1,
         layout_version: 1,
         metadata_version: 1,
         last_audit_id: 0,
@@ -309,6 +312,7 @@ function mapLayerRow(row: {
   layout_version: number;
   metadata_version: number;
   attachments_version: number;
+  annotations_version?: number | bigint;
   current_version: number;
   current_artifact_key: string | null;
   current_artifact_sha: string | null;
@@ -326,6 +330,7 @@ function mapLayerRow(row: {
     layoutVersion: Number(row.layout_version),
     metadataVersion: Number(row.metadata_version),
     attachmentsVersion: Number(row.attachments_version),
+    annotationsVersion: Number(row.annotations_version ?? 1),
     lastAuditId: Number(row.last_audit_id ?? 0),
     currentVersion: Number(row.current_version),
     currentArtifactKey: row.current_artifact_key,

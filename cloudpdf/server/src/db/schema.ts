@@ -122,6 +122,15 @@ export interface LayersTable {
    * different cadence than `doc_version` and `metadata_version`.
    */
   attachments_version: number;
+  /**
+   * Bulk-annotations pointer epoch for the whole-document
+   * `/annotations/items@annotationsVersion` leaf. Bumps only when
+   * annotation list BODIES change (annotation CRUD, page insert/delete,
+   * redaction, flatten, form field/widget structure) — deliberately NOT
+   * on form value writes, metadata, attachments, or page move/rotate.
+   * The `metadata_version` independent-cadence design.
+   */
+  annotations_version: number;
   /** Audit-log head at this layer's current state — advanced in the same
    *  transaction as every audit append. Published as the manifest's
    *  `auditHead` (the gapless subscribe cursor). */

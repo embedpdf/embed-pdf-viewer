@@ -75,6 +75,7 @@ const RESOURCE_PLANES: Partial<Record<DocResourceId, readonly LayerScopePlane[]>
   'page-geometry': ['content'],
   'page-render-annotated': ['content', 'annotations'],
   'page-annotations': ['annotations'],
+  'annotations-all': ['annotations'],
   layout: ['layout'],
   metadata: ['metadata'],
   actions: ['actions'],

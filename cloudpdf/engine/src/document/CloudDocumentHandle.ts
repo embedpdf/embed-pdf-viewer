@@ -408,6 +408,12 @@ export class CloudDocumentHandle implements DocumentHandle {
     this.manifestCache = {
       ...this.manifestCache,
       docVersion: delta?.docVersion ?? this.manifestCache.docVersion,
+      // Bulk annotations pin: absorbed when the mutation bumped it, so the
+      // next `listRawAll` addresses the fresh bulk leaf without a
+      // 404-refresh round trip.
+      ...(delta?.annotationsVersion !== undefined
+        ? { annotationsVersion: delta.annotationsVersion }
+        : {}),
       // The manifest is a per-page registry keyed by pageObjectNumber, not a
       // display-order list — geometry/order now lives in `pages.list()`
       // (/layout). Keep a deterministic order by PON so cache merges are
@@ -637,6 +643,12 @@ export class CloudDocumentHandle implements DocumentHandle {
       // exact too: the first manifest fetched afterwards is newer anyway.
       initialCursor: this.hub.lastServerId() ?? this.manifestCache?.auditHead ?? null,
       onRow: (row) => {
+        // Advance the cached manifest's audit cursor — own echoes and
+        // unknown kinds included — so a later `listRawAll` never stamps a
+        // cursor older than the pins the absorbed cache hands it.
+        if (this.manifestCache && row.id > this.manifestCache.auditHead) {
+          this.manifestCache = { ...this.manifestCache, auditHead: row.id };
+        }
         const event = auditRowToEvent(row, this.sessionId);
         if (!event) return; // own echo or unknown kind
         // Absorb BEFORE publish: a listener reading the manifest in its
@@ -648,6 +660,9 @@ export class CloudDocumentHandle implements DocumentHandle {
         // Too far behind to replay: drop the cache; the next read refetches.
         this.manifestCache = null;
         this.inflightManifest = null;
+        // Tell subscribers their event-derived state may be stale — the
+        // gap's mutations will never arrive as events.
+        this.hub.publish({ type: 'stream.desynced', reason: 'backlog-overflow', ts: Date.now() });
       },
       onAuthLost: () => {
         // The stream is gone for good under this credential. Local events

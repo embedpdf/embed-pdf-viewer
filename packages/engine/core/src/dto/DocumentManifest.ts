@@ -44,6 +44,19 @@ export interface DocumentManifest {
    */
   attachmentsVersion: number;
   /**
+   * Doc-level pin for the immutable whole-document annotation listing
+   * (`/annotations/items@annotationsVersion=N`) — the cloud's one-request
+   * hydration read. Bumps ONLY when annotation list BODIES change —
+   * annotation create/update/delete/move, page insert/delete,
+   * redaction-apply, flatten, and form field/widget structure — and
+   * deliberately NOT on form value writes (widget DTOs carry no value;
+   * only `/AP` rasters change, which the per-page `annotationVersion`
+   * covers), metadata, attachments, or page move/rotate (bulk page order
+   * is unspecified by contract). The same independent-cadence design as
+   * `layoutVersion` / `metadataVersion`.
+   */
+  annotationsVersion: number;
+  /**
    * Audit-log head at this manifest's state — written in the same
    * transaction as the version bumps, so an event subscriber that starts
    * from `auditHead` can never miss a mutation between manifest fetch and

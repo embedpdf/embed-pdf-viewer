@@ -157,6 +157,7 @@ export {
 export {
   decodeAnnotationAppearancesRenderToken,
   decodeAnnotationToken,
+  decodeAnnotationsAllToken,
   decodeActionsToken,
   decodeAttachmentsToken,
   decodeContentToken,
@@ -167,6 +168,7 @@ export {
   decodeRenderToken,
   encodeAnnotationAppearancesRenderToken,
   encodeAnnotationToken,
+  encodeAnnotationsAllToken,
   encodeActionsToken,
   encodeAttachmentsToken,
   encodeContentToken,

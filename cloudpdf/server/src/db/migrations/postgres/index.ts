@@ -54,6 +54,8 @@ import down027 from './027_document_imports_source_json.down.sql';
 import sql027 from './027_document_imports_source_json.sql';
 import down028 from './028_engine_crash_journal.down.sql';
 import sql028 from './028_engine_crash_journal.sql';
+import down029 from './029_layer_annotations_version.down.sql';
+import sql029 from './029_layer_annotations_version.sql';
 import type { MigrationSource } from '../../migrator/runner';
 
 /**
@@ -96,4 +98,5 @@ export const postgresMigrations: ReadonlyArray<MigrationSource> = [
   { version: '026', name: '026_document_imports.sql', sql: sql026, down: down026 },
   { version: '027', name: '027_document_imports_source_json.sql', sql: sql027, down: down027 },
   { version: '028', name: '028_engine_crash_journal.sql', sql: sql028, down: down028 },
+  { version: '029', name: '029_layer_annotations_version.sql', sql: sql029, down: down029 },
 ];

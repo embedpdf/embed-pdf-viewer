@@ -44,6 +44,10 @@ export type DocResourceId =
   // read family. Each resolves at the base view while the planes it depends
   // on are inherited — see the RESOURCE_PLANES map in wire/cdn/coverage.ts.
   | 'page-annotations'
+  // Whole-document bulk annotation listing, doc-level + layer twin. Its
+  // own family: the path is NOT under the per-page `annotations/pages/`
+  // prefix, so it needs its own catalogue entry for edge grants.
+  | 'annotations-all'
   | 'layout'
   | 'metadata'
   | 'actions'
@@ -73,6 +77,7 @@ export type DocResourceId =
   | 'layer-search-rects'
   | 'layer-search-full'
   | 'annotations-read'
+  | 'layer-annotations-all'
   // Attachments, split by permission tier under DISTINCT prefixes (the
   // search-rects/search-full rule): the metadata listing rides the base
   // read capability, while decoded file bytes egress content and gate on
@@ -226,6 +231,16 @@ export const DOC_RESOURCES: Readonly<Record<DocResourceId, DocResourceDescriptor
     // you see its rendered appearance.
     pathPrefix: '/v1/docs/{docId}/annotations/pages/',
     resolvePathPrefix: (docId) => `/v1/docs/${docId}/annotations/pages/`,
+    requirement: { kind: 'single', capability: 'doc.annotate.read' },
+    routeKind: 'versioned-read',
+    cdnCacheable: true,
+  },
+  'annotations-all': {
+    id: 'annotations-all',
+    pathPattern: '/v1/docs/{docId}/annotations/items@*',
+    resolvePathPattern: (docId) => `/v1/docs/${docId}/annotations/items@*`,
+    pathPrefix: '/v1/docs/{docId}/annotations/items@',
+    resolvePathPrefix: (docId) => `/v1/docs/${docId}/annotations/items@`,
     requirement: { kind: 'single', capability: 'doc.annotate.read' },
     routeKind: 'versioned-read',
     cdnCacheable: true,
@@ -453,6 +468,18 @@ export const DOC_RESOURCES: Readonly<Record<DocResourceId, DocResourceDescriptor
     pathPrefix: '/v1/docs/{docId}/layers/{layerName}/annotations/pages/',
     resolvePathPrefix: (docId, layerName = 'default') =>
       `/v1/docs/${docId}/layers/${layerName}/annotations/pages/`,
+    requirement: { kind: 'single', capability: 'doc.annotate.read' },
+    routeKind: 'versioned-read',
+    cdnCacheable: true,
+  },
+  'layer-annotations-all': {
+    id: 'layer-annotations-all',
+    pathPattern: '/v1/docs/{docId}/layers/{layerName}/annotations/items@*',
+    resolvePathPattern: (docId, layerName = 'default') =>
+      `/v1/docs/${docId}/layers/${layerName}/annotations/items@*`,
+    pathPrefix: '/v1/docs/{docId}/layers/{layerName}/annotations/items@',
+    resolvePathPrefix: (docId, layerName = 'default') =>
+      `/v1/docs/${docId}/layers/${layerName}/annotations/items@`,
     requirement: { kind: 'single', capability: 'doc.annotate.read' },
     routeKind: 'versioned-read',
     cdnCacheable: true,
