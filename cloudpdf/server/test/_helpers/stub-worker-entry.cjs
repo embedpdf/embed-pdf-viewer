@@ -585,6 +585,9 @@ parentPort.on('message', (msg) => {
       });
       return;
     }
+    // Raw and full per-page readers are wire-identical by contract
+    // (parity = output, not mechanism) — one stub serves both kinds.
+    case 'annotations.listRawPage':
     case 'annotations.listFullPage': {
       const meta = openDocs.get(sessionKey(msg));
       if (!meta) {
@@ -608,7 +611,7 @@ parentPort.on('message', (msg) => {
         kind: 'resolve',
         jobId: msg.jobId,
         result: {
-          tag: 'annotations.listFullPage',
+          tag: msg.kind,
           snapshot: {
             pageState: pageState(pon),
             annotations: pageAnnotationDtos(meta, pon),

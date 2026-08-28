@@ -3,10 +3,13 @@ import {
   EngineError,
   EngineErrorCode,
   checkCapability,
+  checkCollab,
+  checkSetGroup,
   decodePdfBits,
   expandRawScope,
   passwordPromptFromState,
   securityStateFromHead,
+  type CollabTarget,
   type DocCapability,
   type DocumentAccessInfo,
   type DocumentIdentity,
@@ -79,6 +82,38 @@ export class CloudDocumentSecurityService implements DocumentSecurityService {
     if (this.access?.effectiveScope.includes(cap)) return true;
     const bits = decodePdfBits(this.state.permissions.bits);
     return checkCapability(cap, this.tokenScope, bits);
+  }
+
+  /**
+   * Per-record annotation authorization mirrors — the same
+   * `checkCollab`/`checkSetGroup` resolvers the server's route layer
+   * enforces with, over the same inputs: the raw scope
+   * (server-canonical post-/access, else the JWT's own claim), the
+   * caller's identity, and /head's PDF bits. A control gated on these
+   * matches the server's allow/deny for the same mutation. False
+   * before any token/access context exists — fail closed, same rule
+   * as `allows`.
+   */
+  allowsAnnotationCreate(): boolean {
+    const id = this.identity ?? {};
+    return checkCollab('create', selfTarget(id), this.rawScope(), id, this.pdfBits());
+  }
+
+  allowsAnnotationMutation(action: 'update' | 'delete', target: CollabTarget): boolean {
+    return checkCollab(action, target, this.rawScope(), this.identity ?? {}, this.pdfBits());
+  }
+
+  allowsAnnotationGroupAssignment(groupId: string): boolean {
+    return checkSetGroup(groupId, this.identity?.group_id, this.rawScope(), this.pdfBits());
+  }
+
+  /** Raw scope for the collab resolver: server-canonical post-/access, else the JWT claim. */
+  private rawScope(): ReadonlyArray<string> {
+    return this.access?.scope ?? this.tokenScope;
+  }
+
+  private pdfBits() {
+    return decodePdfBits(this.state.permissions.bits);
   }
 
   /**
@@ -203,6 +238,19 @@ function safeDecodeClaims(token: string): Record<string, unknown> | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * CREATE's CollabTarget is the caller's own identity — the same
+ * derivation as engine-local's `ScopeGuard.targetForSelfCreate`, so
+ * `:self` trivially passes and `:group=X` matches the caller's
+ * default group.
+ */
+function selfTarget(id: DocumentIdentity): CollabTarget {
+  return {
+    ...(id.user_id !== undefined ? { userId: id.user_id } : {}),
+    ...(id.group_id !== undefined ? { groupId: id.group_id } : {}),
+  };
 }
 
 function identityFromClaims(claims: Record<string, unknown>): DocumentIdentity | null {

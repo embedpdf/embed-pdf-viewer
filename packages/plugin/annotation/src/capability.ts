@@ -1,7 +1,6 @@
 import {
   CONTINUOUS_RENDER_POLICY,
   snapAppearanceScale,
-  type DocCapability,
   type DocumentEvent,
   type PluginContext,
 } from '@embedpdf/core';
@@ -107,11 +106,6 @@ const viewEnv = (zoom?: number, rotation?: number): ViewEnv | undefined =>
   zoom != null || rotation != null
     ? { zoom: zoom ?? 1, rotation: (rotation ?? 0) as ViewEnv['rotation'] }
     : undefined;
-
-/** Broad annotate-write capability (PDF bit 6). The engine independently
- *  enforces this AND the per-owner collab rules; `canEdit`/`canDelete` are the
- *  UI mirror of the coarse gate. */
-const ANNOTATE_MODIFY: DocCapability = 'doc.annotate.modify';
 
 const TEXT_COMMIT_DEBOUNCE_MS = 250;
 
@@ -1114,9 +1108,23 @@ export function createAnnotationCapability(
 
   /** Coarse authority mirror (doc.annotate.modify) — B3 replaces this with
    *  the collab-scope mirrors; the FLAG split is already the real rule. */
-  const coarseAuthority = (): boolean => ctx.doc?.security.allows(ANNOTATE_MODIFY) ?? false;
+  // ── authorization: the engine's own collab resolver, mirrored ──
+  // `allowsAnnotationMutation` asks about the TARGET's stamped owner,
+  // built from the record's EMBD metadata. An unstamped record yields
+  // `{}`, which any narrowed grant denies — matching the engine, so a
+  // control gated here never disagrees with the write's outcome.
+  const mutationTarget = (ref: AnnotationRef): { userId?: string; groupId?: string } => {
+    const d = model().byId[refKey(ref)]?.data;
+    return {
+      ...(d?.userId !== undefined ? { userId: d.userId } : {}),
+      ...(d?.groupId !== undefined ? { groupId: d.groupId } : {}),
+    };
+  };
+  const allowsCreate = (): boolean => ctx.doc?.security.allowsAnnotationCreate() ?? false;
+  const allowsMutation = (action: 'update' | 'delete', ref: AnnotationRef): boolean =>
+    ctx.doc?.security.allowsAnnotationMutation(action, mutationTarget(ref)) ?? false;
   const deletableOne = (ref: AnnotationRef): boolean =>
-    coarseAuthority() && !(model().byId[refKey(ref)]?.flags.locked ?? false);
+    allowsMutation('delete', ref) && !(model().byId[refKey(ref)]?.flags.locked ?? false);
   const threadMemberRefs = (t: CommentThread): AnnotationRef[] => [
     ...t.replies.map((r) => r.ref),
     ...t.groupedParts.map((g) => g.ref),
@@ -1209,13 +1217,14 @@ export function createAnnotationCapability(
     },
 
     permissionsFor: (ref): CommentPermissions => {
-      const authority = coarseAuthority();
       const flags = model().byId[refKey(ref)]?.flags;
       const t = threadsIndex().byMember.get(refKey(ref)) ?? null;
       return {
-        canReply: authority,
-        canSetStatus: authority,
-        canEditText: authority && !(flags?.lockedContents ?? false),
+        // Replying and setting status CREATE new annotations — gated on
+        // the caller's own identity, not the target's owner.
+        canReply: allowsCreate(),
+        canSetStatus: allowsCreate(),
+        canEditText: allowsMutation('update', ref) && !(flags?.lockedContents ?? false),
         canDelete: deletableOne(ref),
         canDeleteThread: t !== null && threadMemberRefs(t).every(deletableOne),
       };
@@ -1563,10 +1572,15 @@ export function createAnnotationCapability(
       apply({ t: 'remove', ids: [refKey(ref)] });
     },
 
-    // ── authorization (coarse UI mirror; engine enforces per-owner) ──
-    canCreate: () => ctx.doc?.security.allows(ANNOTATE_MODIFY) ?? false,
-    canEdit: () => ctx.doc?.security.allows(ANNOTATE_MODIFY) ?? false,
-    canDelete: () => ctx.doc?.security.allows(ANNOTATE_MODIFY) ?? false,
+    // ── authorization: per-record mirrors of the engine's collab
+    // resolver. `canCreate` asks about the caller's own identity;
+    // `canEdit`/`canDelete` about the target's stamped owner. Pure
+    // authority — aspect-specific flag gates (`locked` for geometry
+    // and delete, `lockedContents` for text) live with the surfaces
+    // that touch that aspect (comments.permissionsFor, interaction).
+    canCreate: () => allowsCreate(),
+    canEdit: (ref) => allowsMutation('update', ref),
+    canDelete: (ref) => allowsMutation('delete', ref),
 
     comments,
 
@@ -1881,20 +1895,26 @@ export function createAnnotationCapability(
       await Promise.all(subs.map((a) => writeRelationship(a, { inReplyTo: null })));
     },
     canGroup: (): boolean => {
-      if (!(ctx.doc?.security.allows(ANNOTATE_MODIFY) ?? false)) return false;
       const m = model();
       const members = selectedCommitted();
       if (members.length < 2) return false;
       if (members.some((a) => a.pon !== members[0].pon)) return false;
+      // Grouping WRITES a relationship onto every member — each must
+      // pass the per-record update check.
+      if (!members.every((a) => a.ref != null && allowsMutation('update', a.ref))) return false;
       // Already exactly one complete group → nothing to do.
       const keys = new Set(m.selected.map((id) => groupKeyOf(m, id)));
       if (keys.size === 1 && !keys.has(null)) return false;
       return true;
     },
     canUngroup: (): boolean => {
-      if (!(ctx.doc?.security.allows(ANNOTATE_MODIFY) ?? false)) return false;
       const m = model();
-      return m.selected.some((id) => groupKeyOf(m, id) != null);
+      // Ungrouping clears the relationship on every member of every
+      // selected group — same per-record write gate as `ungroup` hits.
+      const subs = expandGroups(m, m.selected)
+        .map((id) => m.byId[id])
+        .filter((a): a is Annot => !!a && !!a.group);
+      return subs.length > 0 && subs.every((a) => a.ref != null && allowsMutation('update', a.ref));
     },
 
     // Whole-document hydration supersedes per-page loading: the model is

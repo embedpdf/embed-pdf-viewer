@@ -405,8 +405,13 @@ export interface AnnotationCapability {
    *  with {@link currentDefaults}/{@link setDefaults}. */
   propsForTool(toolId: string): PropSpec[];
 
-  // ── authorization (mirrors the engine's own enforcement; the engine still
-  //    independently enforces, and per-owner collab rules are checked there) ──
+  // ── authorization: per-record mirrors of the engine's collab resolver
+  //    (`security.allowsAnnotation*`). `canCreate` asks about the caller's
+  //    own identity; `canEdit`/`canDelete` about the TARGET's stamped owner,
+  //    so under a narrowed grant (`annotations:update:self`) they answer
+  //    per annotation. Pure authority — the `locked`/`lockedContents` flag
+  //    gates live with the surfaces that touch that aspect (see
+  //    `comments.permissionsFor`). The engine independently enforces. ──
   canCreate(): boolean;
   canEdit(ref: AnnotationRef): boolean;
   canDelete(ref: AnnotationRef): boolean;

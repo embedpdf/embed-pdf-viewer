@@ -86,8 +86,22 @@ export class ScopeGuard {
    * draft overrides); PATCH/DELETE handlers compute it from the
    * existing annotation row.
    */
+  /**
+   * Non-throwing collab check — the same predicate `assertCollab`
+   * enforces with, surfaced so the security service can mirror
+   * per-record authorization for UI gating.
+   */
+  canCollab(action: CollabAction, target: CollabTarget): boolean {
+    return checkCollab(action, target, this.ctx.scope, this.ctx.identity, this.ctx.pdfBits);
+  }
+
+  /** Non-throwing destination-group check — see `assertSetGroup`. */
+  canSetGroup(newGroupId: string): boolean {
+    return checkSetGroup(newGroupId, this.ctx.identity.group_id, this.ctx.scope, this.ctx.pdfBits);
+  }
+
   assertCollab(action: CollabAction, target: CollabTarget): void {
-    if (!checkCollab(action, target, this.ctx.scope, this.ctx.identity, this.ctx.pdfBits)) {
+    if (!this.canCollab(action, target)) {
       throw new PermissionDenied(`annotations:${action}`, 'engine-local');
     }
   }
@@ -99,7 +113,7 @@ export class ScopeGuard {
    */
   assertSetGroup(newGroupId: string | undefined): void {
     if (newGroupId === undefined) return;
-    if (!checkSetGroup(newGroupId, this.ctx.identity.group_id, this.ctx.scope, this.ctx.pdfBits)) {
+    if (!this.canSetGroup(newGroupId)) {
       throw new PermissionDenied(`annotations:set-group:group=${newGroupId}`, 'engine-local');
     }
   }

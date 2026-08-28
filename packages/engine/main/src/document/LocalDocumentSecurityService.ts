@@ -12,6 +12,7 @@ import {
   type DocumentUnlockInput,
   type DocumentUnlockResult,
   type PasswordPrompt,
+  type CollabTarget,
   type DocCapability,
 } from '@embedpdf/engine-core/runtime';
 
@@ -63,6 +64,25 @@ export class LocalDocumentSecurityService implements DocumentSecurityService {
    */
   allows(cap: DocCapability): boolean {
     return this.guard ? this.guard.can(cap) : false;
+  }
+
+  /**
+   * Per-record annotation authorization mirrors — delegate to the SAME
+   * ScopeGuard predicates the annotation service enforces with
+   * (`assertCollab`/`assertSetGroup`), so a control gated on these can
+   * never disagree with the engine's own deny. False on the legacy
+   * no-scope open path, same rule as `allows`.
+   */
+  allowsAnnotationCreate(): boolean {
+    return this.guard ? this.guard.canCollab('create', this.guard.targetForSelfCreate()) : false;
+  }
+
+  allowsAnnotationMutation(action: 'update' | 'delete', target: CollabTarget): boolean {
+    return this.guard ? this.guard.canCollab(action, target) : false;
+  }
+
+  allowsAnnotationGroupAssignment(groupId: string): boolean {
+    return this.guard ? this.guard.canSetGroup(groupId) : false;
   }
 
   /** Identity claims supplied at `engine.open()`, or null when none. */

@@ -89,6 +89,12 @@ function harness() {
   const remove = vi.fn(async (_ref: AnnotationRef) => ({}));
   const list = vi.fn();
   const listRawAll = vi.fn();
+  // Collab-resolver mirrors, allow-all by default; permission tests
+  // install narrowed behavior via mockImplementation.
+  const allowsAnnotationCreate = vi.fn(() => true);
+  const allowsAnnotationMutation = vi.fn(
+    (_action: 'update' | 'delete', _target: { userId?: string; groupId?: string }) => true,
+  );
   const ctx = {
     getState: () => state,
     dispatch: (action: AnnotationAction) => {
@@ -103,7 +109,13 @@ function harness() {
     doc: {
       page: () => ({ annotations: { create, update, delete: remove, list } }),
       annotations: { listRawAll },
-      security: { allows: () => true, identity: { user_id: 'me' } },
+      security: {
+        allows: () => true,
+        identity: { user_id: 'me' },
+        allowsAnnotationCreate,
+        allowsAnnotationMutation,
+        allowsAnnotationGroupAssignment: () => true,
+      },
     },
     tryGet: () => null,
   } as unknown as PluginContext<AnnotationState, AnnotationAction>;
@@ -114,6 +126,8 @@ function harness() {
     remove,
     list,
     listRawAll,
+    allowsAnnotationCreate,
+    allowsAnnotationMutation,
     state: () => state,
   };
 }
@@ -650,6 +664,88 @@ describe('the comments lens', () => {
     const perms2 = h.capability.comments.permissionsFor(ref(20));
     expect(perms2.canDelete).toBe(true);
     expect(perms2.canDeleteThread).toBe(false);
+  });
+
+  it('a foreign status annotation blocks the THREAD gate for a self-only deleter', async () => {
+    const h = harness();
+    // `annotations:delete:self`-shaped narrowing: only records stamped
+    // with the session's own userId pass.
+    h.allowsAnnotationMutation.mockImplementation((_action, target) => target.userId === 'me');
+    h.list.mockResolvedValueOnce({
+      annotations: [
+        { ...rootAt(20, 760), userId: 'me' } as unknown as AnnotationDTO,
+        textDto(21, { inReplyTo: ref(20), replyType: 'reply', userId: 'me' }),
+        textDto(22, {
+          inReplyTo: ref(20),
+          replyType: 'reply',
+          state: 'accepted',
+          stateModel: 'review',
+          userId: 'alice',
+        }),
+      ],
+    });
+    await h.capability.reloadPage(PON);
+    const perms = h.capability.comments.permissionsFor(ref(20));
+    // My own root and reply delete fine one-by-one…
+    expect(perms.canDelete).toBe(true);
+    // …but alice's status is a thread MEMBER (statusRefs), and the
+    // all-or-nothing gate answers for every member.
+    expect(perms.canDeleteThread).toBe(false);
+  });
+
+  it('canReply/canSetStatus gate on the CREATE mirror, not the target owner', async () => {
+    const h = harness();
+    h.allowsAnnotationCreate.mockReturnValue(false);
+    await seed(h);
+    const perms = h.capability.comments.permissionsFor(ref(20));
+    expect(perms.canReply).toBe(false);
+    expect(perms.canSetStatus).toBe(false);
+    // Mutation authority is unaffected — separate questions.
+    expect(perms.canDelete).toBe(true);
+    expect(h.capability.canCreate()).toBe(false);
+  });
+});
+
+describe('per-record authorization (collab-resolver mirrors)', () => {
+  const stamped = (n: number, userId?: string): AnnotationDTO =>
+    ({ ...hydrationSquare(n), ...(userId ? { userId } : {}) }) as AnnotationDTO;
+  /** `annotations:*:self`-shaped narrowing installed on the harness mirror. */
+  const selfOnly = (h: ReturnType<typeof harness>) =>
+    h.allowsAnnotationMutation.mockImplementation((_action, target) => target.userId === 'me');
+
+  it('canEdit/canDelete answer per annotation from the stamped owner', async () => {
+    const h = harness();
+    selfOnly(h);
+    h.list.mockResolvedValueOnce({
+      annotations: [stamped(20, 'me'), stamped(21, 'alice'), stamped(22)],
+    });
+    await h.capability.reloadPage(PON);
+    expect(h.capability.canEdit(ref(20))).toBe(true);
+    expect(h.capability.canEdit(ref(21))).toBe(false);
+    expect(h.capability.canDelete(ref(20))).toBe(true);
+    // Unstamped record → `{}` target: denied under narrowing, same as the engine.
+    expect(h.capability.canDelete(ref(22))).toBe(false);
+    // The mirror received the target's OWN stamp, not the caller's.
+    expect(h.allowsAnnotationMutation).toHaveBeenCalledWith('update', { userId: 'alice' });
+    expect(h.allowsAnnotationMutation).toHaveBeenCalledWith('delete', {});
+  });
+
+  it('canGroup requires the per-record update check on EVERY member', async () => {
+    const h = harness();
+    selfOnly(h);
+    h.list.mockResolvedValueOnce({ annotations: [stamped(20, 'me'), stamped(21, 'alice')] });
+    await h.capability.reloadPage(PON);
+    h.capability.select(ref(20));
+    h.capability.select(ref(21), { add: true });
+    expect(h.capability.canGroup()).toBe(false);
+
+    const h2 = harness();
+    selfOnly(h2);
+    h2.list.mockResolvedValueOnce({ annotations: [stamped(20, 'me'), stamped(21, 'me')] });
+    await h2.capability.reloadPage(PON);
+    h2.capability.select(ref(20));
+    h2.capability.select(ref(21), { add: true });
+    expect(h2.capability.canGroup()).toBe(true);
   });
 });
 
