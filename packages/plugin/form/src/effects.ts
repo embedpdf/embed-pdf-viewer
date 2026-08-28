@@ -42,7 +42,16 @@ export function registerFormEffects(ctx: EffectContext<FormState, FormAction>): 
   };
 
   const unsubscribe = doc.events.subscribe((event) => {
-    if (!event.type.startsWith('form.')) return;
+    // The live stream fell too far behind to replay: the gap's form events
+    // will never arrive, so the snapshot in the model may be stale. This
+    // plugin reconciles by REFETCH (not incremental merge), so the desync
+    // notice is the only extra signal it needs — re-read the whole (cheap)
+    // snapshot.
+    if (event.type === 'stream.desynced') {
+      void refresh();
+      return;
+    }
+    if (!event.type.startsWith('form.') || !('origin' in event)) return;
     const structural = STRUCTURAL.has(event.type);
     // Own non-structural writes already landed via the capability.
     if (event.origin.kind !== 'remote' && !structural) return;

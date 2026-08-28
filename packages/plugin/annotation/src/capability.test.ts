@@ -6,7 +6,7 @@ import type {
   AnnotationRef,
   PdfQuad,
 } from '@embedpdf/engine-core/runtime';
-import type { PluginContext } from '@embedpdf/core';
+import type { DocumentEvent, PluginContext } from '@embedpdf/core';
 
 import { createAnnotationCapability } from './capability';
 import { annotationReducer, initialAnnotationState } from './reducer';
@@ -87,6 +87,7 @@ function harness() {
   const update = vi.fn();
   const remove = vi.fn(async () => ({}));
   const list = vi.fn();
+  const listRawAll = vi.fn();
   const ctx = {
     getState: () => state,
     dispatch: (action: AnnotationAction) => {
@@ -95,6 +96,7 @@ function harness() {
     document: () => ({ pages: [{ pageObjectNumber: PON, boxes: { crop: CROP } }] }),
     doc: {
       page: () => ({ annotations: { create, update, delete: remove, list } }),
+      annotations: { listRawAll },
     },
     tryGet: () => null,
   } as unknown as PluginContext<AnnotationState, AnnotationAction>;
@@ -104,6 +106,7 @@ function harness() {
     update,
     remove,
     list,
+    listRawAll,
     state: () => state,
   };
 }
@@ -179,10 +182,11 @@ describe('annotation flags', () => {
       replyType: null,
     }) as AnnotationDTO;
 
-  /** Load one page of DTOs into the model through the real `ensurePage` path. */
+  /** Load one page of DTOs into the model through the real `reloadPage`
+   *  path (`ensurePage` is a no-op under whole-document hydration). */
   const loadPage = async (h: ReturnType<typeof harness>, dtos: AnnotationDTO[]) => {
     h.list.mockResolvedValueOnce({ annotations: dtos });
-    h.capability.ensurePage(PON);
+    await h.capability.reloadPage(PON);
     await vi.waitFor(() => expect(h.state().model.order.length).toBe(dtos.length));
   };
 
@@ -269,5 +273,206 @@ describe('claimsTouchAt (touch consent)', () => {
   it('empty space never claims', () => {
     const h = harness();
     expect(h.capability.claimsTouchAt(PON, { x: 300, y: 400 })).toBe(false);
+  });
+});
+
+// ── whole-document hydration + remote delivery ──────────────────────────
+
+const hydrationSquare = (n: number): AnnotationDTO =>
+  ({
+    ...base(n),
+    subtype: 'square',
+    rect: { left: 100, bottom: 700, right: 180, top: 760 },
+    color: { r: 0, g: 0, b: 0 },
+    opacity: 1,
+    strokeWidth: 2,
+    inReplyTo: null,
+    replyType: null,
+  }) as AnnotationDTO;
+
+const remoteOrigin = (serverId: number) => ({
+  kind: 'remote' as const,
+  sessionId: 'cloud:other',
+  sub: 'u-2',
+  ts: 0,
+  serverId,
+});
+
+const createdEvent = (dto: AnnotationDTO, serverId: number): DocumentEvent =>
+  ({
+    type: 'annotation.created',
+    pageObjectNumber: PON,
+    origin: remoteOrigin(serverId),
+    created: dto,
+  }) as unknown as DocumentEvent;
+
+const updatedEvent = (dto: AnnotationDTO, serverId: number, changed: boolean): DocumentEvent =>
+  ({
+    type: 'annotation.updated',
+    pageObjectNumber: PON,
+    origin: remoteOrigin(serverId),
+    updated: dto,
+    appearance: { changed },
+  }) as unknown as DocumentEvent;
+
+const deletedEvent = (annotObjectNumber: number, serverId: number): DocumentEvent =>
+  ({
+    type: 'annotation.deleted',
+    pageObjectNumber: PON,
+    origin: remoteOrigin(serverId),
+    deleted: { kind: 'objectNumber', value: annotObjectNumber },
+  }) as unknown as DocumentEvent;
+
+const snapshot = (dtos: AnnotationDTO[], auditHead?: number) => ({
+  pages: [{ pageState: { pageObjectNumber: PON }, annotations: dtos }],
+  ...(auditHead !== undefined ? { auditHead } : {}),
+});
+
+describe('whole-document hydration', () => {
+  it('ingests the listRawAll snapshot once and reports complete', async () => {
+    const h = harness();
+    h.listRawAll.mockResolvedValue(snapshot([hydrationSquare(20), hydrationSquare(21)], 40));
+    expect(h.state().hydration.status).toBe('loading');
+    h.capability.ensureHydrated();
+    h.capability.ensureHydrated(); // second kick no-ops
+    await vi.waitFor(() => expect(h.state().hydration.status).toBe('complete'));
+    expect(h.listRawAll).toHaveBeenCalledTimes(1);
+    expect(h.state().model.order).toHaveLength(2);
+  });
+
+  it('queues remote events during the window and replays by audit cursor', async () => {
+    const h = harness();
+    let resolveSnap!: (value: unknown) => void;
+    h.listRawAll.mockReturnValueOnce(new Promise((resolve) => (resolveSnap = resolve)));
+    h.capability.ensureHydrated();
+
+    // A delete NEWER than the snapshot arrives mid-hydration — the
+    // resurrection setup: the stale snapshot still contains obj:30.
+    h.capability.deliverRemoteAnnotationEvent(deletedEvent(30, 45));
+    // An update ALREADY REFLECTED in the snapshot (serverId ≤ auditHead)
+    // must drop — replaying it would regress obj:31 to the event's DTO.
+    h.capability.deliverRemoteAnnotationEvent(updatedEvent(hydrationSquare(31), 44, true));
+
+    resolveSnap(snapshot([hydrationSquare(30), hydrationSquare(31)], 44));
+    await vi.waitFor(() => expect(h.state().hydration.status).toBe('complete'));
+
+    // obj:30 was ingested from the snapshot, then the queued newer delete
+    // replayed on top — resurrection structurally impossible.
+    expect(h.state().model.byId['obj:30']).toBeUndefined();
+    expect(h.state().model.order).toEqual(['obj:31']);
+    // The stale queued update was dropped: no apVersion bump beyond ingest.
+    expect(h.state().model.byId['obj:31']!.apVersion ?? 0).toBe(0);
+  });
+
+  it('falls back to live application when hydration fails', async () => {
+    const h = harness();
+    let rejectSnap!: (reason: unknown) => void;
+    h.listRawAll.mockReturnValueOnce(new Promise((_r, reject) => (rejectSnap = reject)));
+    h.capability.ensureHydrated();
+    h.capability.deliverRemoteAnnotationEvent(createdEvent(hydrationSquare(50), 45));
+
+    rejectSnap(new Error('network down'));
+    await vi.waitFor(() => expect(h.state().hydration.status).toBe('error'));
+    // The queued event applied live — the view stays as correct as it can.
+    expect(h.state().model.byId['obj:50']).toBeDefined();
+
+    // A later event applies directly (no window open any more).
+    h.capability.deliverRemoteAnnotationEvent(deletedEvent(50, 46));
+    expect(h.state().model.byId['obj:50']).toBeUndefined();
+  });
+
+  it('rehydrate reaps committed entries missing from the snapshot and keeps optimistic drafts', async () => {
+    const h = harness();
+    h.listRawAll.mockResolvedValueOnce(snapshot([hydrationSquare(40), hydrationSquare(41)], 40));
+    h.capability.ensureHydrated();
+    await vi.waitFor(() => expect(h.state().model.order).toHaveLength(2));
+
+    // An optimistic creation whose engine confirm never lands: two tmp
+    // annots (caret + strikeout) that a rehydrate must never reap.
+    h.create.mockReturnValue(new Promise(() => {}));
+    const rect = { x: 10, y: 20, width: 80, height: 15 };
+    h.capability.createReplaceText(
+      PON,
+      [textQuadFromRect(rect)],
+      { glyphQuad: textQuadFromRect(rect), advance: 1 },
+      'replace-text',
+    );
+    const tmpIds = h.state().model.order.filter((id) => id.startsWith('tmp:'));
+    expect(tmpIds.length).toBeGreaterThan(0);
+
+    // The gap deleted obj:41 — the fresh snapshot no longer contains it.
+    h.listRawAll.mockResolvedValueOnce(snapshot([hydrationSquare(40)], 60));
+    await h.capability.rehydrate();
+    await vi.waitFor(() => expect(h.state().hydration.status).toBe('complete'));
+
+    expect(h.state().model.byId['obj:41']).toBeUndefined();
+    expect(h.state().model.byId['obj:40']).toBeDefined();
+    // Desync re-ingest bumps rasters once (gap changes were invisible).
+    expect(h.state().model.byId['obj:40']!.apVersion).toBe(1);
+    for (const id of tmpIds) expect(h.state().model.byId[id]).toBeDefined();
+  });
+});
+
+describe('conversation plane at the capability boundary', () => {
+  it('a remote review-status annotation joins the model but never paints or churns the epoch', async () => {
+    const h = harness();
+    h.list.mockResolvedValueOnce({ annotations: [hydrationSquare(80)] });
+    await h.capability.reloadPage(PON);
+    const epochBefore = h.capability.appearanceEpoch(PON);
+
+    const statusDto = {
+      ...base(81),
+      subtype: 'text',
+      rect: { left: 100, bottom: 700, right: 120, top: 720 },
+      color: { r: 255, g: 255, b: 0 },
+      opacity: 1,
+      icon: 'note',
+      state: 'accepted',
+      stateModel: 'review',
+      inReplyTo: ref(80),
+      replyType: 'reply',
+    } as unknown as AnnotationDTO;
+    h.capability.deliverRemoteAnnotationEvent(createdEvent(statusDto, 45));
+
+    // In the model (the conversation plane will read it)…
+    expect(h.state().model.byId['obj:81']).toBeDefined();
+    // …but invisible to the page: not painted, and the raster cache key of
+    // the page is untouched despite the created-event's bake-fetch default.
+    expect(h.capability.pageItems(PON).map((i) => i.id)).toEqual(['obj:80']);
+    expect(h.capability.appearanceEpoch(PON)).toBe(epochBefore);
+  });
+});
+
+describe('remote delivery — echo-driven appearance invalidation', () => {
+  const seed = async (h: ReturnType<typeof harness>, dto: AnnotationDTO) => {
+    h.list.mockResolvedValueOnce({ annotations: [dto] });
+    await h.capability.reloadPage(PON);
+  };
+
+  it('a PRESERVED remote update re-syncs the model without an appearance re-fetch', async () => {
+    const h = harness();
+    await seed(h, hydrationSquare(70));
+    h.capability.deliverRemoteAnnotationEvent(updatedEvent(hydrationSquare(70), 45, false));
+    expect(h.state().model.byId['obj:70']!.apVersion ?? 0).toBe(0);
+    expect(h.state().model.byId['obj:70']!.source).toBe('baked');
+  });
+
+  it('a REGENERATED remote update advances apVersion exactly once', async () => {
+    const h = harness();
+    await seed(h, hydrationSquare(70));
+    h.capability.deliverRemoteAnnotationEvent(updatedEvent(hydrationSquare(70), 45, true));
+    expect(h.state().model.byId['obj:70']!.apVersion).toBe(1);
+  });
+
+  it('a remote z-order move never re-fetches appearances', async () => {
+    const h = harness();
+    await seed(h, hydrationSquare(70));
+    h.capability.deliverRemoteAnnotationEvent({
+      type: 'annotation.moved',
+      pageObjectNumber: PON,
+      origin: remoteOrigin(45),
+      moved: [hydrationSquare(70)],
+    } as unknown as DocumentEvent);
+    expect(h.state().model.byId['obj:70']!.apVersion ?? 0).toBe(0);
   });
 });

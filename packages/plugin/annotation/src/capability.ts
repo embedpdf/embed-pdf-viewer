@@ -2,10 +2,12 @@ import {
   CONTINUOUS_RENDER_POLICY,
   snapAppearanceScale,
   type DocCapability,
+  type DocumentEvent,
   type PluginContext,
 } from '@embedpdf/core';
 import type { PageRotation } from '@embedpdf/core-geometry';
 import {
+  encodeStableIdKey,
   resolveBinarySource,
   sniffBinaryMetadata,
   type AnnotationDraft,
@@ -40,6 +42,7 @@ import {
   sharedProps,
   styleFromProps,
   update,
+  isConversationOnly,
   uprightRotation,
   viewable,
   type Annot,
@@ -77,6 +80,7 @@ import type {
   AnnotationAction,
   AnnotationConfig,
   AnnotationHostCapability,
+  AnnotationHydration,
   AnnotationState,
   ArmedStampPreview,
   Behavior,
@@ -116,7 +120,6 @@ export function createAnnotationCapability(
   ctx: PluginContext<AnnotationState, AnnotationAction>,
   config: AnnotationConfig = {},
 ): AnnotationHostCapability {
-  const loaded = new Set<number>();
   const behaviors: Behavior[] = [];
   /** Per-annotation debounce timer for the engine `contents` write while typing. */
   const textTimers = new Map<string, ReturnType<typeof setTimeout>>();
@@ -810,6 +813,186 @@ export function createAnnotationCapability(
     for (const fx of effects) perform(fx, next);
   }
 
+  // ── whole-document hydration ──────────────────────────────────────────
+  // The plugin ALWAYS hydrates every page via `listRawAll()` — one bulk
+  // request on cloud, one raw worker job locally. A comments sidebar needs
+  // every page, and per-page lazy loading could never truthfully claim
+  // completeness. Coherence protocol: the snapshot arrives cursor-stamped
+  // (`auditHead`); remote annotation events arriving DURING the hydration
+  // window queue here and replay by cursor after ingest — events with
+  // `serverId <= auditHead` are already inside the snapshot and drop,
+  // newer ones apply on top. This makes the delete-during-hydrate
+  // resurrection structurally impossible. `stream.desynced` re-runs the
+  // same ingest with `bumpAp` (rasters may have changed invisibly inside
+  // the gap).
+  let hydrationStarted = false;
+  let hydrationWindow = false;
+  let hydrationRunning: Promise<void> | null = null;
+  let hydrateAgain = false;
+  const pendingRemote: DocumentEvent[] = [];
+
+  const setHydration = (hydration: AnnotationHydration): void =>
+    ctx.dispatch({ type: 'SET_HYDRATION', hydration });
+
+  const ingestSnapshot = (
+    snap: Awaited<ReturnType<NonNullable<typeof ctx.doc>['annotations']['listRawAll']>>,
+    bumpAp: boolean,
+  ): void => {
+    const annots: Annot[] = [];
+    for (const page of snap.pages) {
+      const crop = cropOf(page.pageState.pageObjectNumber);
+      if (!crop) continue;
+      // Fold per page (attached-link children are same-page by ISO rule).
+      annots.push(...foldAttachedLinks(page.annotations.map((d) => fromDTO(d, crop))));
+    }
+    apply({ t: 'hydrated', annots, bumpAp });
+  };
+
+  const runHydration = (bumpAp: boolean): Promise<void> => {
+    const doc = ctx.doc;
+    if (!doc) return Promise.resolve();
+    hydrationWindow = true;
+    setHydration({ status: 'loading' });
+    const run = doc.annotations
+      .listRawAll()
+      .then((snap) => {
+        ingestSnapshot(snap, bumpAp);
+        const head = snap.auditHead;
+        const queued = pendingRemote.splice(0);
+        hydrationWindow = false;
+        for (const event of queued) {
+          const serverId = 'origin' in event ? event.origin.serverId : null;
+          // ≤ auditHead ⇒ already inside the snapshot; drop. Absent head =
+          // a local engine, which has no remote events anyway.
+          if (head !== undefined && serverId !== null && serverId <= head) continue;
+          applyRemoteAnnotationEvent(event);
+        }
+        setHydration({ status: 'complete' });
+      })
+      .catch((error: unknown) => {
+        // Degrade to live-only: queued and future events apply directly so
+        // the view stays as correct as it can be until a rehydrate lands.
+        hydrationWindow = false;
+        for (const event of pendingRemote.splice(0)) applyRemoteAnnotationEvent(event);
+        setHydration({ status: 'error', error });
+      })
+      .finally(() => {
+        hydrationRunning = null;
+        if (hydrateAgain) {
+          hydrateAgain = false;
+          hydrationRunning = runHydration(true);
+        }
+      });
+    hydrationRunning = run;
+    return run;
+  };
+
+  const rehydrate = (): Promise<void> => {
+    if (hydrationRunning) {
+      // A desync during an in-flight hydration: that snapshot may already
+      // be stale — run once more after it settles.
+      hydrateAgain = true;
+      return hydrationRunning;
+    }
+    hydrationRunning = runHydration(true);
+    return hydrationRunning;
+  };
+
+  /**
+   * Fold one REMOTE annotation event into the model (transplanted from the
+   * effects layer so hydration can queue + replay through the same code
+   * path). `bump` re-fetches rasters, `keep` doesn't — driven by the
+   * ENGINE'S appearance echo riding the event, so a remote MOVE costs
+   * peers zero re-renders while a remote restyle refreshes exactly once.
+   */
+  const upsertRemote = (
+    dtos: ReadonlyArray<Parameters<typeof fromDTO>[0]>,
+    bumpAp: boolean,
+  ): void => {
+    const bump: Annot[] = [];
+    const keep: Annot[] = [];
+    for (const dto of dtos) {
+      const crop = cropOf(dto.pageObjectNumber);
+      if (!crop) continue;
+      // Another session authored this — trust the engine's baked AP.
+      const a = fromDTO(dto, crop, 'baked');
+      // A remote ATTACHED-link child (grouped /Link under a linkable local
+      // parent) folds onto the parent instead of entering the model — the
+      // same rule the hydration fold applies. A child retarget never
+      // repaints the PARENT, so the fold never bumps.
+      if (a.subtype === 'link' && a.data?.subtype === 'link' && a.data.replyType === 'group') {
+        const parentId = a.data.inReplyTo ? refKey(a.data.inReplyTo) : null;
+        const parent = parentId ? model().byId[parentId] : null;
+        if (
+          parent &&
+          parent.subtype !== 'link' &&
+          propsFor(parent.subtype).some((s) => s.key === 'link') &&
+          a.ref
+        ) {
+          const refs = parent.linkRefs ?? [];
+          const known = refs.some((r) => refKey(r) === a.id);
+          keep.push({
+            ...parent,
+            link: a.data.target,
+            linkRefs: known ? refs : [...refs, a.ref],
+          });
+          continue;
+        }
+      }
+      // Conversation-plane annotations (replies, review states) never paint,
+      // so their arrival must not trigger a raster fetch or epoch churn.
+      (bumpAp && !isConversationOnly(a) ? bump : keep).push(a);
+    }
+    if (bump.length) apply({ t: 'upsert', annots: bump, bumpAp: true });
+    if (keep.length) apply({ t: 'upsert', annots: keep });
+  };
+
+  const applyRemoteAnnotationEvent = (event: DocumentEvent): void => {
+    switch (event.type) {
+      case 'annotation.created':
+        // A create ships with a freshly baked /AP — fetch it.
+        upsertRemote([event.created], true);
+        break;
+      case 'annotation.updated':
+        // The engine's verdict rides the event: preserved moves keep the
+        // cached raster, regenerated appearances re-fetch exactly once.
+        upsertRemote([event.updated], event.appearance.changed);
+        break;
+      case 'annotation.moved':
+        // A z-order move never touches /AP.
+        upsertRemote(event.moved, false);
+        break;
+      case 'annotation.deleted':
+        if (event.deleted) {
+          const key = encodeStableIdKey(event.deleted);
+          const m = model();
+          if (m.byId[key]) {
+            apply({ t: 'remove', ids: [key] });
+          } else {
+            // Not in the model → possibly a folded ATTACHED-link child a
+            // remote session deleted: prune it from its parent's join keys
+            // (clearing the parent's link value with the last child).
+            for (const id of m.order) {
+              const a = m.byId[id];
+              const refs = a?.linkRefs;
+              if (!a || !refs?.length || !refs.some((r) => refKey(r) === key)) continue;
+              const remaining = refs.filter((r) => refKey(r) !== key);
+              apply({
+                t: 'upsert',
+                annots: [
+                  { ...a, linkRefs: remaining, ...(remaining.length ? {} : { link: null }) },
+                ],
+              });
+              break;
+            }
+          }
+        }
+        break;
+      default:
+        break;
+    }
+  };
+
   /**
    * Per-parent serialization of attached-link reconciles: rapid edits chain
    * instead of interleaving (two overlapping runs could double-create
@@ -1272,6 +1455,9 @@ export function createAnnotationCapability(
       for (const id of m.order) {
         const a = m.byId[id];
         if (!a || a.pon !== pon || a.source !== 'baked' || !a.ref) continue;
+        // Conversation-plane annotations never paint — a remote reply or
+        // status change must not churn the page's raster cache key.
+        if (isConversationOnly(a)) continue;
         parts.push(`${id}@${a.apVersion ?? 0}`);
       }
       return parts.sort().join('|');
@@ -1480,32 +1666,16 @@ export function createAnnotationCapability(
       return m.selected.some((id) => groupKeyOf(m, id) != null);
     },
 
-    ensurePage: (pon) => {
-      if (loaded.has(pon)) return;
-      const doc = ctx.doc;
-      const crop = cropOf(pon);
-      if (!doc || !crop) return;
-      loaded.add(pon);
-      doc
-        .page(pon)
-        .annotations.list()
-        .then(
-          (snap) =>
-            apply({
-              t: 'loaded',
-              annots: foldAttachedLinks(snap.annotations.map((d) => fromDTO(d, crop))),
-            }),
-          () => {
-            loaded.delete(pon);
-          },
-        );
-    },
+    // Whole-document hydration supersedes per-page loading: the model is
+    // seeded by `listRawAll()` at document open (see `ensureHydrated`), so
+    // a page mount has nothing to fetch. Kept as API for layers/plugins
+    // that call it on mount; appearance fetching stays per-page/viewport.
+    ensurePage: () => {},
 
     reloadPage: async (pon) => {
       const doc = ctx.doc;
       const crop = cropOf(pon);
       if (!doc || !crop) return;
-      loaded.add(pon);
       try {
         const snap = await doc.page(pon).annotations.list();
         // Replace, not merge: drop this page's current annots first so
@@ -1518,8 +1688,24 @@ export function createAnnotationCapability(
           annots: foldAttachedLinks(snap.annotations.map((d) => fromDTO(d, crop))),
         });
       } catch {
-        loaded.delete(pon);
+        // A failed reload leaves the previous view; the next event or a
+        // rehydrate reconciles.
       }
+    },
+
+    hydration: () => ctx.getState().hydration,
+    ensureHydrated: () => {
+      if (hydrationStarted) return;
+      hydrationStarted = true;
+      void runHydration(false);
+    },
+    rehydrate,
+    deliverRemoteAnnotationEvent: (event) => {
+      if (hydrationWindow) {
+        pendingRemote.push(event);
+        return;
+      }
+      applyRemoteAnnotationEvent(event);
     },
 
     // ── free-text (the editable-element layer) ──

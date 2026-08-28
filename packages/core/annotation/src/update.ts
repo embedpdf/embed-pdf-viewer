@@ -8,6 +8,7 @@
 import type { AnnotationFlags, AnnotationRef, InkIntent } from '@embedpdf/engine-core/runtime';
 import { expandGroups, groupMembers } from './group';
 import { canMove, groupUnionBounds, hitTest, isSelectable } from './hit';
+import { isConversationOnly } from './plane';
 import { capsFor } from './kinds';
 import {
   annotContentsEditable,
@@ -353,6 +354,8 @@ export function update(m: Model, msg: Msg): [Model, Effect[]] {
       return [{ ...m, draft: null }, []];
     case 'loaded':
       return [mergeLoaded(m, msg.annots), []];
+    case 'hydrated':
+      return [hydrateAnnots(m, msg.annots, msg.bumpAp ?? false), []];
     case 'created':
       return [reconcile(m, msg.tempId, msg.id, msg.ref), []];
     case 'createFailed':
@@ -1398,6 +1401,9 @@ export function annotsInBox(
   return m.order.filter((id) => {
     const annot = m.byId[id];
     if (annot?.pon !== pon || inert?.has(id) || !isSelectable(m, id)) return false;
+    // Conversation-plane annotations (replies, review states) are never on
+    // the page — the marquee cannot sweep up what does not paint.
+    if (isConversationOnly(annot)) return false;
     // intersect against what is actually DRAWN: the oriented selection quad
     // (exact, via SAT) — the SAME quad the chrome outlines and the grab region
     // uses (screen-anchored bodies at their view-projected footprint). Its
@@ -1420,6 +1426,40 @@ function mergeLoaded(m: Model, annots: Annot[]): Model {
     order.push(a.id);
   }
   return { ...m, byId, order };
+}
+
+/**
+ * Whole-document hydration ingest: the snapshot is the committed truth.
+ * Overwrites by id via `upsertAnnots` (gesture protection included), then
+ * reaps committed entries the snapshot no longer contains — deletions that
+ * happened before we subscribed (initial load) or inside a desync gap.
+ * Gentler than `removeAnnots`: `tmp:` drafts and gesture-locked ids
+ * survive, and an in-progress draft is NOT cancelled — reaped ids can
+ * never be part of it (locked ids are excluded from reaping).
+ */
+function hydrateAnnots(m: Model, annots: Annot[], bumpApFlag: boolean): Model {
+  const incoming = new Set(annots.map((a) => a.id));
+  const locked = draftIds(m.draft);
+  const reaped = m.order.filter((id) => {
+    if (incoming.has(id) || locked.has(id)) return false;
+    const a = m.byId[id];
+    return a !== undefined && a.ref !== null; // committed only; tmp: drafts stay
+  });
+  let next = m;
+  if (reaped.length > 0) {
+    const gone = new Set(reaped);
+    const byId = { ...m.byId };
+    for (const id of reaped) delete byId[id];
+    next = {
+      ...m,
+      byId,
+      order: m.order.filter((id) => !gone.has(id)),
+      selected: m.selected.filter((id) => !gone.has(id)),
+      hovered: m.hovered && gone.has(m.hovered) ? null : m.hovered,
+      editing: m.editing && gone.has(m.editing) ? null : m.editing,
+    };
+  }
+  return upsertAnnots(next, annots, bumpApFlag);
 }
 
 /**

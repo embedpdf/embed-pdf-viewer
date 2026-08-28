@@ -18,7 +18,8 @@ import {
   selectionBoundsOnPage,
   selectionKnob,
 } from './view';
-import { cursorAt, groupUnionBounds, hitTest } from './hit';
+import { cursorAt, groupUnionBounds, hitTest, paintOrder } from './hit';
+import { isConversationOnly } from './plane';
 import { capsFor } from './kinds';
 import { DRAWN_FLAGS } from './flags';
 import {
@@ -3805,5 +3806,73 @@ describe('link prop (attached links folded onto their parent)', () => {
     const item = pageItems(m, PON).find((i) => i.id === 'L1');
     expect(item).toBeTruthy();
     expect(scene(item!)).toEqual([]);
+  });
+});
+
+describe('conversation plane — replies and review states never reach the page', () => {
+  const at = (x: number, y: number): Annot['geom'] => ({
+    t: 'rect',
+    rect: { x, y, width: 40, height: 30 },
+    ellipse: false,
+  });
+  const annot = (id: string, over: Partial<Annot>): Annot => ({
+    id,
+    ref: null,
+    pon: PON,
+    subtype: 'square',
+    geom: at(10, 10),
+    style: initialModel.style,
+    flags: DRAWN_FLAGS,
+    source: 'vector',
+    ...over,
+  });
+  const stateData = (state: string | null, stateModel: string | null): Annot['data'] =>
+    ({ subtype: 'text', state, stateModel }) as unknown as Annot['data'];
+
+  const root = annot('root', {});
+  const reply = annot('reply', { subtype: 'text', geom: at(100, 10), irt: 'root' });
+  const subordinate = annot('sub', {
+    subtype: 'caret',
+    geom: at(200, 10),
+    irt: 'root',
+    group: 'root',
+  });
+  const status = annot('status', {
+    subtype: 'text',
+    geom: at(300, 10),
+    data: stateData('accepted', 'review'),
+  });
+  const model = () =>
+    update(initialModel, { t: 'loaded', annots: [root, reply, subordinate, status] })[0];
+
+  it('classifies replies and state annotations; group subordinates stay painted', () => {
+    expect(isConversationOnly(root)).toBe(false);
+    expect(isConversationOnly(reply)).toBe(true);
+    expect(isConversationOnly(subordinate)).toBe(false);
+    expect(isConversationOnly(status)).toBe(true);
+    // A plain sticky note (no state entries) is a page visual.
+    expect(isConversationOnly(annot('note', { subtype: 'text' }))).toBe(false);
+    expect(
+      isConversationOnly(annot('empty-state', { subtype: 'text', data: stateData('', '') })),
+    ).toBe(false);
+    // A model-defaulted state (stateModel only) is still a state annotation.
+    expect(
+      isConversationOnly(annot('model-only', { subtype: 'text', data: stateData(null, 'review') })),
+    ).toBe(true);
+  });
+
+  it('paintOrder culls the conversation plane (paint AND hit share this cull)', () => {
+    expect(paintOrder(model(), PON)).toEqual(['root', 'sub']);
+    expect(pageItems(model(), PON).map((i) => i.id)).toEqual(['root', 'sub']);
+  });
+
+  it('the marquee cannot sweep up conversation-only annotations', () => {
+    // A sweep across every rect: only the page visuals select.
+    const m = run(model(), [
+      marqueePtr('down', 0, 0),
+      marqueePtr('move', 400, 60),
+      marqueePtr('up', 400, 60),
+    ]);
+    expect([...m.selected].sort()).toEqual(['root', 'sub']);
   });
 });

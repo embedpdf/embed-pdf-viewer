@@ -683,6 +683,17 @@ export type Msg =
   | { t: 'delete' }
   | { t: 'cancel' }
   | { t: 'loaded'; annots: Annot[] }
+  /**
+   * Whole-document hydration ingest (and desync re-ingest): the snapshot is
+   * the committed TRUTH. Incoming annots overwrite by id (gesture-locked ids
+   * excepted, as in `upsert`); committed model entries ABSENT from the
+   * snapshot are reaped — they were deleted while we could not watch.
+   * Uncommitted `tmp:` drafts and gesture-locked ids are never reaped, and
+   * an in-progress draft survives (unlike `remove`). `bumpAp` marks a
+   * desync re-ingest: rasters may have changed invisibly during the gap,
+   * so every replaced annotation re-fetches once.
+   */
+  | { t: 'hydrated'; annots: Annot[]; bumpAp?: boolean }
   | { t: 'created'; tempId: Id; id: Id; ref: AnnotationRef }
   | { t: 'createFailed'; tempId: Id }
   // store maintenance for the data API + collaboration: add-or-replace an

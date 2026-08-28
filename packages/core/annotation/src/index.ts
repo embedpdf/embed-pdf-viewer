@@ -34,6 +34,7 @@ export {
 export type { TextBox } from './view';
 export { hitTest, cursorAt, isSelectable, canMove, type Target } from './hit';
 export { groupKeyOf, groupMembers, expandGroups, groupCaps, type GroupCaps } from './group';
+export { isConversationOnly } from './plane';
 // `/F` annotation flags: the predicates are the ONE spec interpretation.
 export {
   DRAWN_FLAGS,

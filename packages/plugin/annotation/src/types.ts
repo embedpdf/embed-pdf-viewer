@@ -1,4 +1,8 @@
-import { createCapabilityToken, type PageObjectNumber } from '@embedpdf/core';
+import {
+  createCapabilityToken,
+  type DocumentEvent,
+  type PageObjectNumber,
+} from '@embedpdf/core';
 import type { PageRotation } from '@embedpdf/core-geometry';
 import type {
   AnnotationAppearanceImage,
@@ -105,8 +109,23 @@ export interface ChromeSettingsPatch {
   guides?: Partial<ChromeSettings['guides']>;
 }
 
+/**
+ * Whole-document annotation hydration. The plugin always hydrates ALL
+ * pages through `doc.annotations.listRawAll()` (one bulk request on
+ * cloud, one worker job locally) — a comments sidebar needs every page,
+ * and per-page lazy loading could never truthfully claim completeness.
+ * `loading` covers the initial ingest AND a desync re-ingest; `error`
+ * means live events still apply but the whole-document view is
+ * incomplete until a rehydrate succeeds.
+ */
+export type AnnotationHydration =
+  | { status: 'loading' }
+  | { status: 'complete' }
+  | { status: 'error'; error: unknown };
+
 export interface AnnotationState {
   model: Model;
+  hydration: AnnotationHydration;
   chrome: ChromeSettings;
   /**
    * The armed tool's FOOTPRINT ghost: where (and what) the NEXT click would
@@ -165,6 +184,7 @@ export interface AnnotationConfig {
 }
 export type AnnotationAction =
   | { type: 'SET_MODEL'; model: Model }
+  | { type: 'SET_HYDRATION'; hydration: AnnotationHydration }
   | { type: 'SET_CHROME'; patch: ChromeSettingsPatch }
   | { type: 'SET_TOOL_GHOST'; ghost: ToolGhost | null }
   | { type: 'STAMP_ARM_CHANGED' };
@@ -559,7 +579,10 @@ export interface AnnotationHostCapability extends AnnotationCapability {
    *  the renderer places the baked bitmap by its OWN `/Rect` without touching the
    *  PDF↔content seam. Null if the page's crop box is unknown. */
   toContentBox(pon: PageObjectNumber, rect: PdfRect): Rect | null;
-  ensurePage(pon: PageObjectNumber): void; // lazy-load a page's annotations
+  /** No-op since whole-document hydration: the model is seeded by
+   *  `listRawAll()` at document open. Kept as API for layers that call it
+   *  on page mount. */
+  ensurePage(pon: PageObjectNumber): void;
   /**
    * Drop and RE-READ one page's annotations from the engine — the hook for
    * cross-plane mutations (e.g. `doc.forms.createField`/`deleteField`
@@ -568,6 +591,22 @@ export interface AnnotationHostCapability extends AnnotationCapability {
    * created.
    */
   reloadPage(pon: PageObjectNumber): Promise<void>;
+  // ── whole-document hydration (see the controller in capability.ts) ──
+  /** Live hydration status — `loading` covers initial ingest AND a desync
+   *  re-ingest. */
+  hydration(): AnnotationHydration;
+  /** Kick hydration exactly once per document; the effects layer calls
+   *  this at registration. Subsequent calls no-op. */
+  ensureHydrated(): void;
+  /** Re-run whole-document hydration (desync recovery). Safe to call while
+   *  one is in flight — the fresh run is chained after it. */
+  rehydrate(): Promise<void>;
+  /**
+   * The effects layer hands every REMOTE `annotation.*` event here: during
+   * a hydration window it queues (replayed by audit cursor after ingest —
+   * the delete-resurrection guard); otherwise it applies immediately.
+   */
+  deliverRemoteAnnotationEvent(event: DocumentEvent): void;
   // ── free-text (the editable-element layer) ──
   /** The free-text boxes on a page, ready to render as editable elements.
    *  `view` as in {@link pageItems}. */
