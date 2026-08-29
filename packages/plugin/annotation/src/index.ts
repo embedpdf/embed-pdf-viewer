@@ -22,6 +22,15 @@ export {
 // sibling COMMIT PLANE (the form plugin's place handler) resolves clicks with
 // the exact call the annotation core and the footprint ghost use.
 export { MIN_DRAG, resolveClickPlacement, type ClickPlacement } from '@embedpdf/core-annotation';
+// The comments lens's thread shapes (composed in engine-core, ISO 32000
+// §12.5.6.3) + the annotation identity type its verbs take — re-exported
+// so consumers type against this package alone.
+export type {
+  AnnotationRef,
+  CommentThread,
+  CommentThreadReview,
+  ReviewStatus,
+} from '@embedpdf/engine-core/runtime';
 export { DEFAULT_CHROME } from './reducer';
 export { DEFAULT_TOOLS } from './tools';
 export type {
@@ -41,7 +50,11 @@ export type {
   AnnotationConfig,
   AnnotationState,
   AnnotationAction,
+  AnnotationHydration,
   Behavior,
+  CommentPermissions,
+  CommentsApi,
+  ThreadDeleteResult,
   ChromeSettings,
   ChromeSettingsPatch,
   LinkNavItem,

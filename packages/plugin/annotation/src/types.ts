@@ -271,9 +271,10 @@ export interface TextItem {
  * methods.
  */
 /**
- * Per-thread action gates, composed from two axes: authority (may this
- * session act — B2 ships the coarse `doc.annotate.modify` mirror; B3
- * swaps in the collab-scope mirrors) and PDF state (the two lock flags
+ * Per-thread action gates, composed from two axes: authority (the
+ * engine's collab-resolver mirrors — `allowsAnnotationCreate` for
+ * reply/status, `allowsAnnotationMutation` against each target's
+ * stamped owner for edit/delete) and PDF state (the two lock flags
  * gate DIFFERENT aspects, ISO 32000 Table 167: `lockedContents` blocks
  * text edits, `locked` blocks deletion). A courtesy, not the guard — the
  * engine independently enforces every write.

@@ -16,7 +16,11 @@ import { useEffect, useState } from 'react';
 import {
   AnnotationToken,
   refKey,
+  type AnnotationHydration,
+  type AnnotationRef,
   type Behavior,
+  type CommentsApi,
+  type CommentThread,
   type SelectionFlags,
   type SelectionProps,
   type FilePickerProvider,
@@ -58,11 +62,13 @@ export type { SelectionFlags, SelectionProps } from '@embedpdf/plugin-annotation
 import {
   shallowArray,
   useCapability,
+  useDocumentId,
+  useKernelValue,
   useOptionalCapability,
   usePage,
   useSelector,
 } from './runtime';
-import type { PageContextValue } from './runtime';
+import type { PageContextValue, PageLayout } from './runtime';
 
 /** `#rrggbb` → `rgba(...)` — the marquee's translucent fill derives from the
  *  accent, so one `setChrome({ accent })` restyles every piece of chrome. */
@@ -931,6 +937,80 @@ export function useSelectionProps(): SelectionProps {
  */
 export function useSelectionFlags(): SelectionFlags | null {
   return useSelector(AnnotationToken, (c) => c.getSelectionFlags());
+}
+
+// ── Comments (the conversation plane) ────────────────────────────────────────
+
+/**
+ * A {@link CommentThread} enriched with its page's live display position —
+ * the framework-layer join. Identity stays `pageObjectNumber` (like every
+ * annotation surface); these two fields are PRESENTATION, tracking page
+ * moves and deletes.
+ */
+export interface CommentThreadView extends CommentThread {
+  /** Current 0-based display index of the thread's page; `-1` when the page
+   *  is no longer in the document (one-frame teardown race on delete). */
+  pageIndex: number;
+  /** The page's `/PageLabels` label when the PDF declares one ("iv", "A-2"),
+   *  else the 1-based position as a string — print it verbatim. */
+  pageLabel: string;
+}
+
+/** Pure join behind {@link useCommentThreads} — exported for tests. */
+export function enrichCommentThreads(
+  threads: readonly CommentThread[],
+  pages: readonly PageLayout[],
+): CommentThreadView[] {
+  const byPon = new Map(pages.map((p) => [p.pageObjectNumber, p] as const));
+  return threads.map((t) => {
+    const page = byPon.get(t.pageObjectNumber);
+    return {
+      ...t,
+      pageIndex: page ? page.index : -1,
+      pageLabel: page ? (page.label ?? String(page.index + 1)) : '?',
+    };
+  });
+}
+
+/** The comments surface (verbs + `permissionsFor`) — imperative; pair with
+ *  {@link useCommentThreads} for the subscribed view. */
+export function useComments(): CommentsApi {
+  return useCapability(AnnotationToken).comments;
+}
+
+const EMPTY_PAGES: readonly PageLayout[] = [];
+
+/**
+ * Every comment thread in the document, display-ordered (page position →
+ * top of page → creation date) and enriched with `pageIndex`/`pageLabel`.
+ * Subscribed to BOTH stores: annotation writes (own, remote, hydration)
+ * recompute the threads; page moves/deletes re-run the join. Reference-
+ * stable between changes — safe to memo child renders on the array.
+ */
+export function useCommentThreads(): CommentThreadView[] {
+  const docId = useDocumentId();
+  const threads = useSelector(AnnotationToken, (c) => c.comments.threads());
+  const pages = useKernelValue((k) =>
+    docId ? (k.getState().core.documents[docId]?.pages ?? EMPTY_PAGES) : EMPTY_PAGES,
+  );
+  return React.useMemo(() => enrichCommentThreads(threads, pages), [threads, pages]);
+}
+
+/** The enriched thread containing ANY member ref (root, reply, grouped part,
+ *  state annotation), or null. */
+export function useCommentThread(ref: AnnotationRef | null): CommentThreadView | null {
+  const views = useCommentThreads();
+  const api = useComments();
+  if (ref == null) return null;
+  const t = api.thread(ref);
+  if (!t) return null;
+  return views.find((v) => refKey(v.root.ref) === refKey(t.root.ref)) ?? null;
+}
+
+/** Whole-document hydration status — the comments sidebar's honest loading
+ *  state (`loading` until `listRawAll` lands, then `complete`/`error`). */
+export function useCommentsHydration(): AnnotationHydration {
+  return useSelector(AnnotationToken, (c) => c.comments.hydration());
 }
 
 // ── Selection-menu anchor vocabulary ─────────────────────────────────────────
