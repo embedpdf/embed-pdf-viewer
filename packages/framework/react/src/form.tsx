@@ -60,8 +60,8 @@ import type { PageContextValue } from './runtime';
 
 /** Content rect → a view-px box (the page wrapper's own coordinate space). */
 function viewBox(r: Rect, page: PageContextValue) {
-  const tl = page.transform.pageToContent({ x: r.x, y: r.y });
-  const br = page.transform.pageToContent({ x: r.x + r.width, y: r.y + r.height });
+  const tl = page.transform.toPixels({ x: r.x, y: r.y });
+  const br = page.transform.toPixels({ x: r.x + r.width, y: r.y + r.height });
   return { left: tl.x, top: tl.y, width: br.x - tl.x, height: br.y - tl.y };
 }
 
@@ -401,7 +401,7 @@ function ChoiceWidget({ fill, item, page, appearance }: WidgetProps<'choice'>) {
           the engine's baked appearance stays the visible value. Keyed +
           uncontrolled so an in-flight write never snaps the selection back. */}
       <select
-        key={fill.selected.join(' ')}
+        key={fill.selected.join('\0')}
         multiple={multiple}
         size={fill.kind === 'list' ? Math.max(2, fill.options.length) : undefined}
         defaultValue={multiple ? fill.selected : (fill.selected[0] ?? '')}

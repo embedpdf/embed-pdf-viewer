@@ -26,7 +26,10 @@ export { MIN_DRAG, resolveClickPlacement, type ClickPlacement } from '@embedpdf/
 // §12.5.6.3) + the annotation identity type its verbs take — re-exported
 // so consumers type against this package alone.
 export type {
+  AnnotationDTO,
   AnnotationRef,
+  AnnotationSubtype,
+  Color,
   CommentThread,
   CommentThreadReview,
   ReviewStatus,

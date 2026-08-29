@@ -21,7 +21,7 @@ export type Phase = 'down' | 'move' | 'up';
 
 export interface PointerSample {
   phase: Phase;
-  page: Pt; // pointer in PAGE space (adapter already applied viewToPage)
+  page: Pt; // pointer in PAGE space (adapter already applied viewToContent)
   view: Pt; // pointer in VIEW px (used for fixed-size handle hit-testing)
   shift: boolean;
 }

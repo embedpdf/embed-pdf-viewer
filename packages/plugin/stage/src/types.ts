@@ -228,7 +228,7 @@ export interface StageSettings {
  *    `x/y/width/height` only to POSITION the page container.
  *  - `transform`: PRESENTATION truth — the single bridge between PDF points,
  *    view px, and device px for this page. Plugins do ALL coordinate work
- *    through it (`pageToView` / `viewToPage` / `deviceWidth` / `cssMatrix`),
+ *    through it (`contentToView` / `viewToContent` / `deviceWidth` / `cssMatrix`),
  *    never by re-deriving `x * scale` / `* dpr`. Page-local, so it's
  *    camera/pan-invariant.
  */
@@ -403,11 +403,13 @@ export type RevealZoom = 'keep' | 'fit' | 'fit-width' | 'fit-height' | { level: 
 export interface RevealOptions {
   behavior?: ScrollBehaviorKind;
   /**
-   * CONTENT-space target rect on the page (y-down, crop-relative, unscaled
-   * points — the same space selection/search rects live in). Absent → the
-   * whole page. A zero-size rect is a point (/XYZ).
+   * Target rect on the page in the VIEWER's coordinates (y-down,
+   * crop-relative, unscaled points — the same `Rect` selection/search rects
+   * and `CommentThreadView.contentRect` live in). Absent or `null` → the
+   * whole page (null accepted so nullable sources flow in directly). A
+   * zero-size rect is a point (/XYZ).
    */
-  rect?: Rect;
+  rect?: Rect | null;
   zoom?: RevealZoom;
   anchor?: RevealAnchor;
 }

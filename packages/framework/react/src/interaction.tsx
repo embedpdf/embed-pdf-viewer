@@ -2,7 +2,7 @@
  * The React surface for @embedpdf/plugin-interaction.
  *
  * <PagePointerSource> is the ONE pointer listener per page: it converts events to
- * page space via PageContext.toPagePoint and forwards normalized samples to the
+ * page space via PageContext.toContentPoint and forwards normalized samples to the
  * hub. It binds only to the page context, so it works identically inside a
  * virtualized <Stage> page and a standalone <PageView>. Features never attach
  * their own pointer listeners — they register handlers with the hub.
@@ -71,15 +71,15 @@ export function PagePointerSource() {
         // transform so a standalone <PageView> drives handlers identically.
         page: {
           pon: page.pon,
-          point: page.toPagePoint(e.clientX, e.clientY),
+          point: page.toContentPoint(e.clientX, e.clientY),
           scale: page.transform.viewScale,
           rotation: page.transform.rotation,
           zoom: page.transform.zoom,
         },
-        // A per-page source can only project onto its OWN page — toPagePoint is
+        // A per-page source can only project onto its OWN page — toContentPoint is
         // already unclamped (the drag listener lives on window), so a gesture
         // anchored here keeps tracking past the page bounds.
-        project: (pon) => (pon === page.pon ? page.toPagePoint(e.clientX, e.clientY) : null),
+        project: (pon) => (pon === page.pon ? page.toContentPoint(e.clientX, e.clientY) : null),
         modifiers: mods(e),
         clickCount,
         pointerType: (e.pointerType || 'mouse') as PointerSample['pointerType'],

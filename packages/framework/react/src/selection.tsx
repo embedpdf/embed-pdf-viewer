@@ -3,7 +3,7 @@
  *
  * <SelectionLayer> is a dumb renderer: it warms the page's geometry on mount,
  * reads the content-space highlight rects from the capability, and paints them —
- * mapping each rect through PageContext.pageToContent (the same path markers use).
+ * mapping each rect through PageContext.toPixels (the same path markers use).
  * Zero pointer handling here; that's the PagePointerSource + the hub.
  *
  * The layer resolves the HOST lens (`/internal`: geometry warming, the
@@ -90,7 +90,7 @@ export function SelectionLayer({ color = 'rgba(33, 150, 243, 0.35)' }: Selection
         // rotation). An affine map, so mapping the four corners is exact —
         // upright segments render pixel-identical to the old div-per-rect.
         const ring = [s.quad.upperStart, s.quad.upperEnd, s.quad.lowerEnd, s.quad.lowerStart].map(
-          (p) => page.transform.pageToContent(p),
+          (p) => page.transform.toPixels(p),
         );
         return (
           <polygon key={i} points={ring.map((p) => `${p.x},${p.y}`).join(' ')} fill={color} />

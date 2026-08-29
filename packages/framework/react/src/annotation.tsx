@@ -34,6 +34,7 @@ import { AnnotationToken as AnnotationHostToken } from '@embedpdf/plugin-annotat
 import {
   scene,
   MITER_LIMIT,
+  pdfToContentRect,
   type AnnotationProps,
   type CreationDraftAnchor,
   type Paint,
@@ -131,8 +132,8 @@ export interface AnnotationLayerProps {
 
 /** Content rect → a view-px box (the page wrapper's own coordinate space). */
 function boxOf(r: Rect, page: PageContextValue) {
-  const tl = page.transform.pageToContent({ x: r.x, y: r.y });
-  const br = page.transform.pageToContent({ x: r.x + r.width, y: r.y + r.height });
+  const tl = page.transform.toPixels({ x: r.x, y: r.y });
+  const br = page.transform.toPixels({ x: r.x + r.width, y: r.y + r.height });
   return { left: tl.x, top: tl.y, width: br.x - tl.x, height: br.y - tl.y };
 }
 
@@ -371,14 +372,14 @@ function Chrome({ page }: { page: PageContextValue }) {
   // The live rotation readout — an HTML chip (rounded box + padded text beats
   // hand-rolling it in SVG), riding the pointer like v2's.
   const chip = nodes.find((n) => n.kind === 'angle-chip');
-  const chipAt = chip ? page.transform.pageToContent(chip.at) : null;
+  const chipAt = chip ? page.transform.toPixels(chip.at) : null;
   return (
     <>
       <svg style={{ position: 'absolute', inset: 0, overflow: 'visible', pointerEvents: 'none' }}>
         {nodes.map((n, i) => {
           if (n.kind === 'angle-chip') return null; // rendered as HTML below
           if (n.kind === 'handle') {
-            const p = page.transform.pageToContent(n.at);
+            const p = page.transform.toPixels(n.at);
             const hs = cs.handles.size;
             return (
               <rect
@@ -398,10 +399,10 @@ function Chrome({ page }: { page: PageContextValue }) {
           // A live alignment guide of a snapped move: a through-line at the snapped
           // edge/center, spanning both shapes.
           if (n.kind === 'guide') {
-            const a = page.transform.pageToContent(
+            const a = page.transform.toPixels(
               n.axis === 'x' ? { x: n.at, y: n.lo } : { x: n.lo, y: n.at },
             );
-            const b = page.transform.pageToContent(
+            const b = page.transform.toPixels(
               n.axis === 'x' ? { x: n.at, y: n.hi } : { x: n.hi, y: n.at },
             );
             return (
@@ -422,7 +423,7 @@ function Chrome({ page }: { page: PageContextValue }) {
           if (n.kind === 'obb') {
             const pts = n.corners
               .map((c) => {
-                const p = page.transform.pageToContent(c);
+                const p = page.transform.toPixels(c);
                 return `${p.x},${p.y}`;
               })
               .join(' ');
@@ -445,8 +446,8 @@ function Chrome({ page }: { page: PageContextValue }) {
             return (
               <g key={i}>
                 {n.lines.map((l, j) => {
-                  const a = page.transform.pageToContent(l.a);
-                  const b = page.transform.pageToContent(l.b);
+                  const a = page.transform.toPixels(l.a);
+                  const b = page.transform.toPixels(l.b);
                   const axis = l.role === 'axis';
                   return (
                     <line
@@ -471,8 +472,8 @@ function Chrome({ page }: { page: PageContextValue }) {
           }
           // The rotate knob: a stalk from the top-edge midpoint out to a grab dot.
           if (n.kind === 'rotate-knob') {
-            const at = page.transform.pageToContent(n.at);
-            const from = page.transform.pageToContent(n.from);
+            const at = page.transform.toPixels(n.at);
+            const from = page.transform.toPixels(n.from);
             return (
               <g key={i}>
                 {cs.knob.stalk && (
@@ -954,6 +955,14 @@ export interface CommentThreadView extends CommentThread {
   /** The page's `/PageLabels` label when the PDF declares one ("iv", "A-2"),
    *  else the 1-based position as a string — print it verbatim. */
   pageLabel: string;
+  /**
+   * The root annotation's rect in CONTENT space (y-down, crop-relative,
+   * unscaled points) — the space `StageCapability.reveal` takes, so a
+   * "jump to this comment" is `stage.reveal(pageIndex, { rect: contentRect })`.
+   * Null when the page is gone. Identity still travels as `pageObjectNumber`;
+   * this, like `pageIndex`, is presentation.
+   */
+  contentRect: Rect | null;
 }
 
 /** Pure join behind {@link useCommentThreads} — exported for tests. */
@@ -968,6 +977,7 @@ export function enrichCommentThreads(
       ...t,
       pageIndex: page ? page.index : -1,
       pageLabel: page ? (page.label ?? String(page.index + 1)) : '?',
+      contentRect: page ? pdfToContentRect(t.root.rect, page.boxes.crop) : null,
     };
   });
 }

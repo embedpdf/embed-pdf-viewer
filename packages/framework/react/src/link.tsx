@@ -22,8 +22,8 @@ import type { PageContextValue } from './runtime';
 /** Content rect → view px (the page wrapper's own space) — the same idiom as
  *  the annotation and form layers: never re-derive `x * scale`. */
 function boxOf(item: LinkNavItem, page: PageContextValue) {
-  const tl = page.transform.pageToContent({ x: item.rect.x, y: item.rect.y });
-  const br = page.transform.pageToContent({
+  const tl = page.transform.toPixels({ x: item.rect.x, y: item.rect.y });
+  const br = page.transform.toPixels({
     x: item.rect.x + item.rect.width,
     y: item.rect.y + item.rect.height,
   });
