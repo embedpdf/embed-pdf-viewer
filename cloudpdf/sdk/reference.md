@@ -1743,16 +1743,16 @@ await client.doc.annotations.listAll({
 <dl>
 <dd>
 
-**request:** `CloudPDF.doc.ListAllAnnotationsRequest`
-
+**request:** `CloudPDF.doc.ListAllAnnotationsRequest` 
+    
 </dd>
 </dl>
 
 <dl>
 <dd>
 
-**requestOptions:** `AnnotationsClient.RequestOptions`
-
+**requestOptions:** `AnnotationsClient.RequestOptions` 
+    
 </dd>
 </dl>
 </dd>
@@ -2802,3 +2802,4 @@ await client.doc.redactions.apply({
 </dd>
 </dl>
 </details>
+
