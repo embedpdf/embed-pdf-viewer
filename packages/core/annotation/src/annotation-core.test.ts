@@ -3796,6 +3796,64 @@ describe('link prop (attached children in the substrate, read via linkOf)', () =
     expect(fx).toEqual([]);
   });
 
+  it('an attached link is NOT a visual-group member: single selection, handles, no Ungroup', () => {
+    const parent = committedSquare();
+    const child: Annot = {
+      id: 'C1',
+      ref: CHILD_REF,
+      pon: PON,
+      subtype: 'link',
+      geom: { t: 'rect', rect: { x: 10, y: 10, width: 50, height: 40 }, ellipse: false },
+      style: { ...baseStyle },
+      flags: DRAWN_FLAGS,
+      source: 'baked',
+      group: 'S1',
+      irt: 'S1',
+      data: { subtype: 'link', target: URI } as unknown as Annot['data'],
+    };
+    const loaded = update(initialModel, { t: 'loaded', annots: [parent, child] })[0];
+    // The wire mechanism is /RT /Group, but the SEMANTICS are plumbing: the
+    // square is no group primary, the selection stays the square alone…
+    expect(groupKeyOf(loaded, 'S1')).toBe(null);
+    expect(groupKeyOf(loaded, 'C1')).toBe(null);
+    expect(expandGroups(loaded, ['S1'])).toEqual(['S1']);
+    expect(groupMembers(loaded, 'S1')).toEqual(['S1']);
+    // …so the selection chrome shows the full 8 resize handles, exactly as
+    // if no link were attached (the bug: a 2-member "group" with no handles).
+    const m = { ...loaded, selected: ['S1'] };
+    expect(chrome(m, PON).filter((n) => n.kind === 'handle')).toHaveLength(8);
+  });
+
+  it('a REAL visual group keeps working; its attached link child stays excluded', () => {
+    const primary = committedSquare({ id: 'P1' });
+    const sub = committedSquare({
+      id: 'P2',
+      ref: { kind: 'objectNumber', pageObjectNumber: 1, annotObjectNumber: 42 },
+      group: 'P1',
+      irt: 'P1',
+    });
+    const child: Annot = {
+      id: 'C1',
+      ref: CHILD_REF,
+      pon: PON,
+      subtype: 'link',
+      geom: { t: 'rect', rect: { x: 10, y: 10, width: 50, height: 40 }, ellipse: false },
+      style: { ...baseStyle },
+      flags: DRAWN_FLAGS,
+      source: 'baked',
+      group: 'P1',
+      irt: 'P1',
+      data: { subtype: 'link', target: URI } as unknown as Annot['data'],
+    };
+    const m = update(initialModel, { t: 'loaded', annots: [primary, sub, child] })[0];
+    // The pair is a group; the link child never appears among the members —
+    // so the ungroup verb (which walks expandGroups) can never strip its
+    // /IRT and orphan it into an unmanaged standalone link.
+    expect(groupKeyOf(m, 'P1')).toBe('P1');
+    expect(groupMembers(m, 'P1')).toEqual(['P1', 'P2']);
+    expect(expandGroups(m, ['P2'])).toEqual(['P1', 'P2']);
+  });
+
   it('deleting a parent also deletes its attached link children (substrate)', () => {
     const parent = committedSquare();
     const child: Annot = {

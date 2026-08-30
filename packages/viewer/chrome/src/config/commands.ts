@@ -572,14 +572,16 @@ export const defaultCommands: CommandDef[] = [
 
   // ── link strip items (v2's "Link / Go to link / Remove link") ───────────
   {
-    // Make the selection a link: opens the style panel, whose Link control
-    // sets the target (create-then-edit — the plugin materializes the
-    // attached child annotations).
+    // Make the selection a link: opens the anchored POPOVER (v2's popup —
+    // a link is a verb on the selection, not a style), whose editor sets
+    // the target through `updateSelection({ link })`; the plugin's
+    // reconciler materializes the attached child annotations.
     id: 'annotation:link',
     labelKey: 'commands.annotate.link',
     icon: 'link',
     categories: ['annotation'],
-    panel: { id: 'annotation-style', exclusive: 'right' },
+    run: (c) => c.tryGet(ShellToken)?.toggle('link-editor'),
+    active: (c) => c.tryGet(ShellToken)?.isOpen('link-editor') ?? false,
     visible: (c) => selectionLink(c) === null,
   },
   {

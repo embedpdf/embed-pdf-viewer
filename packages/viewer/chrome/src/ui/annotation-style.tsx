@@ -31,9 +31,8 @@ import {
   type TextAlign,
 } from '@embedpdf/react/annotation';
 import { useTool } from '@embedpdf/react/interaction';
-import { useKernel, useOptionalCapability } from '@embedpdf/react/runtime';
+import { useOptionalCapability } from '@embedpdf/react/runtime';
 import { RedactionToken } from '@embedpdf/react/redaction';
-import { LinkToken, openLinkTarget, type PdfLinkTarget } from '@embedpdf/react/link';
 import { useT } from '@embedpdf/react/i18n';
 import { Icon } from './icons';
 import { AnnotationFlagsSection } from './annotation-flags';
@@ -548,116 +547,6 @@ function Toggle({
   );
 }
 
-/**
- * The link-target editor — v2's "Link / Go to link / Remove link" menu items,
- * rebuilt on the schema: any kind whose table declares the `link` spec gets
- * this control, and every write is the ONE `updateSelection({ link })` path
- * (the plugin materializes/retargets/deletes the attached children).
- */
-function LinkTargetControl({
-  label,
-  value,
-  mixed,
-  onChange,
-}: {
-  label: string;
-  value: PdfLinkTarget | null;
-  mixed: boolean;
-  onChange: (patch: AnnotationPropsPatch) => void;
-}) {
-  const kernel = useKernel();
-  const link = useOptionalCapability(LinkToken);
-  const [mode, setMode] = useState<'uri' | 'page'>(value?.kind === 'goto' ? 'page' : 'uri');
-  const [uri, setUri] = useState(value?.kind === 'uri' ? value.uri : '');
-  const [pageNo, setPageNo] = useState('1');
-
-  // Adopt the selection's current target whenever it changes under us.
-  useEffect(() => {
-    setMode(value?.kind === 'goto' ? 'page' : 'uri');
-    if (value?.kind === 'uri') setUri(value.uri);
-  }, [value]);
-
-  const apply = () => {
-    if (mode === 'uri') {
-      const trimmed = uri.trim();
-      if (trimmed) onChange({ link: { kind: 'uri', uri: trimmed } });
-      return;
-    }
-    // Page number (1-based) → the page's OBJECT NUMBER (stable across moves).
-    const activeId = kernel.documents.activeId();
-    const meta = activeId ? kernel.getState().core.documents[activeId] : null;
-    const layout = meta?.pages[Math.max(0, Number(pageNo) - 1)];
-    if (layout) {
-      onChange({
-        link: {
-          kind: 'goto',
-          destination: { kind: 'fit', pageObjectNumber: layout.pageObjectNumber },
-        },
-      });
-    }
-  };
-
-  const inputCls = 'border-border bg-surface text-fg w-full rounded border px-3 py-1.5 text-sm';
-  return (
-    <Field label={label} mixed={mixed}>
-      {value != null && (
-        <div className="mb-2 flex items-center gap-2">
-          <button
-            type="button"
-            className="border-border bg-surface text-fg flex-1 rounded border px-2 py-1.5 text-sm"
-            // The opener PERFORMS the uri outcome — bare activate() opens nothing for URLs.
-            onClick={() => link && openLinkTarget(link, value)}
-          >
-            Go to link
-          </button>
-          <button
-            type="button"
-            className="border-border bg-surface text-fg flex-1 rounded border px-2 py-1.5 text-sm"
-            onClick={() => onChange({ link: null })}
-          >
-            Remove link
-          </button>
-        </div>
-      )}
-      <div className="mb-2 flex gap-2">
-        <Toggle title="Link to a URL" active={mode === 'uri'} onClick={() => setMode('uri')}>
-          URL
-        </Toggle>
-        <Toggle title="Link to a page" active={mode === 'page'} onClick={() => setMode('page')}>
-          Page
-        </Toggle>
-      </div>
-      {mode === 'uri' ? (
-        <input
-          type="url"
-          className={inputCls}
-          placeholder="https://…"
-          value={uri}
-          onChange={(e) => setUri(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && apply()}
-        />
-      ) : (
-        <input
-          type="number"
-          min={1}
-          className={inputCls}
-          placeholder="Page number"
-          value={pageNo}
-          onChange={(e) => setPageNo(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && apply()}
-        />
-      )}
-      <button
-        type="button"
-        className="border-border bg-surface text-fg mt-2 w-full rounded border px-2 py-1.5 text-sm font-medium"
-        onClick={apply}
-      >
-        {value == null ? 'Add link' : 'Update link'}
-      </button>
-    </Field>
-  );
-}
-
 // ── one control per PropSpec — the entire surface an app customizes ──────────
 function PropControl({
   spec,
@@ -806,15 +695,11 @@ function PropControl({
           />
         </Field>
       );
+    // `link` deliberately renders NOTHING here: a link is a verb on the
+    // selection, edited in the anchored popover (see ui/link-editor.tsx) —
+    // never a style-panel section.
     case 'link':
-      return (
-        <LinkTargetControl
-          label={spec.label}
-          value={(value as PdfLinkTarget | null) ?? null}
-          mixed={mixed}
-          onChange={onChange}
-        />
-      );
+      return null;
     default:
       return null;
   }

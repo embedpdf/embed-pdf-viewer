@@ -462,6 +462,19 @@ describe('links lens — substrate children, no ledger', () => {
     expect(h.capability.links.of(ref(20))).toBe(null);
   });
 
+  it('a linked annotation selects as a SINGLE unit: no ungroup, full selection', async () => {
+    const h = harness();
+    h.list.mockResolvedValueOnce({ annotations: [hydrationSquare(20), childDTO(21, 20)] });
+    await h.capability.reloadPage(PON);
+    h.capability.select(ref(20));
+    // One selected id — the child never joins the selection…
+    expect(h.capability.getSelection()).toEqual([ref(20)]);
+    // …and the group verbs stay hidden: ungroup on this "group" would strip
+    // the child's /IRT and orphan it into an unmanaged standalone link.
+    expect(h.capability.canUngroup()).toBe(false);
+    expect(h.capability.canGroup()).toBe(false);
+  });
+
   it('links.set creates the grouped child and resolves when committed; clear deletes it', async () => {
     const h = harness();
     h.list.mockResolvedValueOnce({ annotations: [hydrationSquare(20)] });
