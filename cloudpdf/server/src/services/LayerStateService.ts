@@ -45,6 +45,11 @@ const BASE_METADATA_VERSION = 1;
  *  `attachmentsVersion` still sits here has never written an attachment. */
 const BASE_ATTACHMENTS_VERSION = 1;
 
+/** The immutable base annotation corpus's epoch — the base view's
+ *  annotations never change (all writes target a layer), so its bulk
+ *  `/annotations/items@…` pin stays at the initial epoch. */
+const BASE_ANNOTATIONS_VERSION = 1;
+
 /** Every plane inherited — the scopes of a never-written layer. */
 const ALL_BASE_SCOPES: LayerScopes = {
   content: 'base',
@@ -188,6 +193,7 @@ export class LayerStateService {
       // The base view's EmbeddedFiles tree is immutable (attachment writes
       // always target a layer), so its pointer is the initial epoch.
       attachmentsVersion: 1,
+      annotationsVersion: BASE_ANNOTATIONS_VERSION,
       // No layer writes have happened on the base view; a fresh subscriber's
       // gapless cursor starts at 0 ("everything in the log is new to me").
       auditHead: 0,
@@ -202,7 +208,12 @@ export class LayerStateService {
     layerName: string,
     layer: Pick<
       LayerRow,
-      'docVersion' | 'layoutVersion' | 'metadataVersion' | 'attachmentsVersion' | 'lastAuditId'
+      | 'docVersion'
+      | 'layoutVersion'
+      | 'metadataVersion'
+      | 'attachmentsVersion'
+      | 'annotationsVersion'
+      | 'lastAuditId'
     >,
     pages: DurablePageRow[],
     /**
@@ -218,6 +229,7 @@ export class LayerStateService {
       metadataVersion: layer.metadataVersion,
       actionsVersion: 1,
       attachmentsVersion: layer.attachmentsVersion,
+      annotationsVersion: layer.annotationsVersion,
       // Written in the same transaction as the audit append, so a client
       // subscribing from this manifest can never miss a row (gapless cursor).
       auditHead: layer.lastAuditId,
@@ -234,11 +246,22 @@ export class LayerStateService {
     layerName: string;
     previousDocVersion: number;
     docVersion: number;
+    /**
+     * The new bulk-annotations pin when this mutation bumped it. Stamped
+     * by the annotation CRUD, flatten, and redaction paths; the form and
+     * page-structure paths bump the COLUMN but omit it here — their
+     * clients recover through the 404-refresh rail, which is correct,
+     * just one round trip slower.
+     */
+    annotationsVersion?: number;
     pages: DurablePageRow[];
   }): CacheDelta {
     return {
       previousDocVersion: input.previousDocVersion,
       docVersion: input.docVersion,
+      ...(input.annotationsVersion !== undefined
+        ? { annotationsVersion: input.annotationsVersion }
+        : {}),
       pages: input.pages.map((page) => ({
         pageObjectNumber: page.pageObjectNumber,
         cache: this.toCachePins(page),

@@ -56,7 +56,7 @@ export interface SelectionPageGeometry {
  * Build a page's selection geometry. Page display rotation does NOT enter
  * here — the overlay rides the page's CSS rotation, so content space stays
  * un-rotated (the crop-relative y-flip is the only conversion; zoom = 1,
- * the viewer's zoom is applied later by `PageTransform.pageToContent`).
+ * the viewer's zoom is applied later by `PageTransform.toPixels`).
  */
 export function buildSelectionPageGeometry(
   snapshot: PageGeometrySnapshot,

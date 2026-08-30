@@ -4,7 +4,8 @@
 `@embedpdf/engine` and `@cloudpdf/server`.
 
 The package should read like a small framework: a developer should know what a file does from its
-directory before opening it.
+directory before opening it. Paths below are relative to
+`packages/engine/services/` unless they start at the repository root.
 
 ## Top-level structure
 

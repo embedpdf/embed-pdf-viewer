@@ -102,6 +102,7 @@ export interface PdfFunctions {
   EPDFAnnot_HasEmbedMetadata: (arg0: Ptr) => boolean;
   EPDFAnnot_RemoveAction: (arg0: Ptr) => boolean;
   EPDFAnnot_RemoveDest: (arg0: Ptr) => boolean;
+  EPDFAnnot_RemoveKey: (arg0: Ptr, arg1: string) => boolean;
   EPDFAnnot_SetAction: (arg0: Ptr, arg1: Ptr) => boolean;
   EPDFAnnot_SetAPMatrix: (arg0: Ptr, arg1: number, arg2: Ptr) => boolean;
   EPDFAnnot_SetAppearanceFromPage: (arg0: Ptr, arg1: Ptr, arg2: number) => boolean;
@@ -127,6 +128,7 @@ export interface PdfFunctions {
   EPDFAnnot_SetOpacity: (arg0: Ptr, arg1: number) => boolean;
   EPDFAnnot_SetOverlayText: (arg0: Ptr, arg1: Ptr) => boolean;
   EPDFAnnot_SetOverlayTextRepeat: (arg0: Ptr, arg1: boolean) => boolean;
+  EPDFAnnot_SetRect: (arg0: Ptr, arg1: Ptr) => boolean;
   EPDFAnnot_SetRectangleDifferences: (arg0: Ptr, arg1: number, arg2: number, arg3: number, arg4: number) => boolean;
   EPDFAnnot_SetReplyType: (arg0: Ptr, arg1: number) => boolean;
   EPDFAnnot_SetRotate: (arg0: Ptr, arg1: number) => boolean;
@@ -874,6 +876,7 @@ export const pdfFunctionSignatures = {
   EPDFAnnot_HasEmbedMetadata: { params: [{"ts":"Ptr","wasm":{"kind":"pointer","cwrap":"number"},"native":{"kind":"pointer","cwrap":"bigint"}}], result: {"ts":"boolean","wasm":{"kind":"bool","cwrap":"boolean"},"native":{"kind":"bool","cwrap":"boolean"}} },
   EPDFAnnot_RemoveAction: { params: [{"ts":"Ptr","wasm":{"kind":"pointer","cwrap":"number"},"native":{"kind":"pointer","cwrap":"bigint"}}], result: {"ts":"boolean","wasm":{"kind":"bool","cwrap":"boolean"},"native":{"kind":"bool","cwrap":"boolean"}} },
   EPDFAnnot_RemoveDest: { params: [{"ts":"Ptr","wasm":{"kind":"pointer","cwrap":"number"},"native":{"kind":"pointer","cwrap":"bigint"}}], result: {"ts":"boolean","wasm":{"kind":"bool","cwrap":"boolean"},"native":{"kind":"bool","cwrap":"boolean"}} },
+  EPDFAnnot_RemoveKey: { params: [{"ts":"Ptr","wasm":{"kind":"pointer","cwrap":"number"},"native":{"kind":"pointer","cwrap":"bigint"}},{"ts":"string","wasm":{"kind":"cstring","cwrap":"string"},"native":{"kind":"cstring","cwrap":"string"}}], result: {"ts":"boolean","wasm":{"kind":"bool","cwrap":"boolean"},"native":{"kind":"bool","cwrap":"boolean"}} },
   EPDFAnnot_SetAction: { params: [{"ts":"Ptr","wasm":{"kind":"pointer","cwrap":"number"},"native":{"kind":"pointer","cwrap":"bigint"}},{"ts":"Ptr","wasm":{"kind":"pointer","cwrap":"number"},"native":{"kind":"pointer","cwrap":"bigint"}}], result: {"ts":"boolean","wasm":{"kind":"bool","cwrap":"boolean"},"native":{"kind":"bool","cwrap":"boolean"}} },
   EPDFAnnot_SetAPMatrix: { params: [{"ts":"Ptr","wasm":{"kind":"pointer","cwrap":"number"},"native":{"kind":"pointer","cwrap":"bigint"}},{"ts":"number","wasm":{"kind":"i32","cwrap":"number"},"native":{"kind":"i32","cwrap":"number"}},{"ts":"Ptr","wasm":{"kind":"pointer","cwrap":"number"},"native":{"kind":"pointer","cwrap":"bigint"}}], result: {"ts":"boolean","wasm":{"kind":"bool","cwrap":"boolean"},"native":{"kind":"bool","cwrap":"boolean"}} },
   EPDFAnnot_SetAppearanceFromPage: { params: [{"ts":"Ptr","wasm":{"kind":"pointer","cwrap":"number"},"native":{"kind":"pointer","cwrap":"bigint"}},{"ts":"Ptr","wasm":{"kind":"pointer","cwrap":"number"},"native":{"kind":"pointer","cwrap":"bigint"}},{"ts":"number","wasm":{"kind":"i32","cwrap":"number"},"native":{"kind":"i32","cwrap":"number"}}], result: {"ts":"boolean","wasm":{"kind":"bool","cwrap":"boolean"},"native":{"kind":"bool","cwrap":"boolean"}} },
@@ -899,6 +902,7 @@ export const pdfFunctionSignatures = {
   EPDFAnnot_SetOpacity: { params: [{"ts":"Ptr","wasm":{"kind":"pointer","cwrap":"number"},"native":{"kind":"pointer","cwrap":"bigint"}},{"ts":"number","wasm":{"kind":"i32","cwrap":"number"},"native":{"kind":"i32","cwrap":"number"}}], result: {"ts":"boolean","wasm":{"kind":"bool","cwrap":"boolean"},"native":{"kind":"bool","cwrap":"boolean"}} },
   EPDFAnnot_SetOverlayText: { params: [{"ts":"Ptr","wasm":{"kind":"pointer","cwrap":"number"},"native":{"kind":"pointer","cwrap":"bigint"}},{"ts":"Ptr","wasm":{"kind":"pointer","cwrap":"number"},"native":{"kind":"pointer","cwrap":"bigint"}}], result: {"ts":"boolean","wasm":{"kind":"bool","cwrap":"boolean"},"native":{"kind":"bool","cwrap":"boolean"}} },
   EPDFAnnot_SetOverlayTextRepeat: { params: [{"ts":"Ptr","wasm":{"kind":"pointer","cwrap":"number"},"native":{"kind":"pointer","cwrap":"bigint"}},{"ts":"boolean","wasm":{"kind":"bool","cwrap":"boolean"},"native":{"kind":"bool","cwrap":"boolean"}}], result: {"ts":"boolean","wasm":{"kind":"bool","cwrap":"boolean"},"native":{"kind":"bool","cwrap":"boolean"}} },
+  EPDFAnnot_SetRect: { params: [{"ts":"Ptr","wasm":{"kind":"pointer","cwrap":"number"},"native":{"kind":"pointer","cwrap":"bigint"}},{"ts":"Ptr","wasm":{"kind":"pointer","cwrap":"number"},"native":{"kind":"pointer","cwrap":"bigint"}}], result: {"ts":"boolean","wasm":{"kind":"bool","cwrap":"boolean"},"native":{"kind":"bool","cwrap":"boolean"}} },
   EPDFAnnot_SetRectangleDifferences: { params: [{"ts":"Ptr","wasm":{"kind":"pointer","cwrap":"number"},"native":{"kind":"pointer","cwrap":"bigint"}},{"ts":"number","wasm":{"kind":"f32","cwrap":"number"},"native":{"kind":"f32","cwrap":"number"}},{"ts":"number","wasm":{"kind":"f32","cwrap":"number"},"native":{"kind":"f32","cwrap":"number"}},{"ts":"number","wasm":{"kind":"f32","cwrap":"number"},"native":{"kind":"f32","cwrap":"number"}},{"ts":"number","wasm":{"kind":"f32","cwrap":"number"},"native":{"kind":"f32","cwrap":"number"}}], result: {"ts":"boolean","wasm":{"kind":"bool","cwrap":"boolean"},"native":{"kind":"bool","cwrap":"boolean"}} },
   EPDFAnnot_SetReplyType: { params: [{"ts":"Ptr","wasm":{"kind":"pointer","cwrap":"number"},"native":{"kind":"pointer","cwrap":"bigint"}},{"ts":"number","wasm":{"kind":"i32","cwrap":"number"},"native":{"kind":"i32","cwrap":"number"}}], result: {"ts":"boolean","wasm":{"kind":"bool","cwrap":"boolean"},"native":{"kind":"bool","cwrap":"boolean"}} },
   EPDFAnnot_SetRotate: { params: [{"ts":"Ptr","wasm":{"kind":"pointer","cwrap":"number"},"native":{"kind":"pointer","cwrap":"bigint"}},{"ts":"number","wasm":{"kind":"f32","cwrap":"number"},"native":{"kind":"f32","cwrap":"number"}}], result: {"ts":"boolean","wasm":{"kind":"bool","cwrap":"boolean"},"native":{"kind":"bool","cwrap":"boolean"}} },

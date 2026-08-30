@@ -1,0 +1,4 @@
+interface:
+  display_name: 'EmbedPDF Conventions'
+  short_description: 'Apply EmbedPDF architecture conventions'
+  default_prompt: 'Use $embedpdf-conventions to apply the relevant repository conventions to this change.'

@@ -1324,11 +1324,32 @@ export function geomScene(g: Geom, strokeWidth = 0, border?: Border): RenderNode
   // plus a stroke-only box border (the DOM owns the text + background).
   if (g.t === 'text') {
     if (!g.callout) return [];
-    const pts = calloutLinePoints(g);
+    const pts = [...calloutLinePoints(g)];
+    // Mirror the AP generator's `adjusted_conn`: extend the connection point
+    // under the box border by half the stroke, so the leader meets the border
+    // ink without an angular gap at the box edge.
+    if (strokeWidth > 0 && pts.length >= 2) {
+      const last = pts[pts.length - 1];
+      const prev = pts[pts.length - 2];
+      const dx = last.x - prev.x;
+      const dy = last.y - prev.y;
+      const len = Math.hypot(dx, dy);
+      if (len > 0) {
+        pts[pts.length - 1] = {
+          x: last.x + (dx / len) * (strokeWidth / 2),
+          y: last.y + (dy / len) * (strokeWidth / 2),
+        };
+      }
+    }
     const nodes: RenderNode[] = [{ kind: 'poly', points: pts, closed: false }];
     const seg = calloutEndingSeg(pts, g.callout.ending);
     if (seg) nodes.push(...endingNodes(seg.tip, seg.angle, seg.ending, strokeWidth));
     if (strokeWidth > 0) {
+      // The box border mirrors the AP generator (and the square/circle
+      // convention below): the drawn path insets by half the stroke so the
+      // ink sits INSIDE `g.rect` with its outer edge ON the rect — never
+      // straddling the selection outline.
+      const r = insetRect(g.rect, strokeWidth / 2);
       // A tilted box (the upright policy) draws as its rotated corner ring —
       // the scene stays plane-agnostic, so every framework painter gets the
       // tilt for free (the leader above is page-space and never rotates).
@@ -1338,10 +1359,10 @@ export function geomScene(g: Geom, strokeWidth = 0, border?: Border): RenderNode
         rot
           ? {
               kind: 'poly',
-              points: rectCornerPoints(g.rect).map((p) => rotatePoint(p, c, rot)),
+              points: rectCornerPoints(r).map((p) => rotatePoint(p, c, rot)),
               closed: true,
             }
-          : { kind: 'rect', rect: g.rect },
+          : { kind: 'rect', rect: r },
       );
     }
     return nodes;

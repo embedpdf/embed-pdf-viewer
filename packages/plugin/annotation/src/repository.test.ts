@@ -9,9 +9,15 @@ import type {
   CalloutLine,
   PdfRect,
 } from '@embedpdf/engine-core/runtime';
-import { DRAWN_FLAGS, type Annot } from '@embedpdf/core-annotation';
 import {
-  foldAttachedLinks,
+  DRAWN_FLAGS,
+  isAttachedLink,
+  linkChildrenOf,
+  linkOf,
+  type Annot,
+  type Model,
+} from '@embedpdf/core-annotation';
+import {
   fromDTO,
   linkChildRects,
   refKey,
@@ -105,6 +111,7 @@ describe('repository — Ink Highlight intent and blend', () => {
     flags: NO_FLAGS,
     rect: { left: 10, bottom: 740, right: 120, top: 760 },
     contents: null,
+    subject: null,
     author: null,
     created: null,
     modified: null,
@@ -691,6 +698,79 @@ describe('repository — toScopedPatch (sparse emission)', () => {
   });
 });
 
+describe('repository — /Rect derives from line endings (the clipped-arrowhead class)', () => {
+  const lineDTO = (lineEndings: { start: string; end: string }): AnnotationDTO =>
+    ({
+      ref: { kind: 'objectNumber', pageObjectNumber: 1, annotObjectNumber: 77 },
+      pageObjectNumber: 1,
+      index: 0,
+      identityQuality: 'durable',
+      nm: null,
+      flags: NO_FLAGS,
+      rect: { left: 100, bottom: 100, right: 300, top: 200 },
+      contents: null,
+      subject: null,
+      author: null,
+      created: null,
+      modified: null,
+      blendMode: 'normal',
+      inReplyTo: null,
+      replyType: null,
+      subtype: 'line',
+      color: { r: 0, g: 0, b: 0 },
+      interiorColor: null,
+      strokeWidth: 4,
+      opacity: 1,
+      borderStyle: 'solid',
+      linePoints: { start: { x: 120, y: 120 }, end: { x: 280, y: 180 } },
+      lineEndings,
+      rotation: null,
+    }) as unknown as AnnotationDTO;
+
+  type RectPatch = { lineEndings?: unknown; rect?: PdfRect };
+  const area = (r: PdfRect) => (r.right - r.left) * (r.top - r.bottom);
+
+  it('props lineEndings on a line re-emits the grown VISUAL-bounds /Rect', () => {
+    const none = fromDTO(lineDTO({ start: 'none', end: 'none' }), CROP);
+    const before = toScopedPatch(none, { kind: 'props', keys: ['lineEndings'] }, CROP) as RectPatch;
+    // The model AFTER the reducer applied the user's gesture: arrows on both ends.
+    const arrows = {
+      ...none,
+      geom: { ...none.geom, ends: { start: 'open-arrow', end: 'open-arrow' } },
+    } as typeof none;
+    const patch = toScopedPatch(arrows, { kind: 'props', keys: ['lineEndings'] }, CROP) as RectPatch;
+    expect(patch.lineEndings).toEqual({ start: 'open-arrow', end: 'open-arrow' });
+    // The derivation rides along — the sparse patch can never change an input
+    // of /Rect without re-emitting it (else the /AP re-bakes into the stale
+    // box and the arrowhead is clipped in every other viewer).
+    expect(before.rect).toBeDefined();
+    expect(patch.rect).toBeDefined();
+    const r0 = before.rect!;
+    const r1 = patch.rect!;
+    // Grew to enclose the arrowheads, and shrank on no side.
+    expect(area(r1)).toBeGreaterThan(area(r0));
+    expect(r1.left).toBeLessThanOrEqual(r0.left);
+    expect(r1.bottom).toBeLessThanOrEqual(r0.bottom);
+    expect(r1.right).toBeGreaterThanOrEqual(r0.right);
+    expect(r1.top).toBeGreaterThanOrEqual(r0.top);
+  });
+
+  it('polyline endings ride the same derivation', () => {
+    const base = fromDTO(rotatedPolylineDTO(0, 78), CROP);
+    const arrows = {
+      ...base,
+      geom: { ...base.geom, ends: { start: 'closed-arrow', end: 'closed-arrow' } },
+    } as typeof base;
+    const patch = toScopedPatch(
+      arrows,
+      { kind: 'props', keys: ['lineEndings'] },
+      CROP,
+    ) as RectPatch;
+    expect(patch.lineEndings).toBeDefined();
+    expect(patch.rect).toBeDefined();
+  });
+});
+
 describe('repository — shape cloudy border tri-state', () => {
   const cloudySquare = (annotObjectNumber = 45): AnnotationDTO =>
     ({
@@ -747,25 +827,32 @@ describe('repository — attached links (fold + desired state + link kind mappin
     annotObjectNumber: 10,
   };
 
+  // Minimal Model for lens reads (order + byId are all the lens touches).
+  const modelWith = (annots: Annot[]): Model =>
+    ({
+      byId: Object.fromEntries(annots.map((a) => [a.id, a])),
+      order: annots.map((a) => a.id),
+    }) as unknown as Model;
+
   it('fromDTO maps a link DTO target onto the link slot', () => {
     const a = fromDTO(linkDTO(20, URI), CROP);
     expect(a.subtype).toBe('link');
     expect(a.link).toEqual(URI);
   });
 
-  it('folds a grouped link child onto its linkable parent and removes it', () => {
+  it('a grouped link child is SUBSTRATE: classified attached, read via linkOf', () => {
     const parent = fromDTO(squareDTO(10), CROP);
     const child = fromDTO(linkDTO(11, URI, { inReplyTo: parentRef, replyType: 'group' }), CROP);
-    const out = foldAttachedLinks([parent, child]);
-    expect(out).toHaveLength(1);
-    expect(out[0].id).toBe(parent.id);
-    expect(out[0].link).toEqual(URI);
-    expect(out[0].linkRefs?.map(refKey)).toEqual([refKey(child.ref!)]);
+    // Nothing folds — both are first-class model annotations…
+    expect(isAttachedLink(parent)).toBe(false);
+    expect(isAttachedLink(child)).toBe(true);
+    const m = modelWith([parent, child]);
+    // …and the parent's value DERIVES from the committed child.
+    expect(linkOf(m, parent.id)).toEqual(URI);
+    expect(linkChildrenOf(m, parent.id).map((c) => c.id)).toEqual([child.id]);
   });
 
-  it('does NOT fold onto non-linkable parents (widgets) or other links — orphans stay standalone', () => {
-    const widget = { ...fromDTO(squareDTO(10), CROP), subtype: 'widget-text' };
-    const child = fromDTO(linkDTO(11, URI, { inReplyTo: parentRef, replyType: 'group' }), CROP);
+  it('an orphan grouped link derives nothing for strangers and keeps its own target', () => {
     const orphan = fromDTO(
       linkDTO(12, URI, {
         inReplyTo: { kind: 'objectNumber', pageObjectNumber: 1, annotObjectNumber: 99 },
@@ -773,17 +860,18 @@ describe('repository — attached links (fold + desired state + link kind mappin
       }),
       CROP,
     );
-    const out = foldAttachedLinks([widget, child, orphan]);
-    expect(out).toHaveLength(3); // nothing folded, nothing hidden
+    const m = modelWith([orphan]);
+    expect(linkOf(m, 'obj:1')).toBe(null); // no children of that parent
+    expect(isAttachedLink(orphan)).toBe(true);
   });
 
-  it('multi-segment: several children fold to ONE link value + all join keys', () => {
+  it('multi-segment: several children, ONE derived value (first child wins)', () => {
     const parent = fromDTO(squareDTO(10), CROP);
     const c1 = fromDTO(linkDTO(11, URI, { inReplyTo: parentRef, replyType: 'group' }), CROP);
     const c2 = fromDTO(linkDTO(12, URI, { inReplyTo: parentRef, replyType: 'group' }), CROP);
-    const out = foldAttachedLinks([parent, c1, c2]);
-    expect(out).toHaveLength(1);
-    expect(out[0].linkRefs).toHaveLength(2);
+    const m = modelWith([parent, c1, c2]);
+    expect(linkChildrenOf(m, parent.id)).toHaveLength(2);
+    expect(linkOf(m, parent.id)).toEqual(URI);
   });
 
   it('linkChildRects: a ROTATED parent gets the AABB of its rotated footprint, not the unrotated box', () => {

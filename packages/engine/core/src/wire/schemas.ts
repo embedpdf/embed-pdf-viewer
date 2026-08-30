@@ -448,6 +448,7 @@ export const DocumentManifestSchema = z.object({
   metadataVersion: z.number().int().positive(),
   actionsVersion: z.number().int().positive().default(1),
   attachmentsVersion: z.number().int().positive().default(1),
+  annotationsVersion: z.number().int().positive().default(1),
   auditHead: z.number().int().nonnegative(),
   baseSha: z.string(),
   // Plane scopes: layer manifests only; absent = all-'layer'.
@@ -464,6 +465,8 @@ export const AnnotationListPageSnapshotSchema: z.ZodType<AnnotationListPageSnaps
 export const AnnotationListSnapshotAllPagesSchema: z.ZodType<AnnotationListSnapshotAllPages> =
   z.object({
     pages: z.array(AnnotationListPageSnapshotSchema),
+    // Cloud stamps the manifest's transactional audit cursor; local omits it.
+    auditHead: z.number().int().nonnegative().optional(),
   });
 
 /**
@@ -811,6 +814,7 @@ export const RefetchReasonSchema: z.ZodType<RefetchReason> = z.enum([
 export const CacheDeltaSchema: z.ZodType<CacheDelta> = z.object({
   previousDocVersion: z.number().int().positive(),
   docVersion: z.number().int().positive(),
+  annotationsVersion: z.number().int().positive().optional(),
   pages: z.array(
     z.object({
       pageObjectNumber: z.number().int().positive(),

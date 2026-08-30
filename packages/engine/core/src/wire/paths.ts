@@ -48,6 +48,7 @@ import {
   encodeActionsToken,
   encodeAnnotationAppearancesRenderToken,
   encodeAnnotationToken,
+  encodeAnnotationsAllToken,
   encodeAttachmentsToken,
   encodeContentToken,
   encodeDocToken,
@@ -324,6 +325,10 @@ export const wirePaths = {
   docPageAnnotations: (docId: string, pageObjectNumber: number, annotationVersion: number) =>
     `/v1/docs/${encodeURIComponent(docId)}/annotations/pages/${pageObjectNumber}/items@${encodeAnnotationToken(annotationVersion)}`,
 
+  /** Immutable BASE whole-document annotation listing (bulk hydration). */
+  docAnnotationsAll: (docId: string, annotationsVersion: number) =>
+    `/v1/docs/${encodeURIComponent(docId)}/annotations/items@${encodeAnnotationsAllToken(annotationsVersion)}`,
+
   /** Immutable BASE appearance batch (twin of
    *  `layerPageAnnotationAppearances` — same `annotations` plane gate). */
   docPageAnnotationAppearances: (docId: string, pageObjectNumber: number, token: TokenInput) =>
@@ -342,6 +347,10 @@ export const wirePaths = {
     annotationVersion: number,
   ) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/annotations/pages/${pageObjectNumber}/items@${encodeAnnotationToken(annotationVersion)}`,
+
+  /** Immutable LAYER whole-document annotation listing (bulk hydration). */
+  layerAnnotationsAll: (docId: string, layerName: string, annotationsVersion: number) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/annotations/items@${encodeAnnotationsAllToken(annotationsVersion)}`,
 
   layerPageAnnotationsCurrent: (docId: string, layerName: string, pageObjectNumber: number) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/annotations/pages/${pageObjectNumber}/items`,

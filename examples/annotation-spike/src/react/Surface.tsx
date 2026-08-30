@@ -26,7 +26,7 @@ export function Surface({
   const hostRef = useRef<HTMLDivElement>(null);
 
   const toView: Mat2D = compose(translate(PAD, PAD), scale(zoom, zoom));
-  const viewToPage = invert(toView);
+  const viewToContent = invert(toView);
   const W = pageW * zoom + PAD * 2;
   const H = pageH * zoom + PAD * 2;
 
@@ -37,7 +37,7 @@ export function Surface({
     const toPoint = (e: PointerEvent) => {
       const r = host.getBoundingClientRect();
       const v = { x: e.clientX - r.left, y: e.clientY - r.top };
-      return { view: v, page: apply(viewToPage, v) };
+      return { view: v, page: apply(viewToContent, v) };
     };
     const env = { toView, handlePx: 10, page: { width: pageW, height: pageH } };
     let dragging = false;
@@ -68,7 +68,7 @@ export function Surface({
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', up);
     };
-  }, [store, zoom]); // toView/viewToPage depend on zoom
+  }, [store, zoom]); // toView/viewToContent depend on zoom
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

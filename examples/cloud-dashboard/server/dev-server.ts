@@ -3,6 +3,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { mkdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
+import { adminWirePaths } from '@cloudpdf/contract';
 import { CloudPDFClient } from '@cloudpdf/sdk';
 import {
   AzureFrontDoorCdnSigner,
@@ -348,14 +349,14 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
   const thumbMatch = matchPath(url.pathname, '/api/documents/:id/thumbnail');
   if (thumbMatch && req.method === 'GET') {
     const tenantId = url.searchParams.get('tenantId') || defaultTenant;
-    await proxyAdminBinary(res, tenantId, `/v1/admin/documents/${thumbMatch.id}/thumbnail`);
+    await proxyAdminBinary(res, tenantId, adminWirePaths.documentThumbnail(tenantId, thumbMatch.id!));
     return;
   }
 
   const downloadMatch = matchPath(url.pathname, '/api/documents/:id/download');
   if (downloadMatch && req.method === 'GET') {
     const tenantId = url.searchParams.get('tenantId') || defaultTenant;
-    await proxyAdminBinary(res, tenantId, `/v1/admin/documents/${downloadMatch.id}/download`, {
+    await proxyAdminBinary(res, tenantId, adminWirePaths.documentDownload(tenantId, downloadMatch.id!), {
       'content-disposition': `attachment; filename="${downloadMatch.id}.pdf"`,
     });
     return;

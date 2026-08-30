@@ -43,6 +43,7 @@ export const mergeChrome = (base: ChromeSettings, patch: ChromeSettingsPatch): C
  */
 export const initialAnnotationState = (config: AnnotationConfig = {}): AnnotationState => ({
   model: { ...initialModel, snap: { ...initialModel.snap, ...config.snap } },
+  hydration: { status: 'loading' },
   chrome: mergeChrome(DEFAULT_CHROME, config.chrome ?? {}),
   toolGhost: null,
   stampArmEpoch: 0,
@@ -55,6 +56,8 @@ export const annotationReducer = (
   switch (action.type) {
     case 'SET_MODEL':
       return { ...state, model: action.model };
+    case 'SET_HYDRATION':
+      return { ...state, hydration: action.hydration };
     case 'SET_CHROME':
       return { ...state, chrome: mergeChrome(state.chrome, action.patch) };
     case 'SET_TOOL_GHOST':

@@ -1,13 +1,16 @@
 # Doors — the law for the viewer product line
 
-`NAMING.md` is the law for where a package lives, and
-`tooling/build/README.md` for how packages build. This file is the law for
+[`naming.md`](./naming.md) is the law for where a package lives, and
+[`tooling/build/README.md`](../../../../tooling/build/README.md) for how packages build. This file is the law for
 **how one viewer serves several deliveries**: EmbedPDF with the built-in
 engine, CloudPDF with a remote one, a CDN snippet, and one wrapper per
 framework — without forking the viewer once.
 
 A **door** is an entry point that decides ONE thing: which engine is in the
 bundle. Everything else is shared.
+
+Unqualified `kernel/`, `local/`, and `doors/` paths below are relative to
+`packages/viewer/main/src/`.
 
 ## The five laws
 
@@ -81,7 +84,7 @@ Read one wrapper and you have read them all.
 
 ## Checklist: adding a framework wrapper
 
-1. `packages/viewer/<framework>` — the name falls out of `NAMING.md`
+1. `packages/viewer/<framework>` — the name falls out of [`naming.md`](./naming.md)
    (`@embedpdf/viewer-<framework>`).
 2. `component.*`: types only from `@embedpdf/viewer/core`; props are
    `ElementConfig & <Framework>Extras`. Set `.config` before the element's

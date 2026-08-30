@@ -79,6 +79,11 @@ export function runAnnotationReadConformance(
         const snap = await doc.annotations.listRawAll();
         expect(AnnotationListSnapshotAllPagesSchema.safeParse(snap).success).toBe(true);
         expect(snap.pages.length >= 1).toBe(true);
+        // Cloud stamps its reconciliation cursor; local omits it. When
+        // present it must be a nonnegative integer.
+        if (snap.auditHead !== undefined) {
+          expect(Number.isInteger(snap.auditHead) && snap.auditHead >= 0).toBe(true);
+        }
         const target = snap.pages.find(
           (p) => p.pageState.pageObjectNumber === opts.fixture.pageObjectNumber,
         );

@@ -104,6 +104,7 @@ function annotation(index: number) {
     },
     rect: { left: 0, top: 0, right: 10, bottom: 10 },
     contents: null,
+    subject: null,
     author: null,
     created: null,
     modified: null,

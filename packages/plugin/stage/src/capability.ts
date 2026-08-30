@@ -913,7 +913,7 @@ export function createStageCapability(
     );
     const visibleRect =
       onScreen.width > 0 && onScreen.height > 0
-        ? transform.viewToPageRect(onScreen)
+        ? transform.viewToContentRect(onScreen)
         : { x: 0, y: 0, width: 0, height: 0 };
     return {
       ...box,
@@ -1108,15 +1108,15 @@ export function createStageCapability(
     },
     pageAt: (screen) => {
       // Find the visible page whose device-snapped display box contains the
-      // point, then invert that page's transform — same `viewToPage` the
-      // per-page PageContext.toPagePoint uses, so the two never drift.
+      // point, then invert that page's transform — same `viewToContent` the
+      // per-page PageContext.toContentPoint uses, so the two never drift.
       for (const p of visiblePages()) {
         const lx = screen.x - p.screenX;
         const ly = screen.y - p.screenY;
         if (lx >= 0 && ly >= 0 && lx <= p.transform.viewWidth && ly <= p.transform.viewHeight) {
           return {
             pon: p.pon,
-            point: p.transform.viewToPage({ x: lx, y: ly }),
+            point: p.transform.viewToContent({ x: lx, y: ly }),
             scale: p.transform.viewScale,
             rotation: p.rotation,
             zoom: p.transform.zoom,
@@ -1130,7 +1130,7 @@ export function createStageCapability(
       // valid outside its bounds — the same inverse transform, so no drift.
       const p = visiblePages().find((v) => v.pon === pon);
       if (!p) return null;
-      return p.transform.viewToPage({ x: screen.x - p.screenX, y: screen.y - p.screenY });
+      return p.transform.viewToContent({ x: screen.x - p.screenX, y: screen.y - p.screenY });
     },
     pageToWorld: (pon, pt) => {
       const pr = api.pageRect(pon);
@@ -1386,7 +1386,9 @@ export function createStageCapability(
       const target = Math.max(0, Math.min(pageIndex, doc.pageCount - 1));
       const positioned =
         !!opts &&
-        (opts.rect !== undefined ||
+        // `rect: null` means "no rect", same as absent — so nullable sources
+        // (`CommentThreadView.contentRect`) flow in without a `?? undefined`.
+        (opts.rect != null ||
           opts.anchor !== undefined ||
           (opts.zoom !== undefined && opts.zoom !== 'keep'));
 

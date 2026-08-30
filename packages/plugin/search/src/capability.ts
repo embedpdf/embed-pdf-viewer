@@ -255,6 +255,17 @@ export function createSearchCapability(
   };
 
   return {
+    // The twin. Search is a pure request, so the VERBS carry no client gate
+    // (the engine enforces; the ERROR state reports) — the twin exists for
+    // affordance hiding. 'full' composes both capabilities because a snippet
+    // reproduces document text; the session's own degradation means plain
+    // `canSearch()` is exactly "would `search()` produce hits".
+    canSearch: (mode) => {
+      const sec = ctx.doc?.security;
+      if (!sec) return false;
+      return sec.allows('doc.text.search') && (mode !== 'full' || sec.allows('doc.text.copy'));
+    },
+
     // An empty text is "stop searching", not a query — identical to clear().
     search: (query, exec) =>
       query.text.length === 0 ? clear() : void runSession(query, exec?.startPage),

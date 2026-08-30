@@ -1,4 +1,4 @@
-import type { DocCapability, PdfBits } from '../auth/scope';
+import type { CollabTarget, DocCapability, PdfBits } from '../auth/scope';
 import type { AbortablePromise } from '../promise/AbortablePromise';
 
 export type DocumentOpenMode = 'none' | 'user' | 'owner';
@@ -216,6 +216,38 @@ export interface DocumentSecurityService {
    * only to *display* the concrete grants.
    */
   allows(capability: DocCapability): boolean;
+
+  /**
+   * Per-record annotation authorization mirrors — the SAME resolver the
+   * engine enforces with (`checkCollab`'s narrowing rule: an applicable
+   * `annotations:<action>:<filter>` grant SHADOWS the coarse
+   * `doc.annotate.modify` fallback for that action), over the same
+   * inputs (raw scope + identity claims + PDF bits). `allows()` cannot
+   * answer these: it enumerates capabilities, and a filtered collab
+   * grant is not a capability — whether "update" is allowed depends on
+   * WHOSE annotation you're touching.
+   *
+   * Three surfaces because the questions genuinely differ:
+   *   - create derives its target from the caller's OWN identity
+   *     (`:self` trivially passes; `:group=X` matches the caller's
+   *     default group),
+   *   - update/delete are asked about the TARGET record's stamped
+   *     owner (`userId`/`groupId` from its EMBD metadata; pass `{}`
+   *     when unstamped — matching the engine, which denies unstamped
+   *     targets under any narrowed grant),
+   *   - group assignment is asked about the DESTINATION group
+   *     (`annotations:set-group:` ladder; the caller's own default
+   *     group is always assignable).
+   *
+   * These are a courtesy for UI gating — the engine (and the server,
+   * on cloud) independently enforces every mutation with the same
+   * predicates, so a stale or bypassed answer here never widens
+   * access. Returns false when no scope context exists (legacy local
+   * open without `scope`, cloud open without a token before /access).
+   */
+  allowsAnnotationCreate(): boolean;
+  allowsAnnotationMutation(action: 'update' | 'delete', target: CollabTarget): boolean;
+  allowsAnnotationGroupAssignment(groupId: string): boolean;
 
   /**
    * Identity of the current caller, or null when anonymous.

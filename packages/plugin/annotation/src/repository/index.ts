@@ -51,7 +51,7 @@ export {
   widgetAppearanceFromProps,
   writableTarget,
 } from './seam';
-export { foldAttachedLinks, linkChildRects } from './links';
+export { linkChildRects } from './links';
 export { boxEmit } from './projection';
 export type { KindProjection } from './projection';
 
@@ -197,5 +197,8 @@ export function toCreateDraft(a: Annot, crop: PdfRect): AnnotationDraft | null {
   if (!base) return null;
   const extras = kind.draftExtras?.(a, crop);
   if (kind.draftExtras && extras === null) return null;
-  return { ...base, ...extras, flags: a.flags } as AnnotationDraft;
+  // Seed /NM on every create: a durable identity that survives save/reload
+  // and gives replies and status annotations a stable join key from birth
+  // (the engine never auto-stamps on read — creation is the one moment).
+  return { ...base, ...extras, nm: crypto.randomUUID(), flags: a.flags } as AnnotationDraft;
 }

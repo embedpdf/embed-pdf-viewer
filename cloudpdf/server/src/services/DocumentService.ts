@@ -544,6 +544,7 @@ export class DocumentService {
           layoutVersion: 1,
           metadataVersion: 1,
           attachmentsVersion: 1,
+          annotationsVersion: 1,
           lastAuditId: 0,
         },
         pages,

@@ -106,12 +106,20 @@ export function runDocumentEventsConformance(
           expect(evMeta.metadata).toEqual(meta.metadata);
         }
 
-        // Provenance: own mutations, one engine instance.
+        // Provenance: own mutations, one engine instance. Every event in
+        // this suite is a mutation event — transport notices
+        // (`stream.desynced`) never fire from local mutations, so a
+        // missing origin here is a real failure, asserted explicitly.
+        const first = events[0];
+        expect(first !== undefined && 'origin' in first).toBe(true);
+        if (first === undefined || !('origin' in first)) return;
         for (const event of events) {
+          expect('origin' in event).toBe(true);
+          if (!('origin' in event)) continue;
           expect(event.origin.kind).toBe('local');
           expect(typeof event.origin.sessionId).toBe('string');
           expect(event.origin.sessionId.length > 0).toBe(true);
-          expect(event.origin.sessionId).toBe(events[0].origin.sessionId);
+          expect(event.origin.sessionId).toBe(first.origin.sessionId);
           expect(typeof event.origin.ts).toBe('number');
         }
       } finally {

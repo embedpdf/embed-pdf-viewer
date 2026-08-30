@@ -4,6 +4,7 @@ export type { TokenInput } from './token';
 import {
   AnnotationAppearancesRenderTokenSchema,
   AnnotationTokenSchema,
+  AnnotationsAllTokenSchema,
   ActionsTokenSchema,
   AttachmentsTokenSchema,
   ContentTokenSchema,
@@ -48,6 +49,14 @@ export const decodeAnnotationToken = (raw: string): number =>
   decodePositiveInteger(
     decodeToken(AnnotationTokenSchema, raw).annotationVersion,
     'annotationVersion',
+  );
+
+export const encodeAnnotationsAllToken = (annotationsVersion: number): string =>
+  encodeToken(AnnotationsAllTokenSchema, { annotationsVersion });
+export const decodeAnnotationsAllToken = (raw: string): number =>
+  decodePositiveInteger(
+    decodeToken(AnnotationsAllTokenSchema, raw).annotationsVersion,
+    'annotationsVersion',
   );
 
 export const encodeActionsToken = (actionsVersion: number): string =>

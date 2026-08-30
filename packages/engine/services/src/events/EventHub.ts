@@ -41,9 +41,13 @@ export class EventHub implements DocumentEventStream {
   }
 
   publish(event: DocumentEvent): void {
-    const { serverId } = event.origin;
-    if (serverId !== null) {
-      this.serverId = this.serverId === null ? serverId : Math.max(this.serverId, serverId);
+    // Transport notices (`stream.desynced`) carry no origin; only mutation
+    // events advance the server cursor.
+    if ('origin' in event) {
+      const { serverId } = event.origin;
+      if (serverId !== null) {
+        this.serverId = this.serverId === null ? serverId : Math.max(this.serverId, serverId);
+      }
     }
     // Snapshot so a listener that (un)subscribes mid-fan-out cannot skew
     // delivery for this event.

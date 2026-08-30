@@ -2,7 +2,7 @@
  * @embedpdf/core-geometry — the viewer's pure 2D coordinate primitives.
  *
  * The bottom of the pyramid: stage-core (layout), plugin-stage (`pageToWorld`),
- * and every framework adapter (`toPagePoint` hit-testing) all sit on these.
+ * and every framework adapter (`toContentPoint` hit-testing) all sit on these.
  * Zero dependencies, DOM-free, serializable — Rust-portable.
  *
  * The page-rotation transforms are the reason this package exists: the same
@@ -18,8 +18,15 @@ export interface Size {
   width: number;
   height: number;
 }
-/** Viewer-side rect: top-left origin, y-down (view/page-point convention — NOT the
- *  engine's bottom-left PDF rect). */
+/**
+ * A rectangle in the VIEWER's coordinates: top-left origin, y-down, PDF-point
+ * scale. What every viewer API speaks — `stage.reveal`, selection and search
+ * rects, render boxes.
+ *
+ * The rule: shown on screen → `Rect`; stored in the file → the engine's y-up
+ * `PdfRect` (`{left, bottom, right, top}`). The shapes are incompatible on
+ * purpose — passing one where the other goes doesn't compile.
+ */
 export interface Rect {
   x: number;
   y: number;
@@ -190,21 +197,27 @@ export interface PageTransform {
    * its body to `zoom ≤ 1`. Distinct from `viewScale` (a units conversion).
    */
   readonly zoom: number;
-  /** Content point → UN-rotated content view px. For overlays INSIDE the rotated
-   *  content wrapper (markers, annotations) — they ride the wrapper's rotation,
-   *  so they place in content space and only scale here. */
-  pageToContent(p: Point): Point;
+  /**
+   * Content point → this page's pixels (the un-rotated content wrapper's local
+   * px). THE overlay author's converter: elements inside the wrapper ride its
+   * rotation, so they place in content points and only scale here. Convert at
+   * the last moment — pixels are never stored.
+   */
+  toPixels(p: Point): Point;
+  /** Inverse of {@link toPixels}: wrapper-local px → content point (a pointer
+   *  event inside the wrapper back to the viewer's coordinates). */
+  fromPixels(p: Point): Point;
   /** Content point → page-local view px in the DISPLAY box (rotation applied). For
    *  footprint-space layers (outside the wrapper). */
-  pageToView(p: Point): Point;
+  contentToView(p: Point): Point;
   /** Content rect → its axis-aligned view-px rect (exact for quarter-turns). */
-  pageToViewRect(r: Rect): Rect;
+  contentToViewRect(r: Rect): Rect;
   /** Inverse — display-box view px (box-local) → content point. Hit-testing. */
-  viewToPage(p: Point): Point;
-  /** Inverse of {@link pageToViewRect}: display-box view-px rect → its content
+  viewToContent(p: Point): Point;
+  /** Inverse of {@link contentToViewRect}: display-box view-px rect → its content
    *  AABB (exact for quarter-turns). The visibility primitive — projecting a
    *  viewport rect into page points is THIS, never per-adapter corner math. */
-  viewToPageRect(r: Rect): Rect;
+  viewToContentRect(r: Rect): Rect;
   /** CSS `matrix()` mapping content space → this page's display box. Drop it on
    *  a footprint-space layer (`transform`, `transform-origin: 0 0`) and place
    *  children in content points — rotation + scale handled for free. */
@@ -244,7 +257,7 @@ export function pageTransform(input: {
 
   // The un-rotated content box in VIEW px, taken from the snapped device dims so
   // every edge lands on a whole device pixel. The effective view scale is derived
-  // from it (not the raw `scale`) so `pageToView(pageWidth) === content edge`.
+  // from it (not the raw `scale`) so `contentToView(pageWidth) === content edge`.
   const content: Size = { width: deviceWidth / dpr, height: deviceHeight / dpr };
   const viewScale = content.width / pageSize.width;
   const baseScale = input.baseScale ?? scale;
@@ -262,11 +275,13 @@ export function pageTransform(input: {
   const viewMat = rotateScaleMatrix(viewScale, content.width, content.height, rotation);
   const invMat = invert(viewMat);
 
-  const pageToContent = (p: Point): Point => applyPoint(contentMat, p);
-  const pageToView = (p: Point): Point => applyPoint(viewMat, p);
-  const viewToPage = (p: Point): Point => applyPoint(invMat, p);
-  const pageToViewRect = (r: Rect): Rect => applyRect(viewMat, r);
-  const viewToPageRect = (r: Rect): Rect => applyRect(invMat, r);
+  const toPixels = (p: Point): Point => applyPoint(contentMat, p);
+  const contentInv = invert(contentMat);
+  const fromPixels = (p: Point): Point => applyPoint(contentInv, p);
+  const contentToView = (p: Point): Point => applyPoint(viewMat, p);
+  const viewToContent = (p: Point): Point => applyPoint(invMat, p);
+  const contentToViewRect = (r: Rect): Rect => applyRect(viewMat, r);
+  const viewToContentRect = (r: Rect): Rect => applyRect(invMat, r);
   const cssMatrix = matrixToCss(viewMat);
 
   return {
@@ -281,11 +296,12 @@ export function pageTransform(input: {
     viewScale,
     baseScale,
     zoom,
-    pageToContent,
-    pageToView,
-    pageToViewRect,
-    viewToPage,
-    viewToPageRect,
+    toPixels,
+    fromPixels,
+    contentToView,
+    contentToViewRect,
+    viewToContent,
+    viewToContentRect,
     cssMatrix,
   };
 }

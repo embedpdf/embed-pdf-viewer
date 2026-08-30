@@ -63,7 +63,7 @@ module.exports = [
     },
   },
   {
-    // The two-door invariant, enforced (NAMING.md + packages/viewer/*/src/component.*).
+    // The two-door invariant, enforced (naming.md + packages/viewer/*/src/component.*).
     //
     // A framework wrapper's component module must stay ENGINE-BLIND: the local
     // PDFium engine enters a consumer's bundle through a runtime import of the

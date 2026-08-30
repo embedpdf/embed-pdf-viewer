@@ -27,6 +27,8 @@ import type { AnnotationRef } from '../identity/AnnotationRef';
  */
 export interface AnnotationPatchBase {
   contents?: string | null;
+  /** `/Subj`, three-state like `contents`: undefined=leave, null=remove, value=set. */
+  subject?: string | null;
   /** New appearance blend mode. Omit to preserve the current effective mode. */
   blendMode?: BlendMode;
 

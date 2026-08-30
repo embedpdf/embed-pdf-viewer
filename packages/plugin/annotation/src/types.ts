@@ -1,4 +1,8 @@
-import { createCapabilityToken, type PageObjectNumber } from '@embedpdf/core';
+import {
+  createCapabilityToken,
+  type DocumentEvent,
+  type PageObjectNumber,
+} from '@embedpdf/core';
 import type { PageRotation } from '@embedpdf/core-geometry';
 import type {
   AnnotationAppearanceImage,
@@ -9,6 +13,7 @@ import type {
   AttachmentContent,
   AttachmentFileSource,
   BinarySource,
+  CommentThread,
   PdfLinkTarget,
   PdfRect,
 } from '@embedpdf/engine-core/runtime';
@@ -105,8 +110,27 @@ export interface ChromeSettingsPatch {
   guides?: Partial<ChromeSettings['guides']>;
 }
 
+/**
+ * Whole-document annotation hydration. The plugin always hydrates ALL
+ * pages through `doc.annotations.listRawAll()` (one bulk request on
+ * cloud, one worker job locally) — a comments sidebar needs every page,
+ * and per-page lazy loading could never truthfully claim completeness.
+ * `loading` covers the initial ingest AND a desync re-ingest; `error`
+ * means live events still apply but the whole-document view is
+ * incomplete until a rehydrate succeeds.
+ */
+export type AnnotationHydration =
+  | { status: 'loading' }
+  | { status: 'complete' }
+  | { status: 'error'; error: unknown }
+  // The scope lacks `doc.annotate.read`: hydration never runs (no doomed
+  // request), the comments panel hides, and `rehydrate` re-checks — the
+  // state clears if an /access refresh grants read later.
+  | { status: 'forbidden' };
+
 export interface AnnotationState {
   model: Model;
+  hydration: AnnotationHydration;
   chrome: ChromeSettings;
   /**
    * The armed tool's FOOTPRINT ghost: where (and what) the NEXT click would
@@ -165,6 +189,7 @@ export interface AnnotationConfig {
 }
 export type AnnotationAction =
   | { type: 'SET_MODEL'; model: Model }
+  | { type: 'SET_HYDRATION'; hydration: AnnotationHydration }
   | { type: 'SET_CHROME'; patch: ChromeSettingsPatch }
   | { type: 'SET_TOOL_GHOST'; ghost: ToolGhost | null }
   | { type: 'STAMP_ARM_CHANGED' };
@@ -181,6 +206,14 @@ export interface LinkNavItem {
   id: string;
   rect: Rect;
   target: PdfLinkTarget;
+  /**
+   * True for a link CHILD riding an editable annotation (an `/RT /Group`
+   * subordinate) — a PROPERTY of its parent while authoring, a nav behavior
+   * only while reading. The nav layer stands its anchors down for attached
+   * items whenever the active tool enables `annotation-edit`, so the parent
+   * stays selectable/movable; standalone document links navigate regardless.
+   */
+  attached: boolean;
 }
 
 export interface Behavior {
@@ -249,6 +282,87 @@ export interface TextItem {
  * object — two typed lenses on one token — so app code simply can't see the host
  * methods.
  */
+/**
+ * Per-thread action gates, composed from two axes: authority (the
+ * engine's collab-resolver mirrors — `allowsAnnotationCreate` for
+ * reply/status, `allowsAnnotationMutation` against each target's
+ * stamped owner for edit/delete) and PDF state (the two lock flags
+ * gate DIFFERENT aspects, ISO 32000 Table 167: `lockedContents` blocks
+ * text edits, `locked` blocks deletion). A courtesy, not the guard — the
+ * engine independently enforces every write.
+ */
+export interface CommentPermissions {
+  /** A reply is an annotation CREATE. */
+  canReply: boolean;
+  /** Editing this comment's text (`contents`) — gated by `lockedContents`. */
+  canEditText: boolean;
+  /** Deleting this one annotation — gated by `locked`. */
+  canDelete: boolean;
+  /** A status change is a NEW hidden annotation — create authority only,
+   *  never edit rights on someone else's comment. */
+  canSetStatus: boolean;
+  /** `canDelete` over EVERY thread member (root, replies, grouped parts,
+   *  state annotations) — the whole-thread preflight. */
+  canDeleteThread: boolean;
+}
+
+export interface ThreadDeleteResult {
+  deleted: AnnotationRef[];
+  failed: Array<{ ref: AnnotationRef; error: unknown }>;
+}
+
+/**
+ * The conversation plane's surface: a derived, memoized threads index over
+ * the annotation substrate, plus the ISO-native verbs. Every verb compiles
+ * down to plain annotation creates/patches/deletes — one optimistic
+ * pipeline, no second write path — so remote SSE events, own edits, and
+ * hydration all update `threads()` for free.
+ *
+ * Threads carry `pageObjectNumber` (identity is PON, like everything
+ * else); DISPLAY order is a behavior of `threads()` (sorted against the
+ * live layout at computation time), and display labels (`pageIndex`) are a
+ * framework-hook enrichment — the layer that watches both stores.
+ */
+export interface CommentsApi {
+  /** Every comment thread in the document, display-ordered, memoized. */
+  threads(): CommentThread[];
+  /** The thread containing ANY member ref (root, reply, grouped part, or
+   *  state annotation), or null. */
+  thread(ref: AnnotationRef): CommentThread | null;
+  /** Whole-document hydration status (the sidebar's honest loading state). */
+  hydration(): AnnotationHydration;
+  /** Re-run whole-document hydration (desync recovery / manual refresh). */
+  rehydrate(): Promise<void>;
+
+  /** Reply to a thread. Writes FLAT (`/IRT` → the thread root, ISO reply
+   *  type), whatever member was passed — presentation stays one level. */
+  reply(ref: AnnotationRef, text: string): Promise<AnnotationRef>;
+  /** Edit a comment's text. Appearance-inert for every kind except
+   *  free-text and redaction (whose `/AP` paints `/Contents`). */
+  edit(ref: AnnotationRef, text: string): Promise<void>;
+  /**
+   * Set this session's review status on the thread (ISO 32000 §12.5.6.3):
+   * creates a hidden state annotation chained to the caller's previous
+   * status when one exists, else to the root. The target annotation is
+   * never modified. Known states: accepted / rejected / cancelled /
+   * completed / none (custom vocabularies ride the raw create API).
+   */
+  setStatus(ref: AnnotationRef, state: string): Promise<void>;
+  /** Toggle this session's Marked-model checkmark on the thread. */
+  setMarked(ref: AnnotationRef, marked: boolean): Promise<void>;
+  /** Delete exactly ONE annotation (a reply, a status, or a bare root). */
+  remove(ref: AnnotationRef): Promise<void>;
+  /**
+   * Delete a WHOLE thread, children first. Preflighted: when any member
+   * fails the delete gate the call returns every blocked ref as `failed`
+   * and deletes nothing; mid-flight races surface the same way.
+   */
+  removeThread(ref: AnnotationRef): Promise<ThreadDeleteResult>;
+
+  /** Truthful per-thread action gates for the ref's thread. */
+  permissionsFor(ref: AnnotationRef): CommentPermissions;
+}
+
 export interface AnnotationCapability {
   // ── data API: the mutation vocabulary (engine-core types, addressable by ref) ──
   /**
@@ -304,11 +418,43 @@ export interface AnnotationCapability {
    *  with {@link currentDefaults}/{@link setDefaults}. */
   propsForTool(toolId: string): PropSpec[];
 
-  // ── authorization (mirrors the engine's own enforcement; the engine still
-  //    independently enforces, and per-owner collab rules are checked there) ──
+  // ── authorization: the `can` twins (permissions.md). Each answers "would
+  //    this verb succeed now for this session?" — authority (the engine's
+  //    collab mirrors) AND document flags, via the same fused predicates the
+  //    gestures and chrome consume; the active tool is deliberately excluded
+  //    (twins are facts; mode gates rendering). `canRead` mirrors
+  //    `doc.annotate.read`: false → hydration reports `forbidden` and the
+  //    comments UI hides. The engine independently enforces everything. ──
+  canRead(): boolean;
+  // ── authorization: per-record mirrors of the engine's collab resolver
+  //    (`security.allowsAnnotation*`). `canCreate` asks about the caller's
+  //    own identity; `canEdit`/`canDelete` about the TARGET's stamped owner,
+  //    so under a narrowed grant (`annotations:update:self`) they answer
+  //    per annotation. Pure authority — the `locked`/`lockedContents` flag
+  //    gates live with the surfaces that touch that aspect (see
+  //    `comments.permissionsFor`). The engine independently enforces. ──
   canCreate(): boolean;
   canEdit(ref: AnnotationRef): boolean;
   canDelete(ref: AnnotationRef): boolean;
+
+  /** The conversation plane's read/write surface — see {@link CommentsApi}. */
+  comments: CommentsApi;
+
+  /**
+   * The attached-link lens: an annotation's link is a `/Link` CHILD grouped
+   * under it in the document (ISO-native, Acrobat-interoperable) — a
+   * PROPERTY while authoring, a nav BEHAVIOR while reading. `of` derives
+   * from the committed children (the one source of truth); `set`/`clear`
+   * resolve when the children are committed, after which `of` reflects the
+   * change. `updateSelection({ link })` remains the props-pipeline alias.
+   * On the link KIND itself, `of` reads the annotation's own `/A` target
+   * (retarget standalone links via `updateSelection`).
+   */
+  links: {
+    of(ref: AnnotationRef): PdfLinkTarget | null;
+    set(ref: AnnotationRef, target: PdfLinkTarget): Promise<void>;
+    clear(ref: AnnotationRef): Promise<void>;
+  };
 
   // ── reads (canonical engine DTOs) ──
   /** The annotation for a ref, or null if unknown / not yet committed. */
@@ -559,7 +705,10 @@ export interface AnnotationHostCapability extends AnnotationCapability {
    *  the renderer places the baked bitmap by its OWN `/Rect` without touching the
    *  PDF↔content seam. Null if the page's crop box is unknown. */
   toContentBox(pon: PageObjectNumber, rect: PdfRect): Rect | null;
-  ensurePage(pon: PageObjectNumber): void; // lazy-load a page's annotations
+  /** No-op since whole-document hydration: the model is seeded by
+   *  `listRawAll()` at document open. Kept as API for layers that call it
+   *  on page mount. */
+  ensurePage(pon: PageObjectNumber): void;
   /**
    * Drop and RE-READ one page's annotations from the engine — the hook for
    * cross-plane mutations (e.g. `doc.forms.createField`/`deleteField`
@@ -568,6 +717,22 @@ export interface AnnotationHostCapability extends AnnotationCapability {
    * created.
    */
   reloadPage(pon: PageObjectNumber): Promise<void>;
+  // ── whole-document hydration (see the controller in capability.ts) ──
+  /** Live hydration status — `loading` covers initial ingest AND a desync
+   *  re-ingest. */
+  hydration(): AnnotationHydration;
+  /** Kick hydration exactly once per document; the effects layer calls
+   *  this at registration. Subsequent calls no-op. */
+  ensureHydrated(): void;
+  /** Re-run whole-document hydration (desync recovery). Safe to call while
+   *  one is in flight — the fresh run is chained after it. */
+  rehydrate(): Promise<void>;
+  /**
+   * The effects layer hands every REMOTE `annotation.*` event here: during
+   * a hydration window it queues (replayed by audit cursor after ingest —
+   * the delete-resurrection guard); otherwise it applies immediately.
+   */
+  deliverRemoteAnnotationEvent(event: DocumentEvent): void;
   // ── free-text (the editable-element layer) ──
   /** The free-text boxes on a page, ready to render as editable elements.
    *  `view` as in {@link pageItems}. */

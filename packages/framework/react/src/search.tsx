@@ -3,7 +3,7 @@
  *
  * <SearchLayer> is a dumb renderer, the SelectionLayer's twin: it reads
  * the page's content-space hit rects from the capability and paints them
- * through PageContext.pageToContent. The active hit gets its own colour.
+ * through PageContext.toPixels. The active hit gets its own colour.
  * No pointer handling, no engine calls — search is driven from app chrome
  * via useSearch().
  */
@@ -52,8 +52,8 @@ export function SearchLayer({
             q.lowerStart.y === q.lowerEnd.y &&
             q.upperStart.x === q.lowerStart.x;
           if (upright) {
-            const tl = page.transform.pageToContent(q.upperStart);
-            const br = page.transform.pageToContent(q.lowerEnd);
+            const tl = page.transform.toPixels(q.upperStart);
+            const br = page.transform.toPixels(q.lowerEnd);
             return (
               <div
                 key={`${hit.charStart}:${i}`}
@@ -71,7 +71,7 @@ export function SearchLayer({
             );
           }
           const ring = [q.upperStart, q.upperEnd, q.lowerEnd, q.lowerStart].map((p) =>
-            page.transform.pageToContent(p),
+            page.transform.toPixels(p),
           );
           return (
             <svg

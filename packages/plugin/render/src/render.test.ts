@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { DocumentEvent, EffectContext } from '@embedpdf/core';
 
 import { createRenderCapability } from './capability';
@@ -244,6 +244,7 @@ describe('policy conformance', () => {
       }),
       doc: {
         events: { subscribe: () => () => {} },
+        security: { allows: () => true },
         page: (pon: number) => ({
           render: {
             image: (options: Record<string, unknown>) => {
@@ -392,5 +393,54 @@ describe('policy conformance', () => {
       tiles: true,
     });
     expect(harness({ options: { tiles: false } }).capability.paintSettings().tiles).toBe(false);
+  });
+});
+
+describe('the twin law (permissions.md) — canRender and the fetch gates', () => {
+  const makeCtx = (allowed: boolean) => {
+    let state = initialRenderState();
+    const image = vi.fn(() => {
+      const p = Promise.resolve({ close: () => {} }) as Promise<unknown> & {
+        abort: (r?: unknown) => void;
+      };
+      p.abort = () => {};
+      return p;
+    });
+    const ctx = {
+      getState: () => state,
+      dispatch: (a: RenderAction) => {
+        state = renderReducer(state, a);
+      },
+      document: () => ({
+        pages: [{ pageObjectNumber: 11, size: { width: 612, height: 792 } }],
+      }),
+      doc: {
+        security: { allows: () => allowed },
+        page: () => ({ render: { image } }),
+        events: { subscribe: () => () => {} },
+      },
+      cleanup: () => {},
+      tryGet: () => null,
+    } as unknown as EffectContext<RenderState, RenderAction>;
+    return { capability: createRenderCapability(ctx), image };
+  };
+
+  it('canRender mirrors doc.render', () => {
+    expect(makeCtx(true).capability.canRender()).toBe(true);
+    expect(makeCtx(false).capability.canRender()).toBe(false);
+  });
+
+  it('a denied session never spends an engine round-trip on a raster', async () => {
+    const { capability, image } = makeCtx(false);
+    await expect(
+      capability.renderPage(11, { scale: 1, signal: new AbortController().signal }),
+    ).rejects.toMatchObject({ name: 'PermissionDenied', required: 'doc.render' });
+    expect(image).not.toHaveBeenCalled();
+  });
+
+  it('an allowed session renders (twin ⇔ verb conformance)', async () => {
+    const { capability, image } = makeCtx(true);
+    await capability.renderPage(11, { scale: 1, signal: new AbortController().signal });
+    expect(image).toHaveBeenCalledOnce();
   });
 });

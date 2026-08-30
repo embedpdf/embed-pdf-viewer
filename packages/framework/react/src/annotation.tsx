@@ -16,7 +16,11 @@ import { useEffect, useState } from 'react';
 import {
   AnnotationToken,
   refKey,
+  type AnnotationHydration,
+  type AnnotationRef,
   type Behavior,
+  type CommentsApi,
+  type CommentThread,
   type SelectionFlags,
   type SelectionProps,
   type FilePickerProvider,
@@ -30,6 +34,7 @@ import { AnnotationToken as AnnotationHostToken } from '@embedpdf/plugin-annotat
 import {
   scene,
   MITER_LIMIT,
+  pdfToContentRect,
   type AnnotationProps,
   type CreationDraftAnchor,
   type Paint,
@@ -58,11 +63,13 @@ export type { SelectionFlags, SelectionProps } from '@embedpdf/plugin-annotation
 import {
   shallowArray,
   useCapability,
+  useDocumentId,
+  useKernelValue,
   useOptionalCapability,
   usePage,
   useSelector,
 } from './runtime';
-import type { PageContextValue } from './runtime';
+import type { PageContextValue, PageLayout } from './runtime';
 
 /** `#rrggbb` → `rgba(...)` — the marquee's translucent fill derives from the
  *  accent, so one `setChrome({ accent })` restyles every piece of chrome. */
@@ -125,8 +132,8 @@ export interface AnnotationLayerProps {
 
 /** Content rect → a view-px box (the page wrapper's own coordinate space). */
 function boxOf(r: Rect, page: PageContextValue) {
-  const tl = page.transform.pageToContent({ x: r.x, y: r.y });
-  const br = page.transform.pageToContent({ x: r.x + r.width, y: r.y + r.height });
+  const tl = page.transform.toPixels({ x: r.x, y: r.y });
+  const br = page.transform.toPixels({ x: r.x + r.width, y: r.y + r.height });
   return { left: tl.x, top: tl.y, width: br.x - tl.x, height: br.y - tl.y };
 }
 
@@ -365,14 +372,14 @@ function Chrome({ page }: { page: PageContextValue }) {
   // The live rotation readout — an HTML chip (rounded box + padded text beats
   // hand-rolling it in SVG), riding the pointer like v2's.
   const chip = nodes.find((n) => n.kind === 'angle-chip');
-  const chipAt = chip ? page.transform.pageToContent(chip.at) : null;
+  const chipAt = chip ? page.transform.toPixels(chip.at) : null;
   return (
     <>
       <svg style={{ position: 'absolute', inset: 0, overflow: 'visible', pointerEvents: 'none' }}>
         {nodes.map((n, i) => {
           if (n.kind === 'angle-chip') return null; // rendered as HTML below
           if (n.kind === 'handle') {
-            const p = page.transform.pageToContent(n.at);
+            const p = page.transform.toPixels(n.at);
             const hs = cs.handles.size;
             return (
               <rect
@@ -392,10 +399,10 @@ function Chrome({ page }: { page: PageContextValue }) {
           // A live alignment guide of a snapped move: a through-line at the snapped
           // edge/center, spanning both shapes.
           if (n.kind === 'guide') {
-            const a = page.transform.pageToContent(
+            const a = page.transform.toPixels(
               n.axis === 'x' ? { x: n.at, y: n.lo } : { x: n.lo, y: n.at },
             );
-            const b = page.transform.pageToContent(
+            const b = page.transform.toPixels(
               n.axis === 'x' ? { x: n.at, y: n.hi } : { x: n.hi, y: n.at },
             );
             return (
@@ -416,7 +423,7 @@ function Chrome({ page }: { page: PageContextValue }) {
           if (n.kind === 'obb') {
             const pts = n.corners
               .map((c) => {
-                const p = page.transform.pageToContent(c);
+                const p = page.transform.toPixels(c);
                 return `${p.x},${p.y}`;
               })
               .join(' ');
@@ -439,8 +446,8 @@ function Chrome({ page }: { page: PageContextValue }) {
             return (
               <g key={i}>
                 {n.lines.map((l, j) => {
-                  const a = page.transform.pageToContent(l.a);
-                  const b = page.transform.pageToContent(l.b);
+                  const a = page.transform.toPixels(l.a);
+                  const b = page.transform.toPixels(l.b);
                   const axis = l.role === 'axis';
                   return (
                     <line
@@ -465,8 +472,8 @@ function Chrome({ page }: { page: PageContextValue }) {
           }
           // The rotate knob: a stalk from the top-edge midpoint out to a grab dot.
           if (n.kind === 'rotate-knob') {
-            const at = page.transform.pageToContent(n.at);
-            const from = page.transform.pageToContent(n.from);
+            const at = page.transform.toPixels(n.at);
+            const from = page.transform.toPixels(n.from);
             return (
               <g key={i}>
                 {cs.knob.stalk && (
@@ -559,6 +566,18 @@ function FreeText({ item, page }: { item: TextItem; page: PageContextValue }) {
   const ref = React.useRef<HTMLDivElement>(null);
   const box = boxOf(item.box, page);
   const scale = item.box.width > 0 ? box.width / item.box.width : 1; // content units → screen px
+  // The element IS the engine's text PLATE (`SetPlateRect` + its `re W n`
+  // clip): positioned at the padding inset with ZERO CSS padding, so the
+  // scrollport's edge is the plate edge. CSS padding does NOT clip overflow —
+  // scrolled lines slide straight through it and paint over the border band —
+  // so the border band must sit OUTSIDE the scrollport, never inside it.
+  const pad = item.css.padding * scale;
+  const plate = {
+    left: box.left + pad,
+    top: box.top + pad,
+    width: Math.max(0, box.width - 2 * pad),
+    height: Math.max(0, box.height - 2 * pad),
+  };
 
   // DOM ← model, but ONLY when this element isn't being typed in — keeps the caret
   // stable while you type AND lets a remote (collab) edit land live when idle.
@@ -572,7 +591,15 @@ function FreeText({ item, page }: { item: TextItem; page: PageContextValue }) {
   // model — it never drives it (exit is hub-driven, see the edit handler), so a
   // transient focus-steal by the page surface can't end the edit.
   useEffect(() => {
-    if (item.editing) ref.current?.focus();
+    if (item.editing) {
+      const el = ref.current;
+      if (!el) return;
+      el.focus();
+      // Enter at the TOP — the same anchoring the baked appearance uses
+      // (/Q vertical-align top), so baked → edit → baked never jumps. The
+      // browser still follows the caret once the user clicks or types.
+      el.scrollTop = 0;
+    }
   }, [item.editing]);
 
   // Isolate the editor from the interaction hub: a pointerdown inside it must NOT
@@ -616,18 +643,18 @@ function FreeText({ item, page }: { item: TextItem; page: PageContextValue }) {
       }}
       style={{
         position: 'absolute',
-        left: box.left,
-        top: box.top,
-        width: box.width,
-        // Fixed to the annotation rect — the box never grows with content; it
-        // scrolls while editing and clips otherwise (matching the baked /AP).
-        height: box.height,
+        left: plate.left,
+        top: plate.top,
+        width: plate.width,
+        // Fixed to the annotation rect's plate — the box never grows with
+        // content; it scrolls while editing and clips otherwise, at the SAME
+        // boundary the baked /AP clips at (`re W n` on the text body).
+        height: plate.height,
         fontFamily: item.css.fontFamily,
         fontSize: item.css.fontSize * scale,
         lineHeight: `${item.css.lineHeight * scale}px`,
         color: item.css.color,
         textAlign: item.css.align,
-        padding: item.css.padding * scale,
         boxSizing: 'border-box',
         background: item.css.background ?? 'transparent',
         whiteSpace: 'pre-wrap',
@@ -931,6 +958,89 @@ export function useSelectionProps(): SelectionProps {
  */
 export function useSelectionFlags(): SelectionFlags | null {
   return useSelector(AnnotationToken, (c) => c.getSelectionFlags());
+}
+
+// ── Comments (the conversation plane) ────────────────────────────────────────
+
+/**
+ * A {@link CommentThread} enriched with its page's live display position —
+ * the framework-layer join. Identity stays `pageObjectNumber` (like every
+ * annotation surface); these two fields are PRESENTATION, tracking page
+ * moves and deletes.
+ */
+export interface CommentThreadView extends CommentThread {
+  /** Current 0-based display index of the thread's page; `-1` when the page
+   *  is no longer in the document (one-frame teardown race on delete). */
+  pageIndex: number;
+  /** The page's `/PageLabels` label when the PDF declares one ("iv", "A-2"),
+   *  else the 1-based position as a string — print it verbatim. */
+  pageLabel: string;
+  /**
+   * The root annotation's rect in CONTENT space (y-down, crop-relative,
+   * unscaled points) — the space `StageCapability.reveal` takes, so a
+   * "jump to this comment" is `stage.reveal(pageIndex, { rect: contentRect })`.
+   * Null when the page is gone. Identity still travels as `pageObjectNumber`;
+   * this, like `pageIndex`, is presentation.
+   */
+  contentRect: Rect | null;
+}
+
+/** Pure join behind {@link useCommentThreads} — exported for tests. */
+export function enrichCommentThreads(
+  threads: readonly CommentThread[],
+  pages: readonly PageLayout[],
+): CommentThreadView[] {
+  const byPon = new Map(pages.map((p) => [p.pageObjectNumber, p] as const));
+  return threads.map((t) => {
+    const page = byPon.get(t.pageObjectNumber);
+    return {
+      ...t,
+      pageIndex: page ? page.index : -1,
+      pageLabel: page ? (page.label ?? String(page.index + 1)) : '?',
+      contentRect: page ? pdfToContentRect(t.root.rect, page.boxes.crop) : null,
+    };
+  });
+}
+
+/** The comments surface (verbs + `permissionsFor`) — imperative; pair with
+ *  {@link useCommentThreads} for the subscribed view. */
+export function useComments(): CommentsApi {
+  return useCapability(AnnotationToken).comments;
+}
+
+const EMPTY_PAGES: readonly PageLayout[] = [];
+
+/**
+ * Every comment thread in the document, display-ordered (page position →
+ * top of page → creation date) and enriched with `pageIndex`/`pageLabel`.
+ * Subscribed to BOTH stores: annotation writes (own, remote, hydration)
+ * recompute the threads; page moves/deletes re-run the join. Reference-
+ * stable between changes — safe to memo child renders on the array.
+ */
+export function useCommentThreads(): CommentThreadView[] {
+  const docId = useDocumentId();
+  const threads = useSelector(AnnotationToken, (c) => c.comments.threads());
+  const pages = useKernelValue((k) =>
+    docId ? (k.getState().core.documents[docId]?.pages ?? EMPTY_PAGES) : EMPTY_PAGES,
+  );
+  return React.useMemo(() => enrichCommentThreads(threads, pages), [threads, pages]);
+}
+
+/** The enriched thread containing ANY member ref (root, reply, grouped part,
+ *  state annotation), or null. */
+export function useCommentThread(ref: AnnotationRef | null): CommentThreadView | null {
+  const views = useCommentThreads();
+  const api = useComments();
+  if (ref == null) return null;
+  const t = api.thread(ref);
+  if (!t) return null;
+  return views.find((v) => refKey(v.root.ref) === refKey(t.root.ref)) ?? null;
+}
+
+/** Whole-document hydration status — the comments sidebar's honest loading
+ *  state (`loading` until `listRawAll` lands, then `complete`/`error`). */
+export function useCommentsHydration(): AnnotationHydration {
+  return useSelector(AnnotationToken, (c) => c.comments.hydration());
 }
 
 // ── Selection-menu anchor vocabulary ─────────────────────────────────────────

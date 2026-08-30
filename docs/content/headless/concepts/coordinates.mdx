@@ -1,0 +1,98 @@
+---
+title: Coordinates
+description: The two coordinate systems in EmbedPDF — the file's and the viewer's — and the one rule for using them.
+---
+
+# Coordinates
+
+Every position in EmbedPDF is one of two kinds. You can tell them apart at a
+glance, and the compiler won't let you mix them.
+
+## The file's coordinates — `PdfRect`
+
+What the PDF document itself stores. Y grows **upward** (PDF is a math
+graph), measured in PDF points, corners named explicitly:
+
+```ts
+annotation.rect;
+// { left: 100, bottom: 700, right: 120, top: 720 }
+```
+
+You'll meet this shape anywhere you read or write the document: annotation
+DTOs, creation drafts, patches. It round-trips byte-for-byte with what
+Acrobat and every other PDF tool sees.
+
+## The viewer's coordinates — `Rect`
+
+What you use to put things on screen. Y grows **downward** (like HTML), same
+points scale, origin at the page's top-left:
+
+```ts
+thread.contentRect;
+// { x: 100, y: 80, width: 20, height: 20 }
+```
+
+Every viewer API speaks this shape: `stage.reveal(...)`, selection and search
+rects, render boxes, overlay anchors.
+
+> **The rule:** stored in the file → `PdfRect`. Shown on screen → `Rect`.
+> Wrong one → compile error, because the shapes don't match.
+
+## You usually don't convert
+
+APIs hand you the right kind for the job. A comment thread carries both —
+same sticky note, two jobs:
+
+```tsx
+const threads = useCommentThreads();
+const stage = useStage();
+
+threads.map((t) => (
+  <button key={refKey(t.root.ref)} onClick={() => stage.reveal(t.pageIndex, { rect: t.contentRect })}>
+    {t.root.contents} — page {t.pageLabel}
+  </button>
+));
+```
+
+No math. `t.root.rect` stays the document's truth (export it, save it, diff
+it); `t.contentRect` is the same box, ready for the viewer.
+
+## When you do convert
+
+Holding a raw annotation and pointing the viewer at it is one call:
+
+```ts
+const anno = useAnnotation();
+stage.reveal(pageIndex, { rect: anno.toContentBox(dto.pageObjectNumber, dto.rect) });
+```
+
+That's the only file ↔ viewer bridge you'll ever need.
+
+## Pixels are never stored
+
+Pixels change with every zoom, rotation, and scroll — so no EmbedPDF API
+stores them. When you draw your own overlay, convert at the last moment:
+
+```tsx
+function Pin({ item, page }: AnnotationRendererProps) {
+  // viewer coordinates → this page's pixels (zoom + rotation handled)
+  const px = page.transform.toPixels({ x: item.box.x, y: item.box.y });
+  return <div style={{ position: 'absolute', left: px.x, top: px.y }}>📌</div>;
+}
+```
+
+Going the other way (a pointer event → viewer coordinates) is
+`page.transform.fromPixels(px)`, and for raw client coordinates the page
+context has `page.toContentPoint(clientX, clientY)`.
+
+## Cheat sheet
+
+| You're doing…                                  | Use                | Shape                          |
+| ---------------------------------------------- | ------------------ | ------------------------------ |
+| Reading / writing annotations, drafts, patches | file coordinates   | `{ left, bottom, right, top }` |
+| `reveal`, selection & search rects, overlays   | viewer coordinates | `{ x, y, width, height }`      |
+| Drawing DOM/canvas right now                   | `page.transform`   | pixels — convert, never store  |
+
+**Bringing your own coordinate system?** Viewer coordinates are a plain
+y-down frame in points — one affine transform maps them into your world, and
+nothing else in the API will surprise you.

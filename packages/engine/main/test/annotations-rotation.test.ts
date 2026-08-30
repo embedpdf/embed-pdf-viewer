@@ -32,6 +32,48 @@ const VERTICES = [
   { x: 110, y: 150 },
 ];
 
+type Rect = { left: number; bottom: number; right: number; top: number };
+
+function rotatedAabb(rect: Rect, degrees: number): Rect {
+  const radians = (degrees * Math.PI) / 180;
+  const width = rect.right - rect.left;
+  const height = rect.top - rect.bottom;
+  const aabbWidth = width * Math.abs(Math.cos(radians)) + height * Math.abs(Math.sin(radians));
+  const aabbHeight = width * Math.abs(Math.sin(radians)) + height * Math.abs(Math.cos(radians));
+  const centerX = (rect.left + rect.right) / 2;
+  const centerY = (rect.bottom + rect.top) / 2;
+  return {
+    left: centerX - aabbWidth / 2,
+    bottom: centerY - aabbHeight / 2,
+    right: centerX + aabbWidth / 2,
+    top: centerY + aabbHeight / 2,
+  };
+}
+
+function alphaCoverage(raster: { width: number; height: number; data: ArrayBuffer }): {
+  x: number;
+  y: number;
+} {
+  const bytes = new Uint8Array(raster.data);
+  let minX = raster.width;
+  let minY = raster.height;
+  let maxX = -1;
+  let maxY = -1;
+  for (let y = 0; y < raster.height; y++) {
+    for (let x = 0; x < raster.width; x++) {
+      if (bytes[(y * raster.width + x) * 4 + 3]! > 8) {
+        minX = Math.min(minX, x);
+        minY = Math.min(minY, y);
+        maxX = Math.max(maxX, x);
+        maxY = Math.max(maxY, y);
+      }
+    }
+  }
+  return maxX < 0
+    ? { x: 0, y: 0 }
+    : { x: (maxX - minX + 1) / raster.width, y: (maxY - minY + 1) / raster.height };
+}
+
 let annotationsPdf: Uint8Array;
 
 beforeAll(async () => {
@@ -91,6 +133,67 @@ describe('annotation rotation (local engine) — save + reopen', () => {
       expect(Math.round(square.unrotatedRect!.left)).toBe(SQUARE_RECT.left);
       expect(Math.round(square.unrotatedRect!.right)).toBe(SQUARE_RECT.right);
     }
+    await doc.close();
+  });
+
+  test('box move preserves a rotated appearance when the new AABB contains its old BBox', async () => {
+    engine = await createLocalEngine({ runtime: { prefer: 'wasm' } });
+
+    const rotation = 45;
+    const originalBox = { left: 100, bottom: 100, right: 300, top: 300 };
+    const movedBox = { left: 80, bottom: 100, right: 280, top: 300 };
+
+    let artifact: Uint8Array;
+    let ref: unknown;
+    {
+      const doc = await engine.open({
+        kind: 'layerBytes',
+        id: 'rot-move',
+        baseBytes: annotationsPdf,
+        layer: { kind: 'fresh' },
+      });
+      const page = doc.page(PAGE);
+      const created = await page.annotations.create({
+        subtype: 'circle',
+        contents: 'rotation: preserved move',
+        rect: rotatedAabb(originalBox, rotation),
+        unrotatedRect: originalBox,
+        rotation,
+        interiorColor: { r: 255, g: 213, b: 0 },
+        color: { r: 229, g: 72, b: 77 },
+        strokeWidth: 6,
+        borderStyle: 'solid',
+        opacity: 1,
+      });
+      ref = created.created.ref;
+
+      const updated = await page.annotations.update(created.created.ref, {
+        subtype: 'circle',
+        rect: rotatedAabb(movedBox, rotation),
+        unrotatedRect: movedBox,
+        rotation,
+      });
+      expect(updated.appearance).toEqual({ action: 'preserved', changed: false });
+
+      artifact = await doc.downloadLayer!();
+      await doc.close();
+    }
+
+    const doc = await engine.open({
+      kind: 'layerBytes',
+      id: 'rot-move-reopened',
+      baseBytes: annotationsPdf,
+      layer: { kind: 'artifact', bytes: artifact },
+    });
+    const rendered = await doc.page(PAGE).annotations.renderAppearances();
+    const appearance = rendered.appearances.find(
+      (candidate) => JSON.stringify(candidate.ref) === JSON.stringify(ref),
+    );
+    expect(appearance).toBeDefined();
+    expect(appearance!.rect).toMatchObject(movedBox);
+    const coverage = alphaCoverage(appearance!.raster);
+    expect(coverage.x).toBeGreaterThan(0.98);
+    expect(coverage.y).toBeGreaterThan(0.98);
     await doc.close();
   });
 

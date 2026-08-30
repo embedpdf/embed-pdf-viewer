@@ -6,10 +6,21 @@
  * carries `group = <primary's id>` (its `refKey`). The primary is NOT stamped —
  * it is simply the annotation whose `id` equals the group key, so membership is
  * the set of annotations pointing at it plus the primary itself.
+ *
+ * ATTACHED LINK CHILDREN are the exception: they ride the same `/RT /Group`
+ * wire mechanism but are NOT part of the composite visual — they're substrate
+ * plumbing (the parent's link property). They never count as members here, so
+ * a linked square still selects as a SINGLE annotation with handles, never
+ * shows Ungroup, and the ungroup verb can never strip an attached link's
+ * `/IRT` (which would orphan it into an unmanaged standalone document link).
  */
 import { capsFor } from './kinds';
 import { annotTransformable } from './flags';
-import type { Id, Model } from './types';
+import { isAttachedLink } from './plane';
+import type { Annot, Id, Model } from './types';
+
+/** A subordinate that counts toward a VISUAL group (not link plumbing). */
+const visualMember = (a: Annot | undefined): boolean => !!a && !isAttachedLink(a);
 
 /**
  * The transform capabilities of a multi-target (group) selection: a group can
@@ -46,9 +57,10 @@ export function groupCaps(m: Model, ids: Id[]): GroupCaps {
 export function groupKeyOf(m: Model, id: Id): Id | null {
   const a = m.byId[id];
   if (!a) return null;
-  if (a.group) return a.group;
+  if (a.group) return isAttachedLink(a) ? null : a.group;
   for (const other of m.order) {
-    if (m.byId[other]?.group === id) return id;
+    const sub = m.byId[other];
+    if (sub?.group === id && visualMember(sub)) return id;
   }
   return null;
 }
@@ -64,7 +76,8 @@ export function groupMembers(m: Model, id: Id): Id[] {
   const members: Id[] = [];
   if (m.byId[key]) members.push(key);
   for (const other of m.order) {
-    if (other !== key && m.byId[other]?.group === key) members.push(other);
+    const sub = m.byId[other];
+    if (other !== key && sub?.group === key && visualMember(sub)) members.push(other);
   }
   return members;
 }

@@ -17,10 +17,13 @@ import {
   selectionAnchor,
   selectionBoundsOnPage,
   selectionKnob,
+  textBoxes,
 } from './view';
-import { cursorAt, groupUnionBounds, hitTest } from './hit';
+import { cursorAt, groupUnionBounds, hitTest, paintOrder } from './hit';
+import { isAttachedLink, isConversationOnly, isSubstrateOnly } from './plane';
+import { linkChildrenOf, linkOf } from './links';
 import { capsFor } from './kinds';
-import { DRAWN_FLAGS } from './flags';
+import { annotDeletable, annotTransformable, DRAWN_FLAGS } from './flags';
 import {
   chordThrough,
   geomBounds,
@@ -1887,10 +1890,13 @@ describe('annotation-core callout — upright on a rotated page', () => {
     if (!ring || ring.kind !== 'poly') throw new Error('expected ring');
     const xs = ring.points.map((p) => p.x);
     const ys = ring.points.map((p) => p.y);
-    expect(Math.min(...xs)).toBeCloseTo(240);
-    expect(Math.max(...xs)).toBeCloseTo(280);
-    expect(Math.min(...ys)).toBeCloseTo(60);
-    expect(Math.max(...ys)).toBeCloseTo(180);
+    // The drawn ring insets by half the stroke (0.5 here) so the stroke's
+    // OUTER edge lands on the footprint (x∈[240,280], y∈[60,180]) — the
+    // AP-generator mirror; the ink never straddles the selection outline.
+    expect(Math.min(...xs)).toBeCloseTo(240.5);
+    expect(Math.max(...xs)).toBeCloseTo(279.5);
+    expect(Math.min(...ys)).toBeCloseTo(60.5);
+    expect(Math.max(...ys)).toBeCloseTo(179.5);
     // no axis-aligned rect node sneaks in for the border
     expect(nodes.some((n) => n.kind === 'rect')).toBe(false);
     expect(nodes.some((n) => n.kind === 'poly' && !n.closed)).toBe(true);
@@ -3722,7 +3728,7 @@ describe('apVersion: baked /AP content versioning (what re-fetches a raster)', (
   });
 });
 
-describe('link prop (attached links folded onto their parent)', () => {
+describe('link prop (attached children in the substrate, read via linkOf)', () => {
   const REF = { kind: 'objectNumber', pageObjectNumber: 1, annotObjectNumber: 40 } as const;
   const CHILD_REF = { kind: 'objectNumber', pageObjectNumber: 1, annotObjectNumber: 41 } as const;
   const URI = { kind: 'uri', uri: 'https://www.embedpdf.com/' } as const;
@@ -3753,13 +3759,15 @@ describe('link prop (attached links folded onto their parent)', () => {
     return { ...m, selected: [a.id] };
   };
 
-  it('setProps { link } on a non-link kind emits syncLink, no engine patch, and keeps the render source', () => {
+  it('setProps { link } on a non-link kind emits target-carrying syncLink, writes NOTHING to the model', () => {
     const m = withSelected(committedSquare());
     const [next, fx] = update(m, { t: 'setProps', patch: { link: URI } });
-    expect(next.byId['S1'].link).toEqual(URI);
+    // Parents store no link value — the committed children are the truth,
+    // read back through `linkOf` once the reconciler's writes land.
+    expect(next.byId['S1'].link).toBeUndefined();
     // A link-only change is NOT appearance: no patch, no vector flip.
     expect(next.byId['S1'].source).toBe('baked');
-    expect(fx).toEqual([{ fx: 'syncLink', id: 'S1' }]);
+    expect(fx).toEqual([{ fx: 'syncLink', id: 'S1', target: URI }]);
   });
 
   it('setProps { link } plus a style key emits both syncLink and a patch', () => {
@@ -3768,7 +3776,7 @@ describe('link prop (attached links folded onto their parent)', () => {
     expect(next.byId['S1'].style.color).toBe('#00ff00');
     expect(fx).toEqual([
       { fx: 'patch', id: 'S1', scope: { kind: 'props', keys: ['link', 'color'] } },
-      { fx: 'syncLink', id: 'S1' },
+      { fx: 'syncLink', id: 'S1', target: URI },
     ]);
   });
 
@@ -3788,11 +3796,115 @@ describe('link prop (attached links folded onto their parent)', () => {
     expect(fx).toEqual([]);
   });
 
-  it('deleting a parent also deletes its attached link children (linkRefs)', () => {
-    const parent = committedSquare({ link: URI, linkRefs: [CHILD_REF] });
-    const m = withSelected(parent);
+  it('authority fuses into the flags gate: no update right → the locked treatment', () => {
+    // A record this session may not edit (a colleague's annotation under an
+    // `annotations:update:self` grant) renders and behaves EXACTLY like a
+    // locked one: selectable, bare outline, no handles, no transforms.
+    const foreign = committedSquare({ authority: { update: false, delete: false } });
+    expect(annotTransformable(foreign)).toBe(false);
+    expect(annotDeletable(foreign)).toBe(false);
+    const m = { ...update(initialModel, { t: 'loaded', annots: [foreign] })[0], selected: ['S1'] };
+    expect(chrome(m, PON).filter((n) => n.kind === 'handle')).toHaveLength(0);
+    // …and deletion refuses through the same split.
     const [next, fx] = update(m, { t: 'delete' });
+    expect(next.byId['S1']).toBeDefined();
+    expect(fx).toEqual([]);
+  });
+
+  it('the authority split is per-action: update without delete, delete without update', () => {
+    const updatable = committedSquare({ authority: { update: true, delete: false } });
+    expect(annotTransformable(updatable)).toBe(true);
+    expect(annotDeletable(updatable)).toBe(false);
+    const deletable = committedSquare({ authority: { update: false, delete: true } });
+    expect(annotTransformable(deletable)).toBe(false);
+    expect(annotDeletable(deletable)).toBe(true);
+    // Unstamped (drafts, wildcard local engines) stays fully allowed.
+    expect(annotTransformable(committedSquare())).toBe(true);
+    expect(annotDeletable(committedSquare())).toBe(true);
+  });
+
+  it('an attached link is NOT a visual-group member: single selection, handles, no Ungroup', () => {
+    const parent = committedSquare();
+    const child: Annot = {
+      id: 'C1',
+      ref: CHILD_REF,
+      pon: PON,
+      subtype: 'link',
+      geom: { t: 'rect', rect: { x: 10, y: 10, width: 50, height: 40 }, ellipse: false },
+      style: { ...baseStyle },
+      flags: DRAWN_FLAGS,
+      source: 'baked',
+      group: 'S1',
+      irt: 'S1',
+      data: { subtype: 'link', target: URI } as unknown as Annot['data'],
+    };
+    const loaded = update(initialModel, { t: 'loaded', annots: [parent, child] })[0];
+    // The wire mechanism is /RT /Group, but the SEMANTICS are plumbing: the
+    // square is no group primary, the selection stays the square alone…
+    expect(groupKeyOf(loaded, 'S1')).toBe(null);
+    expect(groupKeyOf(loaded, 'C1')).toBe(null);
+    expect(expandGroups(loaded, ['S1'])).toEqual(['S1']);
+    expect(groupMembers(loaded, 'S1')).toEqual(['S1']);
+    // …so the selection chrome shows the full 8 resize handles, exactly as
+    // if no link were attached (the bug: a 2-member "group" with no handles).
+    const m = { ...loaded, selected: ['S1'] };
+    expect(chrome(m, PON).filter((n) => n.kind === 'handle')).toHaveLength(8);
+  });
+
+  it('a REAL visual group keeps working; its attached link child stays excluded', () => {
+    const primary = committedSquare({ id: 'P1' });
+    const sub = committedSquare({
+      id: 'P2',
+      ref: { kind: 'objectNumber', pageObjectNumber: 1, annotObjectNumber: 42 },
+      group: 'P1',
+      irt: 'P1',
+    });
+    const child: Annot = {
+      id: 'C1',
+      ref: CHILD_REF,
+      pon: PON,
+      subtype: 'link',
+      geom: { t: 'rect', rect: { x: 10, y: 10, width: 50, height: 40 }, ellipse: false },
+      style: { ...baseStyle },
+      flags: DRAWN_FLAGS,
+      source: 'baked',
+      group: 'P1',
+      irt: 'P1',
+      data: { subtype: 'link', target: URI } as unknown as Annot['data'],
+    };
+    const m = update(initialModel, { t: 'loaded', annots: [primary, sub, child] })[0];
+    // The pair is a group; the link child never appears among the members —
+    // so the ungroup verb (which walks expandGroups) can never strip its
+    // /IRT and orphan it into an unmanaged standalone link.
+    expect(groupKeyOf(m, 'P1')).toBe('P1');
+    expect(groupMembers(m, 'P1')).toEqual(['P1', 'P2']);
+    expect(expandGroups(m, ['P2'])).toEqual(['P1', 'P2']);
+  });
+
+  it('deleting a parent also deletes its attached link children (substrate)', () => {
+    const parent = committedSquare();
+    const child: Annot = {
+      id: 'C1',
+      ref: CHILD_REF,
+      pon: PON,
+      subtype: 'link',
+      geom: { t: 'rect', rect: { x: 10, y: 10, width: 50, height: 40 }, ellipse: false },
+      style: { ...baseStyle },
+      flags: DRAWN_FLAGS,
+      source: 'baked',
+      group: 'S1',
+      irt: 'S1',
+      data: { subtype: 'link', target: URI } as unknown as Annot['data'],
+    };
+    const loaded = update(initialModel, { t: 'loaded', annots: [parent, child] })[0];
+    // The child is substrate: readable through the lens, absent from paint.
+    expect(linkOf(loaded, 'S1')).toEqual(URI);
+    expect(pageItems(loaded, PON).some((i) => i.id === 'C1')).toBe(false);
+    const m = { ...loaded, selected: ['S1'] };
+    const [next, fx] = update(m, { t: 'delete' });
+    // Parent AND child leave the model through the ONE uniform delete path.
     expect(next.byId['S1']).toBeUndefined();
+    expect(next.byId['C1']).toBeUndefined();
     expect(fx).toEqual([
       { fx: 'delete', ref: REF },
       { fx: 'delete', ref: CHILD_REF },
@@ -3805,5 +3917,142 @@ describe('link prop (attached links folded onto their parent)', () => {
     const item = pageItems(m, PON).find((i) => i.id === 'L1');
     expect(item).toBeTruthy();
     expect(scene(item!)).toEqual([]);
+  });
+});
+
+describe('conversation plane — replies and review states never reach the page', () => {
+  const at = (x: number, y: number): Annot['geom'] => ({
+    t: 'rect',
+    rect: { x, y, width: 40, height: 30 },
+    ellipse: false,
+  });
+  const annot = (id: string, over: Partial<Annot>): Annot => ({
+    id,
+    ref: null,
+    pon: PON,
+    subtype: 'square',
+    geom: at(10, 10),
+    style: initialModel.style,
+    flags: DRAWN_FLAGS,
+    source: 'vector',
+    ...over,
+  });
+  const stateData = (state: string | null, stateModel: string | null): Annot['data'] =>
+    ({ subtype: 'text', state, stateModel }) as unknown as Annot['data'];
+
+  const root = annot('root', {});
+  const reply = annot('reply', { subtype: 'text', geom: at(100, 10), irt: 'root' });
+  const subordinate = annot('sub', {
+    subtype: 'caret',
+    geom: at(200, 10),
+    irt: 'root',
+    group: 'root',
+  });
+  const status = annot('status', {
+    subtype: 'text',
+    geom: at(300, 10),
+    data: stateData('accepted', 'review'),
+  });
+  const model = () =>
+    update(initialModel, { t: 'loaded', annots: [root, reply, subordinate, status] })[0];
+
+  it('classifies replies and state annotations; group subordinates stay painted', () => {
+    expect(isConversationOnly(root)).toBe(false);
+    expect(isConversationOnly(reply)).toBe(true);
+    expect(isConversationOnly(subordinate)).toBe(false);
+    expect(isConversationOnly(status)).toBe(true);
+    // A plain sticky note (no state entries) is a page visual.
+    expect(isConversationOnly(annot('note', { subtype: 'text' }))).toBe(false);
+    expect(
+      isConversationOnly(annot('empty-state', { subtype: 'text', data: stateData('', '') })),
+    ).toBe(false);
+    // A model-defaulted state (stateModel only) is still a state annotation.
+    expect(
+      isConversationOnly(annot('model-only', { subtype: 'text', data: stateData(null, 'review') })),
+    ).toBe(true);
+  });
+
+  it('paintOrder culls the conversation plane (paint AND hit share this cull)', () => {
+    expect(paintOrder(model(), PON)).toEqual(['root', 'sub']);
+    expect(pageItems(model(), PON).map((i) => i.id)).toEqual(['root', 'sub']);
+  });
+
+  it('the marquee cannot sweep up conversation-only annotations', () => {
+    // A sweep across every rect: only the page visuals select.
+    const m = run(model(), [
+      marqueePtr('down', 0, 0),
+      marqueePtr('move', 400, 60),
+      marqueePtr('up', 400, 60),
+    ]);
+    expect([...m.selected].sort()).toEqual(['root', 'sub']);
+  });
+});
+
+describe('callout ↔ AP-generator mirror', () => {
+  // Box (200,100)+120×40; tip far left; knee below-left of the box centre →
+  // conn = left-edge midpoint (200,120). Same fixture as the callout describe.
+  const calloutGeom = (): Extract<Geom, { t: 'text' }> => ({
+    t: 'text',
+    rect: { x: 200, y: 100, width: 120, height: 40 },
+    callout: { tip: { x: 40, y: 60 }, knee: { x: 120, y: 120 }, ending: 'open-arrow' },
+  });
+
+  it('the box border insets by half the stroke — ink INSIDE the rect, like squares', () => {
+    const nodes = geomScene(calloutGeom(), 6);
+    const box = nodes.find((n) => n.kind === 'rect');
+    if (box?.kind !== 'rect') throw new Error('expected a rect border node');
+    // rect (200,100,120,40) inset by 3: outer edge of the 6-wide stroke lands
+    // ON the rect — mirroring GenerateFreeTextAP's `Deflate(half_bw)` and the
+    // square/circle convention, so the border never straddles the selection.
+    expect(box.rect).toEqual({ x: 203, y: 103, width: 114, height: 34 });
+  });
+
+  it("the leader's connection point extends under the border by half the stroke", () => {
+    const nodes = geomScene(calloutGeom(), 6);
+    const leader = nodes[0];
+    if (leader?.kind !== 'poly' || leader.closed) throw new Error('expected the open leader poly');
+    // conn (200,120), incoming direction +x → adjusted to (203,120): the line
+    // slides under the border ink (the generator's `adjusted_conn`), so no
+    // angular gap opens at the box edge.
+    expect(leader.points[2]).toEqual({ x: 203, y: 120 });
+    // tip + knee untouched
+    expect(leader.points[0]).toEqual({ x: 40, y: 60 });
+    expect(leader.points[1]).toEqual({ x: 120, y: 120 });
+  });
+
+  it('text edit renders the callout fully LIVE — never baked raster + DOM text', () => {
+    const callout: Annot = {
+      id: 'C1',
+      ref: null,
+      pon: PON,
+      subtype: 'freeText',
+      geom: calloutGeom(),
+      style: {
+        color: '#e07b39',
+        interiorColor: '#ffffff',
+        strokeWidth: 6,
+        opacity: 1,
+        blendMode: 'normal',
+        border: { kind: 'solid' },
+      },
+      flags: DRAWN_FLAGS,
+      source: 'baked',
+    };
+    let m = update(initialModel, { t: 'loaded', annots: [callout] })[0];
+    // At rest: baked like any shape — one renderer, the engine raster.
+    expect(pageItems(m, PON)[0]!.source).toBe('baked');
+    expect(textBoxes(m, PON)).toHaveLength(0);
+
+    m = update(m, { t: 'beginTextEdit', id: 'C1' })[0];
+    const it = pageItems(m, PON)[0]!;
+    // The raster (whose flat bitmap includes the baked TEXT) is replaced by the
+    // vector scene; the DOM editor is the ONE text source. Blending the two is
+    // exactly the doubled-text bug.
+    expect(it.source).toBe('vector');
+    expect(textBoxes(m, PON).map((b) => b.id)).toEqual(['C1']);
+
+    m = update(m, { t: 'endTextEdit' })[0];
+    expect(pageItems(m, PON)[0]!.source).toBe('baked');
+    expect(textBoxes(m, PON)).toHaveLength(0);
   });
 });

@@ -128,6 +128,11 @@ function effSource(m: Model, id: Id): 'baked' | 'vector' {
   // gesture — the bitmap stretches with `effApBox` and tilts via the item's
   // live `rot`, then the engine's re-fit appearance replaces it on commit.
   if (capsFor(a.subtype).opaqueBody) return a.source;
+  // A callout under TEXT EDIT renders fully live (scene leader/border + DOM
+  // text): the flat baked raster can't hide just its text, so any blend
+  // doubles it. Geometry gestures flip below; editing joins them here. (A
+  // plain free-text needs no rule — it leaves the render list while live.)
+  if (m.editing === id && a.geom.t === 'text' && a.geom.callout) return 'vector';
   const d = m.draft;
   // A live resize/rotate/group transform must render LIVE — the baked raster
   // can't stretch or tilt — even before the commit flips `source`.

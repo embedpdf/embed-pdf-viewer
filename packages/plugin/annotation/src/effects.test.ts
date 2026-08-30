@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { DocumentEvent, EffectContext } from '@embedpdf/core';
 import { encodeStableIdKey } from '@embedpdf/engine-core/runtime';
 import type { Annot } from '@embedpdf/core-annotation';
@@ -10,44 +10,60 @@ import type { AnnotationAction, AnnotationState } from './types';
 const event = (partial: Record<string, unknown>): DocumentEvent =>
   partial as unknown as DocumentEvent;
 
+/** Effects harness: real reducer + a recording host stub — the effects
+ *  layer routes; the routed-to behavior lives in capability.test.ts. */
+const harness = (seed?: (state: AnnotationState) => AnnotationState) => {
+  let state = initialAnnotationState();
+  if (seed) state = seed(state);
+  const host = {
+    ensureHydrated: vi.fn(),
+    rehydrate: vi.fn(async () => {}),
+    deliverRemoteAnnotationEvent: vi.fn(),
+    reloadPage: vi.fn(async () => {}),
+  };
+  let emit: ((documentEvent: DocumentEvent) => void) | null = null;
+  const ctx = {
+    getState: () => state,
+    dispatch: (action: AnnotationAction) => {
+      state = annotationReducer(state, action);
+    },
+    document: () => null,
+    get: () => host,
+    doc: {
+      events: {
+        subscribe: (handler: (documentEvent: DocumentEvent) => void) => {
+          emit = handler;
+          return () => undefined;
+        },
+      },
+    },
+    cleanup: () => undefined,
+  } as unknown as EffectContext<AnnotationState, AnnotationAction>;
+  registerAnnotationEffects(ctx);
+  return { host, emit: emit!, getState: () => state };
+};
+
 describe('annotation document effects', () => {
+  it('kicks whole-document hydration exactly once at registration', () => {
+    const { host } = harness();
+    expect(host.ensureHydrated).toHaveBeenCalledTimes(1);
+  });
+
   it.each(['form.valueChanged', 'form.effectsApplied'])(
     '%s advances the changed widget appearance version',
     (type) => {
       const annotObjectNumber = 5;
       const id = encodeStableIdKey({ kind: 'objectNumber', value: annotObjectNumber });
-      let state = initialAnnotationState();
-      state = {
+      const { emit, getState } = harness((state) => ({
         ...state,
         model: {
           ...state.model,
-          byId: {
-            [id]: { id, apVersion: 0 } as Annot,
-          },
+          byId: { [id]: { id, apVersion: 0 } as Annot },
           order: [id],
         },
-      };
+      }));
 
-      let emit: ((event: DocumentEvent) => void) | null = null;
-      const ctx = {
-        getState: () => state,
-        dispatch: (action: AnnotationAction) => {
-          state = annotationReducer(state, action);
-        },
-        document: () => null,
-        doc: {
-          events: {
-            subscribe: (handler: (documentEvent: DocumentEvent) => void) => {
-              emit = handler;
-              return () => undefined;
-            },
-          },
-        },
-        cleanup: () => undefined,
-      } as unknown as EffectContext<AnnotationState, AnnotationAction>;
-
-      registerAnnotationEffects(ctx);
-      emit!(
+      emit(
         event({
           type,
           changedWidgets: [{ annotObjectNumber, pageObjectNumber: 11 }],
@@ -55,122 +71,95 @@ describe('annotation document effects', () => {
         }),
       );
 
-      expect(state.model.byId[id]?.apVersion).toBe(1);
+      expect(getState().model.byId[id]?.apVersion).toBe(1);
     },
   );
-});
 
-describe('remote annotation events — echo-driven appearance invalidation', () => {
-  const CROP = { left: 0, bottom: 0, right: 600, top: 800 };
-  const NO_FLAGS = {
-    invisible: false,
-    hidden: false,
-    print: false,
-    noZoom: false,
-    noRotate: false,
-    noView: false,
-    readOnly: false,
-    locked: false,
-    toggleNoView: false,
-    lockedContents: false,
-  };
-  const squareDTO = (annotObjectNumber: number) => ({
-    ref: { kind: 'objectNumber', pageObjectNumber: 11, annotObjectNumber },
-    pageObjectNumber: 11,
-    index: 0,
-    identityQuality: 'durable',
-    nm: null,
-    flags: NO_FLAGS,
-    rect: { left: 100, bottom: 100, right: 200, top: 200 },
-    contents: null,
-    author: null,
-    created: null,
-    modified: null,
-    blendMode: 'normal',
-    inReplyTo: null,
-    replyType: null,
-    subtype: 'square',
-    color: { r: 0, g: 0, b: 0 },
-    interiorColor: null,
-    strokeWidth: 2,
-    opacity: 1,
-    borderStyle: 'solid',
+  it('hands every REMOTE annotation event to the hydration-aware delivery', () => {
+    const { host, emit } = harness();
+    const remote = event({
+      type: 'annotation.created',
+      pageObjectNumber: 11,
+      origin: { kind: 'remote', serverId: 45 },
+      created: {},
+    });
+    emit(remote);
+    expect(host.deliverRemoteAnnotationEvent).toHaveBeenCalledWith(remote);
   });
 
-  const harness = () => {
-    const id = 'obj:70';
-    let state = initialAnnotationState();
-    state = {
+  it('filters LOCAL annotation events — own edits flow through the capability', () => {
+    const { host, emit } = harness();
+    emit(
+      event({
+        type: 'annotation.created',
+        pageObjectNumber: 11,
+        origin: { kind: 'local', serverId: null },
+        created: {},
+      }),
+    );
+    expect(host.deliverRemoteAnnotationEvent).not.toHaveBeenCalled();
+  });
+
+  it('stream.desynced triggers a rehydrate', () => {
+    const { host, emit } = harness();
+    emit(event({ type: 'stream.desynced', reason: 'backlog-overflow', ts: 1 }));
+    expect(host.rehydrate).toHaveBeenCalledTimes(1);
+  });
+
+  it('pages.deleted removes the pages’ annotations from the model', () => {
+    const keep = 'obj:1';
+    const gone = 'obj:2';
+    const { emit, getState } = harness((state) => ({
       ...state,
       model: {
         ...state.model,
-        byId: { [id]: { id, apVersion: 0 } as Annot },
-        order: [id],
-      },
-    };
-    let emit: ((documentEvent: DocumentEvent) => void) | null = null;
-    const ctx = {
-      getState: () => state,
-      dispatch: (action: AnnotationAction) => {
-        state = annotationReducer(state, action);
-      },
-      document: () => ({ pages: [{ pageObjectNumber: 11, boxes: { crop: CROP } }] }),
-      doc: {
-        events: {
-          subscribe: (handler: (documentEvent: DocumentEvent) => void) => {
-            emit = handler;
-            return () => undefined;
-          },
+        byId: {
+          [keep]: { id: keep, pon: 11 } as Annot,
+          [gone]: { id: gone, pon: 12 } as Annot,
         },
+        order: [keep, gone],
       },
-      cleanup: () => undefined,
-    } as unknown as EffectContext<AnnotationState, AnnotationAction>;
-    registerAnnotationEffects(ctx);
-    return { id, emit: emit!, getState: () => state };
-  };
+    }));
 
-  it('a PRESERVED remote update re-syncs the model without an appearance re-fetch', () => {
-    const { id, emit, getState } = harness();
     emit(
       event({
-        type: 'annotation.updated',
-        pageObjectNumber: 11,
-        origin: { kind: 'remote' },
-        updated: squareDTO(70),
-        appearance: { action: 'preserved', changed: false },
+        type: 'pages.deleted',
+        pageObjectNumbers: [12],
+        origin: { kind: 'remote', serverId: 45 },
       }),
     );
-    const a = getState().model.byId[id];
-    expect(a?.subtype).toBe('square'); // the DTO re-sync applied
-    expect(a?.apVersion ?? 0).toBe(0); // …but the cached raster stays
+
+    expect(getState().model.order).toEqual([keep]);
+    expect(getState().model.byId[gone]).toBeUndefined();
   });
 
-  it('a REGENERATED remote update advances apVersion exactly once', () => {
-    const { id, emit, getState } = harness();
+  it('pages.inserted reloads the new pages', () => {
+    const { host, emit } = harness();
     emit(
       event({
-        type: 'annotation.updated',
-        pageObjectNumber: 11,
-        origin: { kind: 'remote' },
-        updated: squareDTO(70),
-        appearance: { action: 'regenerated', changed: true },
+        type: 'pages.inserted',
+        insertedPageObjectNumbers: [21, 22],
+        origin: { kind: 'remote', serverId: 45 },
       }),
     );
-    expect(getState().model.byId[id]?.apVersion).toBe(1);
+    expect(host.reloadPage).toHaveBeenCalledTimes(2);
+    expect(host.reloadPage).toHaveBeenCalledWith(21);
+    expect(host.reloadPage).toHaveBeenCalledWith(22);
   });
 
-  it('a remote z-order move never re-fetches appearances', () => {
-    const { id, emit, getState } = harness();
+  it('redaction.applied reloads the applied pages, origin-agnostic', () => {
+    const { host, emit } = harness();
     emit(
       event({
-        type: 'annotation.moved',
-        pageObjectNumber: 11,
-        origin: { kind: 'remote' },
-        moved: [squareDTO(70)],
+        type: 'redaction.applied',
+        origin: { kind: 'local', serverId: null },
+        results: [
+          { status: 'applied', pageObjectNumber: 11 },
+          { status: 'skipped', pageObjectNumber: 12 },
+        ],
       }),
     );
-    const a = getState().model.byId[id];
-    expect(a?.subtype).toBe('square');
-    expect(a?.apVersion ?? 0).toBe(0);
+    expect(host.reloadPage).toHaveBeenCalledTimes(1);
+    expect(host.reloadPage).toHaveBeenCalledWith(11);
   });
 });

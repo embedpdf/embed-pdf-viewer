@@ -17,6 +17,7 @@ import { useT } from '@embedpdf/react/i18n';
 import { ThumbsStageToken } from '../config/stage';
 import { Icon } from './icons';
 import { AnnotationStylePanel } from './annotation-style';
+import { CommentsPanel } from './comments-panel';
 import { RedactionPanel } from './redaction-panel';
 import { SearchPanel } from './search-panel';
 
@@ -173,9 +174,7 @@ export function RightSidebar() {
       ) : active === 'redaction' ? (
         <RedactionPanel />
       ) : (
-        <div className="p-3">
-          <p className="text-fg-muted text-sm">{t('demo.empty')}</p>
-        </div>
+        <CommentsPanel key={documentId ?? 'none'} />
       )}
     </aside>
   );

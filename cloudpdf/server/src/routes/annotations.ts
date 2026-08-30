@@ -27,6 +27,7 @@ import {
   annotationRenderOptionsFromImageOptions,
   decodeAnnotationAppearancesRenderToken,
   decodeAnnotationToken,
+  decodeAnnotationsAllToken,
   PageNetworkRenderFormatSchema,
   WeakAnnotationSessionPagesRequestSchema,
   type ManifestPage,
@@ -190,6 +191,55 @@ export async function registerAnnotationRoutes(
       signal: abortSignalFromRequest(req),
       scope: { kind: 'layer', ctx, docId, layerName },
       pageObjectNumber: parsePageObjectNumber(pon),
+    });
+  });
+
+  // ── Whole-document BULK listing: one CDN-immutable object per
+  //    `annotationsVersion` pin, materialized by a single raw (no
+  //    page-load) sweep. The doc-level twin serves annotations-inheriting
+  //    layers from the base session; a diverged layer reads its own view.
+  //    Always version-addressed — the client learns the pin from the
+  //    manifest, so no unversioned "current" variant exists. ─────────────
+
+  app.get('/v1/docs/:docId/annotations/items@:token', async (req, reply) => {
+    const { docId, token } = req.params as { docId: string; token: string };
+    const ctx = await requireSharedDocRead(req, documentService, docId, 'annotations-all', [
+      'annotations',
+    ]);
+    return readAnnotationsAll({
+      documentService,
+      revisionBridge,
+      reply,
+      signal: abortSignalFromRequest(req),
+      scope: { kind: 'base', ctx, docId },
+      requestedVersion: parseTokenOrInvalidArg(
+        decodeAnnotationsAllToken,
+        token,
+        'annotationsVersion token',
+      ),
+    });
+  });
+
+  app.get('/v1/docs/:docId/layers/:layerName/annotations/items@:token', async (req, reply) => {
+    const { docId, layerName, token } = req.params as {
+      docId: string;
+      layerName: string;
+      token: string;
+    };
+    const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
+    const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
+    const ctx = requireLayerResource(req, docId, layerName, 'layer-annotations-all', pdfBits);
+    return readAnnotationsAll({
+      documentService,
+      revisionBridge,
+      reply,
+      signal: abortSignalFromRequest(req),
+      scope: { kind: 'layer', ctx, docId, layerName },
+      requestedVersion: parseTokenOrInvalidArg(
+        decodeAnnotationsAllToken,
+        token,
+        'annotationsVersion token',
+      ),
     });
   });
 
@@ -991,9 +1041,14 @@ async function readAnnotations(input: {
       input.scope.layerName,
     );
   }
+  // RAW read (docPtr dictionary walk, no FPDF_LoadPage): wire-identical to
+  // the full path today — no dispatched subtype reader uses the pagePtr —
+  // and ~1000x cheaper per cold leaf materialization. If a pagePtr-dependent
+  // reader ever lands, the local-vs-cloud conformance parity diff fails and
+  // forces this choice back onto the table (safe-by-conformance).
   const build = (jobId: WorkerJobId) =>
     wirePack({
-      kind: 'annotations.listFullPage' as const,
+      kind: 'annotations.listRawPage' as const,
       jobId,
       docId: input.scope.docId,
       ...(input.scope.kind === 'layer' ? { layerName: input.scope.layerName } : {}),
@@ -1007,12 +1062,12 @@ async function readAnnotations(input: {
     build,
     input.signal,
   );
-  if (result.tag !== 'annotations.listFullPage') {
+  if (result.tag !== 'annotations.listRawPage') {
     throw new EngineError(
       EngineErrorCode.WireFormat,
       `unexpected ${
         input.scope.kind === 'layer' ? 'layer ' : ''
-      }annotations.listFullPage payload: ${result.tag}`,
+      }annotations.listRawPage payload: ${result.tag}`,
     );
   }
 
@@ -1039,6 +1094,95 @@ async function readAnnotations(input: {
 
   input.requestedVersion === undefined ? setNoStore(input.reply) : setImmutableCache(input.reply);
   return input.revisionBridge.decorateAnnotationSnapshot(toPageState(page), result.snapshot);
+}
+
+/**
+ * Whole-document bulk read: ONE `annotations.listRawAll` worker job (the
+ * raw docPtr sweep — no per-page loads) serving one CDN-immutable body
+ * per `annotationsVersion` pin. Follows `readAnnotations`' double-check
+ * pattern against the MANIFEST's pin: pre-check before dispatch,
+ * re-validate after the worker read — a body served under an `immutable`
+ * header must never belong to a newer pin (one slip poisons the CDN).
+ * The response stamps the pre-check manifest's `auditHead`: the same row
+ * read that certified the pin, so replaying events with
+ * `serverId > auditHead` over this body is exact.
+ */
+async function readAnnotationsAll(input: {
+  documentService: DocumentService;
+  revisionBridge: CloudRevisionBridge;
+  reply: { header(name: 'Cache-Control', value: string): unknown };
+  signal: AbortSignal;
+  scope: ReadScope;
+  requestedVersion: number;
+}) {
+  const scope = input.scope;
+  const getManifest = () =>
+    scope.kind === 'layer'
+      ? input.documentService.getLayerManifest(scope.ctx, scope.docId, scope.layerName)
+      : input.documentService.getManifest(scope.ctx, scope.docId);
+
+  const manifest = await getManifest();
+  const current = manifest.annotationsVersion ?? 1;
+  if (input.requestedVersion !== current) {
+    setNoStore(input.reply);
+    throw new EngineError(
+      EngineErrorCode.NotFound,
+      `${scope.kind === 'layer' ? 'layer ' : ''}annotations version ${
+        input.requestedVersion
+      } no longer current (current=${current})`,
+    );
+  }
+
+  if (scope.kind === 'layer') {
+    await input.documentService.ensureLayerOnPool(scope.ctx, scope.docId, scope.layerName);
+  }
+  const build = (jobId: WorkerJobId) =>
+    wirePack({
+      kind: 'annotations.listRawAll' as const,
+      jobId,
+      docId: scope.docId,
+      ...(scope.kind === 'layer' ? { layerName: scope.layerName } : {}),
+    });
+  const result = await input.documentService.readOnPool(
+    scope.ctx,
+    scope.docId,
+    scope.kind === 'layer' ? scope.layerName : undefined,
+    build,
+    input.signal,
+  );
+  if (result.tag !== 'annotations.listRawAll') {
+    throw new EngineError(
+      EngineErrorCode.WireFormat,
+      `unexpected ${scope.kind === 'layer' ? 'layer ' : ''}annotations.listRawAll payload: ${
+        result.tag
+      }`,
+    );
+  }
+
+  // RE-validate the pin AFTER the worker read (see readAnnotations).
+  const fresh = await getManifest();
+  const freshCurrent = fresh.annotationsVersion ?? 1;
+  if (input.requestedVersion !== freshCurrent) {
+    setNoStore(input.reply);
+    throw new EngineError(
+      EngineErrorCode.NotFound,
+      `${scope.kind === 'layer' ? 'layer ' : ''}annotations version ${
+        input.requestedVersion
+      } no longer current (current=${freshCurrent})`,
+    );
+  }
+
+  // Decorate every page with its cloud-stable PageState from the SAME
+  // manifest that certified the pin (toManifestPage already scope-stamped
+  // the revision tokens).
+  const stateByPon = new Map(manifest.pages.map((page) => [page.state.pageObjectNumber, page.state]));
+  const pages = result.snapshot.pages.map((page) => {
+    const state = stateByPon.get(page.pageState.pageObjectNumber);
+    return state ? input.revisionBridge.decorateAnnotationSnapshot(state, page) : page;
+  });
+
+  setImmutableCache(input.reply);
+  return { pages, auditHead: manifest.auditHead };
 }
 
 async function resolvePageForRead(input: {

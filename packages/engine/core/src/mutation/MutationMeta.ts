@@ -19,6 +19,14 @@ import type { PageState } from '../revision/PageState';
 export interface CacheDelta {
   previousDocVersion: number;
   docVersion: number;
+  /**
+   * New doc-level bulk annotations pin, present when this mutation bumped
+   * it (annotation CRUD, page insert/delete, redaction, flatten, form
+   * structure — see `DocumentManifest.annotationsVersion`). Absorbing it
+   * keeps the client's cached manifest addressing the fresh bulk leaf
+   * without a 404-refresh round trip.
+   */
+  annotationsVersion?: number;
   pages: Array<{
     pageObjectNumber: PageObjectNumber;
     cache: CachePins;

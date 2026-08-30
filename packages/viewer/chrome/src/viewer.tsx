@@ -260,7 +260,7 @@ export function FullViewer({
     }),
     renderPlugin(),
     pageEditPlugin(),
-    interactionPlugin({ defaultTool: 'pointer' }),
+    interactionPlugin(),
     // Platform haptics, default-on: the Vibration API where it exists
     // (Android), a safe silent no-op elsewhere — iOS Safari included, until
     // Apple ships a haptics API. Native shells swap in their own provider

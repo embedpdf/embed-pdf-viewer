@@ -88,6 +88,22 @@ describe('appearanceImpactOf — value diffing (inert)', () => {
     expect(appearanceImpactOf(squareDto(), p)).toBe('inert');
   });
 
+  it('conversation-plane keys are inert (subject, review state)', () => {
+    // /Subj is dictionary-only on every kind.
+    expect(
+      appearanceImpactOf(squareDto(), patch({ subtype: 'square', subject: 'Pricing question' })),
+    ).toBe('inert');
+    // /State + /StateModel live on a text annotation whose AP is baked
+    // from /C + /Name alone — a status change never repaints anything.
+    const note = dto({ subtype: 'text', rect: rect(0, 0, 20, 20), icon: 'note' });
+    expect(
+      appearanceImpactOf(
+        note,
+        patch({ subtype: 'text', state: 'accepted', stateModel: 'review' }),
+      ),
+    ).toBe('inert');
+  });
+
   it('tri-state: clearing an already-absent entry is a no-op', () => {
     // DTO totality states absence as null; a null-clear patch diffs away.
     expect(

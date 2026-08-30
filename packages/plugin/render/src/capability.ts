@@ -1,5 +1,6 @@
 import {
   CONTINUOUS_RENDER_POLICY,
+  PermissionDenied,
   type EngineRenderPolicy,
   type PageObjectNumber,
   type PageRenderViewport,
@@ -31,6 +32,10 @@ export function createRenderCapability(
   options: RenderPluginOptions = {},
 ): RenderCapability {
   const resolved: ResolvedRenderOptions = resolveRenderOptions(options);
+
+  // The twin (permissions.md). Both fetch seams below consult it, so a
+  // denied session never spends engine round-trips on doomed rasters.
+  const canRender = (): boolean => ctx.doc?.security.allows('doc.render') ?? false;
 
   // Document-lifetime cache; keys embed the conformed width + epoch, so
   // the render points are the cache axis and staleness is a new key, never
@@ -147,6 +152,9 @@ export function createRenderCapability(
     fetchTile: (pon, rect, scale, includeAnnotations, signal) => {
       const doc = ctx.doc;
       if (!doc) return Promise.reject(new Error('render: no document bound'));
+      // Same refusal the engine would send, without the round trip — a denied
+      // session's viewport would otherwise 403 once per tile, forever.
+      if (!canRender()) return Promise.reject(new PermissionDenied('doc.render', 'render.tile'));
       const s = strategy();
       const task = doc.page(pon).render.image({
         target: { kind: 'rect', rect },
@@ -166,9 +174,12 @@ export function createRenderCapability(
   });
 
   return {
+    canRender,
     renderPage(pon, { scale, includeAnnotations, signal }) {
       const doc = ctx.doc;
       if (!doc) return Promise.reject(new Error('render: no document bound'));
+      if (!canRender())
+        return Promise.reject(new PermissionDenied('doc.render', 'render.renderPage'));
       const annotations = includeAnnotations ?? true;
       const viewport = conformViewport(pon, scale);
       const key = baseKey(pon, viewport, annotations);

@@ -13,6 +13,8 @@ import type { AnnotationDTO } from '../annotation/kinds';
  * are disjoint. We do compare `pageObjectNumber` and `generation` (which
  * should be 0 for fresh reads on both sides). Page order is no longer part
  * of `PageState`; it lives in `PageLayout.index` (see `pages.list()`).
+ * `auditHead` is likewise not compared: it is a cloud-only reconciliation
+ * cursor, absent on local snapshots by design.
  */
 export function diffAnnotationListSnapshot(
   a: AnnotationListPageSnapshot,

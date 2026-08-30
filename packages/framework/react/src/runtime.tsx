@@ -378,18 +378,19 @@ export interface PageContextValue {
   frame: PageFrame;
   /**
    * The single bridge between PDF points, view px, and device px for this page.
-   * Layers do ALL coordinate work through it — `pageToContent` to place content-
+   * Layers do ALL coordinate work through it — `toPixels` to place content-
    * space overlays, `renderScale`/`deviceWidth` to render, `contentWidth` for
    * page-relative sizing. Never re-derive `x * scale` or `* dpr`.
    */
   transform: PageTransform;
-  /** Client (screen) point → PDF point — the one platform-bound hit-test. */
-  toPagePoint(clientX: number, clientY: number): Point;
-  /** PDF/content point → client (screen) px — the exact inverse of `toPagePoint`
+  /** Client (screen) point → the viewer's coordinates (content point) — the
+   *  one platform-bound hit-test. */
+  toContentPoint(clientX: number, clientY: number): Point;
+  /** Content point → client (screen) px — the exact inverse of `toContentPoint`
    *  (rotation applied). Lets viewport-space UI (e.g. a selection menu) anchor to a
    *  page point WITHOUT a Stage camera, so it works the same in `<PageView>`. */
   toClientPoint(p: Point): Point;
-  /** PDF/content rect → client (screen) px AABB. Rect analog of `toClientPoint`
+  /** Content rect → client (screen) px AABB. Rect analog of `toClientPoint`
    *  for upright viewport-space UI that frames a selected page region. */
   toClientRect(rect: Rect): Rect;
   /**
@@ -442,25 +443,25 @@ export function makePageContext(
     frame,
     transform,
     ...(getViewDemand ? { getViewDemand } : {}),
-    toPagePoint: (cx, cy) => {
+    toContentPoint: (cx, cy) => {
       // `getRect()` is the rotated content wrapper's axis-aligned bounding box =
       // the page's DISPLAY box on screen. Convert client → box-local view px,
       // then invert rotation + scale via the transform (verified once in geometry,
       // not re-derived per framework adapter).
       const r = getRect();
-      return transform.viewToPage({ x: cx - r.left, y: cy - r.top });
+      return transform.viewToContent({ x: cx - r.left, y: cy - r.top });
     },
     toClientPoint: (p) => {
-      // Exact inverse of `toPagePoint`: page/content point → display-box view px
+      // Exact inverse of `toContentPoint`: page/content point → display-box view px
       // (rotation applied by the transform), offset by the same live display-box
       // origin. So the two can never drift, in either <Stage> or <PageView>.
       const r = getRect();
-      const v = transform.pageToView(p);
+      const v = transform.contentToView(p);
       return { x: r.left + v.x, y: r.top + v.y };
     },
     toClientRect: (rect) => {
       const r = getRect();
-      const v = transform.pageToViewRect(rect);
+      const v = transform.contentToViewRect(rect);
       return { x: r.left + v.x, y: r.top + v.y, width: v.width, height: v.height };
     },
   };

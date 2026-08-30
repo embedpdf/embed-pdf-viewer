@@ -1,11 +1,12 @@
-import type {
-  AnnotationRef,
-  FormDataFormat,
-  FormFieldDraft,
-  FormFieldPatch,
-  FormFieldRef,
-  FormFieldValue,
-  PdfRect,
+import {
+  PermissionDenied,
+  type AnnotationRef,
+  type FormDataFormat,
+  type FormFieldDraft,
+  type FormFieldPatch,
+  type FormFieldRef,
+  type FormFieldValue,
+  type PdfRect,
 } from '@embedpdf/engine-core/runtime';
 import type { PluginContext } from '@embedpdf/core';
 import { AnnotationToken as AnnotationHostToken } from '@embedpdf/plugin-annotation/internal';
@@ -128,11 +129,20 @@ export function createFormCapability(
     }
   };
 
+  // Authority reads for the twins, the hydration gate, the fused fill
+  // projection, and the write gate — one wildcard-aware helper.
+  const can = (cap: 'doc.forms.read' | 'doc.forms.fill' | 'doc.forms.modify'): boolean =>
+    ctx.doc?.security.allows(cap) ?? false;
+
   // ── snapshot loading ────────────────────────────────────────────────────
   let refreshPromise: Promise<void> | null = null;
   const refresh = async (force = false): Promise<void> => {
     const doc = ctx.doc;
     if (!doc) return;
+    // No read authority → don't fire a doomed list (a reviewer-shaped token
+    // without `doc.forms.read` is the COMMON narrowed scope); the model stays
+    // empty and `canRead()` tells chrome why. The engine enforces regardless.
+    if (!can('doc.forms.read')) return;
     if (refreshPromise) {
       await refreshPromise;
       if (!force) return;
@@ -140,6 +150,11 @@ export function createFormCapability(
     refreshPromise = doc.forms
       .list()
       .then((snapshot) => apply({ t: 'snapshot', snapshot }))
+      .catch((err) => {
+        // A race with an access change 403s here; anything else is a real
+        // load failure. Either way: surfaced, never an unhandled rejection.
+        console.warn('[form] form snapshot failed to load', err);
+      })
       .finally(() => {
         refreshPromise = null;
       });
@@ -172,25 +187,37 @@ export function createFormCapability(
   };
 
   // ── memoized fill projection ────────────────────────────────────────────
-  const fillCache = new Map<number, { seq: number; items: FillItem[] }>();
+  // Session fill authority FUSES into the same `disabled` the field's
+  // ReadOnly flag feeds (permissions.md: authority rides the flags gate) —
+  // without `doc.forms.fill` every widget renders inert, so the pixels are
+  // truthful and no gesture reaches a doomed write.
+  const fuseFill = (item: FillItem | null, fillable: boolean): FillItem | null =>
+    item === null || fillable || item.disabled ? item : { ...item, disabled: true };
+
+  const fillCache = new Map<number, { seq: number; fillable: boolean; items: FillItem[] }>();
   const fillItems = (pon: number): FillItem[] => {
     const m = model();
+    const fillable = can('doc.forms.fill');
     const hit = fillCache.get(pon);
-    if (hit && hit.seq === m.seq) return hit.items;
-    const items = coreFillItems(m, pon);
-    fillCache.set(pon, { seq: m.seq, items });
+    if (hit && hit.seq === m.seq && hit.fillable === fillable) return hit.items;
+    const items = coreFillItems(m, pon).map((item) => fuseFill(item, fillable) as FillItem);
+    fillCache.set(pon, { seq: m.seq, fillable, items });
     return items;
   };
 
   // Single-widget projection — reference-stable per model.seq so framework
   // selectors can use plain identity equality.
-  const fillItemCache = new Map<number, { seq: number; item: FillItem | null }>();
+  const fillItemCache = new Map<
+    number,
+    { seq: number; fillable: boolean; item: FillItem | null }
+  >();
   const fillItem = (annotObjectNumber: number): FillItem | null => {
     const m = model();
+    const fillable = can('doc.forms.fill');
     const hit = fillItemCache.get(annotObjectNumber);
-    if (hit && hit.seq === m.seq) return hit.item;
-    const item = coreFillItemForWidget(m, annotObjectNumber);
-    fillItemCache.set(annotObjectNumber, { seq: m.seq, item });
+    if (hit && hit.seq === m.seq && hit.fillable === fillable) return hit.item;
+    const item = fuseFill(coreFillItemForWidget(m, annotObjectNumber), fillable);
+    fillItemCache.set(annotObjectNumber, { seq: m.seq, fillable, item });
     return item;
   };
 
@@ -220,8 +247,14 @@ export function createFormCapability(
     };
   };
 
-  const write = (key: FieldKey, value: FormFieldValue): Promise<void> =>
-    enqueueMutation(async () => {
+  const write = (key: FieldKey, value: FormFieldValue): Promise<void> => {
+    // The optimistic gate: no fill authority → refuse BEFORE the spinner and
+    // the queued engine call, with the refusal shape the engine would send.
+    // (The fused projection renders such widgets inert; this covers the
+    // imperative door.)
+    if (!can('doc.forms.fill'))
+      return Promise.reject(new PermissionDenied('doc.forms.fill', 'form.fill'));
+    return enqueueMutation(async () => {
       const doc = ctx.doc;
       if (!doc) return;
       apply({ t: 'writeStart', key });
@@ -238,9 +271,7 @@ export function createFormCapability(
         throw err;
       }
     });
-
-  const can = (cap: 'doc.forms.fill' | 'doc.forms.modify'): boolean =>
-    ctx.doc?.security.allows(cap) ?? false;
+  };
 
   // ── design mode ──────────────────────────────────────────────────────────
   // The annotation plane must re-read pages whose widget population changed
@@ -420,8 +451,11 @@ export function createFormCapability(
     setText: (key, value) => write(key, { type: 'text', value }),
     toggle: (key, onState) => write(key, { type: 'toggle', state: onState }),
     choose: (key, values) => write(key, { type: 'choice', values }),
-    reset: (key) =>
-      enqueueMutation(async () => {
+    reset: (key) => {
+      // Reset writes a value (the default) — same optimistic gate as write().
+      if (!can('doc.forms.fill'))
+        return Promise.reject(new PermissionDenied('doc.forms.fill', 'form.reset'));
+      return enqueueMutation(async () => {
         const doc = ctx.doc;
         if (!doc) return;
         apply({ t: 'writeStart', key });
@@ -432,7 +466,8 @@ export function createFormCapability(
           apply({ t: 'writeFailed', key });
           throw err;
         }
-      }),
+      });
+    },
     commitValue: (ref, value) => enqueueMutation(() => commitValueNow(ref, value)),
     activateWidget: (key, annotationRef) =>
       enqueueMutation(() => activateWidgetNow(key, annotationRef)),
@@ -474,7 +509,11 @@ export function createFormCapability(
     deleteField: (key) => enqueueMutation(() => deleteFieldNow(key)),
     detachWidget: (key, annotObjectNumber) =>
       enqueueMutation(() => detachWidgetNow(key, annotObjectNumber)),
+    // The twins (permissions.md). `canRead` mirrors the hydration gate above
+    // — false means the model stays empty by RIGHT, not by loading. Fill and
+    // design are independent grants: a filler is not a designer.
+    canRead: () => can('doc.forms.read'),
     canFill: () => can('doc.forms.fill'),
-    canModify: () => can('doc.forms.modify'),
+    canDesign: () => can('doc.forms.modify'),
   };
 }

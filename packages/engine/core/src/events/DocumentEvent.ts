@@ -145,12 +145,35 @@ export type DocumentEvent =
   | ({
       type: 'redaction.applied';
       origin: EventOrigin;
-    } & RedactionApplyResult);
+    } & RedactionApplyResult)
+  | {
+      /**
+       * Cloud only: the live event stream fell too far behind to replay
+       * (the server's SSE `full-refresh`) — state derived from earlier
+       * events or snapshots may be stale, and the gap's mutations will
+       * NEVER arrive as events. Consumers must re-read the snapshots they
+       * keep fresh from this stream (`doc.annotations.listRawAll()`,
+       * `doc.forms.list()`, …).
+       *
+       * Carries no `EventOrigin`: it is a transport notice, not a
+       * document mutation — the exactly-once / results-ride-verbatim
+       * invariants above apply to mutation events only. The local engine
+       * never emits it.
+       */
+      type: 'stream.desynced';
+      reason: 'backlog-overflow';
+      ts: number;
+    };
 
 export type DocumentEventType = DocumentEvent['type'];
 
 type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
 
 /** A `DocumentEvent` before provenance is stamped — what mutation paths
- *  hand to their engine's publisher, which adds `origin`. */
-export type DocumentEventInit = DistributiveOmit<DocumentEvent, 'origin'>;
+ *  hand to their engine's publisher, which adds `origin`. Transport
+ *  notices (`stream.desynced`) are excluded: they are published directly
+ *  by the remote channel, never through a mutation publisher. */
+export type DocumentEventInit = DistributiveOmit<
+  Exclude<DocumentEvent, { type: 'stream.desynced' }>,
+  'origin'
+>;

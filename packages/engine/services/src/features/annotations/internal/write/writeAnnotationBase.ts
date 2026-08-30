@@ -1,14 +1,17 @@
 import type { AnnotationDraftBase, AnnotationPatchBase } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
-import { NULL_PTR } from '@embedpdf/engine-runtime';
 
-import { setAnnotFlags } from './annotationWritePrimitives';
+import {
+  setAnnotFlags,
+  writeAnnotString,
+  writeAnnotStringOrClear,
+} from './annotationWritePrimitives';
 import { formatPdfDate } from '../../../../shared/pdf-date';
 
 /**
  * Write the annotation-wide base fields shared by every Draft
- * (contents/nm). The kind-specific writer calls this BEFORE its own
- * field writes; order doesn't actually matter at the PDF level, but
+ * (contents/subject/nm). The kind-specific writer calls this BEFORE its
+ * own field writes; order doesn't actually matter at the PDF level, but
  * keeping the base first makes the writers symmetric with the readers.
  *
  * `/T` (author display) is stamped by the mutator from
@@ -25,10 +28,13 @@ export function applyAnnotationBaseDraft(
   draft: AnnotationDraftBase,
 ): void {
   if (draft.contents !== undefined) {
-    writeStringOrClear(fn, mem, annotPtr, 'Contents', draft.contents);
+    writeAnnotStringOrClear(fn, mem, annotPtr, 'Contents', draft.contents);
+  }
+  if (draft.subject !== undefined) {
+    writeAnnotStringOrClear(fn, mem, annotPtr, 'Subj', draft.subject);
   }
   if (draft.nm !== undefined && draft.nm.length > 0) {
-    writeString(fn, mem, annotPtr, 'NM', draft.nm);
+    writeAnnotString(fn, mem, annotPtr, 'NM', draft.nm);
   }
   if (draft.flags !== undefined) {
     setAnnotFlags(fn, annotPtr, draft.flags);
@@ -37,7 +43,7 @@ export function applyAnnotationBaseDraft(
 
 /**
  * Write the annotation-wide base fields shared by every Patch
- * (contents). /T is bound at creation and not patchable — see
+ * (contents/subject). /T is bound at creation and not patchable — see
  * `AnnotationPatchBase`. /NM is monotonic per annotation; the mutator
  * may stamp /NM opportunistically on a weak annotation via
  * `writeAnnotationNm`.
@@ -54,7 +60,10 @@ export function applyAnnotationBasePatch(
   patch: AnnotationPatchBase,
 ): void {
   if (patch.contents !== undefined) {
-    writeStringOrClear(fn, mem, annotPtr, 'Contents', patch.contents);
+    writeAnnotStringOrClear(fn, mem, annotPtr, 'Contents', patch.contents);
+  }
+  if (patch.subject !== undefined) {
+    writeAnnotStringOrClear(fn, mem, annotPtr, 'Subj', patch.subject);
   }
   if (patch.flags !== undefined) {
     setAnnotFlags(fn, annotPtr, patch.flags);
@@ -74,7 +83,7 @@ export function writeAnnotationAuthor(
   displayName: string,
 ): void {
   if (displayName.length === 0) return;
-  writeString(fn, mem, annotPtr, 'T', displayName);
+  writeAnnotString(fn, mem, annotPtr, 'T', displayName);
 }
 
 /**
@@ -89,7 +98,7 @@ export function writeAnnotationNm(
   nm: string,
 ): void {
   if (nm.length === 0) return;
-  writeString(fn, mem, annotPtr, 'NM', nm);
+  writeAnnotString(fn, mem, annotPtr, 'NM', nm);
 }
 
 /**
@@ -112,35 +121,5 @@ export function writeAnnotationModified(
   annotPtr: Ptr,
   now: Date = new Date(),
 ): void {
-  writeString(fn, mem, annotPtr, 'M', formatPdfDate(now));
-}
-
-function writeString(
-  fn: PdfFunctions,
-  mem: PdfRuntimeMemory,
-  annotPtr: Ptr,
-  key: string,
-  value: string,
-): void {
-  const ptr = mem.writeU16String(value);
-  try {
-    fn.FPDFAnnot_SetStringValue(annotPtr, key, ptr);
-  } finally {
-    mem.free(ptr);
-  }
-}
-
-function writeStringOrClear(
-  fn: PdfFunctions,
-  mem: PdfRuntimeMemory,
-  annotPtr: Ptr,
-  key: string,
-  value: string | null,
-): void {
-  if (value === null) {
-    // PDFium accepts a NULL string-value pointer as "clear the entry".
-    fn.FPDFAnnot_SetStringValue(annotPtr, key, NULL_PTR);
-    return;
-  }
-  writeString(fn, mem, annotPtr, key, value);
+  writeAnnotString(fn, mem, annotPtr, 'M', formatPdfDate(now));
 }

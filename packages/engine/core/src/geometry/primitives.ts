@@ -23,9 +23,13 @@ export interface PdfPoint {
 }
 
 /**
- * A rectangle in PDF user space, expressed as edges (y-up, so `top > bottom`
- * and `right > left` once normalized). Page-box origin is preserved, so
- * `left`/`bottom` may be non-zero or negative.
+ * A rectangle in the FILE's coordinates — PDF user space, expressed as edges
+ * (y-up, so `top > bottom` and `right > left` once normalized). Page-box
+ * origin is preserved, so `left`/`bottom` may be non-zero or negative.
+ *
+ * The rule: stored in the file → `PdfRect`; shown on screen → the viewer's
+ * y-down `Rect` (`{x, y, width, height}`). The shapes are incompatible on
+ * purpose — passing one where the other goes doesn't compile.
  */
 export interface PdfRect {
   left: number;

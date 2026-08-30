@@ -168,9 +168,17 @@ export interface FormCapability {
   /** Unlink one widget: it stays as an inert annotation, the field survives. */
   detachWidget(key: FieldKey, annotObjectNumber: number): Promise<void>;
 
-  /** UI mirror of the engine gates (`doc.forms.fill` / `doc.forms.modify`). */
+  /**
+   * The twins (permissions.md): would the family's verbs succeed now for
+   * this session? `canRead` — the form model hydrates at all (false = the
+   * hydration gate left it empty by right); `canFill` — value writes
+   * (`setText`/`toggle`/`choose`/`reset`; also fused into every
+   * `FillItem.disabled`); `canDesign` — the field-design family
+   * (`placeField`/`updateField`/`deleteField`/`detachWidget`).
+   */
+  canRead(): boolean;
   canFill(): boolean;
-  canModify(): boolean;
+  canDesign(): boolean;
 }
 
 export const FormToken = createCapabilityToken<FormCapability>('form');

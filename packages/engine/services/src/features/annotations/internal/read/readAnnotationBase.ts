@@ -33,6 +33,7 @@ export function readAnnotationBase(
   const rect = readAnnotRect(fn, mem, annotPtr);
   const flags = readAnnotFlags(fn, annotPtr);
   const contents = readAnnotString(fn, mem, annotPtr, 'Contents');
+  const subject = readAnnotString(fn, mem, annotPtr, 'Subj');
   const author = readAnnotString(fn, mem, annotPtr, 'T');
   const createdRaw = readAnnotString(fn, mem, annotPtr, 'CreationDate');
   const modifiedRaw = readAnnotString(fn, mem, annotPtr, 'M');
@@ -53,6 +54,7 @@ export function readAnnotationBase(
     flags,
     rect,
     contents,
+    subject,
     author,
     created: createdRaw ? pdfDateToIso(createdRaw) : null,
     modified: modifiedRaw ? pdfDateToIso(modifiedRaw) : null,

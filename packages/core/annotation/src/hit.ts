@@ -11,6 +11,7 @@ import {
 } from './geometry';
 import { capsFor, isMarkup } from './kinds';
 import { groupCaps } from './group';
+import { isSubstrateOnly } from './plane';
 import { annotInteractive, annotTransformable, viewable } from './flags';
 import { anchoredGeom, anchoredStrokeWidth, anchorModeOf, type ViewEnv } from './anchor';
 import {
@@ -39,7 +40,9 @@ export type Target =
  *  (always beneath), then every other kind, each group preserving creation
  *  z-order. The ONE z-order shared by rendering (`pageItems`) and hit-testing —
  *  and the ONE visibility cull: what `/F` hides (hidden / un-engaged noView)
- *  neither paints nor hits, so an invisible annotation can never eat a click. */
+ *  neither paints nor hits, so an invisible annotation can never eat a click.
+ *  Conversation-plane annotations (replies, review-status states) are culled
+ *  here too — dialogue lives in the comments UI, never on the page. */
 export function paintOrder(m: Model, pon: number): Id[] {
   const markup: Id[] = [];
   const other: Id[] = [];
@@ -47,6 +50,7 @@ export function paintOrder(m: Model, pon: number): Id[] {
     const a = m.byId[id];
     if (!a || a.pon !== pon) continue;
     if (!viewable(a.flags, m.selected.includes(id))) continue;
+    if (isSubstrateOnly(a)) continue;
     (isMarkup(a.subtype) ? markup : other).push(id);
   }
   return [...markup, ...other];

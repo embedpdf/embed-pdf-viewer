@@ -196,6 +196,7 @@ export const AnnotationBaseShape = {
   flags: AnnotationFlagsSchema,
   rect: PdfRectSchema,
   contents: z.string().nullable(),
+  subject: z.string().nullable(),
   author: z.string().nullable(),
   created: z.string().datetime().nullable(),
   modified: z.string().datetime().nullable(),
@@ -223,6 +224,7 @@ export const AnnotationBaseShape = {
  */
 export const AnnotationDraftBaseShape = {
   contents: z.string().nullable().optional(),
+  subject: z.string().nullable().optional(),
   blendMode: BlendModeSchema.optional(),
   nm: z.string().optional(),
   flags: AnnotationFlagsPartialSchema.optional(),
@@ -242,6 +244,7 @@ export const AnnotationDraftBaseShape = {
  */
 export const AnnotationPatchBaseShape = {
   contents: z.string().nullable().optional(),
+  subject: z.string().nullable().optional(),
   blendMode: BlendModeSchema.optional(),
   groupId: z.string().min(1).optional(),
   flags: AnnotationFlagsPartialSchema.optional(),

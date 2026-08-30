@@ -1,19 +1,24 @@
 import {
   CONTINUOUS_RENDER_POLICY,
   snapAppearanceScale,
-  type DocCapability,
+  type DocumentEvent,
   type PluginContext,
 } from '@embedpdf/core';
 import type { PageRotation } from '@embedpdf/core-geometry';
 import {
+  buildCommentThreads,
+  encodeStableIdKey,
   resolveBinarySource,
   sniffBinaryMetadata,
+  type CommentThread,
   type AnnotationDraft,
   type AnnotationDTO,
   type AnnotationPatch,
   type AnnotationRef,
   type AttachmentFileSource,
   type BinarySource,
+  type PdfLinkTarget,
+  type PdfRect,
 } from '@embedpdf/engine-core/runtime';
 import { InteractionToken } from '@embedpdf/plugin-interaction';
 import { SelectionToken as SelectionPublicToken } from '@embedpdf/plugin-selection';
@@ -40,6 +45,12 @@ import {
   sharedProps,
   styleFromProps,
   update,
+  annotContentsEditable,
+  annotDeletable,
+  annotTransformable,
+  isSubstrateOnly,
+  linkChildrenOf,
+  linkOf,
   uprightRotation,
   viewable,
   type Annot,
@@ -61,7 +72,6 @@ import {
 } from '@embedpdf/core-annotation';
 import {
   boxGeomFields,
-  foldAttachedLinks,
   fromDTO,
   linkChildRects,
   refKey,
@@ -77,8 +87,12 @@ import type {
   AnnotationAction,
   AnnotationConfig,
   AnnotationHostCapability,
+  AnnotationHydration,
   AnnotationState,
   ArmedStampPreview,
+  CommentPermissions,
+  CommentsApi,
+  ThreadDeleteResult,
   Behavior,
   ChromeSettings,
   SelectionFlags,
@@ -99,11 +113,6 @@ const viewEnv = (zoom?: number, rotation?: number): ViewEnv | undefined =>
     ? { zoom: zoom ?? 1, rotation: (rotation ?? 0) as ViewEnv['rotation'] }
     : undefined;
 
-/** Broad annotate-write capability (PDF bit 6). The engine independently
- *  enforces this AND the per-owner collab rules; `canEdit`/`canDelete` are the
- *  UI mirror of the coarse gate. */
-const ANNOTATE_MODIFY: DocCapability = 'doc.annotate.modify';
-
 const TEXT_COMMIT_DEBOUNCE_MS = 250;
 
 /**
@@ -116,7 +125,6 @@ export function createAnnotationCapability(
   ctx: PluginContext<AnnotationState, AnnotationAction>,
   config: AnnotationConfig = {},
 ): AnnotationHostCapability {
-  const loaded = new Set<number>();
   const behaviors: Behavior[] = [];
   /** Per-annotation debounce timer for the engine `contents` write while typing. */
   const textTimers = new Map<string, ReturnType<typeof setTimeout>>();
@@ -315,11 +323,16 @@ export function createAnnotationCapability(
     const specs = sharedProps(members.map((a) => a.subtype));
     const values: Partial<AnnotationProps> = {};
     const mixed: PropKey[] = [];
+    // `link` is the one derived value: parents store nothing — the committed
+    // children are the truth, read through the lens (the link KIND still
+    // reads its own /A off the annot).
+    const valueOf = (a: Annot, key: PropKey): unknown =>
+      key === 'link' && a.subtype !== 'link' ? linkOf(m, a.id) : readProp(a, key);
     for (const spec of specs) {
-      const first = readProp(members[0], spec.key);
+      const first = valueOf(members[0], spec.key);
       (values as Record<PropKey, unknown>)[spec.key] = first;
       const firstJson = JSON.stringify(first);
-      if (members.some((a) => JSON.stringify(readProp(a, spec.key)) !== firstJson))
+      if (members.some((a) => JSON.stringify(valueOf(a, spec.key)) !== firstJson))
         mixed.push(spec.key);
     }
     const v: SelectionProps = { specs, values, mixed };
@@ -337,13 +350,16 @@ export function createAnnotationCapability(
     const v: LinkNavItem[] = [];
     for (const id of m.order) {
       const a = m.byId[id];
-      if (!a || a.pon !== pon || a.link == null) continue;
+      if (!a || a.pon !== pon || a.subtype !== 'link') continue;
       if (!viewable(a.flags, false)) continue; // hidden links don't navigate
-      if (a.subtype === 'link') {
-        if (a.geom.t === 'rect') v.push({ id, rect: a.geom.rect, target: a.link });
-      } else {
-        linkChildRects(a).forEach((rect, i) => v.push({ id: `${id}#${i}`, rect, target: a.link! }));
-      }
+      // Standalone links carry their own model `link` (/A); attached children
+      // carry the target on their DTO. Rects are the CHILD's own committed
+      // geometry — anchors render only in view contexts, where nothing is
+      // mid-gesture, so no live parent-derivation is needed.
+      const target =
+        a.link ?? (a.data?.subtype === 'link' ? (a.data.target ?? null) : null);
+      if (target == null || a.geom.t !== 'rect') continue;
+      v.push({ id, rect: a.geom.rect, target, attached: a.group !== undefined });
     }
     linkItemsCache.set(pon, { model: m, v });
     return v;
@@ -790,7 +806,7 @@ export function createAnnotationCapability(
     bumpAp = false,
   ): void => {
     const crop = cropOf(dto.pageObjectNumber);
-    if (crop) apply({ t: 'upsert', annots: [fromDTO(dto, crop, source)], bumpAp });
+    if (crop) apply({ t: 'upsert', annots: [ingestDTO(dto, crop, source)], bumpAp });
   };
 
   /** The one engine-update path, shared by `update` and `updateSelection`. A
@@ -810,6 +826,429 @@ export function createAnnotationCapability(
     for (const fx of effects) perform(fx, next);
   }
 
+  // ── whole-document hydration ──────────────────────────────────────────
+  // The plugin ALWAYS hydrates every page via `listRawAll()` — one bulk
+  // request on cloud, one raw worker job locally. A comments sidebar needs
+  // every page, and per-page lazy loading could never truthfully claim
+  // completeness. Coherence protocol: the snapshot arrives cursor-stamped
+  // (`auditHead`); remote annotation events arriving DURING the hydration
+  // window queue here and replay by cursor after ingest — events with
+  // `serverId <= auditHead` are already inside the snapshot and drop,
+  // newer ones apply on top. This makes the delete-during-hydrate
+  // resurrection structurally impossible. `stream.desynced` re-runs the
+  // same ingest with `bumpAp` (rasters may have changed invisibly inside
+  // the gap).
+  let hydrationStarted = false;
+  let hydrationWindow = false;
+  let hydrationRunning: Promise<void> | null = null;
+  let hydrateAgain = false;
+  const pendingRemote: DocumentEvent[] = [];
+
+  const setHydration = (hydration: AnnotationHydration): void =>
+    ctx.dispatch({ type: 'SET_HYDRATION', hydration });
+
+  const ingestSnapshot = (
+    snap: Awaited<ReturnType<NonNullable<typeof ctx.doc>['annotations']['listRawAll']>>,
+    bumpAp: boolean,
+  ): void => {
+    const annots: Annot[] = [];
+    for (const page of snap.pages) {
+      const crop = cropOf(page.pageState.pageObjectNumber);
+      if (!crop) continue;
+      // Children (replies, states, attached links) enter the substrate as
+      // first-class annots; the planes derive (paint cull + lenses).
+      annots.push(...page.annotations.map((d) => ingestDTO(d, crop)));
+    }
+    apply({ t: 'hydrated', annots, bumpAp });
+  };
+
+  const canRead = (): boolean => ctx.doc?.security.allows('doc.annotate.read') ?? true;
+
+  const runHydration = (bumpAp: boolean): Promise<void> => {
+    const doc = ctx.doc;
+    if (!doc) return Promise.resolve();
+    // No read grant → no doomed listRawAll: the state says so, the comments
+    // panel hides, and a later rehydrate (e.g. post-/access) re-checks.
+    if (!canRead()) {
+      setHydration({ status: 'forbidden' });
+      return Promise.resolve();
+    }
+    hydrationWindow = true;
+    setHydration({ status: 'loading' });
+    const run = doc.annotations
+      .listRawAll()
+      .then((snap) => {
+        ingestSnapshot(snap, bumpAp);
+        const head = snap.auditHead;
+        const queued = pendingRemote.splice(0);
+        hydrationWindow = false;
+        for (const event of queued) {
+          const serverId = 'origin' in event ? event.origin.serverId : null;
+          // ≤ auditHead ⇒ already inside the snapshot; drop. Absent head =
+          // a local engine, which has no remote events anyway.
+          if (head !== undefined && serverId !== null && serverId <= head) continue;
+          applyRemoteAnnotationEvent(event);
+        }
+        setHydration({ status: 'complete' });
+      })
+      .catch((error: unknown) => {
+        // Degrade to live-only: queued and future events apply directly so
+        // the view stays as correct as it can be until a rehydrate lands.
+        hydrationWindow = false;
+        for (const event of pendingRemote.splice(0)) applyRemoteAnnotationEvent(event);
+        setHydration({ status: 'error', error });
+      })
+      .finally(() => {
+        hydrationRunning = null;
+        if (hydrateAgain) {
+          hydrateAgain = false;
+          hydrationRunning = runHydration(true);
+        }
+      });
+    hydrationRunning = run;
+    return run;
+  };
+
+  const rehydrate = (): Promise<void> => {
+    if (hydrationRunning) {
+      // A desync during an in-flight hydration: that snapshot may already
+      // be stale — run once more after it settles.
+      hydrateAgain = true;
+      return hydrationRunning;
+    }
+    hydrationRunning = runHydration(true);
+    return hydrationRunning;
+  };
+
+  /**
+   * Fold one REMOTE annotation event into the model (transplanted from the
+   * effects layer so hydration can queue + replay through the same code
+   * path). `bump` re-fetches rasters, `keep` doesn't — driven by the
+   * ENGINE'S appearance echo riding the event, so a remote MOVE costs
+   * peers zero re-renders while a remote restyle refreshes exactly once.
+   */
+  const upsertRemote = (
+    dtos: ReadonlyArray<Parameters<typeof fromDTO>[0]>,
+    bumpAp: boolean,
+  ): void => {
+    const bump: Annot[] = [];
+    const keep: Annot[] = [];
+    for (const dto of dtos) {
+      const crop = cropOf(dto.pageObjectNumber);
+      if (!crop) continue;
+      // Another session authored this — trust the engine's baked AP.
+      const a = ingestDTO(dto, crop, 'baked');
+      // Substrate-only annotations (replies, review states, attached link
+      // children) never paint, so their arrival must not trigger a raster
+      // fetch or epoch churn. A remote link child is just an upsert — the
+      // `linkOf` lens re-derives the parent's value on the next read.
+      (bumpAp && !isSubstrateOnly(a) ? bump : keep).push(a);
+    }
+    if (bump.length) apply({ t: 'upsert', annots: bump, bumpAp: true });
+    if (keep.length) apply({ t: 'upsert', annots: keep });
+  };
+
+  const applyRemoteAnnotationEvent = (event: DocumentEvent): void => {
+    switch (event.type) {
+      case 'annotation.created':
+        // A create ships with a freshly baked /AP — fetch it.
+        upsertRemote([event.created], true);
+        break;
+      case 'annotation.updated':
+        // The engine's verdict rides the event: preserved moves keep the
+        // cached raster, regenerated appearances re-fetch exactly once.
+        upsertRemote([event.updated], event.appearance.changed);
+        break;
+      case 'annotation.moved':
+        // A z-order move never touches /AP.
+        upsertRemote(event.moved, false);
+        break;
+      case 'annotation.deleted':
+        if (event.deleted) {
+          const key = encodeStableIdKey(event.deleted);
+          // Attached link children are model annotations, so a remote child
+          // delete is this same plain remove — the `linkOf` lens re-derives.
+          if (model().byId[key]) apply({ t: 'remove', ids: [key] });
+        }
+        break;
+      default:
+        break;
+    }
+  };
+
+  // ── the comments lens (the conversation plane's surface) ──────────────
+  // A derived, memoized threads index over the substrate. Because every
+  // path — optimistic writes, engine confirms, remote events, hydration —
+  // lands in the model, the sidebar updates with zero extra wiring. The
+  // memo keys on the model's annotation content (byId/order — hover and
+  // drafts don't invalidate) PLUS the layout (display order is computed
+  // fresh against the live pages) and the session identity.
+
+  const currentUserId = (): string | undefined => ctx.doc?.security.identity?.user_id;
+
+  interface ThreadsIndex {
+    threads: CommentThread[];
+    byMember: Map<Id, CommentThread>;
+  }
+  let threadsMemo:
+    | (ThreadsIndex & {
+        byId: Model['byId'];
+        order: Model['order'];
+        layout: string;
+        userId: string | undefined;
+      })
+    | null = null;
+
+  /** Value-stable layout key: display order is all the sort consumes, so
+   *  the memo must survive hosts that rebuild the pages array per read. */
+  const layoutSignature = (): string =>
+    (ctx.document()?.pages ?? []).map((p) => p.pageObjectNumber).join(',');
+
+  const computeThreadsIndex = (): ThreadsIndex => {
+    const m = model();
+    // Committed truth only: optimistic tmp drafts have no DTO yet and join
+    // the index when their create confirms.
+    const dtos: AnnotationDTO[] = [];
+    for (const id of m.order) {
+      const data = m.byId[id]?.data;
+      if (data) dtos.push(data);
+    }
+    const threads = buildCommentThreads(dtos, { currentUserId: currentUserId() });
+
+    // Display order: page position first (live layout), then top of page
+    // (PDF user space is y-up — larger `top` sits higher), then creation.
+    const pages = ctx.document()?.pages ?? [];
+    const displayIndex = new Map(pages.map((p, i) => [p.pageObjectNumber, i]));
+    threads.sort((a, b) => {
+      const pa = displayIndex.get(a.pageObjectNumber) ?? Number.MAX_SAFE_INTEGER;
+      const pb = displayIndex.get(b.pageObjectNumber) ?? Number.MAX_SAFE_INTEGER;
+      if (pa !== pb) return pa - pb;
+      if (a.root.rect.top !== b.root.rect.top) return b.root.rect.top - a.root.rect.top;
+      const ca = a.root.created ?? '';
+      const cb = b.root.created ?? '';
+      return ca < cb ? -1 : ca > cb ? 1 : 0;
+    });
+
+    const byMember = new Map<Id, CommentThread>();
+    for (const t of threads) {
+      byMember.set(refKey(t.root.ref), t);
+      for (const r of t.replies) byMember.set(refKey(r.ref), t);
+      for (const g of t.groupedParts) byMember.set(refKey(g.ref), t);
+      for (const s of t.review.statusRefs) byMember.set(refKey(s), t);
+    }
+    return { threads, byMember };
+  };
+
+  const threadsIndex = (): ThreadsIndex => {
+    const m = model();
+    const layout = layoutSignature();
+    const userId = currentUserId();
+    if (
+      threadsMemo &&
+      threadsMemo.byId === m.byId &&
+      threadsMemo.order === m.order &&
+      threadsMemo.layout === layout &&
+      threadsMemo.userId === userId
+    ) {
+      return threadsMemo;
+    }
+    threadsMemo = { ...computeThreadsIndex(), byId: m.byId, order: m.order, layout, userId };
+    return threadsMemo;
+  };
+
+  const threadOf = (ref: AnnotationRef): CommentThread => {
+    const t = threadsIndex().byMember.get(refKey(ref));
+    if (!t) throw new Error('[annotation] no comment thread contains this ref');
+    return t;
+  };
+
+  /** Engine create + model sync for conversation-plane annotations (they
+   *  never paint, so the render source is immaterial — 'baked' avoids any
+   *  vector-scene work). */
+  const createConversationAnnot = async (
+    pon: number,
+    draft: AnnotationDraft,
+  ): Promise<AnnotationDTO> => {
+    const doc = ctx.doc;
+    if (!doc) throw new Error('[annotation] no document bound');
+    const res = await doc.page(pon).annotations.create(draft);
+    syncDTO(res.created, 'baked');
+    return res.created;
+  };
+
+  const deleteOne = async (ref: AnnotationRef): Promise<void> => {
+    const doc = ctx.doc;
+    if (!doc) throw new Error('[annotation] no document bound');
+    await doc.page(ref.pageObjectNumber).annotations.delete(ref);
+    apply({ t: 'remove', ids: [refKey(ref)] });
+  };
+
+  // Screen-anchored like a sticky note; `print` for Acrobat parity.
+  const REPLY_FLAGS = { print: true, noZoom: true, noRotate: true };
+  // Status annotations are metadata: hidden everywhere (our paint plane
+  // culls them regardless; `hidden` keeps foreign viewers from drawing an
+  // icon). Phase 0 golden fixtures may refine this convention.
+  const STATUS_FLAGS = { hidden: true, noZoom: true, noRotate: true };
+
+  /** Coarse authority mirror (doc.annotate.modify) — B3 replaces this with
+   *  the collab-scope mirrors; the FLAG split is already the real rule. */
+  // ── authorization: the engine's own collab resolver, mirrored ──
+  // `allowsAnnotationMutation` asks about the TARGET's stamped owner,
+  // built from the record's EMBD metadata. An unstamped record yields
+  // `{}`, which any narrowed grant denies — matching the engine, so a
+  // control gated here never disagrees with the write's outcome.
+  const mutationTarget = (ref: AnnotationRef): { userId?: string; groupId?: string } => {
+    const d = model().byId[refKey(ref)]?.data;
+    return {
+      ...(d?.userId !== undefined ? { userId: d.userId } : {}),
+      ...(d?.groupId !== undefined ? { groupId: d.groupId } : {}),
+    };
+  };
+  const allowsCreate = (): boolean => ctx.doc?.security.allowsAnnotationCreate() ?? false;
+
+  /**
+   * Ingest an engine DTO with this session's per-record AUTHORITY projected
+   * onto it (permissions.md) — asked of the SAME mirrors the server enforces
+   * with, against the record's stamped owner. Fused into
+   * `annotTransformable`/`annotDeletable`, so hit-test, chrome, props and
+   * delete all agree with the engine by construction. No security context
+   * (bare local engines, tests) → unstamped → allowed; the engine enforces.
+   */
+  const ingestDTO = (
+    dto: Parameters<typeof fromDTO>[0],
+    crop: PdfRect,
+    source?: Parameters<typeof fromDTO>[2],
+  ): Annot => {
+    const a = fromDTO(dto, crop, source);
+    const sec = ctx.doc?.security;
+    if (!sec) return a;
+    const target = {
+      ...(dto.userId !== undefined ? { userId: dto.userId } : {}),
+      ...(dto.groupId !== undefined ? { groupId: dto.groupId } : {}),
+    };
+    return {
+      ...a,
+      authority: {
+        update: sec.allowsAnnotationMutation('update', target),
+        delete: sec.allowsAnnotationMutation('delete', target),
+      },
+    };
+  };
+  const allowsMutation = (action: 'update' | 'delete', ref: AnnotationRef): boolean =>
+    ctx.doc?.security.allowsAnnotationMutation(action, mutationTarget(ref)) ?? false;
+  const deletableOne = (ref: AnnotationRef): boolean => {
+    const a = model().byId[refKey(ref)];
+    return !!a && annotDeletable(a);
+  };
+  const threadMemberRefs = (t: CommentThread): AnnotationRef[] => [
+    ...t.replies.map((r) => r.ref),
+    ...t.groupedParts.map((g) => g.ref),
+    ...t.review.statusRefs,
+    t.root.ref, // root LAST — children first keeps foreign readers coherent
+  ];
+
+  const comments: CommentsApi = {
+    threads: () => threadsIndex().threads,
+    thread: (ref) => threadsIndex().byMember.get(refKey(ref)) ?? null,
+    hydration: () => ctx.getState().hydration,
+    rehydrate,
+
+    reply: async (ref, text) => {
+      const t = threadOf(ref);
+      const created = await createConversationAnnot(t.pageObjectNumber, {
+        subtype: 'text',
+        rect: t.root.rect,
+        icon: 'comment',
+        contents: text,
+        inReplyTo: t.root.ref,
+        flags: { ...REPLY_FLAGS },
+      } as AnnotationDraft);
+      return created.ref;
+    },
+
+    edit: async (ref, text) => {
+      const subtype = model().byId[refKey(ref)]?.data?.subtype;
+      if (!subtype) throw new Error('[annotation] cannot edit an uncommitted annotation');
+      await updateOne(ref, { subtype, contents: text } as AnnotationPatch);
+    },
+
+    setStatus: async (ref, state) => {
+      const t = threadOf(ref);
+      const userId = currentUserId();
+      // ISO chain: reply to the caller's previous state annotation when one
+      // exists, else to the root. Readers everywhere (ours included) accept
+      // both shapes.
+      const previous = userId ? t.review.byReviewer[userId] : undefined;
+      await createConversationAnnot(t.pageObjectNumber, {
+        subtype: 'text',
+        rect: t.root.rect,
+        inReplyTo: previous?.ref ?? t.root.ref,
+        state,
+        stateModel: 'review',
+        flags: { ...STATUS_FLAGS },
+      } as AnnotationDraft);
+    },
+
+    setMarked: async (ref, marked) => {
+      const t = threadOf(ref);
+      await createConversationAnnot(t.pageObjectNumber, {
+        subtype: 'text',
+        rect: t.root.rect,
+        inReplyTo: t.root.ref,
+        state: marked ? 'marked' : 'unmarked',
+        stateModel: 'marked',
+        flags: { ...STATUS_FLAGS },
+      } as AnnotationDraft);
+    },
+
+    remove: deleteOne,
+
+    removeThread: async (ref): Promise<ThreadDeleteResult> => {
+      const t = threadOf(ref);
+      const members = threadMemberRefs(t);
+      // Preflight: all-or-nothing. A blocked member means NOTHING deletes —
+      // a half-deleted thread orphans replies in every other viewer.
+      const blocked = members.filter((r) => !deletableOne(r));
+      if (blocked.length > 0) {
+        return {
+          deleted: [],
+          failed: blocked.map((r) => ({ ref: r, error: new Error('delete not permitted') })),
+        };
+      }
+      const deleted: AnnotationRef[] = [];
+      const failed: ThreadDeleteResult['failed'] = [];
+      for (const member of members) {
+        // A child failure (a race: someone else acted first) stops the
+        // cascade before the root, so nothing orphans.
+        if (failed.length > 0) break;
+        try {
+          await deleteOne(member);
+          deleted.push(member);
+        } catch (error) {
+          failed.push({ ref: member, error });
+        }
+      }
+      return { deleted, failed };
+    },
+
+    permissionsFor: (ref): CommentPermissions => {
+      const flags = model().byId[refKey(ref)]?.flags;
+      const t = threadsIndex().byMember.get(refKey(ref)) ?? null;
+      return {
+        // Replying and setting status CREATE new annotations — gated on
+        // the caller's own identity, not the target's owner.
+        canReply: allowsCreate(),
+        canSetStatus: allowsCreate(),
+        canEditText: (() => {
+          const a = model().byId[refKey(ref)];
+          return !!a && annotContentsEditable(a);
+        })(),
+        canDelete: deletableOne(ref),
+        canDeleteThread: t !== null && threadMemberRefs(t).every(deletableOne),
+      };
+    },
+  };
+
   /**
    * Per-parent serialization of attached-link reconciles: rapid edits chain
    * instead of interleaving (two overlapping runs could double-create
@@ -817,24 +1256,35 @@ export function createAnnotationCapability(
    * chained run converges on the latest desired state.
    */
   const linkSyncChains = new Map<Id, Promise<void>>();
-  const scheduleLinkSync = (id: Id): void => {
+  /**
+   * Queue a reconcile. `intent` is either an explicit target (a set/clear —
+   * captured by THIS run's closure, so chained sets stay latest-wins) or
+   * `'keep'` (a geometry follow: re-rect the children toward whatever target
+   * the substrate holds AT RUN TIME — so a remote retarget is never undone
+   * by a local move). Returns the chain, so `links.set()` can await commit.
+   */
+  const scheduleLinkSync = (id: Id, intent: { target: PdfLinkTarget | null } | 'keep'): Promise<void> => {
     const prev = linkSyncChains.get(id) ?? Promise.resolve();
-    const next = prev.then(() => reconcileLinkChildren(id));
+    const next = prev.then(() =>
+      reconcileLinkChildren(id, intent === 'keep' ? linkOf(model(), id) : intent.target),
+    );
     linkSyncChains.set(id, next);
     void next.finally(() => {
       if (linkSyncChains.get(id) === next) linkSyncChains.delete(id);
     });
+    return next;
   };
 
   /**
    * THE one place attached link children are created, retargeted, re-rected,
-   * or deleted (the delete-with-parent expansion in the core is the one other
-   * consumer of `linkRefs`). Declarative: desired state is derived fresh from
-   * the parent's `link` value + committed geometry (`linkChildRects`), then
-   * diffed against the join keys the last fold reported. Idempotent — foreign
+   * or deleted. Declarative: desired state = `desired` target + the parent's
+   * committed geometry (`linkChildRects`); CURRENT state is read straight
+   * from the substrate (`linkChildrenOf`) — no join-key ledger. Results land
+   * as ordinary substrate upserts/removes, so the `linkOf` lens converges
+   * immediately locally and via events everywhere else. Idempotent — foreign
    * inconsistencies heal on the next local edit.
    */
-  const reconcileLinkChildren = async (id: Id): Promise<void> => {
+  const reconcileLinkChildren = async (id: Id, desired: PdfLinkTarget | null): Promise<void> => {
     const doc = ctx.doc;
     const a = model().byId[id];
     if (!doc || !a || !a.ref || a.subtype === 'link') return;
@@ -843,19 +1293,20 @@ export function createAnnotationCapability(
     const page = doc.page(a.pon);
     // Read-only target arms can't be (re)written: children keep their /A and
     // only their rects follow the parent.
-    const target = writableTarget(a.link);
-    const rects = a.link == null ? [] : linkChildRects(a).map((r) => contentToPdfRect(r, crop));
-    const current = a.linkRefs ?? [];
-    const nextRefs: AnnotationRef[] = [];
+    const target = writableTarget(desired);
+    const rects = desired == null ? [] : linkChildRects(a).map((r) => contentToPdfRect(r, crop));
+    const current = linkChildrenOf(model(), id);
     try {
       const paired = Math.min(current.length, rects.length);
       for (let i = 0; i < paired; i++) {
-        const res = await page.annotations.update(current[i], {
+        const ref = current[i].ref;
+        if (!ref) continue;
+        const res = await page.annotations.update(ref, {
           subtype: 'link',
           rect: rects[i],
           ...(target ? { target } : {}),
         });
-        nextRefs.push(res.updated.ref);
+        apply({ t: 'upsert', annots: [ingestDTO(res.updated, crop, 'baked')] });
       }
       for (let i = current.length; i < rects.length; i++) {
         const res = await page.annotations.create({
@@ -865,19 +1316,16 @@ export function createAnnotationCapability(
           inReplyTo: a.ref,
           replyType: 'group',
         });
-        nextRefs.push(res.created.ref);
+        apply({ t: 'upsert', annots: [ingestDTO(res.created, crop, 'baked')] });
       }
       for (let i = rects.length; i < current.length; i++) {
-        await page.annotations.delete(current[i]);
+        const child = current[i];
+        if (child.ref) await page.annotations.delete(child.ref);
+        apply({ t: 'remove', ids: [child.id] });
       }
     } catch (err) {
       console.error('[annotation] attached-link sync failed:', err);
     }
-    // Refresh the join keys on the CURRENT model annot (it may have moved on
-    // since this run was scheduled). Explicit `linkRefs` (possibly []) wins
-    // over the upsert's fold preservation.
-    const cur = model().byId[id];
-    if (cur) apply({ t: 'upsert', annots: [{ ...cur, linkRefs: nextRefs }] });
   };
 
   /** A relationship-only engine patch (sets/clears `/IRT` + `/RT`) — geometry and
@@ -1044,12 +1492,19 @@ export function createAnnotationCapability(
             // Attached link children follow their parent's COMMITTED geometry
             // — scheduled after the parent's own write resolves, from ONE
             // place, so no gesture ever has to know the children exist.
-            if (a.linkRefs?.length) scheduleLinkSync(fx.id);
+            if (linkChildrenOf(model(), fx.id).length)
+              void scheduleLinkSync(fx.id, 'keep');
           },
-          () => {},
+          // A refused write (a race, a stale /access) must not leave the
+          // optimistic patch as a lie. The effect runs AFTER the reducer
+          // applied it, so the pre-image is the annot's own canonical DTO —
+          // the last COMMITTED truth — re-ingested with fresh authority.
+          () => {
+            if (a.data && crop) apply({ t: 'upsert', annots: [ingestDTO(a.data, crop, a.source)] });
+          },
         );
     } else if (fx.fx === 'syncLink') {
-      scheduleLinkSync(fx.id);
+      void scheduleLinkSync(fx.id, { target: fx.target });
     } else {
       doc
         .page(fx.ref.pageObjectNumber)
@@ -1151,10 +1606,40 @@ export function createAnnotationCapability(
       apply({ t: 'remove', ids: [refKey(ref)] });
     },
 
-    // ── authorization (coarse UI mirror; engine enforces per-owner) ──
-    canCreate: () => ctx.doc?.security.allows(ANNOTATE_MODIFY) ?? false,
-    canEdit: () => ctx.doc?.security.allows(ANNOTATE_MODIFY) ?? false,
-    canDelete: () => ctx.doc?.security.allows(ANNOTATE_MODIFY) ?? false,
+    // ── authorization: per-record mirrors of the engine's collab
+    // resolver. `canCreate` asks about the caller's own identity;
+    // `canEdit`/`canDelete` about the target's stamped owner. Pure
+    // authority — aspect-specific flag gates (`locked` for geometry
+    // and delete, `lockedContents` for text) live with the surfaces
+    // that touch that aspect (comments.permissionsFor, interaction).
+    canRead: () => canRead(),
+    canCreate: () => allowsCreate(),
+    // The twins answer "would the verb succeed?" — authority AND flags, via
+    // the SAME fused predicates the gestures and chrome consume, so a false
+    // twin and a bare-outline render can never disagree (permissions.md).
+    canEdit: (ref) => {
+      const a = model().byId[refKey(ref)];
+      return !!a && annotTransformable(a);
+    },
+    canDelete: (ref) => {
+      const a = model().byId[refKey(ref)];
+      return !!a && annotDeletable(a);
+    },
+
+    comments,
+
+    links: {
+      of: (ref) => {
+        const a = model().byId[refKey(ref)];
+        if (!a) return null;
+        return a.subtype === 'link' ? (a.link ?? null) : linkOf(model(), a.id);
+      },
+      // The verbs go straight to the reconciler chain (latest-wins per
+      // parent) and resolve when the children are COMMITTED — `of` reads
+      // the new value the moment the promise settles.
+      set: (ref, target) => scheduleLinkSync(refKey(ref), { target }),
+      clear: (ref) => scheduleLinkSync(refKey(ref), { target: null }),
+    },
 
     getSelection: (): AnnotationRef[] => {
       const m = model();
@@ -1272,6 +1757,9 @@ export function createAnnotationCapability(
       for (const id of m.order) {
         const a = m.byId[id];
         if (!a || a.pon !== pon || a.source !== 'baked' || !a.ref) continue;
+        // Conversation-plane annotations never paint — a remote reply or
+        // status change must not churn the page's raster cache key.
+        if (isSubstrateOnly(a)) continue;
         parts.push(`${id}@${a.apVersion ?? 0}`);
       }
       return parts.sort().join('|');
@@ -1333,6 +1821,9 @@ export function createAnnotationCapability(
         },
       }),
     createPointer: (tool, phase, pon, point, finish = false, displayRotation) => {
+      // No create authority → creation gestures are inert: no ghost, no
+      // draft, no doomed 403. The engine enforces; this keeps pixels honest.
+      if (!allowsCreate()) return;
       // Resolve the authoring TOOL to its routing subtype + defaults key. Two
       // tools can share a subtype (line / arrow); `preset` keeps their defaults
       // apart. Unknown id → treat it as a bare subtype (headless/programmatic).
@@ -1367,6 +1858,7 @@ export function createAnnotationCapability(
       // One-shot form of the markup tools' commit: selection quads → one
       // markup per page → clear. Selection is an OPTIONAL peer — resolve
       // lazily so annotation keeps working without it installed.
+      if (!allowsCreate()) return false;
       const selection = ctx.tryGet(SelectionPublicToken);
       if (!selection || !selection.hasSelection()) return false;
       const snapshot = selection.snapshot();
@@ -1386,7 +1878,9 @@ export function createAnnotationCapability(
       if (created) selection.clear();
       return created;
     },
-    createMarkup: (subtype, pon, quads, preset) =>
+    createMarkup: (subtype, pon, quads, preset) => {
+      // Optimistic create — the same self-refusal `createPointer` has.
+      if (!allowsCreate()) return;
       // A markup tool's `/F` seed rides along (the preset IS the tool id).
       apply({
         t: 'createMarkup',
@@ -1395,10 +1889,16 @@ export function createAnnotationCapability(
         quads,
         preset,
         flags: preset ? registry.get(preset)?.flags : undefined,
-      }),
-    createCaret: (pon, anchor) => apply({ t: 'createCaret', pon, anchor }),
-    createReplaceText: (pon, quads, anchor, preset) =>
-      apply({ t: 'createReplaceText', pon, quads, anchor, preset }),
+      });
+    },
+    createCaret: (pon, anchor) => {
+      if (!allowsCreate()) return;
+      apply({ t: 'createCaret', pon, anchor });
+    },
+    createReplaceText: (pon, quads, anchor, preset) => {
+      if (!allowsCreate()) return;
+      apply({ t: 'createReplaceText', pon, quads, anchor, preset });
+    },
     previewMarkup: (subtype, quadsByPage, preset) =>
       apply({ t: 'setMarkupPreview', subtype, quadsByPage, preset }),
     clearMarkupPreview: () => apply({ t: 'clearMarkupPreview' }),
@@ -1464,48 +1964,38 @@ export function createAnnotationCapability(
       await Promise.all(subs.map((a) => writeRelationship(a, { inReplyTo: null })));
     },
     canGroup: (): boolean => {
-      if (!(ctx.doc?.security.allows(ANNOTATE_MODIFY) ?? false)) return false;
       const m = model();
       const members = selectedCommitted();
       if (members.length < 2) return false;
       if (members.some((a) => a.pon !== members[0].pon)) return false;
+      // Grouping WRITES a relationship onto every member — each must
+      // pass the per-record update check.
+      if (!members.every((a) => a.ref != null && allowsMutation('update', a.ref))) return false;
       // Already exactly one complete group → nothing to do.
       const keys = new Set(m.selected.map((id) => groupKeyOf(m, id)));
       if (keys.size === 1 && !keys.has(null)) return false;
       return true;
     },
     canUngroup: (): boolean => {
-      if (!(ctx.doc?.security.allows(ANNOTATE_MODIFY) ?? false)) return false;
       const m = model();
-      return m.selected.some((id) => groupKeyOf(m, id) != null);
+      // Ungrouping clears the relationship on every member of every
+      // selected group — same per-record write gate as `ungroup` hits.
+      const subs = expandGroups(m, m.selected)
+        .map((id) => m.byId[id])
+        .filter((a): a is Annot => !!a && !!a.group);
+      return subs.length > 0 && subs.every((a) => a.ref != null && allowsMutation('update', a.ref));
     },
 
-    ensurePage: (pon) => {
-      if (loaded.has(pon)) return;
-      const doc = ctx.doc;
-      const crop = cropOf(pon);
-      if (!doc || !crop) return;
-      loaded.add(pon);
-      doc
-        .page(pon)
-        .annotations.list()
-        .then(
-          (snap) =>
-            apply({
-              t: 'loaded',
-              annots: foldAttachedLinks(snap.annotations.map((d) => fromDTO(d, crop))),
-            }),
-          () => {
-            loaded.delete(pon);
-          },
-        );
-    },
+    // Whole-document hydration supersedes per-page loading: the model is
+    // seeded by `listRawAll()` at document open (see `ensureHydrated`), so
+    // a page mount has nothing to fetch. Kept as API for layers/plugins
+    // that call it on mount; appearance fetching stays per-page/viewport.
+    ensurePage: () => {},
 
     reloadPage: async (pon) => {
       const doc = ctx.doc;
       const crop = cropOf(pon);
       if (!doc || !crop) return;
-      loaded.add(pon);
       try {
         const snap = await doc.page(pon).annotations.list();
         // Replace, not merge: drop this page's current annots first so
@@ -1513,13 +2003,26 @@ export function createAnnotationCapability(
         const m = model();
         const stale = m.order.filter((id) => m.byId[id]?.pon === pon);
         if (stale.length) apply({ t: 'remove', ids: stale });
-        apply({
-          t: 'loaded',
-          annots: foldAttachedLinks(snap.annotations.map((d) => fromDTO(d, crop))),
-        });
+        apply({ t: 'loaded', annots: snap.annotations.map((d) => ingestDTO(d, crop)) });
       } catch {
-        loaded.delete(pon);
+        // A failed reload leaves the previous view; the next event or a
+        // rehydrate reconciles.
       }
+    },
+
+    hydration: () => ctx.getState().hydration,
+    ensureHydrated: () => {
+      if (hydrationStarted) return;
+      hydrationStarted = true;
+      void runHydration(false);
+    },
+    rehydrate,
+    deliverRemoteAnnotationEvent: (event) => {
+      if (hydrationWindow) {
+        pendingRemote.push(event);
+        return;
+      }
+      applyRemoteAnnotationEvent(event);
     },
 
     // ── free-text (the editable-element layer) ──

@@ -88,7 +88,9 @@ export function setAnnotFlags(
 }
 
 /**
- * Write `/Rect` via `FPDFAnnot_SetRect`. FS_RECTF layout is
+ * Write `/Rect` without touching `/AP`. Appearance preservation/regeneration
+ * belongs to AnnotationMutator; a geometry primitive must not silently rewrite
+ * an existing appearance `/BBox`. FS_RECTF layout is
  * `{ left, top, right, bottom }` (top > bottom in PDF coords).
  */
 export function setAnnotRect(
@@ -103,12 +105,54 @@ export function setAnnotRect(
     mem.poke(buf, 'f32', rect.top, 4);
     mem.poke(buf, 'f32', rect.right, 8);
     mem.poke(buf, 'f32', rect.bottom, 12);
-    if (!fn.FPDFAnnot_SetRect(annotPtr, buf)) {
-      throw new EngineError(EngineErrorCode.Unknown, 'FPDFAnnot_SetRect returned false');
+    if (!fn.EPDFAnnot_SetRect(annotPtr, buf)) {
+      throw new EngineError(EngineErrorCode.Unknown, 'EPDFAnnot_SetRect returned false');
     }
   } finally {
     mem.free(buf);
   }
+}
+
+/**
+ * Write a UTF-16 string entry into an annotation dictionary. The write
+ * side of `readAnnotString`.
+ */
+export function writeAnnotString(
+  fn: PdfFunctions,
+  mem: PdfRuntimeMemory,
+  annotPtr: Ptr,
+  key: string,
+  value: string,
+): void {
+  const ptr = mem.writeU16String(value);
+  try {
+    fn.FPDFAnnot_SetStringValue(annotPtr, key, ptr);
+  } finally {
+    mem.free(ptr);
+  }
+}
+
+/**
+ * Three-state string write: `null` REMOVES the dictionary entry.
+ *
+ * Clearing goes through `EPDFAnnot_RemoveKey` because
+ * `FPDFAnnot_SetStringValue` with a NULL value writes an EMPTY string —
+ * it never removes. True removal is what keeps the read side honest:
+ * `readAnnotString` returns `null` iff the key is absent, so a cleared
+ * field reads back as `null`, not `''`.
+ */
+export function writeAnnotStringOrClear(
+  fn: PdfFunctions,
+  mem: PdfRuntimeMemory,
+  annotPtr: Ptr,
+  key: string,
+  value: string | null,
+): void {
+  if (value === null) {
+    fn.EPDFAnnot_RemoveKey(annotPtr, key);
+    return;
+  }
+  writeAnnotString(fn, mem, annotPtr, key, value);
 }
 
 /**

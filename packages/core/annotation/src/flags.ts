@@ -58,6 +58,9 @@ export const interactive = (f: AnnotationFlags): boolean => !f.hidden && !f.noVi
 export interface FlagBearer {
   subtype: string;
   flags: AnnotationFlags;
+  /** Session authority projected at ingest (permissions.md). Absent =
+   *  unstamped (drafts, wildcard local engines, tests) = allowed. */
+  authority?: { update: boolean; delete: boolean };
 }
 
 /** Interaction gate for a concrete annotation: widget kinds ignore `readOnly`
@@ -66,11 +69,20 @@ export interface FlagBearer {
 export const annotInteractive = (a: FlagBearer): boolean =>
   capsFor(a.subtype).ignoresReadOnly ? !a.flags.hidden && !a.flags.noView : interactive(a.flags);
 
-/** Geometry/style/delete mutations — `locked` freezes the OBJECT, not its
- *  contents (that's `lockedContents`). */
+/**
+ * Geometry/style mutations — `locked` freezes the OBJECT, not its contents
+ * (that's `lockedContents`), AND the session must hold update authority over
+ * the record. One predicate for hit-test, chrome, and props alike, so a
+ * record you may not edit renders and behaves exactly like a locked one.
+ */
 export const annotTransformable = (a: FlagBearer): boolean =>
-  annotInteractive(a) && !a.flags.locked;
+  annotInteractive(a) && !a.flags.locked && (a.authority?.update ?? true);
+
+/** Deletion — the delete half of the authority split (a narrowed grant can
+ *  allow update but not delete, or vice versa). Flags gate like transforms. */
+export const annotDeletable = (a: FlagBearer): boolean =>
+  annotInteractive(a) && !a.flags.locked && (a.authority?.delete ?? true);
 
 /** `/Contents` text edits — the contents counterpart of `locked`. */
 export const annotContentsEditable = (a: FlagBearer): boolean =>
-  annotInteractive(a) && !a.flags.lockedContents;
+  annotInteractive(a) && !a.flags.lockedContents && (a.authority?.update ?? true);

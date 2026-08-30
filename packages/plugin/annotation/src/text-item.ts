@@ -30,6 +30,12 @@ export function buildTextItems(m: Model, pon: number, view?: ViewEnv): TextItem[
     // `text`/`style` are the OPTIMISTIC content projections (a props edit lands
     // here before the engine round-trips), so the editor restyles instantly.
     const t = a?.text ?? initialTextStyle;
+    // The text plate inset MIRRORS the engine's AP generator, so the DOM text
+    // sits exactly where the baked text will land (WYSIWYG across the
+    // baked↔live swap): callout body = border + 2 (`kCalloutTextPadding`),
+    // plain free-text body = border width (two half-width deflates).
+    const sw = a?.style.strokeWidth ?? 0;
+    const isCallout = a?.geom.t === 'text' && !!a.geom.callout;
     return {
       id: tb.id,
       ref: a?.ref ?? null,
@@ -43,7 +49,7 @@ export function buildTextItems(m: Model, pon: number, view?: ViewEnv): TextItem[
         lineHeight: t.fontSize, // CPVT lays out free-text at line-height ≈ font size
         color: t.fontColor,
         align: t.textAlign,
-        padding: 2,
+        padding: isCallout ? sw + 2 : sw,
         background: a?.style.interiorColor ?? null,
       },
     };

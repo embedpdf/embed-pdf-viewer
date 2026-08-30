@@ -2,7 +2,7 @@
 
 `@cloudpdf/server` ships its schema as an ordered set of SQL migrations
 (`NNN_name.sql`) for both SQLite and Postgres, applied by the migrator in
-[`src/db/migrator/runner.ts`](src/db/migrator/runner.ts). Each applied
+[`src/db/migrator/runner.ts`](../../../../cloudpdf/server/src/db/migrator/runner.ts). Each applied
 migration is recorded in `schema_migrations` with a SHA-256 checksum of
 its `up` SQL, so editing an already-applied migration is detected as
 drift and refused at boot.
@@ -87,14 +87,16 @@ the routine deploy.
 
 ## Adding a migration
 
-1. Add `NNN_name.sql` to **both** `src/db/migrations/sqlite/` and
-   `src/db/migrations/postgres/`.
+1. Add `NNN_name.sql` to **both**
+   `cloudpdf/server/src/db/migrations/sqlite/` and
+   `cloudpdf/server/src/db/migrations/postgres/`.
 2. Add the matching `NNN_name.down.sql` to both dialects (reverse the up
    in child-before-parent FK order).
-3. Register both in `sqlite/index.ts` and `postgres/index.ts`
+3. Register both in the dialect's `index.ts`
    (`{ version, name, sql, down }`).
 4. Run `pnpm --filter @cloudpdf/server test` — the round-trip test
-   (`test/migrator-down.test.ts`) asserts `up → down --all → up` works on
+   (`cloudpdf/server/test/migrator-down.test.ts`) asserts
+   `up → down --all → up` works on
    both dialects.
 
 ### SQLite `DROP COLUMN` caveat
@@ -102,7 +104,8 @@ the routine deploy.
 SQLite refuses `ALTER TABLE ... DROP COLUMN` for a column referenced by a
 `CHECK` constraint (or index/PK/FK/generated expression). When a down
 needs to remove such a column, rebuild the table instead (see
-`sqlite/007_document_security.down.sql`): mark the file
+`cloudpdf/server/src/db/migrations/sqlite/007_document_security.down.sql`):
+mark the file
 `-- pragma: no-transaction`, `PRAGMA foreign_keys=OFF`, create the
 table's prior shape, copy, drop, rename, recreate indexes,
 `PRAGMA foreign_keys=ON`. Postgres has no such limitation and drops the
