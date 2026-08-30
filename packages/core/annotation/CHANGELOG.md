@@ -1,5 +1,14 @@
 # @embedpdf/core-annotation
 
+## 3.0.0-next.10
+
+### Minor Changes
+
+- [#788](https://github.com/embedpdf/embed-pdf-viewer/pull/788) by [@bobsingor](https://github.com/bobsingor) – Add comment-thread and review-state composition, attached-link substrate
+  helpers, conversation-plane filtering, and per-record annotation authority.
+  Align annotation grouping, hit testing, geometry, and sparse property updates
+  with the new comments, links, and permission model.
+
 ## 3.0.0-next.9
 
 ## 3.0.0-next.8

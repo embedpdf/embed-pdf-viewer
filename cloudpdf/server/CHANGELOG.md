@@ -1,5 +1,15 @@
 # @cloudpdf/server
 
+## 3.0.0-next.10
+
+### Minor Changes
+
+- [#788](https://github.com/embedpdf/embed-pdf-viewer/pull/788) by [@bobsingor](https://github.com/bobsingor) – Persist per-layer annotation versions and add versioned page and
+  whole-document annotation reads with audit-head metadata. Expose a no-store
+  backend endpoint for listing every annotation in a layer. Annotation mutations
+  now advance the version atomically so clients can hydrate and retry against
+  coherent snapshots.
+
 ## 3.0.0-next.9
 
 ### Minor Changes

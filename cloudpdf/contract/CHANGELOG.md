@@ -1,5 +1,12 @@
 # @cloudpdf/contract
 
+## 3.0.0-next.10
+
+### Minor Changes
+
+- [#791](https://github.com/embedpdf/embed-pdf-viewer/pull/791) by [@bobsingor](https://github.com/bobsingor) – Add `doc.annotations.listAll` to the public contract for retrieving every
+  page's annotations as one coherent snapshot with audit-head metadata.
+
 ## 3.0.0-next.9
 
 ### Minor Changes

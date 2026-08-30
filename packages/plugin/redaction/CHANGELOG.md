@@ -1,5 +1,13 @@
 # @embedpdf/plugin-redaction
 
+## 3.0.0-next.10
+
+### Minor Changes
+
+- [#788](https://github.com/embedpdf/embed-pdf-viewer/pull/788) by [@bobsingor](https://github.com/bobsingor) – Add `canMark()` for redaction annotation creation and make `canApply()` mirror
+  every capability required by destructive redaction. Unauthorized selection
+  queueing is now rejected before creating marks.
+
 ## 3.0.0-next.9
 
 ## 3.0.0-next.8

@@ -1,5 +1,14 @@
 # @embedpdf/plugin-annotation
 
+## 3.0.0-next.10
+
+### Minor Changes
+
+- [#788](https://github.com/embedpdf/embed-pdf-viewer/pull/788) by [@bobsingor](https://github.com/bobsingor) – Add whole-document annotation hydration with event replay and desync
+  recovery, a comments and review-state API, and an attached-link lens backed by
+  substrate annotations. Add per-record permission checks and keep conversation
+  records out of painting, hit testing, and selection.
+
 ## 3.0.0-next.9
 
 ## 3.0.0-next.8

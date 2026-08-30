@@ -1,5 +1,12 @@
 # @embedpdf/plugin-link
 
+## 3.0.0-next.10
+
+### Patch Changes
+
+- [#788](https://github.com/embedpdf/embed-pdf-viewer/pull/788) by [@bobsingor](https://github.com/bobsingor) – Mark grouped annotation link children as attached navigation items so link
+  activation can defer to annotation editing instead of opening the target.
+
 ## 3.0.0-next.9
 
 ## 3.0.0-next.8

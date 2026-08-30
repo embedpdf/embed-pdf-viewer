@@ -1,5 +1,14 @@
 # @cloudpdf/engine
 
+## 3.0.0-next.10
+
+### Minor Changes
+
+- [#788](https://github.com/embedpdf/embed-pdf-viewer/pull/788) by [@bobsingor](https://github.com/bobsingor) – Add coherent whole-document annotation snapshots using annotation versions
+  and audit heads, including stale-version retries and desync-safe hydration.
+  Expose per-record annotation creation, mutation, and group-assignment
+  permission checks through the cloud document security service.
+
 ## 3.0.0-next.9
 
 ### Minor Changes
