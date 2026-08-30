@@ -1,6 +1,7 @@
 # Package naming — the law
 
-`PLUGINS.md` is the law for plugin authors, and `tooling/build/README.md` for
+[`plugins.md`](./plugins.md) is the law for plugin authors, and
+[`tooling/build/README.md`](../../../../tooling/build/README.md) for
 how packages build. This file is the law for WHERE a package lives and WHAT it
 is called. Every name derives from the tree; if you have to debate a name, the
 tree is wrong.

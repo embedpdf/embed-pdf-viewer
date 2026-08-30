@@ -1,7 +1,7 @@
 # @embedpdf/tooling-build — the one build preset
 
 `epdf-build` turns a publishable TS package into dual ESM+CJS with
-declarations, and proves the result on every build. `PLUGINS.md` is the law for
+declarations, and proves the result on every build. [`plugins.md`](../../.agents/skills/embedpdf-conventions/references/plugins.md) is the law for
 plugin authors; this file is the law for how packages BUILD.
 
 ## The laws

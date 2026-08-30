@@ -104,7 +104,7 @@ const tool = (
 ): CommandDef => {
   TOOL_ICONS[toolId] = { icon, ...(accent ? { accent } : {}) };
   // Authoring tools grey out without their family's authority — the SAME
-  // twin the owning plugin's gesture gate consults (PERMISSIONS.md), so a
+  // twin the owning plugin's gesture gate consults (permissions.md), so a
   // button can never offer a doomed paint: annotation/insert tools ask
   // annotation create authority, form-design tools ask `form.canDesign()`,
   // the redact marker asks `redaction.canMark()`. Absent plugin → ungated
@@ -300,7 +300,7 @@ export const defaultCommands: CommandDef[] = [
         })
         .catch((e) => console.warn('[snippet-react] download failed', e));
     },
-    // The PERMISSIONS.md chrome exception: a kernel verb with a 1:1
+    // The permissions.md chrome exception: a kernel verb with a 1:1
     // capability reads the kernel's `allows` directly — no owning plugin.
     enabled: (c) =>
       c.documentId != null && (c.tryGet(DocumentsToken)?.allows('doc.download') ?? false),

@@ -4,6 +4,9 @@ The law for how documentation is structured so that five integrations never
 mean five copies. Framework parity makes this possible: "one page of prose +
 per-framework code" is rendering, not aspiration.
 
+Website source paths below are relative to `website/`; paths beginning with
+`/docs` are public documentation URLs.
+
 ## The two halves
 
 ```

@@ -169,7 +169,7 @@ export interface FormCapability {
   detachWidget(key: FieldKey, annotObjectNumber: number): Promise<void>;
 
   /**
-   * The twins (PERMISSIONS.md): would the family's verbs succeed now for
+   * The twins (permissions.md): would the family's verbs succeed now for
    * this session? `canRead` — the form model hydrates at all (false = the
    * hydration gate left it empty by right); `canFill` — value writes
    * (`setText`/`toggle`/`choose`/`reset`; also fused into every

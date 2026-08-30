@@ -6,7 +6,7 @@ export { CancelledError, isCancelled } from './scope';
 export {
   AbortablePromise,
   CONTINUOUS_RENDER_POLICY,
-  // The refusal shape of the permissions convention (PERMISSIONS.md): a
+  // The refusal shape of the permissions convention (permissions.md): a
   // plugin's optimistic gate rejects with the SAME error the engine throws.
   PermissionDenied,
   snapAppearanceScale,

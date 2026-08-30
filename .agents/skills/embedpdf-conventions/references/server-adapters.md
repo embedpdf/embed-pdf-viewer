@@ -1,6 +1,9 @@
 # Server Adapter House Style
 
-The server has five adapter families: **Secrets**, **KMS**, **Storage**, **CDN**, **Import** (read-only pull sources for `documents.import`). They differ in _what they do_ but share _how they're structured_. This document is the contract a new adapter must follow.
+The server has five adapter families: **Secrets**, **KMS**, **Storage**, **CDN**, **Import** (read-only pull sources for `documents.importFrom`). They differ in _what they do_ but share _how they're structured_. This document is the contract a new adapter must follow.
+
+Unless stated otherwise, adapter source paths below are relative to
+`cloudpdf/server/src/`; test paths are relative to `cloudpdf/server/`.
 
 ---
 
@@ -20,7 +23,9 @@ Every family lives at the same shape:
     └── <Kind2><Family>.ts
 ```
 
-Examples: `security/kms/adapters/AwsKmsKeyring.ts`, `storage/adapters/S3ObjectStore.ts`, `cdn/adapters/BunnyCdnSigner.ts`.
+Examples: `cloudpdf/server/src/security/kms/adapters/AwsKmsKeyring.ts`,
+`cloudpdf/server/src/storage/adapters/S3ObjectStore.ts`, and
+`cloudpdf/server/src/cdn/adapters/BunnyCdnSigner.ts`.
 
 ---
 
@@ -106,7 +111,8 @@ private async createClient(): Promise<Client> {
 
 ### `optionalDependencies`
 
-Every cloud-SDK package **must** be listed in `package.json` under `optionalDependencies`, never `dependencies`. This way:
+Every cloud-SDK package **must** be listed in `cloudpdf/server/package.json`
+under `optionalDependencies`, never `dependencies`. This way:
 
 - `npm install` doesn't pull SDKs the user isn't using.
 - Errors at adapter construction time are clear: "Cannot find module '@scope/package' — install it to use the X adapter."
@@ -200,13 +206,14 @@ logger.info({ config: redactConfig(myConfig) }, 'starting');
 - `SecretRef`-shaped values become `<SecretRef provider/name>`
 - Caller can pass `additionalSensitiveKeys` to redact literal-string secret values by field name
 
-A test (`test/config-redact.test.ts`) pins that secret material never leaks through `JSON.stringify` of a redacted config.
+A test (`cloudpdf/server/test/config-redact.test.ts`) pins that secret material
+never leaks through `JSON.stringify` of a redacted config.
 
 ---
 
 ## The bootstrap recipe
 
-In `bin/cloudpdf-server.ts`:
+In `cloudpdf/server/src/bin/cloudpdf-server.ts`:
 
 ```typescript
 // 1. Secrets — primary user-facing utility.
@@ -248,7 +255,7 @@ No `createServerRuntime` or other bundler. Five lines of factory composition is 
 3. **Adapter class** — one file in `<family>/adapters/<Kind><Family>.ts`. Implements the interface; exposes `info: { kind, ... }`; uses the lazy-load house pattern if it wraps a cloud SDK.
 4. **Factory case** — one new `case` in `<family>/create<Family>.ts`'s switch. TypeScript fails the build if you forget.
 5. **Env loader case** — one new branch in `<family>/config/load<Family>ConfigFromEnv.ts`'s kind-specific field reader.
-6. **Optional dependency** — if the adapter wraps a cloud SDK, add the package to `package.json`'s `optionalDependencies`.
-7. **Test** — one file at `test/<family>-<kind>.test.ts` covering construction, key operations, and that `info` exposes only public identifiers.
+6. **Optional dependency** — if the adapter wraps a cloud SDK, add the package to `cloudpdf/server/package.json`'s `optionalDependencies`.
+7. **Test** — one file at `cloudpdf/server/test/<family>-<kind>.test.ts` covering construction, key operations, and that `info` exposes only public identifiers.
 
 That's the entire surface. If a step doesn't apply (e.g., no cloud SDK → skip step 6), skip it explicitly in the PR description.

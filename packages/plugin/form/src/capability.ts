@@ -188,7 +188,7 @@ export function createFormCapability(
 
   // ── memoized fill projection ────────────────────────────────────────────
   // Session fill authority FUSES into the same `disabled` the field's
-  // ReadOnly flag feeds (PERMISSIONS.md: authority rides the flags gate) —
+  // ReadOnly flag feeds (permissions.md: authority rides the flags gate) —
   // without `doc.forms.fill` every widget renders inert, so the pixels are
   // truthful and no gesture reaches a doomed write.
   const fuseFill = (item: FillItem | null, fillable: boolean): FillItem | null =>
@@ -509,7 +509,7 @@ export function createFormCapability(
     deleteField: (key) => enqueueMutation(() => deleteFieldNow(key)),
     detachWidget: (key, annotObjectNumber) =>
       enqueueMutation(() => detachWidgetNow(key, annotObjectNumber)),
-    // The twins (PERMISSIONS.md). `canRead` mirrors the hydration gate above
+    // The twins (permissions.md). `canRead` mirrors the hydration gate above
     // — false means the model stays empty by RIGHT, not by loading. Fill and
     // design are independent grants: a filler is not a designer.
     canRead: () => can('doc.forms.read'),

@@ -112,7 +112,7 @@ export interface SearchPluginConfig {
  */
 export interface SearchCapability {
   /**
-   * The twin (PERMISSIONS.md): would a search succeed now for this session?
+   * The twin (permissions.md): would a search succeed now for this session?
    * No `mode` (or `'rects'`) asks about finding at all — `doc.text.search`
    * — which is what `search()` needs (the session degrades `'full'` to
    * `'rects'` by itself when snippets are denied). `canSearch('full')` also

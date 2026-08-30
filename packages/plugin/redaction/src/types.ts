@@ -38,7 +38,7 @@ export interface RedactionLabelPatch {
 
 export interface RedactionCapability {
   /**
-   * The twins (PERMISSIONS.md). Marking and applying are DIFFERENT powers:
+   * The twins (permissions.md). Marking and applying are DIFFERENT powers:
    * a mark is an ordinary `redact` annotation, so `canMark()` is annotation
    * create authority (any reviewer who can annotate can propose redactions —
    * Acrobat parity); `canApply()` is the destructive rewrite — engine support

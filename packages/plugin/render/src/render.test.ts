@@ -396,7 +396,7 @@ describe('policy conformance', () => {
   });
 });
 
-describe('the twin law (PERMISSIONS.md) — canRender and the fetch gates', () => {
+describe('the twin law (permissions.md) — canRender and the fetch gates', () => {
   const makeCtx = (allowed: boolean) => {
     let state = initialRenderState();
     const image = vi.fn(() => {

@@ -146,7 +146,7 @@ export interface ViewTiles {
 
 export interface RenderCapability {
   /**
-   * The twin (PERMISSIONS.md): would page rasters be served to this session?
+   * The twin (permissions.md): would page rasters be served to this session?
    * Mirrors `doc.render`. When false, `renderPage` and the tile plane refuse
    * locally (no doomed engine round-trips — the gate case for a capability
    * whose denial would otherwise 403 on every viewport tile) and a host can

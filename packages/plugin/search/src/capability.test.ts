@@ -14,7 +14,7 @@ const makeCtx = (granted: readonly string[] | null) =>
     tryGet: () => null,
   }) as unknown as PluginContext<SearchState, SearchAction>;
 
-describe('the twin law (PERMISSIONS.md) — canSearch', () => {
+describe('the twin law (permissions.md) — canSearch', () => {
   it('no mode (and rects) asks about finding at all: doc.text.search', () => {
     const cap = createSearchCapability(makeCtx(['doc.text.search']));
     expect(cap.canSearch()).toBe(true);

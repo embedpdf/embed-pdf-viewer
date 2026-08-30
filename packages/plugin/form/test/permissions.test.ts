@@ -52,7 +52,7 @@ function harness(granted: readonly string[]) {
 
 const ALL = ['doc.forms.read', 'doc.forms.fill', 'doc.forms.modify'];
 
-describe('the twin law (PERMISSIONS.md) — form', () => {
+describe('the twin law (permissions.md) — form', () => {
   it('the three twins mirror their capabilities independently', () => {
     const h = harness(['doc.forms.read', 'doc.forms.fill']);
     expect(h.capability.canRead()).toBe(true);

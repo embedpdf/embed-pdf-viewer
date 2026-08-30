@@ -1108,7 +1108,7 @@ export function createAnnotationCapability(
 
   /**
    * Ingest an engine DTO with this session's per-record AUTHORITY projected
-   * onto it (PERMISSIONS.md) — asked of the SAME mirrors the server enforces
+   * onto it (permissions.md) — asked of the SAME mirrors the server enforces
    * with, against the record's stamped owner. Fused into
    * `annotTransformable`/`annotDeletable`, so hit-test, chrome, props and
    * delete all agree with the engine by construction. No security context
@@ -1616,7 +1616,7 @@ export function createAnnotationCapability(
     canCreate: () => allowsCreate(),
     // The twins answer "would the verb succeed?" — authority AND flags, via
     // the SAME fused predicates the gestures and chrome consume, so a false
-    // twin and a bare-outline render can never disagree (PERMISSIONS.md).
+    // twin and a bare-outline render can never disagree (permissions.md).
     canEdit: (ref) => {
       const a = model().byId[refKey(ref)];
       return !!a && annotTransformable(a);

@@ -767,7 +767,7 @@ export function createKernel(opts: {
       }
       return handle.downloadLayer();
     },
-    // The PERMISSIONS.md chrome exception: print/download are kernel verbs
+    // The permissions.md chrome exception: print/download are kernel verbs
     // with 1:1 capabilities, so their authority question is answered here.
     allows: (cap, id) => documentHandle(id)?.security.allows(cap) ?? false,
   };

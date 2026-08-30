@@ -1,6 +1,6 @@
 # Permissions — the law for authorization-aware plugins
 
-`PLUGINS.md` is the law for a plugin's shape; this file is the law for how a
+[`plugins.md`](./plugins.md) is the law for a plugin's shape; this file is the law for how a
 plugin answers **"may this session do that?"** — so every viewer built on the
 plugins, ours or a host's, renders a truthful UI instead of offering actions
 the engine will refuse.
@@ -39,7 +39,7 @@ Why twins and not a `permissions()` bag or a generic `can('verb')`:
   argument-taking questions; twins cover every case with one rule.
 - **Drift resistance.** The twin lives next to its verb and changes in the
   same diff; the 1:1 name/signature mapping admits a mechanical conformance
-  test: *calling a gated verb while its twin is false must refuse.*
+  test: _calling a gated verb while its twin is false must refuse._
 - **Zero-judgment derivation.** The convention is a function, not a style
   guide: verb name → `can` prefix → same signature. Nothing to decide for
   any future plugin — which is how shape drift is prevented, not policed.
@@ -99,14 +99,14 @@ so every twin's subscribers re-render.
 
 ## Current twin registry (as built)
 
-| Capability | Twins | Composes from |
-| --- | --- | --- |
-| annotation | `canRead()` · `canCreate()` · `canEdit(ref)` · `canDelete(ref)` · `canGroup()` · `canUngroup()` | `doc.annotate.read` / collab mirrors + flags + structure |
-| comments | `permissionsFor(ref)` (convenience bag of twins) | the annotation twins |
-| selection | `canSelect()` · `canCopy()` | `doc.text.select` / `doc.text.copy` |
-| search | `canSearch(mode?)` | `doc.text.search`; `'full'` also `doc.text.copy` (a snippet reproduces text). No verb gate — pure request. |
-| render | `canRender()` | `doc.render`; gate case: `renderPage` AND tile fetches refuse locally (else a denied viewport 403s per tile, forever) |
-| page-edit | `canEdit()` — the collapse rule | `doc.pages.assemble` (rotate/move/delete/insert are ONE answer; PDF has one assemble bit) |
-| form | `canRead()` · `canFill()` · `canDesign()` | `doc.forms.read` (hydration gate) / `doc.forms.fill` (fused into `FillItem.disabled` + write/reset gates) / `doc.forms.modify` (place/update/delete/detach; the draw-to-place handler's gate) |
-| redaction | `canMark()` · `canApply()` | marks are annotations ⇒ `canMark` IS `annotation.canCreate()`; apply mirrors ALL THREE engine assertions: `doc.redact` ∧ `doc.pages.modify` ∧ `doc.annotate.modify` (+ engine support) |
-| kernel documents | `allows(cap, id?)` | THE 1:1 exception surface: chrome print/download read `documents.allows('doc.print' / 'doc.download')` — the verbs live on the kernel, no owning plugin |
+| Capability       | Twins                                                                                           | Composes from                                                                                                                                                                                 |
+| ---------------- | ----------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| annotation       | `canRead()` · `canCreate()` · `canEdit(ref)` · `canDelete(ref)` · `canGroup()` · `canUngroup()` | `doc.annotate.read` / collab mirrors + flags + structure                                                                                                                                      |
+| comments         | `permissionsFor(ref)` (convenience bag of twins)                                                | the annotation twins                                                                                                                                                                          |
+| selection        | `canSelect()` · `canCopy()`                                                                     | `doc.text.select` / `doc.text.copy`                                                                                                                                                           |
+| search           | `canSearch(mode?)`                                                                              | `doc.text.search`; `'full'` also `doc.text.copy` (a snippet reproduces text). No verb gate — pure request.                                                                                    |
+| render           | `canRender()`                                                                                   | `doc.render`; gate case: `renderPage` AND tile fetches refuse locally (else a denied viewport 403s per tile, forever)                                                                         |
+| page-edit        | `canEdit()` — the collapse rule                                                                 | `doc.pages.assemble` (rotate/move/delete/insert are ONE answer; PDF has one assemble bit)                                                                                                     |
+| form             | `canRead()` · `canFill()` · `canDesign()`                                                       | `doc.forms.read` (hydration gate) / `doc.forms.fill` (fused into `FillItem.disabled` + write/reset gates) / `doc.forms.modify` (place/update/delete/detach; the draw-to-place handler's gate) |
+| redaction        | `canMark()` · `canApply()`                                                                      | marks are annotations ⇒ `canMark` IS `annotation.canCreate()`; apply mirrors ALL THREE engine assertions: `doc.redact` ∧ `doc.pages.modify` ∧ `doc.annotate.modify` (+ engine support)        |
+| kernel documents | `allows(cap, id?)`                                                                              | THE 1:1 exception surface: chrome print/download read `documents.allows('doc.print' / 'doc.download')` — the verbs live on the kernel, no owning plugin                                       |

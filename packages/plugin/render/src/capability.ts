@@ -33,7 +33,7 @@ export function createRenderCapability(
 ): RenderCapability {
   const resolved: ResolvedRenderOptions = resolveRenderOptions(options);
 
-  // The twin (PERMISSIONS.md). Both fetch seams below consult it, so a
+  // The twin (permissions.md). Both fetch seams below consult it, so a
   // denied session never spends engine round-trips on doomed rasters.
   const canRender = (): boolean => ctx.doc?.security.allows('doc.render') ?? false;
 

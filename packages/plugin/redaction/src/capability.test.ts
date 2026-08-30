@@ -48,7 +48,7 @@ describe('redaction selection geometry', () => {
   });
 });
 
-describe('the twin law (PERMISSIONS.md)', () => {
+describe('the twin law (permissions.md)', () => {
   const APPLY_CAPS = ['doc.redact', 'doc.pages.modify', 'doc.annotate.modify'] as const;
 
   const makeCtx = (opts: {

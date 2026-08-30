@@ -184,8 +184,11 @@ rootfs, all capabilities dropped, `RuntimeDefault` seccomp. A PDFium RCE
 is still native code in the pod; `runtimeClassName` (gVisor/Kata) adds
 kernel-exploit containment for the WHOLE pod (pod-to-node isolation — it
 does not separate engine from API within the pod) at syscall-emulation
-cost — measure with the drills before committing. Full threat model:
-`THREAD_CONFINED_RUNTIME.md`.
+cost — measure with the drills before committing. See
+[engine-host-isolation.md](../../../../.agents/skills/embedpdf-conventions/references/engine-host-isolation.md)
+for the full threat model and
+[runtime-confinement.md](../../../../.agents/skills/embedpdf-conventions/references/runtime-confinement.md)
+for PDFium's worker ownership contract.
 
 ## Sizing
 
@@ -210,7 +213,9 @@ upgrades both see the right values) and forces
 Independent of Helm, the migrator holds a Postgres advisory lock across
 discovery + execution — two releases sharing a database, a manual
 `migrate up`, and racing auto-migrations all serialize at the database.
-Rollback runbook: `cloudpdf/server/MIGRATIONS.md` (there is no automatic
+Rollback runbook:
+[server-migrations.md](../../../../.agents/skills/embedpdf-conventions/references/server-migrations.md)
+(there is no automatic
 `migrate down` hook, by design).
 
 ## Drills

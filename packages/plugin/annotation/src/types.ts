@@ -418,7 +418,7 @@ export interface AnnotationCapability {
    *  with {@link currentDefaults}/{@link setDefaults}. */
   propsForTool(toolId: string): PropSpec[];
 
-  // ── authorization: the `can` twins (PERMISSIONS.md). Each answers "would
+  // ── authorization: the `can` twins (permissions.md). Each answers "would
   //    this verb succeed now for this session?" — authority (the engine's
   //    collab mirrors) AND document flags, via the same fused predicates the
   //    gestures and chrome consume; the active tool is deliberately excluded

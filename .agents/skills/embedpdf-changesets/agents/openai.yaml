@@ -1,0 +1,4 @@
+interface:
+  display_name: 'EmbedPDF Changesets'
+  short_description: 'Create package-specific release changesets'
+  default_prompt: 'Use $embedpdf-changesets to create and validate changesets for this PR.'

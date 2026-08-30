@@ -58,7 +58,7 @@ export const interactive = (f: AnnotationFlags): boolean => !f.hidden && !f.noVi
 export interface FlagBearer {
   subtype: string;
   flags: AnnotationFlags;
-  /** Session authority projected at ingest (PERMISSIONS.md). Absent =
+  /** Session authority projected at ingest (permissions.md). Absent =
    *  unstamped (drafts, wildcard local engines, tests) = allowed. */
   authority?: { update: boolean; delete: boolean };
 }
