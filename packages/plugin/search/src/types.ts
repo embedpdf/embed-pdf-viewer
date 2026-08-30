@@ -111,6 +111,16 @@ export interface SearchPluginConfig {
  * sidebar, the highlights layer, and next/prev render the session.
  */
 export interface SearchCapability {
+  /**
+   * The twin (PERMISSIONS.md): would a search succeed now for this session?
+   * No `mode` (or `'rects'`) asks about finding at all — `doc.text.search`
+   * — which is what `search()` needs (the session degrades `'full'` to
+   * `'rects'` by itself when snippets are denied). `canSearch('full')` also
+   * requires `doc.text.copy` (a snippet reproduces document text) — ask it
+   * before advertising snippet UI or pinning `mode: 'full'` in `findAll`.
+   */
+  canSearch(mode?: SearchMode): boolean;
+
   // ── the session: THE user-visible find, one per document ────────────────
   /**
    * Start a new search (supersedes and aborts any running one). Results

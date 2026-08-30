@@ -13,6 +13,7 @@ import { linkChildrenOf } from './links';
 import { capsFor } from './kinds';
 import {
   annotContentsEditable,
+  annotDeletable,
   annotTransformable,
   DRAWN_FLAGS,
   flagsEqual,
@@ -1383,7 +1384,7 @@ function deleteSelection(m: Model): [Model, Effect[]] {
   // selection deletes what it may and leaves the frozen ones visibly selected.
   const deletable = m.selected.filter((id) => {
     const a = m.byId[id];
-    return !!a && annotTransformable(a);
+    return !!a && annotDeletable(a);
   });
   if (!deletable.length) return [m, []];
   // Attached link children die with their parent. They ARE model

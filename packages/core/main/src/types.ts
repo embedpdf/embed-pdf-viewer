@@ -324,6 +324,15 @@ export interface DocumentsCapability {
    * is absent there). Defaults to the active document.
    */
   downloadLayer(id?: string): Promise<Uint8Array>;
+  /**
+   * Session authority over a document — the sanctioned surface for the ONE
+   * chrome exception in PERMISSIONS.md: kernel-level features with a 1:1
+   * capability and no owning plugin (print via `'doc.print'`, download via
+   * `'doc.download'` — the verbs live on THIS capability). Everything else
+   * asks the owning plugin's twins, never a raw capability string. Defaults
+   * to the active document; `false` with no (ready) document.
+   */
+  allows(cap: DocCapability, id?: string): boolean;
 }
 
 /** Built-in token for the document registry capability (provided by the kernel). */

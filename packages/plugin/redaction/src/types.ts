@@ -37,8 +37,16 @@ export interface RedactionLabelPatch {
 }
 
 export interface RedactionCapability {
-  /** Engine support present AND this session holds `doc.redact`. The engine
-   *  enforces the same capability independently — this is the UI mirror. */
+  /**
+   * The twins (PERMISSIONS.md). Marking and applying are DIFFERENT powers:
+   * a mark is an ordinary `redact` annotation, so `canMark()` is annotation
+   * create authority (any reviewer who can annotate can propose redactions —
+   * Acrobat parity); `canApply()` is the destructive rewrite — engine support
+   * present AND every capability the engine's apply asserts (`doc.redact`,
+   * `doc.pages.modify`, `doc.annotate.modify`). The engine enforces both
+   * independently — these are the UI mirrors.
+   */
+  canMark(): boolean;
   canApply(): boolean;
   isApplying(): boolean;
   lastResult(): RedactionApplyResult | null;

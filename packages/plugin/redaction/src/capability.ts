@@ -16,8 +16,15 @@ import type {
   RedactionState,
 } from './types';
 
-/** Applying destroys content — its own granted power, narrower than annotate. */
-const REDACT_CAPABILITY: DocCapability = 'doc.redact';
+/** Applying destroys content — its own granted power, narrower than annotate.
+ *  The engine's apply asserts all three (LocalDocumentRedactionService; the
+ *  cloud route guards match): the redact grant itself, the page-content
+ *  rewrite, and the annotation consumption. `canApply` mirrors the full set. */
+const APPLY_CAPABILITIES: readonly DocCapability[] = [
+  'doc.redact',
+  'doc.pages.modify',
+  'doc.annotate.modify',
+];
 
 /** The annotation plugin's model-id convention for a durable ref. */
 const idOf = (ref: AnnotationRef): string =>
@@ -133,8 +140,17 @@ export function createRedactionCapability(
   }
 
   return {
-    canApply: () =>
-      (ctx.doc?.redaction !== undefined && ctx.doc?.security.allows(REDACT_CAPABILITY)) ?? false,
+    // Marks are annotations — marking authority IS annotation create
+    // authority (the annotation plugin's own twin, not a re-derivation).
+    canMark: () => anno.canCreate(),
+    // Mirror EVERYTHING the engine's apply asserts, not just the headline
+    // capability — a token granted `doc.redact` à la carte without its bit-4
+    // siblings must not see an armed Apply button.
+    canApply: () => {
+      const doc = ctx.doc;
+      if (!doc || doc.redaction === undefined) return false;
+      return APPLY_CAPABILITIES.every((cap) => doc.security.allows(cap));
+    },
     isApplying: () => ctx.getState().applying,
     lastResult: () => ctx.getState().lastResult,
 
@@ -147,6 +163,9 @@ export function createRedactionCapability(
     isRedactActive: () => ctx.tryGet(InteractionToken)?.activeToolId() === 'redact',
 
     queueCurrentSelection: async () => {
+      // Marks are optimistic annotation creates — the same gate the pointer
+      // path has (the annotation plugin refuses ungated creates too).
+      if (!anno.canCreate()) return false;
       const selection = ctx.tryGet(SelectionToken);
       if (!selection || !selection.hasSelection()) return false;
       const snapshot = selection.snapshot();

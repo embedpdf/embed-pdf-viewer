@@ -52,7 +52,7 @@ export function createPlaceHandler(
       // No capture without a page, a known palette tool, or write permission —
       // declining lets edit/pan/text-selection act on the gesture instead.
       if (!s.page || !FORM_TOOL_BY_ID.has(interaction.activeToolId())) return false;
-      if (!form.canModify()) return false;
+      if (!form.canDesign()) return false;
       origin = { pon: s.page.pon, start: s.page.point, last: s.page.point };
       return true;
     },

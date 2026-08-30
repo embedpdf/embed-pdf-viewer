@@ -272,6 +272,17 @@ export interface Annot {
    */
   apVersion?: number;
   /**
+   * This SESSION's authority over this record, projected from the security
+   * service's collab mirrors at ingest (see PERMISSIONS.md) — model-owned
+   * derived state like `apVersion`, never DTO-derived. Fused into
+   * `annotTransformable`/`annotDeletable`, so a record the session may not
+   * edit renders and behaves exactly like a `locked` one (bare outline, no
+   * handles, no drag). Absent = unstamped (a local draft, a wildcard local
+   * engine, tests) and treated as allowed — the client gate is a COURTESY
+   * that keeps the UI truthful; the engine independently enforces.
+   */
+  authority?: { update: boolean; delete: boolean };
+  /**
    * The canonical engine DTO this annotation was derived from (PDF-space, sRGB)
    * — the single source of truth for its data. `geom` and `style` are
    * content-space RENDER PROJECTIONS of it, recomputed (never edited directly)

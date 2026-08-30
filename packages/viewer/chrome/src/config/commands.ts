@@ -24,6 +24,8 @@ import { AnnotationToken } from '@embedpdf/react/annotation';
 import { copySelection, SelectionToken, type TextRange } from '@embedpdf/react/selection';
 import { fieldKeyOf, FormToken } from '@embedpdf/react/form';
 import { LinkToken, openLinkTarget, type PdfLinkTarget } from '@embedpdf/react/link';
+import { SearchToken } from '@embedpdf/react/search';
+import { RedactionToken } from '@embedpdf/react/redaction';
 
 // ── helpers ────────────────────────────────────────────────────────────────
 type Ctx = Parameters<NonNullable<CommandDef['run']>>[0];
@@ -101,6 +103,20 @@ const tool = (
   accent?: ToolAccentDefinition,
 ): CommandDef => {
   TOOL_ICONS[toolId] = { icon, ...(accent ? { accent } : {}) };
+  // Authoring tools grey out without their family's authority — the SAME
+  // twin the owning plugin's gesture gate consults (PERMISSIONS.md), so a
+  // button can never offer a doomed paint: annotation/insert tools ask
+  // annotation create authority, form-design tools ask `form.canDesign()`,
+  // the redact marker asks `redaction.canMark()`. Absent plugin → ungated
+  // (a build without the plugin has no authority question to ask).
+  const authority: ((c: Ctx) => boolean) | null =
+    id.startsWith('annotation:add') || id.startsWith('insert:add')
+      ? (c) => anno(c)?.canCreate() ?? true
+      : id.startsWith('form:add')
+        ? (c) => c.tryGet(FormToken)?.canDesign() ?? true
+        : id === 'redaction:redact'
+          ? (c) => c.tryGet(RedactionToken)?.canMark() ?? true
+          : null;
   return {
     id,
     labelKey,
@@ -108,7 +124,7 @@ const tool = (
     categories: ['tool'],
     run: (c) => interaction(c)?.activateTool(toolId),
     active: (c) => interaction(c)?.activeToolId() === toolId,
-    enabled: (c) => interaction(c) != null,
+    enabled: (c) => interaction(c) != null && (authority?.(c) ?? true),
     iconAccent: (c) => toolAccent(c, toolId, accent),
   };
 };
@@ -225,6 +241,8 @@ export const defaultCommands: CommandDef[] = [
     id: 'panel:search',
     labelKey: 'commands.search',
     icon: 'search',
+    // No doc.text.search → every query would 403; the panel has no job.
+    visible: (c) => c.tryGet(SearchToken)?.canSearch() ?? true,
     categories: ['panel'],
     panel: { id: 'search', exclusive: 'right' },
   },
@@ -232,6 +250,8 @@ export const defaultCommands: CommandDef[] = [
     id: 'panel:comment',
     labelKey: 'commands.comment',
     icon: 'comment',
+    // No doc.annotate.read → there is nothing this panel could show.
+    visible: (c) => anno(c)?.canRead() ?? true,
     categories: ['panel'],
     panel: { id: 'comment', exclusive: 'right' },
   },
@@ -280,7 +300,10 @@ export const defaultCommands: CommandDef[] = [
         })
         .catch((e) => console.warn('[snippet-react] download failed', e));
     },
-    enabled: (c) => c.tryGet(DocumentsToken) != null && c.documentId != null,
+    // The PERMISSIONS.md chrome exception: a kernel verb with a 1:1
+    // capability reads the kernel's `allows` directly — no owning plugin.
+    enabled: (c) =>
+      c.documentId != null && (c.tryGet(DocumentsToken)?.allows('doc.download') ?? false),
   },
   {
     id: 'document:print',
@@ -289,6 +312,9 @@ export const defaultCommands: CommandDef[] = [
     shortcut: 'Mod+p',
     categories: ['document'],
     run: () => window.print(),
+    // Same exception; documentless chrome (no doc open) keeps print enabled
+    // for whatever the host page shows.
+    enabled: (c) => c.documentId == null || (c.tryGet(DocumentsToken)?.allows('doc.print') ?? true),
   },
   {
     id: 'document:fullscreen',
@@ -461,6 +487,12 @@ export const defaultCommands: CommandDef[] = [
     id: 'panel:redaction',
     labelKey: 'commands.redact.panel',
     icon: 'redactionSidebar',
+    // Useful to a session that can propose marks OR apply them; with neither
+    // power the panel could only display other people's pending marks.
+    visible: (c) => {
+      const r = c.tryGet(RedactionToken);
+      return r ? r.canMark() || r.canApply() : true;
+    },
     categories: ['panel'],
     panel: { id: 'redaction', exclusive: 'right' },
   },

@@ -18,6 +18,7 @@ import {
   type AttachmentFileSource,
   type BinarySource,
   type PdfLinkTarget,
+  type PdfRect,
 } from '@embedpdf/engine-core/runtime';
 import { InteractionToken } from '@embedpdf/plugin-interaction';
 import { SelectionToken as SelectionPublicToken } from '@embedpdf/plugin-selection';
@@ -44,6 +45,9 @@ import {
   sharedProps,
   styleFromProps,
   update,
+  annotContentsEditable,
+  annotDeletable,
+  annotTransformable,
   isSubstrateOnly,
   linkChildrenOf,
   linkOf,
@@ -802,7 +806,7 @@ export function createAnnotationCapability(
     bumpAp = false,
   ): void => {
     const crop = cropOf(dto.pageObjectNumber);
-    if (crop) apply({ t: 'upsert', annots: [fromDTO(dto, crop, source)], bumpAp });
+    if (crop) apply({ t: 'upsert', annots: [ingestDTO(dto, crop, source)], bumpAp });
   };
 
   /** The one engine-update path, shared by `update` and `updateSelection`. A
@@ -853,14 +857,22 @@ export function createAnnotationCapability(
       if (!crop) continue;
       // Children (replies, states, attached links) enter the substrate as
       // first-class annots; the planes derive (paint cull + lenses).
-      annots.push(...page.annotations.map((d) => fromDTO(d, crop)));
+      annots.push(...page.annotations.map((d) => ingestDTO(d, crop)));
     }
     apply({ t: 'hydrated', annots, bumpAp });
   };
 
+  const canRead = (): boolean => ctx.doc?.security.allows('doc.annotate.read') ?? true;
+
   const runHydration = (bumpAp: boolean): Promise<void> => {
     const doc = ctx.doc;
     if (!doc) return Promise.resolve();
+    // No read grant → no doomed listRawAll: the state says so, the comments
+    // panel hides, and a later rehydrate (e.g. post-/access) re-checks.
+    if (!canRead()) {
+      setHydration({ status: 'forbidden' });
+      return Promise.resolve();
+    }
     hydrationWindow = true;
     setHydration({ status: 'loading' });
     const run = doc.annotations
@@ -925,7 +937,7 @@ export function createAnnotationCapability(
       const crop = cropOf(dto.pageObjectNumber);
       if (!crop) continue;
       // Another session authored this — trust the engine's baked AP.
-      const a = fromDTO(dto, crop, 'baked');
+      const a = ingestDTO(dto, crop, 'baked');
       // Substrate-only annotations (replies, review states, attached link
       // children) never paint, so their arrival must not trigger a raster
       // fetch or epoch churn. A remote link child is just an upsert — the
@@ -1093,10 +1105,41 @@ export function createAnnotationCapability(
     };
   };
   const allowsCreate = (): boolean => ctx.doc?.security.allowsAnnotationCreate() ?? false;
+
+  /**
+   * Ingest an engine DTO with this session's per-record AUTHORITY projected
+   * onto it (PERMISSIONS.md) — asked of the SAME mirrors the server enforces
+   * with, against the record's stamped owner. Fused into
+   * `annotTransformable`/`annotDeletable`, so hit-test, chrome, props and
+   * delete all agree with the engine by construction. No security context
+   * (bare local engines, tests) → unstamped → allowed; the engine enforces.
+   */
+  const ingestDTO = (
+    dto: Parameters<typeof fromDTO>[0],
+    crop: PdfRect,
+    source?: Parameters<typeof fromDTO>[2],
+  ): Annot => {
+    const a = fromDTO(dto, crop, source);
+    const sec = ctx.doc?.security;
+    if (!sec) return a;
+    const target = {
+      ...(dto.userId !== undefined ? { userId: dto.userId } : {}),
+      ...(dto.groupId !== undefined ? { groupId: dto.groupId } : {}),
+    };
+    return {
+      ...a,
+      authority: {
+        update: sec.allowsAnnotationMutation('update', target),
+        delete: sec.allowsAnnotationMutation('delete', target),
+      },
+    };
+  };
   const allowsMutation = (action: 'update' | 'delete', ref: AnnotationRef): boolean =>
     ctx.doc?.security.allowsAnnotationMutation(action, mutationTarget(ref)) ?? false;
-  const deletableOne = (ref: AnnotationRef): boolean =>
-    allowsMutation('delete', ref) && !(model().byId[refKey(ref)]?.flags.locked ?? false);
+  const deletableOne = (ref: AnnotationRef): boolean => {
+    const a = model().byId[refKey(ref)];
+    return !!a && annotDeletable(a);
+  };
   const threadMemberRefs = (t: CommentThread): AnnotationRef[] => [
     ...t.replies.map((r) => r.ref),
     ...t.groupedParts.map((g) => g.ref),
@@ -1196,7 +1239,10 @@ export function createAnnotationCapability(
         // the caller's own identity, not the target's owner.
         canReply: allowsCreate(),
         canSetStatus: allowsCreate(),
-        canEditText: allowsMutation('update', ref) && !(flags?.lockedContents ?? false),
+        canEditText: (() => {
+          const a = model().byId[refKey(ref)];
+          return !!a && annotContentsEditable(a);
+        })(),
         canDelete: deletableOne(ref),
         canDeleteThread: t !== null && threadMemberRefs(t).every(deletableOne),
       };
@@ -1260,7 +1306,7 @@ export function createAnnotationCapability(
           rect: rects[i],
           ...(target ? { target } : {}),
         });
-        apply({ t: 'upsert', annots: [fromDTO(res.updated, crop, 'baked')] });
+        apply({ t: 'upsert', annots: [ingestDTO(res.updated, crop, 'baked')] });
       }
       for (let i = current.length; i < rects.length; i++) {
         const res = await page.annotations.create({
@@ -1270,7 +1316,7 @@ export function createAnnotationCapability(
           inReplyTo: a.ref,
           replyType: 'group',
         });
-        apply({ t: 'upsert', annots: [fromDTO(res.created, crop, 'baked')] });
+        apply({ t: 'upsert', annots: [ingestDTO(res.created, crop, 'baked')] });
       }
       for (let i = rects.length; i < current.length; i++) {
         const child = current[i];
@@ -1449,7 +1495,13 @@ export function createAnnotationCapability(
             if (linkChildrenOf(model(), fx.id).length)
               void scheduleLinkSync(fx.id, 'keep');
           },
-          () => {},
+          // A refused write (a race, a stale /access) must not leave the
+          // optimistic patch as a lie. The effect runs AFTER the reducer
+          // applied it, so the pre-image is the annot's own canonical DTO —
+          // the last COMMITTED truth — re-ingested with fresh authority.
+          () => {
+            if (a.data && crop) apply({ t: 'upsert', annots: [ingestDTO(a.data, crop, a.source)] });
+          },
         );
     } else if (fx.fx === 'syncLink') {
       void scheduleLinkSync(fx.id, { target: fx.target });
@@ -1560,9 +1612,19 @@ export function createAnnotationCapability(
     // authority — aspect-specific flag gates (`locked` for geometry
     // and delete, `lockedContents` for text) live with the surfaces
     // that touch that aspect (comments.permissionsFor, interaction).
+    canRead: () => canRead(),
     canCreate: () => allowsCreate(),
-    canEdit: (ref) => allowsMutation('update', ref),
-    canDelete: (ref) => allowsMutation('delete', ref),
+    // The twins answer "would the verb succeed?" — authority AND flags, via
+    // the SAME fused predicates the gestures and chrome consume, so a false
+    // twin and a bare-outline render can never disagree (PERMISSIONS.md).
+    canEdit: (ref) => {
+      const a = model().byId[refKey(ref)];
+      return !!a && annotTransformable(a);
+    },
+    canDelete: (ref) => {
+      const a = model().byId[refKey(ref)];
+      return !!a && annotDeletable(a);
+    },
 
     comments,
 
@@ -1759,6 +1821,9 @@ export function createAnnotationCapability(
         },
       }),
     createPointer: (tool, phase, pon, point, finish = false, displayRotation) => {
+      // No create authority → creation gestures are inert: no ghost, no
+      // draft, no doomed 403. The engine enforces; this keeps pixels honest.
+      if (!allowsCreate()) return;
       // Resolve the authoring TOOL to its routing subtype + defaults key. Two
       // tools can share a subtype (line / arrow); `preset` keeps their defaults
       // apart. Unknown id → treat it as a bare subtype (headless/programmatic).
@@ -1793,6 +1858,7 @@ export function createAnnotationCapability(
       // One-shot form of the markup tools' commit: selection quads → one
       // markup per page → clear. Selection is an OPTIONAL peer — resolve
       // lazily so annotation keeps working without it installed.
+      if (!allowsCreate()) return false;
       const selection = ctx.tryGet(SelectionPublicToken);
       if (!selection || !selection.hasSelection()) return false;
       const snapshot = selection.snapshot();
@@ -1812,7 +1878,9 @@ export function createAnnotationCapability(
       if (created) selection.clear();
       return created;
     },
-    createMarkup: (subtype, pon, quads, preset) =>
+    createMarkup: (subtype, pon, quads, preset) => {
+      // Optimistic create — the same self-refusal `createPointer` has.
+      if (!allowsCreate()) return;
       // A markup tool's `/F` seed rides along (the preset IS the tool id).
       apply({
         t: 'createMarkup',
@@ -1821,10 +1889,16 @@ export function createAnnotationCapability(
         quads,
         preset,
         flags: preset ? registry.get(preset)?.flags : undefined,
-      }),
-    createCaret: (pon, anchor) => apply({ t: 'createCaret', pon, anchor }),
-    createReplaceText: (pon, quads, anchor, preset) =>
-      apply({ t: 'createReplaceText', pon, quads, anchor, preset }),
+      });
+    },
+    createCaret: (pon, anchor) => {
+      if (!allowsCreate()) return;
+      apply({ t: 'createCaret', pon, anchor });
+    },
+    createReplaceText: (pon, quads, anchor, preset) => {
+      if (!allowsCreate()) return;
+      apply({ t: 'createReplaceText', pon, quads, anchor, preset });
+    },
     previewMarkup: (subtype, quadsByPage, preset) =>
       apply({ t: 'setMarkupPreview', subtype, quadsByPage, preset }),
     clearMarkupPreview: () => apply({ t: 'clearMarkupPreview' }),
@@ -1929,7 +2003,7 @@ export function createAnnotationCapability(
         const m = model();
         const stale = m.order.filter((id) => m.byId[id]?.pon === pon);
         if (stale.length) apply({ t: 'remove', ids: stale });
-        apply({ t: 'loaded', annots: snap.annotations.map((d) => fromDTO(d, crop)) });
+        apply({ t: 'loaded', annots: snap.annotations.map((d) => ingestDTO(d, crop)) });
       } catch {
         // A failed reload leaves the previous view; the next event or a
         // rehydrate reconciles.

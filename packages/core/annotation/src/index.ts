@@ -43,6 +43,7 @@ export {
   NO_ANNOTATION_FLAGS,
   annotContentsEditable,
   annotInteractive,
+  annotDeletable,
   annotTransformable,
   flagsEqual,
   interactive,

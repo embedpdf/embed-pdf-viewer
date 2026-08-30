@@ -23,7 +23,7 @@ import { cursorAt, groupUnionBounds, hitTest, paintOrder } from './hit';
 import { isAttachedLink, isConversationOnly, isSubstrateOnly } from './plane';
 import { linkChildrenOf, linkOf } from './links';
 import { capsFor } from './kinds';
-import { DRAWN_FLAGS } from './flags';
+import { annotDeletable, annotTransformable, DRAWN_FLAGS } from './flags';
 import {
   chordThrough,
   geomBounds,
@@ -3794,6 +3794,33 @@ describe('link prop (attached children in the substrate, read via linkOf)', () =
     const [next, fx] = update(m, { t: 'setProps', patch: { link: URI } });
     expect(next).toBe(m);
     expect(fx).toEqual([]);
+  });
+
+  it('authority fuses into the flags gate: no update right → the locked treatment', () => {
+    // A record this session may not edit (a colleague's annotation under an
+    // `annotations:update:self` grant) renders and behaves EXACTLY like a
+    // locked one: selectable, bare outline, no handles, no transforms.
+    const foreign = committedSquare({ authority: { update: false, delete: false } });
+    expect(annotTransformable(foreign)).toBe(false);
+    expect(annotDeletable(foreign)).toBe(false);
+    const m = { ...update(initialModel, { t: 'loaded', annots: [foreign] })[0], selected: ['S1'] };
+    expect(chrome(m, PON).filter((n) => n.kind === 'handle')).toHaveLength(0);
+    // …and deletion refuses through the same split.
+    const [next, fx] = update(m, { t: 'delete' });
+    expect(next.byId['S1']).toBeDefined();
+    expect(fx).toEqual([]);
+  });
+
+  it('the authority split is per-action: update without delete, delete without update', () => {
+    const updatable = committedSquare({ authority: { update: true, delete: false } });
+    expect(annotTransformable(updatable)).toBe(true);
+    expect(annotDeletable(updatable)).toBe(false);
+    const deletable = committedSquare({ authority: { update: false, delete: true } });
+    expect(annotTransformable(deletable)).toBe(false);
+    expect(annotDeletable(deletable)).toBe(true);
+    // Unstamped (drafts, wildcard local engines) stays fully allowed.
+    expect(annotTransformable(committedSquare())).toBe(true);
+    expect(annotDeletable(committedSquare())).toBe(true);
   });
 
   it('an attached link is NOT a visual-group member: single selection, handles, no Ungroup', () => {

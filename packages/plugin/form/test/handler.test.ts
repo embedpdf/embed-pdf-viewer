@@ -23,7 +23,7 @@ function makeForm(over: Partial<FormCapability> = {}) {
     widget: { annotObjectNumber: 42, pageObjectNumber: PON } as PlacedField['widget'],
   };
   const form = {
-    canModify: () => true,
+    canDesign: () => true,
     pageBox: () => PAGE,
     placeField: vi.fn(async (input: PlaceFieldInput) => {
       placed.push(input);
@@ -108,7 +108,7 @@ describe('form place handler', () => {
   });
 
   it('declines the gesture without write permission (edit/pan still route)', () => {
-    const { form } = makeForm({ canModify: () => false } as Partial<FormCapability>);
+    const { form } = makeForm({ canDesign: () => false } as Partial<FormCapability>);
     const h = createPlaceHandler(form, interactionFor('form-text'), null);
     expect(h.onDown(at('down', 10, 10))).toBe(false);
   });

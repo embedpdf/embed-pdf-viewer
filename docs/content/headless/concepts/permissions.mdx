@@ -1,0 +1,105 @@
+---
+title: Permissions
+description: How EmbedPDF answers "may this session do that?" — one rule, every plugin.
+---
+
+# Permissions
+
+A document can be opened with less than full power: a share link that only
+lets people read and comment, a signing session that only fills forms, a
+reviewer token that can't download. The engine enforces those limits on
+every call — this page is about building UI that **tells the truth about
+them** instead of offering buttons that fail.
+
+## Every verb has a twin
+
+Any capability method that can be refused ships a boolean twin named
+`can` + the verb, answering one question: *would this succeed right now,
+for this session?*
+
+```ts
+annotation.canCreate(); // may I draw new annotations?
+annotation.canEdit(ref); // may I move/restyle THIS one?
+annotation.canDelete(ref); // …delete this one?
+selection.canCopy(); // may selected text leave the document?
+search.canSearch(); // would a search return hits?
+search.canSearch('full'); // …with text snippets? (needs copy too)
+form.canFill(); // may I write field values?
+form.canDesign(); // may I add/edit/delete fields?
+pageEdit.canEdit(); // may I rotate/reorder/insert/delete pages?
+redaction.canMark(); // may I propose redaction marks?
+redaction.canApply(); // may I burn them in?
+render.canRender(); // will page images be served at all?
+```
+
+A twin already composes everything its verb checks — the session's grant,
+the document's own flags (a `locked` annotation, a read-only field), and
+structure (what's selected). You never combine them yourself, and you never
+look at scope strings: what a verb requires is the plugin's knowledge, not
+yours.
+
+> **The rule:** render an affordance if and only if its twin is true.
+> Subscribe to the twin like any other state — answers change when the
+> selection changes or access is refreshed.
+
+```tsx
+const annotation = useAnnotation();
+
+{annotation.canCreate() && <DrawingToolbar />}
+<button disabled={!annotation.canDelete(ref)}>Delete</button>
+```
+
+## Per-record answers
+
+Twins that take a ref answer **per record**. In a collaborative document a
+session may hold `annotations:update:self` — edit your own, read everyone
+else's. You don't have to handle that: another person's annotation answers
+`canEdit(ref) === false` and already renders the way a locked one renders —
+selectable, commentable, no drag handles. The same fusion drives forms:
+a field you can't fill renders inert, exactly like a read-only field.
+
+## Calling anyway is safe
+
+Twins are for honest pixels, not safety — enforcement never depends on
+them. A refused verb rejects with the same shape everywhere:
+
+```ts
+try {
+  await form.setText(key, 'value');
+} catch (err) {
+  if (err.name === 'PermissionDenied') {
+    // err.required — the capability that was missing, e.g. 'doc.forms.fill'
+  }
+}
+```
+
+Gesture-driven verbs go quietly inert instead of throwing — a drawing
+gesture without create authority paints nothing and sends nothing.
+
+## Where the limits come from
+
+Power is granted when the document opens. On the local engine you pass it
+directly; a cloud session carries it in the token:
+
+```ts
+const doc = await engine.open(source, {
+  scope: ['doc.render', 'doc.text.select', 'doc.annotate.read'],
+});
+```
+
+Omitting `scope` on the local engine grants everything (with a console
+warning) — handy in development, but pass the scope your deployment will
+really issue so the twins show you the UI your users will get.
+
+## Cheat sheet
+
+| Plugin     | Twins                                                     |
+| ---------- | --------------------------------------------------------- |
+| annotation | `canRead()` `canCreate()` `canEdit(ref)` `canDelete(ref)` `canGroup()` `canUngroup()` |
+| selection  | `canSelect()` `canCopy()`                                 |
+| search     | `canSearch(mode?)` — `'full'` asks about snippets         |
+| render     | `canRender()`                                             |
+| page-edit  | `canEdit()` — one answer for all page structure edits     |
+| form       | `canRead()` `canFill()` `canDesign()`                     |
+| redaction  | `canMark()` `canApply()`                                  |
+| documents  | `allows(cap)` — kernel verbs only (print, download)       |

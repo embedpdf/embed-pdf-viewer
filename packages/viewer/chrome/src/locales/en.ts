@@ -157,6 +157,7 @@ export const en: Locale = {
       searchNoResults: 'No results',
       searchPage: 'Page {page}',
       commentsTitle: 'Comments',
+      commentsForbidden: 'You don\u2019t have access to comments on this document.',
       commentsLoading: 'Loading comments…',
       commentsError: 'Comments failed to load.',
       commentsRetry: 'Retry',

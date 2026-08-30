@@ -122,7 +122,11 @@ export interface ChromeSettingsPatch {
 export type AnnotationHydration =
   | { status: 'loading' }
   | { status: 'complete' }
-  | { status: 'error'; error: unknown };
+  | { status: 'error'; error: unknown }
+  // The scope lacks `doc.annotate.read`: hydration never runs (no doomed
+  // request), the comments panel hides, and `rehydrate` re-checks — the
+  // state clears if an /access refresh grants read later.
+  | { status: 'forbidden' };
 
 export interface AnnotationState {
   model: Model;
@@ -414,6 +418,14 @@ export interface AnnotationCapability {
    *  with {@link currentDefaults}/{@link setDefaults}. */
   propsForTool(toolId: string): PropSpec[];
 
+  // ── authorization: the `can` twins (PERMISSIONS.md). Each answers "would
+  //    this verb succeed now for this session?" — authority (the engine's
+  //    collab mirrors) AND document flags, via the same fused predicates the
+  //    gestures and chrome consume; the active tool is deliberately excluded
+  //    (twins are facts; mode gates rendering). `canRead` mirrors
+  //    `doc.annotate.read`: false → hydration reports `forbidden` and the
+  //    comments UI hides. The engine independently enforces everything. ──
+  canRead(): boolean;
   // ── authorization: per-record mirrors of the engine's collab resolver
   //    (`security.allowsAnnotation*`). `canCreate` asks about the caller's
   //    own identity; `canEdit`/`canDelete` about the TARGET's stamped owner,

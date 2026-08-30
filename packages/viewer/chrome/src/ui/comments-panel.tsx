@@ -106,6 +106,8 @@ export function CommentsPanel() {
   }, [threads]);
 
   if (hydration.status === 'loading') return <Empty icon="comment" text={t('demo.commentsLoading')} />;
+  if (hydration.status === 'forbidden')
+    return <Empty icon="lock" text={t('demo.commentsForbidden')} />;
   if (hydration.status === 'error') {
     return (
       <Empty icon="alertTriangle" text={t('demo.commentsError')}>

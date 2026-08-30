@@ -146,6 +146,14 @@ export interface ViewTiles {
 
 export interface RenderCapability {
   /**
+   * The twin (PERMISSIONS.md): would page rasters be served to this session?
+   * Mirrors `doc.render`. When false, `renderPage` and the tile plane refuse
+   * locally (no doomed engine round-trips — the gate case for a capability
+   * whose denial would otherwise 403 on every viewport tile) and a host can
+   * render its "no preview" state instead of error tiles.
+   */
+  canRender(): boolean;
+  /**
    * Render a page (by its durable pon) to an ENCODED image. Abortable. Encoded
    * output is identical for local & cloud and cheap over the wire (vs. raw RGBA).
    *

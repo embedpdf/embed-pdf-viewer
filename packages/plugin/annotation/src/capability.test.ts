@@ -91,6 +91,7 @@ function harness() {
   const listRawAll = vi.fn();
   // Collab-resolver mirrors, allow-all by default; permission tests
   // install narrowed behavior via mockImplementation.
+  const allows = vi.fn((_cap: string) => true);
   const allowsAnnotationCreate = vi.fn(() => true);
   const allowsAnnotationMutation = vi.fn(
     (_action: 'update' | 'delete', _target: { userId?: string; groupId?: string }) => true,
@@ -110,7 +111,7 @@ function harness() {
       page: () => ({ annotations: { create, update, delete: remove, list } }),
       annotations: { listRawAll },
       security: {
-        allows: () => true,
+        allows,
         identity: { user_id: 'me' },
         allowsAnnotationCreate,
         allowsAnnotationMutation,
@@ -126,6 +127,7 @@ function harness() {
     remove,
     list,
     listRawAll,
+    allows,
     allowsAnnotationCreate,
     allowsAnnotationMutation,
     state: () => state,
@@ -802,6 +804,85 @@ describe('the comments lens', () => {
     // Mutation authority is unaffected — separate questions.
     expect(perms.canDelete).toBe(true);
     expect(h.capability.canCreate()).toBe(false);
+  });
+});
+
+describe('the twin law — authority fused into presentation and gestures', () => {
+  const selfOnly = (h: ReturnType<typeof harness>) =>
+    h.allowsAnnotationMutation.mockImplementation((_action, target) => target.userId === 'me');
+  const stamped = (n: number, userId?: string): AnnotationDTO =>
+    ({ ...hydrationSquare(n), ...(userId ? { userId } : {}) }) as AnnotationDTO;
+
+  it("a foreign record renders the LOCKED treatment: selectable, zero handles", async () => {
+    const h = harness();
+    selfOnly(h);
+    h.list.mockResolvedValueOnce({ annotations: [stamped(20, 'me'), stamped(21, 'alice')] });
+    await h.capability.reloadPage(PON);
+    // Own record: full selection chrome.
+    h.capability.select(ref(20));
+    expect(
+      h.capability.chrome(PON, 1, 0, 1).filter((n) => n.kind === 'handle').length,
+    ).toBeGreaterThan(0);
+    // Alice's record under `:self`: selectable, but the SAME fused predicate
+    // that answers canEdit(false) strips every handle — pixels can't lie.
+    h.capability.select(ref(21));
+    expect(h.capability.chrome(PON, 1, 0, 1).filter((n) => n.kind === 'handle')).toHaveLength(0);
+    expect(h.capability.canEdit(ref(21))).toBe(false);
+    expect(h.capability.canDelete(ref(21))).toBe(false);
+    expect(h.capability.canEdit(ref(20))).toBe(true);
+  });
+
+  it('no create authority → creation gestures are inert (no ghost, no draft, no 403)', async () => {
+    const h = harness();
+    h.allowsAnnotationCreate.mockReturnValue(false);
+    h.capability.createPointer('square', 'down', PON, { x: 10, y: 10 });
+    h.capability.createPointer('square', 'move', PON, { x: 80, y: 60 });
+    h.capability.createPointer('square', 'up', PON, { x: 80, y: 60 }, true);
+    expect(h.state().model.order).toHaveLength(0);
+    expect(h.create).not.toHaveBeenCalled();
+    expect(h.capability.canCreate()).toBe(false);
+  });
+
+  it('EVERY optimistic create door self-refuses, not just the pointer', async () => {
+    const h = harness();
+    h.allowsAnnotationCreate.mockReturnValue(false);
+    const rect = { x: 10, y: 20, width: 80, height: 15 };
+    h.capability.createMarkup('highlight', PON, [textQuadFromRect(rect)], 'highlight');
+    h.capability.createCaret(PON, { glyphQuad: textQuadFromRect(rect), advance: 1 });
+    h.capability.createReplaceText(
+      PON,
+      [textQuadFromRect(rect)],
+      { glyphQuad: textQuadFromRect(rect), advance: 1 },
+      'replace-text',
+    );
+    expect(h.capability.markupFromSelection('highlight')).toBe(false);
+    expect(h.state().model.order).toHaveLength(0);
+    expect(h.create).not.toHaveBeenCalled();
+  });
+
+  it('no doc.annotate.read → hydration reports forbidden and never fetches', async () => {
+    const h = harness();
+    h.allows.mockImplementation((cap: string) => cap !== 'doc.annotate.read');
+    await h.capability.rehydrate();
+    expect(h.state().hydration).toEqual({ status: 'forbidden' });
+    expect(h.listRawAll).not.toHaveBeenCalled();
+    expect(h.capability.canRead()).toBe(false);
+  });
+
+  it('a refused patch rolls the optimistic change back', async () => {
+    const h = harness();
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    h.list.mockResolvedValueOnce({ annotations: [stamped(20, 'me')] });
+    await h.capability.reloadPage(PON);
+    h.capability.select(ref(20));
+    const id = h.state().model.order[0]!;
+    const before = h.state().model.byId[id]!.style.color;
+    h.update.mockRejectedValueOnce(new Error('Forbidden'));
+    h.capability.updateSelection({ color: '#00ff00' });
+    // optimistic first…
+    expect(h.state().model.byId[id]!.style.color).toBe('#00ff00');
+    // …then the refusal restores the pre-patch annotation.
+    await vi.waitFor(() => expect(h.state().model.byId[id]!.style.color).toBe(before));
   });
 });
 

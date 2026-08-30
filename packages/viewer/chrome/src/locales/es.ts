@@ -158,6 +158,7 @@ export const es: Locale = {
       searchNoResults: 'Sin resultados',
       searchPage: 'Página {page}',
       commentsTitle: 'Comentarios',
+      commentsForbidden: 'No tienes acceso a los comentarios de este documento.',
       commentsLoading: 'Cargando comentarios…',
       commentsError: 'No se pudieron cargar los comentarios.',
       commentsRetry: 'Reintentar',

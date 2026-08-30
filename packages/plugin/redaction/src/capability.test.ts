@@ -15,7 +15,7 @@ describe('redaction selection geometry', () => {
     };
     const createMarkup = vi.fn();
     const clear = vi.fn();
-    const annotation = { createMarkup };
+    const annotation = { createMarkup, canCreate: () => true };
     const selection = {
       hasSelection: () => true,
       snapshot: () => ({
@@ -45,5 +45,54 @@ describe('redaction selection geometry', () => {
     await expect(capability.queueCurrentSelection()).resolves.toBe(true);
     expect(createMarkup).toHaveBeenCalledWith('redact', 7, [quad], 'redact');
     expect(clear).toHaveBeenCalledOnce();
+  });
+});
+
+describe('the twin law (PERMISSIONS.md)', () => {
+  const APPLY_CAPS = ['doc.redact', 'doc.pages.modify', 'doc.annotate.modify'] as const;
+
+  const makeCtx = (opts: {
+    canCreate?: boolean;
+    granted?: readonly string[];
+    engineSupport?: boolean;
+  }) => {
+    const createMarkup = vi.fn();
+    const annotation = { createMarkup, canCreate: () => opts.canCreate ?? true };
+    const granted = new Set(opts.granted ?? APPLY_CAPS);
+    const ctx = {
+      doc: {
+        redaction: (opts.engineSupport ?? true) ? {} : undefined,
+        security: { allows: (cap: string) => granted.has(cap) },
+        events: { subscribe: () => () => {} },
+      },
+      get: (token: unknown) => {
+        if (token === AnnotationToken) return annotation;
+        throw new Error('unexpected capability');
+      },
+      tryGet: () => null,
+      cleanup: () => {},
+    } as unknown as PluginContext<RedactionState, RedactionAction>;
+    return { capability: createRedactionCapability(ctx), createMarkup };
+  };
+
+  it('canMark IS annotation create authority — marks are annotations', () => {
+    expect(makeCtx({ canCreate: true }).capability.canMark()).toBe(true);
+    expect(makeCtx({ canCreate: false }).capability.canMark()).toBe(false);
+  });
+
+  it('canApply mirrors ALL THREE engine assertions, not just doc.redact', () => {
+    expect(makeCtx({}).capability.canApply()).toBe(true);
+    // An à-la-carte doc.redact grant without its bit-4 siblings must not arm Apply.
+    for (const missing of APPLY_CAPS) {
+      const granted = APPLY_CAPS.filter((c) => c !== missing);
+      expect(makeCtx({ granted }).capability.canApply()).toBe(false);
+    }
+    expect(makeCtx({ engineSupport: false }).capability.canApply()).toBe(false);
+  });
+
+  it('queueCurrentSelection is inert without create authority', async () => {
+    const { capability, createMarkup } = makeCtx({ canCreate: false });
+    await expect(capability.queueCurrentSelection()).resolves.toBe(false);
+    expect(createMarkup).not.toHaveBeenCalled();
   });
 });
