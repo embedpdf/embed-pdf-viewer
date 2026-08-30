@@ -88,7 +88,9 @@ export function setAnnotFlags(
 }
 
 /**
- * Write `/Rect` via `FPDFAnnot_SetRect`. FS_RECTF layout is
+ * Write `/Rect` without touching `/AP`. Appearance preservation/regeneration
+ * belongs to AnnotationMutator; a geometry primitive must not silently rewrite
+ * an existing appearance `/BBox`. FS_RECTF layout is
  * `{ left, top, right, bottom }` (top > bottom in PDF coords).
  */
 export function setAnnotRect(
@@ -103,8 +105,8 @@ export function setAnnotRect(
     mem.poke(buf, 'f32', rect.top, 4);
     mem.poke(buf, 'f32', rect.right, 8);
     mem.poke(buf, 'f32', rect.bottom, 12);
-    if (!fn.FPDFAnnot_SetRect(annotPtr, buf)) {
-      throw new EngineError(EngineErrorCode.Unknown, 'FPDFAnnot_SetRect returned false');
+    if (!fn.EPDFAnnot_SetRect(annotPtr, buf)) {
+      throw new EngineError(EngineErrorCode.Unknown, 'EPDFAnnot_SetRect returned false');
     }
   } finally {
     mem.free(buf);
