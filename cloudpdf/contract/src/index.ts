@@ -1,6 +1,7 @@
 import type { DocCapability } from '@embedpdf/engine-core/runtime';
 import {
   AnnotationListPageSnapshotSchema,
+  AnnotationListSnapshotAllPagesSchema,
   DocumentHeadSchema,
   DocumentManifestSchema,
   DocumentMetadataSchema,
@@ -1422,6 +1423,25 @@ export const docOperations = {
     responses: {
       200: { contentType: 'application/json', schema: AnnotationListPageSnapshotSchema },
       404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+    },
+  },
+  'doc.annotations.listAll': {
+    operationId: 'doc.annotations.listAll',
+    title: 'List all annotations',
+    summary: "All pages' annotations as one coherent snapshot at the current layer version.",
+    method: 'GET',
+    path: wireTemplates.layerAnnotationItemsAll,
+    credentials: docCredentials,
+    scope: [],
+    docCapabilities: ['doc.annotate.read'],
+    requestHeaders: [documentPasswordHeader],
+    params: DocLayerParamsSchema,
+    notes:
+      'Returns one entry per page plus the audit-log cursor for reconciling subsequent document events. Page order is unspecified; join by `pageState.pageObjectNumber` when display order matters.',
+    responses: {
+      200: { contentType: 'application/json', schema: AnnotationListSnapshotAllPagesSchema },
+      404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+      409: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
     },
   },
   'doc.annotations.create': {

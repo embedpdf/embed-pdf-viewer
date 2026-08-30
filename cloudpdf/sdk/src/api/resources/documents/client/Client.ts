@@ -532,10 +532,7 @@ export class DocumentsClient {
                 case 400:
                     throw new CloudPDF.BadRequestError(_response.error.body as unknown, _response.rawResponse);
                 case 409:
-                    throw new CloudPDF.ConflictError(
-                        _response.error.body as CloudPDF.DocumentsUploadProxy409Response,
-                        _response.rawResponse,
-                    );
+                    throw new CloudPDF.ConflictError(_response.error.body as unknown, _response.rawResponse);
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,

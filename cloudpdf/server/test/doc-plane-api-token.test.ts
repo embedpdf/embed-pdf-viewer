@@ -191,6 +191,19 @@ describe('API token on the doc plane', () => {
     expect(manifest.status).toBe(200);
     const body = (await manifest.json()) as { pages?: unknown[] };
     expect(Array.isArray(body.pages)).toBe(true);
+
+    const annotations = await fetch(
+      `${fx.baseUrl}/v1/docs/docapiread1/layers/reviews/annotations/items`,
+      { headers: apiHeaders() },
+    );
+    expect(annotations.status, await annotations.clone().text()).toBe(200);
+    expect(annotations.headers.get('cache-control')).toContain('no-store');
+    const annotationBody = (await annotations.json()) as {
+      pages?: unknown[];
+      auditHead?: number;
+    };
+    expect(annotationBody.pages).toHaveLength(3);
+    expect(annotationBody.auditHead).toEqual(expect.any(Number));
   });
 
   test('a nonexistent document is a clean 404 from the resolution hook', async () => {
