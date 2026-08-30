@@ -36,6 +36,7 @@ export namespace DocAnnotationsDelete200Response {
         export interface CacheDelta {
             previousDocVersion: number;
             docVersion: number;
+            annotationsVersion?: number | undefined;
             pages: CacheDelta.Pages.Item[];
         }
 

@@ -198,8 +198,8 @@ export async function registerAnnotationRoutes(
   //    `annotationsVersion` pin, materialized by a single raw (no
   //    page-load) sweep. The doc-level twin serves annotations-inheriting
   //    layers from the base session; a diverged layer reads its own view.
-  //    Always version-addressed — the client learns the pin from the
-  //    manifest, so no unversioned "current" variant exists. ─────────────
+  //    The plain layer route is the public backend operation; the viewer
+  //    protocol continues to use the immutable version-addressed routes. ─
 
   app.get('/v1/docs/:docId/annotations/items@:token', async (req, reply) => {
     const { docId, token } = req.params as { docId: string; token: string };
@@ -240,6 +240,23 @@ export async function registerAnnotationRoutes(
         token,
         'annotationsVersion token',
       ),
+    });
+  });
+
+  app.get('/v1/docs/:docId/layers/:layerName/annotations/items', async (req, reply) => {
+    const { docId, layerName } = req.params as {
+      docId: string;
+      layerName: string;
+    };
+    const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
+    const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
+    const ctx = requireLayerResource(req, docId, layerName, 'layer-annotations-all', pdfBits);
+    return readAnnotationsAll({
+      documentService,
+      revisionBridge,
+      reply,
+      signal: abortSignalFromRequest(req),
+      scope: { kind: 'layer', ctx, docId, layerName },
     });
   });
 
@@ -1097,15 +1114,14 @@ async function readAnnotations(input: {
 }
 
 /**
- * Whole-document bulk read: ONE `annotations.listRawAll` worker job (the
- * raw docPtr sweep — no per-page loads) serving one CDN-immutable body
- * per `annotationsVersion` pin. Follows `readAnnotations`' double-check
- * pattern against the MANIFEST's pin: pre-check before dispatch,
- * re-validate after the worker read — a body served under an `immutable`
- * header must never belong to a newer pin (one slip poisons the CDN).
- * The response stamps the pre-check manifest's `auditHead`: the same row
- * read that certified the pin, so replaying events with
- * `serverId > auditHead` over this body is exact.
+ * Whole-document bulk read: ONE `annotations.listRawAll` worker job per
+ * attempt (the raw docPtr sweep — no per-page loads). Version-addressed
+ * reads double-check the manifest pin before serving a CDN-immutable body.
+ * The public current-version read retries once if a mutation races the
+ * sweep, then returns a retryable conflict rather than mixing a snapshot
+ * with the wrong audit cursor. The response stamps the pre-check
+ * manifest's `auditHead`, so replaying events with `serverId > auditHead`
+ * over this body is exact.
  */
 async function readAnnotationsAll(input: {
   documentService: DocumentService;
@@ -1113,7 +1129,7 @@ async function readAnnotationsAll(input: {
   reply: { header(name: 'Cache-Control', value: string): unknown };
   signal: AbortSignal;
   scope: ReadScope;
-  requestedVersion: number;
+  requestedVersion?: number;
 }) {
   const scope = input.scope;
   const getManifest = () =>
@@ -1121,68 +1137,86 @@ async function readAnnotationsAll(input: {
       ? input.documentService.getLayerManifest(scope.ctx, scope.docId, scope.layerName)
       : input.documentService.getManifest(scope.ctx, scope.docId);
 
-  const manifest = await getManifest();
-  const current = manifest.annotationsVersion ?? 1;
-  if (input.requestedVersion !== current) {
-    setNoStore(input.reply);
-    throw new EngineError(
-      EngineErrorCode.NotFound,
-      `${scope.kind === 'layer' ? 'layer ' : ''}annotations version ${
-        input.requestedVersion
-      } no longer current (current=${current})`,
-    );
-  }
+  const maxAttempts = input.requestedVersion === undefined ? 2 : 1;
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    const manifest = await getManifest();
+    const current = manifest.annotationsVersion ?? 1;
+    if (input.requestedVersion !== undefined && input.requestedVersion !== current) {
+      setNoStore(input.reply);
+      throw new EngineError(
+        EngineErrorCode.NotFound,
+        `${scope.kind === 'layer' ? 'layer ' : ''}annotations version ${
+          input.requestedVersion
+        } no longer current (current=${current})`,
+      );
+    }
+    const pinnedVersion = input.requestedVersion ?? current;
 
-  if (scope.kind === 'layer') {
-    await input.documentService.ensureLayerOnPool(scope.ctx, scope.docId, scope.layerName);
-  }
-  const build = (jobId: WorkerJobId) =>
-    wirePack({
-      kind: 'annotations.listRawAll' as const,
-      jobId,
-      docId: scope.docId,
-      ...(scope.kind === 'layer' ? { layerName: scope.layerName } : {}),
+    if (scope.kind === 'layer') {
+      await input.documentService.ensureLayerOnPool(scope.ctx, scope.docId, scope.layerName);
+    }
+    const build = (jobId: WorkerJobId) =>
+      wirePack({
+        kind: 'annotations.listRawAll' as const,
+        jobId,
+        docId: scope.docId,
+        ...(scope.kind === 'layer' ? { layerName: scope.layerName } : {}),
+      });
+    const result = await input.documentService.readOnPool(
+      scope.ctx,
+      scope.docId,
+      scope.kind === 'layer' ? scope.layerName : undefined,
+      build,
+      input.signal,
+    );
+    if (result.tag !== 'annotations.listRawAll') {
+      throw new EngineError(
+        EngineErrorCode.WireFormat,
+        `unexpected ${scope.kind === 'layer' ? 'layer ' : ''}annotations.listRawAll payload: ${
+          result.tag
+        }`,
+      );
+    }
+
+    // Re-validate the pin AFTER the worker read (see readAnnotations).
+    const fresh = await getManifest();
+    const freshCurrent = fresh.annotationsVersion ?? 1;
+    if (pinnedVersion !== freshCurrent) {
+      setNoStore(input.reply);
+      if (input.requestedVersion !== undefined) {
+        throw new EngineError(
+          EngineErrorCode.NotFound,
+          `${scope.kind === 'layer' ? 'layer ' : ''}annotations version ${
+            input.requestedVersion
+          } no longer current (current=${freshCurrent})`,
+        );
+      }
+      if (attempt + 1 < maxAttempts) continue;
+      throw new EngineError(
+        EngineErrorCode.LayerVersionConflict,
+        `${scope.kind === 'layer' ? 'layer ' : ''}annotations changed while reading; retry the request`,
+      );
+    }
+
+    // Decorate every page with its cloud-stable PageState from the SAME
+    // manifest that certified the pin (toManifestPage already scope-stamped
+    // the revision tokens).
+    const stateByPon = new Map(
+      manifest.pages.map((page) => [page.state.pageObjectNumber, page.state]),
+    );
+    const pages = result.snapshot.pages.map((page) => {
+      const state = stateByPon.get(page.pageState.pageObjectNumber);
+      return state ? input.revisionBridge.decorateAnnotationSnapshot(state, page) : page;
     });
-  const result = await input.documentService.readOnPool(
-    scope.ctx,
-    scope.docId,
-    scope.kind === 'layer' ? scope.layerName : undefined,
-    build,
-    input.signal,
+
+    input.requestedVersion === undefined ? setNoStore(input.reply) : setImmutableCache(input.reply);
+    return { pages, auditHead: manifest.auditHead };
+  }
+
+  throw new EngineError(
+    EngineErrorCode.LayerVersionConflict,
+    `${scope.kind === 'layer' ? 'layer ' : ''}annotations changed while reading; retry the request`,
   );
-  if (result.tag !== 'annotations.listRawAll') {
-    throw new EngineError(
-      EngineErrorCode.WireFormat,
-      `unexpected ${scope.kind === 'layer' ? 'layer ' : ''}annotations.listRawAll payload: ${
-        result.tag
-      }`,
-    );
-  }
-
-  // RE-validate the pin AFTER the worker read (see readAnnotations).
-  const fresh = await getManifest();
-  const freshCurrent = fresh.annotationsVersion ?? 1;
-  if (input.requestedVersion !== freshCurrent) {
-    setNoStore(input.reply);
-    throw new EngineError(
-      EngineErrorCode.NotFound,
-      `${scope.kind === 'layer' ? 'layer ' : ''}annotations version ${
-        input.requestedVersion
-      } no longer current (current=${freshCurrent})`,
-    );
-  }
-
-  // Decorate every page with its cloud-stable PageState from the SAME
-  // manifest that certified the pin (toManifestPage already scope-stamped
-  // the revision tokens).
-  const stateByPon = new Map(manifest.pages.map((page) => [page.state.pageObjectNumber, page.state]));
-  const pages = result.snapshot.pages.map((page) => {
-    const state = stateByPon.get(page.pageState.pageObjectNumber);
-    return state ? input.revisionBridge.decorateAnnotationSnapshot(state, page) : page;
-  });
-
-  setImmutableCache(input.reply);
-  return { pages, auditHead: manifest.auditHead };
 }
 
 async function resolvePageForRead(input: {

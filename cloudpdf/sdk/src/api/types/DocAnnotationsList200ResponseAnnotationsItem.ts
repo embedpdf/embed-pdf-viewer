@@ -34,6 +34,7 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
         flags: DocAnnotationsList200ResponseAnnotationsItemHighlight.Flags;
         rect: DocAnnotationsList200ResponseAnnotationsItemHighlight.Rect;
         contents: string | null;
+        subject: string | null;
         author: string | null;
         created: string | null;
         modified: string | null;
@@ -740,6 +741,7 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
         flags: DocAnnotationsList200ResponseAnnotationsItemUnderline.Flags;
         rect: DocAnnotationsList200ResponseAnnotationsItemUnderline.Rect;
         contents: string | null;
+        subject: string | null;
         author: string | null;
         created: string | null;
         modified: string | null;
@@ -1446,6 +1448,7 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
         flags: DocAnnotationsList200ResponseAnnotationsItemSquiggly.Flags;
         rect: DocAnnotationsList200ResponseAnnotationsItemSquiggly.Rect;
         contents: string | null;
+        subject: string | null;
         author: string | null;
         created: string | null;
         modified: string | null;
@@ -2152,6 +2155,7 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
         flags: DocAnnotationsList200ResponseAnnotationsItemStrikeout.Flags;
         rect: DocAnnotationsList200ResponseAnnotationsItemStrikeout.Rect;
         contents: string | null;
+        subject: string | null;
         author: string | null;
         created: string | null;
         modified: string | null;
@@ -2864,6 +2868,7 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
         flags: DocAnnotationsList200ResponseAnnotationsItemCircle.Flags;
         rect: DocAnnotationsList200ResponseAnnotationsItemCircle.Rect;
         contents: string | null;
+        subject: string | null;
         author: string | null;
         created: string | null;
         modified: string | null;
@@ -3572,6 +3577,7 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
         flags: DocAnnotationsList200ResponseAnnotationsItemSquare.Flags;
         rect: DocAnnotationsList200ResponseAnnotationsItemSquare.Rect;
         contents: string | null;
+        subject: string | null;
         author: string | null;
         created: string | null;
         modified: string | null;
@@ -4280,6 +4286,7 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
         flags: DocAnnotationsList200ResponseAnnotationsItemPolygon.Flags;
         rect: DocAnnotationsList200ResponseAnnotationsItemPolygon.Rect;
         contents: string | null;
+        subject: string | null;
         author: string | null;
         created: string | null;
         modified: string | null;
@@ -4982,6 +4989,7 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
         flags: DocAnnotationsList200ResponseAnnotationsItemPolyline.Flags;
         rect: DocAnnotationsList200ResponseAnnotationsItemPolyline.Rect;
         contents: string | null;
+        subject: string | null;
         author: string | null;
         created: string | null;
         modified: string | null;
@@ -5718,6 +5726,7 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
         flags: DocAnnotationsList200ResponseAnnotationsItemLine.Flags;
         rect: DocAnnotationsList200ResponseAnnotationsItemLine.Rect;
         contents: string | null;
+        subject: string | null;
         author: string | null;
         created: string | null;
         modified: string | null;
@@ -6462,6 +6471,7 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
         flags: DocAnnotationsList200ResponseAnnotationsItemLink.Flags;
         rect: DocAnnotationsList200ResponseAnnotationsItemLink.Rect;
         contents: string | null;
+        subject: string | null;
         author: string | null;
         created: string | null;
         modified: string | null;
@@ -7127,6 +7137,7 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
         flags: DocAnnotationsList200ResponseAnnotationsItemInk.Flags;
         rect: DocAnnotationsList200ResponseAnnotationsItemInk.Rect;
         contents: string | null;
+        subject: string | null;
         author: string | null;
         created: string | null;
         modified: string | null;
@@ -7825,6 +7836,7 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
         flags: DocAnnotationsList200ResponseAnnotationsItemFreeText.Flags;
         rect: DocAnnotationsList200ResponseAnnotationsItemFreeText.Rect;
         contents: string | null;
+        subject: string | null;
         author: string | null;
         created: string | null;
         modified: string | null;
@@ -8588,6 +8600,7 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
         flags: DocAnnotationsList200ResponseAnnotationsItemCaret.Flags;
         rect: DocAnnotationsList200ResponseAnnotationsItemCaret.Rect;
         contents: string | null;
+        subject: string | null;
         author: string | null;
         created: string | null;
         modified: string | null;
@@ -9283,6 +9296,7 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
         flags: DocAnnotationsList200ResponseAnnotationsItemText.Flags;
         rect: DocAnnotationsList200ResponseAnnotationsItemText.Rect;
         contents: string | null;
+        subject: string | null;
         author: string | null;
         created: string | null;
         modified: string | null;
@@ -9297,6 +9311,8 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
         color: DocAnnotationsList200ResponseAnnotationsItemText.Color;
         opacity: number;
         icon: DocAnnotationsList200ResponseAnnotationsItemText.Icon;
+        state: string | null;
+        stateModel: string | null;
     }
 
     export namespace DocAnnotationsList200ResponseAnnotationsItemText {
@@ -9967,6 +9983,7 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
         flags: DocAnnotationsList200ResponseAnnotationsItemStamp.Flags;
         rect: DocAnnotationsList200ResponseAnnotationsItemStamp.Rect;
         contents: string | null;
+        subject: string | null;
         author: string | null;
         created: string | null;
         modified: string | null;
@@ -10641,6 +10658,7 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
         flags: DocAnnotationsList200ResponseAnnotationsItemFileAttachment.Flags;
         rect: DocAnnotationsList200ResponseAnnotationsItemFileAttachment.Rect;
         contents: string | null;
+        subject: string | null;
         author: string | null;
         created: string | null;
         modified: string | null;
@@ -11332,6 +11350,7 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
         flags: DocAnnotationsList200ResponseAnnotationsItemWidget.Flags;
         rect: DocAnnotationsList200ResponseAnnotationsItemWidget.Rect;
         contents: string | null;
+        subject: string | null;
         author: string | null;
         created: string | null;
         modified: string | null;
@@ -12067,6 +12086,7 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
         flags: DocAnnotationsList200ResponseAnnotationsItemRedact.Flags;
         rect: DocAnnotationsList200ResponseAnnotationsItemRedact.Rect;
         contents: string | null;
+        subject: string | null;
         author: string | null;
         created: string | null;
         modified: string | null;
@@ -12817,6 +12837,7 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
         flags: DocAnnotationsList200ResponseAnnotationsItemUnsupported.Flags;
         rect: DocAnnotationsList200ResponseAnnotationsItemUnsupported.Rect;
         contents: string | null;
+        subject: string | null;
         author: string | null;
         created: string | null;
         modified: string | null;

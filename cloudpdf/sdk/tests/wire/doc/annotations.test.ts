@@ -5,6 +5,123 @@ import { CloudPDFClient } from "../../../src/Client";
 import { mockServerPool } from "../../mock-server/MockServerPool";
 
 describe("AnnotationsClient", () => {
+    test("listAll (1)", async () => {
+        const server = mockServerPool.createServer();
+        const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
+
+        const rawResponseBody = {
+            pages: [
+                {
+                    pageState: {
+                        pageObjectNumber: 1,
+                        revision: { docSessionId: "docSessionId", pageObjectNumber: 1, generation: 1 },
+                        weakAnnotationState: { kind: "unknown" },
+                    },
+                    annotations: [
+                        {
+                            subtype: "highlight",
+                            ref: { kind: "objectNumber", pageObjectNumber: 1, annotObjectNumber: 1 },
+                            pageObjectNumber: 1,
+                            index: 1,
+                            identityQuality: "durable",
+                            nm: null,
+                            flags: {
+                                invisible: true,
+                                hidden: true,
+                                print: true,
+                                noZoom: true,
+                                noRotate: true,
+                                noView: true,
+                                readOnly: true,
+                                locked: true,
+                                toggleNoView: true,
+                                lockedContents: true,
+                            },
+                            rect: { left: 1.1, bottom: 1.1, right: 1.1, top: 1.1 },
+                            contents: null,
+                            subject: null,
+                            author: null,
+                            created: null,
+                            modified: null,
+                            blendMode: "normal",
+                            inReplyTo: null,
+                            replyType: null,
+                            color: { r: 1, g: 1, b: 1 },
+                            opacity: 1.1,
+                            quadPoints: [
+                                {
+                                    p1: { x: 1.1, y: 1.1 },
+                                    p2: { x: 1.1, y: 1.1 },
+                                    p3: { x: 1.1, y: 1.1 },
+                                    p4: { x: 1.1, y: 1.1 },
+                                },
+                            ],
+                        },
+                    ],
+                },
+            ],
+            auditHead: 1,
+        };
+
+        server
+            .mockEndpoint()
+            .get("/v1/docs/docId/layers/layerName/annotations/items")
+            .respondWith()
+            .statusCode(200)
+            .jsonBody(rawResponseBody)
+            .build();
+
+        const response = await client.doc.annotations.listAll({
+            docId: "docId",
+            layerName: "layerName",
+        });
+        expect(response).toEqual(rawResponseBody);
+    });
+
+    test("listAll (2)", async () => {
+        const server = mockServerPool.createServer();
+        const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
+
+        const rawResponseBody = { key: "value" };
+
+        server
+            .mockEndpoint()
+            .get("/v1/docs/docId/layers/layerName/annotations/items")
+            .respondWith()
+            .statusCode(404)
+            .jsonBody(rawResponseBody)
+            .build();
+
+        await expect(async () => {
+            return await client.doc.annotations.listAll({
+                docId: "docId",
+                layerName: "layerName",
+            });
+        }).rejects.toThrow(CloudPDF.NotFoundError);
+    });
+
+    test("listAll (3)", async () => {
+        const server = mockServerPool.createServer();
+        const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
+
+        const rawResponseBody = { key: "value" };
+
+        server
+            .mockEndpoint()
+            .get("/v1/docs/docId/layers/layerName/annotations/items")
+            .respondWith()
+            .statusCode(409)
+            .jsonBody(rawResponseBody)
+            .build();
+
+        await expect(async () => {
+            return await client.doc.annotations.listAll({
+                docId: "docId",
+                layerName: "layerName",
+            });
+        }).rejects.toThrow(CloudPDF.ConflictError);
+    });
+
     test("list (1)", async () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
@@ -37,6 +154,7 @@ describe("AnnotationsClient", () => {
                     },
                     rect: { left: 1.1, bottom: 1.1, right: 1.1, top: 1.1 },
                     contents: "contents",
+                    subject: "subject",
                     author: "author",
                     created: "2024-01-15T09:30:00Z",
                     modified: "2024-01-15T09:30:00Z",
@@ -116,6 +234,7 @@ describe("AnnotationsClient", () => {
                 cacheDelta: {
                     previousDocVersion: 1,
                     docVersion: 1,
+                    annotationsVersion: 1,
                     pages: [{ pageObjectNumber: 1, cache: { contentVersion: 1, annotationVersion: 1 } }],
                 },
             },
@@ -215,6 +334,7 @@ describe("AnnotationsClient", () => {
                 cacheDelta: {
                     previousDocVersion: 1,
                     docVersion: 1,
+                    annotationsVersion: 1,
                     pages: [{ pageObjectNumber: 1, cache: { contentVersion: 1, annotationVersion: 1 } }],
                 },
             },
@@ -277,6 +397,7 @@ describe("AnnotationsClient", () => {
                 cacheDelta: {
                     previousDocVersion: 1,
                     docVersion: 1,
+                    annotationsVersion: 1,
                     pages: [{ pageObjectNumber: 1, cache: { contentVersion: 1, annotationVersion: 1 } }],
                 },
             },

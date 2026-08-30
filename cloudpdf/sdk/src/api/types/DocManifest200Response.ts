@@ -8,6 +8,7 @@ export interface DocManifest200Response {
     metadataVersion: number;
     actionsVersion?: number | undefined;
     attachmentsVersion?: number | undefined;
+    annotationsVersion?: number | undefined;
     auditHead: number;
     baseSha: string;
     scopes?: DocManifest200Response.Scopes | undefined;

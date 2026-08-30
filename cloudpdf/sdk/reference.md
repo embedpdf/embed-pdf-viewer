@@ -1697,6 +1697,72 @@ await client.tokens.revoke({
 </details>
 
 ## Doc Annotations
+<details><summary><code>client.doc.annotations.<a href="/src/api/resources/doc/resources/annotations/client/Client.ts">listAll</a>({ ...params }) -> CloudPDF.DocAnnotationsListAll200Response</code></summary>
+<dl>
+<dd>
+
+#### 📝 Description
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+Returns one entry per page plus the audit-log cursor for reconciling subsequent document events. Page order is unspecified; join by `pageState.pageObjectNumber` when display order matters.
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### 🔌 Usage
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+```typescript
+await client.doc.annotations.listAll({
+    docId: "docId",
+    layerName: "layerName"
+});
+
+```
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### ⚙️ Parameters
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+**request:** `CloudPDF.doc.ListAllAnnotationsRequest`
+
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**requestOptions:** `AnnotationsClient.RequestOptions`
+
+</dd>
+</dl>
+</dd>
+</dl>
+
+
+</dd>
+</dl>
+</details>
+
 <details><summary><code>client.doc.annotations.<a href="/src/api/resources/doc/resources/annotations/client/Client.ts">list</a>({ ...params }) -> CloudPDF.DocAnnotationsList200Response</code></summary>
 <dl>
 <dd>
@@ -2736,4 +2802,3 @@ await client.doc.redactions.apply({
 </dd>
 </dl>
 </details>
-

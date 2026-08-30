@@ -558,6 +558,7 @@ export const wireTemplates = {
   layerMetadata: '/v1/docs/:docId/layers/:layerName/metadata',
   layerRenderPage: '/v1/docs/:docId/layers/:layerName/render/pages/:pon/data',
   layerTextPage: '/v1/docs/:docId/layers/:layerName/text/pages/:pon/data',
+  layerAnnotationItemsAll: '/v1/docs/:docId/layers/:layerName/annotations/items',
   layerAnnotationItems: '/v1/docs/:docId/layers/:layerName/annotations/pages/:pon/items',
   layerAnnotationItem: '/v1/docs/:docId/layers/:layerName/annotations/pages/:pon/items/:annotKey',
   layerForm: '/v1/docs/:docId/layers/:layerName/form',

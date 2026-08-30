@@ -92,6 +92,10 @@ describe('operation registry', () => {
     for (const op of Object.values(docOperations)) {
       expect(Object.values(wireTemplates)).toContain(op.path);
     }
+    expect(docOperations['doc.annotations.listAll']).toMatchObject({
+      method: 'GET',
+      path: wireTemplates.layerAnnotationItemsAll,
+    });
   });
 
   test('path templates agree with the adminWirePaths builders', () => {
