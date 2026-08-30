@@ -202,6 +202,14 @@ export interface LinkNavItem {
   id: string;
   rect: Rect;
   target: PdfLinkTarget;
+  /**
+   * True for a link CHILD riding an editable annotation (an `/RT /Group`
+   * subordinate) — a PROPERTY of its parent while authoring, a nav behavior
+   * only while reading. The nav layer stands its anchors down for attached
+   * items whenever the active tool enables `annotation-edit`, so the parent
+   * stays selectable/movable; standalone document links navigate regardless.
+   */
+  attached: boolean;
 }
 
 export interface Behavior {

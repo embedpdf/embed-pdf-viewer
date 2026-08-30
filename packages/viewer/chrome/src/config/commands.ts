@@ -23,7 +23,7 @@ import { ShellToken } from '@embedpdf/react/shell';
 import { AnnotationToken } from '@embedpdf/react/annotation';
 import { copySelection, SelectionToken, type TextRange } from '@embedpdf/react/selection';
 import { fieldKeyOf, FormToken } from '@embedpdf/react/form';
-import { LinkToken, type PdfLinkTarget } from '@embedpdf/react/link';
+import { LinkToken, openLinkTarget, type PdfLinkTarget } from '@embedpdf/react/link';
 
 // ── helpers ────────────────────────────────────────────────────────────────
 type Ctx = Parameters<NonNullable<CommandDef['run']>>[0];
@@ -350,11 +350,13 @@ export const defaultCommands: CommandDef[] = [
     id: 'mode:view',
     labelKey: 'commands.mode.view',
     categories: ['mode'],
-    // View = no mode band. Close any open mode surface and drop to pointer.
+    // View = no mode band, and READING interaction: the `view` tool (text
+    // selects, forms fill, links — attached ones included — navigate; nothing
+    // selects or moves). Authoring needs an authoring tab.
     run: (c) => {
       const shell = c.tryGet(ShellToken);
       for (const m of MODE_SURFACES) shell?.close(m);
-      interaction(c)?.activateTool('pointer');
+      interaction(c)?.activateTool('view');
     },
     active: (c) => {
       const shell = c.tryGet(ShellToken);
@@ -587,7 +589,10 @@ export const defaultCommands: CommandDef[] = [
     categories: ['annotation'],
     run: (c) => {
       const target = selectionLink(c);
-      if (target) c.tryGet(LinkToken)?.activate(target);
+      const link = c.tryGet(LinkToken);
+      // The opener PERFORMS the uri outcome (window.open) — bare `activate`
+      // resolves but opens nothing for URL targets.
+      if (target && link) openLinkTarget(link, target);
     },
     visible: (c) => selectionLink(c) != null,
   },
@@ -622,6 +627,47 @@ export const defaultCommands: CommandDef[] = [
 // ── mode helpers ─────────────────────────────────────────────────────────────
 // Modes are exclusive shell surfaces tagged 'mode'; the secondary band renders
 // whichever one is open. Kept below the array to keep the list readable.
+/**
+ * `readOnly` command overrides: the pan/pointer toggles activate the READING
+ * tool pair (`view-pan`/`view` — no `annotation-edit`) instead of the
+ * authoring pair. Applied by the viewer between the defaults and the user's
+ * own commands, so a user override by id still wins.
+ */
+export const readOnlyCommandOverrides: CommandDef[] = [
+  {
+    id: 'pan:toggle',
+    labelKey: 'commands.pan',
+    icon: 'hand',
+    categories: ['tools'],
+    run: (c) => interaction(c)?.activateTool('view-pan'),
+    active: (c) => interaction(c)?.activeToolId() === 'view-pan',
+    enabled: (c) => interaction(c) != null,
+  },
+  {
+    id: 'pointer:toggle',
+    labelKey: 'commands.pointer',
+    icon: 'pointer',
+    categories: ['tools'],
+    run: (c) => interaction(c)?.activateTool('view'),
+    active: (c) => interaction(c)?.activeToolId() === 'view',
+    enabled: (c) => interaction(c) != null,
+  },
+];
+
+/**
+ * What `readOnly` hides from every surface: the authoring mode tabs, the
+ * annotation verbs, undo/redo, and page rotation. Reading features — zoom,
+ * panels (search / comments / thumbnails), text copy, form fill, download,
+ * print — stay. Category filtering is ANY-match, so `rotate` hides only the
+ * two `['page','rotate']` commands, not the page-scroll settings.
+ */
+export const READ_ONLY_DISABLED_CATEGORIES: readonly string[] = [
+  'mode',
+  'annotation',
+  'history',
+  'rotate',
+];
+
 export const MODE_SURFACES = [
   'mode:annotate',
   'mode:shapes',
@@ -646,7 +692,9 @@ function modeCommand(
     run: (c) => {
       const shell = c.tryGet(ShellToken);
       shell?.toggle(id, { exclusive: 'mode' });
-      interaction(c)?.activateTool(shell?.isOpen(id) ? toolId : 'pointer');
+      // Closing a tab IS returning to View mode — so it lands on the reading
+      // `view` tool, keeping "View ⇔ view tool" a single invariant.
+      interaction(c)?.activateTool(shell?.isOpen(id) ? toolId : 'view');
     },
     active: (c) => c.tryGet(ShellToken)?.isOpen(id) ?? false,
   };

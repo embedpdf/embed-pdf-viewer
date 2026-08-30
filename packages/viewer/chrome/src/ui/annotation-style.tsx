@@ -33,7 +33,7 @@ import {
 import { useTool } from '@embedpdf/react/interaction';
 import { useKernel, useOptionalCapability } from '@embedpdf/react/runtime';
 import { RedactionToken } from '@embedpdf/react/redaction';
-import { LinkToken, type PdfLinkTarget } from '@embedpdf/react/link';
+import { LinkToken, openLinkTarget, type PdfLinkTarget } from '@embedpdf/react/link';
 import { useT } from '@embedpdf/react/i18n';
 import { Icon } from './icons';
 import { AnnotationFlagsSection } from './annotation-flags';
@@ -605,7 +605,8 @@ function LinkTargetControl({
           <button
             type="button"
             className="border-border bg-surface text-fg flex-1 rounded border px-2 py-1.5 text-sm"
-            onClick={() => link?.activate(value)}
+            // The opener PERFORMS the uri outcome — bare activate() opens nothing for URLs.
+            onClick={() => link && openLinkTarget(link, value)}
           >
             Go to link
           </button>

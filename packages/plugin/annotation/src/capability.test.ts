@@ -434,6 +434,39 @@ describe('whole-document hydration', () => {
   });
 });
 
+describe('link nav items — attached vs standalone', () => {
+  it('labels attached children so the nav layer can defer to editing', async () => {
+    const h = harness();
+    h.list.mockResolvedValueOnce({
+      annotations: [
+        hydrationSquare(20),
+        // The square's attached link child (`/RT /Group` → parent): folds into
+        // parent.link and surfaces as an ATTACHED nav item over the parent.
+        {
+          ...hydrationSquare(21),
+          subtype: 'link',
+          target: { kind: 'uri', uri: 'https://example.com' },
+          inReplyTo: ref(20),
+          replyType: 'group',
+        } as unknown as AnnotationDTO,
+        // A standalone document link (no group): navigates under ANY link-nav
+        // tool — never stands down.
+        {
+          ...hydrationSquare(22),
+          subtype: 'link',
+          target: { kind: 'uri', uri: 'https://docs.example.com' },
+        } as unknown as AnnotationDTO,
+      ],
+    });
+    await h.capability.reloadPage(PON);
+    const items = h.capability.linkItemsOn(PON);
+    const byAttached = new Map(items.map((i) => [i.attached, i]));
+    expect(items).toHaveLength(2);
+    expect(byAttached.get(true)?.target).toEqual({ kind: 'uri', uri: 'https://example.com' });
+    expect(byAttached.get(false)?.target).toEqual({ kind: 'uri', uri: 'https://docs.example.com' });
+  });
+});
+
 describe('conversation plane at the capability boundary', () => {
   it('a remote review-status annotation joins the model but never paints or churns the epoch', async () => {
     const h = harness();

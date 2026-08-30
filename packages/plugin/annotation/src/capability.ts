@@ -342,9 +342,12 @@ export function createAnnotationCapability(
       if (!a || a.pon !== pon || a.link == null) continue;
       if (!viewable(a.flags, false)) continue; // hidden links don't navigate
       if (a.subtype === 'link') {
-        if (a.geom.t === 'rect') v.push({ id, rect: a.geom.rect, target: a.link });
+        if (a.geom.t === 'rect')
+          v.push({ id, rect: a.geom.rect, target: a.link, attached: false });
       } else {
-        linkChildRects(a).forEach((rect, i) => v.push({ id: `${id}#${i}`, rect, target: a.link! }));
+        linkChildRects(a).forEach((rect, i) =>
+          v.push({ id: `${id}#${i}`, rect, target: a.link!, attached: true }),
+        );
       }
     }
     linkItemsCache.set(pon, { model: m, v });

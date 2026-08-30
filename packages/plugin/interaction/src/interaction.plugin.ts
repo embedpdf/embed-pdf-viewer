@@ -41,6 +41,21 @@ export const builtinTools = (): Tool[] => [
     gapCursor: 'grab', // pan works anywhere — the open hand doesn't stop at page edges
     enables: new Set(['scroll', 'annotation-edit', 'form-fill', 'link-nav']),
   },
+  // The READING pair — pointer/pan minus authoring. Under these, annotations
+  // are CONTENT: text selects, forms fill, links (attached ones included)
+  // navigate — nothing selects, moves, or places. Chrome's View mode and its
+  // `readOnly` prop ride them; `pointer`/`pan` are these plus editing.
+  {
+    id: 'view',
+    cursor: 'default',
+    enables: new Set(['text-select', 'form-fill', 'link-nav']),
+  },
+  {
+    id: 'view-pan',
+    cursor: 'grab',
+    gapCursor: 'grab',
+    enables: new Set(['scroll', 'form-fill', 'link-nav']),
+  },
 ];
 
 /**

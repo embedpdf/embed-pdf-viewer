@@ -7,7 +7,7 @@
   "scripts": {
     "build:deps": "pnpm --filter @embedpdf/engine-core build && pnpm --filter @embedpdf/engine-services build && pnpm --filter @cloudpdf/contract build && pnpm --filter @cloudpdf/sdk build && pnpm --filter @cloudpdf/engine build && pnpm --filter @cloudpdf/server build",
     "dev": "pnpm run build:deps && concurrently -k -n api,ui \"pnpm run dev:api\" \"pnpm run dev:ui\"",
-    "dev:api": "tsx server/dev-server.ts",
+    "dev:api": "tsx --env-file-if-exists=.env.local server/dev-server.ts",
     "dev:ui": "vite --host 127.0.0.1 --port 5178",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host 127.0.0.1 --port 5178"

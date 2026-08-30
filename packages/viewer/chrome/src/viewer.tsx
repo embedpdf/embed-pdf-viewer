@@ -40,7 +40,11 @@ import { chromeHelpers, validateChrome } from '@embedpdf/react/toolbar';
 import type { ChromeHelpers, ChromeSchema } from '@embedpdf/react/toolbar';
 import { ThumbsStageToken } from './config/stage';
 import { defaultChrome } from './config/chrome';
-import { defaultCommands } from './config/commands';
+import {
+  defaultCommands,
+  readOnlyCommandOverrides,
+  READ_ONLY_DISABLED_CATEGORIES,
+} from './config/commands';
 import { demoToolsPlugin } from './config/demo-tools.plugin';
 import { en } from './locales/en';
 import { ViewerConfigProvider, type ResolvedViewerConfig } from './config-context';
@@ -102,6 +106,20 @@ export interface ViewerCustomization {
   locale?: 'auto' | (string & {});
   /** Feature gating: a disabled category vanishes from every surface. */
   disabledCategories?: readonly string[];
+  /**
+   * Pure reading: one prop that locks the viewer to View mode. The authoring
+   * tabs (Annotate / Shapes / Insert / Form / Redact), annotation verbs,
+   * undo/redo and page rotation vanish; the pan/pointer toggles drive the
+   * reading tool pair (no annotation editing); attached links navigate.
+   * Reading features — zoom, search, comments panel, thumbnails, text copy,
+   * form fill, download, print — stay.
+   *
+   * This is UX-level read-only (chrome + interaction). For ENFORCED
+   * read-only — true even against direct API calls — open the document with
+   * a scope that lacks `doc.annotate.modify`; the permission mirrors then
+   * hide the same affordances and the engine refuses writes. The two compose.
+   */
+  readOnly?: boolean;
   /** The structure — a value you OWN: the default (pass nothing), a transform
    *  of it, or your own schema. Never merged. */
   chrome?: ChromeSchema | ((base: ChromeSchema, helpers: ChromeHelpers) => ChromeSchema);
@@ -176,6 +194,7 @@ export function FullViewer({
   strings,
   locale = 'auto',
   disabledCategories,
+  readOnly = false,
   chrome,
   theme,
   themeTarget,
@@ -188,6 +207,8 @@ export function FullViewer({
   const [resolved] = useState(() => {
     // ── registries: additive, user wins by id ───────────────────────────────
     const byId = new Map(defaultCommands.map((c) => [c.id, c]));
+    // readOnly: tool toggles drive the reading pair; user overrides still win.
+    if (readOnly) for (const c of readOnlyCommandOverrides) byId.set(c.id, c);
     for (const c of commands ?? []) byId.set(c.id, c);
     const resolvedCommands = [...byId.values()];
 
@@ -260,7 +281,11 @@ export function FullViewer({
     }),
     renderPlugin(),
     pageEditPlugin(),
-    interactionPlugin({ defaultTool: 'pointer' }),
+    // Documents open in View mode, so the READING tool is the resting state
+    // ("View ⇔ view tool"): text selects, links navigate, nothing edits until
+    // an authoring tab is opened. Headless (chrome-less) hosts keep the
+    // plugin's own 'pointer' default.
+    interactionPlugin({ defaultTool: 'view' }),
     // Platform haptics, default-on: the Vibration API where it exists
     // (Android), a safe silent no-op elsewhere — iOS Safari included, until
     // Apple ships a haptics API. Native shells swap in their own provider
@@ -299,7 +324,11 @@ export function FullViewer({
     }),
     commandsPlugin({
       commands: resolved.commands,
-      disabledCategories: disabledCategories ? [...disabledCategories] : undefined,
+      disabledCategories: readOnly
+        ? [...READ_ONLY_DISABLED_CATEGORIES, ...(disabledCategories ?? [])]
+        : disabledCategories
+          ? [...disabledCategories]
+          : undefined,
     }),
     shellPlugin(),
   ]);
