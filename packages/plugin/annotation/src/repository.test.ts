@@ -692,6 +692,79 @@ describe('repository — toScopedPatch (sparse emission)', () => {
   });
 });
 
+describe('repository — /Rect derives from line endings (the clipped-arrowhead class)', () => {
+  const lineDTO = (lineEndings: { start: string; end: string }): AnnotationDTO =>
+    ({
+      ref: { kind: 'objectNumber', pageObjectNumber: 1, annotObjectNumber: 77 },
+      pageObjectNumber: 1,
+      index: 0,
+      identityQuality: 'durable',
+      nm: null,
+      flags: NO_FLAGS,
+      rect: { left: 100, bottom: 100, right: 300, top: 200 },
+      contents: null,
+      subject: null,
+      author: null,
+      created: null,
+      modified: null,
+      blendMode: 'normal',
+      inReplyTo: null,
+      replyType: null,
+      subtype: 'line',
+      color: { r: 0, g: 0, b: 0 },
+      interiorColor: null,
+      strokeWidth: 4,
+      opacity: 1,
+      borderStyle: 'solid',
+      linePoints: { start: { x: 120, y: 120 }, end: { x: 280, y: 180 } },
+      lineEndings,
+      rotation: null,
+    }) as unknown as AnnotationDTO;
+
+  type RectPatch = { lineEndings?: unknown; rect?: PdfRect };
+  const area = (r: PdfRect) => (r.right - r.left) * (r.top - r.bottom);
+
+  it('props lineEndings on a line re-emits the grown VISUAL-bounds /Rect', () => {
+    const none = fromDTO(lineDTO({ start: 'none', end: 'none' }), CROP);
+    const before = toScopedPatch(none, { kind: 'props', keys: ['lineEndings'] }, CROP) as RectPatch;
+    // The model AFTER the reducer applied the user's gesture: arrows on both ends.
+    const arrows = {
+      ...none,
+      geom: { ...none.geom, ends: { start: 'open-arrow', end: 'open-arrow' } },
+    } as typeof none;
+    const patch = toScopedPatch(arrows, { kind: 'props', keys: ['lineEndings'] }, CROP) as RectPatch;
+    expect(patch.lineEndings).toEqual({ start: 'open-arrow', end: 'open-arrow' });
+    // The derivation rides along — the sparse patch can never change an input
+    // of /Rect without re-emitting it (else the /AP re-bakes into the stale
+    // box and the arrowhead is clipped in every other viewer).
+    expect(before.rect).toBeDefined();
+    expect(patch.rect).toBeDefined();
+    const r0 = before.rect!;
+    const r1 = patch.rect!;
+    // Grew to enclose the arrowheads, and shrank on no side.
+    expect(area(r1)).toBeGreaterThan(area(r0));
+    expect(r1.left).toBeLessThanOrEqual(r0.left);
+    expect(r1.bottom).toBeLessThanOrEqual(r0.bottom);
+    expect(r1.right).toBeGreaterThanOrEqual(r0.right);
+    expect(r1.top).toBeGreaterThanOrEqual(r0.top);
+  });
+
+  it('polyline endings ride the same derivation', () => {
+    const base = fromDTO(rotatedPolylineDTO(0, 78), CROP);
+    const arrows = {
+      ...base,
+      geom: { ...base.geom, ends: { start: 'closed-arrow', end: 'closed-arrow' } },
+    } as typeof base;
+    const patch = toScopedPatch(
+      arrows,
+      { kind: 'props', keys: ['lineEndings'] },
+      CROP,
+    ) as RectPatch;
+    expect(patch.lineEndings).toBeDefined();
+    expect(patch.rect).toBeDefined();
+  });
+});
+
 describe('repository — shape cloudy border tri-state', () => {
   const cloudySquare = (annotObjectNumber = 45): AnnotationDTO =>
     ({

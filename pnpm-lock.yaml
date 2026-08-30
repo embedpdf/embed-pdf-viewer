@@ -589,6 +589,9 @@ importers:
 
   examples/cloud-dashboard:
     dependencies:
+      '@cloudpdf/contract':
+        specifier: workspace:*
+        version: link:../../cloudpdf/contract
       '@cloudpdf/engine':
         specifier: workspace:*
         version: link:../../cloudpdf/engine

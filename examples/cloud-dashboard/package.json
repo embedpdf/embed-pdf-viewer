@@ -13,6 +13,7 @@
     "preview": "vite preview --host 127.0.0.1 --port 5178"
   },
   "dependencies": {
+    "@cloudpdf/contract": "workspace:*",
     "@cloudpdf/sdk": "workspace:*",
     "@cloudpdf/engine": "workspace:*",
     "@cloudpdf/server": "workspace:*",

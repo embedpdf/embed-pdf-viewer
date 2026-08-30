@@ -2,8 +2,9 @@
  * The stroke family — line, polygon, polyline, ink. Shared physics: their
  * `/Rect` is the VISUAL bounds (stroke radius included — and, for a cloudy
  * polygon, the outward curl extent), so it derives from the point geometry
- * PLUS the stroke width and border; and their `/EMBD_Metadata/Rotation` is an
- * advisory scalar (the points are already rotated; inert for AP).
+ * PLUS the stroke width, border, and line endings; and their
+ * `/EMBD_Metadata/Rotation` is an advisory scalar (the points are already
+ * rotated; inert for AP).
  */
 import type { AnnotationDTO, PdfRect } from '@embedpdf/engine-core/runtime';
 import {
@@ -40,17 +41,30 @@ const visualRect = (a: Annot, crop: PdfRect): Wire => {
   return {};
 };
 
-/** Stroke-family prop exceptions: width and border feed the derived /Rect. */
+/**
+ * A lowering whose key is an INPUT of the derived /Rect: the visual bounds
+ * ride along with every emission, so a sparse patch can never change an input
+ * without re-emitting the derivation. (The bug this kills: patch `lineEndings`
+ * alone → the engine re-bakes the /AP inside the stale /Rect → the new
+ * arrowhead is clipped in every viewer except the live vector one.)
+ */
+const withRect =
+  (lower: (a: Annot, crop: PdfRect) => Wire) =>
+  (a: Annot, crop: PdfRect): Wire => ({ ...lower(a, crop), ...visualRect(a, crop) });
+
+/** Stroke-family prop exceptions: width, border, AND line endings feed the
+ *  derived /Rect — an ending's arrowhead reaches well past the endpoint, and
+ *  ISO 32000 requires /Rect to enclose it. Where a key can't change the
+ *  bounds (a line's border restyle), the re-emitted rect is an idempotent
+ *  no-op — uniformity beats per-case reasoning here. */
 const strokeProps: KindProjection['prop'] = {
-  strokeWidth: (a, crop) => ({ strokeWidth: a.style.strokeWidth, ...visualRect(a, crop) }),
-  border: (a, crop) => ({
-    ...borderSlice(a.style),
-    ...polyCloudy(a),
-    // Only a closed poly's rect depends on the border (cloud extent).
-    ...(a.geom.t === 'poly' && a.geom.closed ? visualRect(a, crop) : {}),
-  }),
-  lineEndings: (a) =>
-    (a.geom.t === 'line' || a.geom.t === 'poly') && a.geom.ends ? { lineEndings: a.geom.ends } : {},
+  strokeWidth: withRect((a) => ({ strokeWidth: a.style.strokeWidth })),
+  border: withRect((a) => ({ ...borderSlice(a.style), ...polyCloudy(a) })),
+  lineEndings: withRect((a) =>
+    (a.geom.t === 'line' || a.geom.t === 'poly') && a.geom.ends
+      ? { lineEndings: a.geom.ends }
+      : {},
+  ),
 };
 
 export const line: KindProjection = {

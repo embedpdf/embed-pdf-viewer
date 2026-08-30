@@ -17,6 +17,7 @@ import {
   selectionAnchor,
   selectionBoundsOnPage,
   selectionKnob,
+  textBoxes,
 } from './view';
 import { cursorAt, groupUnionBounds, hitTest, paintOrder } from './hit';
 import { isConversationOnly } from './plane';
@@ -1888,10 +1889,13 @@ describe('annotation-core callout — upright on a rotated page', () => {
     if (!ring || ring.kind !== 'poly') throw new Error('expected ring');
     const xs = ring.points.map((p) => p.x);
     const ys = ring.points.map((p) => p.y);
-    expect(Math.min(...xs)).toBeCloseTo(240);
-    expect(Math.max(...xs)).toBeCloseTo(280);
-    expect(Math.min(...ys)).toBeCloseTo(60);
-    expect(Math.max(...ys)).toBeCloseTo(180);
+    // The drawn ring insets by half the stroke (0.5 here) so the stroke's
+    // OUTER edge lands on the footprint (x∈[240,280], y∈[60,180]) — the
+    // AP-generator mirror; the ink never straddles the selection outline.
+    expect(Math.min(...xs)).toBeCloseTo(240.5);
+    expect(Math.max(...xs)).toBeCloseTo(279.5);
+    expect(Math.min(...ys)).toBeCloseTo(60.5);
+    expect(Math.max(...ys)).toBeCloseTo(179.5);
     // no axis-aligned rect node sneaks in for the border
     expect(nodes.some((n) => n.kind === 'rect')).toBe(false);
     expect(nodes.some((n) => n.kind === 'poly' && !n.closed)).toBe(true);
@@ -3874,5 +3878,74 @@ describe('conversation plane — replies and review states never reach the page'
       marqueePtr('up', 400, 60),
     ]);
     expect([...m.selected].sort()).toEqual(['root', 'sub']);
+  });
+});
+
+describe('callout ↔ AP-generator mirror', () => {
+  // Box (200,100)+120×40; tip far left; knee below-left of the box centre →
+  // conn = left-edge midpoint (200,120). Same fixture as the callout describe.
+  const calloutGeom = (): Extract<Geom, { t: 'text' }> => ({
+    t: 'text',
+    rect: { x: 200, y: 100, width: 120, height: 40 },
+    callout: { tip: { x: 40, y: 60 }, knee: { x: 120, y: 120 }, ending: 'open-arrow' },
+  });
+
+  it('the box border insets by half the stroke — ink INSIDE the rect, like squares', () => {
+    const nodes = geomScene(calloutGeom(), 6);
+    const box = nodes.find((n) => n.kind === 'rect');
+    if (box?.kind !== 'rect') throw new Error('expected a rect border node');
+    // rect (200,100,120,40) inset by 3: outer edge of the 6-wide stroke lands
+    // ON the rect — mirroring GenerateFreeTextAP's `Deflate(half_bw)` and the
+    // square/circle convention, so the border never straddles the selection.
+    expect(box.rect).toEqual({ x: 203, y: 103, width: 114, height: 34 });
+  });
+
+  it("the leader's connection point extends under the border by half the stroke", () => {
+    const nodes = geomScene(calloutGeom(), 6);
+    const leader = nodes[0];
+    if (leader?.kind !== 'poly' || leader.closed) throw new Error('expected the open leader poly');
+    // conn (200,120), incoming direction +x → adjusted to (203,120): the line
+    // slides under the border ink (the generator's `adjusted_conn`), so no
+    // angular gap opens at the box edge.
+    expect(leader.points[2]).toEqual({ x: 203, y: 120 });
+    // tip + knee untouched
+    expect(leader.points[0]).toEqual({ x: 40, y: 60 });
+    expect(leader.points[1]).toEqual({ x: 120, y: 120 });
+  });
+
+  it('text edit renders the callout fully LIVE — never baked raster + DOM text', () => {
+    const callout: Annot = {
+      id: 'C1',
+      ref: null,
+      pon: PON,
+      subtype: 'freeText',
+      geom: calloutGeom(),
+      style: {
+        color: '#e07b39',
+        interiorColor: '#ffffff',
+        strokeWidth: 6,
+        opacity: 1,
+        blendMode: 'normal',
+        border: { kind: 'solid' },
+      },
+      flags: DRAWN_FLAGS,
+      source: 'baked',
+    };
+    let m = update(initialModel, { t: 'loaded', annots: [callout] })[0];
+    // At rest: baked like any shape — one renderer, the engine raster.
+    expect(pageItems(m, PON)[0]!.source).toBe('baked');
+    expect(textBoxes(m, PON)).toHaveLength(0);
+
+    m = update(m, { t: 'beginTextEdit', id: 'C1' })[0];
+    const it = pageItems(m, PON)[0]!;
+    // The raster (whose flat bitmap includes the baked TEXT) is replaced by the
+    // vector scene; the DOM editor is the ONE text source. Blending the two is
+    // exactly the doubled-text bug.
+    expect(it.source).toBe('vector');
+    expect(textBoxes(m, PON).map((b) => b.id)).toEqual(['C1']);
+
+    m = update(m, { t: 'endTextEdit' })[0];
+    expect(pageItems(m, PON)[0]!.source).toBe('baked');
+    expect(textBoxes(m, PON)).toHaveLength(0);
   });
 });

@@ -566,6 +566,18 @@ function FreeText({ item, page }: { item: TextItem; page: PageContextValue }) {
   const ref = React.useRef<HTMLDivElement>(null);
   const box = boxOf(item.box, page);
   const scale = item.box.width > 0 ? box.width / item.box.width : 1; // content units → screen px
+  // The element IS the engine's text PLATE (`SetPlateRect` + its `re W n`
+  // clip): positioned at the padding inset with ZERO CSS padding, so the
+  // scrollport's edge is the plate edge. CSS padding does NOT clip overflow —
+  // scrolled lines slide straight through it and paint over the border band —
+  // so the border band must sit OUTSIDE the scrollport, never inside it.
+  const pad = item.css.padding * scale;
+  const plate = {
+    left: box.left + pad,
+    top: box.top + pad,
+    width: Math.max(0, box.width - 2 * pad),
+    height: Math.max(0, box.height - 2 * pad),
+  };
 
   // DOM ← model, but ONLY when this element isn't being typed in — keeps the caret
   // stable while you type AND lets a remote (collab) edit land live when idle.
@@ -579,7 +591,15 @@ function FreeText({ item, page }: { item: TextItem; page: PageContextValue }) {
   // model — it never drives it (exit is hub-driven, see the edit handler), so a
   // transient focus-steal by the page surface can't end the edit.
   useEffect(() => {
-    if (item.editing) ref.current?.focus();
+    if (item.editing) {
+      const el = ref.current;
+      if (!el) return;
+      el.focus();
+      // Enter at the TOP — the same anchoring the baked appearance uses
+      // (/Q vertical-align top), so baked → edit → baked never jumps. The
+      // browser still follows the caret once the user clicks or types.
+      el.scrollTop = 0;
+    }
   }, [item.editing]);
 
   // Isolate the editor from the interaction hub: a pointerdown inside it must NOT
@@ -623,18 +643,18 @@ function FreeText({ item, page }: { item: TextItem; page: PageContextValue }) {
       }}
       style={{
         position: 'absolute',
-        left: box.left,
-        top: box.top,
-        width: box.width,
-        // Fixed to the annotation rect — the box never grows with content; it
-        // scrolls while editing and clips otherwise (matching the baked /AP).
-        height: box.height,
+        left: plate.left,
+        top: plate.top,
+        width: plate.width,
+        // Fixed to the annotation rect's plate — the box never grows with
+        // content; it scrolls while editing and clips otherwise, at the SAME
+        // boundary the baked /AP clips at (`re W n` on the text body).
+        height: plate.height,
         fontFamily: item.css.fontFamily,
         fontSize: item.css.fontSize * scale,
         lineHeight: `${item.css.lineHeight * scale}px`,
         color: item.css.color,
         textAlign: item.css.align,
-        padding: item.css.padding * scale,
         boxSizing: 'border-box',
         background: item.css.background ?? 'transparent',
         whiteSpace: 'pre-wrap',
