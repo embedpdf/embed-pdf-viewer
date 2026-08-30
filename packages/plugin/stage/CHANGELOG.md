@@ -1,5 +1,12 @@
 # @embedpdf/plugin-stage
 
+## 3.0.0-next.10
+
+### Patch Changes
+
+- [#788](https://github.com/embedpdf/embed-pdf-viewer/pull/788) by [@bobsingor](https://github.com/bobsingor) – Allow `RevealOptions.rect` to be `null` and align stage coordinate conversion
+  with the content-space page transform API.
+
 ## 3.0.0-next.9
 
 ## 3.0.0-next.8

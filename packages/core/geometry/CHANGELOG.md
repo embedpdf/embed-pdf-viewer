@@ -1,5 +1,14 @@
 # @embedpdf/core-geometry
 
+## 3.0.0-next.10
+
+### Minor Changes
+
+- [#788](https://github.com/embedpdf/embed-pdf-viewer/pull/788) by [@bobsingor](https://github.com/bobsingor) – Clarify the public page transform API around content-space coordinates. Add
+  `toPixels` and `fromPixels`, and rename the display conversions to
+  `contentToView`, `contentToViewRect`, `viewToContent`, and
+  `viewToContentRect`.
+
 ## 3.0.0-next.9
 
 ## 3.0.0-next.8

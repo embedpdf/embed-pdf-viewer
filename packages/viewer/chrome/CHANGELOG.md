@@ -1,5 +1,14 @@
 # @embedpdf/viewer-chrome
 
+## 3.0.0-next.10
+
+### Minor Changes
+
+- [#788](https://github.com/embedpdf/embed-pdf-viewer/pull/788) by [@bobsingor](https://github.com/bobsingor) – Add a comments and review sidebar with loading, retry, and navigation states,
+  plus an anchored editor for annotation links. Commands and controls now
+  reflect document and per-record permissions, with updated locale strings for
+  the new states.
+
 ## 3.0.0-next.9
 
 ## 3.0.0-next.8

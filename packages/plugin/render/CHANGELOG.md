@@ -1,5 +1,13 @@
 # @embedpdf/plugin-render
 
+## 3.0.0-next.10
+
+### Minor Changes
+
+- [#788](https://github.com/embedpdf/embed-pdf-viewer/pull/788) by [@bobsingor](https://github.com/bobsingor) – Add `canRender()` and reject unauthorized page and tile renders locally with
+  `PermissionDenied`, avoiding repeated engine requests for sessions without
+  render access.
+
 ## 3.0.0-next.9
 
 ## 3.0.0-next.8

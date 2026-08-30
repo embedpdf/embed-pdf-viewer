@@ -1,5 +1,13 @@
 # @embedpdf/plugin-form
 
+## 3.0.0-next.10
+
+### Minor Changes
+
+- [#788](https://github.com/embedpdf/embed-pdf-viewer/pull/788) by [@bobsingor](https://github.com/bobsingor) – Add `canRead()`, `canFill()`, and `canDesign()` permission helpers, replacing
+  `canModify()`. Form hydration and mutations now refuse unauthorized work
+  locally, and realtime desync events trigger a full form snapshot refresh.
+
 ## 3.0.0-next.9
 
 ## 3.0.0-next.8

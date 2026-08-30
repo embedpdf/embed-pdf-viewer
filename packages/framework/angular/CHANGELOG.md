@@ -1,5 +1,12 @@
 # @embedpdf/angular
 
+## 3.0.0-next.10
+
+### Minor Changes
+
+- [#788](https://github.com/embedpdf/embed-pdf-viewer/pull/788) by [@bobsingor](https://github.com/bobsingor) – Rename `EpdfPageContext.toPagePoint()` to `toContentPoint()` and align the
+  Angular page context with the content-space page transform API.
+
 ## 3.0.0-next.9
 
 ## 3.0.0-next.8

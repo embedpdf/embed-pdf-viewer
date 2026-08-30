@@ -1,5 +1,13 @@
 # @embedpdf/core
 
+## 3.0.0-next.10
+
+### Minor Changes
+
+- [#788](https://github.com/embedpdf/embed-pdf-viewer/pull/788) by [@bobsingor](https://github.com/bobsingor) – Export `PermissionDenied` and add `DocumentsCapability.allows()` so hosts can
+  gate document-level print and download controls using the active document's
+  security policy.
+
 ## 3.0.0-next.9
 
 ### Minor Changes

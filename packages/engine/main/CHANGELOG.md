@@ -1,5 +1,13 @@
 # @embedpdf/engine
 
+## 3.0.0-next.10
+
+### Minor Changes
+
+- [#788](https://github.com/embedpdf/embed-pdf-viewer/pull/788) by [@bobsingor](https://github.com/bobsingor) – Implement local per-record collaboration permission checks for annotation
+  creation, mutation, and group assignment. Update scope guards and the local
+  runtime integration to support the new annotation and security contracts.
+
 ## 3.0.0-next.9
 
 ### Minor Changes

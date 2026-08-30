@@ -1,5 +1,7 @@
 # @embedpdf/plugin-selection
 
+## 3.0.0-next.10
+
 ## 3.0.0-next.9
 
 ## 3.0.0-next.8

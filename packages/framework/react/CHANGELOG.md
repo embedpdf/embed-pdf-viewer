@@ -1,5 +1,14 @@
 # @embedpdf/react
 
+## 3.0.0-next.10
+
+### Minor Changes
+
+- [#788](https://github.com/embedpdf/embed-pdf-viewer/pull/788) by [@bobsingor](https://github.com/bobsingor) – Add comment-thread APIs with live page metadata and navigation rectangles.
+  Align React page contexts with the content-space transform API, improve live
+  free-text and callout rendering, and route link activation through the shared
+  link-opening behavior.
+
 ## 3.0.0-next.9
 
 ## 3.0.0-next.8

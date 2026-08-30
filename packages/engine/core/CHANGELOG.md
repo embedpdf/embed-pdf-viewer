@@ -1,5 +1,15 @@
 # @embedpdf/engine-core
 
+## 3.0.0-next.10
+
+### Minor Changes
+
+- [#788](https://github.com/embedpdf/embed-pdf-viewer/pull/788) by [@bobsingor](https://github.com/bobsingor) – Add annotation subjects, text review states, comment-thread composition, and
+  coherent whole-document annotation snapshots. Extend document security with
+  per-record collaboration checks, add versioned annotation wire resources and
+  the public whole-document annotation path, and surface unrecoverable event
+  gaps through `stream.desynced`.
+
 ## 3.0.0-next.9
 
 ### Minor Changes
