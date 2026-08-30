@@ -36,3 +36,27 @@ export function isConversationOnly(
   }
   return false;
 }
+
+/**
+ * A link CHILD attached to another annotation — a `/Link` grouped
+ * (`/IRT` + `/RT /Group`) under a non-link parent. Pure substrate: it is
+ * the parent's `link` PROPERTY while authoring (derived via `linkOf`) and
+ * the navigation plane's anchor while reading — never painted, never hit
+ * as itself. Its rect is RECONCILED from the parent's geometry, so direct
+ * manipulation would be overwritten anyway.
+ */
+export function isAttachedLink(a: Pick<Annot, 'subtype' | 'group'>): boolean {
+  return a.subtype === 'link' && a.group !== undefined;
+}
+
+/**
+ * The ONE page-surface cull: everything that lives in the substrate but is
+ * not a page visual of its own — conversation members (replies, review
+ * states) and attached link children. Paint order, hit-testing, marquee
+ * and the appearance epoch all filter through THIS, never the parts.
+ */
+export function isSubstrateOnly(
+  a: Pick<Annot, 'irt' | 'group' | 'subtype' | 'data'>,
+): boolean {
+  return isConversationOnly(a) || isAttachedLink(a);
+}

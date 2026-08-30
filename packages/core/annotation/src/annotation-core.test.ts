@@ -20,7 +20,8 @@ import {
   textBoxes,
 } from './view';
 import { cursorAt, groupUnionBounds, hitTest, paintOrder } from './hit';
-import { isConversationOnly } from './plane';
+import { isAttachedLink, isConversationOnly, isSubstrateOnly } from './plane';
+import { linkChildrenOf, linkOf } from './links';
 import { capsFor } from './kinds';
 import { DRAWN_FLAGS } from './flags';
 import {
@@ -3727,7 +3728,7 @@ describe('apVersion: baked /AP content versioning (what re-fetches a raster)', (
   });
 });
 
-describe('link prop (attached links folded onto their parent)', () => {
+describe('link prop (attached children in the substrate, read via linkOf)', () => {
   const REF = { kind: 'objectNumber', pageObjectNumber: 1, annotObjectNumber: 40 } as const;
   const CHILD_REF = { kind: 'objectNumber', pageObjectNumber: 1, annotObjectNumber: 41 } as const;
   const URI = { kind: 'uri', uri: 'https://www.embedpdf.com/' } as const;
@@ -3758,13 +3759,15 @@ describe('link prop (attached links folded onto their parent)', () => {
     return { ...m, selected: [a.id] };
   };
 
-  it('setProps { link } on a non-link kind emits syncLink, no engine patch, and keeps the render source', () => {
+  it('setProps { link } on a non-link kind emits target-carrying syncLink, writes NOTHING to the model', () => {
     const m = withSelected(committedSquare());
     const [next, fx] = update(m, { t: 'setProps', patch: { link: URI } });
-    expect(next.byId['S1'].link).toEqual(URI);
+    // Parents store no link value — the committed children are the truth,
+    // read back through `linkOf` once the reconciler's writes land.
+    expect(next.byId['S1'].link).toBeUndefined();
     // A link-only change is NOT appearance: no patch, no vector flip.
     expect(next.byId['S1'].source).toBe('baked');
-    expect(fx).toEqual([{ fx: 'syncLink', id: 'S1' }]);
+    expect(fx).toEqual([{ fx: 'syncLink', id: 'S1', target: URI }]);
   });
 
   it('setProps { link } plus a style key emits both syncLink and a patch', () => {
@@ -3773,7 +3776,7 @@ describe('link prop (attached links folded onto their parent)', () => {
     expect(next.byId['S1'].style.color).toBe('#00ff00');
     expect(fx).toEqual([
       { fx: 'patch', id: 'S1', scope: { kind: 'props', keys: ['link', 'color'] } },
-      { fx: 'syncLink', id: 'S1' },
+      { fx: 'syncLink', id: 'S1', target: URI },
     ]);
   });
 
@@ -3793,11 +3796,30 @@ describe('link prop (attached links folded onto their parent)', () => {
     expect(fx).toEqual([]);
   });
 
-  it('deleting a parent also deletes its attached link children (linkRefs)', () => {
-    const parent = committedSquare({ link: URI, linkRefs: [CHILD_REF] });
-    const m = withSelected(parent);
+  it('deleting a parent also deletes its attached link children (substrate)', () => {
+    const parent = committedSquare();
+    const child: Annot = {
+      id: 'C1',
+      ref: CHILD_REF,
+      pon: PON,
+      subtype: 'link',
+      geom: { t: 'rect', rect: { x: 10, y: 10, width: 50, height: 40 }, ellipse: false },
+      style: { ...baseStyle },
+      flags: DRAWN_FLAGS,
+      source: 'baked',
+      group: 'S1',
+      irt: 'S1',
+      data: { subtype: 'link', target: URI } as unknown as Annot['data'],
+    };
+    const loaded = update(initialModel, { t: 'loaded', annots: [parent, child] })[0];
+    // The child is substrate: readable through the lens, absent from paint.
+    expect(linkOf(loaded, 'S1')).toEqual(URI);
+    expect(pageItems(loaded, PON).some((i) => i.id === 'C1')).toBe(false);
+    const m = { ...loaded, selected: ['S1'] };
     const [next, fx] = update(m, { t: 'delete' });
+    // Parent AND child leave the model through the ONE uniform delete path.
     expect(next.byId['S1']).toBeUndefined();
+    expect(next.byId['C1']).toBeUndefined();
     expect(fx).toEqual([
       { fx: 'delete', ref: REF },
       { fx: 'delete', ref: CHILD_REF },

@@ -11,7 +11,7 @@ import {
 } from './geometry';
 import { capsFor, isMarkup } from './kinds';
 import { groupCaps } from './group';
-import { isConversationOnly } from './plane';
+import { isSubstrateOnly } from './plane';
 import { annotInteractive, annotTransformable, viewable } from './flags';
 import { anchoredGeom, anchoredStrokeWidth, anchorModeOf, type ViewEnv } from './anchor';
 import {
@@ -50,7 +50,7 @@ export function paintOrder(m: Model, pon: number): Id[] {
     const a = m.byId[id];
     if (!a || a.pon !== pon) continue;
     if (!viewable(a.flags, m.selected.includes(id))) continue;
-    if (isConversationOnly(a)) continue;
+    if (isSubstrateOnly(a)) continue;
     (isMarkup(a.subtype) ? markup : other).push(id);
   }
   return [...markup, ...other];

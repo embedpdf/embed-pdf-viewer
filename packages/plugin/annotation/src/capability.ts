@@ -17,6 +17,7 @@ import {
   type AnnotationRef,
   type AttachmentFileSource,
   type BinarySource,
+  type PdfLinkTarget,
 } from '@embedpdf/engine-core/runtime';
 import { InteractionToken } from '@embedpdf/plugin-interaction';
 import { SelectionToken as SelectionPublicToken } from '@embedpdf/plugin-selection';
@@ -43,7 +44,9 @@ import {
   sharedProps,
   styleFromProps,
   update,
-  isConversationOnly,
+  isSubstrateOnly,
+  linkChildrenOf,
+  linkOf,
   uprightRotation,
   viewable,
   type Annot,
@@ -65,7 +68,6 @@ import {
 } from '@embedpdf/core-annotation';
 import {
   boxGeomFields,
-  foldAttachedLinks,
   fromDTO,
   linkChildRects,
   refKey,
@@ -317,11 +319,16 @@ export function createAnnotationCapability(
     const specs = sharedProps(members.map((a) => a.subtype));
     const values: Partial<AnnotationProps> = {};
     const mixed: PropKey[] = [];
+    // `link` is the one derived value: parents store nothing — the committed
+    // children are the truth, read through the lens (the link KIND still
+    // reads its own /A off the annot).
+    const valueOf = (a: Annot, key: PropKey): unknown =>
+      key === 'link' && a.subtype !== 'link' ? linkOf(m, a.id) : readProp(a, key);
     for (const spec of specs) {
-      const first = readProp(members[0], spec.key);
+      const first = valueOf(members[0], spec.key);
       (values as Record<PropKey, unknown>)[spec.key] = first;
       const firstJson = JSON.stringify(first);
-      if (members.some((a) => JSON.stringify(readProp(a, spec.key)) !== firstJson))
+      if (members.some((a) => JSON.stringify(valueOf(a, spec.key)) !== firstJson))
         mixed.push(spec.key);
     }
     const v: SelectionProps = { specs, values, mixed };
@@ -339,16 +346,16 @@ export function createAnnotationCapability(
     const v: LinkNavItem[] = [];
     for (const id of m.order) {
       const a = m.byId[id];
-      if (!a || a.pon !== pon || a.link == null) continue;
+      if (!a || a.pon !== pon || a.subtype !== 'link') continue;
       if (!viewable(a.flags, false)) continue; // hidden links don't navigate
-      if (a.subtype === 'link') {
-        if (a.geom.t === 'rect')
-          v.push({ id, rect: a.geom.rect, target: a.link, attached: false });
-      } else {
-        linkChildRects(a).forEach((rect, i) =>
-          v.push({ id: `${id}#${i}`, rect, target: a.link!, attached: true }),
-        );
-      }
+      // Standalone links carry their own model `link` (/A); attached children
+      // carry the target on their DTO. Rects are the CHILD's own committed
+      // geometry — anchors render only in view contexts, where nothing is
+      // mid-gesture, so no live parent-derivation is needed.
+      const target =
+        a.link ?? (a.data?.subtype === 'link' ? (a.data.target ?? null) : null);
+      if (target == null || a.geom.t !== 'rect') continue;
+      v.push({ id, rect: a.geom.rect, target, attached: a.group !== undefined });
     }
     linkItemsCache.set(pon, { model: m, v });
     return v;
@@ -844,8 +851,9 @@ export function createAnnotationCapability(
     for (const page of snap.pages) {
       const crop = cropOf(page.pageState.pageObjectNumber);
       if (!crop) continue;
-      // Fold per page (attached-link children are same-page by ISO rule).
-      annots.push(...foldAttachedLinks(page.annotations.map((d) => fromDTO(d, crop))));
+      // Children (replies, states, attached links) enter the substrate as
+      // first-class annots; the planes derive (paint cull + lenses).
+      annots.push(...page.annotations.map((d) => fromDTO(d, crop)));
     }
     apply({ t: 'hydrated', annots, bumpAp });
   };
@@ -918,32 +926,11 @@ export function createAnnotationCapability(
       if (!crop) continue;
       // Another session authored this — trust the engine's baked AP.
       const a = fromDTO(dto, crop, 'baked');
-      // A remote ATTACHED-link child (grouped /Link under a linkable local
-      // parent) folds onto the parent instead of entering the model — the
-      // same rule the hydration fold applies. A child retarget never
-      // repaints the PARENT, so the fold never bumps.
-      if (a.subtype === 'link' && a.data?.subtype === 'link' && a.data.replyType === 'group') {
-        const parentId = a.data.inReplyTo ? refKey(a.data.inReplyTo) : null;
-        const parent = parentId ? model().byId[parentId] : null;
-        if (
-          parent &&
-          parent.subtype !== 'link' &&
-          propsFor(parent.subtype).some((s) => s.key === 'link') &&
-          a.ref
-        ) {
-          const refs = parent.linkRefs ?? [];
-          const known = refs.some((r) => refKey(r) === a.id);
-          keep.push({
-            ...parent,
-            link: a.data.target,
-            linkRefs: known ? refs : [...refs, a.ref],
-          });
-          continue;
-        }
-      }
-      // Conversation-plane annotations (replies, review states) never paint,
-      // so their arrival must not trigger a raster fetch or epoch churn.
-      (bumpAp && !isConversationOnly(a) ? bump : keep).push(a);
+      // Substrate-only annotations (replies, review states, attached link
+      // children) never paint, so their arrival must not trigger a raster
+      // fetch or epoch churn. A remote link child is just an upsert — the
+      // `linkOf` lens re-derives the parent's value on the next read.
+      (bumpAp && !isSubstrateOnly(a) ? bump : keep).push(a);
     }
     if (bump.length) apply({ t: 'upsert', annots: bump, bumpAp: true });
     if (keep.length) apply({ t: 'upsert', annots: keep });
@@ -967,27 +954,9 @@ export function createAnnotationCapability(
       case 'annotation.deleted':
         if (event.deleted) {
           const key = encodeStableIdKey(event.deleted);
-          const m = model();
-          if (m.byId[key]) {
-            apply({ t: 'remove', ids: [key] });
-          } else {
-            // Not in the model → possibly a folded ATTACHED-link child a
-            // remote session deleted: prune it from its parent's join keys
-            // (clearing the parent's link value with the last child).
-            for (const id of m.order) {
-              const a = m.byId[id];
-              const refs = a?.linkRefs;
-              if (!a || !refs?.length || !refs.some((r) => refKey(r) === key)) continue;
-              const remaining = refs.filter((r) => refKey(r) !== key);
-              apply({
-                t: 'upsert',
-                annots: [
-                  { ...a, linkRefs: remaining, ...(remaining.length ? {} : { link: null }) },
-                ],
-              });
-              break;
-            }
-          }
+          // Attached link children are model annotations, so a remote child
+          // delete is this same plain remove — the `linkOf` lens re-derives.
+          if (model().byId[key]) apply({ t: 'remove', ids: [key] });
         }
         break;
       default:
@@ -1241,24 +1210,35 @@ export function createAnnotationCapability(
    * chained run converges on the latest desired state.
    */
   const linkSyncChains = new Map<Id, Promise<void>>();
-  const scheduleLinkSync = (id: Id): void => {
+  /**
+   * Queue a reconcile. `intent` is either an explicit target (a set/clear —
+   * captured by THIS run's closure, so chained sets stay latest-wins) or
+   * `'keep'` (a geometry follow: re-rect the children toward whatever target
+   * the substrate holds AT RUN TIME — so a remote retarget is never undone
+   * by a local move). Returns the chain, so `links.set()` can await commit.
+   */
+  const scheduleLinkSync = (id: Id, intent: { target: PdfLinkTarget | null } | 'keep'): Promise<void> => {
     const prev = linkSyncChains.get(id) ?? Promise.resolve();
-    const next = prev.then(() => reconcileLinkChildren(id));
+    const next = prev.then(() =>
+      reconcileLinkChildren(id, intent === 'keep' ? linkOf(model(), id) : intent.target),
+    );
     linkSyncChains.set(id, next);
     void next.finally(() => {
       if (linkSyncChains.get(id) === next) linkSyncChains.delete(id);
     });
+    return next;
   };
 
   /**
    * THE one place attached link children are created, retargeted, re-rected,
-   * or deleted (the delete-with-parent expansion in the core is the one other
-   * consumer of `linkRefs`). Declarative: desired state is derived fresh from
-   * the parent's `link` value + committed geometry (`linkChildRects`), then
-   * diffed against the join keys the last fold reported. Idempotent — foreign
+   * or deleted. Declarative: desired state = `desired` target + the parent's
+   * committed geometry (`linkChildRects`); CURRENT state is read straight
+   * from the substrate (`linkChildrenOf`) — no join-key ledger. Results land
+   * as ordinary substrate upserts/removes, so the `linkOf` lens converges
+   * immediately locally and via events everywhere else. Idempotent — foreign
    * inconsistencies heal on the next local edit.
    */
-  const reconcileLinkChildren = async (id: Id): Promise<void> => {
+  const reconcileLinkChildren = async (id: Id, desired: PdfLinkTarget | null): Promise<void> => {
     const doc = ctx.doc;
     const a = model().byId[id];
     if (!doc || !a || !a.ref || a.subtype === 'link') return;
@@ -1267,19 +1247,20 @@ export function createAnnotationCapability(
     const page = doc.page(a.pon);
     // Read-only target arms can't be (re)written: children keep their /A and
     // only their rects follow the parent.
-    const target = writableTarget(a.link);
-    const rects = a.link == null ? [] : linkChildRects(a).map((r) => contentToPdfRect(r, crop));
-    const current = a.linkRefs ?? [];
-    const nextRefs: AnnotationRef[] = [];
+    const target = writableTarget(desired);
+    const rects = desired == null ? [] : linkChildRects(a).map((r) => contentToPdfRect(r, crop));
+    const current = linkChildrenOf(model(), id);
     try {
       const paired = Math.min(current.length, rects.length);
       for (let i = 0; i < paired; i++) {
-        const res = await page.annotations.update(current[i], {
+        const ref = current[i].ref;
+        if (!ref) continue;
+        const res = await page.annotations.update(ref, {
           subtype: 'link',
           rect: rects[i],
           ...(target ? { target } : {}),
         });
-        nextRefs.push(res.updated.ref);
+        apply({ t: 'upsert', annots: [fromDTO(res.updated, crop, 'baked')] });
       }
       for (let i = current.length; i < rects.length; i++) {
         const res = await page.annotations.create({
@@ -1289,19 +1270,16 @@ export function createAnnotationCapability(
           inReplyTo: a.ref,
           replyType: 'group',
         });
-        nextRefs.push(res.created.ref);
+        apply({ t: 'upsert', annots: [fromDTO(res.created, crop, 'baked')] });
       }
       for (let i = rects.length; i < current.length; i++) {
-        await page.annotations.delete(current[i]);
+        const child = current[i];
+        if (child.ref) await page.annotations.delete(child.ref);
+        apply({ t: 'remove', ids: [child.id] });
       }
     } catch (err) {
       console.error('[annotation] attached-link sync failed:', err);
     }
-    // Refresh the join keys on the CURRENT model annot (it may have moved on
-    // since this run was scheduled). Explicit `linkRefs` (possibly []) wins
-    // over the upsert's fold preservation.
-    const cur = model().byId[id];
-    if (cur) apply({ t: 'upsert', annots: [{ ...cur, linkRefs: nextRefs }] });
   };
 
   /** A relationship-only engine patch (sets/clears `/IRT` + `/RT`) — geometry and
@@ -1468,12 +1446,13 @@ export function createAnnotationCapability(
             // Attached link children follow their parent's COMMITTED geometry
             // — scheduled after the parent's own write resolves, from ONE
             // place, so no gesture ever has to know the children exist.
-            if (a.linkRefs?.length) scheduleLinkSync(fx.id);
+            if (linkChildrenOf(model(), fx.id).length)
+              void scheduleLinkSync(fx.id, 'keep');
           },
           () => {},
         );
     } else if (fx.fx === 'syncLink') {
-      scheduleLinkSync(fx.id);
+      void scheduleLinkSync(fx.id, { target: fx.target });
     } else {
       doc
         .page(fx.ref.pageObjectNumber)
@@ -1586,6 +1565,19 @@ export function createAnnotationCapability(
     canDelete: (ref) => allowsMutation('delete', ref),
 
     comments,
+
+    links: {
+      of: (ref) => {
+        const a = model().byId[refKey(ref)];
+        if (!a) return null;
+        return a.subtype === 'link' ? (a.link ?? null) : linkOf(model(), a.id);
+      },
+      // The verbs go straight to the reconciler chain (latest-wins per
+      // parent) and resolve when the children are COMMITTED — `of` reads
+      // the new value the moment the promise settles.
+      set: (ref, target) => scheduleLinkSync(refKey(ref), { target }),
+      clear: (ref) => scheduleLinkSync(refKey(ref), { target: null }),
+    },
 
     getSelection: (): AnnotationRef[] => {
       const m = model();
@@ -1705,7 +1697,7 @@ export function createAnnotationCapability(
         if (!a || a.pon !== pon || a.source !== 'baked' || !a.ref) continue;
         // Conversation-plane annotations never paint — a remote reply or
         // status change must not churn the page's raster cache key.
-        if (isConversationOnly(a)) continue;
+        if (isSubstrateOnly(a)) continue;
         parts.push(`${id}@${a.apVersion ?? 0}`);
       }
       return parts.sort().join('|');
@@ -1937,10 +1929,7 @@ export function createAnnotationCapability(
         const m = model();
         const stale = m.order.filter((id) => m.byId[id]?.pon === pon);
         if (stale.length) apply({ t: 'remove', ids: stale });
-        apply({
-          t: 'loaded',
-          annots: foldAttachedLinks(snap.annotations.map((d) => fromDTO(d, crop))),
-        });
+        apply({ t: 'loaded', annots: snap.annotations.map((d) => fromDTO(d, crop)) });
       } catch {
         // A failed reload leaves the previous view; the next event or a
         // rehydrate reconciles.

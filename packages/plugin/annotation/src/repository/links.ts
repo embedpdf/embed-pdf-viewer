@@ -20,40 +20,6 @@ import { refKey } from './seam';
  *  link)? Widgets/caret/redact/file-attachment deliberately don't. */
 const takesLink = (subtype: string): boolean => propsFor(subtype).some((s) => s.key === 'link');
 
-/**
- * Fold attached link children onto their parents: a `/Link` annotation
- * grouped (`/RT /Group`) under a linkable non-link parent is not an object
- * in the client model — it becomes the parent's `link` prop value plus the
- * `linkRefs` join keys the write side needs. Folded children are REMOVED
- * from the returned list, so they never render, hit-test, or select.
- * Anything that doesn't match (orphans, links grouped under widgets or
- * other links) stays a standalone annotation — nothing is ever hidden.
- *
- * Multi-segment parents (markup) carry several children with one shared
- * target; the first child's target wins and the next write heals any
- * foreign disagreement.
- */
-export function foldAttachedLinks(annots: Annot[]): Annot[] {
-  const byId = new Map(annots.map((a) => [a.id, a]));
-  const folded = new Set<string>();
-  const patched = new Map<string, Annot>();
-  for (const a of annots) {
-    if (a.subtype !== 'link' || a.data?.subtype !== 'link') continue;
-    if (a.data.replyType !== 'group' || !a.data.inReplyTo || !a.ref) continue;
-    const parentId = refKey(a.data.inReplyTo);
-    const parent = patched.get(parentId) ?? byId.get(parentId);
-    if (!parent || parent.subtype === 'link' || !takesLink(parent.subtype)) continue;
-    patched.set(parentId, {
-      ...parent,
-      link: parent.link ?? a.data.target,
-      linkRefs: [...(parent.linkRefs ?? []), a.ref],
-    });
-    folded.add(a.id);
-  }
-  if (!folded.size) return annots;
-  return annots.filter((a) => !folded.has(a.id)).map((a) => patched.get(a.id) ?? a);
-}
-
 /** Bounds of one quad (content space). */
 const quadBounds = (q: Quad): Rect => unionRect(q);
 

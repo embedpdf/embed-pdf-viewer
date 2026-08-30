@@ -282,20 +282,13 @@ export interface Annot {
   /** Normalized PDF `/IT` for intent-bearing annotations authored before a DTO exists. */
   intent?: CaretIntent | StrikeoutIntent | InkIntent;
   /**
-   * The `link` prop's value (see {@link AnnotationProps.link}): the link
-   * kind's own target, or — on other linkable kinds — the folded attached
-   * link's target. Editable via `setProps`.
+   * The link KIND's own `/A` target (see {@link AnnotationProps.link}) —
+   * present only on `subtype: 'link'`. Every OTHER kind's link is an
+   * attached child annotation in the substrate, read through the `linkOf`
+   * lens and materialized by the shell's `syncLink` reconciler; parents
+   * store nothing.
    */
   link?: PdfLinkTarget | null;
-  /**
-   * INTERNAL join keys, never a prop: the engine refs of the attached link
-   * child annotation(s) this parent's `link` value is materialized as (one
-   * per visual segment for markup). Maintained by the repository fold and
-   * consumed by the shell's `syncLink` reconciler + delete expansion — the
-   * ONLY code allowed to touch those children. Absent on the link kind
-   * itself and on anything without an attached link.
-   */
-  linkRefs?: AnnotationRef[];
   /**
    * Relationship to another annotation. `irt` ("in reply to") links a child to a
    * parent — a reply in a comment thread, or a caret bound to its strikeout in a
@@ -739,7 +732,10 @@ export type Effect =
    *  shell's reconciler is the only code that spells out child operations.
    *  (Geometry commits don't emit this; the shell re-runs the reconciler on
    *  any `patch` of an annotation that has `linkRefs`.) */
-  | { fx: 'syncLink'; id: Id }
+  // Reconcile the parent's attached link children toward `target` (null =
+  // remove them). The intent rides the effect — parents store no link value;
+  // the committed children ARE the truth (`linkOf` reads them back).
+  | { fx: 'syncLink'; id: Id; target: PdfLinkTarget | null }
   | { fx: 'delete'; ref: AnnotationRef };
 
 /** Per-annotation render data — its content geometry + style + live state. */

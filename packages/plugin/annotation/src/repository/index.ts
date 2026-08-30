@@ -51,7 +51,7 @@ export {
   widgetAppearanceFromProps,
   writableTarget,
 } from './seam';
-export { foldAttachedLinks, linkChildRects } from './links';
+export { linkChildRects } from './links';
 export { boxEmit } from './projection';
 export type { KindProjection } from './projection';
 

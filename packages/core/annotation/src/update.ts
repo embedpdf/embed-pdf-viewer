@@ -8,7 +8,8 @@
 import type { AnnotationFlags, AnnotationRef, InkIntent } from '@embedpdf/engine-core/runtime';
 import { expandGroups, groupMembers } from './group';
 import { canMove, groupUnionBounds, hitTest, isSelectable } from './hit';
-import { isConversationOnly } from './plane';
+import { isSubstrateOnly } from './plane';
+import { linkChildrenOf } from './links';
 import { capsFor } from './kinds';
 import {
   annotContentsEditable,
@@ -43,7 +44,7 @@ import {
   uprightRotation,
 } from './geometry';
 import { clickCreateGeom, resolveClickPlacement } from './placement';
-import { applyProps, initialTextStyle, styleFromProps, textStyleFromProps } from './props';
+import { applyProps, initialTextStyle, kindTakesLink, styleFromProps, textStyleFromProps } from './props';
 import { computeMoveSnap } from './snap';
 import { straightenInkStroke } from './ink';
 import type {
@@ -1250,14 +1251,23 @@ function setProps(m: Model, patch: AnnotationPropsPatch): [Model, Effect[]] {
   for (const id of m.selected) {
     const a = byId[id];
     if (!a) continue;
+    // The `link` slot is NOT appearance and NOT model state on a non-link
+    // kind: the value lives in attached child annotations (the `linkOf`
+    // lens reads them back), so the intent is read off the PATCH and rides
+    // the target-carrying `syncLink` — the shell's reconciler owns the child
+    // operations. Locked annotations refuse it like any other prop write.
+    const linkIntent =
+      patch.link !== undefined &&
+      a.subtype !== 'link' &&
+      kindTakesLink(a.subtype) &&
+      annotTransformable(a);
     const next = applyProps(a, patch);
-    if (!next) continue; // locked, or no declared key in the patch
-    // The `link` slot is NOT appearance: on a non-link kind it is the folded
-    // attached-link target, materialized as separate child annotations. A
-    // link-only change therefore keeps the render source, skips the engine
-    // patch, and emits the declarative `syncLink` instead — the shell's
-    // reconciler owns the child operations. Slot spreads in `applyProps`
-    // make the identity checks exact.
+    if (!next) {
+      // Nothing applied to the model (link-only patch on a parent, or an
+      // undeclared key) — the link intent still materializes.
+      if (linkIntent) fx.push({ fx: 'syncLink', id, target: patch.link ?? null });
+      continue;
+    }
     const linkChanged = next.link !== a.link;
     const otherChanged =
       next.style !== a.style ||
@@ -1273,7 +1283,7 @@ function setProps(m: Model, patch: AnnotationPropsPatch): [Model, Effect[]] {
     // The link KIND's target lives on its own DTO — a plain engine patch.
     if (otherChanged || (linkChanged && a.subtype === 'link'))
       fx.push({ fx: 'patch', id, scope: { kind: 'props', keys } });
-    if (linkChanged && a.subtype !== 'link') fx.push({ fx: 'syncLink', id });
+    if (linkIntent) fx.push({ fx: 'syncLink', id, target: patch.link ?? null });
   }
   return fx.length ? [{ ...m, byId }, fx] : [m, []];
 }
@@ -1376,16 +1386,19 @@ function deleteSelection(m: Model): [Model, Effect[]] {
     return !!a && annotTransformable(a);
   });
   if (!deletable.length) return [m, []];
+  // Attached link children die with their parent. They ARE model
+  // annotations now, so expanding the deletable set makes the one loop
+  // below handle parent and children uniformly — no side ledger.
+  const withChildren = [
+    ...deletable,
+    ...deletable.flatMap((id) => linkChildrenOf(m, id).map((c) => c.id)),
+  ];
   const fx: Effect[] = [];
-  for (const id of deletable) {
+  for (const id of withChildren) {
     const a = m.byId[id];
     if (a?.ref) fx.push({ fx: 'delete', ref: a.ref });
-    // Attached link children die with their parent — besides the shell's
-    // reconciler, this is the ONE other consumer of `linkRefs`. (The
-    // children aren't model annotations, so `removeAnnots` never sees them.)
-    for (const childRef of a?.linkRefs ?? []) fx.push({ fx: 'delete', ref: childRef });
   }
-  return [removeAnnots(m, deletable), fx];
+  return [removeAnnots(m, withChildren), fx];
 }
 
 /* ── marquee helper; exported for tests ───────────────────────────────────── */
@@ -1403,7 +1416,7 @@ export function annotsInBox(
     if (annot?.pon !== pon || inert?.has(id) || !isSelectable(m, id)) return false;
     // Conversation-plane annotations (replies, review states) are never on
     // the page — the marquee cannot sweep up what does not paint.
-    if (isConversationOnly(annot)) return false;
+    if (isSubstrateOnly(annot)) return false;
     // intersect against what is actually DRAWN: the oriented selection quad
     // (exact, via SAT) — the SAME quad the chrome outlines and the grab region
     // uses (screen-anchored bodies at their view-projected footprint). Its
@@ -1478,18 +1491,9 @@ function upsertAnnots(m: Model, annots: Annot[], bumpAp = false): Model {
     if (dragging.has(a.id)) continue;
     if (!byId[a.id]) order.push(a.id);
     const prev = byId[a.id];
-    // The attached-link fold (`link` + `linkRefs` on a NON-link kind) is
-    // model-owned, like `apVersion`: a DTO-derived re-sync knows nothing of
-    // it, so an upsert that doesn't carry `linkRefs` PRESERVES the fold.
-    // The reconciler's own refreshes pass `linkRefs` explicitly ([] to
-    // clear), which wins here.
-    const fold =
-      a.linkRefs === undefined && prev?.linkRefs?.length && a.subtype !== 'link'
-        ? { link: a.link !== undefined ? a.link : prev.link, linkRefs: prev.linkRefs }
-        : {};
     // `apVersion` is model-owned, not DTO-derived: carry it across the replace,
     // +1 when this upsert confirms an engine re-bake with new raster content.
-    byId[a.id] = { ...a, ...fold, apVersion: (prev?.apVersion ?? 0) + (bumpAp ? 1 : 0) };
+    byId[a.id] = { ...a, apVersion: (prev?.apVersion ?? 0) + (bumpAp ? 1 : 0) };
   }
   return { ...m, byId, order };
 }

@@ -47,6 +47,11 @@ export const textStyleFromProps = (p: AnnotationProps): TextStyle => ({
   textAlign: p.textAlign,
 });
 
+/** Does this kind's prop table declare `link` (attachable link)? The link
+ *  KIND itself also declares it, but stores its own `/A` instead. */
+export const kindTakesLink = (subtype: string): boolean =>
+  propsFor(subtype).some((s) => s.key === 'link');
+
 /** A geom that carries `/LE` endings: a line, or an OPEN poly (polyline). */
 const endingsGeom = (g: Geom): g is Extract<Geom, { t: 'line' } | { t: 'poly' }> =>
   g.t === 'line' || (g.t === 'poly' && !g.closed);
@@ -141,7 +146,11 @@ export function applyProps(a: Annot, patch: AnnotationPropsPatch): Annot | null 
     next = { ...next, icon: patch.icon };
   }
 
-  if (patch.link !== undefined && takes.has('link')) {
+  // Only the link KIND stores `link` (its own /A, a real wire prop). On every
+  // other kind the value lives in attached child annotations: `setProps`
+  // emits the `syncLink` intent instead of touching the model, and reads
+  // derive through the `linkOf` lens.
+  if (patch.link !== undefined && takes.has('link') && a.subtype === 'link') {
     next = { ...next, link: patch.link };
   }
 

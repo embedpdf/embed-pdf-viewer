@@ -434,6 +434,59 @@ describe('whole-document hydration', () => {
   });
 });
 
+describe('links lens — substrate children, no ledger', () => {
+  const TARGET = { kind: 'uri', uri: 'https://www.embedpdf.com/' } as const;
+  const childDTO = (n: number, parent: number): AnnotationDTO =>
+    ({
+      ...hydrationSquare(n),
+      subtype: 'link',
+      target: TARGET,
+      inReplyTo: ref(parent),
+      replyType: 'group',
+    }) as unknown as AnnotationDTO;
+
+  it('links.of derives from the committed child; a remote child delete clears it (no sweep)', async () => {
+    const h = harness();
+    h.list.mockResolvedValueOnce({ annotations: [hydrationSquare(20), childDTO(21, 20)] });
+    await h.capability.reloadPage(PON);
+    expect(h.capability.links.of(ref(20))).toEqual(TARGET);
+    // The child is substrate: never painted, never hit as itself.
+    // A remote session deletes the child → ordinary remove, lens re-derives.
+    h.capability.deliverRemoteAnnotationEvent({
+      type: 'annotation.deleted',
+      pageObjectNumber: PON,
+      deleted: { kind: 'objectNumber', value: 21 },
+      origin: { kind: 'remote', sub: 'alice' },
+      ts: Date.now(),
+    } as unknown as Parameters<typeof h.capability.deliverRemoteAnnotationEvent>[0]);
+    expect(h.capability.links.of(ref(20))).toBe(null);
+  });
+
+  it('links.set creates the grouped child and resolves when committed; clear deletes it', async () => {
+    const h = harness();
+    h.list.mockResolvedValueOnce({ annotations: [hydrationSquare(20)] });
+    await h.capability.reloadPage(PON);
+    h.create.mockResolvedValueOnce({ created: childDTO(30, 20) });
+
+    await h.capability.links.set(ref(20), TARGET);
+    // The engine write is the grouped child create…
+    expect(h.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        subtype: 'link',
+        target: TARGET,
+        inReplyTo: ref(20),
+        replyType: 'group',
+      }),
+    );
+    // …and the lens reads the NEW value the moment the promise settles.
+    expect(h.capability.links.of(ref(20))).toEqual(TARGET);
+
+    await h.capability.links.clear(ref(20));
+    expect(h.remove).toHaveBeenCalledWith(ref(30));
+    expect(h.capability.links.of(ref(20))).toBe(null);
+  });
+});
+
 describe('link nav items — attached vs standalone', () => {
   it('labels attached children so the nav layer can defer to editing', async () => {
     const h = harness();

@@ -428,6 +428,22 @@ export interface AnnotationCapability {
   /** The conversation plane's read/write surface — see {@link CommentsApi}. */
   comments: CommentsApi;
 
+  /**
+   * The attached-link lens: an annotation's link is a `/Link` CHILD grouped
+   * under it in the document (ISO-native, Acrobat-interoperable) — a
+   * PROPERTY while authoring, a nav BEHAVIOR while reading. `of` derives
+   * from the committed children (the one source of truth); `set`/`clear`
+   * resolve when the children are committed, after which `of` reflects the
+   * change. `updateSelection({ link })` remains the props-pipeline alias.
+   * On the link KIND itself, `of` reads the annotation's own `/A` target
+   * (retarget standalone links via `updateSelection`).
+   */
+  links: {
+    of(ref: AnnotationRef): PdfLinkTarget | null;
+    set(ref: AnnotationRef, target: PdfLinkTarget): Promise<void>;
+    clear(ref: AnnotationRef): Promise<void>;
+  };
+
   // ── reads (canonical engine DTOs) ──
   /** The annotation for a ref, or null if unknown / not yet committed. */
   get(ref: AnnotationRef): AnnotationDTO | null;
