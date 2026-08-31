@@ -23,6 +23,8 @@ import {
 import { InteractionToken } from '@embedpdf/plugin-interaction';
 import { SelectionToken as SelectionPublicToken } from '@embedpdf/plugin-selection';
 import {
+  effBearer,
+  effFlags,
   canMove,
   chrome as coreChrome,
   clickCreateGeom,
@@ -351,7 +353,7 @@ export function createAnnotationCapability(
     for (const id of m.order) {
       const a = m.byId[id];
       if (!a || a.pon !== pon || a.subtype !== 'link') continue;
-      if (!viewable(a.flags, false)) continue; // hidden links don't navigate
+      if (!viewable(effFlags(m, id), false)) continue; // hidden links don't navigate
       // Standalone links carry their own model `link` (/A); attached children
       // carry the target on their DTO. Rects are the CHILD's own committed
       // geometry — anchors render only in view contexts, where nothing is
@@ -359,7 +361,16 @@ export function createAnnotationCapability(
       const target =
         a.link ?? (a.data?.subtype === 'link' ? (a.data.target ?? null) : null);
       if (target == null || a.geom.t !== 'rect') continue;
-      v.push({ id, rect: a.geom.rect, target, attached: a.group !== undefined });
+      const activate = a.data?.actions?.activate;
+      const ref = a.ref ?? a.data?.ref ?? undefined;
+      v.push({
+        id,
+        rect: a.geom.rect,
+        target,
+        attached: a.group !== undefined,
+        ...(activate ? { activate } : {}),
+        ...(ref ? { ref } : {}),
+      });
     }
     linkItemsCache.set(pon, { model: m, v });
     return v;
@@ -1137,8 +1148,9 @@ export function createAnnotationCapability(
   const allowsMutation = (action: 'update' | 'delete', ref: AnnotationRef): boolean =>
     ctx.doc?.security.allowsAnnotationMutation(action, mutationTarget(ref)) ?? false;
   const deletableOne = (ref: AnnotationRef): boolean => {
-    const a = model().byId[refKey(ref)];
-    return !!a && annotDeletable(a);
+    const m = model();
+    const a = m.byId[refKey(ref)];
+    return !!a && annotDeletable(effBearer(m, a));
   };
   const threadMemberRefs = (t: CommentThread): AnnotationRef[] => [
     ...t.replies.map((r) => r.ref),
@@ -1240,8 +1252,9 @@ export function createAnnotationCapability(
         canReply: allowsCreate(),
         canSetStatus: allowsCreate(),
         canEditText: (() => {
-          const a = model().byId[refKey(ref)];
-          return !!a && annotContentsEditable(a);
+          const m = model();
+          const a = m.byId[refKey(ref)];
+          return !!a && annotContentsEditable(effBearer(m, a));
         })(),
         canDelete: deletableOne(ref),
         canDeleteThread: t !== null && threadMemberRefs(t).every(deletableOne),
@@ -1506,11 +1519,17 @@ export function createAnnotationCapability(
     } else if (fx.fx === 'syncLink') {
       void scheduleLinkSync(fx.id, { target: fx.target });
     } else {
+      const deletedId = refKey(fx.ref);
       doc
         .page(fx.ref.pageObjectNumber)
         .annotations.delete(fx.ref)
         .then(
-          () => {},
+          () => {
+            // True deletion (never a reload) forgets its session-visibility
+            // override — reloads must keep the overlay, so the generic
+            // `remove` arm deliberately does not reap it.
+            apply({ t: 'forgetSessionHidden', ids: [deletedId] });
+          },
           () => {},
         );
     }
@@ -1622,8 +1641,9 @@ export function createAnnotationCapability(
       return !!a && annotTransformable(a);
     },
     canDelete: (ref) => {
-      const a = model().byId[refKey(ref)];
-      return !!a && annotDeletable(a);
+      const m = model();
+      const a = m.byId[refKey(ref)];
+      return !!a && annotDeletable(effBearer(m, a));
     },
 
     comments,
@@ -2094,6 +2114,16 @@ export function createAnnotationCapability(
       apply({ t: 'endTextEdit' });
     },
 
+    applySessionVisibility: (entries) => {
+      const m = model();
+      const resolved: Array<{ id: string; hidden: boolean }> = [];
+      for (const { annotObjectNumber, hidden } of entries) {
+        const id = `obj:${annotObjectNumber}`;
+        if (m.byId[id]) resolved.push({ id, hidden });
+      }
+      if (resolved.length) apply({ t: 'setSessionHidden', entries: resolved });
+      return resolved.length;
+    },
     registerBehavior: (b) => {
       behaviors.push(b);
       return () => {

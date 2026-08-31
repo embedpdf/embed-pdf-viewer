@@ -1,13 +1,13 @@
 %PDF-1.7
 %‚„œ”
 1 0 obj
-<< /Type /Catalog /Pages 2 0 R >>
+<< /Type /Catalog /Pages 2 0 R /AcroForm << /Fields [18 0 R 19 0 R] /DA (/Helv 0 Tf 0 g) /DR << /Font << /Helv 20 0 R >> >> >> >>
 endobj
 2 0 obj
 << /Type /Pages /Kids [3 0 R] /Count 1 >>
 endobj
 3 0 obj
-<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Annots [4 0 R 5 0 R 6 0 R 7 0 R 8 0 R 9 0 R 10 0 R 11 0 R 12 0 R 13 0 R 14 0 R 15 0 R 16 0 R 17 0 R] >>
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Annots [4 0 R 5 0 R 6 0 R 7 0 R 8 0 R 9 0 R 10 0 R 11 0 R 12 0 R 13 0 R 14 0 R 15 0 R 16 0 R 17 0 R 18 0 R 19 0 R] >>
 endobj
 4 0 obj
 << /Type /Annot /Subtype /Square /Rect [400 700 450 750] /NM (note1) /F 4 >>
@@ -51,28 +51,40 @@ endobj
 17 0 obj
 << /Type /Annot /Subtype /Link /Rect [10 340 60 360] /NM (hide-partial) /F 4 /A << /S /Hide /T [(kept) << /Foo 1 >>] >> >>
 endobj
+18 0 obj
+<< /Type /Annot /Subtype /Widget /FT /Tx /T (note1) /Rect [400 640 500 660] /F 4 /P 3 0 R /V (hello) /DV (start) /DA (/Helv 0 Tf 0 g) >>
+endobj
+19 0 obj
+<< /Type /Annot /Subtype /Widget /FT /Tx /T (calc1) /Rect [400 600 500 620] /F 4 /P 3 0 R /V (42) /DV (0) /DA (/Helv 0 Tf 0 g) >>
+endobj
+20 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
 xref
-0 18
+0 21
 0000000000 65535 f 
 0000000015 00000 n 
-0000000064 00000 n 
-0000000121 00000 n 
-0000000294 00000 n 
-0000000386 00000 n 
-0000000527 00000 n 
-0000000678 00000 n 
-0000000803 00000 n 
-0000000942 00000 n 
-0000001066 00000 n 
-0000001213 00000 n 
-0000001341 00000 n 
-0000001470 00000 n 
-0000001597 00000 n 
-0000001737 00000 n 
-0000001970 00000 n 
-0000002086 00000 n 
+0000000160 00000 n 
+0000000217 00000 n 
+0000000404 00000 n 
+0000000496 00000 n 
+0000000637 00000 n 
+0000000788 00000 n 
+0000000913 00000 n 
+0000001052 00000 n 
+0000001176 00000 n 
+0000001323 00000 n 
+0000001451 00000 n 
+0000001580 00000 n 
+0000001707 00000 n 
+0000001847 00000 n 
+0000002080 00000 n 
+0000002196 00000 n 
+0000002335 00000 n 
+0000002488 00000 n 
+0000002634 00000 n 
 trailer
-<< /Size 18 /Root 1 0 R >>
+<< /Size 21 /Root 1 0 R >>
 startxref
-2225
+2705
 %%EOF

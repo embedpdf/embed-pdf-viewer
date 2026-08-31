@@ -13,8 +13,10 @@ import type {
   FormSetValueResult,
   FormEffectsResult,
   FormSnapshot,
+  PdfActionTargetRef,
   WidgetAppearance,
 } from '@embedpdf/engine-core/runtime';
+import type { ActionDispatchResult } from '@embedpdf/plugin-actions';
 import type {
   ScriptBudget,
   ScriptDiagnostic,
@@ -135,8 +137,13 @@ export interface FormCapability {
   choose(key: FieldKey, values: string[]): Promise<void>;
   /** Commit one originating-client value transaction, including K/V/C/F scripts when enabled. */
   commitValue(ref: FormFieldRef, value: FormFieldValue): Promise<FormCommitResult>;
-  /** Execute one widget's `/A` activation action (and `/Next`) when scripting is enabled. */
-  activateWidget(key: FieldKey, annotationRef: AnnotationRef): Promise<FormCommitResult>;
+  /**
+   * Execute one widget's `/A` activation. With the actions plugin installed
+   * the FULL tree is delegated to its dispatcher (Hide/ResetForm buttons work
+   * even with scripting off) — `kind: 'dispatched'`; without it, today's
+   * scripting-transaction path runs — `kind: 'form'`.
+   */
+  activateWidget(key: FieldKey, annotationRef: AnnotationRef): Promise<WidgetActivationResult>;
   /** Install the framework/application adapter for script-produced UI requests. */
   setUiEffectProvider(provider: FormUiEffectProvider | null): void;
   /** Restore a field to its /DV default. */
@@ -181,7 +188,48 @@ export interface FormCapability {
   canDesign(): boolean;
 }
 
-export const FormToken = createCapabilityToken<FormCapability>('form');
+/** What one widget activation did — which world handled it (see
+ *  {@link FormCapability.activateWidget}). Both framework call sites ignore
+ *  the value today; chrome that cares can discriminate on `kind`. */
+export type WidgetActivationResult =
+  | { kind: 'form'; result: FormCommitResult }
+  | { kind: 'dispatched'; result: ActionDispatchResult };
+
+/**
+ * INTERNAL host lens — plugin-to-plugin only (the actions plugin's interim
+ * `javascript` / `reset-form` executors). Import the token from
+ * `@embedpdf/plugin-form/internal`, never from application code. Phase 3's
+ * shared ScriptHost replaces `runActivationScript`.
+ */
+export interface FormHostCapability extends FormCapability {
+  /**
+   * Run ONE activation script (a single JS node from a dispatched chain) as a
+   * widget-activate transaction. Takes the SCRIPT, not the node — the
+   * dispatcher owns the `/Next` walk, and the program builder recurses into
+   * `next`, so passing a node through would re-execute descendants.
+   * `scripted: false` in the result = the controller never ran (scripting
+   * off, or no form fields to anchor the transaction on) — the caller maps
+   * that to an inert node, not a failure.
+   */
+  runActivationScript(script: string, origin?: FormFieldRef): Promise<FormCommitResult>;
+  /**
+   * Execute one ResetForm action: resolve targets against the live snapshot
+   * (`null` = every field; `exclude` = complement; a resolution yielding
+   * zero refs never reaches the engine), reset as ONE engine batch, refresh,
+   * then recalculate when scripting is enabled (Acrobat's behaviour).
+   */
+  resetFormAction(
+    fields: PdfActionTargetRef[] | null,
+    exclude: boolean,
+  ): Promise<FormCommitResult>;
+}
+
+/**
+ * The form capability token. Typed to the full {@link FormHostCapability}
+ * here (the package internals + the `/internal` entry use this view). The
+ * package root re-exports the SAME token narrowed to {@link FormCapability}.
+ */
+export const FormToken = createCapabilityToken<FormHostCapability>('form');
 
 export type { FillItem } from './core/fill-items';
 export type { Box, FieldKey } from './core/model';

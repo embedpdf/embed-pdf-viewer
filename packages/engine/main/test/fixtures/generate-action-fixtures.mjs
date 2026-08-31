@@ -15,6 +15,16 @@
 //                           ResetForm three states, Launch, GoToR, one
 //                           JavaScript→GoTo→Hide /Next chain, and one
 //                           malformed GoTo (no /D) for payload-dropped.
+//                           Plus a minimal AcroForm (text fields note1/calc1
+//                           as merged widgets) so hide-by-NAME and the
+//                           reset-include list resolve end-to-end in the
+//                           dispatcher integration tests. Conformance keys
+//                           on link /NM values and ignores the AcroForm.
+//   action_buttons_form.pdf — a small AcroForm with HIDE / SHOW / RESET /
+//                           CHAIN push buttons (mirroring the real-world 05
+//                           form's shapes) for the plugin e2e: Hide+/H false,
+//                           ResetForm include+exclude, and a
+//                           JavaScript→ResetForm→JavaScript /Next chain.
 //   open_action_dest.pdf  — a destination-form catalog /OpenAction.
 
 import { writeFileSync } from 'node:fs';
@@ -77,17 +87,73 @@ function linkAnnot(nm, rect, action) {
     linkAnnot('goto-malformed', '10 370 60 390', '<< /S /GoTo >>'),
     linkAnnot('hide-partial', '10 340 60 360', '<< /S /Hide /T [(kept) << /Foo 1 >>] >>'),
   ];
+  // A minimal AcroForm (merged field+widget dicts) so the hide-by-NAME
+  // target (note1) and the reset-include list (calc1) resolve against real
+  // fields. Appended AFTER the links so every pre-existing object number —
+  // including the hide-by-reference square at 4 — stays byte-identical.
+  const FIELD_NOTE1 = `${5 + links.length} 0 R`;
+  const FIELD_CALC1 = `${6 + links.length} 0 R`;
+  const FONT = `${7 + links.length} 0 R`;
   const annotRefs = ['4 0 R'];
   for (let i = 0; i < links.length; i++) annotRefs.push(`${5 + i} 0 R`);
+  annotRefs.push(FIELD_NOTE1, FIELD_CALC1);
 
   const objects = [
-    '<< /Type /Catalog /Pages 2 0 R >>',
+    `<< /Type /Catalog /Pages 2 0 R /AcroForm << /Fields [${FIELD_NOTE1} ${FIELD_CALC1}] ` +
+      `/DA (/Helv 0 Tf 0 g) /DR << /Font << /Helv ${FONT} >> >> >> >>`,
     '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
     `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Annots [${annotRefs.join(' ')}] >>`,
     '<< /Type /Annot /Subtype /Square /Rect [400 700 450 750] /NM (note1) /F 4 >>',
     ...links,
+    `<< /Type /Annot /Subtype /Widget /FT /Tx /T (note1) /Rect [400 640 500 660] /F 4 ` +
+      `/P ${PAGE} /V (hello) /DV (start) /DA (/Helv 0 Tf 0 g) >>`,
+    `<< /Type /Annot /Subtype /Widget /FT /Tx /T (calc1) /Rect [400 600 500 620] /F 4 ` +
+      `/P ${PAGE} /V (42) /DV (0) /DA (/Helv 0 Tf 0 g) >>`,
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
   ];
   writeFileSync(resolve(here, 'action_payloads.pdf'), buildPdf(objects));
+}
+
+// ── action_buttons_form.pdf ────────────────────────────────────────────────
+// The plugin e2e form: three text fields with distinct /V vs /DV so a reset
+// is observable, plus push buttons whose /A trees exercise the executor
+// spine WITHOUT JavaScript (hide/show/reset — the actions-≠-JS proof) and
+// one JS→ResetForm→JS chain (each script exactly once, in order).
+{
+  const PAGE = '3 0 R';
+  const fieldRefs = ['4 0 R', '5 0 R', '6 0 R', '7 0 R', '8 0 R', '9 0 R', '10 0 R'];
+  const FONT = '11 0 R';
+  const textField = (name, rect, value, defaultValue) =>
+    `<< /Type /Annot /Subtype /Widget /FT /Tx /T (${name}) /Rect [${rect}] /F 4 ` +
+    `/P ${PAGE} /V (${value}) /DV (${defaultValue}) /DA (/Helv 0 Tf 0 g) >>`;
+  const button = (name, rect, action) =>
+    `<< /Type /Annot /Subtype /Widget /FT /Btn /Ff 65536 /T (${name}) /Rect [${rect}] ` +
+    `/F 4 /P ${PAGE} /A ${action} >>`;
+  const appendLog = (letter) =>
+    `(var f = this.getField\\('log'\\); f.value = f.value + '${letter}';)`;
+
+  const objects = [
+    `<< /Type /Catalog /Pages 2 0 R /AcroForm << /Fields [${fieldRefs.join(' ')}] ` +
+      `/DA (/Helv 0 Tf 0 g) /DR << /Font << /Helv ${FONT} >> >> >> >>`,
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Annots [${fieldRefs.join(' ')}] >>`,
+    textField('alpha', '50 700 250 720', 'filled-a', 'default-a'),
+    textField('beta', '50 660 250 680', 'filled-b', 'default-b'),
+    textField('log', '50 620 250 640', '', ''),
+    button('btn-hide', '300 700 400 720', '<< /S /Hide /T [(alpha)] >>'),
+    button('btn-show', '300 660 400 680', '<< /S /Hide /T [(alpha)] /H false >>'),
+    // Exclusion: resets the COMPLEMENT of [alpha, log] — i.e. beta only.
+    button('btn-reset', '300 620 400 640', '<< /S /ResetForm /Fields [(alpha) (log)] /Flags 1 >>'),
+    button(
+      'btn-chain',
+      '300 580 400 600',
+      `<< /S /JavaScript /JS ${appendLog('A')} ` +
+        `/Next << /S /ResetForm /Fields [(alpha)] ` +
+        `/Next << /S /JavaScript /JS ${appendLog('B')} >> >> >>`,
+    ),
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+  ];
+  writeFileSync(resolve(here, 'action_buttons_form.pdf'), buildPdf(objects));
 }
 
 // ── open_action_dest.pdf ───────────────────────────────────────────────────
@@ -100,4 +166,4 @@ function linkAnnot(nm, rect, action) {
   writeFileSync(resolve(here, 'open_action_dest.pdf'), buildPdf(objects));
 }
 
-console.log('wrote action_payloads.pdf + open_action_dest.pdf');
+console.log('wrote action_payloads.pdf + action_buttons_form.pdf + open_action_dest.pdf');

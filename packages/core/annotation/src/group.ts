@@ -16,6 +16,7 @@
  */
 import { capsFor } from './kinds';
 import { annotTransformable } from './flags';
+import { effBearer } from './session';
 import { isAttachedLink } from './plane';
 import type { Annot, Id, Model } from './types';
 
@@ -40,7 +41,7 @@ export function groupCaps(m: Model, ids: Id[]): GroupCaps {
   const members = ids.map((id) => m.byId[id]).filter((a): a is NonNullable<typeof a> => !!a);
   if (members.length === 0) return { movable: false, resizable: false, rotatable: false };
   const ok = (pick: (c: ReturnType<typeof capsFor>) => boolean): boolean =>
-    members.every((a) => annotTransformable(a) && pick(capsFor(a.subtype)));
+    members.every((a) => annotTransformable(effBearer(m, a)) && pick(capsFor(a.subtype)));
   return {
     movable: ok((c) => c.groupMovable),
     resizable: ok((c) => c.groupResizable),

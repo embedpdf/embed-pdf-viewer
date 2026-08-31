@@ -1,4 +1,8 @@
 import { definePlugin } from '@embedpdf/core';
+import { ActionsToken } from '@embedpdf/plugin-actions';
+// Executor registration lives on the actions HOST capability — same runtime
+// token, wider type (the annotation-internal precedent).
+import { ActionsToken as ActionsHostToken } from '@embedpdf/plugin-actions/internal';
 import { AnnotationToken } from '@embedpdf/plugin-annotation';
 // Behavior registration lives on the HOST capability (framework/plugin
 // surface) — same runtime token, wider type.
@@ -11,7 +15,7 @@ import { createPlaceHandler } from './handler';
 import { formReducer, initialFormState } from './reducer';
 import { FORM_TOOLS, PLACE_TAGS } from './tools';
 import { FormToken } from './types';
-import type { FormAction, FormCapability, FormPluginOptions, FormState } from './types';
+import type { FormAction, FormHostCapability, FormPluginOptions, FormState } from './types';
 
 /**
  * The form plugin: the FIELD plane. Document-scoped; requires the
@@ -25,12 +29,12 @@ import type { FormAction, FormCapability, FormPluginOptions, FormState } from '.
  * widgets become ordinary editable annotations.
  */
 export const formPlugin = (options: FormPluginOptions = {}) =>
-  definePlugin<FormState, FormAction, FormCapability>({
+  definePlugin<FormState, FormAction, FormHostCapability>({
     id: 'form',
     token: FormToken,
     scope: 'document',
     requires: [InteractionToken],
-    optional: [AnnotationToken],
+    optional: [AnnotationToken, ActionsToken],
     initialState: initialFormState,
     reduce: formReducer,
     capability: (ctx) => createFormCapability(ctx, options),
@@ -93,6 +97,58 @@ export const formPlugin = (options: FormPluginOptions = {}) =>
           matches: (a) => a.subtype.startsWith('widget'),
           engaged: () => interaction.activeTool()?.enables.has('form-fill') ?? false,
         });
+      }
+
+      // ── interim Phase-1 action executors ────────────────────────────────
+      // The registry is the phasing seam: Phase 3's shared ScriptHost swaps
+      // in by re-registering 'javascript' (last-wins). Lazy self-resolution
+      // on purpose — executors run post-bringup against the kernel's
+      // memoized capability, so the closure-held scripting controller exists
+      // exactly when needed.
+      const actions = ctx.tryGet(ActionsHostToken);
+      if (actions) {
+        ctx.cleanup(
+          actions.registerExecutor('javascript', async (node, actionCtx) => {
+            if (node.type !== 'javascript') return { status: 'inert', reason: 'not a JS node' };
+            const formHost = ctx.tryGet(FormToken);
+            if (!formHost) return { status: 'inert', reason: 'form plugin unavailable' };
+            const origin =
+              actionCtx.source.kind === 'widget' ? actionCtx.source.field : undefined;
+            const result = await formHost.runActivationScript(node.script, origin);
+            // 'rejected' (a script's event.rc = false) still RAN — only a
+            // real failure fails the chain.
+            if (result.status === 'failed') {
+              return { status: 'failed', error: result.error?.message ?? 'script failed' };
+            }
+            if (!result.scripted) {
+              return {
+                status: 'inert',
+                reason: result.diagnostics[0]?.message ?? 'scripting disabled',
+              };
+            }
+            return { status: 'executed' };
+          }),
+        );
+        ctx.cleanup(
+          actions.registerExecutor('reset-form', async (node) => {
+            if (node.type !== 'reset-form') {
+              return { status: 'inert', reason: 'not a reset-form node' };
+            }
+            const formHost = ctx.tryGet(FormToken);
+            if (!formHost) return { status: 'inert', reason: 'form plugin unavailable' };
+            const result = await formHost.resetFormAction(node.fields, node.exclude);
+            if (result.status === 'failed') {
+              return { status: 'failed', error: result.error?.message ?? 'reset failed' };
+            }
+            if (result.effectsResult === null) {
+              return {
+                status: 'inert',
+                reason: result.diagnostics[0]?.message ?? 'reset-form resolved no fields',
+              };
+            }
+            return { status: 'executed' };
+          }),
+        );
       }
     },
   });

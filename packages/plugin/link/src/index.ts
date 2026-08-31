@@ -13,6 +13,7 @@
 export { linkPlugin } from './link.plugin';
 export { LinkToken } from './types';
 export type {
+  LinkActivateContext,
   LinkActivation,
   LinkActivateEvent,
   LinkCapability,

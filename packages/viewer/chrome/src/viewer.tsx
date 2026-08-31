@@ -28,6 +28,7 @@ import { feedbackPlugin, interactionPlugin, vibrationFeedback } from '@embedpdf/
 import { selectionPlugin } from '@embedpdf/react/selection';
 import { annotationPlugin } from '@embedpdf/react/annotation';
 import { redactionPlugin } from '@embedpdf/react/redaction';
+import { actionsPlugin } from '@embedpdf/react/actions';
 import { formPlugin } from '@embedpdf/react/form';
 import { linkPlugin } from '@embedpdf/react/link';
 import { searchPlugin } from '@embedpdf/react/search';
@@ -279,6 +280,10 @@ export function FullViewer({
         },
       ],
     }),
+    // The action engine: link/widget /A trees dispatch through one policy-
+    // gated executor spine (stage registers goto/named, form registers
+    // javascript/reset-form; the Shell installs the URI/Print UI adapter).
+    actionsPlugin(),
     // Forms: fillable under the default pointer/pan (widgets render as fill
     // controls), editable under the Form tab's 'form-edit' + palette tools.
     formPlugin({ scripting: { enabled: true } }),

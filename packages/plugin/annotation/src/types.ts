@@ -16,6 +16,7 @@ import type {
   CommentThread,
   PdfLinkTarget,
   PdfRect,
+  PdfActionTree,
 } from '@embedpdf/engine-core/runtime';
 import type { AnnotationToolInput, ResolvedTool } from './tools';
 import type {
@@ -214,6 +215,11 @@ export interface LinkNavItem {
    * stays selectable/movable; standalone document links navigate regardless.
    */
   attached: boolean;
+  /** The full payload-carrying `/A` tree, when one exists — the action
+   *  engine's dispatch input. `target` remains its root projection. */
+  activate?: PdfActionTree;
+  /** The annotation ref, carried for ActionSource context. */
+  ref?: AnnotationRef;
 }
 
 export interface Behavior {
@@ -949,6 +955,15 @@ export interface AnnotationHostCapability extends AnnotationCapability {
   toolSubtype(id: string): Subtype;
   // ── extension point for sibling plugins (forms, links) ──
   registerBehavior(b: Behavior): () => void;
+
+  /**
+   * The actions plane's session-visibility write (Hide actions, script
+   * `annot.hidden`): resolve annotation OBJECT NUMBERS to loaded model ids
+   * (the `obj:` refKey seam) and merge session-hidden overrides. Returns how
+   * many resolved — unresolved numbers (unloaded pages, nm/index refs) are
+   * the caller's diagnostics. Session state only; never an engine write.
+   */
+  applySessionVisibility(entries: Array<{ annotObjectNumber: number; hidden: boolean }>): number;
 }
 
 /**

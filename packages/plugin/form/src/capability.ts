@@ -6,9 +6,13 @@ import {
   type FormFieldPatch,
   type FormFieldRef,
   type FormFieldValue,
+  type FormSnapshot,
+  type PdfActionTargetRef,
+  type PdfActionTree,
   type PdfRect,
 } from '@embedpdf/engine-core/runtime';
 import type { PluginContext } from '@embedpdf/core';
+import { ActionsToken } from '@embedpdf/plugin-actions';
 import { AnnotationToken as AnnotationHostToken } from '@embedpdf/plugin-annotation/internal';
 
 import {
@@ -29,13 +33,14 @@ import { createSerialMutationQueue } from './mutationQueue';
 import { createFormScriptingController } from './scripting';
 import type {
   FormAction,
-  FormCapability,
   FormCommitResult,
+  FormHostCapability,
   FormPluginOptions,
   FormState,
   FormUiEffectProvider,
   PlacedField,
   PlaceFieldInput,
+  WidgetActivationResult,
 } from './types';
 
 /** PDF user-space rect (y-up) → content-space box (y-down, crop-relative). */
@@ -68,7 +73,7 @@ const sameAnnotationRef = (left: AnnotationRef, right: AnnotationRef): boolean =
 export function createFormCapability(
   ctx: PluginContext<FormState, FormAction>,
   options: FormPluginOptions = {},
-): FormCapability {
+): FormHostCapability {
   const model = (): Model => ctx.getState().model;
   const apply = (msg: Msg): void => {
     ctx.dispatch({ type: 'SET_MODEL', model: update(model(), msg) });
@@ -320,6 +325,160 @@ export function createFormCapability(
     return result;
   };
 
+  // ── action-executor doors (host lens) ───────────────────────────────────
+  // Both ride enqueueMutation: an actions-driven form mutation must never
+  // interleave with a user's in-flight commit. The direction is always
+  // actions queue → form queue — the delegated activateWidget below never
+  // enters the form queue, so these can (no self-deadlock).
+
+  const NOT_SCRIPTED: FormCommitResult = {
+    status: 'unchanged',
+    scripted: false,
+    effectsResult: null,
+    uiEffects: [],
+    diagnostics: [],
+  };
+
+  const snapshotHasField = (snapshot: FormSnapshot, ref: FormFieldRef): boolean =>
+    snapshot.fields.some((f) =>
+      ref.kind === 'objectNumber'
+        ? f.ref.kind === 'objectNumber' && f.ref.fieldObjectNumber === ref.fieldObjectNumber
+        : f.name === ref.name,
+    );
+
+  const runActivationScript = (
+    script: string,
+    origin?: FormFieldRef,
+  ): Promise<FormCommitResult> =>
+    enqueueMutation(async () => {
+      const doc = ctx.doc;
+      if (!doc) throw new Error('no document');
+      if (!scripting) return NOT_SCRIPTED;
+      const snapshot = await doc.forms.list();
+      // No dispatch origin (a JS link): anchor on the recalculate() target —
+      // first live /CO field, else the first field. A zero-field document
+      // can't host the widget transaction at all: the honest Phase-1
+      // limitation, lifted by Phase 3's shared ScriptHost.
+      const anchor =
+        origin ??
+        snapshot.calculationOrder.find(
+          (ref): ref is FormFieldRef => ref !== null && snapshotHasField(snapshot, ref),
+        ) ??
+        snapshot.fields[0]?.ref;
+      if (!anchor) {
+        const result: FormCommitResult = {
+          ...NOT_SCRIPTED,
+          diagnostics: [
+            {
+              code: 'unsupported-api',
+              message:
+                'activation script skipped: no form fields to anchor the transaction on',
+            },
+          ],
+        };
+        surfaceScriptingResult(result);
+        return result;
+      }
+      // A LEAF tree on purpose: the dispatcher owns the /Next walk, and the
+      // program builder recurses into `next` — a real node here would
+      // re-execute its descendants.
+      const tree: PdfActionTree = {
+        root: { type: 'javascript', subtype: 'JavaScript', script, next: [] },
+        incomplete: false,
+        warningFlags: 0,
+        warnings: [],
+      };
+      const result = await scripting.activate(snapshot, anchor, tree);
+      surfaceScriptingResult(result);
+      if (result.effectsResult !== null) await refresh(true);
+      return result;
+    });
+
+  const resetFormAction = (
+    targets: PdfActionTargetRef[] | null,
+    exclude: boolean,
+  ): Promise<FormCommitResult> =>
+    enqueueMutation(async () => {
+      const doc = ctx.doc;
+      if (!doc) throw new Error('no document');
+      if (!doc.forms.applyEffects) {
+        const result: FormCommitResult = {
+          ...NOT_SCRIPTED,
+          diagnostics: [
+            { code: 'unsupported-api', message: 'this engine has no form-effects batch door' },
+          ],
+        };
+        surfaceScriptingResult(result);
+        return result;
+      }
+      const snapshot = await doc.forms.list();
+      const all = snapshot.fields;
+      let resolved: typeof all;
+      if (targets === null) {
+        // `/Fields` absent → reset everything; `exclude` is meaningless.
+        resolved = all;
+      } else {
+        const matched = new Set(
+          targets
+            .map((t) =>
+              t.kind === 'name'
+                ? all.find((f) => f.name === t.name)
+                : all.find(
+                    (f) =>
+                      f.ref.kind === 'objectNumber' &&
+                      f.ref.fieldObjectNumber === t.objectNumber,
+                  ),
+            )
+            .filter((f): f is (typeof all)[number] => f !== undefined),
+        );
+        resolved = exclude ? all.filter((f) => !matched.has(f)) : all.filter((f) => matched.has(f));
+      }
+      // ResetForm SKIPS fields with nothing to restore — the engine's batch
+      // applier refuses pushbutton/signature refs outright (validateEffect),
+      // and an exclude-mode complement always sweeps in the form's buttons.
+      const resettable = resolved.filter(
+        (f) => f.family !== 'pushbutton' && f.family !== 'signature',
+      );
+      // Zero refs must NEVER reach the engine (the applier throws InvalidArg
+      // on an empty reset) — `[] + include` is a valid action that resets
+      // nothing. `effectsResult: null` tells the executor this was inert.
+      if (resettable.length === 0) return NOT_SCRIPTED;
+      const effectsResult = await doc.forms.applyEffects([
+        { kind: 'reset', refs: resettable.map((f) => f.ref) },
+      ]);
+      // The batch is non-rollback-atomic and resolves with per-effect
+      // statuses instead of throwing — reflect a rejected/failed reset
+      // honestly (the executor maps 'failed' to a failed chain node).
+      const resetFailed = effectsResult.results.some(
+        (entry) => entry.status === 'failed' || entry.status === 'rejected',
+      );
+      await refresh(true);
+      if (resetFailed) {
+        return {
+          status: 'failed',
+          scripted: false,
+          effectsResult,
+          uiEffects: [],
+          diagnostics: [],
+        };
+      }
+      // Acrobat recalculates after a reset; boot rides along lazily.
+      let recalc: FormCommitResult | null = null;
+      if (scripting) {
+        recalc = await scripting.recalculate(await doc.forms.list());
+        surfaceScriptingResult(recalc);
+        if (recalc.effectsResult !== null) await refresh(true);
+      }
+      return {
+        status: 'applied',
+        scripted: recalc !== null,
+        effectsResult,
+        uiEffects: recalc?.uiEffects ?? [],
+        diagnostics: recalc?.diagnostics ?? [],
+        ...(recalc?.error ? { error: recalc.error } : {}),
+      };
+    });
+
   const nudgeAnnotations = (pons: Iterable<number>): void => {
     if (!annotationHost) return;
     for (const pon of new Set(pons)) void annotationHost.reloadPage(pon);
@@ -469,11 +628,39 @@ export function createFormCapability(
       });
     },
     commitValue: (ref, value) => enqueueMutation(() => commitValueNow(ref, value)),
-    activateWidget: (key, annotationRef) =>
-      enqueueMutation(() => activateWidgetNow(key, annotationRef)),
+    activateWidget: async (key, annotationRef): Promise<WidgetActivationResult> => {
+      // Delegated path: the ACTIONS queue is the serializer — entering the
+      // form queue here would deadlock the executors it calls back into
+      // (queue-direction law: actions → form, never form → actions → form).
+      // No scripting gate on purpose: Hide/ResetForm buttons must work with
+      // JS off — per-type policy lives in the dispatcher now.
+      const actions = ctx.tryGet(ActionsToken);
+      if (actions) {
+        const tree = await annotationActivation(annotationRef);
+        if (tree?.root) {
+          const result = await actions.execute(tree, {
+            origin: 'user',
+            source: {
+              kind: 'widget',
+              field: refKeyOf(key),
+              annotation: annotationRef,
+              pon: annotationRef.pageObjectNumber,
+            },
+          });
+          return { kind: 'dispatched', result };
+        }
+      }
+      return {
+        kind: 'form',
+        result: await enqueueMutation(() => activateWidgetNow(key, annotationRef)),
+      };
+    },
     setUiEffectProvider: (provider) => {
       uiEffectProvider = provider;
     },
+    // Host lens (the actions plugin's executors) — see FormHostCapability.
+    runActivationScript,
+    resetFormAction,
     setValue: (ref, value) =>
       enqueueMutation(async () => {
         const doc = ctx.doc;

@@ -9,6 +9,8 @@ export * from './selection';
 export * from './annotation';
 export * from './annotation-menu';
 export * from './link';
+export { useActionsUiAdapter } from './actions';
+export type { ActionsUiHandlers } from './actions';
 export * from './views';
 export * from './page-edit';
 export * from './metadata';

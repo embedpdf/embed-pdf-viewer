@@ -16,6 +16,7 @@ import { useEffect } from 'react';
 import { InteractionToken } from '@embedpdf/plugin-interaction';
 import {
   LinkToken,
+  type LinkActivateContext,
   type LinkActivation,
   type LinkCapability,
   type LinkNavItem,
@@ -40,12 +41,18 @@ import type { PageContextValue } from './runtime';
  * anchors below, the selection menu's "Open link", the style editor's "Go to
  * link" — goes through here, so none of them can drop the uri outcome again.
  */
-export function openLinkTarget(link: LinkCapability, target: PdfLinkTarget): LinkActivation {
-  const activation = link.activate(target);
+export function openLinkTarget(
+  link: LinkCapability,
+  target: PdfLinkTarget,
+  context?: LinkActivateContext,
+): LinkActivation {
+  const activation = link.activate(target, context);
   if (activation.outcome === 'uri') {
     const href = sanitizeExternalUri(activation.uri);
     if (href && typeof window !== 'undefined') window.open(href, '_blank', 'noopener,noreferrer');
   }
+  // 'dispatched': the action engine took it — the actions UI adapter owns any
+  // URI open (the no-double-open rule); this opener must do NOTHING.
   return activation;
 }
 
@@ -112,9 +119,14 @@ export function LinkLayer({ renderLink }: LinkLayerProps = {}) {
     <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
       {visible.map((item) => {
         const box = boxOf(item, page);
-        // Real href ONLY for sanitized external URIs; blocked schemes and
-        // internal targets activate through the plugin instead.
-        const href = item.target.kind === 'uri' ? sanitizeExternalUri(item.target.uri) : null;
+        // Real href ONLY for a chain-free sanitized external URI; blocked
+        // schemes, internal targets, and chain-bearing trees (/Next after the
+        // URI) activate through the plugin instead — a native navigation
+        // would perform the first action and silently drop the rest.
+        const chained = (item.activate?.root?.next.length ?? 0) > 0;
+        const href =
+          item.target.kind === 'uri' && !chained ? sanitizeExternalUri(item.target.uri) : null;
+        const context: LinkActivateContext = { activate: item.activate, ref: item.ref, pon: page.pon };
         const native = (
           <a
             href={href ?? undefined}
@@ -136,12 +148,12 @@ export function LinkLayer({ renderLink }: LinkLayerProps = {}) {
               // clicking a URL link did nothing at all).
               if (href) return;
               e.preventDefault();
-              openLinkTarget(link, item.target);
+              openLinkTarget(link, item.target, context);
             }}
             onKeyDown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();
-                openLinkTarget(link, item.target);
+                openLinkTarget(link, item.target, context);
               }
             }}
             // Keep the hub out of it: a down inside the anchor must not reach

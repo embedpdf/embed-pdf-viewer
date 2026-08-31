@@ -28,6 +28,7 @@ import { groupCaps } from './group';
 import { isSelectable, paintOrder } from './hit';
 import { capsFor } from './kinds';
 import { annotTransformable, viewable } from './flags';
+import { effBearer, effFlags } from './session';
 import {
   anchoredBox,
   anchoredGeom,
@@ -295,7 +296,7 @@ export function textBoxes(m: Model, pon: number, view?: ViewEnv): TextBox[] {
   for (const id of m.order) {
     const a = m.byId[id];
     if (a.pon !== pon || a.geom.t !== 'text') continue;
-    if (!viewable(a.flags, m.selected.includes(id))) continue; // `/F`-hidden
+    if (!viewable(effFlags(m, id), m.selected.includes(id))) continue; // `/F`-hidden
     if (!textIsLive(m, id)) continue; // baked → rendered as the /AP image instead
     const g = effGeom(m, id, view);
     if (g.t !== 'text') continue;
@@ -378,7 +379,7 @@ function placeSelectionKnob(
     // (`noRotate` only exempts it from the page's rotation). The obb takes
     // the PROJECTED stroke width (`effStyle`) — with the raw width, the knob
     // drifts off the outline as zoom grows.
-    if (!capsFor(a.subtype).rotatable || !annotTransformable(a)) return null;
+    if (!capsFor(a.subtype).rotatable || !annotTransformable(effBearer(m, a))) return null;
     const obb = obbFromGeom(geomOf(sel[0]), effStyle(a, view).strokeWidth, a.style.border);
     return obb ? placeRotateKnob(obb.corners, knobOffset, pageBox) : null;
   }
@@ -500,7 +501,7 @@ export function chrome(
     // them. `geomHandles` already places them on the rotated box; `rot`
     // additionally tilts each handle GLYPH so it rides the box's orientation.
     // Suppressed during a live rotate (`rd`) — guides own that mode.
-    if (!rd && annotTransformable(a) && (caps.resizable || caps.vertexEditable)) {
+    if (!rd && annotTransformable(effBearer(m, a)) && (caps.resizable || caps.vertexEditable)) {
       for (const h of geomHandles(g))
         nodes.push({ kind: 'handle', at: h.at, cursor: h.cursor, ...(rot ? { rot } : {}) });
     }

@@ -1,5 +1,16 @@
+import type { CapabilityToken } from '@embedpdf/core';
+
+import { FormToken as FormHostToken } from './types';
+import type { FormCapability } from './types';
+
 export { formPlugin } from './form.plugin';
-export { FormToken } from './types';
+/**
+ * App-facing form token: resolves the public {@link FormCapability}. It is
+ * the SAME runtime token the plugin provides, narrowed to the public lens —
+ * the plugin-to-plugin surface (action executors) is reachable only via
+ * `@embedpdf/plugin-form/internal`.
+ */
+export const FormToken = FormHostToken as unknown as CapabilityToken<FormCapability>;
 export type {
   Box,
   FieldKey,
@@ -15,6 +26,7 @@ export type {
   FormUiEffectProvider,
   PlacedField,
   PlaceFieldInput,
+  WidgetActivationResult,
 } from './types';
 export { createFormScriptingController, FormScriptingController } from './scripting';
 export { createSerialMutationQueue } from './mutationQueue';

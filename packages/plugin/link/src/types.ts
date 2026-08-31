@@ -1,5 +1,11 @@
 import { createCapabilityToken, type PageObjectNumber } from '@embedpdf/core';
-import type { PdfDestination, PdfLinkTarget } from '@embedpdf/engine-core/runtime';
+import type {
+  AnnotationRef,
+  PdfActionTree,
+  PdfDestination,
+  PdfLinkTarget,
+} from '@embedpdf/engine-core/runtime';
+import type { ActionDispatchResult } from '@embedpdf/plugin-actions';
 import type { LinkNavItem } from '@embedpdf/plugin-annotation';
 
 export type { LinkNavItem };
@@ -22,7 +28,22 @@ export type LinkActivation =
   | { outcome: 'uri'; uri: string }
   | { outcome: 'named'; name: string }
   | { outcome: 'reported'; target: PdfLinkTarget }
+  /** The action engine took the activation (full payload tree, mixed /Next
+   *  chains included). `dispatch` is the in-flight result; the framework
+   *  opener must do NOTHING for this outcome — the actions UI adapter owns
+   *  any URI open (the no-double-open rule). */
+  | { outcome: 'dispatched'; dispatch: Promise<ActionDispatchResult> }
   | { outcome: 'none' };
+
+/** Optional activation context: the payload-carrying /A tree (and its
+ *  annotation identity) from the LinkNavItem, enabling action-engine
+ *  delegation. Without it — or without the actions plugin — activation
+ *  follows the classic root-projection path. */
+export interface LinkActivateContext {
+  activate?: PdfActionTree;
+  ref?: AnnotationRef;
+  pon?: PageObjectNumber;
+}
 
 export interface LinkActivateEvent {
   target: PdfLinkTarget;
@@ -52,7 +73,7 @@ export interface LinkCapability {
    *  owns them and the LinkLayer stands down. */
   engaged(): boolean;
   /** THE one activation entry point (framework layers call it on click). */
-  activate(target: PdfLinkTarget): LinkActivation;
+  activate(target: PdfLinkTarget, context?: LinkActivateContext): LinkActivation;
 }
 
 /** Engine-backed page cache (viewer-only deployments). */

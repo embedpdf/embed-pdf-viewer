@@ -32,6 +32,7 @@ import { SelectionClipboard, SelectionHandles, SelectionLayer } from '@embedpdf/
 import { AnnotationLayer, useFilePickerProvider } from '@embedpdf/react/annotation';
 import { LinkLayer } from '@embedpdf/react/link';
 import type { AnnotationRenderer } from '@embedpdf/react/annotation';
+import { useActionsUiAdapter } from '@embedpdf/react/actions';
 import { formWidgetRenderer, useFormScriptingProvider } from '@embedpdf/react/form';
 import { SearchLayer } from '@embedpdf/react/search';
 import { useCommandShortcuts } from '@embedpdf/react/commands';
@@ -115,6 +116,9 @@ export function Shell() {
   // Form scripts stay inside the isolated form pipeline; this hook fulfils the
   // resulting alert, page-navigation, and print UI requests in the React shell.
   useFormScriptingProvider();
+  // The action dispatcher's UI port: policy-approved URI opens (sanitized,
+  // new tab) and Named `Print` land here.
+  useActionsUiAdapter();
   const schema = useChromeSchema();
 
   // The FRAME: region arrangement & visibility from the chrome value (see

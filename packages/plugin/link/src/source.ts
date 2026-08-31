@@ -36,6 +36,8 @@ export function loadLinksPage(io: LinkSourceIO, pon: number): void {
                 : `idx:${pon}:${dto.index}`,
             rect: pdfToContentRect(dto.rect, crop),
             target: dto.target,
+            ...(dto.actions?.activate ? { activate: dto.actions.activate } : {}),
+            ref: dto.ref,
             // A `/RT /Group` child riding another annotation — labeled so the
             // nav layer can defer to editing (moot in viewer-only deployments,
             // but the item contract stays truthful either way).

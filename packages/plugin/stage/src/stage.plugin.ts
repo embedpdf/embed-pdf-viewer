@@ -1,6 +1,9 @@
 import { definePlugin } from '@embedpdf/core';
 import type { CapabilityToken } from '@embedpdf/core';
+import { ActionsToken as PublicActionsToken } from '@embedpdf/plugin-actions';
+import { ActionsToken as ActionsHostToken } from '@embedpdf/plugin-actions/internal';
 import { createStageCapability } from './capability';
+import { destinationToReveal } from './destination';
 import { registerStageEffects } from './effects';
 import { initialStageState, stageReducer } from './reducer';
 import { StageToken } from './types';
@@ -38,6 +41,7 @@ export const stagePlugin = (options: StagePluginOptions = {}) => {
     id,
     token,
     scope: 'document', // one instance of THIS lens per open document
+    optional: [PublicActionsToken],
     initialState: () => initialStageState(config),
     reduce: stageReducer,
     capability: (ctx) => createStageCapability(ctx, config),
@@ -52,5 +56,54 @@ export const stagePlugin = (options: StagePluginOptions = {}) => {
     // by priority. The one effect below is STEADY-STATE — it re-fits when the
     // page registry mutates (rotate/move/delete) and so has no such race.
     effects: (ctx) => registerStageEffects(ctx, token),
+    init: (ctx) => {
+      // Navigation executors for the action engine — registered by the
+      // DEFAULT lens only (a thumbnail lens must never win the last-wins
+      // registry and start navigating the sidebar). Executor bodies resolve
+      // the stage capability at CALL time; the dispatcher invokes them as
+      // DEFERRED navigation effects, never mid-walk.
+      if (id !== 'stage') return;
+      const actions = ctx.tryGet(ActionsHostToken);
+      if (!actions) return;
+      ctx.cleanup(
+        actions.registerExecutor('goto', (node) => {
+          if (node.type !== 'goto') return { status: 'inert', reason: 'not a goto node' };
+          const stage = ctx.tryGet(token);
+          const layout = ctx
+            .document()
+            ?.pages.find((p) => p.pageObjectNumber === node.destination.pageObjectNumber);
+          if (!stage || !layout) {
+            return { status: 'failed', error: 'no stage or destination page available' };
+          }
+          const { pageIndex, options: reveal } = destinationToReveal(node.destination, layout);
+          stage.reveal(pageIndex, { ...reveal, behavior: 'smooth' });
+          return { status: 'executed' };
+        }),
+      );
+      ctx.cleanup(
+        actions.registerExecutor('named', (node) => {
+          if (node.type !== 'named') return { status: 'inert', reason: 'not a named node' };
+          const stage = ctx.tryGet(token);
+          if (!stage) return { status: 'failed', error: 'no stage available' };
+          // Page verbs only — the dispatcher owns /N Print (policy + adapter).
+          switch (node.name) {
+            case 'NextPage':
+              stage.next({ behavior: 'smooth' });
+              return { status: 'executed' };
+            case 'PrevPage':
+              stage.prev({ behavior: 'smooth' });
+              return { status: 'executed' };
+            case 'FirstPage':
+              stage.goToPage(0, { behavior: 'smooth' });
+              return { status: 'executed' };
+            case 'LastPage':
+              stage.goToPage(Math.max(0, stage.pageCount() - 1), { behavior: 'smooth' });
+              return { status: 'executed' };
+            default:
+              return { status: 'inert', reason: `unknown named action '${node.name}'` };
+          }
+        }),
+      );
+    },
   });
 };

@@ -2,11 +2,13 @@ import type { PluginContext } from '@embedpdf/core';
 import type { PdfLinkTarget } from '@embedpdf/engine-core/runtime';
 import { InteractionToken } from '@embedpdf/plugin-interaction';
 import { destinationToReveal, StageToken } from '@embedpdf/plugin-stage';
+import { ActionsToken } from '@embedpdf/plugin-actions';
 // The host lens (linkItemsOn) — same runtime token as the public one.
 import { AnnotationToken as AnnotationHostToken } from '@embedpdf/plugin-annotation/internal';
 import { loadLinksPage } from './source';
 import type {
   LinkAction,
+  LinkActivateContext,
   LinkActivation,
   LinkCapability,
   LinkNavItem,
@@ -29,8 +31,20 @@ export function createLinkCapability(
 ): LinkCapability {
   const anno = () => ctx.tryGet(AnnotationHostToken);
 
-  const activate = (target: PdfLinkTarget): LinkActivation => {
+  const activate = (target: PdfLinkTarget, context?: LinkActivateContext): LinkActivation => {
     const activation = ((): LinkActivation => {
+      // The action engine takes precedence when it is installed and the item
+      // carries its payload tree: named verbs execute, mixed /Next chains
+      // run, and the dispatcher enforces policy + the incomplete-tree law.
+      // Without it, the classic root-projection path below is the fallback.
+      const actions = ctx.tryGet(ActionsToken);
+      if (actions && context?.activate) {
+        const dispatch = actions.execute(context.activate, {
+          origin: 'user',
+          source: { kind: 'link', annotation: context.ref, pon: context.pon },
+        });
+        return { outcome: 'dispatched', dispatch };
+      }
       switch (target.kind) {
         case 'goto': {
           const stage = ctx.tryGet(StageToken);

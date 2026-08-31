@@ -13,6 +13,7 @@ import { capsFor, isMarkup } from './kinds';
 import { groupCaps } from './group';
 import { isSubstrateOnly } from './plane';
 import { annotInteractive, annotTransformable, viewable } from './flags';
+import { effBearer, effFlags } from './session';
 import { anchoredGeom, anchoredStrokeWidth, anchorModeOf, type ViewEnv } from './anchor';
 import {
   type Annot,
@@ -49,7 +50,7 @@ export function paintOrder(m: Model, pon: number): Id[] {
   for (const id of m.order) {
     const a = m.byId[id];
     if (!a || a.pon !== pon) continue;
-    if (!viewable(a.flags, m.selected.includes(id))) continue;
+    if (!viewable(effFlags(m, id), m.selected.includes(id))) continue;
     if (isSubstrateOnly(a)) continue;
     (isMarkup(a.subtype) ? markup : other).push(id);
   }
@@ -61,7 +62,7 @@ export function paintOrder(m: Model, pon: number): Id[] {
  *  just won't transform.) */
 export const isSelectable = (m: Model, id: Id): boolean => {
   const a = m.byId[id];
-  return !!a && annotInteractive(a) && capsFor(a.subtype).selectable;
+  return !!a && annotInteractive(effBearer(m, a)) && capsFor(a.subtype).selectable;
 };
 
 /** An anchored kind's QUAD geometry is bound to underlying text — never moved
@@ -74,15 +75,15 @@ const textBound = (a: Annot): boolean => capsFor(a.subtype).anchored && a.geom.t
 /** Can this annotation be dragged by its body to move? (`locked` freezes it.) */
 export const canMove = (m: Model, id: Id): boolean => {
   const a = m.byId[id];
-  return !!a && annotTransformable(a) && capsFor(a.subtype).movable && !textBound(a);
+  return !!a && annotTransformable(effBearer(m, a)) && capsFor(a.subtype).movable && !textBound(a);
 };
 
 /** Does this kind expose drag handles (box resize OR per-vertex)? Only
  *  `locked` (and inert `/F` states) suppress them at runtime — a
  *  screen-anchored body keeps its handles: `noZoom`/`noRotate` exempt it from
  *  the display transform, they don't freeze its size or vertices. */
-const hasHandles = (a: Annot): boolean => {
-  if (!annotTransformable(a) || textBound(a)) return false;
+const hasHandles = (m: Model, a: Annot): boolean => {
+  if (!annotTransformable(effBearer(m, a)) || textBound(a)) return false;
   const c = capsFor(a.subtype);
   return c.resizable || c.vertexEditable;
 };
@@ -172,7 +173,7 @@ export function hitTest(
       // gesture edits its authored tilt; `noRotate` only exempts it from the
       // PAGE's rotation). Locked suppresses it. `placeRotateKnob` keeps it
       // inside `pageBox`.
-      if (capsFor(a.subtype).rotatable && annotTransformable(a)) {
+      if (capsFor(a.subtype).rotatable && annotTransformable(effBearer(m, a))) {
         const hg = hitGeomOf(a, view);
         const obb = obbFromGeom(hg, hitStrokeOf(a, view), a.style.border);
         if (obb) {
@@ -191,7 +192,7 @@ export function hitTest(
           }
         }
       }
-      if (hasHandles(a)) {
+      if (hasHandles(m, a)) {
         // Handles live on the PROJECTED geometry — the handle gesture then
         // runs entirely in view space (see the `handle` draft).
         for (const h of geomHandles(hitGeomOf(a, view))) {

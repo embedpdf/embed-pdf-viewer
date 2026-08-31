@@ -1,6 +1,8 @@
 import { definePlugin } from '@embedpdf/core';
 import { InteractionToken } from '@embedpdf/plugin-interaction';
 import { SelectionToken } from '@embedpdf/plugin-selection/internal';
+import { ActionsToken as PublicActionsToken } from '@embedpdf/plugin-actions';
+import { ActionsToken as ActionsHostToken } from '@embedpdf/plugin-actions/internal';
 import { createAnnotationCapability } from './capability';
 import { registerAnnotationEffects } from './effects';
 import {
@@ -32,7 +34,7 @@ export const annotationPlugin = (config: AnnotationConfig = {}) =>
     token: AnnotationToken,
     scope: 'document',
     requires: [InteractionToken],
-    optional: [SelectionToken],
+    optional: [SelectionToken, PublicActionsToken],
     initialState: () => initialAnnotationState(config),
     reduce: annotationReducer,
     // The capability owns the resolved tool registry (built-ins + config `tools`),
@@ -44,6 +46,21 @@ export const annotationPlugin = (config: AnnotationConfig = {}) =>
       const interaction = ctx.get(InteractionToken);
       const annotation = ctx.get(AnnotationToken);
       const selection = ctx.tryGet(SelectionToken);
+
+      // The actions plane's session-visibility door (Hide actions,
+      // `annot.hidden`): resolve annotation object numbers to loaded model
+      // ids (the `obj:` refKey seam — O(1), cross-page) and write the
+      // session overlay. Session state only — never an engine write.
+      const actions = ctx.tryGet(ActionsHostToken);
+      if (actions) {
+        ctx.cleanup(
+          actions.registerSessionSink({
+            applyVisibility(entries) {
+              return annotation.applySessionVisibility(entries);
+            },
+          }),
+        );
+      }
 
       // Register every resolved tool (shapes, lines, ink, free-text, markup, stamp,
       // plus anything the embedder added via config `tools`) and seed its defaults.
