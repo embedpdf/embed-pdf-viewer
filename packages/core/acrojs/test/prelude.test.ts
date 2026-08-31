@@ -312,7 +312,7 @@ describe('AcroJS prelude', () => {
           subtype: 'JavaScript',
           script: 'root();',
           next: [
-            { type: 'uri', subtype: 'URI', next: [] },
+            { type: 'uri', subtype: 'URI', uri: 'https://example.test/', isMap: false, next: [] },
             {
               type: 'javascript',
               subtype: 'JavaScript',

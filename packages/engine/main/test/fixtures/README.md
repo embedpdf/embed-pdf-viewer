@@ -43,3 +43,25 @@ cd packages/engine/runtime/runtime-src/testing/resources && cp \
 
 If the vendored list keeps growing, replace the manual copy with a sync
 script instead of adding more entries here.
+
+## Generated action-payload fixtures
+
+`action_payloads.pdf` and `open_action_dest.pdf` are authored in-repo by a
+committed deterministic generator (no dates, no randomness — byte-stable
+output, so diffs are reviewable):
+
+```bash
+node packages/engine/main/test/fixtures/generate-action-fixtures.mjs
+```
+
+`action_payloads.pdf` is one page of `/NM`-keyed link annotations carrying
+every executable action-payload shape: GoTo `/FitR`, URI + `/IsMap`, Named,
+Hide (an array mixing a field-name string with an indirect annotation
+reference plus `/H false`; a scalar `/T`; and a partial list poisoned by a
+direct inline dictionary), the ResetForm three states (`/Fields` absent /
+empty / non-empty with `/Flags 1`), Launch, GoToR, one
+JavaScript → GoTo → Hide `/Next` chain, and one malformed GoTo (no `/D`).
+`open_action_dest.pdf` carries a destination-form catalog `/OpenAction`.
+Both are single-page with a correct `/Count` so the cloud suite needs no
+byte patching. Edit the generator, re-run it, and commit both the script
+and the regenerated PDFs together.

@@ -1,39 +1,29 @@
 import type {
   AnnotationBase,
   LinkAnnotationDTO,
+  PdfActionTree,
   PdfLinkTarget,
 } from '@embedpdf/engine-core/runtime';
-import {
-  NULL_PTR,
-  type PdfFunctions,
-  type PdfRuntimeMemory,
-  type Ptr,
-} from '@embedpdf/engine-runtime';
+import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
-import { readUtf8String } from '../../../../runtime/memory/strings';
-import {
-  ANNOT_ACTION_ACTIVATE,
-  actionTypeFromCode,
-  isValidActionNodeId,
-} from '../../../actions/ActionModelReader';
+import { readDestination } from '../../../destinations/readDestination';
 import type { AnnotationReadContext } from './annotationReadContext';
-import { readDestination } from './readDestination';
 
 /**
  * Link reader: rect/flags/relationship ride the base (a link grouped to an
  * annotation is plain `inReplyTo` + `replyType: 'group'`); this module only
  * materialises the normalized target.
  *
- * ONE truth, two views: the target is projected off the SAME fork action
- * model the scripting plane reads (`base.actions`) — root classification
- * via the full `EPDF_ACTION_TYPE_*` vocabulary, payloads via the on-demand
- * node getters. The classic `FPDFAction_*` surface (5 types, JavaScript-
- * and Named-blind) is deliberately not consulted; `FPDFLink_GetDest`
- * remains only for the data-only direct `/Dest`, which is not an action.
+ * ONE truth, one projection: the target is a pure function of the SAME
+ * payload-carrying action tree the scripting plane reads
+ * (`base.actions.activate`) — no second native read exists any more, so the
+ * two action-shaped surfaces cannot drift by construction.
  *
- * `/A` wins over `/Dest` — the spec forbids carrying both, and when a
- * malformed file has both, Acrobat gives the action precedence. (Our own
- * writes can't produce that state: `EPDFAnnot_SetAction` strips `/Dest`.)
+ * `/A` precedence, pinned: an activate action that exists but cannot be
+ * executed (an `incomplete` tree, a degraded/unreadable root) projects
+ * `unsupported` — a broken action is a dead link, never an invitation to
+ * guess. The direct `/Dest` (which is data, not an action) is consulted
+ * ONLY when no `/A` exists at all.
  */
 export function readLink(
   fn: PdfFunctions,
@@ -43,82 +33,56 @@ export function readLink(
   _rawSubtypeCode: number,
   ctx: AnnotationReadContext,
 ): LinkAnnotationDTO {
-  return { ...base, subtype: 'link', target: readLinkTarget(fn, mem, annotPtr, ctx) };
+  return { ...base, subtype: 'link', target: readLinkTarget(fn, mem, annotPtr, base, ctx) };
+}
+
+/**
+ * Project the navigation view from a payload-carrying activate tree. Pure —
+ * shared with any consumer that wants the root-level navigation reading of a
+ * tree (the link plugin's no-actions-plugin fallback uses the same law).
+ */
+export function linkTargetFromActionTree(tree: PdfActionTree): PdfLinkTarget | null {
+  // The law, enforced at the projection too: never execute — not even
+  // navigate the root of — a tree marked incomplete.
+  if (tree.incomplete) return { kind: 'unsupported' };
+  const root = tree.root;
+  if (!root) return { kind: 'unsupported' };
+  switch (root.type) {
+    case 'goto':
+      return { kind: 'goto', destination: root.destination };
+    case 'uri':
+      return { kind: 'uri', uri: root.uri };
+    // Reported, never followed/executed (and never writable — see the DTO).
+    case 'goto-remote':
+      return { kind: 'goto-remote', file: root.filePath };
+    case 'launch':
+      return { kind: 'launch', path: root.filePath };
+    case 'javascript':
+      // No script payload here by design: the text rides the action tree —
+      // the scripting plane's single home.
+      return { kind: 'javascript' };
+    case 'named':
+      return { kind: 'named', name: root.name };
+    default:
+      return { kind: 'unsupported' };
+  }
 }
 
 function readLinkTarget(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
+  base: AnnotationBase,
   ctx: AnnotationReadContext,
 ): PdfLinkTarget | null {
-  // The activate slot (/A). Root-only read: O(1) native calls, no tree
-  // walk — the chain (/Next) rides base.actions for the orchestrator.
-  const modelPtr = fn.EPDFAnnot_GetActionModel(annotPtr, ANNOT_ACTION_ACTIVATE);
-  if (modelPtr !== NULL_PTR) {
-    try {
-      const root = fn.EPDFAction_GetRootNode(modelPtr);
-      if (isValidActionNodeId(root)) {
-        return readRootTarget(fn, mem, modelPtr, root, ctx);
-      }
-    } finally {
-      fn.EPDFAction_CloseModel(modelPtr);
-    }
-  }
+  const activate = base.actions?.activate;
+  if (activate) return linkTargetFromActionTree(activate);
 
-  // No usable /A → the direct `/Dest`, normalized onto `goto`.
+  // No /A at all → the direct `/Dest`, normalized onto `goto`.
   const linkPtr = fn.FPDFAnnot_GetLink(annotPtr);
   if (!linkPtr) return null;
   const destPtr = fn.FPDFLink_GetDest(ctx.docPtr, linkPtr);
   if (!destPtr) return null; // neither /A nor /Dest: a dead link, reported as-is
   const destination = readDestination(fn, mem, ctx.docPtr, destPtr);
   return destination ? { kind: 'goto', destination } : { kind: 'unsupported' };
-}
-
-/** Classify the root action node and fetch its payload — the projection. */
-function readRootTarget(
-  fn: PdfFunctions,
-  mem: PdfRuntimeMemory,
-  modelPtr: Ptr,
-  node: number,
-  ctx: AnnotationReadContext,
-): PdfLinkTarget {
-  switch (actionTypeFromCode(fn.EPDFAction_GetNodeType(modelPtr, node))) {
-    case 'goto': {
-      const destPtr = fn.EPDFAction_GetNodeDest(ctx.docPtr, modelPtr, node);
-      const destination = destPtr ? readDestination(fn, mem, ctx.docPtr, destPtr) : null;
-      return destination ? { kind: 'goto', destination } : { kind: 'unsupported' };
-    }
-    case 'uri': {
-      const uri = readUtf8String(mem, (buf, capacity) =>
-        fn.EPDFAction_GetNodeURI(ctx.docPtr, modelPtr, node, buf, capacity),
-      );
-      return uri == null ? { kind: 'unsupported' } : { kind: 'uri', uri };
-    }
-    // Reported, never followed/executed (and never writable — see the DTO).
-    case 'goto-remote': {
-      const file = readUtf8String(mem, (buf, capacity) =>
-        fn.EPDFAction_GetNodeFilePath(modelPtr, node, buf, capacity),
-      );
-      return { kind: 'goto-remote', file: file ?? '' };
-    }
-    case 'launch': {
-      const path = readUtf8String(mem, (buf, capacity) =>
-        fn.EPDFAction_GetNodeFilePath(modelPtr, node, buf, capacity),
-      );
-      return { kind: 'launch', path: path ?? '' };
-    }
-    case 'javascript':
-      // No script payload here by design: the text rides base.actions —
-      // the scripting plane's single home.
-      return { kind: 'javascript' };
-    case 'named': {
-      const name = readUtf8String(mem, (buf, capacity) =>
-        fn.EPDFAction_GetNodeName(modelPtr, node, buf, capacity),
-      );
-      return name == null ? { kind: 'unsupported' } : { kind: 'named', name };
-    }
-    default:
-      return { kind: 'unsupported' };
-  }
 }

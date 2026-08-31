@@ -25,6 +25,7 @@ export type { PageLayout, PageBoxes, PageRotation } from './dto/PageLayout';
 export type {
   PdfActionType,
   PdfActionNode,
+  PdfActionTargetRef,
   PdfActionWarning,
   PdfActionTree,
   PdfFieldActions,

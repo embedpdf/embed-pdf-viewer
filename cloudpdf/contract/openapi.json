@@ -7510,45 +7510,565 @@
                           "type": "object",
                           "properties": {
                             "root": {
-                              "type": "object",
-                              "properties": {
-                                "type": {
-                                  "type": "string",
-                                  "enum": [
-                                    "unknown",
-                                    "goto",
-                                    "goto-remote",
-                                    "goto-embedded",
-                                    "launch",
-                                    "thread",
-                                    "uri",
-                                    "sound",
-                                    "movie",
-                                    "hide",
-                                    "named",
-                                    "submit-form",
-                                    "reset-form",
-                                    "import-data",
-                                    "javascript",
-                                    "set-ocg-state",
-                                    "rendition",
-                                    "transition",
-                                    "goto-3d-view"
-                                  ]
+                              "anyOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "type": {
+                                      "type": "string",
+                                      "enum": ["javascript"]
+                                    },
+                                    "subtype": {
+                                      "type": "string"
+                                    },
+                                    "next": {
+                                      "type": "array",
+                                      "items": {}
+                                    },
+                                    "script": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": ["type", "subtype", "next", "script"],
+                                  "additionalProperties": false
                                 },
-                                "subtype": {
-                                  "type": "string"
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "type": {
+                                      "type": "string",
+                                      "enum": ["goto"]
+                                    },
+                                    "subtype": {
+                                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/0/properties/subtype"
+                                    },
+                                    "next": {
+                                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/0/properties/next"
+                                    },
+                                    "destination": {
+                                      "anyOf": [
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "kind": {
+                                              "type": "string",
+                                              "enum": ["xyz"]
+                                            },
+                                            "pageObjectNumber": {
+                                              "type": "integer",
+                                              "exclusiveMinimum": true,
+                                              "minimum": 0
+                                            },
+                                            "left": {
+                                              "type": "number",
+                                              "nullable": true
+                                            },
+                                            "top": {
+                                              "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/1/properties/destination/anyOf/0/properties/left"
+                                            },
+                                            "zoom": {
+                                              "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/1/properties/destination/anyOf/0/properties/left"
+                                            }
+                                          },
+                                          "required": ["kind", "pageObjectNumber"],
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "kind": {
+                                              "type": "string",
+                                              "enum": ["fit"]
+                                            },
+                                            "pageObjectNumber": {
+                                              "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/1/properties/destination/anyOf/0/properties/pageObjectNumber"
+                                            }
+                                          },
+                                          "required": ["kind", "pageObjectNumber"],
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "kind": {
+                                              "type": "string",
+                                              "enum": ["fitH"]
+                                            },
+                                            "pageObjectNumber": {
+                                              "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/1/properties/destination/anyOf/0/properties/pageObjectNumber"
+                                            },
+                                            "top": {
+                                              "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/1/properties/destination/anyOf/0/properties/left"
+                                            }
+                                          },
+                                          "required": ["kind", "pageObjectNumber"],
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "kind": {
+                                              "type": "string",
+                                              "enum": ["fitV"]
+                                            },
+                                            "pageObjectNumber": {
+                                              "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/1/properties/destination/anyOf/0/properties/pageObjectNumber"
+                                            },
+                                            "left": {
+                                              "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/1/properties/destination/anyOf/0/properties/left"
+                                            }
+                                          },
+                                          "required": ["kind", "pageObjectNumber"],
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "kind": {
+                                              "type": "string",
+                                              "enum": ["fitR"]
+                                            },
+                                            "pageObjectNumber": {
+                                              "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/1/properties/destination/anyOf/0/properties/pageObjectNumber"
+                                            },
+                                            "left": {
+                                              "type": "number"
+                                            },
+                                            "bottom": {
+                                              "type": "number"
+                                            },
+                                            "right": {
+                                              "type": "number"
+                                            },
+                                            "top": {
+                                              "type": "number"
+                                            }
+                                          },
+                                          "required": [
+                                            "kind",
+                                            "pageObjectNumber",
+                                            "left",
+                                            "bottom",
+                                            "right",
+                                            "top"
+                                          ],
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "kind": {
+                                              "type": "string",
+                                              "enum": ["fitB"]
+                                            },
+                                            "pageObjectNumber": {
+                                              "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/1/properties/destination/anyOf/0/properties/pageObjectNumber"
+                                            }
+                                          },
+                                          "required": ["kind", "pageObjectNumber"],
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "kind": {
+                                              "type": "string",
+                                              "enum": ["fitBH"]
+                                            },
+                                            "pageObjectNumber": {
+                                              "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/1/properties/destination/anyOf/0/properties/pageObjectNumber"
+                                            },
+                                            "top": {
+                                              "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/1/properties/destination/anyOf/0/properties/left"
+                                            }
+                                          },
+                                          "required": ["kind", "pageObjectNumber"],
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "kind": {
+                                              "type": "string",
+                                              "enum": ["fitBV"]
+                                            },
+                                            "pageObjectNumber": {
+                                              "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/1/properties/destination/anyOf/0/properties/pageObjectNumber"
+                                            },
+                                            "left": {
+                                              "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/1/properties/destination/anyOf/0/properties/left"
+                                            }
+                                          },
+                                          "required": ["kind", "pageObjectNumber"],
+                                          "additionalProperties": false
+                                        }
+                                      ]
+                                    }
+                                  },
+                                  "required": ["type", "subtype", "next", "destination"],
+                                  "additionalProperties": false
                                 },
-                                "script": {
-                                  "type": "string"
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "type": {
+                                      "type": "string",
+                                      "enum": ["uri"]
+                                    },
+                                    "subtype": {
+                                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/0/properties/subtype"
+                                    },
+                                    "next": {
+                                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/0/properties/next"
+                                    },
+                                    "uri": {
+                                      "type": "string"
+                                    },
+                                    "isMap": {
+                                      "type": "boolean"
+                                    }
+                                  },
+                                  "required": ["type", "subtype", "next", "uri", "isMap"],
+                                  "additionalProperties": false
                                 },
-                                "next": {
-                                  "type": "array",
-                                  "items": {}
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "type": {
+                                      "type": "string",
+                                      "enum": ["named"]
+                                    },
+                                    "subtype": {
+                                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/0/properties/subtype"
+                                    },
+                                    "next": {
+                                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/0/properties/next"
+                                    },
+                                    "name": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": ["type", "subtype", "next", "name"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "type": {
+                                      "type": "string",
+                                      "enum": ["hide"]
+                                    },
+                                    "subtype": {
+                                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/0/properties/subtype"
+                                    },
+                                    "next": {
+                                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/0/properties/next"
+                                    },
+                                    "targets": {
+                                      "type": "array",
+                                      "items": {
+                                        "anyOf": [
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "kind": {
+                                                "type": "string",
+                                                "enum": ["name"]
+                                              },
+                                              "name": {
+                                                "type": "string"
+                                              }
+                                            },
+                                            "required": ["kind", "name"],
+                                            "additionalProperties": false
+                                          },
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "kind": {
+                                                "type": "string",
+                                                "enum": ["objectNumber"]
+                                              },
+                                              "objectNumber": {
+                                                "type": "integer",
+                                                "exclusiveMinimum": true,
+                                                "minimum": 0
+                                              }
+                                            },
+                                            "required": ["kind", "objectNumber"],
+                                            "additionalProperties": false
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    "hide": {
+                                      "type": "boolean"
+                                    }
+                                  },
+                                  "required": ["type", "subtype", "next", "targets", "hide"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "type": {
+                                      "type": "string",
+                                      "enum": ["reset-form"]
+                                    },
+                                    "subtype": {
+                                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/0/properties/subtype"
+                                    },
+                                    "next": {
+                                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/0/properties/next"
+                                    },
+                                    "fields": {
+                                      "type": "array",
+                                      "items": {
+                                        "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/4/properties/targets/items"
+                                      },
+                                      "nullable": true
+                                    },
+                                    "exclude": {
+                                      "type": "boolean"
+                                    }
+                                  },
+                                  "required": ["type", "subtype", "next", "fields", "exclude"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "type": {
+                                      "type": "string",
+                                      "enum": ["goto-remote"]
+                                    },
+                                    "subtype": {
+                                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/0/properties/subtype"
+                                    },
+                                    "next": {
+                                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/0/properties/next"
+                                    },
+                                    "filePath": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": ["type", "subtype", "next", "filePath"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "type": {
+                                      "type": "string",
+                                      "enum": ["goto-embedded"]
+                                    },
+                                    "subtype": {
+                                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/0/properties/subtype"
+                                    },
+                                    "next": {
+                                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/0/properties/next"
+                                    },
+                                    "filePath": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": ["type", "subtype", "next", "filePath"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "type": {
+                                      "type": "string",
+                                      "enum": ["launch"]
+                                    },
+                                    "subtype": {
+                                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/0/properties/subtype"
+                                    },
+                                    "next": {
+                                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/0/properties/next"
+                                    },
+                                    "filePath": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": ["type", "subtype", "next", "filePath"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "type": {
+                                      "type": "string",
+                                      "enum": ["rendition"]
+                                    },
+                                    "subtype": {
+                                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/0/properties/subtype"
+                                    },
+                                    "next": {
+                                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/0/properties/next"
+                                    },
+                                    "script": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": ["type", "subtype", "next"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "type": {
+                                      "type": "string",
+                                      "enum": ["submit-form"]
+                                    },
+                                    "subtype": {
+                                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/0/properties/subtype"
+                                    },
+                                    "next": {
+                                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/0/properties/next"
+                                    }
+                                  },
+                                  "required": ["type", "subtype", "next"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "type": {
+                                      "type": "string",
+                                      "enum": ["thread"]
+                                    },
+                                    "subtype": {
+                                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/0/properties/subtype"
+                                    },
+                                    "next": {
+                                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/0/properties/next"
+                                    }
+                                  },
+                                  "required": ["type", "subtype", "next"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "type": {
+                                      "type": "string",
+                                      "enum": ["sound"]
+                                    },
+                                    "subtype": {
+                                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/0/properties/subtype"
+                                    },
+                                    "next": {
+                                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/0/properties/next"
+                                    }
+                                  },
+                                  "required": ["type", "subtype", "next"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "type": {
+                                      "type": "string",
+                                      "enum": ["movie"]
+                                    },
+                                    "subtype": {
+                                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/0/properties/subtype"
+                                    },
+                                    "next": {
+                                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/0/properties/next"
+                                    }
+                                  },
+                                  "required": ["type", "subtype", "next"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "type": {
+                                      "type": "string",
+                                      "enum": ["import-data"]
+                                    },
+                                    "subtype": {
+                                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/0/properties/subtype"
+                                    },
+                                    "next": {
+                                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/0/properties/next"
+                                    }
+                                  },
+                                  "required": ["type", "subtype", "next"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "type": {
+                                      "type": "string",
+                                      "enum": ["set-ocg-state"]
+                                    },
+                                    "subtype": {
+                                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/0/properties/subtype"
+                                    },
+                                    "next": {
+                                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/0/properties/next"
+                                    }
+                                  },
+                                  "required": ["type", "subtype", "next"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "type": {
+                                      "type": "string",
+                                      "enum": ["transition"]
+                                    },
+                                    "subtype": {
+                                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/0/properties/subtype"
+                                    },
+                                    "next": {
+                                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/0/properties/next"
+                                    }
+                                  },
+                                  "required": ["type", "subtype", "next"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "type": {
+                                      "type": "string",
+                                      "enum": ["goto-3d-view"]
+                                    },
+                                    "subtype": {
+                                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/0/properties/subtype"
+                                    },
+                                    "next": {
+                                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/0/properties/next"
+                                    }
+                                  },
+                                  "required": ["type", "subtype", "next"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "type": {
+                                      "type": "string",
+                                      "enum": ["unknown"]
+                                    },
+                                    "subtype": {
+                                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/0/properties/subtype"
+                                    },
+                                    "next": {
+                                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/0/properties/next"
+                                    }
+                                  },
+                                  "required": ["type", "subtype", "next"],
+                                  "additionalProperties": false
                                 }
-                              },
-                              "required": ["type", "subtype", "next"],
-                              "additionalProperties": false,
+                              ],
                               "nullable": true
                             },
                             "incomplete": {
@@ -7562,7 +8082,12 @@
                               "type": "array",
                               "items": {
                                 "type": "string",
-                                "enum": ["cycle-dropped", "malformed-next", "incomplete"]
+                                "enum": [
+                                  "cycle-dropped",
+                                  "malformed-next",
+                                  "incomplete",
+                                  "payload-dropped"
+                                ]
                               }
                             }
                           },
@@ -8766,163 +9291,7 @@
                               "enum": ["goto"]
                             },
                             "destination": {
-                              "anyOf": [
-                                {
-                                  "type": "object",
-                                  "properties": {
-                                    "kind": {
-                                      "type": "string",
-                                      "enum": ["xyz"]
-                                    },
-                                    "pageObjectNumber": {
-                                      "type": "integer",
-                                      "exclusiveMinimum": true,
-                                      "minimum": 0
-                                    },
-                                    "left": {
-                                      "type": "number",
-                                      "nullable": true
-                                    },
-                                    "top": {
-                                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/9/properties/target/anyOf/0/properties/destination/anyOf/0/properties/left"
-                                    },
-                                    "zoom": {
-                                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/9/properties/target/anyOf/0/properties/destination/anyOf/0/properties/left"
-                                    }
-                                  },
-                                  "required": ["kind", "pageObjectNumber"],
-                                  "additionalProperties": false
-                                },
-                                {
-                                  "type": "object",
-                                  "properties": {
-                                    "kind": {
-                                      "type": "string",
-                                      "enum": ["fit"]
-                                    },
-                                    "pageObjectNumber": {
-                                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/9/properties/target/anyOf/0/properties/destination/anyOf/0/properties/pageObjectNumber"
-                                    }
-                                  },
-                                  "required": ["kind", "pageObjectNumber"],
-                                  "additionalProperties": false
-                                },
-                                {
-                                  "type": "object",
-                                  "properties": {
-                                    "kind": {
-                                      "type": "string",
-                                      "enum": ["fitH"]
-                                    },
-                                    "pageObjectNumber": {
-                                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/9/properties/target/anyOf/0/properties/destination/anyOf/0/properties/pageObjectNumber"
-                                    },
-                                    "top": {
-                                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/9/properties/target/anyOf/0/properties/destination/anyOf/0/properties/left"
-                                    }
-                                  },
-                                  "required": ["kind", "pageObjectNumber"],
-                                  "additionalProperties": false
-                                },
-                                {
-                                  "type": "object",
-                                  "properties": {
-                                    "kind": {
-                                      "type": "string",
-                                      "enum": ["fitV"]
-                                    },
-                                    "pageObjectNumber": {
-                                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/9/properties/target/anyOf/0/properties/destination/anyOf/0/properties/pageObjectNumber"
-                                    },
-                                    "left": {
-                                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/9/properties/target/anyOf/0/properties/destination/anyOf/0/properties/left"
-                                    }
-                                  },
-                                  "required": ["kind", "pageObjectNumber"],
-                                  "additionalProperties": false
-                                },
-                                {
-                                  "type": "object",
-                                  "properties": {
-                                    "kind": {
-                                      "type": "string",
-                                      "enum": ["fitR"]
-                                    },
-                                    "pageObjectNumber": {
-                                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/9/properties/target/anyOf/0/properties/destination/anyOf/0/properties/pageObjectNumber"
-                                    },
-                                    "left": {
-                                      "type": "number"
-                                    },
-                                    "bottom": {
-                                      "type": "number"
-                                    },
-                                    "right": {
-                                      "type": "number"
-                                    },
-                                    "top": {
-                                      "type": "number"
-                                    }
-                                  },
-                                  "required": [
-                                    "kind",
-                                    "pageObjectNumber",
-                                    "left",
-                                    "bottom",
-                                    "right",
-                                    "top"
-                                  ],
-                                  "additionalProperties": false
-                                },
-                                {
-                                  "type": "object",
-                                  "properties": {
-                                    "kind": {
-                                      "type": "string",
-                                      "enum": ["fitB"]
-                                    },
-                                    "pageObjectNumber": {
-                                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/9/properties/target/anyOf/0/properties/destination/anyOf/0/properties/pageObjectNumber"
-                                    }
-                                  },
-                                  "required": ["kind", "pageObjectNumber"],
-                                  "additionalProperties": false
-                                },
-                                {
-                                  "type": "object",
-                                  "properties": {
-                                    "kind": {
-                                      "type": "string",
-                                      "enum": ["fitBH"]
-                                    },
-                                    "pageObjectNumber": {
-                                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/9/properties/target/anyOf/0/properties/destination/anyOf/0/properties/pageObjectNumber"
-                                    },
-                                    "top": {
-                                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/9/properties/target/anyOf/0/properties/destination/anyOf/0/properties/left"
-                                    }
-                                  },
-                                  "required": ["kind", "pageObjectNumber"],
-                                  "additionalProperties": false
-                                },
-                                {
-                                  "type": "object",
-                                  "properties": {
-                                    "kind": {
-                                      "type": "string",
-                                      "enum": ["fitBV"]
-                                    },
-                                    "pageObjectNumber": {
-                                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/9/properties/target/anyOf/0/properties/destination/anyOf/0/properties/pageObjectNumber"
-                                    },
-                                    "left": {
-                                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/9/properties/target/anyOf/0/properties/destination/anyOf/0/properties/left"
-                                    }
-                                  },
-                                  "required": ["kind", "pageObjectNumber"],
-                                  "additionalProperties": false
-                                }
-                              ]
+                              "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/1/properties/destination"
                             }
                           },
                           "required": ["kind", "destination"],
@@ -10568,45 +10937,571 @@
                                 "type": "object",
                                 "properties": {
                                   "root": {
-                                    "type": "object",
-                                    "properties": {
-                                      "type": {
-                                        "type": "string",
-                                        "enum": [
-                                          "unknown",
-                                          "goto",
-                                          "goto-remote",
-                                          "goto-embedded",
-                                          "launch",
-                                          "thread",
-                                          "uri",
-                                          "sound",
-                                          "movie",
-                                          "hide",
-                                          "named",
-                                          "submit-form",
-                                          "reset-form",
-                                          "import-data",
-                                          "javascript",
-                                          "set-ocg-state",
-                                          "rendition",
-                                          "transition",
-                                          "goto-3d-view"
-                                        ]
+                                    "anyOf": [
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "type": {
+                                            "type": "string",
+                                            "enum": ["javascript"]
+                                          },
+                                          "subtype": {
+                                            "type": "string"
+                                          },
+                                          "next": {
+                                            "type": "array",
+                                            "items": {}
+                                          },
+                                          "script": {
+                                            "type": "string"
+                                          }
+                                        },
+                                        "required": ["type", "subtype", "next", "script"],
+                                        "additionalProperties": false
                                       },
-                                      "subtype": {
-                                        "type": "string"
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "type": {
+                                            "type": "string",
+                                            "enum": ["goto"]
+                                          },
+                                          "subtype": {
+                                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/0/properties/subtype"
+                                          },
+                                          "next": {
+                                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/0/properties/next"
+                                          },
+                                          "destination": {
+                                            "anyOf": [
+                                              {
+                                                "type": "object",
+                                                "properties": {
+                                                  "kind": {
+                                                    "type": "string",
+                                                    "enum": ["xyz"]
+                                                  },
+                                                  "pageObjectNumber": {
+                                                    "type": "integer",
+                                                    "exclusiveMinimum": true,
+                                                    "minimum": 0
+                                                  },
+                                                  "left": {
+                                                    "type": "number",
+                                                    "nullable": true
+                                                  },
+                                                  "top": {
+                                                    "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/1/properties/destination/anyOf/0/properties/left"
+                                                  },
+                                                  "zoom": {
+                                                    "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/1/properties/destination/anyOf/0/properties/left"
+                                                  }
+                                                },
+                                                "required": ["kind", "pageObjectNumber"],
+                                                "additionalProperties": false
+                                              },
+                                              {
+                                                "type": "object",
+                                                "properties": {
+                                                  "kind": {
+                                                    "type": "string",
+                                                    "enum": ["fit"]
+                                                  },
+                                                  "pageObjectNumber": {
+                                                    "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/1/properties/destination/anyOf/0/properties/pageObjectNumber"
+                                                  }
+                                                },
+                                                "required": ["kind", "pageObjectNumber"],
+                                                "additionalProperties": false
+                                              },
+                                              {
+                                                "type": "object",
+                                                "properties": {
+                                                  "kind": {
+                                                    "type": "string",
+                                                    "enum": ["fitH"]
+                                                  },
+                                                  "pageObjectNumber": {
+                                                    "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/1/properties/destination/anyOf/0/properties/pageObjectNumber"
+                                                  },
+                                                  "top": {
+                                                    "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/1/properties/destination/anyOf/0/properties/left"
+                                                  }
+                                                },
+                                                "required": ["kind", "pageObjectNumber"],
+                                                "additionalProperties": false
+                                              },
+                                              {
+                                                "type": "object",
+                                                "properties": {
+                                                  "kind": {
+                                                    "type": "string",
+                                                    "enum": ["fitV"]
+                                                  },
+                                                  "pageObjectNumber": {
+                                                    "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/1/properties/destination/anyOf/0/properties/pageObjectNumber"
+                                                  },
+                                                  "left": {
+                                                    "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/1/properties/destination/anyOf/0/properties/left"
+                                                  }
+                                                },
+                                                "required": ["kind", "pageObjectNumber"],
+                                                "additionalProperties": false
+                                              },
+                                              {
+                                                "type": "object",
+                                                "properties": {
+                                                  "kind": {
+                                                    "type": "string",
+                                                    "enum": ["fitR"]
+                                                  },
+                                                  "pageObjectNumber": {
+                                                    "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/1/properties/destination/anyOf/0/properties/pageObjectNumber"
+                                                  },
+                                                  "left": {
+                                                    "type": "number"
+                                                  },
+                                                  "bottom": {
+                                                    "type": "number"
+                                                  },
+                                                  "right": {
+                                                    "type": "number"
+                                                  },
+                                                  "top": {
+                                                    "type": "number"
+                                                  }
+                                                },
+                                                "required": [
+                                                  "kind",
+                                                  "pageObjectNumber",
+                                                  "left",
+                                                  "bottom",
+                                                  "right",
+                                                  "top"
+                                                ],
+                                                "additionalProperties": false
+                                              },
+                                              {
+                                                "type": "object",
+                                                "properties": {
+                                                  "kind": {
+                                                    "type": "string",
+                                                    "enum": ["fitB"]
+                                                  },
+                                                  "pageObjectNumber": {
+                                                    "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/1/properties/destination/anyOf/0/properties/pageObjectNumber"
+                                                  }
+                                                },
+                                                "required": ["kind", "pageObjectNumber"],
+                                                "additionalProperties": false
+                                              },
+                                              {
+                                                "type": "object",
+                                                "properties": {
+                                                  "kind": {
+                                                    "type": "string",
+                                                    "enum": ["fitBH"]
+                                                  },
+                                                  "pageObjectNumber": {
+                                                    "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/1/properties/destination/anyOf/0/properties/pageObjectNumber"
+                                                  },
+                                                  "top": {
+                                                    "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/1/properties/destination/anyOf/0/properties/left"
+                                                  }
+                                                },
+                                                "required": ["kind", "pageObjectNumber"],
+                                                "additionalProperties": false
+                                              },
+                                              {
+                                                "type": "object",
+                                                "properties": {
+                                                  "kind": {
+                                                    "type": "string",
+                                                    "enum": ["fitBV"]
+                                                  },
+                                                  "pageObjectNumber": {
+                                                    "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/1/properties/destination/anyOf/0/properties/pageObjectNumber"
+                                                  },
+                                                  "left": {
+                                                    "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/1/properties/destination/anyOf/0/properties/left"
+                                                  }
+                                                },
+                                                "required": ["kind", "pageObjectNumber"],
+                                                "additionalProperties": false
+                                              }
+                                            ]
+                                          }
+                                        },
+                                        "required": ["type", "subtype", "next", "destination"],
+                                        "additionalProperties": false
                                       },
-                                      "script": {
-                                        "type": "string"
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "type": {
+                                            "type": "string",
+                                            "enum": ["uri"]
+                                          },
+                                          "subtype": {
+                                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/0/properties/subtype"
+                                          },
+                                          "next": {
+                                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/0/properties/next"
+                                          },
+                                          "uri": {
+                                            "type": "string"
+                                          },
+                                          "isMap": {
+                                            "type": "boolean"
+                                          }
+                                        },
+                                        "required": ["type", "subtype", "next", "uri", "isMap"],
+                                        "additionalProperties": false
                                       },
-                                      "next": {
-                                        "type": "array",
-                                        "items": {}
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "type": {
+                                            "type": "string",
+                                            "enum": ["named"]
+                                          },
+                                          "subtype": {
+                                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/0/properties/subtype"
+                                          },
+                                          "next": {
+                                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/0/properties/next"
+                                          },
+                                          "name": {
+                                            "type": "string"
+                                          }
+                                        },
+                                        "required": ["type", "subtype", "next", "name"],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "type": {
+                                            "type": "string",
+                                            "enum": ["hide"]
+                                          },
+                                          "subtype": {
+                                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/0/properties/subtype"
+                                          },
+                                          "next": {
+                                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/0/properties/next"
+                                          },
+                                          "targets": {
+                                            "type": "array",
+                                            "items": {
+                                              "anyOf": [
+                                                {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "kind": {
+                                                      "type": "string",
+                                                      "enum": ["name"]
+                                                    },
+                                                    "name": {
+                                                      "type": "string"
+                                                    }
+                                                  },
+                                                  "required": ["kind", "name"],
+                                                  "additionalProperties": false
+                                                },
+                                                {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "kind": {
+                                                      "type": "string",
+                                                      "enum": ["objectNumber"]
+                                                    },
+                                                    "objectNumber": {
+                                                      "type": "integer",
+                                                      "exclusiveMinimum": true,
+                                                      "minimum": 0
+                                                    }
+                                                  },
+                                                  "required": ["kind", "objectNumber"],
+                                                  "additionalProperties": false
+                                                }
+                                              ]
+                                            }
+                                          },
+                                          "hide": {
+                                            "type": "boolean"
+                                          }
+                                        },
+                                        "required": ["type", "subtype", "next", "targets", "hide"],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "type": {
+                                            "type": "string",
+                                            "enum": ["reset-form"]
+                                          },
+                                          "subtype": {
+                                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/0/properties/subtype"
+                                          },
+                                          "next": {
+                                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/0/properties/next"
+                                          },
+                                          "fields": {
+                                            "type": "array",
+                                            "items": {
+                                              "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/4/properties/targets/items"
+                                            },
+                                            "nullable": true
+                                          },
+                                          "exclude": {
+                                            "type": "boolean"
+                                          }
+                                        },
+                                        "required": [
+                                          "type",
+                                          "subtype",
+                                          "next",
+                                          "fields",
+                                          "exclude"
+                                        ],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "type": {
+                                            "type": "string",
+                                            "enum": ["goto-remote"]
+                                          },
+                                          "subtype": {
+                                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/0/properties/subtype"
+                                          },
+                                          "next": {
+                                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/0/properties/next"
+                                          },
+                                          "filePath": {
+                                            "type": "string"
+                                          }
+                                        },
+                                        "required": ["type", "subtype", "next", "filePath"],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "type": {
+                                            "type": "string",
+                                            "enum": ["goto-embedded"]
+                                          },
+                                          "subtype": {
+                                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/0/properties/subtype"
+                                          },
+                                          "next": {
+                                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/0/properties/next"
+                                          },
+                                          "filePath": {
+                                            "type": "string"
+                                          }
+                                        },
+                                        "required": ["type", "subtype", "next", "filePath"],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "type": {
+                                            "type": "string",
+                                            "enum": ["launch"]
+                                          },
+                                          "subtype": {
+                                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/0/properties/subtype"
+                                          },
+                                          "next": {
+                                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/0/properties/next"
+                                          },
+                                          "filePath": {
+                                            "type": "string"
+                                          }
+                                        },
+                                        "required": ["type", "subtype", "next", "filePath"],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "type": {
+                                            "type": "string",
+                                            "enum": ["rendition"]
+                                          },
+                                          "subtype": {
+                                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/0/properties/subtype"
+                                          },
+                                          "next": {
+                                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/0/properties/next"
+                                          },
+                                          "script": {
+                                            "type": "string"
+                                          }
+                                        },
+                                        "required": ["type", "subtype", "next"],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "type": {
+                                            "type": "string",
+                                            "enum": ["submit-form"]
+                                          },
+                                          "subtype": {
+                                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/0/properties/subtype"
+                                          },
+                                          "next": {
+                                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/0/properties/next"
+                                          }
+                                        },
+                                        "required": ["type", "subtype", "next"],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "type": {
+                                            "type": "string",
+                                            "enum": ["thread"]
+                                          },
+                                          "subtype": {
+                                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/0/properties/subtype"
+                                          },
+                                          "next": {
+                                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/0/properties/next"
+                                          }
+                                        },
+                                        "required": ["type", "subtype", "next"],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "type": {
+                                            "type": "string",
+                                            "enum": ["sound"]
+                                          },
+                                          "subtype": {
+                                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/0/properties/subtype"
+                                          },
+                                          "next": {
+                                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/0/properties/next"
+                                          }
+                                        },
+                                        "required": ["type", "subtype", "next"],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "type": {
+                                            "type": "string",
+                                            "enum": ["movie"]
+                                          },
+                                          "subtype": {
+                                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/0/properties/subtype"
+                                          },
+                                          "next": {
+                                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/0/properties/next"
+                                          }
+                                        },
+                                        "required": ["type", "subtype", "next"],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "type": {
+                                            "type": "string",
+                                            "enum": ["import-data"]
+                                          },
+                                          "subtype": {
+                                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/0/properties/subtype"
+                                          },
+                                          "next": {
+                                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/0/properties/next"
+                                          }
+                                        },
+                                        "required": ["type", "subtype", "next"],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "type": {
+                                            "type": "string",
+                                            "enum": ["set-ocg-state"]
+                                          },
+                                          "subtype": {
+                                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/0/properties/subtype"
+                                          },
+                                          "next": {
+                                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/0/properties/next"
+                                          }
+                                        },
+                                        "required": ["type", "subtype", "next"],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "type": {
+                                            "type": "string",
+                                            "enum": ["transition"]
+                                          },
+                                          "subtype": {
+                                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/0/properties/subtype"
+                                          },
+                                          "next": {
+                                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/0/properties/next"
+                                          }
+                                        },
+                                        "required": ["type", "subtype", "next"],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "type": {
+                                            "type": "string",
+                                            "enum": ["goto-3d-view"]
+                                          },
+                                          "subtype": {
+                                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/0/properties/subtype"
+                                          },
+                                          "next": {
+                                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/0/properties/next"
+                                          }
+                                        },
+                                        "required": ["type", "subtype", "next"],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "type": {
+                                            "type": "string",
+                                            "enum": ["unknown"]
+                                          },
+                                          "subtype": {
+                                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/0/properties/subtype"
+                                          },
+                                          "next": {
+                                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/0/properties/next"
+                                          }
+                                        },
+                                        "required": ["type", "subtype", "next"],
+                                        "additionalProperties": false
                                       }
-                                    },
-                                    "required": ["type", "subtype", "next"],
-                                    "additionalProperties": false,
+                                    ],
                                     "nullable": true
                                   },
                                   "incomplete": {
@@ -10620,7 +11515,12 @@
                                     "type": "array",
                                     "items": {
                                       "type": "string",
-                                      "enum": ["cycle-dropped", "malformed-next", "incomplete"]
+                                      "enum": [
+                                        "cycle-dropped",
+                                        "malformed-next",
+                                        "incomplete",
+                                        "payload-dropped"
+                                      ]
                                     }
                                   }
                                 },
@@ -11824,163 +12724,7 @@
                                     "enum": ["goto"]
                                   },
                                   "destination": {
-                                    "anyOf": [
-                                      {
-                                        "type": "object",
-                                        "properties": {
-                                          "kind": {
-                                            "type": "string",
-                                            "enum": ["xyz"]
-                                          },
-                                          "pageObjectNumber": {
-                                            "type": "integer",
-                                            "exclusiveMinimum": true,
-                                            "minimum": 0
-                                          },
-                                          "left": {
-                                            "type": "number",
-                                            "nullable": true
-                                          },
-                                          "top": {
-                                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/9/properties/target/anyOf/0/properties/destination/anyOf/0/properties/left"
-                                          },
-                                          "zoom": {
-                                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/9/properties/target/anyOf/0/properties/destination/anyOf/0/properties/left"
-                                          }
-                                        },
-                                        "required": ["kind", "pageObjectNumber"],
-                                        "additionalProperties": false
-                                      },
-                                      {
-                                        "type": "object",
-                                        "properties": {
-                                          "kind": {
-                                            "type": "string",
-                                            "enum": ["fit"]
-                                          },
-                                          "pageObjectNumber": {
-                                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/9/properties/target/anyOf/0/properties/destination/anyOf/0/properties/pageObjectNumber"
-                                          }
-                                        },
-                                        "required": ["kind", "pageObjectNumber"],
-                                        "additionalProperties": false
-                                      },
-                                      {
-                                        "type": "object",
-                                        "properties": {
-                                          "kind": {
-                                            "type": "string",
-                                            "enum": ["fitH"]
-                                          },
-                                          "pageObjectNumber": {
-                                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/9/properties/target/anyOf/0/properties/destination/anyOf/0/properties/pageObjectNumber"
-                                          },
-                                          "top": {
-                                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/9/properties/target/anyOf/0/properties/destination/anyOf/0/properties/left"
-                                          }
-                                        },
-                                        "required": ["kind", "pageObjectNumber"],
-                                        "additionalProperties": false
-                                      },
-                                      {
-                                        "type": "object",
-                                        "properties": {
-                                          "kind": {
-                                            "type": "string",
-                                            "enum": ["fitV"]
-                                          },
-                                          "pageObjectNumber": {
-                                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/9/properties/target/anyOf/0/properties/destination/anyOf/0/properties/pageObjectNumber"
-                                          },
-                                          "left": {
-                                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/9/properties/target/anyOf/0/properties/destination/anyOf/0/properties/left"
-                                          }
-                                        },
-                                        "required": ["kind", "pageObjectNumber"],
-                                        "additionalProperties": false
-                                      },
-                                      {
-                                        "type": "object",
-                                        "properties": {
-                                          "kind": {
-                                            "type": "string",
-                                            "enum": ["fitR"]
-                                          },
-                                          "pageObjectNumber": {
-                                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/9/properties/target/anyOf/0/properties/destination/anyOf/0/properties/pageObjectNumber"
-                                          },
-                                          "left": {
-                                            "type": "number"
-                                          },
-                                          "bottom": {
-                                            "type": "number"
-                                          },
-                                          "right": {
-                                            "type": "number"
-                                          },
-                                          "top": {
-                                            "type": "number"
-                                          }
-                                        },
-                                        "required": [
-                                          "kind",
-                                          "pageObjectNumber",
-                                          "left",
-                                          "bottom",
-                                          "right",
-                                          "top"
-                                        ],
-                                        "additionalProperties": false
-                                      },
-                                      {
-                                        "type": "object",
-                                        "properties": {
-                                          "kind": {
-                                            "type": "string",
-                                            "enum": ["fitB"]
-                                          },
-                                          "pageObjectNumber": {
-                                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/9/properties/target/anyOf/0/properties/destination/anyOf/0/properties/pageObjectNumber"
-                                          }
-                                        },
-                                        "required": ["kind", "pageObjectNumber"],
-                                        "additionalProperties": false
-                                      },
-                                      {
-                                        "type": "object",
-                                        "properties": {
-                                          "kind": {
-                                            "type": "string",
-                                            "enum": ["fitBH"]
-                                          },
-                                          "pageObjectNumber": {
-                                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/9/properties/target/anyOf/0/properties/destination/anyOf/0/properties/pageObjectNumber"
-                                          },
-                                          "top": {
-                                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/9/properties/target/anyOf/0/properties/destination/anyOf/0/properties/left"
-                                          }
-                                        },
-                                        "required": ["kind", "pageObjectNumber"],
-                                        "additionalProperties": false
-                                      },
-                                      {
-                                        "type": "object",
-                                        "properties": {
-                                          "kind": {
-                                            "type": "string",
-                                            "enum": ["fitBV"]
-                                          },
-                                          "pageObjectNumber": {
-                                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/9/properties/target/anyOf/0/properties/destination/anyOf/0/properties/pageObjectNumber"
-                                          },
-                                          "left": {
-                                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/9/properties/target/anyOf/0/properties/destination/anyOf/0/properties/left"
-                                          }
-                                        },
-                                        "required": ["kind", "pageObjectNumber"],
-                                        "additionalProperties": false
-                                      }
-                                    ]
+                                    "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/actions/properties/activate/properties/root/anyOf/1/properties/destination"
                                   }
                                 },
                                 "required": ["kind", "destination"],
@@ -14148,45 +14892,565 @@
                           "type": "object",
                           "properties": {
                             "root": {
-                              "type": "object",
-                              "properties": {
-                                "type": {
-                                  "type": "string",
-                                  "enum": [
-                                    "unknown",
-                                    "goto",
-                                    "goto-remote",
-                                    "goto-embedded",
-                                    "launch",
-                                    "thread",
-                                    "uri",
-                                    "sound",
-                                    "movie",
-                                    "hide",
-                                    "named",
-                                    "submit-form",
-                                    "reset-form",
-                                    "import-data",
-                                    "javascript",
-                                    "set-ocg-state",
-                                    "rendition",
-                                    "transition",
-                                    "goto-3d-view"
-                                  ]
+                              "anyOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "type": {
+                                      "type": "string",
+                                      "enum": ["javascript"]
+                                    },
+                                    "subtype": {
+                                      "type": "string"
+                                    },
+                                    "next": {
+                                      "type": "array",
+                                      "items": {}
+                                    },
+                                    "script": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": ["type", "subtype", "next", "script"],
+                                  "additionalProperties": false
                                 },
-                                "subtype": {
-                                  "type": "string"
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "type": {
+                                      "type": "string",
+                                      "enum": ["goto"]
+                                    },
+                                    "subtype": {
+                                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/actions/properties/keystroke/properties/root/anyOf/0/properties/subtype"
+                                    },
+                                    "next": {
+                                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/actions/properties/keystroke/properties/root/anyOf/0/properties/next"
+                                    },
+                                    "destination": {
+                                      "anyOf": [
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "kind": {
+                                              "type": "string",
+                                              "enum": ["xyz"]
+                                            },
+                                            "pageObjectNumber": {
+                                              "type": "integer",
+                                              "exclusiveMinimum": true,
+                                              "minimum": 0
+                                            },
+                                            "left": {
+                                              "type": "number",
+                                              "nullable": true
+                                            },
+                                            "top": {
+                                              "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/actions/properties/keystroke/properties/root/anyOf/1/properties/destination/anyOf/0/properties/left"
+                                            },
+                                            "zoom": {
+                                              "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/actions/properties/keystroke/properties/root/anyOf/1/properties/destination/anyOf/0/properties/left"
+                                            }
+                                          },
+                                          "required": ["kind", "pageObjectNumber"],
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "kind": {
+                                              "type": "string",
+                                              "enum": ["fit"]
+                                            },
+                                            "pageObjectNumber": {
+                                              "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/actions/properties/keystroke/properties/root/anyOf/1/properties/destination/anyOf/0/properties/pageObjectNumber"
+                                            }
+                                          },
+                                          "required": ["kind", "pageObjectNumber"],
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "kind": {
+                                              "type": "string",
+                                              "enum": ["fitH"]
+                                            },
+                                            "pageObjectNumber": {
+                                              "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/actions/properties/keystroke/properties/root/anyOf/1/properties/destination/anyOf/0/properties/pageObjectNumber"
+                                            },
+                                            "top": {
+                                              "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/actions/properties/keystroke/properties/root/anyOf/1/properties/destination/anyOf/0/properties/left"
+                                            }
+                                          },
+                                          "required": ["kind", "pageObjectNumber"],
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "kind": {
+                                              "type": "string",
+                                              "enum": ["fitV"]
+                                            },
+                                            "pageObjectNumber": {
+                                              "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/actions/properties/keystroke/properties/root/anyOf/1/properties/destination/anyOf/0/properties/pageObjectNumber"
+                                            },
+                                            "left": {
+                                              "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/actions/properties/keystroke/properties/root/anyOf/1/properties/destination/anyOf/0/properties/left"
+                                            }
+                                          },
+                                          "required": ["kind", "pageObjectNumber"],
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "kind": {
+                                              "type": "string",
+                                              "enum": ["fitR"]
+                                            },
+                                            "pageObjectNumber": {
+                                              "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/actions/properties/keystroke/properties/root/anyOf/1/properties/destination/anyOf/0/properties/pageObjectNumber"
+                                            },
+                                            "left": {
+                                              "type": "number"
+                                            },
+                                            "bottom": {
+                                              "type": "number"
+                                            },
+                                            "right": {
+                                              "type": "number"
+                                            },
+                                            "top": {
+                                              "type": "number"
+                                            }
+                                          },
+                                          "required": [
+                                            "kind",
+                                            "pageObjectNumber",
+                                            "left",
+                                            "bottom",
+                                            "right",
+                                            "top"
+                                          ],
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "kind": {
+                                              "type": "string",
+                                              "enum": ["fitB"]
+                                            },
+                                            "pageObjectNumber": {
+                                              "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/actions/properties/keystroke/properties/root/anyOf/1/properties/destination/anyOf/0/properties/pageObjectNumber"
+                                            }
+                                          },
+                                          "required": ["kind", "pageObjectNumber"],
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "kind": {
+                                              "type": "string",
+                                              "enum": ["fitBH"]
+                                            },
+                                            "pageObjectNumber": {
+                                              "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/actions/properties/keystroke/properties/root/anyOf/1/properties/destination/anyOf/0/properties/pageObjectNumber"
+                                            },
+                                            "top": {
+                                              "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/actions/properties/keystroke/properties/root/anyOf/1/properties/destination/anyOf/0/properties/left"
+                                            }
+                                          },
+                                          "required": ["kind", "pageObjectNumber"],
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "kind": {
+                                              "type": "string",
+                                              "enum": ["fitBV"]
+                                            },
+                                            "pageObjectNumber": {
+                                              "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/actions/properties/keystroke/properties/root/anyOf/1/properties/destination/anyOf/0/properties/pageObjectNumber"
+                                            },
+                                            "left": {
+                                              "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/actions/properties/keystroke/properties/root/anyOf/1/properties/destination/anyOf/0/properties/left"
+                                            }
+                                          },
+                                          "required": ["kind", "pageObjectNumber"],
+                                          "additionalProperties": false
+                                        }
+                                      ]
+                                    }
+                                  },
+                                  "required": ["type", "subtype", "next", "destination"],
+                                  "additionalProperties": false
                                 },
-                                "script": {
-                                  "type": "string"
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "type": {
+                                      "type": "string",
+                                      "enum": ["uri"]
+                                    },
+                                    "subtype": {
+                                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/actions/properties/keystroke/properties/root/anyOf/0/properties/subtype"
+                                    },
+                                    "next": {
+                                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/actions/properties/keystroke/properties/root/anyOf/0/properties/next"
+                                    },
+                                    "uri": {
+                                      "type": "string"
+                                    },
+                                    "isMap": {
+                                      "type": "boolean"
+                                    }
+                                  },
+                                  "required": ["type", "subtype", "next", "uri", "isMap"],
+                                  "additionalProperties": false
                                 },
-                                "next": {
-                                  "type": "array",
-                                  "items": {}
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "type": {
+                                      "type": "string",
+                                      "enum": ["named"]
+                                    },
+                                    "subtype": {
+                                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/actions/properties/keystroke/properties/root/anyOf/0/properties/subtype"
+                                    },
+                                    "next": {
+                                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/actions/properties/keystroke/properties/root/anyOf/0/properties/next"
+                                    },
+                                    "name": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": ["type", "subtype", "next", "name"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "type": {
+                                      "type": "string",
+                                      "enum": ["hide"]
+                                    },
+                                    "subtype": {
+                                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/actions/properties/keystroke/properties/root/anyOf/0/properties/subtype"
+                                    },
+                                    "next": {
+                                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/actions/properties/keystroke/properties/root/anyOf/0/properties/next"
+                                    },
+                                    "targets": {
+                                      "type": "array",
+                                      "items": {
+                                        "anyOf": [
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "kind": {
+                                                "type": "string",
+                                                "enum": ["name"]
+                                              },
+                                              "name": {
+                                                "type": "string"
+                                              }
+                                            },
+                                            "required": ["kind", "name"],
+                                            "additionalProperties": false
+                                          },
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "kind": {
+                                                "type": "string",
+                                                "enum": ["objectNumber"]
+                                              },
+                                              "objectNumber": {
+                                                "type": "integer",
+                                                "exclusiveMinimum": true,
+                                                "minimum": 0
+                                              }
+                                            },
+                                            "required": ["kind", "objectNumber"],
+                                            "additionalProperties": false
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    "hide": {
+                                      "type": "boolean"
+                                    }
+                                  },
+                                  "required": ["type", "subtype", "next", "targets", "hide"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "type": {
+                                      "type": "string",
+                                      "enum": ["reset-form"]
+                                    },
+                                    "subtype": {
+                                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/actions/properties/keystroke/properties/root/anyOf/0/properties/subtype"
+                                    },
+                                    "next": {
+                                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/actions/properties/keystroke/properties/root/anyOf/0/properties/next"
+                                    },
+                                    "fields": {
+                                      "type": "array",
+                                      "items": {
+                                        "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/actions/properties/keystroke/properties/root/anyOf/4/properties/targets/items"
+                                      },
+                                      "nullable": true
+                                    },
+                                    "exclude": {
+                                      "type": "boolean"
+                                    }
+                                  },
+                                  "required": ["type", "subtype", "next", "fields", "exclude"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "type": {
+                                      "type": "string",
+                                      "enum": ["goto-remote"]
+                                    },
+                                    "subtype": {
+                                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/actions/properties/keystroke/properties/root/anyOf/0/properties/subtype"
+                                    },
+                                    "next": {
+                                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/actions/properties/keystroke/properties/root/anyOf/0/properties/next"
+                                    },
+                                    "filePath": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": ["type", "subtype", "next", "filePath"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "type": {
+                                      "type": "string",
+                                      "enum": ["goto-embedded"]
+                                    },
+                                    "subtype": {
+                                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/actions/properties/keystroke/properties/root/anyOf/0/properties/subtype"
+                                    },
+                                    "next": {
+                                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/actions/properties/keystroke/properties/root/anyOf/0/properties/next"
+                                    },
+                                    "filePath": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": ["type", "subtype", "next", "filePath"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "type": {
+                                      "type": "string",
+                                      "enum": ["launch"]
+                                    },
+                                    "subtype": {
+                                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/actions/properties/keystroke/properties/root/anyOf/0/properties/subtype"
+                                    },
+                                    "next": {
+                                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/actions/properties/keystroke/properties/root/anyOf/0/properties/next"
+                                    },
+                                    "filePath": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": ["type", "subtype", "next", "filePath"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "type": {
+                                      "type": "string",
+                                      "enum": ["rendition"]
+                                    },
+                                    "subtype": {
+                                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/actions/properties/keystroke/properties/root/anyOf/0/properties/subtype"
+                                    },
+                                    "next": {
+                                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/actions/properties/keystroke/properties/root/anyOf/0/properties/next"
+                                    },
+                                    "script": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": ["type", "subtype", "next"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "type": {
+                                      "type": "string",
+                                      "enum": ["submit-form"]
+                                    },
+                                    "subtype": {
+                                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/actions/properties/keystroke/properties/root/anyOf/0/properties/subtype"
+                                    },
+                                    "next": {
+                                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/actions/properties/keystroke/properties/root/anyOf/0/properties/next"
+                                    }
+                                  },
+                                  "required": ["type", "subtype", "next"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "type": {
+                                      "type": "string",
+                                      "enum": ["thread"]
+                                    },
+                                    "subtype": {
+                                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/actions/properties/keystroke/properties/root/anyOf/0/properties/subtype"
+                                    },
+                                    "next": {
+                                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/actions/properties/keystroke/properties/root/anyOf/0/properties/next"
+                                    }
+                                  },
+                                  "required": ["type", "subtype", "next"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "type": {
+                                      "type": "string",
+                                      "enum": ["sound"]
+                                    },
+                                    "subtype": {
+                                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/actions/properties/keystroke/properties/root/anyOf/0/properties/subtype"
+                                    },
+                                    "next": {
+                                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/actions/properties/keystroke/properties/root/anyOf/0/properties/next"
+                                    }
+                                  },
+                                  "required": ["type", "subtype", "next"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "type": {
+                                      "type": "string",
+                                      "enum": ["movie"]
+                                    },
+                                    "subtype": {
+                                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/actions/properties/keystroke/properties/root/anyOf/0/properties/subtype"
+                                    },
+                                    "next": {
+                                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/actions/properties/keystroke/properties/root/anyOf/0/properties/next"
+                                    }
+                                  },
+                                  "required": ["type", "subtype", "next"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "type": {
+                                      "type": "string",
+                                      "enum": ["import-data"]
+                                    },
+                                    "subtype": {
+                                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/actions/properties/keystroke/properties/root/anyOf/0/properties/subtype"
+                                    },
+                                    "next": {
+                                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/actions/properties/keystroke/properties/root/anyOf/0/properties/next"
+                                    }
+                                  },
+                                  "required": ["type", "subtype", "next"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "type": {
+                                      "type": "string",
+                                      "enum": ["set-ocg-state"]
+                                    },
+                                    "subtype": {
+                                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/actions/properties/keystroke/properties/root/anyOf/0/properties/subtype"
+                                    },
+                                    "next": {
+                                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/actions/properties/keystroke/properties/root/anyOf/0/properties/next"
+                                    }
+                                  },
+                                  "required": ["type", "subtype", "next"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "type": {
+                                      "type": "string",
+                                      "enum": ["transition"]
+                                    },
+                                    "subtype": {
+                                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/actions/properties/keystroke/properties/root/anyOf/0/properties/subtype"
+                                    },
+                                    "next": {
+                                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/actions/properties/keystroke/properties/root/anyOf/0/properties/next"
+                                    }
+                                  },
+                                  "required": ["type", "subtype", "next"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "type": {
+                                      "type": "string",
+                                      "enum": ["goto-3d-view"]
+                                    },
+                                    "subtype": {
+                                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/actions/properties/keystroke/properties/root/anyOf/0/properties/subtype"
+                                    },
+                                    "next": {
+                                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/actions/properties/keystroke/properties/root/anyOf/0/properties/next"
+                                    }
+                                  },
+                                  "required": ["type", "subtype", "next"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "type": {
+                                      "type": "string",
+                                      "enum": ["unknown"]
+                                    },
+                                    "subtype": {
+                                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/actions/properties/keystroke/properties/root/anyOf/0/properties/subtype"
+                                    },
+                                    "next": {
+                                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/actions/properties/keystroke/properties/root/anyOf/0/properties/next"
+                                    }
+                                  },
+                                  "required": ["type", "subtype", "next"],
+                                  "additionalProperties": false
                                 }
-                              },
-                              "required": ["type", "subtype", "next"],
-                              "additionalProperties": false,
+                              ],
                               "nullable": true
                             },
                             "incomplete": {
@@ -14200,7 +15464,12 @@
                               "type": "array",
                               "items": {
                                 "type": "string",
-                                "enum": ["cycle-dropped", "malformed-next", "incomplete"]
+                                "enum": [
+                                  "cycle-dropped",
+                                  "malformed-next",
+                                  "incomplete",
+                                  "payload-dropped"
+                                ]
                               }
                             }
                           },

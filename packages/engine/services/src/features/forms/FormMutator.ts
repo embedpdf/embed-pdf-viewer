@@ -70,7 +70,7 @@ export class FormMutator {
     const resolved = resolveFieldRef(this.runtime, model, ref);
     this.assertWritable(resolved.fieldObjectNumber);
 
-    const before = readFieldAt(this.runtime, model, resolved.fieldIndex);
+    const before = readFieldAt(this.runtime, model, resolved.fieldIndex, this.session.requireDocPtr());
     const allowed = FAMILY_BY_VALUE_TYPE[value.type];
     if (!allowed.includes(before.family)) {
       throw new EngineError(
@@ -140,7 +140,7 @@ export class FormMutator {
     const fresh = acquireFormModel(this.runtime, this.session);
     return {
       ...counters,
-      snapshot: readFormSnapshot(this.runtime, fresh),
+      snapshot: readFormSnapshot(this.runtime, fresh, this.session.requireDocPtr()),
       meta: EMPTY_META,
     };
   }
@@ -270,7 +270,7 @@ export class FormMutator {
     const model = acquireFormModel(this.runtime, this.session);
     const resolved = resolveFieldRef(this.runtime, model, ref);
     this.assertWritable(resolved.fieldObjectNumber);
-    const before = readFieldAt(this.runtime, model, resolved.fieldIndex);
+    const before = readFieldAt(this.runtime, model, resolved.fieldIndex, this.session.requireDocPtr());
     if (before.family !== patch.family) {
       throw new EngineError(
         EngineErrorCode.InvalidArg,
@@ -350,7 +350,7 @@ export class FormMutator {
     const model = acquireFormModel(this.runtime, this.session);
     const resolved = resolveFieldRef(this.runtime, model, ref);
     this.assertWritable(resolved.fieldObjectNumber);
-    const before = readFieldAt(this.runtime, model, resolved.fieldIndex);
+    const before = readFieldAt(this.runtime, model, resolved.fieldIndex, this.session.requireDocPtr());
 
     const ok = withScratchN(mem, [256 * 4, 4], ([buf, countPtr]) => {
       mem.poke(countPtr, 'i32', 0);
@@ -387,7 +387,7 @@ export class FormMutator {
     const model = acquireFormModel(this.runtime, this.session);
     const resolved = resolveFieldRef(this.runtime, model, ref);
     this.assertWritable(resolved.fieldObjectNumber);
-    const before = readFieldAt(this.runtime, model, resolved.fieldIndex);
+    const before = readFieldAt(this.runtime, model, resolved.fieldIndex, this.session.requireDocPtr());
     const toggle = before.family === 'checkbox' || before.family === 'radio';
     const state = toggle ? (onState ?? (before.family === 'checkbox' ? 'Yes' : '')) : '';
     if (toggle && (!state || state === 'Off')) {
@@ -500,7 +500,7 @@ export class FormMutator {
     if (fieldIndex < 0) {
       throw new EngineError(EngineErrorCode.Unknown, 'form field vanished after write');
     }
-    return readFieldAt(this.runtime, fresh, fieldIndex);
+    return readFieldAt(this.runtime, fresh, fieldIndex, this.session.requireDocPtr());
   }
 
   private assertWritable(fieldObjectNumber: number): void {
@@ -591,7 +591,12 @@ export class FormMutator {
     if (fieldIndex < 0) {
       throw new EngineError(EngineErrorCode.Unknown, 'form field vanished after write');
     }
-    const field: FormFieldDTO = readFieldAt(this.runtime, fresh, fieldIndex);
+    const field: FormFieldDTO = readFieldAt(
+      this.runtime,
+      fresh,
+      fieldIndex,
+      this.session.requireDocPtr(),
+    );
     const changedSet = new Set(changedObjNums);
     const changedWidgets: FormWidgetRef[] = field.widgets
       .filter((w) => changedSet.has(w.annotObjectNumber))

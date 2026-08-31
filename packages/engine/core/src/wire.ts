@@ -78,6 +78,7 @@ export {
 export {
   PdfActionTypeSchema,
   PdfActionNodeSchema,
+  PdfActionTargetRefSchema,
   PdfActionTreeSchema,
   PdfFieldActionsSchema,
   PdfPageActionsSchema,

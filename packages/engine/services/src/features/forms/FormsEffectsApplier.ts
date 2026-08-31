@@ -155,7 +155,7 @@ export class FormsEffectsApplier {
       const model = acquireFormModel(this.runtime, this.session);
       const resolved = refs.map((ref) => this.resolve(model, ref));
       const fields = resolved.map(({ fieldIndex }) =>
-        readFieldAt(this.runtime, model, fieldIndex, actionBudget),
+        readFieldAt(this.runtime, model, fieldIndex, this.session.requireDocPtr(), actionBudget),
       );
       validateEffect(effect, fields);
       return {
@@ -191,7 +191,7 @@ export class FormsEffectsApplier {
     if (index < 0) {
       throw new EngineError(EngineErrorCode.InvalidReference, 'form field disappeared');
     }
-    return readFieldAt(this.runtime, model, index, actionBudget);
+    return readFieldAt(this.runtime, model, index, this.session.requireDocPtr(), actionBudget);
   }
 
   private readFieldsBestEffort(

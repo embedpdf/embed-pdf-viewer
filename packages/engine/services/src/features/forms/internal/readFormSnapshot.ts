@@ -122,6 +122,7 @@ export function readFieldAt(
   runtime: PdfRuntimeModule,
   model: Ptr,
   fieldIndex: number,
+  docPtr: Ptr,
   actionBudget = new ActionReadBudgetTracker(),
 ): FormFieldDTO {
   const { fn } = runtime;
@@ -133,7 +134,7 @@ export function readFieldAt(
   const family = FAMILY_BY_CODE[fn.EPDFForm_GetFieldFamily(model, fieldIndex)] ?? 'unknown';
   const valueEntry = readValueEntry(runtime, model, fieldIndex, false);
   const defaultValueEntry = readValueEntry(runtime, model, fieldIndex, true);
-  const actions = readFieldActions(runtime, model, fieldIndex, actionBudget);
+  const actions = readFieldActions(runtime, model, fieldIndex, docPtr, actionBudget);
 
   const base: FormFieldBase = {
     ref:
@@ -237,13 +238,13 @@ export function readFieldAt(
 }
 
 /** Read the whole native model into a detached {@link FormSnapshot}. */
-export function readFormSnapshot(runtime: PdfRuntimeModule, model: Ptr): FormSnapshot {
+export function readFormSnapshot(runtime: PdfRuntimeModule, model: Ptr, docPtr: Ptr): FormSnapshot {
   const { fn } = runtime;
   const count = fn.EPDFForm_CountFields(model);
   const fields: FormFieldDTO[] = [];
   const actionBudget = new ActionReadBudgetTracker();
   for (let i = 0; i < count; i++) {
-    fields.push(readFieldAt(runtime, model, i, actionBudget));
+    fields.push(readFieldAt(runtime, model, i, docPtr, actionBudget));
   }
   const calculationOrder: FormSnapshot['calculationOrder'] = [];
   const calculationCount = fn.EPDFForm_CountCalculationOrder(model);
@@ -300,6 +301,7 @@ function readFieldActions(
   runtime: PdfRuntimeModule,
   model: Ptr,
   fieldIndex: number,
+  docPtr: Ptr,
   budget: ActionReadBudgetTracker,
 ): PdfFieldActions | undefined {
   const { fn, mem } = runtime;
@@ -314,6 +316,7 @@ function readFieldActions(
     const action = readActionModel(
       fn,
       mem,
+      docPtr,
       fn.EPDFForm_GetFieldActionModel(model, fieldIndex, event),
       budget,
     );

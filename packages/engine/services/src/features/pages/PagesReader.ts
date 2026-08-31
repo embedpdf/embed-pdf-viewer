@@ -91,12 +91,14 @@ function readPageActions(
   const open = readActionModel(
     fn,
     mem,
+    docPtr,
     fn.EPDFDoc_GetPageActionModel(docPtr, pageObjectNumber, 0),
     budget,
   );
   const close = readActionModel(
     fn,
     mem,
+    docPtr,
     fn.EPDFDoc_GetPageActionModel(docPtr, pageObjectNumber, 1),
     budget,
   );

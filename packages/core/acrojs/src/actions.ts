@@ -11,7 +11,9 @@ export function javaScriptSourcesFromActionTree(tree: PdfActionTree): string[] {
 
   const sources: string[] = [];
   const visit = (node: PdfActionNode): void => {
-    if (node.type === 'javascript' && node.script !== undefined) sources.push(node.script);
+    // Only the javascript arm is collected; rendition `/JS` deliberately
+    // waits for a rendition interpreter.
+    if (node.type === 'javascript') sources.push(node.script);
     for (const child of node.next) visit(child);
   };
   if (tree.root) visit(tree.root);

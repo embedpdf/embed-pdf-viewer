@@ -26,7 +26,7 @@ export function readAnnotationFromPtr(
   revision: RevisionToken,
   ctx: AnnotationReadContext,
 ): AnnotationDTO {
-  const base = readAnnotationBase(fn, mem, annotPtr, pageObjectNumber, index, revision);
+  const base = readAnnotationBase(fn, mem, ctx.docPtr, annotPtr, pageObjectNumber, index, revision);
   const subtypeCode = fn.FPDFAnnot_GetSubtype(annotPtr);
   const { reader } = pickReader(subtypeCode);
   return reader(fn, mem, annotPtr, base, subtypeCode, ctx);

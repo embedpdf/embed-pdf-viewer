@@ -20,6 +20,7 @@ export interface ConformanceExpect {
     toHaveLength(expected: number): void;
     toMatch(re: RegExp): void;
     toMatchObject(shape: Record<string, unknown>): void;
+    toContain(expected: unknown): void;
     toBeInstanceOf(ctor: Function): void;
     toBeTruthy(): void;
     rejects: {

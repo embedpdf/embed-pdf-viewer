@@ -1,0 +1,78 @@
+%PDF-1.7
+%‚„œ”
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Annots [4 0 R 5 0 R 6 0 R 7 0 R 8 0 R 9 0 R 10 0 R 11 0 R 12 0 R 13 0 R 14 0 R 15 0 R 16 0 R 17 0 R] >>
+endobj
+4 0 obj
+<< /Type /Annot /Subtype /Square /Rect [400 700 450 750] /NM (note1) /F 4 >>
+endobj
+5 0 obj
+<< /Type /Annot /Subtype /Link /Rect [10 700 60 720] /NM (goto-fitr) /F 4 /A << /S /GoTo /D [3 0 R /FitR 10 20 300 400] >> >>
+endobj
+6 0 obj
+<< /Type /Annot /Subtype /Link /Rect [10 670 60 690] /NM (uri-map) /F 4 /A << /S /URI /URI (https://example.test/map) /IsMap true >> >>
+endobj
+7 0 obj
+<< /Type /Annot /Subtype /Link /Rect [10 640 60 660] /NM (named-next) /F 4 /A << /S /Named /N /NextPage >> >>
+endobj
+8 0 obj
+<< /Type /Annot /Subtype /Link /Rect [10 610 60 630] /NM (hide-mixed) /F 4 /A << /S /Hide /T [(note1) 4 0 R] /H false >> >>
+endobj
+9 0 obj
+<< /Type /Annot /Subtype /Link /Rect [10 580 60 600] /NM (hide-scalar) /F 4 /A << /S /Hide /T (fieldB) >> >>
+endobj
+10 0 obj
+<< /Type /Annot /Subtype /Link /Rect [10 550 60 570] /NM (reset-include) /F 4 /A << /S /ResetForm /Fields [(calc1)] /Flags 1 >> >>
+endobj
+11 0 obj
+<< /Type /Annot /Subtype /Link /Rect [10 520 60 540] /NM (reset-absent) /F 4 /A << /S /ResetForm /Flags 1 >> >>
+endobj
+12 0 obj
+<< /Type /Annot /Subtype /Link /Rect [10 490 60 510] /NM (reset-empty) /F 4 /A << /S /ResetForm /Fields [] >> >>
+endobj
+13 0 obj
+<< /Type /Annot /Subtype /Link /Rect [10 460 60 480] /NM (launch-app) /F 4 /A << /S /Launch /F (app.exe) >> >>
+endobj
+14 0 obj
+<< /Type /Annot /Subtype /Link /Rect [10 430 60 450] /NM (gotor-file) /F 4 /A << /S /GoToR /F (other.pdf) /D [0 /Fit] >> >>
+endobj
+15 0 obj
+<< /Type /Annot /Subtype /Link /Rect [10 400 60 420] /NM (chain-js-goto-hide) /F 4 /A << /S /JavaScript /JS (app.alert\('chain'\);) /Next << /S /GoTo /D [3 0 R /XYZ 5 10 1.25] /Next << /S /Hide /T (note1) >> >> >> >>
+endobj
+16 0 obj
+<< /Type /Annot /Subtype /Link /Rect [10 370 60 390] /NM (goto-malformed) /F 4 /A << /S /GoTo >> >>
+endobj
+17 0 obj
+<< /Type /Annot /Subtype /Link /Rect [10 340 60 360] /NM (hide-partial) /F 4 /A << /S /Hide /T [(kept) << /Foo 1 >>] >> >>
+endobj
+xref
+0 18
+0000000000 65535 f 
+0000000015 00000 n 
+0000000064 00000 n 
+0000000121 00000 n 
+0000000294 00000 n 
+0000000386 00000 n 
+0000000527 00000 n 
+0000000678 00000 n 
+0000000803 00000 n 
+0000000942 00000 n 
+0000001066 00000 n 
+0000001213 00000 n 
+0000001341 00000 n 
+0000001470 00000 n 
+0000001597 00000 n 
+0000001737 00000 n 
+0000001970 00000 n 
+0000002086 00000 n 
+trailer
+<< /Size 18 /Root 1 0 R >>
+startxref
+2225
+%%EOF

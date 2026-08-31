@@ -57,45 +57,13 @@ export namespace DocFormsGet200ResponseFieldsItem {
 
         export namespace Actions {
             export interface Keystroke {
-                root: Keystroke.Root | null;
+                root: CloudPDF.DocFormsGet200ResponseFieldsItemTextActionsKeystrokeRoot | null;
                 incomplete: boolean;
                 warningFlags: number;
                 warnings: Keystroke.Warnings.Item[];
             }
 
             export namespace Keystroke {
-                export interface Root {
-                    type: Root.Type;
-                    subtype: string;
-                    script?: string | undefined;
-                    next: unknown[];
-                }
-
-                export namespace Root {
-                    export const Type = {
-                        Unknown: "unknown",
-                        Goto: "goto",
-                        GotoRemote: "goto-remote",
-                        GotoEmbedded: "goto-embedded",
-                        Launch: "launch",
-                        Thread: "thread",
-                        Uri: "uri",
-                        Sound: "sound",
-                        Movie: "movie",
-                        Hide: "hide",
-                        Named: "named",
-                        SubmitForm: "submit-form",
-                        ResetForm: "reset-form",
-                        ImportData: "import-data",
-                        Javascript: "javascript",
-                        SetOcgState: "set-ocg-state",
-                        Rendition: "rendition",
-                        Transition: "transition",
-                        Goto3DView: "goto-3d-view",
-                    } as const;
-                    export type Type = (typeof Type)[keyof typeof Type];
-                }
-
                 export type Warnings = Warnings.Item[];
 
                 export namespace Warnings {
@@ -103,51 +71,20 @@ export namespace DocFormsGet200ResponseFieldsItem {
                         CycleDropped: "cycle-dropped",
                         MalformedNext: "malformed-next",
                         Incomplete: "incomplete",
+                        PayloadDropped: "payload-dropped",
                     } as const;
                     export type Item = (typeof Item)[keyof typeof Item];
                 }
             }
 
             export interface Format {
-                root: Format.Root | null;
+                root: CloudPDF.DocFormsGet200ResponseFieldsItemTextActionsFormatRoot | null;
                 incomplete: boolean;
                 warningFlags: number;
                 warnings: Format.Warnings.Item[];
             }
 
             export namespace Format {
-                export interface Root {
-                    type: Root.Type;
-                    subtype: string;
-                    script?: string | undefined;
-                    next: unknown[];
-                }
-
-                export namespace Root {
-                    export const Type = {
-                        Unknown: "unknown",
-                        Goto: "goto",
-                        GotoRemote: "goto-remote",
-                        GotoEmbedded: "goto-embedded",
-                        Launch: "launch",
-                        Thread: "thread",
-                        Uri: "uri",
-                        Sound: "sound",
-                        Movie: "movie",
-                        Hide: "hide",
-                        Named: "named",
-                        SubmitForm: "submit-form",
-                        ResetForm: "reset-form",
-                        ImportData: "import-data",
-                        Javascript: "javascript",
-                        SetOcgState: "set-ocg-state",
-                        Rendition: "rendition",
-                        Transition: "transition",
-                        Goto3DView: "goto-3d-view",
-                    } as const;
-                    export type Type = (typeof Type)[keyof typeof Type];
-                }
-
                 export type Warnings = Warnings.Item[];
 
                 export namespace Warnings {
@@ -155,51 +92,20 @@ export namespace DocFormsGet200ResponseFieldsItem {
                         CycleDropped: "cycle-dropped",
                         MalformedNext: "malformed-next",
                         Incomplete: "incomplete",
+                        PayloadDropped: "payload-dropped",
                     } as const;
                     export type Item = (typeof Item)[keyof typeof Item];
                 }
             }
 
             export interface Validate {
-                root: Validate.Root | null;
+                root: CloudPDF.DocFormsGet200ResponseFieldsItemTextActionsValidateRoot | null;
                 incomplete: boolean;
                 warningFlags: number;
                 warnings: Validate.Warnings.Item[];
             }
 
             export namespace Validate {
-                export interface Root {
-                    type: Root.Type;
-                    subtype: string;
-                    script?: string | undefined;
-                    next: unknown[];
-                }
-
-                export namespace Root {
-                    export const Type = {
-                        Unknown: "unknown",
-                        Goto: "goto",
-                        GotoRemote: "goto-remote",
-                        GotoEmbedded: "goto-embedded",
-                        Launch: "launch",
-                        Thread: "thread",
-                        Uri: "uri",
-                        Sound: "sound",
-                        Movie: "movie",
-                        Hide: "hide",
-                        Named: "named",
-                        SubmitForm: "submit-form",
-                        ResetForm: "reset-form",
-                        ImportData: "import-data",
-                        Javascript: "javascript",
-                        SetOcgState: "set-ocg-state",
-                        Rendition: "rendition",
-                        Transition: "transition",
-                        Goto3DView: "goto-3d-view",
-                    } as const;
-                    export type Type = (typeof Type)[keyof typeof Type];
-                }
-
                 export type Warnings = Warnings.Item[];
 
                 export namespace Warnings {
@@ -207,51 +113,20 @@ export namespace DocFormsGet200ResponseFieldsItem {
                         CycleDropped: "cycle-dropped",
                         MalformedNext: "malformed-next",
                         Incomplete: "incomplete",
+                        PayloadDropped: "payload-dropped",
                     } as const;
                     export type Item = (typeof Item)[keyof typeof Item];
                 }
             }
 
             export interface Calculate {
-                root: Calculate.Root | null;
+                root: CloudPDF.DocFormsGet200ResponseFieldsItemTextActionsCalculateRoot | null;
                 incomplete: boolean;
                 warningFlags: number;
                 warnings: Calculate.Warnings.Item[];
             }
 
             export namespace Calculate {
-                export interface Root {
-                    type: Root.Type;
-                    subtype: string;
-                    script?: string | undefined;
-                    next: unknown[];
-                }
-
-                export namespace Root {
-                    export const Type = {
-                        Unknown: "unknown",
-                        Goto: "goto",
-                        GotoRemote: "goto-remote",
-                        GotoEmbedded: "goto-embedded",
-                        Launch: "launch",
-                        Thread: "thread",
-                        Uri: "uri",
-                        Sound: "sound",
-                        Movie: "movie",
-                        Hide: "hide",
-                        Named: "named",
-                        SubmitForm: "submit-form",
-                        ResetForm: "reset-form",
-                        ImportData: "import-data",
-                        Javascript: "javascript",
-                        SetOcgState: "set-ocg-state",
-                        Rendition: "rendition",
-                        Transition: "transition",
-                        Goto3DView: "goto-3d-view",
-                    } as const;
-                    export type Type = (typeof Type)[keyof typeof Type];
-                }
-
                 export type Warnings = Warnings.Item[];
 
                 export namespace Warnings {
@@ -259,6 +134,7 @@ export namespace DocFormsGet200ResponseFieldsItem {
                         CycleDropped: "cycle-dropped",
                         MalformedNext: "malformed-next",
                         Incomplete: "incomplete",
+                        PayloadDropped: "payload-dropped",
                     } as const;
                     export type Item = (typeof Item)[keyof typeof Item];
                 }
@@ -315,45 +191,13 @@ export namespace DocFormsGet200ResponseFieldsItem {
 
         export namespace Actions {
             export interface Keystroke {
-                root: Keystroke.Root | null;
+                root: CloudPDF.DocFormsGet200ResponseFieldsItemCheckboxActionsKeystrokeRoot | null;
                 incomplete: boolean;
                 warningFlags: number;
                 warnings: Keystroke.Warnings.Item[];
             }
 
             export namespace Keystroke {
-                export interface Root {
-                    type: Root.Type;
-                    subtype: string;
-                    script?: string | undefined;
-                    next: unknown[];
-                }
-
-                export namespace Root {
-                    export const Type = {
-                        Unknown: "unknown",
-                        Goto: "goto",
-                        GotoRemote: "goto-remote",
-                        GotoEmbedded: "goto-embedded",
-                        Launch: "launch",
-                        Thread: "thread",
-                        Uri: "uri",
-                        Sound: "sound",
-                        Movie: "movie",
-                        Hide: "hide",
-                        Named: "named",
-                        SubmitForm: "submit-form",
-                        ResetForm: "reset-form",
-                        ImportData: "import-data",
-                        Javascript: "javascript",
-                        SetOcgState: "set-ocg-state",
-                        Rendition: "rendition",
-                        Transition: "transition",
-                        Goto3DView: "goto-3d-view",
-                    } as const;
-                    export type Type = (typeof Type)[keyof typeof Type];
-                }
-
                 export type Warnings = Warnings.Item[];
 
                 export namespace Warnings {
@@ -361,51 +205,20 @@ export namespace DocFormsGet200ResponseFieldsItem {
                         CycleDropped: "cycle-dropped",
                         MalformedNext: "malformed-next",
                         Incomplete: "incomplete",
+                        PayloadDropped: "payload-dropped",
                     } as const;
                     export type Item = (typeof Item)[keyof typeof Item];
                 }
             }
 
             export interface Format {
-                root: Format.Root | null;
+                root: CloudPDF.DocFormsGet200ResponseFieldsItemCheckboxActionsFormatRoot | null;
                 incomplete: boolean;
                 warningFlags: number;
                 warnings: Format.Warnings.Item[];
             }
 
             export namespace Format {
-                export interface Root {
-                    type: Root.Type;
-                    subtype: string;
-                    script?: string | undefined;
-                    next: unknown[];
-                }
-
-                export namespace Root {
-                    export const Type = {
-                        Unknown: "unknown",
-                        Goto: "goto",
-                        GotoRemote: "goto-remote",
-                        GotoEmbedded: "goto-embedded",
-                        Launch: "launch",
-                        Thread: "thread",
-                        Uri: "uri",
-                        Sound: "sound",
-                        Movie: "movie",
-                        Hide: "hide",
-                        Named: "named",
-                        SubmitForm: "submit-form",
-                        ResetForm: "reset-form",
-                        ImportData: "import-data",
-                        Javascript: "javascript",
-                        SetOcgState: "set-ocg-state",
-                        Rendition: "rendition",
-                        Transition: "transition",
-                        Goto3DView: "goto-3d-view",
-                    } as const;
-                    export type Type = (typeof Type)[keyof typeof Type];
-                }
-
                 export type Warnings = Warnings.Item[];
 
                 export namespace Warnings {
@@ -413,51 +226,20 @@ export namespace DocFormsGet200ResponseFieldsItem {
                         CycleDropped: "cycle-dropped",
                         MalformedNext: "malformed-next",
                         Incomplete: "incomplete",
+                        PayloadDropped: "payload-dropped",
                     } as const;
                     export type Item = (typeof Item)[keyof typeof Item];
                 }
             }
 
             export interface Validate {
-                root: Validate.Root | null;
+                root: CloudPDF.DocFormsGet200ResponseFieldsItemCheckboxActionsValidateRoot | null;
                 incomplete: boolean;
                 warningFlags: number;
                 warnings: Validate.Warnings.Item[];
             }
 
             export namespace Validate {
-                export interface Root {
-                    type: Root.Type;
-                    subtype: string;
-                    script?: string | undefined;
-                    next: unknown[];
-                }
-
-                export namespace Root {
-                    export const Type = {
-                        Unknown: "unknown",
-                        Goto: "goto",
-                        GotoRemote: "goto-remote",
-                        GotoEmbedded: "goto-embedded",
-                        Launch: "launch",
-                        Thread: "thread",
-                        Uri: "uri",
-                        Sound: "sound",
-                        Movie: "movie",
-                        Hide: "hide",
-                        Named: "named",
-                        SubmitForm: "submit-form",
-                        ResetForm: "reset-form",
-                        ImportData: "import-data",
-                        Javascript: "javascript",
-                        SetOcgState: "set-ocg-state",
-                        Rendition: "rendition",
-                        Transition: "transition",
-                        Goto3DView: "goto-3d-view",
-                    } as const;
-                    export type Type = (typeof Type)[keyof typeof Type];
-                }
-
                 export type Warnings = Warnings.Item[];
 
                 export namespace Warnings {
@@ -465,51 +247,20 @@ export namespace DocFormsGet200ResponseFieldsItem {
                         CycleDropped: "cycle-dropped",
                         MalformedNext: "malformed-next",
                         Incomplete: "incomplete",
+                        PayloadDropped: "payload-dropped",
                     } as const;
                     export type Item = (typeof Item)[keyof typeof Item];
                 }
             }
 
             export interface Calculate {
-                root: Calculate.Root | null;
+                root: CloudPDF.DocFormsGet200ResponseFieldsItemCheckboxActionsCalculateRoot | null;
                 incomplete: boolean;
                 warningFlags: number;
                 warnings: Calculate.Warnings.Item[];
             }
 
             export namespace Calculate {
-                export interface Root {
-                    type: Root.Type;
-                    subtype: string;
-                    script?: string | undefined;
-                    next: unknown[];
-                }
-
-                export namespace Root {
-                    export const Type = {
-                        Unknown: "unknown",
-                        Goto: "goto",
-                        GotoRemote: "goto-remote",
-                        GotoEmbedded: "goto-embedded",
-                        Launch: "launch",
-                        Thread: "thread",
-                        Uri: "uri",
-                        Sound: "sound",
-                        Movie: "movie",
-                        Hide: "hide",
-                        Named: "named",
-                        SubmitForm: "submit-form",
-                        ResetForm: "reset-form",
-                        ImportData: "import-data",
-                        Javascript: "javascript",
-                        SetOcgState: "set-ocg-state",
-                        Rendition: "rendition",
-                        Transition: "transition",
-                        Goto3DView: "goto-3d-view",
-                    } as const;
-                    export type Type = (typeof Type)[keyof typeof Type];
-                }
-
                 export type Warnings = Warnings.Item[];
 
                 export namespace Warnings {
@@ -517,6 +268,7 @@ export namespace DocFormsGet200ResponseFieldsItem {
                         CycleDropped: "cycle-dropped",
                         MalformedNext: "malformed-next",
                         Incomplete: "incomplete",
+                        PayloadDropped: "payload-dropped",
                     } as const;
                     export type Item = (typeof Item)[keyof typeof Item];
                 }
@@ -577,45 +329,13 @@ export namespace DocFormsGet200ResponseFieldsItem {
 
         export namespace Actions {
             export interface Keystroke {
-                root: Keystroke.Root | null;
+                root: CloudPDF.DocFormsGet200ResponseFieldsItemRadioActionsKeystrokeRoot | null;
                 incomplete: boolean;
                 warningFlags: number;
                 warnings: Keystroke.Warnings.Item[];
             }
 
             export namespace Keystroke {
-                export interface Root {
-                    type: Root.Type;
-                    subtype: string;
-                    script?: string | undefined;
-                    next: unknown[];
-                }
-
-                export namespace Root {
-                    export const Type = {
-                        Unknown: "unknown",
-                        Goto: "goto",
-                        GotoRemote: "goto-remote",
-                        GotoEmbedded: "goto-embedded",
-                        Launch: "launch",
-                        Thread: "thread",
-                        Uri: "uri",
-                        Sound: "sound",
-                        Movie: "movie",
-                        Hide: "hide",
-                        Named: "named",
-                        SubmitForm: "submit-form",
-                        ResetForm: "reset-form",
-                        ImportData: "import-data",
-                        Javascript: "javascript",
-                        SetOcgState: "set-ocg-state",
-                        Rendition: "rendition",
-                        Transition: "transition",
-                        Goto3DView: "goto-3d-view",
-                    } as const;
-                    export type Type = (typeof Type)[keyof typeof Type];
-                }
-
                 export type Warnings = Warnings.Item[];
 
                 export namespace Warnings {
@@ -623,51 +343,20 @@ export namespace DocFormsGet200ResponseFieldsItem {
                         CycleDropped: "cycle-dropped",
                         MalformedNext: "malformed-next",
                         Incomplete: "incomplete",
+                        PayloadDropped: "payload-dropped",
                     } as const;
                     export type Item = (typeof Item)[keyof typeof Item];
                 }
             }
 
             export interface Format {
-                root: Format.Root | null;
+                root: CloudPDF.DocFormsGet200ResponseFieldsItemRadioActionsFormatRoot | null;
                 incomplete: boolean;
                 warningFlags: number;
                 warnings: Format.Warnings.Item[];
             }
 
             export namespace Format {
-                export interface Root {
-                    type: Root.Type;
-                    subtype: string;
-                    script?: string | undefined;
-                    next: unknown[];
-                }
-
-                export namespace Root {
-                    export const Type = {
-                        Unknown: "unknown",
-                        Goto: "goto",
-                        GotoRemote: "goto-remote",
-                        GotoEmbedded: "goto-embedded",
-                        Launch: "launch",
-                        Thread: "thread",
-                        Uri: "uri",
-                        Sound: "sound",
-                        Movie: "movie",
-                        Hide: "hide",
-                        Named: "named",
-                        SubmitForm: "submit-form",
-                        ResetForm: "reset-form",
-                        ImportData: "import-data",
-                        Javascript: "javascript",
-                        SetOcgState: "set-ocg-state",
-                        Rendition: "rendition",
-                        Transition: "transition",
-                        Goto3DView: "goto-3d-view",
-                    } as const;
-                    export type Type = (typeof Type)[keyof typeof Type];
-                }
-
                 export type Warnings = Warnings.Item[];
 
                 export namespace Warnings {
@@ -675,51 +364,20 @@ export namespace DocFormsGet200ResponseFieldsItem {
                         CycleDropped: "cycle-dropped",
                         MalformedNext: "malformed-next",
                         Incomplete: "incomplete",
+                        PayloadDropped: "payload-dropped",
                     } as const;
                     export type Item = (typeof Item)[keyof typeof Item];
                 }
             }
 
             export interface Validate {
-                root: Validate.Root | null;
+                root: CloudPDF.DocFormsGet200ResponseFieldsItemRadioActionsValidateRoot | null;
                 incomplete: boolean;
                 warningFlags: number;
                 warnings: Validate.Warnings.Item[];
             }
 
             export namespace Validate {
-                export interface Root {
-                    type: Root.Type;
-                    subtype: string;
-                    script?: string | undefined;
-                    next: unknown[];
-                }
-
-                export namespace Root {
-                    export const Type = {
-                        Unknown: "unknown",
-                        Goto: "goto",
-                        GotoRemote: "goto-remote",
-                        GotoEmbedded: "goto-embedded",
-                        Launch: "launch",
-                        Thread: "thread",
-                        Uri: "uri",
-                        Sound: "sound",
-                        Movie: "movie",
-                        Hide: "hide",
-                        Named: "named",
-                        SubmitForm: "submit-form",
-                        ResetForm: "reset-form",
-                        ImportData: "import-data",
-                        Javascript: "javascript",
-                        SetOcgState: "set-ocg-state",
-                        Rendition: "rendition",
-                        Transition: "transition",
-                        Goto3DView: "goto-3d-view",
-                    } as const;
-                    export type Type = (typeof Type)[keyof typeof Type];
-                }
-
                 export type Warnings = Warnings.Item[];
 
                 export namespace Warnings {
@@ -727,51 +385,20 @@ export namespace DocFormsGet200ResponseFieldsItem {
                         CycleDropped: "cycle-dropped",
                         MalformedNext: "malformed-next",
                         Incomplete: "incomplete",
+                        PayloadDropped: "payload-dropped",
                     } as const;
                     export type Item = (typeof Item)[keyof typeof Item];
                 }
             }
 
             export interface Calculate {
-                root: Calculate.Root | null;
+                root: CloudPDF.DocFormsGet200ResponseFieldsItemRadioActionsCalculateRoot | null;
                 incomplete: boolean;
                 warningFlags: number;
                 warnings: Calculate.Warnings.Item[];
             }
 
             export namespace Calculate {
-                export interface Root {
-                    type: Root.Type;
-                    subtype: string;
-                    script?: string | undefined;
-                    next: unknown[];
-                }
-
-                export namespace Root {
-                    export const Type = {
-                        Unknown: "unknown",
-                        Goto: "goto",
-                        GotoRemote: "goto-remote",
-                        GotoEmbedded: "goto-embedded",
-                        Launch: "launch",
-                        Thread: "thread",
-                        Uri: "uri",
-                        Sound: "sound",
-                        Movie: "movie",
-                        Hide: "hide",
-                        Named: "named",
-                        SubmitForm: "submit-form",
-                        ResetForm: "reset-form",
-                        ImportData: "import-data",
-                        Javascript: "javascript",
-                        SetOcgState: "set-ocg-state",
-                        Rendition: "rendition",
-                        Transition: "transition",
-                        Goto3DView: "goto-3d-view",
-                    } as const;
-                    export type Type = (typeof Type)[keyof typeof Type];
-                }
-
                 export type Warnings = Warnings.Item[];
 
                 export namespace Warnings {
@@ -779,6 +406,7 @@ export namespace DocFormsGet200ResponseFieldsItem {
                         CycleDropped: "cycle-dropped",
                         MalformedNext: "malformed-next",
                         Incomplete: "incomplete",
+                        PayloadDropped: "payload-dropped",
                     } as const;
                     export type Item = (typeof Item)[keyof typeof Item];
                 }
@@ -840,45 +468,13 @@ export namespace DocFormsGet200ResponseFieldsItem {
 
         export namespace Actions {
             export interface Keystroke {
-                root: Keystroke.Root | null;
+                root: CloudPDF.DocFormsGet200ResponseFieldsItemComboboxActionsKeystrokeRoot | null;
                 incomplete: boolean;
                 warningFlags: number;
                 warnings: Keystroke.Warnings.Item[];
             }
 
             export namespace Keystroke {
-                export interface Root {
-                    type: Root.Type;
-                    subtype: string;
-                    script?: string | undefined;
-                    next: unknown[];
-                }
-
-                export namespace Root {
-                    export const Type = {
-                        Unknown: "unknown",
-                        Goto: "goto",
-                        GotoRemote: "goto-remote",
-                        GotoEmbedded: "goto-embedded",
-                        Launch: "launch",
-                        Thread: "thread",
-                        Uri: "uri",
-                        Sound: "sound",
-                        Movie: "movie",
-                        Hide: "hide",
-                        Named: "named",
-                        SubmitForm: "submit-form",
-                        ResetForm: "reset-form",
-                        ImportData: "import-data",
-                        Javascript: "javascript",
-                        SetOcgState: "set-ocg-state",
-                        Rendition: "rendition",
-                        Transition: "transition",
-                        Goto3DView: "goto-3d-view",
-                    } as const;
-                    export type Type = (typeof Type)[keyof typeof Type];
-                }
-
                 export type Warnings = Warnings.Item[];
 
                 export namespace Warnings {
@@ -886,51 +482,20 @@ export namespace DocFormsGet200ResponseFieldsItem {
                         CycleDropped: "cycle-dropped",
                         MalformedNext: "malformed-next",
                         Incomplete: "incomplete",
+                        PayloadDropped: "payload-dropped",
                     } as const;
                     export type Item = (typeof Item)[keyof typeof Item];
                 }
             }
 
             export interface Format {
-                root: Format.Root | null;
+                root: CloudPDF.DocFormsGet200ResponseFieldsItemComboboxActionsFormatRoot | null;
                 incomplete: boolean;
                 warningFlags: number;
                 warnings: Format.Warnings.Item[];
             }
 
             export namespace Format {
-                export interface Root {
-                    type: Root.Type;
-                    subtype: string;
-                    script?: string | undefined;
-                    next: unknown[];
-                }
-
-                export namespace Root {
-                    export const Type = {
-                        Unknown: "unknown",
-                        Goto: "goto",
-                        GotoRemote: "goto-remote",
-                        GotoEmbedded: "goto-embedded",
-                        Launch: "launch",
-                        Thread: "thread",
-                        Uri: "uri",
-                        Sound: "sound",
-                        Movie: "movie",
-                        Hide: "hide",
-                        Named: "named",
-                        SubmitForm: "submit-form",
-                        ResetForm: "reset-form",
-                        ImportData: "import-data",
-                        Javascript: "javascript",
-                        SetOcgState: "set-ocg-state",
-                        Rendition: "rendition",
-                        Transition: "transition",
-                        Goto3DView: "goto-3d-view",
-                    } as const;
-                    export type Type = (typeof Type)[keyof typeof Type];
-                }
-
                 export type Warnings = Warnings.Item[];
 
                 export namespace Warnings {
@@ -938,51 +503,20 @@ export namespace DocFormsGet200ResponseFieldsItem {
                         CycleDropped: "cycle-dropped",
                         MalformedNext: "malformed-next",
                         Incomplete: "incomplete",
+                        PayloadDropped: "payload-dropped",
                     } as const;
                     export type Item = (typeof Item)[keyof typeof Item];
                 }
             }
 
             export interface Validate {
-                root: Validate.Root | null;
+                root: CloudPDF.DocFormsGet200ResponseFieldsItemComboboxActionsValidateRoot | null;
                 incomplete: boolean;
                 warningFlags: number;
                 warnings: Validate.Warnings.Item[];
             }
 
             export namespace Validate {
-                export interface Root {
-                    type: Root.Type;
-                    subtype: string;
-                    script?: string | undefined;
-                    next: unknown[];
-                }
-
-                export namespace Root {
-                    export const Type = {
-                        Unknown: "unknown",
-                        Goto: "goto",
-                        GotoRemote: "goto-remote",
-                        GotoEmbedded: "goto-embedded",
-                        Launch: "launch",
-                        Thread: "thread",
-                        Uri: "uri",
-                        Sound: "sound",
-                        Movie: "movie",
-                        Hide: "hide",
-                        Named: "named",
-                        SubmitForm: "submit-form",
-                        ResetForm: "reset-form",
-                        ImportData: "import-data",
-                        Javascript: "javascript",
-                        SetOcgState: "set-ocg-state",
-                        Rendition: "rendition",
-                        Transition: "transition",
-                        Goto3DView: "goto-3d-view",
-                    } as const;
-                    export type Type = (typeof Type)[keyof typeof Type];
-                }
-
                 export type Warnings = Warnings.Item[];
 
                 export namespace Warnings {
@@ -990,51 +524,20 @@ export namespace DocFormsGet200ResponseFieldsItem {
                         CycleDropped: "cycle-dropped",
                         MalformedNext: "malformed-next",
                         Incomplete: "incomplete",
+                        PayloadDropped: "payload-dropped",
                     } as const;
                     export type Item = (typeof Item)[keyof typeof Item];
                 }
             }
 
             export interface Calculate {
-                root: Calculate.Root | null;
+                root: CloudPDF.DocFormsGet200ResponseFieldsItemComboboxActionsCalculateRoot | null;
                 incomplete: boolean;
                 warningFlags: number;
                 warnings: Calculate.Warnings.Item[];
             }
 
             export namespace Calculate {
-                export interface Root {
-                    type: Root.Type;
-                    subtype: string;
-                    script?: string | undefined;
-                    next: unknown[];
-                }
-
-                export namespace Root {
-                    export const Type = {
-                        Unknown: "unknown",
-                        Goto: "goto",
-                        GotoRemote: "goto-remote",
-                        GotoEmbedded: "goto-embedded",
-                        Launch: "launch",
-                        Thread: "thread",
-                        Uri: "uri",
-                        Sound: "sound",
-                        Movie: "movie",
-                        Hide: "hide",
-                        Named: "named",
-                        SubmitForm: "submit-form",
-                        ResetForm: "reset-form",
-                        ImportData: "import-data",
-                        Javascript: "javascript",
-                        SetOcgState: "set-ocg-state",
-                        Rendition: "rendition",
-                        Transition: "transition",
-                        Goto3DView: "goto-3d-view",
-                    } as const;
-                    export type Type = (typeof Type)[keyof typeof Type];
-                }
-
                 export type Warnings = Warnings.Item[];
 
                 export namespace Warnings {
@@ -1042,6 +545,7 @@ export namespace DocFormsGet200ResponseFieldsItem {
                         CycleDropped: "cycle-dropped",
                         MalformedNext: "malformed-next",
                         Incomplete: "incomplete",
+                        PayloadDropped: "payload-dropped",
                     } as const;
                     export type Item = (typeof Item)[keyof typeof Item];
                 }
@@ -1109,45 +613,13 @@ export namespace DocFormsGet200ResponseFieldsItem {
 
         export namespace Actions {
             export interface Keystroke {
-                root: Keystroke.Root | null;
+                root: CloudPDF.DocFormsGet200ResponseFieldsItemListboxActionsKeystrokeRoot | null;
                 incomplete: boolean;
                 warningFlags: number;
                 warnings: Keystroke.Warnings.Item[];
             }
 
             export namespace Keystroke {
-                export interface Root {
-                    type: Root.Type;
-                    subtype: string;
-                    script?: string | undefined;
-                    next: unknown[];
-                }
-
-                export namespace Root {
-                    export const Type = {
-                        Unknown: "unknown",
-                        Goto: "goto",
-                        GotoRemote: "goto-remote",
-                        GotoEmbedded: "goto-embedded",
-                        Launch: "launch",
-                        Thread: "thread",
-                        Uri: "uri",
-                        Sound: "sound",
-                        Movie: "movie",
-                        Hide: "hide",
-                        Named: "named",
-                        SubmitForm: "submit-form",
-                        ResetForm: "reset-form",
-                        ImportData: "import-data",
-                        Javascript: "javascript",
-                        SetOcgState: "set-ocg-state",
-                        Rendition: "rendition",
-                        Transition: "transition",
-                        Goto3DView: "goto-3d-view",
-                    } as const;
-                    export type Type = (typeof Type)[keyof typeof Type];
-                }
-
                 export type Warnings = Warnings.Item[];
 
                 export namespace Warnings {
@@ -1155,51 +627,20 @@ export namespace DocFormsGet200ResponseFieldsItem {
                         CycleDropped: "cycle-dropped",
                         MalformedNext: "malformed-next",
                         Incomplete: "incomplete",
+                        PayloadDropped: "payload-dropped",
                     } as const;
                     export type Item = (typeof Item)[keyof typeof Item];
                 }
             }
 
             export interface Format {
-                root: Format.Root | null;
+                root: CloudPDF.DocFormsGet200ResponseFieldsItemListboxActionsFormatRoot | null;
                 incomplete: boolean;
                 warningFlags: number;
                 warnings: Format.Warnings.Item[];
             }
 
             export namespace Format {
-                export interface Root {
-                    type: Root.Type;
-                    subtype: string;
-                    script?: string | undefined;
-                    next: unknown[];
-                }
-
-                export namespace Root {
-                    export const Type = {
-                        Unknown: "unknown",
-                        Goto: "goto",
-                        GotoRemote: "goto-remote",
-                        GotoEmbedded: "goto-embedded",
-                        Launch: "launch",
-                        Thread: "thread",
-                        Uri: "uri",
-                        Sound: "sound",
-                        Movie: "movie",
-                        Hide: "hide",
-                        Named: "named",
-                        SubmitForm: "submit-form",
-                        ResetForm: "reset-form",
-                        ImportData: "import-data",
-                        Javascript: "javascript",
-                        SetOcgState: "set-ocg-state",
-                        Rendition: "rendition",
-                        Transition: "transition",
-                        Goto3DView: "goto-3d-view",
-                    } as const;
-                    export type Type = (typeof Type)[keyof typeof Type];
-                }
-
                 export type Warnings = Warnings.Item[];
 
                 export namespace Warnings {
@@ -1207,51 +648,20 @@ export namespace DocFormsGet200ResponseFieldsItem {
                         CycleDropped: "cycle-dropped",
                         MalformedNext: "malformed-next",
                         Incomplete: "incomplete",
+                        PayloadDropped: "payload-dropped",
                     } as const;
                     export type Item = (typeof Item)[keyof typeof Item];
                 }
             }
 
             export interface Validate {
-                root: Validate.Root | null;
+                root: CloudPDF.DocFormsGet200ResponseFieldsItemListboxActionsValidateRoot | null;
                 incomplete: boolean;
                 warningFlags: number;
                 warnings: Validate.Warnings.Item[];
             }
 
             export namespace Validate {
-                export interface Root {
-                    type: Root.Type;
-                    subtype: string;
-                    script?: string | undefined;
-                    next: unknown[];
-                }
-
-                export namespace Root {
-                    export const Type = {
-                        Unknown: "unknown",
-                        Goto: "goto",
-                        GotoRemote: "goto-remote",
-                        GotoEmbedded: "goto-embedded",
-                        Launch: "launch",
-                        Thread: "thread",
-                        Uri: "uri",
-                        Sound: "sound",
-                        Movie: "movie",
-                        Hide: "hide",
-                        Named: "named",
-                        SubmitForm: "submit-form",
-                        ResetForm: "reset-form",
-                        ImportData: "import-data",
-                        Javascript: "javascript",
-                        SetOcgState: "set-ocg-state",
-                        Rendition: "rendition",
-                        Transition: "transition",
-                        Goto3DView: "goto-3d-view",
-                    } as const;
-                    export type Type = (typeof Type)[keyof typeof Type];
-                }
-
                 export type Warnings = Warnings.Item[];
 
                 export namespace Warnings {
@@ -1259,51 +669,20 @@ export namespace DocFormsGet200ResponseFieldsItem {
                         CycleDropped: "cycle-dropped",
                         MalformedNext: "malformed-next",
                         Incomplete: "incomplete",
+                        PayloadDropped: "payload-dropped",
                     } as const;
                     export type Item = (typeof Item)[keyof typeof Item];
                 }
             }
 
             export interface Calculate {
-                root: Calculate.Root | null;
+                root: CloudPDF.DocFormsGet200ResponseFieldsItemListboxActionsCalculateRoot | null;
                 incomplete: boolean;
                 warningFlags: number;
                 warnings: Calculate.Warnings.Item[];
             }
 
             export namespace Calculate {
-                export interface Root {
-                    type: Root.Type;
-                    subtype: string;
-                    script?: string | undefined;
-                    next: unknown[];
-                }
-
-                export namespace Root {
-                    export const Type = {
-                        Unknown: "unknown",
-                        Goto: "goto",
-                        GotoRemote: "goto-remote",
-                        GotoEmbedded: "goto-embedded",
-                        Launch: "launch",
-                        Thread: "thread",
-                        Uri: "uri",
-                        Sound: "sound",
-                        Movie: "movie",
-                        Hide: "hide",
-                        Named: "named",
-                        SubmitForm: "submit-form",
-                        ResetForm: "reset-form",
-                        ImportData: "import-data",
-                        Javascript: "javascript",
-                        SetOcgState: "set-ocg-state",
-                        Rendition: "rendition",
-                        Transition: "transition",
-                        Goto3DView: "goto-3d-view",
-                    } as const;
-                    export type Type = (typeof Type)[keyof typeof Type];
-                }
-
                 export type Warnings = Warnings.Item[];
 
                 export namespace Warnings {
@@ -1311,6 +690,7 @@ export namespace DocFormsGet200ResponseFieldsItem {
                         CycleDropped: "cycle-dropped",
                         MalformedNext: "malformed-next",
                         Incomplete: "incomplete",
+                        PayloadDropped: "payload-dropped",
                     } as const;
                     export type Item = (typeof Item)[keyof typeof Item];
                 }
@@ -1375,45 +755,13 @@ export namespace DocFormsGet200ResponseFieldsItem {
 
         export namespace Actions {
             export interface Keystroke {
-                root: Keystroke.Root | null;
+                root: CloudPDF.DocFormsGet200ResponseFieldsItemPushbuttonActionsKeystrokeRoot | null;
                 incomplete: boolean;
                 warningFlags: number;
                 warnings: Keystroke.Warnings.Item[];
             }
 
             export namespace Keystroke {
-                export interface Root {
-                    type: Root.Type;
-                    subtype: string;
-                    script?: string | undefined;
-                    next: unknown[];
-                }
-
-                export namespace Root {
-                    export const Type = {
-                        Unknown: "unknown",
-                        Goto: "goto",
-                        GotoRemote: "goto-remote",
-                        GotoEmbedded: "goto-embedded",
-                        Launch: "launch",
-                        Thread: "thread",
-                        Uri: "uri",
-                        Sound: "sound",
-                        Movie: "movie",
-                        Hide: "hide",
-                        Named: "named",
-                        SubmitForm: "submit-form",
-                        ResetForm: "reset-form",
-                        ImportData: "import-data",
-                        Javascript: "javascript",
-                        SetOcgState: "set-ocg-state",
-                        Rendition: "rendition",
-                        Transition: "transition",
-                        Goto3DView: "goto-3d-view",
-                    } as const;
-                    export type Type = (typeof Type)[keyof typeof Type];
-                }
-
                 export type Warnings = Warnings.Item[];
 
                 export namespace Warnings {
@@ -1421,51 +769,20 @@ export namespace DocFormsGet200ResponseFieldsItem {
                         CycleDropped: "cycle-dropped",
                         MalformedNext: "malformed-next",
                         Incomplete: "incomplete",
+                        PayloadDropped: "payload-dropped",
                     } as const;
                     export type Item = (typeof Item)[keyof typeof Item];
                 }
             }
 
             export interface Format {
-                root: Format.Root | null;
+                root: CloudPDF.DocFormsGet200ResponseFieldsItemPushbuttonActionsFormatRoot | null;
                 incomplete: boolean;
                 warningFlags: number;
                 warnings: Format.Warnings.Item[];
             }
 
             export namespace Format {
-                export interface Root {
-                    type: Root.Type;
-                    subtype: string;
-                    script?: string | undefined;
-                    next: unknown[];
-                }
-
-                export namespace Root {
-                    export const Type = {
-                        Unknown: "unknown",
-                        Goto: "goto",
-                        GotoRemote: "goto-remote",
-                        GotoEmbedded: "goto-embedded",
-                        Launch: "launch",
-                        Thread: "thread",
-                        Uri: "uri",
-                        Sound: "sound",
-                        Movie: "movie",
-                        Hide: "hide",
-                        Named: "named",
-                        SubmitForm: "submit-form",
-                        ResetForm: "reset-form",
-                        ImportData: "import-data",
-                        Javascript: "javascript",
-                        SetOcgState: "set-ocg-state",
-                        Rendition: "rendition",
-                        Transition: "transition",
-                        Goto3DView: "goto-3d-view",
-                    } as const;
-                    export type Type = (typeof Type)[keyof typeof Type];
-                }
-
                 export type Warnings = Warnings.Item[];
 
                 export namespace Warnings {
@@ -1473,51 +790,20 @@ export namespace DocFormsGet200ResponseFieldsItem {
                         CycleDropped: "cycle-dropped",
                         MalformedNext: "malformed-next",
                         Incomplete: "incomplete",
+                        PayloadDropped: "payload-dropped",
                     } as const;
                     export type Item = (typeof Item)[keyof typeof Item];
                 }
             }
 
             export interface Validate {
-                root: Validate.Root | null;
+                root: CloudPDF.DocFormsGet200ResponseFieldsItemPushbuttonActionsValidateRoot | null;
                 incomplete: boolean;
                 warningFlags: number;
                 warnings: Validate.Warnings.Item[];
             }
 
             export namespace Validate {
-                export interface Root {
-                    type: Root.Type;
-                    subtype: string;
-                    script?: string | undefined;
-                    next: unknown[];
-                }
-
-                export namespace Root {
-                    export const Type = {
-                        Unknown: "unknown",
-                        Goto: "goto",
-                        GotoRemote: "goto-remote",
-                        GotoEmbedded: "goto-embedded",
-                        Launch: "launch",
-                        Thread: "thread",
-                        Uri: "uri",
-                        Sound: "sound",
-                        Movie: "movie",
-                        Hide: "hide",
-                        Named: "named",
-                        SubmitForm: "submit-form",
-                        ResetForm: "reset-form",
-                        ImportData: "import-data",
-                        Javascript: "javascript",
-                        SetOcgState: "set-ocg-state",
-                        Rendition: "rendition",
-                        Transition: "transition",
-                        Goto3DView: "goto-3d-view",
-                    } as const;
-                    export type Type = (typeof Type)[keyof typeof Type];
-                }
-
                 export type Warnings = Warnings.Item[];
 
                 export namespace Warnings {
@@ -1525,51 +811,20 @@ export namespace DocFormsGet200ResponseFieldsItem {
                         CycleDropped: "cycle-dropped",
                         MalformedNext: "malformed-next",
                         Incomplete: "incomplete",
+                        PayloadDropped: "payload-dropped",
                     } as const;
                     export type Item = (typeof Item)[keyof typeof Item];
                 }
             }
 
             export interface Calculate {
-                root: Calculate.Root | null;
+                root: CloudPDF.DocFormsGet200ResponseFieldsItemPushbuttonActionsCalculateRoot | null;
                 incomplete: boolean;
                 warningFlags: number;
                 warnings: Calculate.Warnings.Item[];
             }
 
             export namespace Calculate {
-                export interface Root {
-                    type: Root.Type;
-                    subtype: string;
-                    script?: string | undefined;
-                    next: unknown[];
-                }
-
-                export namespace Root {
-                    export const Type = {
-                        Unknown: "unknown",
-                        Goto: "goto",
-                        GotoRemote: "goto-remote",
-                        GotoEmbedded: "goto-embedded",
-                        Launch: "launch",
-                        Thread: "thread",
-                        Uri: "uri",
-                        Sound: "sound",
-                        Movie: "movie",
-                        Hide: "hide",
-                        Named: "named",
-                        SubmitForm: "submit-form",
-                        ResetForm: "reset-form",
-                        ImportData: "import-data",
-                        Javascript: "javascript",
-                        SetOcgState: "set-ocg-state",
-                        Rendition: "rendition",
-                        Transition: "transition",
-                        Goto3DView: "goto-3d-view",
-                    } as const;
-                    export type Type = (typeof Type)[keyof typeof Type];
-                }
-
                 export type Warnings = Warnings.Item[];
 
                 export namespace Warnings {
@@ -1577,6 +832,7 @@ export namespace DocFormsGet200ResponseFieldsItem {
                         CycleDropped: "cycle-dropped",
                         MalformedNext: "malformed-next",
                         Incomplete: "incomplete",
+                        PayloadDropped: "payload-dropped",
                     } as const;
                     export type Item = (typeof Item)[keyof typeof Item];
                 }
@@ -1631,45 +887,13 @@ export namespace DocFormsGet200ResponseFieldsItem {
 
         export namespace Actions {
             export interface Keystroke {
-                root: Keystroke.Root | null;
+                root: CloudPDF.DocFormsGet200ResponseFieldsItemSignatureActionsKeystrokeRoot | null;
                 incomplete: boolean;
                 warningFlags: number;
                 warnings: Keystroke.Warnings.Item[];
             }
 
             export namespace Keystroke {
-                export interface Root {
-                    type: Root.Type;
-                    subtype: string;
-                    script?: string | undefined;
-                    next: unknown[];
-                }
-
-                export namespace Root {
-                    export const Type = {
-                        Unknown: "unknown",
-                        Goto: "goto",
-                        GotoRemote: "goto-remote",
-                        GotoEmbedded: "goto-embedded",
-                        Launch: "launch",
-                        Thread: "thread",
-                        Uri: "uri",
-                        Sound: "sound",
-                        Movie: "movie",
-                        Hide: "hide",
-                        Named: "named",
-                        SubmitForm: "submit-form",
-                        ResetForm: "reset-form",
-                        ImportData: "import-data",
-                        Javascript: "javascript",
-                        SetOcgState: "set-ocg-state",
-                        Rendition: "rendition",
-                        Transition: "transition",
-                        Goto3DView: "goto-3d-view",
-                    } as const;
-                    export type Type = (typeof Type)[keyof typeof Type];
-                }
-
                 export type Warnings = Warnings.Item[];
 
                 export namespace Warnings {
@@ -1677,51 +901,20 @@ export namespace DocFormsGet200ResponseFieldsItem {
                         CycleDropped: "cycle-dropped",
                         MalformedNext: "malformed-next",
                         Incomplete: "incomplete",
+                        PayloadDropped: "payload-dropped",
                     } as const;
                     export type Item = (typeof Item)[keyof typeof Item];
                 }
             }
 
             export interface Format {
-                root: Format.Root | null;
+                root: CloudPDF.DocFormsGet200ResponseFieldsItemSignatureActionsFormatRoot | null;
                 incomplete: boolean;
                 warningFlags: number;
                 warnings: Format.Warnings.Item[];
             }
 
             export namespace Format {
-                export interface Root {
-                    type: Root.Type;
-                    subtype: string;
-                    script?: string | undefined;
-                    next: unknown[];
-                }
-
-                export namespace Root {
-                    export const Type = {
-                        Unknown: "unknown",
-                        Goto: "goto",
-                        GotoRemote: "goto-remote",
-                        GotoEmbedded: "goto-embedded",
-                        Launch: "launch",
-                        Thread: "thread",
-                        Uri: "uri",
-                        Sound: "sound",
-                        Movie: "movie",
-                        Hide: "hide",
-                        Named: "named",
-                        SubmitForm: "submit-form",
-                        ResetForm: "reset-form",
-                        ImportData: "import-data",
-                        Javascript: "javascript",
-                        SetOcgState: "set-ocg-state",
-                        Rendition: "rendition",
-                        Transition: "transition",
-                        Goto3DView: "goto-3d-view",
-                    } as const;
-                    export type Type = (typeof Type)[keyof typeof Type];
-                }
-
                 export type Warnings = Warnings.Item[];
 
                 export namespace Warnings {
@@ -1729,51 +922,20 @@ export namespace DocFormsGet200ResponseFieldsItem {
                         CycleDropped: "cycle-dropped",
                         MalformedNext: "malformed-next",
                         Incomplete: "incomplete",
+                        PayloadDropped: "payload-dropped",
                     } as const;
                     export type Item = (typeof Item)[keyof typeof Item];
                 }
             }
 
             export interface Validate {
-                root: Validate.Root | null;
+                root: CloudPDF.DocFormsGet200ResponseFieldsItemSignatureActionsValidateRoot | null;
                 incomplete: boolean;
                 warningFlags: number;
                 warnings: Validate.Warnings.Item[];
             }
 
             export namespace Validate {
-                export interface Root {
-                    type: Root.Type;
-                    subtype: string;
-                    script?: string | undefined;
-                    next: unknown[];
-                }
-
-                export namespace Root {
-                    export const Type = {
-                        Unknown: "unknown",
-                        Goto: "goto",
-                        GotoRemote: "goto-remote",
-                        GotoEmbedded: "goto-embedded",
-                        Launch: "launch",
-                        Thread: "thread",
-                        Uri: "uri",
-                        Sound: "sound",
-                        Movie: "movie",
-                        Hide: "hide",
-                        Named: "named",
-                        SubmitForm: "submit-form",
-                        ResetForm: "reset-form",
-                        ImportData: "import-data",
-                        Javascript: "javascript",
-                        SetOcgState: "set-ocg-state",
-                        Rendition: "rendition",
-                        Transition: "transition",
-                        Goto3DView: "goto-3d-view",
-                    } as const;
-                    export type Type = (typeof Type)[keyof typeof Type];
-                }
-
                 export type Warnings = Warnings.Item[];
 
                 export namespace Warnings {
@@ -1781,51 +943,20 @@ export namespace DocFormsGet200ResponseFieldsItem {
                         CycleDropped: "cycle-dropped",
                         MalformedNext: "malformed-next",
                         Incomplete: "incomplete",
+                        PayloadDropped: "payload-dropped",
                     } as const;
                     export type Item = (typeof Item)[keyof typeof Item];
                 }
             }
 
             export interface Calculate {
-                root: Calculate.Root | null;
+                root: CloudPDF.DocFormsGet200ResponseFieldsItemSignatureActionsCalculateRoot | null;
                 incomplete: boolean;
                 warningFlags: number;
                 warnings: Calculate.Warnings.Item[];
             }
 
             export namespace Calculate {
-                export interface Root {
-                    type: Root.Type;
-                    subtype: string;
-                    script?: string | undefined;
-                    next: unknown[];
-                }
-
-                export namespace Root {
-                    export const Type = {
-                        Unknown: "unknown",
-                        Goto: "goto",
-                        GotoRemote: "goto-remote",
-                        GotoEmbedded: "goto-embedded",
-                        Launch: "launch",
-                        Thread: "thread",
-                        Uri: "uri",
-                        Sound: "sound",
-                        Movie: "movie",
-                        Hide: "hide",
-                        Named: "named",
-                        SubmitForm: "submit-form",
-                        ResetForm: "reset-form",
-                        ImportData: "import-data",
-                        Javascript: "javascript",
-                        SetOcgState: "set-ocg-state",
-                        Rendition: "rendition",
-                        Transition: "transition",
-                        Goto3DView: "goto-3d-view",
-                    } as const;
-                    export type Type = (typeof Type)[keyof typeof Type];
-                }
-
                 export type Warnings = Warnings.Item[];
 
                 export namespace Warnings {
@@ -1833,6 +964,7 @@ export namespace DocFormsGet200ResponseFieldsItem {
                         CycleDropped: "cycle-dropped",
                         MalformedNext: "malformed-next",
                         Incomplete: "incomplete",
+                        PayloadDropped: "payload-dropped",
                     } as const;
                     export type Item = (typeof Item)[keyof typeof Item];
                 }
@@ -1888,45 +1020,13 @@ export namespace DocFormsGet200ResponseFieldsItem {
 
         export namespace Actions {
             export interface Keystroke {
-                root: Keystroke.Root | null;
+                root: CloudPDF.DocFormsGet200ResponseFieldsItemUnknownActionsKeystrokeRoot | null;
                 incomplete: boolean;
                 warningFlags: number;
                 warnings: Keystroke.Warnings.Item[];
             }
 
             export namespace Keystroke {
-                export interface Root {
-                    type: Root.Type;
-                    subtype: string;
-                    script?: string | undefined;
-                    next: unknown[];
-                }
-
-                export namespace Root {
-                    export const Type = {
-                        Unknown: "unknown",
-                        Goto: "goto",
-                        GotoRemote: "goto-remote",
-                        GotoEmbedded: "goto-embedded",
-                        Launch: "launch",
-                        Thread: "thread",
-                        Uri: "uri",
-                        Sound: "sound",
-                        Movie: "movie",
-                        Hide: "hide",
-                        Named: "named",
-                        SubmitForm: "submit-form",
-                        ResetForm: "reset-form",
-                        ImportData: "import-data",
-                        Javascript: "javascript",
-                        SetOcgState: "set-ocg-state",
-                        Rendition: "rendition",
-                        Transition: "transition",
-                        Goto3DView: "goto-3d-view",
-                    } as const;
-                    export type Type = (typeof Type)[keyof typeof Type];
-                }
-
                 export type Warnings = Warnings.Item[];
 
                 export namespace Warnings {
@@ -1934,51 +1034,20 @@ export namespace DocFormsGet200ResponseFieldsItem {
                         CycleDropped: "cycle-dropped",
                         MalformedNext: "malformed-next",
                         Incomplete: "incomplete",
+                        PayloadDropped: "payload-dropped",
                     } as const;
                     export type Item = (typeof Item)[keyof typeof Item];
                 }
             }
 
             export interface Format {
-                root: Format.Root | null;
+                root: CloudPDF.DocFormsGet200ResponseFieldsItemUnknownActionsFormatRoot | null;
                 incomplete: boolean;
                 warningFlags: number;
                 warnings: Format.Warnings.Item[];
             }
 
             export namespace Format {
-                export interface Root {
-                    type: Root.Type;
-                    subtype: string;
-                    script?: string | undefined;
-                    next: unknown[];
-                }
-
-                export namespace Root {
-                    export const Type = {
-                        Unknown: "unknown",
-                        Goto: "goto",
-                        GotoRemote: "goto-remote",
-                        GotoEmbedded: "goto-embedded",
-                        Launch: "launch",
-                        Thread: "thread",
-                        Uri: "uri",
-                        Sound: "sound",
-                        Movie: "movie",
-                        Hide: "hide",
-                        Named: "named",
-                        SubmitForm: "submit-form",
-                        ResetForm: "reset-form",
-                        ImportData: "import-data",
-                        Javascript: "javascript",
-                        SetOcgState: "set-ocg-state",
-                        Rendition: "rendition",
-                        Transition: "transition",
-                        Goto3DView: "goto-3d-view",
-                    } as const;
-                    export type Type = (typeof Type)[keyof typeof Type];
-                }
-
                 export type Warnings = Warnings.Item[];
 
                 export namespace Warnings {
@@ -1986,51 +1055,20 @@ export namespace DocFormsGet200ResponseFieldsItem {
                         CycleDropped: "cycle-dropped",
                         MalformedNext: "malformed-next",
                         Incomplete: "incomplete",
+                        PayloadDropped: "payload-dropped",
                     } as const;
                     export type Item = (typeof Item)[keyof typeof Item];
                 }
             }
 
             export interface Validate {
-                root: Validate.Root | null;
+                root: CloudPDF.DocFormsGet200ResponseFieldsItemUnknownActionsValidateRoot | null;
                 incomplete: boolean;
                 warningFlags: number;
                 warnings: Validate.Warnings.Item[];
             }
 
             export namespace Validate {
-                export interface Root {
-                    type: Root.Type;
-                    subtype: string;
-                    script?: string | undefined;
-                    next: unknown[];
-                }
-
-                export namespace Root {
-                    export const Type = {
-                        Unknown: "unknown",
-                        Goto: "goto",
-                        GotoRemote: "goto-remote",
-                        GotoEmbedded: "goto-embedded",
-                        Launch: "launch",
-                        Thread: "thread",
-                        Uri: "uri",
-                        Sound: "sound",
-                        Movie: "movie",
-                        Hide: "hide",
-                        Named: "named",
-                        SubmitForm: "submit-form",
-                        ResetForm: "reset-form",
-                        ImportData: "import-data",
-                        Javascript: "javascript",
-                        SetOcgState: "set-ocg-state",
-                        Rendition: "rendition",
-                        Transition: "transition",
-                        Goto3DView: "goto-3d-view",
-                    } as const;
-                    export type Type = (typeof Type)[keyof typeof Type];
-                }
-
                 export type Warnings = Warnings.Item[];
 
                 export namespace Warnings {
@@ -2038,51 +1076,20 @@ export namespace DocFormsGet200ResponseFieldsItem {
                         CycleDropped: "cycle-dropped",
                         MalformedNext: "malformed-next",
                         Incomplete: "incomplete",
+                        PayloadDropped: "payload-dropped",
                     } as const;
                     export type Item = (typeof Item)[keyof typeof Item];
                 }
             }
 
             export interface Calculate {
-                root: Calculate.Root | null;
+                root: CloudPDF.DocFormsGet200ResponseFieldsItemUnknownActionsCalculateRoot | null;
                 incomplete: boolean;
                 warningFlags: number;
                 warnings: Calculate.Warnings.Item[];
             }
 
             export namespace Calculate {
-                export interface Root {
-                    type: Root.Type;
-                    subtype: string;
-                    script?: string | undefined;
-                    next: unknown[];
-                }
-
-                export namespace Root {
-                    export const Type = {
-                        Unknown: "unknown",
-                        Goto: "goto",
-                        GotoRemote: "goto-remote",
-                        GotoEmbedded: "goto-embedded",
-                        Launch: "launch",
-                        Thread: "thread",
-                        Uri: "uri",
-                        Sound: "sound",
-                        Movie: "movie",
-                        Hide: "hide",
-                        Named: "named",
-                        SubmitForm: "submit-form",
-                        ResetForm: "reset-form",
-                        ImportData: "import-data",
-                        Javascript: "javascript",
-                        SetOcgState: "set-ocg-state",
-                        Rendition: "rendition",
-                        Transition: "transition",
-                        Goto3DView: "goto-3d-view",
-                    } as const;
-                    export type Type = (typeof Type)[keyof typeof Type];
-                }
-
                 export type Warnings = Warnings.Item[];
 
                 export namespace Warnings {
@@ -2090,6 +1097,7 @@ export namespace DocFormsGet200ResponseFieldsItem {
                         CycleDropped: "cycle-dropped",
                         MalformedNext: "malformed-next",
                         Incomplete: "incomplete",
+                        PayloadDropped: "payload-dropped",
                     } as const;
                     export type Item = (typeof Item)[keyof typeof Item];
                 }

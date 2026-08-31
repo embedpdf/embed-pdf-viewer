@@ -34,6 +34,8 @@ runActionsConformance(runner, {
     annotation: fixture('actions-annotation-local', 'annots_action_handling.pdf'),
     field: fixture('actions-field-local', 'annot_javascript.pdf'),
     javascriptLink: fixture('actions-js-link-local', 'link_javascript.pdf'),
+    payloads: fixture('actions-payloads-local', 'action_payloads.pdf'),
+    openDestination: fixture('actions-open-dest-local', 'open_action_dest.pdf'),
   },
   makeEngine: () => createLocalEngine({ runtime: { prefer: 'wasm' } }),
 });
