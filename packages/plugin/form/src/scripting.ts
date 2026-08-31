@@ -461,8 +461,15 @@ export class FormScriptingController {
         );
       }
       if (program) {
+        // Acrobat fires per-typing keystroke events plus one final commit
+        // event. This pipeline compresses typing into ONE paste-shaped
+        // replacement (Acrobat's own paste contract: the whole string rides
+        // `event.change`, willCommit=false) so transform/filter scripts run,
+        // then fires the Acrobat-faithful willCommit pass (the full value on
+        // `event.value`, empty `change`) so AF* and commit validators see
+        // what Adobe's library expects.
         const oldValue = String(targetInput.value ?? '');
-        const key = await run('run', program, {
+        const typing = await run('run', program, {
           ...inputBase,
           fields: overlay.fields,
           event: {
@@ -473,20 +480,60 @@ export class FormScriptingController {
             change: String(proposedValue ?? ''),
             selStart: 0,
             selEnd: oldValue.length,
+            willCommit: false,
+          },
+        });
+        if (typing.error && typing.error.kind !== 'exception') {
+          return this.failed(uiEffects, diagnostics, typing.error);
+        }
+        if (typing.error) {
+          // Fault ladder: an exception is not a rejection. Keep the typed
+          // value, surface a diagnostic, and let the transaction continue.
+          diagnostics.push({
+            code: 'script-error',
+            message: `Keystroke script failed (kept the typed value): ${typing.error.message}`,
+          });
+        } else {
+          if (!typing.output!.event.rc) {
+            return this.finishRejected(bootEffects, uiEffects, diagnostics);
+          }
+          applyEffects(overlay, typing.output!.formEffects);
+          const event = typing.output!.event;
+          const base = String(event.value ?? '');
+          proposedValue =
+            base.slice(0, event.selStart) +
+            event.change +
+            base.slice(Math.max(event.selStart, event.selEnd));
+        }
+        const commit = await run('run', program, {
+          ...inputBase,
+          fields: overlay.fields,
+          event: {
+            kind: 'field-keystroke',
+            target: ref,
+            source: ref,
+            value: proposedValue,
+            change: '',
+            selStart: 0,
+            selEnd: 0,
             willCommit: true,
           },
         });
-        if (key.error) return this.failed(uiEffects, diagnostics, key.error);
-        if (!key.output!.event.rc) {
-          return this.finishRejected(bootEffects, uiEffects, diagnostics);
+        if (commit.error && commit.error.kind !== 'exception') {
+          return this.failed(uiEffects, diagnostics, commit.error);
         }
-        applyEffects(overlay, key.output!.formEffects);
-        const event = key.output!.event;
-        const base = String(event.value ?? '');
-        proposedValue =
-          base.slice(0, event.selStart) +
-          event.change +
-          base.slice(Math.max(event.selStart, event.selEnd));
+        if (commit.error) {
+          diagnostics.push({
+            code: 'script-error',
+            message: `Keystroke commit script failed (kept the typed value): ${commit.error.message}`,
+          });
+        } else {
+          if (!commit.output!.event.rc) {
+            return this.finishRejected(bootEffects, uiEffects, diagnostics);
+          }
+          applyEffects(overlay, commit.output!.formEffects);
+          proposedValue = cloneValue(commit.output!.event.value);
+        }
       }
     }
 
@@ -518,12 +565,22 @@ export class FormScriptingController {
             willCommit: true,
           },
         });
-        if (validation.error) return this.failed(uiEffects, diagnostics, validation.error);
-        if (!validation.output!.event.rc) {
-          return this.finishRejected(bootEffects, uiEffects, diagnostics);
+        if (validation.error && validation.error.kind !== 'exception') {
+          return this.failed(uiEffects, diagnostics, validation.error);
         }
-        targetInput.value = cloneValue(validation.output!.event.value);
-        applyEffects(overlay, validation.output!.formEffects);
+        if (validation.error) {
+          // Fault ladder: a broken validator must not reject the value.
+          diagnostics.push({
+            code: 'script-error',
+            message: `Validate script failed (accepted the value): ${validation.error.message}`,
+          });
+        } else {
+          if (!validation.output!.event.rc) {
+            return this.finishRejected(bootEffects, uiEffects, diagnostics);
+          }
+          targetInput.value = cloneValue(validation.output!.event.value);
+          applyEffects(overlay, validation.output!.formEffects);
+        }
       }
     }
 
@@ -555,8 +612,18 @@ export class FormScriptingController {
             value: calculatedInput.value,
           },
         });
-        if (calculation.error) return this.failed(uiEffects, diagnostics, calculation.error);
-        applyEffects(overlay, calculation.output!.formEffects);
+        if (calculation.error && calculation.error.kind !== 'exception') {
+          return this.failed(uiEffects, diagnostics, calculation.error);
+        }
+        if (calculation.error) {
+          // Fault ladder: this field's calculation is skipped; the /CO chain continues.
+          diagnostics.push({
+            code: 'script-error',
+            message: `Calculate script failed (field left unchanged): ${calculation.error.message}`,
+          });
+        } else {
+          applyEffects(overlay, calculation.output!.formEffects);
+        }
       }
       if (!formatRefs.some((candidate) => sameRef(candidate, calculationRef))) {
         formatRefs.push(calculationRef);
@@ -589,7 +656,17 @@ export class FormScriptingController {
           value: overlayField.value,
         },
       });
-      if (format.error) return this.failed(uiEffects, diagnostics, format.error);
+      if (format.error && format.error.kind !== 'exception') {
+        return this.failed(uiEffects, diagnostics, format.error);
+      }
+      if (format.error) {
+        // Fault ladder: formatting is cosmetic — skip it, keep the raw value.
+        diagnostics.push({
+          code: 'script-error',
+          message: `Format script failed (kept the raw value): ${format.error.message}`,
+        });
+        continue;
+      }
       applyEffects(overlay, format.output!.formEffects);
     }
 

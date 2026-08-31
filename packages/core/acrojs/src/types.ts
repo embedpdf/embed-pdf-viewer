@@ -88,8 +88,9 @@ export type ScriptDiagnosticCode =
   | 'blocked-network'
   | 'unsupported-api'
   | 'invalid-field-value'
-  // A document-level script failed and was degraded to a warning (a boot
-  // script error must never disable interactive filling).
+  // A script failed and was degraded to a warning. Boot errors must never
+  // disable interactive filling, and a K/V/C/F exception must never destroy
+  // the user's input (only an explicit `event.rc = false` rejects).
   | 'script-error';
 
 export interface ScriptDiagnostic {
