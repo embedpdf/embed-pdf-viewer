@@ -1,5 +1,11 @@
 # @embedpdf/core-js-sandbox
 
+## 3.0.0-next.11
+
+### Patch Changes
+
+- [#793](https://github.com/embedpdf/embed-pdf-viewer/pull/793) by [@bobsingor](https://github.com/bobsingor) – The `ScriptSandbox`/`ScriptSandboxFactory` structural contract moved to `@embedpdf/core-acrojs` (cycle fix); this package implements and re-exports it, and threads the new annots plane + `annotEffects` through the QuickJS bridge unchanged.
+
 ## 3.0.0-next.10
 
 ## 3.0.0-next.9

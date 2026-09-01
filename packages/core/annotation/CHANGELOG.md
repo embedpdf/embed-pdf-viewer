@@ -1,5 +1,13 @@
 # @embedpdf/core-annotation
 
+## 3.0.0-next.11
+
+### Minor Changes
+
+- [#793](https://github.com/embedpdf/embed-pdf-viewer/pull/793) by [@bobsingor](https://github.com/bobsingor) – Session-visibility overlay: `Model.sessionHidden` with `setSessionHidden`/`forgetSessionHidden`/`clearSessionHidden` messages, composed through the new `effFlags`/`effBearer` lenses so Hide actions and scripts flip presentation-only visibility (paint, hit-testing, selectability, handles) without ever touching the document `/F` flags — and a session-SHOWN annotation is live, not painted-but-dead. The overlay survives page reloads and is forgotten only on true deletes.
+
+- [#793](https://github.com/embedpdf/embed-pdf-viewer/pull/793) by [@bobsingor](https://github.com/bobsingor) – `sessionHidden`, `effFlags`/`effBearer`, and the session-visibility messages are REMOVED — visibility is document truth again (`/F` flags, mutated through the normal write path), and every paint/hit/selection gate reads the annotation's own flags.
+
 ## 3.0.0-next.10
 
 ### Minor Changes

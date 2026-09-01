@@ -1,5 +1,11 @@
 # @embedpdf/plugin-page-edit
 
+## 3.0.0-next.11
+
+### Minor Changes
+
+- [#793](https://github.com/embedpdf/embed-pdf-viewer/pull/793) by [@bobsingor](https://github.com/bobsingor) – Publish a bundle-safe `/contract` entry for the page-edit token and capability type without mutation or plugin wiring.
+
 ## 3.0.0-next.10
 
 ## 3.0.0-next.9

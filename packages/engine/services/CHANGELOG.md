@@ -1,5 +1,13 @@
 # @embedpdf/engine-services
 
+## 3.0.0-next.11
+
+### Minor Changes
+
+- [#793](https://github.com/embedpdf/embed-pdf-viewer/pull/793) by [@bobsingor](https://github.com/bobsingor) – The action model reader extracts the SubmitForm payload atomically (feature-detecting the Phase-4 runtime getters: an older runtime payload yields the bare recognized-inert node — the pin-lag skew case, unit-pinned; a NEW runtime withholding an unresolvable `/F` degrades the whole node to `unknown` + `payload-dropped`). `/Fields` targets and the URL/CharSet strings charge the existing aggregate budgets.
+
+- [#793](https://github.com/embedpdf/embed-pdf-viewer/pull/793) by [@bobsingor](https://github.com/bobsingor) – The action-model walker now materialises interpreter payloads (destinations, URIs + `/IsMap`, named-action names, Hide targets + `/H`, ResetForm three-state fields + exclude, file specs) with reserve-before-allocate budgeting — payload lengths are charged against the aggregate read budget before any scratch buffer is allocated, and name-tree script names ride the same budget. `readActionModel` and the annotation/form field readers take the owning document pointer; `readDestination` moved to a shared `features/destinations/` home. The link target is now a pure projection of the payload-carrying activate tree (`linkTargetFromActionTree`) — the duplicate native root-read is gone, an `incomplete` tree projects `unsupported`, and a malformed `/A` no longer silently falls back to `/Dest`.
+
 ## 3.0.0-next.10
 
 ### Minor Changes

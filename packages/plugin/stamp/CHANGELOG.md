@@ -1,5 +1,15 @@
 # @embedpdf/plugin-stamp
 
+## 3.0.0-next.11
+
+### Minor Changes
+
+- [#793](https://github.com/embedpdf/embed-pdf-viewer/pull/793) by [@bobsingor](https://github.com/bobsingor) – Publish a bundle-safe `/contract` entry for stamp-library tokens, assets, previews, configuration, and capability types without import, render, or plugin wiring.
+
+### Patch Changes
+
+- [#793](https://github.com/embedpdf/embed-pdf-viewer/pull/793) by [@bobsingor](https://github.com/bobsingor) – Dynamic stamp evaluation constructs its OWN standalone realm per detached stamp-asset document (`StampScriptingOptions` — the opt-in and script observers stay stamp-config; the viewer document's shared host is never involved).
+
 ## 3.0.0-next.10
 
 ## 3.0.0-next.9

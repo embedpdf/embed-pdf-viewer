@@ -1,5 +1,13 @@
 # @embedpdf/engine-core
 
+## 3.0.0-next.11
+
+### Minor Changes
+
+- [#793](https://github.com/embedpdf/embed-pdf-viewer/pull/793) by [@bobsingor](https://github.com/bobsingor) – The SubmitForm intent and the document's-home submit contract (Phase 4). The `submit-form` node grows an ATOMIC optional `payload` (`url` + `fields` + decoded `SubmitFormFlags` + `charSet?`; absent = older-runtime extraction, the node stays recognized-inert — partial states are unrepresentable). `decodeSubmitFormFlags` is the ONE ISO Table-240 decode (`exclude` derived from bit 1, never duplicated; bit 12 is `ExclFKey`, bit 13 reserved, `EmbedForm` is bit 14; bit 9 SubmitPDF dominates format with GetMethod kept alive). NEW: `doc.forms.submit?(request)` — the optional delivery-to-the-document's-HOME capability (present only where a home exists; the local engine truthfully lacks it), gated by the NEW grant-minted `doc.forms.submit` scope (no PDF permission bit exists for submission, so `pdf.permissions` never expands it); `FormSubmissionRequest`/`Receipt` DTOs + wire schemas fix the record shape (dataset entries + declared intent as METADATA — the home derives WHO submitted from its own verified session, and never fetches the PDF's URL). Conformance pins the payload extraction (`/UF` precedence, flag decode, both degrade shapes) in both flavors.
+
+- [#793](https://github.com/embedpdf/embed-pdf-viewer/pull/793) by [@bobsingor](https://github.com/bobsingor) – `PdfActionNode` is now a discriminated union carrying full interpreter payloads — a `goto` without its destination or a `uri` without its URI is unrepresentable. Executable arms: `javascript` (script), `goto` (destination), `uri` (+ `isMap`), `named`, `hide` (targets + `/H`), `reset-form` (`fields: PdfActionTargetRef[] | null` — null means `/Fields` was absent and every field resets — plus the exclude flag), the file-spec arms, and `rendition` with its optional `/JS`. Unreadable payloads degrade that node to `unknown` with the new `payload-dropped` tree warning. `DocumentActionsSnapshot` gains `openDestination` (the destination-form `/OpenAction`, schema-defaulted and mutually exclusive with `openAction`), `ActionReadBudget` gains target-entry and payload-text limits, and `PdfDestinationSchema` moved to a neutral `dto/` module (re-exported from its old home). The wire entry now also exposes `PdfActionWireComponents`, the stable named-schema registry used by API generators. This is a breaking source-level contract for code that constructed or narrowed action nodes, recorded as minor only because the `3.0.0-next` train is prerelease.
+
 ## 3.0.0-next.10
 
 ### Minor Changes

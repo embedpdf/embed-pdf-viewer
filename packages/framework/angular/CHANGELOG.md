@@ -1,5 +1,15 @@
 # @embedpdf/angular
 
+## 3.0.0-next.11
+
+### Minor Changes
+
+- [#793](https://github.com/embedpdf/embed-pdf-viewer/pull/793) by [@bobsingor](https://github.com/bobsingor) – NEW `@embedpdf/angular/actions` entry: `injectActionsUiAdapter(handlers?)` — Angular's spelling of React's `useActionsUiAdapter` (the `inject*` law), installing the SHARED default policy from `@embedpdf/web` so the two bindings can never drift; re-exports the `@embedpdf/plugin-actions` contract. The parity gate goes green (`actions` ported; `anchored` consciously added to PENDING).
+
+### Patch Changes
+
+- [#793](https://github.com/embedpdf/embed-pdf-viewer/pull/793) by [@bobsingor](https://github.com/bobsingor) – Route the Stage adapter's interaction dependency through the bundle-safe plugin contract entry instead of the interaction implementation root.
+
 ## 3.0.0-next.10
 
 ### Minor Changes

@@ -1,5 +1,15 @@
 # @embedpdf/viewer-chrome
 
+## 3.0.0-next.11
+
+### Patch Changes
+
+- [#793](https://github.com/embedpdf/embed-pdf-viewer/pull/793) by [@bobsingor](https://github.com/bobsingor) – The viewer wires the action engine in: `actionsPlugin()` joins the plugin set and the Shell installs the default URI/Print UI adapter.
+
+- [#793](https://github.com/embedpdf/embed-pdf-viewer/pull/793) by [@bobsingor](https://github.com/bobsingor) – The chrome save/print commands become the Phase-4 verb owners: `document:download` runs WS → serialize → DS as ONE queued operation (the WillSave mutations are IN the downloaded bytes; two rapid saves can never interleave) and `document:print` runs WP → `window.print()` → DP under the reentrancy latch — both degrading to today's behavior when the actions plugin is absent.
+
+- [#793](https://github.com/embedpdf/embed-pdf-viewer/pull/793) by [@bobsingor](https://github.com/bobsingor) – Scripting migrates to `actionsPlugin({ javascript: { enabled: true } })` with a bare `formPlugin()`; the Shell's form scripting provider hook is gone — `useActionsUiAdapter` carries everything.
+
 ## 3.0.0-next.10
 
 ### Minor Changes

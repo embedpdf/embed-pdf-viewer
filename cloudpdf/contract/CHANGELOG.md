@@ -1,5 +1,11 @@
 # @cloudpdf/contract
 
+## 3.0.0-next.11
+
+### Minor Changes
+
+- [#793](https://github.com/embedpdf/embed-pdf-viewer/pull/793) by [@bobsingor](https://github.com/bobsingor) – The annotation and form response schemas now describe action nodes as a payload-carrying discriminated union exposed through reusable OpenAPI components. Recursive `/Next` elements intentionally remain open (`{}`) for Fern compatibility, so generated SDK types show `unknown[]` for nested chains without duplicating the action model for every response path.
+
 ## 3.0.0-next.10
 
 ### Minor Changes

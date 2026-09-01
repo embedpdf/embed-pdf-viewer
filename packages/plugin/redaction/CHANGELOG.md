@@ -1,5 +1,11 @@
 # @embedpdf/plugin-redaction
 
+## 3.0.0-next.11
+
+### Minor Changes
+
+- [#793](https://github.com/embedpdf/embed-pdf-viewer/pull/793) by [@bobsingor](https://github.com/bobsingor) – Publish a bundle-safe `/contract` entry for the redaction token, state, pending-item, and capability protocols without destructive-apply plugin wiring.
+
 ## 3.0.0-next.10
 
 ### Minor Changes

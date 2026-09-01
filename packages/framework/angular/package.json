@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/angular",
-  "version": "3.0.0-next.10",
+  "version": "3.0.0-next.11",
   "private": false,
   "description": "Angular adapter for EmbedPDF v3: one generic signal binding + structural components (EpdfViewer, EpdfStage) + headless layers & inject functions. The whole framework surface, one secondary entry point per feature.",
   "sideEffects": false,
