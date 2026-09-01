@@ -430,6 +430,7 @@ function ToggleWidget({ fill, item, page, appearance }: WidgetProps<'toggle'>) {
         height: b.height,
         cursor: fill.disabled ? 'default' : 'pointer',
         pointerEvents: 'auto', // always the event surface; toggle() self-gates
+        outline: 'none', // the top-layer FormFocusRing owns focus indication
       }}
     >
       <Picture page={page} appearance={appearance} apBox={item.apBox} frame={b} />
@@ -469,6 +470,7 @@ function ChoiceFrame({
         width: b.width,
         height: b.height,
         pointerEvents: 'auto',
+        outline: 'none', // the top-layer FormFocusRing owns focus indication
       }}
     >
       {children}
