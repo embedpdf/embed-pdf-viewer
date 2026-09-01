@@ -84,6 +84,7 @@ export {
   PdfPageActionsSchema,
   PdfAnnotationActionsSchema,
   DocumentActionsSnapshotSchema,
+  PdfActionWireComponents,
 } from './dto/PdfAction.schema';
 export type {
   OpenDocumentResponse,

@@ -92,6 +92,15 @@ switch (language) {
     includes('src/uploads/Uploads.ts', 'class Uploads');
     includes('src/errors/CloudPDFError.ts', 'export class CloudPDFError');
     includes('src/errors/CloudPDFTimeoutError.ts', 'export class CloudPDFTimeoutError');
+    includes('src/api/types/PdfActionNode.ts', 'export type PdfActionNode =');
+    includes('src/api/types/PdfActionNode.ts', 'payload?: PdfActionNodeSubmitForm.Payload');
+    const pathScopedActionTypes = readdirSync(`${outputDirectory}/src/api/types`).filter((file) =>
+      /^Doc(?:Annotations|Forms).*Actions.*Root/.test(file),
+    );
+    assert(
+      pathScopedActionTypes.length === 0,
+      `shared action components expanded into ${pathScopedActionTypes.length} path-scoped types`,
+    );
     break;
   }
   case 'python': {

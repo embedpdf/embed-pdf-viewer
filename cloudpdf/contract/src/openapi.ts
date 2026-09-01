@@ -9,9 +9,9 @@
  * committed artifact, never this module.
  */
 
-import { EngineErrorPayloadSchema } from '@embedpdf/engine-core/wire';
+import { EngineErrorPayloadSchema, PdfActionWireComponents } from '@embedpdf/engine-core/wire';
 import { z } from 'zod';
-import { zodToJsonSchema } from 'zod-to-json-schema';
+import { ignoreOverride, zodToJsonSchema } from 'zod-to-json-schema';
 
 import {
   AdminErrorPayloadSchema,
@@ -44,6 +44,15 @@ const SECURITY_SCHEME: Record<AdminCredential, string> = {
 const ADMIN_ERROR_REF = '#/components/schemas/AdminErrorPayload';
 const ENGINE_ERROR_REF = '#/components/schemas/EngineErrorPayload';
 
+const SHARED_COMPONENT_SCHEMAS = PdfActionWireComponents;
+
+const SHARED_COMPONENT_BY_DEFINITION = new Map<z.ZodTypeDef, string>(
+  Object.entries(SHARED_COMPONENT_SCHEMAS).map(([name, schema]) => [schema._def, name]),
+);
+const SHARED_COMPONENT_REFS = new Set(
+  Object.keys(SHARED_COMPONENT_SCHEMAS).map((name) => `#/components/schemas/${name}`),
+);
+
 export interface BuildAdminOpenApiOptions {
   /** Package version stamped into `info.version`; keeps the emitter pure. */
   version: string;
@@ -55,6 +64,9 @@ export function buildAdminOpenApiDocument(opts: BuildAdminOpenApiOptions): Recor
 
   registerSchema(schemas, 'AdminErrorPayload', AdminErrorPayloadSchema);
   registerSchema(schemas, 'EngineErrorPayload', EngineErrorPayloadSchema);
+  for (const [name, schema] of Object.entries(SHARED_COMPONENT_SCHEMAS)) {
+    registerSchema(schemas, name, schema);
+  }
 
   for (const op of Object.values(allOperations) as AdminOperation[]) {
     assertDocsGroupsCover(op);
@@ -344,13 +356,80 @@ function registerSchema(
     target: 'openApi3',
     $refStrategy: 'root',
     basePath: ['#', ...componentPath],
+    override: (definition) => {
+      const sharedName = SHARED_COMPONENT_BY_DEFINITION.get(definition);
+      if (!sharedName || sharedName === name) return ignoreOverride;
+      return { $ref: `#/components/schemas/${sharedName}` };
+    },
   }) as Record<string, unknown>;
   // Fern's OpenAPI importer currently expands property-level recursive refs
   // until it exhausts the Node heap. Preserve every ordinary reuse ref and
   // replace only the recursive back-edge with the same valid open schema (`{}`)
   // that zod-to-json-schema uses for its non-reference strategy.
-  schemas[name] = breakAncestorReferences(referenced, componentPath) as Record<string, unknown>;
+  const canonical = collapseSharedReferenceAliases(referenced, referenced, componentPath);
+  schemas[name] = breakAncestorReferences(canonical, componentPath) as Record<string, unknown>;
   return { $ref: `#/components/schemas/${name}` };
+}
+
+/**
+ * zod-to-json-schema aliases repeated definitions to their first property
+ * location before invoking `override` again. If that first location is already
+ * one of our shared component refs, collapse the alias to the component itself
+ * so SDK importers see one stable public type instead of a path-shaped type.
+ */
+function collapseSharedReferenceAliases(
+  value: unknown,
+  component: unknown,
+  componentPath: string[],
+): unknown {
+  if (Array.isArray(value)) {
+    return value.map((child) => collapseSharedReferenceAliases(child, component, componentPath));
+  }
+  if (!value || typeof value !== 'object') return value;
+
+  const record = value as Record<string, unknown>;
+  if (Object.keys(record).length === 1 && typeof record.$ref === 'string') {
+    const target = resolveComponentReference(component, record.$ref, componentPath);
+    if (target && typeof target === 'object' && !Array.isArray(target)) {
+      const targetRecord = target as Record<string, unknown>;
+      if (
+        Object.keys(targetRecord).length === 1 &&
+        typeof targetRecord.$ref === 'string' &&
+        SHARED_COMPONENT_REFS.has(targetRecord.$ref)
+      ) {
+        return { $ref: targetRecord.$ref };
+      }
+    }
+  }
+
+  return Object.fromEntries(
+    Object.entries(record).map(([key, child]) => [
+      key,
+      collapseSharedReferenceAliases(child, component, componentPath),
+    ]),
+  );
+}
+
+function resolveComponentReference(
+  component: unknown,
+  reference: string,
+  componentPath: string[],
+): unknown {
+  if (!reference.startsWith('#/')) return undefined;
+  const target = reference
+    .slice(2)
+    .split('/')
+    .map((segment) => segment.replaceAll('~1', '/').replaceAll('~0', '~'));
+  if (
+    target.length < componentPath.length ||
+    !componentPath.every((segment, index) => target[index] === segment)
+  ) {
+    return undefined;
+  }
+  return target.slice(componentPath.length).reduce<unknown>((current, segment) => {
+    if (!current || typeof current !== 'object') return undefined;
+    return (current as Record<string, unknown>)[segment];
+  }, component);
 }
 
 function breakAncestorReferences(value: unknown, path: string[]): unknown {

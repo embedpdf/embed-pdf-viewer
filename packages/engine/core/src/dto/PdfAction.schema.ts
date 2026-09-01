@@ -81,9 +81,7 @@ const PDF_ACTION_NODE_ARMS = [
 
 export const PdfActionNodeSchema: z.ZodType<PdfActionNode> = z.lazy(
   () =>
-    z.discriminatedUnion('type', [
-      ...PDF_ACTION_NODE_ARMS,
-    ]) as unknown as z.ZodType<PdfActionNode>,
+    z.discriminatedUnion('type', [...PDF_ACTION_NODE_ARMS]) as unknown as z.ZodType<PdfActionNode>,
 );
 
 /** The `/S` vocabulary, derived from the union arms so it cannot drift. */
@@ -98,9 +96,7 @@ export const PdfActionTreeSchema: z.ZodType<PdfActionTree> = z.object({
   root: PdfActionNodeSchema.nullable(),
   incomplete: z.boolean(),
   warningFlags: z.number().int().nonnegative(),
-  warnings: z.array(
-    z.enum(['cycle-dropped', 'malformed-next', 'incomplete', 'payload-dropped']),
-  ),
+  warnings: z.array(z.enum(['cycle-dropped', 'malformed-next', 'incomplete', 'payload-dropped'])),
 });
 
 export const PdfFieldActionsSchema = z.object({
@@ -158,3 +154,19 @@ export const DocumentActionsSnapshotSchema: z.ZodType<DocumentActionsSnapshot> =
       });
     }
   }) as unknown as z.ZodType<DocumentActionsSnapshot>;
+
+/**
+ * Stable public component names for generators that project the action wire
+ * model into OpenAPI or another schema format. Keep reusable boundaries here;
+ * individual action arms remain owned by `PdfActionNodeSchema`.
+ */
+export const PdfActionWireComponents = {
+  PdfActionTargetRef: PdfActionTargetRefSchema,
+  PdfDestination: PdfDestinationSchema,
+  PdfActionNode: PdfActionNodeSchema,
+  PdfActionTree: PdfActionTreeSchema,
+  PdfFieldActions: PdfFieldActionsSchema,
+  PdfPageActions: PdfPageActionsSchema,
+  PdfAnnotationActions: PdfAnnotationActionsSchema,
+  DocumentActionsSnapshot: DocumentActionsSnapshotSchema,
+} as const satisfies Record<string, z.ZodTypeAny>;

@@ -24,7 +24,7 @@ export namespace DocFormsGet200ResponseFieldsItem {
         mappingName: string | null;
         valueEntry: CloudPDF.DocFormsGet200ResponseFieldsItemTextValueEntry;
         defaultValueEntry: CloudPDF.DocFormsGet200ResponseFieldsItemTextDefaultValueEntry;
-        actions?: DocFormsGet200ResponseFieldsItemText.Actions | undefined;
+        actions?: CloudPDF.PdfFieldActions | undefined;
         widgets: DocFormsGet200ResponseFieldsItemText.Widgets.Item[];
         value: string;
         defaultValue: string;
@@ -48,99 +48,6 @@ export namespace DocFormsGet200ResponseFieldsItem {
             raw: number;
         }
 
-        export interface Actions {
-            keystroke?: Actions.Keystroke | undefined;
-            format?: Actions.Format | undefined;
-            validate?: Actions.Validate | undefined;
-            calculate?: Actions.Calculate | undefined;
-        }
-
-        export namespace Actions {
-            export interface Keystroke {
-                root: CloudPDF.DocFormsGet200ResponseFieldsItemTextActionsKeystrokeRoot | null;
-                incomplete: boolean;
-                warningFlags: number;
-                warnings: Keystroke.Warnings.Item[];
-            }
-
-            export namespace Keystroke {
-                export type Warnings = Warnings.Item[];
-
-                export namespace Warnings {
-                    export const Item = {
-                        CycleDropped: "cycle-dropped",
-                        MalformedNext: "malformed-next",
-                        Incomplete: "incomplete",
-                        PayloadDropped: "payload-dropped",
-                    } as const;
-                    export type Item = (typeof Item)[keyof typeof Item];
-                }
-            }
-
-            export interface Format {
-                root: CloudPDF.DocFormsGet200ResponseFieldsItemTextActionsFormatRoot | null;
-                incomplete: boolean;
-                warningFlags: number;
-                warnings: Format.Warnings.Item[];
-            }
-
-            export namespace Format {
-                export type Warnings = Warnings.Item[];
-
-                export namespace Warnings {
-                    export const Item = {
-                        CycleDropped: "cycle-dropped",
-                        MalformedNext: "malformed-next",
-                        Incomplete: "incomplete",
-                        PayloadDropped: "payload-dropped",
-                    } as const;
-                    export type Item = (typeof Item)[keyof typeof Item];
-                }
-            }
-
-            export interface Validate {
-                root: CloudPDF.DocFormsGet200ResponseFieldsItemTextActionsValidateRoot | null;
-                incomplete: boolean;
-                warningFlags: number;
-                warnings: Validate.Warnings.Item[];
-            }
-
-            export namespace Validate {
-                export type Warnings = Warnings.Item[];
-
-                export namespace Warnings {
-                    export const Item = {
-                        CycleDropped: "cycle-dropped",
-                        MalformedNext: "malformed-next",
-                        Incomplete: "incomplete",
-                        PayloadDropped: "payload-dropped",
-                    } as const;
-                    export type Item = (typeof Item)[keyof typeof Item];
-                }
-            }
-
-            export interface Calculate {
-                root: CloudPDF.DocFormsGet200ResponseFieldsItemTextActionsCalculateRoot | null;
-                incomplete: boolean;
-                warningFlags: number;
-                warnings: Calculate.Warnings.Item[];
-            }
-
-            export namespace Calculate {
-                export type Warnings = Warnings.Item[];
-
-                export namespace Warnings {
-                    export const Item = {
-                        CycleDropped: "cycle-dropped",
-                        MalformedNext: "malformed-next",
-                        Incomplete: "incomplete",
-                        PayloadDropped: "payload-dropped",
-                    } as const;
-                    export type Item = (typeof Item)[keyof typeof Item];
-                }
-            }
-        }
-
         export type Widgets = Widgets.Item[];
 
         export namespace Widgets {
@@ -162,7 +69,7 @@ export namespace DocFormsGet200ResponseFieldsItem {
         mappingName: string | null;
         valueEntry: CloudPDF.DocFormsGet200ResponseFieldsItemCheckboxValueEntry;
         defaultValueEntry: CloudPDF.DocFormsGet200ResponseFieldsItemCheckboxDefaultValueEntry;
-        actions?: DocFormsGet200ResponseFieldsItemCheckbox.Actions | undefined;
+        actions?: CloudPDF.PdfFieldActions | undefined;
         widgets: DocFormsGet200ResponseFieldsItemCheckbox.Widgets.Item[];
         checked: boolean;
         exportValue: string;
@@ -180,99 +87,6 @@ export namespace DocFormsGet200ResponseFieldsItem {
             required: boolean;
             noExport: boolean;
             raw: number;
-        }
-
-        export interface Actions {
-            keystroke?: Actions.Keystroke | undefined;
-            format?: Actions.Format | undefined;
-            validate?: Actions.Validate | undefined;
-            calculate?: Actions.Calculate | undefined;
-        }
-
-        export namespace Actions {
-            export interface Keystroke {
-                root: CloudPDF.DocFormsGet200ResponseFieldsItemCheckboxActionsKeystrokeRoot | null;
-                incomplete: boolean;
-                warningFlags: number;
-                warnings: Keystroke.Warnings.Item[];
-            }
-
-            export namespace Keystroke {
-                export type Warnings = Warnings.Item[];
-
-                export namespace Warnings {
-                    export const Item = {
-                        CycleDropped: "cycle-dropped",
-                        MalformedNext: "malformed-next",
-                        Incomplete: "incomplete",
-                        PayloadDropped: "payload-dropped",
-                    } as const;
-                    export type Item = (typeof Item)[keyof typeof Item];
-                }
-            }
-
-            export interface Format {
-                root: CloudPDF.DocFormsGet200ResponseFieldsItemCheckboxActionsFormatRoot | null;
-                incomplete: boolean;
-                warningFlags: number;
-                warnings: Format.Warnings.Item[];
-            }
-
-            export namespace Format {
-                export type Warnings = Warnings.Item[];
-
-                export namespace Warnings {
-                    export const Item = {
-                        CycleDropped: "cycle-dropped",
-                        MalformedNext: "malformed-next",
-                        Incomplete: "incomplete",
-                        PayloadDropped: "payload-dropped",
-                    } as const;
-                    export type Item = (typeof Item)[keyof typeof Item];
-                }
-            }
-
-            export interface Validate {
-                root: CloudPDF.DocFormsGet200ResponseFieldsItemCheckboxActionsValidateRoot | null;
-                incomplete: boolean;
-                warningFlags: number;
-                warnings: Validate.Warnings.Item[];
-            }
-
-            export namespace Validate {
-                export type Warnings = Warnings.Item[];
-
-                export namespace Warnings {
-                    export const Item = {
-                        CycleDropped: "cycle-dropped",
-                        MalformedNext: "malformed-next",
-                        Incomplete: "incomplete",
-                        PayloadDropped: "payload-dropped",
-                    } as const;
-                    export type Item = (typeof Item)[keyof typeof Item];
-                }
-            }
-
-            export interface Calculate {
-                root: CloudPDF.DocFormsGet200ResponseFieldsItemCheckboxActionsCalculateRoot | null;
-                incomplete: boolean;
-                warningFlags: number;
-                warnings: Calculate.Warnings.Item[];
-            }
-
-            export namespace Calculate {
-                export type Warnings = Warnings.Item[];
-
-                export namespace Warnings {
-                    export const Item = {
-                        CycleDropped: "cycle-dropped",
-                        MalformedNext: "malformed-next",
-                        Incomplete: "incomplete",
-                        PayloadDropped: "payload-dropped",
-                    } as const;
-                    export type Item = (typeof Item)[keyof typeof Item];
-                }
-            }
         }
 
         export type Widgets = Widgets.Item[];
@@ -299,7 +113,7 @@ export namespace DocFormsGet200ResponseFieldsItem {
         mappingName: string | null;
         valueEntry: CloudPDF.DocFormsGet200ResponseFieldsItemRadioValueEntry;
         defaultValueEntry: CloudPDF.DocFormsGet200ResponseFieldsItemRadioDefaultValueEntry;
-        actions?: DocFormsGet200ResponseFieldsItemRadio.Actions | undefined;
+        actions?: CloudPDF.PdfFieldActions | undefined;
         widgets: DocFormsGet200ResponseFieldsItemRadio.Widgets.Item[];
         value: string;
         radiosInUnison: boolean;
@@ -318,99 +132,6 @@ export namespace DocFormsGet200ResponseFieldsItem {
             required: boolean;
             noExport: boolean;
             raw: number;
-        }
-
-        export interface Actions {
-            keystroke?: Actions.Keystroke | undefined;
-            format?: Actions.Format | undefined;
-            validate?: Actions.Validate | undefined;
-            calculate?: Actions.Calculate | undefined;
-        }
-
-        export namespace Actions {
-            export interface Keystroke {
-                root: CloudPDF.DocFormsGet200ResponseFieldsItemRadioActionsKeystrokeRoot | null;
-                incomplete: boolean;
-                warningFlags: number;
-                warnings: Keystroke.Warnings.Item[];
-            }
-
-            export namespace Keystroke {
-                export type Warnings = Warnings.Item[];
-
-                export namespace Warnings {
-                    export const Item = {
-                        CycleDropped: "cycle-dropped",
-                        MalformedNext: "malformed-next",
-                        Incomplete: "incomplete",
-                        PayloadDropped: "payload-dropped",
-                    } as const;
-                    export type Item = (typeof Item)[keyof typeof Item];
-                }
-            }
-
-            export interface Format {
-                root: CloudPDF.DocFormsGet200ResponseFieldsItemRadioActionsFormatRoot | null;
-                incomplete: boolean;
-                warningFlags: number;
-                warnings: Format.Warnings.Item[];
-            }
-
-            export namespace Format {
-                export type Warnings = Warnings.Item[];
-
-                export namespace Warnings {
-                    export const Item = {
-                        CycleDropped: "cycle-dropped",
-                        MalformedNext: "malformed-next",
-                        Incomplete: "incomplete",
-                        PayloadDropped: "payload-dropped",
-                    } as const;
-                    export type Item = (typeof Item)[keyof typeof Item];
-                }
-            }
-
-            export interface Validate {
-                root: CloudPDF.DocFormsGet200ResponseFieldsItemRadioActionsValidateRoot | null;
-                incomplete: boolean;
-                warningFlags: number;
-                warnings: Validate.Warnings.Item[];
-            }
-
-            export namespace Validate {
-                export type Warnings = Warnings.Item[];
-
-                export namespace Warnings {
-                    export const Item = {
-                        CycleDropped: "cycle-dropped",
-                        MalformedNext: "malformed-next",
-                        Incomplete: "incomplete",
-                        PayloadDropped: "payload-dropped",
-                    } as const;
-                    export type Item = (typeof Item)[keyof typeof Item];
-                }
-            }
-
-            export interface Calculate {
-                root: CloudPDF.DocFormsGet200ResponseFieldsItemRadioActionsCalculateRoot | null;
-                incomplete: boolean;
-                warningFlags: number;
-                warnings: Calculate.Warnings.Item[];
-            }
-
-            export namespace Calculate {
-                export type Warnings = Warnings.Item[];
-
-                export namespace Warnings {
-                    export const Item = {
-                        CycleDropped: "cycle-dropped",
-                        MalformedNext: "malformed-next",
-                        Incomplete: "incomplete",
-                        PayloadDropped: "payload-dropped",
-                    } as const;
-                    export type Item = (typeof Item)[keyof typeof Item];
-                }
-            }
         }
 
         export type Widgets = Widgets.Item[];
@@ -437,7 +158,7 @@ export namespace DocFormsGet200ResponseFieldsItem {
         mappingName: string | null;
         valueEntry: CloudPDF.DocFormsGet200ResponseFieldsItemComboboxValueEntry;
         defaultValueEntry: CloudPDF.DocFormsGet200ResponseFieldsItemComboboxDefaultValueEntry;
-        actions?: DocFormsGet200ResponseFieldsItemCombobox.Actions | undefined;
+        actions?: CloudPDF.PdfFieldActions | undefined;
         widgets: DocFormsGet200ResponseFieldsItemCombobox.Widgets.Item[];
         value: string;
         defaultValue: string;
@@ -457,99 +178,6 @@ export namespace DocFormsGet200ResponseFieldsItem {
             required: boolean;
             noExport: boolean;
             raw: number;
-        }
-
-        export interface Actions {
-            keystroke?: Actions.Keystroke | undefined;
-            format?: Actions.Format | undefined;
-            validate?: Actions.Validate | undefined;
-            calculate?: Actions.Calculate | undefined;
-        }
-
-        export namespace Actions {
-            export interface Keystroke {
-                root: CloudPDF.DocFormsGet200ResponseFieldsItemComboboxActionsKeystrokeRoot | null;
-                incomplete: boolean;
-                warningFlags: number;
-                warnings: Keystroke.Warnings.Item[];
-            }
-
-            export namespace Keystroke {
-                export type Warnings = Warnings.Item[];
-
-                export namespace Warnings {
-                    export const Item = {
-                        CycleDropped: "cycle-dropped",
-                        MalformedNext: "malformed-next",
-                        Incomplete: "incomplete",
-                        PayloadDropped: "payload-dropped",
-                    } as const;
-                    export type Item = (typeof Item)[keyof typeof Item];
-                }
-            }
-
-            export interface Format {
-                root: CloudPDF.DocFormsGet200ResponseFieldsItemComboboxActionsFormatRoot | null;
-                incomplete: boolean;
-                warningFlags: number;
-                warnings: Format.Warnings.Item[];
-            }
-
-            export namespace Format {
-                export type Warnings = Warnings.Item[];
-
-                export namespace Warnings {
-                    export const Item = {
-                        CycleDropped: "cycle-dropped",
-                        MalformedNext: "malformed-next",
-                        Incomplete: "incomplete",
-                        PayloadDropped: "payload-dropped",
-                    } as const;
-                    export type Item = (typeof Item)[keyof typeof Item];
-                }
-            }
-
-            export interface Validate {
-                root: CloudPDF.DocFormsGet200ResponseFieldsItemComboboxActionsValidateRoot | null;
-                incomplete: boolean;
-                warningFlags: number;
-                warnings: Validate.Warnings.Item[];
-            }
-
-            export namespace Validate {
-                export type Warnings = Warnings.Item[];
-
-                export namespace Warnings {
-                    export const Item = {
-                        CycleDropped: "cycle-dropped",
-                        MalformedNext: "malformed-next",
-                        Incomplete: "incomplete",
-                        PayloadDropped: "payload-dropped",
-                    } as const;
-                    export type Item = (typeof Item)[keyof typeof Item];
-                }
-            }
-
-            export interface Calculate {
-                root: CloudPDF.DocFormsGet200ResponseFieldsItemComboboxActionsCalculateRoot | null;
-                incomplete: boolean;
-                warningFlags: number;
-                warnings: Calculate.Warnings.Item[];
-            }
-
-            export namespace Calculate {
-                export type Warnings = Warnings.Item[];
-
-                export namespace Warnings {
-                    export const Item = {
-                        CycleDropped: "cycle-dropped",
-                        MalformedNext: "malformed-next",
-                        Incomplete: "incomplete",
-                        PayloadDropped: "payload-dropped",
-                    } as const;
-                    export type Item = (typeof Item)[keyof typeof Item];
-                }
-            }
         }
 
         export type Widgets = Widgets.Item[];
@@ -583,7 +211,7 @@ export namespace DocFormsGet200ResponseFieldsItem {
         mappingName: string | null;
         valueEntry: CloudPDF.DocFormsGet200ResponseFieldsItemListboxValueEntry;
         defaultValueEntry: CloudPDF.DocFormsGet200ResponseFieldsItemListboxDefaultValueEntry;
-        actions?: DocFormsGet200ResponseFieldsItemListbox.Actions | undefined;
+        actions?: CloudPDF.PdfFieldActions | undefined;
         widgets: DocFormsGet200ResponseFieldsItemListbox.Widgets.Item[];
         selectedValues: string[];
         multiSelect: boolean;
@@ -602,99 +230,6 @@ export namespace DocFormsGet200ResponseFieldsItem {
             required: boolean;
             noExport: boolean;
             raw: number;
-        }
-
-        export interface Actions {
-            keystroke?: Actions.Keystroke | undefined;
-            format?: Actions.Format | undefined;
-            validate?: Actions.Validate | undefined;
-            calculate?: Actions.Calculate | undefined;
-        }
-
-        export namespace Actions {
-            export interface Keystroke {
-                root: CloudPDF.DocFormsGet200ResponseFieldsItemListboxActionsKeystrokeRoot | null;
-                incomplete: boolean;
-                warningFlags: number;
-                warnings: Keystroke.Warnings.Item[];
-            }
-
-            export namespace Keystroke {
-                export type Warnings = Warnings.Item[];
-
-                export namespace Warnings {
-                    export const Item = {
-                        CycleDropped: "cycle-dropped",
-                        MalformedNext: "malformed-next",
-                        Incomplete: "incomplete",
-                        PayloadDropped: "payload-dropped",
-                    } as const;
-                    export type Item = (typeof Item)[keyof typeof Item];
-                }
-            }
-
-            export interface Format {
-                root: CloudPDF.DocFormsGet200ResponseFieldsItemListboxActionsFormatRoot | null;
-                incomplete: boolean;
-                warningFlags: number;
-                warnings: Format.Warnings.Item[];
-            }
-
-            export namespace Format {
-                export type Warnings = Warnings.Item[];
-
-                export namespace Warnings {
-                    export const Item = {
-                        CycleDropped: "cycle-dropped",
-                        MalformedNext: "malformed-next",
-                        Incomplete: "incomplete",
-                        PayloadDropped: "payload-dropped",
-                    } as const;
-                    export type Item = (typeof Item)[keyof typeof Item];
-                }
-            }
-
-            export interface Validate {
-                root: CloudPDF.DocFormsGet200ResponseFieldsItemListboxActionsValidateRoot | null;
-                incomplete: boolean;
-                warningFlags: number;
-                warnings: Validate.Warnings.Item[];
-            }
-
-            export namespace Validate {
-                export type Warnings = Warnings.Item[];
-
-                export namespace Warnings {
-                    export const Item = {
-                        CycleDropped: "cycle-dropped",
-                        MalformedNext: "malformed-next",
-                        Incomplete: "incomplete",
-                        PayloadDropped: "payload-dropped",
-                    } as const;
-                    export type Item = (typeof Item)[keyof typeof Item];
-                }
-            }
-
-            export interface Calculate {
-                root: CloudPDF.DocFormsGet200ResponseFieldsItemListboxActionsCalculateRoot | null;
-                incomplete: boolean;
-                warningFlags: number;
-                warnings: Calculate.Warnings.Item[];
-            }
-
-            export namespace Calculate {
-                export type Warnings = Warnings.Item[];
-
-                export namespace Warnings {
-                    export const Item = {
-                        CycleDropped: "cycle-dropped",
-                        MalformedNext: "malformed-next",
-                        Incomplete: "incomplete",
-                        PayloadDropped: "payload-dropped",
-                    } as const;
-                    export type Item = (typeof Item)[keyof typeof Item];
-                }
-            }
         }
 
         export type Widgets = Widgets.Item[];
@@ -728,7 +263,7 @@ export namespace DocFormsGet200ResponseFieldsItem {
         mappingName: string | null;
         valueEntry: CloudPDF.DocFormsGet200ResponseFieldsItemPushbuttonValueEntry;
         defaultValueEntry: CloudPDF.DocFormsGet200ResponseFieldsItemPushbuttonDefaultValueEntry;
-        actions?: DocFormsGet200ResponseFieldsItemPushbutton.Actions | undefined;
+        actions?: CloudPDF.PdfFieldActions | undefined;
         widgets: DocFormsGet200ResponseFieldsItemPushbutton.Widgets.Item[];
     }
 
@@ -744,99 +279,6 @@ export namespace DocFormsGet200ResponseFieldsItem {
             required: boolean;
             noExport: boolean;
             raw: number;
-        }
-
-        export interface Actions {
-            keystroke?: Actions.Keystroke | undefined;
-            format?: Actions.Format | undefined;
-            validate?: Actions.Validate | undefined;
-            calculate?: Actions.Calculate | undefined;
-        }
-
-        export namespace Actions {
-            export interface Keystroke {
-                root: CloudPDF.DocFormsGet200ResponseFieldsItemPushbuttonActionsKeystrokeRoot | null;
-                incomplete: boolean;
-                warningFlags: number;
-                warnings: Keystroke.Warnings.Item[];
-            }
-
-            export namespace Keystroke {
-                export type Warnings = Warnings.Item[];
-
-                export namespace Warnings {
-                    export const Item = {
-                        CycleDropped: "cycle-dropped",
-                        MalformedNext: "malformed-next",
-                        Incomplete: "incomplete",
-                        PayloadDropped: "payload-dropped",
-                    } as const;
-                    export type Item = (typeof Item)[keyof typeof Item];
-                }
-            }
-
-            export interface Format {
-                root: CloudPDF.DocFormsGet200ResponseFieldsItemPushbuttonActionsFormatRoot | null;
-                incomplete: boolean;
-                warningFlags: number;
-                warnings: Format.Warnings.Item[];
-            }
-
-            export namespace Format {
-                export type Warnings = Warnings.Item[];
-
-                export namespace Warnings {
-                    export const Item = {
-                        CycleDropped: "cycle-dropped",
-                        MalformedNext: "malformed-next",
-                        Incomplete: "incomplete",
-                        PayloadDropped: "payload-dropped",
-                    } as const;
-                    export type Item = (typeof Item)[keyof typeof Item];
-                }
-            }
-
-            export interface Validate {
-                root: CloudPDF.DocFormsGet200ResponseFieldsItemPushbuttonActionsValidateRoot | null;
-                incomplete: boolean;
-                warningFlags: number;
-                warnings: Validate.Warnings.Item[];
-            }
-
-            export namespace Validate {
-                export type Warnings = Warnings.Item[];
-
-                export namespace Warnings {
-                    export const Item = {
-                        CycleDropped: "cycle-dropped",
-                        MalformedNext: "malformed-next",
-                        Incomplete: "incomplete",
-                        PayloadDropped: "payload-dropped",
-                    } as const;
-                    export type Item = (typeof Item)[keyof typeof Item];
-                }
-            }
-
-            export interface Calculate {
-                root: CloudPDF.DocFormsGet200ResponseFieldsItemPushbuttonActionsCalculateRoot | null;
-                incomplete: boolean;
-                warningFlags: number;
-                warnings: Calculate.Warnings.Item[];
-            }
-
-            export namespace Calculate {
-                export type Warnings = Warnings.Item[];
-
-                export namespace Warnings {
-                    export const Item = {
-                        CycleDropped: "cycle-dropped",
-                        MalformedNext: "malformed-next",
-                        Incomplete: "incomplete",
-                        PayloadDropped: "payload-dropped",
-                    } as const;
-                    export type Item = (typeof Item)[keyof typeof Item];
-                }
-            }
         }
 
         export type Widgets = Widgets.Item[];
@@ -860,7 +302,7 @@ export namespace DocFormsGet200ResponseFieldsItem {
         mappingName: string | null;
         valueEntry: CloudPDF.DocFormsGet200ResponseFieldsItemSignatureValueEntry;
         defaultValueEntry: CloudPDF.DocFormsGet200ResponseFieldsItemSignatureDefaultValueEntry;
-        actions?: DocFormsGet200ResponseFieldsItemSignature.Actions | undefined;
+        actions?: CloudPDF.PdfFieldActions | undefined;
         widgets: DocFormsGet200ResponseFieldsItemSignature.Widgets.Item[];
     }
 
@@ -876,99 +318,6 @@ export namespace DocFormsGet200ResponseFieldsItem {
             required: boolean;
             noExport: boolean;
             raw: number;
-        }
-
-        export interface Actions {
-            keystroke?: Actions.Keystroke | undefined;
-            format?: Actions.Format | undefined;
-            validate?: Actions.Validate | undefined;
-            calculate?: Actions.Calculate | undefined;
-        }
-
-        export namespace Actions {
-            export interface Keystroke {
-                root: CloudPDF.DocFormsGet200ResponseFieldsItemSignatureActionsKeystrokeRoot | null;
-                incomplete: boolean;
-                warningFlags: number;
-                warnings: Keystroke.Warnings.Item[];
-            }
-
-            export namespace Keystroke {
-                export type Warnings = Warnings.Item[];
-
-                export namespace Warnings {
-                    export const Item = {
-                        CycleDropped: "cycle-dropped",
-                        MalformedNext: "malformed-next",
-                        Incomplete: "incomplete",
-                        PayloadDropped: "payload-dropped",
-                    } as const;
-                    export type Item = (typeof Item)[keyof typeof Item];
-                }
-            }
-
-            export interface Format {
-                root: CloudPDF.DocFormsGet200ResponseFieldsItemSignatureActionsFormatRoot | null;
-                incomplete: boolean;
-                warningFlags: number;
-                warnings: Format.Warnings.Item[];
-            }
-
-            export namespace Format {
-                export type Warnings = Warnings.Item[];
-
-                export namespace Warnings {
-                    export const Item = {
-                        CycleDropped: "cycle-dropped",
-                        MalformedNext: "malformed-next",
-                        Incomplete: "incomplete",
-                        PayloadDropped: "payload-dropped",
-                    } as const;
-                    export type Item = (typeof Item)[keyof typeof Item];
-                }
-            }
-
-            export interface Validate {
-                root: CloudPDF.DocFormsGet200ResponseFieldsItemSignatureActionsValidateRoot | null;
-                incomplete: boolean;
-                warningFlags: number;
-                warnings: Validate.Warnings.Item[];
-            }
-
-            export namespace Validate {
-                export type Warnings = Warnings.Item[];
-
-                export namespace Warnings {
-                    export const Item = {
-                        CycleDropped: "cycle-dropped",
-                        MalformedNext: "malformed-next",
-                        Incomplete: "incomplete",
-                        PayloadDropped: "payload-dropped",
-                    } as const;
-                    export type Item = (typeof Item)[keyof typeof Item];
-                }
-            }
-
-            export interface Calculate {
-                root: CloudPDF.DocFormsGet200ResponseFieldsItemSignatureActionsCalculateRoot | null;
-                incomplete: boolean;
-                warningFlags: number;
-                warnings: Calculate.Warnings.Item[];
-            }
-
-            export namespace Calculate {
-                export type Warnings = Warnings.Item[];
-
-                export namespace Warnings {
-                    export const Item = {
-                        CycleDropped: "cycle-dropped",
-                        MalformedNext: "malformed-next",
-                        Incomplete: "incomplete",
-                        PayloadDropped: "payload-dropped",
-                    } as const;
-                    export type Item = (typeof Item)[keyof typeof Item];
-                }
-            }
         }
 
         export type Widgets = Widgets.Item[];
@@ -992,7 +341,7 @@ export namespace DocFormsGet200ResponseFieldsItem {
         mappingName: string | null;
         valueEntry: CloudPDF.DocFormsGet200ResponseFieldsItemUnknownValueEntry;
         defaultValueEntry: CloudPDF.DocFormsGet200ResponseFieldsItemUnknownDefaultValueEntry;
-        actions?: DocFormsGet200ResponseFieldsItemUnknown.Actions | undefined;
+        actions?: CloudPDF.PdfFieldActions | undefined;
         widgets: DocFormsGet200ResponseFieldsItemUnknown.Widgets.Item[];
         rawValue: string;
     }
@@ -1009,99 +358,6 @@ export namespace DocFormsGet200ResponseFieldsItem {
             required: boolean;
             noExport: boolean;
             raw: number;
-        }
-
-        export interface Actions {
-            keystroke?: Actions.Keystroke | undefined;
-            format?: Actions.Format | undefined;
-            validate?: Actions.Validate | undefined;
-            calculate?: Actions.Calculate | undefined;
-        }
-
-        export namespace Actions {
-            export interface Keystroke {
-                root: CloudPDF.DocFormsGet200ResponseFieldsItemUnknownActionsKeystrokeRoot | null;
-                incomplete: boolean;
-                warningFlags: number;
-                warnings: Keystroke.Warnings.Item[];
-            }
-
-            export namespace Keystroke {
-                export type Warnings = Warnings.Item[];
-
-                export namespace Warnings {
-                    export const Item = {
-                        CycleDropped: "cycle-dropped",
-                        MalformedNext: "malformed-next",
-                        Incomplete: "incomplete",
-                        PayloadDropped: "payload-dropped",
-                    } as const;
-                    export type Item = (typeof Item)[keyof typeof Item];
-                }
-            }
-
-            export interface Format {
-                root: CloudPDF.DocFormsGet200ResponseFieldsItemUnknownActionsFormatRoot | null;
-                incomplete: boolean;
-                warningFlags: number;
-                warnings: Format.Warnings.Item[];
-            }
-
-            export namespace Format {
-                export type Warnings = Warnings.Item[];
-
-                export namespace Warnings {
-                    export const Item = {
-                        CycleDropped: "cycle-dropped",
-                        MalformedNext: "malformed-next",
-                        Incomplete: "incomplete",
-                        PayloadDropped: "payload-dropped",
-                    } as const;
-                    export type Item = (typeof Item)[keyof typeof Item];
-                }
-            }
-
-            export interface Validate {
-                root: CloudPDF.DocFormsGet200ResponseFieldsItemUnknownActionsValidateRoot | null;
-                incomplete: boolean;
-                warningFlags: number;
-                warnings: Validate.Warnings.Item[];
-            }
-
-            export namespace Validate {
-                export type Warnings = Warnings.Item[];
-
-                export namespace Warnings {
-                    export const Item = {
-                        CycleDropped: "cycle-dropped",
-                        MalformedNext: "malformed-next",
-                        Incomplete: "incomplete",
-                        PayloadDropped: "payload-dropped",
-                    } as const;
-                    export type Item = (typeof Item)[keyof typeof Item];
-                }
-            }
-
-            export interface Calculate {
-                root: CloudPDF.DocFormsGet200ResponseFieldsItemUnknownActionsCalculateRoot | null;
-                incomplete: boolean;
-                warningFlags: number;
-                warnings: Calculate.Warnings.Item[];
-            }
-
-            export namespace Calculate {
-                export type Warnings = Warnings.Item[];
-
-                export namespace Warnings {
-                    export const Item = {
-                        CycleDropped: "cycle-dropped",
-                        MalformedNext: "malformed-next",
-                        Incomplete: "incomplete",
-                        PayloadDropped: "payload-dropped",
-                    } as const;
-                    export type Item = (typeof Item)[keyof typeof Item];
-                }
-            }
         }
 
         export type Widgets = Widgets.Item[];
