@@ -807,7 +807,7 @@ export function installAcroJs(g: Record<string, unknown>): void {
         );
       }
     }
-    static now(): number {
+    static override now(): number {
       return Number(((state?.input.environment ?? {}) as AnyRecord).nowMs ?? 0);
     }
   }

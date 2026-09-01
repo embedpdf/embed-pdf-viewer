@@ -1297,9 +1297,6 @@ importers:
       '@embedpdf/engine':
         specifier: workspace:*
         version: link:../../engine/main
-      '@embedpdf/plugin-stage':
-        specifier: workspace:*
-        version: link:../stage
       '@embedpdf/tooling-build':
         specifier: workspace:*
         version: link:../../../tooling/build
@@ -1644,6 +1641,9 @@ importers:
         specifier: workspace:*
         version: link:../interaction
     devDependencies:
+      '@embedpdf/engine':
+        specifier: workspace:*
+        version: link:../../engine/main
       '@embedpdf/tooling-build':
         specifier: workspace:*
         version: link:../../../tooling/build

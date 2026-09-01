@@ -6,7 +6,6 @@ import { describe, expect, it } from 'vitest';
 import { createKernel } from '@embedpdf/core';
 import { createLocalEngine } from '@embedpdf/engine';
 import type { AnnotationRef } from '@embedpdf/engine-core/runtime';
-import { StageToken, stagePlugin } from '@embedpdf/plugin-stage';
 
 import { actionsPlugin } from '../src/actions.plugin';
 import { ActionsToken } from '../src/internal';
@@ -17,17 +16,11 @@ const fixture = (name: string) =>
   resolve(here, '..', '..', '..', 'engine', 'main', 'test', 'fixtures', name);
 
 /** Kernel + real engine + recording seams over one fixture. */
-async function boot(
-  file: string,
-  opts?: { config?: ActionsPluginConfig; stage?: boolean },
-) {
+async function boot(file: string, opts?: { config?: ActionsPluginConfig }) {
   const engine = await createLocalEngine({ runtime: { prefer: 'wasm' } });
   const kernel = createKernel({
     engine,
-    plugins: [
-      actionsPlugin(opts?.config),
-      ...(opts?.stage ? [stagePlugin()] : []),
-    ],
+    plugins: [actionsPlugin(opts?.config)],
   });
   const bytes = new Uint8Array(await readFile(fixture(file)));
   await kernel.documents.open({ kind: 'bytes', id: `trigger-${file}`, bytes });
@@ -166,27 +159,7 @@ describe('trigger integration (real engine)', () => {
     expect(t.seam).toEqual(['goto:xyz']);
   });
 
-  it('wires stage state reports through the coordinator: placement opens the actual page', async () => {
-    await using t = await boot('action_triggers.pdf', { stage: true });
-    const stage = t.kernel.capability(StageToken);
-    t.actions.setUiAdapter({ openUri: () => {}, print: () => {} });
-    await t.drain();
-    expect(t.seam).toEqual([]); // no stage report yet, no fallback in auto
-    stage.setViewport({ width: 800, height: 600 }); // placement → report
-    await t.drain();
-    await t.drain();
-    // Canonical coordinator order: the visible set (/PV shows 12) precedes
-    // the open fan-out (page /O shows 7, then the /PO set shows 9).
-    expect(t.seam).toEqual(['show:12', 'show:7', 'show:9']);
-    t.seam.length = 0;
-    stage.goToPage(1); // programmatic navigation to page 2 (no /AA there)
-    await t.drain();
-    await t.drain();
-    // Leaving page 3: close fires (/PC set then /C — ISO order). The /PI
-    // set is VIEWPORT truth, not cursor truth — at this zoom page 3 may
-    // still peek into the viewport, so only assert it never fired a bogus
-    // show and the close pair is ordered.
-    expect(t.seam.slice(0, 2)).toEqual(['hide:9', 'hide:7']);
-    expect(t.seam).not.toContain('show:12');
-  });
+  // The stage-report half of the coordinator (placement → page open, real
+  // stagePlugin) lives with the feeder: plugin-stage/test/actions-feed —
+  // a devDependency here would close the stage↔actions package cycle.
 });

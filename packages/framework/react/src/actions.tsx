@@ -12,7 +12,7 @@
 export * from '@embedpdf/plugin-actions';
 import { useEffect, useRef } from 'react';
 import { ActionsToken, type ActionUiAdapter } from '@embedpdf/plugin-actions';
-import { StageToken } from '@embedpdf/plugin-stage';
+import { StageToken } from '@embedpdf/plugin-stage/contract';
 import { sanitizeExternalUri } from '@embedpdf/web';
 
 import { useOptionalCapability } from './runtime';

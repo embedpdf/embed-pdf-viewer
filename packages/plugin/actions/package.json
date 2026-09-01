@@ -57,8 +57,7 @@
     "typescript": "^5.0.0",
     "vitest": "^2.1.9",
     "@embedpdf/tooling-build": "workspace:*",
-    "@embedpdf/engine": "workspace:*",
-    "@embedpdf/plugin-stage": "workspace:*"
+    "@embedpdf/engine": "workspace:*"
   },
   "license": "Apache-2.0",
   "sideEffects": false,
