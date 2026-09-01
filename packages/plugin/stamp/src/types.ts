@@ -1,6 +1,6 @@
 import type { BinarySource, Engine } from '@embedpdf/engine-core/runtime';
 import { createCapabilityToken } from '@embedpdf/core';
-import type { FormScriptingOptions } from '@embedpdf/plugin-form';
+import type { FormScriptingOptions } from '@embedpdf/plugin-form/contract';
 
 /**
  * The stamp plugin: a workspace-scoped ASSET substrate.

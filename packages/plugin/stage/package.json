@@ -9,6 +9,8 @@
   "types": "./dist/index.d.cts",
   "exports": {
     ".": "./src/index.ts",
+    "./contract": "./src/contract.ts",
+    "./destination": "./src/destination.ts",
     "./package.json": "./package.json"
   },
   "publishConfig": {
@@ -19,6 +21,14 @@
       ".": {
         "import": "./dist/index.js",
         "require": "./dist/index.cjs"
+      },
+      "./contract": {
+        "import": "./dist/contract.js",
+        "require": "./dist/contract.cjs"
+      },
+      "./destination": {
+        "import": "./dist/destination.js",
+        "require": "./dist/destination.cjs"
       },
       "./package.json": "./package.json"
     }

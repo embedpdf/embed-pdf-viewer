@@ -2,13 +2,13 @@ import {
   MIN_DRAG,
   resolveClickPlacement,
   widgetAppearanceFromProps,
-} from '@embedpdf/plugin-annotation';
-import type { AnnotationHostCapability } from '@embedpdf/plugin-annotation/internal';
+} from '@embedpdf/plugin-annotation/authoring';
+import type { AnnotationHostCapability } from '@embedpdf/plugin-annotation/contract/host';
 import {
   samplePointOn,
   type InteractionCapability,
   type InteractionHandler,
-} from '@embedpdf/plugin-interaction';
+} from '@embedpdf/plugin-interaction/contract';
 
 import type { Box } from './core/model';
 import { FORM_TOOL_BY_ID } from './tools';

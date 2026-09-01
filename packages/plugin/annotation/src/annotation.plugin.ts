@@ -1,8 +1,8 @@
 import { definePlugin } from '@embedpdf/core';
-import { InteractionToken } from '@embedpdf/plugin-interaction';
-import { SelectionToken } from '@embedpdf/plugin-selection/internal';
-import { ActionsToken as PublicActionsToken } from '@embedpdf/plugin-actions';
-import { ActionsToken as ActionsHostToken } from '@embedpdf/plugin-actions/internal';
+import { ActionsToken as PublicActionsToken } from '@embedpdf/plugin-actions/contract';
+import { ActionsToken as ActionsHostToken } from '@embedpdf/plugin-actions/contract/host';
+import { InteractionToken } from '@embedpdf/plugin-interaction/contract';
+import { SelectionToken } from '@embedpdf/plugin-selection/contract/host';
 import { createAnnotationCapability } from './capability';
 import { registerAnnotationEffects } from './effects';
 import {

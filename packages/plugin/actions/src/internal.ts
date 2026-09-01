@@ -2,17 +2,8 @@
  * The HOST surface: what sibling plugins (stage, annotation, link, form) need
  * to register executors, session sinks, and trigger sources. Same runtime
  * token as the public one, wider type — import from
- * `@embedpdf/plugin-actions/internal`, never from application code.
+ * `@embedpdf/plugin-actions/contract/host`. `/internal` keeps this legacy
+ * re-export plus implementation helpers; it is an API-visibility boundary,
+ * not a bundle-purity boundary.
  */
-import { ActionsToken as PublicActionsToken } from './types';
-import type { ActionsHostCapability } from './types';
-import type { CapabilityToken } from '@embedpdf/core';
-
-export const ActionsToken = PublicActionsToken as CapabilityToken<ActionsHostCapability>;
-export type {
-  ActionExecutor,
-  ActionExecutorResult,
-  ActionsHostCapability,
-  PageStateReport,
-  SessionEffectSink,
-} from './types';
+export * from './host-contract';

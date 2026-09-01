@@ -1,7 +1,7 @@
 import type { DocCapability, PluginContext } from '@embedpdf/core';
-import { AnnotationToken } from '@embedpdf/plugin-annotation/internal';
-import { InteractionToken } from '@embedpdf/plugin-interaction';
-import { SelectionToken } from '@embedpdf/plugin-selection';
+import { AnnotationToken } from '@embedpdf/plugin-annotation/contract/host';
+import { InteractionToken } from '@embedpdf/plugin-interaction/contract';
+import { SelectionToken } from '@embedpdf/plugin-selection/contract';
 import type {
   AnnotationDTO,
   AnnotationRef,

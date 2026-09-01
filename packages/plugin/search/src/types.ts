@@ -1,6 +1,6 @@
 import { createCapabilityToken, type PageObjectNumber } from '@embedpdf/core';
 import type { Rect, TextQuad } from '@embedpdf/core-geometry';
-import type { RevealAnchor, ScrollBehaviorKind } from '@embedpdf/plugin-stage';
+import type { RevealAnchor, ScrollBehaviorKind } from '@embedpdf/plugin-stage/contract';
 import type { SearchMode, SearchQuery, SearchSnippet } from '@embedpdf/engine-core/runtime';
 
 /**

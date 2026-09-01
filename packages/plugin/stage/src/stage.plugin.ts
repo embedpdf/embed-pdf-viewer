@@ -1,7 +1,7 @@
 import { definePlugin } from '@embedpdf/core';
 import type { CapabilityToken } from '@embedpdf/core';
-import { ActionsToken as PublicActionsToken } from '@embedpdf/plugin-actions';
-import { ActionsToken as ActionsHostToken } from '@embedpdf/plugin-actions/internal';
+import { ActionsToken as PublicActionsToken } from '@embedpdf/plugin-actions/contract';
+import { ActionsToken as ActionsHostToken } from '@embedpdf/plugin-actions/contract/host';
 import { createStageCapability } from './capability';
 import { destinationToReveal } from './destination';
 import { registerStageEffects } from './effects';

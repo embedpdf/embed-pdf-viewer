@@ -1,8 +1,4 @@
-import {
-  createCapabilityToken,
-  type DocumentEvent,
-  type PageObjectNumber,
-} from '@embedpdf/core';
+import { createCapabilityToken, type DocumentEvent, type PageObjectNumber } from '@embedpdf/core';
 import type { PageRotation } from '@embedpdf/core-geometry';
 import type {
   AnnotationAppearanceImage,
@@ -288,8 +284,9 @@ export interface TextItem {
  * package root (`@embedpdf/plugin-annotation`).
  *
  * Framework-only plumbing (render projection, pointer gestures, behavior
- * registration) lives on {@link AnnotationHostCapability}, reachable only through
- * the `@embedpdf/plugin-annotation/internal` entry. Both are the SAME runtime
+ * registration) lives on {@link AnnotationHostCapability}, reachable through
+ * `@embedpdf/plugin-annotation/contract/host` (and the framework's `/internal`
+ * entry). Both are the SAME runtime
  * object — two typed lenses on one token — so app code simply can't see the host
  * methods.
  */
@@ -658,8 +655,9 @@ export type FilePickerProvider = (req: FilePromptRequest) => Promise<AttachmentF
 /**
  * The HOST (framework) surface: everything the render layer, the interaction hub,
  * and sibling plugins need, on top of the public {@link AnnotationCapability}.
- * Internal — import the token from `@embedpdf/plugin-annotation/internal`, never
- * from application code.
+ * Host-only — sibling plugins import the token from
+ * `@embedpdf/plugin-annotation/contract/host`; framework implementation code may
+ * use `/internal`. Never use either from application code.
  */
 export interface AnnotationHostCapability extends AnnotationCapability {
   // ── render projection (consumed by the framework render layer) ──
@@ -973,8 +971,9 @@ export interface AnnotationHostCapability extends AnnotationCapability {
 
 /**
  * The annotation capability token. Typed to the full {@link AnnotationHostCapability}
- * here (the package internals + the `/internal` entry use this view). The package
- * root re-exports the SAME token narrowed to {@link AnnotationCapability}.
+ * here (the package internals, `/contract/host`, and `/internal` use this view).
+ * The package root re-exports the SAME token narrowed to
+ * {@link AnnotationCapability}.
  */
 export const AnnotationToken = createCapabilityToken<AnnotationHostCapability>('annotation', {
   hint: `add annotationPlugin() from '@embedpdf/plugin-annotation' to your plugins list`,

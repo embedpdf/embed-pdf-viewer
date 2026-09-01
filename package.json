@@ -20,6 +20,7 @@
     "verify:consume": "pnpm --filter @embedpdf/tooling-consume-fixtures run verify",
     "bootstrap:package": "node scripts/bootstrap-package.mjs",
     "verify:engine-runtime-packages": "pnpm --filter @embedpdf/engine-runtime run verify:packages",
+    "check:plugin-boundaries": "node tooling/build/src/check-plugin-boundaries.mjs",
     "changeset": "changeset",
     "cloudpdf:sdk:generate": "node fern/scripts/generate-sdks.mjs --only typescript --force",
     "api:sync": "node fern/scripts/generate-sdks.mjs && pnpm --filter @cloudpdf/website api:snippets && pnpm --filter @cloudpdf/website api:pages && pnpm --filter @cloudpdf/website api:check",

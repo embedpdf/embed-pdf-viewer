@@ -20,9 +20,9 @@ import {
   type PdfLinkTarget,
   type PdfRect,
 } from '@embedpdf/engine-core/runtime';
-import { ActionsToken as PublicActionsToken } from '@embedpdf/plugin-actions';
-import { InteractionToken } from '@embedpdf/plugin-interaction';
-import { SelectionToken as SelectionPublicToken } from '@embedpdf/plugin-selection';
+import { ActionsToken as PublicActionsToken } from '@embedpdf/plugin-actions/contract';
+import { InteractionToken } from '@embedpdf/plugin-interaction/contract';
+import { SelectionToken as SelectionPublicToken } from '@embedpdf/plugin-selection/contract';
 import {
   effBearer,
   effFlags,

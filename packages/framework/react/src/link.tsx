@@ -13,9 +13,12 @@
 export * from '@embedpdf/plugin-link';
 import * as React from 'react';
 import { useEffect, useMemo } from 'react';
-import { ActionsToken, createHoverPump } from '@embedpdf/plugin-actions';
-import type { ActionSource, PdfAnnotationEventKind } from '@embedpdf/plugin-actions';
-import { InteractionToken } from '@embedpdf/plugin-interaction';
+import { ActionsToken, createHoverPump } from '@embedpdf/plugin-actions/contract';
+import type {
+  ActionSource,
+  PdfAnnotationEventKind,
+} from '@embedpdf/plugin-actions/contract';
+import { InteractionToken } from '@embedpdf/plugin-interaction/contract';
 import {
   LinkToken,
   type LinkActivateContext,

@@ -1,4 +1,4 @@
-import type { Locale } from '@embedpdf/plugin-i18n';
+import type { Locale } from '@embedpdf/plugin-i18n/contract';
 
 /** The demo's Spanish pack — loaded LAZILY (see the `loaders` config in App). */
 export const es: Locale = {

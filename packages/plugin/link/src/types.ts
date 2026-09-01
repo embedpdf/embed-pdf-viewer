@@ -5,8 +5,8 @@ import type {
   PdfDestination,
   PdfLinkTarget,
 } from '@embedpdf/engine-core/runtime';
-import type { ActionDispatchResult } from '@embedpdf/plugin-actions';
-import type { LinkNavItem } from '@embedpdf/plugin-annotation';
+import type { ActionDispatchResult } from '@embedpdf/plugin-actions/contract';
+import type { LinkNavItem } from '@embedpdf/plugin-annotation/contract';
 
 export type { LinkNavItem };
 // The wire target vocabulary, re-exported so app code building link editors

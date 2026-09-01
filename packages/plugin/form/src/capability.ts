@@ -12,9 +12,9 @@ import {
   type PdfRect,
 } from '@embedpdf/engine-core/runtime';
 import { DocumentsToken, type PluginContext } from '@embedpdf/core';
-import { ActionsToken, createHoverPump } from '@embedpdf/plugin-actions';
-import type { ActionOrigin, ActionSource } from '@embedpdf/plugin-actions';
-import { AnnotationToken as AnnotationHostToken } from '@embedpdf/plugin-annotation/internal';
+import { ActionsToken, createHoverPump } from '@embedpdf/plugin-actions/contract';
+import type { ActionOrigin, ActionSource } from '@embedpdf/plugin-actions/contract';
+import { AnnotationToken as AnnotationHostToken } from '@embedpdf/plugin-annotation/contract/host';
 
 import {
   fillItemForWidget as coreFillItemForWidget,

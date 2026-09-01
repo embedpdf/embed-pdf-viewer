@@ -2,7 +2,7 @@ import type {
   InteractionCapability,
   InteractionHandler,
   PointerSample,
-} from '@embedpdf/plugin-interaction';
+} from '@embedpdf/plugin-interaction/contract';
 import type { PageRotation } from '@embedpdf/core-geometry';
 import type { Subtype, Vec } from '@embedpdf/core-annotation';
 import type { AnnotationHostCapability } from './types';

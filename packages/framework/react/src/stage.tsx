@@ -18,7 +18,7 @@ import type { CapabilityToken } from '@embedpdf/core';
  *  token to drive an additional lens (e.g. a wrapped thumbnail sidebar). */
 export type StageTokenProp = CapabilityToken<StageCapability>;
 import type { PageFrame } from '@embedpdf/core-geometry';
-import { InteractionToken } from '@embedpdf/plugin-interaction';
+import { InteractionToken } from '@embedpdf/plugin-interaction/contract';
 import { createStageSurface } from '@embedpdf/web';
 import { ProjectorProvider, type ProjectorBinding, type ViewProjector } from './anchored';
 import {

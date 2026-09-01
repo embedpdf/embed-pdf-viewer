@@ -36,8 +36,8 @@
 export * from '@embedpdf/plugin-form';
 import * as React from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { PdfAnnotationEventKind } from '@embedpdf/plugin-actions';
-import type { AnnotationRef } from '@embedpdf/plugin-annotation';
+import type { PdfAnnotationEventKind } from '@embedpdf/plugin-actions/contract';
+import type { AnnotationRef } from '@embedpdf/plugin-annotation/contract';
 import { FormToken } from '@embedpdf/plugin-form';
 import type {
   FillItem,
@@ -45,11 +45,11 @@ import type {
   FormUiEffect,
   FormUiEffectProvider,
 } from '@embedpdf/plugin-form';
-import { InteractionToken } from '@embedpdf/plugin-interaction';
-import { StageToken } from '@embedpdf/plugin-stage';
+import { InteractionToken } from '@embedpdf/plugin-interaction/contract';
+import { StageToken } from '@embedpdf/plugin-stage/contract';
 import type { Rect } from '@embedpdf/core-annotation';
 
-import { useAnnotationSelected } from './annotation';
+import { useAnnotationSelected } from './annotation-hooks';
 import type { AnnotationRenderer, AnnotationRendererProps } from './annotation';
 import {
   shallowArray,

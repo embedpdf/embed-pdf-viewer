@@ -1,5 +1,5 @@
-import { createHoverPump } from '@embedpdf/plugin-actions';
-import type { ActionsCapability, HoverTarget } from '@embedpdf/plugin-actions';
+import { createHoverPump } from '@embedpdf/plugin-actions/contract';
+import type { ActionsCapability, HoverTarget } from '@embedpdf/plugin-actions/contract';
 import type { Annot } from '@embedpdf/core-annotation';
 
 export interface AnnotationHoverFeed {

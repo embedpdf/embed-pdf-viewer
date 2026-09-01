@@ -20,7 +20,7 @@ import type {
   ActionOrigin,
   ActionTriggerResult,
   PdfAnnotationEventKind,
-} from '@embedpdf/plugin-actions';
+} from '@embedpdf/plugin-actions/contract';
 import type {
   ScriptBudget,
   ScriptDiagnostic,
@@ -220,9 +220,9 @@ export type WidgetActivationResult =
   | { kind: 'dispatched'; result: ActionTriggerResult };
 
 /**
- * INTERNAL host lens — plugin-to-plugin only (the actions plugin's interim
+ * HOST lens — plugin-to-plugin only (the actions plugin's interim
  * `javascript` / `reset-form` executors). Import the token from
- * `@embedpdf/plugin-form/internal`, never from application code. Phase 3's
+ * `@embedpdf/plugin-form/contract/host`, never from application code. Phase 3's
  * shared ScriptHost replaces `runActivationScript`.
  */
 export interface FormHostCapability extends FormCapability {
@@ -246,10 +246,7 @@ export interface FormHostCapability extends FormCapability {
    * zero refs never reaches the engine), reset as ONE engine batch, refresh,
    * then recalculate when scripting is enabled (Acrobat's behaviour).
    */
-  resetFormAction(
-    fields: PdfActionTargetRef[] | null,
-    exclude: boolean,
-  ): Promise<FormCommitResult>;
+  resetFormAction(fields: PdfActionTargetRef[] | null, exclude: boolean): Promise<FormCommitResult>;
 }
 
 /**

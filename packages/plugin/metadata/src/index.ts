@@ -4,5 +4,4 @@
  * Standard layout: types.ts · reducer.ts · capability.ts · effects.ts · metadata.plugin.ts.
  */
 export { metadataPlugin } from './metadata.plugin';
-export { MetadataToken } from './types';
-export type { MetadataCapability, MetadataState } from './types';
+export * from './contract';

@@ -11,8 +11,9 @@ import {
   type PieceInfoPatch,
 } from '@embedpdf/engine-core/runtime';
 import { type PluginContext } from '@embedpdf/core';
-import { AnnotationToken } from '@embedpdf/plugin-annotation';
-import { createFormScriptingController, type FormCommitResult } from '@embedpdf/plugin-form';
+import { AnnotationToken } from '@embedpdf/plugin-annotation/contract';
+import type { FormCommitResult } from '@embedpdf/plugin-form/contract';
+import { createFormScriptingController } from '@embedpdf/plugin-form/scripting';
 
 import type {
   AddAssetInput,

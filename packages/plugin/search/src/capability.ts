@@ -1,6 +1,6 @@
 import type { PageObjectNumber, PluginContext } from '@embedpdf/core';
 import { type PointIn, type TextQuad, applyPoint, boundsOfRects, pageGeometry, textQuadBounds } from '@embedpdf/core-geometry';
-import { StageToken } from '@embedpdf/plugin-stage';
+import { StageToken } from '@embedpdf/plugin-stage/contract';
 import { EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
 import type {
   PdfQuad,

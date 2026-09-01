@@ -1,6 +1,6 @@
 import type { CapabilityToken, PluginContext } from '@embedpdf/core';
-import { I18nToken } from '@embedpdf/plugin-i18n';
-import { ShellToken } from '@embedpdf/plugin-shell';
+import { I18nToken } from '@embedpdf/plugin-i18n/contract';
+import { ShellToken } from '@embedpdf/plugin-shell/contract';
 import { matchShortcut, parseShortcut } from '@embedpdf/core-ui';
 import type { KeyStroke, ParsedShortcut } from '@embedpdf/core-ui';
 import type {

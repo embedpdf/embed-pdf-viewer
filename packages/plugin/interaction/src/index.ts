@@ -6,22 +6,7 @@
  * reducer.ts · capability.ts · interaction.plugin.ts. Zero framework code.
  */
 export { interactionPlugin, builtinTools } from './interaction.plugin';
+export * from './contract';
 export { createInteractionCapability } from './capability';
 export { initialInteractionState, interactionReducer } from './reducer';
-export { InteractionToken, samplePointOn } from './types';
-export { FeedbackToken, feedbackPlugin } from './feedback';
-export type { FeedbackPluginOptions, PlatformFeedback } from './feedback';
-export type {
-  Cursor,
-  InteractionAction,
-  InteractionCapability,
-  InteractionConfig,
-  InteractionHandler,
-  InteractionState,
-  Modifiers,
-  Phase,
-  PointerKind,
-  PointerSample,
-  Tool,
-  ToolId,
-} from './types';
+export { feedbackPlugin } from './feedback';

@@ -11,15 +11,4 @@
  * active tool's `link-nav` tag decides which plane owns a click.
  */
 export { linkPlugin } from './link.plugin';
-export { LinkToken } from './types';
-export type {
-  LinkActivateContext,
-  LinkActivation,
-  LinkActivateEvent,
-  LinkCapability,
-  LinkNavItem,
-  LinkPluginConfig,
-  LinkState,
-  PdfDestination,
-  PdfLinkTarget,
-} from './types';
+export * from './contract';

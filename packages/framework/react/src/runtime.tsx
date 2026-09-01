@@ -31,7 +31,7 @@ import type {
 // Pure coordinate math from the geometry base — NOT from stage-core. The
 // PageContext seam stays stage-agnostic (it must also serve standalone PageView).
 import type { PageFrame, PageTransform, Point, Rect } from '@embedpdf/core-geometry';
-import type { PageViewDemand } from '@embedpdf/plugin-render';
+import type { PageViewDemand } from '@embedpdf/plugin-render/contract';
 
 const KernelCtx = createContext<Kernel | null>(null);
 /** The document a subtree is bound to. null => use the active document. */

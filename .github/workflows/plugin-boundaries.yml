@@ -1,0 +1,51 @@
+name: plugin-boundaries
+
+on:
+  pull_request:
+    paths:
+      - 'packages/**'
+      - 'cloudpdf/**'
+      - 'examples/**'
+      - 'tooling/build/**'
+      - '.agents/skills/embedpdf-conventions/references/plugins.md'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/plugin-boundaries.yml'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: plugin-boundaries-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PNPM
+        uses: pnpm/action-setup@v5
+        with:
+          run_install: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install deps
+        run: pnpm install --frozen-lockfile
+        env:
+          NPM_TOKEN: ''
+
+      - name: Test boundary checker
+        run: pnpm --filter @embedpdf/tooling-build test
+
+      - name: Check plugin boundaries
+        run: pnpm check:plugin-boundaries

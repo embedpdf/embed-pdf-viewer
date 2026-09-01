@@ -1,13 +1,13 @@
 import { definePlugin } from '@embedpdf/core';
-import { ActionsToken } from '@embedpdf/plugin-actions';
+import { ActionsToken } from '@embedpdf/plugin-actions/contract';
 // Executor registration lives on the actions HOST capability — same runtime
 // token, wider type (the annotation-internal precedent).
-import { ActionsToken as ActionsHostToken } from '@embedpdf/plugin-actions/internal';
-import { AnnotationToken } from '@embedpdf/plugin-annotation';
+import { ActionsToken as ActionsHostToken } from '@embedpdf/plugin-actions/contract/host';
+import { AnnotationToken } from '@embedpdf/plugin-annotation/contract';
 // Behavior registration lives on the HOST capability (framework/plugin
 // surface) — same runtime token, wider type.
-import { AnnotationToken as AnnotationHostToken } from '@embedpdf/plugin-annotation/internal';
-import { InteractionToken } from '@embedpdf/plugin-interaction';
+import { AnnotationToken as AnnotationHostToken } from '@embedpdf/plugin-annotation/contract/host';
+import { InteractionToken } from '@embedpdf/plugin-interaction/contract';
 
 import { createFormCapability } from './capability';
 import { registerFormEffects } from './effects';

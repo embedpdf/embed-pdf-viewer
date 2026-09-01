@@ -1,10 +1,11 @@
 import type { PluginContext } from '@embedpdf/core';
 import type { PdfLinkTarget } from '@embedpdf/engine-core/runtime';
-import { InteractionToken } from '@embedpdf/plugin-interaction';
-import { destinationToReveal, StageToken } from '@embedpdf/plugin-stage';
-import { ActionsToken } from '@embedpdf/plugin-actions';
+import { ActionsToken } from '@embedpdf/plugin-actions/contract';
 // The host lens (linkItemsOn) — same runtime token as the public one.
-import { AnnotationToken as AnnotationHostToken } from '@embedpdf/plugin-annotation/internal';
+import { AnnotationToken as AnnotationHostToken } from '@embedpdf/plugin-annotation/contract/host';
+import { InteractionToken } from '@embedpdf/plugin-interaction/contract';
+import { StageToken } from '@embedpdf/plugin-stage/contract';
+import { destinationToReveal } from '@embedpdf/plugin-stage/destination';
 import { loadLinksPage } from './source';
 import type {
   LinkAction,

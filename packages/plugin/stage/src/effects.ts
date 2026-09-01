@@ -1,5 +1,5 @@
 import type { CapabilityToken, EffectContext } from '@embedpdf/core';
-import { ActionsToken as ActionsHostToken } from '@embedpdf/plugin-actions/internal';
+import { ActionsToken as ActionsHostToken } from '@embedpdf/plugin-actions/contract/host';
 import type { StageAction, StageCapability, StageState } from './types';
 
 /**

@@ -1,4 +1,4 @@
-import type { Locale } from '@embedpdf/plugin-i18n';
+import type { Locale } from '@embedpdf/plugin-i18n/contract';
 
 /**
  * The demo's English pack. Strings belong to the PRODUCT, not the plugin —

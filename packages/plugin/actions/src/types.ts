@@ -71,9 +71,7 @@ export const originOf = (trigger: ActionTrigger): ActionOrigin => {
     case 'activate':
       return 'user';
     case 'annotation':
-      return trigger.event === 'cursorEnter' || trigger.event === 'cursorExit'
-        ? 'hover'
-        : 'user';
+      return trigger.event === 'cursorEnter' || trigger.event === 'cursorExit' ? 'hover' : 'user';
     case 'page':
     case 'document':
       return 'lifecycle';
@@ -265,8 +263,8 @@ export interface ActionsCapability {
   onDiagnostic: EventHook<ActionDiagnostic>;
 }
 
-/** INTERNAL host lens — plugin-to-plugin only; import the token from
- *  `@embedpdf/plugin-actions/internal`, never from application code. */
+/** HOST lens — plugin-to-plugin only; import the token from
+ *  `@embedpdf/plugin-actions/contract/host`, never from application code. */
 export interface ActionsHostCapability extends ActionsCapability {
   /** Deterministic LAST-WINS on duplicates (a `duplicate-executor`
    *  diagnostic is emitted); the disposer removes the entry only while it is

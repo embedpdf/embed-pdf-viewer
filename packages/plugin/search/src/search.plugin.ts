@@ -1,5 +1,5 @@
 import { definePlugin } from '@embedpdf/core';
-import { StageToken } from '@embedpdf/plugin-stage';
+import { StageToken } from '@embedpdf/plugin-stage/contract';
 
 import { createSearchCapability } from './capability';
 import { registerSearchEffects } from './effects';

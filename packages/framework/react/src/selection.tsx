@@ -32,7 +32,7 @@ import {
   type SelectionMenuAnchor,
 } from '@embedpdf/plugin-selection';
 import { SelectionToken as SelectionHostToken } from '@embedpdf/plugin-selection/internal';
-import { StageToken, type StageCapability } from '@embedpdf/plugin-stage';
+import { StageToken, type StageCapability } from '@embedpdf/plugin-stage/contract';
 import {
   attachSelectionHandle,
   wireSelectionClipboard,
