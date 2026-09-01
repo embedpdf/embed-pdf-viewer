@@ -188,6 +188,11 @@ switch (language) {
     break;
   }
   case 'java': {
+    assert(
+      read('gradle.properties') ===
+        'org.gradle.jvmargs=-Xmx2g -XX:MaxMetaspaceSize=512m -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8\n',
+      'Gradle build JVM memory is not configured for the generated API surface',
+    );
     const build = read('build.gradle');
     assert(build.includes("group = 'com.cloudpdf'"), 'Gradle group is not com.cloudpdf');
     assert(build.includes("artifactId = 'sdk'"), 'Gradle artifact is not sdk');
