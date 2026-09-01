@@ -59,6 +59,7 @@ import {
   useSelector,
 } from './runtime';
 import type { PageContextValue } from './runtime';
+import { FormFocusRing } from './form-focus-ring';
 import { NativeListBox } from './form-listbox';
 
 /** Content rect → a view-px box (the page wrapper's own coordinate space). */
@@ -429,11 +430,10 @@ function ToggleWidget({ fill, item, page, appearance }: WidgetProps<'toggle'>) {
         height: b.height,
         cursor: fill.disabled ? 'default' : 'pointer',
         pointerEvents: 'auto', // always the event surface; toggle() self-gates
-        outline: focused ? '2px solid rgba(66, 133, 244, 0.8)' : 'none',
-        outlineOffset: -2,
       }}
     >
       <Picture page={page} appearance={appearance} apBox={item.apBox} frame={b} />
+      <FormFocusRing visible={focused} />
     </div>
   );
 }
@@ -469,11 +469,10 @@ function ChoiceFrame({
         width: b.width,
         height: b.height,
         pointerEvents: 'auto',
-        outline: focused ? '2px solid rgba(66, 133, 244, 0.8)' : 'none',
-        outlineOffset: -2,
       }}
     >
       {children}
+      <FormFocusRing visible={focused} />
     </div>
   );
 }

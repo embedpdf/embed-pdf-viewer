@@ -9,3 +9,5 @@ Widget fill controls become always-active `/AA` event surfaces, link anchors fee
 Route sibling feature dependencies through plugin contract/helper entries. Annotation selection hooks and anchor equality helpers are split into leaf modules so form and annotation-menu entries no longer import the full annotation feature implementation.
 
 Render PDF list boxes as visible native scrolling controls in both form surfaces, with stable optimistic selection and wheel isolation so row hit-testing, selection, and scrolling stay synchronized while engine writes complete. Combo boxes retain their baked resting appearance and native popup behavior.
+
+Keep keyboard focus indicators above baked PDF appearances so checkboxes and choice controls display the same clear blue focus ring as text fields and radio buttons.
