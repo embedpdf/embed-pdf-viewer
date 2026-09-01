@@ -1,4 +1,5 @@
 import { createCapabilityToken, type DocumentEvent, type PageObjectNumber } from '@embedpdf/core';
+import type { AnnotCommitEntry, AnnotCommitResult } from '@embedpdf/plugin-actions/contract/host';
 import type { PageRotation } from '@embedpdf/core-geometry';
 import type {
   AnnotationAppearanceImage,
@@ -966,7 +967,10 @@ export interface AnnotationHostCapability extends AnnotationCapability {
    * many resolved — unresolved numbers (unloaded pages, nm/index refs) are
    * the caller's diagnostics. Session state only; never an engine write.
    */
-  applySessionVisibility(entries: Array<{ annotObjectNumber: number; hidden: boolean }>): number;
+  /** The script/Hide DOCUMENT-commit door (full ISO): engine updates +
+   *  model reconciliation, per entry, stop-on-failure. Never enqueues,
+   *  never touches the script host — the D2 sink contract. */
+  commitScriptEffects(entries: AnnotCommitEntry[]): Promise<AnnotCommitResult>;
 }
 
 /**

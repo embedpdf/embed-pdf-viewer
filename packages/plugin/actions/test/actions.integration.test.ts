@@ -66,11 +66,38 @@ describe('plugin-actions integration (real engine)', () => {
       });
       return { status: 'executed' };
     });
-    actions.registerSessionSink({
-      applyVisibility: (entries) => {
-        calls.push({ seam: 'hide', detail: entries });
-        return entries.length;
-      },
+    actions.registerFormCommitSink(async (effects) => {
+      calls.push({
+        seam: 'hideForm',
+        detail: effects.map((effect) =>
+          effect.kind === 'setDisplay' ? { display: effect.display } : { kind: effect.kind },
+        ),
+      });
+      return {
+        results: effects.map((_, index) => ({
+          index,
+          status: 'applied' as const,
+          fields: [],
+          changedWidgets: [],
+        })),
+        changedWidgets: [],
+        meta: null,
+      };
+    });
+    actions.registerAnnotCommitSink(async (entries) => {
+      calls.push({
+        seam: 'hide',
+        detail: entries.map((entry) => ({
+          annotObjectNumber: entry.annotObjectNumber,
+          hidden: entry.patch.flags?.hidden ?? false,
+        })),
+      });
+      return {
+        results: entries.map((entry) => ({
+          annotObjectNumber: entry.annotObjectNumber,
+          status: 'applied' as const,
+        })),
+      };
     });
     actions.setUiAdapter({
       openUri: (uri, opts) => calls.push({ seam: 'uri', detail: { uri, ...opts } }),
@@ -105,7 +132,11 @@ describe('plugin-actions integration (real engine)', () => {
     await engine?.destroy();
   });
 
-  const user = { origin: 'user' as const, source: { kind: 'api' as const } };
+  const user = {
+    origin: 'user' as const,
+    source: { kind: 'api' as const },
+    event: { scope: 'activate' as const },
+  };
   const lastCallsSince = (mark: number) => calls.slice(mark).map((c) => c.seam);
 
   it('routes a GoTo /FitR tree to the navigation executor with its payload', async () => {
@@ -123,17 +154,15 @@ describe('plugin-actions integration (real engine)', () => {
     expect(calls.at(-1)).toMatchObject({ seam: 'named', detail: 'NextPage' });
   });
 
-  it('resolves hide-mixed: the objectNumber ref directly, the NAME through doc.forms', async () => {
+  it('routes hide-mixed by plane: the NAME → form setDisplay, the objectNumber → annot flags', async () => {
     const mark = calls.length;
     const result = await actions.execute(treeOf('hide-mixed'), user);
     expect(result.status).toBe('executed');
-    expect(lastCallsSince(mark)).toEqual(['hide']);
+    // Declared order: the forms plane commits first, then the annot plane.
+    expect(lastCallsSince(mark)).toEqual(['hideForm', 'hide']);
+    expect(calls.at(-2)!.detail).toEqual([{ display: 'visible' }]); // field note1
     const entries = calls.at(-1)!.detail as Array<{ annotObjectNumber: number; hidden: boolean }>;
-    // /H false — a SHOW. Two resolved targets: the square (by object number)
-    // and the note1 FIELD's widget (name → doc.forms → annotObjectNumber).
-    expect(entries).toHaveLength(2);
-    expect(entries.every((e) => e.hidden === false)).toBe(true);
-    expect(new Set(entries.map((e) => e.annotObjectNumber)).size).toBe(2);
+    expect(entries).toEqual([{ annotObjectNumber: 4, hidden: false }]); // the square
     expect(result.diagnostics).toEqual([]);
   });
 
@@ -178,9 +207,9 @@ describe('plugin-actions integration (real engine)', () => {
     const mark = calls.length;
     const result = await actions.execute(treeOf('chain-js-goto-hide'), user);
     expect(result.status).toBe('executed');
-    // Walk order executes JS then Hide inline; the GoTo navigation thunk
-    // fires only after every document-lifetime node succeeded.
-    expect(lastCallsSince(mark)).toEqual(['js', 'hide', 'goto']);
+    // Walk order executes JS then Hide inline (the note1 NAME rides the
+    // forms plane); the GoTo navigation thunk fires last.
+    expect(lastCallsSince(mark)).toEqual(['js', 'hideForm', 'goto']);
     expect(result.nodes.map((n) => [n.path.join('.'), n.type, n.status])).toEqual([
       ['', 'javascript', 'executed'],
       ['0', 'goto', 'executed'],

@@ -11,6 +11,7 @@ import type {
   FormRepairOptions,
   FormRepairResult,
   FormSetValueResult,
+  FormEffect,
   FormEffectsResult,
   FormSnapshot,
   PdfActionTargetRef,
@@ -38,9 +39,13 @@ export interface FormState {
   model: Model;
 }
 
+/**
+ * Standalone-realm configuration for `createFormScriptingHost` — stamp's
+ * detached documents and direct controller tests. Viewer documents configure
+ * scripting on `actionsPlugin({ javascript })` instead (D8), and every UI
+ * effect/diagnostic surfaces through the actions port (D9).
+ */
 export interface FormScriptingOptions {
-  /** Explicit opt-in. PDF JavaScript remains inert when false/omitted. */
-  enabled: boolean;
   /** Override the lazy QuickJS factory (tests or another isolated VM). */
   sandboxFactory?: ScriptSandboxFactory;
   /** Optional embedder identity fields layered over engine/JWT identity. */
@@ -52,15 +57,10 @@ export interface FormScriptingOptions {
   utcOffsetMinutes?: () => number;
   randomSeed?: () => number;
   budget?: ScriptBudget;
-  /** Framework/application port for app.alert, print, and page navigation. */
-  onUiEffect?: (effect: ScriptUiEffect) => void;
-  onDiagnostic?: (diagnostic: ScriptDiagnostic) => void;
-  onError?: (error: ScriptExecutionError) => void;
 }
 
-export interface FormPluginOptions {
-  scripting?: FormScriptingOptions;
-}
+/** The scripting switch moved to `actionsPlugin({ javascript })` (D8). */
+export interface FormPluginOptions {}
 
 export type FormCommitStatus = 'applied' | 'unchanged' | 'rejected' | 'failed';
 
@@ -94,8 +94,6 @@ export type FormUiEffect = ScriptUiEffect & {
   origin?: ActionOrigin;
 };
 
-/** Runtime adapter for alerts, print requests, and zero-based page navigation. */
-export type FormUiEffectProvider = (effect: FormUiEffect) => void;
 
 /** Input for {@link FormCapability.placeField}. */
 export interface PlaceFieldInput {
@@ -168,8 +166,6 @@ export interface FormCapability {
    * Fire-and-forget by design: results surface via the actions events.
    */
   notifyWidgetEvent(key: FieldKey, ref: AnnotationRef, event: PdfAnnotationEventKind): void;
-  /** Install the framework/application adapter for script-produced UI requests. */
-  setUiEffectProvider(provider: FormUiEffectProvider | null): void;
   /** Restore a field to its /DV default. */
   reset(key: FieldKey): Promise<void>;
   /** Raw engine passthrough for anything the sugar above doesn't cover. */
@@ -222,24 +218,9 @@ export type WidgetActivationResult =
 /**
  * HOST lens — plugin-to-plugin only (the actions plugin's interim
  * `javascript` / `reset-form` executors). Import the token from
- * `@embedpdf/plugin-form/contract/host`, never from application code. Phase 3's
- * shared ScriptHost replaces `runActivationScript`.
+ * `@embedpdf/plugin-form/contract/host`, never from application code.
  */
 export interface FormHostCapability extends FormCapability {
-  /**
-   * Run ONE activation script (a single JS node from a dispatched chain) as a
-   * widget-activate transaction. Takes the SCRIPT, not the node — the
-   * dispatcher owns the `/Next` walk, and the program builder recurses into
-   * `next`, so passing a node through would re-execute descendants.
-   * `scripted: false` in the result = the controller never ran (scripting
-   * off, or no form fields to anchor the transaction on) — the caller maps
-   * that to an inert node, not a failure.
-   */
-  runActivationScript(
-    script: string,
-    origin?: FormFieldRef,
-    dispatchOrigin?: ActionOrigin,
-  ): Promise<FormCommitResult>;
   /**
    * Execute one ResetForm action: resolve targets against the live snapshot
    * (`null` = every field; `exclude` = complement; a resolution yielding
@@ -247,6 +228,10 @@ export interface FormHostCapability extends FormCapability {
    * then recalculate when scripting is enabled (Acrobat's behaviour).
    */
   resetFormAction(fields: PdfActionTargetRef[] | null, exclude: boolean): Promise<FormCommitResult>;
+  /** The form DOCUMENT-commit sink (D3): engine `applyEffects` + snapshot
+   *  reconciliation. Sink contract: never throws, never enqueues, never
+   *  touches the script host — callable under a held host transaction. */
+  commitScriptFormEffects(effects: FormEffect[]): Promise<FormEffectsResult>;
 }
 
 /**

@@ -621,19 +621,14 @@ export function createStampCapability(
         );
       }
 
-      const scriptingConfig = config.scripting;
+      // The DETACHED stamp-asset document gets its OWN standalone realm —
+      // never the viewer document's shared host (realm isolation; WP4).
       scripting = createFormScriptingController({
         doc,
         document: () => targetMeta,
-        config: scriptingConfig,
-        sandboxFactory:
-          scriptingConfig.sandboxFactory ??
-          (() =>
-            import('@embedpdf/core-js-sandbox').then(({ createQuickJsSandbox }) =>
-              createQuickJsSandbox(),
-            )),
+        config: config.scripting,
       });
-      const result = await scripting.recalculate(snapshot);
+      const result = await scripting.recalculate();
       surfaceScriptingResult(result);
       if (result.status === 'failed') {
         throw new EngineError(

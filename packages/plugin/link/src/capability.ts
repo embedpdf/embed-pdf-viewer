@@ -43,6 +43,7 @@ export function createLinkCapability(
         const dispatch = actions.execute(context.activate, {
           origin: 'user',
           source: { kind: 'link', annotation: context.ref, pon: context.pon },
+          event: { scope: 'activate' },
         });
         return { outcome: 'dispatched', dispatch };
       }

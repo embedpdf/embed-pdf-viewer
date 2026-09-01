@@ -12,6 +12,7 @@
 export * from '@embedpdf/plugin-actions';
 import { useEffect, useRef } from 'react';
 import { ActionsToken, type ActionUiAdapter } from '@embedpdf/plugin-actions';
+import { StageToken } from '@embedpdf/plugin-stage';
 import { sanitizeExternalUri } from '@embedpdf/web';
 
 import { useOptionalCapability } from './runtime';
@@ -28,11 +29,16 @@ export type ActionsUiHandlers = Partial<ActionUiAdapter>;
  */
 export function useActionsUiAdapter(handlers?: ActionsUiHandlers): void {
   const actions = useOptionalCapability(ActionsToken);
+  const stage = useOptionalCapability(StageToken);
   const handlersRef = useRef(handlers);
   handlersRef.current = handlers;
 
   useEffect(() => {
     if (!actions) return;
+    // The DEFAULT visibility matrix (origin × phase). Embedder handlers
+    // receive every effect (context attached) and decide for themselves;
+    // these defaults govern only the built-in fallbacks. The doc.print
+    // AUTHORITY gate is upstream (the actions plugin) and not overridable.
     const adapter: ActionUiAdapter = {
       openUri: (uri, opts) => {
         const current = handlersRef.current;
@@ -45,12 +51,27 @@ export function useActionsUiAdapter(handlers?: ActionsUiHandlers): void {
           window.open(href, '_blank', 'noopener,noreferrer');
         }
       },
-      print: () => {
+      print: (opts) => {
         const current = handlersRef.current;
-        if (current?.print) current.print();
-        else if (typeof globalThis.print === 'function') globalThis.print();
+        if (current?.print) current.print(opts);
+        else if (opts && opts.origin !== 'user') {
+          // Hover/lifecycle scripts never open the print dialog by default.
+        } else if (typeof globalThis.print === 'function') globalThis.print();
+      },
+      alert: (message, opts) => {
+        const current = handlersRef.current;
+        if (current?.alert) current.alert(message, opts);
+        else if (opts.origin === 'lifecycle' || opts.phase === 'boot') {
+          // Document-open nags (Adobe version checks, lifecycle scripts)
+          // never alert by default — the boot-nag gap, closed.
+        } else if (typeof globalThis.alert === 'function') globalThis.alert(message);
+      },
+      gotoPage: (page, opts) => {
+        const current = handlersRef.current;
+        if (current?.gotoPage) current.gotoPage(page, opts);
+        else stage?.goToPage(page);
       },
     };
     return actions.setUiAdapter(adapter);
-  }, [actions]);
+  }, [actions, stage]);
 }

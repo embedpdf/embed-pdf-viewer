@@ -1,6 +1,18 @@
 import { createCapabilityToken, type EventHook, type Unsubscribe } from '@embedpdf/core';
 import type {
+  ScriptAnnotEffect,
+  ScriptBudget,
+  ScriptDiagnostic,
+  ScriptExecutionError,
+  ScriptIdentity,
+  ScriptSandboxFactory,
+  ScriptTransaction,
+  ScriptUiEffect,
+} from '@embedpdf/core-acrojs';
+import type {
   AnnotationRef,
+  FormEffect,
+  FormEffectsResult,
   FormFieldRef,
   PageObjectNumber,
   PdfActionNode,
@@ -29,9 +41,19 @@ export type ActionSource =
   | { kind: 'document' }
   | { kind: 'api' };
 
+/** Trigger provenance, derived centrally beside {@link originOf} — the
+ *  executor-visible "which event fired" (cursorEnter vs cursorExit are both
+ *  `origin: 'hover'`; this carries the difference). */
+export type ActionTriggerEvent =
+  | { scope: 'activate' }
+  | { scope: 'annotation'; name: PdfAnnotationEventKind }
+  | { scope: 'page'; name: 'open' | 'close' | 'visible' | 'invisible' }
+  | { scope: 'document'; name: 'open' };
+
 export interface ActionContext {
   origin: ActionOrigin;
   source: ActionSource;
+  event: ActionTriggerEvent;
 }
 
 /** The six annotation /AA pointer/focus events (ISO Table 197: E X D U Fo Bl).
@@ -63,6 +85,20 @@ export type ActionTrigger =
     }
   | { scope: 'page'; event: 'open' | 'close' | 'visible' | 'invisible'; pon: PageObjectNumber }
   | { scope: 'document'; event: 'open' };
+
+/** Trigger → provenance descriptor (the {@link ActionContext.event} axis). */
+export const eventOf = (trigger: ActionTrigger): ActionTriggerEvent => {
+  switch (trigger.scope) {
+    case 'activate':
+      return { scope: 'activate' };
+    case 'annotation':
+      return { scope: 'annotation', name: trigger.event };
+    case 'page':
+      return { scope: 'page', name: trigger.event };
+    case 'document':
+      return { scope: 'document', name: trigger.event };
+  }
+};
 
 /** The one origin mapping — derived by the dispatcher, never claimed by a
  *  caller: a feed cannot launder a hover into a user gesture. */
@@ -108,6 +144,7 @@ export interface ActionDiagnostic {
     | 'executor-inert'
     | 'executor-failed'
     | 'trigger-disabled' // config.triggers gated this family off
+    | 'no-commit-sink' // a document effect had no registered owner sink
     | 'trigger-failed' // resolution threw — dispatch() never rejects
     | 'cascade-budget' // programmatic page-lifecycle rounds exceeded the cap
     | 'open-sequence-replayed'; // a second document-open trigger arrived
@@ -211,6 +248,33 @@ export interface ActionsPluginConfig {
    * fires it — but still releases the page-lifecycle barrier.
    */
   openSequence?: 'auto' | 'headless' | 'off';
+  /**
+   * THE JavaScript switch (relocated from `formPlugin({ scripting })`).
+   * Default off — no VM ever loads. When enabled, the plugin owns the ONE
+   * per-document ScriptHost realm, registers the real `javascript` executor,
+   * and exposes the transaction port on the host lens (form's K/V/C/F
+   * pipeline rides it).
+   */
+  javascript?: {
+    enabled: boolean;
+    /** Override the lazy QuickJS factory (tests or another isolated VM). */
+    sandboxFactory?: ScriptSandboxFactory;
+    /** Embedder identity fields layered over engine/JWT identity. */
+    identity?: Partial<ScriptIdentity> | (() => Partial<ScriptIdentity>);
+    fileName?: () => string;
+    /** Injected deterministic transaction environment. */
+    now?: () => number;
+    utcOffsetMinutes?: () => number;
+    randomSeed?: () => number;
+    budget?: ScriptBudget;
+    /**
+     * D11's deterministic aggregate: the max JS nodes ONE dispatch may run
+     * (a /Next chain shares this instead of multiplying the per-run time
+     * budget; a wall-clock aggregate would be the flake class we banned).
+     * Exhausted → remaining JS nodes report inert with a budget reason.
+     */
+    maxScriptNodesPerDispatch?: number;
+  };
 }
 
 // ── registration surfaces (host lens) ──────────────────────────────────────
@@ -227,16 +291,61 @@ export type ActionExecutor = (
   ctx: ActionContext,
 ) => Promise<ActionExecutorResult> | ActionExecutorResult;
 
-/** The annotation plugin's session-visibility door (umbrella §3.6): apply
- *  session-hidden overrides by annotation object number. Returns how many
- *  resolved; unresolved numbers surface as `unresolved-target` diagnostics. */
-export interface SessionEffectSink {
-  applyVisibility(entries: Array<{ annotObjectNumber: number; hidden: boolean }>): number;
+// ── owner commit sinks (D3) — full ISO: every script/Hide effect is a
+// DOCUMENT mutation committed by the plugin that owns the model, so the
+// engine write and the visible model can never diverge. Calling contract:
+// invoked from inside the actions/form serialized operations (the script
+// executor calls them while HOLDING the host transaction); a sink never
+// enqueues and never acquires the host — the proven deadlock class.
+
+/** One annotation-effect commit entry. `pageObjectNumber` may be absent for
+ *  bare Hide object-number targets — the sink resolves it from its model
+ *  (`obj:N` is a cross-page key there); unresolvable entries fail honestly. */
+export interface AnnotCommitEntry {
+  annotObjectNumber: number;
+  pageObjectNumber?: number;
+  patch: ScriptAnnotEffect['patch'];
+}
+export interface AnnotCommitResult {
+  results: Array<{
+    annotObjectNumber: number;
+    status: 'applied' | 'failed' | 'skipped';
+    error?: string;
+  }>;
+}
+export type AnnotCommitSink = (entries: AnnotCommitEntry[]) => Promise<AnnotCommitResult>;
+
+/** The form plugin's document commit: engine `applyEffects` + snapshot
+ *  reconciliation (its existing commit tail, extracted). */
+export type FormCommitSink = (effects: FormEffect[]) => Promise<FormEffectsResult>;
+
+/** What a script transaction surfaced besides document effects. */
+export interface ScriptSurfaceResult {
+  uiEffects: ScriptUiEffect[];
+  diagnostics: ScriptDiagnostic[];
+  error?: ScriptExecutionError;
+  origin: ActionOrigin;
+  phase: 'boot' | 'user';
+}
+
+/** Origin/phase context every script-produced UI request carries — the
+ *  DEFAULT adapter's visibility matrix keys on it; embedder adapters receive
+ *  everything and decide for themselves. */
+export interface ActionUiContext {
+  origin: ActionOrigin;
+  /** Script-model axis: `'boot'` = name-tree/document-open boot scripts. */
+  phase: 'boot' | 'user';
 }
 
 export interface ActionUiAdapter {
   openUri(uri: string, opts: { isMap: boolean; origin: ActionOrigin }): void;
-  print(): void;
+  /** The Named `Print` verb AND script `print()` requests (authority-gated
+   *  upstream — `doc.print` refusals never reach the adapter). */
+  print(opts?: ActionUiContext): void;
+  /** Script `app.alert` — the ONE alert port for every script origin. */
+  alert?(message: string, opts: ActionUiContext & { icon: number; title?: string }): void;
+  /** Script `this.pageNum = n` navigation requests. */
+  gotoPage?(page: number, opts: ActionUiContext): void;
 }
 
 // ── capabilities ───────────────────────────────────────────────────────────
@@ -261,6 +370,10 @@ export interface ActionsCapability {
   setUiAdapter(adapter: ActionUiAdapter | null): Unsubscribe;
   onAction: EventHook<ActionDispatchEvent>;
   onDiagnostic: EventHook<ActionDiagnostic>;
+  /** Script-plane observability (dispatch-driven AND K/V/C/F-driven — the
+   *  form pipeline surfaces through the same doors). */
+  onScriptDiagnostic: EventHook<ScriptDiagnostic>;
+  onScriptError: EventHook<ScriptExecutionError>;
 }
 
 /** HOST lens — plugin-to-plugin only; import the token from
@@ -270,7 +383,18 @@ export interface ActionsHostCapability extends ActionsCapability {
    *  diagnostic is emitted); the disposer removes the entry only while it is
    *  still the current one. */
   registerExecutor(type: PdfActionType, executor: ActionExecutor): Unsubscribe;
-  registerSessionSink(sink: SessionEffectSink): Unsubscribe;
+  registerAnnotCommitSink(sink: AnnotCommitSink): Unsubscribe;
+  registerFormCommitSink(sink: FormCommitSink): Unsubscribe;
+  /**
+   * The realm transaction port — present ONLY when `javascript.enabled`
+   * (its presence IS form's "scripting on" signal). The body must perform
+   * prefetch, runs, sink commits, and reconciliation before returning
+   * (commit-inside-the-boundary).
+   */
+  scriptTransaction?<T>(body: (txn: ScriptTransaction) => Promise<T>): Promise<T>;
+  /** Surface a script transaction's UI effects/diagnostics/error through the
+   *  ONE port (adapter matrix + authority print gate + script hooks). */
+  surfaceScriptResult(result: ScriptSurfaceResult): void;
   /** Stage's page-truth push door — see {@link PageStateReport}. */
   reportPageState(report: PageStateReport): void;
 }

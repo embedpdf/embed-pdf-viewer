@@ -127,7 +127,7 @@ function harness(snapshot: FormSnapshot, sandbox: ScriptSandbox = new NodeSandbo
   });
   const doc = {
     id: 'form-doc',
-    forms: { applyEffects },
+    forms: { list: async () => snapshot, applyEffects },
     actions: { read: async () => ({ nameTreeScripts: [], openAction: null }) },
     security: { identity: { user_id: 'alex', display_name: 'Alex Morgan', group_id: 'EmbedPDF' } },
   } as unknown as DocumentHandle;
@@ -135,12 +135,11 @@ function harness(snapshot: FormSnapshot, sandbox: ScriptSandbox = new NodeSandbo
     doc,
     document: documentMeta,
     config: {
-      enabled: true,
       now: () => Date.UTC(2026, 6, 15, 9, 30, 0),
       utcOffsetMinutes: () => 180,
       randomSeed: () => 7,
+      sandboxFactory: vi.fn(async () => sandbox),
     },
-    sandboxFactory: vi.fn(async () => sandbox),
   });
   return { controller, batches, snapshot };
 }
@@ -155,7 +154,7 @@ describe('script fault ladder', () => {
     };
     const fx = harness(snapshot);
 
-    const result = await fx.controller.commit(snapshot, ref(2), { type: 'text', value: '42' });
+    const result = await fx.controller.commit(ref(2), { type: 'text', value: '42' });
 
     expect(result.status).toBe('applied');
     expect(fx.batches[0]).toEqual([
@@ -177,7 +176,7 @@ describe('script fault ladder', () => {
     };
     const fx = harness(snapshot);
 
-    const rejected = await fx.controller.commit(snapshot, ref(2), { type: 'text', value: 'abc' });
+    const rejected = await fx.controller.commit(ref(2), { type: 'text', value: 'abc' });
     expect(rejected.status).toBe('rejected');
     expect(rejected.uiEffects).toContainEqual(
       expect.objectContaining({
@@ -188,7 +187,7 @@ describe('script fault ladder', () => {
     );
     expect(fx.batches).toEqual([]);
 
-    const accepted = await fx.controller.commit(snapshot, ref(2), {
+    const accepted = await fx.controller.commit(ref(2), {
       type: 'text',
       value: '1,234.56',
     });
@@ -207,7 +206,7 @@ describe('script fault ladder', () => {
     };
     const fx = harness(snapshot);
 
-    const result = await fx.controller.commit(snapshot, ref(2), { type: 'text', value: '7' });
+    const result = await fx.controller.commit(ref(2), { type: 'text', value: '7' });
 
     expect(result.status).toBe('applied');
     expect(fx.batches[0]).toEqual([
@@ -233,7 +232,7 @@ describe('script fault ladder', () => {
     };
     const fx = harness(snapshot);
 
-    const result = await fx.controller.commit(snapshot, ref(2), { type: 'text', value: '5' });
+    const result = await fx.controller.commit(ref(2), { type: 'text', value: '5' });
 
     expect(result.status).toBe('applied');
     expect(fx.batches[0]).toEqual([
@@ -254,7 +253,7 @@ describe('script fault ladder', () => {
     };
     const fx = harness(snapshot);
 
-    const result = await fx.controller.commit(snapshot, ref(2), { type: 'text', value: '7' });
+    const result = await fx.controller.commit(ref(2), { type: 'text', value: '7' });
 
     expect(result.status).toBe('applied');
     expect(fx.batches[0]).toEqual([
@@ -274,7 +273,7 @@ describe('script fault ladder', () => {
     };
     const fx = harness(snapshot, new BudgetFaultSandbox());
 
-    const result = await fx.controller.commit(snapshot, ref(2), { type: 'text', value: '5' });
+    const result = await fx.controller.commit(ref(2), { type: 'text', value: '5' });
 
     expect(result.status).toBe('failed');
     expect(result.error).toMatchObject({ kind: 'budget' });

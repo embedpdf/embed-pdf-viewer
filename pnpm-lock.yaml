@@ -1284,6 +1284,12 @@ importers:
       '@embedpdf/core':
         specifier: workspace:*
         version: link:../../core/main
+      '@embedpdf/core-acrojs':
+        specifier: workspace:*
+        version: link:../../core/acrojs
+      '@embedpdf/core-js-sandbox':
+        specifier: workspace:*
+        version: link:../../core/js-sandbox
       '@embedpdf/engine-core':
         specifier: workspace:*
         version: link:../../engine/core
@@ -1309,6 +1315,9 @@ importers:
       '@embedpdf/core':
         specifier: workspace:*
         version: link:../../core/main
+      '@embedpdf/core-acrojs':
+        specifier: workspace:*
+        version: link:../../core/acrojs
       '@embedpdf/core-annotation':
         specifier: workspace:*
         version: link:../../core/annotation
@@ -1650,6 +1659,9 @@ importers:
       '@embedpdf/core':
         specifier: workspace:*
         version: link:../../core/main
+      '@embedpdf/core-acrojs':
+        specifier: workspace:*
+        version: link:../../core/acrojs
       '@embedpdf/core-js-sandbox':
         specifier: workspace:*
         version: link:../../core/js-sandbox

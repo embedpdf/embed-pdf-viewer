@@ -32,7 +32,6 @@ describe('plugin-form dynamic-stamp acceptance', () => {
         revision: 0,
       }),
       config: {
-        enabled: true,
         identity: {
           name: 'Alex Morgan',
           loginName: 'alex',
@@ -42,13 +41,13 @@ describe('plugin-form dynamic-stamp acceptance', () => {
         now: () => Date.UTC(2026, 6, 15, 9, 30, 0),
         utcOffsetMinutes: () => 180,
         randomSeed: () => 7,
+        sandboxFactory: createQuickJsSandbox,
       },
-      sandboxFactory: createQuickJsSandbox,
     });
 
     try {
       const snapshot = await doc.forms.list();
-      const result = await controller.recalculate(snapshot);
+      const result = await controller.recalculate();
 
       expect(result.status).toBe('applied');
       expect(result.effectsResult?.results.map(({ status }) => status)).toEqual([

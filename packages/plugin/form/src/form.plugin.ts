@@ -107,32 +107,26 @@ export const formPlugin = (options: FormPluginOptions = {}) =>
       // exactly when needed.
       const actions = ctx.tryGet(ActionsHostToken);
       if (actions) {
+        // The real `javascript` executor is the actions plugin's own (Phase 3
+        // ScriptHost); form contributes its DOCUMENT-commit sink so script
+        // form effects land through the owner (engine write + model
+        // reconciliation in one place — the stale-model class is structural).
         ctx.cleanup(
-          actions.registerExecutor('javascript', async (node, actionCtx) => {
-            if (node.type !== 'javascript') return { status: 'inert', reason: 'not a JS node' };
+          actions.registerFormCommitSink((effects) => {
             const formHost = ctx.tryGet(FormToken);
-            if (!formHost) return { status: 'inert', reason: 'form plugin unavailable' };
-            const origin =
-              actionCtx.source.kind === 'widget' ? actionCtx.source.field : undefined;
-            // Thread the dispatch origin: lifecycle/hover scripts tag their
-            // UI effects so providers can apply the visibility matrix.
-            const result = await formHost.runActivationScript(
-              node.script,
-              origin,
-              actionCtx.origin,
-            );
-            // 'rejected' (a script's event.rc = false) still RAN — only a
-            // real failure fails the chain.
-            if (result.status === 'failed') {
-              return { status: 'failed', error: result.error?.message ?? 'script failed' };
+            if (!formHost) {
+              return Promise.resolve({
+                results: effects.map((_, index) => ({
+                  index,
+                  status: 'failed' as const,
+                  fields: [],
+                  changedWidgets: [],
+                })),
+                changedWidgets: [],
+                meta: null,
+              });
             }
-            if (!result.scripted) {
-              return {
-                status: 'inert',
-                reason: result.diagnostics[0]?.message ?? 'scripting disabled',
-              };
-            }
-            return { status: 'executed' };
+            return formHost.commitScriptFormEffects(effects);
           }),
         );
         ctx.cleanup(

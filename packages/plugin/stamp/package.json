@@ -42,7 +42,8 @@
     "@embedpdf/core-js-sandbox": "workspace:*",
     "@embedpdf/plugin-annotation": "workspace:*",
     "@embedpdf/plugin-form": "workspace:*",
-    "@embedpdf/engine-core": "workspace:*"
+    "@embedpdf/engine-core": "workspace:*",
+    "@embedpdf/core-acrojs": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.0.0",

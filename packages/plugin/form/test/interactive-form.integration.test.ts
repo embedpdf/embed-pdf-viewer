@@ -94,12 +94,11 @@ describe('interactive form JavaScript acceptance', () => {
         revision: 0,
       }),
       config: {
-        enabled: true,
         now: () => Date.UTC(2026, 6, 15, 9, 30, 0),
         utcOffsetMinutes: () => 180,
         randomSeed: () => 7,
+        sandboxFactory: createQuickJsSandbox,
       },
-      sandboxFactory: createQuickJsSandbox,
     });
 
     try {
@@ -107,9 +106,7 @@ describe('interactive form JavaScript acceptance', () => {
       const summaryButton = initial.fields.find(({ name }) => name === 'btn_summary');
       if (!summaryButton) throw new Error('summary button is missing');
 
-      const summaryResult = await controller.activate(
-        initial,
-        summaryButton.ref,
+      const summaryResult = await controller.activate(summaryButton.ref,
         await activationFor(doc, summaryButton),
       );
 
@@ -124,9 +121,7 @@ describe('interactive form JavaScript acceptance', () => {
 
       const printButton = afterSummary.fields.find(({ name }) => name === 'btn_print');
       if (!printButton) throw new Error('print button is missing');
-      const printResult = await controller.activate(
-        afterSummary,
-        printButton.ref,
+      const printResult = await controller.activate(printButton.ref,
         await activationFor(doc, printButton),
       );
 
@@ -144,11 +139,11 @@ describe('interactive form JavaScript acceptance', () => {
       const premium = packageField.options.find(({ label }) => label === 'Premium - $900');
       if (!premium) throw new Error('Premium package option is missing');
 
-      await controller.commit(await doc.forms.list(), packageField.ref, {
+      await controller.commit(packageField.ref, {
         type: 'choice',
         values: [premium.value],
       });
-      await controller.commit(await doc.forms.list(), recording.ref, {
+      await controller.commit(recording.ref, {
         type: 'toggle',
         state: recording.exportValue,
       });
@@ -156,9 +151,7 @@ describe('interactive form JavaScript acceptance', () => {
       const beforeReset = await doc.forms.list();
       const resetButton = beforeReset.fields.find(({ name }) => name === 'btn_reset');
       if (!resetButton) throw new Error('reset button is missing');
-      const resetResult = await controller.activate(
-        beforeReset,
-        resetButton.ref,
+      const resetResult = await controller.activate(resetButton.ref,
         await activationFor(doc, resetButton),
       );
       expect(resetResult.status).toBe('applied');
@@ -169,9 +162,7 @@ describe('interactive form JavaScript acceptance', () => {
       for (let attempt = 0; attempt < 2; attempt++) {
         const repeatedResetButton = afterReset.fields.find(({ name }) => name === 'btn_reset');
         if (!repeatedResetButton) throw new Error('reset button is missing after reset');
-        const repeatedResetResult = await controller.activate(
-          afterReset,
-          repeatedResetButton.ref,
+        const repeatedResetResult = await controller.activate(repeatedResetButton.ref,
           await activationFor(doc, repeatedResetButton),
         );
         expect(repeatedResetResult.status).toBe('unchanged');
@@ -181,14 +172,12 @@ describe('interactive form JavaScript acceptance', () => {
 
       const confirmation = afterReset.fields.find(({ name }) => name === 'confirmation');
       if (confirmation?.family !== 'text') throw new Error('confirmation field is missing');
-      await controller.commit(afterReset, confirmation.ref, { type: 'text', value: 'CONFIRM' });
+      await controller.commit(confirmation.ref, { type: 'text', value: 'CONFIRM' });
 
       const beforeConfirm = await doc.forms.list();
       const confirmButton = beforeConfirm.fields.find(({ name }) => name === 'btn_confirm');
       if (!confirmButton) throw new Error('confirm button is missing');
-      const confirmResult = await controller.activate(
-        beforeConfirm,
-        confirmButton.ref,
+      const confirmResult = await controller.activate(confirmButton.ref,
         await activationFor(doc, confirmButton),
       );
       expect(confirmResult.uiEffects).toContainEqual({

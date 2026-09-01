@@ -15,11 +15,22 @@ export function installAcroJs(g: Record<string, unknown>): void {
     display: string;
     wrapper: AnyRecord;
   };
+  type AnnotRecord = {
+    input: AnyRecord;
+    /** Writable-key snapshots: original vs current — effects are the diff. */
+    original: AnyRecord;
+    current: AnyRecord;
+    wrapper: AnyRecord;
+  };
   type RunState = {
     input: AnyRecord;
     fields: FieldRecord[];
     fieldsByName: Map<string, FieldRecord>;
     fieldsByRef: Map<string, FieldRecord>;
+    annots: AnnotRecord[];
+    annotsByPage: Map<number, AnnotRecord[]>;
+    annotPages: Set<number>;
+    annotsCoverDocument: boolean;
     event: AnyRecord;
     resetRefs: AnyRecord[];
     resetKeys: Set<string>;
@@ -132,6 +143,180 @@ export function installAcroJs(g: Record<string, unknown>): void {
 
   const getField = (name: unknown): AnyRecord | null =>
     state?.fieldsByName.get(String(name))?.wrapper ?? null;
+
+  // ── the annots plane (curated; self-contained twins of src/color.ts and
+  //    types.ts ANNOT_WRITABLE_KEYS — parity tests pin them) ───────────────
+  const ANNOT_WRITABLE: Record<string, string[]> = {
+    square: ['strokeColor', 'fillColor', 'opacity', 'width', 'borderStyle', 'dash', 'rect'],
+    circle: ['strokeColor', 'fillColor', 'opacity', 'width', 'borderStyle', 'dash', 'rect'],
+    polygon: ['strokeColor', 'fillColor', 'opacity', 'width', 'borderStyle', 'dash', 'rect'],
+    polyline: ['strokeColor', 'fillColor', 'opacity', 'width', 'borderStyle', 'dash', 'rect'],
+    line: ['strokeColor', 'fillColor', 'opacity', 'width', 'borderStyle', 'dash', 'rect'],
+    ink: ['strokeColor', 'opacity', 'width', 'rect'],
+    'free-text': ['strokeColor', 'fillColor', 'opacity', 'rect'],
+    highlight: ['strokeColor', 'opacity'],
+    underline: ['strokeColor', 'opacity'],
+    squiggly: ['strokeColor', 'opacity'],
+    strikeout: ['strokeColor', 'opacity'],
+    caret: ['strokeColor', 'opacity'],
+    text: ['strokeColor', 'opacity', 'rect'],
+    stamp: ['rect'],
+    'file-attachment': ['strokeColor', 'opacity'],
+  };
+  const ANNOT_FLAG_KEYS = ['hidden', 'print', 'readOnly', 'locked', 'noView', 'toggleNoView'];
+  const ACROBAT_TYPE: Record<string, string> = {
+    square: 'Square',
+    circle: 'Circle',
+    line: 'Line',
+    polygon: 'Polygon',
+    polyline: 'PolyLine',
+    ink: 'Ink',
+    'free-text': 'FreeText',
+    highlight: 'Highlight',
+    underline: 'Underline',
+    squiggly: 'Squiggly',
+    strikeout: 'StrikeOut',
+    text: 'Text',
+    stamp: 'Stamp',
+    caret: 'Caret',
+    'file-attachment': 'FileAttachment',
+  };
+  const isColorArray = (value: unknown): boolean => {
+    if (!Array.isArray(value) || value.length === 0) return false;
+    const counts: Record<string, number> = { T: 0, G: 1, RGB: 3, CMYK: 4 };
+    const expected = counts[String(value[0])];
+    return (
+      expected !== undefined &&
+      value.length === expected + 1 &&
+      value.slice(1).every((part) => typeof part === 'number' && isFinite(Number(part)))
+    );
+  };
+  const colorToRgbTriple = (value: unknown): number[] | null => {
+    const color = value as unknown[];
+    const space = String(color[0]);
+    if (space === 'T') return null;
+    if (space === 'G') return [Number(color[1]), Number(color[1]), Number(color[1])];
+    if (space === 'RGB') return [Number(color[1]), Number(color[2]), Number(color[3])];
+    const c = Number(color[1]);
+    const m = Number(color[2]);
+    const y = Number(color[3]);
+    const k = Number(color[4]);
+    return [1 - Math.min(1, c + k), 1 - Math.min(1, m + k), 1 - Math.min(1, y + k)];
+  };
+  const sameAnnotValue = (a: unknown, b: unknown): boolean => {
+    if (Array.isArray(a) && Array.isArray(b)) {
+      return a.length === b.length && a.every((item, index) => item === b[index]);
+    }
+    return a === b;
+  };
+  const cloneAnnotValue = (value: unknown): unknown => (Array.isArray(value) ? [...value] : value);
+
+  const makeAnnot = (record: AnnotRecord): AnyRecord => {
+    const input = record.input;
+    const subtype = String(input.subtype);
+    const writable = ANNOT_WRITABLE[subtype] ?? [];
+    const wrapper: AnyRecord = {};
+    const stage = (key: string, value: unknown, validate: (v: unknown) => boolean): void => {
+      // Flags and contents are writable on every script-addressable subtype;
+      // appearance keys follow the per-subtype matrix.
+      if (key !== 'contents' && ANNOT_FLAG_KEYS.indexOf(key) < 0 && writable.indexOf(key) < 0) {
+        diagnostic(
+          'unsupported-api',
+          `Annot.${key} is not writable on subtype '${subtype}' (write ignored)`,
+        );
+        return;
+      }
+      if (input.opaqueBody && ANNOT_FLAG_KEYS.indexOf(key) < 0 && key !== 'contents') {
+        diagnostic(
+          'unsupported-api',
+          `Annot.${key}: '${subtype}' has an opaque appearance (write ignored)`,
+        );
+        return;
+      }
+      if (!validate(value)) {
+        diagnostic('invalid-field-value', `Annot.${key}: invalid value (write ignored)`);
+        return;
+      }
+      record.current[key] = cloneAnnotValue(value);
+    };
+    const prop = (key: string, validate: (v: unknown) => boolean): PropertyDescriptor => ({
+      enumerable: true,
+      get: () => cloneAnnotValue(record.current[key]),
+      set: (value: unknown) => stage(key, value, validate),
+    });
+    const isNum = (v: unknown) => typeof v === 'number' && isFinite(v);
+    const isBool = (v: unknown) => typeof v === 'boolean';
+    Object.defineProperties(wrapper, {
+      name: { enumerable: true, get: () => String(input.name ?? '') },
+      type: { enumerable: true, get: () => ACROBAT_TYPE[subtype] ?? subtype },
+      page: { enumerable: true, get: () => Number(input.page ?? 0) },
+      author: { enumerable: true, get: () => String(input.author ?? '') },
+      subject: { enumerable: true, get: () => String(input.subject ?? '') },
+      strokeColor: prop('strokeColor', isColorArray),
+      fillColor: prop('fillColor', isColorArray),
+      opacity: prop('opacity', (v) => isNum(v) && Number(v) >= 0 && Number(v) <= 1),
+      width: prop('width', (v) => isNum(v) && Number(v) >= 0),
+      style: prop('borderStyle', (v) => v === 'S' || v === 'D'),
+      dash: prop('dash', (v) => Array.isArray(v) && v.every(isNum)),
+      rect: prop('rect', (v) => Array.isArray(v) && v.length === 4 && v.every(isNum)),
+      contents: prop('contents', (v) => typeof v === 'string'),
+      hidden: prop('hidden', isBool),
+      print: prop('print', isBool),
+      readOnly: prop('readOnly', isBool),
+      lock: prop('locked', isBool),
+      noView: prop('noView', isBool),
+      toggleNoView: prop('toggleNoView', isBool),
+      doc: { enumerable: false, get: () => doc },
+    });
+    wrapper.getProps = () => {
+      const out: AnyRecord = {};
+      for (const key of Object.keys(record.current)) out[key] = cloneAnnotValue(record.current[key]);
+      return out;
+    };
+    wrapper.setProps = (props: unknown) => {
+      const source = (props ?? {}) as AnyRecord;
+      for (const key of Object.keys(source)) {
+        const alias = key === 'style' ? 'borderStyle' : key === 'lock' ? 'locked' : key;
+        void alias;
+        (wrapper as AnyRecord)[key] = source[key];
+      }
+    };
+    return wrapper;
+  };
+
+  const getAnnots = (spec?: unknown): AnyRecord[] | null => {
+    if (!state) return null;
+    const nPage = (spec as AnyRecord | undefined)?.nPage;
+    if (nPage === undefined || nPage === null) {
+      if (!state.annotsCoverDocument) {
+        diagnostic(
+          'unsupported-api',
+          'getAnnots: whole-document search is limited to the prefetched pages (compatibility deviation)',
+        );
+      }
+      return state.annots.length ? state.annots.map((record) => record.wrapper) : null;
+    }
+    const page = Math.trunc(Number(nPage));
+    if (!state.annotPages.has(page)) {
+      diagnostic(
+        'unsupported-api',
+        `getAnnots: page ${page} is outside the prefetched annots plane (compatibility deviation)`,
+      );
+      return null;
+    }
+    const records = state.annotsByPage.get(page) ?? [];
+    return records.length ? records.map((record) => record.wrapper) : null;
+  };
+  const getAnnot = (nPage: unknown, name: unknown): AnyRecord | null => {
+    const records = getAnnots({ nPage });
+    if (!records) return null;
+    for (const wrapper of records) {
+      if (String((wrapper as AnyRecord).name) === String(name)) return wrapper;
+    }
+    return null;
+  };
+  doc.getAnnots = getAnnots;
+  doc.getAnnot = getAnnot;
 
   Object.defineProperties(doc, {
     documentFileName: {
@@ -309,6 +494,41 @@ export function installAcroJs(g: Record<string, unknown>): void {
     });
     const fieldsByName = new Map(fields.map((field) => [String(field.input.name), field]));
     const fieldsByRef = new Map(fields.map((field) => [refKey(field.input.ref), field]));
+    const annots: AnnotRecord[] = ((input.annots as AnyRecord[] | undefined) ?? []).map(
+      (annot) => {
+        const writableSnapshot = (): AnyRecord => ({
+          strokeColor: cloneAnnotValue(annot.strokeColor ?? ['T']),
+          fillColor: cloneAnnotValue(annot.fillColor ?? ['T']),
+          opacity: Number(annot.opacity ?? 1),
+          width: Number(annot.width ?? 1),
+          borderStyle: String(annot.borderStyle ?? 'S'),
+          dash: cloneAnnotValue(annot.dash ?? []),
+          rect: cloneAnnotValue(annot.rect ?? [0, 0, 0, 0]),
+          contents: String(annot.contents ?? ''),
+          hidden: Boolean(annot.hidden),
+          print: Boolean(annot.print),
+          readOnly: Boolean(annot.readOnly),
+          locked: Boolean(annot.locked),
+          noView: Boolean(annot.noView),
+          toggleNoView: Boolean(annot.toggleNoView),
+        });
+        const record: AnnotRecord = {
+          input: annot,
+          original: writableSnapshot(),
+          current: writableSnapshot(),
+          wrapper: {},
+        };
+        record.wrapper = makeAnnot(record);
+        return record;
+      },
+    );
+    const annotsByPage = new Map<number, AnnotRecord[]>();
+    for (const record of annots) {
+      const page = Number(record.input.page ?? 0);
+      const bucket = annotsByPage.get(page);
+      if (bucket) bucket.push(record);
+      else annotsByPage.set(page, [record]);
+    }
     const eventInput = (input.event ?? {}) as AnyRecord;
     const target = fieldsByRef.get(refKey(eventInput.target));
     const source = fieldsByRef.get(refKey(eventInput.source));
@@ -317,8 +537,16 @@ export function installAcroJs(g: Record<string, unknown>): void {
         ? cloneValue(eventInput.value)
         : cloneValue(target?.value ?? null);
     const event: AnyRecord = {
-      name: eventName(String(eventInput.kind ?? '')),
-      type: eventInput.kind === 'name-tree-boot' ? 'Doc' : 'Field',
+      // Explicit type/name (action-driven runs, from trigger provenance)
+      // beat the kind-derived defaults (the K/V/C/F pipeline path).
+      name: eventInput.name !== undefined
+        ? String(eventInput.name)
+        : eventName(String(eventInput.kind ?? '')),
+      type: eventInput.type !== undefined
+        ? String(eventInput.type)
+        : eventInput.kind === 'name-tree-boot'
+          ? 'Doc'
+          : 'Field',
       target: target?.wrapper ?? null,
       targetName: String(target?.input.name ?? ''),
       source: source?.wrapper ?? { source: doc },
@@ -336,6 +564,12 @@ export function installAcroJs(g: Record<string, unknown>): void {
       fields,
       fieldsByName,
       fieldsByRef,
+      annots,
+      annotsByPage,
+      annotPages: new Set(
+        ((input.annotPages as unknown[] | undefined) ?? []).map((page) => Math.trunc(Number(page))),
+      ),
+      annotsCoverDocument: Boolean(input.annotsCoverDocument),
       event,
       resetRefs: [],
       resetKeys: new Set(),
@@ -413,11 +647,27 @@ export function installAcroJs(g: Record<string, unknown>): void {
         text: String(state.event.value ?? ''),
       });
     }
-    const totalEffects = formEffects.length + state.uiEffects.length;
+    // Annot effects: the canonical per-annot diff, exactly the fields model —
+    // last write wins per key, ordered by the input plane's annot order.
+    const annotEffects: AnyRecord[] = [];
+    for (const record of state.annots) {
+      const patch: AnyRecord = {};
+      const flags: AnyRecord = {};
+      for (const key of Object.keys(record.current)) {
+        if (sameAnnotValue(record.current[key], record.original[key])) continue;
+        if (ANNOT_FLAG_KEYS.indexOf(key) >= 0) flags[key] = record.current[key];
+        else patch[key] = cloneAnnotValue(record.current[key]);
+      }
+      if (Object.keys(flags).length > 0) patch.flags = flags;
+      if (Object.keys(patch).length > 0) annotEffects.push({ ref: record.input.ref, patch });
+    }
+
+    const totalEffects = formEffects.length + annotEffects.length + state.uiEffects.length;
     if (totalEffects > state.maxEffects) {
       return {
         event: eventOutput(),
         formEffects: [],
+        annotEffects: [],
         uiEffects: [],
         diagnostics: [...state.diagnostics],
         error: {
@@ -429,6 +679,7 @@ export function installAcroJs(g: Record<string, unknown>): void {
     return {
       event: eventOutput(),
       formEffects,
+      annotEffects,
       uiEffects: [...state.uiEffects],
       diagnostics: [...state.diagnostics],
     };
@@ -437,6 +688,7 @@ export function installAcroJs(g: Record<string, unknown>): void {
   const failed = (error: unknown): AnyRecord => ({
     event: eventOutput(),
     formEffects: [],
+    annotEffects: [],
     uiEffects: [],
     diagnostics: [...(state?.diagnostics ?? [])],
     error: {
@@ -481,7 +733,45 @@ export function installAcroJs(g: Record<string, unknown>): void {
   host.app = app;
   host.util = util;
   host.display = Object.freeze({ visible: 0, hidden: 1, noPrint: 2, noView: 3 });
+  // The standard Acrobat color object: constants + convert/equal with the
+  // documented G/RGB/CMYK vectors (self-contained twin of src/color.ts).
+  host.color = Object.freeze({
+    transparent: Object.freeze(['T']),
+    black: Object.freeze(['G', 0]),
+    white: Object.freeze(['G', 1]),
+    gray: Object.freeze(['G', 0.5]),
+    ltGray: Object.freeze(['G', 0.75]),
+    dkGray: Object.freeze(['G', 0.25]),
+    red: Object.freeze(['RGB', 1, 0, 0]),
+    green: Object.freeze(['RGB', 0, 1, 0]),
+    blue: Object.freeze(['RGB', 0, 0, 1]),
+    cyan: Object.freeze(['CMYK', 1, 0, 0, 0]),
+    magenta: Object.freeze(['CMYK', 0, 1, 0, 0]),
+    yellow: Object.freeze(['CMYK', 0, 0, 1, 0]),
+    convert: (value: unknown, space: unknown): unknown[] => {
+      if (!isColorArray(value)) return ['T'];
+      const target = String(space);
+      const rgb = colorToRgbTriple(value);
+      if (target === 'T' || rgb === null) return ['T'];
+      if (target === 'G') return ['G', 0.3 * rgb[0] + 0.59 * rgb[1] + 0.11 * rgb[2]];
+      if (target === 'RGB') return ['RGB', rgb[0], rgb[1], rgb[2]];
+      if (target === 'CMYK') {
+        const k = 1 - Math.max(rgb[0], rgb[1], rgb[2]);
+        return ['CMYK', 1 - rgb[0] - k, 1 - rgb[1] - k, 1 - rgb[2] - k, k];
+      }
+      return ['T'];
+    },
+    equal: (a: unknown, b: unknown): boolean => {
+      if (!isColorArray(a) || !isColorArray(b)) return false;
+      const left = colorToRgbTriple(a);
+      const right = colorToRgbTriple(b);
+      if (left === null || right === null) return left === right;
+      return left.every((component, index) => Math.abs(component - right[index]) < 1e-6);
+    },
+  });
   host.getField = getField;
+  host.getAnnots = getAnnots;
+  host.getAnnot = getAnnot;
   host.resetForm = doc.resetForm;
   host.print = doc.print;
   host.submitForm = doc.submitForm;

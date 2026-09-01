@@ -225,6 +225,48 @@ function linkAnnot(nm, rect, action) {
   writeFileSync(resolve(here, 'action_open_chain.pdf'), buildPdf(objects));
 }
 
+// ── action_hover_colors.pdf ────────────────────────────────────────────────
+// The Phase-3 GATE, synthetically (corpus 02's exact shape, our bytes): a
+// widget whose /AA /E JavaScript recolors a named square via getAnnots and
+// writes a status field; /X restores the original colors. Under full ISO
+// these are DOCUMENT mutations — authorized sessions persist them (engine
+// /AP regeneration), unauthorized sessions get refusals + diagnostics.
+{
+  const PAGE = '3 0 R';
+  const FONT = '8 0 R';
+  const hoverScript = (stroke, fill, status) =>
+    '(function findAnnot\(doc, page, name\) {\n' +
+    '  var annots = doc.getAnnots\({nPage: page}\);\n' +
+    '  if \(!annots\) return null;\n' +
+    '  for \(var i = 0; i < annots.length; i++\) {\n' +
+    '    if \(annots[i].name == name\) return annots[i];\n' +
+    '  }\n' +
+    '  return null;\n' +
+    '}\n' +
+    "var a = findAnnot\(this, 0, 'hoverSquare'\);\n" +
+    `if \(a\) { a.strokeColor = ${stroke}; a.fillColor = ${fill}; }\n` +
+    "var f = this.getField\('eventStatus'\);\n" +
+    `if \(f\) f.value = '${status}';)`;
+  const enter = hoverScript("['RGB', 0.14, 0.43, 0.89]", "['RGB', 0.86, 0.93, 1]", 'enter');
+  const exit = hoverScript("['RGB', 0, 0.8, 0.2]", "['RGB', 0.9, 1, 0.9]", 'exit');
+  const objects = [
+    '<< /Type /Catalog /Pages 2 0 R /AcroForm << /Fields [5 0 R 6 0 R] ' +
+      `/DA (/Helv 0 Tf 0 g) /DR << /Font << /Helv ${FONT} >> >> >> >>`,
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Annots [4 0 R 5 0 R 6 0 R 7 0 R] >>',
+    '<< /Type /Annot /Subtype /Square /Rect [300 650 420 730] /NM (hoverSquare) /F 4 ' +
+      '/C [0 0.8 0.2] /IC [0.9 1 0.9] /CA 1 /BS << /W 2 >> >>',
+    `<< /Type /Annot /Subtype /Widget /FT /Tx /T (hoverTrigger) /Rect [50 650 250 700] /F 4 ` +
+      `/P ${PAGE} /V (hover me) /DV (hover me) /DA (/Helv 0 Tf 0 g) ` +
+      `/AA << /E << /S /JavaScript /JS ${enter} >> /X << /S /JavaScript /JS ${exit} >> >> >>`,
+    `<< /Type /Annot /Subtype /Widget /FT /Tx /T (eventStatus) /Rect [50 600 250 630] /F 4 ` +
+      `/P ${PAGE} /V () /DV () /DA (/Helv 0 Tf 0 g) >>`,
+    '<< /Type /Annot /Subtype /Square /Rect [450 650 500 700] /NM (bystander) /F 4 /C [0 0 0] >>',
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+  ];
+  writeFileSync(resolve(here, 'action_hover_colors.pdf'), buildPdf(objects));
+}
+
 console.log(
-  'wrote action_payloads.pdf + action_buttons_form.pdf + action_triggers.pdf + action_open_chain.pdf + open_action_dest.pdf',
+  'wrote action_payloads.pdf + action_buttons_form.pdf + action_triggers.pdf + action_open_chain.pdf + action_hover_colors.pdf + open_action_dest.pdf',
 );

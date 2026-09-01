@@ -42,8 +42,6 @@ import { FormToken } from '@embedpdf/plugin-form';
 import type {
   FillItem,
   FormFieldDTO,
-  FormUiEffect,
-  FormUiEffectProvider,
 } from '@embedpdf/plugin-form';
 import { InteractionToken } from '@embedpdf/plugin-interaction/contract';
 import { StageToken } from '@embedpdf/plugin-stage/contract';
@@ -121,61 +119,7 @@ function useWidgetEvents(
   }, [form, key]);
 }
 
-export interface FormScriptingUiHandlers {
-  alert?: (message: string, effect: Extract<FormUiEffect, { kind: 'alert' }>) => void;
-  print?: (effect: Extract<FormUiEffect, { kind: 'print' }>) => void;
-  gotoPage?: (page: number, effect: Extract<FormUiEffect, { kind: 'gotoPage' }>) => void;
-}
 
-/**
- * Fulfil form-script UI requests for the active document. By default alerts use
- * the browser dialog, page navigation uses the main Stage, and print delegates
- * to the browser. Pass handlers (or one raw provider) to replace that policy.
- */
-export function useFormScriptingProvider(
-  adapter?: FormScriptingUiHandlers | FormUiEffectProvider,
-): void {
-  const form = useOptionalCapability(FormToken);
-  const stage = useOptionalCapability(StageToken);
-  const adapterRef = useRef(adapter);
-  adapterRef.current = adapter;
-
-  useEffect(() => {
-    if (!form) return;
-    const provider: FormUiEffectProvider = (effect) => {
-      const current = adapterRef.current;
-      if (typeof current === 'function') {
-        current(effect);
-        return;
-      }
-      // The DEFAULT visibility matrix (origin × phase). Embedder handlers
-      // above receive every effect (origin/phase attached) and decide for
-      // themselves; these defaults only govern the built-in fallbacks. The
-      // doc.print AUTHORITY gate is form-side and not overridable.
-      switch (effect.kind) {
-        case 'alert':
-          if (current?.alert) current.alert(effect.message, effect);
-          else if (effect.origin === 'lifecycle' || effect.phase === 'boot') {
-            // Document-open nags (Adobe version checks, lifecycle scripts)
-            // never alert by default — the boot-nag gap, closed.
-          } else if (typeof globalThis.alert === 'function') globalThis.alert(effect.message);
-          break;
-        case 'gotoPage':
-          if (current?.gotoPage) current.gotoPage(effect.page, effect);
-          else stage?.goToPage(effect.page);
-          break;
-        case 'print':
-          if (current?.print) current.print(effect);
-          else if (effect.origin !== undefined && effect.origin !== 'user') {
-            // Hover/lifecycle scripts never open the print dialog by default.
-          } else if (typeof globalThis.print === 'function') globalThis.print();
-          break;
-      }
-    };
-    form.setUiEffectProvider(provider);
-    return () => form.setUiEffectProvider(null);
-  }, [form, stage]);
-}
 
 /* ══════════════════════════ behavior widgets ══════════════════════════ */
 

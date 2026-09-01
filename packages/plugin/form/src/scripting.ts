@@ -9,20 +9,22 @@ import type {
   PdfActionTree,
 } from '@embedpdf/engine-core/runtime';
 import {
+  createScriptHost,
   DEFAULT_SCRIPT_BUDGET,
   javaScriptProgramFromActionTree,
+  resolveScriptIdentity,
   scriptFieldsFromSnapshot,
+  seedFrom,
   type ScriptBudget,
   type ScriptDiagnostic,
   type ScriptExecutionError,
   type ScriptFieldInput,
-  type ScriptIdentity,
-  type ScriptInput,
   type ScriptOutput,
+  type ScriptTransaction,
   type ScriptUiEffect,
   type ScriptValue,
+  type ScriptWorldInput,
 } from '@embedpdf/core-acrojs';
-import type { ScriptSandbox, ScriptSandboxFactory } from '@embedpdf/core-js-sandbox';
 import type { DocumentMeta } from '@embedpdf/core';
 
 import type { FormCommitResult, FormScriptingOptions, FormUiEffect } from './types';
@@ -34,11 +36,75 @@ interface Overlay {
   appearances: Map<string, { ref: FormFieldRef; text: string }>;
 }
 
-export interface FormScriptingControllerOptions {
+export type FormScriptingControllerOptions = {
+  doc: DocumentHandle;
+  document(): DocumentMeta | null;
+} & (
+  | {
+      /** The shared realm's transaction port ({@link ScriptTransaction}) —
+       *  the actions plugin's per-document host. The K/V/C/F pipeline runs
+       *  WHOLLY inside one transaction: snapshot fetch, every pass, and the
+       *  engine commit — the commit-inside-the-boundary law. */
+      transaction<T>(body: (txn: ScriptTransaction) => Promise<T>): Promise<T>;
+      budget?: ScriptBudget;
+    }
+  | {
+      /** Standalone convenience (stamp's detached documents, direct tests):
+       *  the controller builds and OWNS its own realm via
+       *  {@link createFormScriptingHost}; `dispose()` releases it. */
+      config: FormScriptingOptions;
+    }
+);
+
+/**
+ * A STANDALONE realm for one document, configured with the legacy
+ * `FormScriptingOptions` vocabulary — stamp's detached stamp-asset documents
+ * and direct controller tests construct their own host here; viewer
+ * documents get theirs from `actionsPlugin({ javascript })`.
+ */
+export function createFormScriptingHost(options: {
   doc: DocumentHandle;
   document(): DocumentMeta | null;
   config: FormScriptingOptions;
-  sandboxFactory: ScriptSandboxFactory;
+}): {
+  transaction<T>(body: (txn: ScriptTransaction) => Promise<T>): Promise<T>;
+  dispose(): void;
+} {
+  const { doc, config } = options;
+  const host = createScriptHost({
+    sandboxFactory:
+      config.sandboxFactory ??
+      (() =>
+        import('@embedpdf/core-js-sandbox').then(({ createQuickJsSandbox }) =>
+          createQuickJsSandbox(),
+        )),
+    document: () => {
+      const meta = options.document();
+      return {
+        id: doc.id,
+        fileName: config.fileName?.() ?? meta?.name ?? doc.id,
+        pageCount: meta?.pageCount ?? 0,
+        pageNumber: 0,
+      };
+    },
+    identity: () => resolveScriptIdentity(doc, config.identity),
+    environment: (sequence) => {
+      const nowMs = config.now?.() ?? Date.now();
+      return {
+        nowMs,
+        utcOffsetMinutes: config.utcOffsetMinutes?.() ?? -new Date(nowMs).getTimezoneOffset(),
+        randomSeed: config.randomSeed?.() ?? seedFrom(doc.id, sequence),
+      };
+    },
+    bootSources: async () => {
+      const actions = doc.actions ? await doc.actions.read() : null;
+      return (
+        actions?.nameTreeScripts.map(({ action }) => javaScriptProgramFromActionTree(action)) ?? []
+      );
+    },
+    ...(config.budget ? { budget: config.budget } : {}),
+  });
+  return { transaction: host.transaction.bind(host), dispose: () => host.dispose() };
 }
 
 const refKey = (ref: FormFieldRef): string =>
@@ -187,27 +253,6 @@ function utf8Length(value: string): number {
   return length;
 }
 
-function seedFrom(documentId: string, sequence: number): number {
-  let hash = 2166136261;
-  for (const char of `${documentId}:${sequence}`) {
-    hash ^= char.charCodeAt(0);
-    hash = Math.imul(hash, 16777619);
-  }
-  return hash >>> 0;
-}
-
-function resolvedIdentity(doc: DocumentHandle, config: FormScriptingOptions): ScriptIdentity {
-  const claims = doc.security.identity;
-  const supplied =
-    typeof config.identity === 'function' ? config.identity() : (config.identity ?? {});
-  return {
-    name: supplied.name ?? claims?.display_name ?? claims?.user_id ?? '',
-    loginName: supplied.loginName ?? claims?.user_id ?? '',
-    corporation: supplied.corporation ?? claims?.group_id ?? '',
-    email: supplied.email ?? '',
-  };
-}
-
 function pageNumberFor(meta: DocumentMeta | null, field: FormFieldDTO): number {
   const pon = field.widgets.find((widget) => widget.pageObjectNumber > 0)?.pageObjectNumber;
   if (!meta || pon === undefined) return 0;
@@ -224,43 +269,79 @@ function statusFromEffects(result: FormEffectsResult): FormCommitResult['status'
 }
 
 export class FormScriptingController {
-  private sandboxPromise: Promise<ScriptSandbox> | null = null;
-  private booted = false;
   private disposed = false;
-  private sequence = 0;
+  private readonly transaction: <T>(body: (txn: ScriptTransaction) => Promise<T>) => Promise<T>;
+  private readonly transactionBudget: ScriptBudget | undefined;
+  private readonly ownedHost: { dispose(): void } | null;
 
-  constructor(private readonly options: FormScriptingControllerOptions) {}
-
-  dispose(): void {
-    if (this.disposed) return;
-    this.disposed = true;
-    void this.sandboxPromise?.then((sandbox) => sandbox.dispose()).catch(() => undefined);
+  constructor(private readonly options: FormScriptingControllerOptions) {
+    if ('transaction' in options) {
+      this.transaction = options.transaction.bind(options);
+      this.transactionBudget = options.budget;
+      this.ownedHost = null;
+    } else {
+      const host = createFormScriptingHost({
+        doc: options.doc,
+        document: () => options.document(),
+        config: options.config,
+      });
+      this.transaction = host.transaction;
+      this.transactionBudget = options.config.budget;
+      this.ownedHost = host;
+    }
   }
 
-  async commit(
-    snapshot: FormSnapshot,
-    ref: FormFieldRef,
-    proposed: FormFieldValue,
-  ): Promise<FormCommitResult> {
-    return this.transact(snapshot, ref, proposed);
+  /** A shared realm belongs to its HOST (the actions plugin) — this only
+   *  fences further transactions; a standalone-owned realm is released. */
+  dispose(): void {
+    this.disposed = true;
+    this.ownedHost?.dispose();
+  }
+
+  async commit(ref: FormFieldRef, proposed: FormFieldValue): Promise<FormCommitResult> {
+    return this.transact(ref, proposed);
   }
 
   /** Execute one originating widget's activation action (`/A`, including `/Next`). */
-  async activate(
-    snapshot: FormSnapshot,
-    ref: FormFieldRef,
-    action: PdfActionTree,
-  ): Promise<FormCommitResult> {
-    return this.transact(snapshot, ref, undefined, action);
+  async activate(ref: FormFieldRef, action: PdfActionTree): Promise<FormCommitResult> {
+    return this.transact(ref, undefined, action);
   }
 
-  /** Run lazy document boot plus the `/CO` chain without a user field change. */
-  async recalculate(snapshot: FormSnapshot): Promise<FormCommitResult> {
-    const target =
+  /** Run lazy document boot plus the `/CO` chain without a user field change.
+   *  The anchor field resolves INSIDE the transaction (undefined ref). */
+  async recalculate(): Promise<FormCommitResult> {
+    return this.transact(undefined);
+  }
+
+
+  private async transact(
+    refInput: FormFieldRef | undefined,
+    proposed?: FormFieldValue,
+    activation?: PdfActionTree,
+  ): Promise<FormCommitResult> {
+    if (this.disposed) throw new Error('Form scripting controller is disposed');
+    // EVERYTHING inside the realm transaction — snapshot fetch, every pass,
+    // the engine commit — so the next transaction reads post-commit truth.
+    return this.transaction((txn) => this.transactBody(txn, refInput, proposed, activation));
+  }
+
+  private async transactBody(
+    txn: ScriptTransaction,
+    refInput: FormFieldRef | undefined,
+    proposed?: FormFieldValue,
+    activation?: PdfActionTree,
+  ): Promise<FormCommitResult> {
+    const snapshot = await this.options.doc.forms.list();
+    // Recalculate's anchor resolves HERE (first live /CO field, else the
+    // first field); a zero-field document is an honest no-op.
+    const ref =
+      refInput ??
       snapshot.calculationOrder.find(
-        (ref): ref is FormFieldRef => ref !== null && snapshotField(snapshot, ref) !== undefined,
-      ) ?? snapshot.fields[0]?.ref;
-    if (!target) {
+        (candidate): candidate is FormFieldRef =>
+          candidate !== null && snapshotField(snapshot, candidate) !== undefined,
+      ) ??
+      snapshot.fields[0]?.ref;
+    if (!ref) {
       return {
         status: 'unchanged',
         scripted: true,
@@ -269,16 +350,6 @@ export class FormScriptingController {
         diagnostics: [],
       };
     }
-    return this.transact(snapshot, target);
-  }
-
-  private async transact(
-    snapshot: FormSnapshot,
-    ref: FormFieldRef,
-    proposed?: FormFieldValue,
-    activation?: PdfActionTree,
-  ): Promise<FormCommitResult> {
-    if (this.disposed) throw new Error('Form scripting controller is disposed');
     const target = snapshotField(snapshot, ref);
     if (!target) {
       return this.failed([], [], scriptError(`Form field '${refKey(ref)}' no longer exists`));
@@ -313,24 +384,10 @@ export class FormScriptingController {
     const uiEffects: FormUiEffect[] = [];
     const diagnostics: ScriptDiagnostic[] = [];
     const meta = this.options.document();
-    const nowMs = this.options.config.now?.() ?? Date.now();
-    const inputBase: Omit<ScriptInput, 'fields' | 'event'> = {
-      document: {
-        id: this.options.doc.id,
-        fileName: this.options.config.fileName?.() ?? meta?.name ?? this.options.doc.id,
-        pageCount: meta?.pageCount ?? 0,
-        pageNumber: pageNumberFor(meta, target),
-      },
-      identity: resolvedIdentity(this.options.doc, this.options.config),
-      environment: {
-        nowMs,
-        utcOffsetMinutes:
-          this.options.config.utcOffsetMinutes?.() ?? -new Date(nowMs).getTimezoneOffset(),
-        randomSeed:
-          this.options.config.randomSeed?.() ?? seedFrom(this.options.doc.id, this.sequence++),
-      },
-    };
-    const budget = this.options.config.budget ?? DEFAULT_SCRIPT_BUDGET;
+    // Document/identity/environment are HOST-owned now; the world carries the
+    // per-field current page for `this.pageNum`.
+    const pageNumber = pageNumberFor(meta, target);
+    const budget = this.transactionBudget ?? DEFAULT_SCRIPT_BUDGET;
     let executionMs = 0;
     let aggregateOutputSize = 0;
 
@@ -355,10 +412,14 @@ export class FormScriptingController {
       const remaining = budget.maxExecutionMs - executionMs;
       return remaining <= 0 ? null : { ...budget, maxExecutionMs: remaining };
     };
+    const world = (fields: ScriptFieldInput[], event: ScriptWorldInput['event']): ScriptWorldInput => ({
+      fields,
+      pageNumber,
+      event,
+    });
     const run = async (
-      kind: 'boot' | 'run',
-      source: string[] | string,
-      input: ScriptInput,
+      source: string,
+      input: ScriptWorldInput,
     ): Promise<{ output?: ScriptOutput; error?: ScriptExecutionError }> => {
       const remaining = remainingBudget();
       if (!remaining) {
@@ -366,57 +427,40 @@ export class FormScriptingController {
       }
       let output: ScriptOutput;
       try {
-        const sandbox = await this.sandbox();
         const startedAt = Date.now();
-        output =
-          kind === 'boot'
-            ? sandbox.boot(source as string[], input, remaining)
-            : sandbox.run(source as string, input, remaining);
+        output = await txn.run(source, input, remaining);
         executionMs += Date.now() - startedAt;
       } catch (error) {
         return {
           error: scriptError(error instanceof Error ? error.message : String(error)),
         };
       }
-      const error = consume(output, kind === 'boot' ? 'boot' : 'user');
+      const error = consume(output, 'user');
       return error ? { error } : { output };
     };
 
-    if (!this.booted) {
-      // Boot runs ONCE and can only ever degrade, never brick: document-open
-      // scripts are Adobe version-check boilerplate and calculation seeds — a
-      // failure there (an API we don't emulate, a broken script, a hostile
-      // one) must NEVER disable interactive filling. On any boot problem we
-      // surface a `script-error` diagnostic, DROP the partial boot state, and
-      // continue this transaction with a clean overlay.
-      this.booted = true;
-      let sources: string[] = [];
-      let bootError: ScriptExecutionError | null = null;
+    {
+      // Boot runs ONCE per realm (host-owned latch) and can only ever
+      // degrade, never brick — a failure surfaces a diagnostic and this
+      // transaction continues from pristine state.
+      let boot: ScriptOutput | null = null;
       try {
-        const actions = this.options.doc.actions ? await this.options.doc.actions.read() : null;
-        sources =
-          actions?.nameTreeScripts.map(({ action }) => javaScriptProgramFromActionTree(action)) ??
-          [];
+        boot = await txn.boot(world(overlay.fields, { kind: 'name-tree-boot' }), budget);
       } catch (error) {
-        bootError = scriptError(error instanceof Error ? error.message : String(error));
-      }
-      if (!bootError && sources.length > 0) {
-        const boot = await run('boot', sources, {
-          ...inputBase,
-          fields: overlay.fields,
-          event: { kind: 'name-tree-boot' },
-        });
-        if (boot.error) bootError = boot.error;
-        else applyEffects(overlay, boot.output!.formEffects);
-      }
-      if (bootError) {
-        // No overlay cleanup needed: effects only apply on SUCCESS, so a
-        // failed boot never touched the overlay — the user's own commit
-        // proceeds from pristine state.
         diagnostics.push({
           code: 'script-error',
-          message: `Document boot script failed (continuing without it): ${bootError.message}`,
+          message: `Document boot script failed (continuing without it): ${error instanceof Error ? error.message : String(error)}`,
         });
+      }
+      if (boot) {
+        const bootError = consume(boot, 'boot');
+        if (!bootError) applyEffects(overlay, boot.formEffects);
+        else {
+          diagnostics.push({
+            code: 'script-error',
+            message: `Document boot script failed (continuing without it): ${bootError.message}`,
+          });
+        }
       }
     }
 
@@ -434,16 +478,12 @@ export class FormScriptingController {
         );
       }
       if (program) {
-        const activated = await run('run', program, {
-          ...inputBase,
-          fields: overlay.fields,
-          event: {
+        const activated = await run(program, world(overlay.fields, {
             kind: 'widget-activate',
             target: ref,
             source: ref,
             value: targetInput.value,
-          },
-        });
+          }));
         if (activated.error) return this.failed(uiEffects, diagnostics, activated.error);
         applyEffects(overlay, activated.output!.formEffects);
       }
@@ -469,10 +509,7 @@ export class FormScriptingController {
         // `event.value`, empty `change`) so AF* and commit validators see
         // what Adobe's library expects.
         const oldValue = String(targetInput.value ?? '');
-        const typing = await run('run', program, {
-          ...inputBase,
-          fields: overlay.fields,
-          event: {
+        const typing = await run(program, world(overlay.fields, {
             kind: 'field-keystroke',
             target: ref,
             source: ref,
@@ -481,8 +518,7 @@ export class FormScriptingController {
             selStart: 0,
             selEnd: oldValue.length,
             willCommit: false,
-          },
-        });
+          }));
         if (typing.error && typing.error.kind !== 'exception') {
           return this.failed(uiEffects, diagnostics, typing.error);
         }
@@ -505,10 +541,7 @@ export class FormScriptingController {
             event.change +
             base.slice(Math.max(event.selStart, event.selEnd));
         }
-        const commit = await run('run', program, {
-          ...inputBase,
-          fields: overlay.fields,
-          event: {
+        const commit = await run(program, world(overlay.fields, {
             kind: 'field-keystroke',
             target: ref,
             source: ref,
@@ -517,8 +550,7 @@ export class FormScriptingController {
             selStart: 0,
             selEnd: 0,
             willCommit: true,
-          },
-        });
+          }));
         if (commit.error && commit.error.kind !== 'exception') {
           return this.failed(uiEffects, diagnostics, commit.error);
         }
@@ -554,17 +586,13 @@ export class FormScriptingController {
         );
       }
       if (program) {
-        const validation = await run('run', program, {
-          ...inputBase,
-          fields: overlay.fields,
-          event: {
+        const validation = await run(program, world(overlay.fields, {
             kind: 'field-validate',
             target: ref,
             source: ref,
             value: proposedValue,
             willCommit: true,
-          },
-        });
+          }));
         if (validation.error && validation.error.kind !== 'exception') {
           return this.failed(uiEffects, diagnostics, validation.error);
         }
@@ -602,16 +630,15 @@ export class FormScriptingController {
       }
       const calculatedInput = fieldByRef(overlay.fields, calculationRef);
       if (program && calculatedInput) {
-        const calculation = await run('run', program, {
-          ...inputBase,
-          fields: overlay.fields,
-          event: {
+        const calculation = await run(
+          program,
+          world(overlay.fields, {
             kind: 'field-calculate',
             target: calculationRef,
             ...(hasProposedValue ? { source: ref } : {}),
             value: calculatedInput.value,
-          },
-        });
+          }),
+        );
         if (calculation.error && calculation.error.kind !== 'exception') {
           return this.failed(uiEffects, diagnostics, calculation.error);
         }
@@ -646,16 +673,15 @@ export class FormScriptingController {
         );
       }
       if (!program) continue;
-      const format = await run('run', program, {
-        ...inputBase,
-        fields: overlay.fields,
-        event: {
+      const format = await run(
+        program,
+        world(overlay.fields, {
           kind: 'field-format',
           target: formatRef,
           ...(hasProposedValue ? { source: ref } : {}),
           value: overlayField.value,
-        },
-      });
+        }),
+      );
       if (format.error && format.error.kind !== 'exception') {
         return this.failed(uiEffects, diagnostics, format.error);
       }
@@ -700,14 +726,6 @@ export class FormScriptingController {
         ? { error: scriptError('One or more native form effects failed') }
         : {}),
     };
-  }
-
-  private async sandbox(): Promise<ScriptSandbox> {
-    this.sandboxPromise ??= this.options.sandboxFactory().then((sandbox) => {
-      if (this.disposed) sandbox.dispose();
-      return sandbox;
-    });
-    return this.sandboxPromise;
   }
 
   private failed(

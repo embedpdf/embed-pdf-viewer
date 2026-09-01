@@ -49,7 +49,9 @@
   },
   "dependencies": {
     "@embedpdf/core": "workspace:*",
-    "@embedpdf/engine-core": "workspace:*"
+    "@embedpdf/engine-core": "workspace:*",
+    "@embedpdf/core-acrojs": "workspace:*",
+    "@embedpdf/core-js-sandbox": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.0.0",

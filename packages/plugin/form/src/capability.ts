@@ -13,6 +13,7 @@ import {
 } from '@embedpdf/engine-core/runtime';
 import { DocumentsToken, type PluginContext } from '@embedpdf/core';
 import { ActionsToken, createHoverPump } from '@embedpdf/plugin-actions/contract';
+import { ActionsToken as ActionsHostToken } from '@embedpdf/plugin-actions/contract/host';
 import type { ActionOrigin, ActionSource } from '@embedpdf/plugin-actions/contract';
 import { AnnotationToken as AnnotationHostToken } from '@embedpdf/plugin-annotation/contract/host';
 
@@ -32,13 +33,13 @@ import {
 } from './core/model';
 import { createSerialMutationQueue } from './mutationQueue';
 import { createFormScriptingController } from './scripting';
+import type { FormEffectsResult } from '@embedpdf/engine-core/runtime';
 import type {
   FormAction,
   FormCommitResult,
   FormHostCapability,
   FormPluginOptions,
   FormState,
-  FormUiEffectProvider,
   PlacedField,
   PlaceFieldInput,
   WidgetActivationResult,
@@ -88,69 +89,36 @@ export function createFormCapability(
   };
   const enqueueMutation = createSerialMutationQueue();
 
+  // Scripting rides the actions plugin's per-document realm: the transaction
+  // port's PRESENCE is the "JavaScript is on" signal (D8 — the switch lives
+  // on actionsPlugin({ javascript }); form owns only the K/V/C/F pipeline).
+  const actionsHost = ctx.tryGet(ActionsHostToken);
+  const scriptPort = actionsHost?.scriptTransaction?.bind(actionsHost) ?? null;
   const scripting =
-    options.scripting?.enabled && ctx.doc
+    scriptPort && ctx.doc
       ? createFormScriptingController({
           doc: ctx.doc,
           document: () => ctx.document(),
-          config: options.scripting,
-          sandboxFactory:
-            options.scripting.sandboxFactory ??
-            (() =>
-              import('@embedpdf/core-js-sandbox').then(({ createQuickJsSandbox }) =>
-                createQuickJsSandbox(),
-              )),
+          transaction: scriptPort,
         })
       : null;
   if (scripting) ctx.cleanup(() => scripting.dispose());
 
-  let uiEffectProvider: FormUiEffectProvider | null = null;
-
-  const allowsPrint = (): boolean =>
-    ctx.tryGet(DocumentsToken)?.allows('doc.print', ctx.documentId ?? undefined) ?? true;
-
-  const surfaceScriptingResult = (result: FormCommitResult): void => {
-    const observe = (callback: (() => void) | undefined): void => {
-      if (!callback) return;
-      try {
-        callback();
-      } catch (error) {
-        globalThis.console?.error('[form] scripting observer failed:', error);
-      }
-    };
-    for (const effect of result.uiEffects) {
-      // PERMISSION, not preference: a script print request without doc.print
-      // authority never reaches any provider (the same gate the dispatcher's
-      // Named-Print thunk applies). Origin/phase VISIBILITY stays the
-      // provider's default matrix — overridable; this is not.
-      if (effect.kind === 'print' && !allowsPrint()) {
-        const suppressed = {
-          code: 'ui-effect-suppressed' as const,
-          message: 'script print request withheld: doc.print is not allowed',
-        };
-        observe(
-          options.scripting?.onDiagnostic
-            ? () => options.scripting!.onDiagnostic!(suppressed)
-            : undefined,
-        );
-        continue;
-      }
-      observe(
-        options.scripting?.onUiEffect ? () => options.scripting!.onUiEffect!(effect) : undefined,
-      );
-      observe(uiEffectProvider ? () => uiEffectProvider!(effect) : undefined);
-    }
-    for (const diagnostic of result.diagnostics) {
-      observe(
-        options.scripting?.onDiagnostic
-          ? () => options.scripting!.onDiagnostic!(diagnostic)
-          : undefined,
-      );
-    }
-    if (result.error) {
-      observe(
-        options.scripting?.onError ? () => options.scripting!.onError!(result.error!) : undefined,
-      );
+  /** Every script surface (UI effects, diagnostics, errors) flows through
+   *  the actions plugin's ONE port — origin/phase attached (D9). */
+  const surfaceViaActions = (result: FormCommitResult, origin: ActionOrigin): void => {
+    if (!actionsHost) return;
+    const phases: Array<'boot' | 'user'> = ['boot', 'user'];
+    for (const phase of phases) {
+      const uiEffects = result.uiEffects.filter((effect) => effect.phase === phase);
+      if (uiEffects.length === 0 && phase === 'boot') continue;
+      actionsHost.surfaceScriptResult({
+        uiEffects,
+        diagnostics: phase === 'user' ? result.diagnostics : [],
+        ...(phase === 'user' && result.error ? { error: result.error } : {}),
+        origin,
+        phase,
+      });
     }
   };
 
@@ -254,8 +222,8 @@ export function createFormCapability(
     const doc = ctx.doc;
     if (!doc) throw new Error('no document');
     if (scripting) {
-      const result = await scripting.commit(await doc.forms.list(), ref, value);
-      surfaceScriptingResult(result);
+      const result = await scripting.commit(ref, value);
+      surfaceViaActions(result, 'user');
       // A native partial/failed effects result can still have mutated state.
       if (result.effectsResult !== null) await refresh(true);
       return result;
@@ -339,8 +307,8 @@ export function createFormCapability(
         diagnostics: [],
       };
     }
-    const result = await scripting.activate(await doc.forms.list(), refKeyOf(key), action);
-    surfaceScriptingResult(result);
+    const result = await scripting.activate(refKeyOf(key), action);
+    surfaceViaActions(result, 'user');
     if (result.effectsResult !== null) await refresh(true);
     return result;
   };
@@ -359,67 +327,6 @@ export function createFormCapability(
     diagnostics: [],
   };
 
-  const snapshotHasField = (snapshot: FormSnapshot, ref: FormFieldRef): boolean =>
-    snapshot.fields.some((f) =>
-      ref.kind === 'objectNumber'
-        ? f.ref.kind === 'objectNumber' && f.ref.fieldObjectNumber === ref.fieldObjectNumber
-        : f.name === ref.name,
-    );
-
-  const runActivationScript = (
-    script: string,
-    origin?: FormFieldRef,
-    dispatchOrigin?: ActionOrigin,
-  ): Promise<FormCommitResult> =>
-    enqueueMutation(async () => {
-      const doc = ctx.doc;
-      if (!doc) throw new Error('no document');
-      if (!scripting) return NOT_SCRIPTED;
-      const snapshot = await doc.forms.list();
-      // No dispatch origin (a JS link): anchor on the recalculate() target —
-      // first live /CO field, else the first field. A zero-field document
-      // can't host the widget transaction at all: the honest Phase-1
-      // limitation, lifted by Phase 3's shared ScriptHost.
-      const anchor =
-        origin ??
-        snapshot.calculationOrder.find(
-          (ref): ref is FormFieldRef => ref !== null && snapshotHasField(snapshot, ref),
-        ) ??
-        snapshot.fields[0]?.ref;
-      if (!anchor) {
-        const result: FormCommitResult = {
-          ...NOT_SCRIPTED,
-          diagnostics: [
-            {
-              code: 'unsupported-api',
-              message:
-                'activation script skipped: no form fields to anchor the transaction on',
-            },
-          ],
-        };
-        surfaceScriptingResult(result);
-        return result;
-      }
-      // A LEAF tree on purpose: the dispatcher owns the /Next walk, and the
-      // program builder recurses into `next` — a real node here would
-      // re-execute its descendants.
-      const tree: PdfActionTree = {
-        root: { type: 'javascript', subtype: 'JavaScript', script, next: [] },
-        incomplete: false,
-        warningFlags: 0,
-        warnings: [],
-      };
-      const raw = await scripting.activate(snapshot, anchor, tree);
-      // The dispatch-origin axis rides every UI effect (separate from the
-      // script-model `phase`) — providers apply the visibility matrix.
-      const result = dispatchOrigin
-        ? { ...raw, uiEffects: raw.uiEffects.map((effect) => ({ ...effect, origin: dispatchOrigin })) }
-        : raw;
-      surfaceScriptingResult(result);
-      if (result.effectsResult !== null) await refresh(true);
-      return result;
-    });
-
   const resetFormAction = (
     targets: PdfActionTargetRef[] | null,
     exclude: boolean,
@@ -434,7 +341,7 @@ export function createFormCapability(
             { code: 'unsupported-api', message: 'this engine has no form-effects batch door' },
           ],
         };
-        surfaceScriptingResult(result);
+        surfaceViaActions(result, 'user');
         return result;
       }
       const snapshot = await doc.forms.list();
@@ -491,8 +398,8 @@ export function createFormCapability(
       // Acrobat recalculates after a reset; boot rides along lazily.
       let recalc: FormCommitResult | null = null;
       if (scripting) {
-        recalc = await scripting.recalculate(await doc.forms.list());
-        surfaceScriptingResult(recalc);
+        recalc = await scripting.recalculate();
+        surfaceViaActions(recalc, 'user');
         if (recalc.effectsResult !== null) await refresh(true);
       }
       return {
@@ -747,12 +654,58 @@ export function createFormCapability(
         source,
       });
     },
-    setUiEffectProvider: (provider) => {
-      uiEffectProvider = provider;
-    },
-    // Host lens (the actions plugin's executors) — see FormHostCapability.
-    runActivationScript,
+    // Host lens (the actions plugin's executors/sinks) — FormHostCapability.
     resetFormAction,
+    commitScriptFormEffects: async (effects) => {
+      const doc = ctx.doc;
+      if (!doc?.forms.applyEffects) {
+        // Sink contract: never throw — shape an all-failed batch honestly.
+        return {
+          results: effects.map((_, index) => ({
+            index,
+            status: 'failed' as const,
+            fields: [],
+            changedWidgets: [],
+            error: { code: 'NotSupported', message: 'no form-effects batch door' } as never,
+          })),
+          changedWidgets: [],
+          meta: null,
+        };
+      }
+      let result: FormEffectsResult;
+      try {
+        result = await doc.forms.applyEffects(effects);
+      } catch (error) {
+        // Sink contract: never throw. An authority pre-check rejection
+        // (PermissionDenied) becomes an all-failed batch, honestly.
+        const message = error instanceof Error ? error.message : String(error);
+        return {
+          results: effects.map((_, index) => ({
+            index,
+            status: 'failed' as const,
+            fields: [],
+            changedWidgets: [],
+            error: { code: 'Refused', message } as never,
+          })),
+          changedWidgets: [],
+          meta: null,
+        };
+      }
+      // Reconcile OUR model — the owner folds its own writes (the effects
+      // listener deliberately ignores local events) — and the ANNOTATION
+      // plane's view of any changed widgets (setDisplay flips widget /F
+      // bits, and widget pixels live on that plane).
+      await refresh(true);
+      if (annotationHost) {
+        const pons = new Set(
+          result.changedWidgets
+            .map((widget) => widget.pageObjectNumber)
+            .filter((pon) => pon > 0),
+        );
+        for (const pon of pons) await annotationHost.reloadPage(pon);
+      }
+      return result;
+    },
     setValue: (ref, value) =>
       enqueueMutation(async () => {
         const doc = ctx.doc;

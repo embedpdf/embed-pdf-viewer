@@ -9,6 +9,10 @@ export type {
   ActionExecutor,
   ActionExecutorResult,
   ActionsHostCapability,
+  AnnotCommitEntry,
+  AnnotCommitResult,
+  AnnotCommitSink,
+  FormCommitSink,
   PageStateReport,
-  SessionEffectSink,
+  ScriptSurfaceResult,
 } from './types';

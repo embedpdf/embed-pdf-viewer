@@ -45,12 +45,11 @@ describe('synthetic action form AF library acceptance', () => {
         revision: 0,
       }),
       config: {
-        enabled: true,
         now: () => Date.UTC(2026, 6, 15, 9, 30, 0),
         utcOffsetMinutes: () => 180,
         randomSeed: () => 7,
+        sandboxFactory: createQuickJsSandbox,
       },
-      sandboxFactory: createQuickJsSandbox,
     });
 
     try {
@@ -62,14 +61,14 @@ describe('synthetic action form AF library acceptance', () => {
       if (!calc1 || !calc2 || !email) throw new Error('expected synthetic fields are missing');
 
       // The bug this fixture exposed: typing 12 must survive the K action.
-      const first = await controller.commit(initial, calc1.ref, { type: 'text', value: '12' });
+      const first = await controller.commit(calc1.ref, { type: 'text', value: '12' });
       expect(first.status).toBe('applied');
       expect(first.error).toBeUndefined();
       const afterFirst = await doc.forms.list();
       expect(scalar(afterFirst, 'calc1')).toBe('12');
       expect(scalar(afterFirst, 'calcsum')).toBe('12');
 
-      const second = await controller.commit(afterFirst, calc2.ref, { type: 'text', value: '12' });
+      const second = await controller.commit(calc2.ref, { type: 'text', value: '12' });
       expect(second.status).toBe('applied');
       const afterSecond = await doc.forms.list();
       expect(scalar(afterSecond, 'calc2')).toBe('12');
@@ -77,7 +76,7 @@ describe('synthetic action form AF library acceptance', () => {
       expect(scalar(afterSecond, 'calcsum')).toBe('24');
 
       // AFNumber_Keystroke rejects garbage with Acrobat's alert; value survives.
-      const rejected = await controller.commit(afterSecond, calc1.ref, {
+      const rejected = await controller.commit(calc1.ref, {
         type: 'text',
         value: 'abc',
       });
@@ -95,7 +94,7 @@ describe('synthetic action form AF library acceptance', () => {
 
       // The email validator alerts (app.alert works, app.beep degrades to a
       // diagnostic) but never sets rc=false, so the value still commits.
-      const emailResult = await controller.commit(afterRejected, email.ref, {
+      const emailResult = await controller.commit(email.ref, {
         type: 'text',
         value: 'not-an-email',
       });

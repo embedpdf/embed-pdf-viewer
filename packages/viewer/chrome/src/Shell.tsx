@@ -33,7 +33,7 @@ import { AnnotationLayer, useFilePickerProvider } from '@embedpdf/react/annotati
 import { LinkLayer } from '@embedpdf/react/link';
 import type { AnnotationRenderer } from '@embedpdf/react/annotation';
 import { useActionsUiAdapter } from '@embedpdf/react/actions';
-import { formWidgetRenderer, useFormScriptingProvider } from '@embedpdf/react/form';
+import { formWidgetRenderer } from '@embedpdf/react/form';
 import { SearchLayer } from '@embedpdf/react/search';
 import { useCommandShortcuts } from '@embedpdf/react/commands';
 import { ShellToken } from '@embedpdf/react/shell';
@@ -113,11 +113,9 @@ export function Shell() {
   // the built-in file picker honouring each tool's `accept` filter (swap it for
   // a custom picker, or pass null to disable). The plugin stays DOM-free.
   useFilePickerProvider();
-  // Form scripts stay inside the isolated form pipeline; this hook fulfils the
-  // resulting alert, page-navigation, and print UI requests in the React shell.
-  useFormScriptingProvider();
-  // The action dispatcher's UI port: policy-approved URI opens (sanitized,
-  // new tab) and Named `Print` land here.
+  // The ONE UI port for the action engine AND every script-produced effect:
+  // sanitized URI opens, Named `Print`, script alerts (boot/lifecycle nags
+  // suppressed by default), and script page navigation.
   useActionsUiAdapter();
   const schema = useChromeSchema();
 

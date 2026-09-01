@@ -54,11 +54,7 @@ export const annotationPlugin = (config: AnnotationConfig = {}) =>
       const actions = ctx.tryGet(ActionsHostToken);
       if (actions) {
         ctx.cleanup(
-          actions.registerSessionSink({
-            applyVisibility(entries) {
-              return annotation.applySessionVisibility(entries);
-            },
-          }),
+          actions.registerAnnotCommitSink((entries) => annotation.commitScriptEffects(entries)),
         );
       }
 

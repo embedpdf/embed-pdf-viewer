@@ -34,11 +34,16 @@ async function boot(
   const actions = kernel.capability(ActionsToken) as ActionsHostCapability;
 
   const seam: string[] = [];
-  actions.registerSessionSink({
-    applyVisibility: (entries) => {
-      for (const e of entries) seam.push(`${e.hidden ? 'hide' : 'show'}:${e.annotObjectNumber}`);
-      return entries.length;
-    },
+  actions.registerAnnotCommitSink(async (entries) => {
+    for (const e of entries) {
+      seam.push(`${e.patch.flags?.hidden ? 'hide' : 'show'}:${e.annotObjectNumber}`);
+    }
+    return {
+      results: entries.map((entry) => ({
+        annotObjectNumber: entry.annotObjectNumber,
+        status: 'applied' as const,
+      })),
+    };
   });
   actions.registerExecutor('named', (node) => {
     seam.push(`named:${node.type === 'named' ? node.name : '?'}`);

@@ -492,15 +492,6 @@ export interface Model {
    *  applied-look preview) purely from the scene. Updated on CHANGE only
    *  (enter/leave cadence, never per-move). */
   hovered: Id | null;
-  /**
-   * Session-only visibility overrides written by actions/scripts (Hide
-   * actions, `annot.hidden`): id → forced hidden state. Absent = the
-   * document's `/F` flags rule; `false` SHOWS an annotation whose `/F`
-   * hidden bit is set (Hide `/H false`). Never lowered to the engine —
-   * presentation state, like `hovered`. NOT reaped by `remove` (reloads are
-   * remove-then-load); true deletion forgets via `forgetSessionHidden`.
-   */
-  sessionHidden: Record<Id, boolean>;
   draft: Draft | null;
   /** Transient ghost of an in-progress markup selection (null when idle). */
   preview: MarkupPreview | null;
@@ -671,10 +662,7 @@ export type Msg =
   /** Force/clear session visibility for specific annotations (the actions
    *  plane's Hide sink). Hiding also clears transient engagement (selection,
    *  editing, hover) for the hidden ids. Unknown ids no-op. Zero effects. */
-  | { t: 'setSessionHidden'; entries: Array<{ id: Id; hidden: boolean }> }
   /** Drop overrides for truly DELETED annotations (never for reloads). */
-  | { t: 'forgetSessionHidden'; ids: Id[] }
-  | { t: 'clearSessionHidden' }
   // Programmatic selection (the data-API `select(ref)` — e.g. auto-selecting
   // a freshly placed form widget). Unknown/unselectable ids are dropped;
   // selecting a group member takes the whole group, like a click would.

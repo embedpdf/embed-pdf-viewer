@@ -8,7 +8,6 @@
 import type { AnnotationFlags, AnnotationRef, InkIntent } from '@embedpdf/engine-core/runtime';
 import { expandGroups, groupMembers } from './group';
 import { canMove, groupUnionBounds, hitTest, isSelectable } from './hit';
-import { effBearer } from './session';
 import { isSubstrateOnly } from './plane';
 import { linkChildrenOf } from './links';
 import { capsFor } from './kinds';
@@ -96,7 +95,6 @@ export const initialModel: Model = {
   order: [],
   selected: [],
   hovered: null,
-  sessionHidden: {},
   draft: null,
   preview: null,
   seq: 0,
@@ -368,21 +366,6 @@ export function update(m: Model, msg: Msg): [Model, Effect[]] {
       return [upsertAnnots(m, msg.annots, msg.bumpAp), []];
     case 'bumpAp':
       return [bumpAp(m, msg.ids), []];
-    case 'setSessionHidden':
-      return setSessionHidden(m, msg.entries);
-    case 'forgetSessionHidden': {
-      let sessionHidden: Model['sessionHidden'] | null = null;
-      for (const id of msg.ids) {
-        if (!((sessionHidden ?? m.sessionHidden)[id] !== undefined)) continue;
-        sessionHidden ??= { ...m.sessionHidden };
-        delete sessionHidden[id];
-      }
-      return sessionHidden ? [{ ...m, sessionHidden }, []] : [m, []];
-    }
-    case 'clearSessionHidden':
-      return Object.keys(m.sessionHidden).length
-        ? [{ ...m, sessionHidden: {} }, []]
-        : [m, []];
     case 'hover':
       // Pure view-model state; the capability diffs before dispatching, so
       // this fires at enter/leave cadence only.
@@ -395,7 +378,7 @@ export function update(m: Model, msg: Msg): [Model, Effect[]] {
     case 'beginTextEdit':
       // `lockedContents` (or an inert `/F` state) blocks entering text edit —
       // the geometry gates don't apply here: locked-only contents still edit.
-      return m.byId[msg.id] && annotContentsEditable(effBearer(m, m.byId[msg.id]))
+      return m.byId[msg.id] && annotContentsEditable(m.byId[msg.id]!)
         ? [{ ...m, editing: msg.id, selected: [msg.id], draft: null }, []]
         : [m, []];
     case 'setText':
@@ -1323,30 +1306,6 @@ function setProps(m: Model, patch: AnnotationPropsPatch): [Model, Effect[]] {
  * survives on an invisible annotation. Identity-preserving no-op when nothing
  * changes (plugin memo caches key on model identity).
  */
-function setSessionHidden(
-  m: Model,
-  entries: Array<{ id: Id; hidden: boolean }>,
-): [Model, Effect[]] {
-  let sessionHidden: Model['sessionHidden'] | null = null;
-  const hiddenIds: Id[] = [];
-  for (const { id, hidden } of entries) {
-    if (!m.byId[id]) continue;
-    if ((sessionHidden ?? m.sessionHidden)[id] === hidden) continue;
-    sessionHidden ??= { ...m.sessionHidden };
-    sessionHidden[id] = hidden;
-    if (hidden) hiddenIds.push(id);
-  }
-  if (!sessionHidden) return [m, []];
-  let next: Model = { ...m, sessionHidden };
-  if (hiddenIds.length) {
-    const hiddenSet = new Set(hiddenIds);
-    const selected = next.selected.filter((id) => !hiddenSet.has(id));
-    if (selected.length !== next.selected.length) next = { ...next, selected };
-    if (next.editing && hiddenSet.has(next.editing)) next = { ...next, editing: null };
-    if (next.hovered && hiddenSet.has(next.hovered)) next = { ...next, hovered: null };
-  }
-  return [next, []];
-}
 
 function setFlags(m: Model, patch: Partial<AnnotationFlags>, ids?: Id[]): [Model, Effect[]] {
   const targets = ids ?? m.selected;
@@ -1434,7 +1393,7 @@ function deleteSelection(m: Model): [Model, Effect[]] {
   // selection deletes what it may and leaves the frozen ones visibly selected.
   const deletable = m.selected.filter((id) => {
     const a = m.byId[id];
-    return !!a && annotDeletable(effBearer(m, a));
+    return !!a && annotDeletable(a);
   });
   if (!deletable.length) return [m, []];
   // Attached link children die with their parent. They ARE model

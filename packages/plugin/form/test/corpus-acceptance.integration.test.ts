@@ -27,6 +27,7 @@ import type { FormUiEffect } from '../src/types';
 const here = dirname(fileURLToPath(import.meta.url));
 const corpus = (name: string) => resolve(here, '..', '..', '..', '..', 'JS tests', name);
 const DOC_01 = corpus('01_document_and_page_events.pdf');
+const DOC_02 = corpus('02_widget_annotation_events (1).pdf');
 const DOC_03 = corpus('03_visibility_controls_js_and_hide_action_fixed.pdf');
 
 const settle = () => new Promise((r) => setTimeout(r, 25));
@@ -41,18 +42,17 @@ describe('corpus acceptance (skips without the local JS tests folder)', () => {
         engine,
         plugins: [
           interactionPlugin(),
-          actionsPlugin(),
-          annotationPlugin(),
-          formPlugin({
-            scripting: {
+          actionsPlugin({
+            javascript: {
               enabled: true,
               sandboxFactory: createQuickJsSandbox,
               now: () => Date.UTC(2026, 6, 15),
               utcOffsetMinutes: () => 0,
               randomSeed: () => 7,
-              onUiEffect: (effect) => uiEffects.push(effect as FormUiEffect),
             },
           }),
+          annotationPlugin(),
+          formPlugin(),
         ],
       });
       try {
@@ -60,7 +60,20 @@ describe('corpus acceptance (skips without the local JS tests folder)', () => {
         await kernel.documents.open({ kind: 'bytes', id: 'corpus-01', bytes });
         const actions = kernel.capability(ActionsHostToken);
         const form = kernel.capability(FormToken);
-        actions.setUiAdapter({ openUri: () => {}, print: () => {} }); // fires the latch
+        actions.setUiAdapter({
+          openUri: () => {},
+          print: () => {},
+          // Script alerts flow through the ONE adapter now (D9), origin
+          // attached — an embedder handler sees everything.
+          alert: (message, opts) =>
+            uiEffects.push({
+              kind: 'alert',
+              message,
+              icon: opts.icon,
+              phase: opts.phase,
+              origin: opts.origin,
+            } as FormUiEffect),
+        }); // fires the latch
         // Drain the open sequence (the queued script transaction included).
         await actions.dispatch({
           scope: 'annotation',
@@ -71,7 +84,8 @@ describe('corpus acceptance (skips without the local JS tests folder)', () => {
         await settle();
         await form.refresh();
         const docStatus = form.snapshot()?.fields.find((f) => f.name === 'docStatus');
-        // The script wrote through the interim executor (lifecycle origin).
+        // The script wrote through the ScriptHost executor + the form
+        // commit sink (lifecycle origin).
         expect(
           docStatus?.valueEntry.kind === 'scalar' ? docStatus.valueEntry.value : '',
         ).toContain('OpenAction');
@@ -79,6 +93,70 @@ describe('corpus acceptance (skips without the local JS tests folder)', () => {
         // matrix suppresses it; embedder handlers (like this one) see it.
         const alert = uiEffects.find((e) => e.kind === 'alert');
         expect(alert?.origin).toBe('lifecycle');
+      } finally {
+        await kernel.destroy();
+        await engine.destroy();
+      }
+    },
+  );
+
+  it.skipIf(!existsSync(DOC_02))(
+    "02: hover colors — THE Phase-3 gate on the real corpus document",
+    async () => {
+      const engine = await createLocalEngine({ runtime: { prefer: 'wasm' } });
+      const kernel = createKernel({
+        engine,
+        plugins: [
+          interactionPlugin(),
+          actionsPlugin({
+            openSequence: 'off',
+            javascript: {
+              enabled: true,
+              sandboxFactory: createQuickJsSandbox,
+              now: () => Date.UTC(2026, 6, 15),
+              utcOffsetMinutes: () => 0,
+              randomSeed: () => 7,
+            },
+          }),
+          annotationPlugin(),
+          formPlugin(),
+        ],
+      });
+      try {
+        const bytes = new Uint8Array(await readFile(DOC_02));
+        await kernel.documents.open({ kind: 'bytes', id: 'corpus-02', bytes });
+        const form = kernel.capability(FormToken);
+        const annotation = kernel.capability(AnnotationHostToken);
+        const actions = kernel.capability(ActionsHostToken);
+        await form.refresh();
+        const trigger = form.snapshot()?.fields.find((f) => f.widgets.length > 0);
+        if (!trigger) throw new Error('no widget field in 02');
+        const pon = trigger.widgets[0]!.pageObjectNumber;
+        await annotation.reloadPage(pon);
+        const hoverSquare = () =>
+          annotation.pageItems(pon).find((item) => item.subtype === 'square');
+        const before = hoverSquare()?.style.color;
+        const drain = () =>
+          actions.dispatch({
+            scope: 'annotation',
+            event: 'cursorEnter',
+            ref: { kind: 'objectNumber', pageObjectNumber: 999, annotObjectNumber: 1 },
+            pon: 999,
+          });
+        // The first field in 02 is `hoverTarget`'s trigger (obj:5, /AA E/X JS).
+        form.notifyWidgetEvent(
+          `obj:${trigger.fieldObjectNumber}`,
+          {
+            kind: 'objectNumber',
+            pageObjectNumber: pon,
+            annotObjectNumber: trigger.widgets[0]!.annotObjectNumber,
+          },
+          'cursorEnter',
+        );
+        await drain();
+        await drain();
+        // The square turned blue — the document changed, every surface agrees.
+        expect(hoverSquare()?.style.color).not.toBe(before);
       } finally {
         await kernel.destroy();
         await engine.destroy();
@@ -96,7 +174,7 @@ describe('corpus acceptance (skips without the local JS tests folder)', () => {
           interactionPlugin(),
           actionsPlugin({ openSequence: 'off' }),
           annotationPlugin(),
-          formPlugin({}),
+          formPlugin(),
         ],
       });
       try {

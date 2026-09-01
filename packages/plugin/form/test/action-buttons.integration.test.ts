@@ -45,12 +45,10 @@ async function boot(scripting: boolean, scope?: string[]) {
     engine,
     plugins: [
       interactionPlugin(),
-      actionsPlugin(),
-      annotationPlugin(),
-      formPlugin(
+      actionsPlugin(
         scripting
           ? {
-              scripting: {
+              javascript: {
                 enabled: true,
                 sandboxFactory: createQuickJsSandbox,
                 now: () => Date.UTC(2026, 6, 15, 9, 30, 0),
@@ -60,6 +58,8 @@ async function boot(scripting: boolean, scope?: string[]) {
             }
           : {},
       ),
+      annotationPlugin(),
+      formPlugin(),
     ],
   });
   const bytes = new Uint8Array(await readFile(fixturePath));
@@ -113,6 +113,7 @@ async function boot(scripting: boolean, scope?: string[]) {
     kernel,
     engine,
     form,
+    actions,
     annotation,
     pon,
     fieldOf,
@@ -214,17 +215,9 @@ describe('action buttons e2e (scripting ON)', () => {
   }, 20_000);
 });
 
-describe('widget /AA events (Phase 2 — the DOM-event feed)', () => {
-  it('runs the native tooltip via hover with scripting OFF and NO fill authority', async () => {
-    // The read-only viewer: doc.forms.fill deliberately ABSENT — session
-    // Hide needs no write authority, so the tooltip must still work.
-    await using t = await boot(false, [
-      'doc.open',
-      'doc.render',
-      'doc.forms.read',
-      'doc.annotate.read',
-    ]);
-    expect(t.form.canFill()).toBe(false); // the scope really is narrowed
+describe('widget /AA events (Phase 2/3 — the DOM-event feed, full ISO)', () => {
+  it('runs the native tooltip via hover — a DOCUMENT mutation in an authorized session', async () => {
+    await using t = await boot(false);
     const tipId = t.widgetId('tip');
     expect(t.paintedIds()).not.toContain(tipId); // /F hidden at rest
 
@@ -236,6 +229,28 @@ describe('widget /AA events (Phase 2 — the DOM-event feed)', () => {
     await t.drainActions();
     await t.drainActions(); // the pump settles, then delivers the exit
     expect(t.paintedIds()).not.toContain(tipId);
+  });
+
+  it('refuses the tooltip WITHOUT authority: the ISO permission model, honestly reported', async () => {
+    // Full ISO (D7): a Hide is a document mutation — a read-only session's
+    // hover runs the trigger, the engine refuses the write, diagnostics say
+    // so, and NOTHING changes anywhere.
+    await using t = await boot(false, [
+      'doc.open',
+      'doc.render',
+      'doc.forms.read',
+      'doc.annotate.read',
+    ]);
+    expect(t.form.canFill()).toBe(false); // the scope really is narrowed
+    const tipId = t.widgetId('tip');
+    expect(t.paintedIds()).not.toContain(tipId);
+
+    const diagnostics: string[] = [];
+    t.actions.onDiagnostic((d) => diagnostics.push(`${d.code}:${d.message}`));
+    t.notify('alpha', 'cursorEnter');
+    await t.drainActions();
+    expect(t.paintedIds()).not.toContain(tipId); // refused — byte-stable view
+    expect(diagnostics.some((d) => d.includes('executor-failed'))).toBe(true);
   });
 
   it('dispatches Fo/Bl and D/U; /A shadows /AA U on the buttons (ISO Table 197)', async () => {

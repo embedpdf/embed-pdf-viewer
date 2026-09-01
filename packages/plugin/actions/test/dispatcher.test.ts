@@ -12,8 +12,16 @@ import type {
   ActionUiAdapter,
 } from '../src/types';
 
-const USER: ActionContext = { origin: 'user', source: { kind: 'api' } };
-const LIFECYCLE: ActionContext = { origin: 'lifecycle', source: { kind: 'api' } };
+const USER: ActionContext = {
+  origin: 'user',
+  source: { kind: 'api' },
+  event: { scope: 'activate' },
+};
+const LIFECYCLE: ActionContext = {
+  origin: 'lifecycle',
+  source: { kind: 'api' },
+  event: { scope: 'document', name: 'open' },
+};
 
 const tree = (root: PdfActionNode | null, incomplete = false): PdfActionTree => ({
   root,
@@ -54,8 +62,9 @@ function harness(config?: ActionsPluginConfig, fields: Array<{ name: string; wid
     doc: {
       forms: {
         list: async () => ({
-          fields: fields.map(({ name, widgets }) => ({
+          fields: fields.map(({ name, widgets }, index) => ({
             name,
+            fieldObjectNumber: 100 + index,
             widgets: widgets.map((annotObjectNumber) => ({
               annotObjectNumber,
               pageObjectNumber: 3,
@@ -181,37 +190,82 @@ describe('actions dispatcher', () => {
     expect(result.status).toBe('executed');
   });
 
-  it('resolves hide name targets to field widgets and object numbers to the sink', async () => {
+  it('routes hide by OWNING plane: field names → form setDisplay, plain annots → flag patches', async () => {
     const { capability } = harness(undefined, [{ name: 'note1', widgets: [41, 42] }]);
-    const applied: Array<{ annotObjectNumber: number; hidden: boolean }> = [];
-    capability.registerSessionSink({
-      applyVisibility: (entries) => {
-        applied.push(...entries);
-        return entries.length;
-      },
+    const displays: Array<{ fieldObjectNumber: number; display: string }> = [];
+    capability.registerFormCommitSink(async (effects) => {
+      for (const effect of effects) {
+        if (effect.kind === 'setDisplay' && effect.ref.kind === 'objectNumber') {
+          displays.push({
+            fieldObjectNumber: effect.ref.fieldObjectNumber,
+            display: effect.display,
+          });
+        }
+      }
+      return {
+        results: effects.map((_, index) => ({
+          index,
+          status: 'applied' as const,
+          fields: [],
+          changedWidgets: [],
+        })),
+        changedWidgets: [],
+        meta: null,
+      };
+    });
+    const flagged: Array<{ annotObjectNumber: number; hidden: boolean | undefined }> = [];
+    capability.registerAnnotCommitSink(async (entries) => {
+      for (const entry of entries) {
+        flagged.push({
+          annotObjectNumber: entry.annotObjectNumber,
+          hidden: entry.patch.flags?.hidden,
+        });
+      }
+      return {
+        results: entries.map((entry) => ({
+          annotObjectNumber: entry.annotObjectNumber,
+          status: 'applied' as const,
+        })),
+      };
     });
     const result = await capability.execute(
       tree(hide([{ kind: 'name', name: 'note1' }, { kind: 'objectNumber', objectNumber: 7 }], false)),
       USER,
     );
     expect(result.status).toBe('executed');
-    expect(applied).toEqual([
-      { annotObjectNumber: 7, hidden: false },
-      { annotObjectNumber: 41, hidden: false },
-      { annotObjectNumber: 42, hidden: false },
-    ]);
+    // The field name became FIELD-level display truth (the engine's widget
+    // visibility door); the bare object number stayed an annotation flag.
+    expect(displays).toEqual([{ fieldObjectNumber: 100, display: 'visible' }]);
+    expect(flagged).toEqual([{ annotObjectNumber: 7, hidden: false }]);
   });
 
-  it('reports unresolved hide names and a missing sink honestly', async () => {
+  it('reports missing sinks, unresolved names, and refused commits honestly', async () => {
     const { capability } = harness();
-    const noSink = await capability.execute(tree(hide([{ kind: 'name', name: 'ghost' }])), USER);
+    const noSink = await capability.execute(
+      tree(hide([{ kind: 'objectNumber', objectNumber: 7 }])),
+      USER,
+    );
     expect(noSink.nodes[0].status).toBe('no-executor');
-    expect(noSink.diagnostics[0]).toMatchObject({ code: 'no-session-sink' });
+    expect(noSink.diagnostics[0]).toMatchObject({ code: 'no-commit-sink' });
 
-    capability.registerSessionSink({ applyVisibility: () => 0 });
-    const missing = await capability.execute(tree(hide([{ kind: 'name', name: 'ghost' }])), USER);
-    expect(missing.nodes[0].status).toBe('executed');
-    expect(missing.diagnostics.some((d) => d.code === 'unresolved-target')).toBe(true);
+    const ghost = await capability.execute(tree(hide([{ kind: 'name', name: 'ghost' }])), USER);
+    expect(ghost.nodes[0].status).toBe('executed'); // nothing resolved, nothing failed
+    expect(ghost.diagnostics.some((d) => d.code === 'unresolved-target')).toBe(true);
+
+    // An authority refusal is a FAILED document mutation — full ISO.
+    capability.registerAnnotCommitSink(async (entries) => ({
+      results: entries.map((entry) => ({
+        annotObjectNumber: entry.annotObjectNumber,
+        status: 'failed' as const,
+        error: 'PermissionDenied: doc.annotate.modify',
+      })),
+    }));
+    const refused = await capability.execute(
+      tree(hide([{ kind: 'objectNumber', objectNumber: 7 }])),
+      USER,
+    );
+    expect(refused.nodes[0].status).toBe('failed');
+    expect(refused.diagnostics.some((d) => d.message.includes('PermissionDenied'))).toBe(true);
   });
 
   it('serializes dispatches on one queue', async () => {

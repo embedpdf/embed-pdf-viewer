@@ -119,6 +119,7 @@ function failedOutput(
       selEnd: input.event.selEnd ?? 0,
     },
     formEffects: [],
+    annotEffects: [],
     uiEffects: [],
     diagnostics: [],
     error: { kind, message },

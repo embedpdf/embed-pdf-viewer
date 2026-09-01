@@ -280,13 +280,13 @@ export function FullViewer({
         },
       ],
     }),
-    // The action engine: link/widget /A trees dispatch through one policy-
-    // gated executor spine (stage registers goto/named, form registers
-    // javascript/reset-form; the Shell installs the URI/Print UI adapter).
-    actionsPlugin(),
+    // The action engine: /A and /AA trees dispatch through one policy-gated
+    // executor spine, and THE JavaScript switch lives here (the per-document
+    // ScriptHost realm; form's K/V/C/F pipeline rides its transaction port).
+    actionsPlugin({ javascript: { enabled: true } }),
     // Forms: fillable under the default pointer/pan (widgets render as fill
     // controls), editable under the Form tab's 'form-edit' + palette tools.
-    formPlugin({ scripting: { enabled: true } }),
+    formPlugin(),
     // Links: navigable under the default pointer/pan ('link-nav'), editable
     // under the link tool — the annotation plane then owns them (select, move,
     // retarget via the style panel's Link control).

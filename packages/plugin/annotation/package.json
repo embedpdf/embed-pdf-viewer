@@ -59,7 +59,8 @@
     "@embedpdf/plugin-interaction": "workspace:*",
     "@embedpdf/plugin-selection": "workspace:*",
     "@embedpdf/engine-core": "workspace:*",
-    "@embedpdf/plugin-actions": "workspace:*"
+    "@embedpdf/plugin-actions": "workspace:*",
+    "@embedpdf/core-acrojs": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.0.0",

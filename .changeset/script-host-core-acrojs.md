@@ -1,0 +1,5 @@
+---
+'@embedpdf/core-acrojs': minor
+---
+
+The ScriptHost and the annots plane. `createScriptHost` owns the ONE realm per document (its own serialized transaction port; lazy name-tree boot delivered exactly once to the first transaction; resource faults poison and lazily rebuild the realm; per-run and caller-sliced budgets). The script world grows the curated annotation plane: `this.getAnnots({nPage})` / `getAnnot(nPage, name)` over a caller-prefetched, page-scoped input (null when nothing matches — Acrobat parity; unfetched pages are a NAMED compatibility deviation), `Annot` wrappers with a per-subtype validity matrix (`ANNOT_WRITABLE_KEYS`, drift-guarded against the kind registry; no dictionary access — the Acrobat model), `setProps`/`getProps`, and diff-derived canonical `annotEffects` beside `formEffects` (declared cross-plane commit order: form first, then annot). Ships the standard `color` object (constants + `convert`/`equal` with the documented G/RGB/CMYK vectors), Acrobat `{type, name}` event overrides, and — cycle fix — the `ScriptSandbox`/`ScriptSandboxFactory` structural contract now lives HERE (`core-js-sandbox` implements and re-exports it).

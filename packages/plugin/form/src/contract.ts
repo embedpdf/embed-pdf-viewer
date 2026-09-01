@@ -17,7 +17,6 @@ export type {
   FormScriptingOptions,
   FormState,
   FormUiEffect,
-  FormUiEffectProvider,
   PlacedField,
   PlaceFieldInput,
   WidgetActivationResult,
