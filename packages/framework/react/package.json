@@ -178,6 +178,7 @@
     "react-dom": ">=18"
   },
   "devDependencies": {
+    "@embedpdf/engine": "workspace:*",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/react": "^16.3.2",
     "@types/react": "^18.3.0",

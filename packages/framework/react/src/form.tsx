@@ -37,7 +37,7 @@
 // One-line-per-feature (ADAPTERS.md): registration travels with the UI.
 export * from '@embedpdf/plugin-form';
 import * as React from 'react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { PdfAnnotationEventKind } from '@embedpdf/plugin-actions/contract';
 import type { AnnotationRef } from '@embedpdf/plugin-annotation/contract';
 import { FormToken } from '@embedpdf/plugin-form';
@@ -119,6 +119,27 @@ function useWidgetEvents(
       onFocus: () => notify('focus'),
       onBlur: () => notify('blur'),
     };
+  }, [form, key]);
+}
+
+/**
+ * Widget ACTIVATION: a click on ANY widget runs its `/A`. ISO puts the
+ * activate action on the annotation dictionary — any subtype, any field
+ * type — so activation is a WIDGET behavior, not a push-button behavior:
+ * real-world producers ship "buttons" as read-only text fields carrying an
+ * `/A` (the Test Lab's Reset/Next/Hide controls), and Acrobat runs them.
+ * A widget without an `/A` resolves inert — dispatching is the cheap,
+ * honest way to ask (the dispatcher owns `/A`-vs-`/AA U` precedence).
+ * Push buttons keep their own gated door: `disabled` still blocks
+ * activation there — unchanged shipped semantics.
+ */
+function useWidgetActivation(key: string, annotationRef: AnnotationRef | null): () => void {
+  const form = useCapability(FormToken);
+  const refBox = useRef(annotationRef);
+  refBox.current = annotationRef;
+  return useCallback(() => {
+    const target = refBox.current;
+    if (target) void form.activateWidget(key, target);
   }, [form, key]);
 }
 
@@ -252,6 +273,7 @@ function TextWidget({ fill, item, page, appearance }: WidgetProps<'text'>) {
   const form = useCapability(FormToken);
   const wrap = useIsolated<HTMLDivElement>();
   const events = useWidgetEvents(fill.key, item.ref);
+  const activate = useWidgetActivation(fill.key, item.ref);
   // The editor is ALWAYS MOUNTED (v2's pattern): transparent over the picture
   // at rest, visible while focused. That makes the DOM the focus manager —
   // native Tab order reaches every field, focus enters edit, blur commits —
@@ -296,6 +318,10 @@ function TextWidget({ fill, item, page, appearance }: WidgetProps<'text'>) {
     resize: 'none',
     cursor: 'text',
     opacity: focused ? 1 : 0, // rest: the engine's picture IS the field
+    // A DISABLED control suppresses click events entirely — it must not
+    // swallow the stream before it reaches the wrapper, which owns /A
+    // activation (the read-only "fake button" pattern) and the /AA feed.
+    ...(fill.disabled ? { pointerEvents: 'none' as const } : {}),
   };
   const editorProps = {
     value: draft,
@@ -328,6 +354,11 @@ function TextWidget({ fill, item, page, appearance }: WidgetProps<'text'>) {
     <div
       ref={wrap}
       {...events}
+      // ANY widget click runs its /A (see useWidgetActivation): an editable
+      // field's focus click bubbles here (Acrobat runs /A on that click
+      // too); a read-only field's click lands here directly (the disabled
+      // editor is pointer-transparent) — the fake-button pattern.
+      onClick={activate}
       style={{
         position: 'absolute',
         left: b.left,
@@ -353,13 +384,19 @@ function ToggleWidget({ fill, item, page, appearance }: WidgetProps<'toggle'>) {
   const form = useCapability(FormToken);
   const wrap = useIsolated<HTMLDivElement>();
   const events = useWidgetEvents(fill.key, item.ref);
+  const activate = useWidgetActivation(fill.key, item.ref);
   const [focused, setFocused] = useState(false);
   const b = viewBox(item.box, page);
-  const toggle = () => {
-    if (fill.disabled) return;
+  const press = () => {
     // Checkbox: click toggles on/off (null clears). Radio: click always
     // selects its own on-state — no untoggle, per PDF/Acrobat convention.
-    void form.toggle(fill.key, fill.kind === 'checkbox' && fill.checked ? null : fill.onState);
+    // Acrobat's order: the VALUE change first, THEN the /A — so an /A
+    // script reads the post-toggle state. A read-only toggle still
+    // activates (it just doesn't flip).
+    const flipped = fill.disabled
+      ? undefined
+      : form.toggle(fill.key, fill.kind === 'checkbox' && fill.checked ? null : fill.onState);
+    void Promise.resolve(flipped).then(activate, activate);
   };
   return (
     <div
@@ -369,7 +406,7 @@ function ToggleWidget({ fill, item, page, appearance }: WidgetProps<'toggle'>) {
       aria-label={fill.label}
       tabIndex={fill.disabled ? -1 : 0}
       {...events}
-      onClick={toggle}
+      onClick={press}
       onFocus={(e) => {
         setFocused(true);
         events.onFocus?.(e);
@@ -381,7 +418,7 @@ function ToggleWidget({ fill, item, page, appearance }: WidgetProps<'toggle'>) {
       onKeyDown={(e) => {
         if (e.key === ' ' || e.key === 'Enter') {
           e.preventDefault();
-          toggle();
+          press();
         }
       }}
       style={{
@@ -418,11 +455,13 @@ function ChoiceFrame({
   children: React.ReactNode;
 }) {
   const events = useWidgetEvents(fill.key, item.ref);
+  const activate = useWidgetActivation(fill.key, item.ref);
   const b = viewBox(item.box, page);
   return (
     <div
       ref={innerRef}
       {...events}
+      onClick={activate}
       style={{
         position: 'absolute',
         left: b.left,
@@ -468,6 +507,9 @@ function ComboBoxWidget({ fill, item, page, appearance }: WidgetProps<'choice'>)
           height: '100%',
           opacity: 0,
           cursor: fill.disabled ? 'default' : 'pointer',
+          // A disabled control suppresses clicks — the frame owns /A
+          // activation and must still receive them.
+          ...(fill.disabled ? { pointerEvents: 'none' as const } : {}),
         }}
       >
         {fill.options.map((o, i) => (
@@ -518,6 +560,9 @@ function ListBoxWidget({ fill, item, page }: WidgetProps<'choice'>) {
           fontSize: (item.text?.fontSize || 12) * scale,
           textAlign: item.text?.textAlign ?? 'left',
           cursor: fill.disabled ? 'default' : 'pointer',
+          // A disabled control suppresses clicks — the frame owns /A
+          // activation and must still receive them.
+          ...(fill.disabled ? { pointerEvents: 'none' as const } : {}),
         }}
       />
     </ChoiceFrame>
@@ -550,19 +595,29 @@ const fillBox = (item: FillItem, page: PageContextValue) => viewBox(item.box, pa
 
 /** The standalone layer's event surface: positions ONE control's box and
  *  carries the /AA DOM-event feed — always pointer-active (see
- *  useWidgetEvents); the control inside fills it and self-gates edits. */
+ *  useWidgetEvents); the control inside fills it and self-gates edits.
+ *  With `activate`, a click on the box runs the widget's /A (see
+ *  useWidgetActivation — activation is a WIDGET behavior); push buttons
+ *  keep their own gated inner door and do NOT set it. */
 function FillEventBox({
   item,
   page,
   cursor,
+  activate,
   children,
 }: {
   item: FillItem;
   page: PageContextValue;
   cursor?: string;
+  activate?: boolean;
   children: React.ReactNode;
 }) {
   const events = useWidgetEvents(item.key, {
+    kind: 'objectNumber',
+    pageObjectNumber: page.pon,
+    annotObjectNumber: item.annotObjectNumber,
+  });
+  const onActivate = useWidgetActivation(item.key, {
     kind: 'objectNumber',
     pageObjectNumber: page.pon,
     annotObjectNumber: item.annotObjectNumber,
@@ -571,6 +626,7 @@ function FillEventBox({
   return (
     <div
       {...events}
+      onClick={activate ? onActivate : undefined}
       style={{ position: 'absolute', ...css, pointerEvents: 'auto', ...(cursor ? { cursor } : {}) }}
     >
       {children}
@@ -611,8 +667,11 @@ function FillText({
     padding: '0 3px',
     ...(item.comb ? { letterSpacing: css.width / Math.max(1, item.maxLength ?? 1) / 2 } : {}),
   };
+  // A disabled control suppresses clicks — the box owns /A activation and
+  // must still receive them (the read-only "fake button" pattern).
+  const editorGate = item.disabled ? ({ pointerEvents: 'none' } as const) : {};
   return (
-    <FillEventBox item={item} page={page}>
+    <FillEventBox item={item} page={page} activate>
       {item.multiline ? (
         <textarea
           aria-label={item.label}
@@ -620,7 +679,7 @@ function FillText({
           disabled={item.disabled}
           onChange={(e) => setDraft(e.target.value)}
           onBlur={commit}
-          style={{ ...shared, resize: 'none' }}
+          style={{ ...shared, resize: 'none', ...editorGate }}
         />
       ) : (
         <input
@@ -634,7 +693,7 @@ function FillText({
           onKeyDown={(e) => {
             if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
           }}
-          style={shared}
+          style={{ ...shared, ...editorGate }}
         />
       )}
     </FillEventBox>
@@ -649,19 +708,32 @@ function FillToggle({
   page: PageContextValue;
 }) {
   const form = useCapability(FormToken);
+  const activate = useWidgetActivation(item.key, {
+    kind: 'objectNumber',
+    pageObjectNumber: page.pon,
+    annotObjectNumber: item.annotObjectNumber,
+  });
   const css = fillBox(item, page);
   const glyphSize = Math.min(css.width, css.height) * 0.72;
   return (
-    <FillEventBox item={item} page={page} cursor={item.disabled ? 'default' : 'pointer'}>
+    // `activate` covers the DISABLED path (pointer-transparent button → the
+    // box click activates without toggling — a read-only toggle's /A still
+    // runs); the enabled button below chains toggle-then-/A itself and
+    // stops propagation so the click never double-activates.
+    <FillEventBox item={item} page={page} cursor={item.disabled ? 'default' : 'pointer'} activate>
     <button
       role={item.kind}
       aria-checked={item.checked}
       aria-label={item.label}
       disabled={item.disabled}
-      onClick={() =>
+      onClick={(e) => {
+        e.stopPropagation();
         // Checkbox re-click clears; radio click always selects its state.
-        void form.toggle(item.key, item.kind === 'checkbox' && item.checked ? null : item.onState)
-      }
+        // Acrobat's order: the VALUE change first, THEN the /A.
+        void Promise.resolve(
+          form.toggle(item.key, item.kind === 'checkbox' && item.checked ? null : item.onState),
+        ).then(activate, activate);
+      }}
       style={{
         ...controlBase,
         ...fillControl,
@@ -673,6 +745,8 @@ function FillToggle({
         fontSize: glyphSize,
         lineHeight: 1,
         color: '#1f2a44',
+        // A disabled control suppresses clicks — the box must receive them.
+        ...(item.disabled ? { pointerEvents: 'none' as const } : {}),
       }}
     >
       {item.checked ? (item.kind === 'radio' ? '●' : '✓') : ''}
@@ -690,9 +764,12 @@ function FillChoice({
 }) {
   const form = useCapability(FormToken);
   const css = fillBox(item, page);
+  // A disabled control suppresses clicks — the box owns /A activation and
+  // must still receive them.
+  const controlGate = item.disabled ? ({ pointerEvents: 'none' } as const) : {};
   if (item.kind === 'list') {
     return (
-      <FillEventBox item={item} page={page}>
+      <FillEventBox item={item} page={page} activate>
         <NativeListBox
           ariaLabel={item.label}
           disabled={item.disabled}
@@ -704,13 +781,14 @@ function FillChoice({
             ...controlBase,
             ...fillControl,
             fontSize: Math.max(9, Math.min(css.height * 0.55, 18)),
+            ...controlGate,
           }}
         />
       </FillEventBox>
     );
   }
   return (
-    <FillEventBox item={item} page={page}>
+    <FillEventBox item={item} page={page} activate>
       <select
         aria-label={item.label}
         disabled={item.disabled}
@@ -720,6 +798,7 @@ function FillChoice({
           ...controlBase,
           ...fillControl,
           fontSize: Math.max(9, Math.min(css.height * 0.55, 18)),
+          ...controlGate,
         }}
       >
         {item.selected.length === 0 && <option value="" />}

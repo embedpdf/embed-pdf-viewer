@@ -152,6 +152,25 @@ describe('action buttons e2e (scripting OFF — actions ≠ JavaScript)', () => 
     expect(t.paintedIds()).toContain(alphaId);
   });
 
+  it('a READ-ONLY TEXT field with /A activates like a button (the fake-button pattern)', async () => {
+    // The Test Lab's Reset/Next/Hide shape: /FT /Tx /Ff 1 styled as a
+    // button, action on the widget /A. Activation is a WIDGET behavior
+    // (ISO puts /A on the annotation dictionary) — field family and the
+    // ReadOnly flag are irrelevant to it.
+    await using t = await boot(false);
+    const alphaId = `obj:${t.fieldOf('alpha').widgets[0]!.annotObjectNumber}`;
+    expect(t.fieldOf('fakeButton').flags.readOnly).toBe(true);
+    expect(t.paintedIds()).toContain(alphaId);
+
+    const pressed = await t.press('fakeButton');
+    expect(pressed.kind).toBe('dispatched');
+    if (pressed.kind !== 'dispatched') throw new Error('unreachable');
+    expect(pressed.result.steps[0]!.result.nodes).toEqual([
+      expect.objectContaining({ type: 'hide', status: 'executed' }),
+    ]);
+    expect(t.paintedIds()).not.toContain(alphaId);
+  });
+
   it('RESET with /Flags 1 resets the COMPLEMENT of the listed fields', async () => {
     await using t = await boot(false);
     expect(t.valueOf('alpha')).toBe('filled-a');
