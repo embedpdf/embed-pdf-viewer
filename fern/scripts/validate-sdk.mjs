@@ -200,6 +200,12 @@ switch (language) {
       build.includes(`version = '${expectedVersion}'`),
       `Gradle version is not ${expectedVersion}`,
     );
+    assert(
+      build.includes(`tasks.withType(Jar).configureEach {
+    zip64 = true
+}`),
+      'ZIP64 is not enabled for Gradle JAR tasks',
+    );
     assert(build.includes("id 'signing'"), 'Gradle signing plugin is not enabled');
     assert(
       build.includes("name = 'Apache License, Version 2.0'"),

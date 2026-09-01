@@ -362,6 +362,10 @@ tasks.withType(GenerateModuleMetadata) {
     enabled = false
 }
 
+tasks.withType(Jar).configureEach {
+    zip64 = true
+}
+
 signing {
     useInMemoryPgpKeys(
         System.getenv('MAVEN_GPG_PRIVATE_KEY'),
