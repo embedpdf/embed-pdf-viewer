@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/core-stage",
-  "version": "3.0.0-next.10",
+  "version": "3.0.0-next.11",
   "private": false,
   "description": "Pure spatial model for the EmbedPDF viewer: Scene (layout strategies), Camera, Anchor, and framing. DOM-free, framework-free, and serializable.",
   "type": "module",

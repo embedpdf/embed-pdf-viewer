@@ -1,5 +1,11 @@
 # @embedpdf/core
 
+## 3.0.0-next.11
+
+### Minor Changes
+
+- [#793](https://github.com/embedpdf/embed-pdf-viewer/pull/793) by [@bobsingor](https://github.com/bobsingor) – Adds `createEventHook` (the one capability-event primitive: subscribe-only `EventHook<T>` face, snapshot fan-out, listener error isolation, inert after dispose) and `createSerialQueue` (promise-tail serialization) to the core toolkit.
+
 ## 3.0.0-next.10
 
 ### Minor Changes

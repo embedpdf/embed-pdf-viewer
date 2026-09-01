@@ -1,5 +1,17 @@
 # @embedpdf/plugin-annotation
 
+## 3.0.0-next.11
+
+### Minor Changes
+
+- [#793](https://github.com/embedpdf/embed-pdf-viewer/pull/793) by [@bobsingor](https://github.com/bobsingor) – Registers the action engine's session-visibility sink (`applySessionVisibility` on the host lens) when `@embedpdf/plugin-actions` is present, and carries the full activate action tree + annotation ref on `LinkNavItem` so the nav layer can delegate chains to the dispatcher.
+
+  The pointer-driven hover diff feeds annotation `/AA` cursorEnter/cursorExit through the shared hover pump while reducer-side clears, widgets, links, and tree-less items stay inert. `LinkNavItem` also carries hover-event presence flags for the link plane.
+
+  Publish bundle-safe `/contract` and `/contract/host` entries over the same annotation token, plus the focused `/authoring` helper entry. `/internal` keeps its implementation-helper meaning and no longer serves as the sibling bundle boundary.
+
+- [#793](https://github.com/embedpdf/embed-pdf-viewer/pull/793) by [@bobsingor](https://github.com/bobsingor) – The session-visibility overlay is RETIRED — `applySessionVisibility` is replaced by `commitScriptEffects`, the annotation DOCUMENT-commit sink: script/Hide effects become engine `annotations.update` patches (colors crossing the Acrobat-array → engine boundary, `/AP` regenerated engine-side), authority-enforced, stop-on-failure, with the owner reconciling its own model per touched page.
+
 ## 3.0.0-next.10
 
 ### Minor Changes

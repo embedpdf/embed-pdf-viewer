@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/plugin-metadata",
-  "version": "3.0.0-next.10",
+  "version": "3.0.0-next.11",
   "private": false,
   "description": "Document-scoped metadata: reactive Info-dict state fed by the document event stream (own edits + remote SSE), with a three-state update that writes to the layer.",
   "type": "module",

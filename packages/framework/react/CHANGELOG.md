@@ -1,5 +1,27 @@
 # @embedpdf/react
 
+## 3.0.0-next.11
+
+### Minor Changes
+
+- [#793](https://github.com/embedpdf/embed-pdf-viewer/pull/793) by [@bobsingor](https://github.com/bobsingor) – New `@embedpdf/react/actions` entry with `useActionsUiAdapter` (browser-default URI open through `sanitizeExternalUri` + print dialog, overridable per handler), a `useCapabilityEvent` hook for capability event subscriptions, and link-layer delegation: chain-bearing URI links drop the native `href` fast path so the dispatcher runs the whole chain (the `'dispatched'` outcome opens nothing itself — the adapter owns it).
+
+  Widget fill controls become always-active `/AA` event surfaces, link anchors feed link hover events, and scripting-provider defaults use the dispatch origin when deciding whether to suppress lifecycle/boot UI effects.
+
+  Route sibling feature dependencies through plugin contract/helper entries. Annotation selection hooks and anchor equality helpers are split into leaf modules so form and annotation-menu entries no longer import the full annotation feature implementation.
+
+  Render PDF list boxes as visible native scrolling controls in both form surfaces, with stable optimistic selection and wheel isolation so row hit-testing, selection, and scrolling stay synchronized while engine writes complete. Combo boxes retain their baked resting appearance and native popup behavior.
+
+  Keep keyboard focus indicators above baked PDF appearances so checkboxes and choice controls display the same clear blue focus ring as text fields and radio buttons.
+
+- [#793](https://github.com/embedpdf/embed-pdf-viewer/pull/793) by [@bobsingor](https://github.com/bobsingor) – `useActionsUiAdapter` is the ONE script UI port: it gains `alert` and `gotoPage` defaults with the origin×phase visibility matrix (lifecycle/boot alerts and non-user print suppressed unless the embedder passes handlers — which receive everything, context attached). `useFormScriptingProvider` and `FormScriptingUiHandlers` are DELETED.
+
+### Patch Changes
+
+- [#793](https://github.com/embedpdf/embed-pdf-viewer/pull/793) by [@bobsingor](https://github.com/bobsingor) – `useActionsUiAdapter` is now glue over `@embedpdf/web`'s `createDefaultActionsUiAdapter` — behavior-identical (the corpus alert matrix pins it); the default policy lives in ONE place for every binding.
+
+- [#793](https://github.com/embedpdf/embed-pdf-viewer/pull/793) by [@bobsingor](https://github.com/bobsingor) – Widget activation is a WIDGET behavior, not a push-button behavior: clicking ANY form widget now dispatches its `/A` through `form.activateWidget` — text, toggle, and choice widgets (both the annotation-backed renderers and the standalone fill layer) join the button path. This makes real-world "fake buttons" work: producers ship Reset/Next/Hide controls as READ-ONLY text fields carrying a widget `/A` (ISO puts the activate action on the annotation dictionary, any field type), which previously died in the viewer because only push buttons routed clicks to activation while the pointer feed's mouseUp was — correctly — shadowed by `/A` precedence. Disabled controls become pointer-transparent so their clicks reach the activation surface (a disabled form control suppresses click events entirely); toggles keep Acrobat's order (the value change first, THEN the `/A`); push buttons keep their gated door (`disabled` still blocks activation there). Proven end-to-end by a real-DOM regression test (rendered FormLayer over a real engine — the gap every prior `activateWidget()`-direct test masked) and a read-only fake-button fixture in the plugin e2e.
+
 ## 3.0.0-next.10
 
 ### Minor Changes

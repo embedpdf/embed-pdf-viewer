@@ -1,5 +1,11 @@
 # @cloudpdf/server
 
+## 3.0.0-next.11
+
+### Minor Changes
+
+- [#793](https://github.com/embedpdf/embed-pdf-viewer/pull/793) by [@bobsingor](https://github.com/bobsingor) – Action reads served by `/v1/docs/:docId/actions@:token` (and the layer-scoped variant) now include interpreter payloads on every executable node and the destination-form `/OpenAction` as `openDestination`, via the shared engine-services reader. The wire representation of action nodes changed shape (payload-carrying discriminated union); deploy server and clients from the same prerelease train.
+
 ## 3.0.0-next.10
 
 ### Minor Changes

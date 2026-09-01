@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/core-acrojs",
-  "version": "3.0.0-next.10",
+  "version": "3.0.0-next.11",
   "private": false,
   "description": "Pure Acrobat-JavaScript compatibility core: deterministic contracts, security policy, and a self-contained VM prelude.",
   "type": "module",

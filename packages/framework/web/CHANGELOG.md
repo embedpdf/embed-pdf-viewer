@@ -1,5 +1,11 @@
 # @embedpdf/web
 
+## 3.0.0-next.11
+
+### Minor Changes
+
+- [#793](https://github.com/embedpdf/embed-pdf-viewer/pull/793) by [@bobsingor](https://github.com/bobsingor) – `createDefaultActionsUiAdapter` — the actions UI adapter's DEFAULT policy (the origin×phase visibility matrix: hover/lifecycle prints suppressed, boot/lifecycle alerts suppressed, sanitizeExternalUri URI opens, browser fallbacks), hoisted here and written ONCE so every framework binding (react, angular) ships the same behavior instead of forking it. Structural twins keep this package plugin-free per the layering law; `overrides` accepts a getter for late-bound handlers.
+
 ## 3.0.0-next.10
 
 ## 3.0.0-next.9
