@@ -4,6 +4,7 @@ import type { FormFieldPatch } from '../forms/patch';
 import type { FormSnapshot } from '../forms/snapshot';
 import type { FormDataFormat, FormFieldValue } from '../forms/value';
 import type { FormEffect, FormEffectsResult } from '../forms/effects';
+import type { FormSubmissionReceipt, FormSubmissionRequest } from '../forms/submission';
 import type { FormFieldRef, FormWidgetRef } from '../identity/FormFieldRef';
 import type {
   FormDataExport,
@@ -77,6 +78,19 @@ export interface DocumentFormsService {
    * skipped and any landed state is finalized as one artifact/event/version.
    */
   applyEffects?(effects: FormEffect[]): AbortablePromise<FormEffectsResult>;
+
+  /**
+   * Deliver a resolved form submission to the document's HOME. Present only
+   * where the document HAS a home that accepts submissions — the cloud
+   * engine when the deployment advertises the capability; the local engine
+   * truthfully lacks it (an in-process document has no home, and this
+   * contract is never a callback trampoline). Gated by `doc.forms.submit`
+   * (grant-minted; no PDF permission bit exists for submission), asserted
+   * at the home's boundary where enforcement is real. The home stores the
+   * dataset with the declared intent as metadata and derives WHO submitted
+   * from its own verified session — it never fetches the PDF's URL.
+   */
+  submit?(request: FormSubmissionRequest): AbortablePromise<FormSubmissionReceipt>;
 
   /**
    * Serialize the form data for interchange. Defaults to `'xfdf'` (the

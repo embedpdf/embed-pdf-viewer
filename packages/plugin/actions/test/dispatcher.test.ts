@@ -156,7 +156,7 @@ describe('actions dispatcher', () => {
     ]);
   });
 
-  it('applies the origin policy matrix: lifecycle uri reports, submit-form blocks, launch never', async () => {
+  it('applies the origin policy matrix: lifecycle uri reports, submit-form gates, launch never', async () => {
     const { capability } = harness();
     const openUri = vi.fn();
     capability.setUiAdapter({ openUri, print: vi.fn() });
@@ -166,11 +166,48 @@ describe('actions dispatcher', () => {
     expect(capability.canExecute(tree(uri('https://a.test/')), LIFECYCLE)).toBe(false);
     expect(capability.canExecute(tree(uri('https://a.test/')), USER)).toBe(true);
 
-    const submit = await capability.execute(
+    // A payload-LESS submit node (older-runtime extraction) is exactly the
+    // pre-payload behavior: recognized-inert, honestly diagnosed.
+    const bare = await capability.execute(
       tree({ type: 'submit-form', subtype: 'SubmitForm', next: [] }),
       USER,
     );
-    expect(submit.nodes[0].status).toBe('blocked');
+    expect(bare.nodes[0].status).toBe('inert');
+    expect(
+      bare.diagnostics.some((diagnostic) => diagnostic.code === 'submit-payload-unavailable'),
+    ).toBe(true);
+
+    // A payloaded submit under HOVER origin never reaches any sink.
+    const payloaded = tree({
+      type: 'submit-form',
+      subtype: 'SubmitForm',
+      payload: {
+        url: 'https://home.test/x',
+        fields: null,
+        flags: {
+          raw: 0,
+          exclude: false,
+          includeNoValueFields: false,
+          format: 'fdf' as const,
+          method: 'post' as const,
+          submitCoordinates: false,
+          includeAppendSaves: false,
+          includeAnnotations: false,
+          canonicalFormat: false,
+          exclNonUserAnnots: false,
+          exclFKey: false,
+          embedForm: false,
+        },
+      },
+      next: [],
+    });
+    const hover = await capability.execute(payloaded, {
+      origin: 'hover',
+      source: { kind: 'api' },
+      event: { scope: 'annotation', name: 'cursorEnter' },
+    });
+    expect(hover.nodes[0].status).toBe('blocked');
+
     const launch = await capability.execute(
       tree({ type: 'launch', subtype: 'Launch', filePath: 'x.exe', next: [] }),
       USER,

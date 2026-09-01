@@ -28,6 +28,21 @@ const nodeCommon = {
 const arm = <T extends string>(type: T, shape: z.ZodRawShape = {}) =>
   z.object({ type: z.literal(type), ...nodeCommon, ...shape });
 
+const SubmitFormFlagsSchema = z.object({
+  raw: z.number().int().nonnegative(),
+  exclude: z.boolean(),
+  includeNoValueFields: z.boolean(),
+  format: z.enum(['fdf', 'html', 'xfdf', 'pdf']),
+  method: z.enum(['post', 'get']),
+  submitCoordinates: z.boolean(),
+  includeAppendSaves: z.boolean(),
+  includeAnnotations: z.boolean(),
+  canonicalFormat: z.boolean(),
+  exclNonUserAnnots: z.boolean(),
+  exclFKey: z.boolean(),
+  embedForm: z.boolean(),
+});
+
 const PDF_ACTION_NODE_ARMS = [
   arm('javascript', { script: z.string() }),
   arm('goto', { destination: PdfDestinationSchema }),
@@ -42,7 +57,18 @@ const PDF_ACTION_NODE_ARMS = [
   arm('goto-embedded', { filePath: z.string() }),
   arm('launch', { filePath: z.string() }),
   arm('rendition', { script: z.string().optional() }),
-  arm('submit-form'),
+  arm('submit-form', {
+    // Optional as a whole and complete when present — the atomic-payload
+    // law; a pre-payload producer (older runtime/server) omits the key.
+    payload: z
+      .object({
+        url: z.string(),
+        fields: z.array(PdfActionTargetRefSchema).nullable(),
+        flags: SubmitFormFlagsSchema,
+        charSet: z.string().optional(),
+      })
+      .optional(),
+  }),
   arm('thread'),
   arm('sound'),
   arm('movie'),

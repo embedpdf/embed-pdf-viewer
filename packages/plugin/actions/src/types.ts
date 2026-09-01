@@ -14,8 +14,11 @@ import type {
   FormEffect,
   FormEffectsResult,
   FormFieldRef,
+  FormSubmissionEntry,
+  FormSubmissionReceipt,
   PageObjectNumber,
   PdfActionNode,
+  PdfActionTargetRef,
   PdfActionTree,
   PdfActionType,
 } from '@embedpdf/engine-core/runtime';
@@ -44,11 +47,23 @@ export type ActionSource =
 /** Trigger provenance, derived centrally beside {@link originOf} — the
  *  executor-visible "which event fired" (cursorEnter vs cursorExit are both
  *  `origin: 'hover'`; this carries the difference). */
+/** The document lifecycle vocabulary: `open` (§3.9's sequence) plus the
+ *  five catalog `/AA` verbs (ISO 32000-2 Table 200 — WC/WS/DS/WP/DP).
+ *  Whoever owns the verb dispatches them; `runDocumentVerb` is the
+ *  serialized door for save/print, `prepareClose` for close. */
+export type DocumentTriggerEvent =
+  | 'open'
+  | 'will-save'
+  | 'did-save'
+  | 'will-print'
+  | 'did-print'
+  | 'will-close';
+
 export type ActionTriggerEvent =
   | { scope: 'activate' }
   | { scope: 'annotation'; name: PdfAnnotationEventKind }
   | { scope: 'page'; name: 'open' | 'close' | 'visible' | 'invisible' }
-  | { scope: 'document'; name: 'open' };
+  | { scope: 'document'; name: DocumentTriggerEvent };
 
 export interface ActionContext {
   origin: ActionOrigin;
@@ -84,7 +99,7 @@ export type ActionTrigger =
       source?: ActionSource;
     }
   | { scope: 'page'; event: 'open' | 'close' | 'visible' | 'invisible'; pon: PageObjectNumber }
-  | { scope: 'document'; event: 'open' };
+  | { scope: 'document'; event: DocumentTriggerEvent };
 
 /** Trigger → provenance descriptor (the {@link ActionContext.event} axis). */
 export const eventOf = (trigger: ActionTrigger): ActionTriggerEvent => {
@@ -147,7 +162,12 @@ export interface ActionDiagnostic {
     | 'no-commit-sink' // a document effect had no registered owner sink
     | 'trigger-failed' // resolution threw — dispatch() never rejects
     | 'cascade-budget' // programmatic page-lifecycle rounds exceeded the cap
-    | 'open-sequence-replayed'; // a second document-open trigger arrived
+    | 'open-sequence-replayed' // a second document-open trigger arrived
+    | 'no-submit-sink' // no handler installed and the document has no home
+    | 'no-submit-resolver' // no form plugin registered a dataset resolver
+    | 'submit-payload-unavailable' // older-runtime extraction: node stays inert
+    | 'submit-entry-unsupported' // an explicitly included entry has no representable value
+    | 'reentrant-print'; // a print request during a document print event — suppressed
   message: string;
 }
 
@@ -215,9 +235,11 @@ export interface PageStateReport {
 // ── policy ─────────────────────────────────────────────────────────────────
 
 /** Per-(type × origin) decision. `allow` executes; `adapter` routes through
- *  the UI adapter; `report` records a blocked node without executing;
- *  `block` refuses. `launch`/`goto-remote`/`goto-embedded`/media arms are
- *  fixed `'never'` and not configurable; `submit-form` is fixed `'blocked'`. */
+ *  the type's port (the UI adapter; for `submit-form`, the sink chain —
+ *  embedder handler → the document's home → blocked); `report` records a
+ *  blocked node without executing; `block` refuses.
+ *  `launch`/`goto-remote`/`goto-embedded`/media arms are fixed `'never'`
+ *  and not configurable. */
 export type ActionPolicyDecision = 'allow' | 'adapter' | 'report' | 'block';
 export type ActionPolicyRow = Record<ActionOrigin, ActionPolicyDecision>;
 
@@ -228,8 +250,13 @@ export interface ActionPolicy {
   'reset-form': ActionPolicyRow;
   javascript: ActionPolicyRow;
   uri: ActionPolicyRow;
-  /** The Named `Print` verb — owned by policy + the UI adapter, never stage. */
+  /** The Named `Print` verb — owned by policy + the UI adapter, never stage.
+   *  (An Adobe-compat extension: ISO Table 215 defines only the four page
+   *  verbs; an unrecognized name "shall take no action".) */
   print: ActionPolicyRow;
+  /** SubmitForm — `'adapter'` routes through the sink chain. Default: user
+   *  origin only; hover/lifecycle submits stay blocked. */
+  'submit-form': ActionPolicyRow;
 }
 
 export interface ActionsPluginConfig {
@@ -348,6 +375,72 @@ export interface ActionUiAdapter {
   gotoPage?(page: number, opts: ActionUiContext): void;
 }
 
+// ── the submit pipeline (D7: one intent, one resolver, one sink chain) ─────
+
+/**
+ * A normalized submit INTENT — one shape for both sources: a SubmitForm
+ * action node's extracted payload, or a script `doc.submitForm()` effect
+ * (include-mode names, `exclude` false). Resolution into a dataset is the
+ * FORM plugin's job (it owns the field plane) via the registered resolver.
+ */
+export interface SubmitIntent {
+  url: string | null;
+  /** Table-239 targets (mixed names/object numbers); `null` = the whole
+   *  eligible form. */
+  fields: PdfActionTargetRef[] | null;
+  exclude: boolean;
+  includeNoValueFields: boolean;
+  format: 'fdf' | 'html' | 'xfdf' | 'pdf';
+  method: 'post' | 'get';
+  /** Raw ISO Table 240 word (0 for scripted submits without one). */
+  flagsRaw: number;
+  charSet?: string;
+}
+
+/**
+ * The resolved dataset a sink receives. Entries carry the ISO semantics
+ * already applied (descendants, the unconditional NoExport veto,
+ * push-button/unsupported exclusion — diagnosed, never silent); the
+ * document's declared routing survives as METADATA. The stack never
+ * fetches `url` — an embedder handler that chooses to must validate it
+ * (protocol + destination allowlists) before any network call.
+ */
+export interface ActionSubmitRequest {
+  url: string | null;
+  method: 'post' | 'get';
+  format: 'fdf' | 'html' | 'xfdf' | 'pdf';
+  flagsRaw: number;
+  charSet?: string;
+  entries: FormSubmissionEntry[];
+  origin: ActionOrigin;
+  event: ActionTriggerEvent;
+}
+
+/**
+ * Sink 1 of the chain: the embedder's application. Consent = installation
+ * (it receives nothing the embedder couldn't already compute from
+ * `forms.list()` under `doc.forms.read`, so no submit scope gates it).
+ * Contract: synchronous acceptance marks the node `executed` — "handed to
+ * the embedder", NOT "delivered"; a synchronous throw marks it `failed`; a
+ * returned promise is DETACHED and a later rejection emits a diagnostic
+ * only. `submitToDocumentHome` lets a handler COMPOSE with sink 2 (present
+ * only when the document has a submit-capable home).
+ */
+export type ActionSubmitHandler = (
+  request: ActionSubmitRequest,
+  ctx: { submitToDocumentHome: (() => Promise<FormSubmissionReceipt>) | null },
+) => void | Promise<void>;
+
+/** The form plugin's dataset resolver — registered on the host lens.
+ *  `diagnose` is the per-entry observability channel (the honesty rule: an
+ *  explicitly listed push-button/signature/unsupported value is DIAGNOSED
+ *  as `submit-entry-unsupported`, never silently dropped). */
+export type SubmitResolver = (
+  intent: SubmitIntent,
+  ctx: ActionContext,
+  diagnose: (diagnostic: ActionDiagnostic) => void,
+) => Promise<ActionSubmitRequest>;
+
 // ── capabilities ───────────────────────────────────────────────────────────
 
 /** PUBLIC — embedders and chrome. Twins follow permissions.md: same name,
@@ -368,6 +461,35 @@ export interface ActionsCapability {
   /** Identity-safe port install: the returned disposer clears the slot only
    *  while THIS adapter is still current; `null` force-clears. */
   setUiAdapter(adapter: ActionUiAdapter | null): Unsubscribe;
+  /**
+   * Run one embedder-owned document verb as ONE serialized queue operation:
+   * open-ordering guard → before-event tree (WS/WP) → `operation()` →
+   * after-event tree (DS/DP). Two concurrent calls can never interleave
+   * their phases. Laws: a before-event failure never cancels the operation;
+   * `operation()` throwing skips the after-event and rethrows; the whole
+   * body honors `triggers.document: false` (trees skipped, operation still
+   * runs); print verbs hold the document-print latch, so nested
+   * `doc.print()` calls are suppressed with a `reentrant-print` diagnostic.
+   * The queue is deliberately held for the operation's duration — that IS
+   * the serialization (WS mutations are in the bytes a save operation
+   * pulls).
+   */
+  runDocumentVerb<T>(verb: 'save' | 'print', operation: () => Promise<T> | T): Promise<T>;
+  /**
+   * The cooperative WC door (D4): runs the catalog will-close tree (open
+   * ordering guaranteed) and resolves when its effects are committed. Call
+   * `documents.close()` AFTER this resolves. Scripts never run inside
+   * teardown — closing without this call is a named Acrobat-parity
+   * deviation, not an error.
+   */
+  prepareClose(): Promise<ActionTriggerResult>;
+  /**
+   * Sink 1 of the submit chain (identity-safe slot, like the UI adapter —
+   * but installing it does NOT arm the open-sequence latch). With no
+   * handler and no submit-capable document home, submits block with a
+   * `no-submit-sink` diagnostic.
+   */
+  setSubmitHandler(handler: ActionSubmitHandler | null): Unsubscribe;
   onAction: EventHook<ActionDispatchEvent>;
   onDiagnostic: EventHook<ActionDiagnostic>;
   /** Script-plane observability (dispatch-driven AND K/V/C/F-driven — the
@@ -397,6 +519,13 @@ export interface ActionsHostCapability extends ActionsCapability {
   surfaceScriptResult(result: ScriptSurfaceResult): void;
   /** Stage's page-truth push door — see {@link PageStateReport}. */
   reportPageState(report: PageStateReport): void;
+  /**
+   * The form plugin's dataset resolver (D7): both submit sources — action
+   * nodes and script `doc.submitForm()` effects — normalize to a
+   * {@link SubmitIntent} and resolve through this one door. Identity-safe;
+   * without it every submit blocks with `no-submit-resolver`.
+   */
+  registerSubmitResolver(resolver: SubmitResolver): Unsubscribe;
 }
 
 export interface ActionsState {

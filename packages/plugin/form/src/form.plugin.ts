@@ -130,13 +130,27 @@ export const formPlugin = (options: FormPluginOptions = {}) =>
           }),
         );
         ctx.cleanup(
-          actions.registerExecutor('reset-form', async (node) => {
+          actions.registerSubmitResolver((intent, actionCtx, diagnose) => {
+            const formHost = ctx.tryGet(FormToken);
+            if (!formHost) throw new Error('form plugin unavailable');
+            return formHost.resolveSubmitDataset(intent, actionCtx, diagnose);
+          }),
+        );
+        ctx.cleanup(
+          // The executor THREADS its ActionContext (the origin-laundering
+          // fix): a lifecycle ResetForm's recalculation surfaces as
+          // lifecycle, never as a user gesture.
+          actions.registerExecutor('reset-form', async (node, actionCtx) => {
             if (node.type !== 'reset-form') {
               return { status: 'inert', reason: 'not a reset-form node' };
             }
             const formHost = ctx.tryGet(FormToken);
             if (!formHost) return { status: 'inert', reason: 'form plugin unavailable' };
-            const result = await formHost.resetFormAction(node.fields, node.exclude);
+            const result = await formHost.resetFormAction(
+              node.fields,
+              node.exclude,
+              actionCtx.origin,
+            );
             if (result.status === 'failed') {
               return { status: 'failed', error: result.error?.message ?? 'reset failed' };
             }

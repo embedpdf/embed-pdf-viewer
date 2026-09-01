@@ -1,0 +1,66 @@
+%PDF-1.7
+%‚„œ”
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R /AcroForm << /Fields [4 0 R 7 0 R 8 0 R 9 0 R 10 0 R 11 0 R 12 0 R 13 0 R] /DA (/Helv 0 Tf 0 g) /DR << /Font << /Helv 14 0 R >> >> >> >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Annots [5 0 R 6 0 R 7 0 R 8 0 R 9 0 R 10 0 R 11 0 R 12 0 R 13 0 R] >>
+endobj
+4 0 obj
+<< /FT /Tx /T (parent) /Kids [5 0 R 6 0 R] >>
+endobj
+5 0 obj
+<< /Type /Annot /Subtype /Widget /Parent 4 0 R /T (c1) /Rect [50 700 250 720] /F 4 /P 3 0 R /V (child-one) /DA (/Helv 0 Tf 0 g) >>
+endobj
+6 0 obj
+<< /Type /Annot /Subtype /Widget /Parent 4 0 R /T (c2) /Rect [50 670 250 690] /F 4 /P 3 0 R /V (child-two) /DA (/Helv 0 Tf 0 g) >>
+endobj
+7 0 obj
+<< /Type /Annot /Subtype /Widget /FT /Tx /T (noexport) /Ff 4 /Rect [50 640 250 660] /F 4 /P 3 0 R /V (secret) /DA (/Helv 0 Tf 0 g) >>
+endobj
+8 0 obj
+<< /Type /Annot /Subtype /Widget /FT /Tx /T (empty) /Rect [50 610 250 630] /F 4 /P 3 0 R /DA (/Helv 0 Tf 0 g) >>
+endobj
+9 0 obj
+<< /Type /Annot /Subtype /Widget /FT /Tx /T (plain) /Rect [50 580 250 600] /F 4 /P 3 0 R /V (visible) /DA (/Helv 0 Tf 0 g) >>
+endobj
+10 0 obj
+<< /Type /Annot /Subtype /Widget /FT /Btn /Ff 65536 /T (btnParent) /Rect [300 700 420 720] /F 4 /P 3 0 R /DA (/Helv 0 Tf 0 g) /A << /S /SubmitForm /F << /FS /URL /F (https://home.test/parent) >> /Fields [(parent)] >> >>
+endobj
+11 0 obj
+<< /Type /Annot /Subtype /Widget /FT /Btn /Ff 65536 /T (btnAll) /Rect [300 670 420 690] /F 4 /P 3 0 R /DA (/Helv 0 Tf 0 g) /A << /S /SubmitForm /F << /FS /URL /F (https://home.test/all) >> /Flags 2 >> >>
+endobj
+12 0 obj
+<< /Type /Annot /Subtype /Widget /FT /Btn /Ff 65536 /T (btnVeto) /Rect [300 640 420 660] /F 4 /P 3 0 R /DA (/Helv 0 Tf 0 g) /A << /S /SubmitForm /F << /FS /URL /F (https://home.test/veto) >> /Fields [(noexport) (btnParent) (plain)] >> >>
+endobj
+13 0 obj
+<< /Type /Annot /Subtype /Widget /FT /Btn /Ff 65536 /T (btnJs) /Rect [300 610 420 630] /F 4 /P 3 0 R /DA (/Helv 0 Tf 0 g) /A << /S /JavaScript /JS (this.submitForm\({cURL: "https://home.test/js", aFields: ["plain"], bEmpty: true, cSubmitAs: "XFDF"}\);) >> >>
+endobj
+14 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+xref
+0 15
+0000000000 65535 f 
+0000000015 00000 n 
+0000000198 00000 n 
+0000000255 00000 n 
+0000000394 00000 n 
+0000000455 00000 n 
+0000000601 00000 n 
+0000000747 00000 n 
+0000000896 00000 n 
+0000001024 00000 n 
+0000001165 00000 n 
+0000001401 00000 n 
+0000001621 00000 n 
+0000001875 00000 n 
+0000002150 00000 n 
+trailer
+<< /Size 15 /Root 1 0 R >>
+startxref
+2221
+%%EOF

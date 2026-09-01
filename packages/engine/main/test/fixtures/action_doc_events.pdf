@@ -1,0 +1,58 @@
+%PDF-1.7
+%‚„œ”
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R /OpenAction 6 0 R /AA << /WC 7 0 R /WS 8 0 R /DS 9 0 R /WP 10 0 R /DP 11 0 R >> /AcroForm << /Fields [4 0 R 5 0 R] /DA (/Helv 0 Tf 0 g) /DR << /Font << /Helv 12 0 R >> >> >> >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Annots [4 0 R 5 0 R] >>
+endobj
+4 0 obj
+<< /Type /Annot /Subtype /Widget /FT /Tx /T (eventLog) /Rect [50 700 550 720] /F 4 /P 3 0 R /V () /DV () /DA (/Helv 0 Tf 0 g) >>
+endobj
+5 0 obj
+<< /Type /Annot /Subtype /Widget /FT /Tx /T (savedAt) /Rect [50 670 550 690] /F 4 /P 3 0 R /V () /DV () /DA (/Helv 0 Tf 0 g) >>
+endobj
+6 0 obj
+<< /S /JavaScript /JS (var f = this.getField\('eventLog'\); if \(f\) f.value = \(f.value ? f.value + ' ' : ''\) + event.name;) >>
+endobj
+7 0 obj
+<< /S /JavaScript /JS (var f = this.getField\('eventLog'\); if \(f\) f.value = \(f.value ? f.value + ' ' : ''\) + event.name;) >>
+endobj
+8 0 obj
+<< /S /JavaScript /JS (var f = this.getField\('eventLog'\); if \(f\) f.value = \(f.value ? f.value + ' ' : ''\) + event.name; var s = event.target.getField\('savedAt'\); if \(s\) s.value = 'saved-by-willsave';) >>
+endobj
+9 0 obj
+<< /S /JavaScript /JS (var f = this.getField\('eventLog'\); if \(f\) f.value = \(f.value ? f.value + ' ' : ''\) + event.name;) >>
+endobj
+10 0 obj
+<< /S /JavaScript /JS (var f = this.getField\('eventLog'\); if \(f\) f.value = \(f.value ? f.value + ' ' : ''\) + event.name; this.print\(\);) >>
+endobj
+11 0 obj
+<< /S /JavaScript /JS (var f = this.getField\('eventLog'\); if \(f\) f.value = \(f.value ? f.value + ' ' : ''\) + event.name;) >>
+endobj
+12 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+xref
+0 13
+0000000000 65535 f 
+0000000015 00000 n 
+0000000238 00000 n 
+0000000295 00000 n 
+0000000388 00000 n 
+0000000532 00000 n 
+0000000675 00000 n 
+0000000820 00000 n 
+0000000965 00000 n 
+0000001194 00000 n 
+0000001339 00000 n 
+0000001501 00000 n 
+0000001647 00000 n 
+trailer
+<< /Size 13 /Root 1 0 R >>
+startxref
+1718
+%%EOF

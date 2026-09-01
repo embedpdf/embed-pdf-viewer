@@ -13,7 +13,7 @@ export * from '@embedpdf/plugin-actions';
 import { useEffect, useRef } from 'react';
 import { ActionsToken, type ActionUiAdapter } from '@embedpdf/plugin-actions';
 import { StageToken } from '@embedpdf/plugin-stage/contract';
-import { sanitizeExternalUri } from '@embedpdf/web';
+import { createDefaultActionsUiAdapter } from '@embedpdf/web';
 
 import { useOptionalCapability } from './runtime';
 
@@ -21,11 +21,13 @@ import { useOptionalCapability } from './runtime';
 export type ActionsUiHandlers = Partial<ActionUiAdapter>;
 
 /**
- * Install the UI adapter for the active document's action dispatcher. By
- * default URIs open in a new tab through `sanitizeExternalUri` (blocked
- * schemes are dropped — the dispatcher already policy-gated the node) and
- * Print delegates to the browser dialog. Pass handlers to replace either.
- * Identity-safe: uninstalls on unmount only while still the current adapter.
+ * Install the UI adapter for the active document's action dispatcher. The
+ * DEFAULT policy — the origin×phase visibility matrix, sanitizeExternalUri
+ * URI opens, browser print/alert fallbacks — is `@embedpdf/web`'s
+ * `createDefaultActionsUiAdapter`, written ONCE for every binding; this
+ * hook is React glue only (late-bound handlers, stage navigation,
+ * identity-safe install/uninstall). The doc.print AUTHORITY gate is
+ * upstream (the actions plugin) and not overridable.
  */
 export function useActionsUiAdapter(handlers?: ActionsUiHandlers): void {
   const actions = useOptionalCapability(ActionsToken);
@@ -35,43 +37,10 @@ export function useActionsUiAdapter(handlers?: ActionsUiHandlers): void {
 
   useEffect(() => {
     if (!actions) return;
-    // The DEFAULT visibility matrix (origin × phase). Embedder handlers
-    // receive every effect (context attached) and decide for themselves;
-    // these defaults govern only the built-in fallbacks. The doc.print
-    // AUTHORITY gate is upstream (the actions plugin) and not overridable.
-    const adapter: ActionUiAdapter = {
-      openUri: (uri, opts) => {
-        const current = handlersRef.current;
-        if (current?.openUri) {
-          current.openUri(uri, opts);
-          return;
-        }
-        const href = sanitizeExternalUri(uri);
-        if (href && typeof window !== 'undefined') {
-          window.open(href, '_blank', 'noopener,noreferrer');
-        }
-      },
-      print: (opts) => {
-        const current = handlersRef.current;
-        if (current?.print) current.print(opts);
-        else if (opts && opts.origin !== 'user') {
-          // Hover/lifecycle scripts never open the print dialog by default.
-        } else if (typeof globalThis.print === 'function') globalThis.print();
-      },
-      alert: (message, opts) => {
-        const current = handlersRef.current;
-        if (current?.alert) current.alert(message, opts);
-        else if (opts.origin === 'lifecycle' || opts.phase === 'boot') {
-          // Document-open nags (Adobe version checks, lifecycle scripts)
-          // never alert by default — the boot-nag gap, closed.
-        } else if (typeof globalThis.alert === 'function') globalThis.alert(message);
-      },
-      gotoPage: (page, opts) => {
-        const current = handlersRef.current;
-        if (current?.gotoPage) current.gotoPage(page, opts);
-        else stage?.goToPage(page);
-      },
-    };
+    const adapter: ActionUiAdapter = createDefaultActionsUiAdapter({
+      overrides: () => handlersRef.current,
+      goToPage: (page) => stage?.goToPage(page),
+    });
     return actions.setUiAdapter(adapter);
   }, [actions, stage]);
 }

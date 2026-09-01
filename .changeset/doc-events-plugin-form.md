@@ -1,0 +1,5 @@
+---
+'@embedpdf/plugin-form': minor
+---
+
+The submit dataset resolver + the reset() symmetry fix (Phase 4). `resolveSubmitDataset` (registered as THE actions submit resolver) does a FRESH engine read and applies the ISO Table-239/240 semantics through the new shared `field-selection` module: include-mode NAMES select descendants by FQN dot-prefix (fixing the ResetForm exact-match conformance bug too — Tables 241/242 want subtrees), the NoExport veto is unconditional (diagnosed when explicitly listed), explicitly listed push-buttons/signatures and unsupported `/V` shapes are DIAGNOSED (`submit-entry-unsupported`), never silently dropped, and IncludeNoValueFields yields name-only entries. `resetFormAction` gains an origin parameter threaded from the executor's ActionContext — a lifecycle/hover ResetForm can no longer launder its recalculation alerts into user origin — and the public `form.reset(key)` now rides the SAME shared reset core (one effects batch → refresh → V/C/F recalculation), so a dependent calculated field can no longer go stale through the API door.

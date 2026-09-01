@@ -13,6 +13,92 @@ export type PdfActionTargetRef =
   | { kind: 'name'; name: string }
   | { kind: 'objectNumber'; objectNumber: number };
 
+/**
+ * Decoded SubmitForm `/Flags` word (ISO 32000-2:2020 Table 240) plus the raw
+ * value. `exclude` is DERIVED from bit 1 — never stored separately, so the
+ * two cannot disagree. Note the two easily-missed positions verified against
+ * the spec: bit 12 is `ExclFKey` (not "ExclFDFTemplate") and bit 13 is
+ * reserved/undefined, so `EmbedForm` is bit 14.
+ */
+export interface SubmitFormFlags {
+  raw: number;
+  /** Bit 1: set → `fields` lists EXCLUDED fields. */
+  exclude: boolean;
+  /** Bit 2: submit designated valueless fields too, as name-only entries. */
+  includeNoValueFields: boolean;
+  /** Bits 3/6/9 folded into one verdict: bit 9 SubmitPDF dominates ("all
+   *  other flags shall be ignored except GetMethod"), else bit 6 XFDF, else
+   *  bit 3 HTML Form format, else FDF (the Table 240 default). */
+  format: 'fdf' | 'html' | 'xfdf' | 'pdf';
+  /** Bit 4. ISO makes GetMethod meaningful only with ExportFormat set, and
+   *  the bit-9 rule keeps it alive for SubmitPDF — so `'get'` only for
+   *  `'html'` and `'pdf'`; everything else posts. */
+  method: 'post' | 'get';
+  /** Bit 5 (meaningful only with ExportFormat; passed through — this stack
+   *  does not capture click coordinates). */
+  submitCoordinates: boolean;
+  /** Bit 7 (FDF only): include incremental updates via FDF `Differences`. */
+  includeAppendSaves: boolean;
+  /** Bit 8 (FDF only): include markup annotations. */
+  includeAnnotations: boolean;
+  /** Bit 10: convert date-like values to the standard date format. */
+  canonicalFormat: boolean;
+  /** Bit 11 (FDF, with IncludeAnnotations): only the current user's
+   *  annotations. */
+  exclNonUserAnnots: boolean;
+  /** Bit 12: the submitted FDF excludes its `F` entry. */
+  exclFKey: boolean;
+  /** Bit 14 (bit 13 is reserved): the FDF `F` entry embeds the source PDF. */
+  embedForm: boolean;
+}
+
+/**
+ * The one Table-240 decode, shared by the reader, the schema's producers,
+ * and tests — so bit semantics cannot fork.
+ */
+export const decodeSubmitFormFlags = (raw: number): SubmitFormFlags => {
+  const bit = (n: number): boolean => (raw & (1 << (n - 1))) !== 0;
+  const format = bit(9) ? 'pdf' : bit(6) ? 'xfdf' : bit(3) ? 'html' : 'fdf';
+  return {
+    raw,
+    exclude: bit(1),
+    includeNoValueFields: bit(2),
+    format,
+    method: bit(4) && (format === 'html' || format === 'pdf') ? 'get' : 'post',
+    submitCoordinates: bit(5),
+    includeAppendSaves: bit(7),
+    includeAnnotations: bit(8),
+    canonicalFormat: bit(10),
+    exclNonUserAnnots: bit(11),
+    exclFKey: bit(12),
+    embedForm: bit(14),
+  };
+};
+
+/**
+ * SubmitForm's extracted intent. ATOMIC on purpose: either every required
+ * component resolved (a complete, executable payload) or the node carries no
+ * payload at all — partial states are unrepresentable. An unreadable
+ * REQUIRED component (`/F`) degrades the whole node to `unknown` +
+ * `payload-dropped` at read time instead.
+ */
+export interface SubmitFormPayload {
+  /** Resolved `/F` URL — a `<< /FS /URL >>` file specification (7.11.5,
+   *  `/UF` preferred over `/F` per 7.11.2); a bare string `/F` is accepted
+   *  as a producer-compat extension. */
+  url: string;
+  /**
+   * `null` = `/Fields` ABSENT → Include/Exclude is ignored and every field
+   * except NoExport-flagged ones is submitted (Table 239). `[]` =
+   * present-but-empty: include mode submits NOTHING, exclude mode submits
+   * everything eligible — presence and emptiness are different states.
+   */
+  fields: PdfActionTargetRef[] | null;
+  flags: SubmitFormFlags;
+  /** `/CharSet` (PDF 2.0), extracted but not encoded by this stack. */
+  charSet?: string;
+}
+
 interface PdfActionNodeCommon {
   /** Raw `/S` name, retained for unknown and future action types. */
   subtype: string;
@@ -52,8 +138,10 @@ export type PdfActionNode = PdfActionNodeCommon &
     | { type: 'launch'; filePath: string }
     /** ISO allows `/Rendition` to carry `/JS`; preserved, not collected. */
     | { type: 'rendition'; script?: string }
-    /** Recognized-inert: no payload in this phase. */
-    | { type: 'submit-form' }
+    /** Recognized; executable only when `payload` is present. Absent payload
+     *  = extracted by an older runtime (skew) — the node stays
+     *  recognized-inert exactly as before this payload existed. */
+    | { type: 'submit-form'; payload?: SubmitFormPayload }
     | { type: 'thread' }
     | { type: 'sound' }
     | { type: 'movie' }
@@ -143,9 +231,11 @@ export interface ActionReadBudget {
   maxModels: number;
   maxNodes: number;
   maxScriptCodeUnits: number;
-  /** Hide `/T` + ResetForm `/Fields` entries, aggregate across the job. */
+  /** Hide `/T` + ResetForm/SubmitForm `/Fields` entries, aggregate across
+   *  the job. */
   maxTargetEntries: number;
-  /** Payload string code units (URIs, names, file paths, name-tree script
-   *  names), aggregate across the job. Reserved BEFORE allocation. */
+  /** Payload string code units (URIs, submit URLs/CharSets, names, file
+   *  paths, name-tree script names), aggregate across the job. Reserved
+   *  BEFORE allocation. */
   maxPayloadCodeUnits: number;
 }

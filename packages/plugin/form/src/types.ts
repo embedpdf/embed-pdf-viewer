@@ -18,9 +18,13 @@ import type {
   WidgetAppearance,
 } from '@embedpdf/engine-core/runtime';
 import type {
+  ActionContext,
+  ActionDiagnostic,
   ActionOrigin,
+  ActionSubmitRequest,
   ActionTriggerResult,
   PdfAnnotationEventKind,
+  SubmitIntent,
 } from '@embedpdf/plugin-actions/contract';
 import type {
   ScriptBudget,
@@ -223,11 +227,28 @@ export type WidgetActivationResult =
 export interface FormHostCapability extends FormCapability {
   /**
    * Execute one ResetForm action: resolve targets against the live snapshot
-   * (`null` = every field; `exclude` = complement; a resolution yielding
-   * zero refs never reaches the engine), reset as ONE engine batch, refresh,
-   * then recalculate when scripting is enabled (Acrobat's behaviour).
+   * with the shared ISO selection (`null` = every field; a parent NAME
+   * selects its descendants too; `exclude` = complement; a resolution
+   * yielding zero refs never reaches the engine), reset as ONE engine
+   * batch, refresh, then recalculate when scripting is enabled (Acrobat's
+   * behaviour). `origin` (default `'user'`) is preserved through
+   * recalculation surfacing — a lifecycle ResetForm's alerts stay lifecycle.
    */
-  resetFormAction(fields: PdfActionTargetRef[] | null, exclude: boolean): Promise<FormCommitResult>;
+  resetFormAction(
+    fields: PdfActionTargetRef[] | null,
+    exclude: boolean,
+    origin?: ActionOrigin,
+  ): Promise<FormCommitResult>;
+  /**
+   * The submit dataset resolver (Phase 4, D7): fresh engine read + the pure
+   * ISO builder (`field-selection.ts`). Registered with the actions plugin
+   * as THE resolver for both action-node and script submits.
+   */
+  resolveSubmitDataset(
+    intent: SubmitIntent,
+    ctx: ActionContext,
+    diagnose: (diagnostic: ActionDiagnostic) => void,
+  ): Promise<ActionSubmitRequest>;
   /** The form DOCUMENT-commit sink (D3): engine `applyEffects` + snapshot
    *  reconciliation. Sink contract: never throws, never enqueues, never
    *  touches the script host — callable under a held host transaction. */

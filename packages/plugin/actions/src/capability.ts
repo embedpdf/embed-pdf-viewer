@@ -19,17 +19,21 @@ import type {
   ScriptEventInput,
   ScriptExecutionError,
   ScriptOutput,
+  ScriptUiEffect,
   ScriptWorldInput,
 } from '@embedpdf/core-acrojs';
 import type {
   AnnotationRef,
+  DocumentActionsSnapshot,
   FormSnapshot,
+  FormSubmissionRequest,
   PageObjectNumber,
   PdfActionNode,
   PdfActionTree,
   PdfActionType,
   PdfAnnotationActions,
   PdfPageActions,
+  SubmitFormPayload,
 } from '@embedpdf/engine-core/runtime';
 
 import { eventOf, originOf } from './types';
@@ -51,14 +55,19 @@ import type {
   ActionsState,
   ActionSource,
   ActionStepResult,
+  ActionSubmitHandler,
+  ActionSubmitRequest,
   ActionTrigger,
   ActionTriggerResult,
   ActionUiAdapter,
   AnnotCommitEntry,
   AnnotCommitSink,
+  DocumentTriggerEvent,
   FormCommitSink,
   PageStateReport,
   ScriptSurfaceResult,
+  SubmitIntent,
+  SubmitResolver,
 } from './types';
 
 const ALLOW_ALL: ActionPolicyRow = { user: 'allow', hover: 'allow', lifecycle: 'allow' };
@@ -73,6 +82,9 @@ const DEFAULT_POLICY: ActionPolicy = {
   uri: { user: 'adapter', hover: 'report', lifecycle: 'report' },
   // The Named Print verb: adapter on user gestures, blocked otherwise.
   print: { user: 'adapter', hover: 'block', lifecycle: 'block' },
+  // The sink chain (handler → the document's home → blocked) on user
+  // gestures only; hover/lifecycle submits never leave the viewer.
+  'submit-form': { user: 'adapter', hover: 'block', lifecycle: 'block' },
 };
 
 /** Never executable, not configurable — diagnostics only. */
@@ -124,6 +136,14 @@ export function createActionsCapability(
   let annotCommitSink: AnnotCommitSink | null = null;
   let formCommitSink: FormCommitSink | null = null;
   let uiAdapter: ActionUiAdapter | null = null;
+  /** Sink 1 of the submit chain (consent = installation). */
+  let submitHandler: ActionSubmitHandler | null = null;
+  /** The form plugin's dataset resolver (D7's one door). */
+  let submitResolver: SubmitResolver | null = null;
+  /** D3's document-print latch: while a print event wrapper is active, a
+   *  nested print request is SUPPRESSED (`reentrant-print`) — the adapter
+   *  opens exactly one dialog per outer request. */
+  let docPrintEventActive = false;
   /** D11's deterministic aggregate: JS nodes run in the CURRENT dispatch. */
   let jsNodesThisDispatch = 0;
 
@@ -151,7 +171,6 @@ export function createActionsCapability(
     node: PdfActionNode,
     origin: ActionOrigin,
   ): ActionPolicyDecision | 'never' | 'unsupported' => {
-    if (node.type === 'submit-form') return 'block';
     if (NEVER_TYPES.has(node.type)) return 'never';
     if (UNSUPPORTED_TYPES.has(node.type)) return 'unsupported';
     if (isPrintVerb(node)) return policy.print[origin];
@@ -161,6 +180,144 @@ export function createActionsCapability(
 
   const allowsPrint = (): boolean =>
     ctx.tryGet(DocumentsToken)?.allows('doc.print', ctx.documentId ?? undefined) ?? true;
+
+  // ── the ONE catalog-actions read (D11) ──────────────────────────────────
+  // The catalog /AA is immutable in-session (no writer exists in the
+  // stack), so the open sequence, boot sources, and the five document
+  // events share one memoized read. A REJECTED read is evicted so a
+  // transient failure cannot poison every future lifecycle event.
+  let actionsSnapshotPromise: Promise<DocumentActionsSnapshot | null> | null = null;
+  const readDocumentActions = (): Promise<DocumentActionsSnapshot | null> => {
+    if (!actionsSnapshotPromise) {
+      const doc = ctx.doc;
+      const read: Promise<DocumentActionsSnapshot | null> = doc?.actions
+        ? Promise.resolve(doc.actions.read())
+        : Promise.resolve(null);
+      const memo: Promise<DocumentActionsSnapshot | null> = read.catch((error: unknown) => {
+        if (actionsSnapshotPromise === memo) actionsSnapshotPromise = null;
+        throw error;
+      });
+      actionsSnapshotPromise = memo;
+    }
+    return actionsSnapshotPromise;
+  };
+
+  /** The Table-200 key for each verb-shaped document trigger event. */
+  const DOC_EVENT_TREES = {
+    'will-save': 'willSave',
+    'did-save': 'didSave',
+    'will-print': 'willPrint',
+    'did-print': 'didPrint',
+    'will-close': 'willClose',
+  } as const;
+
+  // ── the submit pipeline (D7): one intent, one resolver, one sink chain ──
+  const nowMs = (): number => js?.now?.() ?? Date.now();
+
+  const intentOfPayload = (payload: SubmitFormPayload): SubmitIntent => ({
+    url: payload.url,
+    fields: payload.fields,
+    exclude: payload.flags.exclude,
+    includeNoValueFields: payload.flags.includeNoValueFields,
+    format: payload.flags.format,
+    method: payload.flags.method,
+    flagsRaw: payload.flags.raw,
+    ...(payload.charSet === undefined ? {} : { charSet: payload.charSet }),
+  });
+
+  const toFormSubmissionRequest = (request: ActionSubmitRequest): FormSubmissionRequest => ({
+    entries: request.entries,
+    intent: {
+      url: request.url,
+      format: request.format,
+      method: request.method,
+      flagsRaw: request.flagsRaw,
+      ...(request.charSet === undefined ? {} : { charSet: request.charSet }),
+    },
+    origin: request.origin,
+    clientTimeMs: nowMs(),
+  });
+
+  /**
+   * The ONE submit door — both sources land here after policy. Sink order:
+   * embedder handler (explicit beats ambient; detached-promise contract) →
+   * the document's home (`doc.forms.submit`, engine-asserted, AWAITED — a
+   * real op with a real receipt) → blocked with `no-submit-sink`. Never a
+   * network call from this plugin.
+   */
+  const performSubmit = async (
+    intent: SubmitIntent,
+    actionCtx: ActionContext,
+    diagnose: (diagnostic: ActionDiagnostic) => void,
+  ): Promise<{ status: ActionNodeStatus; detail?: string }> => {
+    const decision = policy['submit-form'][actionCtx.origin];
+    if (decision !== 'adapter' && decision !== 'allow') {
+      diagnose({
+        code: 'blocked',
+        message: `submit-form: policy '${decision}' for origin '${actionCtx.origin}'`,
+      });
+      return { status: 'blocked' };
+    }
+    if (!submitResolver) {
+      diagnose({
+        code: 'no-submit-resolver',
+        message: 'submit-form: no dataset resolver registered (form plugin missing?)',
+      });
+      return { status: 'blocked', detail: 'no dataset resolver' };
+    }
+    let request: ActionSubmitRequest;
+    try {
+      request = await submitResolver(intent, actionCtx, diagnose);
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      diagnose({ code: 'executor-failed', message: `submit-form: dataset resolution: ${detail}` });
+      return { status: 'failed', detail };
+    }
+    const doc = ctx.doc;
+    const homeSubmit =
+      doc && typeof doc.forms.submit === 'function'
+        ? () => Promise.resolve(doc.forms.submit!(toFormSubmissionRequest(request)))
+        : null;
+    if (submitHandler) {
+      try {
+        const outcome = submitHandler(request, { submitToDocumentHome: homeSubmit });
+        if (outcome && typeof (outcome as Promise<void>).then === 'function') {
+          // DETACHED by contract: `executed` means "handed to the embedder";
+          // a later rejection is observability, never a node-result rewrite.
+          void (outcome as Promise<void>).catch((error: unknown) => {
+            diagnosticHook.emit({
+              code: 'executor-failed',
+              message: `submit handler rejected (detached): ${
+                error instanceof Error ? error.message : String(error)
+              }`,
+            });
+          });
+        }
+        return { status: 'executed' };
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : String(error);
+        diagnose({ code: 'executor-failed', message: `submit handler threw: ${detail}` });
+        return { status: 'failed', detail };
+      }
+    }
+    if (homeSubmit) {
+      try {
+        await homeSubmit();
+        return { status: 'executed' };
+      } catch (error) {
+        // The engine's refusal (authority, transport) surfaced on the node —
+        // enforcement lives at the home's boundary, we just report it.
+        const detail = error instanceof Error ? error.message : String(error);
+        diagnose({ code: 'executor-failed', message: `document home refused submit: ${detail}` });
+        return { status: 'failed', detail };
+      }
+    }
+    diagnose({
+      code: 'no-submit-sink',
+      message: 'submit-form: no handler installed and the document has no submit-capable home',
+    });
+    return { status: 'blocked', detail: 'no submit sink' };
+  };
 
   // ── the ONE per-document ScriptHost (D8) ────────────────────────────────
   const js = config.javascript;
@@ -195,7 +352,7 @@ export function createActionsCapability(
             };
           },
           bootSources: async () => {
-            const snapshot = ctx.doc?.actions ? await ctx.doc.actions.read() : null;
+            const snapshot = await readDocumentActions();
             return (snapshot?.nameTreeScripts ?? []).map(({ action }) =>
               javaScriptProgramFromActionTree(action),
             );
@@ -206,15 +363,45 @@ export function createActionsCapability(
   if (scriptHost) ctx.cleanup(() => scriptHost.dispose());
 
   // ── surface door (D9): the ONE UI/diagnostic port for script results ────
+  // Print and submitForm effects arriving from the ACTIONS plane never
+  // reach this door (the js executor extracts them and routes through
+  // `firePrintThroughAdapter` / `performSubmit` post-transaction — the
+  // WP/DP wrap and the post-commit dataset need to run outside the host
+  // transaction). Effects here come from the FORM pipeline's K/V/C/F path.
   const surfaceScriptResult = (result: ScriptSurfaceResult): void => {
     const uiContext = { origin: result.origin, phase: result.phase };
     for (const effect of result.uiEffects) {
+      if (effect.kind === 'submitForm') {
+        // Form-pipeline scripted submit: same door, DETACHED (the form
+        // queue must not await into submit sinks). Policy + sinks +
+        // diagnostics all live inside performSubmit.
+        void performSubmit(
+          intentOfSubmitEffect(effect),
+          {
+            origin: result.origin,
+            source: { kind: 'api' },
+            event: { scope: 'activate' },
+          },
+          (diagnostic) => diagnosticHook.emit(diagnostic),
+        );
+        continue;
+      }
       // PERMISSION, not preference: a print request without doc.print
       // authority reaches no adapter — non-overridable, observable.
       if (effect.kind === 'print' && !allowsPrint()) {
         scriptDiagnosticHook.emit({
           code: 'ui-effect-suppressed',
           message: 'script print request withheld: doc.print is not allowed',
+        });
+        continue;
+      }
+      // D3's latch: a WillPrint/DidPrint script (or anything running while
+      // a print wrapper is active) printing again is suppressed — one
+      // dialog per outer request.
+      if (effect.kind === 'print' && docPrintEventActive) {
+        scriptDiagnosticHook.emit({
+          code: 'ui-effect-suppressed',
+          message: 'script print request during a document print event — suppressed (reentrant)',
         });
         continue;
       }
@@ -239,6 +426,23 @@ export function createActionsCapability(
     }
     for (const diagnostic of result.diagnostics) scriptDiagnosticHook.emit(diagnostic);
     if (result.error) scriptErrorHook.emit(result.error);
+  };
+
+  /** Script `doc.submitForm(...)` → the one normalized intent. Script field
+   *  names are include-mode by definition (Acrobat's aFields). */
+  const intentOfSubmitEffect = (
+    effect: Extract<ScriptUiEffect, { kind: 'submitForm' }>,
+  ): SubmitIntent => {
+    const format = effect.format ?? 'fdf';
+    return {
+      url: effect.url,
+      fields: effect.fieldNames?.map((name) => ({ kind: 'name' as const, name })) ?? null,
+      exclude: false,
+      includeNoValueFields: effect.includeEmpty,
+      format,
+      method: effect.method ?? 'post',
+      flagsRaw: 0,
+    };
   };
 
   // ── script world building (D6: page-scoped prefetch) ────────────────────
@@ -324,6 +528,17 @@ export function createActionsCapability(
     visible: 'Visible',
     invisible: 'Invisible',
   };
+  // The two-standard bridge (D5): the /AA keys are ISO 32000-2 Table 200;
+  // the camelCase event names live in the JS API layer (ISO 21757-1 /
+  // Acrobat) — only the key half is verifiable against the in-repo spec.
+  const DOC_EVENT_NAMES: Record<string, string> = {
+    open: 'Open',
+    'will-save': 'WillSave',
+    'did-save': 'DidSave',
+    'will-print': 'WillPrint',
+    'did-print': 'DidPrint',
+    'will-close': 'WillClose',
+  };
 
   const scriptEventFor = (actionCtx: ActionContext, snapshot: FormSnapshot): ScriptEventInput => {
     const provenance = actionCtx.event;
@@ -344,7 +559,7 @@ export function createActionsCapability(
           ? (ANNOTATION_EVENT_NAMES[provenance.name] ?? 'Mouse Up')
           : provenance.scope === 'page'
             ? (PAGE_EVENT_NAMES[provenance.name] ?? 'Open')
-            : 'Open';
+            : (DOC_EVENT_NAMES[provenance.name] ?? 'Open');
     const targetRef = actionCtx.source.kind === 'widget' ? actionCtx.source.field : undefined;
     const targetField = targetRef
       ? snapshot.fields.find((field) =>
@@ -441,7 +656,25 @@ export function createActionsCapability(
               : ctx.document()?.pages[0]?.pageObjectNumber;
       if (pon === undefined) return { status: 'inert', reason: 'no page to anchor the world on' };
       const diagnose = (diagnostic: ActionDiagnostic): void => diagnosticHook.emit(diagnostic);
-      return scriptHost.transaction(async (txn) => {
+      // Print/submit effects are EXTERNAL: the WP/DP wrap runs action trees
+      // (which may need their own host transactions) and the submit dataset
+      // must be resolved from POST-COMMIT truth — both must run after the
+      // transaction releases, still inside this queued dispatch op.
+      const pendingExternal: Array<{
+        effect: Extract<ScriptUiEffect, { kind: 'print' | 'submitForm' }>;
+        phase: 'boot' | 'user';
+      }> = [];
+      const splitExternal = (output: ScriptOutput, phase: 'boot' | 'user'): ScriptUiEffect[] =>
+        output.uiEffects.filter((effect) => {
+          if (effect.kind === 'print' || effect.kind === 'submitForm') {
+            pendingExternal.push({ effect, phase });
+            return false;
+          }
+          return true;
+        });
+      const outcome = await scriptHost.transaction<
+        { status: 'executed' } | { status: 'failed'; error: string }
+      >(async (txn) => {
         let built = await scriptWorldFor(pon);
         const boot = await txn.boot({
           ...built.world,
@@ -453,7 +686,7 @@ export function createActionsCapability(
           // sees post-boot truth.
           await commitScriptOutput(boot, diagnose);
           surfaceScriptResult({
-            uiEffects: boot.uiEffects,
+            uiEffects: splitExternal(boot, 'boot'),
             diagnostics: boot.diagnostics,
             ...(boot.error ? { error: boot.error } : {}),
             origin: actionCtx.origin,
@@ -468,7 +701,7 @@ export function createActionsCapability(
           event: scriptEventFor(actionCtx, built.snapshot),
         });
         surfaceScriptResult({
-          uiEffects: output.uiEffects,
+          uiEffects: splitExternal(output, 'user'),
           diagnostics: output.diagnostics,
           ...(output.error ? { error: output.error } : {}),
           origin: actionCtx.origin,
@@ -478,6 +711,14 @@ export function createActionsCapability(
         const failure = await commitScriptOutput(output, diagnose);
         return failure ? { status: 'failed', error: failure } : { status: 'executed' };
       });
+      for (const entry of pendingExternal) {
+        if (entry.effect.kind === 'print') {
+          await firePrintThroughAdapter({ origin: actionCtx.origin, phase: entry.phase }, diagnose);
+        } else {
+          await performSubmit(intentOfSubmitEffect(entry.effect), actionCtx, diagnose);
+        }
+      }
+      return outcome;
     });
   }
 
@@ -665,28 +906,56 @@ export function createActionsCapability(
         return;
       }
 
+      if (node.type === 'submit-form') {
+        if (!node.payload) {
+          // Older-runtime extraction (pin lag): exactly the pre-payload
+          // behavior — recognized-inert, honestly diagnosed.
+          result.status = 'inert';
+          result.detail = 'submit payload unavailable (older runtime extraction)';
+          diagnose({
+            code: 'submit-payload-unavailable',
+            message: 'submit-form: payload unavailable (older runtime extraction) — node inert',
+          });
+          return;
+        }
+        const payload = node.payload;
+        // External like print/uri: deferred until every document-lifetime
+        // node succeeded — a submission must never carry a half-failed
+        // form state.
+        result.status = 'skipped'; // provisional until fired
+        deferred.push({
+          result,
+          fire: async () => {
+            const outcome = await performSubmit(intentOfPayload(payload), actionCtx, diagnose);
+            result.status = outcome.status;
+            if (outcome.detail) result.detail = outcome.detail;
+          },
+        });
+        return;
+      }
+
       if (isPrintVerb(node) || node.type === 'uri') {
         // External: adapter-routed, deferred.
         result.status = 'skipped'; // provisional until fired
         deferred.push({
           result,
-          fire: () => {
-            if (isPrintVerb(node) && !allowsPrint()) {
-              result.status = 'blocked';
-              diagnose({ code: 'blocked', message: 'print: doc.print is not allowed' });
-              return;
-            }
-            if (!uiAdapter) {
-              result.status = 'no-executor';
-              diagnose({ code: 'no-adapter', message: `${node.type}: no UI adapter installed` });
-              return;
-            }
+          fire: async () => {
             if (node.type === 'uri') {
+              if (!uiAdapter) {
+                result.status = 'no-executor';
+                diagnose({ code: 'no-adapter', message: `${node.type}: no UI adapter installed` });
+                return;
+              }
               uiAdapter.openUri(node.uri, { isMap: node.isMap, origin: actionCtx.origin });
-            } else {
-              uiAdapter.print();
+              result.status = 'executed';
+              return;
             }
-            result.status = 'executed';
+            // The Print verb: WP → adapter (exactly once) → DP, one latch
+            // (D3). Authority/adapter/reentrancy verdicts come back as the
+            // node's status.
+            const outcome = await firePrintThroughAdapter(undefined, diagnose);
+            result.status = outcome.status;
+            if (outcome.detail) result.detail = outcome.detail;
           },
         });
         return;
@@ -941,6 +1210,9 @@ export function createActionsCapability(
           return await runSteps(steps, origin, eventOf(trigger), diagnostics);
         }
         case 'document': {
+          if (trigger.event !== 'open') {
+            return await runDocumentEventOp(trigger.event, diagnostics, diagnose);
+          }
           if (openFired) {
             diagnose({
               code: 'open-sequence-replayed',
@@ -1071,8 +1343,7 @@ export function createActionsCapability(
       event: { scope: 'document', name: 'open' },
     };
     try {
-      const doc = ctx.doc;
-      const snapshot = doc?.actions ? await doc.actions.read() : null;
+      const snapshot = await readDocumentActions();
       if (snapshot?.openDestination) {
         // The initial view reuses the whole spine (stage's goto executor,
         // policy included) as a synthesized lifecycle goto.
@@ -1116,6 +1387,105 @@ export function createActionsCapability(
     return foldSteps(steps, diagnostics);
   };
 
+  // ── document lifecycle events (Phase 4: WC/WS/DS/WP/DP) ─────────────────
+
+  /**
+   * D1's open-ordering law: catalog `OpenAction` may never run AFTER a
+   * WillSave/WillPrint/WillClose script. Before the first verb-shaped
+   * document event, an armed-but-unfired open sequence runs inline (we are
+   * already inside the queue; `runOpenSequenceOp` never enqueues). It does
+   * NOT wait for the initial page `/O` — the guarantee is catalog-level.
+   */
+  const ensureOpenSequenceBeforeDocEvent = async (): Promise<void> => {
+    if (openFired || config.openSequence === 'off') return;
+    openFired = true;
+    await runOpenSequenceOp();
+  };
+
+  /**
+   * Run ONE catalog lifecycle tree inside the current queue operation —
+   * shared by the dispatch path, `runDocumentVerb`, and the print wrapper.
+   * Never throws: a read/resolution failure degrades to a diagnostic (a
+   * broken script must not cancel the user's save/print — D2).
+   */
+  const runDocEventTreeSafe = async (
+    event: Exclude<DocumentTriggerEvent, 'open'>,
+    diagnose: (diagnostic: ActionDiagnostic) => void,
+  ): Promise<ActionStepResult | null> => {
+    if (config.triggers?.document === false) return null;
+    try {
+      await ensureOpenSequenceBeforeDocEvent();
+      const snapshot = await readDocumentActions();
+      const tree = snapshot?.[DOC_EVENT_TREES[event]];
+      if (!tree?.root && !tree?.incomplete) return null;
+      const actionCtx: ActionContext = {
+        origin: 'lifecycle',
+        source: { kind: 'document' },
+        event: { scope: 'document', name: event },
+      };
+      return { source: { kind: 'document' }, tree, result: await runAndEmit(tree, actionCtx) };
+    } catch (error) {
+      diagnose({
+        code: 'trigger-failed',
+        message: `${event}: ${error instanceof Error ? error.message : String(error)}`,
+      });
+      return null;
+    }
+  };
+
+  /** The dispatch-path body for a verb-shaped document event. */
+  const runDocumentEventOp = async (
+    event: Exclude<DocumentTriggerEvent, 'open'>,
+    diagnostics: ActionDiagnostic[],
+    diagnose: (diagnostic: ActionDiagnostic) => void,
+  ): Promise<ActionTriggerResult> => {
+    const step = await runDocEventTreeSafe(event, diagnose);
+    return foldSteps(step ? [step] : [], diagnostics);
+  };
+
+  /**
+   * D3: BOTH adapter print invocations (the Named Print verb; script
+   * `doc.print()` effects from the actions plane) go through here — WP →
+   * `uiAdapter.print` exactly once → DP, latch reset in `finally`. While
+   * the latch is held (including `runDocumentVerb('print')`'s body) a
+   * nested request is suppressed with `reentrant-print`. An adapter throw
+   * skips DP (the latch still resets) — named deviation: DP otherwise
+   * fires when the adapter call RETURNS, since a browser cannot observe
+   * dialog completion.
+   */
+  const firePrintThroughAdapter = async (
+    uiContext: { origin: ActionOrigin; phase: 'boot' | 'user' } | undefined,
+    diagnose: (diagnostic: ActionDiagnostic) => void,
+  ): Promise<{ status: ActionNodeStatus; detail?: string }> => {
+    if (docPrintEventActive) {
+      diagnose({
+        code: 'reentrant-print',
+        message: 'print request during a document print event — suppressed (one dialog per request)',
+      });
+      return { status: 'blocked', detail: 'reentrant print suppressed' };
+    }
+    if (!allowsPrint()) {
+      diagnose({ code: 'blocked', message: 'print: doc.print is not allowed' });
+      return { status: 'blocked', detail: 'doc.print is not allowed' };
+    }
+    if (!uiAdapter) {
+      diagnose({ code: 'no-adapter', message: 'print: no UI adapter installed' });
+      return { status: 'no-executor', detail: 'no UI adapter installed' };
+    }
+    docPrintEventActive = true;
+    try {
+      await runDocEventTreeSafe('will-print', diagnose);
+      const adapter = uiAdapter;
+      if (!adapter) return { status: 'no-executor', detail: 'UI adapter uninstalled mid-print' };
+      if (uiContext) adapter.print(uiContext);
+      else adapter.print();
+      await runDocEventTreeSafe('did-print', diagnose);
+      return { status: 'executed' };
+    } finally {
+      docPrintEventActive = false;
+    }
+  };
+
   const maybeFireOpenSequence = (): void => {
     if (openFired) return;
     if (config.openSequence === 'off') {
@@ -1157,6 +1527,46 @@ export function createActionsCapability(
         if (uiAdapter === adapter) uiAdapter = null;
       };
     },
+    runDocumentVerb: <T>(
+      verb: 'save' | 'print',
+      operation: () => Promise<T> | T,
+    ): Promise<T> =>
+      enqueue(async () => {
+        jsNodesThisDispatch = 0; // one D11 aggregate for the whole verb op
+        const diagnose = (diagnostic: ActionDiagnostic): void => diagnosticHook.emit(diagnostic);
+        const before = verb === 'save' ? ('will-save' as const) : ('will-print' as const);
+        const after = verb === 'save' ? ('did-save' as const) : ('did-print' as const);
+        const body = async (): Promise<T> => {
+          // A before-event failure never cancels the user's verb (D2);
+          // runDocEventTreeSafe already degrades to diagnostics.
+          await runDocEventTreeSafe(before, diagnose);
+          // `operation()` throwing skips the after-event and rethrows —
+          // no DidSave for a failed save.
+          const value = await operation();
+          await runDocEventTreeSafe(after, diagnose);
+          return value;
+        };
+        if (verb !== 'print') return body();
+        // The print verb holds the D3 latch for its WHOLE body, so a
+        // WillPrint/DidPrint script calling doc.print() is suppressed
+        // instead of opening a second dialog.
+        docPrintEventActive = true;
+        try {
+          return await body();
+        } finally {
+          docPrintEventActive = false;
+        }
+      }),
+    prepareClose: (): Promise<ActionTriggerResult> =>
+      dispatch({ scope: 'document', event: 'will-close' }),
+    setSubmitHandler: (handler): Unsubscribe => {
+      submitHandler = handler;
+      // Deliberately NOT an open-latch release — that stays the UI
+      // adapter's role.
+      return () => {
+        if (submitHandler === handler) submitHandler = null;
+      };
+    },
     onAction: actionHook.on,
     onDiagnostic: diagnosticHook.on,
     onScriptDiagnostic: scriptDiagnosticHook.on,
@@ -1195,5 +1605,11 @@ export function createActionsCapability(
       : {}),
     surfaceScriptResult,
     reportPageState,
+    registerSubmitResolver: (resolver): Unsubscribe => {
+      submitResolver = resolver;
+      return () => {
+        if (submitResolver === resolver) submitResolver = null;
+      };
+    },
   };
 }

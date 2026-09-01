@@ -6,7 +6,11 @@ import type {
   PdfActionType,
   PdfActionWarning,
 } from '@embedpdf/engine-core/runtime';
-import { EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
+import {
+  decodeSubmitFormFlags,
+  EngineError,
+  EngineErrorCode,
+} from '@embedpdf/engine-core/runtime';
 import {
   NULL_PTR,
   type PdfFunctions,
@@ -217,6 +221,17 @@ export function readActionModel(
         };
       });
 
+    const readSubmitFormState = (nodeId: number): { hasFields: boolean; flags: number } | null =>
+      withScratchN(mem, [I32_BYTES, I32_BYTES], ([hasFieldsPtr, flagsPtr]) => {
+        if (!fn.EPDFAction_GetNodeSubmitForm(modelPtr, nodeId, hasFieldsPtr, flagsPtr)) {
+          return null;
+        }
+        return {
+          hasFields: readI32(mem, hasFieldsPtr) !== 0,
+          flags: readI32(mem, flagsPtr) >>> 0,
+        };
+      });
+
     const readNode = (nodeId: number): PdfActionNode => {
       if (visiting.has(nodeId)) {
         throw malformedActionModel('native action model contains a cycle', { nodeId });
@@ -309,6 +324,42 @@ export function readActionModel(
             const fields = state.hasFields ? readTargets(nodeId, count) : null;
             if (state.hasFields && fields === null) return degraded();
             return { type, subtype, fields, exclude: state.exclude, next };
+          }
+          case 'submit-form': {
+            // Feature-detect: an older runtime payload (pin lag) exposes no
+            // submit getters — the node stays payload-less recognized-inert,
+            // the pre-payload behavior, NOT a degraded unknown.
+            if (typeof fn.EPDFAction_GetNodeSubmitForm !== 'function') {
+              return { type, subtype, next };
+            }
+            const state = readSubmitFormState(nodeId);
+            // The getter refuses when the REQUIRED /F did not resolve to a
+            // URL: the native side withheld the payload — the atomic rule
+            // degrades the whole node, never a half payload.
+            if (state === null) return degraded();
+            const url = readPayloadString((buf, capacity) =>
+              fn.EPDFAction_GetNodeSubmitFormURL(modelPtr, nodeId, buf, capacity),
+            );
+            if (url === null) return degraded();
+            const count = fn.EPDFAction_GetNodeTargetCount(modelPtr, nodeId);
+            if (!Number.isInteger(count) || count < 0) return degraded();
+            budget.reserveTargets(count);
+            const fields = state.hasFields ? readTargets(nodeId, count) : null;
+            if (state.hasFields && fields === null) return degraded();
+            const charSet = readPayloadString((buf, capacity) =>
+              fn.EPDFAction_GetNodeSubmitFormCharSet(modelPtr, nodeId, buf, capacity),
+            );
+            return {
+              type,
+              subtype,
+              payload: {
+                url,
+                fields,
+                flags: decodeSubmitFormFlags(state.flags),
+                ...(charSet === null ? {} : { charSet }),
+              },
+              next,
+            };
           }
           case 'goto-remote':
           case 'goto-embedded':

@@ -199,7 +199,18 @@ export interface ScriptInput {
 export type ScriptUiEffect =
   | { kind: 'alert'; message: string; icon: number; title?: string }
   | { kind: 'print' }
-  | { kind: 'gotoPage'; page: number };
+  | { kind: 'gotoPage'; page: number }
+  /** `doc.submitForm(...)` — a submit INTENT, resolved and sink-routed
+   *  outside the VM (never a network call from here). `fieldNames` are
+   *  include-mode (Acrobat's aFields); `null` = the whole eligible form. */
+  | {
+      kind: 'submitForm';
+      url: string | null;
+      fieldNames: string[] | null;
+      includeEmpty: boolean;
+      format?: 'fdf' | 'html' | 'xfdf' | 'pdf';
+      method?: 'post' | 'get';
+    };
 
 export type ScriptDiagnosticCode =
   | 'blocked-network'
@@ -282,30 +293,40 @@ export const DEFAULT_SCRIPT_BUDGET: Readonly<ScriptBudget> = Object.freeze({
   maxOutputBytes: 1024 * 1024,
 });
 
-/** V1 security posture. The only configurable switch is explicit opt-in. */
+/**
+ * The shipped security posture (updated per phase — the live authority for
+ * per-type × origin decisions is the actions plugin's policy; these
+ * constants DOCUMENT the posture, they do not enforce it). The only
+ * configurable switch is explicit opt-in.
+ */
 export interface ScriptSecurityPolicy {
   enabled: boolean;
   executionOwner: 'originating-client-only';
   nameTreeBoot: 'lazy-first-transaction';
-  submitForm: 'blocked';
-  openAction: 'preserve-only';
-  pageActions: 'preserve-only';
-  catalogLifecycleActions: 'preserve-only';
-  annotationActions: 'widget-activate-only';
+  /** Submit is a sink chain — embedder handler → the document's HOME
+   *  (`doc.forms.submit`, engine-asserted) → blocked. Never auto-network. */
+  submitForm: 'sink-chain';
+  openAction: 'execute-lifecycle';
+  pageActions: 'execute-lifecycle';
+  /** WC/WS/DS/WP/DP run when the VERB OWNER dispatches them. */
+  catalogLifecycleActions: 'execute-on-verb';
+  annotationActions: 'execute-full-matrix';
 }
 
 export const DEFAULT_SCRIPT_SECURITY_POLICY: Readonly<ScriptSecurityPolicy> = Object.freeze({
   enabled: false,
   executionOwner: 'originating-client-only',
   nameTreeBoot: 'lazy-first-transaction',
-  submitForm: 'blocked',
-  openAction: 'preserve-only',
-  pageActions: 'preserve-only',
-  catalogLifecycleActions: 'preserve-only',
-  annotationActions: 'widget-activate-only',
+  submitForm: 'sink-chain',
+  openAction: 'execute-lifecycle',
+  pageActions: 'execute-lifecycle',
+  catalogLifecycleActions: 'execute-on-verb',
+  annotationActions: 'execute-full-matrix',
 });
 
-/** Frozen V1 dispatch matrix; extracted actions outside it remain data only. */
+/** The shipped dispatch matrix; extracted actions outside it remain data
+ *  only. (Historical note: v1 froze everything beyond K/V/C/F as
+ *  preserve-only; phases 1–4 executed the rest.) */
 export const SCRIPT_EVENT_MATRIX = Object.freeze({
   nameTree: 'lazy-first-originating-field-transaction',
   field: Object.freeze({
@@ -314,14 +335,14 @@ export const SCRIPT_EVENT_MATRIX = Object.freeze({
     calculate: 'execute-in-calculation-order',
     format: 'execute-after-value-calculation',
   }),
-  openAction: 'preserve-only',
-  page: 'preserve-only',
-  catalogLifecycle: 'preserve-only',
+  openAction: 'execute-lifecycle',
+  page: 'execute-lifecycle',
+  catalogLifecycle: 'execute-on-verb',
   annotation: Object.freeze({
     widgetActivate: 'execute-on-originating-client',
-    other: 'preserve-only',
+    other: 'execute-full-matrix',
   }),
-  submitForm: 'blocked',
+  submitForm: 'sink-chain',
 } as const);
 
 /** Functions installed into the isolated VM global by `PRELUDE_SOURCE`. */

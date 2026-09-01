@@ -23,6 +23,7 @@ import { ShellToken } from '@embedpdf/react/shell';
 import { AnnotationToken } from '@embedpdf/react/annotation';
 import { copySelection, SelectionToken, type TextRange } from '@embedpdf/react/selection';
 import { fieldKeyOf, FormToken } from '@embedpdf/react/form';
+import { ActionsToken } from '@embedpdf/react/actions';
 import { LinkToken, openLinkTarget, type PdfLinkTarget } from '@embedpdf/react/link';
 import { SearchToken } from '@embedpdf/react/search';
 import { RedactionToken } from '@embedpdf/react/redaction';
@@ -287,8 +288,15 @@ export const defaultCommands: CommandDef[] = [
     categories: ['document'],
     run: (c) => {
       const id = c.documentId ?? undefined;
-      c.tryGet(DocumentsToken)
-        ?.download(id)
+      const documents = c.tryGet(DocumentsToken);
+      if (!documents) return;
+      const pull = () => documents.download(id);
+      // The Phase-4 verb-owner contract: WS → serialize → DS as ONE queued
+      // operation, so the WillSave mutations are IN the downloaded bytes
+      // and two rapid saves can never interleave. Without the actions
+      // plugin this degrades to a plain download.
+      const actions = c.tryGet(ActionsToken);
+      (actions ? actions.runDocumentVerb('save', pull) : pull())
         .then((bytes) => {
           const blob = new Blob([bytes as BlobPart], { type: 'application/pdf' });
           const url = URL.createObjectURL(blob);
@@ -311,7 +319,14 @@ export const defaultCommands: CommandDef[] = [
     icon: 'print',
     shortcut: 'Mod+p',
     categories: ['document'],
-    run: () => window.print(),
+    // WP → window.print() → DP through the one serialized verb op (the
+    // latch suppresses any nested script print); documentless chrome (or
+    // no actions plugin) keeps today's direct dialog.
+    run: (c) => {
+      const actions = c.documentId != null ? c.tryGet(ActionsToken) : null;
+      if (actions) void actions.runDocumentVerb('print', () => window.print());
+      else window.print();
+    },
     // Same exception; documentless chrome (no doc open) keeps print enabled
     // for whatever the host page shows.
     enabled: (c) => c.documentId == null || (c.tryGet(DocumentsToken)?.allows('doc.print') ?? true),

@@ -201,6 +201,45 @@ export function runActionsConformance(
         expect(rootOf('reset-absent')).toMatchObject({ type: 'reset-form', fields: null, exclude: true });
         expect(rootOf('reset-empty')).toMatchObject({ type: 'reset-form', fields: [], exclude: false });
 
+        // SubmitForm's ATOMIC payload (Phase 4). /UF beats /F in a
+        // conforming << /FS /URL >> spec; a bare-string /F is the
+        // producer-compat extension; bit 9 dominates format with GetMethod
+        // kept alive (ISO 32000-2 Table 240).
+        expect(rootOf('submit-urlspec')).toMatchObject({
+          type: 'submit-form',
+          payload: {
+            url: 'https://uf.example.test/submit',
+            fields: [{ kind: 'name', name: 'parent' }],
+            flags: { raw: 0, exclude: false, format: 'fdf', method: 'post' },
+          },
+        });
+        expect(rootOf('submit-compat-xfdf')).toMatchObject({
+          type: 'submit-form',
+          payload: {
+            url: 'https://example.test/xfdf',
+            fields: [
+              { kind: 'name', name: 'noexport' },
+              { kind: 'name', name: 'plain' },
+            ],
+            flags: {
+              raw: 35,
+              exclude: true,
+              includeNoValueFields: true,
+              format: 'xfdf',
+              method: 'post',
+            },
+            charSet: 'utf-8',
+          },
+        });
+        expect(rootOf('submit-pdf-get')).toMatchObject({
+          type: 'submit-form',
+          payload: {
+            url: 'https://example.test/pdf',
+            fields: null,
+            flags: { raw: 264, format: 'pdf', method: 'get' },
+          },
+        });
+
         expect(rootOf('launch-app')).toMatchObject({ type: 'launch', filePath: 'app.exe' });
         expect(rootOf('gotor-file')).toMatchObject({ type: 'goto-remote', filePath: 'other.pdf' });
 
@@ -229,6 +268,10 @@ export function runActionsConformance(
         for (const [nm, subtype] of [
           ['goto-malformed', 'GoTo'],
           ['hide-partial', 'Hide'], // a partial target list must never half-execute
+          // The atomic-payload law: a submit whose REQUIRED /F is not a URL
+          // (or is absent) degrades WHOLE — never a half payload.
+          ['submit-not-url', 'SubmitForm'],
+          ['submit-no-f', 'SubmitForm'],
         ] as const) {
           const annotation = snapshot.annotations.find((candidate) => candidate.nm === nm);
           const tree = annotation?.actions?.activate;

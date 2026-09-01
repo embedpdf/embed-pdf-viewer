@@ -86,6 +86,30 @@ function linkAnnot(nm, rect, action) {
     ),
     linkAnnot('goto-malformed', '10 370 60 390', '<< /S /GoTo >>'),
     linkAnnot('hide-partial', '10 340 60 360', '<< /S /Hide /T [(kept) << /Foo 1 >>] >>'),
+    // SubmitForm's atomic payload (Phase 4): a conforming URL file spec
+    // (/UF preferred over /F), a bare-string /F producer-compat form with
+    // exclude+IncludeNoValueFields+XFDF flags and a /CharSet, the
+    // SubmitPDF+GetMethod bit-9 dominance case, and the two degrade shapes
+    // (a non-URL file spec; the REQUIRED /F missing entirely).
+    linkAnnot(
+      'submit-urlspec',
+      '10 310 60 330',
+      '<< /S /SubmitForm /F << /FS /URL /F (https://f.example.test/submit) ' +
+        '/UF (https://uf.example.test/submit) >> /Fields [(parent)] /Flags 0 >>',
+    ),
+    linkAnnot(
+      'submit-compat-xfdf',
+      '10 280 60 300',
+      '<< /S /SubmitForm /F (https://example.test/xfdf) /Fields [(noexport) (plain)] ' +
+        '/Flags 35 /CharSet (utf-8) >>',
+    ),
+    linkAnnot(
+      'submit-pdf-get',
+      '10 250 60 270',
+      '<< /S /SubmitForm /F << /FS /URL /F (https://example.test/pdf) >> /Flags 264 >>',
+    ),
+    linkAnnot('submit-not-url', '10 220 60 240', '<< /S /SubmitForm /F << /F (disk-file.fdf) >> >>'),
+    linkAnnot('submit-no-f', '10 190 60 210', '<< /S /SubmitForm >>'),
   ];
   // A minimal AcroForm (merged field+widget dicts) so the hide-by-NAME
   // target (note1) and the reset-include list (calc1) resolve against real
@@ -267,6 +291,99 @@ function linkAnnot(nm, rect, action) {
   writeFileSync(resolve(here, 'action_hover_colors.pdf'), buildPdf(objects));
 }
 
+// ── action_doc_events.pdf ──────────────────────────────────────────────────
+// THE Phase-4 lifecycle gate: a catalog /AA carrying all five Table-200
+// trees (WC/WS/DS/WP/DP) plus an /OpenAction — every script APPENDS its
+// event.name to the eventLog field (proving the WillSave/DidPrint name
+// bridge end-to-end), WS additionally writes savedAt through EVENT.TARGET
+// (the Doc-typed event.target = doc proof), and WP calls this.print() (the
+// reentrant-print suppression proof — it fires while the print latch is
+// held, so it must be suppressed with a diagnostic, never a second dialog).
+{
+  const PAGE = '3 0 R';
+  const append =
+    "(var f = this.getField\\('eventLog'\\); " +
+    "if \\(f\\) f.value = \\(f.value ? f.value + ' ' : ''\\) + event.name;";
+  const OPEN_JS = `${append})`;
+  const WC_JS = `${append})`;
+  const WS_JS =
+    `${append} ` +
+    "var s = event.target.getField\\('savedAt'\\); if \\(s\\) s.value = 'saved-by-willsave';)";
+  const DS_JS = `${append})`;
+  const WP_JS = `${append} this.print\\(\\);)`;
+  const DP_JS = `${append})`;
+  const objects = [
+    '<< /Type /Catalog /Pages 2 0 R /OpenAction 6 0 R ' +
+      '/AA << /WC 7 0 R /WS 8 0 R /DS 9 0 R /WP 10 0 R /DP 11 0 R >> ' +
+      '/AcroForm << /Fields [4 0 R 5 0 R] /DA (/Helv 0 Tf 0 g) ' +
+      '/DR << /Font << /Helv 12 0 R >> >> >> >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Annots [4 0 R 5 0 R] >>',
+    `<< /Type /Annot /Subtype /Widget /FT /Tx /T (eventLog) /Rect [50 700 550 720] /F 4 ` +
+      `/P ${PAGE} /V () /DV () /DA (/Helv 0 Tf 0 g) >>`,
+    `<< /Type /Annot /Subtype /Widget /FT /Tx /T (savedAt) /Rect [50 670 550 690] /F 4 ` +
+      `/P ${PAGE} /V () /DV () /DA (/Helv 0 Tf 0 g) >>`,
+    `<< /S /JavaScript /JS ${OPEN_JS} >>`,
+    `<< /S /JavaScript /JS ${WC_JS} >>`,
+    `<< /S /JavaScript /JS ${WS_JS} >>`,
+    `<< /S /JavaScript /JS ${DS_JS} >>`,
+    `<< /S /JavaScript /JS ${WP_JS} >>`,
+    `<< /S /JavaScript /JS ${DP_JS} >>`,
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+  ];
+  writeFileSync(resolve(here, 'action_doc_events.pdf'), buildPdf(objects));
+}
+
+// ── action_submit_form.pdf ─────────────────────────────────────────────────
+// The Phase-4 submit-dataset form: a field HIERARCHY (parent.c1/parent.c2 —
+// the ISO descendants rule), a NoExport field (the unconditional veto), a
+// valueless field (IncludeNoValueFields's name-only entries), a plain field,
+// and push buttons whose /A SubmitForm trees pin the three selection modes:
+// include-the-parent, /Fields absent (everything eligible; push-buttons and
+// NoExport excluded), and an explicit include of vetoed/unsupported targets.
+// One JavaScript button drives the scripted doc.submitForm() path.
+{
+  const PAGE = '3 0 R';
+  // Objects: 1 catalog, 2 pages, 3 page, 4 parent field, 5 c1, 6 c2,
+  // 7 noexport, 8 empty, 9 plain, 10-12 submit buttons, 13 js button,
+  // 14 font.
+  const URLSPEC = (path) => `<< /FS /URL /F (https://home.test/${path}) >>`;
+  const button = (name, rect, action) =>
+    `<< /Type /Annot /Subtype /Widget /FT /Btn /Ff 65536 /T (${name}) /Rect [${rect}] ` +
+    `/F 4 /P ${PAGE} /DA (/Helv 0 Tf 0 g) /A ${action} >>`;
+  const jsSubmit =
+    '(this.submitForm\\({cURL: "https://home.test/js", aFields: ["plain"], ' +
+    'bEmpty: true, cSubmitAs: "XFDF"}\\);)';
+  const objects = [
+    '<< /Type /Catalog /Pages 2 0 R /AcroForm << /Fields [4 0 R 7 0 R 8 0 R 9 0 R 10 0 R 11 0 R 12 0 R 13 0 R] ' +
+      '/DA (/Helv 0 Tf 0 g) /DR << /Font << /Helv 14 0 R >> >> >> >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] ' +
+      '/Annots [5 0 R 6 0 R 7 0 R 8 0 R 9 0 R 10 0 R 11 0 R 12 0 R 13 0 R] >>',
+    '<< /FT /Tx /T (parent) /Kids [5 0 R 6 0 R] >>',
+    `<< /Type /Annot /Subtype /Widget /Parent 4 0 R /T (c1) /Rect [50 700 250 720] /F 4 ` +
+      `/P ${PAGE} /V (child-one) /DA (/Helv 0 Tf 0 g) >>`,
+    `<< /Type /Annot /Subtype /Widget /Parent 4 0 R /T (c2) /Rect [50 670 250 690] /F 4 ` +
+      `/P ${PAGE} /V (child-two) /DA (/Helv 0 Tf 0 g) >>`,
+    `<< /Type /Annot /Subtype /Widget /FT /Tx /T (noexport) /Ff 4 /Rect [50 640 250 660] /F 4 ` +
+      `/P ${PAGE} /V (secret) /DA (/Helv 0 Tf 0 g) >>`,
+    `<< /Type /Annot /Subtype /Widget /FT /Tx /T (empty) /Rect [50 610 250 630] /F 4 ` +
+      `/P ${PAGE} /DA (/Helv 0 Tf 0 g) >>`,
+    `<< /Type /Annot /Subtype /Widget /FT /Tx /T (plain) /Rect [50 580 250 600] /F 4 ` +
+      `/P ${PAGE} /V (visible) /DA (/Helv 0 Tf 0 g) >>`,
+    button('btnParent', '300 700 420 720', `<< /S /SubmitForm /F ${URLSPEC('parent')} /Fields [(parent)] >>`),
+    button('btnAll', '300 670 420 690', `<< /S /SubmitForm /F ${URLSPEC('all')} /Flags 2 >>`),
+    button(
+      'btnVeto',
+      '300 640 420 660',
+      `<< /S /SubmitForm /F ${URLSPEC('veto')} /Fields [(noexport) (btnParent) (plain)] >>`,
+    ),
+    button('btnJs', '300 610 420 630', `<< /S /JavaScript /JS ${jsSubmit} >>`),
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+  ];
+  writeFileSync(resolve(here, 'action_submit_form.pdf'), buildPdf(objects));
+}
+
 console.log(
-  'wrote action_payloads.pdf + action_buttons_form.pdf + action_triggers.pdf + action_open_chain.pdf + action_hover_colors.pdf + open_action_dest.pdf',
+  'wrote action_payloads.pdf + action_buttons_form.pdf + action_triggers.pdf + action_open_chain.pdf + action_hover_colors.pdf + action_doc_events.pdf + action_submit_form.pdf + open_action_dest.pdf',
 );

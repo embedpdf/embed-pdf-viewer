@@ -354,7 +354,42 @@ export function installAcroJs(g: Record<string, unknown>): void {
     }
   };
   doc.print = () => state?.uiEffects.push({ kind: 'print' });
-  doc.submitForm = () => blocked('submitForm');
+  // Acrobat's doc.submitForm: positional (cURL, bFDF, bEmpty, aFields) or a
+  // single argument object ({cURL, aFields, bEmpty, cSubmitAs, bGet}). It
+  // emits a submit INTENT — resolution (Table 239/240 semantics) and the
+  // sink chain (embedder handler → the document's home → blocked) live
+  // outside the VM; nothing here touches a network.
+  doc.submitForm = (cUrlOrArgs?: unknown, bFDF?: unknown, bEmpty?: unknown, aFields?: unknown) => {
+    if (!state) return;
+    const args: AnyRecord =
+      cUrlOrArgs !== null && typeof cUrlOrArgs === 'object'
+        ? (cUrlOrArgs as AnyRecord)
+        : { cURL: cUrlOrArgs, bFDF: bFDF, bEmpty: bEmpty, aFields: aFields };
+    const names = Array.isArray(args.aFields)
+      ? (args.aFields as unknown[]).map((name) => String(name))
+      : null;
+    const submitAs = args.cSubmitAs === undefined ? undefined : String(args.cSubmitAs).toUpperCase();
+    const format =
+      submitAs === 'FDF'
+        ? 'fdf'
+        : submitAs === 'XFDF'
+          ? 'xfdf'
+          : submitAs === 'HTML'
+            ? 'html'
+            : submitAs === 'PDF'
+              ? 'pdf'
+              : args.bFDF === false
+                ? 'html'
+                : undefined;
+    state.uiEffects.push({
+      kind: 'submitForm',
+      url: args.cURL === undefined || args.cURL === null ? null : String(args.cURL),
+      fieldNames: names,
+      includeEmpty: Boolean(args.bEmpty),
+      ...(format === undefined ? {} : { format }),
+      ...(args.bGet === undefined ? {} : { method: args.bGet ? 'get' : 'post' }),
+    });
+  };
   doc.mailDoc = () => blocked('mailDoc');
   doc.getURL = () => blocked('getURL');
 
@@ -536,18 +571,23 @@ export function installAcroJs(g: Record<string, unknown>): void {
       eventInput.value !== undefined
         ? cloneValue(eventInput.value)
         : cloneValue(target?.value ?? null);
+    const eventType =
+      eventInput.type !== undefined
+        ? String(eventInput.type)
+        : eventInput.kind === 'name-tree-boot'
+          ? 'Doc'
+          : 'Field';
     const event: AnyRecord = {
       // Explicit type/name (action-driven runs, from trigger provenance)
       // beat the kind-derived defaults (the K/V/C/F pipeline path).
       name: eventInput.name !== undefined
         ? String(eventInput.name)
         : eventName(String(eventInput.kind ?? '')),
-      type: eventInput.type !== undefined
-        ? String(eventInput.type)
-        : eventInput.kind === 'name-tree-boot'
-          ? 'Doc'
-          : 'Field',
-      target: target?.wrapper ?? null,
+      type: eventType,
+      // Doc-typed events target the Doc object (Acrobat's WillSave
+      // boilerplate does `event.target.getField(...)`); field targets win
+      // when present (a widget-anchored run).
+      target: target?.wrapper ?? (eventType === 'Doc' ? doc : null),
       targetName: String(target?.input.name ?? ''),
       source: source?.wrapper ?? { source: doc },
       value: initialValue,

@@ -265,18 +265,44 @@ describe('AcroJS prelude', () => {
     expect(out.uiEffects).toEqual([]);
   });
 
-  it('keeps submitForm inert and reports the policy decision', () => {
+  it('doc.submitForm emits a submit INTENT effect (object and positional forms)', () => {
     const vm = createVm();
     const out = plain(
       vm.__acrojsRun(
-        `this.submitForm({ cURL: 'https://example.com/collect' });`,
+        `this.submitForm({ cURL: 'https://example.com/collect', aFields: ['a', 'b'],
+           bEmpty: true, cSubmitAs: 'XFDF', bGet: true });
+         this.submitForm('https://example.com/plain');
+         this.submitForm('https://example.com/html', false, false, ['c']);`,
         input([], { kind: 'name-tree-boot' }),
       ),
     );
 
     expect(out.formEffects).toEqual([]);
-    expect(out.diagnostics).toEqual([
-      { code: 'blocked-network', message: 'submitForm is blocked by the scripting policy' },
+    expect(out.diagnostics).toEqual([]);
+    expect(out.uiEffects).toEqual([
+      {
+        kind: 'submitForm',
+        url: 'https://example.com/collect',
+        fieldNames: ['a', 'b'],
+        includeEmpty: true,
+        format: 'xfdf',
+        method: 'get',
+      },
+      // Positional default: FDF via POST, whole eligible form.
+      {
+        kind: 'submitForm',
+        url: 'https://example.com/plain',
+        fieldNames: null,
+        includeEmpty: false,
+      },
+      // bFDF === false is Acrobat's HTML-format switch.
+      {
+        kind: 'submitForm',
+        url: 'https://example.com/html',
+        fieldNames: ['c'],
+        includeEmpty: false,
+        format: 'html',
+      },
     ]);
   });
 
@@ -294,14 +320,15 @@ describe('AcroJS prelude', () => {
     expect(out.formEffects).toEqual([]);
   });
 
-  it('ships conservative defaults and the explicit V1 event matrix', () => {
+  it('ships conservative defaults and the SHIPPED event matrix (phases 1-4)', () => {
     expect(DEFAULT_SCRIPT_SECURITY_POLICY.enabled).toBe(false);
-    expect(DEFAULT_SCRIPT_SECURITY_POLICY.submitForm).toBe('blocked');
+    expect(DEFAULT_SCRIPT_SECURITY_POLICY.submitForm).toBe('sink-chain');
     expect(DEFAULT_SCRIPT_SECURITY_POLICY.executionOwner).toBe('originating-client-only');
     expect(SCRIPT_EVENT_MATRIX.field.calculate).toBe('execute-in-calculation-order');
     expect(SCRIPT_EVENT_MATRIX.annotation.widgetActivate).toBe('execute-on-originating-client');
-    expect(SCRIPT_EVENT_MATRIX.annotation.other).toBe('preserve-only');
-    expect(SCRIPT_EVENT_MATRIX.openAction).toBe('preserve-only');
+    expect(SCRIPT_EVENT_MATRIX.annotation.other).toBe('execute-full-matrix');
+    expect(SCRIPT_EVENT_MATRIX.openAction).toBe('execute-lifecycle');
+    expect(SCRIPT_EVENT_MATRIX.catalogLifecycle).toBe('execute-on-verb');
   });
 
   it('linearizes complete /Next action trees without executing non-JavaScript nodes', () => {

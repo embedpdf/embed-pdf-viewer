@@ -4,11 +4,11 @@
   "artifacts": {
     "wasm32": {
       "url": "file:///Users/bobsingor/GitHub/cloudpdf-platform/oss/embedpdf/packages/engine/runtime/runtime-src/out/embedpdf-runtime-artifacts/libembedpdf-runtime-wasm32-e4174c4f9.tar.gz",
-      "sha256": "9da003ba8d10d77ebf822ec9e0e0ad6ed4c74c16334f1b945e24af627f028214"
+      "sha256": "8487812da6635427bb6bacd9a8ee3452b690edc4686f257d0e28086d014cb986"
     },
     "darwin-arm64": {
       "url": "file:///Users/bobsingor/GitHub/cloudpdf-platform/oss/embedpdf/packages/engine/runtime/runtime-src/out/embedpdf-runtime-artifacts/libembedpdf-runtime-darwin-arm64-e4174c4f9.tar.gz",
-      "sha256": "1b1938b3fcd87fc0c485d4c00b3eb0ac48935a6922f2e100220e74174eda4358"
+      "sha256": "3d01246bc722843e08fc77d62d748b9ebe6031d451ef13c69c746ec8ed6309b4"
     }
   }
 }

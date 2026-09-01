@@ -31,6 +31,10 @@ const PENDING = new Set([
   'toolbar',
   'link',
   'redaction',
+  // The anchored-overlay vertical (React, Aug 2026) — deferred consciously
+  // with Phase 4's actions port; lands with the annotation vertical it
+  // serves.
+  'anchored',
 ]);
 
 const reactPkg = JSON.parse(

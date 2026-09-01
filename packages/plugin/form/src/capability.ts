@@ -14,7 +14,16 @@ import {
 import { DocumentsToken, type PluginContext } from '@embedpdf/core';
 import { ActionsToken, createHoverPump } from '@embedpdf/plugin-actions/contract';
 import { ActionsToken as ActionsHostToken } from '@embedpdf/plugin-actions/contract/host';
-import type { ActionOrigin, ActionSource } from '@embedpdf/plugin-actions/contract';
+import type {
+  ActionContext,
+  ActionDiagnostic,
+  ActionOrigin,
+  ActionSource,
+  ActionSubmitRequest,
+  SubmitIntent,
+} from '@embedpdf/plugin-actions/contract';
+
+import { buildSubmitEntries, resolveFieldSelection } from './field-selection';
 import { AnnotationToken as AnnotationHostToken } from '@embedpdf/plugin-annotation/contract/host';
 
 import {
@@ -327,90 +336,118 @@ export function createFormCapability(
     diagnostics: [],
   };
 
+  /**
+   * The shared reset core: one effects batch → refresh → V/C/F
+   * recalculation when the transaction port is present. Ridden by BOTH
+   * doors — the /ResetForm executor and the public `reset(key)` — so the
+   * two can never diverge again (the "reset() asymmetry" fix). `origin` is
+   * PRESERVED through recalculation surfacing: a lifecycle/hover ResetForm
+   * can no longer launder its alerts into user origin.
+   */
+  const applyResetBatch = async (
+    refs: FormFieldRef[],
+    origin: ActionOrigin,
+  ): Promise<FormCommitResult> => {
+    const doc = ctx.doc;
+    if (!doc) throw new Error('no document');
+    if (!doc.forms.applyEffects) {
+      const result: FormCommitResult = {
+        ...NOT_SCRIPTED,
+        diagnostics: [
+          { code: 'unsupported-api', message: 'this engine has no form-effects batch door' },
+        ],
+      };
+      surfaceViaActions(result, origin);
+      return result;
+    }
+    // Zero refs must NEVER reach the engine (the applier throws InvalidArg
+    // on an empty reset) — `[] + include` is a valid action that resets
+    // nothing. `effectsResult: null` tells the executor this was inert.
+    if (refs.length === 0) return NOT_SCRIPTED;
+    const effectsResult = await doc.forms.applyEffects([{ kind: 'reset', refs }]);
+    // The batch is non-rollback-atomic and resolves with per-effect
+    // statuses instead of throwing — reflect a rejected/failed reset
+    // honestly (the executor maps 'failed' to a failed chain node).
+    const resetFailed = effectsResult.results.some(
+      (entry) => entry.status === 'failed' || entry.status === 'rejected',
+    );
+    await refresh(true);
+    if (resetFailed) {
+      return {
+        status: 'failed',
+        scripted: false,
+        effectsResult,
+        uiEffects: [],
+        diagnostics: [],
+      };
+    }
+    // Acrobat recalculates after a reset; boot rides along lazily.
+    let recalc: FormCommitResult | null = null;
+    if (scripting) {
+      recalc = await scripting.recalculate();
+      surfaceViaActions(recalc, origin);
+      if (recalc.effectsResult !== null) await refresh(true);
+    }
+    return {
+      status: 'applied',
+      scripted: recalc !== null,
+      effectsResult,
+      uiEffects: recalc?.uiEffects ?? [],
+      diagnostics: recalc?.diagnostics ?? [],
+      ...(recalc?.error ? { error: recalc.error } : {}),
+    };
+  };
+
   const resetFormAction = (
     targets: PdfActionTargetRef[] | null,
     exclude: boolean,
+    origin: ActionOrigin = 'user',
   ): Promise<FormCommitResult> =>
     enqueueMutation(async () => {
       const doc = ctx.doc;
       if (!doc) throw new Error('no document');
-      if (!doc.forms.applyEffects) {
-        const result: FormCommitResult = {
-          ...NOT_SCRIPTED,
-          diagnostics: [
-            { code: 'unsupported-api', message: 'this engine has no form-effects batch door' },
-          ],
-        };
-        surfaceViaActions(result, 'user');
-        return result;
-      }
       const snapshot = await doc.forms.list();
-      const all = snapshot.fields;
-      let resolved: typeof all;
-      if (targets === null) {
-        // `/Fields` absent → reset everything; `exclude` is meaningless.
-        resolved = all;
-      } else {
-        const matched = new Set(
-          targets
-            .map((t) =>
-              t.kind === 'name'
-                ? all.find((f) => f.name === t.name)
-                : all.find(
-                    (f) =>
-                      f.ref.kind === 'objectNumber' &&
-                      f.ref.fieldObjectNumber === t.objectNumber,
-                  ),
-            )
-            .filter((f): f is (typeof all)[number] => f !== undefined),
-        );
-        resolved = exclude ? all.filter((f) => !matched.has(f)) : all.filter((f) => matched.has(f));
-      }
+      // The shared ISO selection (Tables 241/242): a parent NAME resets its
+      // descendants too — the exact-match resolution this replaces was a
+      // conformance bug.
+      const { selected } = resolveFieldSelection(snapshot.fields, targets, exclude);
       // ResetForm SKIPS fields with nothing to restore — the engine's batch
       // applier refuses pushbutton/signature refs outright (validateEffect),
       // and an exclude-mode complement always sweeps in the form's buttons.
-      const resettable = resolved.filter(
+      const resettable = selected.filter(
         (f) => f.family !== 'pushbutton' && f.family !== 'signature',
       );
-      // Zero refs must NEVER reach the engine (the applier throws InvalidArg
-      // on an empty reset) — `[] + include` is a valid action that resets
-      // nothing. `effectsResult: null` tells the executor this was inert.
-      if (resettable.length === 0) return NOT_SCRIPTED;
-      const effectsResult = await doc.forms.applyEffects([
-        { kind: 'reset', refs: resettable.map((f) => f.ref) },
-      ]);
-      // The batch is non-rollback-atomic and resolves with per-effect
-      // statuses instead of throwing — reflect a rejected/failed reset
-      // honestly (the executor maps 'failed' to a failed chain node).
-      const resetFailed = effectsResult.results.some(
-        (entry) => entry.status === 'failed' || entry.status === 'rejected',
+      return applyResetBatch(
+        resettable.map((f) => f.ref),
+        origin,
       );
-      await refresh(true);
-      if (resetFailed) {
-        return {
-          status: 'failed',
-          scripted: false,
-          effectsResult,
-          uiEffects: [],
-          diagnostics: [],
-        };
-      }
-      // Acrobat recalculates after a reset; boot rides along lazily.
-      let recalc: FormCommitResult | null = null;
-      if (scripting) {
-        recalc = await scripting.recalculate();
-        surfaceViaActions(recalc, 'user');
-        if (recalc.effectsResult !== null) await refresh(true);
-      }
-      return {
-        status: 'applied',
-        scripted: recalc !== null,
-        effectsResult,
-        uiEffects: recalc?.uiEffects ?? [],
-        diagnostics: recalc?.diagnostics ?? [],
-        ...(recalc?.error ? { error: recalc.error } : {}),
-      };
     });
+
+  /**
+   * The submit dataset resolver (Phase 4, D7): a FRESH engine read — never
+   * the cached model, so no staleness class exists — then the pure ISO
+   * builder. Selection/veto/value semantics live in `field-selection.ts`;
+   * this door only supplies the live fields and assembles the request.
+   */
+  const resolveSubmitDataset = async (
+    intent: SubmitIntent,
+    actionCtx: ActionContext,
+    diagnose: (diagnostic: ActionDiagnostic) => void,
+  ): Promise<ActionSubmitRequest> => {
+    const doc = ctx.doc;
+    if (!doc) throw new Error('no document');
+    const snapshot = await doc.forms.list();
+    return {
+      url: intent.url,
+      method: intent.method,
+      format: intent.format,
+      flagsRaw: intent.flagsRaw,
+      ...(intent.charSet === undefined ? {} : { charSet: intent.charSet }),
+      entries: buildSubmitEntries(snapshot.fields, intent, diagnose),
+      origin: actionCtx.origin,
+      event: actionCtx.event,
+    };
+  };
 
   // ── widget DOM-event feed helpers ───────────────────────────────────────
   const widgetSource = (key: FieldKey, annotationRef: AnnotationRef): ActionSource => ({
@@ -581,8 +618,27 @@ export function createFormCapability(
         if (!doc) return;
         apply({ t: 'writeStart', key });
         try {
-          const result = await doc.forms.reset(refKeyOf(key));
-          apply({ t: 'writeDone', key, field: result.field });
+          if (doc.forms.applyEffects) {
+            // The reset() SYMMETRY fix: this door now rides the SAME core a
+            // /ResetForm action does — one reset effect, then V/C/F
+            // recalculation — so a dependent /C total can never go stale
+            // through the public API while staying fresh through the action.
+            const result = await applyResetBatch([refKeyOf(key)], 'user');
+            if (result.status === 'failed') {
+              throw new Error(
+                result.effectsResult?.results.find(
+                  (entry) => entry.status === 'failed' || entry.status === 'rejected',
+                )?.error?.message ?? 'reset failed',
+              );
+            }
+            const field = fieldByKey(model(), key);
+            if (field) apply({ t: 'writeDone', key, field });
+            else apply({ t: 'writeFailed', key });
+          } else {
+            // Batch-less engines keep the direct single-field door.
+            const result = await doc.forms.reset(refKeyOf(key));
+            apply({ t: 'writeDone', key, field: result.field });
+          }
         } catch (err) {
           apply({ t: 'writeFailed', key });
           throw err;
@@ -656,6 +712,7 @@ export function createFormCapability(
     },
     // Host lens (the actions plugin's executors/sinks) — FormHostCapability.
     resetFormAction,
+    resolveSubmitDataset,
     commitScriptFormEffects: async (effects) => {
       const doc = ctx.doc;
       if (!doc?.forms.applyEffects) {

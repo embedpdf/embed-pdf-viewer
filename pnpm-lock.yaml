@@ -1123,6 +1123,9 @@ importers:
       '@embedpdf/core-stage':
         specifier: workspace:*
         version: link:../../core/stage
+      '@embedpdf/plugin-actions':
+        specifier: workspace:*
+        version: link:../../plugin/actions
       '@embedpdf/plugin-interaction':
         specifier: workspace:*
         version: link:../../plugin/interaction
