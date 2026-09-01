@@ -7,3 +7,5 @@ New `@embedpdf/react/actions` entry with `useActionsUiAdapter` (browser-default 
 Widget fill controls become always-active `/AA` event surfaces, link anchors feed link hover events, and scripting-provider defaults use the dispatch origin when deciding whether to suppress lifecycle/boot UI effects.
 
 Route sibling feature dependencies through plugin contract/helper entries. Annotation selection hooks and anchor equality helpers are split into leaf modules so form and annotation-menu entries no longer import the full annotation feature implementation.
+
+Render PDF list boxes as visible native scrolling controls in both form surfaces, with stable optimistic selection and wheel isolation so row hit-testing, selection, and scrolling stay synchronized while engine writes complete. Combo boxes retain their baked resting appearance and native popup behavior.

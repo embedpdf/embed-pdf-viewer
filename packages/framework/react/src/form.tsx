@@ -17,8 +17,10 @@
  *               re-bakes the /AP, the refreshed picture replaces the editor.
  *      toggle → the picture is the whole control; click writes the toggled
  *               value; the re-baked appearance shows the new check state.
- *      choice → an invisible native <select> over the picture (v2's trick):
- *               the browser owns the dropdown, the engine owns the pixels.
+ *      combo  → an invisible native <select> over the picture: the browser
+ *               owns the dropdown, the engine owns the resting pixels.
+ *      list   → a visible native <select>: one surface owns pixels, row
+ *               hit-testing, keyboard selection, and scrolling.
  *      button → native keyboard/click target over the picture; activation is
  *               delegated to the form plugin's isolated scripting pipeline.
  *
@@ -57,6 +59,7 @@ import {
   useSelector,
 } from './runtime';
 import type { PageContextValue } from './runtime';
+import { NativeListBox } from './form-listbox';
 
 /** Content rect → a view-px box (the page wrapper's own coordinate space). */
 function viewBox(r: Rect, page: PageContextValue) {
@@ -398,16 +401,27 @@ function ToggleWidget({ fill, item, page, appearance }: WidgetProps<'toggle'>) {
   );
 }
 
-function ChoiceWidget({ fill, item, page, appearance }: WidgetProps<'choice'>) {
-  const form = useCapability(FormToken);
-  const wrap = useIsolated<HTMLDivElement>();
+function ChoiceWidget(props: WidgetProps<'choice'>) {
+  return props.fill.kind === 'list' ? <ListBoxWidget {...props} /> : <ComboBoxWidget {...props} />;
+}
+
+function ChoiceFrame({
+  fill,
+  item,
+  page,
+  focused,
+  innerRef,
+  children,
+}: Pick<WidgetProps<'choice'>, 'fill' | 'item' | 'page'> & {
+  focused: boolean;
+  innerRef: React.RefObject<HTMLDivElement>;
+  children: React.ReactNode;
+}) {
   const events = useWidgetEvents(fill.key, item.ref);
-  const [focused, setFocused] = useState(false);
   const b = viewBox(item.box, page);
-  const multiple = fill.kind === 'list' && fill.multi;
   return (
     <div
-      ref={wrap}
+      ref={innerRef}
       {...events}
       style={{
         position: 'absolute',
@@ -415,20 +429,30 @@ function ChoiceWidget({ fill, item, page, appearance }: WidgetProps<'choice'>) {
         top: b.top,
         width: b.width,
         height: b.height,
-        pointerEvents: 'auto', // always the event surface; the select self-gates
+        pointerEvents: 'auto',
         outline: focused ? '2px solid rgba(66, 133, 244, 0.8)' : 'none',
         outlineOffset: -2,
       }}
     >
+      {children}
+    </div>
+  );
+}
+
+function ComboBoxWidget({ fill, item, page, appearance }: WidgetProps<'choice'>) {
+  const form = useCapability(FormToken);
+  const wrap = useIsolated<HTMLDivElement>();
+  const [focused, setFocused] = useState(false);
+  const b = viewBox(item.box, page);
+  return (
+    <ChoiceFrame fill={fill} item={item} page={page} focused={focused} innerRef={wrap}>
       <Picture page={page} appearance={appearance} apBox={item.apBox} frame={b} />
-      {/* v2's trick: an invisible NATIVE select owns the dropdown/keyboard;
-          the engine's baked appearance stays the visible value. Keyed +
-          uncontrolled so an in-flight write never snaps the selection back. */}
+      {/* A combo's popup is separate from its resting box, so the baked
+          appearance and transparent native trigger do not maintain competing
+          in-place row geometry or scroll state. */}
       <select
         key={fill.selected.join('\0')}
-        multiple={multiple}
-        size={fill.kind === 'list' ? Math.max(2, fill.options.length) : undefined}
-        defaultValue={multiple ? fill.selected : (fill.selected[0] ?? '')}
+        defaultValue={fill.selected[0] ?? ''}
         aria-label={fill.label}
         disabled={fill.disabled}
         onFocus={() => setFocused(true)}
@@ -452,7 +476,51 @@ function ChoiceWidget({ fill, item, page, appearance }: WidgetProps<'choice'>) {
           </option>
         ))}
       </select>
-    </div>
+    </ChoiceFrame>
+  );
+}
+
+function ListBoxWidget({ fill, item, page }: WidgetProps<'choice'>) {
+  const form = useCapability(FormToken);
+  const wrap = useIsolated<HTMLDivElement>();
+  const [focused, setFocused] = useState(false);
+  const b = viewBox(item.box, page);
+  const scale = item.box.width > 0 ? b.width / item.box.width : 1;
+  const strokeWidth = item.style.strokeWidth * scale;
+  const borderStyle = item.style.border.kind === 'dashed' ? 'dashed' : 'solid';
+  return (
+    <ChoiceFrame fill={fill} item={item} page={page} focused={focused} innerRef={wrap}>
+      <NativeListBox
+        ariaLabel={fill.label}
+        disabled={fill.disabled}
+        multi={fill.multi}
+        options={fill.options}
+        selected={fill.selected}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+        onSelect={(values) => form.choose(fill.key, values)}
+        style={{
+          position: 'absolute',
+          inset: 0,
+          width: '100%',
+          height: '100%',
+          boxSizing: 'border-box',
+          margin: 0,
+          padding: 0,
+          borderWidth: strokeWidth,
+          borderStyle,
+          borderColor: item.style.color,
+          borderRadius: 0,
+          outline: 'none',
+          background: item.style.interiorColor ?? '#fff',
+          color: item.text?.fontColor ?? '#000',
+          fontFamily: item.text?.fontFamily ?? 'Helvetica, Arial, sans-serif',
+          fontSize: (item.text?.fontSize || 12) * scale,
+          textAlign: item.text?.textAlign ?? 'left',
+          cursor: fill.disabled ? 'default' : 'pointer',
+        }}
+      />
+    </ChoiceFrame>
   );
 }
 
@@ -622,32 +690,45 @@ function FillChoice({
 }) {
   const form = useCapability(FormToken);
   const css = fillBox(item, page);
+  if (item.kind === 'list') {
+    return (
+      <FillEventBox item={item} page={page}>
+        <NativeListBox
+          ariaLabel={item.label}
+          disabled={item.disabled}
+          multi={item.multi}
+          options={item.options}
+          selected={item.selected}
+          onSelect={(values) => form.choose(item.key, values)}
+          style={{
+            ...controlBase,
+            ...fillControl,
+            fontSize: Math.max(9, Math.min(css.height * 0.55, 18)),
+          }}
+        />
+      </FillEventBox>
+    );
+  }
   return (
     <FillEventBox item={item} page={page}>
-    <select
-      aria-label={item.label}
-      multiple={item.multi}
-      disabled={item.disabled}
-      value={item.multi ? item.selected : (item.selected[0] ?? '')}
-      onChange={(e) => {
-        const values = item.multi
-          ? Array.from(e.target.selectedOptions).map((o) => o.value)
-          : [e.target.value];
-        void form.choose(item.key, values);
-      }}
-      style={{
-        ...controlBase,
-        ...fillControl,
-        fontSize: Math.max(9, Math.min(css.height * 0.55, 18)),
-      }}
-    >
-      {!item.multi && item.selected.length === 0 && <option value="" />}
-      {item.options.map((o) => (
-        <option key={o.value} value={o.value}>
-          {o.label}
-        </option>
-      ))}
-    </select>
+      <select
+        aria-label={item.label}
+        disabled={item.disabled}
+        value={item.selected[0] ?? ''}
+        onChange={(e) => void form.choose(item.key, [e.target.value])}
+        style={{
+          ...controlBase,
+          ...fillControl,
+          fontSize: Math.max(9, Math.min(css.height * 0.55, 18)),
+        }}
+      >
+        {item.selected.length === 0 && <option value="" />}
+        {item.options.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
+        ))}
+      </select>
     </FillEventBox>
   );
 }
