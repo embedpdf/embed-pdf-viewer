@@ -34,10 +34,9 @@ describe('Adobe boot-script boilerplate (i-140, hybrid-XFA AcroForm)', () => {
       const controller = createFormScriptingController({
         doc,
         document: () => null,
-        config: { enabled: true },
-        sandboxFactory: async () => createQuickJsSandbox(),
+        config: { sandboxFactory: async () => createQuickJsSandbox() },
       });
-      const result = await controller.commit(snapshot, text.ref, {
+      const result = await controller.commit(text.ref, {
         type: 'text',
         value: 'FAMILY-NAME',
       });

@@ -11,8 +11,9 @@ import {
   type PieceInfoPatch,
 } from '@embedpdf/engine-core/runtime';
 import { type PluginContext } from '@embedpdf/core';
-import { AnnotationToken } from '@embedpdf/plugin-annotation';
-import { createFormScriptingController, type FormCommitResult } from '@embedpdf/plugin-form';
+import { AnnotationToken } from '@embedpdf/plugin-annotation/contract';
+import type { FormCommitResult } from '@embedpdf/plugin-form/contract';
+import { createFormScriptingController } from '@embedpdf/plugin-form/scripting';
 
 import type {
   AddAssetInput,
@@ -620,19 +621,14 @@ export function createStampCapability(
         );
       }
 
-      const scriptingConfig = config.scripting;
+      // The DETACHED stamp-asset document gets its OWN standalone realm —
+      // never the viewer document's shared host (realm isolation; WP4).
       scripting = createFormScriptingController({
         doc,
         document: () => targetMeta,
-        config: scriptingConfig,
-        sandboxFactory:
-          scriptingConfig.sandboxFactory ??
-          (() =>
-            import('@embedpdf/core-js-sandbox').then(({ createQuickJsSandbox }) =>
-              createQuickJsSandbox(),
-            )),
+        config: config.scripting,
       });
-      const result = await scripting.recalculate(snapshot);
+      const result = await scripting.recalculate();
       surfaceScriptingResult(result);
       if (result.status === 'failed') {
         throw new EngineError(

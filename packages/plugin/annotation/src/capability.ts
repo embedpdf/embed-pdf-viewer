@@ -20,8 +20,12 @@ import {
   type PdfLinkTarget,
   type PdfRect,
 } from '@embedpdf/engine-core/runtime';
-import { InteractionToken } from '@embedpdf/plugin-interaction';
-import { SelectionToken as SelectionPublicToken } from '@embedpdf/plugin-selection';
+import { ActionsToken as PublicActionsToken } from '@embedpdf/plugin-actions/contract';
+import { scriptColorToRgb } from '@embedpdf/core-acrojs';
+import type { ScriptAnnotEffect, ScriptColorArray } from '@embedpdf/core-acrojs';
+import type { AnnotCommitResult } from '@embedpdf/plugin-actions/contract/host';
+import { InteractionToken } from '@embedpdf/plugin-interaction/contract';
+import { SelectionToken as SelectionPublicToken } from '@embedpdf/plugin-selection/contract';
 import {
   canMove,
   chrome as coreChrome,
@@ -80,6 +84,7 @@ import {
   toScopedPatch,
   writableTarget,
 } from './repository';
+import { createAnnotationHoverFeed } from './hover-feed';
 import { buildTextItems } from './text-item';
 import { buildToolRegistry, isTouchDirect } from './tools';
 import type { AnnotationToolInput, ResolvedTool } from './tools';
@@ -141,6 +146,13 @@ export function createAnnotationCapability(
   let filePickerProvider: FilePickerProvider | null = null;
 
   const model = (): Model => ctx.getState().model;
+
+  // The E/X trigger feed (actions plugin present): driven ONLY from the
+  // pointer-driven hoverAt diff below — see hover-feed.ts for the law.
+  const actionsForHover = ctx.tryGet(PublicActionsToken);
+  const hoverFeed = actionsForHover
+    ? createAnnotationHoverFeed(actionsForHover, (id) => model().byId[id] ?? null)
+    : null;
   const chromeSettings = (): ChromeSettings => ctx.getState().chrome;
 
   /**
@@ -359,7 +371,21 @@ export function createAnnotationCapability(
       const target =
         a.link ?? (a.data?.subtype === 'link' ? (a.data.target ?? null) : null);
       if (target == null || a.geom.t !== 'rect') continue;
-      v.push({ id, rect: a.geom.rect, target, attached: a.group !== undefined });
+      const activate = a.data?.actions?.activate;
+      const ref = a.ref ?? a.data?.ref ?? undefined;
+      const hoverEnter = Boolean(a.data?.actions?.cursorEnter?.root);
+      const hoverExit = Boolean(a.data?.actions?.cursorExit?.root);
+      v.push({
+        id,
+        rect: a.geom.rect,
+        target,
+        attached: a.group !== undefined,
+        ...(activate ? { activate } : {}),
+        ...(ref ? { ref } : {}),
+        ...(hoverEnter || hoverExit
+          ? { hoverEvents: { enter: hoverEnter, exit: hoverExit } }
+          : {}),
+      });
     }
     linkItemsCache.set(pon, { model: m, v });
     return v;
@@ -1137,7 +1163,8 @@ export function createAnnotationCapability(
   const allowsMutation = (action: 'update' | 'delete', ref: AnnotationRef): boolean =>
     ctx.doc?.security.allowsAnnotationMutation(action, mutationTarget(ref)) ?? false;
   const deletableOne = (ref: AnnotationRef): boolean => {
-    const a = model().byId[refKey(ref)];
+    const m = model();
+    const a = m.byId[refKey(ref)];
     return !!a && annotDeletable(a);
   };
   const threadMemberRefs = (t: CommentThread): AnnotationRef[] => [
@@ -1240,7 +1267,8 @@ export function createAnnotationCapability(
         canReply: allowsCreate(),
         canSetStatus: allowsCreate(),
         canEditText: (() => {
-          const a = model().byId[refKey(ref)];
+          const m = model();
+          const a = m.byId[refKey(ref)];
           return !!a && annotContentsEditable(a);
         })(),
         canDelete: deletableOne(ref),
@@ -1506,6 +1534,7 @@ export function createAnnotationCapability(
     } else if (fx.fx === 'syncLink') {
       void scheduleLinkSync(fx.id, { target: fx.target });
     } else {
+      const deletedId = refKey(fx.ref);
       doc
         .page(fx.ref.pageObjectNumber)
         .annotations.delete(fx.ref)
@@ -1515,6 +1544,65 @@ export function createAnnotationCapability(
         );
     }
   }
+
+  const reloadPageNow = async (pon: number): Promise<void> => {
+    const doc = ctx.doc;
+    const crop = cropOf(pon);
+    if (!doc || !crop) return;
+    try {
+      const snap = await doc.page(pon).annotations.list();
+      // Replace, not merge: drop this page's current annots first so
+      // cross-plane deletions (deleteField) actually disappear.
+      const m = model();
+      const stale = m.order.filter((id) => m.byId[id]?.pon === pon);
+      if (stale.length) apply({ t: 'remove', ids: stale });
+      apply({ t: 'loaded', annots: snap.annotations.map((d) => ingestDTO(d, crop)) });
+    } catch {
+      // A failed reload leaves the previous view; the next event or a
+      // rehydrate reconciles.
+    }
+  };
+
+  /** Script patch → the engine's per-kind patch vocabulary. Colors cross the
+   *  Acrobat-array → engine {r,g,b}/255 boundary here; everything else maps
+   *  one-to-one (the VM's validity matrix already scoped keys per kind). */
+  const engineScriptPatch = (
+    subtype: string,
+    patch: ScriptAnnotEffect['patch'],
+  ): Record<string, unknown> | Error => {
+    const out: Record<string, unknown> = { subtype };
+    const toEngineColor = (color: ScriptColorArray) => {
+      const rgb = scriptColorToRgb(color);
+      return rgb
+        ? {
+            r: Math.round(rgb.r * 255),
+            g: Math.round(rgb.g * 255),
+            b: Math.round(rgb.b * 255),
+          }
+        : null;
+    };
+    if (patch.strokeColor) {
+      const color = toEngineColor(patch.strokeColor);
+      if (!color) return new Error('transparent stroke colours are not supported');
+      out.color = color;
+    }
+    if (patch.fillColor) out.interiorColor = toEngineColor(patch.fillColor);
+    if (patch.opacity !== undefined) out.opacity = patch.opacity;
+    if (patch.width !== undefined) out.strokeWidth = patch.width;
+    if (patch.borderStyle) out.borderStyle = patch.borderStyle === 'D' ? 'dashed' : 'solid';
+    if (patch.dash) out.dashArray = patch.dash;
+    if (patch.rect) {
+      out.rect = {
+        left: patch.rect[0],
+        bottom: patch.rect[1],
+        right: patch.rect[2],
+        top: patch.rect[3],
+      };
+    }
+    if (patch.contents !== undefined) out.contents = patch.contents;
+    if (patch.flags) out.flags = patch.flags;
+    return out;
+  };
 
   return {
     // ── data API: create / update / delete (engine-routed, ref-addressed) ──
@@ -1622,7 +1710,8 @@ export function createAnnotationCapability(
       return !!a && annotTransformable(a);
     },
     canDelete: (ref) => {
-      const a = model().byId[refKey(ref)];
+      const m = model();
+      const a = m.byId[refKey(ref)];
       return !!a && annotDeletable(a);
     },
 
@@ -1737,8 +1826,14 @@ export function createAnnotationCapability(
         );
         if (h.t === 'annot') id = h.id;
       }
-      // Diff HERE so the reducer sees enter/leave transitions only.
-      if (m.hovered !== id) apply({ t: 'hover', id });
+      // Diff HERE so the reducer sees enter/leave transitions only. The E/X
+      // feed hangs off THIS seam alone: reducer-side hover clears
+      // (session-hide, remove, reload) bypass it, so effect-induced hover
+      // loss never fires a cursor exit (the anti-cascade law).
+      if (m.hovered !== id) {
+        hoverFeed?.hover(id);
+        apply({ t: 'hover', id });
+      }
     },
     behaviorFor: (a) => behaviors.find((b) => b.matches(a) && b.engaged()) ?? null,
     linkItemsOn: (pon) => memoLinkItems(pon),
@@ -1992,23 +2087,7 @@ export function createAnnotationCapability(
     // that call it on mount; appearance fetching stays per-page/viewport.
     ensurePage: () => {},
 
-    reloadPage: async (pon) => {
-      const doc = ctx.doc;
-      const crop = cropOf(pon);
-      if (!doc || !crop) return;
-      try {
-        const snap = await doc.page(pon).annotations.list();
-        // Replace, not merge: drop this page's current annots first so
-        // cross-plane deletions (deleteField) actually disappear.
-        const m = model();
-        const stale = m.order.filter((id) => m.byId[id]?.pon === pon);
-        if (stale.length) apply({ t: 'remove', ids: stale });
-        apply({ t: 'loaded', annots: snap.annotations.map((d) => ingestDTO(d, crop)) });
-      } catch {
-        // A failed reload leaves the previous view; the next event or a
-        // rehydrate reconciles.
-      }
-    },
+    reloadPage: (pon) => reloadPageNow(pon),
 
     hydration: () => ctx.getState().hydration,
     ensureHydrated: () => {
@@ -2094,6 +2173,86 @@ export function createAnnotationCapability(
       apply({ t: 'endTextEdit' });
     },
 
+    // Full ISO (D7): every script/Hide effect is a DOCUMENT mutation — the
+    // owner commits it (engine write, authority-enforced there) and
+    // reconciles its own model, so the PDF and the pixels can never diverge.
+    commitScriptEffects: async (entries) => {
+      const doc = ctx.doc;
+      if (!doc) {
+        return {
+          results: entries.map((entry) => ({
+            annotObjectNumber: entry.annotObjectNumber,
+            status: 'failed' as const,
+            error: 'no document',
+          })),
+        };
+      }
+      const results: AnnotCommitResult['results'] = [];
+      const touchedPons = new Set<number>();
+      let failed = false;
+      for (const entry of entries) {
+        if (failed) {
+          results.push({ annotObjectNumber: entry.annotObjectNumber, status: 'skipped' });
+          continue;
+        }
+        const loaded = model().byId[`obj:${entry.annotObjectNumber}`];
+        const pon = loaded?.pon ?? entry.pageObjectNumber;
+        let ref = loaded?.ref ?? null;
+        let subtype: string | undefined = loaded?.subtype;
+        if ((!ref || !subtype) && pon !== undefined) {
+          // Engine fallback for pages the model hasn't loaded.
+          try {
+            const { annotations } = await doc.page(pon).annotations.list();
+            const dto = annotations.find(
+              (candidate) =>
+                candidate.ref.kind === 'objectNumber' &&
+                candidate.ref.annotObjectNumber === entry.annotObjectNumber,
+            );
+            if (dto) {
+              ref = dto.ref;
+              subtype = dto.subtype;
+            }
+          } catch {
+            /* resolved as a failure below */
+          }
+        }
+        if (pon === undefined || !ref || !subtype) {
+          results.push({
+            annotObjectNumber: entry.annotObjectNumber,
+            status: 'failed',
+            error: 'annotation not resolved (page not loaded)',
+          });
+          continue;
+        }
+        const patch = engineScriptPatch(subtype, entry.patch);
+        if (patch instanceof Error) {
+          results.push({
+            annotObjectNumber: entry.annotObjectNumber,
+            status: 'failed',
+            error: patch.message,
+          });
+          continue;
+        }
+        try {
+          await doc.page(pon).annotations.update(ref, patch as never);
+          touchedPons.add(pon);
+          results.push({ annotObjectNumber: entry.annotObjectNumber, status: 'applied' });
+        } catch (error) {
+          // Stop-on-failure: PermissionDenied and friends fail THIS entry and
+          // skip the rest — the declared cross-plane law, per-plane too.
+          failed = true;
+          results.push({
+            annotObjectNumber: entry.annotObjectNumber,
+            status: 'failed',
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
+      // Reconcile OUR model (the engine emitted local events both listeners
+      // deliberately ignore — the owner folds its own writes).
+      for (const touched of touchedPons) await reloadPageNow(touched);
+      return { results };
+    },
     registerBehavior: (b) => {
       behaviors.push(b);
       return () => {

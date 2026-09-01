@@ -11,10 +11,21 @@ import type {
   FormRepairOptions,
   FormRepairResult,
   FormSetValueResult,
+  FormEffect,
   FormEffectsResult,
   FormSnapshot,
+  PdfActionTargetRef,
   WidgetAppearance,
 } from '@embedpdf/engine-core/runtime';
+import type {
+  ActionContext,
+  ActionDiagnostic,
+  ActionOrigin,
+  ActionSubmitRequest,
+  ActionTriggerResult,
+  PdfAnnotationEventKind,
+  SubmitIntent,
+} from '@embedpdf/plugin-actions/contract';
 import type {
   ScriptBudget,
   ScriptDiagnostic,
@@ -32,9 +43,13 @@ export interface FormState {
   model: Model;
 }
 
+/**
+ * Standalone-realm configuration for `createFormScriptingHost` — stamp's
+ * detached documents and direct controller tests. Viewer documents configure
+ * scripting on `actionsPlugin({ javascript })` instead (D8), and every UI
+ * effect/diagnostic surfaces through the actions port (D9).
+ */
 export interface FormScriptingOptions {
-  /** Explicit opt-in. PDF JavaScript remains inert when false/omitted. */
-  enabled: boolean;
   /** Override the lazy QuickJS factory (tests or another isolated VM). */
   sandboxFactory?: ScriptSandboxFactory;
   /** Optional embedder identity fields layered over engine/JWT identity. */
@@ -46,15 +61,10 @@ export interface FormScriptingOptions {
   utcOffsetMinutes?: () => number;
   randomSeed?: () => number;
   budget?: ScriptBudget;
-  /** Framework/application port for app.alert, print, and page navigation. */
-  onUiEffect?: (effect: ScriptUiEffect) => void;
-  onDiagnostic?: (diagnostic: ScriptDiagnostic) => void;
-  onError?: (error: ScriptExecutionError) => void;
 }
 
-export interface FormPluginOptions {
-  scripting?: FormScriptingOptions;
-}
+/** The scripting switch moved to `actionsPlugin({ javascript })` (D8). */
+export interface FormPluginOptions {}
 
 export type FormCommitStatus = 'applied' | 'unchanged' | 'rejected' | 'failed';
 
@@ -74,10 +84,20 @@ export interface FormCommitResult {
  * nags), `'user'` = a script triggered by the user's own interaction (a
  * validation alert — show it).
  */
-export type FormUiEffect = ScriptUiEffect & { phase: 'boot' | 'user' };
+export type FormUiEffect = ScriptUiEffect & {
+  /** WHO asked, script-model axis: `'boot'` = a name-tree/document-open boot
+   *  script, `'user'` = a runtime script. */
+  phase: 'boot' | 'user';
+  /**
+   * The dispatch-origin axis (present when the script ran inside an action
+   * dispatch): a lifecycle `/OpenAction` script is NOT a name-tree boot
+   * script — the two axes are deliberately separate. Providers use this for
+   * the default visibility matrix (suppress lifecycle alerts, block
+   * non-user print); embedder handlers receive it and may decide otherwise.
+   */
+  origin?: ActionOrigin;
+};
 
-/** Runtime adapter for alerts, print requests, and zero-based page navigation. */
-export type FormUiEffectProvider = (effect: FormUiEffect) => void;
 
 /** Input for {@link FormCapability.placeField}. */
 export interface PlaceFieldInput {
@@ -135,10 +155,21 @@ export interface FormCapability {
   choose(key: FieldKey, values: string[]): Promise<void>;
   /** Commit one originating-client value transaction, including K/V/C/F scripts when enabled. */
   commitValue(ref: FormFieldRef, value: FormFieldValue): Promise<FormCommitResult>;
-  /** Execute one widget's `/A` activation action (and `/Next`) when scripting is enabled. */
-  activateWidget(key: FieldKey, annotationRef: AnnotationRef): Promise<FormCommitResult>;
-  /** Install the framework/application adapter for script-produced UI requests. */
-  setUiEffectProvider(provider: FormUiEffectProvider | null): void;
+  /**
+   * Execute one widget's `/A` activation. With the actions plugin installed
+   * the FULL tree is delegated to its dispatcher (Hide/ResetForm buttons work
+   * even with scripting off) — `kind: 'dispatched'`; without it, today's
+   * scripting-transaction path runs — `kind: 'form'`.
+   */
+  activateWidget(key: FieldKey, annotationRef: AnnotationRef): Promise<WidgetActivationResult>;
+  /**
+   * Report one widget DOM event (pointer enter/leave, down/up, focus/blur).
+   * With the actions plugin present the matching `/AA` tree dispatches
+   * (hover rides the shared coalescing pump; `/A` shadows `/AA U` per ISO
+   * Table 197); without it — or without a tree — this is a cheap no-op.
+   * Fire-and-forget by design: results surface via the actions events.
+   */
+  notifyWidgetEvent(key: FieldKey, ref: AnnotationRef, event: PdfAnnotationEventKind): void;
   /** Restore a field to its /DV default. */
   reset(key: FieldKey): Promise<void>;
   /** Raw engine passthrough for anything the sugar above doesn't cover. */
@@ -181,7 +212,55 @@ export interface FormCapability {
   canDesign(): boolean;
 }
 
-export const FormToken = createCapabilityToken<FormCapability>('form');
+/** What one widget activation did — which world handled it (see
+ *  {@link FormCapability.activateWidget}). Both framework call sites ignore
+ *  the value today; chrome that cares can discriminate on `kind`. */
+export type WidgetActivationResult =
+  | { kind: 'form'; result: FormCommitResult }
+  | { kind: 'dispatched'; result: ActionTriggerResult };
+
+/**
+ * HOST lens — plugin-to-plugin only (the actions plugin's interim
+ * `javascript` / `reset-form` executors). Import the token from
+ * `@embedpdf/plugin-form/contract/host`, never from application code.
+ */
+export interface FormHostCapability extends FormCapability {
+  /**
+   * Execute one ResetForm action: resolve targets against the live snapshot
+   * with the shared ISO selection (`null` = every field; a parent NAME
+   * selects its descendants too; `exclude` = complement; a resolution
+   * yielding zero refs never reaches the engine), reset as ONE engine
+   * batch, refresh, then recalculate when scripting is enabled (Acrobat's
+   * behaviour). `origin` (default `'user'`) is preserved through
+   * recalculation surfacing — a lifecycle ResetForm's alerts stay lifecycle.
+   */
+  resetFormAction(
+    fields: PdfActionTargetRef[] | null,
+    exclude: boolean,
+    origin?: ActionOrigin,
+  ): Promise<FormCommitResult>;
+  /**
+   * The submit dataset resolver (Phase 4, D7): fresh engine read + the pure
+   * ISO builder (`field-selection.ts`). Registered with the actions plugin
+   * as THE resolver for both action-node and script submits.
+   */
+  resolveSubmitDataset(
+    intent: SubmitIntent,
+    ctx: ActionContext,
+    diagnose: (diagnostic: ActionDiagnostic) => void,
+  ): Promise<ActionSubmitRequest>;
+  /** The form DOCUMENT-commit sink (D3): engine `applyEffects` + snapshot
+   *  reconciliation. Sink contract: never throws, never enqueues, never
+   *  touches the script host — callable under a held host transaction. */
+  commitScriptFormEffects(effects: FormEffect[]): Promise<FormEffectsResult>;
+}
+
+/**
+ * The form capability token. Typed to the full {@link FormHostCapability}
+ * here (the package internals + the `/internal` entry use this view). The
+ * package root re-exports the SAME token narrowed to {@link FormCapability}.
+ */
+export const FormToken = createCapabilityToken<FormHostCapability>('form');
 
 export type { FillItem } from './core/fill-items';
 export type { Box, FieldKey } from './core/model';

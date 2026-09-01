@@ -33,6 +33,8 @@ const docs = {
   page: ['actions-page-cloud', 'get_page_aaction.pdf'],
   annotation: ['actions-annotation-cloud', 'annots_action_handling.pdf'],
   field: ['actions-field-cloud', 'annot_javascript.pdf'],
+  payloads: ['actions-payloads-cloud', 'action_payloads.pdf'],
+  openDestination: ['actions-open-dest-cloud', 'open_action_dest.pdf'],
 } as const;
 
 beforeAll(async () => {
@@ -74,6 +76,8 @@ runActionsConformance(runner, {
     page: fixture('page'),
     annotation: fixture('annotation'),
     field: fixture('field'),
+    payloads: fixture('payloads'),
+    openDestination: fixture('openDestination'),
   },
   makeEngine: () => {
     if (!fx) throw new Error('fixture not initialised');

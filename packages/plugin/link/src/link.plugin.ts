@@ -1,10 +1,11 @@
 import { definePlugin } from '@embedpdf/core';
-import { InteractionToken } from '@embedpdf/plugin-interaction';
-import { StageToken } from '@embedpdf/plugin-stage';
-import { AnnotationToken } from '@embedpdf/plugin-annotation';
+import { ActionsToken } from '@embedpdf/plugin-actions/contract';
+import { AnnotationToken } from '@embedpdf/plugin-annotation/contract';
 // Behavior registration lives on the HOST capability (framework/plugin
 // surface) — same runtime token, wider type. The form plugin's precedent.
-import { AnnotationToken as AnnotationHostToken } from '@embedpdf/plugin-annotation/internal';
+import { AnnotationToken as AnnotationHostToken } from '@embedpdf/plugin-annotation/contract/host';
+import { InteractionToken } from '@embedpdf/plugin-interaction/contract';
+import { StageToken } from '@embedpdf/plugin-stage/contract';
 
 import { createLinkCapability } from './capability';
 import { registerLinkEffects } from './effects';
@@ -27,7 +28,7 @@ export const linkPlugin = (config?: LinkPluginConfig) =>
     token: LinkToken,
     scope: 'document',
     requires: [InteractionToken],
-    optional: [StageToken, AnnotationToken],
+    optional: [StageToken, AnnotationToken, ActionsToken],
     initialState: initialLinkState,
     reduce: linkReducer,
     capability: (ctx) => createLinkCapability(ctx, config),

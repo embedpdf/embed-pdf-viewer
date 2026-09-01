@@ -14,7 +14,7 @@ export type DocAnnotationsList200ResponseAnnotationsItemLinkTarget =
 export namespace DocAnnotationsList200ResponseAnnotationsItemLinkTarget {
     export interface Goto {
         kind: "goto";
-        destination: CloudPDF.DocAnnotationsList200ResponseAnnotationsItemLinkTargetGotoDestination;
+        destination: CloudPDF.PdfDestination;
     }
 
     export interface Uri {

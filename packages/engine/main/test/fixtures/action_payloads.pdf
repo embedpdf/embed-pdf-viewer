@@ -1,0 +1,110 @@
+%PDF-1.7
+%‚„œ”
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R /AcroForm << /Fields [23 0 R 24 0 R] /DA (/Helv 0 Tf 0 g) /DR << /Font << /Helv 25 0 R >> >> >> >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Annots [4 0 R 5 0 R 6 0 R 7 0 R 8 0 R 9 0 R 10 0 R 11 0 R 12 0 R 13 0 R 14 0 R 15 0 R 16 0 R 17 0 R 18 0 R 19 0 R 20 0 R 21 0 R 22 0 R 23 0 R 24 0 R] >>
+endobj
+4 0 obj
+<< /Type /Annot /Subtype /Square /Rect [400 700 450 750] /NM (note1) /F 4 >>
+endobj
+5 0 obj
+<< /Type /Annot /Subtype /Link /Rect [10 700 60 720] /NM (goto-fitr) /F 4 /A << /S /GoTo /D [3 0 R /FitR 10 20 300 400] >> >>
+endobj
+6 0 obj
+<< /Type /Annot /Subtype /Link /Rect [10 670 60 690] /NM (uri-map) /F 4 /A << /S /URI /URI (https://example.test/map) /IsMap true >> >>
+endobj
+7 0 obj
+<< /Type /Annot /Subtype /Link /Rect [10 640 60 660] /NM (named-next) /F 4 /A << /S /Named /N /NextPage >> >>
+endobj
+8 0 obj
+<< /Type /Annot /Subtype /Link /Rect [10 610 60 630] /NM (hide-mixed) /F 4 /A << /S /Hide /T [(note1) 4 0 R] /H false >> >>
+endobj
+9 0 obj
+<< /Type /Annot /Subtype /Link /Rect [10 580 60 600] /NM (hide-scalar) /F 4 /A << /S /Hide /T (fieldB) >> >>
+endobj
+10 0 obj
+<< /Type /Annot /Subtype /Link /Rect [10 550 60 570] /NM (reset-include) /F 4 /A << /S /ResetForm /Fields [(calc1)] /Flags 1 >> >>
+endobj
+11 0 obj
+<< /Type /Annot /Subtype /Link /Rect [10 520 60 540] /NM (reset-absent) /F 4 /A << /S /ResetForm /Flags 1 >> >>
+endobj
+12 0 obj
+<< /Type /Annot /Subtype /Link /Rect [10 490 60 510] /NM (reset-empty) /F 4 /A << /S /ResetForm /Fields [] >> >>
+endobj
+13 0 obj
+<< /Type /Annot /Subtype /Link /Rect [10 460 60 480] /NM (launch-app) /F 4 /A << /S /Launch /F (app.exe) >> >>
+endobj
+14 0 obj
+<< /Type /Annot /Subtype /Link /Rect [10 430 60 450] /NM (gotor-file) /F 4 /A << /S /GoToR /F (other.pdf) /D [0 /Fit] >> >>
+endobj
+15 0 obj
+<< /Type /Annot /Subtype /Link /Rect [10 400 60 420] /NM (chain-js-goto-hide) /F 4 /A << /S /JavaScript /JS (app.alert\('chain'\);) /Next << /S /GoTo /D [3 0 R /XYZ 5 10 1.25] /Next << /S /Hide /T (note1) >> >> >> >>
+endobj
+16 0 obj
+<< /Type /Annot /Subtype /Link /Rect [10 370 60 390] /NM (goto-malformed) /F 4 /A << /S /GoTo >> >>
+endobj
+17 0 obj
+<< /Type /Annot /Subtype /Link /Rect [10 340 60 360] /NM (hide-partial) /F 4 /A << /S /Hide /T [(kept) << /Foo 1 >>] >> >>
+endobj
+18 0 obj
+<< /Type /Annot /Subtype /Link /Rect [10 310 60 330] /NM (submit-urlspec) /F 4 /A << /S /SubmitForm /F << /FS /URL /F (https://f.example.test/submit) /UF (https://uf.example.test/submit) >> /Fields [(parent)] /Flags 0 >> >>
+endobj
+19 0 obj
+<< /Type /Annot /Subtype /Link /Rect [10 280 60 300] /NM (submit-compat-xfdf) /F 4 /A << /S /SubmitForm /F (https://example.test/xfdf) /Fields [(noexport) (plain)] /Flags 35 /CharSet (utf-8) >> >>
+endobj
+20 0 obj
+<< /Type /Annot /Subtype /Link /Rect [10 250 60 270] /NM (submit-pdf-get) /F 4 /A << /S /SubmitForm /F << /FS /URL /F (https://example.test/pdf) >> /Flags 264 >> >>
+endobj
+21 0 obj
+<< /Type /Annot /Subtype /Link /Rect [10 220 60 240] /NM (submit-not-url) /F 4 /A << /S /SubmitForm /F << /F (disk-file.fdf) >> >> >>
+endobj
+22 0 obj
+<< /Type /Annot /Subtype /Link /Rect [10 190 60 210] /NM (submit-no-f) /F 4 /A << /S /SubmitForm >> >>
+endobj
+23 0 obj
+<< /Type /Annot /Subtype /Widget /FT /Tx /T (note1) /Rect [400 640 500 660] /F 4 /P 3 0 R /V (hello) /DV (start) /DA (/Helv 0 Tf 0 g) >>
+endobj
+24 0 obj
+<< /Type /Annot /Subtype /Widget /FT /Tx /T (calc1) /Rect [400 600 500 620] /F 4 /P 3 0 R /V (42) /DV (0) /DA (/Helv 0 Tf 0 g) >>
+endobj
+25 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+xref
+0 26
+0000000000 65535 f 
+0000000015 00000 n 
+0000000160 00000 n 
+0000000217 00000 n 
+0000000439 00000 n 
+0000000531 00000 n 
+0000000672 00000 n 
+0000000823 00000 n 
+0000000948 00000 n 
+0000001087 00000 n 
+0000001211 00000 n 
+0000001358 00000 n 
+0000001486 00000 n 
+0000001615 00000 n 
+0000001742 00000 n 
+0000001882 00000 n 
+0000002115 00000 n 
+0000002231 00000 n 
+0000002370 00000 n 
+0000002610 00000 n 
+0000002823 00000 n 
+0000003004 00000 n 
+0000003154 00000 n 
+0000003273 00000 n 
+0000003426 00000 n 
+0000003572 00000 n 
+trailer
+<< /Size 26 /Root 1 0 R >>
+startxref
+3643
+%%EOF

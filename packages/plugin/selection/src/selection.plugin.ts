@@ -1,5 +1,5 @@
 import { definePlugin } from '@embedpdf/core';
-import { FeedbackToken, InteractionToken } from '@embedpdf/plugin-interaction';
+import { FeedbackToken, InteractionToken } from '@embedpdf/plugin-interaction/contract';
 import { createSelectionCapability } from './capability';
 import { createTextSelectHandler } from './handler';
 import { initialSelectionState, selectionReducer } from './reducer';

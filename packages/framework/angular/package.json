@@ -22,6 +22,10 @@
     "./render": {
       "types": "./dist/render/index.d.ts",
       "default": "./dist/fesm2022/embedpdf-angular-render.mjs"
+    },
+    "./actions": {
+      "types": "./dist/actions/index.d.ts",
+      "default": "./dist/fesm2022/embedpdf-angular-actions.mjs"
     }
   },
   "files": [
@@ -40,6 +44,7 @@
     "@embedpdf/plugin-stage": "workspace:*",
     "@embedpdf/plugin-render": "workspace:*",
     "@embedpdf/plugin-interaction": "workspace:*",
+    "@embedpdf/plugin-actions": "workspace:*",
     "@embedpdf/web": "workspace:*"
   },
   "peerDependencies": {

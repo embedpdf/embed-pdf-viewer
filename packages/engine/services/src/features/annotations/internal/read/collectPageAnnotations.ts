@@ -49,6 +49,7 @@ export function collectPageAnnotations(input: {
       const base = readAnnotationBase(
         fn,
         mem,
+        readCtx.docPtr,
         annotPtr,
         pageObjectNumber,
         i,

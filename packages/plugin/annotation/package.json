@@ -9,6 +9,9 @@
   "types": "./dist/index.d.cts",
   "exports": {
     ".": "./src/index.ts",
+    "./authoring": "./src/authoring.ts",
+    "./contract": "./src/contract.ts",
+    "./contract/host": "./src/host-contract.ts",
     "./internal": "./src/internal.ts",
     "./package.json": "./package.json"
   },
@@ -20,6 +23,18 @@
       ".": {
         "import": "./dist/index.js",
         "require": "./dist/index.cjs"
+      },
+      "./authoring": {
+        "import": "./dist/authoring.js",
+        "require": "./dist/authoring.cjs"
+      },
+      "./contract": {
+        "import": "./dist/contract.js",
+        "require": "./dist/contract.cjs"
+      },
+      "./contract/host": {
+        "import": "./dist/contract/host.js",
+        "require": "./dist/contract/host.cjs"
       },
       "./internal": {
         "import": "./dist/internal.js",
@@ -43,7 +58,9 @@
     "@embedpdf/core-geometry": "workspace:*",
     "@embedpdf/plugin-interaction": "workspace:*",
     "@embedpdf/plugin-selection": "workspace:*",
-    "@embedpdf/engine-core": "workspace:*"
+    "@embedpdf/engine-core": "workspace:*",
+    "@embedpdf/plugin-actions": "workspace:*",
+    "@embedpdf/core-acrojs": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.0.0",

@@ -293,6 +293,15 @@ export interface StageState extends StageSettings {
    * Stored as a page index so it survives spread/layout regrouping.
    */
   cursor: number;
+  /**
+   * What last drove the camera/cursor: `'programmatic'` for the arrival and
+   * reveal doors (goToPage/next/prev/reset/reveal — the doors action
+   * executors use), `'user'` for direct camera manipulation (wheel, drag,
+   * scrollbars, embedder scroll APIs). Transient like `camera`. Consumed by
+   * the page-state feed as the action engine's cascade-budget fuel: only
+   * programmatic rounds burn budget, so user scrolling never starves.
+   */
+  motionCause: 'user' | 'programmatic';
 }
 
 export type StageAction =
@@ -302,6 +311,7 @@ export type StageAction =
   | { type: 'VP'; vp: Size }
   | { type: 'DPR'; dpr: number }
   | { type: 'CURSOR'; cursor: number }
+  | { type: 'MOTION_CAUSE'; cause: 'user' | 'programmatic' }
   | { type: 'PATCH'; patch: Partial<StageSettings> }
   | { type: 'RESPONSIVE'; active: readonly string[] };
 

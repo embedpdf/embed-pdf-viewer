@@ -9,6 +9,10 @@
   "types": "./dist/index.d.cts",
   "exports": {
     ".": "./src/index.ts",
+    "./contract": "./src/contract.ts",
+    "./contract/host": "./src/host-contract.ts",
+    "./internal": "./src/internal.ts",
+    "./scripting": "./src/scripting.ts",
     "./package.json": "./package.json"
   },
   "publishConfig": {
@@ -19,6 +23,22 @@
       ".": {
         "import": "./dist/index.js",
         "require": "./dist/index.cjs"
+      },
+      "./contract": {
+        "import": "./dist/contract.js",
+        "require": "./dist/contract.cjs"
+      },
+      "./contract/host": {
+        "import": "./dist/contract/host.js",
+        "require": "./dist/contract/host.cjs"
+      },
+      "./internal": {
+        "import": "./dist/internal.js",
+        "require": "./dist/internal.cjs"
+      },
+      "./scripting": {
+        "import": "./dist/scripting.js",
+        "require": "./dist/scripting.cjs"
       },
       "./package.json": "./package.json"
     }
@@ -38,7 +58,8 @@
     "@embedpdf/core": "workspace:*",
     "@embedpdf/plugin-interaction": "workspace:*",
     "@embedpdf/plugin-annotation": "workspace:*",
-    "@embedpdf/engine-core": "workspace:*"
+    "@embedpdf/engine-core": "workspace:*",
+    "@embedpdf/plugin-actions": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.0.0",

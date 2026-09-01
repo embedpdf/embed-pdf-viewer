@@ -78,11 +78,13 @@ export {
 export {
   PdfActionTypeSchema,
   PdfActionNodeSchema,
+  PdfActionTargetRefSchema,
   PdfActionTreeSchema,
   PdfFieldActionsSchema,
   PdfPageActionsSchema,
   PdfAnnotationActionsSchema,
   DocumentActionsSnapshotSchema,
+  PdfActionWireComponents,
 } from './dto/PdfAction.schema';
 export type {
   OpenDocumentResponse,
@@ -117,6 +119,11 @@ export {
   FormFieldPatchSchema,
   FormValueEntrySchema,
 } from './forms/schema';
+export {
+  FormSubmissionEntrySchema,
+  FormSubmissionRequestSchema,
+  FormSubmissionReceiptSchema,
+} from './forms/submission';
 export { DEFAULT_LAYER_NAME, wirePaths, wireTemplates } from './wire/paths';
 // General resource catalog + route-guard helper (server uses this for
 // every read endpoint, not just CDN-cacheable ones).

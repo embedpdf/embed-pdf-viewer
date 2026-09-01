@@ -1,5 +1,7 @@
 export * from './types';
 export * from './kernel';
+export * from './event-hook';
+export * from './serial-queue';
 export { CancelledError, isCancelled } from './scope';
 
 // Re-export the engine contracts so plugins/adapters import them from @embedpdf/core.

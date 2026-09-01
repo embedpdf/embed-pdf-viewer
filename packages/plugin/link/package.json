@@ -9,6 +9,7 @@
   "types": "./dist/index.d.cts",
   "exports": {
     ".": "./src/index.ts",
+    "./contract": "./src/contract.ts",
     "./package.json": "./package.json"
   },
   "publishConfig": {
@@ -19,6 +20,10 @@
       ".": {
         "import": "./dist/index.js",
         "require": "./dist/index.cjs"
+      },
+      "./contract": {
+        "import": "./dist/contract.js",
+        "require": "./dist/contract.cjs"
       },
       "./package.json": "./package.json"
     }
@@ -39,7 +44,8 @@
     "@embedpdf/plugin-annotation": "workspace:*",
     "@embedpdf/plugin-interaction": "workspace:*",
     "@embedpdf/plugin-stage": "workspace:*",
-    "@embedpdf/engine-core": "workspace:*"
+    "@embedpdf/engine-core": "workspace:*",
+    "@embedpdf/plugin-actions": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.0.0",

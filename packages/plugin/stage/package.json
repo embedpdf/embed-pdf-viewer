@@ -9,6 +9,8 @@
   "types": "./dist/index.d.cts",
   "exports": {
     ".": "./src/index.ts",
+    "./contract": "./src/contract.ts",
+    "./destination": "./src/destination.ts",
     "./package.json": "./package.json"
   },
   "publishConfig": {
@@ -19,6 +21,14 @@
       ".": {
         "import": "./dist/index.js",
         "require": "./dist/index.cjs"
+      },
+      "./contract": {
+        "import": "./dist/contract.js",
+        "require": "./dist/contract.cjs"
+      },
+      "./destination": {
+        "import": "./dist/destination.js",
+        "require": "./dist/destination.cjs"
       },
       "./package.json": "./package.json"
     }
@@ -36,12 +46,14 @@
     "@embedpdf/core-geometry": "workspace:*",
     "@embedpdf/core": "workspace:*",
     "@embedpdf/plugin-interaction": "workspace:*",
-    "@embedpdf/core-stage": "workspace:*"
+    "@embedpdf/core-stage": "workspace:*",
+    "@embedpdf/plugin-actions": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.0.0",
     "vitest": "^2.1.9",
-    "@embedpdf/tooling-build": "workspace:*"
+    "@embedpdf/tooling-build": "workspace:*",
+    "@embedpdf/engine": "workspace:*"
   },
   "license": "Apache-2.0",
   "sideEffects": false,

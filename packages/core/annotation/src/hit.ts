@@ -81,7 +81,7 @@ export const canMove = (m: Model, id: Id): boolean => {
  *  `locked` (and inert `/F` states) suppress them at runtime — a
  *  screen-anchored body keeps its handles: `noZoom`/`noRotate` exempt it from
  *  the display transform, they don't freeze its size or vertices. */
-const hasHandles = (a: Annot): boolean => {
+const hasHandles = (m: Model, a: Annot): boolean => {
   if (!annotTransformable(a) || textBound(a)) return false;
   const c = capsFor(a.subtype);
   return c.resizable || c.vertexEditable;
@@ -191,7 +191,7 @@ export function hitTest(
           }
         }
       }
-      if (hasHandles(a)) {
+      if (hasHandles(m, a)) {
         // Handles live on the PROJECTED geometry — the handle gesture then
         // runs entirely in view space (see the `handle` draft).
         for (const h of geomHandles(hitGeomOf(a, view))) {

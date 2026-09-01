@@ -228,6 +228,45 @@ describe('openapi document', () => {
       expect(target, ref).toBeDefined();
     }
   });
+
+  test('shared action models remain named components instead of per-location SDK types', () => {
+    const doc = buildAdminOpenApiDocument({ version: pkg.version }) as {
+      components: { schemas: Record<string, any> };
+    };
+    const schemas = doc.components.schemas;
+
+    expect(schemas.PdfActionNode.anyOf).toHaveLength(19);
+    expect(schemas.PdfActionTree.properties.root).toEqual({
+      allOf: [{ $ref: '#/components/schemas/PdfActionNode' }],
+      nullable: true,
+    });
+    expect(
+      schemas.DocAnnotationsList200Response.properties.annotations.items.anyOf[0].properties
+        .actions,
+    ).toEqual({ $ref: '#/components/schemas/PdfAnnotationActions' });
+    expect(
+      schemas.DocAnnotationsListAll200Response.properties.pages.items.properties.annotations.items
+        .anyOf[0].properties.actions,
+    ).toEqual({ $ref: '#/components/schemas/PdfAnnotationActions' });
+    expect(
+      schemas.DocFormsGet200Response.properties.fields.items.anyOf[0].properties.actions,
+    ).toEqual({ $ref: '#/components/schemas/PdfFieldActions' });
+
+    const refs: string[] = [];
+    const visit = (value: unknown): void => {
+      if (Array.isArray(value)) {
+        value.forEach(visit);
+        return;
+      }
+      if (!value || typeof value !== 'object') return;
+      for (const [key, child] of Object.entries(value)) {
+        if (key === '$ref' && typeof child === 'string') refs.push(child);
+        visit(child);
+      }
+    };
+    visit(doc);
+    expect(refs.filter((ref) => ref.includes('/properties/actions'))).toEqual([]);
+  });
 });
 
 describe('sdkOperationName', () => {

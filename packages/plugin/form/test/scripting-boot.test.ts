@@ -88,6 +88,7 @@ function makeDoc(applied: FormEffect[][]) {
       }),
     },
     forms: {
+      list: async () => snapshot(),
       applyEffects: vi.fn(async (effects: FormEffect[]) => {
         applied.push(effects);
         return { results: effects.map(() => ({ status: 'applied' as const })) };
@@ -110,12 +111,10 @@ describe('FormScriptingController — boot failures degrade, never brick', () =>
     const controller = createFormScriptingController({
       doc: makeDoc(applied),
       document: () => null,
-      config: { enabled: true },
-      sandboxFactory: async () => failingBootSandbox(),
+      config: { sandboxFactory: async () => failingBootSandbox() },
     });
 
     const first = await controller.commit(
-      snapshot(),
       { kind: 'objectNumber', fieldObjectNumber: 7 },
       { type: 'text', value: 'HELLO' },
     );
@@ -134,7 +133,6 @@ describe('FormScriptingController — boot failures degrade, never brick', () =>
 
     // Boot ran once; the next commit neither retries nor fails.
     const second = await controller.commit(
-      snapshot(),
       { kind: 'objectNumber', fieldObjectNumber: 7 },
       { type: 'text', value: 'WORLD' },
     );
@@ -152,11 +150,9 @@ describe('FormScriptingController — boot failures degrade, never brick', () =>
     const controller = createFormScriptingController({
       doc,
       document: () => null,
-      config: { enabled: true },
-      sandboxFactory: async () => failingBootSandbox(),
+      config: { sandboxFactory: async () => failingBootSandbox() },
     });
     const result = await controller.commit(
-      snapshot(),
       { kind: 'objectNumber', fieldObjectNumber: 7 },
       { type: 'text', value: 'HELLO' },
     );

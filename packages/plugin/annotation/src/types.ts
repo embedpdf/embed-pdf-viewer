@@ -1,8 +1,5 @@
-import {
-  createCapabilityToken,
-  type DocumentEvent,
-  type PageObjectNumber,
-} from '@embedpdf/core';
+import { createCapabilityToken, type DocumentEvent, type PageObjectNumber } from '@embedpdf/core';
+import type { AnnotCommitEntry, AnnotCommitResult } from '@embedpdf/plugin-actions/contract/host';
 import type { PageRotation } from '@embedpdf/core-geometry';
 import type {
   AnnotationAppearanceImage,
@@ -16,6 +13,7 @@ import type {
   CommentThread,
   PdfLinkTarget,
   PdfRect,
+  PdfActionTree,
 } from '@embedpdf/engine-core/runtime';
 import type { AnnotationToolInput, ResolvedTool } from './tools';
 import type {
@@ -214,6 +212,16 @@ export interface LinkNavItem {
    * stays selectable/movable; standalone document links navigate regardless.
    */
   attached: boolean;
+  /** The full payload-carrying `/A` tree, when one exists — the action
+   *  engine's dispatch input. `target` remains its root projection. */
+  activate?: PdfActionTree;
+  /** The annotation ref, carried for ActionSource context. */
+  ref?: AnnotationRef;
+  /** Which `/AA` hover trees this link carries — the nav layer's pump flags
+   *  (tree-less hover must cost zero dispatches). Links are behavior-inert
+   *  to the annotation plane's hover feed while navigable, so THEIR
+   *  cursorEnter/cursorExit can only fire from the LinkLayer anchors. */
+  hoverEvents?: { enter: boolean; exit: boolean };
 }
 
 export interface Behavior {
@@ -277,8 +285,9 @@ export interface TextItem {
  * package root (`@embedpdf/plugin-annotation`).
  *
  * Framework-only plumbing (render projection, pointer gestures, behavior
- * registration) lives on {@link AnnotationHostCapability}, reachable only through
- * the `@embedpdf/plugin-annotation/internal` entry. Both are the SAME runtime
+ * registration) lives on {@link AnnotationHostCapability}, reachable through
+ * `@embedpdf/plugin-annotation/contract/host` (and the framework's `/internal`
+ * entry). Both are the SAME runtime
  * object — two typed lenses on one token — so app code simply can't see the host
  * methods.
  */
@@ -647,8 +656,9 @@ export type FilePickerProvider = (req: FilePromptRequest) => Promise<AttachmentF
 /**
  * The HOST (framework) surface: everything the render layer, the interaction hub,
  * and sibling plugins need, on top of the public {@link AnnotationCapability}.
- * Internal — import the token from `@embedpdf/plugin-annotation/internal`, never
- * from application code.
+ * Host-only — sibling plugins import the token from
+ * `@embedpdf/plugin-annotation/contract/host`; framework implementation code may
+ * use `/internal`. Never use either from application code.
  */
 export interface AnnotationHostCapability extends AnnotationCapability {
   // ── render projection (consumed by the framework render layer) ──
@@ -949,12 +959,25 @@ export interface AnnotationHostCapability extends AnnotationCapability {
   toolSubtype(id: string): Subtype;
   // ── extension point for sibling plugins (forms, links) ──
   registerBehavior(b: Behavior): () => void;
+
+  /**
+   * The actions plane's session-visibility write (Hide actions, script
+   * `annot.hidden`): resolve annotation OBJECT NUMBERS to loaded model ids
+   * (the `obj:` refKey seam) and merge session-hidden overrides. Returns how
+   * many resolved — unresolved numbers (unloaded pages, nm/index refs) are
+   * the caller's diagnostics. Session state only; never an engine write.
+   */
+  /** The script/Hide DOCUMENT-commit door (full ISO): engine updates +
+   *  model reconciliation, per entry, stop-on-failure. Never enqueues,
+   *  never touches the script host — the D2 sink contract. */
+  commitScriptEffects(entries: AnnotCommitEntry[]): Promise<AnnotCommitResult>;
 }
 
 /**
  * The annotation capability token. Typed to the full {@link AnnotationHostCapability}
- * here (the package internals + the `/internal` entry use this view). The package
- * root re-exports the SAME token narrowed to {@link AnnotationCapability}.
+ * here (the package internals, `/contract/host`, and `/internal` use this view).
+ * The package root re-exports the SAME token narrowed to
+ * {@link AnnotationCapability}.
  */
 export const AnnotationToken = createCapabilityToken<AnnotationHostCapability>('annotation', {
   hint: `add annotationPlugin() from '@embedpdf/plugin-annotation' to your plugins list`,

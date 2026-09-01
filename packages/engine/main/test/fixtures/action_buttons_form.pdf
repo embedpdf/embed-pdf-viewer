@@ -1,0 +1,62 @@
+%PDF-1.7
+%‚„œ”
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R /AcroForm << /Fields [4 0 R 5 0 R 6 0 R 7 0 R 8 0 R 9 0 R 10 0 R 12 0 R 13 0 R] /DA (/Helv 0 Tf 0 g) /DR << /Font << /Helv 11 0 R >> >> >> >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Annots [4 0 R 5 0 R 6 0 R 7 0 R 8 0 R 9 0 R 10 0 R 12 0 R 13 0 R] >>
+endobj
+4 0 obj
+<< /Type /Annot /Subtype /Widget /FT /Tx /T (alpha) /Rect [50 700 250 720] /F 4 /P 3 0 R /V (filled-a) /DV (default-a) /DA (/Helv 0 Tf 0 g) /AA << /E << /S /Hide /T [(tip)] /H false >> /X << /S /Hide /T [(tip)] >> >> >>
+endobj
+5 0 obj
+<< /Type /Annot /Subtype /Widget /FT /Tx /T (beta) /Rect [50 660 250 680] /F 4 /P 3 0 R /V (filled-b) /DV (default-b) /DA (/Helv 0 Tf 0 g) /AA << /Fo << /S /Hide /T [(alpha)] >> /Bl << /S /Hide /T [(alpha)] /H false >> /D << /S /Hide /T [(log)] >> /U << /S /Hide /T [(log)] /H false >> >> >>
+endobj
+6 0 obj
+<< /Type /Annot /Subtype /Widget /FT /Tx /T (log) /Rect [50 620 250 640] /F 4 /P 3 0 R /V () /DV () /DA (/Helv 0 Tf 0 g) >>
+endobj
+7 0 obj
+<< /Type /Annot /Subtype /Widget /FT /Btn /Ff 65536 /T (btn-hide) /Rect [300 700 400 720] /F 4 /P 3 0 R /A << /S /Hide /T [(alpha)] >> >>
+endobj
+8 0 obj
+<< /Type /Annot /Subtype /Widget /FT /Btn /Ff 65536 /T (btn-show) /Rect [300 660 400 680] /F 4 /P 3 0 R /A << /S /Hide /T [(alpha)] /H false >> >>
+endobj
+9 0 obj
+<< /Type /Annot /Subtype /Widget /FT /Btn /Ff 65536 /T (btn-reset) /Rect [300 620 400 640] /F 4 /P 3 0 R /A << /S /ResetForm /Fields [(alpha) (log)] /Flags 1 >> >>
+endobj
+10 0 obj
+<< /Type /Annot /Subtype /Widget /FT /Btn /Ff 65536 /T (btn-chain) /Rect [300 580 400 600] /F 4 /P 3 0 R /A << /S /JavaScript /JS (var f = this.getField\('log'\); f.value = f.value + 'A';) /Next << /S /ResetForm /Fields [(alpha)] /Next << /S /JavaScript /JS (var f = this.getField\('log'\); f.value = f.value + 'B';) >> >> >> >>
+endobj
+11 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+12 0 obj
+<< /Type /Annot /Subtype /Widget /FT /Tx /T (tip) /Rect [300 540 400 560] /F 6 /P 3 0 R /V (tooltip) /DV (tooltip) /DA (/Helv 0 Tf 0 g) >>
+endobj
+13 0 obj
+<< /Type /Annot /Subtype /Widget /FT /Tx /Ff 1 /T (fakeButton) /Rect [300 500 400 520] /F 4 /P 3 0 R /V (Hide alpha) /DV (Hide alpha) /DA (/Helv 0 Tf 0 g) /A << /S /Hide /T [(alpha)] >> >>
+endobj
+xref
+0 14
+0000000000 65535 f 
+0000000015 00000 n 
+0000000203 00000 n 
+0000000260 00000 n 
+0000000398 00000 n 
+0000000633 00000 n 
+0000000940 00000 n 
+0000001079 00000 n 
+0000001232 00000 n 
+0000001394 00000 n 
+0000001573 00000 n 
+0000001918 00000 n 
+0000001989 00000 n 
+0000002144 00000 n 
+trailer
+<< /Size 14 /Root 1 0 R >>
+startxref
+2349
+%%EOF

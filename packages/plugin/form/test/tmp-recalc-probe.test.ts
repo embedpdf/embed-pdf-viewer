@@ -37,7 +37,6 @@ describe('recalc probe', () => {
         revision: 0,
       }),
       config: {
-        enabled: true,
         now: () => Date.UTC(2026, 6, 15, 9, 30, 0),
         utcOffsetMinutes: () => 0,
       },
@@ -51,7 +50,7 @@ describe('recalc probe', () => {
       'actions:',
       Object.keys(guests.actions ?? {}),
     );
-    const result = await controller.commit(snap, guests.ref, { type: 'text', value: '50' });
+    const result = await controller.commit(guests.ref, { type: 'text', value: '50' });
     console.log('STATUS:', result.status);
     console.log(
       'EFFECTS RESULT:',

@@ -6,3 +6,4 @@
 export * from '@embedpdf/angular/runtime';
 export * from '@embedpdf/angular/stage';
 export * from '@embedpdf/angular/render';
+export * from '@embedpdf/angular/actions';

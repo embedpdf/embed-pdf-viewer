@@ -24,13 +24,14 @@ import type {
   CapabilityToken,
   Engine,
   EngineFactory,
+  EventHook,
   InitialDocument,
   Kernel,
 } from '@embedpdf/core';
 // Pure coordinate math from the geometry base — NOT from stage-core. The
 // PageContext seam stays stage-agnostic (it must also serve standalone PageView).
 import type { PageFrame, PageTransform, Point, Rect } from '@embedpdf/core-geometry';
-import type { PageViewDemand } from '@embedpdf/plugin-render';
+import type { PageViewDemand } from '@embedpdf/plugin-render/contract';
 
 const KernelCtx = createContext<Kernel | null>(null);
 /** The document a subtree is bound to. null => use the active document. */
@@ -190,6 +191,29 @@ export function useOptionalSelector<C, R>(
     return next;
   };
   return useSyncExternalStore(kernel.subscribe, get, get);
+}
+
+/**
+ * Subscribe to a capability's {@link EventHook} for the mounted lifetime —
+ * `useCapabilityEvent(ActionsToken, (c) => c.onAction, handler)`. Events
+ * carry occurrences, never state (a late subscriber that needs the current
+ * value uses `useSelector`). The handler rides a ref, so a fresh closure per
+ * render never resubscribes. Null-safe: no plugin/document → no subscription.
+ */
+export function useCapabilityEvent<C, T>(
+  token: CapabilityToken<C>,
+  select: (cap: C) => EventHook<T>,
+  handler: (event: T) => void,
+): void {
+  const cap = useOptionalCapability(token);
+  const handlerRef = useRef(handler);
+  handlerRef.current = handler;
+  const selectRef = useRef(select);
+  selectRef.current = select;
+  useEffect(() => {
+    if (!cap) return;
+    return selectRef.current(cap)((event) => handlerRef.current(event));
+  }, [cap]);
 }
 
 /** The document registry (open/close/active/list), reactive. */

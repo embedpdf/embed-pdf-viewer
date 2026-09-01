@@ -28,14 +28,14 @@ export class FormReader {
   snapshot(signal: AbortSignal): FormSnapshot {
     throwIfAborted(signal);
     const model = acquireFormModel(this.runtime, this.session);
-    return readFormSnapshot(this.runtime, model);
+    return readFormSnapshot(this.runtime, model, this.session.requireDocPtr());
   }
 
   field(ref: FormFieldRef, signal: AbortSignal): FormFieldDTO {
     throwIfAborted(signal);
     const model = acquireFormModel(this.runtime, this.session);
     const { fieldIndex } = resolveFieldRef(this.runtime, model, ref);
-    return readFieldAt(this.runtime, model, fieldIndex);
+    return readFieldAt(this.runtime, model, fieldIndex, this.session.requireDocPtr());
   }
 
   /**

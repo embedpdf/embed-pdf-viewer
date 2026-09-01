@@ -1,0 +1,5 @@
+---
+'@embedpdf/plugin-form': minor
+---
+
+The K/V/C/F pipeline rides the shared realm: `FormScriptingController` keeps its ordering, `event.rc` semantics, two-pass keystroke, overlay, and fault ladder UNCHANGED, but acquires the realm through a transaction port — the actions plugin's per-document host in viewers, or a self-owned standalone host (`createFormScriptingHost` / the `{ config }` constructor arm) for stamp and tests. The snapshot moves INSIDE the transaction boundary (`commit(ref, value)` / `activate(ref, action)` / `recalculate()` — no snapshot parameters). `formPlugin({ scripting })` is DELETED (the switch is `actionsPlugin({ javascript })`); the interim `runActivationScript` executor and the form-side UI-effect provider (`setUiEffectProvider`/`FormUiEffectProvider`) are gone — every script surface flows through the actions port with origin/phase attached, and the new `commitScriptFormEffects` sink commits script form effects with engine write + snapshot AND annotation-plane reconciliation in one place.

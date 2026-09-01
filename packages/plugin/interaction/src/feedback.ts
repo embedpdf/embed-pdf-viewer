@@ -18,32 +18,13 @@
  * output; call-site semantics ("word selected", "annotation picked up") pick a
  * family, they never add one.
  */
-import { createCapabilityToken, definePlugin } from '@embedpdf/core';
+import { definePlugin } from '@embedpdf/core';
 
-export interface PlatformFeedback {
-  /**
-   * The featherweight "selection is changing" tick
-   * (`UISelectionFeedbackGenerator`) — tuned for rapid repetition: a
-   * long-press engaging a word, a handle drag ticking across boundaries.
-   */
-  selection(): void;
-  /** A physical-collision bump (`UIImpactFeedbackGenerator`): something was
-   *  picked up, snapped, or docked. Default weight 'light'. */
-  impact(weight?: 'light' | 'medium' | 'heavy'): void;
-  /** An outcome announcement (`UINotificationFeedbackGenerator`). */
-  notify(kind: 'success' | 'warning' | 'error'): void;
-}
-
-export const FeedbackToken = createCapabilityToken<PlatformFeedback>('feedback');
+import { FeedbackToken } from './feedback.types';
+import type { FeedbackPluginOptions, PlatformFeedback } from './feedback.types';
 
 /** No provider → every call is a cheap no-op; consumers never branch. */
 const NOOP: PlatformFeedback = { selection() {}, impact() {}, notify() {} };
-
-export interface FeedbackPluginOptions {
-  /** The platform's feedback implementation. Omit for silence (headless,
-   *  tests, or a "haptics off" preference) — consumers keep working. */
-  provider?: PlatformFeedback;
-}
 
 /** The plugin is stateless; the action type exists only to satisfy the
  *  reducer contract (nothing ever dispatches it). */

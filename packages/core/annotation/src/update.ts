@@ -378,7 +378,7 @@ export function update(m: Model, msg: Msg): [Model, Effect[]] {
     case 'beginTextEdit':
       // `lockedContents` (or an inert `/F` state) blocks entering text edit —
       // the geometry gates don't apply here: locked-only contents still edit.
-      return m.byId[msg.id] && annotContentsEditable(m.byId[msg.id])
+      return m.byId[msg.id] && annotContentsEditable(m.byId[msg.id]!)
         ? [{ ...m, editing: msg.id, selected: [msg.id], draft: null }, []]
         : [m, []];
     case 'setText':
@@ -1298,6 +1298,15 @@ function setProps(m: Model, patch: AnnotationPropsPatch): [Model, Effect[]] {
  * COMMITTED member; uncommitted drafts just merge (their create draft carries
  * the flags when it commits).
  */
+/**
+ * The actions plane's session-visibility write (Hide actions, script
+ * `annot.hidden`): merge per-id hidden overrides into the session overlay.
+ * Pure session state — ZERO effects, no engine write, no authority. Hiding
+ * clears transient engagement so no orphaned selection chrome or text editor
+ * survives on an invisible annotation. Identity-preserving no-op when nothing
+ * changes (plugin memo caches key on model identity).
+ */
+
 function setFlags(m: Model, patch: Partial<AnnotationFlags>, ids?: Id[]): [Model, Effect[]] {
   const targets = ids ?? m.selected;
   if (!targets.length) return [m, []];

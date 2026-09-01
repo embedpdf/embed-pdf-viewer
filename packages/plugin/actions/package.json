@@ -1,0 +1,69 @@
+{
+  "name": "@embedpdf/plugin-actions",
+  "version": "3.0.0-next.10",
+  "private": false,
+  "description": "The PDF action engine: one dispatcher for extracted /A and /AA action trees (GoTo, URI, Hide, Named, ResetForm, JavaScript chains) with a per-document serialized queue, origin-aware policy, can-twins, and a registry where sibling plugins provide executors and effect sinks. JavaScript is one registered interpreter among many — Hide/ResetForm/navigation work with scripting off.",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.cts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./contract": "./src/contract.ts",
+    "./contract/host": "./src/host-contract.ts",
+    "./internal": "./src/internal.ts",
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "main": "./dist/index.js",
+    "module": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+      ".": {
+        "import": "./dist/index.js",
+        "require": "./dist/index.cjs"
+      },
+      "./contract": {
+        "import": "./dist/contract.js",
+        "require": "./dist/contract.cjs"
+      },
+      "./contract/host": {
+        "import": "./dist/contract/host.js",
+        "require": "./dist/contract/host.cjs"
+      },
+      "./internal": {
+        "import": "./dist/internal.js",
+        "require": "./dist/internal.cjs"
+      },
+      "./package.json": "./package.json"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "epdf-build",
+    "clean": "rimraf dist",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@embedpdf/core": "workspace:*",
+    "@embedpdf/engine-core": "workspace:*",
+    "@embedpdf/core-acrojs": "workspace:*",
+    "@embedpdf/core-js-sandbox": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "vitest": "^2.1.9",
+    "@embedpdf/tooling-build": "workspace:*",
+    "@embedpdf/engine": "workspace:*"
+  },
+  "license": "Apache-2.0",
+  "sideEffects": false,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/embedpdf/embed-pdf-viewer.git",
+    "directory": "packages/plugin/actions"
+  }
+}

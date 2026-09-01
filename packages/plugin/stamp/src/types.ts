@@ -1,6 +1,11 @@
 import type { BinarySource, Engine } from '@embedpdf/engine-core/runtime';
 import { createCapabilityToken } from '@embedpdf/core';
-import type { FormScriptingOptions } from '@embedpdf/plugin-form';
+import type {
+  ScriptDiagnostic,
+  ScriptExecutionError,
+  ScriptUiEffect,
+} from '@embedpdf/core-acrojs';
+import type { FormScriptingOptions } from '@embedpdf/plugin-form/contract';
 
 /**
  * The stamp plugin: a workspace-scoped ASSET substrate.
@@ -85,7 +90,21 @@ export interface StampConfig {
    * document's identity/name/clock, flattens it, and arms the resulting
    * static page. Canonical library and derived base bytes stay unchanged.
    */
-  scripting?: FormScriptingOptions;
+  scripting?: StampScriptingOptions;
+}
+
+/**
+ * Stamp evaluates dynamic assets in its OWN standalone realm (a detached
+ * stamp-asset document is never the viewer document's shared host), so the
+ * opt-in switch and the script observers live HERE — deliberately not on
+ * `actionsPlugin({ javascript })`, whose port serves the viewer document.
+ */
+export interface StampScriptingOptions extends FormScriptingOptions {
+  /** Explicit opt-in for evaluating dynamic (form-backed) stamp assets. */
+  enabled: boolean;
+  onUiEffect?: (effect: ScriptUiEffect) => void;
+  onDiagnostic?: (diagnostic: ScriptDiagnostic) => void;
+  onError?: (error: ScriptExecutionError) => void;
 }
 
 export interface ImportLibraryOptions {

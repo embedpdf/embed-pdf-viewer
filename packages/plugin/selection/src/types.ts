@@ -129,7 +129,8 @@ export type SelectionAction =
  *
  * Framework-only plumbing (pointer-gesture intents, geometry warming, the
  * highlight-visibility handshake) lives on {@link SelectionHostCapability},
- * reachable only through `@embedpdf/plugin-selection/internal`. Both are
+ * reachable through `@embedpdf/plugin-selection/contract/host` (and the
+ * framework's `/internal` entry). Both are
  * the SAME runtime object — two typed lenses on one token.
  */
 export interface SelectionCapability {
@@ -218,8 +219,9 @@ export interface SelectionCapability {
 
 /**
  * The HOST (framework) surface: what render layers, the interaction hub,
- * and sibling plugins need on top of the public lens. Import the token from
- * `@embedpdf/plugin-selection/internal`, never from application code. All
+ * and sibling plugins need on top of the public lens. Sibling plugins import
+ * the token from `@embedpdf/plugin-selection/contract/host`; framework
+ * implementation code may use `/internal`. Never use either from application code. All
  * point-based functions are gesture vocabulary (`…At` = point-addressed);
  * the programmatic equivalent is the public range-based {@link
  * SelectionCapability.select}. Every function here is INERT (no requests,
@@ -255,7 +257,8 @@ export interface SelectionHostCapability extends SelectionCapability {
 
 /**
  * The selection capability token. Typed to the full
- * {@link SelectionHostCapability} for this module and `/internal`; the
+ * {@link SelectionHostCapability} for this module, `/contract/host`, and
+ * `/internal`; the
  * package root re-exports the SAME token narrowed to
  * {@link SelectionCapability}.
  */

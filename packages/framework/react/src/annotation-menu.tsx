@@ -11,11 +11,11 @@
  * progress facts); the annotation-selection menu takes plain children.
  */
 import * as React from 'react';
-import { AnnotationToken as AnnotationHostToken } from '@embedpdf/plugin-annotation/internal';
+import { AnnotationToken as AnnotationHostToken } from '@embedpdf/plugin-annotation/contract/host';
 import type { CreationDraftAnchor } from '@embedpdf/core-annotation';
 import { Anchored, useProjectorBinding, type AnchoredPlacement } from './anchored';
 import { useSelector } from './runtime';
-import { sameAnchor, sameCreationDraftAnchor } from './annotation';
+import { sameAnchor, sameCreationDraftAnchor } from './annotation-anchors';
 
 export interface AnnotationMenuProps {
   children: React.ReactNode;

@@ -12,7 +12,7 @@
  * so the annotation draw handler can't wake up for them.
  */
 import type { FormFieldFamily } from '@embedpdf/engine-core/runtime';
-import type { AnnotationPropsPatch, ClickCreate } from '@embedpdf/plugin-annotation';
+import type { AnnotationPropsPatch, ClickCreate } from '@embedpdf/plugin-annotation/contract';
 
 /** The families the palette can author (no pushbutton/signature tools). */
 export type AuthorableFormFamily = Exclude<FormFieldFamily, 'pushbutton' | 'signature' | 'unknown'>;

@@ -4,5 +4,4 @@
  * Standard layout: types.ts · capability.ts · page-edit.plugin.ts.
  */
 export { pageEditPlugin } from './page-edit.plugin';
-export { PageEditToken } from './types';
-export type { PageEditCapability } from './types';
+export * from './contract';

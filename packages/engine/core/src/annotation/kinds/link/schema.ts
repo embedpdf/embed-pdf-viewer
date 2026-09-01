@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
-import type { PdfDestination } from '../../../dto/PdfDestination';
 import type { PdfLinkTarget, PdfLinkTargetWritable } from '../../../dto/PdfLinkTarget';
+import { PdfDestinationSchema } from '../../../dto/PdfDestination.schema';
 import { PdfRectSchema } from '../../../geometry/schemas';
 import {
   AnnotationBaseShape,
@@ -12,31 +12,10 @@ import type { LinkDraft } from './draft';
 import type { LinkAnnotationDTO } from './dto';
 import type { LinkPatch } from './patch';
 
-const pageObjectNumber = z.number().int().positive();
-/** Spec-nullable axis value: absent and `null` both mean "retain current". */
-const axis = z.number().nullable().optional();
-
-/**
- * Runtime schema for {@link PdfDestination}. Lives with the link kind (its
- * first wire consumer); the outline/bookmark port reuses it from here.
- */
-export const PdfDestinationSchema: z.ZodType<PdfDestination> = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('xyz'), pageObjectNumber, left: axis, top: axis, zoom: axis }),
-  z.object({ kind: z.literal('fit'), pageObjectNumber }),
-  z.object({ kind: z.literal('fitH'), pageObjectNumber, top: axis }),
-  z.object({ kind: z.literal('fitV'), pageObjectNumber, left: axis }),
-  z.object({
-    kind: z.literal('fitR'),
-    pageObjectNumber,
-    left: z.number(),
-    bottom: z.number(),
-    right: z.number(),
-    top: z.number(),
-  }),
-  z.object({ kind: z.literal('fitB'), pageObjectNumber }),
-  z.object({ kind: z.literal('fitBH'), pageObjectNumber, top: axis }),
-  z.object({ kind: z.literal('fitBV'), pageObjectNumber, left: axis }),
-]) as unknown as z.ZodType<PdfDestination>;
+// Relocated to dto/PdfDestination.schema.ts (action payloads and
+// openDestination share it); re-exported here so existing importers keep
+// working.
+export { PdfDestinationSchema };
 
 const GotoTargetSchema = z.object({ kind: z.literal('goto'), destination: PdfDestinationSchema });
 const UriTargetSchema = z.object({ kind: z.literal('uri'), uri: z.string() });

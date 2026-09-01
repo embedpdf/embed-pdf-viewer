@@ -2,17 +2,17 @@
 
 import type * as CloudPDF from "../index.js";
 
-export type DocAnnotationsList200ResponseAnnotationsItemLinkTargetGotoDestination =
-    | CloudPDF.DocAnnotationsList200ResponseAnnotationsItemLinkTargetGotoDestination.Xyz
-    | CloudPDF.DocAnnotationsList200ResponseAnnotationsItemLinkTargetGotoDestination.Fit
-    | CloudPDF.DocAnnotationsList200ResponseAnnotationsItemLinkTargetGotoDestination.FitH
-    | CloudPDF.DocAnnotationsList200ResponseAnnotationsItemLinkTargetGotoDestination.FitV
-    | CloudPDF.DocAnnotationsList200ResponseAnnotationsItemLinkTargetGotoDestination.FitR
-    | CloudPDF.DocAnnotationsList200ResponseAnnotationsItemLinkTargetGotoDestination.FitB
-    | CloudPDF.DocAnnotationsList200ResponseAnnotationsItemLinkTargetGotoDestination.FitBh
-    | CloudPDF.DocAnnotationsList200ResponseAnnotationsItemLinkTargetGotoDestination.FitBv;
+export type PdfDestination =
+    | CloudPDF.PdfDestination.Xyz
+    | CloudPDF.PdfDestination.Fit
+    | CloudPDF.PdfDestination.FitH
+    | CloudPDF.PdfDestination.FitV
+    | CloudPDF.PdfDestination.FitR
+    | CloudPDF.PdfDestination.FitB
+    | CloudPDF.PdfDestination.FitBh
+    | CloudPDF.PdfDestination.FitBv;
 
-export namespace DocAnnotationsList200ResponseAnnotationsItemLinkTargetGotoDestination {
+export namespace PdfDestination {
     export interface Xyz {
         kind: "xyz";
         pageObjectNumber: number;

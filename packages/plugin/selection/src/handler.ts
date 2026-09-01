@@ -2,7 +2,7 @@ import type {
   InteractionCapability,
   InteractionHandler,
   PlatformFeedback,
-} from '@embedpdf/plugin-interaction';
+} from '@embedpdf/plugin-interaction/contract';
 import type { SelectionHostCapability } from './types';
 
 const CURSOR_TOKEN = 'selection-text';

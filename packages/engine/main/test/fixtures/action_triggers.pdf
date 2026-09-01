@@ -1,0 +1,58 @@
+%PDF-1.7
+%‚„œ”
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R 4 0 R] /Count 2 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /AA << /O << /S /Hide /T [7 0 R] /H false >> /C << /S /Hide /T [7 0 R] /H true >> >> /Annots [5 0 R 6 0 R 7 0 R 8 0 R 9 0 R 10 0 R 11 0 R 12 0 R] >>
+endobj
+4 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] >>
+endobj
+5 0 obj
+<< /Type /Annot /Subtype /Square /Rect [50 700 150 750] /NM (trigger) /F 4 /AA << /E << /S /Hide /T [6 0 R] /H false >> /X << /S /Hide /T [6 0 R] /H true >> >> >>
+endobj
+6 0 obj
+<< /Type /Annot /Subtype /Square /Rect [170 700 270 750] /NM (tip) /F 6 >>
+endobj
+7 0 obj
+<< /Type /Annot /Subtype /Square /Rect [50 640 150 690] /NM (pageTip) /F 6 >>
+endobj
+8 0 obj
+<< /Type /Annot /Subtype /Square /Rect [50 580 150 630] /NM (lifecycle) /F 4 /AA << /PO << /S /Hide /T [9 0 R] /H false >> /PC << /S /Hide /T [9 0 R] /H true >> /PV << /S /Hide /T [12 0 R] /H false >> /PI << /S /Hide /T [12 0 R] /H true >> >> >>
+endobj
+9 0 obj
+<< /Type /Annot /Subtype /Square /Rect [170 580 270 630] /NM (lifeTip) /F 6 >>
+endobj
+10 0 obj
+<< /Type /Annot /Subtype /Link /Rect [50 520 150 570] /NM (hoverlink) /F 4 /A << /S /URI /URI (https://example.test/hover) >> /AA << /E << /S /Hide /T [11 0 R] /H false >> /X << /S /Hide /T [11 0 R] /H true >> >> >>
+endobj
+11 0 obj
+<< /Type /Annot /Subtype /Square /Rect [170 520 270 570] /NM (linkTip) /F 6 >>
+endobj
+12 0 obj
+<< /Type /Annot /Subtype /Square /Rect [170 460 270 510] /NM (pvTip) /F 6 >>
+endobj
+xref
+0 13
+0000000000 65535 f 
+0000000015 00000 n 
+0000000064 00000 n 
+0000000127 00000 n 
+0000000344 00000 n 
+0000000415 00000 n 
+0000000593 00000 n 
+0000000683 00000 n 
+0000000776 00000 n 
+0000001037 00000 n 
+0000001131 00000 n 
+0000001363 00000 n 
+0000001458 00000 n 
+trailer
+<< /Size 13 /Root 1 0 R >>
+startxref
+1551
+%%EOF

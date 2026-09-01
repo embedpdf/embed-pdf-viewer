@@ -10,6 +10,7 @@
   "types": "./dist/index.d.cts",
   "exports": {
     ".": "./src/index.ts",
+    "./actions": "./src/actions.tsx",
     "./anchored": "./src/anchored.tsx",
     "./annotation": "./src/annotation.tsx",
     "./annotation-menu": "./src/annotation-menu.tsx",
@@ -42,6 +43,10 @@
       ".": {
         "import": "./dist/index.js",
         "require": "./dist/index.cjs"
+      },
+      "./actions": {
+        "import": "./dist/actions.js",
+        "require": "./dist/actions.cjs"
       },
       "./anchored": {
         "import": "./dist/anchored.js",
@@ -165,13 +170,15 @@
     "@embedpdf/plugin-view-manager": "workspace:*",
     "@embedpdf/core-stage": "workspace:*",
     "@embedpdf/core-ui": "workspace:*",
-    "@embedpdf/web": "workspace:*"
+    "@embedpdf/web": "workspace:*",
+    "@embedpdf/plugin-actions": "workspace:*"
   },
   "peerDependencies": {
     "react": ">=18",
     "react-dom": ">=18"
   },
   "devDependencies": {
+    "@embedpdf/engine": "workspace:*",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/react": "^16.3.2",
     "@types/react": "^18.3.0",

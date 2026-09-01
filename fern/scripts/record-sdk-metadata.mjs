@@ -287,6 +287,14 @@ if (language === 'csharp') {
 // repository. Stage a signed local Maven repository instead; the repository
 // release workflow bundles and uploads it through the Central Portal API.
 if (language === 'java') {
+  // The generated API surface is large enough to make Gradle's default 512 MiB
+  // build heap thrash during compileJava. Keep the build VM configuration in
+  // the generated project so it applies both here and in the standalone SDK.
+  writeFileSync(
+    `${outputDirectory}/gradle.properties`,
+    'org.gradle.jvmargs=-Xmx2g -XX:MaxMetaspaceSize=512m -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8\n',
+  );
+
   const projectPath = `${outputDirectory}/build.gradle`;
   const project = readFileSync(projectPath, 'utf8')
     .replace("    id 'maven-publish'\n", "    id 'maven-publish'\n    id 'signing'\n")
@@ -352,6 +360,10 @@ if (language === 'java') {
     ).concat(`
 tasks.withType(GenerateModuleMetadata) {
     enabled = false
+}
+
+tasks.withType(Jar).configureEach {
+    zip64 = true
 }
 
 signing {

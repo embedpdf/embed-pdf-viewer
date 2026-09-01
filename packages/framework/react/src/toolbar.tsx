@@ -29,8 +29,8 @@ import type {
   NormalizedUnit,
   OverflowSection,
 } from '@embedpdf/core-ui';
-import { CommandsToken, resolvedCommandsEqual } from '@embedpdf/plugin-commands';
-import type { ResolvedCommand } from '@embedpdf/plugin-commands';
+import { CommandsToken, resolvedCommandsEqual } from '@embedpdf/plugin-commands/contract';
+import type { ResolvedCommand } from '@embedpdf/plugin-commands/contract';
 import { useCapability, useDocumentId, useKernel, useKernelValue } from './runtime';
 
 // ── public render-prop contracts ─────────────────────────────────────────────

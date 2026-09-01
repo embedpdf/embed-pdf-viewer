@@ -1,5 +1,5 @@
 import type { DocumentEvent, EffectContext } from '@embedpdf/core';
-import { AnnotationToken as AnnotationHostToken } from '@embedpdf/plugin-annotation/internal';
+import { AnnotationToken as AnnotationHostToken } from '@embedpdf/plugin-annotation/contract/host';
 import { loadLinksPage } from './source';
 import type { LinkAction, LinkState } from './types';
 

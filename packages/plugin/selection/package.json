@@ -9,6 +9,8 @@
   "types": "./dist/index.d.cts",
   "exports": {
     ".": "./src/index.ts",
+    "./contract": "./src/contract.ts",
+    "./contract/host": "./src/host-contract.ts",
     "./internal": "./src/internal.ts",
     "./package.json": "./package.json"
   },
@@ -20,6 +22,14 @@
       ".": {
         "import": "./dist/index.js",
         "require": "./dist/index.cjs"
+      },
+      "./contract": {
+        "import": "./dist/contract.js",
+        "require": "./dist/contract.cjs"
+      },
+      "./contract/host": {
+        "import": "./dist/contract/host.js",
+        "require": "./dist/contract/host.cjs"
       },
       "./internal": {
         "import": "./dist/internal.js",

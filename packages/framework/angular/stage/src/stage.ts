@@ -28,7 +28,7 @@ import {
 } from '@angular/core';
 import { StageToken, createScrollHandler } from '@embedpdf/plugin-stage';
 import type { StageCapability, VisiblePage } from '@embedpdf/plugin-stage';
-import { InteractionToken } from '@embedpdf/plugin-interaction';
+import { InteractionToken } from '@embedpdf/plugin-interaction/contract';
 import {
   injectDocumentId,
   injectKernelHost,

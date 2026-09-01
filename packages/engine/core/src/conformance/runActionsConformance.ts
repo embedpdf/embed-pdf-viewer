@@ -1,13 +1,27 @@
 import type { DocumentHandle } from '../engine/DocumentHandle';
 import type { Engine } from '../engine/Engine';
+import type { PdfActionNode } from '../dto/PdfAction';
 import { DocumentActionsSnapshotSchema } from '../dto/PdfAction.schema';
 import type { ConformanceFixture, ConformanceTestRunner } from './runMetadataConformance';
+
+/** The script payload rides only the javascript/rendition arms. */
+function scriptOf(node: PdfActionNode | null | undefined): string {
+  if (!node) return '';
+  if (node.type === 'javascript') return node.script;
+  if (node.type === 'rendition') return node.script ?? '';
+  return '';
+}
 
 export interface ActionsConformanceFixtures {
   document: ConformanceFixture;
   page: ConformanceFixture;
   annotation: ConformanceFixture;
   field: ConformanceFixture;
+  /** `action_payloads.pdf` — every executable payload shape on one page of
+   *  /NM-keyed links. REQUIRED on both flavours: payload parity is a gate. */
+  payloads: ConformanceFixture;
+  /** `open_action_dest.pdf` — a destination-form catalog `/OpenAction`. */
+  openDestination: ConformanceFixture;
   /** A page whose only annotation is a Link with a `/S /JavaScript` action.
    *  Optional: the javascript-link classification test skips without it. */
   javascriptLink?: ConformanceFixture;
@@ -45,10 +59,10 @@ export function runActionsConformance(
         expect(DocumentActionsSnapshotSchema.safeParse(snapshot).success).toBe(true);
         expect(snapshot.openAction).toBeNull();
         expect(snapshot.willSave?.root?.type).toBe('javascript');
-        expect(snapshot.willSave?.root?.script ?? '').toMatch(/Will Save/);
-        expect(snapshot.didSave?.root?.script ?? '').toMatch(/Did Save/);
-        expect(snapshot.willPrint?.root?.script ?? '').toMatch(/Will Print/);
-        expect(snapshot.didPrint?.root?.script ?? '').toMatch(/Did Print/);
+        expect(scriptOf(snapshot.willSave?.root)).toMatch(/Will Save/);
+        expect(scriptOf(snapshot.didSave?.root)).toMatch(/Did Save/);
+        expect(scriptOf(snapshot.willPrint?.root)).toMatch(/Will Print/);
+        expect(scriptOf(snapshot.didPrint?.root)).toMatch(/Did Print/);
 
         const form = await doc.forms.list();
         expect(form.calculationOrder).toEqual([{ kind: 'objectNumber', fieldObjectNumber: 9 }]);
@@ -113,7 +127,7 @@ export function runActionsConformance(
         }
         // …while the script text lives ONLY on the scripting plane's model.
         expect(link?.actions?.activate?.root?.type).toBe('javascript');
-        expect(link?.actions?.activate?.root?.script ?? '').toMatch(/app\.alert/);
+        expect(scriptOf(link?.actions?.activate?.root)).toMatch(/app\.alert/);
       } finally {
         await doc.close();
       }
@@ -125,10 +139,170 @@ export function runActionsConformance(
         const form = await doc.forms.list();
         expect(form.fields).toHaveLength(1);
         expect(form.fields[0].actions?.format?.root?.type).toBe('javascript');
-        expect(form.fields[0].actions?.format?.root?.script ?? '').toMatch(/AFDate_FormatEx/);
+        expect(scriptOf(form.fields[0].actions?.format?.root)).toMatch(/AFDate_FormatEx/);
         const page = (await doc.pages.list()).pages[0];
         const widget = (await doc.page(page.pageObjectNumber).annotations.list()).annotations[0];
         expect(widget.actions).toBe(undefined);
+      } finally {
+        await doc.close();
+      }
+    });
+
+    test('carries interpreter payloads on every executable node', async () => {
+      const doc = await open(engine, opts, opts.fixtures.payloads);
+      try {
+        const page = (await doc.pages.list()).pages[0];
+        const snapshot = await doc.page(page.pageObjectNumber).annotations.list();
+        const pon = page.pageObjectNumber;
+        const rootOf = (nm: string) => {
+          const annotation = snapshot.annotations.find((candidate) => candidate.nm === nm);
+          expect(Boolean(annotation)).toBe(true);
+          return annotation?.actions?.activate?.root ?? null;
+        };
+        const targetOf = (nm: string) => {
+          const annotation = snapshot.annotations.find((candidate) => candidate.nm === nm);
+          return annotation?.subtype === 'link' ? annotation.target : null;
+        };
+
+        expect(rootOf('goto-fitr')).toMatchObject({
+          type: 'goto',
+          destination: { kind: 'fitR', pageObjectNumber: pon, left: 10, bottom: 20, right: 300, top: 400 },
+        });
+        // Dual planes agree by construction: the target IS the tree's projection.
+        expect(targetOf('goto-fitr')).toMatchObject({ kind: 'goto', destination: { kind: 'fitR' } });
+
+        expect(rootOf('uri-map')).toMatchObject({
+          type: 'uri',
+          uri: 'https://example.test/map',
+          isMap: true,
+        });
+        expect(rootOf('named-next')).toMatchObject({ type: 'named', name: 'NextPage' });
+
+        const mixed = rootOf('hide-mixed');
+        expect(mixed).toMatchObject({ type: 'hide', hide: false });
+        const mixedTargets = mixed?.type === 'hide' ? mixed.targets : [];
+        expect(mixedTargets).toHaveLength(2);
+        expect(mixedTargets[0]).toEqual({ kind: 'name', name: 'note1' });
+        expect(
+          mixedTargets[1]?.kind === 'objectNumber' && mixedTargets[1].objectNumber > 0,
+        ).toBe(true);
+        expect(rootOf('hide-scalar')).toMatchObject({
+          type: 'hide',
+          targets: [{ kind: 'name', name: 'fieldB' }],
+          hide: true,
+        });
+
+        // ResetForm's three states survive the wire distinctly.
+        expect(rootOf('reset-include')).toMatchObject({
+          type: 'reset-form',
+          fields: [{ kind: 'name', name: 'calc1' }],
+          exclude: true,
+        });
+        expect(rootOf('reset-absent')).toMatchObject({ type: 'reset-form', fields: null, exclude: true });
+        expect(rootOf('reset-empty')).toMatchObject({ type: 'reset-form', fields: [], exclude: false });
+
+        // SubmitForm's ATOMIC payload (Phase 4). /UF beats /F in a
+        // conforming << /FS /URL >> spec; a bare-string /F is the
+        // producer-compat extension; bit 9 dominates format with GetMethod
+        // kept alive (ISO 32000-2 Table 240).
+        expect(rootOf('submit-urlspec')).toMatchObject({
+          type: 'submit-form',
+          payload: {
+            url: 'https://uf.example.test/submit',
+            fields: [{ kind: 'name', name: 'parent' }],
+            flags: { raw: 0, exclude: false, format: 'fdf', method: 'post' },
+          },
+        });
+        expect(rootOf('submit-compat-xfdf')).toMatchObject({
+          type: 'submit-form',
+          payload: {
+            url: 'https://example.test/xfdf',
+            fields: [
+              { kind: 'name', name: 'noexport' },
+              { kind: 'name', name: 'plain' },
+            ],
+            flags: {
+              raw: 35,
+              exclude: true,
+              includeNoValueFields: true,
+              format: 'xfdf',
+              method: 'post',
+            },
+            charSet: 'utf-8',
+          },
+        });
+        expect(rootOf('submit-pdf-get')).toMatchObject({
+          type: 'submit-form',
+          payload: {
+            url: 'https://example.test/pdf',
+            fields: null,
+            flags: { raw: 264, format: 'pdf', method: 'get' },
+          },
+        });
+
+        expect(rootOf('launch-app')).toMatchObject({ type: 'launch', filePath: 'app.exe' });
+        expect(rootOf('gotor-file')).toMatchObject({ type: 'goto-remote', filePath: 'other.pdf' });
+
+        // A mixed /Next chain carries every payload in PDF order.
+        const chain = rootOf('chain-js-goto-hide');
+        expect(chain).toMatchObject({ type: 'javascript', script: "app.alert('chain');" });
+        expect(chain?.next[0]).toMatchObject({
+          type: 'goto',
+          destination: { kind: 'xyz', pageObjectNumber: pon, left: 5, top: 10, zoom: 1.25 },
+        });
+        expect(chain?.next[0]?.next[0]).toMatchObject({
+          type: 'hide',
+          targets: [{ kind: 'name', name: 'note1' }],
+          hide: true,
+        });
+      } finally {
+        await doc.close();
+      }
+    });
+
+    test('degrades unreadable payloads to unknown with payload-dropped', async () => {
+      const doc = await open(engine, opts, opts.fixtures.payloads);
+      try {
+        const page = (await doc.pages.list()).pages[0];
+        const snapshot = await doc.page(page.pageObjectNumber).annotations.list();
+        for (const [nm, subtype] of [
+          ['goto-malformed', 'GoTo'],
+          ['hide-partial', 'Hide'], // a partial target list must never half-execute
+          // The atomic-payload law: a submit whose REQUIRED /F is not a URL
+          // (or is absent) degrades WHOLE — never a half payload.
+          ['submit-not-url', 'SubmitForm'],
+          ['submit-no-f', 'SubmitForm'],
+        ] as const) {
+          const annotation = snapshot.annotations.find((candidate) => candidate.nm === nm);
+          const tree = annotation?.actions?.activate;
+          expect(tree?.root).toMatchObject({ type: 'unknown', subtype });
+          expect(tree?.warnings ?? []).toContain('payload-dropped');
+          // /A precedence, pinned: a broken action is a dead link — never a
+          // silent /Dest fallback.
+          if (annotation?.subtype === 'link') {
+            expect(annotation.target).toEqual({ kind: 'unsupported' });
+          }
+        }
+      } finally {
+        await doc.close();
+      }
+    });
+
+    test('reads a destination-form /OpenAction as openDestination', async () => {
+      const doc = await open(engine, opts, opts.fixtures.openDestination);
+      try {
+        expect(Boolean(doc.actions)).toBe(true);
+        const snapshot = await doc.actions!.read();
+        expect(DocumentActionsSnapshotSchema.safeParse(snapshot).success).toBe(true);
+        expect(snapshot.openAction).toBeNull();
+        const pon = (await doc.pages.list()).pages[0].pageObjectNumber;
+        expect(snapshot.openDestination).toEqual({
+          kind: 'xyz',
+          pageObjectNumber: pon,
+          left: 10,
+          top: 700,
+          zoom: 1.5,
+        });
       } finally {
         await doc.close();
       }

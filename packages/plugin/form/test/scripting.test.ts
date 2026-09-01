@@ -127,7 +127,7 @@ function harness(snapshot: FormSnapshot, nameTreeScript?: string) {
   }));
   const doc = {
     id: 'form-doc',
-    forms: { applyEffects },
+    forms: { list: async () => snapshot, applyEffects },
     actions: { read: readActions },
     security: {
       identity: { user_id: 'alex', display_name: 'Alex Morgan', group_id: 'EmbedPDF' },
@@ -139,12 +139,11 @@ function harness(snapshot: FormSnapshot, nameTreeScript?: string) {
     doc,
     document: documentMeta,
     config: {
-      enabled: true,
       now: () => Date.UTC(2026, 6, 15, 9, 30, 0),
       utcOffsetMinutes: () => 180,
       randomSeed: () => 7,
+      sandboxFactory: factory,
     },
-    sandboxFactory: factory,
   });
   return { controller, batches, applyEffects, readActions, factory, sandbox, snapshot };
 }
@@ -168,7 +167,7 @@ describe('form scripting transaction', () => {
     };
     const fx = harness(snapshot, `getField('status').value = 'initialized';`);
 
-    const result = await fx.controller.commit(snapshot, ref(2), { type: 'text', value: '3' });
+    const result = await fx.controller.commit(ref(2), { type: 'text', value: '3' });
 
     expect(result.status).toBe('applied');
     expect(fx.readActions).toHaveBeenCalledTimes(1);
@@ -198,7 +197,7 @@ describe('form scripting transaction', () => {
     };
     const fx = harness(snapshot);
 
-    const result = await fx.controller.commit(snapshot, ref(2), {
+    const result = await fx.controller.commit(ref(2), {
       type: 'text',
       value: 'invalid',
     });
@@ -223,7 +222,7 @@ describe('form scripting transaction', () => {
     };
     const fx = harness(snapshot);
 
-    await fx.controller.commit(snapshot, ref(2), { type: 'text', value: 'abc' });
+    await fx.controller.commit(ref(2), { type: 'text', value: 'abc' });
 
     expect(fx.batches[0]).toEqual([
       { kind: 'setValue', ref: ref(2), value: { type: 'text', value: 'ABC' } },
@@ -239,9 +238,7 @@ describe('form scripting transaction', () => {
     };
     const fx = harness(snapshot);
 
-    const result = await fx.controller.activate(
-      snapshot,
-      ref(2),
+    const result = await fx.controller.activate(ref(2),
       action(`
         getField('status').value = event.name + ':' + event.type;
         app.alert('Summary ready');
@@ -278,8 +275,8 @@ describe('form scripting transaction', () => {
     };
     const fx = harness(snapshot, `throw new Error('boot failed');`);
 
-    const first = await fx.controller.commit(snapshot, ref(2), { type: 'text', value: 'a' });
-    const second = await fx.controller.commit(snapshot, ref(2), { type: 'text', value: 'b' });
+    const first = await fx.controller.commit(ref(2), { type: 'text', value: 'a' });
+    const second = await fx.controller.commit(ref(2), { type: 'text', value: 'b' });
 
     expect(first.status).toBe('applied');
     expect(first.error).toBeUndefined();

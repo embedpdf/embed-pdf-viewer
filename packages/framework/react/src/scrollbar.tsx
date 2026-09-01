@@ -25,8 +25,8 @@
 
 import * as React from 'react';
 import { useEffect, useRef, useState } from 'react';
-import { StageToken } from '@embedpdf/plugin-stage';
-import type { ScrollMetrics, StageCapability } from '@embedpdf/plugin-stage';
+import { StageToken } from '@embedpdf/plugin-stage/contract';
+import type { ScrollMetrics, StageCapability } from '@embedpdf/plugin-stage/contract';
 import type { CapabilityToken } from '@embedpdf/core';
 import { useCapability, useSelector } from './runtime';
 

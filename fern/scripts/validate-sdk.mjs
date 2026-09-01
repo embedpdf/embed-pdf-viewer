@@ -92,6 +92,15 @@ switch (language) {
     includes('src/uploads/Uploads.ts', 'class Uploads');
     includes('src/errors/CloudPDFError.ts', 'export class CloudPDFError');
     includes('src/errors/CloudPDFTimeoutError.ts', 'export class CloudPDFTimeoutError');
+    includes('src/api/types/PdfActionNode.ts', 'export type PdfActionNode =');
+    includes('src/api/types/PdfActionNode.ts', 'payload?: PdfActionNodeSubmitForm.Payload');
+    const pathScopedActionTypes = readdirSync(`${outputDirectory}/src/api/types`).filter((file) =>
+      /^Doc(?:Annotations|Forms).*Actions.*Root/.test(file),
+    );
+    assert(
+      pathScopedActionTypes.length === 0,
+      `shared action components expanded into ${pathScopedActionTypes.length} path-scoped types`,
+    );
     break;
   }
   case 'python': {
@@ -188,12 +197,23 @@ switch (language) {
     break;
   }
   case 'java': {
+    assert(
+      read('gradle.properties') ===
+        'org.gradle.jvmargs=-Xmx2g -XX:MaxMetaspaceSize=512m -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8\n',
+      'Gradle build JVM memory is not configured for the generated API surface',
+    );
     const build = read('build.gradle');
     assert(build.includes("group = 'com.cloudpdf'"), 'Gradle group is not com.cloudpdf');
     assert(build.includes("artifactId = 'sdk'"), 'Gradle artifact is not sdk');
     assert(
       build.includes(`version = '${expectedVersion}'`),
       `Gradle version is not ${expectedVersion}`,
+    );
+    assert(
+      build.includes(`tasks.withType(Jar).configureEach {
+    zip64 = true
+}`),
+      'ZIP64 is not enabled for Gradle JAR tasks',
     );
     assert(build.includes("id 'signing'"), 'Gradle signing plugin is not enabled');
     assert(

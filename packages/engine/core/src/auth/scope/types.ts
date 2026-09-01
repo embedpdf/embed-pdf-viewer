@@ -33,6 +33,7 @@ export type DocCapability =
   | 'doc.forms.read' // structured read of form field definitions/values (cloud-only; no PDF-bit gate — reading is unconditional)
   | 'doc.forms.fill' // set form field values (PDF bit 9, also implied by bit 6)
   | 'doc.forms.modify' // create/restructure/delete fields (PDF bit 6 + bit 4)
+  | 'doc.forms.submit' // deliver a form submission to the document's HOME (grant-minted ONLY — ISO defines no submit permission bit, so `pdf.permissions` never expands it; gates the engine `forms.submit` capability, NOT viewer-side handlers)
 
   // Annotations
   | 'doc.annotate.read' // structured read of annotation lists (cloud-only; no PDF-bit gate — reading is unconditional)

@@ -1,9 +1,9 @@
 import type { PdfDestination } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
-import { withScratchN } from '../../../../runtime/memory/scratch';
-import { F32_BYTES, I32_BYTES, readF32, readI32 } from '../../../../runtime/memory/structs';
-import { DEST_VIEW } from '../destinationViewCodes';
+import { withScratchN } from '../../runtime/memory/scratch';
+import { F32_BYTES, I32_BYTES, readF32, readI32 } from '../../runtime/memory/structs';
+import { DEST_VIEW } from './destinationViewCodes';
 
 const MAX_VIEW_PARAMS = 4; // /FitR carries the most: left, bottom, right, top
 
@@ -16,7 +16,8 @@ const MAX_VIEW_PARAMS = 4; // /FitR carries the most: left, bottom, right, top
  * in the document, or an unknown fit type. Coordinates stay raw PDF user
  * space — no conversion at this layer.
  *
- * Shared by the link reader today; the outline/bookmark port reuses it.
+ * Shared by the link reader, `goto` action-node payloads, and the document
+ * `openDestination`; the outline/bookmark port reuses it too.
  */
 export function readDestination(
   fn: PdfFunctions,

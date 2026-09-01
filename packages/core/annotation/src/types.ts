@@ -659,6 +659,10 @@ export type Msg =
   | { t: 'deselect'; ids?: Id[] }
   /** Pointer entered/left an annotation (topmost hit id, or null). Pure state. */
   | { t: 'hover'; id: Id | null }
+  /** Force/clear session visibility for specific annotations (the actions
+   *  plane's Hide sink). Hiding also clears transient engagement (selection,
+   *  editing, hover) for the hidden ids. Unknown ids no-op. Zero effects. */
+  /** Drop overrides for truly DELETED annotations (never for reloads). */
   // Programmatic selection (the data-API `select(ref)` — e.g. auto-selecting
   // a freshly placed form widget). Unknown/unselectable ids are dropped;
   // selecting a group member takes the whole group, like a click would.

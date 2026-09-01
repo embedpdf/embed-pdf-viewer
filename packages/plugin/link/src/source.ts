@@ -36,6 +36,16 @@ export function loadLinksPage(io: LinkSourceIO, pon: number): void {
                 : `idx:${pon}:${dto.index}`,
             rect: pdfToContentRect(dto.rect, crop),
             target: dto.target,
+            ...(dto.actions?.activate ? { activate: dto.actions.activate } : {}),
+            ...(dto.actions?.cursorEnter?.root || dto.actions?.cursorExit?.root
+              ? {
+                  hoverEvents: {
+                    enter: Boolean(dto.actions?.cursorEnter?.root),
+                    exit: Boolean(dto.actions?.cursorExit?.root),
+                  },
+                }
+              : {}),
+            ref: dto.ref,
             // A `/RT /Group` child riding another annotation — labeled so the
             // nav layer can defer to editing (moot in viewer-only deployments,
             // but the item contract stays truthful either way).

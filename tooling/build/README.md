@@ -31,6 +31,15 @@ plugin authors; this file is the law for how packages BUILD.
      consumers allow. TS resolves dist `.d.ts` (shielded by `skipLibCheck`),
      Vite's dev server still reads source for HMR via the `development`
      condition. Requires dist to exist — `turbo run build` handles ordering.
+5. **Plugin contracts are real entries, not naming conventions.** Every plugin
+   publishes `./contract`; plugins with a wider sibling protocol may also
+   publish `./contract/host`. The root remains the implementation opt-in and
+   re-exports `./contract`. `/internal` is only an API-visibility boundary and
+   may contain implementation code. Named pure/helper entries such as
+   `/destination` are allowed when the contract is the wrong abstraction.
+   `pnpm check:plugin-boundaries` verifies imports and follows each contract's
+   runtime graph so reducers, capabilities, effects, and plugin wiring cannot
+   leak into it.
 
 ## Package setup
 
@@ -39,7 +48,10 @@ plugin authors; this file is the law for how packages BUILD.
   "scripts": { "build": "epdf-build" },
   "devDependencies": { "@embedpdf/tooling-build": "workspace:*" },
   "sideEffects": false,
-  "exports": { ".": "./src/index.ts" }
+  "exports": {
+    ".": "./src/index.ts",
+    "./contract": "./src/contract.ts"
+  }
 }
 ```
 

@@ -6,8 +6,8 @@
  * Selection is the producer; annotation the consumer — selection never knows
  * annotation exists. Kept out of the plugin-definition file so that stays lean.
  */
-import type { InteractionCapability } from '@embedpdf/plugin-interaction';
-import type { SelectionHostCapability } from '@embedpdf/plugin-selection/internal';
+import type { InteractionCapability } from '@embedpdf/plugin-interaction/contract';
+import type { SelectionHostCapability } from '@embedpdf/plugin-selection/contract/host';
 import type { AnnotationHostCapability } from './types';
 
 /**

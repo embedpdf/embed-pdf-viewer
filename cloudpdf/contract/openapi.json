@@ -4293,6 +4293,798 @@
         "required": ["name", "code", "message"],
         "additionalProperties": false
       },
+      "PdfActionTargetRef": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": ["name"]
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": ["kind", "name"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": ["objectNumber"]
+              },
+              "objectNumber": {
+                "type": "integer",
+                "exclusiveMinimum": true,
+                "minimum": 0
+              }
+            },
+            "required": ["kind", "objectNumber"],
+            "additionalProperties": false
+          }
+        ]
+      },
+      "PdfDestination": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": ["xyz"]
+              },
+              "pageObjectNumber": {
+                "type": "integer",
+                "exclusiveMinimum": true,
+                "minimum": 0
+              },
+              "left": {
+                "type": "number",
+                "nullable": true
+              },
+              "top": {
+                "$ref": "#/components/schemas/PdfDestination/anyOf/0/properties/left"
+              },
+              "zoom": {
+                "$ref": "#/components/schemas/PdfDestination/anyOf/0/properties/left"
+              }
+            },
+            "required": ["kind", "pageObjectNumber"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": ["fit"]
+              },
+              "pageObjectNumber": {
+                "$ref": "#/components/schemas/PdfDestination/anyOf/0/properties/pageObjectNumber"
+              }
+            },
+            "required": ["kind", "pageObjectNumber"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": ["fitH"]
+              },
+              "pageObjectNumber": {
+                "$ref": "#/components/schemas/PdfDestination/anyOf/0/properties/pageObjectNumber"
+              },
+              "top": {
+                "$ref": "#/components/schemas/PdfDestination/anyOf/0/properties/left"
+              }
+            },
+            "required": ["kind", "pageObjectNumber"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": ["fitV"]
+              },
+              "pageObjectNumber": {
+                "$ref": "#/components/schemas/PdfDestination/anyOf/0/properties/pageObjectNumber"
+              },
+              "left": {
+                "$ref": "#/components/schemas/PdfDestination/anyOf/0/properties/left"
+              }
+            },
+            "required": ["kind", "pageObjectNumber"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": ["fitR"]
+              },
+              "pageObjectNumber": {
+                "$ref": "#/components/schemas/PdfDestination/anyOf/0/properties/pageObjectNumber"
+              },
+              "left": {
+                "type": "number"
+              },
+              "bottom": {
+                "type": "number"
+              },
+              "right": {
+                "type": "number"
+              },
+              "top": {
+                "type": "number"
+              }
+            },
+            "required": ["kind", "pageObjectNumber", "left", "bottom", "right", "top"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": ["fitB"]
+              },
+              "pageObjectNumber": {
+                "$ref": "#/components/schemas/PdfDestination/anyOf/0/properties/pageObjectNumber"
+              }
+            },
+            "required": ["kind", "pageObjectNumber"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": ["fitBH"]
+              },
+              "pageObjectNumber": {
+                "$ref": "#/components/schemas/PdfDestination/anyOf/0/properties/pageObjectNumber"
+              },
+              "top": {
+                "$ref": "#/components/schemas/PdfDestination/anyOf/0/properties/left"
+              }
+            },
+            "required": ["kind", "pageObjectNumber"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": ["fitBV"]
+              },
+              "pageObjectNumber": {
+                "$ref": "#/components/schemas/PdfDestination/anyOf/0/properties/pageObjectNumber"
+              },
+              "left": {
+                "$ref": "#/components/schemas/PdfDestination/anyOf/0/properties/left"
+              }
+            },
+            "required": ["kind", "pageObjectNumber"],
+            "additionalProperties": false
+          }
+        ]
+      },
+      "PdfActionNode": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["javascript"]
+              },
+              "subtype": {
+                "type": "string"
+              },
+              "next": {
+                "type": "array",
+                "items": {}
+              },
+              "script": {
+                "type": "string"
+              }
+            },
+            "required": ["type", "subtype", "next", "script"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["goto"]
+              },
+              "subtype": {
+                "$ref": "#/components/schemas/PdfActionNode/anyOf/0/properties/subtype"
+              },
+              "next": {
+                "$ref": "#/components/schemas/PdfActionNode/anyOf/0/properties/next"
+              },
+              "destination": {
+                "$ref": "#/components/schemas/PdfDestination"
+              }
+            },
+            "required": ["type", "subtype", "next", "destination"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["uri"]
+              },
+              "subtype": {
+                "$ref": "#/components/schemas/PdfActionNode/anyOf/0/properties/subtype"
+              },
+              "next": {
+                "$ref": "#/components/schemas/PdfActionNode/anyOf/0/properties/next"
+              },
+              "uri": {
+                "type": "string"
+              },
+              "isMap": {
+                "type": "boolean"
+              }
+            },
+            "required": ["type", "subtype", "next", "uri", "isMap"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["named"]
+              },
+              "subtype": {
+                "$ref": "#/components/schemas/PdfActionNode/anyOf/0/properties/subtype"
+              },
+              "next": {
+                "$ref": "#/components/schemas/PdfActionNode/anyOf/0/properties/next"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": ["type", "subtype", "next", "name"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["hide"]
+              },
+              "subtype": {
+                "$ref": "#/components/schemas/PdfActionNode/anyOf/0/properties/subtype"
+              },
+              "next": {
+                "$ref": "#/components/schemas/PdfActionNode/anyOf/0/properties/next"
+              },
+              "targets": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/PdfActionTargetRef"
+                }
+              },
+              "hide": {
+                "type": "boolean"
+              }
+            },
+            "required": ["type", "subtype", "next", "targets", "hide"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["reset-form"]
+              },
+              "subtype": {
+                "$ref": "#/components/schemas/PdfActionNode/anyOf/0/properties/subtype"
+              },
+              "next": {
+                "$ref": "#/components/schemas/PdfActionNode/anyOf/0/properties/next"
+              },
+              "fields": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/PdfActionTargetRef"
+                },
+                "nullable": true
+              },
+              "exclude": {
+                "type": "boolean"
+              }
+            },
+            "required": ["type", "subtype", "next", "fields", "exclude"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["goto-remote"]
+              },
+              "subtype": {
+                "$ref": "#/components/schemas/PdfActionNode/anyOf/0/properties/subtype"
+              },
+              "next": {
+                "$ref": "#/components/schemas/PdfActionNode/anyOf/0/properties/next"
+              },
+              "filePath": {
+                "type": "string"
+              }
+            },
+            "required": ["type", "subtype", "next", "filePath"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["goto-embedded"]
+              },
+              "subtype": {
+                "$ref": "#/components/schemas/PdfActionNode/anyOf/0/properties/subtype"
+              },
+              "next": {
+                "$ref": "#/components/schemas/PdfActionNode/anyOf/0/properties/next"
+              },
+              "filePath": {
+                "type": "string"
+              }
+            },
+            "required": ["type", "subtype", "next", "filePath"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["launch"]
+              },
+              "subtype": {
+                "$ref": "#/components/schemas/PdfActionNode/anyOf/0/properties/subtype"
+              },
+              "next": {
+                "$ref": "#/components/schemas/PdfActionNode/anyOf/0/properties/next"
+              },
+              "filePath": {
+                "type": "string"
+              }
+            },
+            "required": ["type", "subtype", "next", "filePath"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["rendition"]
+              },
+              "subtype": {
+                "$ref": "#/components/schemas/PdfActionNode/anyOf/0/properties/subtype"
+              },
+              "next": {
+                "$ref": "#/components/schemas/PdfActionNode/anyOf/0/properties/next"
+              },
+              "script": {
+                "type": "string"
+              }
+            },
+            "required": ["type", "subtype", "next"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["submit-form"]
+              },
+              "subtype": {
+                "$ref": "#/components/schemas/PdfActionNode/anyOf/0/properties/subtype"
+              },
+              "next": {
+                "$ref": "#/components/schemas/PdfActionNode/anyOf/0/properties/next"
+              },
+              "payload": {
+                "type": "object",
+                "properties": {
+                  "url": {
+                    "type": "string"
+                  },
+                  "fields": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/PdfActionTargetRef"
+                    },
+                    "nullable": true
+                  },
+                  "flags": {
+                    "type": "object",
+                    "properties": {
+                      "raw": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "exclude": {
+                        "type": "boolean"
+                      },
+                      "includeNoValueFields": {
+                        "type": "boolean"
+                      },
+                      "format": {
+                        "type": "string",
+                        "enum": ["fdf", "html", "xfdf", "pdf"]
+                      },
+                      "method": {
+                        "type": "string",
+                        "enum": ["post", "get"]
+                      },
+                      "submitCoordinates": {
+                        "type": "boolean"
+                      },
+                      "includeAppendSaves": {
+                        "type": "boolean"
+                      },
+                      "includeAnnotations": {
+                        "type": "boolean"
+                      },
+                      "canonicalFormat": {
+                        "type": "boolean"
+                      },
+                      "exclNonUserAnnots": {
+                        "type": "boolean"
+                      },
+                      "exclFKey": {
+                        "type": "boolean"
+                      },
+                      "embedForm": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "raw",
+                      "exclude",
+                      "includeNoValueFields",
+                      "format",
+                      "method",
+                      "submitCoordinates",
+                      "includeAppendSaves",
+                      "includeAnnotations",
+                      "canonicalFormat",
+                      "exclNonUserAnnots",
+                      "exclFKey",
+                      "embedForm"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "charSet": {
+                    "type": "string"
+                  }
+                },
+                "required": ["url", "fields", "flags"],
+                "additionalProperties": false
+              }
+            },
+            "required": ["type", "subtype", "next"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["thread"]
+              },
+              "subtype": {
+                "$ref": "#/components/schemas/PdfActionNode/anyOf/0/properties/subtype"
+              },
+              "next": {
+                "$ref": "#/components/schemas/PdfActionNode/anyOf/0/properties/next"
+              }
+            },
+            "required": ["type", "subtype", "next"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["sound"]
+              },
+              "subtype": {
+                "$ref": "#/components/schemas/PdfActionNode/anyOf/0/properties/subtype"
+              },
+              "next": {
+                "$ref": "#/components/schemas/PdfActionNode/anyOf/0/properties/next"
+              }
+            },
+            "required": ["type", "subtype", "next"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["movie"]
+              },
+              "subtype": {
+                "$ref": "#/components/schemas/PdfActionNode/anyOf/0/properties/subtype"
+              },
+              "next": {
+                "$ref": "#/components/schemas/PdfActionNode/anyOf/0/properties/next"
+              }
+            },
+            "required": ["type", "subtype", "next"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["import-data"]
+              },
+              "subtype": {
+                "$ref": "#/components/schemas/PdfActionNode/anyOf/0/properties/subtype"
+              },
+              "next": {
+                "$ref": "#/components/schemas/PdfActionNode/anyOf/0/properties/next"
+              }
+            },
+            "required": ["type", "subtype", "next"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["set-ocg-state"]
+              },
+              "subtype": {
+                "$ref": "#/components/schemas/PdfActionNode/anyOf/0/properties/subtype"
+              },
+              "next": {
+                "$ref": "#/components/schemas/PdfActionNode/anyOf/0/properties/next"
+              }
+            },
+            "required": ["type", "subtype", "next"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["transition"]
+              },
+              "subtype": {
+                "$ref": "#/components/schemas/PdfActionNode/anyOf/0/properties/subtype"
+              },
+              "next": {
+                "$ref": "#/components/schemas/PdfActionNode/anyOf/0/properties/next"
+              }
+            },
+            "required": ["type", "subtype", "next"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["goto-3d-view"]
+              },
+              "subtype": {
+                "$ref": "#/components/schemas/PdfActionNode/anyOf/0/properties/subtype"
+              },
+              "next": {
+                "$ref": "#/components/schemas/PdfActionNode/anyOf/0/properties/next"
+              }
+            },
+            "required": ["type", "subtype", "next"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["unknown"]
+              },
+              "subtype": {
+                "$ref": "#/components/schemas/PdfActionNode/anyOf/0/properties/subtype"
+              },
+              "next": {
+                "$ref": "#/components/schemas/PdfActionNode/anyOf/0/properties/next"
+              }
+            },
+            "required": ["type", "subtype", "next"],
+            "additionalProperties": false
+          }
+        ]
+      },
+      "PdfActionTree": {
+        "type": "object",
+        "properties": {
+          "root": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PdfActionNode"
+              }
+            ],
+            "nullable": true
+          },
+          "incomplete": {
+            "type": "boolean"
+          },
+          "warningFlags": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["cycle-dropped", "malformed-next", "incomplete", "payload-dropped"]
+            }
+          }
+        },
+        "required": ["root", "incomplete", "warningFlags", "warnings"],
+        "additionalProperties": false
+      },
+      "PdfFieldActions": {
+        "type": "object",
+        "properties": {
+          "keystroke": {
+            "$ref": "#/components/schemas/PdfActionTree"
+          },
+          "format": {
+            "$ref": "#/components/schemas/PdfActionTree"
+          },
+          "validate": {
+            "$ref": "#/components/schemas/PdfActionTree"
+          },
+          "calculate": {
+            "$ref": "#/components/schemas/PdfActionTree"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PdfPageActions": {
+        "type": "object",
+        "properties": {
+          "open": {
+            "$ref": "#/components/schemas/PdfActionTree"
+          },
+          "close": {
+            "$ref": "#/components/schemas/PdfActionTree"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PdfAnnotationActions": {
+        "type": "object",
+        "properties": {
+          "activate": {
+            "$ref": "#/components/schemas/PdfActionTree"
+          },
+          "cursorEnter": {
+            "$ref": "#/components/schemas/PdfActionTree"
+          },
+          "cursorExit": {
+            "$ref": "#/components/schemas/PdfActionTree"
+          },
+          "mouseDown": {
+            "$ref": "#/components/schemas/PdfActionTree"
+          },
+          "mouseUp": {
+            "$ref": "#/components/schemas/PdfActionTree"
+          },
+          "focus": {
+            "$ref": "#/components/schemas/PdfActionTree"
+          },
+          "blur": {
+            "$ref": "#/components/schemas/PdfActionTree"
+          },
+          "pageOpen": {
+            "$ref": "#/components/schemas/PdfActionTree"
+          },
+          "pageClose": {
+            "$ref": "#/components/schemas/PdfActionTree"
+          },
+          "pageVisible": {
+            "$ref": "#/components/schemas/PdfActionTree"
+          },
+          "pageInvisible": {
+            "$ref": "#/components/schemas/PdfActionTree"
+          }
+        },
+        "additionalProperties": false
+      },
+      "DocumentActionsSnapshot": {
+        "type": "object",
+        "properties": {
+          "nameTreeScripts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "action": {
+                  "$ref": "#/components/schemas/PdfActionTree"
+                }
+              },
+              "required": ["name", "action"],
+              "additionalProperties": false
+            }
+          },
+          "openAction": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PdfActionTree"
+              }
+            ],
+            "nullable": true
+          },
+          "openDestination": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PdfDestination"
+              }
+            ],
+            "nullable": true,
+            "default": null
+          },
+          "willClose": {
+            "$ref": "#/components/schemas/PdfActionTree"
+          },
+          "willSave": {
+            "$ref": "#/components/schemas/PdfActionTree"
+          },
+          "didSave": {
+            "$ref": "#/components/schemas/PdfActionTree"
+          },
+          "willPrint": {
+            "$ref": "#/components/schemas/PdfActionTree"
+          },
+          "didPrint": {
+            "$ref": "#/components/schemas/PdfActionTree"
+          }
+        },
+        "required": ["nameTreeScripts", "openAction"],
+        "additionalProperties": false
+      },
       "TenantsCreateRequest": {
         "type": "object",
         "properties": {
@@ -7504,103 +8296,7 @@
                       "type": "string"
                     },
                     "actions": {
-                      "type": "object",
-                      "properties": {
-                        "activate": {
-                          "type": "object",
-                          "properties": {
-                            "root": {
-                              "type": "object",
-                              "properties": {
-                                "type": {
-                                  "type": "string",
-                                  "enum": [
-                                    "unknown",
-                                    "goto",
-                                    "goto-remote",
-                                    "goto-embedded",
-                                    "launch",
-                                    "thread",
-                                    "uri",
-                                    "sound",
-                                    "movie",
-                                    "hide",
-                                    "named",
-                                    "submit-form",
-                                    "reset-form",
-                                    "import-data",
-                                    "javascript",
-                                    "set-ocg-state",
-                                    "rendition",
-                                    "transition",
-                                    "goto-3d-view"
-                                  ]
-                                },
-                                "subtype": {
-                                  "type": "string"
-                                },
-                                "script": {
-                                  "type": "string"
-                                },
-                                "next": {
-                                  "type": "array",
-                                  "items": {}
-                                }
-                              },
-                              "required": ["type", "subtype", "next"],
-                              "additionalProperties": false,
-                              "nullable": true
-                            },
-                            "incomplete": {
-                              "type": "boolean"
-                            },
-                            "warningFlags": {
-                              "type": "integer",
-                              "minimum": 0
-                            },
-                            "warnings": {
-                              "type": "array",
-                              "items": {
-                                "type": "string",
-                                "enum": ["cycle-dropped", "malformed-next", "incomplete"]
-                              }
-                            }
-                          },
-                          "required": ["root", "incomplete", "warningFlags", "warnings"],
-                          "additionalProperties": false
-                        },
-                        "cursorEnter": {
-                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/actions/properties/activate"
-                        },
-                        "cursorExit": {
-                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/actions/properties/activate"
-                        },
-                        "mouseDown": {
-                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/actions/properties/activate"
-                        },
-                        "mouseUp": {
-                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/actions/properties/activate"
-                        },
-                        "focus": {
-                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/actions/properties/activate"
-                        },
-                        "blur": {
-                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/actions/properties/activate"
-                        },
-                        "pageOpen": {
-                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/actions/properties/activate"
-                        },
-                        "pageClose": {
-                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/actions/properties/activate"
-                        },
-                        "pageVisible": {
-                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/actions/properties/activate"
-                        },
-                        "pageInvisible": {
-                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/actions/properties/activate"
-                        }
-                      },
-                      "additionalProperties": false
+                      "$ref": "#/components/schemas/PdfAnnotationActions"
                     },
                     "color": {
                       "type": "object",
@@ -7750,7 +8446,7 @@
                       "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/updatedBy"
                     },
                     "actions": {
-                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/actions"
+                      "$ref": "#/components/schemas/PdfAnnotationActions"
                     },
                     "color": {
                       "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/color"
@@ -7850,7 +8546,7 @@
                       "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/updatedBy"
                     },
                     "actions": {
-                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/actions"
+                      "$ref": "#/components/schemas/PdfAnnotationActions"
                     },
                     "color": {
                       "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/color"
@@ -7950,7 +8646,7 @@
                       "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/updatedBy"
                     },
                     "actions": {
-                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/actions"
+                      "$ref": "#/components/schemas/PdfAnnotationActions"
                     },
                     "color": {
                       "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/color"
@@ -8056,7 +8752,7 @@
                       "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/updatedBy"
                     },
                     "actions": {
-                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/actions"
+                      "$ref": "#/components/schemas/PdfAnnotationActions"
                     },
                     "color": {
                       "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/color"
@@ -8216,7 +8912,7 @@
                       "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/updatedBy"
                     },
                     "actions": {
-                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/actions"
+                      "$ref": "#/components/schemas/PdfAnnotationActions"
                     },
                     "color": {
                       "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/color"
@@ -8341,7 +9037,7 @@
                       "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/updatedBy"
                     },
                     "actions": {
-                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/actions"
+                      "$ref": "#/components/schemas/PdfAnnotationActions"
                     },
                     "color": {
                       "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/color"
@@ -8470,7 +9166,7 @@
                       "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/updatedBy"
                     },
                     "actions": {
-                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/actions"
+                      "$ref": "#/components/schemas/PdfAnnotationActions"
                     },
                     "color": {
                       "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/color"
@@ -8618,7 +9314,7 @@
                       "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/updatedBy"
                     },
                     "actions": {
-                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/actions"
+                      "$ref": "#/components/schemas/PdfAnnotationActions"
                     },
                     "color": {
                       "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/color"
@@ -8750,7 +9446,7 @@
                       "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/updatedBy"
                     },
                     "actions": {
-                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/actions"
+                      "$ref": "#/components/schemas/PdfAnnotationActions"
                     },
                     "subtype": {
                       "type": "string",
@@ -8766,163 +9462,7 @@
                               "enum": ["goto"]
                             },
                             "destination": {
-                              "anyOf": [
-                                {
-                                  "type": "object",
-                                  "properties": {
-                                    "kind": {
-                                      "type": "string",
-                                      "enum": ["xyz"]
-                                    },
-                                    "pageObjectNumber": {
-                                      "type": "integer",
-                                      "exclusiveMinimum": true,
-                                      "minimum": 0
-                                    },
-                                    "left": {
-                                      "type": "number",
-                                      "nullable": true
-                                    },
-                                    "top": {
-                                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/9/properties/target/anyOf/0/properties/destination/anyOf/0/properties/left"
-                                    },
-                                    "zoom": {
-                                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/9/properties/target/anyOf/0/properties/destination/anyOf/0/properties/left"
-                                    }
-                                  },
-                                  "required": ["kind", "pageObjectNumber"],
-                                  "additionalProperties": false
-                                },
-                                {
-                                  "type": "object",
-                                  "properties": {
-                                    "kind": {
-                                      "type": "string",
-                                      "enum": ["fit"]
-                                    },
-                                    "pageObjectNumber": {
-                                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/9/properties/target/anyOf/0/properties/destination/anyOf/0/properties/pageObjectNumber"
-                                    }
-                                  },
-                                  "required": ["kind", "pageObjectNumber"],
-                                  "additionalProperties": false
-                                },
-                                {
-                                  "type": "object",
-                                  "properties": {
-                                    "kind": {
-                                      "type": "string",
-                                      "enum": ["fitH"]
-                                    },
-                                    "pageObjectNumber": {
-                                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/9/properties/target/anyOf/0/properties/destination/anyOf/0/properties/pageObjectNumber"
-                                    },
-                                    "top": {
-                                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/9/properties/target/anyOf/0/properties/destination/anyOf/0/properties/left"
-                                    }
-                                  },
-                                  "required": ["kind", "pageObjectNumber"],
-                                  "additionalProperties": false
-                                },
-                                {
-                                  "type": "object",
-                                  "properties": {
-                                    "kind": {
-                                      "type": "string",
-                                      "enum": ["fitV"]
-                                    },
-                                    "pageObjectNumber": {
-                                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/9/properties/target/anyOf/0/properties/destination/anyOf/0/properties/pageObjectNumber"
-                                    },
-                                    "left": {
-                                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/9/properties/target/anyOf/0/properties/destination/anyOf/0/properties/left"
-                                    }
-                                  },
-                                  "required": ["kind", "pageObjectNumber"],
-                                  "additionalProperties": false
-                                },
-                                {
-                                  "type": "object",
-                                  "properties": {
-                                    "kind": {
-                                      "type": "string",
-                                      "enum": ["fitR"]
-                                    },
-                                    "pageObjectNumber": {
-                                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/9/properties/target/anyOf/0/properties/destination/anyOf/0/properties/pageObjectNumber"
-                                    },
-                                    "left": {
-                                      "type": "number"
-                                    },
-                                    "bottom": {
-                                      "type": "number"
-                                    },
-                                    "right": {
-                                      "type": "number"
-                                    },
-                                    "top": {
-                                      "type": "number"
-                                    }
-                                  },
-                                  "required": [
-                                    "kind",
-                                    "pageObjectNumber",
-                                    "left",
-                                    "bottom",
-                                    "right",
-                                    "top"
-                                  ],
-                                  "additionalProperties": false
-                                },
-                                {
-                                  "type": "object",
-                                  "properties": {
-                                    "kind": {
-                                      "type": "string",
-                                      "enum": ["fitB"]
-                                    },
-                                    "pageObjectNumber": {
-                                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/9/properties/target/anyOf/0/properties/destination/anyOf/0/properties/pageObjectNumber"
-                                    }
-                                  },
-                                  "required": ["kind", "pageObjectNumber"],
-                                  "additionalProperties": false
-                                },
-                                {
-                                  "type": "object",
-                                  "properties": {
-                                    "kind": {
-                                      "type": "string",
-                                      "enum": ["fitBH"]
-                                    },
-                                    "pageObjectNumber": {
-                                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/9/properties/target/anyOf/0/properties/destination/anyOf/0/properties/pageObjectNumber"
-                                    },
-                                    "top": {
-                                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/9/properties/target/anyOf/0/properties/destination/anyOf/0/properties/left"
-                                    }
-                                  },
-                                  "required": ["kind", "pageObjectNumber"],
-                                  "additionalProperties": false
-                                },
-                                {
-                                  "type": "object",
-                                  "properties": {
-                                    "kind": {
-                                      "type": "string",
-                                      "enum": ["fitBV"]
-                                    },
-                                    "pageObjectNumber": {
-                                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/9/properties/target/anyOf/0/properties/destination/anyOf/0/properties/pageObjectNumber"
-                                    },
-                                    "left": {
-                                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/9/properties/target/anyOf/0/properties/destination/anyOf/0/properties/left"
-                                    }
-                                  },
-                                  "required": ["kind", "pageObjectNumber"],
-                                  "additionalProperties": false
-                                }
-                              ]
+                              "$ref": "#/components/schemas/PdfDestination"
                             }
                           },
                           "required": ["kind", "destination"],
@@ -9092,7 +9632,7 @@
                       "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/updatedBy"
                     },
                     "actions": {
-                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/actions"
+                      "$ref": "#/components/schemas/PdfAnnotationActions"
                     },
                     "color": {
                       "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/color"
@@ -9218,7 +9758,7 @@
                       "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/updatedBy"
                     },
                     "actions": {
-                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/actions"
+                      "$ref": "#/components/schemas/PdfAnnotationActions"
                     },
                     "intent": {
                       "type": "string",
@@ -9431,7 +9971,7 @@
                       "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/updatedBy"
                     },
                     "actions": {
-                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/actions"
+                      "$ref": "#/components/schemas/PdfAnnotationActions"
                     },
                     "color": {
                       "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/color"
@@ -9548,7 +10088,7 @@
                       "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/updatedBy"
                     },
                     "actions": {
-                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/actions"
+                      "$ref": "#/components/schemas/PdfAnnotationActions"
                     },
                     "color": {
                       "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/color"
@@ -9667,7 +10207,7 @@
                       "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/updatedBy"
                     },
                     "actions": {
-                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/actions"
+                      "$ref": "#/components/schemas/PdfAnnotationActions"
                     },
                     "name": {
                       "type": "string",
@@ -9766,7 +10306,7 @@
                       "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/updatedBy"
                     },
                     "actions": {
-                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/actions"
+                      "$ref": "#/components/schemas/PdfAnnotationActions"
                     },
                     "color": {
                       "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/color"
@@ -9894,7 +10434,7 @@
                       "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/updatedBy"
                     },
                     "actions": {
-                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/actions"
+                      "$ref": "#/components/schemas/PdfAnnotationActions"
                     },
                     "color": {
                       "allOf": [
@@ -10042,7 +10582,7 @@
                       "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/updatedBy"
                     },
                     "actions": {
-                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/actions"
+                      "$ref": "#/components/schemas/PdfAnnotationActions"
                     },
                     "quadPoints": {
                       "type": "array",
@@ -10182,7 +10722,7 @@
                       "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/updatedBy"
                     },
                     "actions": {
-                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/actions"
+                      "$ref": "#/components/schemas/PdfAnnotationActions"
                     },
                     "subtype": {
                       "type": "string",
@@ -10562,103 +11102,7 @@
                             "type": "string"
                           },
                           "actions": {
-                            "type": "object",
-                            "properties": {
-                              "activate": {
-                                "type": "object",
-                                "properties": {
-                                  "root": {
-                                    "type": "object",
-                                    "properties": {
-                                      "type": {
-                                        "type": "string",
-                                        "enum": [
-                                          "unknown",
-                                          "goto",
-                                          "goto-remote",
-                                          "goto-embedded",
-                                          "launch",
-                                          "thread",
-                                          "uri",
-                                          "sound",
-                                          "movie",
-                                          "hide",
-                                          "named",
-                                          "submit-form",
-                                          "reset-form",
-                                          "import-data",
-                                          "javascript",
-                                          "set-ocg-state",
-                                          "rendition",
-                                          "transition",
-                                          "goto-3d-view"
-                                        ]
-                                      },
-                                      "subtype": {
-                                        "type": "string"
-                                      },
-                                      "script": {
-                                        "type": "string"
-                                      },
-                                      "next": {
-                                        "type": "array",
-                                        "items": {}
-                                      }
-                                    },
-                                    "required": ["type", "subtype", "next"],
-                                    "additionalProperties": false,
-                                    "nullable": true
-                                  },
-                                  "incomplete": {
-                                    "type": "boolean"
-                                  },
-                                  "warningFlags": {
-                                    "type": "integer",
-                                    "minimum": 0
-                                  },
-                                  "warnings": {
-                                    "type": "array",
-                                    "items": {
-                                      "type": "string",
-                                      "enum": ["cycle-dropped", "malformed-next", "incomplete"]
-                                    }
-                                  }
-                                },
-                                "required": ["root", "incomplete", "warningFlags", "warnings"],
-                                "additionalProperties": false
-                              },
-                              "cursorEnter": {
-                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/actions/properties/activate"
-                              },
-                              "cursorExit": {
-                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/actions/properties/activate"
-                              },
-                              "mouseDown": {
-                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/actions/properties/activate"
-                              },
-                              "mouseUp": {
-                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/actions/properties/activate"
-                              },
-                              "focus": {
-                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/actions/properties/activate"
-                              },
-                              "blur": {
-                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/actions/properties/activate"
-                              },
-                              "pageOpen": {
-                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/actions/properties/activate"
-                              },
-                              "pageClose": {
-                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/actions/properties/activate"
-                              },
-                              "pageVisible": {
-                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/actions/properties/activate"
-                              },
-                              "pageInvisible": {
-                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/actions/properties/activate"
-                              }
-                            },
-                            "additionalProperties": false
+                            "$ref": "#/components/schemas/PdfAnnotationActions"
                           },
                           "color": {
                             "type": "object",
@@ -10808,7 +11252,7 @@
                             "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/updatedBy"
                           },
                           "actions": {
-                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/actions"
+                            "$ref": "#/components/schemas/PdfAnnotationActions"
                           },
                           "color": {
                             "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/color"
@@ -10908,7 +11352,7 @@
                             "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/updatedBy"
                           },
                           "actions": {
-                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/actions"
+                            "$ref": "#/components/schemas/PdfAnnotationActions"
                           },
                           "color": {
                             "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/color"
@@ -11008,7 +11452,7 @@
                             "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/updatedBy"
                           },
                           "actions": {
-                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/actions"
+                            "$ref": "#/components/schemas/PdfAnnotationActions"
                           },
                           "color": {
                             "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/color"
@@ -11114,7 +11558,7 @@
                             "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/updatedBy"
                           },
                           "actions": {
-                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/actions"
+                            "$ref": "#/components/schemas/PdfAnnotationActions"
                           },
                           "color": {
                             "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/color"
@@ -11274,7 +11718,7 @@
                             "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/updatedBy"
                           },
                           "actions": {
-                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/actions"
+                            "$ref": "#/components/schemas/PdfAnnotationActions"
                           },
                           "color": {
                             "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/color"
@@ -11399,7 +11843,7 @@
                             "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/updatedBy"
                           },
                           "actions": {
-                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/actions"
+                            "$ref": "#/components/schemas/PdfAnnotationActions"
                           },
                           "color": {
                             "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/color"
@@ -11528,7 +11972,7 @@
                             "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/updatedBy"
                           },
                           "actions": {
-                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/actions"
+                            "$ref": "#/components/schemas/PdfAnnotationActions"
                           },
                           "color": {
                             "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/color"
@@ -11676,7 +12120,7 @@
                             "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/updatedBy"
                           },
                           "actions": {
-                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/actions"
+                            "$ref": "#/components/schemas/PdfAnnotationActions"
                           },
                           "color": {
                             "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/color"
@@ -11808,7 +12252,7 @@
                             "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/updatedBy"
                           },
                           "actions": {
-                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/actions"
+                            "$ref": "#/components/schemas/PdfAnnotationActions"
                           },
                           "subtype": {
                             "type": "string",
@@ -11824,163 +12268,7 @@
                                     "enum": ["goto"]
                                   },
                                   "destination": {
-                                    "anyOf": [
-                                      {
-                                        "type": "object",
-                                        "properties": {
-                                          "kind": {
-                                            "type": "string",
-                                            "enum": ["xyz"]
-                                          },
-                                          "pageObjectNumber": {
-                                            "type": "integer",
-                                            "exclusiveMinimum": true,
-                                            "minimum": 0
-                                          },
-                                          "left": {
-                                            "type": "number",
-                                            "nullable": true
-                                          },
-                                          "top": {
-                                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/9/properties/target/anyOf/0/properties/destination/anyOf/0/properties/left"
-                                          },
-                                          "zoom": {
-                                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/9/properties/target/anyOf/0/properties/destination/anyOf/0/properties/left"
-                                          }
-                                        },
-                                        "required": ["kind", "pageObjectNumber"],
-                                        "additionalProperties": false
-                                      },
-                                      {
-                                        "type": "object",
-                                        "properties": {
-                                          "kind": {
-                                            "type": "string",
-                                            "enum": ["fit"]
-                                          },
-                                          "pageObjectNumber": {
-                                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/9/properties/target/anyOf/0/properties/destination/anyOf/0/properties/pageObjectNumber"
-                                          }
-                                        },
-                                        "required": ["kind", "pageObjectNumber"],
-                                        "additionalProperties": false
-                                      },
-                                      {
-                                        "type": "object",
-                                        "properties": {
-                                          "kind": {
-                                            "type": "string",
-                                            "enum": ["fitH"]
-                                          },
-                                          "pageObjectNumber": {
-                                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/9/properties/target/anyOf/0/properties/destination/anyOf/0/properties/pageObjectNumber"
-                                          },
-                                          "top": {
-                                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/9/properties/target/anyOf/0/properties/destination/anyOf/0/properties/left"
-                                          }
-                                        },
-                                        "required": ["kind", "pageObjectNumber"],
-                                        "additionalProperties": false
-                                      },
-                                      {
-                                        "type": "object",
-                                        "properties": {
-                                          "kind": {
-                                            "type": "string",
-                                            "enum": ["fitV"]
-                                          },
-                                          "pageObjectNumber": {
-                                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/9/properties/target/anyOf/0/properties/destination/anyOf/0/properties/pageObjectNumber"
-                                          },
-                                          "left": {
-                                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/9/properties/target/anyOf/0/properties/destination/anyOf/0/properties/left"
-                                          }
-                                        },
-                                        "required": ["kind", "pageObjectNumber"],
-                                        "additionalProperties": false
-                                      },
-                                      {
-                                        "type": "object",
-                                        "properties": {
-                                          "kind": {
-                                            "type": "string",
-                                            "enum": ["fitR"]
-                                          },
-                                          "pageObjectNumber": {
-                                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/9/properties/target/anyOf/0/properties/destination/anyOf/0/properties/pageObjectNumber"
-                                          },
-                                          "left": {
-                                            "type": "number"
-                                          },
-                                          "bottom": {
-                                            "type": "number"
-                                          },
-                                          "right": {
-                                            "type": "number"
-                                          },
-                                          "top": {
-                                            "type": "number"
-                                          }
-                                        },
-                                        "required": [
-                                          "kind",
-                                          "pageObjectNumber",
-                                          "left",
-                                          "bottom",
-                                          "right",
-                                          "top"
-                                        ],
-                                        "additionalProperties": false
-                                      },
-                                      {
-                                        "type": "object",
-                                        "properties": {
-                                          "kind": {
-                                            "type": "string",
-                                            "enum": ["fitB"]
-                                          },
-                                          "pageObjectNumber": {
-                                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/9/properties/target/anyOf/0/properties/destination/anyOf/0/properties/pageObjectNumber"
-                                          }
-                                        },
-                                        "required": ["kind", "pageObjectNumber"],
-                                        "additionalProperties": false
-                                      },
-                                      {
-                                        "type": "object",
-                                        "properties": {
-                                          "kind": {
-                                            "type": "string",
-                                            "enum": ["fitBH"]
-                                          },
-                                          "pageObjectNumber": {
-                                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/9/properties/target/anyOf/0/properties/destination/anyOf/0/properties/pageObjectNumber"
-                                          },
-                                          "top": {
-                                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/9/properties/target/anyOf/0/properties/destination/anyOf/0/properties/left"
-                                          }
-                                        },
-                                        "required": ["kind", "pageObjectNumber"],
-                                        "additionalProperties": false
-                                      },
-                                      {
-                                        "type": "object",
-                                        "properties": {
-                                          "kind": {
-                                            "type": "string",
-                                            "enum": ["fitBV"]
-                                          },
-                                          "pageObjectNumber": {
-                                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/9/properties/target/anyOf/0/properties/destination/anyOf/0/properties/pageObjectNumber"
-                                          },
-                                          "left": {
-                                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/9/properties/target/anyOf/0/properties/destination/anyOf/0/properties/left"
-                                          }
-                                        },
-                                        "required": ["kind", "pageObjectNumber"],
-                                        "additionalProperties": false
-                                      }
-                                    ]
+                                    "$ref": "#/components/schemas/PdfDestination"
                                   }
                                 },
                                 "required": ["kind", "destination"],
@@ -12150,7 +12438,7 @@
                             "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/updatedBy"
                           },
                           "actions": {
-                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/actions"
+                            "$ref": "#/components/schemas/PdfAnnotationActions"
                           },
                           "color": {
                             "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/color"
@@ -12276,7 +12564,7 @@
                             "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/updatedBy"
                           },
                           "actions": {
-                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/actions"
+                            "$ref": "#/components/schemas/PdfAnnotationActions"
                           },
                           "intent": {
                             "type": "string",
@@ -12489,7 +12777,7 @@
                             "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/updatedBy"
                           },
                           "actions": {
-                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/actions"
+                            "$ref": "#/components/schemas/PdfAnnotationActions"
                           },
                           "color": {
                             "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/color"
@@ -12606,7 +12894,7 @@
                             "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/updatedBy"
                           },
                           "actions": {
-                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/actions"
+                            "$ref": "#/components/schemas/PdfAnnotationActions"
                           },
                           "color": {
                             "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/color"
@@ -12725,7 +13013,7 @@
                             "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/updatedBy"
                           },
                           "actions": {
-                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/actions"
+                            "$ref": "#/components/schemas/PdfAnnotationActions"
                           },
                           "name": {
                             "type": "string",
@@ -12824,7 +13112,7 @@
                             "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/updatedBy"
                           },
                           "actions": {
-                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/actions"
+                            "$ref": "#/components/schemas/PdfAnnotationActions"
                           },
                           "color": {
                             "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/color"
@@ -12952,7 +13240,7 @@
                             "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/updatedBy"
                           },
                           "actions": {
-                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/actions"
+                            "$ref": "#/components/schemas/PdfAnnotationActions"
                           },
                           "color": {
                             "allOf": [
@@ -13100,7 +13388,7 @@
                             "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/updatedBy"
                           },
                           "actions": {
-                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/actions"
+                            "$ref": "#/components/schemas/PdfAnnotationActions"
                           },
                           "quadPoints": {
                             "type": "array",
@@ -13240,7 +13528,7 @@
                             "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/updatedBy"
                           },
                           "actions": {
-                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/actions"
+                            "$ref": "#/components/schemas/PdfAnnotationActions"
                           },
                           "subtype": {
                             "type": "string",
@@ -14142,82 +14430,7 @@
                       "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/valueEntry"
                     },
                     "actions": {
-                      "type": "object",
-                      "properties": {
-                        "keystroke": {
-                          "type": "object",
-                          "properties": {
-                            "root": {
-                              "type": "object",
-                              "properties": {
-                                "type": {
-                                  "type": "string",
-                                  "enum": [
-                                    "unknown",
-                                    "goto",
-                                    "goto-remote",
-                                    "goto-embedded",
-                                    "launch",
-                                    "thread",
-                                    "uri",
-                                    "sound",
-                                    "movie",
-                                    "hide",
-                                    "named",
-                                    "submit-form",
-                                    "reset-form",
-                                    "import-data",
-                                    "javascript",
-                                    "set-ocg-state",
-                                    "rendition",
-                                    "transition",
-                                    "goto-3d-view"
-                                  ]
-                                },
-                                "subtype": {
-                                  "type": "string"
-                                },
-                                "script": {
-                                  "type": "string"
-                                },
-                                "next": {
-                                  "type": "array",
-                                  "items": {}
-                                }
-                              },
-                              "required": ["type", "subtype", "next"],
-                              "additionalProperties": false,
-                              "nullable": true
-                            },
-                            "incomplete": {
-                              "type": "boolean"
-                            },
-                            "warningFlags": {
-                              "type": "integer",
-                              "minimum": 0
-                            },
-                            "warnings": {
-                              "type": "array",
-                              "items": {
-                                "type": "string",
-                                "enum": ["cycle-dropped", "malformed-next", "incomplete"]
-                              }
-                            }
-                          },
-                          "required": ["root", "incomplete", "warningFlags", "warnings"],
-                          "additionalProperties": false
-                        },
-                        "format": {
-                          "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/actions/properties/keystroke"
-                        },
-                        "validate": {
-                          "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/actions/properties/keystroke"
-                        },
-                        "calculate": {
-                          "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/actions/properties/keystroke"
-                        }
-                      },
-                      "additionalProperties": false
+                      "$ref": "#/components/schemas/PdfFieldActions"
                     },
                     "widgets": {
                       "type": "array",
@@ -14315,7 +14528,7 @@
                       "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/valueEntry"
                     },
                     "actions": {
-                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/actions"
+                      "$ref": "#/components/schemas/PdfFieldActions"
                     },
                     "widgets": {
                       "type": "array",
@@ -14407,7 +14620,7 @@
                       "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/valueEntry"
                     },
                     "actions": {
-                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/actions"
+                      "$ref": "#/components/schemas/PdfFieldActions"
                     },
                     "widgets": {
                       "type": "array",
@@ -14478,7 +14691,7 @@
                       "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/valueEntry"
                     },
                     "actions": {
-                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/actions"
+                      "$ref": "#/components/schemas/PdfFieldActions"
                     },
                     "widgets": {
                       "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/widgets"
@@ -14566,7 +14779,7 @@
                       "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/valueEntry"
                     },
                     "actions": {
-                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/actions"
+                      "$ref": "#/components/schemas/PdfFieldActions"
                     },
                     "widgets": {
                       "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/widgets"
@@ -14640,7 +14853,7 @@
                       "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/valueEntry"
                     },
                     "actions": {
-                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/actions"
+                      "$ref": "#/components/schemas/PdfFieldActions"
                     },
                     "widgets": {
                       "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/widgets"
@@ -14696,7 +14909,7 @@
                       "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/valueEntry"
                     },
                     "actions": {
-                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/actions"
+                      "$ref": "#/components/schemas/PdfFieldActions"
                     },
                     "widgets": {
                       "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/widgets"
@@ -14752,7 +14965,7 @@
                       "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/valueEntry"
                     },
                     "actions": {
-                      "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/actions"
+                      "$ref": "#/components/schemas/PdfFieldActions"
                     },
                     "widgets": {
                       "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/widgets"

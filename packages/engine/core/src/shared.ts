@@ -25,6 +25,7 @@ export type { PageLayout, PageBoxes, PageRotation } from './dto/PageLayout';
 export type {
   PdfActionType,
   PdfActionNode,
+  PdfActionTargetRef,
   PdfActionWarning,
   PdfActionTree,
   PdfFieldActions,
@@ -33,7 +34,10 @@ export type {
   NamedJavaScriptAction,
   DocumentActionsSnapshot,
   ActionReadBudget,
+  SubmitFormFlags,
+  SubmitFormPayload,
 } from './dto/PdfAction';
+export { decodeSubmitFormFlags } from './dto/PdfAction';
 
 // Canonical PDF-document geometry vocabulary (y-up, edges, browser-free).
 export type {
@@ -378,6 +382,11 @@ export type {
   FormFieldPatch,
 } from './forms/patch';
 export type { FormFieldValue, FormDataFormat } from './forms/value';
+export type {
+  FormSubmissionEntry,
+  FormSubmissionRequest,
+  FormSubmissionReceipt,
+} from './forms/submission';
 export type {
   FormFieldDisplay,
   FormEffect,

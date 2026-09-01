@@ -36,11 +36,9 @@ import {
   MITER_LIMIT,
   pdfToContentRect,
   type AnnotationProps,
-  type CreationDraftAnchor,
   type Paint,
   type Rect,
   type RenderItem,
-  type Vec,
 } from '@embedpdf/core-annotation';
 
 export type {
@@ -70,6 +68,13 @@ import {
   useSelector,
 } from './runtime';
 import type { PageContextValue, PageLayout } from './runtime';
+
+export {
+  sameAnchor,
+  sameCreationDraftAnchor,
+  type SelectionAnchor,
+} from './annotation-anchors';
+export { useAnnotationSelected } from './annotation-hooks';
 
 /** `#rrggbb` → `rgba(...)` — the marquee's translucent fill derives from the
  *  accent, so one `setChrome({ accent })` restyles every piece of chrome. */
@@ -916,11 +921,6 @@ export function useAnnotationSelection() {
   return useSelector(AnnotationToken, (c) => c.selection(), shallowArray);
 }
 
-/** The selected annotations as engine DTOs — for selection-aware toolbars/sidebars. */
-export function useAnnotationSelected() {
-  return useSelector(AnnotationToken, (c) => c.getSelected(), shallowArray);
-}
-
 /** Structural equality for a resolved props bag — keeps the subscription from
  *  re-rendering on unrelated dispatches, since `currentDefaults` returns a fresh
  *  object each call. Small flat objects; JSON compare is exact and cheap here. */
@@ -1042,49 +1042,3 @@ export function useCommentThread(ref: AnnotationRef | null): CommentThreadView |
 export function useCommentsHydration(): AnnotationHydration {
   return useSelector(AnnotationToken, (c) => c.comments.hydration());
 }
-
-// ── Selection-menu anchor vocabulary ─────────────────────────────────────────
-// The content-space anchor (`selectionAnchor`) consumed by `<AnnotationMenu>`
-// (./annotation-menu) through the surface-provided ViewProjector — one menu
-// implementation for <Stage> and <PageView> alike (see ./anchored).
-
-/** The selection's menu anchor: the primary page + the union box of the selection
- *  on that page (content space). */
-export type SelectionAnchor = { pon: number; bounds: Rect; knob?: Vec };
-
-/** Structural equality for the selection anchor — keeps the menu from re-rendering
- *  on unrelated dispatches (the capability returns a fresh object each call). */
-export function sameAnchor(a: SelectionAnchor | null, b: SelectionAnchor | null): boolean {
-  if (a === b) return true;
-  if (!a || !b) return false;
-  return (
-    a.pon === b.pon &&
-    a.bounds.x === b.bounds.x &&
-    a.bounds.y === b.bounds.y &&
-    a.bounds.width === b.bounds.width &&
-    a.bounds.height === b.bounds.height &&
-    a.knob?.x === b.knob?.x &&
-    a.knob?.y === b.knob?.y
-  );
-}
-
-export function sameCreationDraftAnchor(
-  a: CreationDraftAnchor | null,
-  b: CreationDraftAnchor | null,
-): boolean {
-  if (a === b) return true;
-  if (!a || !b) return false;
-  return (
-    a.kind === b.kind &&
-    a.subtype === b.subtype &&
-    a.pon === b.pon &&
-    a.pointCount === b.pointCount &&
-    a.minPoints === b.minPoints &&
-    a.canFinish === b.canFinish &&
-    a.bounds.x === b.bounds.x &&
-    a.bounds.y === b.bounds.y &&
-    a.bounds.width === b.bounds.width &&
-    a.bounds.height === b.bounds.height
-  );
-}
-

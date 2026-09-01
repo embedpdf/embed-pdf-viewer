@@ -11,7 +11,7 @@ import { NULL_PTR } from '@embedpdf/engine-runtime';
 
 import { withScratch } from '../../../../runtime/memory/scratch';
 import { F32_BYTES } from '../../../../runtime/memory/structs';
-import { VIEW_CODE_BY_KIND } from '../destinationViewCodes';
+import { VIEW_CODE_BY_KIND } from '../../../destinations/destinationViewCodes';
 import { setAnnotRect } from './annotationWritePrimitives';
 import type { AnnotationWriteContext } from './annotationWriteContext';
 import { applyAnnotationBaseDraft, applyAnnotationBasePatch } from './writeAnnotationBase';

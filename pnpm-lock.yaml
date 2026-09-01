@@ -366,10 +366,10 @@ importers:
         version: 0.3.3
       next:
         specifier: ^15.4.10
-        version: 15.5.12(@opentelemetry/api@1.9.1)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(sass@1.97.3)
+        version: 15.5.12(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(sass@1.97.3)
       nextra:
         specifier: ^4.6.1
-        version: 4.6.1(next@15.5.12(@opentelemetry/api@1.9.1)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(sass@1.97.3))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.9.3)
+        version: 4.6.1(next@15.5.12(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(sass@1.97.3))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.9.3)
       react:
         specifier: ^18.2.0
         version: 18.3.1
@@ -508,7 +508,7 @@ importers:
         version: 18.3.7(@types/react@18.3.28)
       next:
         specifier: ^15.4.10
-        version: 15.5.12(@opentelemetry/api@1.9.1)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(sass@1.97.3)
+        version: 15.5.12(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(sass@1.97.3)
       react:
         specifier: ^18.3.1
         version: 18.3.1
@@ -1123,6 +1123,9 @@ importers:
       '@embedpdf/core-stage':
         specifier: workspace:*
         version: link:../../core/stage
+      '@embedpdf/plugin-actions':
+        specifier: workspace:*
+        version: link:../../plugin/actions
       '@embedpdf/plugin-interaction':
         specifier: workspace:*
         version: link:../../plugin/interaction
@@ -1181,6 +1184,9 @@ importers:
       '@embedpdf/core-ui':
         specifier: workspace:*
         version: link:../../core/ui
+      '@embedpdf/plugin-actions':
+        specifier: workspace:*
+        version: link:../../plugin/actions
       '@embedpdf/plugin-annotation':
         specifier: workspace:*
         version: link:../../plugin/annotation
@@ -1239,6 +1245,9 @@ importers:
         specifier: '>=18'
         version: 18.3.1(react@18.3.1)
     devDependencies:
+      '@embedpdf/engine':
+        specifier: workspace:*
+        version: link:../../engine/main
       '@embedpdf/tooling-build':
         specifier: workspace:*
         version: link:../../../tooling/build
@@ -1276,11 +1285,42 @@ importers:
         specifier: ^2.1.9
         version: 2.1.9(@types/node@22.19.11)(happy-dom@20.11.0)(less@4.6.7)(lightningcss@1.30.2)(msw@2.11.2(@types/node@22.19.11)(typescript@5.9.3))(sass-embedded@1.97.3)(sass@1.97.3)(terser@5.46.0)
 
+  packages/plugin/actions:
+    dependencies:
+      '@embedpdf/core':
+        specifier: workspace:*
+        version: link:../../core/main
+      '@embedpdf/core-acrojs':
+        specifier: workspace:*
+        version: link:../../core/acrojs
+      '@embedpdf/core-js-sandbox':
+        specifier: workspace:*
+        version: link:../../core/js-sandbox
+      '@embedpdf/engine-core':
+        specifier: workspace:*
+        version: link:../../engine/core
+    devDependencies:
+      '@embedpdf/engine':
+        specifier: workspace:*
+        version: link:../../engine/main
+      '@embedpdf/tooling-build':
+        specifier: workspace:*
+        version: link:../../../tooling/build
+      typescript:
+        specifier: ^5.0.0
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.9
+        version: 2.1.9(@types/node@22.19.11)(happy-dom@20.11.0)(less@4.6.7)(lightningcss@1.30.2)(msw@2.11.2(@types/node@22.19.11)(typescript@5.9.3))(sass-embedded@1.97.3)(sass@1.97.3)(terser@5.46.0)
+
   packages/plugin/annotation:
     dependencies:
       '@embedpdf/core':
         specifier: workspace:*
         version: link:../../core/main
+      '@embedpdf/core-acrojs':
+        specifier: workspace:*
+        version: link:../../core/acrojs
       '@embedpdf/core-annotation':
         specifier: workspace:*
         version: link:../../core/annotation
@@ -1290,6 +1330,9 @@ importers:
       '@embedpdf/engine-core':
         specifier: workspace:*
         version: link:../../engine/core
+      '@embedpdf/plugin-actions':
+        specifier: workspace:*
+        version: link:../actions
       '@embedpdf/plugin-interaction':
         specifier: workspace:*
         version: link:../interaction
@@ -1346,6 +1389,9 @@ importers:
       '@embedpdf/engine-core':
         specifier: workspace:*
         version: link:../../engine/core
+      '@embedpdf/plugin-actions':
+        specifier: workspace:*
+        version: link:../actions
       '@embedpdf/plugin-annotation':
         specifier: workspace:*
         version: link:../annotation
@@ -1415,6 +1461,9 @@ importers:
       '@embedpdf/engine-core':
         specifier: workspace:*
         version: link:../../engine/core
+      '@embedpdf/plugin-actions':
+        specifier: workspace:*
+        version: link:../actions
       '@embedpdf/plugin-annotation':
         specifier: workspace:*
         version: link:../annotation
@@ -1591,10 +1640,16 @@ importers:
       '@embedpdf/core-stage':
         specifier: workspace:*
         version: link:../../core/stage
+      '@embedpdf/plugin-actions':
+        specifier: workspace:*
+        version: link:../actions
       '@embedpdf/plugin-interaction':
         specifier: workspace:*
         version: link:../interaction
     devDependencies:
+      '@embedpdf/engine':
+        specifier: workspace:*
+        version: link:../../engine/main
       '@embedpdf/tooling-build':
         specifier: workspace:*
         version: link:../../../tooling/build
@@ -1610,6 +1665,9 @@ importers:
       '@embedpdf/core':
         specifier: workspace:*
         version: link:../../core/main
+      '@embedpdf/core-acrojs':
+        specifier: workspace:*
+        version: link:../../core/acrojs
       '@embedpdf/core-js-sandbox':
         specifier: workspace:*
         version: link:../../core/js-sandbox
@@ -1787,10 +1845,10 @@ importers:
         version: 2.0.0
       next:
         specifier: ^15.4.10
-        version: 15.5.12(@opentelemetry/api@1.9.1)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(sass@1.97.3)
+        version: 15.5.12(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(sass@1.97.3)
       nextra:
         specifier: ^4.6.1
-        version: 4.6.1(next@15.5.12(@opentelemetry/api@1.9.1)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(sass@1.97.3))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.8.3)
+        version: 4.6.1(next@15.5.12(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(sass@1.97.3))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.8.3)
       npm-to-yarn:
         specifier: ^3.0.1
         version: 3.0.1
@@ -21342,7 +21400,7 @@ snapshots:
 
   neo-async@2.6.2: {}
 
-  next@15.5.12(@opentelemetry/api@1.9.1)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(sass@1.97.3):
+  next@15.5.12(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(sass@1.97.3):
     dependencies:
       '@next/env': 15.5.12
       '@swc/helpers': 0.5.15
@@ -21350,7 +21408,7 @@ snapshots:
       postcss: 8.4.31
       react: 18.3.1
       react-dom: 18.3.1(react@18.3.1)
-      styled-jsx: 5.1.6(react@18.3.1)
+      styled-jsx: 5.1.6(@babel/core@7.29.7)(react@18.3.1)
     optionalDependencies:
       '@next/swc-darwin-arm64': 15.5.12
       '@next/swc-darwin-x64': 15.5.12
@@ -21367,7 +21425,7 @@ snapshots:
       - '@babel/core'
       - babel-plugin-macros
 
-  nextra@4.6.1(next@15.5.12(@opentelemetry/api@1.9.1)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(sass@1.97.3))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.8.3):
+  nextra@4.6.1(next@15.5.12(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(sass@1.97.3))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.8.3):
     dependencies:
       '@formatjs/intl-localematcher': 0.6.2
       '@headlessui/react': 2.2.9(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -21388,7 +21446,7 @@ snapshots:
       mdast-util-gfm: 3.1.0
       mdast-util-to-hast: 13.2.1
       negotiator: 1.0.0
-      next: 15.5.12(@opentelemetry/api@1.9.1)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(sass@1.97.3)
+      next: 15.5.12(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(sass@1.97.3)
       react: 18.3.1
       react-compiler-runtime: 19.1.0-rc.3(react@18.3.1)
       react-dom: 18.3.1(react@18.3.1)
@@ -21415,7 +21473,7 @@ snapshots:
       - supports-color
       - typescript
 
-  nextra@4.6.1(next@15.5.12(@opentelemetry/api@1.9.1)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(sass@1.97.3))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.9.3):
+  nextra@4.6.1(next@15.5.12(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(sass@1.97.3))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.9.3):
     dependencies:
       '@formatjs/intl-localematcher': 0.6.2
       '@headlessui/react': 2.2.9(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -21436,7 +21494,7 @@ snapshots:
       mdast-util-gfm: 3.1.0
       mdast-util-to-hast: 13.2.1
       negotiator: 1.0.0
-      next: 15.5.12(@opentelemetry/api@1.9.1)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(sass@1.97.3)
+      next: 15.5.12(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(sass@1.97.3)
       react: 18.3.1
       react-compiler-runtime: 19.1.0-rc.3(react@18.3.1)
       react-dom: 18.3.1(react@18.3.1)
@@ -23423,10 +23481,12 @@ snapshots:
     dependencies:
       inline-style-parser: 0.2.7
 
-  styled-jsx@5.1.6(react@18.3.1):
+  styled-jsx@5.1.6(@babel/core@7.29.7)(react@18.3.1):
     dependencies:
       client-only: 0.0.1
       react: 18.3.1
+    optionalDependencies:
+      '@babel/core': 7.29.7
 
   stylis@4.3.6: {}
 
