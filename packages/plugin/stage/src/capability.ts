@@ -777,7 +777,14 @@ export function createStageCapability(
   //    axis with no freedom to the fitAlign rest point.
   // The legitimate "nothing moves" cases are STRUCTURAL, not conditional: under
   // fit-all the canonical placement is the centered scene, which doesn't change.
+  /** Tag what drives the NEXT camera/cursor change — dispatched on flips
+   *  only, read by the page-state feed (see StageState.motionCause). */
+  const markCause = (cause: 'user' | 'programmatic'): void => {
+    if (ctx.getState().motionCause !== cause) ctx.dispatch({ type: 'MOTION_CAUSE', cause });
+  };
+
   const goToTarget = (pageIndex: number, opts?: GoToOptions) => {
+    markCause('programmatic');
     cancelAnim();
     const doc = ctx.document();
     if (!doc || doc.pageCount === 0) return;
@@ -1223,11 +1230,13 @@ export function createStageCapability(
       if (ratio > 0 && ratio !== dpr()) ctx.dispatch({ type: 'DPR', dpr: ratio });
     },
     setCamera: (c) => {
+      markCause('user');
       cancelAnim();
       setCam(c);
       syncCursorFromCamera();
     },
     panBy: (dx, dy) => {
+      markCause('user');
       cancelAnim();
       if (gestureDepth > 0 && gestureElastic) {
         // Elastic: integrate the finger on the UNCLAMPED camera and display it
@@ -1241,6 +1250,7 @@ export function createStageCapability(
       syncCursorFromCamera();
     },
     scrollTo: (opts) => {
+      markCause('user');
       cancelAnim();
       const sc = buildScene();
       if (!sc.itemCount) return;
@@ -1381,6 +1391,7 @@ export function createStageCapability(
     },
     goToPage: (pageIndex, opts) => goToTarget(pageIndex, opts),
     reveal: (pageIndex, opts) => {
+      markCause('programmatic');
       const doc = ctx.document();
       if (!doc || doc.pageCount === 0) return;
       const target = Math.max(0, Math.min(pageIndex, doc.pageCount - 1));

@@ -121,7 +121,7 @@ function linkAnnot(nm, rect, action) {
 // one JS→ResetForm→JS chain (each script exactly once, in order).
 {
   const PAGE = '3 0 R';
-  const fieldRefs = ['4 0 R', '5 0 R', '6 0 R', '7 0 R', '8 0 R', '9 0 R', '10 0 R'];
+  const fieldRefs = ['4 0 R', '5 0 R', '6 0 R', '7 0 R', '8 0 R', '9 0 R', '10 0 R', '12 0 R'];
   const FONT = '11 0 R';
   const textField = (name, rect, value, defaultValue) =>
     `<< /Type /Annot /Subtype /Widget /FT /Tx /T (${name}) /Rect [${rect}] /F 4 ` +
@@ -132,13 +132,22 @@ function linkAnnot(nm, rect, action) {
   const appendLog = (letter) =>
     `(var f = this.getField\\('log'\\); f.value = f.value + '${letter}';)`;
 
+  // Widget /AA trees (Phase 2): alpha carries the native tooltip pair
+  // (/E shows the hidden `tip` field, /X re-hides it — works with zero
+  // scripting AND zero fill authority); beta carries /Fo /Bl /D /U Hide
+  // entries (beta has no /A, so /U actually runs — /A shadows /U per ISO).
+  const ALPHA_AA =
+    ' /AA << /E << /S /Hide /T [(tip)] /H false >> /X << /S /Hide /T [(tip)] >> >>';
+  const BETA_AA =
+    ' /AA << /Fo << /S /Hide /T [(alpha)] >> /Bl << /S /Hide /T [(alpha)] /H false >> ' +
+    '/D << /S /Hide /T [(log)] >> /U << /S /Hide /T [(log)] /H false >> >>';
   const objects = [
     `<< /Type /Catalog /Pages 2 0 R /AcroForm << /Fields [${fieldRefs.join(' ')}] ` +
       `/DA (/Helv 0 Tf 0 g) /DR << /Font << /Helv ${FONT} >> >> >> >>`,
     '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
     `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Annots [${fieldRefs.join(' ')}] >>`,
-    textField('alpha', '50 700 250 720', 'filled-a', 'default-a'),
-    textField('beta', '50 660 250 680', 'filled-b', 'default-b'),
+    textField('alpha', '50 700 250 720', 'filled-a', 'default-a').replace(' >>', `${ALPHA_AA} >>`),
+    textField('beta', '50 660 250 680', 'filled-b', 'default-b').replace(' >>', `${BETA_AA} >>`),
     textField('log', '50 620 250 640', '', ''),
     button('btn-hide', '300 700 400 720', '<< /S /Hide /T [(alpha)] >>'),
     button('btn-show', '300 660 400 680', '<< /S /Hide /T [(alpha)] /H false >>'),
@@ -152,6 +161,9 @@ function linkAnnot(nm, rect, action) {
         `/Next << /S /JavaScript /JS ${appendLog('B')} >> >> >>`,
     ),
     '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+    // The tooltip target: HIDDEN (/F 6 = hidden|print) until alpha's /E shows it.
+    `<< /Type /Annot /Subtype /Widget /FT /Tx /T (tip) /Rect [300 540 400 560] /F 6 ` +
+      `/P ${PAGE} /V (tooltip) /DV (tooltip) /DA (/Helv 0 Tf 0 g) >>`,
   ];
   writeFileSync(resolve(here, 'action_buttons_form.pdf'), buildPdf(objects));
 }
@@ -166,4 +178,53 @@ function linkAnnot(nm, rect, action) {
   writeFileSync(resolve(here, 'open_action_dest.pdf'), buildPdf(objects));
 }
 
-console.log('wrote action_payloads.pdf + action_buttons_form.pdf + open_action_dest.pdf');
+// ── action_triggers.pdf ────────────────────────────────────────────────────
+// Phase-2 trigger proofs, all NON-JS (Hide trees + session sink observable):
+//   page 1 /AA: /O shows pageTip(7), /C hides it (PC-before-C order proof);
+//   square 5 `trigger`: /E shows tip(6), /X hides it — the native tooltip;
+//   square 8 carries /PO /PC /PV /PI over lifeTip(9) and pvTip(12);
+//   link 10: /A URI plus /AA /E /X over linkTip(11) — the LINK-plane feed
+//   (links are behavior-inert to annotation hover; only LinkLayer anchors
+//   can deliver these).
+{
+  const hideRef = (ref, show) => `<< /S /Hide /T [${ref}] /H ${show ? 'false' : 'true'} >>`;
+  const square = (num, rect, extra = '') =>
+    `<< /Type /Annot /Subtype /Square /Rect [${rect}]${extra} >>`;
+  const objects = [
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R 4 0 R] /Count 2 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] ' +
+      `/AA << /O ${hideRef('7 0 R', true)} /C ${hideRef('7 0 R', false)} >> ` +
+      '/Annots [5 0 R 6 0 R 7 0 R 8 0 R 9 0 R 10 0 R 11 0 R 12 0 R] >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] >>',
+    square(5, '50 700 150 750', ` /NM (trigger) /F 4 /AA << /E ${hideRef('6 0 R', true)} /X ${hideRef('6 0 R', false)} >>`),
+    square(6, '170 700 270 750', ' /NM (tip) /F 6'),
+    square(7, '50 640 150 690', ' /NM (pageTip) /F 6'),
+    square(8, '50 580 150 630', ` /NM (lifecycle) /F 4 /AA << /PO ${hideRef('9 0 R', true)} /PC ${hideRef('9 0 R', false)} /PV ${hideRef('12 0 R', true)} /PI ${hideRef('12 0 R', false)} >>`),
+    square(9, '170 580 270 630', ' /NM (lifeTip) /F 6'),
+    `<< /Type /Annot /Subtype /Link /Rect [50 520 150 570] /NM (hoverlink) /F 4 ` +
+      `/A << /S /URI /URI (https://example.test/hover) >> ` +
+      `/AA << /E ${hideRef('11 0 R', true)} /X ${hideRef('11 0 R', false)} >> >>`,
+    square(11, '170 520 270 570', ' /NM (linkTip) /F 6'),
+    square(12, '170 460 270 510', ' /NM (pvTip) /F 6'),
+  ];
+  writeFileSync(resolve(here, 'action_triggers.pdf'), buildPdf(objects));
+}
+
+// ── action_open_chain.pdf ──────────────────────────────────────────────────
+// An ACTION-form /OpenAction with a /Next chain (Named → Hide): proves the
+// document-open sequence dispatches trees, JS-free.
+{
+  const objects = [
+    '<< /Type /Catalog /Pages 2 0 R /OpenAction << /S /Named /N /NextPage ' +
+      '/Next << /S /Hide /T [4 0 R] /H false >> >> >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Annots [4 0 R] >>',
+    '<< /Type /Annot /Subtype /Square /Rect [100 700 200 750] /NM (openTip) /F 6 >>',
+  ];
+  writeFileSync(resolve(here, 'action_open_chain.pdf'), buildPdf(objects));
+}
+
+console.log(
+  'wrote action_payloads.pdf + action_buttons_form.pdf + action_triggers.pdf + action_open_chain.pdf + open_action_dest.pdf',
+);

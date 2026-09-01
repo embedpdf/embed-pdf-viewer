@@ -11,8 +11,9 @@ import {
   type PdfActionTree,
   type PdfRect,
 } from '@embedpdf/engine-core/runtime';
-import type { PluginContext } from '@embedpdf/core';
-import { ActionsToken } from '@embedpdf/plugin-actions';
+import { DocumentsToken, type PluginContext } from '@embedpdf/core';
+import { ActionsToken, createHoverPump } from '@embedpdf/plugin-actions';
+import type { ActionOrigin, ActionSource } from '@embedpdf/plugin-actions';
 import { AnnotationToken as AnnotationHostToken } from '@embedpdf/plugin-annotation/internal';
 
 import {
@@ -105,6 +106,9 @@ export function createFormCapability(
 
   let uiEffectProvider: FormUiEffectProvider | null = null;
 
+  const allowsPrint = (): boolean =>
+    ctx.tryGet(DocumentsToken)?.allows('doc.print', ctx.documentId ?? undefined) ?? true;
+
   const surfaceScriptingResult = (result: FormCommitResult): void => {
     const observe = (callback: (() => void) | undefined): void => {
       if (!callback) return;
@@ -115,6 +119,22 @@ export function createFormCapability(
       }
     };
     for (const effect of result.uiEffects) {
+      // PERMISSION, not preference: a script print request without doc.print
+      // authority never reaches any provider (the same gate the dispatcher's
+      // Named-Print thunk applies). Origin/phase VISIBILITY stays the
+      // provider's default matrix — overridable; this is not.
+      if (effect.kind === 'print' && !allowsPrint()) {
+        const suppressed = {
+          code: 'ui-effect-suppressed' as const,
+          message: 'script print request withheld: doc.print is not allowed',
+        };
+        observe(
+          options.scripting?.onDiagnostic
+            ? () => options.scripting!.onDiagnostic!(suppressed)
+            : undefined,
+        );
+        continue;
+      }
       observe(
         options.scripting?.onUiEffect ? () => options.scripting!.onUiEffect!(effect) : undefined,
       );
@@ -349,6 +369,7 @@ export function createFormCapability(
   const runActivationScript = (
     script: string,
     origin?: FormFieldRef,
+    dispatchOrigin?: ActionOrigin,
   ): Promise<FormCommitResult> =>
     enqueueMutation(async () => {
       const doc = ctx.doc;
@@ -388,7 +409,12 @@ export function createFormCapability(
         warningFlags: 0,
         warnings: [],
       };
-      const result = await scripting.activate(snapshot, anchor, tree);
+      const raw = await scripting.activate(snapshot, anchor, tree);
+      // The dispatch-origin axis rides every UI effect (separate from the
+      // script-model `phase`) — providers apply the visibility matrix.
+      const result = dispatchOrigin
+        ? { ...raw, uiEffects: raw.uiEffects.map((effect) => ({ ...effect, origin: dispatchOrigin })) }
+        : raw;
       surfaceScriptingResult(result);
       if (result.effectsResult !== null) await refresh(true);
       return result;
@@ -478,6 +504,35 @@ export function createFormCapability(
         ...(recalc?.error ? { error: recalc.error } : {}),
       };
     });
+
+  // ── widget DOM-event feed helpers ───────────────────────────────────────
+  const widgetSource = (key: FieldKey, annotationRef: AnnotationRef): ActionSource => ({
+    kind: 'widget',
+    field: refKeyOf(key),
+    annotation: annotationRef,
+    pon: annotationRef.pageObjectNumber,
+  });
+
+  /** One shared hover pump (Exit→Enter as one ordered pair; intermediates
+   *  skipped), created on first use against the resolved actions capability. */
+  let widgetPump: ReturnType<typeof createHoverPump> | null = null;
+  const widgetHoverPump = (actions: {
+    dispatch: Parameters<typeof createHoverPump>[0];
+  }): ReturnType<typeof createHoverPump> => {
+    widgetPump ??= createHoverPump(actions.dispatch);
+    return widgetPump;
+  };
+
+  const widgetHoverFlags = (
+    annotationRef: AnnotationRef,
+  ): { enter: boolean; exit: boolean } | null => {
+    const loaded = annotationHost?.get(annotationRef);
+    if (loaded?.subtype !== 'widget') return null;
+    return {
+      enter: Boolean(loaded.actions?.cursorEnter?.root),
+      exit: Boolean(loaded.actions?.cursorExit?.root),
+    };
+  };
 
   const nudgeAnnotations = (pons: Iterable<number>): void => {
     if (!annotationHost) return;
@@ -633,27 +688,64 @@ export function createFormCapability(
       // form queue here would deadlock the executors it calls back into
       // (queue-direction law: actions → form, never form → actions → form).
       // No scripting gate on purpose: Hide/ResetForm buttons must work with
-      // JS off — per-type policy lives in the dispatcher now.
+      // JS off — per-type policy lives in the dispatcher now. Submission is
+      // SYNCHRONOUS (no pre-resolution await): a mouseUp notified just
+      // before this takes the earlier queue slot, always.
       const actions = ctx.tryGet(ActionsToken);
       if (actions) {
-        const tree = await annotationActivation(annotationRef);
-        if (tree?.root) {
-          const result = await actions.execute(tree, {
-            origin: 'user',
-            source: {
-              kind: 'widget',
-              field: refKeyOf(key),
-              annotation: annotationRef,
-              pon: annotationRef.pageObjectNumber,
-            },
-          });
-          return { kind: 'dispatched', result };
-        }
+        const result = await actions.dispatch({
+          scope: 'activate',
+          ref: annotationRef,
+          pon: annotationRef.pageObjectNumber,
+          source: widgetSource(key, annotationRef),
+        });
+        // inert + zero steps + zero diagnostics = no /A tree at all — only
+        // then does the legacy form path apply (byte-for-byte no-actions
+        // behavior); anything else IS the dispatch outcome, refusals included.
+        const noTree =
+          result.status === 'inert' &&
+          result.steps.length === 0 &&
+          result.diagnostics.length === 0;
+        if (!noTree) return { kind: 'dispatched', result };
       }
       return {
         kind: 'form',
         result: await enqueueMutation(() => activateWidgetNow(key, annotationRef)),
       };
+    },
+    notifyWidgetEvent: (key, annotationRef, event) => {
+      const actions = ctx.tryGet(ActionsToken);
+      if (!actions) return;
+      const source = widgetSource(key, annotationRef);
+      if (event === 'cursorEnter' || event === 'cursorExit') {
+        if (event === 'cursorExit') {
+          widgetHoverPump(actions).hover(null);
+          return;
+        }
+        // Tree-presence pre-check through the folded annotation model when
+        // available — tree-less hover costs zero dispatches. Without the
+        // annotation plugin the flags stay unknown and the dispatcher
+        // resolves authoritatively in-queue.
+        const flags = widgetHoverFlags(annotationRef);
+        if (flags && !flags.enter && !flags.exit) return;
+        widgetHoverPump(actions).hover({
+          ref: annotationRef,
+          pon: annotationRef.pageObjectNumber,
+          source,
+          ...(flags ? { events: flags } : {}),
+        });
+        return;
+      }
+      // D/U/Fo/Bl: direct fire-and-forget — dispatch never rejects, the
+      // queue orders, results surface via the actions events. /A-shadowing
+      // of U (ISO Table 197) is enforced centrally by the dispatcher.
+      void actions.dispatch({
+        scope: 'annotation',
+        event,
+        ref: annotationRef,
+        pon: annotationRef.pageObjectNumber,
+        source,
+      });
     },
     setUiEffectProvider: (provider) => {
       uiEffectProvider = provider;

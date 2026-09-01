@@ -20,6 +20,7 @@ import {
   type PdfLinkTarget,
   type PdfRect,
 } from '@embedpdf/engine-core/runtime';
+import { ActionsToken as PublicActionsToken } from '@embedpdf/plugin-actions';
 import { InteractionToken } from '@embedpdf/plugin-interaction';
 import { SelectionToken as SelectionPublicToken } from '@embedpdf/plugin-selection';
 import {
@@ -82,6 +83,7 @@ import {
   toScopedPatch,
   writableTarget,
 } from './repository';
+import { createAnnotationHoverFeed } from './hover-feed';
 import { buildTextItems } from './text-item';
 import { buildToolRegistry, isTouchDirect } from './tools';
 import type { AnnotationToolInput, ResolvedTool } from './tools';
@@ -143,6 +145,13 @@ export function createAnnotationCapability(
   let filePickerProvider: FilePickerProvider | null = null;
 
   const model = (): Model => ctx.getState().model;
+
+  // The E/X trigger feed (actions plugin present): driven ONLY from the
+  // pointer-driven hoverAt diff below — see hover-feed.ts for the law.
+  const actionsForHover = ctx.tryGet(PublicActionsToken);
+  const hoverFeed = actionsForHover
+    ? createAnnotationHoverFeed(actionsForHover, (id) => model().byId[id] ?? null)
+    : null;
   const chromeSettings = (): ChromeSettings => ctx.getState().chrome;
 
   /**
@@ -363,6 +372,8 @@ export function createAnnotationCapability(
       if (target == null || a.geom.t !== 'rect') continue;
       const activate = a.data?.actions?.activate;
       const ref = a.ref ?? a.data?.ref ?? undefined;
+      const hoverEnter = Boolean(a.data?.actions?.cursorEnter?.root);
+      const hoverExit = Boolean(a.data?.actions?.cursorExit?.root);
       v.push({
         id,
         rect: a.geom.rect,
@@ -370,6 +381,9 @@ export function createAnnotationCapability(
         attached: a.group !== undefined,
         ...(activate ? { activate } : {}),
         ...(ref ? { ref } : {}),
+        ...(hoverEnter || hoverExit
+          ? { hoverEvents: { enter: hoverEnter, exit: hoverExit } }
+          : {}),
       });
     }
     linkItemsCache.set(pon, { model: m, v });
@@ -1757,8 +1771,14 @@ export function createAnnotationCapability(
         );
         if (h.t === 'annot') id = h.id;
       }
-      // Diff HERE so the reducer sees enter/leave transitions only.
-      if (m.hovered !== id) apply({ t: 'hover', id });
+      // Diff HERE so the reducer sees enter/leave transitions only. The E/X
+      // feed hangs off THIS seam alone: reducer-side hover clears
+      // (session-hide, remove, reload) bypass it, so effect-induced hover
+      // loss never fires a cursor exit (the anti-cascade law).
+      if (m.hovered !== id) {
+        hoverFeed?.hover(id);
+        apply({ t: 'hover', id });
+      }
     },
     behaviorFor: (a) => behaviors.find((b) => b.matches(a) && b.engaged()) ?? null,
     linkItemsOn: (pon) => memoLinkItems(pon),

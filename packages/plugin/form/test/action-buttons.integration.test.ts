@@ -7,7 +7,8 @@ import { createKernel } from '@embedpdf/core';
 import { createQuickJsSandbox } from '@embedpdf/core-js-sandbox';
 import { createLocalEngine } from '@embedpdf/engine';
 import type { AnnotationRef } from '@embedpdf/engine-core/runtime';
-import { actionsPlugin } from '@embedpdf/plugin-actions';
+import { actionsPlugin, ActionsToken } from '@embedpdf/plugin-actions';
+import type { PdfAnnotationEventKind } from '@embedpdf/plugin-actions';
 import { annotationPlugin } from '@embedpdf/plugin-annotation';
 import { AnnotationToken as AnnotationHostToken } from '@embedpdf/plugin-annotation/internal';
 import { interactionPlugin } from '@embedpdf/plugin-interaction';
@@ -38,7 +39,7 @@ const fixturePath = resolve(
  * JS→ResetForm→JS chain (each script exactly once, in order) and the
  * queue-direction regression (a dispatch racing a queued value commit).
  */
-async function boot(scripting: boolean) {
+async function boot(scripting: boolean, scope?: string[]) {
   const engine = await createLocalEngine({ runtime: { prefer: 'wasm' } });
   const kernel = createKernel({
     engine,
@@ -62,7 +63,10 @@ async function boot(scripting: boolean) {
     ],
   });
   const bytes = new Uint8Array(await readFile(fixturePath));
-  await kernel.documents.open({ kind: 'bytes', id: 'action-buttons', bytes });
+  await kernel.documents.open(
+    { kind: 'bytes', id: 'action-buttons', bytes },
+    scope ? ({ scope } as never) : undefined,
+  );
   const form = kernel.capability(FormToken);
   const annotation = kernel.capability(AnnotationHostToken);
   await form.refresh();
@@ -91,6 +95,19 @@ async function boot(scripting: boolean) {
   const press = (name: string): Promise<WidgetActivationResult> =>
     form.activateWidget(fieldKeyOf(fieldOf(name)), widgetRefOf(name));
   const paintedIds = () => annotation.pageItems(pon).map((item) => item.id);
+  const widgetId = (name: string) => `obj:${fieldOf(name).widgets[0]!.annotObjectNumber}`;
+  const notify = (name: string, event: PdfAnnotationEventKind) =>
+    form.notifyWidgetEvent(fieldKeyOf(fieldOf(name)), widgetRefOf(name), event);
+  // notifyWidgetEvent is fire-and-forget; a bogus hover dispatch drains the
+  // actions queue behind everything already submitted.
+  const actions = kernel.capability(ActionsToken);
+  const drainActions = () =>
+    actions.dispatch({
+      scope: 'annotation',
+      event: 'cursorEnter',
+      ref: { kind: 'objectNumber', pageObjectNumber: pon, annotObjectNumber: 999_999 },
+      pon,
+    });
 
   return {
     kernel,
@@ -103,6 +120,9 @@ async function boot(scripting: boolean) {
     widgetRefOf,
     press,
     paintedIds,
+    widgetId,
+    notify,
+    drainActions,
     async [Symbol.asyncDispose]() {
       await kernel.destroy();
       await engine.destroy();
@@ -119,7 +139,9 @@ describe('action buttons e2e (scripting OFF — actions ≠ JavaScript)', () => 
     const hide = await t.press('btn-hide');
     expect(hide.kind).toBe('dispatched');
     if (hide.kind !== 'dispatched') throw new Error('unreachable');
-    expect(hide.result.nodes).toEqual([
+    // Phase 2: a dispatch returns per-step truth; the /A tree is one step.
+    expect(hide.result.steps).toHaveLength(1);
+    expect(hide.result.steps[0]!.result.nodes).toEqual([
       expect.objectContaining({ type: 'hide', status: 'executed' }),
     ]);
     expect(t.paintedIds()).not.toContain(alphaId);
@@ -137,7 +159,7 @@ describe('action buttons e2e (scripting OFF — actions ≠ JavaScript)', () => 
     const reset = await t.press('btn-reset'); // excludes [alpha, log] → resets beta
     expect(reset.kind).toBe('dispatched');
     if (reset.kind !== 'dispatched') throw new Error('unreachable');
-    expect(reset.result.nodes).toEqual([
+    expect(reset.result.steps[0]!.result.nodes).toEqual([
       expect.objectContaining({ type: 'reset-form', status: 'executed' }),
     ]);
     expect(t.valueOf('beta')).toBe('default-b');
@@ -150,12 +172,12 @@ describe('action buttons e2e (scripting OFF — actions ≠ JavaScript)', () => 
     expect(chain.kind).toBe('dispatched');
     if (chain.kind !== 'dispatched') throw new Error('unreachable');
     // JS inert (scripting off), the reset between them still executes.
-    expect(chain.result.nodes.map((n) => [n.type, n.status])).toEqual([
+    expect(chain.result.steps[0]!.result.nodes.map((n) => [n.type, n.status])).toEqual([
       ['javascript', 'inert'],
       ['reset-form', 'executed'],
       ['javascript', 'inert'],
     ]);
-    expect(chain.result.status).toBe('executed');
+    expect(chain.result.status).toBe('executed'); // inert nodes never demote
     expect(t.valueOf('alpha')).toBe('default-a'); // include-mode [(alpha)]
     expect(t.valueOf('log')).toBe(''); // no script ran
   });
@@ -167,7 +189,7 @@ describe('action buttons e2e (scripting ON)', () => {
     const chain = await t.press('btn-chain');
     expect(chain.kind).toBe('dispatched');
     if (chain.kind !== 'dispatched') throw new Error('unreachable');
-    expect(chain.result.nodes.map((n) => [n.type, n.status])).toEqual([
+    expect(chain.result.steps[0]!.result.nodes.map((n) => [n.type, n.status])).toEqual([
       ['javascript', 'executed'],
       ['reset-form', 'executed'],
       ['javascript', 'executed'],
@@ -190,4 +212,55 @@ describe('action buttons e2e (scripting ON)', () => {
     expect(t.valueOf('log')).toBe('AB');
     expect(t.valueOf('beta')).toBe('raced');
   }, 20_000);
+});
+
+describe('widget /AA events (Phase 2 — the DOM-event feed)', () => {
+  it('runs the native tooltip via hover with scripting OFF and NO fill authority', async () => {
+    // The read-only viewer: doc.forms.fill deliberately ABSENT — session
+    // Hide needs no write authority, so the tooltip must still work.
+    await using t = await boot(false, [
+      'doc.open',
+      'doc.render',
+      'doc.forms.read',
+      'doc.annotate.read',
+    ]);
+    expect(t.form.canFill()).toBe(false); // the scope really is narrowed
+    const tipId = t.widgetId('tip');
+    expect(t.paintedIds()).not.toContain(tipId); // /F hidden at rest
+
+    t.notify('alpha', 'cursorEnter'); // alpha's /AA /E → Hide /H false (tip)
+    await t.drainActions();
+    expect(t.paintedIds()).toContain(tipId);
+
+    t.notify('alpha', 'cursorExit'); // /X → Hide (tip)
+    await t.drainActions();
+    await t.drainActions(); // the pump settles, then delivers the exit
+    expect(t.paintedIds()).not.toContain(tipId);
+  });
+
+  it('dispatches Fo/Bl and D/U; /A shadows /AA U on the buttons (ISO Table 197)', async () => {
+    await using t = await boot(false);
+    const alphaId = t.widgetId('alpha');
+    const logId = t.widgetId('log');
+
+    t.notify('beta', 'focus'); // /Fo → Hide (alpha)
+    await t.drainActions();
+    expect(t.paintedIds()).not.toContain(alphaId);
+    t.notify('beta', 'blur'); // /Bl → Hide /H false (alpha)
+    await t.drainActions();
+    expect(t.paintedIds()).toContain(alphaId);
+
+    t.notify('beta', 'mouseDown'); // /D → Hide (log)
+    await t.drainActions();
+    expect(t.paintedIds()).not.toContain(logId);
+    t.notify('beta', 'mouseUp'); // /U → Hide /H false (log) — beta has NO /A
+    await t.drainActions();
+    expect(t.paintedIds()).toContain(logId);
+
+    // btn-hide HAS /A — its /AA U (none here) and any U would be shadowed;
+    // the dispatch is inert and, critically, the /A tree does NOT run.
+    t.notify('btn-hide', 'mouseUp');
+    await t.drainActions();
+    expect(t.paintedIds()).toContain(alphaId); // the /A Hide did not fire
+  });
 });

@@ -114,7 +114,13 @@ export const formPlugin = (options: FormPluginOptions = {}) =>
             if (!formHost) return { status: 'inert', reason: 'form plugin unavailable' };
             const origin =
               actionCtx.source.kind === 'widget' ? actionCtx.source.field : undefined;
-            const result = await formHost.runActivationScript(node.script, origin);
+            // Thread the dispatch origin: lifecycle/hover scripts tag their
+            // UI effects so providers can apply the visibility matrix.
+            const result = await formHost.runActivationScript(
+              node.script,
+              origin,
+              actionCtx.origin,
+            );
             // 'rejected' (a script's event.rc = false) still RAN — only a
             // real failure fails the chain.
             if (result.status === 'failed') {

@@ -192,5 +192,8 @@
     "type": "git",
     "url": "git+https://github.com/embedpdf/embed-pdf-viewer.git",
     "directory": "packages/framework/react"
+  },
+  "inlinedDependencies": {
+    "zod": "3.25.76"
   }
 }

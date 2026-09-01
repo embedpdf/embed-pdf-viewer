@@ -220,6 +220,11 @@ export interface LinkNavItem {
   activate?: PdfActionTree;
   /** The annotation ref, carried for ActionSource context. */
   ref?: AnnotationRef;
+  /** Which `/AA` hover trees this link carries — the nav layer's pump flags
+   *  (tree-less hover must cost zero dispatches). Links are behavior-inert
+   *  to the annotation plane's hover feed while navigable, so THEIR
+   *  cursorEnter/cursorExit can only fire from the LinkLayer anchors. */
+  hoverEvents?: { enter: boolean; exit: boolean };
 }
 
 export interface Behavior {

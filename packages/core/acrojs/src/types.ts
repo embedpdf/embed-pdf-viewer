@@ -91,7 +91,10 @@ export type ScriptDiagnosticCode =
   // A script failed and was degraded to a warning. Boot errors must never
   // disable interactive filling, and a K/V/C/F exception must never destroy
   // the user's input (only an explicit `event.rc = false` rejects).
-  | 'script-error';
+  | 'script-error'
+  // A script-produced UI effect was withheld by permission (e.g. a print
+  // request without `doc.print` authority) — observable, never silent.
+  | 'ui-effect-suppressed';
 
 export interface ScriptDiagnostic {
   code: ScriptDiagnosticCode;

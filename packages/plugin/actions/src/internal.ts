@@ -13,6 +13,6 @@ export type {
   ActionExecutor,
   ActionExecutorResult,
   ActionsHostCapability,
+  PageStateReport,
   SessionEffectSink,
-  TriggerSource,
 } from './types';

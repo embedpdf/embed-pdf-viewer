@@ -55,7 +55,7 @@ export const stagePlugin = (options: StagePluginOptions = {}) => {
     // *offer* initial views via provideInitialView; placeInitial resolves them
     // by priority. The one effect below is STEADY-STATE — it re-fits when the
     // page registry mutates (rotate/move/delete) and so has no such race.
-    effects: (ctx) => registerStageEffects(ctx, token),
+    effects: (ctx) => registerStageEffects(ctx, token, id === 'stage'),
     init: (ctx) => {
       // Navigation executors for the action engine — registered by the
       // DEFAULT lens only (a thumbnail lens must never win the last-wins

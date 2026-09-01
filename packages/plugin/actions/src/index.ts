@@ -1,5 +1,7 @@
 export { actionsPlugin } from './actions.plugin';
-export { ActionsToken } from './types';
+export { ActionsToken, originOf } from './types';
+export { createHoverPump } from './hover-pump';
+export type { HoverPump, HoverTarget } from './hover-pump';
 export type {
   ActionContext,
   ActionDiagnostic,
@@ -14,6 +16,9 @@ export type {
   ActionsCapability,
   ActionsPluginConfig,
   ActionSource,
+  ActionStepResult,
   ActionTrigger,
+  ActionTriggerResult,
   ActionUiAdapter,
+  PdfAnnotationEventKind,
 } from './types';

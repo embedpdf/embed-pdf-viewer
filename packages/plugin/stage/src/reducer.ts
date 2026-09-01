@@ -12,6 +12,7 @@ export const initialStageState = (config: StageConfig): StageState => {
     vp: { width: 0, height: 0 },
     dpr: 1,
     cursor: 0,
+    motionCause: 'user',
     activeRules: [],
     ...DEFAULT_SETTINGS,
     ...overrides, // config overrides any default; the rest fall back to DEFAULT_SETTINGS
@@ -48,6 +49,8 @@ export const stageReducer = (state: StageState, a: StageAction): StageState => {
       return { ...state, dpr: a.dpr };
     case 'CURSOR':
       return { ...state, cursor: a.cursor };
+    case 'MOTION_CAUSE':
+      return { ...state, motionCause: a.cause };
     case 'PATCH':
       return applyPatch(state, a.patch);
     case 'RESPONSIVE':

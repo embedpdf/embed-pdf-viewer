@@ -16,7 +16,11 @@ import type {
   PdfActionTargetRef,
   WidgetAppearance,
 } from '@embedpdf/engine-core/runtime';
-import type { ActionDispatchResult } from '@embedpdf/plugin-actions';
+import type {
+  ActionOrigin,
+  ActionTriggerResult,
+  PdfAnnotationEventKind,
+} from '@embedpdf/plugin-actions';
 import type {
   ScriptBudget,
   ScriptDiagnostic,
@@ -76,7 +80,19 @@ export interface FormCommitResult {
  * nags), `'user'` = a script triggered by the user's own interaction (a
  * validation alert — show it).
  */
-export type FormUiEffect = ScriptUiEffect & { phase: 'boot' | 'user' };
+export type FormUiEffect = ScriptUiEffect & {
+  /** WHO asked, script-model axis: `'boot'` = a name-tree/document-open boot
+   *  script, `'user'` = a runtime script. */
+  phase: 'boot' | 'user';
+  /**
+   * The dispatch-origin axis (present when the script ran inside an action
+   * dispatch): a lifecycle `/OpenAction` script is NOT a name-tree boot
+   * script — the two axes are deliberately separate. Providers use this for
+   * the default visibility matrix (suppress lifecycle alerts, block
+   * non-user print); embedder handlers receive it and may decide otherwise.
+   */
+  origin?: ActionOrigin;
+};
 
 /** Runtime adapter for alerts, print requests, and zero-based page navigation. */
 export type FormUiEffectProvider = (effect: FormUiEffect) => void;
@@ -144,6 +160,14 @@ export interface FormCapability {
    * scripting-transaction path runs — `kind: 'form'`.
    */
   activateWidget(key: FieldKey, annotationRef: AnnotationRef): Promise<WidgetActivationResult>;
+  /**
+   * Report one widget DOM event (pointer enter/leave, down/up, focus/blur).
+   * With the actions plugin present the matching `/AA` tree dispatches
+   * (hover rides the shared coalescing pump; `/A` shadows `/AA U` per ISO
+   * Table 197); without it — or without a tree — this is a cheap no-op.
+   * Fire-and-forget by design: results surface via the actions events.
+   */
+  notifyWidgetEvent(key: FieldKey, ref: AnnotationRef, event: PdfAnnotationEventKind): void;
   /** Install the framework/application adapter for script-produced UI requests. */
   setUiEffectProvider(provider: FormUiEffectProvider | null): void;
   /** Restore a field to its /DV default. */
@@ -193,7 +217,7 @@ export interface FormCapability {
  *  the value today; chrome that cares can discriminate on `kind`. */
 export type WidgetActivationResult =
   | { kind: 'form'; result: FormCommitResult }
-  | { kind: 'dispatched'; result: ActionDispatchResult };
+  | { kind: 'dispatched'; result: ActionTriggerResult };
 
 /**
  * INTERNAL host lens — plugin-to-plugin only (the actions plugin's interim
@@ -211,7 +235,11 @@ export interface FormHostCapability extends FormCapability {
    * off, or no form fields to anchor the transaction on) — the caller maps
    * that to an inert node, not a failure.
    */
-  runActivationScript(script: string, origin?: FormFieldRef): Promise<FormCommitResult>;
+  runActivationScript(
+    script: string,
+    origin?: FormFieldRef,
+    dispatchOrigin?: ActionOrigin,
+  ): Promise<FormCommitResult>;
   /**
    * Execute one ResetForm action: resolve targets against the live snapshot
    * (`null` = every field; `exclude` = complement; a resolution yielding
