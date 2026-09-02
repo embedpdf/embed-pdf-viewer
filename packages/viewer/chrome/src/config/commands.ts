@@ -515,6 +515,11 @@ export const defaultCommands: CommandDef[] = [
     id: 'annotation:delete',
     labelKey: 'commands.annotate.delete',
     icon: 'trash',
+    // Backspace/Delete removes the current selection — shapes, free text, ink,
+    // stamps, form widgets, and pending redactions are all annotations here, so
+    // one binding covers them all. The keymap ignores strokes from editable
+    // targets, so typing in a field or the free-text editor is unaffected.
+    shortcut: ['Backspace', 'Delete'],
     categories: ['annotation'],
     run: (c) => {
       const a = anno(c);

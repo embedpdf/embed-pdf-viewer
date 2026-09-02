@@ -53,6 +53,11 @@ export function useCommandShortcuts(options?: { isMac?: boolean }): void {
       if (event.defaultPrevented || isEditableTarget(event.target)) return;
       const id = commands.matchStroke(event, { isMac: mac });
       if (!id) return;
+      // Only claim the stroke when the command can actually run — a key that is
+      // also a browser verb (Backspace on a delete command) must keep its
+      // native behavior while the command is hidden or disabled.
+      const resolved = commands.resolve(id);
+      if (!resolved || !resolved.enabled || !resolved.visible) return;
       event.preventDefault();
       commands.execute(id);
     };
