@@ -32,6 +32,7 @@ export function searchQueryKey(query: SearchQuery, mode: string): string {
     query.matchCase ? 1 : 0,
     query.matchDiacritics ? 1 : 0,
     query.wholeWord ? 1 : 0,
+    query.ignoreWhitespace ? 1 : 0,
     mode,
   ]);
 }

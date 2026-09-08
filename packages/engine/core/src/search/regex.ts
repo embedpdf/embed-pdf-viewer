@@ -105,7 +105,10 @@ export function validateSearchRegex(pattern: string): SearchRegexValidation {
  * reject with `InvalidArg`. Literal queries are always valid (an empty
  * literal simply finds nothing).
  */
-export type SearchQueryIssue = SearchRegexIssue | 'diacritics-with-regex';
+export type SearchQueryIssue =
+  | SearchRegexIssue
+  | 'diacritics-with-regex'
+  | 'ignore-whitespace-with-regex';
 
 export type SearchQueryValidation =
   | { ok: true }
@@ -119,6 +122,14 @@ export function validateSearchQuery(query: SearchQuery): SearchQueryValidation {
       issue: 'diacritics-with-regex',
       message:
         'Diacritic-sensitive matching is not available for regex patterns (regex runs on the raw text plane).',
+    };
+  }
+  if (query.ignoreWhitespace) {
+    return {
+      ok: false,
+      issue: 'ignore-whitespace-with-regex',
+      message:
+        'Whitespace-insensitive matching is not available for regex patterns (regex runs on the raw text plane; use \\s* in the pattern).',
     };
   }
   return validateSearchRegex(query.text);

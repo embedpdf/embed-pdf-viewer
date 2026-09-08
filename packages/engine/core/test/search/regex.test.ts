@@ -128,6 +128,12 @@ describe('matchRegex', () => {
       /diacritics-with-regex/,
     );
   });
+
+  test('throws on regex + ignoreWhitespace', () => {
+    expect(() => matchRegex('x', { ...q('a'), ignoreWhitespace: true })).toThrow(
+      /ignore-whitespace-with-regex/,
+    );
+  });
 });
 
 describe('validateSearchQuery', () => {
@@ -148,11 +154,16 @@ describe('validateSearchQuery', () => {
     });
   });
 
-  test('regex + matchDiacritics is the one rejected flag combo', () => {
+  test('regex + matchDiacritics / ignoreWhitespace are the rejected flag combos', () => {
     expect(validateSearchQuery({ text: 'a', regex: true, matchDiacritics: true })).toMatchObject({
       ok: false,
       issue: 'diacritics-with-regex',
     });
+    expect(validateSearchQuery({ text: 'a', regex: true, ignoreWhitespace: true })).toMatchObject({
+      ok: false,
+      issue: 'ignore-whitespace-with-regex',
+    });
+    expect(validateSearchQuery({ text: 'i n v o i c e', ignoreWhitespace: true }).ok).toBe(true);
     // every other combination is legal
     expect(
       validateSearchQuery({ text: 'a', regex: true, matchCase: true, wholeWord: true }).ok,

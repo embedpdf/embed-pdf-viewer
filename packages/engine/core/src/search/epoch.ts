@@ -45,7 +45,9 @@ function fnv1a64(input: string): string {
  * untouched (their raw form IS the query).
  */
 export function canonicalSearchQuery(query: SearchQuery): SearchQuery {
-  if (query.regex || query.matchCase || query.matchDiacritics) return query;
+  if (query.regex || query.matchCase || query.matchDiacritics || query.ignoreWhitespace) {
+    return query;
+  }
   const canonical: SearchQuery = { text: foldText(query.text).folded };
   if (query.wholeWord) canonical.wholeWord = true;
   return canonical;
