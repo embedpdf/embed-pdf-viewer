@@ -552,6 +552,7 @@ export const SearchQuerySchema: z.ZodType<SearchQuery> = z.object({
   matchCase: z.boolean().optional(),
   wholeWord: z.boolean().optional(),
   matchDiacritics: z.boolean().optional(),
+  ignoreWhitespace: z.boolean().optional(),
 });
 
 export const SearchModeSchema = z.enum(['rects', 'full']);

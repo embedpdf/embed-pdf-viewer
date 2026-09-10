@@ -54,6 +54,17 @@ describe('foldText', () => {
     expect(f.folded).toBe('a b');
   });
 
+  test('dropWhitespace removes whitespace and keeps the map on the letters', () => {
+    const f = foldText('i n\tv\noice', { dropWhitespace: true });
+    expect(f.folded).toBe('invoice');
+    expect(Array.from(f.map)).toEqual([0, 2, 4, 6, 7, 8, 9]);
+  });
+
+  test('dropWhitespace also drops whitespace born from decomposition', () => {
+    const f = foldText('a ¨ b', { dropWhitespace: true });
+    expect(f.folded).toBe('ab');
+  });
+
   test('folds compatibility forms', () => {
     expect(foldText('²').folded).toBe('2'); // superscript two
   });

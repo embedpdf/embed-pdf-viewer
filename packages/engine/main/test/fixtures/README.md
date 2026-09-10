@@ -65,3 +65,19 @@ JavaScript → GoTo → Hide `/Next` chain, and one malformed GoTo (no `/D`).
 Both are single-page with a correct `/Count` so the cloud suite needs no
 byte patching. Edit the generator, re-run it, and commit both the script
 and the regenerated PDFs together.
+
+## Generated search fixture
+
+`letter_spaced_text.pdf` backs `search-ignore-whitespace.test.ts` and is
+authored the same way (deterministic, byte-stable):
+
+```bash
+node packages/engine/main/test/fixtures/generate-letter-spaced-fixture.mjs
+```
+
+Two pages of standard Helvetica (no embedded fonts) carrying the text shapes
+the `ignoreWhitespace` search flag exists for: a letter-spaced
+`i n v o i c e` on each page, a tracked-out `INVOICE` heading (character
+spacing), a mixed-case `I n v o i c e`, a plain `Invoice 42`, the glued
+`totalamount` next to the spaced `total amount`, `in` / `voice` split across
+a line break, and `the invoices` as the whole-word trap.

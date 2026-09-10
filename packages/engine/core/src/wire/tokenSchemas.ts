@@ -87,6 +87,7 @@ export const SearchTokenSchema = {
   fields: [
     'epoch',
     'format',
+    'ignoreWhitespace',
     'matchCase',
     'matchDiacritics',
     'maxMatches',

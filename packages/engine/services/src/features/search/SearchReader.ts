@@ -64,8 +64,8 @@ export class SearchReader {
     const mode = request.mode ?? 'full';
 
     // One validator covers everything: regex dialect AND flag combos
-    // (regex + matchDiacritics is the rejected one). Literal queries are
-    // always valid.
+    // (regex + matchDiacritics / ignoreWhitespace are the rejected ones).
+    // Literal queries are always valid.
     const valid = validateSearchQuery(query);
     if (!valid.ok) {
       throw new EngineError(
@@ -128,7 +128,7 @@ export class SearchReader {
       let ranges: SearchMatchRange[];
       if (query.regex) {
         ranges = matchRegex(text, query);
-      } else if (query.matchCase || query.matchDiacritics) {
+      } else if (query.matchCase || query.matchDiacritics || query.ignoreWhitespace) {
         // Non-default fold options: re-fold the cached raw text per query.
         ranges = matchLiteral(foldText(text, foldOptionsFor(query)), query);
       } else {
@@ -145,7 +145,11 @@ export class SearchReader {
           // here — the biased range helper keeps zero-width characters
           // adjacent to the match OUTSIDE it on both sides. Snippets stay in
           // text space (their offsets are internal to the snippet string).
-          const chars = charRangeForTextOffsets(corpus.snapshot, range.start, range.start + range.length);
+          const chars = charRangeForTextOffsets(
+            corpus.snapshot,
+            range.start,
+            range.start + range.length,
+          );
           matches.push({
             pageObjectNumber: pon,
             charStart: chars.start,
