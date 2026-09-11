@@ -1490,6 +1490,41 @@ export class LayerService {
     );
   }
 
+  /** The visual fill of an unsigned signature field: a PDF page drawn into its widgets, nothing sealed. */
+  async setSignatureAppearance(
+    ctx: LayerWriteContext,
+    input: { docId: string; layerName: string; ref: FormFieldRef; pdf: Uint8Array; pageIndex: number },
+    signal?: AbortSignal,
+  ): Promise<FormFieldUpdateResult> {
+    const pdf = new ArrayBuffer(input.pdf.byteLength);
+    new Uint8Array(pdf).set(input.pdf);
+    return this.runFormMutation(
+      ctx,
+      {
+        docId: input.docId,
+        layerName: input.layerName,
+        tag: 'forms.setSignatureAppearance',
+        auditKind: 'form.setSignatureAppearance',
+        build: (jobId, artifactPath) =>
+          wirePack(
+            {
+              kind: 'forms.setSignatureAppearance' as const,
+              jobId,
+              docId: input.docId,
+              layerName: input.layerName,
+              ref: input.ref,
+              pdf,
+              pageIndex: input.pageIndex,
+              artifactPath,
+            },
+            [pdf],
+          ),
+        impacts: (result: FormFieldUpdateResult) => widgetImpacts(result.field.widgets, 'update'),
+      },
+      signal,
+    );
+  }
+
   async deleteFormField(
     ctx: LayerWriteContext,
     input: { docId: string; layerName: string; ref: FormFieldRef },

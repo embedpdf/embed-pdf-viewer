@@ -2,7 +2,14 @@ import { describe, expect, test } from 'vitest';
 import type { FormFieldDTO, FormSnapshot } from '@embedpdf/engine-core/runtime';
 
 import { fillItemForWidget, fillItems } from '../src/core/fill-items';
-import { fieldByKey, fieldForWidget, fieldKeyOf, initialModel, update } from '../src/core/model';
+import {
+  fieldByKey,
+  fieldForWidget,
+  fieldKeyOf,
+  initialModel,
+  update,
+  widgetAt,
+} from '../src/core/model';
 
 const text = (over: Partial<Extract<FormFieldDTO, { family: 'text' }>> = {}): FormFieldDTO => ({
   ref: { kind: 'objectNumber', fieldObjectNumber: 4 },
@@ -104,5 +111,64 @@ describe('form model', () => {
       boxes: { 4: { x: 0, y: 0, width: 10, height: 10 } },
     });
     expect(fillItems(m, 3)[0]!.disabled).toBe(true);
+  });
+});
+
+const signature = (
+  over: Partial<Extract<FormFieldDTO, { family: 'signature' }>> = {},
+): FormFieldDTO => ({
+  ref: { kind: 'objectNumber', fieldObjectNumber: 9 },
+  fieldObjectNumber: 9,
+  name: 'sig',
+  family: 'signature',
+  origin: 'acroform',
+  flags: { readOnly: false, required: false, noExport: false, raw: 0 },
+  alternateName: 'Sign here',
+  mappingName: null,
+  valueEntry: { kind: 'none' },
+  defaultValueEntry: { kind: 'none' },
+  widgets: [{ annotObjectNumber: 9, pageObjectNumber: 3 }],
+  ...over,
+});
+
+describe('signature widgets', () => {
+  test('an unsigned signature field projects a "signature" fill item', () => {
+    const m = update(initialModel(), { t: 'snapshot', snapshot: snapshot([signature()]) });
+    const item = fillItemForWidget(m, 9);
+    expect(item).toMatchObject({ control: 'signature', signed: false, label: 'Sign here' });
+  });
+
+  test('a /V on the field marks the item signed', () => {
+    const m = update(initialModel(), {
+      t: 'snapshot',
+      snapshot: snapshot([signature({ valueEntry: { kind: 'unsupported' } })]),
+    });
+    expect(fillItemForWidget(m, 9)).toMatchObject({ control: 'signature', signed: true });
+  });
+
+  test('widgetAt resolves the smallest containing widget from loaded geometry', () => {
+    let m = update(initialModel(), {
+      t: 'snapshot',
+      snapshot: snapshot([
+        text(),
+        signature({ widgets: [{ annotObjectNumber: 9, pageObjectNumber: 3 }] }),
+      ]),
+    });
+    expect(widgetAt(m, 3, { x: 10, y: 10 })).toBeNull(); // geometry not loaded
+    m = update(m, {
+      t: 'pageGeom',
+      pageObjectNumber: 3,
+      boxes: {
+        4: { x: 0, y: 0, width: 200, height: 200 },
+        9: { x: 50, y: 50, width: 40, height: 20 },
+      },
+    });
+    expect(widgetAt(m, 3, { x: 60, y: 60 })).toMatchObject({
+      annotObjectNumber: 9,
+      field: { name: 'sig' },
+    });
+    expect(widgetAt(m, 3, { x: 10, y: 10 })).toMatchObject({ annotObjectNumber: 4 });
+    expect(widgetAt(m, 3, { x: 500, y: 500 })).toBeNull();
+    expect(widgetAt(m, 7, { x: 60, y: 60 })).toBeNull();
   });
 });

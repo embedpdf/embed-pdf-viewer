@@ -1,10 +1,8 @@
 import type { DigestAlgorithm } from '@embedpdf/engine-core/runtime';
-import * as asn1js from 'asn1js';
-import * as pkijs from 'pkijs';
-
 import type { RawSigner, RawSignatureAlgorithm } from '../cms/build';
 import { ensureEngine } from '../cms/engine';
-import { OID, WEBCRYPTO_HASH } from '../cms/oids';
+import { WEBCRYPTO_HASH } from '../cms/oids';
+import { selfSignedCertificate } from './self-signed';
 
 /**
  * A `RawSigner` over a WebCrypto private key: the key never leaves the
@@ -80,13 +78,36 @@ export interface TestSigner extends RawSigner {
  * `{ anchors: async () => [signer.certificate] }`.
  */
 export async function createTestSigner(
-  opts: { commonName?: string; algorithm?: 'RSA-PKCS1-v1_5' | 'RSA-PSS' | 'ECDSA'; hash?: 'sha256' | 'sha384' | 'sha512' } = {},
+  opts: {
+    commonName?: string;
+    algorithm?: 'RSA-PKCS1-v1_5' | 'RSA-PSS' | 'ECDSA';
+    hash?: 'sha256' | 'sha384' | 'sha512';
+  } = {},
 ): Promise<TestSigner> {
   ensureEngine();
-  const subtle = globalThis.crypto.subtle;
   const hash = opts.hash ?? 'sha256';
-  const algorithm = opts.algorithm ?? 'RSA-PKCS1-v1_5';
-  const keys = (await subtle.generateKey(
+  const keys = await generateSigningKeyPair(opts.algorithm ?? 'RSA-PKCS1-v1_5', hash, true);
+  const certificate = await selfSignedCertificate({
+    publicKey: keys.publicKey,
+    privateKey: keys.privateKey,
+    commonName: opts.commonName ?? 'EmbedPDF test signer',
+    hash,
+  });
+  const signer = webCryptoSigner({
+    privateKey: keys.privateKey,
+    certificateChain: [certificate],
+    hash,
+  });
+  return { ...signer, certificate, privateKey: keys.privateKey };
+}
+
+/** A WebCrypto signing key pair; `extractable: false` keeps the private key inside the runtime for good. */
+export async function generateSigningKeyPair(
+  algorithm: 'RSA-PKCS1-v1_5' | 'RSA-PSS' | 'ECDSA',
+  hash: 'sha256' | 'sha384' | 'sha512',
+  extractable: boolean,
+): Promise<CryptoKeyPair> {
+  return (await globalThis.crypto.subtle.generateKey(
     algorithm === 'ECDSA'
       ? { name: 'ECDSA', namedCurve: 'P-256' }
       : {
@@ -95,40 +116,7 @@ export async function createTestSigner(
           publicExponent: new Uint8Array([1, 0, 1]),
           hash: WEBCRYPTO_HASH[hash],
         },
-    true,
+    extractable,
     ['sign', 'verify'],
   )) as CryptoKeyPair;
-
-  const cert = new pkijs.Certificate();
-  cert.version = 2;
-  const serial = new Uint8Array(8);
-  globalThis.crypto.getRandomValues(serial);
-  serial[0] &= 0x7f;
-  cert.serialNumber = new asn1js.Integer({ valueHex: serial.buffer });
-  const name = new pkijs.AttributeTypeAndValue({
-    type: OID.commonName,
-    value: new asn1js.Utf8String({ value: opts.commonName ?? 'EmbedPDF test signer' }),
-  });
-  cert.issuer.typesAndValues.push(name);
-  cert.subject.typesAndValues.push(name);
-  const now = Date.now();
-  cert.notBefore.value = new Date(now - 24 * 3600 * 1000);
-  cert.notAfter.value = new Date(now + 365 * 24 * 3600 * 1000);
-  const basicConstraints = new pkijs.BasicConstraints({ cA: true });
-  // digitalSignature (bit 0) | keyCertSign (bit 5)
-  const keyUsage = new asn1js.BitString({ valueHex: new Uint8Array([0x84]).buffer, unusedBits: 2 });
-  cert.extensions = [
-    new pkijs.Extension({
-      extnID: OID.basicConstraints,
-      critical: true,
-      extnValue: basicConstraints.toSchema().toBER(false),
-      parsedValue: basicConstraints,
-    }),
-    new pkijs.Extension({ extnID: OID.keyUsage, critical: true, extnValue: keyUsage.toBER(false) }),
-  ];
-  await cert.subjectPublicKeyInfo.importKey(keys.publicKey);
-  await cert.sign(keys.privateKey, WEBCRYPTO_HASH[hash]);
-  const certificate = new Uint8Array(cert.toSchema(true).toBER(false));
-  const signer = webCryptoSigner({ privateKey: keys.privateKey, certificateChain: [certificate], hash });
-  return { ...signer, certificate, privateKey: keys.privateKey };
 }

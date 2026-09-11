@@ -1484,6 +1484,20 @@ export const ChangeAnalysisSchema = z.object({
   verdict: z.enum(['unchanged', 'permitted', 'forbidden', 'indeterminate']),
 }) as unknown as z.ZodType<ChangeAnalysis>;
 
+const SignatureAttributionSchema = z.object({
+  name: z.string().optional(),
+  reason: z.string().optional(),
+  location: z.string().optional(),
+  contactInfo: z.string().optional(),
+});
+
+/** The JSON part of a visual signature fill (multipart envelope): which resource part holds the PDF, and its page. */
+export const SignatureAppearanceBodySchema = z.object({
+  resource: z.string().min(1),
+  pageIndex: z.number().int().nonnegative().optional(),
+});
+export type SignatureAppearanceBody = z.infer<typeof SignatureAppearanceBodySchema>;
+
 /**
  * The JSON part of a prepare (multipart envelope): `SignaturePrepareInput`
  * with the appearance artwork referenced by its resource part instead of
@@ -1495,14 +1509,9 @@ export const SignaturePrepareBodySchema = z.object({
   subFilter: z.enum(['adbe.pkcs7.detached', 'ETSI.CAdES.detached']).optional(),
   digest: z.enum(['sha256', 'sha384', 'sha512']).optional(),
   contentsSize: z.number().int().positive().optional(),
-  signer: z
-    .object({
-      name: z.string().optional(),
-      reason: z.string().optional(),
-      location: z.string().optional(),
-      contactInfo: z.string().optional(),
-    })
-    .optional(),
+  attribution: SignatureAttributionSchema.optional(),
+  /** @deprecated the pre-rename spelling of `attribution`; servers read either. */
+  signer: SignatureAttributionSchema.optional(),
   signingTime: z.string().optional(),
   certify: z.object({ permission: DocMdpPermissionSchema }).optional(),
   lock: FieldLockSpecSchema.optional(),

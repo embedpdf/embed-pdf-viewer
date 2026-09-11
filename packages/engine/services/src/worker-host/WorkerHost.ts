@@ -21,6 +21,7 @@ import {
   type FormsListWorkerRequest,
   type FormsRepairWorkerRequest,
   type FormsUpdateFieldWorkerRequest,
+  type FormsSetSignatureAppearanceWorkerRequest,
   type FormsResetWorkerRequest,
   type FormsSetValueWorkerRequest,
   type SignaturesListWorkerRequest,
@@ -358,6 +359,9 @@ export class WorkerHost {
           break;
         case 'forms.updateField':
           resultPack = this.handleFormsUpdateField(msg, ctrl.signal);
+          break;
+        case 'forms.setSignatureAppearance':
+          resultPack = this.handleFormsSetSignatureAppearance(msg, ctrl.signal);
           break;
         case 'forms.deleteField':
           resultPack = this.handleFormsDeleteField(msg, ctrl.signal);
@@ -1673,6 +1677,28 @@ export class WorkerHost {
     );
   }
 
+  private handleFormsSetSignatureAppearance(
+    req: FormsSetSignatureAppearanceWorkerRequest,
+    signal: AbortSignal,
+  ): WirePack<WorkerResultPayload> {
+    const session = this.requireSession(req);
+    const { field, pages } = new FormMutator(this.runtime, session).setSignatureAppearance(
+      req.ref,
+      new Uint8Array(req.pdf),
+      req.pageIndex,
+      signal,
+    );
+    const meta: MutationMeta = {
+      affectedPages: pages.map((pon) => session.pageState(pon)),
+      cacheDelta: null,
+    };
+    return this.finishMutation(
+      session,
+      { tag: 'forms.setSignatureAppearance', result: { field, meta } },
+      req.artifactPath,
+    );
+  }
+
   private handleFormsDeleteField(
     req: FormsDeleteFieldWorkerRequest,
     signal: AbortSignal,
@@ -1804,6 +1830,7 @@ const MUTATING_KINDS: ReadonlySet<WorkerRequest['kind']> = new Set<WorkerRequest
   'forms.repair',
   'forms.createField',
   'forms.updateField',
+  'forms.setSignatureAppearance',
   'forms.deleteField',
   'forms.attachWidget',
   'forms.detachWidget',

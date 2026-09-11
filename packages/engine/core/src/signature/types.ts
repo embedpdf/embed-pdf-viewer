@@ -210,7 +210,8 @@ export interface SignaturePrepareInput {
   digest?: Exclude<DigestAlgorithm, 'sha1'>;
   /** Room reserved for the CMS, in bytes (256 .. 4 MiB). Default 8192. */
   contentsSize?: number;
-  signer?: { name?: string; reason?: string; location?: string; contactInfo?: string };
+  /** What the signature dictionary says about the signer: `/Name`, `/Reason`, `/Location`, `/ContactInfo`. */
+  attribution?: { name?: string; reason?: string; location?: string; contactInfo?: string };
   /** PDF date string for `/M`; default: now. */
   signingTime?: string;
   /** Make this the certification signature (`/Root /Perms /DocMDP`). Only ever the first signature. */

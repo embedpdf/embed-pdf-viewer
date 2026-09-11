@@ -6,6 +6,13 @@ import type {
 import type { PageRotation } from '@embedpdf/core-geometry';
 import type { Subtype, Vec } from '@embedpdf/core-annotation';
 import type { AnnotationHostCapability } from './types';
+import {
+  ANNOTATION_DRAW_PRIORITY,
+  ANNOTATION_EDIT_PRIORITY,
+  ANNOTATION_GHOST_PRIORITY,
+  ANNOTATION_MARQUEE_PRIORITY,
+  ANNOTATION_PLACE_PRIORITY,
+} from './priorities';
 
 const MARQUEE_DRAG_THRESHOLD_PX = 4;
 const isPolyTool = (subtype: Subtype): boolean => subtype === 'polygon' || subtype === 'polyline';
@@ -39,7 +46,7 @@ export function createPlaceHandler(anno: AnnotationHostCapability): InteractionH
     id: 'annotation-place',
     // `annotation-stamp` is honoured as a legacy alias for embedder tool
     // configs written before the tags were unified.
-    priority: 95,
+    priority: ANNOTATION_PLACE_PRIORITY,
     enabledFor: (t) => t.enables.has('annotation-place') || t.enables.has('annotation-stamp'),
     onDown: (s) => {
       if (!s.page) return false;
@@ -69,7 +76,7 @@ export function createGhostHandler(
   };
   return {
     id: 'annotation-ghost',
-    priority: 1000,
+    priority: ANNOTATION_GHOST_PRIORITY,
     enabledFor: () => true,
     onDown: () => {
       anno.clearGhost();
@@ -100,7 +107,7 @@ export function createEditHandler(
   let origin: { pon: number; point: Vec; downPoint: Vec; touch: boolean } | null = null;
   return {
     id: 'annotation-edit',
-    priority: 100,
+    priority: ANNOTATION_EDIT_PRIORITY,
     enabledFor: (t) => t.enables.has('annotation-edit'),
     // Touch consent: a finger owns a tool drag only over the selection's own
     // chrome or a selected annotation's body (see claimsTouchAt) — unselected
@@ -252,7 +259,7 @@ export function createMarqueeHandler(anno: AnnotationHostCapability): Interactio
   let view: { scale?: number; rotation?: PageRotation; zoom?: number } = {};
   return {
     id: 'annotation-marquee',
-    priority: 50,
+    priority: ANNOTATION_MARQUEE_PRIORITY,
     enabledFor: (t) => t.enables.has('annotation-marquee'),
     onDown: (s) => {
       if (!s.page) return false;
@@ -379,7 +386,7 @@ export function createDrawHandler(
     // per-line quad marks, anywhere else it drag-creates. Priority only breaks
     // ties between simultaneously-ELIGIBLE handlers, and draw-only tools
     // (square/ink/arrow…) never co-enable text-select, so they are unaffected.
-    priority: 55,
+    priority: ANNOTATION_DRAW_PRIORITY,
     enabledFor: (t) => t.enables.has('annotation-draw'),
     onDown: (s) => {
       if (!s.page) return false;

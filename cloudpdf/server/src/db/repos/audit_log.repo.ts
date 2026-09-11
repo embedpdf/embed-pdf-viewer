@@ -27,6 +27,7 @@ export type AuditMutationKind =
   | 'form.attachWidget'
   | 'form.detachWidget'
   | 'form.applyEffects'
+  | 'form.setSignatureAppearance'
   /** A signature published a new base version through this layer. */
   | 'signature.completed';
 

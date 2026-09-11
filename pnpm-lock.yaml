@@ -1218,6 +1218,9 @@ importers:
       '@embedpdf/core-geometry':
         specifier: workspace:*
         version: link:../../core/geometry
+      '@embedpdf/core-signature':
+        specifier: workspace:*
+        version: link:../../core/signature
       '@embedpdf/core-stage':
         specifier: workspace:*
         version: link:../../core/stage
@@ -1266,6 +1269,9 @@ importers:
       '@embedpdf/plugin-shell':
         specifier: workspace:*
         version: link:../../plugin/shell
+      '@embedpdf/plugin-signature':
+        specifier: workspace:*
+        version: link:../../plugin/signature
       '@embedpdf/plugin-stage':
         specifier: workspace:*
         version: link:../../plugin/stage
@@ -1659,6 +1665,43 @@ importers:
         specifier: workspace:*
         version: link:../../core/main
     devDependencies:
+      '@embedpdf/tooling-build':
+        specifier: workspace:*
+        version: link:../../../tooling/build
+      typescript:
+        specifier: ^5.0.0
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.9
+        version: 2.1.9(@types/node@22.19.11)(happy-dom@20.11.0)(less@4.6.7)(lightningcss@1.30.2)(msw@2.11.2(@types/node@22.19.11)(typescript@5.9.3))(sass-embedded@1.97.3)(sass@1.97.3)(terser@5.46.0)
+
+  packages/plugin/signature:
+    dependencies:
+      '@embedpdf/core':
+        specifier: workspace:*
+        version: link:../../core/main
+      '@embedpdf/core-signature':
+        specifier: workspace:*
+        version: link:../../core/signature
+      '@embedpdf/engine-core':
+        specifier: workspace:*
+        version: link:../../engine/core
+      '@embedpdf/plugin-annotation':
+        specifier: workspace:*
+        version: link:../annotation
+      '@embedpdf/plugin-form':
+        specifier: workspace:*
+        version: link:../form
+      '@embedpdf/plugin-interaction':
+        specifier: workspace:*
+        version: link:../interaction
+      '@embedpdf/plugin-stamp':
+        specifier: workspace:*
+        version: link:../stamp
+    devDependencies:
+      '@embedpdf/engine':
+        specifier: workspace:*
+        version: link:../../engine/main
       '@embedpdf/tooling-build':
         specifier: workspace:*
         version: link:../../../tooling/build

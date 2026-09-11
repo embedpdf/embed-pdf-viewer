@@ -499,7 +499,7 @@ function runSigningTests(
         subFilter: 'ETSI.CAdES.detached',
         digest: 'sha256',
         contentsSize: 1024,
-        signer: { reason: 'conformance' },
+        attribution: { reason: 'conformance' },
       });
       expect(prepared.digest.byteLength).toBe(32);
       expect(prepared.algorithm).toBe('sha256');

@@ -35,10 +35,12 @@ import {
   fieldByKey,
   fieldForWidget as coreFieldForWidget,
   update,
+  widgetAt as coreWidgetAt,
   type Box,
   type FieldKey,
   type Model,
   type Msg,
+  type WidgetHit,
 } from './core/model';
 import { createSerialMutationQueue } from './mutationQueue';
 import { createFormScriptingController } from './scripting';
@@ -175,6 +177,34 @@ export function createFormCapability(
       .finally(() => {
         geomLoading.delete(pon);
       });
+  };
+
+  // ── widget hit test ─────────────────────────────────────────────────────
+  // The model's geometry when the page has it (and kick the lazy load so the
+  // next call does); otherwise the annotation plane's live boxes — it is
+  // whole-document hydrated, so a first click on a page already resolves.
+  const widgetAt = (pon: number, point: { x: number; y: number }): WidgetHit | null => {
+    const m = model();
+    ensureGeom(pon);
+    if (m.geom[pon]) return coreWidgetAt(m, pon, point);
+    if (!annotationHost) return null;
+    let best: WidgetHit | null = null;
+    for (const item of annotationHost.pageItems(pon)) {
+      if (!item.subtype.startsWith('widget') || item.ref?.kind !== 'objectNumber') continue;
+      const box = item.box;
+      const inside =
+        point.x >= box.x &&
+        point.x <= box.x + box.width &&
+        point.y >= box.y &&
+        point.y <= box.y + box.height;
+      if (!inside) continue;
+      const field = coreFieldForWidget(m, item.ref.annotObjectNumber);
+      if (!field) continue;
+      if (!best || box.width * box.height < best.box.width * best.box.height) {
+        best = { annotObjectNumber: item.ref.annotObjectNumber, field, box };
+      }
+    }
+    return best;
   };
 
   // ── memoized fill projection ────────────────────────────────────────────
@@ -595,6 +625,7 @@ export function createFormCapability(
     ensureGeom,
     field: (key) => fieldByKey(model(), key),
     fieldForWidget: (annotObjectNumber) => coreFieldForWidget(model(), annotObjectNumber),
+    widgetAt,
     setText: (key, value) => write(key, { type: 'text', value }),
     toggle: (key, onState) => write(key, { type: 'toggle', state: onState }),
     choose: (key, values) => write(key, { type: 'choice', values }),

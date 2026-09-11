@@ -211,8 +211,9 @@ export async function registerSignatureRoutes(
     if (parsed.certify) {
       requireLayerCapability(req, docId, layerName, 'doc.sign.certify', pdfBits);
     }
-    const { appearance, ...rest } = parsed;
+    const { appearance, signer, ...rest } = parsed;
     const input: SignaturePrepareInput = { ...rest };
+    if (!input.attribution && signer) input.attribution = signer;
     if (appearance) {
       const resource = resources?.[appearance.resource];
       if (!resource) {

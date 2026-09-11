@@ -504,6 +504,18 @@ export interface FormsUpdateFieldWorkerRequest {
   artifactPath?: string;
 }
 
+/** Draw a PDF page into every widget of an unsigned signature field (the visual fill). */
+export interface FormsSetSignatureAppearanceWorkerRequest {
+  kind: 'forms.setSignatureAppearance';
+  jobId: WorkerJobId;
+  docId: string;
+  layerName?: string;
+  ref: FormFieldRef;
+  pdf: ArrayBuffer;
+  pageIndex: number;
+  artifactPath?: string;
+}
+
 export interface FormsDeleteFieldWorkerRequest {
   kind: 'forms.deleteField';
   jobId: WorkerJobId;
@@ -1068,6 +1080,7 @@ export type WorkerRequest =
   | FormsRepairWorkerRequest
   | FormsCreateFieldWorkerRequest
   | FormsUpdateFieldWorkerRequest
+  | FormsSetSignatureAppearanceWorkerRequest
   | FormsDeleteFieldWorkerRequest
   | FormsAttachWidgetWorkerRequest
   | FormsDetachWidgetWorkerRequest
@@ -1239,6 +1252,12 @@ export type WorkerResultPayload =
     }
   | {
       tag: 'forms.updateField';
+      result: FormFieldUpdateResult;
+      artifact?: LayerArtifactWorkerPayload;
+      artifactFile?: LayerArtifactFileWorkerPayload;
+    }
+  | {
+      tag: 'forms.setSignatureAppearance';
       result: FormFieldUpdateResult;
       artifact?: LayerArtifactWorkerPayload;
       artifactFile?: LayerArtifactFileWorkerPayload;

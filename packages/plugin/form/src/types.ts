@@ -30,7 +30,8 @@ import type { ScriptDiagnostic, ScriptExecutionError, ScriptUiEffect } from '@em
 import { createCapabilityToken } from '@embedpdf/core';
 
 import type { FillItem } from './core/fill-items';
-import type { Box, FieldKey, Model } from './core/model';
+import type { Box, FieldKey, Model, WidgetHit } from './core/model';
+import type { AuthorableFormFamily } from './tools';
 
 export interface FormState {
   model: Model;
@@ -73,7 +74,7 @@ export type FormUiEffect = ScriptUiEffect & {
 
 /** Input for {@link FormCapability.placeField}. */
 export interface PlaceFieldInput {
-  family: Exclude<FormFieldFamily, 'pushbutton' | 'signature' | 'unknown'>;
+  family: AuthorableFormFamily;
   pageObjectNumber: number;
   /** Content-space LOGICAL field box (no visual padding semantics). */
   box: Box;
@@ -118,6 +119,15 @@ export interface FormCapability {
 
   field(key: FieldKey): FormFieldDTO | null;
   fieldForWidget(annotObjectNumber: number): FormFieldDTO | null;
+  /**
+   * The widget under a content-space point on a page (any family), with
+   * its field — the hit test a sibling plugin runs on a pointer sample
+   * before deciding what a click means (a mark dropped over a signature
+   * field). The model's own geometry answers when it is loaded; until then
+   * the annotation plane's live boxes do, so the first click on a page
+   * already resolves. The smallest containing widget wins.
+   */
+  widgetAt(pageObjectNumber: number, point: { x: number; y: number }): WidgetHit | null;
 
   /** Commit a text value (call on blur/Enter — keystrokes stay local). */
   setText(key: FieldKey, value: string): Promise<void>;
@@ -235,4 +245,4 @@ export interface FormHostCapability extends FormCapability {
 export const FormToken = createCapabilityToken<FormHostCapability>('form');
 
 export type { FillItem } from './core/fill-items';
-export type { Box, FieldKey } from './core/model';
+export type { Box, FieldKey, WidgetHit } from './core/model';

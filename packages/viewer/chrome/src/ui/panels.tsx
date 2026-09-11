@@ -21,6 +21,7 @@ import { CommentsPanel } from './comments-panel';
 import { RedactionPanel } from './redaction-panel';
 import { SearchPanel } from './search-panel';
 import { StampsPanel } from './stamps-panel';
+import { SignaturesPanel } from './signatures-panel';
 
 // ── left sidebar (thumbnails / outline tabs) ─────────────────────────────────
 export function LeftSidebar() {
@@ -129,6 +130,7 @@ export function RightSidebar() {
   const style = useSurface('annotation-style');
   const redaction = useSurface('redaction');
   const stamps = useSurface('stamps');
+  const signatures = useSurface('signatures');
   const active = search.isOpen
     ? 'search'
     : comment.isOpen
@@ -139,7 +141,9 @@ export function RightSidebar() {
           ? 'redaction'
           : stamps.isOpen
             ? 'stamps'
-            : null;
+            : signatures.isOpen
+              ? 'signatures'
+              : null;
   if (!active) return null;
 
   const titleKey =
@@ -151,7 +155,9 @@ export function RightSidebar() {
           ? 'demo.redactionTitle'
           : active === 'stamps'
             ? 'demo.stampsTitle'
-            : 'demo.styleTitle';
+            : active === 'signatures'
+              ? 'demo.signaturesTitle'
+              : 'demo.styleTitle';
   const close =
     active === 'search'
       ? search.close
@@ -161,7 +167,9 @@ export function RightSidebar() {
           ? redaction.close
           : active === 'stamps'
             ? stamps.close
-            : style.close;
+            : active === 'signatures'
+              ? signatures.close
+              : style.close;
 
   return (
     <aside className="border-border-subtle bg-surface flex w-72 shrink-0 flex-col border-l">
@@ -183,6 +191,8 @@ export function RightSidebar() {
         <RedactionPanel />
       ) : active === 'stamps' ? (
         <StampsPanel />
+      ) : active === 'signatures' ? (
+        <SignaturesPanel />
       ) : (
         <CommentsPanel key={documentId ?? 'none'} />
       )}

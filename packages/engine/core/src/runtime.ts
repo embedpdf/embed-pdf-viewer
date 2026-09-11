@@ -156,6 +156,7 @@ export type {
   FormsRepairWorkerRequest,
   FormsCreateFieldWorkerRequest,
   FormsUpdateFieldWorkerRequest,
+  FormsSetSignatureAppearanceWorkerRequest,
   FormsDeleteFieldWorkerRequest,
   FormsAttachWidgetWorkerRequest,
   FormsDetachWidgetWorkerRequest,

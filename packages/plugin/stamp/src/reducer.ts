@@ -16,6 +16,10 @@ export const stampReducer = (state: StampState, action: StampAction): StampState
         libraries: { ...state.libraries, [action.library.id]: action.library },
         libraryOrder: [...state.libraryOrder, action.library.id],
       };
+    case 'LIBRARY_UPDATED':
+      return state.libraries[action.library.id]
+        ? { ...state, libraries: { ...state.libraries, [action.library.id]: action.library } }
+        : state;
     case 'LIBRARY_REMOVED': {
       const library = state.libraries[action.libraryId];
       if (!library) return state;

@@ -64,6 +64,19 @@ export const STAMP_PIECEINFO_APP = 'EMBD_Stamp';
 /** The `Version` both dictionaries carry. */
 export const STAMP_PIECEINFO_VERSION = 2;
 
+/** The library kind every file has unless it says otherwise. */
+export const DEFAULT_LIBRARY_KIND = 'stamps';
+
+/** `/Kind` names: the two the plugin defines keep their PDF spellings; others are written as given. */
+export function libraryKindToPdfName(kind: string): string {
+  return kind === 'stamps' ? 'StampLibrary' : kind === 'signatures' ? 'SignatureLibrary' : kind;
+}
+
+export function libraryKindFromPdfName(name: string | undefined): string {
+  if (!name || name === 'StampLibrary') return DEFAULT_LIBRARY_KIND;
+  return name === 'SignatureLibrary' ? 'signatures' : name;
+}
+
 export function stampKindToPdfName(kind: StampAssetKind): string {
   return kind === 'signature' ? 'Signature' : kind === 'initials' ? 'Initials' : 'Stamp';
 }
@@ -71,12 +84,12 @@ export function stampKindToPdfName(kind: StampAssetKind): string {
 /** The catalog patch: library id, categories, locale. The name is `/Title`. */
 export function stampLibraryPieceInfo(
   id: string,
-  opts: { categories?: readonly string[]; locale?: string } = {},
+  opts: { kind?: string; categories?: readonly string[]; locale?: string } = {},
 ): PieceInfoPatch {
   return {
     Version: STAMP_PIECEINFO_VERSION,
     Id: id,
-    Kind: { name: 'StampLibrary' },
+    Kind: { name: libraryKindToPdfName(opts.kind ?? DEFAULT_LIBRARY_KIND) },
     // v2: the name is the PDF's /Title.
     Name: null,
     Categories: opts.categories ?? null,

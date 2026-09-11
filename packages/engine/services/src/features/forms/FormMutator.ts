@@ -11,6 +11,7 @@ import type {
   FormWidgetRef,
   MutationMeta,
   WidgetPlacement,
+  PageObjectNumber,
 } from '@embedpdf/engine-core/runtime';
 import { EngineError, EngineErrorCode, fieldLockFor } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
@@ -21,6 +22,8 @@ import { withScratch, withScratchN } from '../../runtime/memory/scratch';
 import { createUnattachedWidget } from './internal/authorWidget';
 import { flagMasks } from './internal/fieldFlagBits';
 import { acquireFormModel } from './internal/formModelCache';
+import { bakeWidgetAppearance } from '../signature/internal/appearance';
+import { readSignaturesFromModel, withSignatureModel } from '../signature/internal/readSignatureModel';
 import { withWideStringArray } from './internal/wideStringArray';
 import { readFieldAt, readFormSnapshot } from './internal/readFormSnapshot';
 import { resolveFieldRef, type ResolvedField } from './internal/resolveFieldRef';
@@ -34,6 +37,7 @@ const FAMILY_CODE = {
   text: 4,
   combobox: 5,
   listbox: 6,
+  signature: 7,
 } as const;
 
 /** Widgets a single value write can touch; far above any real form. */
@@ -259,6 +263,57 @@ export class FormMutator {
 
     this.session.noteMutation();
     return { field: this.readBackField(fieldObjectNumber) };
+  }
+
+  /**
+   * Draw a PDF page into every widget of an UNSIGNED signature field: the
+   * visual "sign" of a viewer without a signer. The field's value stays
+   * empty and nothing is sealed; a signed field is refused (its appearance
+   * is part of what the signature covers). Pages whose widgets changed are
+   * reported so their renders re-pin.
+   */
+  setSignatureAppearance(
+    ref: FormFieldRef,
+    pdf: Uint8Array,
+    pageIndex: number,
+    signal: AbortSignal,
+  ): { field: FormFieldDTO; pages: PageObjectNumber[] } {
+    throwIfAborted(signal);
+    const docPtr = this.session.requireDocPtr();
+    const model = acquireFormModel(this.runtime, this.session);
+    const resolved = resolveFieldRef(this.runtime, model, ref);
+    this.assertWritable(resolved);
+    const before = readFieldAt(this.runtime, model, resolved.fieldIndex, docPtr);
+    if (before.family !== 'signature') {
+      throw new EngineError(
+        EngineErrorCode.InvalidArg,
+        `'${before.name}' is a ${before.family} field, not a signature field`,
+      );
+    }
+    const signed = withSignatureModel(this.runtime, docPtr, (signatures) =>
+      readSignaturesFromModel(this.runtime, signatures).some(
+        (s) =>
+          s.signed &&
+          s.field.kind === 'objectNumber' &&
+          s.field.fieldObjectNumber === resolved.fieldObjectNumber,
+      ),
+    );
+    if (signed) {
+      throw new EngineError(
+        EngineErrorCode.InvalidArg,
+        `'${before.name}' is signed; its appearance is sealed with the signature`,
+      );
+    }
+    if (before.widgets.length === 0) {
+      throw new EngineError(EngineErrorCode.InvalidArg, `'${before.name}' has no widget to draw into`);
+    }
+    for (const widget of before.widgets) {
+      bakeWidgetAppearance(this.runtime, docPtr, widget, pdf, pageIndex);
+    }
+    this.session.noteMutation();
+    const pages = [...new Set(before.widgets.map((w) => w.pageObjectNumber))];
+    for (const pon of pages) this.session.bumpRevision(pon);
+    return { field: this.readBackField(resolved.fieldObjectNumber), pages };
   }
 
   updateField(

@@ -223,6 +223,10 @@ export const wirePaths = {
   docVersionRevision: (docId: string, sha256: string, index: number) =>
     `/v1/docs/${encodeURIComponent(docId)}/versions/revisions/${sha256}/${index}`,
 
+  /** POST (multipart envelope): draw a PDF page into an unsigned signature field's widgets. */
+  layerFormFieldSignatureAppearance: (docId: string, layerName: string, fieldKey: string) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/form/fields/${encodeURIComponent(fieldKey)}/signature-appearance`,
+
   /** POST: rewrite the document Info dict for the layer (metadata edit). */
   layerMetadataUpdate: (docId: string, layerName: string) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/metadata`,
@@ -656,6 +660,8 @@ export const wireTemplates = {
   layerForm: '/v1/docs/:docId/layers/:layerName/form',
   layerFormFieldValue: '/v1/docs/:docId/layers/:layerName/form/fields/:fieldKey/value',
   layerFormFieldReset: '/v1/docs/:docId/layers/:layerName/form/fields/:fieldKey/reset',
+  layerFormFieldSignatureAppearance:
+    '/v1/docs/:docId/layers/:layerName/form/fields/:fieldKey/signature-appearance',
   layerFormData: '/v1/docs/:docId/layers/:layerName/form/data',
   layerPagesMove: '/v1/docs/:docId/layers/:layerName/pages/move',
   layerPagesRotate: '/v1/docs/:docId/layers/:layerName/pages/rotate',

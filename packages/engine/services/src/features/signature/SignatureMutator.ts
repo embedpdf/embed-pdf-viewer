@@ -15,6 +15,7 @@ import {
   MemoryCandidateStore,
   type CandidateStore,
 } from './internal/candidateStore';
+import { bakeWidgetAppearance } from './internal/appearance';
 import { assertSealedSignature, bytesEqual, type SealExpectation } from './internal/sealCheck';
 import { disposeSignatureModel } from './internal/signatureModelCache';
 import { DIGEST_CODE, SignatureReader } from './SignatureReader';
@@ -175,14 +176,18 @@ export class SignatureMutator {
       const candidate = this.openCandidate(signingId);
       stack.push(() => candidate.close());
 
+      // `signer` is the pre-rename wire spelling: older clients still send it.
+      const attribution =
+        input.attribution ??
+        (input as { signer?: SignaturePrepareInput['attribution'] }).signer;
       const valueObjNum = this.callPrepare(candidate.docPtr, field.fieldObjectNumber, {
         subfilter: SUBFILTER_CODE[subFilter],
         digest: DIGEST_CODE[algorithm],
         contentsSize,
-        name: input.signer?.name ?? null,
-        reason: input.signer?.reason ?? null,
-        location: input.signer?.location ?? null,
-        contactInfo: input.signer?.contactInfo ?? null,
+        name: attribution?.name ?? null,
+        reason: attribution?.reason ?? null,
+        location: attribution?.location ?? null,
+        contactInfo: attribution?.contactInfo ?? null,
         signingTime: input.signingTime ?? null,
         docmdpPermission: input.certify?.permission ?? 0,
         fieldmdpAction: input.lock ? FIELD_ACTION_CODE[input.lock.action] : 0,
@@ -196,7 +201,7 @@ export class SignatureMutator {
         );
       }
       if (input.appearance && field.widget) {
-        this.bakeAppearance(
+        bakeWidgetAppearance(this.runtime, 
           candidate.docPtr,
           field.widget,
           input.appearance.pdf,
@@ -395,46 +400,6 @@ export class SignatureMutator {
   }
 
   /** Draw a page of `pdf` into the widget's appearance stream on the candidate. */
-  private bakeAppearance(
-    docPtr: Ptr,
-    widget: { annotObjectNumber: number; pageObjectNumber: number },
-    pdf: Uint8Array,
-    pageIndex: number,
-  ): void {
-    const { mem, fn } = this.runtime;
-    const stack = new CloseStack();
-    try {
-      const pagePtr = fn.EPDFDoc_LoadPageByObjectNumber(docPtr, widget.pageObjectNumber);
-      if (!pagePtr) {
-        throw new EngineError(EngineErrorCode.NotFound, 'the widget page could not be loaded');
-      }
-      stack.push(() => fn.FPDF_ClosePage(pagePtr));
-      const annotPtr = fn.EPDFPage_GetAnnotByObjectNumber(pagePtr, widget.annotObjectNumber);
-      if (!annotPtr) {
-        throw new EngineError(EngineErrorCode.NotFound, 'the signature widget could not be loaded');
-      }
-      stack.push(() => fn.FPDFPage_CloseAnnot(annotPtr));
-      const dataPtr = mem.alloc(pdf.byteLength);
-      stack.push(() => mem.free(dataPtr));
-      mem.writeBytes(dataPtr, pdf);
-      const artworkPtr = fn.FPDF_LoadMemDocument64(dataPtr, pdf.byteLength, '');
-      if (!artworkPtr) {
-        throw new EngineError(
-          EngineErrorCode.MalformedPdf,
-          'the appearance PDF could not be opened',
-        );
-      }
-      stack.push(() => fn.FPDF_CloseDocument(artworkPtr));
-      if (!fn.EPDFAnnot_SetAppearanceFromPage(annotPtr, artworkPtr, pageIndex)) {
-        throw new EngineError(
-          EngineErrorCode.InvalidArg,
-          'the appearance page could not be drawn into the widget',
-        );
-      }
-    } finally {
-      stack.close();
-    }
-  }
 
   /**
    * File-backed sessions (a file base in the registry: the server) persist

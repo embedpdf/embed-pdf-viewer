@@ -892,3 +892,185 @@ describe('stamp plugin — placement', () => {
     }
   });
 });
+
+describe('stamp plugin — library kinds', () => {
+  it('a library is created for a kind, written to the file, and filtered by it', async () => {
+    const { engine, catalogEntries } = makeAssetEngine(0);
+    const cap = createStampCapability(makeCtx(engine));
+    const stamps = await cap.createLibrary('Mine');
+    const signer = await cap.createLibrary('Bob Singor', { kind: 'signatures' });
+    const custom = await cap.createLibrary('Review marks', { kind: 'toolbar' });
+
+    expect(cap.library(stamps)).toMatchObject({ kind: 'stamps' });
+    expect(cap.library(signer)).toMatchObject({ kind: 'signatures', name: 'Bob Singor' });
+    // The last write is the toolbar library's: its kind is written as given.
+    expect(catalogEntries.Kind).toEqual({ type: 'name', value: 'toolbar' });
+
+    expect(cap.libraries().map((l) => l.id)).toEqual([stamps, signer, custom]);
+    expect(cap.libraries({ kind: 'stamps' }).map((l) => l.id)).toEqual([stamps]);
+    expect(cap.libraries({ kind: 'signatures' }).map((l) => l.id)).toEqual([signer]);
+    expect(cap.libraries({ kind: ['stamps', 'toolbar'] }).map((l) => l.id)).toEqual([stamps, custom]);
+  });
+
+  it('imports the kind the file declares, defaults v2 files to stamps, and lets the caller override', async () => {
+    const signatures = makeAssetEngine(1, {
+      catalog: { Kind: { type: 'name', value: 'SignatureLibrary' } },
+      title: 'Alice',
+    });
+    const cap = createStampCapability(makeCtx(signatures.engine));
+    const aliceId = await cap.importLibraryPdf(pdfBytes());
+    expect(cap.library(aliceId)).toMatchObject({ kind: 'signatures', name: 'Alice' });
+    expect(signatures.catalogEntries.Kind).toEqual({ type: 'name', value: 'SignatureLibrary' });
+
+    const v2 = makeAssetEngine(1, { catalog: { Kind: { type: 'name', value: 'StampLibrary' } } });
+    const cap2 = createStampCapability(makeCtx(v2.engine));
+    expect(cap2.library(await cap2.importLibraryPdf(pdfBytes()))).toMatchObject({ kind: 'stamps' });
+
+    const overridden = makeAssetEngine(1);
+    const cap3 = createStampCapability(makeCtx(overridden.engine));
+    const id = await cap3.importLibraryPdf(pdfBytes(), { libraryKind: 'toolbar' });
+    expect(cap3.library(id)).toMatchObject({ kind: 'toolbar' });
+    expect(overridden.catalogEntries.Kind).toEqual({ type: 'name', value: 'toolbar' });
+  });
+
+  it('updateLibrary renames through the document title and keeps the kind', async () => {
+    const { engine, metadata, catalogEntries } = makeAssetEngine(0);
+    const cap = createStampCapability(makeCtx(engine));
+    const seen: string[] = [];
+    cap.onLibraryChanged((c) => seen.push(c.reason));
+    const id = await cap.createLibrary('Bob', { kind: 'signatures' });
+    await cap.updateLibrary(id, { name: 'Bob Singor', categories: ['personal'] });
+    expect(metadata.update).toHaveBeenLastCalledWith({ title: 'Bob Singor' });
+    expect(cap.library(id)).toMatchObject({
+      name: 'Bob Singor',
+      kind: 'signatures',
+      categories: ['personal'],
+    });
+    expect(catalogEntries.Kind).toEqual({ type: 'name', value: 'SignatureLibrary' });
+    expect(catalogEntries.Categories).toEqual({ type: 'string-array', value: ['personal'] });
+    expect(seen).toEqual(['created', 'updated']);
+    await expect(cap.updateLibrary('nope', { name: 'x' })).rejects.toMatchObject({
+      code: EngineErrorCode.NotFound,
+    });
+  });
+
+  it('addAsset takes exactly one of source / mark', async () => {
+    const { engine } = makeAssetEngine(0);
+    const cap = createStampCapability(makeCtx(engine));
+    const id = await cap.createLibrary('Mine');
+    await expect(cap.addAsset({ libraryId: id, name: 'A' })).rejects.toMatchObject({
+      code: EngineErrorCode.InvalidArg,
+    });
+    await expect(
+      cap.addAsset({
+        libraryId: id,
+        name: 'A',
+        source: pdfBytes(),
+        mark: { kind: 'image', source: pngBytes() },
+      }),
+    ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg });
+  });
+});
+
+
+/** A real engine whose page renders answer a fixed PNG: Node has no canvas encoder, thumbnails do not matter here. */
+function withFakeRenders(engine: Engine): Engine {
+  return {
+    open: async (input: Parameters<Engine['open']>[0], options?: Parameters<Engine['open']>[1]) => {
+      const doc = await engine.open(input, options);
+      return new Proxy(doc, {
+        get(targetDoc, property) {
+          if (property === 'page') {
+            return (pageObjectNumber: number) => {
+              const page = targetDoc.page(pageObjectNumber);
+              return new Proxy(page, {
+                get(targetPage, pageProperty) {
+                  if (pageProperty === 'render') {
+                    return new Proxy(targetPage.render, {
+                      get(targetRender, renderProperty) {
+                        if (renderProperty === 'image') {
+                          return async () => ({
+                            contentType: 'image/png',
+                            source: { kind: 'bytes', bytes: pngBytes() },
+                          });
+                        }
+                        const value = Reflect.get(targetRender, renderProperty, targetRender);
+                        return typeof value === 'function' ? value.bind(targetRender) : value;
+                      },
+                    });
+                  }
+                  const value = Reflect.get(targetPage, pageProperty, targetPage);
+                  return typeof value === 'function' ? value.bind(targetPage) : value;
+                },
+              });
+            };
+          }
+          const value = Reflect.get(targetDoc, property, targetDoc);
+          return typeof value === 'function' ? value.bind(targetDoc) : value;
+        },
+      });
+    },
+    destroy: () => engine.destroy(),
+  } as unknown as Engine;
+}
+
+describe('stamp plugin — authoring marks (real engine)', () => {
+  it('renders a drawn mark and a typed mark into vector pages the size of the mark', async () => {
+    const engine = await createLocalEngine({ runtime: { prefer: 'wasm' } });
+    const cap = createStampCapability(makeCtx(withFakeRenders(engine)));
+    try {
+      const libraryId = await cap.createLibrary('Bob Singor', { kind: 'signatures' });
+      const drawn = await cap.addAsset({
+        libraryId,
+        name: 'sig',
+        label: 'Signature',
+        kind: 'signature',
+        mark: {
+          kind: 'ink',
+          strokes: [
+            [
+              { x: 10, y: 10 },
+              { x: 60, y: 70 },
+              { x: 110, y: 20 },
+              { x: 210, y: 60 },
+            ],
+          ],
+          strokeWidth: 3,
+        },
+      });
+      const signature = cap.asset(drawn)!;
+      expect(signature.kind).toBe('signature');
+      // The page is the mark's bounds (200 × 60) plus the stroke padding.
+      expect(signature.size.width).toBeGreaterThan(200);
+      expect(signature.size.width).toBeLessThan(215);
+      expect(signature.size.height).toBeGreaterThan(60);
+      expect(signature.size.height).toBeLessThan(75);
+
+      const typed = await cap.addAsset({
+        libraryId,
+        name: 'ini',
+        label: 'Initials',
+        kind: 'initials',
+        mark: { kind: 'text', text: 'BS', fontFamily: 'helvetica', fontSize: 40 },
+      });
+      const initials = cap.asset(typed)!;
+      expect(initials.size.width).toBeGreaterThan(20);
+      expect(initials.size.height).toBeGreaterThan(20);
+
+      // Both are pages of the one library PDF: reopening it lists them by kind.
+      const doc = await engine.open({ kind: 'bytes', id: 'lib', bytes: cap.exportLibrary(libraryId)! });
+      try {
+        // Two registered marks (a created library keeps its blank first page, unregistered).
+        const layout = await doc.pages.list();
+        expect(layout.namedPages?.filter((n) => n.target.kind === 'page')).toHaveLength(2);
+        expect((await doc.metadata.read()).title).toBe('Bob Singor');
+      } finally {
+        await doc.close();
+      }
+      expect(cap.libraries({ kind: 'signatures' })).toHaveLength(1);
+      expect(cap.assets(libraryId).map((a) => a.kind)).toEqual(['signature', 'initials']);
+    } finally {
+      await engine.destroy();
+    }
+  }, 60_000);
+});

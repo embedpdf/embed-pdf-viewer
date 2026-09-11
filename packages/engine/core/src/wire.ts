@@ -17,6 +17,7 @@ export {
   SignatureAbortResultSchema,
   ChangeAnalysisSchema,
   SignaturePrepareBodySchema,
+  SignatureAppearanceBodySchema,
   LayerAnalysisQuerySchema,
   VersionAnalysisQuerySchema,
   analyzeInputFromQuery,
@@ -351,6 +352,7 @@ export {
 export type { SignaturePreparedWire, SignatureCompleteBody } from './wire/schemas';
 export type {
   SignaturePrepareBody,
+  SignatureAppearanceBody,
   LayerAnalysisQuery,
   VersionAnalysisQuery,
   DocumentVersion,
