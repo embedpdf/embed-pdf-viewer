@@ -3,11 +3,20 @@ import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
 import { CloseStack } from '../../../document-session/lifecycle/PdfDocumentOpener';
 
+/** `EPDF_STAMP_FIT_CONTAIN`: uniform scale, letterboxed and centred in the rect. */
+const FIT_CONTAIN = 0;
+
 /**
  * Draw one page of a PDF into a widget annotation's normal appearance —
  * what a signature's mark is, whether the field is being signed
- * (`SignatureMutator`) or only filled visually (`FormMutator`). The
- * artwork page is scaled into the widget's rect by the fork.
+ * (`SignatureMutator`) or only filled visually (`FormMutator`).
+ *
+ * Two fork calls, the same pair the stamp path makes: `SetAppearanceFromPage`
+ * clones the page into the document as a wrapped Form XObject (page content
+ * and resources in a child form, the outer stream a placement matrix), then
+ * `UpdateAppearanceToRect` writes that placement — the page fitted uniformly
+ * into the widget's rect. Without the second call the page sits in its own
+ * box and the viewer's BBox→/Rect mapping stretches it to the rect's aspect.
  */
 export function bakeWidgetAppearance(
   runtime: PdfRuntimeModule,
@@ -41,6 +50,12 @@ export function bakeWidgetAppearance(
       throw new EngineError(
         EngineErrorCode.InvalidArg,
         'the appearance page could not be drawn into the widget',
+      );
+    }
+    if (!fn.EPDFAnnot_UpdateAppearanceToRect(annotPtr, FIT_CONTAIN)) {
+      throw new EngineError(
+        EngineErrorCode.Unknown,
+        'the appearance page could not be fitted into the widget',
       );
     }
   } finally {
