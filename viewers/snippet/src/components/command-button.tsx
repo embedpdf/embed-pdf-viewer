@@ -40,6 +40,13 @@ export function CommandButton({
     }
   };
 
+  const activeAriaProps =
+    command.activeAriaState === 'pressed'
+      ? { 'aria-pressed': command.active }
+      : command.activeAriaState === 'expanded'
+        ? { 'aria-expanded': command.active }
+        : {};
+
   return (
     <Tooltip
       content={command.label}
@@ -54,6 +61,7 @@ export function CommandButton({
         disabled={command.disabled}
         className={className || 'p-1'}
         aria-label={command.label}
+        {...activeAriaProps}
       >
         {variant === 'text' ? (
           <span className="text-sm">{command.label}</span>

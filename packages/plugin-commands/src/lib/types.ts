@@ -44,6 +44,15 @@ export interface Command<TStore = any> {
   disabled?: Dynamic<TStore, boolean>;
   visible?: Dynamic<TStore, boolean>;
 
+  // ARIA semantics for `active`, when this command's control is more than a
+  // one-shot action:
+  //  - 'pressed'  toggles a persistent state independent of any revealed
+  //    content (e.g. pan mode) -> exposed as aria-pressed.
+  //  - 'expanded' opens/closes an attached menu or panel (e.g. a toolbar
+  //    dropdown, a sidebar) -> exposed as aria-expanded.
+  // Omit for plain action commands that have no `active` state.
+  activeAriaState?: 'pressed' | 'expanded';
+
   // Keyboard shortcuts - can be single or multiple
   shortcuts?: string | string[];
   shortcutLabel?: string; // Display label for shortcuts
@@ -59,6 +68,7 @@ export interface ResolvedCommand {
   icon?: string;
   iconProps?: IconProps;
   active: boolean;
+  activeAriaState?: 'pressed' | 'expanded';
   disabled: boolean;
   visible: boolean;
   shortcuts?: string[];
