@@ -28,6 +28,7 @@ import {
   type SignaturesCompleteWorkerRequest,
   type SignaturesAbortWorkerRequest,
   type SignaturesAnalyzeWorkerRequest,
+  type SignaturesFinalizeCandidateWorkerRequest,
   type SignaturesContentsWorkerRequest,
   type SignaturesDigestWorkerRequest,
   type SignaturesRevisionBytesWorkerRequest,
@@ -112,8 +113,6 @@ import {
 import { AttachmentMutator, AttachmentReader } from '../features/attachments';
 import { FontRegistrar, type StartupFontSpec } from '../features/fonts';
 import { FormMutator, FormReader, FormsEffectsApplier, disposeFormModel } from '../features/forms';
-import { SignatureAnalyzer, SignatureMutator, SignatureReader, disposeSignatureModel, hasSignedSignature } from '../features/signature';
-import { generateUuid } from '../shared/uuid';
 import { PageGeometryReader } from '../features/geometry';
 import { MetadataMutator, MetadataReader } from '../features/metadata';
 import {
@@ -129,8 +128,17 @@ import { PageRenderReader } from '../features/render';
 import { DocumentSaver } from '../features/save';
 import { SearchReader } from '../features/search';
 import { SecurityReader } from '../features/security';
+import {
+  CandidateFinalizer,
+  SignatureAnalyzer,
+  SignatureMutator,
+  SignatureReader,
+  disposeSignatureModel,
+  hasSignedSignature,
+} from '../features/signature';
 import { PageTextReader } from '../features/text';
 import { ensureInitialized, destroyLibrary } from '../runtime/lifecycle/bootstrap';
+import { generateUuid } from '../shared/uuid';
 
 /** The image a {@link WorkerImageEncoder} produced. `bytes` must OWN its
  *  buffer (a fresh allocation, not a pooled `Buffer` slab view) — it is
@@ -243,7 +251,6 @@ export class WorkerHost {
     const ctrl = new AbortController();
     this.aborts.set(msg.jobId, ctrl);
 
-
     // Abort policy: only handlers that loop over pages/annotations honor
     // `ctrl.signal` (the read/mutation paths below). One-shot native
     // operations — open, document save, security probe, close, shutdown —
@@ -321,6 +328,9 @@ export class WorkerHost {
           break;
         case 'signatures.analyze':
           resultPack = this.handleSignaturesAnalyze(msg);
+          break;
+        case 'signatures.finalizeCandidate':
+          resultPack = this.handleSignaturesFinalizeCandidate(msg);
           break;
         case 'forms.list':
           resultPack = this.handleFormsList(msg, ctrl.signal);
@@ -569,7 +579,11 @@ export class WorkerHost {
    * validators reject that. Auto-layered sessions serialize no artifact per
    * mutation: the caller never asked for one.
    */
-  private openSignedAware(session: DocumentSession, bytes: Uint8Array, password: string | null): void {
+  private openSignedAware(
+    session: DocumentSession,
+    bytes: Uint8Array,
+    password: string | null,
+  ): void {
     if (session.sessionKind === 'plain') {
       const plain = openFatMemoryDocument(this.runtime, bytes, password);
       // A SIGNED signature, not merely a signature field: an unsigned form
@@ -615,7 +629,9 @@ export class WorkerHost {
 
   private handleSignaturesList(req: SignaturesListWorkerRequest): WirePack<WorkerResultPayload> {
     const session = this.requireSession(req);
-    const snapshot = new SignatureReader(this.runtime, session).readSnapshot();
+    const snapshot = req.workingCopy
+      ? new SignatureAnalyzer(this.runtime, session).readWorkingCopySnapshot()
+      : new SignatureReader(this.runtime, session).readSnapshot();
     return wirePack({ tag: 'signatures.list', snapshot });
   }
 
@@ -627,7 +643,9 @@ export class WorkerHost {
     return wirePack({ tag: 'signatures.contents', bytes }, [bytes]);
   }
 
-  private handleSignaturesDigest(req: SignaturesDigestWorkerRequest): WirePack<WorkerResultPayload> {
+  private handleSignaturesDigest(
+    req: SignaturesDigestWorkerRequest,
+  ): WirePack<WorkerResultPayload> {
     const session = this.requireSession(req);
     const digest = new SignatureReader(this.runtime, session).digest(req.ref, req.algorithm);
     return wirePack({ tag: 'signatures.digest', digest }, [digest]);
@@ -647,10 +665,17 @@ export class WorkerHost {
     return wirePack({ tag: 'document.version', version });
   }
 
-  private handleSignaturesPrepare(req: SignaturesPrepareWorkerRequest): WirePack<WorkerResultPayload> {
+  private handleSignaturesPrepare(
+    req: SignaturesPrepareWorkerRequest,
+  ): WirePack<WorkerResultPayload> {
     const session = this.requireSession(req);
     // The live document is untouched: no mutation, no artifact.
-    const result = new SignatureMutator(this.runtime, session, this.baseDocuments, this.options.signingCandidatePath).prepare(req.input);
+    const result = new SignatureMutator(
+      this.runtime,
+      session,
+      this.baseDocuments,
+      this.options.signingCandidatePath,
+    ).prepare(req.input);
     return wirePack({ tag: 'signatures.prepare', result });
   }
 
@@ -658,7 +683,12 @@ export class WorkerHost {
     req: SignaturesCompleteWorkerRequest,
   ): WirePack<WorkerResultPayload> {
     const session = this.requireSession(req);
-    const result = new SignatureMutator(this.runtime, session, this.baseDocuments, this.options.signingCandidatePath).complete(req.input);
+    const result = new SignatureMutator(
+      this.runtime,
+      session,
+      this.baseDocuments,
+      this.options.signingCandidatePath,
+    ).complete(req.input);
     if (result.status === 'already-completed') {
       return wirePack({ tag: 'signatures.complete', result });
     }
@@ -667,15 +697,41 @@ export class WorkerHost {
     return this.finishMutation(session, { tag: 'signatures.complete', result }, req.artifactPath);
   }
 
-  private handleSignaturesAnalyze(req: SignaturesAnalyzeWorkerRequest): WirePack<WorkerResultPayload> {
+  private handleSignaturesAnalyze(
+    req: SignaturesAnalyzeWorkerRequest,
+  ): WirePack<WorkerResultPayload> {
     const session = this.requireSession(req);
     const analysis = new SignatureAnalyzer(this.runtime, session).analyze(req.input);
     return wirePack({ tag: 'signatures.analyze', analysis });
   }
 
+  /**
+   * Session-less, like `document.renderPageFile`: the candidate file is
+   * the caller's, patched in place and read back through a transient
+   * session that is never stored in `this.sessions`.
+   */
+  private handleSignaturesFinalizeCandidate(
+    req: SignaturesFinalizeCandidateWorkerRequest,
+  ): WirePack<WorkerResultPayload> {
+    const finalized = new CandidateFinalizer(this.runtime, this.baseDocuments).finalize({
+      path: req.path,
+      byteRange: req.byteRange,
+      contentsSize: req.contentsSize,
+      fieldObjectNumber: req.fieldObjectNumber,
+      cms: new Uint8Array(req.cms),
+      password: req.password ?? null,
+    });
+    return wirePack({ tag: 'signatures.finalizeCandidate', ...finalized });
+  }
+
   private handleSignaturesAbort(req: SignaturesAbortWorkerRequest): WirePack<WorkerResultPayload> {
     const session = this.requireSession(req);
-    const result = new SignatureMutator(this.runtime, session, this.baseDocuments, this.options.signingCandidatePath).abort(req.signingId);
+    const result = new SignatureMutator(
+      this.runtime,
+      session,
+      this.baseDocuments,
+      this.options.signingCandidatePath,
+    ).abort(req.signingId);
     return wirePack({ tag: 'signatures.abort', result });
   }
 
@@ -1301,7 +1357,10 @@ export class WorkerHost {
       this.runtime.fileWrite.removeFile(req.path);
       for (let offset = 0; offset < size; offset += chunk) {
         const length = Math.min(chunk, size - offset);
-        this.runtime.fileWrite.appendBytes(req.path, new Uint8Array(reader.readLoadedBytes(offset, length)));
+        this.runtime.fileWrite.appendBytes(
+          req.path,
+          new Uint8Array(reader.readLoadedBytes(offset, length)),
+        );
       }
       if (size === 0) this.runtime.fileWrite.appendBytes(req.path, new Uint8Array(0));
       return wirePack({ tag: 'document.saveFile', path: req.path });

@@ -80,17 +80,26 @@ export function readByteRange(
   });
 }
 
-function readLock(runtime: PdfRuntimeModule, model: Ptr, index: number, which: number): FieldLockSpec | null {
+function readLock(
+  runtime: PdfRuntimeModule,
+  model: Ptr,
+  index: number,
+  which: number,
+): FieldLockSpec | null {
   const { fn } = runtime;
   const code =
-    which === FIELDS_LOCK ? fn.EPDFSig_GetLockAction(model, index) : fn.EPDFSig_GetFieldMDPAction(model, index);
+    which === FIELDS_LOCK
+      ? fn.EPDFSig_GetLockAction(model, index)
+      : fn.EPDFSig_GetFieldMDPAction(model, index);
   const action = FIELD_ACTION_BY_CODE[code];
   if (!action) return null;
   const fields: string[] = [];
   const count = fn.EPDFSig_GetFieldNameCount(model, index, which);
   for (let n = 0; n < count; n++) {
     fields.push(
-      readWide(runtime, (buf, cap) => fn.EPDFSig_GetFieldNameAt(model, index, which, n, buf, cap)) ?? '',
+      readWide(runtime, (buf, cap) =>
+        fn.EPDFSig_GetFieldNameAt(model, index, which, n, buf, cap),
+      ) ?? '',
     );
   }
   const spec: FieldLockSpec = { action, fields };
@@ -101,7 +110,11 @@ function readLock(runtime: PdfRuntimeModule, model: Ptr, index: number, which: n
   return spec;
 }
 
-function readSeedValue(runtime: PdfRuntimeModule, model: Ptr, index: number): SignatureSeedValue | null {
+function readSeedValue(
+  runtime: PdfRuntimeModule,
+  model: Ptr,
+  index: number,
+): SignatureSeedValue | null {
   const { fn } = runtime;
   if (!fn.EPDFSig_HasSeedValue(model, index)) return null;
   const requiredFlags = fn.EPDFSig_GetSeedValueRequiredFlags(model, index) >>> 0;
@@ -113,7 +126,9 @@ function readSeedValue(runtime: PdfRuntimeModule, model: Ptr, index: number): Si
     const items: string[] = [];
     for (let n = 0; n < count; n++) {
       items.push(
-        readWide(runtime, (buf, cap) => fn.EPDFSig_GetSeedValueListAt(model, index, which, n, buf, cap)) ?? '',
+        readWide(runtime, (buf, cap) =>
+          fn.EPDFSig_GetSeedValueListAt(model, index, which, n, buf, cap),
+        ) ?? '',
       );
     }
     return items;
@@ -151,7 +166,10 @@ export function readSignaturesFromModel(runtime: PdfRuntimeModule, model: Ptr): 
       fieldName: readWide(runtime, (buf, cap) => fn.EPDFSig_GetFieldName(model, i, buf, cap)) ?? '',
       widget:
         widgetObjNum > 0
-          ? { annotObjectNumber: widgetObjNum, pageObjectNumber: fn.EPDFSig_GetWidgetPageObjNum(model, i) }
+          ? {
+              annotObjectNumber: widgetObjNum,
+              pageObjectNumber: fn.EPDFSig_GetWidgetPageObjNum(model, i),
+            }
           : null,
       signed,
       kind: fn.EPDFSig_GetKind(model, i) === KIND_DOC_TIMESTAMP ? 'timestamp' : 'signature',
@@ -176,6 +194,27 @@ export function readSignaturesFromModel(runtime: PdfRuntimeModule, model: Ptr): 
     });
   }
   return out;
+}
+
+/** The DER `/Contents` of signature `index`, copied out; `NotFound` when unsigned or malformed. */
+export function readContentsAt(runtime: PdfRuntimeModule, model: Ptr, index: number): Uint8Array {
+  const { fn, mem } = runtime;
+  const length = fn.EPDFSig_GetContents(model, index, NULL_PTR, 0);
+  if (length <= 0) {
+    throw new EngineError(
+      EngineErrorCode.NotFound,
+      'signature has no usable /Contents (malformed encoding)',
+    );
+  }
+  return withScratch(mem, length, (buf) => {
+    const written = fn.EPDFSig_GetContents(model, index, buf, length);
+    if (written !== length) {
+      throw new EngineError(EngineErrorCode.Unknown, 'failed to read signature contents');
+    }
+    const out = new Uint8Array(length);
+    out.set(mem.readBytes(buf, length));
+    return out;
+  });
 }
 
 /** The chained revisions of a document, oldest first; empty when the chain is not valid. */
@@ -218,7 +257,11 @@ export function hasSignedSignature(runtime: PdfRuntimeModule, docPtr: Ptr): bool
 }
 
 /** Run `body` with a fresh signature model of `docPtr`, closing it afterwards. */
-export function withSignatureModel<T>(runtime: PdfRuntimeModule, docPtr: Ptr, body: (model: Ptr) => T): T {
+export function withSignatureModel<T>(
+  runtime: PdfRuntimeModule,
+  docPtr: Ptr,
+  body: (model: Ptr) => T,
+): T {
   const model = runtime.fn.EPDFSig_LoadModel(docPtr);
   if (model === NULL_PTR) {
     throw new EngineError(EngineErrorCode.Unknown, 'failed to build signature model');
@@ -243,7 +286,11 @@ export function readStructure(runtime: PdfRuntimeModule, docPtr: Ptr): RevisionS
     mem.poke(a, 'i32', 0);
     mem.poke(p, 'i32', 0);
     fn.EPDFDoc_GetStructureObjectNumbers(docPtr, r, a, p);
-    return [Number(mem.peek(r, 'i32')) >>> 0, Number(mem.peek(a, 'i32')) >>> 0, Number(mem.peek(p, 'i32')) >>> 0];
+    return [
+      Number(mem.peek(r, 'i32')) >>> 0,
+      Number(mem.peek(a, 'i32')) >>> 0,
+      Number(mem.peek(p, 'i32')) >>> 0,
+    ];
   });
   const pages: number[] = [];
   const pageCount = fn.FPDF_GetPageCount(docPtr);
@@ -267,6 +314,8 @@ export function readStructure(runtime: PdfRuntimeModule, docPtr: Ptr): RevisionS
       fn.EPDFForm_CloseModel(formModel);
     }
   }
-  const signatures = withSignatureModel(runtime, docPtr, (model) => readSignaturesFromModel(runtime, model));
+  const signatures = withSignatureModel(runtime, docPtr, (model) =>
+    readSignaturesFromModel(runtime, model),
+  );
   return { root, acroForm, pagesRoot, pages, fields, signatures };
 }

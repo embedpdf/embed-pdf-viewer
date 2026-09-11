@@ -4,7 +4,10 @@ import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
 import type { SavedCandidate } from '../../../document-session/DocumentSession';
 import type { BaseDocumentRegistry } from '../../../document-session/lifecycle/BaseDocumentRegistry';
-import { openLayerDocument, type OpenedPdfDocument } from '../../../document-session/lifecycle/PdfDocumentOpener';
+import {
+  openLayerDocument,
+  type OpenedPdfDocument,
+} from '../../../document-session/lifecycle/PdfDocumentOpener';
 import { withScratchN } from '../../../runtime/memory/scratch';
 import { U64_BYTES, peekU64, pokeU64 } from '../../../runtime/memory/u64';
 import { generateUuid } from '../../../shared/uuid';
@@ -57,7 +60,15 @@ function sealSpanInHeap(
     for (let k = 0; k < 4; k++) pokeU64(mem, rangePtr, 0, k * U64_BYTES);
     pokeU64(mem, coPtr, 0);
     pokeU64(mem, chPtr, 0);
-    const ok = fn.EPDFSig_SealSpan(spanPtr, BigInt(spanLength), BigInt(objectOffset), BigInt(fileLength), rangePtr, coPtr, chPtr);
+    const ok = fn.EPDFSig_SealSpan(
+      spanPtr,
+      BigInt(spanLength),
+      BigInt(objectOffset),
+      BigInt(fileLength),
+      rangePtr,
+      coPtr,
+      chPtr,
+    );
     if (!ok) {
       throw new EngineError(EngineErrorCode.Unknown, 'failed to seal the signing candidate');
     }
@@ -106,6 +117,51 @@ function writeContentsInHeap(
   }
 }
 
+/**
+ * Hex-encode `cms` into the /Contents hole of a candidate FILE, in place.
+ * Only the hole (`<`, the hex digits, `>`) is read and written back; the
+ * delimiters are checked so a wrong offset patches nothing.
+ */
+export function writeContentsIntoFile(
+  runtime: PdfRuntimeModule,
+  path: string,
+  hole: { holeOffset: number; hexLength: number },
+  cms: Uint8Array,
+): void {
+  const { mem } = runtime;
+  const span = runtime.fileAccess.readRange(path, hole.holeOffset, hole.hexLength + 2);
+  if (
+    span.byteLength !== hole.hexLength + 2 ||
+    span[0] !== 0x3c ||
+    span[span.byteLength - 1] !== 0x3e
+  ) {
+    throw new EngineError(
+      EngineErrorCode.InvalidArg,
+      'the byteRange gap is not a <…> /Contents hole of the candidate',
+    );
+  }
+  const spanPtr = mem.alloc(span.byteLength);
+  try {
+    mem.writeBytes(spanPtr, span);
+    writeContentsInHeap(
+      runtime,
+      spanPtr,
+      span.byteLength,
+      hole.holeOffset,
+      {
+        byteRange: [0, 0, 0, 0],
+        contentsOffset: hole.holeOffset + 1,
+        contentsHexLength: hole.hexLength,
+        digest: new Uint8Array(),
+      },
+      cms,
+    );
+    runtime.fileWrite.writeRange(path, hole.holeOffset, mem.readBytes(spanPtr, span.byteLength));
+  } finally {
+    mem.free(spanPtr);
+  }
+}
+
 // ---------------------------------------------------------------------------
 
 export class MemoryCandidateStore implements CandidateStore {
@@ -120,7 +176,13 @@ export class MemoryCandidateStore implements CandidateStore {
       pokeU64(mem, sizePtr, 0);
       pokeU64(mem, offPtr, 0);
       pokeU64(mem, lenPtr, 0);
-      const bufPtr = fn.EPDFSig_SaveCandidateToOwnedBuffer(candidateDocPtr, sigObjNum, sizePtr, offPtr, lenPtr);
+      const bufPtr = fn.EPDFSig_SaveCandidateToOwnedBuffer(
+        candidateDocPtr,
+        sigObjNum,
+        sizePtr,
+        offPtr,
+        lenPtr,
+      );
       if (!bufPtr) {
         throw new EngineError(EngineErrorCode.Unknown, 'failed to save the signing candidate');
       }
@@ -140,7 +202,8 @@ export class MemoryCandidateStore implements CandidateStore {
   }
 
   seal(saved: SavedCandidate, algorithm: Exclude<DigestAlgorithm, 'sha1'>): SealedCandidate {
-    if (saved.kind !== 'memory') throw new EngineError(EngineErrorCode.InvalidArg, 'not a memory candidate');
+    if (saved.kind !== 'memory')
+      throw new EngineError(EngineErrorCode.InvalidArg, 'not a memory candidate');
     const { mem, fn } = this.runtime;
     const bufPtr = mem.alloc(saved.bytes.byteLength);
     try {
@@ -189,7 +252,8 @@ export class MemoryCandidateStore implements CandidateStore {
   }
 
   writeContents(saved: SavedCandidate, sealed: SealedCandidate, cms: Uint8Array): void {
-    if (saved.kind !== 'memory') throw new EngineError(EngineErrorCode.InvalidArg, 'not a memory candidate');
+    if (saved.kind !== 'memory')
+      throw new EngineError(EngineErrorCode.InvalidArg, 'not a memory candidate');
     const { mem } = this.runtime;
     const bufPtr = mem.alloc(saved.bytes.byteLength);
     try {
@@ -202,8 +266,13 @@ export class MemoryCandidateStore implements CandidateStore {
   }
 
   openSealed(saved: SavedCandidate, password: string | null): OpenedPdfDocument {
-    if (saved.kind !== 'memory') throw new EngineError(EngineErrorCode.InvalidArg, 'not a memory candidate');
-    const base = this.baseDocuments.acquireMemoryBase({ key: `signed:${generateUuid()}`, bytes: saved.bytes, password });
+    if (saved.kind !== 'memory')
+      throw new EngineError(EngineErrorCode.InvalidArg, 'not a memory candidate');
+    const base = this.baseDocuments.acquireMemoryBase({
+      key: `signed:${generateUuid()}`,
+      bytes: saved.bytes,
+      password,
+    });
     return openLayerDocument(this.runtime, base, { kind: 'fresh' }, password);
   }
 
@@ -226,7 +295,10 @@ export class FileCandidateStore implements CandidateStore {
     private readonly runtime: PdfRuntimeModule,
     private readonly baseDocuments: BaseDocumentRegistry,
     private readonly basePath: string,
-    private readonly candidatePath: (basePath: string, signingId: string) => string = defaultCandidatePath,
+    private readonly candidatePath: (
+      basePath: string,
+      signingId: string,
+    ) => string = defaultCandidatePath,
   ) {}
 
   save(candidateDocPtr: Ptr, sigObjNum: number, signingId: string): SavedCandidate {
@@ -239,7 +311,14 @@ export class FileCandidateStore implements CandidateStore {
         pokeU64(mem, sizePtr, 0);
         pokeU64(mem, offPtr, 0);
         pokeU64(mem, lenPtr, 0);
-        const ok = fn.EPDFSig_SaveCandidate(candidateDocPtr, sigObjNum, writer.ptr, sizePtr, offPtr, lenPtr);
+        const ok = fn.EPDFSig_SaveCandidate(
+          candidateDocPtr,
+          sigObjNum,
+          writer.ptr,
+          sizePtr,
+          offPtr,
+          lenPtr,
+        );
         if (!ok) {
           throw new EngineError(EngineErrorCode.Unknown, 'failed to save the signing candidate');
         }
@@ -261,32 +340,57 @@ export class FileCandidateStore implements CandidateStore {
   }
 
   seal(saved: SavedCandidate, algorithm: Exclude<DigestAlgorithm, 'sha1'>): SealedCandidate {
-    if (saved.kind !== 'file') throw new EngineError(EngineErrorCode.InvalidArg, 'not a file candidate');
+    if (saved.kind !== 'file')
+      throw new EngineError(EngineErrorCode.InvalidArg, 'not a file candidate');
     const { mem, fn } = this.runtime;
-    const span = this.runtime.fileAccess.readRange(saved.path, saved.objectOffset, saved.objectLength);
+    const span = this.runtime.fileAccess.readRange(
+      saved.path,
+      saved.objectOffset,
+      saved.objectLength,
+    );
     if (span.byteLength !== saved.objectLength) {
-      throw new EngineError(EngineErrorCode.Unknown, 'the signing candidate file is shorter than its object span');
+      throw new EngineError(
+        EngineErrorCode.Unknown,
+        'the signing candidate file is shorter than its object span',
+      );
     }
     const spanPtr = mem.alloc(span.byteLength);
     let plan: Omit<SealedCandidate, 'digest'>;
     try {
       mem.writeBytes(spanPtr, span);
       plan = sealSpanInHeap(this.runtime, spanPtr, span.byteLength, saved.objectOffset, saved.size);
-      this.runtime.fileWrite.writeRange(saved.path, saved.objectOffset, mem.readBytes(spanPtr, span.byteLength));
+      this.runtime.fileWrite.writeRange(
+        saved.path,
+        saved.objectOffset,
+        mem.readBytes(spanPtr, span.byteLength),
+      );
     } finally {
       mem.free(spanPtr);
     }
     const access = this.runtime.fileAccess.fromNodeFile(saved.path);
     try {
-      const digest = withScratchN(mem, [4 * U64_BYTES, 64, U64_BYTES], ([rangePtr, digestPtr, lenPtr]) => {
-        for (let k = 0; k < 4; k++) pokeU64(mem, rangePtr, plan.byteRange[k], k * U64_BYTES);
-        pokeU64(mem, lenPtr, 64);
-        const ok = fn.EPDFSig_DigestFileRange(access.ptr, rangePtr, DIGEST_CODE[algorithm], digestPtr, lenPtr);
-        if (!ok) {
-          throw new EngineError(EngineErrorCode.Unknown, 'failed to digest the signing candidate file');
-        }
-        return copyOut(mem.readBytes(digestPtr, Number(mem.peek(lenPtr, 'i32'))));
-      });
+      const digest = withScratchN(
+        mem,
+        [4 * U64_BYTES, 64, U64_BYTES],
+        ([rangePtr, digestPtr, lenPtr]) => {
+          for (let k = 0; k < 4; k++) pokeU64(mem, rangePtr, plan.byteRange[k], k * U64_BYTES);
+          pokeU64(mem, lenPtr, 64);
+          const ok = fn.EPDFSig_DigestFileRange(
+            access.ptr,
+            rangePtr,
+            DIGEST_CODE[algorithm],
+            digestPtr,
+            lenPtr,
+          );
+          if (!ok) {
+            throw new EngineError(
+              EngineErrorCode.Unknown,
+              'failed to digest the signing candidate file',
+            );
+          }
+          return copyOut(mem.readBytes(digestPtr, Number(mem.peek(lenPtr, 'i32'))));
+        },
+      );
       return { ...plan, digest };
     } finally {
       access.close();
@@ -294,22 +398,36 @@ export class FileCandidateStore implements CandidateStore {
   }
 
   writeContents(saved: SavedCandidate, sealed: SealedCandidate, cms: Uint8Array): void {
-    if (saved.kind !== 'file') throw new EngineError(EngineErrorCode.InvalidArg, 'not a file candidate');
+    if (saved.kind !== 'file')
+      throw new EngineError(EngineErrorCode.InvalidArg, 'not a file candidate');
     const { mem } = this.runtime;
-    const span = this.runtime.fileAccess.readRange(saved.path, saved.objectOffset, saved.objectLength);
+    const span = this.runtime.fileAccess.readRange(
+      saved.path,
+      saved.objectOffset,
+      saved.objectLength,
+    );
     const spanPtr = mem.alloc(span.byteLength);
     try {
       mem.writeBytes(spanPtr, span);
       writeContentsInHeap(this.runtime, spanPtr, span.byteLength, saved.objectOffset, sealed, cms);
-      this.runtime.fileWrite.writeRange(saved.path, saved.objectOffset, mem.readBytes(spanPtr, span.byteLength));
+      this.runtime.fileWrite.writeRange(
+        saved.path,
+        saved.objectOffset,
+        mem.readBytes(spanPtr, span.byteLength),
+      );
     } finally {
       mem.free(spanPtr);
     }
   }
 
   openSealed(saved: SavedCandidate, password: string | null): OpenedPdfDocument {
-    if (saved.kind !== 'file') throw new EngineError(EngineErrorCode.InvalidArg, 'not a file candidate');
-    const base = this.baseDocuments.acquireFileBase({ key: `signed:${saved.path}`, path: saved.path, password });
+    if (saved.kind !== 'file')
+      throw new EngineError(EngineErrorCode.InvalidArg, 'not a file candidate');
+    const base = this.baseDocuments.acquireFileBase({
+      key: `signed:${saved.path}`,
+      path: saved.path,
+      password,
+    });
     return openLayerDocument(this.runtime, base, { kind: 'fresh' }, password);
   }
 

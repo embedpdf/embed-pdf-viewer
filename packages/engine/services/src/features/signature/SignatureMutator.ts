@@ -10,6 +10,14 @@ import type {
 import { EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
 import { NULL_PTR, type PdfRuntimeModule, type Ptr } from '@embedpdf/engine-runtime';
 
+import {
+  FileCandidateStore,
+  MemoryCandidateStore,
+  type CandidateStore,
+} from './internal/candidateStore';
+import { assertSealedSignature, bytesEqual, type SealExpectation } from './internal/sealCheck';
+import { disposeSignatureModel } from './internal/signatureModelCache';
+import { DIGEST_CODE, SignatureReader } from './SignatureReader';
 import type { DocumentSession } from '../../document-session/DocumentSession';
 import type { BaseDocumentRegistry } from '../../document-session/lifecycle/BaseDocumentRegistry';
 import {
@@ -20,12 +28,9 @@ import {
 } from '../../document-session/lifecycle/PdfDocumentOpener';
 import { withScratch } from '../../runtime/memory/scratch';
 import { generateUuid } from '../../shared/uuid';
-import { DocumentSaver } from '../save/DocumentSaver';
 import { disposeFormModel } from '../forms/internal/formModelCache';
 import { withWideStringArray } from '../forms/internal/wideStringArray';
-import { DIGEST_CODE, SignatureReader } from './SignatureReader';
-import { FileCandidateStore, MemoryCandidateStore, type CandidateStore } from './internal/candidateStore';
-import { disposeSignatureModel } from './internal/signatureModelCache';
+import { DocumentSaver } from '../save/DocumentSaver';
 
 // Mirrors public/epdf_signature.h.
 const SUBFILTER_CODE = {
@@ -34,7 +39,6 @@ const SUBFILTER_CODE = {
   'ETSI.RFC3161': 2,
 } as const;
 const FIELD_ACTION_CODE = { all: 1, include: 2, exclude: 3 } as const;
-const COVERAGE_WHOLE_REVISION = 0;
 const DEFAULT_CONTENTS_SIZE = 8192;
 const MIN_CONTENTS_SIZE = 256;
 const MAX_CONTENTS_SIZE = 4 * 1024 * 1024;
@@ -128,7 +132,10 @@ export class SignatureMutator {
     const reader = new SignatureReader(this.runtime, this.session);
     const field = reader.resolveField(input.field);
     if (field.signed) {
-      throw new EngineError(EngineErrorCode.SignatureRefused, 'the signature field is already signed');
+      throw new EngineError(
+        EngineErrorCode.SignatureRefused,
+        'the signature field is already signed',
+      );
     }
     if (input.appearance && !field.widget) {
       throw new EngineError(
@@ -144,7 +151,10 @@ export class SignatureMutator {
     const subFilter: keyof typeof SUBFILTER_CODE =
       kind === 'timestamp' ? 'ETSI.RFC3161' : (input.subFilter ?? 'ETSI.CAdES.detached');
     if (!(subFilter in SUBFILTER_CODE)) {
-      throw new EngineError(EngineErrorCode.SignatureRefused, `unsupported subFilter '${subFilter}'`);
+      throw new EngineError(
+        EngineErrorCode.SignatureRefused,
+        `unsupported subFilter '${subFilter}'`,
+      );
     }
     const contentsSize = input.contentsSize ?? DEFAULT_CONTENTS_SIZE;
     if (
@@ -186,7 +196,12 @@ export class SignatureMutator {
         );
       }
       if (input.appearance && field.widget) {
-        this.bakeAppearance(candidate.docPtr, field.widget, input.appearance.pdf, input.appearance.pageIndex ?? 0);
+        this.bakeAppearance(
+          candidate.docPtr,
+          field.widget,
+          input.appearance.pdf,
+          input.appearance.pageIndex ?? 0,
+        );
       }
 
       const store = this.storeFor();
@@ -261,7 +276,11 @@ export class SignatureMutator {
     };
     store.writeContents(pending.saved, sealed, input.cms);
     const handle = store.openSealed(pending.saved, this.session.password);
-    this.verifySealed(handle, pending.fieldObjectNumber);
+    this.verifySealed(handle, {
+      fieldObjectNumber: pending.fieldObjectNumber,
+      byteRange: pending.prepared.byteRange,
+      cms: input.cms,
+    });
 
     // Install: the one place a live session changes its bytes.
     this.session.install(handle);
@@ -271,10 +290,14 @@ export class SignatureMutator {
     const reader = new SignatureReader(this.runtime, this.session);
     const snapshot = reader.readSnapshot();
     const signature = snapshot.signatures.find(
-      (s) => s.field.kind === 'objectNumber' && s.field.fieldObjectNumber === pending.fieldObjectNumber,
+      (s) =>
+        s.field.kind === 'objectNumber' && s.field.fieldObjectNumber === pending.fieldObjectNumber,
     );
     if (!signature) {
-      throw new EngineError(EngineErrorCode.Unknown, 'the installed document lost the signature field');
+      throw new EngineError(
+        EngineErrorCode.Unknown,
+        'the installed document lost the signature field',
+      );
     }
     const result: SignatureCompleteResult = {
       status: 'completed',
@@ -283,7 +306,9 @@ export class SignatureMutator {
       previous: pending.prepared.expectedVersion,
       protection: snapshot.protection,
       meta: {
-        affectedPages: this.session.allRecords().map((r) => this.session.pageState(r.pageObjectNumber)),
+        affectedPages: this.session
+          .allRecords()
+          .map((r) => this.session.pageState(r.pageObjectNumber)),
         cacheDelta: null,
       },
     };
@@ -394,11 +419,17 @@ export class SignatureMutator {
       mem.writeBytes(dataPtr, pdf);
       const artworkPtr = fn.FPDF_LoadMemDocument64(dataPtr, pdf.byteLength, '');
       if (!artworkPtr) {
-        throw new EngineError(EngineErrorCode.MalformedPdf, 'the appearance PDF could not be opened');
+        throw new EngineError(
+          EngineErrorCode.MalformedPdf,
+          'the appearance PDF could not be opened',
+        );
       }
       stack.push(() => fn.FPDF_CloseDocument(artworkPtr));
       if (!fn.EPDFAnnot_SetAppearanceFromPage(annotPtr, artworkPtr, pageIndex)) {
-        throw new EngineError(EngineErrorCode.InvalidArg, 'the appearance page could not be drawn into the widget');
+        throw new EngineError(
+          EngineErrorCode.InvalidArg,
+          'the appearance page could not be drawn into the widget',
+        );
       }
     } finally {
       stack.close();
@@ -413,7 +444,12 @@ export class SignatureMutator {
   private storeFor(): CandidateStore {
     const base = this.session.source.base;
     if (base?.kind === 'file') {
-      return new FileCandidateStore(this.runtime, this.baseDocuments, base.path, this.candidatePath);
+      return new FileCandidateStore(
+        this.runtime,
+        this.baseDocuments,
+        base.path,
+        this.candidatePath,
+      );
     }
     return new MemoryCandidateStore(this.runtime, this.baseDocuments);
   }
@@ -422,7 +458,13 @@ export class SignatureMutator {
    * Prove the sealed bytes carry a whole-revision signature on the field
    * before anything is installed; closes the handle on failure.
    */
-  private verifySealed(handle: OpenedPdfDocument, fieldObjectNumber: number): void {
+  /**
+   * Read the sealed candidate back before it is installed: the checks in
+   * `assertSealedSignature` are made on a model loaded from the sealed
+   * bytes themselves, so a candidate the writer got wrong never becomes
+   * the session's bytes.
+   */
+  private verifySealed(handle: OpenedPdfDocument, expected: SealExpectation): void {
     const { fn } = this.runtime;
     try {
       const model = fn.EPDFSig_LoadModel(handle.docPtr);
@@ -430,17 +472,7 @@ export class SignatureMutator {
         throw new EngineError(EngineErrorCode.Unknown, 'the sealed bytes have no signature model');
       }
       try {
-        const index = fn.EPDFSig_GetIndexByFieldObjNum(model, fieldObjectNumber);
-        if (
-          index < 0 ||
-          !fn.EPDFSig_IsSigned(model, index) ||
-          fn.EPDFSig_GetCoverage(model, index) !== COVERAGE_WHOLE_REVISION
-        ) {
-          throw new EngineError(
-            EngineErrorCode.SignatureRefused,
-            'the sealed bytes do not carry a whole-revision signature on the field',
-          );
-        }
+        assertSealedSignature(this.runtime, handle.docPtr, model, expected);
       } finally {
         fn.EPDFSig_CloseModel(model);
       }
@@ -471,7 +503,10 @@ export class SignatureMutator {
       const base = this.baseDocuments.retainByKey(source.base.key);
       if (base) {
         const layer: LayerSource = this.session.hasUnsavedEdits()
-          ? { kind: 'artifact', bytes: new DocumentSaver(this.runtime, this.session).saveLayerArtifact().bytes }
+          ? {
+              kind: 'artifact',
+              bytes: new DocumentSaver(this.runtime, this.session).saveLayerArtifact().bytes,
+            }
           : (source.layer ?? { kind: 'fresh' });
         return openLayerDocument(this.runtime, base, layer, password);
       }
@@ -497,16 +532,8 @@ export class SignatureMutator {
       (s) => s.signed && s.byteRange !== null && s.byteRange[2] + s.byteRange[3] > baseSize,
     );
   }
-
 }
 
 function sameVersion(a: DocumentVersionRef, b: DocumentVersionRef): boolean {
   return a.baseSha256 === b.baseSha256 && a.editsVersion === b.editsVersion;
 }
-
-function bytesEqual(a: Uint8Array, b: Uint8Array): boolean {
-  if (a.byteLength !== b.byteLength) return false;
-  for (let i = 0; i < a.byteLength; i++) if (a[i] !== b[i]) return false;
-  return true;
-}
-

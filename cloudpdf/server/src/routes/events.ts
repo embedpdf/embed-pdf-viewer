@@ -1,13 +1,14 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { Kysely } from 'kysely';
-import type { Database as Schema } from '../db/schema';
-import { AuditLogRepo } from '../db/repos/audit_log.repo';
-import { toJsonlEvent } from '../services/EventLogService';
-import type { DocumentService } from '../services/DocumentService';
-import type { RealtimeBus } from '../realtime/RealtimeBus';
+
 import type { DrainCoordinator } from '../app/drain';
 import { requireLayerCapability, requireLayerDocAccessOnly } from '../app/jwt-plugin';
 import type { RevocationCheck } from '../auth/JwtVerifier';
+import { AuditLogRepo } from '../db/repos/audit_log.repo';
+import type { Database as Schema } from '../db/schema';
+import type { RealtimeBus } from '../realtime/RealtimeBus';
+import type { DocumentService } from '../services/DocumentService';
+import { toJsonlEvent } from '../services/EventLogService';
 
 /** Per-drain page size; rings coalesce, so a burst streams in pages. */
 const DRAIN_LIMIT = 200;
@@ -129,6 +130,12 @@ export async function registerEventsRoutes(
             raw.write(
               `id: ${row.id}\nevent: mutation\ndata: ${JSON.stringify(toJsonlEvent(row))}\n\n`,
             );
+            // A published version changes the whole manifest (base sha, every
+            // promoted page pin, the plane pointers): the client refetches
+            // head + manifest instead of absorbing a delta.
+            if (row.kind === 'signature.completed') {
+              raw.write(`event: full-refresh\nid: ${row.id}\ndata: {}\n\n`);
+            }
             cursor = row.id;
           }
           if (rows.length === DRAIN_LIMIT) ringAgain = true; // page through bursts

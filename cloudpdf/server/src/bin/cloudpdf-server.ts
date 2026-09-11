@@ -26,8 +26,8 @@ import { ConnectedUsageReporter } from '../licensing/ConnectedUsageReporter';
 import { LicenseRuntime } from '../licensing/LicenseRuntime';
 import { UsageMeters } from '../licensing/UsageMeters';
 import { PostgresRealtimeBus } from '../realtime/PostgresRealtimeBus';
-import { resolveRecycleConfig } from '../runtime/EngineRecycler';
 import { readCgroupMemory } from '../runtime/cgroup-memory';
+import { resolveRecycleConfig } from '../runtime/EngineRecycler';
 import { loadFallbackFontsFromEnv } from '../runtime/loadFallbackFontsFromEnv';
 import { loadKmsConfigFromEnv } from '../security/kms/config/loadKmsConfigFromEnv';
 import { createKmsKeyring } from '../security/kms/createKmsKeyring';
@@ -94,6 +94,8 @@ import type { ObjectStore } from '../storage/ObjectStore';
  *   CLOUDPDF_STORAGE_KIND  fs|s3|gcs|azure-blob   (default: fs)
  *   CLOUDPDF_STORAGE_FS_ROOT                (default: ./data/objects)
  *   CLOUDPDF_CACHE_ROOT                      (default: ./data/cache; enables /v1/docs/*)
+ *   CLOUDPDF_SIGNING_TMP                     (default: <tmpdir>/cloudpdf-signing; signing candidates)
+ *   CLOUDPDF_SIGNING_TTL_MS                  (default: 900000; a prepared signing waits this long for its CMS)
  *   CLOUDPDF_IMPORT_ENABLED=0    disable documents.importFrom server-side pulls (default: on)
  *   CLOUDPDF_IMPORT_MAX_BYTES / CLOUDPDF_IMPORT_TIMEOUT_MS / CLOUDPDF_IMPORT_MAX_CONCURRENT
  *   CLOUDPDF_IMPORT_ALLOW_HTTP=1 / CLOUDPDF_IMPORT_ALLOW_PRIVATE_NETWORKS=1   (dev / MinIO)
@@ -363,6 +365,7 @@ function printHelp(): void {
       '  Engine cache (enables /v1/docs/* read+render routes)',
       '    CLOUDPDF_CACHE_ROOT                      (default: ./data/cache)',
       '    CLOUDPDF_CACHE_MAX_BYTES                 (default: 4 GiB)',
+      '    CLOUDPDF_SIGNING_TMP                     (default: <tmpdir>/cloudpdf-signing)',
       '  Fonts',
       '    CLOUDPDF_FALLBACK_FONTS  JSON [{key,path,familyName?,...}]  (default: none)',
       '  Optional adapters (see ADAPTERS.md)',
@@ -836,6 +839,10 @@ async function cmdServe(): Promise<void> {
   const FAIL_ON_PENDING = process.env['CLOUDPDF_FAIL_ON_PENDING'] === '1';
   const AUTO_PROVISION_TENANT = process.env['CLOUDPDF_AUTO_PROVISION_TENANT'] === '1';
   const CACHE_ROOT = process.env['CLOUDPDF_CACHE_ROOT'] ?? './data/cache';
+  const SIGNING_ROOT = process.env['CLOUDPDF_SIGNING_TMP'];
+  const SIGNING_TTL_MS = process.env['CLOUDPDF_SIGNING_TTL_MS']
+    ? Number(process.env['CLOUDPDF_SIGNING_TTL_MS'])
+    : undefined;
   const CACHE_MAX_BYTES = process.env['CLOUDPDF_CACHE_MAX_BYTES']
     ? Number(process.env['CLOUDPDF_CACHE_MAX_BYTES'])
     : undefined;
@@ -1014,6 +1021,8 @@ async function cmdServe(): Promise<void> {
       cdnSigner,
       ...(kms ? { kms } : {}),
       cacheRoot: CACHE_ROOT,
+      ...(SIGNING_ROOT ? { signingRoot: SIGNING_ROOT } : {}),
+      ...(SIGNING_TTL_MS !== undefined ? { signingTtlMs: SIGNING_TTL_MS } : {}),
       ...(CACHE_MAX_BYTES !== undefined ? { cacheMaxBytes: CACHE_MAX_BYTES } : {}),
       ...(AUTO_PROVISION_TENANT ? { autoProvisionTenant: true } : {}),
       uploadProxyPolicy,
@@ -1072,6 +1081,8 @@ async function cmdServe(): Promise<void> {
       cdn: cdnSigner.info.kind,
       kms: kms ? 'on' : 'off',
       cacheRoot: CACHE_ROOT,
+      ...(SIGNING_ROOT ? { signingRoot: SIGNING_ROOT } : {}),
+      ...(SIGNING_TTL_MS !== undefined ? { signingTtlMs: SIGNING_TTL_MS } : {}),
     },
     'cloudpdf-server listening',
   );

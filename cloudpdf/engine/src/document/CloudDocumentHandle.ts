@@ -8,6 +8,7 @@ import {
   type DocumentAnnotationsService,
   type DocumentActionsService,
   type DocumentAttachmentsService,
+  type DocumentSignaturesService,
   type DocumentEvent,
   type DocumentEventStream,
   type DocumentFormsService,
@@ -43,6 +44,7 @@ import { CloudDocumentPagesService } from './CloudDocumentPagesService';
 import { CloudDocumentRedactionService } from './CloudDocumentRedactionService';
 import { CloudDocumentSearchService } from './CloudDocumentSearchService';
 import { CloudDocumentSecurityService } from './CloudDocumentSecurityService';
+import { CloudDocumentSignaturesService } from './CloudDocumentSignaturesService';
 import { CloudMetadataService } from './CloudMetadataService';
 import { CloudPageHandle } from './CloudPageHandle';
 import { auditRowToEvent } from '../realtime/auditRowToEvent';
@@ -96,6 +98,7 @@ export class CloudDocumentHandle implements DocumentHandle {
   readonly annotations: DocumentAnnotationsService;
   readonly actions: DocumentActionsService;
   readonly attachments: DocumentAttachmentsService;
+  readonly signatures: DocumentSignaturesService;
   readonly forms: DocumentFormsService;
   readonly search: CloudDocumentSearchService;
   readonly pages: DocumentPagesService;
@@ -237,6 +240,14 @@ export class CloudDocumentHandle implements DocumentHandle {
       this.manifestAccessor,
     );
     this.attachments = new CloudDocumentAttachmentsService(
+      http,
+      id,
+      layerName,
+      () => this.closed,
+      this.manifestAccessor,
+      this.publisher,
+    );
+    this.signatures = new CloudDocumentSignaturesService(
       http,
       id,
       layerName,
@@ -414,6 +425,10 @@ export class CloudDocumentHandle implements DocumentHandle {
       ...(delta?.annotationsVersion !== undefined
         ? { annotationsVersion: delta.annotationsVersion }
         : {}),
+      // The signing fences: every ordinary commit writes an artifact
+      // (`working`), and the layer's write serial when the delta names it.
+      ...(delta?.layerVersion !== undefined ? { layerVersion: delta.layerVersion } : {}),
+      ...(delta?.working !== undefined ? { working: delta.working } : {}),
       // The manifest is a per-page registry keyed by pageObjectNumber, not a
       // display-order list — geometry/order now lives in `pages.list()`
       // (/layout). Keep a deterministic order by PON so cache merges are

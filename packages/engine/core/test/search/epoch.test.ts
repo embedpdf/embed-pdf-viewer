@@ -12,6 +12,9 @@ function manifest(
     metadataVersion: 3,
     auditHead: 42,
     baseSha: 'abc',
+    layerVersion: 0,
+    working: false,
+    baseByteLength: 0,
     pages: pages.map(([pon, contentVersion]) => ({
       state: { pageObjectNumber: pon } as DocumentManifest['pages'][number]['state'],
       cache: { contentVersion } as DocumentManifest['pages'][number]['cache'],

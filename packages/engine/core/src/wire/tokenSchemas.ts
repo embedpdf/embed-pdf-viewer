@@ -34,6 +34,15 @@ export const AttachmentsTokenSchema = {
   fields: ['attachmentsVersion'],
 } as const satisfies TokenSchema;
 
+/**
+ * Layer signature analysis: the working copy judged against the base,
+ * pinned by `docVersion`; `since.signature` XOR `since.revision`; `level`
+ * only in exploratory mode.
+ */
+export const AnalysisTokenSchema = {
+  fields: ['docVersion', 'since.signature', 'since.revision', 'level'],
+} as const;
+
 export const DownloadTokenSchema = {
   fields: ['docVersion', 'mode'],
   maxLength: 128,

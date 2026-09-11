@@ -7,14 +7,19 @@ import type {
   SignatureSnapshot,
 } from '@embedpdf/engine-core/runtime';
 import { EngineError, EngineErrorCode, deriveProtection } from '@embedpdf/engine-core/runtime';
-import { NULL_PTR, type PdfRuntimeModule, type Ptr } from '@embedpdf/engine-runtime';
+import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
+import {
+  readByteRange,
+  readRevisions,
+  readSignaturesFromModel,
+  readContentsAt,
+} from './internal/readSignatureModel';
+import { acquireSignatureModel } from './internal/signatureModelCache';
 import type { DocumentSession } from '../../document-session/DocumentSession';
 import { withScratch, withScratchN } from '../../runtime/memory/scratch';
-import { U64_BYTES, peekU64, pokeU64 } from '../../runtime/memory/u64';
 import { readUtf16String } from '../../runtime/memory/strings';
-import { readByteRange, readRevisions, readSignaturesFromModel } from './internal/readSignatureModel';
-import { acquireSignatureModel } from './internal/signatureModelCache';
+import { U64_BYTES, pokeU64 } from '../../runtime/memory/u64';
 
 export const DIGEST_CODE: Record<DigestAlgorithm, number> = {
   sha1: 0,
@@ -46,7 +51,9 @@ export class SignatureReader {
     const model = acquireSignatureModel(this.runtime, this.session);
     const chainValid = this.runtime.fn.EPDFSig_IsRevisionChainValid(model);
     const signatures = readSignaturesFromModel(this.runtime, model);
-    const revisions = chainValid ? readRevisions(this.runtime, this.session.requireDocPtr(), signatures) : [];
+    const revisions = chainValid
+      ? readRevisions(this.runtime, this.session.requireDocPtr(), signatures)
+      : [];
     return { chainValid, revisions, signatures, protection: deriveProtection(signatures) };
   }
 
@@ -58,23 +65,9 @@ export class SignatureReader {
 
   /** The DER `/Contents` of a signed field, padding stripped. */
   readContents(ref: FormFieldRef): ArrayBuffer {
-    const { fn, mem } = this.runtime;
     const model = acquireSignatureModel(this.runtime, this.session);
     const index = this.requireSignedIndex(model, ref);
-    const length = fn.EPDFSig_GetContents(model, index, NULL_PTR, 0);
-    if (length <= 0) {
-      throw new EngineError(
-        EngineErrorCode.NotFound,
-        'signature has no usable /Contents (malformed encoding)',
-      );
-    }
-    return withScratch(mem, length, (buf) => {
-      const written = fn.EPDFSig_GetContents(model, index, buf, length);
-      if (written !== length) {
-        throw new EngineError(EngineErrorCode.Unknown, 'failed to read signature contents');
-      }
-      return copyOut(mem.readBytes(buf, length));
-    });
+    return readContentsAt(this.runtime, model, index).buffer as ArrayBuffer;
   }
 
   /** Hash a signed field's `/ByteRange` straight from the loaded bytes. */
@@ -141,7 +134,10 @@ export class SignatureReader {
       (s) => s.field.kind === 'objectNumber' && s.field.fieldObjectNumber === fieldObjectNumber,
     );
     if (!found) {
-      throw new EngineError(EngineErrorCode.NotFound, `signature field not found: object ${fieldObjectNumber}`);
+      throw new EngineError(
+        EngineErrorCode.NotFound,
+        `signature field not found: object ${fieldObjectNumber}`,
+      );
     }
     return found;
   }
@@ -183,22 +179,38 @@ export class SignatureReader {
 
   // -------------------------------------------------------------------------
 
-  private digestRange(range: [number, number, number, number], algorithm: DigestAlgorithm): ArrayBuffer {
+  private digestRange(
+    range: [number, number, number, number],
+    algorithm: DigestAlgorithm,
+  ): ArrayBuffer {
     const { fn, mem } = this.runtime;
     const docPtr = this.session.requireDocPtr();
     const outLength = DIGEST_LENGTH[algorithm];
-    return withScratchN(mem, [4 * U64_BYTES, outLength, U64_BYTES], ([rangePtr, outPtr, lenPtr]) => {
-      for (let k = 0; k < 4; k++) pokeU64(mem, rangePtr, range[k], k * U64_BYTES);
-      // `unsigned long*`: 4 bytes on wasm32, 8 on native — write the whole
-      // 8-byte slot so either width reads the capacity.
-      pokeU64(mem, lenPtr, outLength);
-      const ok = fn.EPDFSig_DigestByteRange(docPtr, rangePtr, DIGEST_CODE[algorithm], outPtr, lenPtr);
-      if (!ok) {
-        throw new EngineError(EngineErrorCode.InvalidArg, 'byte range is not within the loaded bytes');
-      }
-      const written = Number(mem.peek(lenPtr, 'i32'));
-      return copyOut(mem.readBytes(outPtr, written));
-    });
+    return withScratchN(
+      mem,
+      [4 * U64_BYTES, outLength, U64_BYTES],
+      ([rangePtr, outPtr, lenPtr]) => {
+        for (let k = 0; k < 4; k++) pokeU64(mem, rangePtr, range[k], k * U64_BYTES);
+        // `unsigned long*`: 4 bytes on wasm32, 8 on native — write the whole
+        // 8-byte slot so either width reads the capacity.
+        pokeU64(mem, lenPtr, outLength);
+        const ok = fn.EPDFSig_DigestByteRange(
+          docPtr,
+          rangePtr,
+          DIGEST_CODE[algorithm],
+          outPtr,
+          lenPtr,
+        );
+        if (!ok) {
+          throw new EngineError(
+            EngineErrorCode.InvalidArg,
+            'byte range is not within the loaded bytes',
+          );
+        }
+        const written = Number(mem.peek(lenPtr, 'i32'));
+        return copyOut(mem.readBytes(outPtr, written));
+      },
+    );
   }
 
   /** `[offset, offset + length)` of the loaded bytes (base + loaded delta for a layer), copied out. */
@@ -246,14 +258,15 @@ export class SignatureReader {
   }
 
   private readString(model: Ptr, index: number, key: number): string | null {
-    return this.readWide((buf, cap) => this.runtime.fn.EPDFSig_GetString(model, index, key, buf, cap));
+    return this.readWide((buf, cap) =>
+      this.runtime.fn.EPDFSig_GetString(model, index, key, buf, cap),
+    );
   }
 
   private readWide(call: (buf: Ptr, capacity: number) => number): string | null {
     return readUtf16String(this.runtime.mem, call, '');
   }
 }
-
 
 function copyOut(view: Uint8Array): ArrayBuffer {
   const buffer = new ArrayBuffer(view.byteLength);

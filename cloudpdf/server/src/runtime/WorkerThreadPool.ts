@@ -15,6 +15,7 @@ import {
 } from '@embedpdf/engine-core/runtime';
 
 import type { EnginePool, RunAdHocOptions } from './EnginePool';
+import { defaultSigningRoot } from './signing-paths';
 
 let _nextJobId = 1;
 function nextJobId(): WorkerJobId {
@@ -77,6 +78,8 @@ export interface FallbackFontDescriptor {
 /** Shape passed to each worker via `workerData`. */
 export interface WorkerBootstrapData {
   fonts: ReadonlyArray<FallbackFontDescriptor>;
+  /** Where file-backed signing candidates are written (see `signing-paths.ts`). */
+  signingRoot: string;
 }
 
 export interface WorkerThreadPoolOptions {
@@ -123,6 +126,8 @@ export interface WorkerThreadPoolOptions {
    * owned: clients never configure fonts on the cloud engine.
    */
   fonts?: ReadonlyArray<FallbackFontDescriptor>;
+  /** Signing candidate root; defaults to `defaultSigningRoot()`. */
+  signingRoot?: string;
   /**
    * Invoked when a worker thread exits outside `destroy()` after the pool
    * booted. Slots are never respawned in-process, so a dead worker is an
@@ -211,7 +216,10 @@ export class WorkerThreadPool implements EnginePool {
     const pool = new WorkerThreadPool(opts);
     const size = resolvePoolSize(opts.size);
     const entry = opts.workerEntry;
-    const bootstrap: WorkerBootstrapData = { fonts: opts.fonts ?? [] };
+    const bootstrap: WorkerBootstrapData = {
+      fonts: opts.fonts ?? [],
+      signingRoot: opts.signingRoot ?? defaultSigningRoot(),
+    };
 
     for (let i = 0; i < size; i++) {
       // Each worker reads the font files itself and registers them on its own

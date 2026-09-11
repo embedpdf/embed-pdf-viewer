@@ -26,7 +26,9 @@ export type AuditMutationKind =
   | 'form.deleteField'
   | 'form.attachWidget'
   | 'form.detachWidget'
-  | 'form.applyEffects';
+  | 'form.applyEffects'
+  /** A signature published a new base version through this layer. */
+  | 'signature.completed';
 
 export interface AppendAuditLogInput {
   tenantId: string;

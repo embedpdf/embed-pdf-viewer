@@ -68,6 +68,8 @@ export interface HostBootConfig {
   poolSize?: number;
   maxDocsPerSlot?: number;
   fonts: ReadonlyArray<FallbackFontDescriptor>;
+  /** Signing candidate root (the API process derives the same paths). */
+  signingRoot?: string;
   /** Memory-heartbeat interval (ms). Default 5000; tests shrink it. */
   memoryHeartbeatMs?: number;
 }

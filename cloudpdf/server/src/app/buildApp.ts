@@ -28,7 +28,9 @@ import { SuspendedTenantsGuard } from '../auth/SuspendedTenantsGuard';
 import { NoneCdnSigner } from '../cdn/adapters/NoneCdnSigner';
 import type { CdnSigner } from '../cdn/CdnSigner';
 import { validate as validateMigrations, type MigrationSource } from '../db/migrator/runner';
+import { BaseVersionsRepo } from '../db/repos/base_versions.repo';
 import { DocumentImportsRepo } from '../db/repos/document_imports.repo';
+import { DocumentSigningsRepo } from '../db/repos/document_signings.repo';
 import { DocumentsRepo } from '../db/repos/documents.repo';
 import { DocumentPagesRepo, LayerPagesRepo, LayersRepo } from '../db/repos/page_state.repo';
 import { PdfPasswordSessionsRepo } from '../db/repos/pdf_password_sessions.repo';
@@ -63,19 +65,21 @@ import { registerMetadataRoutes } from '../routes/metadata';
 import { registerPageRoutes } from '../routes/pages';
 import { registerRedactionRoutes } from '../routes/redactions';
 import { registerSearchRoutes } from '../routes/search';
+import { registerSignatureRoutes } from '../routes/signatures';
 import { registerShareSessionRoutes } from '../routes/share-sessions';
 import { readCgroupMemory } from '../runtime/cgroup-memory';
 import { EngineHostClient } from '../runtime/EngineHostClient';
 import type { EnginePool } from '../runtime/EnginePool';
 import { EngineRecycler, type EngineRecyclePolicy } from '../runtime/EngineRecycler';
-import { ShardedEnginePool } from '../runtime/ShardedEnginePool';
-import { resolvePoolSize } from '../runtime/WorkerThreadPool';
 import { QuarantiningEnginePool } from '../runtime/QuarantiningEnginePool';
 import {
   EngineBusyError,
   SchedulingEnginePool,
   type EngineSchedulingConfig,
 } from '../runtime/SchedulingEnginePool';
+import { ShardedEnginePool } from '../runtime/ShardedEnginePool';
+import { defaultSigningRoot } from '../runtime/signing-paths';
+import { resolvePoolSize } from '../runtime/WorkerThreadPool';
 import { WorkerThreadPool, type FallbackFontDescriptor } from '../runtime/WorkerThreadPool';
 import type { KmsKeyring } from '../security';
 import { CloudRevisionBridge } from '../services/CloudRevisionBridge';
@@ -263,6 +267,14 @@ export interface BuildAppOptions {
    * Disable by leaving `cacheRoot` unset.
    */
   cacheRoot?: string;
+  /**
+   * Where signing candidates are written between prepare and the upload
+   * of their tail, and rebuilt for completion. Shared by this process and
+   * the engine workers (same machine); defaults to `defaultSigningRoot()`.
+   */
+  signingRoot?: string;
+  /** How long a prepared signing may wait for its CMS (default 15 minutes). */
+  signingTtlMs?: number;
   cacheMaxBytes?: number;
   maxDocsPerSlot?: number;
   /**
@@ -743,6 +755,7 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
   let engineSharded: ShardedEnginePool | undefined;
   const shardRestarts: number[] = [];
   let engineRestartCount = 0;
+  const signingRoot = opts.signingRoot ?? defaultSigningRoot();
   if (opts.workerEntry) {
     if (opts.engineIsolation === 'host') {
       if (!opts.engineHostEntry) {
@@ -768,6 +781,7 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
             ...(opts.poolSize !== undefined ? { poolSize: opts.poolSize } : {}),
             ...(opts.maxDocsPerSlot !== undefined ? { maxDocsPerSlot: opts.maxDocsPerSlot } : {}),
             fonts: opts.fallbackFonts ?? [],
+            signingRoot,
           },
           onEvict: evictForward,
           // Forget everything on host death: durable writes make the lazy
@@ -807,6 +821,7 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
                   ? { maxDocsPerSlot: opts.maxDocsPerSlot }
                   : {}),
                 fonts: opts.fallbackFonts ?? [],
+                signingRoot,
               },
               onEvict: hooks.onEvict,
               onHostRestart: hooks.onHostRestart,
@@ -843,6 +858,7 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
         maxDocsPerSlot: opts.maxDocsPerSlot,
         onEvict: evictForward,
         fonts: opts.fallbackFonts,
+        signingRoot,
       });
     }
     // Admission control wraps outermost in both isolation modes: lanes
@@ -1061,6 +1077,7 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
       importPolicy: importPolicy,
       importConnections: new ImportConnectionRegistry(opts.importConnections ?? []),
       documentImports: documentImportsRepo,
+      baseVersions: new BaseVersionsRepo(opts.db),
       db: opts.db,
       securityProbe: new DocumentSecurityProbe({
         cache: baseFileCache,
@@ -1210,6 +1227,8 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
         documentPages: new DocumentPagesRepo(opts.db),
         layers: new LayersRepo(opts.db),
         layerPages: new LayerPagesRepo(opts.db),
+        documents: new DocumentsRepo(opts.db),
+        baseVersions: new BaseVersionsRepo(opts.db),
       });
       const cloudRevisionBridge = new CloudRevisionBridge();
       const weakAnnotationSessions = new WeakAnnotationSessionService({
@@ -1240,8 +1259,15 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
       // the signed URLs/cookies. The default (`none`) keeps /head
       // saying "no access needed" so public shares stay cheap.
       const cdnAccessRequired = (opts.cdnSigner?.info.kind ?? 'none') !== 'none';
+      const passwordSessionsRepo = opts.kms
+        ? new PdfPasswordSessionsRepo(opts.db, {
+            keyring: opts.kms,
+            serverSecrets: [passwordSessionServerSecret],
+          })
+        : undefined;
       documentService = new DocumentService({
         documents: new DocumentsRepo(opts.db),
+        baseVersions: new BaseVersionsRepo(opts.db),
         counters: engineCounters,
         cache: baseFileCache,
         storage: opts.objectStore,
@@ -1265,12 +1291,9 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
           }) as string,
           ttlMs: opts.pdfPasswordVerificationTtlMs,
         }),
-        ...(opts.kms
+        ...(passwordSessionsRepo
           ? {
-              passwordSessions: new PdfPasswordSessionsRepo(opts.db, {
-                keyring: opts.kms,
-                serverSecrets: [passwordSessionServerSecret],
-              }),
+              passwordSessions: passwordSessionsRepo,
               passwordSessionServerSecret,
               passwordSessionTtlMs: opts.pdfPasswordSessionTtlMs,
               passwordSessionRenewalTtlMs: opts.pdfPasswordSessionRenewalTtlMs,
@@ -1289,7 +1312,17 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
         pool,
         storage: opts.objectStore,
         realtime: realtimeBus,
+        signings: new DocumentSigningsRepo(opts.db),
+        ...(passwordSessionsRepo ? { passwordSessions: passwordSessionsRepo } : {}),
+        signingRoot,
+        ...(opts.signingTtlMs !== undefined ? { signingTtlMs: opts.signingTtlMs } : {}),
       });
+      // A signature published on another replica: forget every session
+      // over the old base here too (this replica's own publish already did).
+      const unsubscribeBaseChanged = realtimeBus.subscribeBaseChanged((key) => {
+        void documentService?.onBaseVersionPublished(key.docId).catch(() => undefined);
+      });
+      app.addHook('onClose', () => unsubscribeBaseChanged());
       await registerAccessRoutes(app, {
         service: documentService,
         cdnSigner: opts.cdnSigner ?? new NoneCdnSigner(),
@@ -1299,6 +1332,7 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
       });
       await registerDocsRoutes(app, { service: documentService });
       await registerMetadataRoutes(app, { service: documentService, layerService });
+      await registerSignatureRoutes(app, { service: documentService, layerService });
       await registerPageRoutes(app, {
         documentService,
         layerService,
@@ -1343,6 +1377,9 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
         lifecycle!
           .sweepStalePending({ olderThanMs: pendingTtlMs })
           .catch((err) => app.log.error({ err }, 'sweepStalePending failed'));
+        layerService
+          ?.expireSignings(Date.now())
+          .catch((err) => app.log.error({ err }, 'expireSignings failed'));
       }, sweepIntervalMs);
       sweeperTimer.unref();
     }
@@ -1579,14 +1616,24 @@ function mapToHttp(code: string): number {
       return 403;
     case EngineErrorCode.WeakAnnotationSessionConflict:
     case EngineErrorCode.LayerVersionConflict:
+    // Signing: a pending candidate, a moved fence, or a layer behind the
+    // head are all conflicts the client resolves by re-preparing; a dead
+    // signing (expired/aborted) is gone for good; a refused CMS is the
+    // caller's input.
+    case EngineErrorCode.SigningPending:
+    case EngineErrorCode.SigningVersionMismatch:
+    case EngineErrorCode.StaleBase:
       return 409;
     case EngineErrorCode.NotFound:
     case EngineErrorCode.DocNotOpen:
       return 404;
+    case EngineErrorCode.SigningExpired:
+      return 410;
     case EngineErrorCode.DocOpenFailed:
     case EngineErrorCode.DocPasswordRequired:
     case EngineErrorCode.DocPasswordIncorrect:
     case EngineErrorCode.MalformedPdf:
+    case EngineErrorCode.SignatureRefused:
       return 422;
     case EngineErrorCode.Aborted:
       return 499;

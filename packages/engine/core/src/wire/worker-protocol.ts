@@ -73,6 +73,7 @@ import type {
   SignatureAbortResult,
   SignatureCompleteInput,
   SignatureCompleteResult,
+  SignatureDTO,
   SignaturePrepareInput,
   SignaturePrepared,
   SignatureSnapshot,
@@ -164,6 +165,13 @@ export interface SignaturesListWorkerRequest {
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
+  /**
+   * Read the session's WORKING COPY (its unsaved state as one more revision
+   * over the loaded bytes) instead of the loaded bytes. The cloud server
+   * sets it: its layer sessions keep every committed edit in memory, so the
+   * layer's durable state IS the working copy. No-op without unsaved edits.
+   */
+  workingCopy?: boolean;
 }
 
 export interface SignaturesContentsWorkerRequest {
@@ -229,6 +237,28 @@ export interface SignaturesAnalyzeWorkerRequest {
   docId: string;
   layerName?: string;
   input: AnalyzeInput;
+}
+
+/**
+ * Session-less: install a CMS into a signing candidate FILE and verify the
+ * result. The server rebuilds the candidate (base ⊕ durable tail) on
+ * whichever replica completes the signing, so this never addresses a
+ * session: the file is patched in place, opened into a transient session
+ * for the checks, and closed. The caller keeps the sealed file.
+ */
+export interface SignaturesFinalizeCandidateWorkerRequest {
+  kind: 'signatures.finalizeCandidate';
+  jobId: WorkerJobId;
+  /** The candidate on the worker's filesystem; its /Contents hole is patched in place. */
+  path: string;
+  /** The /ByteRange the prepare reported — the fence every check is made against. */
+  byteRange: [number, number, number, number];
+  /** The reserved /Contents size the prepare reported (the hole holds twice as many hex digits). */
+  contentsSize: number;
+  fieldObjectNumber: number;
+  /** The detached CMS over the prepared digest. */
+  cms: ArrayBuffer;
+  password?: string | null;
 }
 
 export interface MetadataReadWorkerRequest {
@@ -1084,6 +1114,7 @@ export type WorkerRequest =
   | SignaturesCompleteWorkerRequest
   | SignaturesAbortWorkerRequest
   | SignaturesAnalyzeWorkerRequest
+  | SignaturesFinalizeCandidateWorkerRequest
   | FontsRegisterWorkerRequest
   | FontsAddFallbackWorkerRequest
   | FontsClearFallbacksWorkerRequest
@@ -1115,6 +1146,15 @@ export type WorkerResultPayload =
     }
   | { tag: 'signatures.abort'; result: SignatureAbortResult }
   | { tag: 'signatures.analyze'; analysis: ChangeAnalysis }
+  | {
+      tag: 'signatures.finalizeCandidate';
+      /** The installed signature as the sealed file reports it. */
+      signature: SignatureDTO;
+      /** What the sealed file's signatures forbid from now on. */
+      protection: DocumentProtection;
+      /** The version the sealed file IS (hash and length of the whole file). */
+      version: BaseVersionInfo;
+    }
   | { tag: 'metadata.read'; metadata: DocumentMetadata }
   | { tag: 'actions.read'; snapshot: DocumentActionsSnapshot }
   | {
