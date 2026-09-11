@@ -44,6 +44,10 @@ export interface PdfRuntimeFileAccess {
   fromMemory(bytes: Uint8Array | ArrayBuffer): PdfFileAccessHandle;
   /** Native/node only: range-reads a local file without loading it into JS. */
   fromNodeFile(path: string): PdfFileAccessHandle;
+  /** Native/node only: the bytes `[offset, offset + length)` of a local file (short at EOF). */
+  readRange(path: string, offset: number, length: number): Uint8Array;
+  /** Native/node only: byte length of a local file. */
+  sizeOf(path: string): number;
 }
 
 export interface PdfFileWriteHandle {
@@ -53,9 +57,22 @@ export interface PdfFileWriteHandle {
   close(): void;
 }
 
+/**
+ * Local-file operations the engine services need beyond PDFium's own
+ * writers: patching a few bytes in place (sealing a signing candidate),
+ * appending (streaming a verbatim copy), and removing a discarded file.
+ * Node-only; the wasm runtime throws, exactly as `toNodeFile` does. Kept
+ * here so the shared services never import a node module themselves.
+ */
 export interface PdfRuntimeFileWrite {
   /** Native/node only: writes PDFium output directly to a local file. */
   toNodeFile(path: string): PdfFileWriteHandle;
+  /** Native/node only: overwrite `bytes` at `offset` in place (the file must already extend past it). */
+  writeRange(path: string, offset: number, bytes: Uint8Array): void;
+  /** Native/node only: append `bytes` to a local file, creating it when absent. */
+  appendBytes(path: string, bytes: Uint8Array): void;
+  /** Native/node only: delete a local file; a missing file is not an error. */
+  removeFile(path: string): void;
 }
 
 export interface PdfRuntimeModule {

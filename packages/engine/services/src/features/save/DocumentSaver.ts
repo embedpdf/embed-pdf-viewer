@@ -56,6 +56,42 @@ export class DocumentSaver {
     }
   }
 
+  /**
+   * The raw cumulative delta a layer save writes (every promoted object,
+   * offsets notional from the base's append offset), without the artifact
+   * header: what `EPDFDoc_OpenBaseOverlay` composes with the base. Empty
+   * when nothing was promoted.
+   */
+  saveLayerDelta(): { bytes: ArrayBuffer; size: number } {
+    this.requireLayer();
+
+    const { mem, fn } = this.runtime;
+    const sizePtr = mem.alloc(4);
+    const statusPtr = mem.alloc(4);
+    let deltaPtr: Ptr | null = null;
+    try {
+      mem.poke(sizePtr, 'i32', 0);
+      mem.poke(statusPtr, 'i32', -1);
+      deltaPtr = fn.EPDFLayer_SaveDeltaToOwnedBuffer(this.session.requireDocPtr(), sizePtr, statusPtr);
+      const status = Number(mem.peek(statusPtr, 'i32'));
+      const size = Number(mem.peek(sizePtr, 'i32'));
+      if (status !== 0) {
+        throw layerSaveError(status);
+      }
+      if (!deltaPtr || size <= 0) {
+        return { bytes: new ArrayBuffer(0), size: 0 };
+      }
+      const bytes = mem.readBytes(deltaPtr, size);
+      const buffer = new ArrayBuffer(bytes.byteLength);
+      new Uint8Array(buffer).set(bytes);
+      return { bytes: buffer, size };
+    } finally {
+      if (deltaPtr) fn.EPDF_FreeBuffer(deltaPtr);
+      mem.free(statusPtr);
+      mem.free(sizePtr);
+    }
+  }
+
   saveLayerArtifactToFile(path: string): { path: string } {
     this.requireLayer();
 

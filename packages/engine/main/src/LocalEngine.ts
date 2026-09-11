@@ -130,12 +130,61 @@ export class LocalEngine implements Engine {
       return this.openLayerBytes(input, options);
     }
 
+    if (input.kind === 'layerFile') {
+      return this.openLayerFile(input, options);
+    }
+
     return AbortablePromise.rejectReason(
       new EngineError(
         EngineErrorCode.InvalidArg,
-        `local engine only supports OpenInput.kind === 'bytes' or 'layerBytes' (got '${input.kind}')`,
+        `local engine only supports OpenInput.kind === 'bytes', 'layerBytes' or 'layerFile' (got '${input.kind}')`,
       ),
     );
+  }
+
+  /** A layer over a base FILE: PDFium range-reads the base from disk (Node runtimes only). */
+  private openLayerFile(
+    input: Extract<OpenInput, { kind: 'layerFile' }>,
+    options?: OpenOptions,
+  ): AbortablePromise<DocumentHandle> {
+    const queue = this.queue;
+    const password = options?.password ?? input.password ?? null;
+    const docId = input.id;
+    const baseKey = input.baseKey ?? input.basePath;
+    const artifactBytes =
+      input.layer?.kind === 'artifact' ? toArrayBuffer(input.layer.bytes) : undefined;
+    const layer =
+      input.layer?.kind === 'artifact-file'
+        ? ({ kind: 'artifact-file', path: input.layer.path } as const)
+        : artifactBytes === undefined
+          ? ({ kind: 'fresh' } as const)
+          : ({ kind: 'artifact', bytes: artifactBytes } as const);
+    const transfer = artifactBytes ? [artifactBytes] : [];
+    const signedDocumentPolicy = this.signedDocumentPolicy;
+    const baseSha256 = input.baseSha256;
+
+    const submission = queue.enqueue<WorkerResultPayload>(
+      {
+        buildPack: (jobId: JobId) =>
+          wirePack(
+            {
+              kind: 'open.layerFileBase',
+              jobId,
+              docId,
+              baseKey,
+              basePath: input.basePath,
+              layer,
+              password,
+              signedDocumentPolicy,
+              ...(baseSha256 ? { baseSha256 } : {}),
+            },
+            transfer,
+          ),
+      },
+      { priority: Priority.HIGH },
+    );
+
+    return this.openResult(submission, options);
   }
 
   private openBytes(

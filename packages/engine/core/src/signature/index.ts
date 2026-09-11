@@ -10,3 +10,4 @@ export {
   minLevel,
   protectedCapabilities,
 } from './protection';
+export * from './analysis';

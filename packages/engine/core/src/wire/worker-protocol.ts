@@ -65,6 +65,7 @@ import type { RedactionApplyResult, RedactionApplyScope } from '../mutation/Reda
 import type { WireResourceMap } from '../resource/BinarySource';
 import type { PageState } from '../revision/PageState';
 import type { SearchRequest, SearchSlice } from '../search/types';
+import type { AnalyzeInput, ChangeAnalysis } from '../signature/analysis/types';
 import type {
   BaseVersionInfo,
   DigestAlgorithm,
@@ -220,6 +221,14 @@ export interface SignaturesAbortWorkerRequest {
   docId: string;
   layerName?: string;
   signingId: string;
+}
+
+export interface SignaturesAnalyzeWorkerRequest {
+  kind: 'signatures.analyze';
+  jobId: WorkerJobId;
+  docId: string;
+  layerName?: string;
+  input: AnalyzeInput;
 }
 
 export interface MetadataReadWorkerRequest {
@@ -1074,6 +1083,7 @@ export type WorkerRequest =
   | SignaturesPrepareWorkerRequest
   | SignaturesCompleteWorkerRequest
   | SignaturesAbortWorkerRequest
+  | SignaturesAnalyzeWorkerRequest
   | FontsRegisterWorkerRequest
   | FontsAddFallbackWorkerRequest
   | FontsClearFallbacksWorkerRequest
@@ -1104,6 +1114,7 @@ export type WorkerResultPayload =
       artifactFile?: LayerArtifactFileWorkerPayload;
     }
   | { tag: 'signatures.abort'; result: SignatureAbortResult }
+  | { tag: 'signatures.analyze'; analysis: ChangeAnalysis }
   | { tag: 'metadata.read'; metadata: DocumentMetadata }
   | { tag: 'actions.read'; snapshot: DocumentActionsSnapshot }
   | {

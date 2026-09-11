@@ -1,5 +1,6 @@
 import type { FormFieldRef } from '../identity/FormFieldRef';
 import type { AbortablePromise } from '../promise/AbortablePromise';
+import type { AnalyzeInput, ChangeAnalysis } from '../signature/analysis/types';
 import type {
   DigestAlgorithm,
   SignatureAbortResult,
@@ -40,6 +41,17 @@ export interface DocumentSignaturesService {
 
   /** The exact bytes of revision `revisionIndex` (`[0, end)`): what a signature over it signed. */
   revisionBytes(revisionIndex: number): AbortablePromise<Uint8Array>;
+
+  /**
+   * What changed after a signature (or after any revision), judged
+   * revision by revision against the restrictions in force: every object
+   * whose cross-reference mapping moved, with its value and every
+   * reference to it in both revisions, and the rule that explains each —
+   * or the reference no rule explains. `until: 'working-copy'` snapshots
+   * unsaved edits as one more revision first. A truncated value is never
+   * permitted; a broken chain is `indeterminate`.
+   */
+  analyze(input: AnalyzeInput): AbortablePromise<ChangeAnalysis>;
 
   /**
    * Build the candidate (unsaved edits become their own revision, the

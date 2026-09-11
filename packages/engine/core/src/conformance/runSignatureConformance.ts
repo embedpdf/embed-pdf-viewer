@@ -334,6 +334,124 @@ export function runSignatureConformance(
         () => engine,
         () => supported,
       );
+      runAnalysisTests(
+        runner,
+        opts,
+        () => engine,
+        () => permitEngine,
+        () => supported,
+      );
+    }
+  });
+}
+
+function runAnalysisTests(
+  runner: ConformanceTestRunner,
+  opts: SignatureConformanceOptions,
+  engineOf: () => Engine,
+  permitEngineOf: () => Engine | null,
+  supported: () => boolean,
+): void {
+  const { test, expect } = runner;
+
+  test('analyze: a form fill and a second signature after an approval are permitted', async () => {
+    if (!supported()) return;
+    const doc = await open(engineOf(), opts, opts.fixtures.twoApprovals);
+    try {
+      const analysis = await doc.signatures!.analyze({ since: { signatureIndex: 0 } });
+      expect(analysis.mode).toBe('authoritative');
+      expect(analysis.basis.source).toBe('persisted');
+      expect(analysis.since).toEqual({ revisionIndex: 1, signatureIndex: 0 });
+      expect(analysis.until.revisionIndex).toBe(2);
+      expect(analysis.steps).toHaveLength(1);
+      const [step] = analysis.steps;
+      expect(step.levelInForce).toBe('annotate');
+      expect(step.verdict).toBe('permitted');
+      expect(step.changes.length > 0).toBe(true);
+      const rules = new Set(step.findings.filter((f) => f.verdict === 'permitted').map((f) => f.rule));
+      expect(rules.has('form-fill')).toBe(true);
+      expect(rules.has('signature-added')).toBe(true);
+      expect(step.findings.filter((f) => f.verdict === 'forbidden')).toEqual([]);
+      expect(analysis.verdict).toBe('permitted');
+      // The last signature has nothing after it.
+      const latest = await doc.signatures!.analyze({ since: { signatureIndex: 1 } });
+      expect(latest.steps).toHaveLength(0);
+      expect(latest.verdict).toBe('unchanged');
+      // History only: from the original revision up to the first signature.
+      const historic = await doc.signatures!.analyze({ since: { revisionIndex: 0 }, until: { revisionIndex: 1 } });
+      expect(historic.steps).toHaveLength(1);
+      expect(historic.verdict).toBe('permitted');
+    } finally {
+      await doc.close();
+    }
+  });
+
+  test('analyze: the working copy is one more revision; a partial signature cannot anchor', async () => {
+    if (!supported()) return;
+    const fx = opts.fixtures.unsignedSigField;
+    const doc = await open(engineOf(), opts, fx);
+    try {
+      const prepared = await doc.signatures!.prepare({ field: { kind: 'fqn', name: fx.fieldName }, certify: { permission: 2 } });
+      await doc.signatures!.complete({ signingId: prepared.signingId, cms: FAKE_CMS, expectedVersion: prepared.expectedVersion });
+      const clean = await doc.signatures!.analyze({ since: { signatureIndex: 0 }, until: 'working-copy' });
+      expect(clean.steps).toHaveLength(0);
+      expect(clean.verdict).toBe('unchanged');
+      await doc.forms.setValue({ kind: 'fqn', name: fx.textField }, { type: 'text', value: 'draft' });
+      const persisted = await doc.signatures!.analyze({ since: { signatureIndex: 0 } });
+      expect(persisted.steps).toHaveLength(0);
+      const working = await doc.signatures!.analyze({ since: { signatureIndex: 0 }, until: 'working-copy' });
+      expect(working.basis.source).toBe('working-copy');
+      expect(working.steps).toHaveLength(1);
+      expect(working.steps[0].levelInForce).toBe('fill');
+      expect(working.verdict).toBe('permitted');
+      expect(working.steps[0].findings.some((f) => f.rule === 'form-fill' && f.verdict === 'permitted')).toBe(true);
+    } finally {
+      await doc.close();
+    }
+    const partial = await open(engineOf(), opts, opts.fixtures.partialChain);
+    try {
+      expect(await caughtCode(() => partial.signatures!.analyze({ since: { signatureIndex: 0 } }))).toBe(
+        EngineErrorCode.InvalidArg,
+      );
+      const byRevision = await partial.signatures!.analyze({ since: { revisionIndex: 0 } });
+      expect(byRevision.steps).toHaveLength(2);
+    } finally {
+      await partial.close();
+    }
+  });
+
+  test('analyze: a page edit under a certification and a locked field edit are forbidden', async () => {
+    if (!supported()) return;
+    const permit = permitEngineOf();
+    if (!permit) return;
+    // Page deletion after a certification (permission 2): unexplained by every rule.
+    const certified = await open(permit, opts, opts.fixtures.certified);
+    let reopened: DocumentHandle | null = null;
+    try {
+      // A one-page fixture cannot lose its only page; a rotation is a page
+      // dictionary change no signature permits either.
+      const list = await certified.pages.list();
+      await certified.pages.rotate([list.pages[0].pageObjectNumber], 90);
+      const working = await certified.signatures!.analyze({ since: { signatureIndex: 0 }, until: 'working-copy' });
+      expect(working.verdict).toBe('forbidden');
+      const bytes = await certified.download();
+      reopened = await reopen(permit, opts, `${opts.fixtures.certified.id}-tampered`, bytes);
+      const analysis = await reopened.signatures!.analyze({ since: { signatureIndex: 0 } });
+      expect(analysis.verdict).toBe('forbidden');
+      expect(analysis.steps[0].findings.some((f) => f.verdict === 'forbidden')).toBe(true);
+    } finally {
+      if (reopened) await reopened.close();
+      await certified.close();
+    }
+    // Editing a FieldMDP-locked field: the lock rule, whatever the level.
+    const locked = await open(permit, opts, opts.fixtures.fieldMdp);
+    try {
+      await locked.forms.setValue({ kind: 'fqn', name: opts.fixtures.fieldMdp.lockedField }, { type: 'text', value: 'tampered' });
+      const working = await locked.signatures!.analyze({ since: { signatureIndex: 0 }, until: 'working-copy' });
+      expect(working.verdict).toBe('forbidden');
+      expect(working.steps[0].findings.some((f) => f.rule === 'field-lock')).toBe(true);
+    } finally {
+      await locked.close();
     }
   });
 }
@@ -481,7 +599,7 @@ function runSigningTests(
     }
   });
 
-  test('sign: unsaved edits become their own revision under the signature', async () => {
+  test('sign: unsaved edits are sealed in the signature\'s own revision (layer session)', async () => {
     if (!supported()) return;
     const doc = await open(engineOf(), opts, fx());
     try {
@@ -492,9 +610,12 @@ function runSigningTests(
         cms: FAKE_CMS,
         expectedVersion: prepared.expectedVersion,
       });
-      expect(result.signature.revisionIndex).toBe(2);
+      // The candidate is a layer over the session's own base fed the artifact a
+      // save would write: edits and signature land in ONE revision, as Acrobat
+      // saves a fill-and-sign. (A plain session freezes the edits first: two.)
+      expect(result.signature.revisionIndex).toBe(1);
       const after = await doc.signatures!.list();
-      expect(after.revisions).toHaveLength(3);
+      expect(after.revisions).toHaveLength(2);
       const text = await doc.forms.get(textRef());
       expect((text as { value?: string }).value).toBe('unsaved');
       const bytes = await doc.download();

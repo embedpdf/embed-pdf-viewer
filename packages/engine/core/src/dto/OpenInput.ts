@@ -128,9 +128,37 @@ export interface OpenInputShare {
   password?: string | null;
 }
 
+export type OpenInputLayerFileSource =
+  | { kind: 'fresh' }
+  | { kind: 'artifact'; bytes: Uint8Array | ArrayBuffer }
+  | { kind: 'artifact-file'; path: string };
+
+/**
+ * Local-engine layer open over a base FILE (Node runtimes only): the base
+ * is range-read from disk by PDFium and never loaded into JS, and a
+ * signing candidate for such a session is written beside it rather than
+ * held in memory. What a server does for every document; useful locally
+ * for large files.
+ *
+ * Rejected by `@cloudpdf/engine` and by the wasm runtime.
+ */
+export interface OpenInputLayerFile {
+  kind: 'layerFile';
+  /** Caller-supplied stable id for this layer document handle. */
+  id: string;
+  /** Optional sharing key for the loaded base. Defaults to the path. */
+  baseKey?: string;
+  basePath: string;
+  /** A verified SHA-256 (hex) of the base file, when the caller has one. */
+  baseSha256?: string;
+  layer?: OpenInputLayerFileSource;
+  password?: string | null;
+}
+
 export type OpenInput =
   | OpenInputBytes
   | OpenInputLayerBytes
+  | OpenInputLayerFile
   | OpenInputById
   | OpenInputToken
   | OpenInputShare;

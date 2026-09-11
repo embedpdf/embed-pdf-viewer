@@ -418,6 +418,36 @@ export type {
   SignatureSubFilter,
   SignedDocumentPolicy,
 } from './signature/types';
+export type {
+  AnalyzeInput,
+  ChangeAnalysis,
+  ChangeFinding,
+  ObjectChange,
+  ObjectChangeKind,
+  ObjectChangeType,
+  ObjectReferrer,
+  PdfValue,
+  RevisionAnalysis,
+  RevisionField,
+  RevisionStructure,
+  StepInput,
+  StepVerdict,
+} from './signature/analysis/types';
+export {
+  changedKeys,
+  dictEntries,
+  evaluateStep,
+  parsePdfValue,
+  pdfValueEquals,
+  refsOf,
+  restrictionsOf,
+  stableStringify,
+  worstVerdict,
+  EdgeResolver,
+  DEFAULT_EDGE_RESOLVER_BUDGET,
+  USAGE_INCOMPLETE,
+} from './signature/analysis';
+export type { EdgeResolverBudget, ResolvedUsage } from './signature/analysis';
 export {
   SIGNATURE_POLICY_VERSION,
   deriveProtection,

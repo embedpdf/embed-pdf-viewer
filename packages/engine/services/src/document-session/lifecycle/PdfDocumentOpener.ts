@@ -6,14 +6,36 @@ export type OpenedPdfDocumentKind = 'fat-memory' | 'layer';
 
 const FPDF_ERR_PASSWORD = 4;
 
+/**
+ * Where a session's bytes come from, retained for the session's lifetime
+ * so that every consumer (signing candidates, overlays, verbatim reads)
+ * shares one interpretation: an immutable base in the registry (by key;
+ * file bases also carry their path) and the layer the session was opened
+ * with. A plain session has neither. Byte-backed layer sources keep their
+ * bytes: they are what a candidate reopens over the same base.
+ */
+export type BaseSource =
+  | { readonly kind: 'memory'; readonly key: string }
+  | { readonly kind: 'file'; readonly key: string; readonly path: string };
+
+export interface DocumentSource {
+  readonly base: BaseSource | null;
+  readonly layer: LayerSource | null;
+  readonly password: string | null;
+}
+
 export interface OpenedPdfDocument {
   readonly kind: OpenedPdfDocumentKind;
   readonly docPtr: Ptr;
+  readonly source: DocumentSource;
   close(): void;
 }
 
 export interface AcquiredBaseDocument {
   readonly key: string;
+  readonly kind: 'memory' | 'file';
+  /** File bases only. */
+  readonly path?: string;
   readonly basePtr: Ptr;
   release(): void;
 }
@@ -78,7 +100,12 @@ export function openFatMemoryDocument(
     }
     setRuntimeOwnerPermissionsIfEncrypted(runtime, docPtr);
     stack.push(() => fn.FPDF_CloseDocument(docPtr));
-    return { kind: 'fat-memory', docPtr, close: () => stack.close() };
+    return {
+      kind: 'fat-memory',
+      docPtr,
+      source: { base: null, layer: null, password },
+      close: () => stack.close(),
+    };
   } catch (error) {
     stack.close();
     throw error;
@@ -121,7 +148,16 @@ export function openLayerDocument(
 
     setRuntimeOwnerPermissionsIfEncrypted(runtime, docPtr);
     stack.push(() => fn.FPDF_CloseDocument(docPtr));
-    return { kind: 'layer', docPtr, close: () => stack.close() };
+    const baseSource: BaseSource =
+      base.kind === 'file' && base.path !== undefined
+        ? { kind: 'file', key: base.key, path: base.path }
+        : { kind: 'memory', key: base.key };
+    return {
+      kind: 'layer',
+      docPtr,
+      source: { base: baseSource, layer, password },
+      close: () => stack.close(),
+    };
   } catch (error) {
     stack.close();
     throw error;

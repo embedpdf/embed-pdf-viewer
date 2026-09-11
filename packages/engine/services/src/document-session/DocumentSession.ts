@@ -19,6 +19,7 @@ import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
 import {
   openFatMemoryDocument,
+  type DocumentSource,
   type OpenedPdfDocument,
   type OpenedPdfDocumentKind,
 } from './lifecycle/PdfDocumentOpener';
@@ -37,15 +38,24 @@ import { LocalRevisionAuthority, type RevisionAuthority } from './revisions/Revi
  * underlying PdfRuntimeModule (WASM vs native).
  */
 /**
+ * A serialised signing candidate: the sealed-to-be file with the
+ * zero-filled /Contents hole, either as one buffer in JS memory (the local
+ * engine) or as a file beside the session's base (the server), plus where
+ * the signature value object lies in it.
+ */
+export type SavedCandidate =
+  | { kind: 'memory'; bytes: Uint8Array; size: number; objectOffset: number; objectLength: number }
+  | { kind: 'file'; path: string; size: number; objectOffset: number; objectLength: number };
+
+/**
  * A sealed-to-be candidate parked on a session between `prepare` and
- * `complete`/`abort`. The bytes live in JS memory: the native candidate
- * documents are closed as soon as the seal is computed.
+ * `complete`/`abort`. The native candidate documents are closed as soon as
+ * the seal is computed; only the serialised candidate remains.
  */
 export interface PendingSigning {
   readonly prepared: SignaturePrepared;
   readonly fieldObjectNumber: number;
-  /** The sealed-to-be file with the zero-filled /Contents hole. */
-  readonly buffer: Uint8Array;
+  readonly saved: SavedCandidate;
   readonly contentsOffset: number;
   readonly contentsHexLength: number;
 }
@@ -61,6 +71,7 @@ export class DocumentSession {
   private docPtr: Ptr | null = null;
   private closeDocument: (() => void) | null = null;
   private _kind: OpenedPdfDocumentKind | null = null;
+  private _source: DocumentSource | null = null;
   private readonly _sessionId: string;
 
   /** pon -> record */
@@ -119,6 +130,18 @@ export class DocumentSession {
     return this._kind;
   }
 
+  /**
+   * Where the current bytes come from: the immutable base (registry key,
+   * file path for file bases) and the layer the session was opened with.
+   * One interpretation for signing candidates, overlays and verbatim reads.
+   */
+  get source(): DocumentSource {
+    if (!this._source) {
+      throw new EngineError(EngineErrorCode.DocNotOpen, 'document is not open');
+    }
+    return this._source;
+  }
+
   isOpen(): boolean {
     return this.docPtr !== null;
   }
@@ -135,6 +158,7 @@ export class DocumentSession {
     this.docPtr = handle.docPtr;
     this.closeDocument = () => handle.close();
     this._kind = handle.kind;
+    this._source = handle.source;
     this.revisions = new LocalRevisionAuthority(this._sessionId);
     this.pages = new PagePtrPool(this.runtime, handle.docPtr);
     this.parkedBytes = null;
@@ -190,6 +214,7 @@ export class DocumentSession {
     this.docPtr = handle.docPtr;
     this.closeDocument = () => handle.close();
     this._kind = handle.kind;
+    this._source = handle.source;
     this.pages = new PagePtrPool(this.runtime, handle.docPtr);
     this.recordsByIndex.clear();
     this.recordsByObjectNumber.clear();
@@ -425,6 +450,15 @@ export class DocumentSession {
       this.pages = null;
     }
 
+    // A candidate written to a file must not outlive the session that parked it.
+    if (this.pendingSigning?.saved.kind === 'file') {
+      try {
+        this.runtime.fileWrite.removeFile(this.pendingSigning.saved.path);
+      } catch (error) {
+        firstError ??= error;
+      }
+    }
+
     try {
       this.closeDocument?.();
     } catch (error) {
@@ -433,6 +467,7 @@ export class DocumentSession {
       this.closeDocument = null;
       this.docPtr = null;
       this._kind = null;
+      this._source = null;
       this.parkedBytes = null;
       this.pendingSigning = null;
       this.lastCompletion = null;

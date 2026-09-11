@@ -10,19 +10,21 @@ import type {
 import { EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
 import { NULL_PTR, type PdfRuntimeModule, type Ptr } from '@embedpdf/engine-runtime';
 
-import type { DocumentSession, PendingSigning } from '../../document-session/DocumentSession';
+import type { DocumentSession } from '../../document-session/DocumentSession';
 import type { BaseDocumentRegistry } from '../../document-session/lifecycle/BaseDocumentRegistry';
 import {
   CloseStack,
   openLayerDocument,
+  type LayerSource,
   type OpenedPdfDocument,
 } from '../../document-session/lifecycle/PdfDocumentOpener';
-import { withScratch, withScratchN } from '../../runtime/memory/scratch';
+import { withScratch } from '../../runtime/memory/scratch';
 import { generateUuid } from '../../shared/uuid';
 import { DocumentSaver } from '../save/DocumentSaver';
 import { disposeFormModel } from '../forms/internal/formModelCache';
 import { withWideStringArray } from '../forms/internal/wideStringArray';
 import { DIGEST_CODE, SignatureReader } from './SignatureReader';
+import { FileCandidateStore, MemoryCandidateStore, type CandidateStore } from './internal/candidateStore';
 import { disposeSignatureModel } from './internal/signatureModelCache';
 
 // Mirrors public/epdf_signature.h.
@@ -36,7 +38,6 @@ const COVERAGE_WHOLE_REVISION = 0;
 const DEFAULT_CONTENTS_SIZE = 8192;
 const MIN_CONTENTS_SIZE = 256;
 const MAX_CONTENTS_SIZE = 4 * 1024 * 1024;
-const U64_BYTES = 8;
 
 /**
  * `EPDF_SIG_PREPARE` as the C compiler lays it out. Two layouts: ILP32
@@ -100,20 +101,21 @@ const PREPARE_LP64: PrepareLayout = {
  * The two-phase signing protocol on a session, local and native alike.
  *
  * `prepare` never touches the live document: it builds a CANDIDATE — a
- * fresh layer over the bytes the session would save (the loaded bytes
- * when nothing changed, an incremental save otherwise, so unsaved edits
- * become their own revision) — writes the signature there, saves it with
- * only the objects the signature touched, seals it, and parks the
- * sealed-to-be bytes on the session. `complete` writes the CMS into the
- * parked bytes, opens them the way the session was opened, proves the new
- * signature seals a whole revision, and installs them as the session's
- * document. `abort` drops the candidate.
+ * fresh layer over the session's own immutable base (see `openCandidate`)
+ * — writes the signature there, saves it through a `CandidateStore`
+ * (memory locally, a file beside the base on file-backed sessions), seals
+ * it, and parks the saved candidate on the session. `complete` writes the
+ * CMS into it, opens it as a new base with a fresh layer, proves the new
+ * signature seals a whole revision, and installs it as the session's
+ * document. `abort` discards the candidate.
  */
 export class SignatureMutator {
   constructor(
     private readonly runtime: PdfRuntimeModule,
     private readonly session: DocumentSession,
     private readonly baseDocuments: BaseDocumentRegistry,
+    /** Where a file-backed session's candidate is written; defaults to beside the base file. */
+    private readonly candidatePath?: (basePath: string, signingId: string) => string,
   ) {}
 
   prepare(input: SignaturePrepareInput): SignaturePrepared {
@@ -157,19 +159,10 @@ export class SignatureMutator {
     }
     const expectedVersion = this.session.versionRef(reader.version().sha256);
 
-    // The bytes the session would save, then a throwaway layer on top.
-    const candidateBytes = this.session.hasUnsavedEdits()
-      ? new DocumentSaver(this.runtime, this.session).saveStandaloneToBuffer('incremental').bytes
-      : reader.loadedBytes();
     const signingId = generateUuid();
     const stack = new CloseStack();
     try {
-      const base = this.baseDocuments.acquireMemoryBase({
-        key: `candidate:${signingId}`,
-        bytes: new Uint8Array(candidateBytes),
-        password: this.session.password,
-      });
-      const candidate = openLayerDocument(this.runtime, base, { kind: 'fresh' }, this.session.password);
+      const candidate = this.openCandidate(signingId);
       stack.push(() => candidate.close());
 
       const valueObjNum = this.callPrepare(candidate.docPtr, field.fieldObjectNumber, {
@@ -196,8 +189,15 @@ export class SignatureMutator {
         this.bakeAppearance(candidate.docPtr, field.widget, input.appearance.pdf, input.appearance.pageIndex ?? 0);
       }
 
-      const saved = this.saveCandidate(candidate.docPtr, valueObjNum);
-      const sealed = this.seal(saved, algorithm);
+      const store = this.storeFor();
+      const saved = store.save(candidate.docPtr, valueObjNum, signingId);
+      let sealed;
+      try {
+        sealed = store.seal(saved, algorithm);
+      } catch (error) {
+        store.discard(saved);
+        throw error;
+      }
       const prepared: SignaturePrepared = {
         signingId,
         digest: sealed.digest,
@@ -211,7 +211,7 @@ export class SignatureMutator {
       this.session.pendingSigning = {
         prepared,
         fieldObjectNumber: field.fieldObjectNumber,
-        buffer: saved.bytes,
+        saved,
         contentsOffset: sealed.contentsOffset,
         contentsHexLength: sealed.contentsHexLength,
       };
@@ -252,8 +252,16 @@ export class SignatureMutator {
       );
     }
 
-    const sealed = this.writeContents(pending, input.cms);
-    const handle = this.openSealed(sealed, pending.fieldObjectNumber);
+    const store = this.storeFor();
+    const sealed = {
+      byteRange: pending.prepared.byteRange,
+      contentsOffset: pending.contentsOffset,
+      contentsHexLength: pending.contentsHexLength,
+      digest: pending.prepared.digest,
+    };
+    store.writeContents(pending.saved, sealed, input.cms);
+    const handle = store.openSealed(pending.saved, this.session.password);
+    this.verifySealed(handle, pending.fieldObjectNumber);
 
     // Install: the one place a live session changes its bytes.
     this.session.install(handle);
@@ -287,6 +295,7 @@ export class SignatureMutator {
     const pending = this.session.pendingSigning;
     if (pending && pending.prepared.signingId === signingId) {
       this.session.pendingSigning = null;
+      this.storeFor().discard(pending.saved);
       return { status: 'aborted' };
     }
     if (this.session.lastCompletion?.signingId === signingId) {
@@ -396,137 +405,25 @@ export class SignatureMutator {
     }
   }
 
-  private saveCandidate(
-    docPtr: Ptr,
-    valueObjNum: number,
-  ): { bytes: Uint8Array; objectOffset: number; objectLength: number } {
-    const { mem, fn } = this.runtime;
-    return withScratchN(mem, [U64_BYTES, U64_BYTES, U64_BYTES], ([sizePtr, offPtr, lenPtr]) => {
-      pokeU64(mem, sizePtr, 0);
-      pokeU64(mem, offPtr, 0);
-      pokeU64(mem, lenPtr, 0);
-      const bufPtr = fn.EPDFSig_SaveCandidateToOwnedBuffer(docPtr, valueObjNum, sizePtr, offPtr, lenPtr);
-      if (!bufPtr) {
-        throw new EngineError(EngineErrorCode.Unknown, 'failed to save the signing candidate');
-      }
-      try {
-        const size = peekU64(mem, sizePtr);
-        return {
-          bytes: copyOut(mem.readBytes(bufPtr, size)),
-          objectOffset: peekU64(mem, offPtr),
-          objectLength: peekU64(mem, lenPtr),
-        };
-      } finally {
-        fn.EPDF_FreeBuffer(bufPtr);
-      }
-    });
-  }
-
-  private seal(
-    saved: { bytes: Uint8Array; objectOffset: number; objectLength: number },
-    algorithm: Exclude<DigestAlgorithm, 'sha1'>,
-  ): {
-    byteRange: [number, number, number, number];
-    contentsOffset: number;
-    contentsHexLength: number;
-    digest: Uint8Array;
-  } {
-    const { mem, fn } = this.runtime;
-    const bufPtr = mem.alloc(saved.bytes.byteLength);
-    try {
-      mem.writeBytes(bufPtr, saved.bytes);
-      return withScratchN(
-        mem,
-        [4 * U64_BYTES, U64_BYTES, U64_BYTES, 64, U64_BYTES],
-        ([rangePtr, coPtr, chPtr, digestPtr, lenPtr]) => {
-          for (let k = 0; k < 4; k++) pokeU64(mem, rangePtr, 0, k * U64_BYTES);
-          pokeU64(mem, coPtr, 0);
-          pokeU64(mem, chPtr, 0);
-          pokeU64(mem, lenPtr, 64);
-          const ok = fn.EPDFSig_Seal(
-            bufPtr,
-            BigInt(saved.bytes.byteLength),
-            BigInt(saved.objectOffset),
-            BigInt(saved.objectLength),
-            DIGEST_CODE[algorithm],
-            rangePtr,
-            coPtr,
-            chPtr,
-            digestPtr,
-            lenPtr,
-          );
-          if (!ok) {
-            throw new EngineError(EngineErrorCode.Unknown, 'failed to seal the signing candidate');
-          }
-          // The seal patched /ByteRange in place: keep the patched bytes.
-          saved.bytes = copyOut(mem.readBytes(bufPtr, saved.bytes.byteLength));
-          const digestLength = Number(mem.peek(lenPtr, 'i32'));
-          return {
-            byteRange: [
-              peekU64(mem, rangePtr, 0),
-              peekU64(mem, rangePtr, U64_BYTES),
-              peekU64(mem, rangePtr, 2 * U64_BYTES),
-              peekU64(mem, rangePtr, 3 * U64_BYTES),
-            ],
-            contentsOffset: peekU64(mem, coPtr),
-            contentsHexLength: peekU64(mem, chPtr),
-            digest: copyOut(mem.readBytes(digestPtr, digestLength)),
-          };
-        },
-      );
-    } finally {
-      mem.free(bufPtr);
+  /**
+   * File-backed sessions (a file base in the registry: the server) persist
+   * the candidate as a file beside the base; everything else keeps it in
+   * memory. The choice follows the SESSION's base, not the candidate's.
+   */
+  private storeFor(): CandidateStore {
+    const base = this.session.source.base;
+    if (base?.kind === 'file') {
+      return new FileCandidateStore(this.runtime, this.baseDocuments, base.path, this.candidatePath);
     }
-  }
-
-  private writeContents(pending: PendingSigning, cms: Uint8Array): Uint8Array {
-    const { mem, fn } = this.runtime;
-    const bufPtr = mem.alloc(pending.buffer.byteLength);
-    const cmsPtr = mem.alloc(cms.byteLength);
-    try {
-      mem.writeBytes(bufPtr, pending.buffer);
-      mem.writeBytes(cmsPtr, cms);
-      const ok = fn.EPDFSig_WriteContents(
-        bufPtr,
-        BigInt(pending.buffer.byteLength),
-        BigInt(pending.contentsOffset),
-        BigInt(pending.contentsHexLength),
-        cmsPtr,
-        cms.byteLength,
-      );
-      if (!ok) {
-        throw new EngineError(
-          EngineErrorCode.SignatureRefused,
-          'the CMS is not one DER object that fits the reserved /Contents',
-        );
-      }
-      return copyOut(mem.readBytes(bufPtr, pending.buffer.byteLength));
-    } finally {
-      mem.free(cmsPtr);
-      mem.free(bufPtr);
-    }
+    return new MemoryCandidateStore(this.runtime, this.baseDocuments);
   }
 
   /**
-   * Open the sealed bytes as a new immutable base with a fresh layer on
-   * top — whatever kind the session was — and prove the new signature
-   * seals a whole revision before anything is installed. A signed document
-   * is always edited on a layer: a later save then appends only the
-   * objects that changed, never a rewrite of the signature dictionary,
-   * which strict validators reject as an illegitimate modification.
+   * Prove the sealed bytes carry a whole-revision signature on the field
+   * before anything is installed; closes the handle on failure.
    */
-  private openSealed(sealed: Uint8Array, fieldObjectNumber: number): OpenedPdfDocument {
+  private verifySealed(handle: OpenedPdfDocument, fieldObjectNumber: number): void {
     const { fn } = this.runtime;
-    const password = this.session.password;
-    const base = this.baseDocuments.acquireMemoryBase({
-      key: `signed:${generateUuid()}`,
-      bytes: sealed,
-      password,
-    });
-    const handle = openLayerDocument(this.runtime, base, { kind: 'fresh' }, password);
-    if (this.session.kind !== 'layer') {
-      this.session.persistLayerArtifact = false;
-    }
     try {
       const model = fn.EPDFSig_LoadModel(handle.docPtr);
       if (!model) {
@@ -547,12 +444,60 @@ export class SignatureMutator {
       } finally {
         fn.EPDFSig_CloseModel(model);
       }
-      return handle;
+      if (this.session.kind !== 'layer') {
+        this.session.persistLayerArtifact = false;
+      }
     } catch (error) {
       handle.close();
       throw error;
     }
   }
+
+  /**
+   * The candidate the signature is authored on. A layer session reopens a
+   * fresh layer over ITS OWN immutable base (a registry retain, no copy of
+   * the file), fed the layer it was opened with — or, with unsaved edits,
+   * the artifact a save would write, which is cumulative: the edits and
+   * the signature then share one revision, as Acrobat saves a
+   * fill-and-sign. The fallback freezes the complete loaded bytes as a new
+   * memory base: for a plain session, and for a layer whose loaded delta
+   * already holds signed bytes (a layer save rewrites the delta and would
+   * drop them; the fork refuses to prepare such a candidate).
+   */
+  private openCandidate(signingId: string): OpenedPdfDocument {
+    const password = this.session.password;
+    const source = this.session.source;
+    if (this.session.kind === 'layer' && source.base && !this.loadedDeltaHoldsSignedBytes()) {
+      const base = this.baseDocuments.retainByKey(source.base.key);
+      if (base) {
+        const layer: LayerSource = this.session.hasUnsavedEdits()
+          ? { kind: 'artifact', bytes: new DocumentSaver(this.runtime, this.session).saveLayerArtifact().bytes }
+          : (source.layer ?? { kind: 'fresh' });
+        return openLayerDocument(this.runtime, base, layer, password);
+      }
+    }
+    const candidateBytes = this.session.hasUnsavedEdits()
+      ? new DocumentSaver(this.runtime, this.session).saveStandaloneToBuffer('incremental').bytes
+      : new SignatureReader(this.runtime, this.session).loadedBytes();
+    const base = this.baseDocuments.acquireMemoryBase({
+      key: `candidate:${signingId}`,
+      bytes: new Uint8Array(candidateBytes),
+      password,
+    });
+    return openLayerDocument(this.runtime, base, { kind: 'fresh' }, password);
+  }
+
+  /** Whether a signature's byte range reaches into the layer's loaded delta (past the base). */
+  private loadedDeltaHoldsSignedBytes(): boolean {
+    const layer = this.session.source.layer;
+    if (!layer || layer.kind === 'fresh') return false;
+    const baseSize = Number(this.runtime.fn.EPDFDoc_GetBaseBytesSize(this.session.requireDocPtr()));
+    const snapshot = new SignatureReader(this.runtime, this.session).readSnapshot();
+    return snapshot.signatures.some(
+      (s) => s.signed && s.byteRange !== null && s.byteRange[2] + s.byteRange[3] > baseSize,
+    );
+  }
+
 }
 
 function sameVersion(a: DocumentVersionRef, b: DocumentVersionRef): boolean {
@@ -565,20 +510,3 @@ function bytesEqual(a: Uint8Array, b: Uint8Array): boolean {
   return true;
 }
 
-function copyOut(view: Uint8Array): Uint8Array {
-  const out = new Uint8Array(view.byteLength);
-  out.set(view);
-  return out;
-}
-
-function pokeU64(mem: PdfRuntimeModule['mem'], ptr: Ptr, value: number, byteOffset = 0): void {
-  const big = BigInt(value);
-  mem.poke(ptr, 'i32', Number(big & 0xffffffffn) | 0, byteOffset);
-  mem.poke(ptr, 'i32', Number((big >> 32n) & 0xffffffffn) | 0, byteOffset + 4);
-}
-
-function peekU64(mem: PdfRuntimeModule['mem'], ptr: Ptr, byteOffset = 0): number {
-  const lo = Number(mem.peek(ptr, 'i32', byteOffset)) >>> 0;
-  const hi = Number(mem.peek(ptr, 'i32', byteOffset + 4)) >>> 0;
-  return hi * 0x100000000 + lo;
-}

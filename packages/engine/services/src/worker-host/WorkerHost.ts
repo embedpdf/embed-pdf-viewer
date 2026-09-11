@@ -27,6 +27,7 @@ import {
   type SignaturesPrepareWorkerRequest,
   type SignaturesCompleteWorkerRequest,
   type SignaturesAbortWorkerRequest,
+  type SignaturesAnalyzeWorkerRequest,
   type SignaturesContentsWorkerRequest,
   type SignaturesDigestWorkerRequest,
   type SignaturesRevisionBytesWorkerRequest,
@@ -111,7 +112,7 @@ import {
 import { AttachmentMutator, AttachmentReader } from '../features/attachments';
 import { FontRegistrar, type StartupFontSpec } from '../features/fonts';
 import { FormMutator, FormReader, FormsEffectsApplier, disposeFormModel } from '../features/forms';
-import { SignatureMutator, SignatureReader, disposeSignatureModel } from '../features/signature';
+import { SignatureAnalyzer, SignatureMutator, SignatureReader, disposeSignatureModel, hasSignedSignature } from '../features/signature';
 import { generateUuid } from '../shared/uuid';
 import { PageGeometryReader } from '../features/geometry';
 import { MetadataMutator, MetadataReader } from '../features/metadata';
@@ -155,6 +156,13 @@ export interface WorkerImageEncoder {
 
 export interface WorkerHostOptions {
   imageEncoder?: WorkerImageEncoder;
+  /**
+   * Where a file-backed session (a file base) writes its signing candidate
+   * between `prepare` and `complete`. Defaults to beside the base file
+   * (`<base>.signing-<id>.pdf`); a server maps it into its storage layout so
+   * the sealed file can be published by rename.
+   */
+  signingCandidatePath?: (basePath: string, signingId: string) => string;
 }
 
 /**
@@ -310,6 +318,9 @@ export class WorkerHost {
           break;
         case 'signatures.abort':
           resultPack = this.handleSignaturesAbort(msg);
+          break;
+        case 'signatures.analyze':
+          resultPack = this.handleSignaturesAnalyze(msg);
           break;
         case 'forms.list':
           resultPack = this.handleFormsList(msg, ctrl.signal);
@@ -561,9 +572,12 @@ export class WorkerHost {
   private openSignedAware(session: DocumentSession, bytes: Uint8Array, password: string | null): void {
     if (session.sessionKind === 'plain') {
       const plain = openFatMemoryDocument(this.runtime, bytes, password);
+      // A SIGNED signature, not merely a signature field: an unsigned form
+      // with empty signature fields is an ordinary document and honours the
+      // plain request. (FPDF_GetSignatureCount counts fields.)
       let signed = false;
       try {
-        signed = this.runtime.fn.FPDF_GetSignatureCount(plain.docPtr) > 0;
+        signed = hasSignedSignature(this.runtime, plain.docPtr);
       } catch {
         signed = false;
       }
@@ -636,7 +650,7 @@ export class WorkerHost {
   private handleSignaturesPrepare(req: SignaturesPrepareWorkerRequest): WirePack<WorkerResultPayload> {
     const session = this.requireSession(req);
     // The live document is untouched: no mutation, no artifact.
-    const result = new SignatureMutator(this.runtime, session, this.baseDocuments).prepare(req.input);
+    const result = new SignatureMutator(this.runtime, session, this.baseDocuments, this.options.signingCandidatePath).prepare(req.input);
     return wirePack({ tag: 'signatures.prepare', result });
   }
 
@@ -644,7 +658,7 @@ export class WorkerHost {
     req: SignaturesCompleteWorkerRequest,
   ): WirePack<WorkerResultPayload> {
     const session = this.requireSession(req);
-    const result = new SignatureMutator(this.runtime, session, this.baseDocuments).complete(req.input);
+    const result = new SignatureMutator(this.runtime, session, this.baseDocuments, this.options.signingCandidatePath).complete(req.input);
     if (result.status === 'already-completed') {
       return wirePack({ tag: 'signatures.complete', result });
     }
@@ -653,9 +667,15 @@ export class WorkerHost {
     return this.finishMutation(session, { tag: 'signatures.complete', result }, req.artifactPath);
   }
 
+  private handleSignaturesAnalyze(req: SignaturesAnalyzeWorkerRequest): WirePack<WorkerResultPayload> {
+    const session = this.requireSession(req);
+    const analysis = new SignatureAnalyzer(this.runtime, session).analyze(req.input);
+    return wirePack({ tag: 'signatures.analyze', analysis });
+  }
+
   private handleSignaturesAbort(req: SignaturesAbortWorkerRequest): WirePack<WorkerResultPayload> {
     const session = this.requireSession(req);
-    const result = new SignatureMutator(this.runtime, session, this.baseDocuments).abort(req.signingId);
+    const result = new SignatureMutator(this.runtime, session, this.baseDocuments, this.options.signingCandidatePath).abort(req.signingId);
     return wirePack({ tag: 'signatures.abort', result });
   }
 
@@ -1271,6 +1291,21 @@ export class WorkerHost {
     req: DocumentSaveFileWorkerRequest,
   ): WirePack<WorkerResultPayload> {
     const session = this.requireSession(req);
+    // The no-op save law for files: an untouched session's document is its
+    // loaded bytes — for a layer, the base PLUS the loaded delta, never the
+    // base file alone — streamed out verbatim, no serializer pass.
+    if (req.mode === 'incremental' && !session.hasUnsavedEdits()) {
+      const reader = new SignatureReader(this.runtime, session);
+      const size = Number(this.runtime.fn.EPDFDoc_GetLoadedBytesSize(session.requireDocPtr()));
+      const chunk = 4 * 1024 * 1024;
+      this.runtime.fileWrite.removeFile(req.path);
+      for (let offset = 0; offset < size; offset += chunk) {
+        const length = Math.min(chunk, size - offset);
+        this.runtime.fileWrite.appendBytes(req.path, new Uint8Array(reader.readLoadedBytes(offset, length)));
+      }
+      if (size === 0) this.runtime.fileWrite.appendBytes(req.path, new Uint8Array(0));
+      return wirePack({ tag: 'document.saveFile', path: req.path });
+    }
     const saved = new DocumentSaver(this.runtime, session).saveStandaloneToFile(req.path, req.mode);
     return wirePack({ tag: 'document.saveFile', path: saved.path });
   }

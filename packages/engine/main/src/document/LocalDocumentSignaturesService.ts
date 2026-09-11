@@ -3,6 +3,8 @@ import {
   EngineError,
   EngineErrorCode,
   wirePack,
+  type AnalyzeInput,
+  type ChangeAnalysis,
   type DigestAlgorithm,
   type DocumentSignaturesService,
   type FormFieldRef,
@@ -95,6 +97,17 @@ export class LocalDocumentSignaturesService implements DocumentSignaturesService
       { priority: Priority.MEDIUM },
     );
     return this.await(submission, 'signatures.revisionBytes', (payload) => new Uint8Array(payload.bytes));
+  }
+
+  analyze(input: AnalyzeInput): AbortablePromise<ChangeAnalysis> {
+    const rejected = this.gate('doc.forms.read');
+    if (rejected) return rejected;
+    const docId = this.docId;
+    const submission = this.queue.enqueue<WorkerResultPayload>(
+      { buildPack: (jobId: JobId) => wirePack({ kind: 'signatures.analyze', jobId, docId, input }) },
+      { priority: Priority.MEDIUM },
+    );
+    return this.await(submission, 'signatures.analyze', (payload) => payload.analysis);
   }
 
   prepare(input: SignaturePrepareInput): AbortablePromise<SignaturePrepared> {

@@ -243,6 +243,46 @@ export class LocalDocumentHandle implements DocumentHandle {
     });
   }
 
+  /** Node runtimes only: the document written to a local file, never through JS (see `DocumentHandle`). */
+  downloadToFile(path: string, opts?: { mode?: PdfSaveMode }): AbortablePromise<void> {
+    if (this.closed) {
+      return AbortablePromise.rejectReason(
+        new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.id}`),
+      );
+    }
+    const mode: PdfSaveMode = opts?.mode ?? DEFAULT_PDF_SAVE_MODE;
+    try {
+      this.guard.assertCapability('doc.download');
+    } catch (err) {
+      return AbortablePromise.rejectReason(err);
+    }
+    const protection = this.guard.currentProtection();
+    if (mode === 'rewrite' && protection && protection.level !== null) {
+      return AbortablePromise.rejectReason(
+        new EngineError(
+          EngineErrorCode.ProtectedDocument,
+          'the document is signed: a rewrite save would void every signature (use an incremental save)',
+        ),
+      );
+    }
+    const docId = this.id;
+    const submission = this.queue.enqueue<WorkerResultPayload>(
+      {
+        buildPack: (jobId: JobId) => wirePack({ kind: 'document.saveFile', jobId, docId, mode, path }),
+      },
+      { priority: Priority.HIGH },
+    );
+    return AbortablePromise.run<void>(async (signal) => {
+      const onAbort = () => submission.abort(signal.reason);
+      if (signal.aborted) onAbort();
+      else signal.addEventListener('abort', onAbort, { once: true });
+      const payload = await submission;
+      if (payload.tag !== 'document.saveFile') {
+        throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload tag: ${payload.tag}`);
+      }
+    });
+  }
+
   close(): AbortablePromise<void> {
     if (this.closed) {
       return AbortablePromise.resolveValue<void>(undefined);

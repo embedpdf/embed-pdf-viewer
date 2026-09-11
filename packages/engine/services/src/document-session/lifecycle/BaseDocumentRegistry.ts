@@ -23,6 +23,8 @@ function baseOpenError(runtime: PdfRuntimeModule, password: string | null | unde
 
 interface BaseEntry {
   key: string;
+  kind: 'memory' | 'file';
+  path?: string;
   basePtr: Ptr;
   refs: number;
   close: () => void;
@@ -61,7 +63,7 @@ export class BaseDocumentRegistry {
       setRuntimeOwnerPermissionsIfEncrypted(this.runtime, basePtr);
       stack.push(() => fn.EPDF_ReleaseBaseDocument(basePtr));
       this.supplyKnownSha(basePtr, opts.knownSha256);
-      return this.insert(opts.key, basePtr, () => stack.close());
+      return this.insert({ key: opts.key, kind: 'memory', basePtr, refs: 1, close: () => stack.close() });
     } catch (error) {
       stack.close();
       throw error;
@@ -92,11 +94,21 @@ export class BaseDocumentRegistry {
       setRuntimeOwnerPermissionsIfEncrypted(this.runtime, basePtr);
       stack.push(() => fn.EPDF_ReleaseBaseDocument(basePtr));
       this.supplyKnownSha(basePtr, opts.knownSha256);
-      return this.insert(opts.key, basePtr, () => stack.close());
+      return this.insert({ key: opts.key, kind: 'file', path: opts.path, basePtr, refs: 1, close: () => stack.close() });
     } catch (error) {
       stack.close();
       throw error;
     }
+  }
+
+  /**
+   * One more retain on a base already in the registry (a session holds one
+   * for its lifetime, so its key is live while it is open), or null. The
+   * way a signing candidate reopens over its session's own base without
+   * copying a byte.
+   */
+  retainByKey(key: string): AcquiredBaseDocument | null {
+    return this.retain(key);
   }
 
   /**
@@ -144,9 +156,8 @@ export class BaseDocumentRegistry {
     return this.handleFor(entry);
   }
 
-  private insert(key: string, basePtr: Ptr, close: () => void): AcquiredBaseDocument {
-    const entry: BaseEntry = { key, basePtr, refs: 1, close };
-    this.entries.set(key, entry);
+  private insert(entry: BaseEntry): AcquiredBaseDocument {
+    this.entries.set(entry.key, entry);
     return this.handleFor(entry);
   }
 
@@ -154,6 +165,8 @@ export class BaseDocumentRegistry {
     let released = false;
     return {
       key: entry.key,
+      kind: entry.kind,
+      ...(entry.path !== undefined ? { path: entry.path } : {}),
       basePtr: entry.basePtr,
       release: () => {
         if (released) return;

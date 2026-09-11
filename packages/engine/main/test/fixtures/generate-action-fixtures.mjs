@@ -69,7 +69,11 @@ function linkAnnot(nm, rect, action) {
   const SQUARE = '4 0 R'; // the hide-by-reference target
   const links = [
     linkAnnot('goto-fitr', '10 700 60 720', `<< /S /GoTo /D [${PAGE} /FitR 10 20 300 400] >>`),
-    linkAnnot('uri-map', '10 670 60 690', '<< /S /URI /URI (https://example.test/map) /IsMap true >>'),
+    linkAnnot(
+      'uri-map',
+      '10 670 60 690',
+      '<< /S /URI /URI (https://example.test/map) /IsMap true >>',
+    ),
     linkAnnot('named-next', '10 640 60 660', '<< /S /Named /N /NextPage >>'),
     linkAnnot('hide-mixed', '10 610 60 630', `<< /S /Hide /T [(note1) ${SQUARE}] /H false >>`),
     linkAnnot('hide-scalar', '10 580 60 600', '<< /S /Hide /T (fieldB) >>'),
@@ -108,7 +112,11 @@ function linkAnnot(nm, rect, action) {
       '10 250 60 270',
       '<< /S /SubmitForm /F << /FS /URL /F (https://example.test/pdf) >> /Flags 264 >>',
     ),
-    linkAnnot('submit-not-url', '10 220 60 240', '<< /S /SubmitForm /F << /F (disk-file.fdf) >> >>'),
+    linkAnnot(
+      'submit-not-url',
+      '10 220 60 240',
+      '<< /S /SubmitForm /F << /F (disk-file.fdf) >> >>',
+    ),
     linkAnnot('submit-no-f', '10 190 60 210', '<< /S /SubmitForm >>'),
   ];
   // A minimal AcroForm (merged field+widget dicts) so the hide-by-NAME
@@ -145,7 +153,17 @@ function linkAnnot(nm, rect, action) {
 // one JS→ResetForm→JS chain (each script exactly once, in order).
 {
   const PAGE = '3 0 R';
-  const fieldRefs = ['4 0 R', '5 0 R', '6 0 R', '7 0 R', '8 0 R', '9 0 R', '10 0 R', '12 0 R'];
+  const fieldRefs = [
+    '4 0 R',
+    '5 0 R',
+    '6 0 R',
+    '7 0 R',
+    '8 0 R',
+    '9 0 R',
+    '10 0 R',
+    '12 0 R',
+    '13 0 R',
+  ];
   const FONT = '11 0 R';
   const textField = (name, rect, value, defaultValue) =>
     `<< /Type /Annot /Subtype /Widget /FT /Tx /T (${name}) /Rect [${rect}] /F 4 ` +
@@ -160,8 +178,7 @@ function linkAnnot(nm, rect, action) {
   // (/E shows the hidden `tip` field, /X re-hides it — works with zero
   // scripting AND zero fill authority); beta carries /Fo /Bl /D /U Hide
   // entries (beta has no /A, so /U actually runs — /A shadows /U per ISO).
-  const ALPHA_AA =
-    ' /AA << /E << /S /Hide /T [(tip)] /H false >> /X << /S /Hide /T [(tip)] >> >>';
+  const ALPHA_AA = ' /AA << /E << /S /Hide /T [(tip)] /H false >> /X << /S /Hide /T [(tip)] >> >>';
   const BETA_AA =
     ' /AA << /Fo << /S /Hide /T [(alpha)] >> /Bl << /S /Hide /T [(alpha)] /H false >> ' +
     '/D << /S /Hide /T [(log)] >> /U << /S /Hide /T [(log)] /H false >> >>';
@@ -188,6 +205,14 @@ function linkAnnot(nm, rect, action) {
     // The tooltip target: HIDDEN (/F 6 = hidden|print) until alpha's /E shows it.
     `<< /Type /Annot /Subtype /Widget /FT /Tx /T (tip) /Rect [300 540 400 560] /F 6 ` +
       `/P ${PAGE} /V (tooltip) /DV (tooltip) /DA (/Helv 0 Tf 0 g) >>`,
+    // The real-world "FAKE BUTTON": a READ-ONLY (/Ff 1) TEXT field whose
+    // label is its value, carrying a plain widget /A — the Test Lab's
+    // Reset/Next/Hide shape. Activation is a WIDGET behavior (ISO puts /A
+    // on the annotation), so clicking this must run the Hide exactly like
+    // a push button would.
+    `<< /Type /Annot /Subtype /Widget /FT /Tx /Ff 1 /T (fakeButton) /Rect [300 500 400 520] /F 4 ` +
+      `/P ${PAGE} /V (Hide alpha) /DV (Hide alpha) /DA (/Helv 0 Tf 0 g) ` +
+      `/A << /S /Hide /T [(alpha)] >> >>`,
   ];
   writeFileSync(resolve(here, 'action_buttons_form.pdf'), buildPdf(objects));
 }
@@ -221,10 +246,18 @@ function linkAnnot(nm, rect, action) {
       `/AA << /O ${hideRef('7 0 R', true)} /C ${hideRef('7 0 R', false)} >> ` +
       '/Annots [5 0 R 6 0 R 7 0 R 8 0 R 9 0 R 10 0 R 11 0 R 12 0 R] >>',
     '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] >>',
-    square(5, '50 700 150 750', ` /NM (trigger) /F 4 /AA << /E ${hideRef('6 0 R', true)} /X ${hideRef('6 0 R', false)} >>`),
+    square(
+      5,
+      '50 700 150 750',
+      ` /NM (trigger) /F 4 /AA << /E ${hideRef('6 0 R', true)} /X ${hideRef('6 0 R', false)} >>`,
+    ),
     square(6, '170 700 270 750', ' /NM (tip) /F 6'),
     square(7, '50 640 150 690', ' /NM (pageTip) /F 6'),
-    square(8, '50 580 150 630', ` /NM (lifecycle) /F 4 /AA << /PO ${hideRef('9 0 R', true)} /PC ${hideRef('9 0 R', false)} /PV ${hideRef('12 0 R', true)} /PI ${hideRef('12 0 R', false)} >>`),
+    square(
+      8,
+      '50 580 150 630',
+      ` /NM (lifecycle) /F 4 /AA << /PO ${hideRef('9 0 R', true)} /PC ${hideRef('9 0 R', false)} /PV ${hideRef('12 0 R', true)} /PI ${hideRef('12 0 R', false)} >>`,
+    ),
     square(9, '170 580 270 630', ' /NM (lifeTip) /F 6'),
     `<< /Type /Annot /Subtype /Link /Rect [50 520 150 570] /NM (hoverlink) /F 4 ` +
       `/A << /S /URI /URI (https://example.test/hover) >> ` +
@@ -371,7 +404,11 @@ function linkAnnot(nm, rect, action) {
       `/P ${PAGE} /DA (/Helv 0 Tf 0 g) >>`,
     `<< /Type /Annot /Subtype /Widget /FT /Tx /T (plain) /Rect [50 580 250 600] /F 4 ` +
       `/P ${PAGE} /V (visible) /DA (/Helv 0 Tf 0 g) >>`,
-    button('btnParent', '300 700 420 720', `<< /S /SubmitForm /F ${URLSPEC('parent')} /Fields [(parent)] >>`),
+    button(
+      'btnParent',
+      '300 700 420 720',
+      `<< /S /SubmitForm /F ${URLSPEC('parent')} /Fields [(parent)] >>`,
+    ),
     button('btnAll', '300 670 420 690', `<< /S /SubmitForm /F ${URLSPEC('all')} /Flags 2 >>`),
     button(
       'btnVeto',

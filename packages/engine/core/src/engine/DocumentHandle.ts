@@ -93,6 +93,13 @@ export interface DocumentHandle {
   page(pageObjectNumber: PageObjectNumber): PageHandle;
   download(opts?: { mode?: PdfSaveMode }): AbortablePromise<Uint8Array>;
   /**
+   * Local Node engines only: write the document to a local file without
+   * moving its bytes through JS. An untouched session (no unsaved edits,
+   * incremental mode) is streamed out verbatim — for a signed document,
+   * exactly as sealed. Absent on engines that cannot reach a filesystem.
+   */
+  downloadToFile?(path: string, opts?: { mode?: PdfSaveMode }): AbortablePromise<void>;
+  /**
    * The saved version this session is on: SHA-256 and length of the
    * loaded bytes (for a layer session, of its base). Changes only when
    * a signature completes. Optional while engines ship it.
