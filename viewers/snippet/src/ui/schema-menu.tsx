@@ -429,6 +429,16 @@ function DesktopMenu({
     return () => document.removeEventListener('keydown', handleEscape);
   }, [onClose]);
 
+  // Move focus into the menu on open so its items are keyboard-reachable, and
+  // restore focus to the trigger on close (Escape, outside click, or item
+  // selection) instead of leaving it stuck on a now-hidden/removed element.
+  useEffect(() => {
+    const firstItem = menuRef.current?.querySelector<HTMLElement>('[role="menuitem"]:not([disabled])');
+    firstItem?.focus();
+
+    return () => anchorEl?.focus();
+  }, [anchorEl]);
+
   const menuStyle = position
     ? {
         position: 'fixed' as const,
@@ -441,6 +451,7 @@ function DesktopMenu({
   return (
     <div
       ref={menuRef}
+      role="menu"
       {...getUIItemProps(currentMenu.schema)}
       className="border-border-default bg-bg-elevated min-w-[200px] rounded-lg border py-2 shadow-lg"
       style={menuStyle}
