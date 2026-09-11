@@ -12,7 +12,7 @@ import type {
   MutationMeta,
   WidgetPlacement,
 } from '@embedpdf/engine-core/runtime';
-import { EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
+import { EngineError, EngineErrorCode, fieldLockFor } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
 import type { DocumentSession } from '../../document-session/DocumentSession';
@@ -23,7 +23,9 @@ import { flagMasks } from './internal/fieldFlagBits';
 import { acquireFormModel } from './internal/formModelCache';
 import { withWideStringArray } from './internal/wideStringArray';
 import { readFieldAt, readFormSnapshot } from './internal/readFormSnapshot';
-import { resolveFieldRef } from './internal/resolveFieldRef';
+import { resolveFieldRef, type ResolvedField } from './internal/resolveFieldRef';
+import { SignatureReader } from '../signature/SignatureReader';
+import { readUtf16String } from '../../runtime/memory/strings';
 
 // Mirrors EPDF_FORMFIELD_FAMILY_* in public/epdf_form.h.
 const FAMILY_CODE = {
@@ -68,7 +70,7 @@ export class FormMutator {
     throwIfAborted(signal);
     const model = acquireFormModel(this.runtime, this.session);
     const resolved = resolveFieldRef(this.runtime, model, ref);
-    this.assertWritable(resolved.fieldObjectNumber);
+    this.assertWritable(resolved);
 
     const before = readFieldAt(this.runtime, model, resolved.fieldIndex, this.session.requireDocPtr());
     const allowed = FAMILY_BY_VALUE_TYPE[value.type];
@@ -87,7 +89,7 @@ export class FormMutator {
     throwIfAborted(signal);
     const model = acquireFormModel(this.runtime, this.session);
     const resolved = resolveFieldRef(this.runtime, model, ref);
-    this.assertWritable(resolved.fieldObjectNumber);
+    this.assertWritable(resolved);
 
     const changed = this.withChangedWidgets((buf, cap, countPtr) =>
       this.runtime.fn.EPDFForm_ResetField(
@@ -269,7 +271,7 @@ export class FormMutator {
     const docPtr = this.session.requireDocPtr();
     const model = acquireFormModel(this.runtime, this.session);
     const resolved = resolveFieldRef(this.runtime, model, ref);
-    this.assertWritable(resolved.fieldObjectNumber);
+    this.assertWritable(resolved);
     const before = readFieldAt(this.runtime, model, resolved.fieldIndex, this.session.requireDocPtr());
     if (before.family !== patch.family) {
       throw new EngineError(
@@ -349,7 +351,7 @@ export class FormMutator {
     const { fn, mem } = this.runtime;
     const model = acquireFormModel(this.runtime, this.session);
     const resolved = resolveFieldRef(this.runtime, model, ref);
-    this.assertWritable(resolved.fieldObjectNumber);
+    this.assertWritable(resolved);
     const before = readFieldAt(this.runtime, model, resolved.fieldIndex, this.session.requireDocPtr());
 
     const ok = withScratchN(mem, [256 * 4, 4], ([buf, countPtr]) => {
@@ -386,7 +388,7 @@ export class FormMutator {
     const { fn } = this.runtime;
     const model = acquireFormModel(this.runtime, this.session);
     const resolved = resolveFieldRef(this.runtime, model, ref);
-    this.assertWritable(resolved.fieldObjectNumber);
+    this.assertWritable(resolved);
     const before = readFieldAt(this.runtime, model, resolved.fieldIndex, this.session.requireDocPtr());
     const toggle = before.family === 'checkbox' || before.family === 'radio';
     const state = toggle ? (onState ?? (before.family === 'checkbox' ? 'Yes' : '')) : '';
@@ -422,7 +424,7 @@ export class FormMutator {
     const { fn } = this.runtime;
     const model = acquireFormModel(this.runtime, this.session);
     const resolved = resolveFieldRef(this.runtime, model, ref);
-    this.assertWritable(resolved.fieldObjectNumber);
+    this.assertWritable(resolved);
     if (
       !fn.EPDFForm_DetachWidget(
         this.session.requireDocPtr(),
@@ -503,11 +505,42 @@ export class FormMutator {
     return readFieldAt(this.runtime, fresh, fieldIndex, this.session.requireDocPtr());
   }
 
-  private assertWritable(fieldObjectNumber: number): void {
-    if (fieldObjectNumber === 0) {
+  private assertWritable(resolved: ResolvedField): void {
+    if (resolved.fieldObjectNumber === 0) {
       throw new EngineError(
         EngineErrorCode.InvalidArg,
         'form field is stored as a direct object and cannot be written',
+      );
+    }
+    this.assertNotLockedBySignature(resolved);
+  }
+
+  /**
+   * A field an earlier signature froze (its FieldMDP, or the /Lock of a
+   * signed field) refuses every write: document-derived authority, the
+   * same way encryption bits are. Off under `signedDocumentPolicy:
+   * 'permit'`. A document whose signature model cannot be built is not
+   * known to be locked.
+   */
+  private assertNotLockedBySignature(resolved: ResolvedField): void {
+    if (this.session.signedDocumentPolicy !== 'protect') return;
+    let protection;
+    try {
+      protection = new SignatureReader(this.runtime, this.session).readProtection();
+    } catch {
+      return;
+    }
+    if (protection.fieldLocks.length === 0) return;
+    const model = acquireFormModel(this.runtime, this.session);
+    const name =
+      readUtf16String(this.runtime.mem, (buf, cap) =>
+        this.runtime.fn.EPDFForm_GetFieldName(model, resolved.fieldIndex, buf, cap),
+      ) ?? '';
+    const lock = fieldLockFor(protection, name);
+    if (lock) {
+      throw new EngineError(
+        EngineErrorCode.ProtectedDocument,
+        `form field "${name}" is locked by signature ${lock.signatureIndex} (${lock.source === 'fieldmdp' ? 'FieldMDP' : '/Lock'})`,
       );
     }
   }

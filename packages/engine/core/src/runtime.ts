@@ -63,6 +63,7 @@ export type { DocumentSearchService } from './engine/DocumentSearchService';
 export type { WeakAnnotationEditSession } from './engine/DocumentAnnotationsService';
 export type { DocumentPagesService } from './engine/DocumentPagesService';
 export type { DocumentRedactionService } from './engine/DocumentRedactionService';
+export type { DocumentSignaturesService } from './engine/DocumentSignaturesService';
 export type { PageAnnotationsService } from './engine/PageAnnotationsService';
 export type { DocumentAttachmentsService } from './engine/DocumentAttachmentsService';
 export type { PieceInfoService } from './engine/PieceInfoService';
@@ -115,6 +116,14 @@ export type {
   DocumentRenderPageFileEncodedWorkerRequest,
   DocumentSecurityProbeInfo,
   PagesListWorkerRequest,
+  SignaturesListWorkerRequest,
+  SignaturesContentsWorkerRequest,
+  SignaturesDigestWorkerRequest,
+  SignaturesRevisionBytesWorkerRequest,
+  DocumentVersionWorkerRequest,
+  SignaturesPrepareWorkerRequest,
+  SignaturesCompleteWorkerRequest,
+  SignaturesAbortWorkerRequest,
   PagesMoveWorkerRequest,
   PagesRotateWorkerRequest,
   PagesDeleteWorkerRequest,

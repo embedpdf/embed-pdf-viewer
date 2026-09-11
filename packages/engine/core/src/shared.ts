@@ -107,6 +107,7 @@ export type {
 } from './dto/AnnotationRender';
 export type { CachePins } from './dto/CachePins';
 export { DEFAULT_PDF_SAVE_MODE } from './dto/PdfSaveMode';
+export type { SessionKind } from './dto/SessionKind';
 export type { PdfSaveMode } from './dto/PdfSaveMode';
 export type { FontHandle, FontKey, FontSpec } from './dto/FontSpec';
 
@@ -391,6 +392,43 @@ export type {
   FormEffectResult,
   FormEffectsResult,
 } from './forms/effects';
+export type {
+  BaseVersionInfo,
+  DigestAlgorithm,
+  DocMdpPermission,
+  DocumentFieldLock,
+  DocumentProtection,
+  DocumentVersionRef,
+  FieldLockAction,
+  FieldLockSpec,
+  ModificationLevel,
+  PdfRevision,
+  SignatureAbortResult,
+  SignatureAppearanceInput,
+  SignatureCompleteInput,
+  SignatureCompleteResult,
+  SignatureCoverage,
+  SignatureDTO,
+  SignatureKind,
+  SignaturePrepareInput,
+  SignaturePrepared,
+  SignatureSeedValue,
+  SignatureSigner,
+  SignatureSnapshot,
+  SignatureSubFilter,
+  SignedDocumentPolicy,
+} from './signature/types';
+export {
+  SIGNATURE_POLICY_VERSION,
+  deriveProtection,
+  fieldLockFor,
+  levelAllows,
+  levelFromPermission,
+  lockCovers,
+  lockNameCovers,
+  minLevel,
+  protectedCapabilities,
+} from './signature/protection';
 export type {
   FormSetValueResult,
   FormImportResult,

@@ -459,6 +459,9 @@ export class DocumentService {
           basePath: handle!.path,
           layer: { kind: 'fresh' as const },
           password,
+          // The cache verified this hash against the bytes on disk; the
+          // runtime takes it instead of hashing the file a third time.
+          baseSha256: baseSha,
         });
       const result = await this.pool.runOpen(docId, baseSha, build);
       if (this.counters) this.counters.docOpens += 1;
@@ -1723,6 +1726,7 @@ export class DocumentService {
         basePath: handle.path,
         layer: layerSource,
         password: openPassword,
+        baseSha256: head.baseSha,
       };
       return wirePack(request);
     };

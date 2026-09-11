@@ -1,4 +1,5 @@
 import {
+  type BaseVersionInfo,
   AbortablePromise,
   DEFAULT_PDF_SAVE_MODE,
   EngineError,
@@ -32,6 +33,7 @@ import { LocalDocumentPagesService } from './LocalDocumentPagesService';
 import { LocalDocumentRedactionService } from './LocalDocumentRedactionService';
 import { LocalDocumentSearchService } from './LocalDocumentSearchService';
 import { LocalDocumentSecurityService } from './LocalDocumentSecurityService';
+import { LocalDocumentSignaturesService } from './LocalDocumentSignaturesService';
 import { LocalMetadataService } from './LocalMetadataService';
 import { LocalPageHandle } from './LocalPageHandle';
 import { LocalPieceInfoService } from './LocalPieceInfoService';
@@ -54,6 +56,7 @@ export class LocalDocumentHandle implements DocumentHandle {
   readonly pages: DocumentPagesService;
   readonly redaction: DocumentRedactionService;
   readonly security: DocumentSecurityService;
+  readonly signatures: LocalDocumentSignaturesService;
   /**
    * The engine's configured render policy, advertised through the same
    * `policy()` every engine exposes (engine parity: plugin code never
@@ -97,6 +100,39 @@ export class LocalDocumentHandle implements DocumentHandle {
     this.search = new LocalDocumentSearchService(id, queue, view, guard);
     this.pages = new LocalDocumentPagesService(id, queue, view, guard, this.publisher);
     this.redaction = new LocalDocumentRedactionService(id, queue, view, guard, this.publisher);
+    this.signatures = new LocalDocumentSignaturesService(id, queue, view, guard, this.publisher);
+  }
+
+  /**
+   * The saved version this session is on: SHA-256 and length of the
+   * loaded bytes (for a layer session, of its base).
+   */
+  version(): AbortablePromise<BaseVersionInfo> {
+    if (this.closed) {
+      return AbortablePromise.rejectReason(
+        new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.id}`),
+      );
+    }
+    try {
+      this.guard.assertCapability('doc.open');
+    } catch (err) {
+      return AbortablePromise.rejectReason(err);
+    }
+    const docId = this.id;
+    const submission = this.queue.enqueue<WorkerResultPayload>(
+      { buildPack: (jobId: JobId) => wirePack({ kind: 'document.version', jobId, docId }) },
+      { priority: Priority.MEDIUM },
+    );
+    return AbortablePromise.run<BaseVersionInfo>(async (signal) => {
+      const onAbort = () => submission.abort(signal.reason);
+      if (signal.aborted) onAbort();
+      else signal.addEventListener('abort', onAbort, { once: true });
+      const payload = await submission;
+      if (payload.tag !== 'document.version') {
+        throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload tag: ${payload.tag}`);
+      }
+      return payload.version;
+    });
   }
 
   /**
@@ -138,6 +174,18 @@ export class LocalDocumentHandle implements DocumentHandle {
     }
     const docId = this.id;
     const mode = opts.mode ?? DEFAULT_PDF_SAVE_MODE;
+    // A rewrite drops every revision, and with them every signature. A
+    // signed document refuses it unless the engine runs with
+    // `signedDocumentPolicy: 'permit'`.
+    const protection = this.guard.currentProtection();
+    if (mode === 'rewrite' && protection && protection.level !== null) {
+      return AbortablePromise.rejectReason(
+        new EngineError(
+          EngineErrorCode.ProtectedDocument,
+          'the document is signed: a rewrite save would void every signature (use an incremental save)',
+        ),
+      );
+    }
     const submission = this.queue.enqueue<WorkerResultPayload>(
       {
         buildPack: (jobId: JobId) =>
@@ -162,8 +210,9 @@ export class LocalDocumentHandle implements DocumentHandle {
     });
   }
 
-  /** Export just this document's layer as a re-openable artifact. Rejects when the
-   *  document was opened without a layer (the worker rejects a base-only session). */
+  /** Export just this document's layer as a re-openable artifact. Works for every
+   *  session opened as a layer (the default); rejects on a `sessionKind: 'plain'`
+   *  session, which has no layer to export. */
   downloadLayer(): AbortablePromise<Uint8Array> {
     if (this.closed) {
       return AbortablePromise.rejectReason(

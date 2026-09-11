@@ -58,6 +58,7 @@ export * from './features/annotations';
 export * from './features/attachments';
 export * from './features/security';
 export * from './features/save';
+export * from './features/signature';
 export * from './features/fonts';
 export * from './features/forms';
 export * from './features/search';

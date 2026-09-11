@@ -29,6 +29,8 @@ import type { PageInsertResult } from '../mutation/PageInsertResult';
 import type { PageMoveResult } from '../mutation/PageMoveResult';
 import type { PageNameResult } from '../mutation/PageNameResult';
 import type { PageRotateResult } from '../mutation/PageRotateResult';
+import type { FormFieldRef } from '../identity/FormFieldRef';
+import type { BaseVersionInfo, SignatureCompleteResult } from '../signature/types';
 
 /**
  * Provenance of a `DocumentEvent` — WHOSE HAND caused the mutation, never
@@ -160,6 +162,34 @@ export type DocumentEvent =
       type: 'redaction.applied';
       origin: EventOrigin;
     } & RedactionApplyResult)
+  | {
+      /** A signing candidate was parked: the document is read-only until it completes or aborts. */
+      type: 'signature.prepared';
+      signingId: string;
+      field: FormFieldRef;
+      origin: EventOrigin;
+    }
+  | ({
+      /** The sealed bytes are installed; `version` is what they became. */
+      type: 'signature.completed';
+      signingId: string;
+      origin: EventOrigin;
+    } & SignatureCompleteResult)
+  | {
+      type: 'signature.aborted';
+      signingId: string;
+      origin: EventOrigin;
+    }
+  | {
+      /**
+       * The session moved to a new saved version (a completed signature,
+       * here or in another session). Byte-level facts — revisions,
+       * coverage, digests, verdicts — must be re-read.
+       */
+      type: 'document.versioned';
+      version: BaseVersionInfo;
+      origin: EventOrigin;
+    }
   | {
       /**
        * Cloud only: the live event stream fell too far behind to replay

@@ -65,6 +65,19 @@ import type { RedactionApplyResult, RedactionApplyScope } from '../mutation/Reda
 import type { WireResourceMap } from '../resource/BinarySource';
 import type { PageState } from '../revision/PageState';
 import type { SearchRequest, SearchSlice } from '../search/types';
+import type {
+  BaseVersionInfo,
+  DigestAlgorithm,
+  DocumentProtection,
+  SignatureAbortResult,
+  SignatureCompleteInput,
+  SignatureCompleteResult,
+  SignaturePrepareInput,
+  SignaturePrepared,
+  SignatureSnapshot,
+  SignedDocumentPolicy,
+} from '../signature/types';
+import type { SessionKind } from '../dto/SessionKind';
 
 /**
  * Wire protocol used between an Engine-side queue and any Worker host
@@ -83,6 +96,10 @@ export interface OpenFatMemoryWorkerRequest {
   docId: string;
   bytes: ArrayBuffer;
   password: string | null;
+  /** Default `protect`. */
+  signedDocumentPolicy?: SignedDocumentPolicy;
+  /** Default `layer`: the bytes become an immutable base with a fresh layer on top. */
+  sessionKind?: SessionKind;
 }
 
 export type LayerOpenSource =
@@ -105,6 +122,13 @@ export interface OpenLayerMemoryBaseWorkerRequest {
   baseBytes: ArrayBuffer;
   layer: LayerOpenSource;
   password: string | null;
+  signedDocumentPolicy?: SignedDocumentPolicy;
+  /**
+   * SHA-256 (hex) of the base bytes, when the caller already holds a
+   * verified one. Saves the runtime a full pass over the file; an identity
+   * claim only (a wrong value breaks the caller's own layer artifacts).
+   */
+  baseSha256?: string;
 }
 
 export interface OpenLayerFileBaseWorkerRequest {
@@ -120,12 +144,83 @@ export interface OpenLayerFileBaseWorkerRequest {
   basePath: string;
   layer: LayerOpenSource;
   password: string | null;
+  signedDocumentPolicy?: SignedDocumentPolicy;
+  /** See `OpenLayerMemoryBaseWorkerRequest.baseSha256`. */
+  baseSha256?: string;
 }
 
 export type OpenWorkerRequest =
   | OpenFatMemoryWorkerRequest
   | OpenLayerMemoryBaseWorkerRequest
   | OpenLayerFileBaseWorkerRequest;
+
+// ---------------------------------------------------------------------------
+// Digital signatures (read side) and the saved version.
+// ---------------------------------------------------------------------------
+
+export interface SignaturesListWorkerRequest {
+  kind: 'signatures.list';
+  jobId: WorkerJobId;
+  docId: string;
+  layerName?: string;
+}
+
+export interface SignaturesContentsWorkerRequest {
+  kind: 'signatures.contents';
+  jobId: WorkerJobId;
+  docId: string;
+  layerName?: string;
+  ref: FormFieldRef;
+}
+
+export interface SignaturesDigestWorkerRequest {
+  kind: 'signatures.digest';
+  jobId: WorkerJobId;
+  docId: string;
+  layerName?: string;
+  ref: FormFieldRef;
+  algorithm: DigestAlgorithm;
+}
+
+export interface SignaturesRevisionBytesWorkerRequest {
+  kind: 'signatures.revisionBytes';
+  jobId: WorkerJobId;
+  docId: string;
+  layerName?: string;
+  revisionIndex: number;
+}
+
+export interface DocumentVersionWorkerRequest {
+  kind: 'document.version';
+  jobId: WorkerJobId;
+  docId: string;
+  layerName?: string;
+}
+
+export interface SignaturesPrepareWorkerRequest {
+  kind: 'signatures.prepare';
+  jobId: WorkerJobId;
+  docId: string;
+  layerName?: string;
+  input: SignaturePrepareInput;
+}
+
+export interface SignaturesCompleteWorkerRequest {
+  kind: 'signatures.complete';
+  jobId: WorkerJobId;
+  docId: string;
+  layerName?: string;
+  input: SignatureCompleteInput;
+  artifactPath?: string;
+}
+
+export interface SignaturesAbortWorkerRequest {
+  kind: 'signatures.abort';
+  jobId: WorkerJobId;
+  docId: string;
+  layerName?: string;
+  signingId: string;
+}
 
 export interface MetadataReadWorkerRequest {
   kind: 'metadata.read';
@@ -971,6 +1066,14 @@ export type WorkerRequest =
   | DocumentRenderPageFileWorkerRequest
   | DocumentRenderPageFileEncodedWorkerRequest
   | DocumentCheckPasswordPermissionsWorkerRequest
+  | SignaturesListWorkerRequest
+  | SignaturesContentsWorkerRequest
+  | SignaturesDigestWorkerRequest
+  | SignaturesRevisionBytesWorkerRequest
+  | DocumentVersionWorkerRequest
+  | SignaturesPrepareWorkerRequest
+  | SignaturesCompleteWorkerRequest
+  | SignaturesAbortWorkerRequest
   | FontsRegisterWorkerRequest
   | FontsAddFallbackWorkerRequest
   | FontsClearFallbacksWorkerRequest
@@ -981,7 +1084,26 @@ export type WorkerRequest =
   | ShutdownWorkerRequest;
 
 export type WorkerResultPayload =
-  | { tag: 'open'; docId: string; security: DocumentSecurityProbeInfo }
+  | {
+      tag: 'open';
+      docId: string;
+      security: DocumentSecurityProbeInfo;
+      /** What the document's signatures forbid; `null` when unsigned or not probed (a locked open). */
+      protection?: DocumentProtection | null;
+    }
+  | { tag: 'signatures.list'; snapshot: SignatureSnapshot }
+  | { tag: 'signatures.contents'; bytes: ArrayBuffer }
+  | { tag: 'signatures.digest'; digest: ArrayBuffer }
+  | { tag: 'signatures.revisionBytes'; bytes: ArrayBuffer; size: number }
+  | { tag: 'document.version'; version: BaseVersionInfo }
+  | { tag: 'signatures.prepare'; result: SignaturePrepared }
+  | {
+      tag: 'signatures.complete';
+      result: SignatureCompleteResult;
+      artifact?: LayerArtifactWorkerPayload;
+      artifactFile?: LayerArtifactFileWorkerPayload;
+    }
+  | { tag: 'signatures.abort'; result: SignatureAbortResult }
   | { tag: 'metadata.read'; metadata: DocumentMetadata }
   | { tag: 'actions.read'; snapshot: DocumentActionsSnapshot }
   | {
@@ -1194,7 +1316,11 @@ export type WorkerResultPayload =
       pageCount: number;
       image: EncodedImageWire;
     }
-  | { tag: 'document.checkPasswordPermissions'; security: DocumentSecurityProbeInfo }
+  | {
+      tag: 'document.checkPasswordPermissions';
+      security: DocumentSecurityProbeInfo;
+      protection?: DocumentProtection | null;
+    }
   | { tag: 'fonts.register'; fontKey: string }
   | { tag: 'fonts.addFallback' }
   | { tag: 'fonts.clearFallbacks' }

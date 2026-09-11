@@ -168,7 +168,10 @@ export function materializePdfPermissions(b: PdfBits): DocCapability[] {
   }
   if (b.bit11) out.add('doc.pages.assemble');
   if (b.bit6) out.add('doc.annotate.modify');
-  if (b.bit6 || b.bit9) out.add('doc.forms.fill');
+  if (b.bit6 || b.bit9) {
+    out.add('doc.forms.fill');
+    out.add('doc.sign');
+  }
   if (b.bit6 && b.bit4) out.add('doc.forms.modify');
 
   return [...out];
