@@ -245,8 +245,6 @@ export function styleFromDTO(dto: AnnotationDTO): Style {
     };
   }
   if (dto.subtype === 'stamp') {
-    // The stamp's visual is the engine-baked /AP raster — no color/stroke to
-    // surface, but /CA opacity is real and travels like every other kind.
     const d = dto as Extract<AnnotationDTO, { subtype: 'stamp' }>;
     return {
       color: '#444444',
