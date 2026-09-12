@@ -638,7 +638,7 @@ export function createAnnotationCapability(
     source: BinarySource,
     desired: { width: number; height: number },
     rotCW = 0,
-    identity: { name?: string; subject?: string } = {},
+    identity: { name?: string; subject?: string; opacity?: number } = {},
   ): Promise<AnnotationRef> | null => {
     const doc = ctx.doc;
     const crop = cropOf(pon);
@@ -654,6 +654,7 @@ export function createAnnotationCapability(
         fit: 'contain',
         ...(identity.name !== undefined ? { name: identity.name } : {}),
         ...(identity.subject !== undefined ? { subject: identity.subject } : {}),
+        ...(identity.opacity !== undefined ? { opacity: identity.opacity } : {}),
       })
       .then((res) => {
         // A stamp has no vector render — the engine-baked /AP IS the visual.
@@ -672,7 +673,7 @@ export function createAnnotationCapability(
     source: BinarySource,
     desired: { width: number; height: number },
     rotCW = 0,
-    identity: { name?: string; subject?: string } = {},
+    identity: { name?: string; subject?: string; opacity?: number } = {},
   ): boolean => {
     const placed = createStampAt(pon, point, source, desired, rotCW, identity);
     if (!placed) return false;
@@ -699,6 +700,7 @@ export function createAnnotationCapability(
       {
         ...(input.name !== undefined ? { name: input.name } : {}),
         ...(input.subject !== undefined ? { subject: input.subject } : {}),
+        opacity: defaultsFor(model(), ARMED_STAMP_TOOL_ID).opacity,
       },
     );
     if (!placed) {
@@ -721,6 +723,8 @@ export function createAnnotationCapability(
   const placeArmedStamp = (pon: number, point: Vec, displayRotation?: number): boolean => {
     const armed = armedStamp;
     if (!armed) return false;
+    const ix = ctx.tryGet(InteractionToken);
+    const tool = ix ? registry.get(ix.activeToolId()) : undefined;
     return createStampAtSync(
       pon,
       point,
@@ -730,6 +734,7 @@ export function createAnnotationCapability(
       {
         ...(armed.name !== undefined ? { name: armed.name } : {}),
         ...(armed.subject !== undefined ? { subject: armed.subject } : {}),
+        opacity: defaultsFor(model(), tool?.preset ?? ARMED_STAMP_TOOL_ID).opacity,
       },
     );
   };
@@ -743,6 +748,7 @@ export function createAnnotationCapability(
     source: BinarySource,
     rotCW: number,
     targetWidth?: number,
+    opacity?: number,
   ): Promise<void> => {
     const resolved = await resolveBinarySource(source);
     const meta = sniffBinaryMetadata(resolved.bytes);
@@ -750,7 +756,7 @@ export function createAnnotationCapability(
       console.error('[annotation] stamp source must be PNG, JPEG, or single-page PDF bytes');
       return;
     }
-    createStampAtSync(pon, point, source, desiredStampSize(meta, targetWidth), rotCW);
+    createStampAtSync(pon, point, source, desiredStampSize(meta, targetWidth), rotCW, { opacity });
   };
 
   /**
@@ -768,8 +774,9 @@ export function createAnnotationCapability(
     // belongs to the moment the author picked the spot, even when a 'prompt'
     // source resolves the bytes later.
     const rotCW = tool.upright && displayRotation ? uprightRotation(displayRotation) : 0;
+    const opacity = defaultsFor(model(), tool.preset).opacity;
     if (spec.kind === 'bytes') {
-      void placeStampSource(pon, point, spec.source, rotCW);
+      void placeStampSource(pon, point, spec.source, rotCW, undefined, opacity);
       return true;
     }
     // kind === 'prompt' — needs the environment: the ONE file-picker port.
@@ -777,7 +784,7 @@ export function createAnnotationCapability(
       tool,
       pon,
       point,
-      (picked) => void placeStampSource(pon, point, picked.data, rotCW),
+      (picked) => void placeStampSource(pon, point, picked.data, rotCW, undefined, opacity),
     );
   };
 

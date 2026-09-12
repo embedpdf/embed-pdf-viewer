@@ -23,6 +23,8 @@ export interface StampDraft extends AnnotationDraftBase {
   rect: PdfRect;
   /** What the stamp displays: PNG, JPEG, or single-page PDF bytes. */
   source: BinarySource;
+  /** `/CA` constant opacity, 0..1. Default `1`. */
+  opacity?: number;
   /**
    * `/Name` — the stamp's identifier: a standard name ('Approved', 'Draft',
    * …) or any custom name such as an Acrobat library identifier
@@ -49,6 +51,7 @@ export interface StampWireDraft extends AnnotationDraftBase {
   rect: PdfRect;
   source: ResourceRef;
   name?: string;
+  opacity?: number;
   fit?: StampFit;
   rotation?: number | null;
   unrotatedRect?: PdfRect | null;

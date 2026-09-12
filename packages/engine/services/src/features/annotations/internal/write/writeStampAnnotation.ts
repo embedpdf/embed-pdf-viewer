@@ -15,9 +15,10 @@ import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runti
 import { F32_BYTES } from '../../../../runtime/memory/structs';
 import { readAnnotRect } from '../read/annotationReadPrimitives';
 import type { AnnotationWriteContext } from './annotationWriteContext';
-import { setAnnotRect } from './annotationWritePrimitives';
+import { setAnnotOpacity, setAnnotRect } from './annotationWritePrimitives';
 import { applyAnnotationBaseDraft, applyAnnotationBasePatch } from './writeAnnotationBase';
 import { writeBoxTransformMetadata } from './writeAnnotationTransformMetadata';
+import { DEFAULT_OPACITY } from './writeStyle';
 
 /** `EPDF_STAMP_FIT` codes from `public/fpdf_annot.h` (CSS `object-fit` naming on the wire). */
 const STAMP_FIT_TO_CODE: Record<StampFit, number> = {
@@ -65,6 +66,7 @@ export function applyStampDraft(
   if (draft.name !== undefined) {
     setStampName(fn, annotPtr, draft.name);
   }
+  setAnnotOpacity(fn, annotPtr, draft.opacity ?? DEFAULT_OPACITY);
   authorStampAppearance(
     fn,
     mem,
@@ -96,6 +98,9 @@ export function applyStampPatch(
     fn.EPDFAnnot_RemoveKey(annotPtr, 'Name');
   } else if (patch.name !== undefined) {
     setStampName(fn, annotPtr, patch.name);
+  }
+  if (patch.opacity !== undefined) {
+    setAnnotOpacity(fn, annotPtr, patch.opacity);
   }
   if (patch.source !== undefined) {
     // Content replacement: rebuild the appearance from the new bytes, authored

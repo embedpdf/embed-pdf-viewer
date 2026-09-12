@@ -26,6 +26,7 @@ const StampFitSchema = z.enum(['contain', 'cover', 'fill']);
 export const StampDTOSchema: z.ZodType<StampAnnotationDTO> = z.object({
   ...AnnotationBaseShape,
   name: z.string().nullable(),
+  opacity: z.number().min(0).max(1),
   rotation: z.number().optional(),
   unrotatedRect: PdfRectSchema.optional(),
   subtype: z.literal('stamp'),
@@ -36,6 +37,7 @@ export const StampWireDraftSchema: z.ZodType<StampWireDraft> = z.object({
   rect: PdfRectSchema,
   source: ResourceRefSchema,
   name: z.string().min(1).optional(),
+  opacity: z.number().min(0).max(1).optional(),
   fit: StampFitSchema.optional(),
   rotation: z.number().nullable().optional(),
   unrotatedRect: PdfRectSchema.nullable().optional(),
@@ -47,6 +49,7 @@ export const StampWirePatchSchema: z.ZodType<StampWirePatch> = z.object({
   rect: PdfRectSchema.optional(),
   source: ResourceRefSchema.optional(),
   name: z.string().min(1).nullable().optional(),
+  opacity: z.number().min(0).max(1).optional(),
   fit: StampFitSchema.optional(),
   rotation: z.number().nullable().optional(),
   unrotatedRect: PdfRectSchema.nullable().optional(),

@@ -12,6 +12,8 @@ export type StampAnnotationDTO = AnnotationBase & {
   subtype: 'stamp';
   /** `/Name` — advisory stamp label ('Approved', 'Draft', …). */
   name: string | null;
+  /** `/CA` constant opacity, 0..1. */
+  opacity: number;
   /** Rotation (deg) from `/EMBD_Metadata`. */
   rotation?: number;
   /** Pre-rotation `/Rect` from `/EMBD_Metadata` (present with `rotation`). */

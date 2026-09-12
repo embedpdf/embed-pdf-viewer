@@ -122,7 +122,7 @@ export const TOOL_DEFAULT_KEYS = {
   squiggly: ['color', 'opacity', 'blendMode'],
   caret: ['color', 'opacity'],
   redact: ['color', 'interiorColor', 'opacity', 'fontFamily', 'fontSize', 'fontColor', 'textAlign'],
-  stamp: [],
+  stamp: ['opacity'],
   // A link preset may carry a FIXED target ('docs-link' style one-click links).
   link: ['link'],
   text: ['icon', 'color', 'opacity'],
