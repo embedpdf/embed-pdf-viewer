@@ -1183,7 +1183,7 @@ export const commands: Record<string, Command<State>> = {
 
   'tabs:overflow-menu': {
     id: 'tabs:overflow-menu',
-    labelKey: 'tabs.overflowMenu',
+    labelKey: 'menu.moreOptions',
     icon: 'dots',
     categories: ['ui', 'ui-menu'],
     action: ({ registry, documentId }) => {
