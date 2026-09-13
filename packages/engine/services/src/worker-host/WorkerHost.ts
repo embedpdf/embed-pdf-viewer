@@ -1333,13 +1333,16 @@ export class WorkerHost {
     req: DocumentSaveBufferWorkerRequest,
   ): WirePack<WorkerResultPayload> {
     const session = this.requireSession(req);
-    // A save that changes nothing returns the loaded bytes verbatim: an
-    // incremental serializer pass would append a revision of rewritten
-    // objects to an untouched file, and a signed file must come back
-    // exactly as it was sealed.
-    if (req.mode === 'incremental' && !session.hasUnsavedEdits()) {
-      const bytes = new SignatureReader(this.runtime, session).loadedBytes();
-      return wirePack({ tag: 'document.saveBuffer', bytes, size: bytes.byteLength }, [bytes]);
+    // A save that changes nothing returns the loaded bytes verbatim: a
+    // signed file must come back exactly as it was sealed. Whether anything
+    // changed is the saver's answer (`snapshot`): the session's counter when
+    // nothing was mutated, the fork's save pass otherwise — an annotation
+    // added and removed again leaves the document as loaded.
+    if (req.mode === 'incremental') {
+      const snap = new DocumentSaver(this.runtime, session).snapshot();
+      return wirePack({ tag: 'document.saveBuffer', bytes: snap.bytes, size: snap.bytes.byteLength }, [
+        snap.bytes,
+      ]);
     }
     const saved = new DocumentSaver(this.runtime, session).saveStandaloneToBuffer(req.mode);
     return wirePack({ tag: 'document.saveBuffer', bytes: saved.bytes, size: saved.size }, [
@@ -1351,22 +1354,21 @@ export class WorkerHost {
     req: DocumentSaveFileWorkerRequest,
   ): WirePack<WorkerResultPayload> {
     const session = this.requireSession(req);
-    // The no-op save law for files: an untouched session's document is its
-    // loaded bytes — for a layer, the base PLUS the loaded delta, never the
-    // base file alone — streamed out verbatim, no serializer pass.
-    if (req.mode === 'incremental' && !session.hasUnsavedEdits()) {
-      const reader = new SignatureReader(this.runtime, session);
-      const size = Number(this.runtime.fn.EPDFDoc_GetLoadedBytesSize(session.requireDocPtr()));
-      const chunk = 4 * 1024 * 1024;
-      this.runtime.fileWrite.removeFile(req.path);
-      for (let offset = 0; offset < size; offset += chunk) {
-        const length = Math.min(chunk, size - offset);
-        this.runtime.fileWrite.appendBytes(
-          req.path,
-          new Uint8Array(reader.readLoadedBytes(offset, length)),
-        );
-      }
-      if (size === 0) this.runtime.fileWrite.appendBytes(req.path, new Uint8Array(0));
+    // The no-op save law for files: a session whose document is still the
+    // one it was opened with streams its loaded bytes — for a layer, the
+    // base PLUS the loaded delta, never the base file alone — verbatim. The
+    // decision is the saver's (see handleDocumentSaveBuffer); when its pass
+    // wrote nothing, nothing reached the file yet.
+    const unchanged =
+      req.mode === 'incremental' &&
+      (!session.hasUnsavedEdits() ||
+        new DocumentSaver(this.runtime, session).saveStandaloneToFileEx(req.path, req.mode)
+          .unchangedSinceLoad);
+    if (unchanged) {
+      new DocumentSaver(this.runtime, session).copyLoadedBytesToFile(req.path);
+      return wirePack({ tag: 'document.saveFile', path: req.path });
+    }
+    if (req.mode === 'incremental') {
       return wirePack({ tag: 'document.saveFile', path: req.path });
     }
     const saved = new DocumentSaver(this.runtime, session).saveStandaloneToFile(req.path, req.mode);

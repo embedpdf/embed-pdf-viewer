@@ -96,6 +96,8 @@ export type SignatureChange =
   | { type: 'inspect'; field: FormFieldRef }
   | { type: 'target'; field: FormFieldRef | null }
   | { type: 'validated'; verdicts: SignatureVerdict[] }
+  /** An unsaved edit just turned a signature that held into one a save would invalidate. Once per edge. */
+  | { type: 'invalidating'; field: FormFieldRef; detail: string }
   | { type: 'protectionChanged'; protection: DocumentProtection };
 
 export interface SignatureCapability {
@@ -132,7 +134,15 @@ export interface SignatureCapability {
   inspect(field: FormFieldRef): void;
   // ── reading ──
   refresh(): Promise<SignatureSnapshot | null>;
-  validate(opts?: { at?: ValidationTime }): Promise<SignatureVerdict[]>;
+  /**
+   * Judge every signature. The viewer's default is the WORKING COPY: unsaved
+   * edits count, so the verdict is the one the file a save produces will get.
+   * `until: 'persisted'` judges the loaded bytes only.
+   */
+  validate(opts?: {
+    at?: ValidationTime;
+    until?: 'persisted' | 'working-copy';
+  }): Promise<SignatureVerdict[]>;
   analyze(input: AnalyzeInput): Promise<ChangeAnalysis>;
   /** The exact bytes a signature's revision covers (`doc.signatures.revisionBytes`) — rides `doc.download`. */
   revisionBytes(revisionIndex: number): Promise<Uint8Array>;

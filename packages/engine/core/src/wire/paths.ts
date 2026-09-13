@@ -1,4 +1,5 @@
 import type { ModificationLevel } from '../signature/types';
+import { SIGNATURE_POLICY_VERSION } from '../signature/protection';
 import type { AnalysisToken } from './tokens';
 /**
  * Single source of truth for cloud HTTP paths. Both @cloudpdf/engine and
@@ -637,10 +638,14 @@ export interface AnalysisQueryInput {
 
 export function analysisQueryString(query: AnalysisQueryInput): string {
   const params = new URLSearchParams();
-  if ('signatureIndex' in query.since) params.set('since.signature', String(query.since.signatureIndex));
+  if ('signatureIndex' in query.since)
+    params.set('since.signature', String(query.since.signatureIndex));
   else params.set('since.revision', String(query.since.revisionIndex));
   if (query.until !== undefined) params.set('until', String(query.until));
   if (query.exploratoryLevel !== undefined) params.set('level', query.exploratoryLevel);
+  // The judging policy version: a cache key on the immutable version URL, so
+  // a policy bump never serves a verdict judged the old way.
+  params.set('policy', String(SIGNATURE_POLICY_VERSION));
   return params.toString();
 }
 

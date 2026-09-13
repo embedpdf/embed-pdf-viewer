@@ -21,14 +21,18 @@ import {
 } from '@embedpdf/react/signature';
 import { Icon } from './icons';
 
-const verdictKey = (summary: SignatureVerdict['summary'] | null): string =>
-  summary === 'valid'
-    ? 'demo.verdictValid'
-    : summary === 'valid-untrusted'
-      ? 'demo.verdictValidUntrusted'
-      : summary === 'invalid'
-        ? 'demo.verdictInvalid'
-        : 'demo.verdictIndeterminate';
+const verdictKey = (v: SignatureVerdict | null): string =>
+  !v
+    ? 'demo.verdictIndeterminate'
+    : v.summary === 'valid'
+      ? 'demo.verdictValid'
+      : v.summary === 'valid-untrusted'
+        ? 'demo.verdictValidUntrusted'
+        : v.summary === 'invalid'
+          ? v.modifications.basis === 'working-copy'
+            ? 'demo.verdictWillInvalidate'
+            : 'demo.verdictInvalid'
+          : 'demo.verdictIndeterminate';
 
 /** A PDF date string (`D:YYYYMMDDHHmmSSZ` or with a zone offset) as a locale date; the raw text when it is not one. */
 const pdfDate = (raw: string): string => {
@@ -106,7 +110,7 @@ export function SignatureInspector() {
         </button>
       </div>
       <p className={`mt-1 text-sm font-medium ${tone(summary)}`}>
-        {validating ? t('demo.signaturesValidating') : t(verdictKey(summary))}
+        {validating ? t('demo.signaturesValidating') : t(verdictKey(verdict))}
       </p>
       <div className="mt-2 flex flex-col gap-1">
         {row(t('demo.inspectSigner'), dto.signer.name ?? '—')}

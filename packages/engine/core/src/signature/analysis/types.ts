@@ -1,10 +1,5 @@
 import type { FormFieldFamily } from '../../forms/field';
-import type {
-  BaseVersionInfo,
-  DocumentFieldLock,
-  ModificationLevel,
-  SignatureDTO,
-} from '../types';
+import type { BaseVersionInfo, DocumentFieldLock, ModificationLevel, SignatureDTO } from '../types';
 
 /**
  * The shallow serialisation of a PDF object as the fork's revision diff
@@ -53,7 +48,7 @@ export type ObjectChangeKind =
  * One object whose cross-reference mapping differs between two revisions,
  * with its value in both and every object that references it in both.
  * The trailer is object number 0. Objects that serialise identically are
- * still listed (their mapping changed): the identical-rewrite rule decides.
+ * still listed (their mapping changed): the identical-rewrite rule judges them.
  */
 export interface ObjectChange {
   objectNumber: number;

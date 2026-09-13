@@ -1,4 +1,8 @@
-import type { DocumentHandle, SignatureDTO, SignatureSnapshot } from '@embedpdf/engine-core/runtime';
+import type {
+  DocumentHandle,
+  SignatureDTO,
+  SignatureSnapshot,
+} from '@embedpdf/engine-core/runtime';
 
 import { bytesEqual } from './cms/engine';
 import { CmsError, parseCmsInternal, type ParsedCms, type ParsedCmsInternal } from './cms/parse';
@@ -23,8 +27,16 @@ export interface SignatureVerdict {
   trust: TrustStatus;
   trustReason?: string;
   validatedAt: ValidationTime;
-  /** What changed after the signature. `indeterminate` until the revision analysis ships. */
-  modifications: { verdict: ModificationsVerdict; detail?: string };
+  /**
+   * What changed after the signature, and which bytes were judged: the loaded
+   * file (`persisted`), or the session's unsaved edits snapshotted as one
+   * more revision (`working-copy` — only when such edits existed).
+   */
+  modifications: {
+    verdict: ModificationsVerdict;
+    detail?: string;
+    basis: 'persisted' | 'working-copy';
+  };
   /** `invalid` only on positive evidence; `indeterminate` whenever a fact could not be established. */
   summary: 'valid' | 'valid-untrusted' | 'invalid' | 'indeterminate';
   cms: ParsedCms | null;
@@ -33,6 +45,12 @@ export interface SignatureVerdict {
 export interface ValidateSignaturesOptions {
   trust?: TrustPort | null;
   at?: ValidationTime;
+  /**
+   * `persisted` (default): the loaded bytes — what a file on disk says.
+   * `working-copy`: unsaved edits are judged too, as the revision a save would
+   * write — what the file a save produces will say. A viewer shows this one.
+   */
+  until?: 'persisted' | 'working-copy';
 }
 
 /**
@@ -79,7 +97,8 @@ async function validateOne(
       integrity = signature.coverage === 'whole-revision' && digestMatches ? 'valid' : 'invalid';
     } catch (err) {
       // A CMS this engine cannot read is not evidence of tampering.
-      integrity = err instanceof CmsError && err.reason === 'unsupported' ? 'indeterminate' : 'invalid';
+      integrity =
+        err instanceof CmsError && err.reason === 'unsupported' ? 'indeterminate' : 'invalid';
       if (!(err instanceof CmsError)) integrity = 'indeterminate';
     }
   }
@@ -91,10 +110,14 @@ async function validateOne(
     trustReason = chain.reason;
   }
 
-  const modifications = await modificationsOf(doc, snapshot, signature);
+  const modifications = await modificationsOf(doc, snapshot, signature, opts.until ?? 'persisted');
 
   let summary: SignatureVerdict['summary'];
-  if (integrity === 'invalid' || cryptography === 'invalid' || modifications.verdict === 'forbidden') {
+  if (
+    integrity === 'invalid' ||
+    cryptography === 'invalid' ||
+    modifications.verdict === 'forbidden'
+  ) {
     summary = 'invalid';
   } else if (
     integrity === 'indeterminate' ||
@@ -106,7 +129,17 @@ async function validateOne(
     summary = trust === 'trusted' ? 'valid' : 'valid-untrusted';
   }
 
-  return { signature, integrity, cryptography, trust, trustReason, validatedAt: at, modifications, summary, cms };
+  return {
+    signature,
+    integrity,
+    cryptography,
+    trust,
+    trustReason,
+    validatedAt: at,
+    modifications,
+    summary,
+    cms,
+  };
 }
 
 /**
@@ -118,24 +151,44 @@ async function modificationsOf(
   doc: DocumentHandle,
   snapshot: SignatureSnapshot,
   signature: SignatureDTO,
+  until: 'persisted' | 'working-copy',
 ): Promise<SignatureVerdict['modifications']> {
   if (signature.revisionIndex === null) {
-    return { verdict: 'indeterminate', detail: 'the signature seals no whole revision' };
+    return {
+      verdict: 'indeterminate',
+      detail: 'the signature seals no whole revision',
+      basis: 'persisted',
+    };
   }
-  if (signature.revisionIndex === snapshot.revisions.length - 1) {
-    return { verdict: 'unchanged' };
+  // "Nothing after it" is only knowable from the loaded bytes when unsaved
+  // edits are not part of the question.
+  if (until === 'persisted' && signature.revisionIndex === snapshot.revisions.length - 1) {
+    return { verdict: 'unchanged', basis: 'persisted' };
   }
   try {
-    const analysis = await doc.signatures!.analyze({ since: { signatureIndex: signature.index } });
-    const forbidden = analysis.steps.flatMap((s) => s.findings).find((f) => f.verdict === 'forbidden');
-    const incomplete = analysis.steps.flatMap((s) => s.findings).find((f) => f.verdict === 'incomplete');
+    // The analysis reports its own basis: `persisted` when there were no
+    // unsaved edits to include, even when the working copy was asked for.
+    const analysis = await doc.signatures!.analyze({
+      since: { signatureIndex: signature.index },
+      until,
+    });
+    const forbidden = analysis.steps
+      .flatMap((s) => s.findings)
+      .find((f) => f.verdict === 'forbidden');
+    const incomplete = analysis.steps
+      .flatMap((s) => s.findings)
+      .find((f) => f.verdict === 'incomplete');
     const detail = forbidden
       ? `revision ${analysis.steps.find((s) => s.findings.includes(forbidden))?.newer}: object ${forbidden.objectNumber}, ${forbidden.rule}${forbidden.detail ? `: ${forbidden.detail}` : ''}`
       : incomplete
         ? `object ${incomplete.objectNumber}: ${incomplete.detail ?? 'incomplete evidence'}`
         : undefined;
-    return { verdict: analysis.verdict, detail };
+    return { verdict: analysis.verdict, detail, basis: analysis.basis.source };
   } catch (err) {
-    return { verdict: 'indeterminate', detail: `analysis failed: ${(err as Error).message}` };
+    return {
+      verdict: 'indeterminate',
+      detail: `analysis failed: ${(err as Error).message}`,
+      basis: 'persisted',
+    };
   }
 }

@@ -45,7 +45,8 @@ describe("SignaturesClient", () => {
                 },
             ],
             protection: {
-                level: "none",
+                enforced: "none",
+                judged: "none",
                 certification: { signatureIndex: 1, permission: 1.1 },
                 fieldLocks: [{ signatureIndex: 1, source: "fieldmdp", spec: null }],
                 policyVersion: 1,
@@ -179,7 +180,8 @@ describe("SignaturesClient", () => {
             version: { sha256: "sha256", byteLength: 1 },
             previous: { baseSha256: "baseSha256", editsVersion: 1 },
             protection: {
-                level: "none",
+                enforced: "none",
+                judged: "none",
                 certification: { signatureIndex: 1, permission: 1.1 },
                 fieldLocks: [{ signatureIndex: 1, source: "fieldmdp", spec: null }],
                 policyVersion: 1,

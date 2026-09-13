@@ -17,8 +17,19 @@ type Side = 'old' | 'new';
 const SIDES: Side[] = ['old', 'new'];
 
 const TRAILER_KEYS = new Set([
-  'Size', 'Prev', 'XRefStm', 'Info', 'ID', 'Root',
-  'Type', 'W', 'Index', 'Filter', 'DecodeParms', 'Length', 'Encrypt',
+  'Size',
+  'Prev',
+  'XRefStm',
+  'Info',
+  'ID',
+  'Root',
+  'Type',
+  'W',
+  'Index',
+  'Filter',
+  'DecodeParms',
+  'Length',
+  'Encrypt',
 ]);
 const CATALOG_KEYS = new Set(['Metadata', 'Extensions', 'Version', 'DSS', 'AcroForm', 'Perms']);
 const ACROFORM_KEYS = new Set(['DR', 'DA', 'Q', 'SigFlags', 'NeedAppearances', 'Fields']);
@@ -39,8 +50,9 @@ export function restrictionsOf(before: RevisionStructure): {
   locks: DocumentFieldLock[];
 } {
   const protection = deriveProtection(before.signatures);
-  // Nothing signed yet: nothing forbids, the rule set explains what it can.
-  return { level: protection.level ?? 'annotate', locks: protection.fieldLocks };
+  // The JUDGED level: what a validator holds this step to. Nothing signed
+  // yet: nothing forbids, the rule set explains what it can.
+  return { level: protection.judged ?? 'annotate', locks: protection.fieldLocks };
 }
 
 /**
@@ -128,7 +140,8 @@ function indexRoles(s: RevisionStructure): RoleIndex {
   }
   const signedFields = new Set<number>();
   for (const sig of s.signatures) {
-    if (sig.signed && sig.field.kind === 'objectNumber') signedFields.add(sig.field.fieldObjectNumber);
+    if (sig.signed && sig.field.kind === 'objectNumber')
+      signedFields.add(sig.field.fieldObjectNumber);
   }
   return { fieldByObj, widgetToField, pages: new Set(s.pages), signedFields, sigFields };
 }
@@ -228,7 +241,9 @@ class StepContext {
         if (roots.has(c.objectNumber) || joined.has(c.objectNumber)) continue;
         const edges = c.usage[side];
         if (edges.length === 0) continue;
-        const inside = edges.filter((e) => (roots.has(e.parent) && accept(e.label)) || joined.has(e.parent));
+        const inside = edges.filter(
+          (e) => (roots.has(e.parent) && accept(e.label)) || joined.has(e.parent),
+        );
         if (inside.length === 0) continue;
         for (const e of inside) this.claimEdge(c, side, e, rule);
         // Only an object referenced from nowhere else joins the subtree:
@@ -242,12 +257,18 @@ class StepContext {
   }
 
   isIdentical(c: ObjectChange): boolean {
-    return c.raw.old !== null && c.raw.new !== null && c.raw.old === c.raw.new && !c.streamDataChanged;
+    return (
+      c.raw.old !== null && c.raw.new !== null && c.raw.old === c.raw.new && !c.streamDataChanged
+    );
   }
 
   /** Signatures signed in the newer revision but not the older: this step's signing events. */
-  newlySigned(): Array<{ fieldObjectNumber: number; sig: RevisionStructure['signatures'][number] }> {
-    const out: Array<{ fieldObjectNumber: number; sig: RevisionStructure['signatures'][number] }> = [];
+  newlySigned(): Array<{
+    fieldObjectNumber: number;
+    sig: RevisionStructure['signatures'][number];
+  }> {
+    const out: Array<{ fieldObjectNumber: number; sig: RevisionStructure['signatures'][number] }> =
+      [];
     for (const sig of this.input.after.signatures) {
       if (!sig.signed || sig.field.kind !== 'objectNumber') continue;
       if (this.before.signedFields.has(sig.field.fieldObjectNumber)) continue;
@@ -265,16 +286,47 @@ function ruleXrefContainer(ctx: StepContext): void {
   for (const c of ctx.changes) {
     if (c.kind === 'xref' || c.kind === 'objstm') {
       ctx.claimAll(c, 'xref-container');
-      ctx.permitted(c, 'xref-container', 'cross-reference container; members are judged on their own');
+      ctx.permitted(
+        c,
+        'xref-container',
+        'cross-reference container; members are judged on their own',
+      );
     }
   }
 }
 
+/**
+ * An object rewritten in a later revision without a change in value.
+ * Acrobat rejected a revision made of such rewrites (a page and a signed
+ * widget, after an approval signature): its check is cross-reference
+ * based, and a rewrite is a modification whatever the bytes say. Whether it
+ * rejects every identical rewrite, of every object, at every level, is not
+ * established (the delta plan's Acrobat matrix); until it is, the
+ * conservative reading holds at every level and the finding says so. Our
+ * own writer never produces one — a save writes what changed — so this
+ * fires on files other producers wrote. Claimed here so the object-kind
+ * rules skip it.
+ */
 function ruleIdenticalRewrite(ctx: StepContext): void {
+  // A rewrite can only be a modification OF something: a signature sealed
+  // before this step. Before the first signature nothing is sealed, and no
+  // validator judges the step.
+  const sealed = ctx.input.before.signatures.some((s) => s.signed);
   for (const c of ctx.changes) {
-    if (c.change === 'modified' && ctx.isIdentical(c)) {
-      ctx.claimAll(c, 'identical-rewrite');
-      ctx.permitted(c, 'identical-rewrite', 'rewritten byte-identically');
+    if (c.change !== 'modified' || !ctx.isIdentical(c)) continue;
+    ctx.claimAll(c, 'identical-rewrite');
+    if (sealed) {
+      ctx.forbidden(
+        c,
+        'identical-rewrite',
+        'rewritten without a change in value after a signature; a validator counts any rewrite of a sealed object as a modification (conservative: not yet established per object and level)',
+      );
+    } else {
+      ctx.permitted(
+        c,
+        'identical-rewrite',
+        'rewritten without a change in value before any signature: nothing was sealed',
+      );
     }
   }
 }
@@ -294,7 +346,13 @@ function ruleTrailer(ctx: StepContext): void {
     ctx.forbidden(c, 'trailer', 'the trailer points at a different catalog');
     return;
   }
-  if (changed.has('Encrypt') && !pdfValueEquals(dictEntries(c.value.old)?.Encrypt ?? null, dictEntries(c.value.new)?.Encrypt ?? null)) {
+  if (
+    changed.has('Encrypt') &&
+    !pdfValueEquals(
+      dictEntries(c.value.old)?.Encrypt ?? null,
+      dictEntries(c.value.new)?.Encrypt ?? null,
+    )
+  ) {
     ctx.forbidden(c, 'trailer', 'the trailer points at a different encryption dictionary');
     return;
   }
@@ -339,20 +397,33 @@ function ruleCatalog(ctx: StepContext): void {
   // A DIRECT /AcroForm dictionary changes with the catalog: judge it by the
   // AcroForm rules, and let its default resources ride the catalog's edges.
   if (changed.has('AcroForm') && !ctx.input.after.acroForm && !ctx.input.before.acroForm) {
-    const problem = acroFormProblem(ctx, dictEntries(c.value.old)?.AcroForm ?? null, dictEntries(c.value.new)?.AcroForm ?? null);
+    const problem = acroFormProblem(
+      ctx,
+      dictEntries(c.value.old)?.AcroForm ?? null,
+      dictEntries(c.value.new)?.AcroForm ?? null,
+    );
     if (problem) {
       ctx.forbidden(c, 'acroform-housekeeping', problem);
       return;
     }
     for (const side of SIDES) {
-      ctx.claimSubtree(side, new Set([root]), (label) => label.startsWith('AcroForm/DR/'), 'acroform-housekeeping');
+      ctx.claimSubtree(
+        side,
+        new Set([root]),
+        (label) => label.startsWith('AcroForm/DR/'),
+        'acroform-housekeeping',
+      );
     }
   }
   if (changed.has('Perms')) {
     const after = deriveProtection(ctx.input.after.signatures);
     const before = deriveProtection(ctx.input.before.signatures);
-    if (!after.certification || before.level !== null) {
-      ctx.forbidden(c, 'catalog-housekeeping', '/Perms may only appear with the certification signature, in the first signed revision');
+    if (!after.certification || before.judged !== null) {
+      ctx.forbidden(
+        c,
+        'catalog-housekeeping',
+        '/Perms may only appear with the certification signature, in the first signed revision',
+      );
       return;
     }
   }
@@ -374,12 +445,21 @@ function ruleAcroForm(ctx: StepContext): void {
   ctx.permitted(c, 'acroform-housekeeping');
   // Default resources (fonts for appearances) live under /DR.
   for (const side of SIDES) {
-    ctx.claimSubtree(side, new Set([acro]), (label) => label.startsWith('DR/'), 'acroform-housekeeping');
+    ctx.claimSubtree(
+      side,
+      new Set([acro]),
+      (label) => label.startsWith('DR/'),
+      'acroform-housekeeping',
+    );
   }
 }
 
 /** What is wrong with an AcroForm dictionary change, or null when it is housekeeping. */
-function acroFormProblem(ctx: StepContext, oldValue: PdfValue | null, newValue: PdfValue | null): string | null {
+function acroFormProblem(
+  ctx: StepContext,
+  oldValue: PdfValue | null,
+  newValue: PdfValue | null,
+): string | null {
   const changed = changedKeys(oldValue, newValue);
   const bad = [...changed].filter((k) => !ACROFORM_KEYS.has(k));
   if (bad.length > 0) return `AcroForm keys changed: ${bad.join(', ')}`;
@@ -391,7 +471,8 @@ function acroFormProblem(ctx: StepContext, oldValue: PdfValue | null, newValue: 
     }
     const newSigFields = newSignatureFields(ctx);
     const strangers = newRefs.slice(oldRefs.length).filter((n) => !newSigFields.has(n));
-    if (strangers.length > 0) return `/AcroForm /Fields gained non-signature fields: ${strangers.join(', ')}`;
+    if (strangers.length > 0)
+      return `/AcroForm /Fields gained non-signature fields: ${strangers.join(', ')}`;
   }
   return null;
 }
@@ -421,7 +502,10 @@ function ruleDss(ctx: StepContext): void {
     ctx.claimSubtree(side, roots, (label) => label === 'DSS' || label.startsWith('DSS/'), 'dss');
   }
   for (const c of ctx.changes) {
-    if (c.usage.new.some((e) => roots.has(e.parent) && e.label === 'DSS') && !ctx.findings.some((f) => f.objectNumber === c.objectNumber)) {
+    if (
+      c.usage.new.some((e) => roots.has(e.parent) && e.label === 'DSS') &&
+      !ctx.findings.some((f) => f.objectNumber === c.objectNumber)
+    ) {
       ctx.permitted(c, 'dss', 'document security store');
     }
   }
@@ -474,7 +558,11 @@ function ruleSignatureFieldAdded(ctx: StepContext): void {
     const changed = changedKeys(c.value.old, c.value.new);
     if (changed.size !== 1 || !changed.has('Kids')) continue;
     const appended = appendedRefs(c, 'Kids');
-    if (appended && appended.length > 0 && appended.every((n) => added.has(n) || newWidgets.has(n))) {
+    if (
+      appended &&
+      appended.length > 0 &&
+      appended.every((n) => added.has(n) || newWidgets.has(n))
+    ) {
       ctx.claimAll(c, rule);
       ctx.permitted(c, rule, 'field /Kids gained the new signature field');
     }
@@ -496,7 +584,7 @@ function ruleSignatureAdded(ctx: StepContext): void {
       if (c) ctx.forbidden(c, rule, `a ${sig.kind} was added under level '${ctx.level}'`);
       continue;
     }
-    if (sig.catalogCertification && beforeProtection.level !== null) {
+    if (sig.catalogCertification && beforeProtection.judged !== null) {
       const c = ctx.byNum.get(fieldObjectNumber);
       if (c) ctx.forbidden(c, rule, 'a certification signature after another signature');
       continue;
@@ -511,7 +599,10 @@ function ruleSignatureAdded(ctx: StepContext): void {
     const fieldIsNew = addedThisStep.has(fieldObjectNumber);
     // Before the first signature nothing governs the document, and the /Lock
     // mirror written at authoring time is legitimate; after one, it is not.
-    const allowedFieldKeys = beforeProtection.level === null ? new Set([...SIGNED_FIELD_KEYS, 'Lock']) : SIGNED_FIELD_KEYS;
+    const allowedFieldKeys =
+      beforeProtection.judged === null
+        ? new Set([...SIGNED_FIELD_KEYS, 'Lock'])
+        : SIGNED_FIELD_KEYS;
     const fc = ctx.byNum.get(fieldObjectNumber);
     if (fc && fieldIsNew) {
       ctx.permitted(fc, rule, `new field "${sig.fieldName}" signed`);
@@ -523,7 +614,10 @@ function ruleSignatureAdded(ctx: StepContext): void {
       if (bad.length > 0) {
         ctx.forbidden(fc, rule, `signature field keys changed: ${bad.join(', ')}`);
         ctx.claimStable(fc, rule);
-      } else if (changed.has('Ff') && !readOnlyOnlyChange(fc, ctx.before.fieldByObj.get(fieldObjectNumber)?.flags)) {
+      } else if (
+        changed.has('Ff') &&
+        !readOnlyOnlyChange(fc, ctx.before.fieldByObj.get(fieldObjectNumber)?.flags)
+      ) {
         ctx.forbidden(fc, rule, 'signature field flags changed beyond ReadOnly');
         ctx.claimStable(fc, rule);
       } else {
@@ -535,7 +629,9 @@ function ruleSignatureAdded(ctx: StepContext): void {
       if (w === fieldObjectNumber || fieldIsNew) continue;
       const wc = ctx.byNum.get(w);
       if (!wc || ctx.isIdentical(wc)) continue;
-      const bad = [...changedKeys(wc.value.old, wc.value.new)].filter((k) => !SIGNED_WIDGET_KEYS.has(k));
+      const bad = [...changedKeys(wc.value.old, wc.value.new)].filter(
+        (k) => !SIGNED_WIDGET_KEYS.has(k),
+      );
       if (bad.length > 0) {
         ctx.forbidden(wc, rule, `signature widget keys changed: ${bad.join(', ')}`);
         ctx.claimStable(wc, rule);
@@ -551,13 +647,16 @@ function ruleSignatureAdded(ctx: StepContext): void {
     for (const c of ctx.changes) {
       if (c.change !== 'added') continue;
       const asValue = c.usage.new.filter((e) => e.parent === fieldObjectNumber && e.label === 'V');
-      const asLock = c.usage.new.filter((e) => e.parent === fieldObjectNumber && e.label === 'Lock');
+      const asLock = c.usage.new.filter(
+        (e) => e.parent === fieldObjectNumber && e.label === 'Lock',
+      );
       const type = dictEntries(c.value.new)?.Type;
       if (asValue.length > 0) {
         const isSig = type?.t === 'name' && (type.v === 'Sig' || type.v === 'DocTimeStamp');
         if (!isSig && type !== undefined) continue;
         for (const e of c.usage.new) {
-          if ((e.parent === fieldObjectNumber && e.label === 'V') || e.label === 'DocMDP') ctx.claimEdge(c, 'new', e, rule);
+          if ((e.parent === fieldObjectNumber && e.label === 'V') || e.label === 'DocMDP')
+            ctx.claimEdge(c, 'new', e, rule);
         }
         ctx.permitted(c, rule, 'signature value');
       } else if (asLock.length > 0) {
@@ -569,7 +668,7 @@ function ruleSignatureAdded(ctx: StepContext): void {
     }
   }
   // /Perms: only with the certification, only in the first signed revision.
-  if (afterProtection.certification && beforeProtection.level === null) {
+  if (afterProtection.certification && beforeProtection.judged === null) {
     const root = ctx.input.after.root;
     for (const c of ctx.changes) {
       if (c.change === 'added' && onlyEdges(c, (e) => e.parent === root && e.label === 'Perms')) {
@@ -579,7 +678,8 @@ function ruleSignatureAdded(ctx: StepContext): void {
     }
   }
   // Appearance streams and their resources, through the signed field or its widget.
-  for (const side of SIDES) ctx.claimSubtree(side, parents, (label) => label === 'AP' || label.startsWith('AP/'), rule);
+  for (const side of SIDES)
+    ctx.claimSubtree(side, parents, (label) => label === 'AP' || label.startsWith('AP/'), rule);
 }
 
 /**
@@ -613,7 +713,10 @@ function ruleFormFill(ctx: StepContext): void {
   for (const [num, field] of fields) {
     if (field.family === 'signature') continue;
     const fc = ctx.byNum.get(num);
-    const widgetChanges = field.widgets.filter((w) => w !== num).map((w) => ctx.byNum.get(w)).filter(Boolean) as ObjectChange[];
+    const widgetChanges = field.widgets
+      .filter((w) => w !== num)
+      .map((w) => ctx.byNum.get(w))
+      .filter(Boolean) as ObjectChange[];
     // An appearance regenerated under an untouched field and widget (viewers
     // do this for NeedAppearances): the objects hanging off the field's or a
     // widget's /AP. Form filling at P=2 covers it (pyHanko agrees); what the
@@ -627,17 +730,24 @@ function ruleFormFill(ctx: StepContext): void {
       !fc && widgetChanges.length === 0
         ? ctx.changes.filter(
             (c) =>
-              SIDES.some((side) => c.usage[side].some((e) => owners.has(e.parent) && isAp(e.label))) &&
-              SIDES.every((side) => c.usage[side].every((e) => !isAp(e.label) || owners.has(e.parent))),
+              SIDES.some((side) =>
+                c.usage[side].some((e) => owners.has(e.parent) && isAp(e.label)),
+              ) &&
+              SIDES.every((side) =>
+                c.usage[side].every((e) => !isAp(e.label) || owners.has(e.parent)),
+              ),
           )
         : [];
     if (!fc && widgetChanges.length === 0 && appearanceOnly.length === 0) continue;
     if (!ctx.allows('fill')) {
-      for (const c of [fc, ...widgetChanges, ...appearanceOnly]) if (c && !ctx.isIdentical(c)) ctx.forbidden(c, rule, `form fill under level '${ctx.level}'`);
+      for (const c of [fc, ...widgetChanges, ...appearanceOnly])
+        if (c && !ctx.isIdentical(c))
+          ctx.forbidden(c, rule, `form fill under level '${ctx.level}'`);
       continue;
     }
     if (appearanceOnly.length > 0) {
-      for (const c of appearanceOnly) ctx.permitted(c, rule, `appearance of field "${field.name}" regenerated`);
+      for (const c of appearanceOnly)
+        ctx.permitted(c, rule, `appearance of field "${field.name}" regenerated`);
       parents.add(num);
       for (const w of field.widgets) parents.add(w);
       continue;
@@ -651,9 +761,16 @@ function ruleFormFill(ctx: StepContext): void {
         ok = false;
       } else if (
         changed.has('Ff') &&
-        !(readOnlyOnlyChange(fc, ctx.before.fieldByObj.get(num)?.flags) && newlyLocked.has(field.name))
+        !(
+          readOnlyOnlyChange(fc, ctx.before.fieldByObj.get(num)?.flags) &&
+          newlyLocked.has(field.name)
+        )
       ) {
-        ctx.forbidden(fc, rule, `field "${field.name}" flags changed (only a lock landing in this revision may set ReadOnly)`);
+        ctx.forbidden(
+          fc,
+          rule,
+          `field "${field.name}" flags changed (only a lock landing in this revision may set ReadOnly)`,
+        );
         ok = false;
       } else {
         ctx.claimStable(fc, rule);
@@ -662,7 +779,9 @@ function ruleFormFill(ctx: StepContext): void {
     }
     for (const wc of widgetChanges) {
       if (ctx.isIdentical(wc)) continue;
-      const bad = [...changedKeys(wc.value.old, wc.value.new)].filter((k) => !FILL_WIDGET_KEYS.has(k));
+      const bad = [...changedKeys(wc.value.old, wc.value.new)].filter(
+        (k) => !FILL_WIDGET_KEYS.has(k),
+      );
       if (bad.length > 0) {
         ctx.forbidden(wc, rule, `widget of "${field.name}" keys changed: ${bad.join(', ')}`);
         ok = false;
@@ -676,7 +795,8 @@ function ruleFormFill(ctx: StepContext): void {
       for (const w of field.widgets) parents.add(w);
     }
   }
-  for (const side of SIDES) ctx.claimSubtree(side, parents, (label) => label === 'AP' || label.startsWith('AP/'), rule);
+  for (const side of SIDES)
+    ctx.claimSubtree(side, parents, (label) => label === 'AP' || label.startsWith('AP/'), rule);
 }
 
 function ruleAnnotation(ctx: StepContext): void {
@@ -691,7 +811,9 @@ function ruleAnnotation(ctx: StepContext): void {
   const annots: ObjectChange[] = [];
   for (const c of ctx.changes) {
     if (c.kind !== 'dictionary' || ctx.isIdentical(c)) continue;
-    const onPage = [...c.usage.old, ...c.usage.new].some((e) => pages.has(e.parent) && e.label.startsWith('Annots/'));
+    const onPage = [...c.usage.old, ...c.usage.new].some(
+      (e) => pages.has(e.parent) && e.label.startsWith('Annots/'),
+    );
     if (onPage && !isWidget(c)) annots.push(c);
   }
   if (annots.length === 0) {
@@ -712,9 +834,17 @@ function ruleAnnotation(ctx: StepContext): void {
     if (!c || ctx.isIdentical(c)) continue;
     const changed = changedKeys(c.value.old, c.value.new);
     if (changed.size === 1 && changed.has('Annots')) {
-      const removed = refsOf(dictEntries(c.value.old)?.Annots).filter((n) => !refsOf(dictEntries(c.value.new)?.Annots).includes(n));
-      const added = refsOf(dictEntries(c.value.new)?.Annots).filter((n) => !refsOf(dictEntries(c.value.old)?.Annots).includes(n));
-      const touchesWidget = [...removed, ...added].some((n) => widgets.has(n) && !ctx.findings.some((f) => f.objectNumber === n && f.verdict === 'permitted'));
+      const removed = refsOf(dictEntries(c.value.old)?.Annots).filter(
+        (n) => !refsOf(dictEntries(c.value.new)?.Annots).includes(n),
+      );
+      const added = refsOf(dictEntries(c.value.new)?.Annots).filter(
+        (n) => !refsOf(dictEntries(c.value.old)?.Annots).includes(n),
+      );
+      const touchesWidget = [...removed, ...added].some(
+        (n) =>
+          widgets.has(n) &&
+          !ctx.findings.some((f) => f.objectNumber === n && f.verdict === 'permitted'),
+      );
       if (touchesWidget) {
         ctx.forbidden(c, rule, 'page /Annots added or removed a form widget');
         continue;
@@ -724,13 +854,20 @@ function ruleAnnotation(ctx: StepContext): void {
     }
   }
   for (const side of SIDES) {
-    ctx.claimSubtree(side, parents, (label) => label === 'AP' || label.startsWith('AP/') || label === 'Popup' || label === 'IRT', rule);
+    ctx.claimSubtree(
+      side,
+      parents,
+      (label) => label === 'AP' || label.startsWith('AP/') || label === 'Popup' || label === 'IRT',
+      rule,
+    );
   }
 }
 
 function ruleFieldLock(ctx: StepContext): void {
   if (ctx.locks.length === 0) return;
-  const lockedFields = ctx.input.before.fields.filter((f) => ctx.locks.some((l) => lockCovers(l.spec, f.name)));
+  const lockedFields = ctx.input.before.fields.filter((f) =>
+    ctx.locks.some((l) => lockCovers(l.spec, f.name)),
+  );
   const lockedObjects = new Set<number>();
   for (const f of lockedFields) {
     lockedObjects.add(f.objectNumber);
@@ -751,16 +888,29 @@ function ruleFieldLock(ctx: StepContext): void {
   }
   for (const c of ctx.changes) {
     if (!frontier.has(c.objectNumber) || ctx.isIdentical(c)) continue;
-    const field = lockedFields.find((f) => f.objectNumber === c.objectNumber || f.widgets.includes(c.objectNumber));
+    const field = lockedFields.find(
+      (f) => f.objectNumber === c.objectNumber || f.widgets.includes(c.objectNumber),
+    );
     ctx.locked.add(c.objectNumber);
-    ctx.forbidden(c, 'field-lock', field ? `field "${field.name}" is locked by an earlier signature` : 'part of a locked field changed');
+    ctx.forbidden(
+      c,
+      'field-lock',
+      field
+        ? `field "${field.name}" is locked by an earlier signature`
+        : 'part of a locked field changed',
+    );
   }
 }
 
 function ruleUnexplained(ctx: StepContext): void {
   for (const c of ctx.changes) {
     if (c.value.truncated) {
-      ctx.findings.push({ rule: 'unexplained', verdict: 'incomplete', objectNumber: c.objectNumber, detail: 'value too large to inspect' });
+      ctx.findings.push({
+        rule: 'unexplained',
+        verdict: 'incomplete',
+        objectNumber: c.objectNumber,
+        detail: 'value too large to inspect',
+      });
       continue;
     }
     if (c.usageIncomplete) {
@@ -776,11 +926,20 @@ function ruleUnexplained(ctx: StepContext): void {
     for (const side of SIDES) {
       for (const e of c.usage[side]) {
         if (!ctx.isClaimed(c, side, e)) {
-          ctx.forbidden(c, 'unexplained', `${side === 'old' ? 'was' : 'is'} referenced from object ${e.parent} at ${e.label} and no rule explains it`, e);
+          ctx.forbidden(
+            c,
+            'unexplained',
+            `${side === 'old' ? 'was' : 'is'} referenced from object ${e.parent} at ${e.label} and no rule explains it`,
+            e,
+          );
         }
       }
     }
-    if (c.usage.old.length === 0 && c.usage.new.length === 0 && !ctx.findings.some((f) => f.objectNumber === c.objectNumber)) {
+    if (
+      c.usage.old.length === 0 &&
+      c.usage.new.length === 0 &&
+      !ctx.findings.some((f) => f.objectNumber === c.objectNumber)
+    ) {
       ctx.permitted(c, 'orphan', 'referenced from nowhere reachable');
     }
   }

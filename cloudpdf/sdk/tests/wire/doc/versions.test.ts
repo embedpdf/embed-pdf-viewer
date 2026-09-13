@@ -172,7 +172,8 @@ describe("VersionsClient", () => {
                 },
             ],
             protection: {
-                level: "none",
+                enforced: "none",
+                judged: "none",
                 certification: { signatureIndex: 1, permission: 1.1 },
                 fieldLocks: [{ signatureIndex: 1, source: "fieldmdp", spec: null }],
                 policyVersion: 1,

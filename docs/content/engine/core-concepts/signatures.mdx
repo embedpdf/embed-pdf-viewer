@@ -22,8 +22,11 @@ Three ideas carry everything below:
 - **Signing seals.** A completed signature does not edit the document; it produces a _new version_
   of it. Locally the session moves to the sealed bytes; on the cloud the document's head moves to a
   new immutable version and every layer sits over it.
-- **A signed document is protected.** What its signatures forbid (a certification's DocMDP level,
-  field locks) is subtracted from what the caller may do, exactly like encryption permission bits.
+- **A signature raises two questions.** What a signer _declared_ (a certification's DocMDP level, a
+  field lock) is subtracted from what the caller may do, like encryption permission bits. What a
+  validator will _conclude_ about later changes is a policy, and the engine judges the way the
+  recipient's validator does: after a plain approval signature, form fill-in and further signatures
+  keep it valid; anything else — an annotation included — does not.
 
 Everything here is on `doc.signatures`. It is `undefined` on an engine that does not implement
 signatures, so check once:
@@ -53,7 +56,7 @@ for (const sig of snapshot.signatures) {
   sig.fieldMdp;
   sig.lock; // FieldMDP transform / field /Lock
 }
-snapshot.protection; // { level, certification, fieldLocks, policyVersion }
+snapshot.protection; // { enforced, judged, certification, fieldLocks, policyVersion }
 ```
 
 The bytes a verifier needs are read straight from the loaded file:
@@ -97,7 +100,11 @@ Two options shape the question:
   force. The result is tagged exploratory and never becomes a verdict.
 
 A truncated value is never permitted and a broken chain is `indeterminate`: the analysis fails
-closed.
+closed. An object rewritten in a later revision _without a change in value_ is judged a
+modification at every level: Acrobat rejected such a rewrite of a page and a signed widget after
+an approval signature. The engine's own writer never produces one — a save writes only what
+changed, and an annotation added and removed again writes nothing — so the rule only ever fires on
+files other producers wrote.
 
 ## Signing: two phases
 
@@ -171,23 +178,37 @@ import { validateSignatures } from '@embedpdf/core-signature';
 
 const verdicts = await validateSignatures(doc, {
   trust: { anchors: async () => [rootCertificateDer] }, // omit → 'valid-untrusted' at best
+  until: 'working-copy', // judge unsaved edits too: what the file a save produces will say
 });
 for (const v of verdicts) {
   v.integrity; // 'valid' | 'invalid' | 'indeterminate' — the bytes vs. the signed digest
   v.cryptography; // the CMS verified with its own certificate
   v.trust; // chain to your anchors
-  v.modifications; // { verdict } — what changed after it, from analyze()
+  v.modifications; // { verdict, basis } — what changed after it, and whether the loaded bytes or the working copy were judged
   v.summary; // 'valid' | 'valid-untrusted' | 'invalid' | 'indeterminate'
 }
 ```
 
-## Protection
+## Protection: enforced vs. judged
 
-Once a document carries signatures, the engine enforces what they forbid by default: a certified
-document loses page assembly, a `P=1` certification loses form fill, a FieldMDP-locked field refuses
-writes. The refusals surface as `ProtectedDocument`. Read the policy back from `snapshot.protection`
-to grey out what a user cannot do before they try. An engine constructed with `signedDocumentPolicy: 'permit'` turns
-enforcement off for tools whose job is to produce or test invalid files; analysis never depends on it.
+`snapshot.protection` answers two different questions:
+
+- **`enforced`** is what a signer declared: a certification's `/P`, a signed field's `/Lock` `/P`. The
+  engine refuses what it forbids — a certified document loses page assembly and field authoring, a
+  `P=2` certification refuses annotations, a `P=1` one refuses form fill, a FieldMDP-locked field
+  refuses writes. The refusals surface as `ProtectedDocument`. A plain approval signature declares
+  nothing: `enforced` is `null`, and nothing but a rewrite (which would erase the signature rather
+  than invalidate it) is refused.
+- **`judged`** is what a validator holds later changes to: the declared level, or the approval
+  baseline `fill` when only approval signatures exist. It drives `analyze()` and every verdict. So an
+  annotation added after an approval signature is _allowed_ and then _judged forbidden_ — the
+  signature still verifies cryptographically, but a validator says the document changed in a way
+  it does not permit, which is exactly what Acrobat says. A signer who wants comments to keep a
+  signature valid certifies with `P=3`.
+
+Read the policy back to grey out what a user cannot do before they try, and to warn about what they
+can do but should not. An engine constructed with `signedDocumentPolicy: 'permit'` turns enforcement
+off for tools whose job is to produce or test invalid files; judgement never depends on it.
 
 ## Signature fields and appearances
 

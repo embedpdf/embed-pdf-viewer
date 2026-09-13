@@ -4,7 +4,13 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { createLocalEngine } from '@embedpdf/engine';
 import type { Engine } from '@embedpdf/engine-core/runtime';
-import { createTestSigner, sign, validateSignatures, SigningError, type TestSigner } from '../src/index';
+import {
+  createTestSigner,
+  sign,
+  validateSignatures,
+  SigningError,
+  type TestSigner,
+} from '../src/index';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const fixtures = resolve(here, '..', '..', '..', 'engine', 'main', 'test', 'fixtures');
@@ -19,7 +25,8 @@ describe('sign() and validateSignatures() over the local engine', () => {
     engine = createLocalEngine({ runtime: { prefer: 'wasm' } });
     signer = await createTestSigner({ commonName: 'EmbedPDF test signer' });
     bytes = new Uint8Array(await readFile(resolve(fixtures, 'unsigned_sigfield.pdf')));
-    if (DUMP_DIR) await writeFile(resolve(DUMP_DIR, 'core_signature_test_signer.der'), signer.certificate);
+    if (DUMP_DIR)
+      await writeFile(resolve(DUMP_DIR, 'core_signature_test_signer.der'), signer.certificate);
   });
   afterAll(async () => {
     await engine.destroy();
@@ -28,7 +35,10 @@ describe('sign() and validateSignatures() over the local engine', () => {
   test('one call signs a field with a CAdES-B signature the engine and the validator both accept', async () => {
     const doc = await engine.open({ kind: 'bytes', id: 'cades', bytes });
     try {
-      await doc.forms.setValue({ kind: 'fqn', name: 'group.total' }, { type: 'text', value: 'agreed' });
+      await doc.forms.setValue(
+        { kind: 'fqn', name: 'group.total' },
+        { type: 'text', value: 'agreed' },
+      );
       const result = await sign(doc, {
         field: { kind: 'fqn', name: 'sig' },
         signer,
@@ -38,7 +48,9 @@ describe('sign() and validateSignatures() over the local engine', () => {
       expect(result.signature.subFilter).toBe('ETSI.CAdES.detached');
       expect(result.signature.coverage).toBe('whole-revision');
 
-      const [verdict] = await validateSignatures(doc, { trust: { anchors: async () => [signer.certificate] } });
+      const [verdict] = await validateSignatures(doc, {
+        trust: { anchors: async () => [signer.certificate] },
+      });
       expect(verdict.integrity).toBe('valid');
       expect(verdict.cryptography).toBe('valid');
       expect(verdict.trust).toBe('trusted');
@@ -53,10 +65,14 @@ describe('sign() and validateSignatures() over the local engine', () => {
 
       // The locked field refuses writes.
       await expect(
-        doc.forms.setValue({ kind: 'fqn', name: 'group.total' }, { type: 'text', value: 'changed' }),
+        doc.forms.setValue(
+          { kind: 'fqn', name: 'group.total' },
+          { type: 'text', value: 'changed' },
+        ),
       ).rejects.toMatchObject({ code: 'ProtectedDocument' });
 
-      if (DUMP_DIR) await writeFile(resolve(DUMP_DIR, 'core_signature_cades.pdf'), await doc.download());
+      if (DUMP_DIR)
+        await writeFile(resolve(DUMP_DIR, 'core_signature_cades.pdf'), await doc.download());
     } finally {
       await doc.close();
     }
@@ -72,24 +88,42 @@ describe('sign() and validateSignatures() over the local engine', () => {
         certify: { permission: 2 },
       });
       expect(result.signature.catalogCertification).toBe(true);
-      expect(result.protection.level).toBe('fill');
-      const [verdict] = await validateSignatures(doc, { trust: { anchors: async () => [signer.certificate] } });
+      expect(result.protection.enforced).toBe('fill');
+      expect(result.protection.judged).toBe('fill');
+      const [verdict] = await validateSignatures(doc, {
+        trust: { anchors: async () => [signer.certificate] },
+      });
       expect(verdict.summary).toBe('valid');
       expect(verdict.cms?.signingTime).toBeInstanceOf(Date);
       // A fill after the certification: bytes stay intact, the verdict is honest about the later revision.
-      await doc.forms.setValue({ kind: 'fqn', name: 'group.total' }, { type: 'text', value: 'filled' });
-      const [after] = await validateSignatures(doc, { trust: { anchors: async () => [signer.certificate] } });
+      await doc.forms.setValue(
+        { kind: 'fqn', name: 'group.total' },
+        { type: 'text', value: 'filled' },
+      );
+      const [after] = await validateSignatures(doc, {
+        trust: { anchors: async () => [signer.certificate] },
+      });
       expect(after.integrity).toBe('valid');
       expect(after.modifications.verdict).toBe('unchanged'); // unsaved edits are not a revision
-      const reopened = await engine.open({ kind: 'bytes', id: 'pkcs7-reopen', bytes: await doc.download() });
+      const reopened = await engine.open({
+        kind: 'bytes',
+        id: 'pkcs7-reopen',
+        bytes: await doc.download(),
+      });
       try {
-        const [later] = await validateSignatures(reopened, { trust: { anchors: async () => [signer.certificate] } });
+        const [later] = await validateSignatures(reopened, {
+          trust: { anchors: async () => [signer.certificate] },
+        });
         expect(later.integrity).toBe('valid');
         expect(later.cryptography).toBe('valid');
         // The revision analysis explains the fill: a permitted change under permission 2.
         expect(later.modifications.verdict).toBe('permitted');
         expect(later.summary).toBe('valid');
-        if (DUMP_DIR) await writeFile(resolve(DUMP_DIR, 'core_signature_pkcs7_filled.pdf'), await reopened.download());
+        if (DUMP_DIR)
+          await writeFile(
+            resolve(DUMP_DIR, 'core_signature_pkcs7_filled.pdf'),
+            await reopened.download(),
+          );
       } finally {
         await reopened.close();
       }
@@ -105,10 +139,15 @@ describe('sign() and validateSignatures() over the local engine', () => {
       try {
         const result = await sign(doc, { field: { kind: 'fqn', name: 'sig' }, signer: alt });
         expect(result.status).toBe('completed');
-        const [verdict] = await validateSignatures(doc, { trust: { anchors: async () => [alt.certificate] } });
+        const [verdict] = await validateSignatures(doc, {
+          trust: { anchors: async () => [alt.certificate] },
+        });
         expect(verdict.summary).toBe('valid');
         if (DUMP_DIR) {
-          await writeFile(resolve(DUMP_DIR, `core_signature_${algorithm}.pdf`), await doc.download());
+          await writeFile(
+            resolve(DUMP_DIR, `core_signature_${algorithm}.pdf`),
+            await doc.download(),
+          );
           await writeFile(resolve(DUMP_DIR, `core_signature_${algorithm}.der`), alt.certificate);
         }
       } finally {
@@ -128,7 +167,12 @@ describe('sign() and validateSignatures() over the local engine', () => {
             kind: 'cms',
             sign: async () => {
               const { buildDetachedCms } = await import('../src/index');
-              return buildDetachedCms({ digest: new Uint8Array(32), hash: 'sha256', profile: 'cades-b', signer: other });
+              return buildDetachedCms({
+                digest: new Uint8Array(32),
+                hash: 'sha256',
+                profile: 'cades-b',
+                signer: other,
+              });
             },
           },
         }),
@@ -136,7 +180,10 @@ describe('sign() and validateSignatures() over the local engine', () => {
       const snapshot = await doc.signatures!.list();
       expect(snapshot.signatures[0].signed).toBe(false);
       // The candidate was aborted: the document is writable again.
-      await doc.forms.setValue({ kind: 'fqn', name: 'group.total' }, { type: 'text', value: 'still free' });
+      await doc.forms.setValue(
+        { kind: 'fqn', name: 'group.total' },
+        { type: 'text', value: 'still free' },
+      );
     } finally {
       await doc.close();
     }

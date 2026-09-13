@@ -14,6 +14,7 @@ import {
   FileCandidateStore,
   MemoryCandidateStore,
   type CandidateStore,
+  scratchPath,
 } from './internal/candidateStore';
 import { bakeWidgetAppearance } from './internal/appearance';
 import { assertSealedSignature, bytesEqual, type SealExpectation } from './internal/sealCheck';
@@ -173,7 +174,10 @@ export class SignatureMutator {
     const signingId = generateUuid();
     const stack = new CloseStack();
     try {
-      const candidate = this.openCandidate(signingId);
+      // Scratch files the candidate needs are registered on |stack| before
+      // they are written and go when the candidate closes (LIFO: the
+      // candidate closes first, then its files are removed).
+      const candidate = this.openCandidate(signingId, stack);
       stack.push(() => candidate.close());
 
       // `signer` is the pre-rename wire spelling: older clients still send it.
@@ -461,24 +465,54 @@ export class SignatureMutator {
    * already holds signed bytes (a layer save rewrites the delta and would
    * drop them; the fork refuses to prepare such a candidate).
    */
-  private openCandidate(signingId: string): OpenedPdfDocument {
+  private openCandidate(signingId: string, stack: CloseStack): OpenedPdfDocument {
     const password = this.session.password;
     const source = this.session.source;
+    const saver = new DocumentSaver(this.runtime, this.session);
+    // On a native runtime over a file base, everything document- or
+    // layer-sized goes through scratch files beside the base (the signing
+    // root the file candidate store owns); the wasm client keeps buffers —
+    // its bytes are in memory anyway.
+    const scratch = saver.canWriteScratchFiles() && source.base?.kind === 'file' ? source.base.path : null;
     if (this.session.kind === 'layer' && source.base && !this.loadedDeltaHoldsSignedBytes()) {
       const base = this.baseDocuments.retainByKey(source.base.key);
       if (base) {
-        const layer: LayerSource = this.session.hasUnsavedEdits()
-          ? {
-              kind: 'artifact',
-              bytes: new DocumentSaver(this.runtime, this.session).saveLayerArtifact().bytes,
+        // With unsaved edits, the artifact a save would write — unless the
+        // save pass finds nothing reachable changed since load (an
+        // annotation added and removed again): then the layer the session
+        // was opened with IS the document, and the candidate seals it.
+        let layer: LayerSource = source.layer ?? { kind: 'fresh' };
+        if (this.session.hasUnsavedEdits()) {
+          if (scratch) {
+            const path = scratchPath(scratch, 'signing', signingId, 'layer');
+            stack.push(() => this.runtime.fileWrite.removeFile(path));
+            const saved = saver.saveLayerArtifactToFileEx(path);
+            if (saved.changedSinceLoad) {
+              layer = { kind: 'artifact-file', path };
             }
-          : (source.layer ?? { kind: 'fresh' });
+          } else {
+            const artifact = saver.saveLayerArtifactEx();
+            if (artifact.changedSinceLoad) {
+              layer = { kind: 'artifact', bytes: artifact.bytes };
+            }
+          }
+        }
         return openLayerDocument(this.runtime, base, layer, password);
       }
     }
-    const candidateBytes = this.session.hasUnsavedEdits()
-      ? new DocumentSaver(this.runtime, this.session).saveStandaloneToBuffer('incremental').bytes
-      : new SignatureReader(this.runtime, this.session).loadedBytes();
+    if (scratch) {
+      // The whole document as a file base: never an in-memory buffer.
+      const path = scratchPath(scratch, 'signing', signingId, 'base.pdf');
+      stack.push(() => this.runtime.fileWrite.removeFile(path));
+      saver.snapshotToFile(path);
+      const base = this.baseDocuments.acquireFileBase({
+        key: `candidate:${signingId}`,
+        path,
+        password,
+      });
+      return openLayerDocument(this.runtime, base, { kind: 'fresh' }, password);
+    }
+    const candidateBytes = saver.snapshot().bytes;
     const base = this.baseDocuments.acquireMemoryBase({
       key: `candidate:${signingId}`,
       bytes: new Uint8Array(candidateBytes),

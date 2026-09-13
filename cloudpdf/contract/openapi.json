@@ -3415,6 +3415,15 @@
             }
           },
           {
+            "name": "policy",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
             "name": "X-Document-Password",
             "in": "header",
             "required": false,
@@ -9846,9 +9855,17 @@
           "protection": {
             "type": "object",
             "properties": {
-              "level": {
+              "enforced": {
                 "type": "string",
                 "enum": ["none", "lta", "fill", "annotate"],
+                "nullable": true
+              },
+              "judged": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/DocSignaturesList200Response/properties/protection/properties/enforced"
+                  }
+                ],
                 "nullable": true
               },
               "certification": {
@@ -9891,7 +9908,7 @@
                 "type": "integer"
               }
             },
-            "required": ["level", "certification", "fieldLocks", "policyVersion"],
+            "required": ["enforced", "judged", "certification", "fieldLocks", "policyVersion"],
             "additionalProperties": false
           }
         },
@@ -10696,9 +10713,17 @@
           "protection": {
             "type": "object",
             "properties": {
-              "level": {
+              "enforced": {
                 "type": "string",
                 "enum": ["none", "lta", "fill", "annotate"],
+                "nullable": true
+              },
+              "judged": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/DocSignaturesComplete200Response/properties/protection/properties/enforced"
+                  }
+                ],
                 "nullable": true
               },
               "certification": {
@@ -10741,7 +10766,7 @@
                 "type": "integer"
               }
             },
-            "required": ["level", "certification", "fieldLocks", "policyVersion"],
+            "required": ["enforced", "judged", "certification", "fieldLocks", "policyVersion"],
             "additionalProperties": false
           },
           "meta": {
@@ -11514,9 +11539,17 @@
           "protection": {
             "type": "object",
             "properties": {
-              "level": {
+              "enforced": {
                 "type": "string",
                 "enum": ["none", "lta", "fill", "annotate"],
+                "nullable": true
+              },
+              "judged": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/DocVersionsSignatures200Response/properties/protection/properties/enforced"
+                  }
+                ],
                 "nullable": true
               },
               "certification": {
@@ -11559,7 +11592,7 @@
                 "type": "integer"
               }
             },
-            "required": ["level", "certification", "fieldLocks", "policyVersion"],
+            "required": ["enforced", "judged", "certification", "fieldLocks", "policyVersion"],
             "additionalProperties": false
           }
         },

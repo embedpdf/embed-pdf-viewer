@@ -1282,8 +1282,7 @@ export type WeakAnnotationSessionPagesRequest = z.infer<
 // the HTTP bodies and the server's durable `prepared_json` share.
 // ---------------------------------------------------------------------------
 
-const BASE64_ALPHABET =
-  'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+const BASE64_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 
 /** Standard base64 (padded). Dependency-free: no Buffer, runs in browsers too. */
 export function toBase64(bytes: Uint8Array): string {
@@ -1425,7 +1424,8 @@ export const SignatureDTOSchema: z.ZodType<SignatureDTO> = z.object({
 });
 
 export const DocumentProtectionSchema: z.ZodType<DocumentProtection> = z.object({
-  level: ModificationLevelSchema.nullable(),
+  enforced: ModificationLevelSchema.nullable(),
+  judged: ModificationLevelSchema.nullable(),
   certification: z
     .object({ signatureIndex: z.number().int().nonnegative(), permission: DocMdpPermissionSchema })
     .nullable(),
@@ -1547,6 +1547,8 @@ export const VersionAnalysisQuerySchema = z
     'since.revision': optionalIndex,
     until: optionalIndex,
     level: ModificationLevelSchema.optional(),
+    /** The judging policy version the caller expects — a cache key, not an input (version responses are immutable). */
+    policy: optionalIndex,
   })
   .refine((q) => (q['since.signature'] === undefined) !== (q['since.revision'] === undefined), {
     message: 'exactly one of since.signature / since.revision is required',

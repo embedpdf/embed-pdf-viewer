@@ -47,8 +47,9 @@ export type DocMdpPermission = 1 | 2 | 3;
  * The modification level a signed document allows, as a product policy:
  *   - `none`: no byte change at all (not a DocMDP value)
  *   - `lta`: DSS and document timestamps only (P = 1)
- *   - `fill`: + form fill, signatures, new signature fields (P = 2)
- *   - `annotate`: + annotations (P = 3, and the approval baseline)
+ *   - `fill`: + form fill, signatures, new signature fields (P = 2, and how a
+ *     validator reads an approval signature)
+ *   - `annotate`: + annotations (P = 3)
  */
 export type ModificationLevel = 'none' | 'lta' | 'fill' | 'annotate';
 
@@ -144,14 +145,25 @@ export interface DocumentFieldLock {
 }
 
 /**
- * Document-derived restrictions in force on the CURRENT bytes: what the
- * signatures already in the file forbid. The engine maps this onto
- * capabilities (a certified document loses page assembly, a P=1 document
- * loses form fill) exactly like encryption permission bits.
+ * What the signatures already in a document mean for what comes after, in
+ * two separate answers:
+ *
+ *   - `enforced`: what a signer DECLARED — a certification's /P, a signed
+ *     field's /Lock /P. The engine refuses what it forbids (mapped onto
+ *     capabilities like encryption permission bits). A plain approval
+ *     signature declares nothing: `null`.
+ *   - `judged`: what a validator holds later changes to — the declared level,
+ *     or the approval baseline (`fill`: form fill-in and signing keep the
+ *     signature valid, anything else does not; Acrobat's reading, ISO 32000
+ *     is silent) when only approval signatures exist. Never refused, only
+ *     judged: an annotation after an approval signature is allowed and then
+ *     reads as invalidating, exactly as in Acrobat.
  */
 export interface DocumentProtection {
-  /** `null` when nothing is signed. */
-  level: ModificationLevel | null;
+  /** Declared and enforced; `null` when nothing declared (unsigned, or approval signatures only). */
+  enforced: ModificationLevel | null;
+  /** Judged; `null` when nothing is signed. */
+  judged: ModificationLevel | null;
   certification: { signatureIndex: number; permission: DocMdpPermission } | null;
   fieldLocks: DocumentFieldLock[];
   /** The versioned product policy that derived this. */

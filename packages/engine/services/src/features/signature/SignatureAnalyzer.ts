@@ -32,12 +32,15 @@ import {
 } from '../../document-session/lifecycle/PdfDocumentOpener';
 import { withScratch, withScratchN } from '../../runtime/memory/scratch';
 import { DocumentSaver } from '../save/DocumentSaver';
+import { scratchPath } from './internal/candidateStore';
+import { generateUuid } from '../../shared/uuid';
 import {
   readRevisions,
   readSignaturesFromModel,
   readStructure,
   withSignatureModel,
 } from './internal/readSignatureModel';
+import { withUtf8CString } from '../../runtime/memory/strings';
 
 // Mirrors public/epdf_signature.h.
 const CHANGE_BY_CODE: Record<number, ObjectChangeType> = { 0: 'added', 1: 'modified', 2: 'freed' };
@@ -84,12 +87,13 @@ export class SignatureAnalyzer {
    * nothing is unsaved.
    */
   readWorkingCopySnapshot(): SignatureSnapshot {
-    if (!this.session.hasUnsavedEdits()) {
-      return new SignatureReader(this.runtime, this.session).readSnapshot();
-    }
     const stack = new CloseStack();
     try {
-      const target = this.openWorkingCopy(stack);
+      const copy = this.openWorkingCopy(stack);
+      if (copy.source === 'loaded') {
+        return new SignatureReader(this.runtime, this.session).readSnapshot();
+      }
+      const target = copy.target;
       return withSignatureModel(this.runtime, target, (model) => {
         const chainValid = this.runtime.fn.EPDFSig_IsRevisionChainValid(model);
         const signatures = readSignaturesFromModel(this.runtime, model);
@@ -106,12 +110,12 @@ export class SignatureAnalyzer {
     const snapshot = reader.readSnapshot();
     const version = reader.version();
     const mode = input.exploratoryLevel ? 'exploratory' : 'authoritative';
-    const basisSource = input.until === 'working-copy' ? 'working-copy' : 'persisted';
-    const basis = {
-      version,
-      editsVersion: this.session.mutationSeq(),
-      source: basisSource,
-    } as const;
+    // Which bytes are judged, truthfully: the working copy only when a save
+    // would change the document — the saver's pass decides that once the
+    // working copy is opened below (an annotation added and removed again
+    // leaves the loaded bytes as the document); otherwise the loaded bytes.
+    let basisSource: 'persisted' | 'working-copy' = 'persisted';
+    const editsVersion = this.session.mutationSeq();
 
     let sinceRevision: number;
     let sinceSignature: number | null = null;
@@ -138,7 +142,7 @@ export class SignatureAnalyzer {
       return {
         mode,
         policyVersion: SIGNATURE_POLICY_VERSION,
-        basis,
+        basis: { version, editsVersion, source: 'persisted' },
         since: { revisionIndex: sinceRevision, signatureIndex: sinceSignature },
         until: { revisionIndex: sinceRevision },
         steps: [],
@@ -158,8 +162,10 @@ export class SignatureAnalyzer {
       // The target: the loaded bytes, or a snapshot of the unsaved state.
       let target = this.session.requireDocPtr();
       let revisions: PdfRevision[] = snapshot.revisions;
-      if (input.until === 'working-copy' && this.session.hasUnsavedEdits()) {
-        target = this.openWorkingCopy(stack);
+      const copy = input.until === 'working-copy' ? this.openWorkingCopy(stack) : null;
+      if (copy && copy.source === 'working-copy') {
+        basisSource = 'working-copy';
+        target = copy.target;
         const signatures = withSignatureModel(this.runtime, target, (m) =>
           readSignaturesFromModel(this.runtime, m),
         );
@@ -224,7 +230,7 @@ export class SignatureAnalyzer {
       return {
         mode,
         policyVersion: SIGNATURE_POLICY_VERSION,
-        basis,
+        basis: { version, editsVersion, source: basisSource },
         since: { revisionIndex: sinceRevision, signatureIndex: sinceSignature },
         until: { revisionIndex: untilRevision },
         steps,
@@ -236,27 +242,36 @@ export class SignatureAnalyzer {
   }
 
   /**
-   * The unsaved state as the bytes a save would write, opened read-only.
-   * A layer session composes its immutable base with the cumulative delta
-   * the layer serializer emits (`EPDFDoc_OpenBaseOverlay`): no copy of the
-   * base, one cross-reference parse, and a revision list that is the base's
-   * plus one — the loaded delta's revision REPLACED, as an artifact is. A
-   * plain session (unsigned by law 9, so this is exploratory) still
-   * materialises a standalone incremental save and opens it whole.
+   * The document as a save would write it, opened read-only, and whose
+   * bytes that is. `loaded`: nothing was mutated since load, or the saver's
+   * pass found no reachable object that differs from its loaded version —
+   * the session's own document is the working copy. `working-copy`: a
+   * layer session composes its immutable base with the cumulative delta
+   * the pass emits (`EPDFDoc_OpenBaseOverlay`: no copy of the base, one
+   * cross-reference parse, the loaded delta's revision REPLACED, as an
+   * artifact is), or — when every edit brought the layer back to its base
+   * — a fresh layer over that base; a plain session (unsigned by law 9, so
+   * this is exploratory) materialises a standalone incremental save and
+   * opens it whole.
    */
-  private openWorkingCopy(stack: CloseStack): Ptr {
+  private openWorkingCopy(stack: CloseStack): { target: Ptr; source: 'loaded' | 'working-copy' } {
     const { fn, mem } = this.runtime;
+    const docPtr = this.session.requireDocPtr();
+    if (!this.session.hasUnsavedEdits()) return { target: docPtr, source: 'loaded' };
     const saver = new DocumentSaver(this.runtime, this.session);
     if (this.session.kind === 'layer') {
-      const delta = new Uint8Array(saver.saveLayerDelta().bytes);
-      if (delta.byteLength === 0) return this.session.requireDocPtr();
-      const ptr = mem.alloc(delta.byteLength);
-      try {
-        mem.writeBytes(ptr, delta);
-        const overlay = fn.EPDFDoc_OpenBaseOverlay(
-          this.session.requireDocPtr(),
-          ptr,
-          delta.byteLength,
+      const base = this.session.source.base;
+      if (saver.canWriteScratchFiles() && base?.kind === 'file') {
+        // The delta on disk, composed over the base in place: no buffer of
+        // the delta, no copy of it. The file is owned from the moment it is
+        // named and goes with the stack, whatever happens next.
+        const path = scratchPath(base.path, 'working-copy', generateUuid(), 'delta');
+        stack.push(() => this.runtime.fileWrite.removeFile(path));
+        const delta = saver.saveLayerDeltaToFileEx(path);
+        if (!delta.changedSinceLoad) return { target: docPtr, source: 'loaded' };
+        if (this.runtime.fileAccess.sizeOf(path) === 0) return this.freshLayerOverBase(stack);
+        const overlay = withUtf8CString(mem, path, (pathPtr) =>
+          fn.EPDFDoc_OpenBaseOverlayFromPath(docPtr, pathPtr),
         );
         if (overlay === NULL_PTR) {
           throw new EngineError(
@@ -264,20 +279,59 @@ export class SignatureAnalyzer {
             'the working copy does not compose with its base',
           );
         }
+        stack.push(() => fn.FPDF_CloseDocument(overlay)); // closes before the file goes (LIFO)
+        return { target: overlay, source: 'working-copy' };
+      }
+      const delta = saver.saveLayerDeltaEx();
+      if (!delta.changedSinceLoad) return { target: docPtr, source: 'loaded' };
+      if (delta.size === 0) return this.freshLayerOverBase(stack);
+      const bytes = new Uint8Array(delta.bytes);
+      const ptr = mem.alloc(bytes.byteLength);
+      try {
+        mem.writeBytes(ptr, bytes);
+        const overlay = fn.EPDFDoc_OpenBaseOverlay(docPtr, ptr, bytes.byteLength);
+        if (overlay === NULL_PTR) {
+          throw new EngineError(
+            EngineErrorCode.MalformedPdf,
+            'the working copy does not compose with its base',
+          );
+        }
         stack.push(() => fn.FPDF_CloseDocument(overlay));
-        return overlay;
+        return { target: overlay, source: 'working-copy' };
       } finally {
         mem.free(ptr);
       }
     }
-    const bytes = saver.saveStandaloneToBuffer('incremental').bytes;
+    const saved = saver.saveStandaloneToBufferEx('incremental');
+    if (saved.unchangedSinceLoad) return { target: docPtr, source: 'loaded' };
     const opened = openFatMemoryDocument(
       this.runtime,
-      new Uint8Array(bytes),
+      new Uint8Array(saved.bytes),
       this.session.password,
     );
     stack.push(() => opened.close());
-    return opened.docPtr;
+    return { target: opened.docPtr, source: 'working-copy' };
+  }
+
+  /** Changed since load, nothing to write: the layer equals its base, and a fresh layer over it IS that document. */
+  private freshLayerOverBase(stack: CloseStack): { target: Ptr; source: 'working-copy' } {
+    const { fn, mem } = this.runtime;
+    const base = fn.EPDFLayer_GetBaseDocument(this.session.requireDocPtr());
+    const statusPtr = mem.alloc(4);
+    try {
+      mem.poke(statusPtr, 'i32', -1);
+      const fresh = fn.EPDFLayer_OpenLayer(base, NULL_PTR, this.session.password ?? '', statusPtr);
+      if (fresh === NULL_PTR || Number(mem.peek(statusPtr, 'i32')) !== 0) {
+        throw new EngineError(
+          EngineErrorCode.MalformedPdf,
+          'the working copy could not be opened over its base',
+        );
+      }
+      stack.push(() => fn.FPDF_CloseDocument(fresh));
+      return { target: fresh, source: 'working-copy' };
+    } finally {
+      mem.free(statusPtr);
+    }
   }
 
   /**

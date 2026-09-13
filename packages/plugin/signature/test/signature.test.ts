@@ -366,3 +366,105 @@ describe('the armed mark over a field', () => {
     expect(handler.onDown(sample(3, { x: 0.5, y: 0.5 }))).toBe(false);
   });
 });
+
+describe('judging what a save would write', () => {
+  it('re-judges the working copy after an edit, warns once, and keeps the persisted verdict apart', async () => {
+    const doc = await openDoc();
+    const signer = await createTestSigner({ commonName: 'Working copy' });
+    const { ctx, dispose } = makeCtx(doc, { stamp: stampStub(artwork) });
+    try {
+      const signature = createSignatureCapability(ctx, {
+        signer,
+        trust: { anchors: async () => [signer.certificate] },
+      });
+      const events: SignatureChange[] = [];
+      signature.onChanged((e) => events.push(e));
+      await signature.refresh();
+      await signature.signField({ field: SIG, mark: { assetId: 'people:signature' } });
+      await signature.validate();
+      expect(signature.verdictOf(SIG)).toMatchObject({
+        summary: 'valid',
+        modifications: { verdict: 'unchanged', basis: 'persisted' },
+      });
+
+      // An unsaved ink stroke: the plugin re-judges the working copy on its own.
+      const page = (await doc.pages.list()).pages[0]!;
+      const ink = () =>
+        doc.page(page.pageObjectNumber).annotations.create({
+          subtype: 'ink',
+          inkList: [
+            [
+              { x: 20, y: 20 },
+              { x: 80, y: 60 },
+            ],
+          ],
+          rect: { left: 10, bottom: 600, right: 100, top: 700 },
+          color: { r: 0, g: 0, b: 0 },
+          strokeWidth: 2,
+        } as never);
+      const first = await ink();
+      await new Promise((r) => setTimeout(r, 700));
+      expect(signature.verdictOf(SIG)).toMatchObject({
+        summary: 'invalid',
+        modifications: { verdict: 'forbidden', basis: 'working-copy' },
+      });
+      const warnings = events.filter((e) => e.type === 'invalidating');
+      expect(warnings).toHaveLength(1);
+      // The field ref is the durable one the snapshot carries (object number).
+      expect(warnings[0]).toMatchObject({ field: { kind: 'objectNumber' } });
+      expect((warnings[0] as { detail: string }).detail).toMatch(/annotation/);
+
+      // A second stroke changes nothing about the verdict: no second warning.
+      const second = await ink();
+      await new Promise((r) => setTimeout(r, 700));
+      expect(events.filter((e) => e.type === 'invalidating')).toHaveLength(1);
+
+      // The loaded bytes still say valid — that is what a file on disk says.
+      const persisted = await signature.validate({ until: 'persisted' });
+      expect(persisted[0]!.summary).toBe('valid');
+      expect(persisted[0]!.modifications.basis).toBe('persisted');
+
+      // Remove both strokes: the document is the loaded one again, and the
+      // plugin re-judges it as such — valid on the persisted basis, and no
+      // further warning (the appearance streams left behind are orphans the
+      // save never writes).
+      await doc.page(page.pageObjectNumber).annotations.delete(first.created.ref);
+      await doc.page(page.pageObjectNumber).annotations.delete(second.created.ref);
+      await new Promise((r) => setTimeout(r, 700));
+      expect(signature.verdictOf(SIG)).toMatchObject({
+        summary: 'valid',
+        modifications: { verdict: 'unchanged', basis: 'persisted' },
+      });
+      expect(events.filter((e) => e.type === 'invalidating')).toHaveLength(1);
+    } finally {
+      await dispose();
+      await doc.close();
+    }
+  });
+
+  it('offers the first signature as a choice when certification is allowed', async () => {
+    const doc = await openDoc();
+    const signer = await createTestSigner();
+    const { ctx } = makeCtx(doc, { stamp: stampStub(artwork) });
+    try {
+      const signature = createSignatureCapability(ctx, { signer, allowCertify: true });
+      const events: SignatureChange[] = [];
+      signature.onChanged((e) => events.push(e));
+      await signature.refresh();
+      // Mode 'sign', but nothing is signed yet and a certification is on the
+      // table: the chrome decides (its dialog), the plugin does not seal.
+      await signature.placeMark({ assetId: 'people:signature' }, { field: SIG });
+      expect(events.at(-1)).toMatchObject({ type: 'ask', field: SIG });
+      expect((await doc.signatures!.list()).signatures[0]!.signed).toBe(false);
+      // The chrome's answer: certify with P=3.
+      const result = await signature.signField({
+        field: SIG,
+        mark: { assetId: 'people:signature' },
+        certify: { permission: 3 },
+      });
+      expect(result.protection).toMatchObject({ enforced: 'annotate', judged: 'annotate' });
+    } finally {
+      await doc.close();
+    }
+  });
+});

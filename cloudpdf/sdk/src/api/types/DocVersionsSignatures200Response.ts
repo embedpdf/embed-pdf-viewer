@@ -116,20 +116,28 @@ export namespace DocVersionsSignatures200Response {
     }
 
     export interface Protection {
-        level: Protection.Level | null;
+        enforced: Protection.Enforced | null;
+        judged: Protection.Judged | null;
         certification: Protection.Certification | null;
         fieldLocks: Protection.FieldLocks.Item[];
         policyVersion: number;
     }
 
     export namespace Protection {
-        export const Level = {
+        export const Enforced = {
             None: "none",
             Lta: "lta",
             Fill: "fill",
             Annotate: "annotate",
         } as const;
-        export type Level = (typeof Level)[keyof typeof Level];
+        export type Enforced = (typeof Enforced)[keyof typeof Enforced];
+        export const Judged = {
+            None: "none",
+            Lta: "lta",
+            Fill: "fill",
+            Annotate: "annotate",
+        } as const;
+        export type Judged = (typeof Judged)[keyof typeof Judged];
 
         export interface Certification {
             signatureIndex: number;

@@ -14,7 +14,8 @@ export function parsePdfValue(text: string): PdfValue {
   const parser = new Parser(text);
   const value = parser.value();
   parser.skipSpaces();
-  if (!parser.atEnd()) throw new Error(`trailing input at ${parser.pos}: ${text.slice(parser.pos, parser.pos + 20)}`);
+  if (!parser.atEnd())
+    throw new Error(`trailing input at ${parser.pos}: ${text.slice(parser.pos, parser.pos + 20)}`);
   return value;
 }
 
@@ -110,7 +111,16 @@ class Parser {
     let out = '';
     while (this.pos < this.text.length) {
       const ch = this.text[this.pos];
-      if (ch === ' ' || ch === '/' || ch === '[' || ch === ']' || ch === '<' || ch === '>' || ch === '(' || ch === ')') {
+      if (
+        ch === ' ' ||
+        ch === '/' ||
+        ch === '[' ||
+        ch === ']' ||
+        ch === '<' ||
+        ch === '>' ||
+        ch === '(' ||
+        ch === ')'
+      ) {
         break;
       }
       if (ch === '#' && /^[0-9A-Fa-f]{2}/.test(this.text.slice(this.pos + 1, this.pos + 3))) {

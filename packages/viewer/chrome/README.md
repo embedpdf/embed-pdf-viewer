@@ -346,7 +346,13 @@ import { FullViewer, personalSigner, indexedDbKeyStore } from '@embedpdf/viewer-
 
 A signed field shows its verdict on click — document intact, signature
 verified, signer trusted, changes since — and offers the signed revision as
-a download. `viewer.get(SignatureToken)` drives all of it from code.
+a download. The panel judges what a save _would_ produce: an unsaved
+annotation after a plain approval signature reads "valid, unsaved changes
+will invalidate it" and a one-line notice says which signature, the way
+Acrobat warns. With `allowCertify` on, the first signature opens the sign
+dialog with the choice Acrobat's certify dialog gives: a plain approval,
+or a certification that allows comments, form filling only, or no changes.
+`viewer.get(SignatureToken)` drives all of it from code.
 
 ## What's deliberately NOT here (yet)
 

@@ -17,7 +17,12 @@ export function SignDialog() {
   const signature = useSignature();
   const [reason, setReason] = useState('');
   const [location, setLocation] = useState('');
-  const [certify, setCertify] = useState(false);
+  // What the signature declares about later changes: a plain approval (form
+  // filling and further signatures keep it valid; Acrobat's reading), or a
+  // certification with its DocMDP permission. Only the FIRST signature can certify.
+  const [signKind, setSignKind] = useState<'approval' | 'certify-3' | 'certify-2' | 'certify-1'>(
+    'approval',
+  );
   const [busy, setBusy] = useState<'sign' | 'fill' | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -40,7 +45,9 @@ export function SignDialog() {
           field,
           mark,
           attribution,
-          ...(certify && signature.canCertify() ? { certify: { permission: 2 as const } } : {}),
+          ...(signKind !== 'approval' && signature.canCertify()
+            ? { certify: { permission: Number(signKind.slice(-1)) as 1 | 2 | 3 } }
+            : {}),
         });
       } else {
         await signature.fillField(field, mark);
@@ -74,13 +81,18 @@ export function SignDialog() {
           <input value={location} onChange={(e) => setLocation(e.target.value)} className={input} />
         </label>
         {signature.canCertify() ? (
-          <label className="text-fg mt-3 flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={certify}
-              onChange={(e) => setCertify(e.target.checked)}
-            />
-            {t('demo.signCertify')}
+          <label className="text-fg-muted mt-3 block text-xs">
+            {t('demo.signKind')}
+            <select
+              value={signKind}
+              onChange={(e) => setSignKind(e.target.value as typeof signKind)}
+              className={input}
+            >
+              <option value="approval">{t('demo.signKindApproval')}</option>
+              <option value="certify-3">{t('demo.signKindCertifyAnnotate')}</option>
+              <option value="certify-2">{t('demo.signKindCertifyFill')}</option>
+              <option value="certify-1">{t('demo.signKindCertifyLocked')}</option>
+            </select>
           </label>
         ) : null}
         {error ? <p className="mt-2 text-sm text-red-600">{error}</p> : null}

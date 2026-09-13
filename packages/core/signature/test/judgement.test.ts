@@ -1,0 +1,276 @@
+/**
+ * Judgement follows the validator the recipient uses. After an approval
+ * signature, form filling and further signatures keep it valid; an
+ * annotation does not (Acrobat's rule). A P=3 certification changes that.
+ * And a verdict can be about the bytes a save WOULD write (`working-copy`),
+ * which is what a viewer must show before the file leaves it.
+ */
+import { readFile } from 'node:fs/promises';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { afterAll, beforeAll, describe, expect, test } from 'vitest';
+import { createLocalEngine } from '@embedpdf/engine';
+
+import { createTestSigner, sign, validateSignatures } from '../src/index';
+
+const here = dirname(fileURLToPath(import.meta.url));
+
+type Engine = Awaited<ReturnType<typeof createLocalEngine>>;
+let engine: Engine;
+let base: Uint8Array;
+let signer: Awaited<ReturnType<typeof createTestSigner>>;
+
+beforeAll(async () => {
+  engine = await createLocalEngine();
+  base = new Uint8Array(
+    await readFile(resolve(here, '../../../engine/main/test/fixtures/unsigned_sigfield.pdf')),
+  );
+  signer = await createTestSigner({ commonName: 'Judgement' });
+});
+afterAll(async () => {
+  await engine.destroy();
+});
+
+const trust = { anchors: async () => [signer.certificate] };
+
+async function inkOn(doc: Awaited<ReturnType<Engine['open']>>) {
+  const page = (await doc.pages.list()).pages[0]!;
+  await doc.page(page.pageObjectNumber).annotations.create({
+    subtype: 'ink',
+    inkList: [
+      [
+        { x: 20, y: 20 },
+        { x: 80, y: 60 },
+        { x: 140, y: 15 },
+      ],
+    ],
+    rect: { left: 10, bottom: 600, right: 200, top: 700 },
+    color: { r: 0, g: 0, b: 0 },
+    strokeWidth: 2,
+  } as never);
+}
+
+describe('what a validator concludes', () => {
+  test('an approval signature: an annotation after it reads invalid; nothing is refused', async () => {
+    const doc = await engine.open(
+      { kind: 'bytes', id: 'judge-approval', bytes: base },
+      { scope: ['*'] },
+    );
+    try {
+      const signed = await sign(doc, { field: { kind: 'fqn', name: 'sig' }, signer });
+      // Declared nothing, judged at the baseline; annotations are not refused.
+      expect(signed.protection).toMatchObject({ enforced: null, judged: 'fill' });
+      expect(doc.security.allows('doc.annotate.modify')).toBe(true);
+
+      // The persisted bytes: the signature seals the last revision.
+      let [v] = await validateSignatures(doc, { trust });
+      expect(v.summary).toBe('valid');
+      expect(v.modifications).toEqual({ verdict: 'unchanged', basis: 'persisted' });
+
+      // An unsaved ink stroke: the loaded bytes still say valid; the bytes a
+      // save would write say invalid — and the verdict says which it judged.
+      await inkOn(doc);
+      [v] = await validateSignatures(doc, { trust });
+      expect(v.summary).toBe('valid');
+      expect(v.modifications.basis).toBe('persisted');
+      [v] = await validateSignatures(doc, { trust, until: 'working-copy' });
+      expect(v.summary).toBe('invalid');
+      expect(v.modifications.basis).toBe('working-copy');
+      expect(v.modifications.verdict).toBe('forbidden');
+      expect(v.modifications.detail).toMatch(/annotation/);
+
+      // Saved and reopened: the file itself is invalid, judged on its bytes.
+      const saved = await doc.download();
+      const reopened = await engine.open(
+        { kind: 'bytes', id: 'judge-approval-saved', bytes: saved },
+        { scope: ['*'] },
+      );
+      try {
+        const analysis = await reopened.signatures!.analyze({ since: { signatureIndex: 0 } });
+        expect(analysis.steps).toHaveLength(1);
+        expect(analysis.steps[0]!.levelInForce).toBe('fill');
+        expect(analysis.verdict).toBe('forbidden');
+        const [r] = await validateSignatures(reopened, { trust });
+        expect(r.summary).toBe('invalid');
+        expect(r.modifications.basis).toBe('persisted');
+        // Still possible to annotate: nothing was declared. Only a rewrite is refused.
+        expect(reopened.security.allows('doc.annotate.modify')).toBe(true);
+        expect(reopened.security.allows('doc.download.flattened')).toBe(false);
+      } finally {
+        await reopened.close();
+      }
+    } finally {
+      await doc.close();
+    }
+  });
+
+  test('a P=3 certification: the same annotation is permitted, for us and for Acrobat', async () => {
+    const doc = await engine.open(
+      { kind: 'bytes', id: 'judge-certify', bytes: base },
+      { scope: ['*'] },
+    );
+    try {
+      const signed = await sign(doc, {
+        field: { kind: 'fqn', name: 'sig' },
+        signer,
+        certify: { permission: 3 },
+      });
+      expect(signed.protection).toMatchObject({ enforced: 'annotate', judged: 'annotate' });
+      await inkOn(doc);
+      const [v] = await validateSignatures(doc, { trust, until: 'working-copy' });
+      expect(v.summary).toBe('valid');
+      expect(v.modifications).toMatchObject({ verdict: 'permitted', basis: 'working-copy' });
+    } finally {
+      await doc.close();
+    }
+  });
+
+  test('an annotation added and removed again leaves the signed bytes untouched', async () => {
+    const doc = await engine.open(
+      { kind: 'bytes', id: 'judge-add-remove', bytes: base },
+      { scope: ['*'] },
+    );
+    try {
+      await sign(doc, { field: { kind: 'fqn', name: 'sig' }, signer });
+      const signedBytes = await doc.download();
+
+      // The engine bakes /AP at create: the orphaned appearance stream the
+      // removal leaves behind is part of this test.
+      const page = (await doc.pages.list()).pages[0]!;
+      const created = await doc.page(page.pageObjectNumber).annotations.create({
+        subtype: 'square',
+        rect: { left: 10, bottom: 600, right: 200, top: 700 },
+        color: { r: 0, g: 0, b: 0 },
+        strokeWidth: 2,
+      } as never);
+      let [v] = await validateSignatures(doc, { trust, until: 'working-copy' });
+      expect(v.summary).toBe('invalid');
+      expect(v.modifications.basis).toBe('working-copy');
+
+      await doc.page(page.pageObjectNumber).annotations.delete(created.created.ref);
+      [v] = await validateSignatures(doc, { trust, until: 'working-copy' });
+      expect(v.summary).toBe('valid');
+      // Nothing to judge: the bytes a save would write ARE the loaded bytes.
+      expect(v.modifications).toEqual({ verdict: 'unchanged', basis: 'persisted' });
+
+      const again = await doc.download();
+      expect(Buffer.from(again).equals(Buffer.from(signedBytes))).toBe(true);
+
+      // A different annotation afterwards is still judged: the pass elides
+      // what equals the loaded document, never a real change.
+      await inkOn(doc);
+      [v] = await validateSignatures(doc, { trust, until: 'working-copy' });
+      expect(v.summary).toBe('invalid');
+      expect(v.modifications.basis).toBe('working-copy');
+      const changed = await doc.download();
+      expect(changed.byteLength).toBeGreaterThan(signedBytes.byteLength);
+    } finally {
+      await doc.close();
+    }
+  });
+
+  test('a persisted annotation removed after a reopen leaves the signed bytes untouched', async () => {
+    // The base page has no /Annots; the persisted layer's page has one. A
+    // server reopens layers all the time (eviction, restart, another
+    // replica): removing the annotation there must restore the BASE shape.
+    const twoPage = new Uint8Array(
+      await readFile(resolve(here, '../../../engine/main/test/fixtures/two_page_sigfield.pdf')),
+    );
+    const doc = await engine.open({ kind: 'bytes', id: 'reopen-a', bytes: twoPage }, { scope: ['*'] });
+    let signed: ArrayBuffer;
+    let artifact: Uint8Array;
+    let pageObjectNumber: number;
+    let ref: import('@embedpdf/engine-core/runtime').AnnotationRef;
+    try {
+      await sign(doc, { field: { kind: 'fqn', name: 'sig' }, signer });
+      signed = await doc.download();
+      const page2 = (await doc.pages.list()).pages[1]!;
+      pageObjectNumber = page2.pageObjectNumber;
+      const created = await doc.page(pageObjectNumber).annotations.create({
+        subtype: 'square',
+        rect: { left: 20, bottom: 20, right: 120, top: 60 },
+        color: { r: 1, g: 0, b: 0 },
+        strokeWidth: 2,
+      } as never);
+      ref = created.created.ref;
+      artifact = await doc.downloadLayer!();
+    } finally {
+      await doc.close();
+    }
+    const reopened = await engine.open(
+      { kind: 'layerBytes', id: 'reopen-b', baseBytes: signed, layer: { kind: 'artifact', bytes: artifact } },
+      { scope: ['*'] },
+    );
+    try {
+      await reopened.page(pageObjectNumber).annotations.delete(ref);
+      const again = await reopened.download();
+      expect(Buffer.from(again).equals(Buffer.from(signed))).toBe(true);
+      const [v] = await validateSignatures(reopened, { trust, until: 'working-copy' });
+      expect(v.summary).toBe('valid');
+      expect(v.modifications.verdict).toBe('unchanged');
+    } finally {
+      await reopened.close();
+    }
+  });
+
+  test('two signatures: an annotation added and removed again keeps both sealed', async () => {
+    const doc = await engine.open(
+      { kind: 'bytes', id: 'judge-two-signatures', bytes: base },
+      { scope: ['*'] },
+    );
+    try {
+      await sign(doc, { field: { kind: 'fqn', name: 'sig' }, signer });
+      // A new signature field after an approval signature is permitted.
+      const page = (await doc.pages.list()).pages[0]!;
+      await doc.forms.createField({
+        family: 'signature',
+        name: 'sig2',
+        widget: {
+          pageObjectNumber: page.pageObjectNumber,
+          rect: { left: 300, bottom: 50, right: 500, top: 120 },
+        },
+      } as never);
+      await sign(doc, { field: { kind: 'fqn', name: 'sig2' }, signer });
+      const sealed = await doc.download();
+      let verdicts = await validateSignatures(doc, { trust });
+      expect(verdicts.map((x) => x.summary)).toEqual(['valid', 'valid']);
+
+      const created = await doc.page(page.pageObjectNumber).annotations.create({
+        subtype: 'square',
+        rect: { left: 10, bottom: 600, right: 200, top: 700 },
+        color: { r: 0, g: 0, b: 0 },
+        strokeWidth: 2,
+      } as never);
+      verdicts = await validateSignatures(doc, { trust, until: 'working-copy' });
+      expect(verdicts.map((x) => x.summary)).toEqual(['invalid', 'invalid']);
+
+      await doc.page(page.pageObjectNumber).annotations.delete(created.created.ref);
+      verdicts = await validateSignatures(doc, { trust, until: 'working-copy' });
+      expect(verdicts.map((x) => x.summary)).toEqual(['valid', 'valid']);
+      expect(verdicts.map((x) => x.modifications.basis)).toEqual(['persisted', 'persisted']);
+      const again = await doc.download();
+      expect(Buffer.from(again).equals(Buffer.from(sealed))).toBe(true);
+    } finally {
+      await doc.close();
+    }
+  });
+
+  test('a P=2 certification refuses the annotation up front — a declaration is enforced', async () => {
+    const doc = await engine.open(
+      { kind: 'bytes', id: 'judge-certify-2', bytes: base },
+      { scope: ['*'] },
+    );
+    try {
+      const signed = await sign(doc, {
+        field: { kind: 'fqn', name: 'sig' },
+        signer,
+        certify: { permission: 2 },
+      });
+      expect(signed.protection).toMatchObject({ enforced: 'fill', judged: 'fill' });
+      expect(doc.security.allows('doc.annotate.modify')).toBe(false);
+      await expect(inkOn(doc)).rejects.toMatchObject({ code: 'ProtectedDocument' });
+    } finally {
+      await doc.close();
+    }
+  });
+});

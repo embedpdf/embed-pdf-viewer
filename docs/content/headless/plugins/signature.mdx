@@ -138,8 +138,25 @@ const analysis = await signature.analyze({ since: { signatureIndex: 0 } }); // w
 const bytes = await signature.revisionBytes(dto.revisionIndex); // the exact bytes the signature covers
 ```
 
-The plugin re-reads and re-validates on `document.versioned` — a signature
-completed here or, on the cloud, in another session.
+The plugin judges the **working copy** by default: unsaved edits count, so the verdict is the one
+the file a save produces will get. `validate({ until: 'persisted' })` judges the loaded bytes only;
+`verdict.modifications.basis` says which bytes a verdict is about. After every annotation or form
+edit the plugin re-judges on its own, and the moment an unsaved edit turns a signature that held into
+one a save would invalidate, it emits `invalidating` once — the warning Acrobat shows.
+
+```ts
+signature.onChanged((e) => {
+  if (e.type === 'invalidating') toast(`This change will invalidate ${e.field} when saved`);
+});
+```
+
+What invalidates what is the engine's judgement (see the engine's signatures page): after a plain
+approval signature, form fill-in and further signatures keep it valid, an annotation does not. A
+signer who wants comments to stay valid certifies with `P=3` — with `allowCertify` on, the first
+signature emits `ask` in mode `sign` too, so a chrome can offer that choice.
+
+The plugin also re-reads and re-validates on `document.versioned` — a signature completed here or,
+on the cloud, in another session.
 
 ## The target and the chrome's intents
 

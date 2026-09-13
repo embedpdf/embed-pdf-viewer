@@ -1,6 +1,7 @@
 import { decodeToken, encodeToken, type TokenInput, type TokenQuery } from './token';
 
 export type { TokenInput } from './token';
+import { SIGNATURE_POLICY_VERSION } from '../signature/protection';
 import {
   AnalysisTokenSchema,
   AnnotationAppearancesRenderTokenSchema,
@@ -30,6 +31,8 @@ export interface AnalysisToken {
   docVersion: number;
   since: { signatureIndex: number } | { revisionIndex: number };
   exploratoryLevel?: ModificationLevel;
+  /** The judging policy version the caller expects (`SIGNATURE_POLICY_VERSION`); keys the cache. */
+  policyVersion?: number;
 }
 
 export const encodeAnalysisToken = (input: AnalysisToken): string =>
@@ -38,6 +41,7 @@ export const encodeAnalysisToken = (input: AnalysisToken): string =>
     'since.signature': 'signatureIndex' in input.since ? input.since.signatureIndex : undefined,
     'since.revision': 'revisionIndex' in input.since ? input.since.revisionIndex : undefined,
     level: input.exploratoryLevel,
+    policy: input.policyVersion ?? SIGNATURE_POLICY_VERSION,
   });
 
 export const decodeAnalysisToken = (raw: string): AnalysisToken => {
@@ -54,6 +58,7 @@ export const decodeAnalysisToken = (raw: string): AnalysisToken => {
         ? { signatureIndex: decodeNonNegativeInteger(sinceSignature, 'since.signature') }
         : { revisionIndex: decodeNonNegativeInteger(sinceRevision!, 'since.revision') },
     ...(t.level !== undefined ? { exploratoryLevel: decodeModificationLevel(t.level) } : {}),
+    ...(t.policy !== undefined ? { policyVersion: decodePositiveInteger(t.policy, 'policy') } : {}),
   };
 };
 
@@ -67,7 +72,8 @@ function decodeModificationLevel(raw: string): ModificationLevel {
 
 function decodeNonNegativeInteger(raw: string | undefined, field: string): number {
   if (raw === undefined) throw new Error(`token is missing "${field}"`);
-  if (!/^(0|[1-9][0-9]*)$/.test(raw)) throw new Error(`token field "${field}" must be a non-negative integer`);
+  if (!/^(0|[1-9][0-9]*)$/.test(raw))
+    throw new Error(`token field "${field}" must be a non-negative integer`);
   return Number(raw);
 }
 

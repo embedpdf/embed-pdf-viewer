@@ -92,7 +92,8 @@ export function runSignatureConformance(
         expect(snapshot.chainValid).toBe(true);
         expect(snapshot.signatures).toEqual([]);
         expect(snapshot.revisions.length >= 1).toBe(true);
-        expect(snapshot.protection.level).toBeNull();
+        expect(snapshot.protection.judged).toBeNull();
+        expect(snapshot.protection.enforced).toBeNull();
         expect(snapshot.protection.certification).toBeNull();
         expect(snapshot.protection.fieldLocks).toEqual([]);
         expect(doc.security.allows('doc.pages.assemble')).toBe(true);
@@ -141,8 +142,9 @@ export function runSignatureConformance(
           expect(sig.byteRange![0]).toBe(0);
           expect(sig.byteRange![2] + sig.byteRange![3]).toBe(snapshot.revisions[i + 1].end);
         }
-        // Approval signatures without a certification: the baseline level.
-        expect(snapshot.protection.level).toBe('annotate');
+        // Approval signatures without a certification: nothing declared, judged at the baseline.
+        expect(snapshot.protection.judged).toBe('fill');
+        expect(snapshot.protection.enforced).toBeNull();
         expect(snapshot.protection.certification).toBeNull();
         expect(snapshot.protection.fieldLocks).toEqual([]);
 
@@ -164,17 +166,23 @@ export function runSignatureConformance(
         // Any algorithm, same protocol.
         expect((await doc.signatures!.digest(first.field, 'sha512')).byteLength).toBe(64);
         // fqn refs resolve too.
-        const byName = await doc.signatures!.digest({ kind: 'fqn', name: first.fieldName }, 'sha256');
+        const byName = await doc.signatures!.digest(
+          { kind: 'fqn', name: first.fieldName },
+          'sha256',
+        );
         expect(toHex(byName)).toBe(toHex(digest));
 
         // An unsaved edit is not a revision: the byte facts do not move.
         const fields = await doc.forms.list();
         const text = fields.fields.find((f) => f.name === fixture.textField)!;
         expect(text).toBeTruthy();
-        await doc.forms.setValue({ kind: 'objectNumber', fieldObjectNumber: text.fieldObjectNumber }, {
-          type: 'text',
-          value: 'unsaved',
-        });
+        await doc.forms.setValue(
+          { kind: 'objectNumber', fieldObjectNumber: text.fieldObjectNumber },
+          {
+            type: 'text',
+            value: 'unsaved',
+          },
+        );
         const again = await doc.signatures!.list();
         expect(again.revisions).toEqual(snapshot.revisions);
         expect(again.signatures.map((s) => [s.coverage, s.revisionIndex, s.byteRange])).toEqual(
@@ -202,8 +210,12 @@ export function runSignatureConformance(
         expect(sig.coverage).toBe('whole-revision');
         expect(sig.docMdp).toBe(2);
         expect(sig.catalogCertification).toBe(true);
-        expect(snapshot.protection.level).toBe('fill');
-        expect(snapshot.protection.certification).toEqual({ signatureIndex: sig.index, permission: 2 });
+        expect(snapshot.protection.judged).toBe('fill');
+        expect(snapshot.protection.enforced).toBe('fill');
+        expect(snapshot.protection.certification).toEqual({
+          signatureIndex: sig.index,
+          permission: 2,
+        });
 
         expect(doc.security.allows('doc.forms.read')).toBe(true);
         expect(doc.security.allows('doc.forms.fill')).toBe(true);
@@ -239,7 +251,8 @@ export function runSignatureConformance(
       try {
         // Analysis is policy-independent; enforcement is not.
         const snapshot = await permitted.signatures!.list();
-        expect(snapshot.protection.level).toBe('fill');
+        expect(snapshot.protection.judged).toBe('fill');
+        expect(snapshot.protection.enforced).toBe('fill');
         expect(permitted.security.allows('doc.pages.assemble')).toBe(true);
         const rewritten = await permitted.download({ mode: 'rewrite' });
         expect(rewritten.byteLength > 0).toBe(true);
@@ -258,7 +271,8 @@ export function runSignatureConformance(
         const sig = snapshot.signatures[0];
         expect(sig.fieldName).toBe(fixture.fieldName);
         expect(sig.fieldMdp).toEqual({ action: 'include', fields: [fixture.lockedField] });
-        expect(snapshot.protection.level).toBe('annotate');
+        expect(snapshot.protection.judged).toBe('fill');
+        expect(snapshot.protection.enforced).toBeNull();
         // The FieldMDP, and the /Lock the authoring engine mirrors it with
         // when it wrote the field — both name the same fields.
         expect(snapshot.protection.fieldLocks[0]).toEqual({
@@ -289,7 +303,10 @@ export function runSignatureConformance(
       if (!permitEngine) return;
       const permitted = await open(permitEngine, opts, fixture);
       try {
-        const result = await permitted.forms.setValue(lockedRef, { type: 'text', value: 'changed' });
+        const result = await permitted.forms.setValue(lockedRef, {
+          type: 'text',
+          value: 'changed',
+        });
         expect(result.field.name).toBe(fixture.lockedField);
       } finally {
         await permitted.close();
@@ -313,8 +330,9 @@ export function runSignatureConformance(
           expect((await doc.signatures!.digest(sig.field, 'sha256')).byteLength).toBe(32);
         }
         expect(snapshot.revisions.every((r) => r.signatureIndex === null)).toBe(true);
-        // Signed, so protected at the approval baseline — even a partial one is a signature.
-        expect(snapshot.protection.level).toBe('annotate');
+        // Signed, so judged at the approval baseline — even a partial one is a signature.
+        expect(snapshot.protection.judged).toBe('fill');
+        expect(snapshot.protection.enforced).toBeNull();
         let caught: unknown;
         try {
           await doc.signatures!.revisionBytes(3);
@@ -365,10 +383,12 @@ function runAnalysisTests(
       expect(analysis.until.revisionIndex).toBe(2);
       expect(analysis.steps).toHaveLength(1);
       const [step] = analysis.steps;
-      expect(step.levelInForce).toBe('annotate');
+      expect(step.levelInForce).toBe('fill');
       expect(step.verdict).toBe('permitted');
       expect(step.changes.length > 0).toBe(true);
-      const rules = new Set(step.findings.filter((f) => f.verdict === 'permitted').map((f) => f.rule));
+      const rules = new Set(
+        step.findings.filter((f) => f.verdict === 'permitted').map((f) => f.rule),
+      );
       expect(rules.has('form-fill')).toBe(true);
       expect(rules.has('signature-added')).toBe(true);
       expect(step.findings.filter((f) => f.verdict === 'forbidden')).toEqual([]);
@@ -378,7 +398,10 @@ function runAnalysisTests(
       expect(latest.steps).toHaveLength(0);
       expect(latest.verdict).toBe('unchanged');
       // History only: from the original revision up to the first signature.
-      const historic = await doc.signatures!.analyze({ since: { revisionIndex: 0 }, until: { revisionIndex: 1 } });
+      const historic = await doc.signatures!.analyze({
+        since: { revisionIndex: 0 },
+        until: { revisionIndex: 1 },
+      });
       expect(historic.steps).toHaveLength(1);
       expect(historic.verdict).toBe('permitted');
     } finally {
@@ -391,28 +414,46 @@ function runAnalysisTests(
     const fx = opts.fixtures.unsignedSigField;
     const doc = await open(engineOf(), opts, fx);
     try {
-      const prepared = await doc.signatures!.prepare({ field: { kind: 'fqn', name: fx.fieldName }, certify: { permission: 2 } });
-      await doc.signatures!.complete({ signingId: prepared.signingId, cms: FAKE_CMS, expectedVersion: prepared.expectedVersion });
-      const clean = await doc.signatures!.analyze({ since: { signatureIndex: 0 }, until: 'working-copy' });
+      const prepared = await doc.signatures!.prepare({
+        field: { kind: 'fqn', name: fx.fieldName },
+        certify: { permission: 2 },
+      });
+      await doc.signatures!.complete({
+        signingId: prepared.signingId,
+        cms: FAKE_CMS,
+        expectedVersion: prepared.expectedVersion,
+      });
+      const clean = await doc.signatures!.analyze({
+        since: { signatureIndex: 0 },
+        until: 'working-copy',
+      });
       expect(clean.steps).toHaveLength(0);
       expect(clean.verdict).toBe('unchanged');
-      await doc.forms.setValue({ kind: 'fqn', name: fx.textField }, { type: 'text', value: 'draft' });
+      await doc.forms.setValue(
+        { kind: 'fqn', name: fx.textField },
+        { type: 'text', value: 'draft' },
+      );
       const persisted = await doc.signatures!.analyze({ since: { signatureIndex: 0 } });
       expect(persisted.steps).toHaveLength(0);
-      const working = await doc.signatures!.analyze({ since: { signatureIndex: 0 }, until: 'working-copy' });
+      const working = await doc.signatures!.analyze({
+        since: { signatureIndex: 0 },
+        until: 'working-copy',
+      });
       expect(working.basis.source).toBe('working-copy');
       expect(working.steps).toHaveLength(1);
       expect(working.steps[0].levelInForce).toBe('fill');
       expect(working.verdict).toBe('permitted');
-      expect(working.steps[0].findings.some((f) => f.rule === 'form-fill' && f.verdict === 'permitted')).toBe(true);
+      expect(
+        working.steps[0].findings.some((f) => f.rule === 'form-fill' && f.verdict === 'permitted'),
+      ).toBe(true);
     } finally {
       await doc.close();
     }
     const partial = await open(engineOf(), opts, opts.fixtures.partialChain);
     try {
-      expect(await caughtCode(() => partial.signatures!.analyze({ since: { signatureIndex: 0 } }))).toBe(
-        EngineErrorCode.InvalidArg,
-      );
+      expect(
+        await caughtCode(() => partial.signatures!.analyze({ since: { signatureIndex: 0 } })),
+      ).toBe(EngineErrorCode.InvalidArg);
       const byRevision = await partial.signatures!.analyze({ since: { revisionIndex: 0 } });
       expect(byRevision.steps).toHaveLength(2);
     } finally {
@@ -432,7 +473,10 @@ function runAnalysisTests(
       // dictionary change no signature permits either.
       const list = await certified.pages.list();
       await certified.pages.rotate([list.pages[0].pageObjectNumber], 90);
-      const working = await certified.signatures!.analyze({ since: { signatureIndex: 0 }, until: 'working-copy' });
+      const working = await certified.signatures!.analyze({
+        since: { signatureIndex: 0 },
+        until: 'working-copy',
+      });
       expect(working.verdict).toBe('forbidden');
       const bytes = await certified.download();
       reopened = await reopen(permit, opts, `${opts.fixtures.certified.id}-tampered`, bytes);
@@ -446,8 +490,14 @@ function runAnalysisTests(
     // Editing a FieldMDP-locked field: the lock rule, whatever the level.
     const locked = await open(permit, opts, opts.fixtures.fieldMdp);
     try {
-      await locked.forms.setValue({ kind: 'fqn', name: opts.fixtures.fieldMdp.lockedField }, { type: 'text', value: 'tampered' });
-      const working = await locked.signatures!.analyze({ since: { signatureIndex: 0 }, until: 'working-copy' });
+      await locked.forms.setValue(
+        { kind: 'fqn', name: opts.fixtures.fieldMdp.lockedField },
+        { type: 'text', value: 'tampered' },
+      );
+      const working = await locked.signatures!.analyze({
+        since: { signatureIndex: 0 },
+        until: 'working-copy',
+      });
       expect(working.verdict).toBe('forbidden');
       expect(working.steps[0].findings.some((f) => f.rule === 'field-lock')).toBe(true);
     } finally {
@@ -492,7 +542,7 @@ function runSigningTests(
       expect(before.revisions).toHaveLength(1);
       expect(before.signatures).toHaveLength(1);
       expect(before.signatures[0].signed).toBe(false);
-      expect(before.protection.level).toBeNull();
+      expect(before.protection.judged).toBeNull();
 
       const prepared = await doc.signatures!.prepare({
         field: sigRef(),
@@ -550,7 +600,8 @@ function runSigningTests(
       expect(result.signature.contentsSize).toBe(FAKE_CMS.byteLength);
       expect(result.previous).toEqual(prepared.expectedVersion);
       expect(result.version.sha256 === v0.sha256).toBe(false);
-      expect(result.protection.level).toBe('annotate');
+      expect(result.protection.judged).toBe('fill');
+      expect(result.protection.enforced).toBeNull();
       expect(result.meta.affectedPages.length >= 1).toBe(true);
 
       // The session is on the new version, and every byte fact follows.
@@ -571,7 +622,9 @@ function runSigningTests(
       const fresh = await reopened.signatures!.list();
       expect(fresh.revisions).toHaveLength(2);
       expect(fresh.signatures[0].coverage).toBe('whole-revision');
-      expect(toHex(await reopened.signatures!.digest(sigRef(), 'sha256'))).toBe(toHex(prepared.digest));
+      expect(toHex(await reopened.signatures!.digest(sigRef(), 'sha256'))).toBe(
+        toHex(prepared.digest),
+      );
 
       // Idempotent replay, then the fence is gone.
       const replay = await doc.signatures!.complete({
@@ -599,7 +652,7 @@ function runSigningTests(
     }
   });
 
-  test('sign: unsaved edits are sealed in the signature\'s own revision (layer session)', async () => {
+  test("sign: unsaved edits are sealed in the signature's own revision (layer session)", async () => {
     if (!supported()) return;
     const doc = await open(engineOf(), opts, fx());
     try {
@@ -642,7 +695,8 @@ function runSigningTests(
       });
       expect(result.signature.docMdp).toBe(2);
       expect(result.signature.catalogCertification).toBe(true);
-      expect(result.protection.level).toBe('fill');
+      expect(result.protection.judged).toBe('fill');
+      expect(result.protection.enforced).toBe('fill');
       expect(result.protection.certification).toEqual({
         signatureIndex: result.signature.index,
         permission: 2,
@@ -784,7 +838,11 @@ async function open(
     return engine.open({ kind: 'bytes', id: fixture.id, bytes: await fixture.bytes() });
   }
   if (opts.openKind === 'layerBytes') {
-    return engine.open({ kind: 'layerBytes', id: `${fixture.id}-layer`, baseBytes: await fixture.bytes() });
+    return engine.open({
+      kind: 'layerBytes',
+      id: `${fixture.id}-layer`,
+      baseBytes: await fixture.bytes(),
+    });
   }
   return engine.open({ kind: 'id', id: fixture.cloudId ?? fixture.id });
 }

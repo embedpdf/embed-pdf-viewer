@@ -40,14 +40,22 @@ describe('detached CMS: build → parse → verify', () => {
       const tampered = cms.slice();
       tampered[tampered.byteLength - 1] ^= 0x01;
       expect(await verifyCmsSignature(tampered)).toBe('invalid');
-      expect(await verifyForCompletion({ cms, prepared, profile: 'cades-b' })).toEqual({ ok: true });
+      expect(await verifyForCompletion({ cms, prepared, profile: 'cades-b' })).toEqual({
+        ok: true,
+      });
     });
   }
 
   test('a PKCS#7 CMS carries signing-time and no ESS attribute', async () => {
     const signer = await createTestSigner();
     const when = new Date('2026-09-11T00:00:00Z');
-    const cms = await buildDetachedCms({ digest, hash: 'sha256', profile: 'pkcs7', signer, signingTime: when });
+    const cms = await buildDetachedCms({
+      digest,
+      hash: 'sha256',
+      profile: 'pkcs7',
+      signer,
+      signingTime: when,
+    });
     const parsed = parseDetachedCms(cms);
     expect(parsed.signingTime?.toISOString()).toBe(when.toISOString());
     expect(parsed.signingCertificateV2).toBe(false);
@@ -64,8 +72,15 @@ describe('detached CMS: build → parse → verify', () => {
     const signer = await createTestSigner();
     const other = digest.slice();
     other[0] ^= 0xff;
-    const wrongDigest = await buildDetachedCms({ digest: other, hash: 'sha256', profile: 'cades-b', signer });
-    expect(await verifyForCompletion({ cms: wrongDigest, prepared, profile: 'cades-b' })).toMatchObject({
+    const wrongDigest = await buildDetachedCms({
+      digest: other,
+      hash: 'sha256',
+      profile: 'cades-b',
+      signer,
+    });
+    expect(
+      await verifyForCompletion({ cms: wrongDigest, prepared, profile: 'cades-b' }),
+    ).toMatchObject({
       ok: false,
       reason: 'digest-mismatch',
     });
@@ -76,20 +91,28 @@ describe('detached CMS: build → parse → verify', () => {
       profile: 'cades-b',
       signer: sha384,
     });
-    expect(await verifyForCompletion({ cms: wrongAlgorithm, prepared, profile: 'cades-b' })).toMatchObject({
+    expect(
+      await verifyForCompletion({ cms: wrongAlgorithm, prepared, profile: 'cades-b' }),
+    ).toMatchObject({
       ok: false,
       reason: 'algorithm-mismatch',
     });
     const cms = await buildDetachedCms({ digest, hash: 'sha256', profile: 'cades-b', signer });
     expect(
-      await verifyForCompletion({ cms, prepared: { ...prepared, contentsSize: 16 }, profile: 'cades-b' }),
+      await verifyForCompletion({
+        cms,
+        prepared: { ...prepared, contentsSize: 16 },
+        profile: 'cades-b',
+      }),
     ).toMatchObject({ ok: false, reason: 'too-large' });
-    expect(await verifyForCompletion({ cms: new Uint8Array([1, 2, 3]), prepared, profile: 'cades-b' })).toMatchObject(
-      { ok: false, reason: 'malformed' },
-    );
+    expect(
+      await verifyForCompletion({ cms: new Uint8Array([1, 2, 3]), prepared, profile: 'cades-b' }),
+    ).toMatchObject({ ok: false, reason: 'malformed' });
     const tampered = cms.slice();
     tampered[tampered.byteLength - 2] ^= 0x10;
-    expect(await verifyForCompletion({ cms: tampered, prepared, profile: 'cades-b' })).toMatchObject({
+    expect(
+      await verifyForCompletion({ cms: tampered, prepared, profile: 'cades-b' }),
+    ).toMatchObject({
       ok: false,
       reason: 'signature-invalid',
     });
@@ -97,12 +120,17 @@ describe('detached CMS: build → parse → verify', () => {
 
   test('a signer whose hash disagrees with the prepared digest is refused before signing', async () => {
     const signer = await createTestSigner({ hash: 'sha384' });
-    await expect(buildDetachedCms({ digest, hash: 'sha256', profile: 'cades-b', signer })).rejects.toThrow(
-      /hashes with sha384/,
-    );
+    await expect(
+      buildDetachedCms({ digest, hash: 'sha256', profile: 'cades-b', signer }),
+    ).rejects.toThrow(/hashes with sha384/);
     const sha256: RawSigner = { ...(await createTestSigner()), hash: 'sha256' };
     await expect(
-      buildDetachedCms({ digest: new Uint8Array(20), hash: 'sha256', profile: 'cades-b', signer: sha256 }),
+      buildDetachedCms({
+        digest: new Uint8Array(20),
+        hash: 'sha256',
+        profile: 'cades-b',
+        signer: sha256,
+      }),
     ).rejects.toThrow(/20 bytes/);
   });
 
@@ -111,20 +139,28 @@ describe('detached CMS: build → parse → verify', () => {
     const stranger = await createTestSigner({ commonName: 'someone else' });
     const cms = await buildDetachedCms({ digest, hash: 'sha256', profile: 'cades-b', signer });
     expect(await validateChain(cms, null)).toMatchObject({ status: 'unknown' });
-    expect(await validateChain(cms, { anchors: async () => [] })).toMatchObject({ status: 'unknown' });
+    expect(await validateChain(cms, { anchors: async () => [] })).toMatchObject({
+      status: 'unknown',
+    });
     const trusted = await validateChain(cms, { anchors: async () => [signer.certificate] });
     expect(trusted.status).toBe('trusted');
     // PKI.js reports the anchor as the path's end even when the leaf is the anchor.
     expect((trusted.path?.length ?? 0) >= 1).toBe(true);
-    expect(Array.from(trusted.path![trusted.path!.length - 1])).toEqual(Array.from(signer.certificate));
+    expect(Array.from(trusted.path![trusted.path!.length - 1])).toEqual(
+      Array.from(signer.certificate),
+    );
     const untrusted = await validateChain(cms, { anchors: async () => [stranger.certificate] });
     expect(untrusted.status).toBe('untrusted');
     // A chain judged before the certificate existed is untrusted.
-    const early = await validateChain(cms, { anchors: async () => [signer.certificate] }, {
-      kind: 'timestamp',
-      genTime: new Date('2000-01-01T00:00:00Z'),
-      tokenVerified: true,
-    });
+    const early = await validateChain(
+      cms,
+      { anchors: async () => [signer.certificate] },
+      {
+        kind: 'timestamp',
+        genTime: new Date('2000-01-01T00:00:00Z'),
+        tokenVerified: true,
+      },
+    );
     expect(early.status).toBe('untrusted');
   });
 });

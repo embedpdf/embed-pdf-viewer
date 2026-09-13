@@ -99,14 +99,51 @@ export function createSignatureCapability(
     return snapshot;
   };
 
-  const validate = async (opts?: { at?: ValidationTime }): Promise<SignatureVerdict[]> => {
+  const validate = async (opts?: {
+    at?: ValidationTime;
+    until?: 'persisted' | 'working-copy';
+  }): Promise<SignatureVerdict[]> => {
     const doc = ctx.doc;
     if (!doc?.signatures) return [];
-    const verdicts = await validateSignatures(doc, { trust: config.trust ?? null, at: opts?.at });
+    const verdicts = await validateSignatures(doc, {
+      trust: config.trust ?? null,
+      at: opts?.at,
+      until: opts?.until ?? 'working-copy',
+    });
+    const before = state().verdicts;
     ctx.dispatch({ type: 'VERDICTS', verdicts });
     changed.emit({ type: 'validated', verdicts });
+    // Acrobat's warning, after the fact and only on the edge: a signature that
+    // held (or was never judged) now reads invalid because of unsaved edits.
+    for (const v of verdicts) {
+      if (v.modifications.basis !== 'working-copy' || v.summary !== 'invalid') continue;
+      const was = before?.find((b) => b.signature.index === v.signature.index);
+      if (was && was.summary === 'invalid') continue;
+      changed.emit({
+        type: 'invalidating',
+        field: v.signature.field,
+        detail: v.modifications.detail ?? '',
+      });
+    }
     return verdicts;
   };
+
+  // Every edit that could count as a modification re-judges the working copy.
+  // Coalesced: a pen stroke is many events, one analysis.
+  let revalidateTimer: ReturnType<typeof setTimeout> | null = null;
+  const revalidateSoon = (): void => {
+    if (!state().snapshot?.signatures.some((s) => s.signed)) return;
+    if (revalidateTimer) clearTimeout(revalidateTimer);
+    revalidateTimer = setTimeout(() => {
+      revalidateTimer = null;
+      void validate().catch((error) =>
+        globalThis.console?.error('[signature] re-validation failed:', error),
+      );
+    }, 300);
+  };
+  ctx.cleanup(() => {
+    if (revalidateTimer) clearTimeout(revalidateTimer);
+  });
 
   const analyze = (input: AnalyzeInput): Promise<ChangeAnalysis> =>
     requireSignatures().signatures.analyze(input);
@@ -232,6 +269,13 @@ export function createSignatureCapability(
     }
     switch (mode()) {
       case 'sign':
+        // The first signature is the one that can certify: when the config
+        // allows a certification, let the chrome offer the choice (its sign
+        // dialog) instead of sealing a plain approval on the spot.
+        if (config.allowCertify && !state().snapshot?.signatures.some((s) => s.signed)) {
+          changed.emit({ type: 'ask', field: target.field, mark });
+          return;
+        }
         await signField({ field: target.field, mark });
         return;
       case 'visual':
@@ -281,10 +325,22 @@ export function createSignatureCapability(
         case 'form.imported':
         case 'form.repaired':
           // The field set changed (a signature field authored or removed, here
-          // or remotely): the snapshot lists fields, so re-read it.
-          void refresh().catch((error) =>
-            globalThis.console?.error('[signature] refresh failed:', error),
-          );
+          // or remotely): the snapshot lists fields, so re-read it — and the
+          // change is a modification of the working copy, so re-judge.
+          void refresh()
+            .then(() => revalidateSoon())
+            .catch((error) => globalThis.console?.error('[signature] refresh failed:', error));
+          return;
+        case 'annotation.created':
+        case 'annotation.updated':
+        case 'annotation.deleted':
+        case 'annotation.moved':
+        case 'form.valueChanged':
+        case 'form.fieldUpdated':
+        case 'form.effectsApplied':
+          // An edit of the working copy: what a save would write changed, so
+          // what a validator would say about it may have too.
+          revalidateSoon();
           return;
         default:
           return;

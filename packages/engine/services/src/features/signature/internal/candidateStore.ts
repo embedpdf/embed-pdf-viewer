@@ -440,3 +440,12 @@ export class FileCandidateStore implements CandidateStore {
 export function defaultCandidatePath(basePath: string, signingId: string): string {
   return `${basePath}.signing-${signingId}.pdf`;
 }
+
+/**
+ * A scratch file beside the base: `<base>.<tag>-<id>.<ext>`. Unique per
+ * id, so a file a document holds open is never rewritten; the caller that
+ * names it registers its removal before anything writes it.
+ */
+export function scratchPath(basePath: string, tag: string, id: string, ext: string): string {
+  return `${basePath}.${tag}-${id}.${ext}`;
+}

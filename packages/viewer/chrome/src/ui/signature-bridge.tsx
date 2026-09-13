@@ -27,6 +27,10 @@ export function SignatureBridge() {
       case 'inspect':
         shell.open('signature-inspector', { props: { field: event.field } });
         return;
+      case 'invalidating':
+        // The notice lives in the signatures panel; make sure it is seen.
+        shell.open('signatures', { exclusive: 'right' });
+        return;
       default:
         return;
     }

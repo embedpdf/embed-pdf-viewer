@@ -28,13 +28,19 @@ import {
   useSignatureSnapshot,
   useSignatureTarget,
   useSignatureVerdicts,
+  useSignatureEvent,
   useSignerRows,
   type SignatureDTO,
+  type SignatureVerdict,
   type SignerRow,
 } from '@embedpdf/react/signature';
 import { useSignaturesConfig } from '../config-context';
 import { Icon } from './icons';
 import { restoreStampLibrariesOnce } from './stamp-store';
+
+const fieldLabel = (
+  field: { kind: 'fqn'; name: string } | { kind: 'objectNumber'; fieldObjectNumber: number },
+): string => (field.kind === 'fqn' ? field.name : `#${field.fieldObjectNumber}`);
 
 export function SignaturesPanel() {
   const t = useT();
@@ -48,6 +54,20 @@ export function SignaturesPanel() {
   const maker = useSurface('signature-maker');
   const [armedId, setArmedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Acrobat's warning: an unsaved edit just turned a signature that held into
+  // one a save would invalidate. Shown until the next verdicts land.
+  const [invalidating, setInvalidating] = useState<string | null>(null);
+  useSignatureEvent((event) => {
+    if (event.type === 'invalidating')
+      setInvalidating(signature.signatureOf(event.field)?.fieldName ?? fieldLabel(event.field));
+    else if (
+      event.type === 'validated' &&
+      !event.verdicts.some(
+        (v) => v.summary === 'invalid' && v.modifications.basis === 'working-copy',
+      )
+    )
+      setInvalidating(null);
+  });
 
   // The people live in the same store as the stamps: bring them back on
   // first open (a no-op when the store component already did).
@@ -105,6 +125,11 @@ export function SignaturesPanel() {
         <DocumentSignatures />
       </div>
 
+      {invalidating && (
+        <div className="border-border-subtle shrink-0 border-t px-3 py-2 text-xs text-amber-700">
+          {t('demo.signaturesInvalidating', { params: { field: invalidating } })}
+        </div>
+      )}
       {(error || target || armedId) && (
         <div
           className={`border-border-subtle shrink-0 border-t px-3 py-2 text-xs ${
@@ -290,8 +315,32 @@ function DocumentSignatures() {
   const { target } = useSignatureTarget();
   const [validating, setValidating] = useState(false);
   const fields = snapshot?.signatures ?? [];
-  const summaryOf = (dto: SignatureDTO) =>
-    verdicts?.find((v) => v.signature.index === dto.index)?.summary ?? null;
+  const verdictOf = (dto: SignatureDTO) =>
+    verdicts?.find((v) => v.signature.index === dto.index) ?? null;
+  // Three honest states: valid; valid on disk but unsaved edits would
+  // invalidate it (the verdict judged the working copy); invalid on disk.
+  const verdictLabel = (v: SignatureVerdict | null): string =>
+    !v
+      ? t('demo.signaturesSigned')
+      : v.summary === 'valid'
+        ? t('demo.verdictValid')
+        : v.summary === 'valid-untrusted'
+          ? t('demo.verdictValidUntrusted')
+          : v.summary === 'indeterminate'
+            ? t('demo.verdictIndeterminate')
+            : v.modifications.basis === 'working-copy'
+              ? t('demo.verdictWillInvalidate')
+              : t('demo.verdictInvalid');
+  const verdictTone = (v: SignatureVerdict | null): string =>
+    !v || v.summary === 'indeterminate'
+      ? 'text-fg-muted'
+      : v.summary === 'invalid'
+        ? v.modifications.basis === 'working-copy'
+          ? 'text-amber-600'
+          : 'text-red-600'
+        : v.summary === 'valid-untrusted'
+          ? 'text-amber-600'
+          : 'text-green-600';
   const isTarget = (dto: SignatureDTO) =>
     !!target &&
     (target.kind === 'fqn'
@@ -325,7 +374,7 @@ function DocumentSignatures() {
       ) : (
         <ul className="mt-1 flex flex-col gap-1">
           {fields.map((dto) => {
-            const summary = summaryOf(dto);
+            const verdict = verdictOf(dto);
             return (
               <li key={dto.index}>
                 <button
@@ -343,18 +392,10 @@ function DocumentSignatures() {
                     className={dto.signed ? 'text-green-600' : 'text-fg-muted'}
                   />
                   <span className="text-fg min-w-0 flex-1 truncate">{dto.fieldName}</span>
-                  <span className="text-fg-muted text-xs">
-                    {dto.signed
-                      ? summary === 'valid'
-                        ? t('demo.verdictValid')
-                        : summary === 'valid-untrusted'
-                          ? t('demo.verdictValidUntrusted')
-                          : summary === 'invalid'
-                            ? t('demo.verdictInvalid')
-                            : summary === 'indeterminate'
-                              ? t('demo.verdictIndeterminate')
-                              : t('demo.signaturesSigned')
-                      : t('demo.signaturesUnsigned')}
+                  <span
+                    className={`shrink-0 text-right text-xs ${dto.signed ? verdictTone(verdict) : 'text-fg-muted'}`}
+                  >
+                    {dto.signed ? verdictLabel(verdict) : t('demo.signaturesUnsigned')}
                   </span>
                 </button>
               </li>

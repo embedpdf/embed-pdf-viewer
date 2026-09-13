@@ -125,6 +125,7 @@ export class VersionsClient {
             "since.revision": sinceRevision,
             level,
             until,
+            policy,
             "X-Document-Password": documentPassword,
         } = request;
         const _queryParams: Record<string, unknown> = {
@@ -132,6 +133,7 @@ export class VersionsClient {
             "since.revision": sinceRevision,
             level: level != null ? level : undefined,
             until,
+            policy,
         };
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(

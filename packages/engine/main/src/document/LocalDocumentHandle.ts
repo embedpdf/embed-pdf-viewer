@@ -178,7 +178,7 @@ export class LocalDocumentHandle implements DocumentHandle {
     // signed document refuses it unless the engine runs with
     // `signedDocumentPolicy: 'permit'`.
     const protection = this.guard.currentProtection();
-    if (mode === 'rewrite' && protection && protection.level !== null) {
+    if (mode === 'rewrite' && protection && protection.judged !== null) {
       return AbortablePromise.rejectReason(
         new EngineError(
           EngineErrorCode.ProtectedDocument,
@@ -257,7 +257,7 @@ export class LocalDocumentHandle implements DocumentHandle {
       return AbortablePromise.rejectReason(err);
     }
     const protection = this.guard.currentProtection();
-    if (mode === 'rewrite' && protection && protection.level !== null) {
+    if (mode === 'rewrite' && protection && protection.judged !== null) {
       return AbortablePromise.rejectReason(
         new EngineError(
           EngineErrorCode.ProtectedDocument,

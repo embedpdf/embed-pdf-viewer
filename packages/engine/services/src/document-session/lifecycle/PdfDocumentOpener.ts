@@ -1,6 +1,7 @@
 import { EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
 import type { PdfFileAccessHandle, PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 import { NULL_PTR } from '@embedpdf/engine-runtime';
+import { withUtf8CString } from '../../runtime/memory/strings';
 
 export type OpenedPdfDocumentKind = 'fat-memory' | 'layer';
 
@@ -129,6 +130,13 @@ export function openLayerDocument(
     let docPtr: Ptr;
     if (layer.kind === 'fresh') {
       docPtr = fn.EPDFLayer_OpenLayer(base.basePtr, NULL_PTR, password ?? '', statusPtr);
+    } else if (layer.kind === 'artifact-file' && runtime.kind === 'native') {
+      // The runtime opens the file itself and the layer keeps it open: the
+      // delta is read in place, never copied, and every stream it carries
+      // stays a view into the file (no overlay or twin copy either).
+      docPtr = withUtf8CString(mem, layer.path, (pathPtr) =>
+        fn.EPDFLayer_OpenLayerArtifactFromPath(base.basePtr, pathPtr, password ?? '', statusPtr),
+      );
     } else {
       layerAccess =
         layer.kind === 'artifact-file'

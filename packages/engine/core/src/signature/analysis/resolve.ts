@@ -88,7 +88,11 @@ export class EdgeResolver {
           if (up === null) return null;
           cyclic ||= up.cyclic;
           for (const u of up.edges) {
-            edges.push({ parent: u.parent, label: `${u.label}/${e.label}`, via: [...(u.via ?? []), e.parent] });
+            edges.push({
+              parent: u.parent,
+              label: `${u.label}/${e.label}`,
+              via: [...(u.via ?? []), e.parent],
+            });
           }
         }
         if (edges.length > this.budget.maxEdgesPerObject) return null;
