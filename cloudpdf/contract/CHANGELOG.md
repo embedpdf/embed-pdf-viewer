@@ -1,5 +1,11 @@
 # @cloudpdf/contract
 
+## 3.0.0-next.13
+
+### Minor Changes
+
+- [#812](https://github.com/embedpdf/embed-pdf-viewer/pull/812) by [@bobsingor](https://github.com/bobsingor) – Add API contracts and OpenAPI schemas for preparing, completing, aborting, listing, and analyzing digital signatures. Add document version history, immutable version downloads, signed revision downloads, and signature contents and digest endpoints, with signing permissions and version conflict responses.
+
 ## 3.0.0-next.12
 
 ### Minor Changes

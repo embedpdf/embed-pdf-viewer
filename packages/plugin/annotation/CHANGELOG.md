@@ -1,5 +1,11 @@
 # @embedpdf/plugin-annotation
 
+## 3.0.0-next.13
+
+### Minor Changes
+
+- [#812](https://github.com/embedpdf/embed-pdf-viewer/pull/812) by [@bobsingor](https://github.com/bobsingor) – Refresh widget appearances after visual signature fills and signing, and reload annotations when a new document version is published. Add box styling for signature widgets and expose annotation interaction priorities and the armed-stamp tool ID for cooperating plugins.
+
 ## 3.0.0-next.12
 
 ### Minor Changes

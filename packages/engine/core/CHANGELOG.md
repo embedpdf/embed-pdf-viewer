@@ -1,5 +1,20 @@
 # @embedpdf/engine-core
 
+## 3.0.0-next.13
+
+### Minor Changes
+
+- [#812](https://github.com/embedpdf/embed-pdf-viewer/pull/812) by [@bobsingor](https://github.com/bobsingor) – Add digital signature and document version types, signing permissions, events,
+  wire schemas, and the optional `DocumentSignaturesService` API. Support
+  signature-field authoring and appearances, file-backed layer inputs, file
+  downloads, and configurable session and signed-document policies.
+
+  Add revision change analysis and protection helpers that distinguish declared
+  editing restrictions from the rules used to judge later modifications.
+
+  Prevent excessive processing time when decoding malformed base64 containing long
+  runs of padding characters.
+
 ## 3.0.0-next.12
 
 ### Minor Changes
