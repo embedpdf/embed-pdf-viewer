@@ -1301,7 +1301,12 @@ export function toBase64(bytes: Uint8Array): string {
 }
 
 export function fromBase64(encoded: string): Uint8Array {
-  const clean = encoded.replace(/=+$/, '');
+  // Scan backward to avoid regex backtracking on long runs of interior padding.
+  let end = encoded.length;
+  while (end > 0 && encoded[end - 1] === '=') {
+    end -= 1;
+  }
+  const clean = encoded.slice(0, end);
   if (clean.length % 4 === 1 || /[^A-Za-z0-9+/]/.test(clean)) {
     throw new Error('malformed base64');
   }
