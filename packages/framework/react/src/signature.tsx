@@ -19,7 +19,7 @@ import {
   type SignatureSnapshot,
   type SignatureVerdict,
 } from '@embedpdf/plugin-signature';
-import { StampToken, type StampAsset, type StampLibrary } from '@embedpdf/plugin-stamp';
+import { StampToken, type StampAsset, type StampLibrary } from '@embedpdf/plugin-stamp/contract';
 
 import { shallowArray, useCapability, useCapabilityEvent, useSelector } from './runtime';
 import { useStampLibraries } from './stamp';
