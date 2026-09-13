@@ -2010,14 +2010,13 @@ export class DocumentService {
   }
 
   /**
-   * The caller's password session as a publish must carry it: its binding
-   * (AEAD-bound to the current base sha) and the unlock key this request
-   * holds, so the session can be re-encrypted under the new version's
-   * binding inside the publishing transaction. `null` when the document
-   * needs no password session (unencrypted, or an api token that supplies
-   * the password per request).
+   * The binding and JWT unlock key needed to rebind the caller's session
+   * inside the publishing transaction. This context contains no PDF
+   * password: the repository decrypts and re-encrypts it under the new
+   * version's binding. `null` when the document needs no password session
+   * (unencrypted, or an api token that supplies the password per request).
    */
-  async passwordSessionForRebind(
+  async sessionRebindContext(
     ctx: OpenContext,
     docId: string,
     layerName: string,

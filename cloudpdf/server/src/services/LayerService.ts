@@ -3384,7 +3384,7 @@ export class LayerService {
             await this.uploadVersionObject(versionKey, candidatePath, finalized.version);
 
             // 4. Publish: one transaction, two fences, one audit row.
-            const passwordSession = await documentService.passwordSessionForRebind(
+            const sessionRebindContext = await documentService.sessionRebindContext(
               ctx,
               input.docId,
               input.layerName,
@@ -3399,7 +3399,7 @@ export class LayerService {
                 finalized,
                 versionKey,
                 cms: input.cms,
-                passwordSession,
+                sessionRebindContext,
               });
             } catch (err) {
               if (err instanceof AlreadyCompleted) {
@@ -3631,7 +3631,7 @@ export class LayerService {
       };
       versionKey: string;
       cms: Uint8Array;
-      passwordSession: { binding: PasswordSessionBinding; unlockKey: string } | null;
+      sessionRebindContext: { binding: PasswordSessionBinding; unlockKey: string } | null;
     },
   ): Promise<{ result: SignatureCompleteResult; auditId: number }> {
     const signings = this.requireSignings();
@@ -3784,12 +3784,12 @@ export class LayerService {
         }
 
         // (6) The completer's password session follows the version.
-        if (input.passwordSession && this.passwordSessions) {
+        if (input.sessionRebindContext && this.passwordSessions) {
           await this.passwordSessions.rebind(
             trx,
-            input.passwordSession.binding,
-            { ...input.passwordSession.binding, baseSha: finalized.version.sha256 },
-            input.passwordSession.unlockKey,
+            input.sessionRebindContext.binding,
+            { ...input.sessionRebindContext.binding, baseSha: finalized.version.sha256 },
+            input.sessionRebindContext.unlockKey,
             now,
           );
         }
