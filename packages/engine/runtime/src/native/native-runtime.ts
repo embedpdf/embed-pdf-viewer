@@ -1,3 +1,4 @@
+import { appendFileSync, closeSync, openSync, readSync, statSync, unlinkSync, writeSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import type {
   Callback,
@@ -114,11 +115,50 @@ function createNativeFileAccess(addon: NativeAddon): PdfRuntimeFileAccess {
       }
       return createHandle(addon.createPathFileAccess(path));
     },
+    readRange(path, offset, length) {
+      const fd = openSync(path, 'r');
+      try {
+        const out = new Uint8Array(length);
+        let read = 0;
+        while (read < length) {
+          const n = readSync(fd, out, read, length - read, offset + read);
+          if (n === 0) break;
+          read += n;
+        }
+        return read === length ? out : out.subarray(0, read);
+      } finally {
+        closeSync(fd);
+      }
+    },
+    sizeOf(path) {
+      return statSync(path).size;
+    },
   };
 }
 
 function createNativeFileWrite(addon: NativeAddon): PdfRuntimeFileWrite {
   return {
+    writeRange(path, offset, bytes) {
+      const fd = openSync(path, 'r+');
+      try {
+        let written = 0;
+        while (written < bytes.byteLength) {
+          written += writeSync(fd, bytes, written, bytes.byteLength - written, offset + written);
+        }
+      } finally {
+        closeSync(fd);
+      }
+    },
+    appendBytes(path, bytes) {
+      appendFileSync(path, bytes);
+    },
+    removeFile(path) {
+      try {
+        unlinkSync(path);
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+      }
+    },
     toNodeFile(path) {
       if (!addon.createPathFileWrite || !addon.getFileWritePtr || !addon.destroyFileWrite) {
         throw new Error('Native runtime does not expose file-write helpers');

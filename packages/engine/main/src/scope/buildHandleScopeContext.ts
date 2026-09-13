@@ -3,7 +3,9 @@ import {
   decodePdfBits,
   parseScope,
   validateScopeArray,
+  type DocumentProtection,
   type IdentityClaims,
+  type SignedDocumentPolicy,
 } from '@embedpdf/engine-core/runtime';
 
 import type { HandleScopeContext } from './HandleScopeContext';
@@ -30,6 +32,10 @@ export interface BuildHandleScopeContextInput {
    * typed `PdfBits` view inside this builder.
    */
   pdfPermissionsBits: number | null;
+  /** What the document's signatures forbid, from the open probe; `null` when unsigned or unknown. */
+  protection?: DocumentProtection | null;
+  /** Default `protect`. */
+  signedDocumentPolicy?: SignedDocumentPolicy;
 }
 
 /**
@@ -63,6 +69,8 @@ export function buildHandleScopeContext(input: BuildHandleScopeContextInput): Ha
     scope,
     identity,
     pdfBits: decodePdfBits(input.pdfPermissionsBits),
+    protection: input.protection ?? null,
+    signedDocumentPolicy: input.signedDocumentPolicy ?? 'protect',
   };
 }
 

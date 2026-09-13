@@ -51,8 +51,29 @@ export {
   SearchToken,
   SelectionToken,
   ShellToken,
+  SignatureToken,
   StageToken,
   StampToken,
+} from '@embedpdf/viewer-chrome';
+// Signatures: the signer ports a `signatures` config names — the same one
+// import as the chrome (`personalSigner` keeps a self-signed identity in the
+// browser; `webCryptoSigner` / `remoteSigner` bring the embedder's key).
+export {
+  createTestSigner,
+  indexedDbKeyStore,
+  memoryKeyStore,
+  personalSigner,
+  remoteSigner,
+  webCryptoSigner,
+} from '@embedpdf/viewer-chrome';
+export type {
+  Mark,
+  SignatureMode,
+  SignaturesCustomization,
+  SignerPort,
+  SignFieldInput,
+  StampsCustomization,
+  TrustPort,
 } from '@embedpdf/viewer-chrome';
 export type {
   CapabilityToken,

@@ -17,6 +17,7 @@ import {
   type WorkerImageEncoder,
 } from '@embedpdf/engine-services';
 
+import { signingCandidatePathFactory } from './signing-paths';
 import type { WorkerBootstrapData } from './WorkerThreadPool';
 
 if (!parentPort) {
@@ -33,9 +34,12 @@ const port = parentPort;
  * `init-error`, so a bad font config fails worker spawn rather than degrading
  * silently.
  */
+function bootstrap(): WorkerBootstrapData | undefined {
+  return workerData as WorkerBootstrapData | undefined;
+}
+
 function bootstrapFontSpecs(): StartupFontSpec[] {
-  const data = workerData as WorkerBootstrapData | undefined;
-  const descriptors = data?.fonts ?? [];
+  const descriptors = bootstrap()?.fonts ?? [];
   return descriptors.map((d) => ({
     key: d.key,
     path: d.path,
@@ -86,7 +90,16 @@ function bootstrapFontSpecs(): StartupFontSpec[] {
     (pack: WirePack<WorkerResponse>) => {
       port.postMessage(pack.payload, pack.transfer as readonly ArrayBuffer[]);
     },
-    { imageEncoder },
+    {
+      imageEncoder,
+      // File-backed sessions sign through a candidate FILE under the
+      // signing root the API process shares, keyed by signing id, so the
+      // tail can be streamed to object storage right after prepare without
+      // the path crossing the engine boundary.
+      ...(bootstrap()?.signingRoot
+        ? { signingCandidatePath: signingCandidatePathFactory(bootstrap()!.signingRoot) }
+        : {}),
+    },
   );
 
   // Seed this thread's runtime fonts before reporting ready, so the first

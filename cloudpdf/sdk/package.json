@@ -140,6 +140,28 @@
             },
             "default": "./dist/cjs/api/resources/doc/resources/redactions/exports.js"
         },
+        "./doc/signatures": {
+            "import": {
+                "types": "./dist/esm/api/resources/doc/resources/signatures/exports.d.mts",
+                "default": "./dist/esm/api/resources/doc/resources/signatures/exports.mjs"
+            },
+            "require": {
+                "types": "./dist/cjs/api/resources/doc/resources/signatures/exports.d.ts",
+                "default": "./dist/cjs/api/resources/doc/resources/signatures/exports.js"
+            },
+            "default": "./dist/cjs/api/resources/doc/resources/signatures/exports.js"
+        },
+        "./doc/versions": {
+            "import": {
+                "types": "./dist/esm/api/resources/doc/resources/versions/exports.d.mts",
+                "default": "./dist/esm/api/resources/doc/resources/versions/exports.mjs"
+            },
+            "require": {
+                "types": "./dist/cjs/api/resources/doc/resources/versions/exports.d.ts",
+                "default": "./dist/cjs/api/resources/doc/resources/versions/exports.js"
+            },
+            "default": "./dist/cjs/api/resources/doc/resources/versions/exports.js"
+        },
         "./package.json": "./package.json"
     },
     "files": [

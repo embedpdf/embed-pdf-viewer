@@ -5,6 +5,7 @@ import type { Kysely } from 'kysely';
 
 import type { DerivedRenderService } from './DerivedRenderService';
 import { DocumentSecurityProbe } from './DocumentSecurityProbe';
+import type { BaseVersionsRepo } from '../db/repos/base_versions.repo';
 import {
   DocumentImportsRepo,
   type DocumentImportRow,
@@ -181,6 +182,8 @@ export interface DocumentLifecycleOptions {
   importConnections?: ImportConnectionRegistry;
   /** Import provenance/audit rows; absent = no provenance recorded. */
   documentImports?: DocumentImportsRepo;
+  /** The base version catalog (migration 030): a commit records version 1. */
+  baseVersions?: BaseVersionsRepo;
   /**
    * Raw database handle for multi-repo transactions: async import
    * enqueue must create the pending document and its job atomically.
@@ -225,6 +228,7 @@ export class DocumentLifecycleService {
   private readonly importPolicy?: ImportPolicy;
   private readonly importConnections: ImportConnectionRegistry;
   private readonly documentImports?: DocumentImportsRepo;
+  private readonly baseVersions?: BaseVersionsRepo;
   private readonly db?: Kysely<Schema>;
   private readonly importGate: Semaphore;
   /** Single-flight per (tenant, idempotencyKey): concurrent retries share one transfer. */
@@ -245,6 +249,7 @@ export class DocumentLifecycleService {
     if (opts.importPolicy) this.importPolicy = opts.importPolicy;
     this.importConnections = opts.importConnections ?? new ImportConnectionRegistry();
     if (opts.documentImports) this.documentImports = opts.documentImports;
+    if (opts.baseVersions) this.baseVersions = opts.baseVersions;
     if (opts.db) this.db = opts.db;
     this.importGate = new Semaphore(opts.importPolicy?.maxConcurrent ?? 1);
   }
@@ -975,6 +980,15 @@ export class DocumentLifecycleService {
       if (!updated) {
         throw conflict(`document ${doc.id} state changed during commit`);
       }
+      // Version 1 of the base catalog: the upload is the immutable base
+      // every later signature descends from. Idempotent on the sha.
+      await this.baseVersions?.insertInitial({
+        tenantId: doc.tenantId,
+        docId: doc.id,
+        sha256: declaredSha,
+        byteLength: stat.size,
+        createdAt: updated.createdAt,
+      });
       const recorded = await this.usageMeters?.recordUpload(updated.id, updated.createdAt);
       if (recorded?.counted) await this.tenantUsage?.recordUpload(updated.tenantId);
 

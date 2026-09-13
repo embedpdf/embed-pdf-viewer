@@ -14,8 +14,8 @@
 import type { FormFieldFamily } from '@embedpdf/engine-core/runtime';
 import type { AnnotationPropsPatch, ClickCreate } from '@embedpdf/plugin-annotation/contract';
 
-/** The families the palette can author (no pushbutton/signature tools). */
-export type AuthorableFormFamily = Exclude<FormFieldFamily, 'pushbutton' | 'signature' | 'unknown'>;
+/** The families the palette can author (push buttons are not authorable). */
+export type AuthorableFormFamily = Exclude<FormFieldFamily, 'pushbutton' | 'unknown'>;
 
 export interface FormToolDef {
   id: string;
@@ -23,7 +23,7 @@ export interface FormToolDef {
   family: AuthorableFormFamily;
   /** The client kind the ANNOTATION registry routes on (props panel).
    *  Not a PDF subtype — every widget is PDF `widget`; this is the view. */
-  visualKind: 'widget-text' | 'widget-choice' | 'widget-toggle';
+  visualKind: 'widget-text' | 'widget-choice' | 'widget-toggle' | 'widget-box';
   /** What a bare click places (box policies only — fields are boxes). */
   clickCreate: Extract<ClickCreate, { width: number }>;
   /** Seed drawing defaults: a placed field is VISIBLE (white box, gray
@@ -80,6 +80,17 @@ export const FORM_TOOLS: readonly FormToolDef[] = [
     visualKind: 'widget-choice',
     clickCreate: { width: 140, height: 72 },
     defaults: { ...FIELD_CHROME, fontSize: 12 },
+    cursor: 'crosshair',
+  },
+  // A signature field: the bare widget box every non-text family ingests
+  // as (`widget-box`). It has no value of its own to style — the signing
+  // act (the signature plugin) draws the mark into it later.
+  {
+    id: 'form-signature',
+    family: 'signature',
+    visualKind: 'widget-box',
+    clickCreate: { width: 160, height: 48 },
+    defaults: FIELD_CHROME,
     cursor: 'crosshair',
   },
 ];

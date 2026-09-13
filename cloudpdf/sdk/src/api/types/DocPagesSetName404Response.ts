@@ -32,6 +32,12 @@ export namespace DocPagesSetName404Response {
         LayerVersionConflict: "LayerVersionConflict",
         NotImplemented: "NotImplemented",
         MalformedPdf: "MalformedPdf",
+        SigningPending: "SigningPending",
+        SigningExpired: "SigningExpired",
+        SigningVersionMismatch: "SigningVersionMismatch",
+        SignatureRefused: "SignatureRefused",
+        ProtectedDocument: "ProtectedDocument",
+        StaleBase: "StaleBase",
     } as const;
     export type Code = (typeof Code)[keyof typeof Code];
 }

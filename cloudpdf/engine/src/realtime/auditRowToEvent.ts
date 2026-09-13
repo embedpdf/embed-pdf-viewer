@@ -168,6 +168,7 @@ export function auditRowToEvent(row: AuditEventRow, mySessionId: string): Docume
     case 'form.createField':
       return { type: 'form.fieldCreated', origin, ...(row.payload as FormFieldCreateResult) };
     case 'form.updateField':
+    case 'form.setSignatureAppearance':
       return { type: 'form.fieldUpdated', origin, ...(row.payload as FormFieldUpdateResult) };
     case 'form.deleteField':
       return { type: 'form.fieldDeleted', origin, ...(row.payload as FormFieldDeleteResult) };

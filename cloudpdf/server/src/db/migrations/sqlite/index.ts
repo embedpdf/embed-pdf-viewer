@@ -56,6 +56,8 @@ import down028 from './028_engine_crash_journal.down.sql';
 import sql028 from './028_engine_crash_journal.sql';
 import down029 from './029_layer_annotations_version.down.sql';
 import sql029 from './029_layer_annotations_version.sql';
+import down030 from './030_signatures.down.sql';
+import sql030 from './030_signatures.sql';
 import type { MigrationSource } from '../../migrator/runner';
 
 /**
@@ -99,4 +101,5 @@ export const sqliteMigrations: ReadonlyArray<MigrationSource> = [
   { version: '027', name: '027_document_imports_source_json.sql', sql: sql027, down: down027 },
   { version: '028', name: '028_engine_crash_journal.sql', sql: sql028, down: down028 },
   { version: '029', name: '029_layer_annotations_version.sql', sql: sql029, down: down029 },
+  { version: '030', name: '030_signatures.sql', sql: sql030, down: down030 },
 ];

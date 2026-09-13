@@ -6,4 +6,5 @@ export default {
   selection: 'Selection',
   'page-edit': 'Page edit',
   stamp: 'Stamps',
+  signature: 'Signatures',
 };

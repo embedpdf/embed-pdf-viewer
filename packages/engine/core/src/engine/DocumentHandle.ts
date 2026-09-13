@@ -7,12 +7,14 @@ import type { DocumentRedactionService } from './DocumentRedactionService';
 import type { DocumentRenderService } from './DocumentRenderService';
 import type { DocumentSearchService } from './DocumentSearchService';
 import type { DocumentSecurityService } from './DocumentSecurityService';
+import type { DocumentSignaturesService } from './DocumentSignaturesService';
 import type { MetadataService } from './MetadataService';
 import type { PageHandle } from './PageHandle';
 import type { PieceInfoService } from './PieceInfoService';
 import type { PdfSaveMode } from '../dto/PdfSaveMode';
 import type { DocumentEventStream } from '../events/DocumentEventStream';
 import type { PageObjectNumber } from '../identity/PageObjectNumber';
+import type { BaseVersionInfo } from '../signature/types';
 import { AbortablePromise } from '../promise/AbortablePromise';
 
 export interface DocumentCapabilities {
@@ -71,6 +73,13 @@ export interface DocumentHandle {
    */
   readonly redaction?: DocumentRedactionService;
   /**
+   * Digital signatures: the read side (revisions, signed fields, the
+   * protection they impose) and the two-phase signing protocol. Optional
+   * while engines ship it — feature-detect with
+   * `doc.signatures !== undefined`.
+   */
+  readonly signatures?: DocumentSignaturesService;
+  /**
    * The document's event stream — every confirmed mutation, exactly once,
    * identical shape on local and cloud engines (see `DocumentEvent`). The
    * engine-instance identity lives on each event's `origin.sessionId`.
@@ -84,12 +93,26 @@ export interface DocumentHandle {
   page(pageObjectNumber: PageObjectNumber): PageHandle;
   download(opts?: { mode?: PdfSaveMode }): AbortablePromise<Uint8Array>;
   /**
+   * Local Node engines only: write the document to a local file without
+   * moving its bytes through JS. An untouched session (no unsaved edits,
+   * incremental mode) is streamed out verbatim — for a signed document,
+   * exactly as sealed. Absent on engines that cannot reach a filesystem.
+   */
+  downloadToFile?(path: string, opts?: { mode?: PdfSaveMode }): AbortablePromise<void>;
+  /**
+   * The saved version this session is on: SHA-256 and length of the
+   * loaded bytes (for a layer session, of its base). Changes only when
+   * a signature completes. Optional while engines ship it.
+   */
+  version?(): AbortablePromise<BaseVersionInfo>;
+  /**
    * Export JUST this document's LAYER as a self-contained artifact (the small
    * overlay diff over the immutable base) — re-openable later via
-   * `OpenInputLayerBytes` with `{ kind: 'artifact', bytes }`. Optional: only the
-   * local engine, opened WITH a layer (`layerBytes`), supports it; the cloud
-   * engine manages layers server-side and omits it. Rejects if the document was
-   * opened without a layer.
+   * `OpenInputLayerBytes` with `{ kind: 'artifact', bytes }`. Optional: the
+   * local engine supports it for every session it opens as a layer (the
+   * default `sessionKind`, and any `layerBytes` open); the cloud engine
+   * manages layers server-side and omits it. Rejects on a session opened
+   * with `sessionKind: 'plain'`.
    */
   downloadLayer?(): AbortablePromise<Uint8Array>;
   close(): AbortablePromise<void>;

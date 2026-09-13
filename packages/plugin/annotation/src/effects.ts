@@ -53,6 +53,36 @@ export function registerAnnotationEffects(
       });
       return;
     }
+    // A field update re-bakes its widgets too — a signature field's visual
+    // fill (`forms.setSignatureAppearance`) draws a mark into the widget
+    // without a value write, so it arrives as `form.fieldUpdated`.
+    if (event.type === 'form.fieldUpdated') {
+      apply({
+        t: 'bumpAp',
+        ids: event.field.widgets
+          .filter((w) => w.annotObjectNumber > 0)
+          .map((w) => encodeStableIdKey({ kind: 'objectNumber', value: w.annotObjectNumber })),
+      });
+      return;
+    }
+    // A completed signature sealed the field with its mark as appearance:
+    // repaint that widget. The session also moved to new bytes
+    // (`document.versioned` follows); a remote completion arrives as that
+    // event alone, so the versioned handler below re-reads the plane.
+    if (event.type === 'signature.completed') {
+      const widget = event.signature.widget;
+      if (widget && widget.annotObjectNumber > 0) {
+        apply({
+          t: 'bumpAp',
+          ids: [encodeStableIdKey({ kind: 'objectNumber', value: widget.annotObjectNumber })],
+        });
+      }
+      return;
+    }
+    if (event.type === 'document.versioned') {
+      void host().rehydrate();
+      return;
+    }
     // A redaction apply deleted the consumed marks plus every intersecting
     // annotation on the applied pages. ORIGIN-AGNOSTIC: our own applies run
     // through the redaction plugin's doc-level verb, never this plane's

@@ -16,6 +16,35 @@ import type { StampPlacement } from '@embedpdf/plugin-annotation/contract';
 export type StampAssetKind = 'stamp' | 'signature' | 'initials';
 
 /**
+ * What a library file is FOR — the routing key a surface queries by. Open:
+ * the plugin defines `stamps` (the default) and `signatures`; an embedder
+ * may define its own (`toolbar`, `legal-seals`). Persisted in the file.
+ */
+export type StampLibraryKind = string;
+
+export interface StampLibraryQuery {
+  /** One kind or several; omitted = every library. */
+  kind?: StampLibraryKind | readonly StampLibraryKind[];
+}
+
+/**
+ * How a mark is authored: drawn strokes (kept as a vector path), typed text
+ * in a registered font (embedded by the flatten), a raster image, or a page
+ * of a PDF. Ink strokes are in points, y-up, any origin — the asset page is
+ * the mark's bounds.
+ */
+export type MarkSource =
+  | {
+      kind: 'ink';
+      strokes: ReadonlyArray<ReadonlyArray<{ x: number; y: number }>>;
+      color?: string;
+      strokeWidth?: number;
+    }
+  | { kind: 'text'; text: string; fontFamily: string; color?: string; fontSize?: number }
+  | { kind: 'image'; source: BinarySource }
+  | { kind: 'pdf'; source: BinarySource; pageIndex?: number };
+
+/**
  * One asset's SERIALIZABLE descriptor. The bytes and the cached preview are
  * deliberately NOT here — the reducer state stays pure/serializable (kernel
  * rule 1); binary lives in the capability and crosses only as call
@@ -54,6 +83,8 @@ export interface StampLibrary {
   /** PieceInfo `Id` — stable while the title is editable. */
   id: string;
   name: string;
+  /** PieceInfo `Kind`: `'stamps'`, `'signatures'`, or an embedder's own. */
+  kind: StampLibraryKind;
   /** PieceInfo `Locale` — the language of the labels, when the library says. */
   locale?: string;
   categories?: string[];
@@ -70,6 +101,7 @@ export interface StampState {
 
 export type StampAction =
   | { type: 'LIBRARY_ADDED'; library: StampLibrary }
+  | { type: 'LIBRARY_UPDATED'; library: StampLibrary }
   | { type: 'LIBRARY_REMOVED'; libraryId: string }
   | { type: 'ASSET_ADDED'; asset: StampAsset }
   | { type: 'ASSET_UPDATED'; asset: StampAsset }
@@ -78,7 +110,14 @@ export type StampAction =
 /** Why a library's canonical bytes changed — the persistence signal. */
 export interface StampLibraryChange {
   libraryId: string;
-  reason: 'created' | 'imported' | 'asset-added' | 'asset-updated' | 'asset-removed' | 'removed';
+  reason:
+    | 'created'
+    | 'imported'
+    | 'updated'
+    | 'asset-added'
+    | 'asset-updated'
+    | 'asset-removed'
+    | 'removed';
 }
 
 export interface StampConfig {
@@ -126,6 +165,8 @@ export interface ImportLibraryOptions {
   categories?: string[];
   /** Kind stamped onto every imported asset. Default `'stamp'`. */
   kind?: StampAssetKind;
+  /** What the file is for; overrides what the file says (an Acrobat-authored set imported for a toolbar). */
+  libraryKind?: StampLibraryKind;
   /**
    * FALLBACK per-page labels for a plain PDF (no `/Names /Pages` registry):
    * every page becomes a stamp named `Stamp<n>` with this label. Ignored
@@ -150,7 +191,10 @@ export interface AddAssetInput {
    * image flattened into it — so every asset is a page and every library a
    * complete PDF.
    */
-  source: BinarySource;
+  /** PNG, JPEG, or single-page PDF bytes. Exactly one of `source` / `mark`. */
+  source?: BinarySource;
+  /** An authored mark — drawn, typed, an image, or a PDF page. Exactly one of `source` / `mark`. */
+  mark?: MarkSource;
   /** Thumbnail override for pickers (PNG/JPEG); rendered from the page otherwise. */
   preview?: BinarySource;
   /** Page size in PDF points for a RASTER source. Ignored for PDF sources (the page has one). */
@@ -165,7 +209,7 @@ export interface StampAssetPreview {
 
 export interface StampCapability {
   // ── selectors (pure reads over serializable state) ──
-  libraries(): StampLibrary[];
+  libraries(query?: StampLibraryQuery): StampLibrary[];
   library(id: string): StampLibrary | null;
   /** Assets of one library, in library order — or every asset when omitted. */
   assets(libraryId?: string): StampAsset[];
@@ -182,7 +226,12 @@ export interface StampCapability {
    * is a valid file from the start). Resolves to the library id; feed it to
    * `addAsset({ libraryId })` to fill it.
    */
-  createLibrary(name: string, opts?: { id?: string; categories?: string[] }): Promise<string>;
+  createLibrary(
+    name: string,
+    opts?: { id?: string; kind?: StampLibraryKind; categories?: string[] },
+  ): Promise<string>;
+  /** Rename (the PDF's `/Title`) or re-categorise a library. */
+  updateLibrary(id: string, patch: { name?: string; categories?: string[] }): Promise<void>;
   /**
    * Import a PDF as a stamp library: every page becomes one vector asset
    * (single-page PDF bytes + a cached preview render). Uses the asset
@@ -255,6 +304,8 @@ export interface StampCapability {
   ): Promise<AnnotationRef>;
   /** Disarm the stamp tool on a document. */
   disarm(documentId: string): void;
+  /** The asset armed on a document through {@link armAsset}, while the annotation plugin still holds it. */
+  armedAsset(documentId: string): StampAsset | null;
 }
 
 export const StampToken = createCapabilityToken<StampCapability>('stamp');

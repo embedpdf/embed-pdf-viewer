@@ -46,6 +46,8 @@ export interface BaseClaims extends IdentityClaims {
    * password sessions to this JWT. Kept as an extension claim so the
    * server can encrypt/decrypt password-session rows without treating
    * `jti` itself as secret material.
+   * The issuer must generate this independently of the PDF password using
+   * a CSPRNG (at least 32 random bytes, encoded for example as base64url).
    */
   embedpdf?: {
     unlock_key?: string;

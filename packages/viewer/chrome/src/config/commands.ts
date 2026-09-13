@@ -30,6 +30,7 @@ import { LinkToken, openLinkTarget, type PdfLinkTarget } from '@embedpdf/react/l
 import { SearchToken } from '@embedpdf/react/search';
 import { RedactionToken } from '@embedpdf/react/redaction';
 import { StampToken } from '@embedpdf/react/stamp';
+import { SignatureToken } from '@embedpdf/react/signature';
 import { I18nToken } from '@embedpdf/react/i18n';
 
 // ── helpers ────────────────────────────────────────────────────────────────
@@ -510,7 +511,18 @@ export const defaultCommands: CommandDef[] = [
   },
   // File attachment — click the spot, pick the file (the attachment provider).
   tool('insert:add-attachment', 'attachment', 'commands.insert.attachment', 'paperclip'),
-  tool('insert:add-signature', 'signature', 'commands.insert.signature', 'signature'),
+  // Signatures open the PEOPLE panel (libraries of kind 'signatures'): pick a
+  // mark → with a target field it signs (or fills) it, else it arms — a click
+  // on a signature field signs, anywhere else drops a stamp (Preview).
+  {
+    id: 'insert:add-signature',
+    labelKey: 'commands.insert.signature',
+    icon: 'signature',
+    visible: (c) => c.tryGet(StampToken) != null && c.tryGet(SignatureToken) != null,
+    enabled: (c) => anno(c)?.canCreate() ?? true,
+    categories: ['panel'],
+    panel: { id: 'signatures', exclusive: 'right' },
+  },
   // Image — the click-then-pick placement: click the spot, the file dialog
   // opens (narrowed to rasters), the picture lands where you clicked. The
   // tool itself is a `stamp` preset registered in viewer.tsx.
@@ -522,6 +534,7 @@ export const defaultCommands: CommandDef[] = [
   tool('form:add-radio', 'form-radio', 'commands.form.radio', 'formRadio'),
   tool('form:add-select', 'form-combobox', 'commands.form.select', 'formSelect'),
   tool('form:add-listbox', 'form-listbox', 'commands.form.listbox', 'formListbox'),
+  tool('form:add-signature', 'form-signature', 'commands.form.signature', 'signature'),
 
   // ── redaction (v2 parity: the toolbar arms the tool; the panel owns the
   // destructive verbs — Apply All / Clear live in the redaction sidebar) ────

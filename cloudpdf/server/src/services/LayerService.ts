@@ -1,9 +1,11 @@
-import { randomUUID } from 'node:crypto';
-import { createReadStream } from 'node:fs';
-import { mkdtemp, rm, stat } from 'node:fs/promises';
+import { createHash, randomUUID } from 'node:crypto';
+import { createReadStream, createWriteStream } from 'node:fs';
+import { copyFile, mkdtemp, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { pipeline } from 'node:stream/promises';
 
+import { profileFor, verifyForCompletion } from '@embedpdf/core-signature';
 import {
   EngineError,
   EngineErrorCode,
@@ -60,8 +62,19 @@ import {
   type EmbeddedFileRef,
   type AttachmentCreateResult,
   type AttachmentDeleteResult,
+  type DocumentVersionRef,
+  type SignatureAbortResult,
+  type SignatureCompleteResult,
+  type SignaturePrepareInput,
+  type SignaturePrepared,
+  type SignatureSubFilter,
 } from '@embedpdf/engine-core/runtime';
-import type { Kysely, Transaction } from 'kysely';
+import {
+  SignaturePreparedWireSchema,
+  decodePrepared,
+  encodePrepared,
+} from '@embedpdf/engine-core/wire';
+import { sql, type Kysely, type Transaction } from 'kysely';
 
 import type { CloudRevisionBridge } from './CloudRevisionBridge';
 import type { DocumentService, OpenContext } from './DocumentService';
@@ -71,11 +84,16 @@ import type { MutationImpactKind } from './LayerStateService';
 import type { WeakAnnotationSessionService } from './WeakAnnotationSessionService';
 import type { EngineCounters } from '../app/engine-counters';
 import type { AuditMutationKind } from '../db/repos/audit_log.repo';
+import type { DocumentSigningsRepo, SigningRow } from '../db/repos/document_signings.repo';
 import type { DocumentsRepo } from '../db/repos/documents.repo';
 import type { DurablePageRow, LayerRow } from '../db/repos/page_state.repo';
+import type { PdfPasswordSessionsRepo } from '../db/repos/pdf_password_sessions.repo';
 import type { Database as Schema } from '../db/schema';
 import type { RealtimeBus } from '../realtime/RealtimeBus';
 import type { EnginePool } from '../runtime/EnginePool';
+import { signingCandidatePath } from '../runtime/signing-paths';
+import type { PasswordSessionBinding } from '../security/password-session';
+import type { LocalFileHandle } from '../storage/BaseFileCache';
 import { StorageKeys } from '../storage/keys';
 import type { ObjectStore } from '../storage/ObjectStore';
 
@@ -92,6 +110,15 @@ type LayerArtifactInput = { bytes: ArrayBuffer; size: number } | { path: string 
  * confuse a fence loss with a caller-initiated cancellation: it surfaces
  * as HTTP 409 (retryable), not 499.
  */
+const DEFAULT_SIGNING_TTL_MS = 15 * 60 * 1000;
+
+/** Thrown inside the publish transaction when the claim finds the signing already completed with this CMS. */
+class AlreadyCompleted extends Error {
+  constructor(readonly signing: SigningRow) {
+    super('already completed');
+  }
+}
+
 export class LayerFenceConflict extends EngineError {
   constructor(message: string) {
     super(EngineErrorCode.LayerVersionConflict, message);
@@ -167,6 +194,14 @@ export interface LayerServiceOptions {
   realtime?: RealtimeBus;
   /** Operational counters read by metrics collect closures. */
   counters?: EngineCounters;
+  /** Durable signings (migration 030); the signing verbs need it. */
+  signings?: DocumentSigningsRepo;
+  /** Password sessions, for rebinding the completer's session to the published version. */
+  passwordSessions?: PdfPasswordSessionsRepo;
+  /** Where the engine writes signing candidates (the same root the workers boot with). */
+  signingRoot?: string;
+  /** How long a prepared signing may wait for its CMS. Default 15 minutes. */
+  signingTtlMs?: number;
 }
 
 export type LayerWriteContext = OpenContext;
@@ -195,6 +230,10 @@ export class LayerService {
   private readonly pool?: EnginePool;
   private readonly storage?: ObjectStore;
   private readonly realtime?: RealtimeBus;
+  private readonly signings?: DocumentSigningsRepo;
+  private readonly passwordSessions?: PdfPasswordSessionsRepo;
+  private readonly signingRoot?: string;
+  private readonly signingTtlMs: number;
   private readonly layerWriteQueues = new Map<string, Promise<unknown>>();
   /**
    * Attempt artifact keys uploaded by the CURRENT write op that no commit
@@ -213,6 +252,10 @@ export class LayerService {
     this.counters = opts.counters;
     this.documents = opts.documents;
     this.layerState = opts.layerState;
+    this.signings = opts.signings;
+    this.passwordSessions = opts.passwordSessions;
+    this.signingRoot = opts.signingRoot;
+    this.signingTtlMs = opts.signingTtlMs ?? DEFAULT_SIGNING_TTL_MS;
     this.revisionBridge = opts.revisionBridge;
     this.documentService = opts.documentService;
     this.eventLog = opts.eventLog;
@@ -255,11 +298,29 @@ export class LayerService {
       );
     }
 
+    // Seed the row from the HEAD (law 9c): its docVersion is what the
+    // unwritten layer's manifest already advertises (the first write then
+    // moves to head + 1, never reusing a pin), and its plane pointers are
+    // the head VERSION's, so a layer over a published version compares as
+    // inherited against the right epochs.
+    const base = doc.baseSha
+      ? await this.layerState.baseVersionFacts(docId, doc.baseSha, doc.storageSizeBytes)
+      : null;
     const layer = await this.layerState.repos.layers.createEmpty({
       id: `layer_${randomUUID()}`,
       docId,
       tenantId: ctx.tenantId,
       name: layerName,
+      baseSha: doc.baseSha,
+      docVersion: doc.docVersion,
+      ...(base
+        ? {
+            layoutVersion: base.layoutVersion,
+            metadataVersion: base.metadataVersion,
+            attachmentsVersion: base.attachmentsVersion,
+            annotationsVersion: base.annotationsVersion,
+          }
+        : {}),
     });
     const pages = await this.layerState.ensureLayerPagesFromBase({ layerId: layer.id, docId });
     return { layer, pages };
@@ -1429,6 +1490,41 @@ export class LayerService {
     );
   }
 
+  /** The visual fill of an unsigned signature field: a PDF page drawn into its widgets, nothing sealed. */
+  async setSignatureAppearance(
+    ctx: LayerWriteContext,
+    input: { docId: string; layerName: string; ref: FormFieldRef; pdf: Uint8Array; pageIndex: number },
+    signal?: AbortSignal,
+  ): Promise<FormFieldUpdateResult> {
+    const pdf = new ArrayBuffer(input.pdf.byteLength);
+    new Uint8Array(pdf).set(input.pdf);
+    return this.runFormMutation(
+      ctx,
+      {
+        docId: input.docId,
+        layerName: input.layerName,
+        tag: 'forms.setSignatureAppearance',
+        auditKind: 'form.setSignatureAppearance',
+        build: (jobId, artifactPath) =>
+          wirePack(
+            {
+              kind: 'forms.setSignatureAppearance' as const,
+              jobId,
+              docId: input.docId,
+              layerName: input.layerName,
+              ref: input.ref,
+              pdf,
+              pageIndex: input.pageIndex,
+              artifactPath,
+            },
+            [pdf],
+          ),
+        impacts: (result: FormFieldUpdateResult) => widgetImpacts(result.field.widgets, 'update'),
+      },
+      signal,
+    );
+  }
+
   async deleteFormField(
     ctx: LayerWriteContext,
     input: { docId: string; layerName: string; ref: FormFieldRef },
@@ -1757,6 +1853,17 @@ export class LayerService {
     const documentService = this.requireDocumentService();
     await documentService.getLayerManifest(ctx, docId, layerName);
     const materialized = await this.materializeLayerForWrite(ctx, docId, layerName);
+    // A pending signing blocks layer writes. This check is the courtesy;
+    // the guarantee is that `prepare` is a fenced layer write (its
+    // version bump makes a racing edit lose its own CAS and land here on
+    // its rebase, where the row is now visible).
+    const pending = await this.signings?.findPending(materialized.layer.id);
+    if (pending && pending.expiresAt > Date.now()) {
+      throw new EngineError(
+        EngineErrorCode.SigningPending,
+        `a signing is pending (${pending.id}); complete or abort it before mutating the layer`,
+      );
+    }
     // THE FENCE ALIGNMENT: the worker session must embody exactly the layer
     // row we just read before it may apply this mutation. A session left
     // behind by an earlier open is a stale materialization whenever another
@@ -3015,16 +3122,755 @@ export class LayerService {
    * certifies every earlier read in this transaction: had any competing
    * commit landed since those reads, the predicate could not have matched.
    */
+  // ---------------------------------------------------------------------------
+  // Digital signatures: the three verbs of a durable two-phase signing.
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Prepare: the worker authors and seals a candidate on disk; only the
+   * bytes past the immutable base (the TAIL) leave this machine, so any
+   * replica can complete. Prepare IS a layer write — its fenced version
+   * bump is what makes "a pending signing blocks writes" a guarantee
+   * across replicas — but the artifact is untouched: the manifest's
+   * `layerVersion` and `working` change, so `docVersion` advances (law 9b).
+   */
+  async prepareSignature(
+    ctx: LayerWriteContext,
+    input: { docId: string; layerName: string; input: SignaturePrepareInput },
+    signal?: AbortSignal,
+  ): Promise<SignaturePrepared> {
+    return this.enqueueLayerWrite(ctx, input.docId, input.layerName, async () => {
+      const { layer } = await this.prepareLayerMutation(ctx, input.docId, input.layerName);
+      const documentService = this.requireDocumentService();
+      const head = await documentService.getHead(ctx, input.docId);
+      if (layer.baseSha !== null && layer.baseSha !== head.baseSha) {
+        throw new EngineError(
+          EngineErrorCode.StaleBase,
+          'this layer is behind the document head; rebase it before signing',
+        );
+      }
+      const headVersion = await this.layerState.baseVersionFacts(
+        input.docId,
+        head.baseSha,
+        head.storageSizeBytes,
+      );
+      const fieldObjectNumber = await this.resolveSignatureField(
+        input.docId,
+        input.layerName,
+        input.input.field,
+        signal,
+      );
+
+      const payload = await this.requirePool().run(
+        input.docId,
+        (jobId: WorkerJobId) =>
+          wirePack({
+            kind: 'signatures.prepare' as const,
+            jobId,
+            docId: input.docId,
+            layerName: input.layerName,
+            input: input.input,
+          }),
+        signal,
+      );
+      if (payload.tag !== 'signatures.prepare') {
+        throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload: ${payload.tag}`);
+      }
+      const prepared = payload.result;
+      try {
+        const tail = await this.uploadSigningTail(
+          ctx,
+          input.docId,
+          prepared.signingId,
+          headVersion.byteLength,
+        );
+        const now = Date.now();
+        const expiresAt = now + this.signingTtlMs;
+        const nextVersion = layer.currentVersion + 1;
+        const expectedVersion: DocumentVersionRef = {
+          baseSha256: head.baseSha,
+          editsVersion: nextVersion,
+        };
+        const answer: SignaturePrepared = {
+          ...prepared,
+          expectedVersion,
+          expiresAt: new Date(expiresAt).toISOString(),
+        };
+        try {
+          await this.requireDb()
+            .transaction()
+            .execute(async (trx) => {
+              await this.guardedVersionBump(trx, layer, {
+                current_version: nextVersion,
+                doc_version: layer.docVersion + 1,
+                updated_at: now,
+              });
+              await this.requireSignings().insertPrepared(trx, {
+                id: prepared.signingId,
+                tenantId: ctx.tenantId,
+                docId: input.docId,
+                layerId: layer.id,
+                layerName: input.layerName,
+                expectedBaseSha: head.baseSha,
+                expectedLayerVersion: nextVersion,
+                baseByteLength: headVersion.byteLength,
+                tailKey: tail.key,
+                tailSha: tail.sha256,
+                tailSize: tail.size,
+                fieldObjectNumber,
+                preparedJson: JSON.stringify(encodePrepared(answer)),
+                createdBy: ctx.sub,
+                createdAt: now,
+                expiresAt,
+              });
+            });
+        } catch (err) {
+          await this.requireStorage()
+            .delete(tail.key)
+            .catch(() => undefined);
+          if (isUniqueViolation(err)) {
+            throw new EngineError(
+              EngineErrorCode.SigningPending,
+              'a signing is already pending on this layer; complete or abort it first',
+            );
+          }
+          throw err;
+        }
+        this.requireDocumentService().advanceLayerSession(
+          input.docId,
+          input.layerName,
+          nextVersion,
+        );
+        return answer;
+      } finally {
+        // The worker's parked copy is redundant now (its tail is durable),
+        // or useless after a failure: release it and its file.
+        await this.requirePool()
+          .run(input.docId, (jobId: WorkerJobId) =>
+            wirePack({
+              kind: 'signatures.abort' as const,
+              jobId,
+              docId: input.docId,
+              layerName: input.layerName,
+              signingId: prepared.signingId,
+            }),
+          )
+          .catch(() => undefined);
+      }
+    });
+  }
+
+  /**
+   * Complete: rebuild the candidate from its durable parts on THIS
+   * replica, install the CMS session-less, and publish the sealed bytes as
+   * the document's next base version under two fences (the head and the
+   * layer version the candidate was prepared on). Idempotent by signing
+   * id: the same CMS again returns the stored result.
+   */
+  async completeSignature(
+    ctx: LayerWriteContext,
+    input: {
+      docId: string;
+      layerName: string;
+      signingId: string;
+      cms: Uint8Array;
+      expectedVersion: DocumentVersionRef;
+    },
+    signal?: AbortSignal,
+  ): Promise<SignatureCompleteResult> {
+    return this.enqueueLayerWrite(ctx, input.docId, input.layerName, async () => {
+      const signings = this.requireSignings();
+      const signing = await signings.find(input.signingId);
+      if (
+        !signing ||
+        signing.docId !== input.docId ||
+        signing.layerName !== input.layerName ||
+        signing.tenantId !== ctx.tenantId
+      ) {
+        throw new EngineError(EngineErrorCode.NotFound, `no signing '${input.signingId}'`);
+      }
+      // Fast-path answers from a plain read; every one of them is
+      // re-established by the guarded claim inside the publish transaction.
+      if (signing.state === 'completed') return this.replayCompletion(signing, input.cms);
+      if (signing.state !== 'prepared' || signing.expiresAt <= Date.now()) {
+        throw new EngineError(
+          EngineErrorCode.SigningExpired,
+          `signing '${signing.id}' is ${signing.state === 'prepared' ? 'expired' : signing.state}`,
+        );
+      }
+      if (
+        input.expectedVersion.baseSha256 !== signing.expectedBaseSha ||
+        input.expectedVersion.editsVersion !== signing.expectedLayerVersion
+      ) {
+        throw new EngineError(
+          EngineErrorCode.SigningVersionMismatch,
+          'expectedVersion is not the version the candidate was prepared on',
+        );
+      }
+      const prepared = decodePrepared(
+        SignaturePreparedWireSchema.parse(JSON.parse(signing.preparedJson)),
+      );
+      const layer = await this.layerState.repos.layers.findByDocAndName(
+        input.docId,
+        input.layerName,
+      );
+      if (!layer || layer.id !== signing.layerId) {
+        throw new EngineError(EngineErrorCode.NotFound, `layer '${input.layerName}' is gone`);
+      }
+      const documentService = this.requireDocumentService();
+
+      // 0. Cryptography before any byte is touched: the CMS must fit,
+      //    digest with the prepared algorithm, carry the prepared digest,
+      //    verify with its own certificate, and match the profile. Trust
+      //    is not judged here.
+      const gate = await verifyForCompletion({
+        cms: input.cms,
+        prepared,
+        profile: profileFor(prepared.subFilter as SignatureSubFilter),
+      });
+      if (!gate.ok) {
+        throw new EngineError(EngineErrorCode.SignatureRefused, `${gate.reason}: ${gate.detail}`);
+      }
+
+      const baseFile = await documentService.acquireBaseFileFor(
+        ctx,
+        input.docId,
+        signing.expectedBaseSha,
+      );
+      try {
+        return await this.withTempWorkerFile(
+          'signing-complete',
+          'candidate.pdf',
+          async (candidatePath) => {
+            // 1. The candidate again, as a PRIVATE file for this attempt: the
+            //    verified base plus the verified tail.
+            await this.materializeCandidate(baseFile, signing, candidatePath);
+
+            // 2. Seal and prove in the engine, session-less.
+            const cmsBytes = input.cms.slice().buffer as ArrayBuffer;
+            const finalizedPayload = await this.requirePool().runAdHoc(
+              undefined,
+              (jobId: WorkerJobId) =>
+                wirePack(
+                  {
+                    kind: 'signatures.finalizeCandidate' as const,
+                    jobId,
+                    path: candidatePath,
+                    byteRange: prepared.byteRange,
+                    contentsSize: prepared.contentsSize,
+                    fieldObjectNumber: signing.fieldObjectNumber,
+                    cms: cmsBytes,
+                    password: null as string | null,
+                  },
+                  [cmsBytes],
+                ),
+              signal,
+            );
+            if (finalizedPayload.tag !== 'signatures.finalizeCandidate') {
+              throw new EngineError(
+                EngineErrorCode.WireFormat,
+                `unexpected payload: ${finalizedPayload.tag}`,
+              );
+            }
+            const finalized = finalizedPayload;
+
+            // 3. The new immutable version, uploaded before the fences: the key
+            //    IS the content, so a losing attempt leaves only a harmless object.
+            const versionKey = StorageKeys.baseVersionPdf(
+              ctx.tenantId,
+              input.docId,
+              finalized.version.sha256,
+            );
+            await this.uploadVersionObject(versionKey, candidatePath, finalized.version);
+
+            // 4. Publish: one transaction, two fences, one audit row.
+            const sessionRebindContext = await documentService.sessionRebindContext(
+              ctx,
+              input.docId,
+              input.layerName,
+            );
+            let committed: { result: SignatureCompleteResult; auditId: number };
+            try {
+              committed = await this.commitSignature(ctx, {
+                docId: input.docId,
+                layerName: input.layerName,
+                layer,
+                signing,
+                finalized,
+                versionKey,
+                cms: input.cms,
+                sessionRebindContext,
+              });
+            } catch (err) {
+              if (err instanceof AlreadyCompleted) {
+                return this.replayCompletion(err.signing, input.cms);
+              }
+              if (
+                err instanceof LayerFenceConflict ||
+                (err instanceof EngineError && err.code === EngineErrorCode.SigningVersionMismatch)
+              ) {
+                // A CMS signs the exact bytes its digest covers; those bytes
+                // are no longer publishable. End the signing so the layer is
+                // writable again; the client prepares anew.
+                await this.discardSigning(signing);
+                throw new EngineError(
+                  EngineErrorCode.SigningVersionMismatch,
+                  'the document or layer moved since prepare; prepare again',
+                );
+              }
+              throw err;
+            }
+
+            // 5. Sessions over the old base are garbage, here and everywhere.
+            await documentService.onBaseVersionPublished(input.docId);
+            this.publishMutation(ctx, input.docId, committed.auditId);
+            this.publishBaseChanged(ctx, input.docId);
+            return committed.result;
+          },
+        );
+      } finally {
+        baseFile.release();
+      }
+    });
+  }
+
+  /** Abort: forget a pending signing and its tail. */
+  async abortSignature(
+    ctx: LayerWriteContext,
+    input: { docId: string; layerName: string; signingId: string },
+  ): Promise<SignatureAbortResult> {
+    const signings = this.requireSignings();
+    const signing = await signings.find(input.signingId);
+    if (
+      !signing ||
+      signing.docId !== input.docId ||
+      signing.layerName !== input.layerName ||
+      signing.tenantId !== ctx.tenantId
+    ) {
+      return { status: 'unknown' };
+    }
+    if (signing.state === 'completed') return { status: 'already-completed' };
+    if (signing.state !== 'prepared') return { status: 'unknown' };
+    await this.discardSigning(signing);
+    return { status: 'aborted' };
+  }
+
+  /** The sweep tick: expire pending signings past their deadline and drop their tails. */
+  async expireSignings(now = Date.now()): Promise<number> {
+    if (!this.signings) return 0;
+    const expired = await this.signings.expireDue(now);
+    for (const row of expired) {
+      await this.requireStorage()
+        .delete(row.tailKey)
+        .catch(() => undefined);
+    }
+    return expired.length;
+  }
+
+  /** Newest first; the versions listing joins these to the catalog. */
+  async listSignings(ctx: LayerWriteContext, docId: string): Promise<SigningRow[]> {
+    const signings = this.requireSignings();
+    return (await signings.listForDocument(docId)).filter((s) => s.tenantId === ctx.tenantId);
+  }
+
+  private async discardSigning(signing: SigningRow): Promise<void> {
+    const moved = await this.requireSignings().transition(
+      this.requireDb(),
+      signing.id,
+      'prepared',
+      'aborted',
+      { finishedAt: Date.now() },
+    );
+    if (moved) {
+      await this.requireStorage()
+        .delete(signing.tailKey)
+        .catch(() => undefined);
+    }
+  }
+
+  private replayCompletion(signing: SigningRow, cms: Uint8Array): SignatureCompleteResult {
+    if (signing.cmsSha256 !== sha256Hex(cms) || !signing.resultJson) {
+      throw new EngineError(
+        EngineErrorCode.SignatureRefused,
+        'this signing already completed with a different CMS',
+      );
+    }
+    const result = JSON.parse(signing.resultJson) as SignatureCompleteResult;
+    return { ...result, status: 'already-completed' };
+  }
+
+  /** The durable identity of the signature field, from the layer session's snapshot. */
+  private async resolveSignatureField(
+    docId: string,
+    layerName: string,
+    field: FormFieldRef,
+    signal?: AbortSignal,
+  ): Promise<number> {
+    const payload = await this.requirePool().run(
+      docId,
+      (jobId: WorkerJobId) =>
+        wirePack({ kind: 'signatures.list' as const, jobId, docId, layerName }),
+      signal,
+    );
+    if (payload.tag !== 'signatures.list') {
+      throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload: ${payload.tag}`);
+    }
+    const match = payload.snapshot.signatures.find((s) =>
+      field.kind === 'objectNumber'
+        ? s.field.kind === 'objectNumber' && s.field.fieldObjectNumber === field.fieldObjectNumber
+        : s.fieldName === field.name,
+    );
+    if (!match || match.field.kind !== 'objectNumber') {
+      throw new EngineError(
+        EngineErrorCode.NotFound,
+        `no signature field ${field.kind === 'fqn' ? `'${field.name}'` : `#${field.fieldObjectNumber}`}`,
+      );
+    }
+    return match.field.fieldObjectNumber;
+  }
+
+  private async uploadSigningTail(
+    ctx: LayerWriteContext,
+    docId: string,
+    signingId: string,
+    baseByteLength: number,
+  ): Promise<{ key: string; sha256: string; size: number }> {
+    if (!this.signingRoot) {
+      throw new EngineError(EngineErrorCode.Unknown, 'signing is not configured (no signing root)');
+    }
+    const candidatePath = signingCandidatePath(this.signingRoot, signingId);
+    const info = await stat(candidatePath);
+    if (info.size <= baseByteLength) {
+      throw new EngineError(EngineErrorCode.Unknown, 'the candidate is not longer than its base');
+    }
+    const size = info.size - baseByteLength;
+    const key = StorageKeys.signingTail(ctx.tenantId, docId, signingId);
+    const put = await this.requireStorage().put(
+      key,
+      createReadStream(candidatePath, { start: baseByteLength }),
+      { contentLength: size },
+    );
+    return { key, sha256: put.sha256, size };
+  }
+
+  /**
+   * The published version's object. The key IS the content, so two
+   * completions of one signing racing on two replicas write identical
+   * bytes to one key: whichever put lands first is the object, the other
+   * finds it there (a store whose atomic write uses one staging path per
+   * key fails the loser's rename) and verifies the sha instead of failing.
+   */
+  private async uploadVersionObject(
+    key: string,
+    candidatePath: string,
+    version: { sha256: string; byteLength: number },
+  ): Promise<void> {
+    const storage = this.requireStorage();
+    const alreadyThere = async (): Promise<boolean> =>
+      (await storage.exists(key)) && (await storage.getSha256(key)) === version.sha256;
+    if (await alreadyThere()) return;
+    try {
+      const put = await storage.put(key, createReadStream(candidatePath), {
+        contentLength: version.byteLength,
+      });
+      if (put.sha256 !== version.sha256) {
+        throw new EngineError(
+          EngineErrorCode.Unknown,
+          'the sealed bytes changed between sealing and upload',
+        );
+      }
+    } catch (err) {
+      if (await alreadyThere()) return;
+      throw err;
+    }
+  }
+
+  /** base ⊕ tail into `candidatePath`, both verified: the cache checked the base's sha, the store checks the tail's. */
+  private async materializeCandidate(
+    base: LocalFileHandle,
+    signing: SigningRow,
+    candidatePath: string,
+  ): Promise<void> {
+    if (base.size !== signing.baseByteLength || base.sha256 !== signing.expectedBaseSha) {
+      throw new EngineError(
+        EngineErrorCode.Unknown,
+        'the base file does not match the version the signing was prepared on',
+      );
+    }
+    const tailPath = join(dirname(candidatePath), 'tail.bin');
+    const tail = await this.requireStorage().materializeLocal(signing.tailKey, tailPath, {
+      expectedSha: signing.tailSha,
+    });
+    if (tail.size !== signing.tailSize) {
+      throw new EngineError(EngineErrorCode.Unknown, 'the signing tail changed size in storage');
+    }
+    await copyFile(base.path, candidatePath);
+    await pipeline(createReadStream(tailPath), createWriteStream(candidatePath, { flags: 'a' }));
+    const info = await stat(candidatePath);
+    if (info.size !== signing.baseByteLength + signing.tailSize) {
+      throw new EngineError(EngineErrorCode.Unknown, 'the rebuilt candidate has the wrong length');
+    }
+  }
+
+  /**
+   * The publish transaction. Lock order for a transaction touching more
+   * than one row of a document (law 9d): the signing row, the document
+   * row, then layers in id order.
+   */
+  private async commitSignature(
+    ctx: LayerWriteContext,
+    input: {
+      docId: string;
+      layerName: string;
+      layer: LayerRow;
+      signing: SigningRow;
+      finalized: {
+        signature: SignatureCompleteResult['signature'];
+        protection: SignatureCompleteResult['protection'];
+        version: SignatureCompleteResult['version'];
+      };
+      versionKey: string;
+      cms: Uint8Array;
+      sessionRebindContext: { binding: PasswordSessionBinding; unlockKey: string } | null;
+    },
+  ): Promise<{ result: SignatureCompleteResult; auditId: number }> {
+    const signings = this.requireSignings();
+    return this.requireDb()
+      .transaction()
+      .execute(async (trx) => {
+        const now = Date.now();
+        const { signing, finalized, layer } = input;
+        const cmsSha = sha256Hex(input.cms);
+        const widgetPage = finalized.signature.widget?.pageObjectNumber ?? null;
+
+        // (1) The signing row first, under its expiry: the single arbiter
+        //     across replicas.
+        const claimed = await signings.transition(
+          trx,
+          signing.id,
+          'prepared',
+          'completed',
+          { cmsSha256: cmsSha, resultSha: finalized.version.sha256, finishedAt: now },
+          { notExpiredAt: now },
+        );
+        if (!claimed) {
+          const current = await signings.find(signing.id, trx);
+          if (current?.state === 'completed' && current.cmsSha256 === cmsSha) {
+            throw new AlreadyCompleted(current);
+          }
+          if (current?.state === 'completed') {
+            throw new EngineError(
+              EngineErrorCode.SignatureRefused,
+              'this signing already completed with a different CMS',
+            );
+          }
+          throw new EngineError(
+            EngineErrorCode.SigningExpired,
+            `signing '${signing.id}' is ${current?.state ?? 'gone'}`,
+          );
+        }
+
+        // (2) Fence two: the head did not move since prepare. Its docVersion
+        //     advances so every doc-level pinned family re-resolves.
+        const moved = await trx
+          .updateTable('documents')
+          .set({
+            base_sha: finalized.version.sha256,
+            storage_size_bytes: finalized.version.byteLength,
+            doc_version: sql`doc_version + 1`,
+            updated_at: now,
+          })
+          .where('id', '=', input.docId)
+          .where('base_sha', '=', signing.expectedBaseSha)
+          .executeTakeFirst();
+        if (Number(moved?.numUpdatedRows ?? 0) !== 1) {
+          throw new EngineError(
+            EngineErrorCode.SigningVersionMismatch,
+            'the document head moved since prepare',
+          );
+        }
+
+        // (3) Fence one: the layer is exactly what the candidate consumed.
+        //     It becomes an empty workspace over the new version.
+        const currentLayer = await trx
+          .selectFrom('layers')
+          .select(['current_version', 'doc_version'])
+          .where('id', '=', layer.id)
+          .executeTakeFirst();
+        const layerDocVersion = Number(currentLayer?.doc_version ?? layer.docVersion);
+        const nextVersion = signing.expectedLayerVersion + 1;
+        await this.guardedVersionBump(
+          trx,
+          {
+            id: layer.id,
+            currentVersion: signing.expectedLayerVersion,
+            docVersion: layerDocVersion,
+          },
+          {
+            base_sha: finalized.version.sha256,
+            current_version: nextVersion,
+            current_artifact_key: null,
+            current_artifact_sha: null,
+            current_artifact_size: null,
+            doc_version: layerDocVersion + 1,
+            updated_at: now,
+          },
+        );
+
+        // (4) The version row, numbered after the fenced parent; carries
+        //     the layer's plane pointers (law 9). A document committed
+        //     before the catalog existed has no row for its upload: this
+        //     first publish materializes version 1 for it (the fence above
+        //     proved the sha IS the head).
+        let parent = await this.layerState.repos.baseVersions.find(
+          input.docId,
+          signing.expectedBaseSha,
+          trx,
+        );
+        if (!parent) {
+          await this.layerState.repos.baseVersions.insertInitial(
+            {
+              tenantId: ctx.tenantId,
+              docId: input.docId,
+              sha256: signing.expectedBaseSha,
+              byteLength: signing.baseByteLength,
+              createdAt: now,
+            },
+            trx,
+          );
+          parent = await this.layerState.repos.baseVersions.require(
+            input.docId,
+            signing.expectedBaseSha,
+            trx,
+          );
+        }
+        await this.layerState.repos.baseVersions.insertPublished(trx, {
+          tenantId: ctx.tenantId,
+          docId: input.docId,
+          sha256: finalized.version.sha256,
+          byteLength: finalized.version.byteLength,
+          parent,
+          signingId: signing.id,
+          storageKey: input.versionKey,
+          layoutVersion: layer.layoutVersion,
+          metadataVersion: layer.metadataVersion,
+          attachmentsVersion: layer.attachmentsVersion,
+          annotationsVersion: layer.annotationsVersion,
+          createdAt: now,
+        });
+
+        // (5) Promote the whole layer into the base catalog; every sibling's
+        //     manifest body changes too (scopes flip), so their docVersion
+        //     advances — in id order.
+        const promoted = await this.layerState.promoteLayerToBase(trx, {
+          docId: input.docId,
+          layerId: layer.id,
+          signedPage: widgetPage,
+          now,
+        });
+        const siblings = await trx
+          .selectFrom('layers')
+          .select('id')
+          .where('doc_id', '=', input.docId)
+          .where('id', '!=', layer.id)
+          .orderBy('id')
+          .execute();
+        for (const sibling of siblings) {
+          await trx
+            .updateTable('layers')
+            .set({ doc_version: sql`doc_version + 1`, updated_at: now })
+            .where('id', '=', sibling.id)
+            .execute();
+        }
+
+        // (6) The completer's password session follows the version.
+        if (input.sessionRebindContext && this.passwordSessions) {
+          await this.passwordSessions.rebind(
+            trx,
+            input.sessionRebindContext.binding,
+            { ...input.sessionRebindContext.binding, baseSha: finalized.version.sha256 },
+            input.sessionRebindContext.unlockKey,
+            now,
+          );
+        }
+
+        // (7) The response, complete before it is audited.
+        const result: SignatureCompleteResult = {
+          status: 'completed',
+          signature: finalized.signature,
+          version: finalized.version,
+          previous: {
+            baseSha256: signing.expectedBaseSha,
+            editsVersion: signing.expectedLayerVersion,
+          },
+          protection: finalized.protection,
+          meta: {
+            affectedPages: promoted.map((page) =>
+              this.layerState.decorateLayerPageState(input.docId, input.layerName, page),
+            ),
+            // No delta: a publish changes more of the manifest than a delta
+            // carries; the client refreshes its manifest on completion.
+            cacheDelta: null,
+          },
+        };
+        const auditEvent = makeAuditEvent({
+          ctx,
+          docId: input.docId,
+          layer,
+          layerName: input.layerName,
+          kind: 'signature.completed',
+          pageObjectNumber: widgetPage,
+          affectedPages: widgetPage !== null ? [widgetPage] : [],
+          artifactVersion: nextVersion,
+          artifactKey: input.versionKey,
+          artifactSha: finalized.version.sha256,
+          artifactSize: finalized.version.byteLength,
+          payload: result,
+          ts: now,
+        });
+        const auditId = (await this.eventLog?.appendDb(trx, auditEvent)) ?? 0;
+        if (auditId > 0) {
+          await trx
+            .updateTable('layers')
+            .set({ last_audit_id: auditId })
+            .where('id', '=', layer.id)
+            .execute();
+        }
+        await signings.transition(trx, signing.id, 'completed', 'completed', {
+          resultJson: JSON.stringify(result),
+        });
+        return { result, auditId };
+      });
+  }
+
+  private publishBaseChanged(ctx: LayerWriteContext, docId: string): void {
+    void this.realtime
+      ?.publishBaseChanged({ tenantId: ctx.tenantId, docId })
+      .catch(() => undefined);
+  }
+
+  private requireSignings(): DocumentSigningsRepo {
+    if (!this.signings) {
+      throw new EngineError(EngineErrorCode.Unknown, 'signing is not configured on this server');
+    }
+    return this.signings;
+  }
+
   private async guardedVersionBump(
     trx: Transaction<Schema>,
-    layer: Pick<LayerRow, 'id' | 'currentVersion'>,
+    layer: Pick<LayerRow, 'id' | 'currentVersion' | 'docVersion'>,
     set: Record<string, number | string | bigint | null>,
   ): Promise<void> {
+    // Two fences: the write serial (a concurrent write) and the doc
+    // version (a sibling's publish advanced this row's `doc_version` under
+    // us, law 9d) — either moved means the write was aligned on a stale
+    // row and must rebase.
     const result = await trx
       .updateTable('layers')
       .set(set)
       .where('id', '=', layer.id)
       .where('current_version', '=', layer.currentVersion)
+      .where('doc_version', '=', layer.docVersion)
       .executeTakeFirst();
     if (Number(result?.numUpdatedRows ?? 0) !== 1) {
       throw new LayerFenceConflict(
@@ -3442,6 +4288,16 @@ export class LayerService {
     }
     return this.storage;
   }
+}
+
+function sha256Hex(bytes: Uint8Array): string {
+  return createHash('sha256').update(bytes).digest('hex');
+}
+
+/** SQLite and Postgres spell a unique violation differently; both name the constraint kind. */
+function isUniqueViolation(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : String(err);
+  return /UNIQUE constraint failed|duplicate key value|unique/i.test(message);
 }
 
 function makeAuditEvent(input: {

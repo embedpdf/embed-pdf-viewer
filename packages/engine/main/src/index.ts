@@ -108,6 +108,8 @@ export function createLocalEngine(opts: CreateLocalEngineOptions = {}): LocalEng
     concurrency: opts.concurrency,
     imageEncoder: opts.imageEncoder,
     renderPolicy: opts.renderPolicy,
+    signedDocumentPolicy: opts.signedDocumentPolicy,
+    sessionKind: opts.sessionKind,
   });
 }
 
@@ -134,6 +136,8 @@ export function createLocalEngineWithWorker(opts: CreateLocalEngineWithWorkerOpt
     concurrency: opts.concurrency,
     imageEncoder: opts.imageEncoder,
     renderPolicy: opts.renderPolicy,
+    signedDocumentPolicy: opts.signedDocumentPolicy,
+    sessionKind: opts.sessionKind,
   });
 }
 

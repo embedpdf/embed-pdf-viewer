@@ -70,6 +70,41 @@ export const EngineErrorCode = {
    * doesn't exist).
    */
   MalformedPdf: 'MalformedPdf',
+  /**
+   * A signing candidate is parked on this session: every mutation is
+   * refused until `signatures.complete` or `signatures.abort`.
+   */
+  SigningPending: 'SigningPending',
+  /** The candidate's TTL elapsed; prepare again. */
+  SigningExpired: 'SigningExpired',
+  /**
+   * `complete` presented a version the candidate was not built on (the
+   * document or the layer moved since `prepare`). The CMS cannot be
+   * reused: it signs a digest of bytes that will never be the head.
+   * Prepare again on the current version.
+   */
+  SigningVersionMismatch: 'SigningVersionMismatch',
+  /**
+   * The engine refused to author the signature: the field is signed,
+   * read-only, or locked by an earlier signature; a certification is
+   * requested after a signature exists; the seed value requires what the
+   * engine does not implement; the request is inconsistent. The message
+   * names the reason.
+   */
+  SignatureRefused: 'SignatureRefused',
+  /**
+   * A signature already in the document forbids this change (a
+   * certification's permission, a FieldMDP or `/Lock`, or the approval
+   * baseline). The message names the signature and the restriction. The
+   * engine option `signedDocumentPolicy: 'permit'` disables the guard.
+   */
+  ProtectedDocument: 'ProtectedDocument',
+  /**
+   * The layer is built on a base version that is no longer the
+   * document's head (another signing completed); it can be read and
+   * edited but not signed from.
+   */
+  StaleBase: 'StaleBase',
 } as const;
 
 export type EngineErrorCode = (typeof EngineErrorCode)[keyof typeof EngineErrorCode];

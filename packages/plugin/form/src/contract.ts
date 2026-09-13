@@ -19,5 +19,11 @@ export type {
   PlacedField,
   PlaceFieldInput,
   WidgetActivationResult,
+  WidgetHit,
 } from './types';
-export type { FormFieldDTO, FormFieldPatch, WidgetAppearance } from '@embedpdf/engine-core/runtime';
+export type {
+  FormFieldDTO,
+  FormFieldPatch,
+  FormFieldRef,
+  WidgetAppearance,
+} from '@embedpdf/engine-core/runtime';

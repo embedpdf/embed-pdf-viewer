@@ -49,6 +49,7 @@ const aborts = new Map<number, AbortController>();
     size: config.poolSize,
     maxDocsPerSlot: config.maxDocsPerSlot,
     fonts: config.fonts,
+    ...(config.signingRoot !== undefined ? { signingRoot: config.signingRoot } : {}),
     onEvict: (evt) => send({ t: 'evict', ...evt }),
     // No onFatalWorkerExit override: the default process.exit(70) IS the
     // supervision contract with the parent.

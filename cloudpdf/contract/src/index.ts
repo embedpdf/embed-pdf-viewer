@@ -9,6 +9,13 @@ import {
   FormSnapshotSchema,
   MutationMetaSchema,
   PageTextSnapshotSchema,
+  ChangeAnalysisSchema,
+  DocumentVersionsSchema,
+  SignatureAbortResultSchema,
+  SignatureCompleteBodySchema,
+  SignatureCompleteResultSchema,
+  SignaturePreparedWireSchema,
+  SignatureSnapshotSchema,
   wireTemplates,
 } from '@embedpdf/engine-core/wire';
 import { z } from 'zod';
@@ -1325,6 +1332,34 @@ const docCredentials = ['api-token', 'doc-jwt'] as const;
  */
 const MutationResponseSchema = z.object({ meta: MutationMetaSchema }).passthrough();
 
+export const DocSigningParamsSchema = DocLayerParamsSchema.extend({
+  signingId: z.string().min(1),
+});
+const sha256Pattern = /^[0-9a-f]{64}$/;
+export const DocVersionParamsSchema = DocIdParamsSchema.extend({
+  sha: z.string().regex(sha256Pattern),
+});
+export const DocVersionFieldParamsSchema = DocVersionParamsSchema.extend({
+  fieldKey: z.string().min(1),
+});
+export const DocVersionDigestParamsSchema = DocVersionFieldParamsSchema.extend({
+  algorithm: z.enum(['sha1', 'sha256', 'sha384', 'sha512']),
+});
+export const DocVersionRevisionParamsSchema = DocVersionParamsSchema.extend({
+  index: z.coerce.number().int().min(0),
+});
+/** The flat analysis query: exactly one `since.*`; `level` only in exploratory mode. */
+export const LayerSignaturesAnalysisQuerySchema = z.object({
+  'since.signature': z.coerce.number().int().min(0).optional(),
+  'since.revision': z.coerce.number().int().min(0).optional(),
+  level: z.enum(['none', 'lta', 'fill', 'annotate']).optional(),
+});
+export const VersionAnalysisQuerySchema = LayerSignaturesAnalysisQuerySchema.extend({
+  until: z.coerce.number().int().min(0).optional(),
+  /** The judging policy version the caller expects — a cache key on this immutable URL, not an input. */
+  policy: z.coerce.number().int().min(1).optional(),
+});
+
 export const docOperations = {
   'doc.head': {
     operationId: 'doc.head',
@@ -1371,6 +1406,236 @@ export const docOperations = {
     params: DocLayerParamsSchema,
     responses: {
       200: { contentType: 'application/json', schema: DocumentMetadataSchema },
+      404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+    },
+  },
+  'doc.signatures.list': {
+    operationId: 'doc.signatures.list',
+    title: 'List signatures',
+    summary:
+      'The layer view of digital signatures: revisions, every signature field with its signed state, and the protection in force.',
+    method: 'GET',
+    path: wireTemplates.layerSignatures,
+    credentials: docCredentials,
+    scope: [],
+    docCapabilities: ['doc.forms.read'],
+    requestHeaders: [documentPasswordHeader],
+    params: DocLayerParamsSchema,
+    responses: {
+      200: { contentType: 'application/json', schema: SignatureSnapshotSchema },
+      404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+    },
+    notes:
+      "Describes the bytes the layer is over: the base version's signatures plus the layer's own edits as the last revision. " +
+      'Signed bytes (contents, digests, revision prefixes) are served per base version under /versions.',
+  },
+  'doc.signatures.analysis': {
+    operationId: 'doc.signatures.analysis',
+    title: 'Analyze layer changes',
+    summary:
+      'What the layer changed after a signature (or after any revision), judged against the restrictions in force.',
+    method: 'GET',
+    path: wireTemplates.layerSignaturesAnalysis,
+    credentials: docCredentials,
+    scope: [],
+    docCapabilities: ['doc.forms.read'],
+    requestHeaders: [documentPasswordHeader],
+    params: DocLayerParamsSchema,
+    query: LayerSignaturesAnalysisQuerySchema,
+    responses: {
+      200: { contentType: 'application/json', schema: ChangeAnalysisSchema },
+      400: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+      404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+    },
+    notes:
+      "Exactly one of `since.signature=<index>` or `since.revision=<index>`; the layer's pending edits are the end. " +
+      '`level=fill|annotate|lta|none` evaluates exploratorily and never becomes a verdict. ' +
+      'For history between two base revisions use the version analysis.',
+  },
+  'doc.signatures.prepare': {
+    operationId: 'doc.signatures.prepare',
+    title: 'Prepare a signature',
+    summary:
+      'Author and seal a signing candidate; returns the digest to sign and the version fences.',
+    method: 'POST',
+    path: wireTemplates.layerSignaturesPrepare,
+    credentials: docCredentials,
+    scope: [],
+    docCapabilities: ['doc.sign'],
+    requestHeaders: [documentPasswordHeader],
+    params: DocLayerParamsSchema,
+    body: { contentType: 'multipart/form-data' },
+    responses: {
+      200: { contentType: 'application/json', schema: SignaturePreparedWireSchema },
+      400: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+      404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+      409: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+    },
+    notes:
+      'The multipart envelope: a JSON `body` part (field, subFilter, digest, contentsSize, signer, certify, lock, appearance) ' +
+      "and an optional `resource:<key>` PDF part the body's `appearance.resource` names. A certification (`certify.permission`) " +
+      'additionally requires `doc.sign.certify`. The layer is read-only until the signing completes, is aborted, or expires (15 minutes). ' +
+      'A layer behind the document head cannot sign (StaleBase).',
+  },
+  'doc.signatures.complete': {
+    operationId: 'doc.signatures.complete',
+    title: 'Complete a signature',
+    summary:
+      "Install the CMS into the prepared candidate and publish the sealed bytes as the document's next base version.",
+    method: 'POST',
+    path: wireTemplates.layerSignatureComplete,
+    credentials: docCredentials,
+    scope: [],
+    docCapabilities: ['doc.sign'],
+    requestHeaders: [documentPasswordHeader],
+    params: DocSigningParamsSchema,
+    body: { contentType: 'application/json', schema: SignatureCompleteBodySchema },
+    responses: {
+      200: { contentType: 'application/json', schema: SignatureCompleteResultSchema },
+      400: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+      404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+      409: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+    },
+    notes:
+      '`cms` is the detached CMS over the prepared digest, base64. `expectedVersion` must be what prepare returned. ' +
+      'Idempotent by signing id: the same CMS again answers `already-completed`. Every layer of the document then sits over the new version; ' +
+      'refetch the manifest after a completion.',
+  },
+  'doc.signatures.abort': {
+    operationId: 'doc.signatures.abort',
+    title: 'Abort a signature',
+    summary: 'Discard a pending signing candidate.',
+    method: 'DELETE',
+    path: wireTemplates.layerSignatureAbort,
+    credentials: docCredentials,
+    scope: [],
+    docCapabilities: ['doc.sign'],
+    requestHeaders: [documentPasswordHeader],
+    params: DocSigningParamsSchema,
+    responses: {
+      200: { contentType: 'application/json', schema: SignatureAbortResultSchema },
+      404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+    },
+  },
+  'doc.versions.list': {
+    operationId: 'doc.versions.list',
+    title: 'List versions',
+    summary: "The document's base versions, oldest first, and its head.",
+    method: 'GET',
+    path: wireTemplates.docVersions,
+    credentials: docCredentials,
+    scope: [],
+    docCapabilities: ['doc.open'],
+    requestHeaders: [documentPasswordHeader],
+    params: DocIdParamsSchema,
+    responses: {
+      200: { contentType: 'application/json', schema: DocumentVersionsSchema },
+      404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+    },
+    notes: 'Every completed signature publishes a new version. Never cached: the list grows.',
+  },
+  'doc.versions.signatures': {
+    operationId: 'doc.versions.signatures',
+    title: 'Version signatures',
+    summary: 'The signature snapshot of one base version (immutable).',
+    method: 'GET',
+    path: wireTemplates.docVersionSignatures,
+    credentials: docCredentials,
+    scope: [],
+    docCapabilities: ['doc.forms.read'],
+    requestHeaders: [documentPasswordHeader],
+    params: DocVersionParamsSchema,
+    responses: {
+      200: { contentType: 'application/json', schema: SignatureSnapshotSchema },
+      404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+    },
+  },
+  'doc.versions.signatureContents': {
+    operationId: 'doc.versions.signatureContents',
+    title: 'Signature contents',
+    summary: 'The DER /Contents of a signed field in one base version (immutable).',
+    method: 'GET',
+    path: wireTemplates.docVersionSignatureContents,
+    credentials: docCredentials,
+    scope: [],
+    docCapabilities: ['doc.forms.read'],
+    requestHeaders: [documentPasswordHeader],
+    params: DocVersionFieldParamsSchema,
+    responses: {
+      200: { contentType: 'application/pkcs7-signature' },
+      404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+    },
+    notes:
+      "`fieldKey` is the field's fully qualified name, token-text encoded (the same encoding attachment keys use).",
+  },
+  'doc.versions.signatureDigest': {
+    operationId: 'doc.versions.signatureDigest',
+    title: 'Signature digest',
+    summary: "The digest of a signed field's /ByteRange in one base version (immutable).",
+    method: 'GET',
+    path: wireTemplates.docVersionSignatureDigest,
+    credentials: docCredentials,
+    scope: [],
+    docCapabilities: ['doc.forms.read'],
+    requestHeaders: [documentPasswordHeader],
+    params: DocVersionDigestParamsSchema,
+    responses: {
+      200: { contentType: 'application/octet-stream' },
+      404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+    },
+    notes: 'What a CMS verifier compares its message digest to.',
+  },
+  'doc.versions.analysis': {
+    operationId: 'doc.versions.analysis',
+    title: 'Analyze version history',
+    summary: 'What changed between two revisions of one base version (immutable).',
+    method: 'GET',
+    path: wireTemplates.docVersionAnalysis,
+    credentials: docCredentials,
+    scope: [],
+    docCapabilities: ['doc.forms.read'],
+    requestHeaders: [documentPasswordHeader],
+    params: DocVersionParamsSchema,
+    query: VersionAnalysisQuerySchema,
+    responses: {
+      200: { contentType: 'application/json', schema: ChangeAnalysisSchema },
+      400: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+      404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+    },
+    notes:
+      'Exactly one of `since.signature` / `since.revision`; `until=<revision>` defaults to the last. ' +
+      'The same answer for every layer and every caller.',
+  },
+  'doc.versions.download': {
+    operationId: 'doc.versions.download',
+    title: 'Download a version',
+    summary: 'The bytes of one base version (immutable).',
+    method: 'GET',
+    path: wireTemplates.docVersionDownload,
+    credentials: docCredentials,
+    scope: [],
+    docCapabilities: ['doc.download'],
+    requestHeaders: [documentPasswordHeader],
+    params: DocVersionParamsSchema,
+    responses: {
+      200: { contentType: 'application/pdf' },
+      404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+    },
+  },
+  'doc.versions.revision': {
+    operationId: 'doc.versions.revision',
+    title: 'Download a revision',
+    summary:
+      'The byte prefix of one revision of a base version: exactly what a signature over it signed (immutable).',
+    method: 'GET',
+    path: wireTemplates.docVersionRevision,
+    credentials: docCredentials,
+    scope: [],
+    docCapabilities: ['doc.download'],
+    requestHeaders: [documentPasswordHeader],
+    params: DocVersionRevisionParamsSchema,
+    responses: {
+      200: { contentType: 'application/pdf' },
       404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
     },
   },
@@ -1858,4 +2123,6 @@ export const docsGroups = {
   'doc.metadata': { title: 'Metadata' },
   'doc.pages': { title: 'Pages' },
   'doc.redactions': { title: 'Redactions' },
+  'doc.signatures': { title: 'Digital signatures' },
+  'doc.versions': { title: 'Versions' },
 } as const satisfies Record<string, DocsGroup>;

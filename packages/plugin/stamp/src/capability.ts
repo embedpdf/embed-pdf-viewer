@@ -18,12 +18,15 @@ import {
   type StampPlacement,
   type StampPreviewProvider,
 } from '@embedpdf/plugin-annotation/contract';
+import { AnnotationToken as AnnotationHostToken } from '@embedpdf/plugin-annotation/contract/host';
 import { createFormScriptingController } from '@embedpdf/plugin-form/scripting';
 
 import { blankLibraryPdf } from './blank-library';
 import {
   assetIdFor,
   customStampName,
+  DEFAULT_LIBRARY_KIND,
+  libraryKindFromPdfName,
   parseStampKey,
   stampKey,
   stampLibraryPieceInfo,
@@ -34,6 +37,7 @@ import {
 import type {
   AddAssetInput,
   ImportLibraryOptions,
+  MarkSource,
   StampAction,
   StampAsset,
   StampAssetPreview,
@@ -41,11 +45,62 @@ import type {
   StampConfig,
   StampLibrary,
   StampLibraryChange,
+  StampLibraryQuery,
   StampAssetKind,
   StampState,
 } from './types';
 
 const DEFAULT_PREVIEW_WIDTH = 256;
+
+/** `#rrggbb` → the engine's sRGB triplet. */
+const hexColor = (hex: string): { r: number; g: number; b: number } => {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
+  if (!m) throw new EngineError(EngineErrorCode.InvalidArg, `[stamp] mark color must be #rrggbb, got '${hex}'`);
+  const n = parseInt(m[1], 16);
+  return { r: (n >> 16) & 0xff, g: (n >> 8) & 0xff, b: n & 0xff };
+};
+
+/** An exact ArrayBuffer over a view (the engine's binary idiom). */
+const toArrayBuffer = (bytes: Uint8Array): ArrayBuffer => {
+  const out = new ArrayBuffer(bytes.byteLength);
+  new Uint8Array(out).set(bytes);
+  return out;
+};
+
+/** The rect an ink mark occupies, padded by its stroke. */
+const inkBounds = (
+  strokes: ReadonlyArray<ReadonlyArray<{ x: number; y: number }>>,
+  strokeWidth: number,
+): { left: number; bottom: number; right: number; top: number } => {
+  let left = Infinity;
+  let bottom = Infinity;
+  let right = -Infinity;
+  let top = -Infinity;
+  for (const stroke of strokes) {
+    for (const { x, y } of stroke) {
+      if (x < left) left = x;
+      if (x > right) right = x;
+      if (y < bottom) bottom = y;
+      if (y > top) top = y;
+    }
+  }
+  if (!Number.isFinite(left)) {
+    throw new EngineError(EngineErrorCode.InvalidArg, '[stamp] an ink mark needs at least one point');
+  }
+  const pad = strokeWidth;
+  return { left: left - pad, bottom: bottom - pad, right: right + pad, top: top + pad };
+};
+
+/** A generous box for typed text; the export crops to the glyphs. */
+const textBounds = (
+  text: string,
+  fontSize: number,
+): { left: number; bottom: number; right: number; top: number } => ({
+  left: 0,
+  bottom: 0,
+  right: Math.max(1, text.length) * fontSize * 0.75 + fontSize,
+  top: fontSize * 1.6,
+});
 
 /** Session-unique ids. Assets are session-scoped for now (no persistence),
  *  so a timestamp + counter is enough — durable ids come with the store port. */
@@ -188,8 +243,9 @@ export function createStampCapability(
 
   const createLibrary = async (
     name: string,
-    opts?: { id?: string; categories?: string[] },
+    opts?: { id?: string; kind?: string; categories?: string[] },
   ): Promise<string> => {
+    const kind = opts?.kind ?? DEFAULT_LIBRARY_KIND;
     const taken = new Set(Object.keys(ctx.getState().libraries));
     const id = allocateId(opts?.id, 'stamp-lib', taken);
     const doc = await openAssetDocument(blankLibraryPdf());
@@ -199,7 +255,7 @@ export function createStampCapability(
       await doc.metadata.update({ title: name });
       await doc.pieceInfo!.update(
         STAMP_LIBRARY_PIECEINFO_APP,
-        stampLibraryPieceInfo(id, { categories: opts?.categories }),
+        stampLibraryPieceInfo(id, { kind, categories: opts?.categories }),
       );
       bytes = await doc.download();
     } finally {
@@ -211,6 +267,7 @@ export function createStampCapability(
       library: {
         id,
         name,
+        kind,
         assetIds: [],
         ...(opts?.categories ? { categories: opts.categories } : {}),
       },
@@ -284,6 +341,9 @@ export function createStampCapability(
       if (!docMeta.title) await doc.metadata.update({ title: libraryName });
       const libraryCategories = opts?.categories ?? entryStringArray(catalogEntries, 'Categories');
       const libraryLocale = entryString(catalogEntries, 'Locale');
+      // What the file is for: the caller's word, else the file's, else a plain stamp library.
+      const libraryKind =
+        opts?.libraryKind ?? libraryKindFromPdfName(entryName(catalogEntries, 'Kind'));
 
       // ── the registry: /Names /Pages keys `identifier=label` → pages ──
       const registry = (layout.namedPages ?? []).filter(
@@ -353,7 +413,11 @@ export function createStampCapability(
 
       await doc.pieceInfo!.update(
         STAMP_LIBRARY_PIECEINFO_APP,
-        stampLibraryPieceInfo(libraryId, { categories: libraryCategories, locale: libraryLocale }),
+        stampLibraryPieceInfo(libraryId, {
+          kind: libraryKind,
+          categories: libraryCategories,
+          locale: libraryLocale,
+        }),
       );
 
       const assets: NonNullable<typeof imported>['assets'] = [];
@@ -394,6 +458,7 @@ export function createStampCapability(
         library: {
           id: libraryId,
           name: libraryName,
+          kind: libraryKind,
           ...(libraryLocale ? { locale: libraryLocale } : {}),
           categories: libraryCategories,
           assetIds: [],
@@ -415,6 +480,98 @@ export function createStampCapability(
     return imported.library.id;
   };
 
+  /**
+   * A drawn or typed mark rendered to a one-page PDF: the annotation is
+   * authored on a scratch page and exported the way "stamp from selection"
+   * exports — a fresh page the size of the mark, paths kept as paths, the
+   * font subset-embedded. Self-contained and Acrobat-readable.
+   */
+  const renderMark = async (
+    mark: Extract<MarkSource, { kind: 'ink' | 'text' }>,
+  ): Promise<Uint8Array> => {
+    const doc = await openAssetDocument(blankLibraryPdf());
+    try {
+      const layout = await doc.pages.list();
+      const scratch = layout.pages[0];
+      if (!scratch) throw new EngineError(EngineErrorCode.Unknown, '[stamp] no scratch page');
+      const page = doc.page(scratch.pageObjectNumber);
+      if (!page.annotations.exportAppearance) {
+        throw new EngineError(
+          EngineErrorCode.NotImplemented,
+          '[stamp] authoring a mark needs an asset engine that can export annotation appearances',
+        );
+      }
+      const color = hexColor(mark.color ?? '#1d2b53');
+      const created =
+        mark.kind === 'ink'
+          ? await page.annotations.create({
+              subtype: 'ink',
+              inkList: mark.strokes.map((stroke) => stroke.map(({ x, y }) => ({ x, y }))),
+              rect: inkBounds(mark.strokes, mark.strokeWidth ?? 2),
+              color,
+              strokeWidth: mark.strokeWidth ?? 2,
+            })
+          : await page.annotations.create({
+              subtype: 'free-text',
+              intent: 'free-text',
+              contents: mark.text,
+              fontFamily: mark.fontFamily,
+              fontSize: mark.fontSize ?? 36,
+              textAlign: 'left',
+              rect: textBounds(mark.text, mark.fontSize ?? 36),
+              fontColor: color,
+              strokeWidth: 0,
+            });
+      return new Uint8Array(await page.annotations.exportAppearance([created.created.ref]));
+    } finally {
+      await doc.close();
+    }
+  };
+
+  /** One page of a PDF as a single-page PDF (a `pdf` mark with `pageIndex`). */
+  const extractPage = async (bytes: Uint8Array, pageIndex: number): Promise<Uint8Array> => {
+    const doc = await openAssetDocument(bytes);
+    try {
+      const layout = await doc.pages.list();
+      const page = layout.pages[pageIndex];
+      if (!page) {
+        throw new EngineError(
+          EngineErrorCode.InvalidArg,
+          `[stamp] the PDF has no page ${pageIndex} (${layout.pageCount} pages)`,
+        );
+      }
+      return await doc.pages.extract([page.pageObjectNumber]);
+    } finally {
+      await doc.close();
+    }
+  };
+
+  /** The bytes an asset is made from: the caller's `source`, or its `mark` authored into one. */
+  const resolveAssetSource = async (
+    input: AddAssetInput,
+  ): Promise<{ bytes: ArrayBuffer; mimeType?: string }> => {
+    if ((input.source === undefined) === (input.mark === undefined)) {
+      throw new EngineError(
+        EngineErrorCode.InvalidArg,
+        '[stamp] addAsset takes exactly one of `source` / `mark`',
+      );
+    }
+    if (input.source !== undefined) return resolveBinarySource(input.source);
+    const mark = input.mark!;
+    switch (mark.kind) {
+      case 'image':
+        return resolveBinarySource(mark.source);
+      case 'pdf': {
+        const resolved = await resolveBinarySource(mark.source);
+        if (mark.pageIndex === undefined) return resolved;
+        return { bytes: toArrayBuffer(await extractPage(new Uint8Array(resolved.bytes), mark.pageIndex)) };
+      }
+      case 'ink':
+      case 'text':
+        return { bytes: toArrayBuffer(await renderMark(mark)) };
+    }
+  };
+
   const addAsset = async (input: AddAssetInput): Promise<string> => {
     if (input.libraryId && !ctx.getState().libraries[input.libraryId]) {
       throw new EngineError(
@@ -422,7 +579,7 @@ export function createStampCapability(
         `[stamp] unknown library '${input.libraryId}'`,
       );
     }
-    const resolved = await resolveBinarySource(input.source);
+    const resolved = await resolveAssetSource(input);
     const meta = sniffBinaryMetadata(resolved.bytes);
     if (!meta) {
       throw new EngineError(
@@ -705,6 +862,54 @@ export function createStampCapability(
     });
   };
 
+  const updateLibrary = async (
+    id: string,
+    patch: { name?: string; categories?: string[] },
+  ): Promise<void> => {
+    if (!ctx.getState().libraries[id]) {
+      throw new EngineError(EngineErrorCode.NotFound, `[stamp] unknown library '${id}'`);
+    }
+    return mutateLibrary(id, async () => {
+      const library = ctx.getState().libraries[id];
+      if (!library) {
+        throw new EngineError(EngineErrorCode.NotFound, `[stamp] unknown library '${id}'`);
+      }
+      const canonicalBytes = libraryBinaries.get(id);
+      if (!canonicalBytes) {
+        throw new EngineError(
+          EngineErrorCode.Unknown,
+          `[stamp] canonical bytes are missing for library '${id}'`,
+        );
+      }
+      const next: StampLibrary = {
+        ...library,
+        ...(patch.name !== undefined ? { name: patch.name } : {}),
+        ...(patch.categories !== undefined ? { categories: patch.categories } : {}),
+      };
+      const doc = await openAssetDocument(canonicalBytes);
+      let rewritten: Uint8Array | undefined;
+      try {
+        requireCanonicalServices(doc);
+        // The name is the PDF's /Title; kind, id, categories, locale ride PieceInfo.
+        if (next.name !== library.name) await doc.metadata.update({ title: next.name });
+        await doc.pieceInfo!.update(
+          STAMP_LIBRARY_PIECEINFO_APP,
+          stampLibraryPieceInfo(id, {
+            kind: next.kind,
+            categories: next.categories,
+            locale: next.locale,
+          }),
+        );
+        rewritten = await doc.download();
+      } finally {
+        await doc.close();
+      }
+      libraryBinaries.set(id, rewritten);
+      ctx.dispatch({ type: 'LIBRARY_UPDATED', library: next });
+      libraryChanged.emit({ libraryId: id, reason: 'updated' });
+    });
+  };
+
   /**
    * Form-backed stamps are executable templates only until placement. Work
    * on an isolated copy so neither the canonical library nor its reusable
@@ -849,6 +1054,22 @@ export function createStampCapability(
       ...stampPayload(asset, placement, placement !== bin),
       targetWidth: opts?.targetWidth,
     });
+    armedByDocument.set(documentId, assetId);
+  };
+
+  /** Which asset this plugin armed per document. The annotation plugin owns
+   *  the arm itself (a tool switch disarms it), so the answer is checked
+   *  against it and forgotten once it no longer holds one. */
+  const armedByDocument = new Map<string, string>();
+  const armedAsset = (documentId: string): StampAsset | null => {
+    const assetId = armedByDocument.get(documentId);
+    if (assetId === undefined) return null;
+    const annotation = ctx.tryForDocument(AnnotationHostToken, documentId);
+    if (!annotation?.hasArmedStamp()) {
+      armedByDocument.delete(documentId);
+      return null;
+    }
+    return ctx.getState().assets[assetId] ?? null;
   };
 
   /**
@@ -948,9 +1169,15 @@ export function createStampCapability(
   });
 
   return {
-    libraries: () => {
+    libraries: (query?: StampLibraryQuery) => {
       const s = ctx.getState();
-      return s.libraryOrder.map((id) => s.libraries[id]).filter((l) => l != null);
+      const kinds =
+        query?.kind === undefined
+          ? null
+          : new Set(typeof query.kind === 'string' ? [query.kind] : query.kind);
+      return s.libraryOrder
+        .map((id) => s.libraries[id])
+        .filter((l): l is StampLibrary => l != null && (kinds === null || kinds.has(l.kind)));
     },
     library: (id) => ctx.getState().libraries[id] ?? null,
     assets: (libraryId) => {
@@ -969,6 +1196,7 @@ export function createStampCapability(
     exportLibrary: (id) => libraryBinaries.get(id) ?? null,
     onLibraryChanged: libraryChanged.on,
     createLibrary,
+    updateLibrary,
     importLibraryPdf,
     addAsset,
     addAssetFromAnnotations,
@@ -977,6 +1205,10 @@ export function createStampCapability(
     removeLibrary,
     armAsset,
     placeAsset,
-    disarm: (documentId) => ctx.forDocument(AnnotationToken, documentId).disarmStamp(),
+    disarm: (documentId) => {
+      armedByDocument.delete(documentId);
+      ctx.forDocument(AnnotationToken, documentId).disarmStamp();
+    },
+    armedAsset,
   };
 }

@@ -151,6 +151,9 @@ export const TOOL_DEFAULT_KEYS = {
     'textAlign',
   ],
   'widget-toggle': ['color', 'interiorColor', 'strokeWidth', 'border'],
+  // The bare box every other widget family ingests as (a signature field's
+  // widget among them): box styling only — no text to style.
+  'widget-box': ['color', 'interiorColor', 'strokeWidth', 'border'],
 } as const satisfies Record<string, readonly PropKey[]>;
 
 export type ToolAuthoringKind = keyof typeof TOOL_DEFAULT_KEYS;

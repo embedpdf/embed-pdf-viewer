@@ -18,11 +18,13 @@ import {
   FormFieldPatchSchema,
   FormFieldValueSchema,
   FormWidgetRefSchema,
+  SignatureAppearanceBodySchema,
 } from '@embedpdf/engine-core/wire';
 import { requireLayerCapability, requireLayerDocAccessOnly } from '../app/jwt-plugin';
 import type { DocumentService } from '../services/DocumentService';
 import type { LayerService } from '../services/LayerService';
 import { abortSignalFromRequest, parseOrInvalidArg, setNoStore, type SchemaLike } from './_helpers';
+import { readMutationEnvelope } from './_mutationEnvelope';
 
 interface FormRouteDeps {
   documentService: DocumentService;
@@ -219,6 +221,48 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
     setNoStore(reply);
     return layerService.resetFormField(ctx, { docId, layerName, ref }, abortSignalFromRequest(req));
   });
+
+  app.post(
+    '/v1/docs/:docId/layers/:layerName/form/fields/:fieldKey/signature-appearance',
+    async (req, reply) => {
+      const { docId, layerName } = layerParams(req);
+      const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
+      const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
+      const ctx = requireLayerCapability(req, docId, layerName, 'doc.forms.fill', pdfBits);
+      const ref = fieldRefFromParams(req);
+      // The mark is a page of a PDF (sniffed, never declared), riding the multipart envelope.
+      const { body, resources } = await readMutationEnvelope(req, () => 'image-or-pdf');
+      const parsed = parseOrInvalidArg(
+        SignatureAppearanceBodySchema as unknown as SchemaLike<
+          ReturnType<typeof SignatureAppearanceBodySchema.parse>
+        >,
+        body,
+        'request body',
+      );
+      const resource = resources?.[parsed.resource];
+      if (!resource) {
+        throw new EngineError(
+          EngineErrorCode.InvalidArg,
+          `body references resource '${parsed.resource}' but no such multipart part arrived`,
+        );
+      }
+      if (resource.mimeType !== 'application/pdf') {
+        throw new EngineError(EngineErrorCode.InvalidArg, 'the appearance resource must be a PDF');
+      }
+      setNoStore(reply);
+      return layerService.setSignatureAppearance(
+        ctx,
+        {
+          docId,
+          layerName,
+          ref,
+          pdf: new Uint8Array(resource.bytes),
+          pageIndex: parsed.pageIndex ?? 0,
+        },
+        abortSignalFromRequest(req),
+      );
+    },
+  );
 
   app.post('/v1/docs/:docId/layers/:layerName/form/effects', async (req, reply) => {
     const { docId, layerName } = layerParams(req);

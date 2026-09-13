@@ -86,12 +86,23 @@ export interface ListBoxFieldDraft extends FormFieldDraftBase {
 }
 
 /**
+ * A signature field: identity and (usually) one widget. Created unsigned;
+ * signing it is `doc.signatures`' job, drawing a mark into it without
+ * signing is `doc.forms.setSignatureAppearance`.
+ */
+export interface SignatureFieldDraft extends FormFieldDraftBase {
+  family: 'signature';
+  widget?: WidgetPlacement;
+}
+
+/**
  * What `doc.forms.createField` takes: per-family, mirroring the DTO union.
- * Push buttons and signatures are not authorable.
+ * Push buttons are not authorable.
  */
 export type FormFieldDraft =
   | TextFieldDraft
   | CheckboxFieldDraft
   | RadioFieldDraft
   | ComboBoxFieldDraft
-  | ListBoxFieldDraft;
+  | ListBoxFieldDraft
+  | SignatureFieldDraft;

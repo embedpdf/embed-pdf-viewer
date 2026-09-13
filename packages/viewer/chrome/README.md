@@ -307,6 +307,53 @@ The v1 part vocabulary — public API, grown by demand, never speculatively:
 `toolbar`, `toolbar-button(-active)`, `mode-tab(-active)`, `tab(-active)`,
 `menu`, `menu-item(-active)`.
 
+### Signatures — sign with a mark, through a key you bring
+
+The Insert tab's signature button opens the **people** panel: one row per
+person (a stamp library of kind `signatures`) holding a drawn, typed, or
+uploaded signature and, optionally, initials. Pick a mark, click a signature
+field to sign it — or click anywhere else to drop it as a stamp, as Preview
+does. A "sign here" click on an unsigned field targets it; the next mark
+picked goes in. The Form tab authors signature fields.
+
+What placing a mark on a field does is the `signatures` config:
+
+```tsx
+import { FullViewer, personalSigner, indexedDbKeyStore } from '@embedpdf/viewer-chrome';
+
+<FullViewer
+  engine={engine}
+  signatures={{
+    // The key holder: your own key (`webCryptoSigner`), a signing service
+    // (`remoteSigner`), or one self-signed identity per person kept in the
+    // browser (`personalSigner`). Without a signer the mark is only DRAWN
+    // into the field — nothing is sealed.
+    signer: () => personalSigner({ subject: 'Ada Lovelace', store: indexedDbKeyStore('acme-keys') }),
+    // Anchors a reader trusts; none → "valid, signer not trusted" at best.
+    trust: { anchors: async () => [rootCertificateDer] },
+    // 'sign' (default with a signer) | 'visual' (default without) | 'ask' (a dialog first)
+    mode: 'ask',
+    allowCertify: true, // offer a certification (first signature) in the dialog
+    kinds: ['signature'], // no initials
+    fonts: [{ key: 'great-vibes', url: '/fonts/GreatVibes.ttf', label: 'Great Vibes' }], // typed marks
+  }}
+  stamps={{
+    sidebar: ['stamps'], // library kinds the stamps sidebar lists
+    toolbar: ['embedpdf-standard:Check', 'embedpdf-standard:Cross'], // quick marks in the Insert bar
+  }}
+/>;
+```
+
+A signed field shows its verdict on click — document intact, signature
+verified, signer trusted, changes since — and offers the signed revision as
+a download. The panel judges what a save _would_ produce: an unsaved
+annotation after a plain approval signature reads "valid, unsaved changes
+will invalidate it" and a one-line notice says which signature, the way
+Acrobat warns. With `allowCertify` on, the first signature opens the sign
+dialog with the choice Acrobat's certify dialog gives: a plain approval,
+or a certification that allows comments, form filling only, or no changes.
+`viewer.get(SignatureToken)` drives all of it from code.
+
 ## What's deliberately NOT here (yet)
 
 - **The element registry** (`elements: { button: 'tag' }` + exported base

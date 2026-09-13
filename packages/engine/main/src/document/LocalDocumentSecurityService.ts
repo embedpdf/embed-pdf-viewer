@@ -130,6 +130,9 @@ export class LocalDocumentSecurityService implements DocumentSecurityService {
         throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload tag: ${payload.tag}`);
       }
       this.state = securityStateFromProbe(payload.security);
+      // The unlock loaded the document for real: its signatures are now
+      // known, and what they forbid applies from the next call on.
+      this.guard?.setProtection(payload.protection ?? null);
       return { security: this.state };
     });
   }

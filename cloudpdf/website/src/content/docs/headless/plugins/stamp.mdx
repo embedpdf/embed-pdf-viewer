@@ -77,6 +77,54 @@ placed annotations still go through the cloud engine like any other.
 
 </Engine>
 
+## Library kinds
+
+A library says what it holds: `kind` is `'stamps'` (the default), `'signatures'`
+(a person's marks — see [Signatures](/docs/headless/plugins/signature)), or a
+name of your own. It rides `/PieceInfo` with the library id, and a picker asks
+for the kinds it lists:
+
+```ts
+await stamp.createLibrary('Acme review marks', { kind: 'toolbar' });
+await stamp.importLibraryPdf(bytes, { libraryKind: 'legal-seals' }); // override what the file says
+
+stamp.libraries({ kind: 'stamps' }); // one kind
+useStampLibraries({ kind: ['stamps', 'legal-seals'] }); // several
+```
+
+## Author a mark
+
+An asset can be **drawn, typed, an image, or a PDF page** — one `mark` in
+place of `source`. Ink and text are rendered by the engine into a page of
+the library (a vector appearance, exactly what a placed annotation would
+show); an image becomes a page carrying it; a PDF page is extracted as is:
+
+```ts
+await stamp.addAsset({
+  libraryId,
+  label: 'Signature',
+  mark: { kind: 'ink', strokes, strokeWidth: 2.5 },
+});
+await stamp.addAsset({
+  libraryId,
+  label: 'Initials',
+  mark: { kind: 'text', text: 'AL', fontFamily: 'times-italic' },
+});
+await stamp.addAsset({ libraryId, label: 'Logo', mark: { kind: 'image', source: pngBytes } });
+await stamp.addAsset({
+  libraryId,
+  label: 'Seal',
+  mark: { kind: 'pdf', source: pdfBytes, pageIndex: 2 },
+});
+
+await stamp.updateLibrary(libraryId, { name: 'Ada Lovelace' }); // rename (/Title)
+stamp.armedAsset(documentId); // the asset armed on a document, while the tool holds it
+```
+
+`fontFamily` is a standard PDF font name or the key of a font registered
+through `engine.fonts` on the asset engine — a script face for typed
+signatures, for instance.
+
 ## Place a stamp with code
 
 A click after `armAsset` and a call to `placeAsset` produce the same

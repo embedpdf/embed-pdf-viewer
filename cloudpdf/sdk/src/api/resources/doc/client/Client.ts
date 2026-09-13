@@ -12,6 +12,8 @@ import { FormsClient } from "../resources/forms/client/Client.js";
 import { MetadataClient } from "../resources/metadata/client/Client.js";
 import { PagesClient } from "../resources/pages/client/Client.js";
 import { RedactionsClient } from "../resources/redactions/client/Client.js";
+import { SignaturesClient } from "../resources/signatures/client/Client.js";
+import { VersionsClient } from "../resources/versions/client/Client.js";
 
 export declare namespace DocClient {
     export type Options = BaseClientOptions;
@@ -26,6 +28,8 @@ export class DocClient {
     protected _metadata: MetadataClient | undefined;
     protected _pages: PagesClient | undefined;
     protected _redactions: RedactionsClient | undefined;
+    protected _signatures: SignaturesClient | undefined;
+    protected _versions: VersionsClient | undefined;
 
     constructor(options: DocClient.Options) {
         this._options = normalizeClientOptionsWithAuth(options);
@@ -49,6 +53,14 @@ export class DocClient {
 
     public get redactions(): RedactionsClient {
         return (this._redactions ??= new RedactionsClient(this._options));
+    }
+
+    public get signatures(): SignaturesClient {
+        return (this._signatures ??= new SignaturesClient(this._options));
+    }
+
+    public get versions(): VersionsClient {
+        return (this._versions ??= new VersionsClient(this._options));
     }
 
     /**

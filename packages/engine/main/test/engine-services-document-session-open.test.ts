@@ -299,6 +299,9 @@ describe('DocumentSession open ownership', () => {
       docId: 'doc-a',
       bytes: new ArrayBuffer(1),
       password: null,
+      // This test counts the fake runtime's handles: keep the base-view
+      // session a plain document so the accounting below stays exact.
+      sessionKind: 'plain',
     });
     host.receive({
       kind: 'open.layerMemBase',

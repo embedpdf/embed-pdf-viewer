@@ -65,6 +65,20 @@ export interface DocumentManifest {
   auditHead: number;
   baseSha: string;
   /**
+   * The layer's write serial (`layers.current_version`; 0 for the base view
+   * and for a never-written layer) — the `editsVersion` half of the
+   * `DocumentVersionRef` a signing pins at `prepare` and checks at `complete`.
+   */
+  layerVersion: number;
+  /**
+   * An artifact exists: the layer holds edits not yet sealed into a base
+   * version. After a signature publishes a version the layer is clean again
+   * while `layerVersion` keeps counting, so this is the only honest signal.
+   */
+  working: boolean;
+  /** Byte length of `baseSha`'s file — with the sha, the `BaseVersionInfo` a client signs. */
+  baseByteLength: number;
+  /**
    * Plane scopes (layer manifests only; absent on base manifests and
    * on pre-plane servers = all-`'layer'`). Whole-layer by design — edge
    * grants are prefix-level — and DERIVED from the version counters at

@@ -37,6 +37,8 @@ export namespace DocFormsSetValue200Response {
             previousDocVersion: number;
             docVersion: number;
             annotationsVersion?: number | undefined;
+            layerVersion?: number | undefined;
+            working?: boolean | undefined;
             pages: CacheDelta.Pages.Item[];
         }
 

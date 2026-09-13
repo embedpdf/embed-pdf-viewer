@@ -47,6 +47,11 @@ import { TabBar } from './ui/tab-bar';
 import { ArmedToolCursor } from './ui/tool-cursor';
 import { LeftSidebar, RightSidebar, PageControls } from './ui/panels';
 import { RedactConfirmModal } from './ui/redact-confirm';
+import { SignDialog } from './ui/sign-dialog';
+import { SignatureBridge } from './ui/signature-bridge';
+import { SignatureInspector } from './ui/signature-inspector';
+import { SignatureMakerModal } from './ui/signature-maker';
+import { StampLibraryStore } from './ui/stamp-store';
 import { DocumentError, PasswordPrompt } from './ui/document-boot';
 
 // Annotation renderers — module scope, per the AnnotationRenderer identity
@@ -146,6 +151,9 @@ export function Shell() {
 
   return (
     <div className="bg-app text-fg flex h-full flex-col">
+      {/* the user's stamp + signature libraries: restored once, persisted for
+          the workspace's lifetime (workspace-scoped, like the stamp plugin) */}
+      <StampLibraryStore />
       {/* The header socket. The chrome ships NO header of its own — branding,
           locale pickers and theme switches are the embedder's chrome, not the
           viewer's — so this renders nothing until a child fills the slot. */}
@@ -181,6 +189,8 @@ export function Shell() {
                 <>
                   <AnnotationStrip />
                   <SelectionStrip />
+                  {/* a signed field's facts, anchored at its widget */}
+                  <SignatureInspector />
                   {/* touch: draggable start/end selection handles (long-press
                       selects a word; the lollipops grow it from there) */}
                   <SelectionHandles />
@@ -222,6 +232,10 @@ export function Shell() {
           </div>
           <RightSidebar />
           <RedactConfirmModal />
+          {/* signatures: plugin intents → surfaces; the dialogs they open */}
+          <SignatureBridge />
+          <SignDialog />
+          <SignatureMakerModal />
         </DocumentArea>
       </div>
 

@@ -7,6 +7,8 @@ import type {
   ParsedScope,
   PdfBits,
 } from './types';
+import { protectedCapabilities } from '../../signature/protection';
+import type { DocumentProtection } from '../../signature/types';
 
 /**
  * Resolved collab subject — the per-record identity bits used to test
@@ -29,10 +31,14 @@ export function checkCapability(
   capability: DocCapability,
   rawScope: ReadonlyArray<string>,
   pdfBits: PdfBits,
+  protection: DocumentProtection | null = null,
 ): boolean {
+  // Document-derived authority comes first: what the signatures in the
+  // file forbid, no scope grants — the wildcard included.
+  if (protectedCapabilities(protection).has(capability)) return false;
   const parsed = rawScope.map(parseScope);
   if (parsed.some((s) => s.kind === 'wildcard')) return true;
-  return expandedCapabilities(parsed, pdfBits).has(capability);
+  return expandedCapabilities(parsed, pdfBits, protection).has(capability);
 }
 
 /**
@@ -44,8 +50,9 @@ export function checkAnyCapability(
   capabilities: ReadonlyArray<DocCapability>,
   rawScope: ReadonlyArray<string>,
   pdfBits: PdfBits,
+  protection: DocumentProtection | null = null,
 ): boolean {
-  return capabilities.some((c) => checkCapability(c, rawScope, pdfBits));
+  return capabilities.some((c) => checkCapability(c, rawScope, pdfBits, protection));
 }
 
 /**
@@ -117,6 +124,7 @@ export function checkCollab(
 export function expandedCapabilities(
   parsed: ReadonlyArray<ParsedScope>,
   pdfBits: PdfBits,
+  protection: DocumentProtection | null = null,
 ): Set<DocCapability> {
   const out = new Set<DocCapability>();
   let hasAnnotationCollab = false;
@@ -140,6 +148,10 @@ export function expandedCapabilities(
   if (out.has('doc.forms.fill')) out.add('doc.forms.read');
   if (hasAnnotationCollab) out.add('doc.annotate.read');
 
+  // Subtraction last: a signed document's own restrictions win over any
+  // grant or implication.
+  for (const removed of protectedCapabilities(protection)) out.delete(removed);
+
   return out;
 }
 
@@ -151,8 +163,9 @@ export function expandedCapabilities(
 export function expandRawScope(
   rawScope: ReadonlyArray<string>,
   pdfBits: PdfBits,
+  protection: DocumentProtection | null = null,
 ): Set<DocCapability> {
-  return expandedCapabilities(rawScope.map(parseScope), pdfBits);
+  return expandedCapabilities(rawScope.map(parseScope), pdfBits, protection);
 }
 
 /**
@@ -290,6 +303,9 @@ function addPdfPermissions(out: Set<DocCapability>, b: PdfBits): void {
   if (b.bit6) {
     out.add('doc.annotate.modify');
   }
-  if (b.bit6 || b.bit9) out.add('doc.forms.fill');
+  if (b.bit6 || b.bit9) {
+    out.add('doc.forms.fill');
+    out.add('doc.sign');
+  }
   if (b.bit6 && b.bit4) out.add('doc.forms.modify');
 }
