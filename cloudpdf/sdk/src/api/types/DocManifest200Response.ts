@@ -11,6 +11,9 @@ export interface DocManifest200Response {
     annotationsVersion?: number | undefined;
     auditHead: number;
     baseSha: string;
+    layerVersion?: number | undefined;
+    working?: boolean | undefined;
+    baseByteLength?: number | undefined;
     scopes?: DocManifest200Response.Scopes | undefined;
     pages: DocManifest200Response.Pages.Item[];
 }
