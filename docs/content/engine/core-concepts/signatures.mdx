@@ -162,10 +162,12 @@ A signer is either a `RawSigner` (you hold the key; the package builds the CMS) 
 (your service or HSM returns the CMS for the digest). Nothing but the digest ever leaves.
 
 <Callout type="warn">
-  Signing rides <code>doc.sign</code>; a certification additionally needs{' '}
-  <code>doc.sign.certify</code>. A locked field, a certification that forbids the edit, or a
-  required seed-value entry the engine does not implement all answer <code>SignatureRefused</code>{' '}
-  with the reason in the message.
+
+Signing rides `doc.sign`; a certification additionally needs `doc.sign.certify`.
+A locked field, a certification that forbids the edit, or a required seed-value
+entry the engine does not implement all answer `SignatureRefused` with the reason
+in the message.
+
 </Callout>
 
 ## Validating
