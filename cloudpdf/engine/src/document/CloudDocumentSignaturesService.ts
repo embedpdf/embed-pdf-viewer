@@ -134,6 +134,7 @@ export class CloudDocumentSignaturesService implements DocumentSignaturesService
               ...(input.exploratoryLevel !== undefined
                 ? { exploratoryLevel: input.exploratoryLevel }
                 : {}),
+              ...(input.detail !== undefined ? { detail: input.detail } : {}),
             });
           },
           (raw) => ChangeAnalysisSchema.parse(raw),
@@ -150,6 +151,7 @@ export class CloudDocumentSignaturesService implements DocumentSignaturesService
           ...(input.exploratoryLevel !== undefined
             ? { exploratoryLevel: input.exploratoryLevel }
             : {}),
+          ...(input.detail !== undefined ? { detail: input.detail } : {}),
         }),
         (raw) => ChangeAnalysisSchema.parse(raw),
         signal,

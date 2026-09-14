@@ -282,6 +282,8 @@ export const es: Locale = {
         'Este cambio invalidará {field} al guardar el documento. Deshazlo para conservar la firma.',
       verdictIndeterminate: 'No se pudo verificar',
       verdictUnchanged: 'Ninguno',
+      verdictRestored: 'Modificado y luego restaurado',
+      inspectLaterRevisions: 'Revisiones tras la firma',
       verdictPermitted: 'Permitidos',
       verdictForbidden: 'No permitidos',
     },

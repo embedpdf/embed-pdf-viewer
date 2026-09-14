@@ -42,7 +42,7 @@ export const AttachmentsTokenSchema = {
 export const AnalysisTokenSchema = {
   // `policy`: the judging policy version the caller expects — part of the
   // cache key, so a policy bump never serves a verdict judged the old way.
-  fields: ['docVersion', 'since.signature', 'since.revision', 'level', 'policy'],
+  fields: ['docVersion', 'since.signature', 'since.revision', 'level', 'policy', 'detail'],
 } as const;
 
 export const DownloadTokenSchema = {

@@ -25,8 +25,11 @@ Three ideas carry everything below:
 - **A signature raises two questions.** What a signer _declared_ (a certification's DocMDP level, a
   field lock) is subtracted from what the caller may do, like encryption permission bits. What a
   validator will _conclude_ about later changes is a policy, and the engine judges the way the
-  recipient's validator does: after a plain approval signature, form fill-in and further signatures
-  keep it valid; anything else — an annotation included — does not.
+  recipient's validator does: after a plain approval signature, form fill-in, further signatures and
+  commenting keep it valid (Acrobat's own wording under such a signature); a page or field
+  structure change does not. The rules were checked case by case against Acrobat on a synthetic
+  corpus of 91 signed documents (`signature-compat` in the engine's test fixtures); the few places
+  where the engine is deliberately stricter are recorded there.
 
 Everything here is on `doc.signatures`. It is `undefined` on an engine that does not implement
 signatures, so check once:
@@ -74,37 +77,43 @@ const revision = await doc.signatures.revisionBytes(0); // the exact bytes revis
 
 ## What changed since a signature
 
-`analyze()` judges every revision after a signature (or after any revision) against the restrictions
-in force: which objects moved, what each change is, and the rule that permits it — or the reference no
-rule explains.
+`analyze()` judges the document as it is now against the revision a signature sealed — its _net
+state_, the way Acrobat judges an approval signature: a page changed and byte-restored later is
+unchanged, and each signature has its own reference point. A certification is also replayed
+revision by revision, so an intermediate violation invalidates it even when the final state no
+longer shows it. The result names which objects changed, what each change is, and the rule that
+permits it — or the reference no rule explains.
 
 ```ts
 const analysis = await doc.signatures.analyze({ since: { signatureIndex: 0 } });
 
-analysis.verdict; // 'unchanged' | 'permitted' | 'forbidden' | 'indeterminate'
+analysis.current.verdict; // 'unchanged' | 'permitted' | 'forbidden' | 'indeterminate'
+analysis.current.primary; // the finding that decided it
+analysis.current.findings; // per object: the change, the rule, or the unexplained reference
+analysis.restrictions; // the certification level and this signature's own locks it was judged under
+analysis.later.revisionCount; // revisions appended after the sealed one
+analysis.later.undoneObjectNumbers; // objects changed in between that hold the sealed value again
 analysis.mode; // 'authoritative', or 'exploratory' when you passed a level
-for (const step of analysis.steps) {
-  step.older;
-  step.newer; // the revision pair
-  step.verdict;
-  step.findings; // per object: the change, the rule, or the unexplained reference
-}
 ```
 
-Two options shape the question:
+Three options shape the question:
 
 - `until`: `'persisted'` (default) judges the saved revisions; `'working-copy'` snapshots the
   session's unsaved edits as one more revision first, which is how a viewer previews "would this
   fill be allowed"; `{ revisionIndex }` stops at a revision.
 - `exploratoryLevel`: evaluate as if a modification level (`'lta' | 'fill' | 'annotate'`) were in
   force. The result is tagged exploratory and never becomes a verdict.
+- `detail`: `'summary'` (default) carries the verdict and its findings; `'full'` also carries
+  every pairwise step between the two revisions (`analysis.steps`), with each step's changes.
 
-A truncated value is never permitted and a broken chain is `indeterminate`: the analysis fails
-closed. An object rewritten in a later revision _without a change in value_ is judged a
-modification at every level: Acrobat rejected such a rewrite of a page and a signed widget after
-an approval signature. The engine's own writer never produces one — a save writes only what
-changed, and an annotation added and removed again writes nothing — so the rule only ever fires on
-files other producers wrote.
+A verdict is one of four words. `unchanged`: nothing about the document differs from what the
+signature sealed — an object written again with the same value (Acrobat: "not modified") does
+not count as a change. `permitted`: something changed, and every change is one the policy allows
+(a fill, a further signature, a comment). `forbidden`: a proven violation. `indeterminate`: the
+evidence to decide is missing — a truncated value, an unreadable object, a broken chain, or a
+document Acrobat itself cannot verify later changes to (a first cross-reference section with
+holes, a reachable object that is nothing but a reference). Missing evidence never becomes a
+pass, and a violation is only proven on evidence.
 
 ## Signing: two phases
 
@@ -186,7 +195,7 @@ for (const v of verdicts) {
   v.integrity; // 'valid' | 'invalid' | 'indeterminate' — the bytes vs. the signed digest
   v.cryptography; // the CMS verified with its own certificate
   v.trust; // chain to your anchors
-  v.modifications; // { verdict, basis } — what changed after it, and whether the loaded bytes or the working copy were judged
+  v.modifications; // { verdict, basis, laterRevisions?, undone? } — what changed after it, and whether the loaded bytes or the working copy were judged
   v.summary; // 'valid' | 'valid-untrusted' | 'invalid' | 'indeterminate'
 }
 ```
@@ -202,11 +211,13 @@ for (const v of verdicts) {
   nothing: `enforced` is `null`, and nothing but a rewrite (which would erase the signature rather
   than invalidate it) is refused.
 - **`judged`** is what a validator holds later changes to: the declared level, or the approval
-  baseline `fill` when only approval signatures exist. It drives `analyze()` and every verdict. So an
-  annotation added after an approval signature is _allowed_ and then _judged forbidden_ — the
-  signature still verifies cryptographically, but a validator says the document changed in a way
-  it does not permit, which is exactly what Acrobat says. A signer who wants comments to keep a
-  signature valid certifies with `P=3`.
+  baseline `annotate` when only approval signatures exist. It drives `analyze()` and every verdict.
+  So a field filled or a comment added after an approval signature is _allowed_ and _judged
+  permitted_ — Acrobat reads such a signature as "Form Fill-in, Signing and Commenting are
+  allowed" — while a text field added or deleted, a page edited, or a signed field's structure
+  changed is _judged forbidden_: the signature still verifies cryptographically, but a validator
+  says the document changed in a way it does not permit. A signer who wants to forbid comments
+  certifies with `P=2`.
 
 Read the policy back to grey out what a user cannot do before they try, and to warn about what they
 can do but should not. An engine constructed with `signedDocumentPolicy: 'permit'` turns enforcement

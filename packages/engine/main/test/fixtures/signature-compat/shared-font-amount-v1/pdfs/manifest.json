@@ -1,0 +1,90 @@
+{
+  "schemaVersion": 1,
+  "corpusVersion": "shared-font-amount-v1",
+  "source": "synthetic-from-scratch",
+  "signingTime": "2026-09-14T10:15:18+00:00",
+  "certificateSha256": "0f13f8fc08b2c73b9142fdd9fa9bffcc7c939e134dde6a6bb7ce4d7d91b22d74",
+  "intendedPageRendering": {
+    "SFA-01": "1000",
+    "SFA-02": "9000",
+    "SFA-03": "9000"
+  },
+  "expectedExtractedAmount": "9000",
+  "cases": [
+    {
+      "id": "SFA-01",
+      "file": "01-signed-visible-1000-copy-9000.pdf",
+      "question": "Signed control: visible page amount 1000, extracted text 9000.",
+      "control": null,
+      "facts": {
+        "sha256": "7cf1bf982f6f04aabefedfd6896bcd2b79846f7e8c245b08a4420deec32a34cc",
+        "byteLength": 23514,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 1,
+            "byteRange": [
+              0,
+              6124,
+              22510,
+              1004
+            ],
+            "digestMatches": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "SFA-02",
+      "file": "02-updated-visible-9000-form-appearance.pdf",
+      "question": "Same signed prefix, changed shared glyph, regenerated form AP; field value and page text stay 9000.",
+      "control": "SFA-01",
+      "facts": {
+        "sha256": "a674ecda395caab4e22f0fd36a85041dd4b635a9aa4c9120c77fe8dbacbad7d2",
+        "byteLength": 24432,
+        "revisionCount": 3,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 1,
+            "byteRange": [
+              0,
+              6124,
+              22510,
+              1004
+            ],
+            "digestMatches": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "SFA-03",
+      "file": "03-control-visible-9000-font-only.pdf",
+      "question": "Negative control: same glyph change without regenerating the form appearance.",
+      "control": "SFA-01",
+      "facts": {
+        "sha256": "71a3010a7c0e69b9e3ed316d8c0966ab123e87374457464786b65f98fdb81696",
+        "byteLength": 23925,
+        "revisionCount": 3,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 1,
+            "byteRange": [
+              0,
+              6124,
+              22510,
+              1004
+            ],
+            "digestMatches": true
+          }
+        ]
+      }
+    }
+  ]
+}

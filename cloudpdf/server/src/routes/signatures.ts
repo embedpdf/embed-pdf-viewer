@@ -26,8 +26,10 @@ import { createReadStream } from 'node:fs';
 import {
   EngineError,
   EngineErrorCode,
+  SIGNATURE_POLICY_VERSION,
   wirePack,
   type AnalyzeInput,
+  type ChangeAnalysis,
   type DigestAlgorithm,
   type FormFieldRef,
   type SignaturePrepareInput,
@@ -151,6 +153,7 @@ export async function registerSignatureRoutes(
     const pdfBits = await bitsForLayer(accessCtx, docId, layerName);
     const ctx = requireLayerResource(req, docId, layerName, 'layer-signatures-analysis', pdfBits);
     const requested = parseTokenOrInvalidArg(decodeAnalysisToken, token, 'analysis token');
+    requireServedPolicy(reply, requested.policyVersion);
     const manifest = await service.getLayerManifest(ctx, docId, layerName);
     if (requested.docVersion !== manifest.docVersion) {
       setNoStore(reply);
@@ -165,9 +168,12 @@ export async function registerSignatureRoutes(
       ...(requested.exploratoryLevel !== undefined
         ? { exploratoryLevel: requested.exploratoryLevel }
         : {}),
+      ...(requested.detail !== undefined ? { detail: requested.detail } : {}),
     };
-    setImmutableCache(reply);
-    return analyzeLayer(ctx, docId, layerName, input, abortSignalFromRequest(req));
+    // No cache header until the worker has answered: an error response must
+    // never carry the immutable header the success path earns.
+    const analysis = await analyzeLayer(ctx, docId, layerName, input, abortSignalFromRequest(req));
+    return finishAnalysisReply(reply, analysis);
   });
 
   app.get('/v1/docs/:docId/layers/:layerName/signatures/analysis', async (req, reply) => {
@@ -332,8 +338,9 @@ export async function registerSignatureRoutes(
     const accessCtx = requireDocAccessOnly(req, docId);
     const pdfBits = await bitsForDoc(accessCtx, docId);
     const ctx = requireResource(req, docId, 'version-signatures', pdfBits);
+    const snapshot = await versionSignatures(ctx, docId, requireSha(sha), abortSignalFromRequest(req));
     setImmutableCache(reply);
-    return versionSignatures(ctx, docId, requireSha(sha), abortSignalFromRequest(req));
+    return snapshot;
   });
 
   app.get('/v1/docs/:docId/versions/signatures/:sha/:fieldKey/contents', async (req, reply) => {
@@ -416,6 +423,7 @@ export async function registerSignatureRoutes(
       req.query,
       'query',
     );
+    requireServedPolicy(reply, query.policy);
     const input = analyzeInputFromQuery(
       query,
       query.until !== undefined ? { revisionIndex: query.until } : 'persisted',
@@ -431,8 +439,7 @@ export async function registerSignatureRoutes(
     if (payload.tag !== 'signatures.analyze') {
       throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload: ${payload.tag}`);
     }
-    setImmutableCache(reply);
-    return payload.analysis;
+    return finishAnalysisReply(reply, payload.analysis);
   });
 
   app.get('/v1/docs/:docId/versions/download/:sha', async (req, reply) => {
@@ -498,6 +505,44 @@ function fieldRefFromPath(fieldKey: string): FormFieldRef {
     throw new EngineError(EngineErrorCode.InvalidArg, 'field key must not be empty');
   }
   return { kind: 'fqn', name };
+}
+
+/**
+ * The policy version a caller puts in an analysis URL is the cache key that
+ * keeps a verdict judged under one set of rules from being served under
+ * another. A request for a policy this server does not run is refused, never
+ * answered with the current policy under the requested key.
+ */
+function requireServedPolicy(reply: FastifyReply, requested: number | undefined): void {
+  if (requested !== undefined && requested !== SIGNATURE_POLICY_VERSION) {
+    setNoStore(reply);
+    throw new EngineError(
+      EngineErrorCode.InvalidArg,
+      `signature policy ${requested} is not served here (current=${SIGNATURE_POLICY_VERSION})`,
+    );
+  }
+}
+
+/**
+ * Cache an analysis only when it is a settled, authoritative verdict judged
+ * under this server's policy: a worker at another policy (a mixed fleet), an
+ * exploratory run, or a verdict that could not be established must not live
+ * for a year under an immutable URL.
+ */
+function finishAnalysisReply(reply: FastifyReply, analysis: ChangeAnalysis): ChangeAnalysis {
+  if (analysis.policyVersion !== SIGNATURE_POLICY_VERSION) {
+    setNoStore(reply);
+    throw new EngineError(
+      EngineErrorCode.WireFormat,
+      `analysis judged under policy ${analysis.policyVersion}, this server serves ${SIGNATURE_POLICY_VERSION}`,
+    );
+  }
+  if (analysis.mode === 'exploratory' || analysis.verdict === 'indeterminate') {
+    setNoStore(reply);
+  } else {
+    setImmutableCache(reply);
+  }
+  return analysis;
 }
 
 function rejectQueryParamsOnTokenUrl(query: unknown): void {

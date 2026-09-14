@@ -36,6 +36,10 @@ export interface SignatureVerdict {
     verdict: ModificationsVerdict;
     detail?: string;
     basis: 'persisted' | 'working-copy';
+    /** Revisions appended after the one this signature sealed (present when there are any). */
+    laterRevisions?: number;
+    /** Some object was changed after the signature and holds the sealed value again. */
+    undone?: boolean;
   };
   /** `invalid` only on positive evidence; `indeterminate` whenever a fact could not be established. */
   summary: 'valid' | 'valid-untrusted' | 'invalid' | 'indeterminate';
@@ -144,8 +148,9 @@ async function validateOne(
 
 /**
  * What changed after the signature, from the engine's revision analysis:
- * every later revision judged against the restrictions in force. A
- * signature that seals the last revision is `unchanged` without analysis.
+ * the current document judged against the revision the signature sealed
+ * (net state; a certification also replays every intervening revision).
+ * A signature that seals the last revision is `unchanged` without analysis.
  */
 async function modificationsOf(
   doc: DocumentHandle,
@@ -172,18 +177,22 @@ async function modificationsOf(
       since: { signatureIndex: signature.index },
       until,
     });
-    const forbidden = analysis.steps
-      .flatMap((s) => s.findings)
-      .find((f) => f.verdict === 'forbidden');
-    const incomplete = analysis.steps
-      .flatMap((s) => s.findings)
-      .find((f) => f.verdict === 'incomplete');
-    const detail = forbidden
-      ? `revision ${analysis.steps.find((s) => s.findings.includes(forbidden))?.newer}: object ${forbidden.objectNumber}, ${forbidden.rule}${forbidden.detail ? `: ${forbidden.detail}` : ''}`
-      : incomplete
-        ? `object ${incomplete.objectNumber}: ${incomplete.detail ?? 'incomplete evidence'}`
-        : undefined;
-    return { verdict: analysis.verdict, detail, basis: analysis.basis.source };
+    // The explanation comes from the verdict that counts, never from a step
+    // the final state has since undone.
+    const primary = analysis.current.primary;
+    const detail =
+      primary && primary.verdict === 'forbidden'
+        ? `object ${primary.objectNumber}, ${primary.rule}${primary.detail ? `: ${primary.detail}` : ''}`
+        : primary && primary.verdict === 'incomplete'
+          ? `object ${primary.objectNumber}: ${primary.detail ?? 'incomplete evidence'}`
+          : undefined;
+    return {
+      verdict: analysis.current.verdict,
+      detail,
+      basis: analysis.basis.source,
+      ...(analysis.later.revisionCount > 0 ? { laterRevisions: analysis.later.revisionCount } : {}),
+      ...(analysis.later.undoneObjectNumbers.length > 0 ? { undone: true } : {}),
+    };
   } catch (err) {
     return {
       verdict: 'indeterminate',

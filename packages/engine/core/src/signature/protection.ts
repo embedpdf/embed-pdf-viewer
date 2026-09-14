@@ -10,19 +10,27 @@ import type {
 
 /**
  * Bumped whenever the derivation below (or a judgement rule) changes meaning.
- * Rides every protection and every analysis. v3: an object rewritten without
- * a change in value is judged a modification (see `ruleIdenticalRewrite`).
+ * Rides every protection and every analysis, and keys the cloud's immutable
+ * analysis URLs. v4 (the `signature-compat` corpus, 91 Acrobat observations):
+ * each signature is judged on the net state of the document against the
+ * revision it sealed; an object written again with the sealed value is not
+ * a modification; an approval signature permits commenting; field
+ * properties are judged per level; a lock binds only the signature that
+ * declares it; a changed shared resource must be allowed by every use.
  */
-export const SIGNATURE_POLICY_VERSION = 3;
+export const SIGNATURE_POLICY_VERSION = 4;
 
 /**
  * How a validator reads an approval signature. ISO 32000 defines permitted
- * changes only for certification signatures; Acrobat keeps an approval
- * signature valid through form fill-in, signing and new signature fields,
- * and calls anything else — an annotation included — a modification that
- * invalidates it. pyHanko judges the same way. So do we.
+ * changes only for certification signatures; Acrobat reads an approval
+ * signature as "Form Fill-in, Signing and Commenting are allowed" (its own
+ * permission text under every such signature) and keeps it valid through a
+ * Square annotation added, deleted or recoloured afterwards (corpus
+ * `signature-compat` v3 cases 88, 90, 91: "Annotations Created/Deleted/
+ * Modified", signature valid). pyHanko judges stricter (fill only); Acrobat
+ * is the validator recipients use, so the baseline is `annotate`.
  */
-export const APPROVAL_BASELINE: ModificationLevel = 'fill';
+export const APPROVAL_BASELINE: ModificationLevel = 'annotate';
 
 const LEVEL_RANK: Record<ModificationLevel, number> = { none: 0, lta: 1, fill: 2, annotate: 3 };
 

@@ -163,8 +163,10 @@ describe('analysis: evidence must never fail open', () => {
   test('a trailer too large to inspect is indeterminate', async () => {
     const base = document({ 3: page([30]), 10: acroForm([30]), 30: SIG_FIELD, 50: '<< /Certs [] >>' }, ' /DSS 50 0 R');
     const signed = await sign(base, { permission: 2 });
-    // One innocuous object change so the update carries an xref section; the trailer gains a huge key.
-    const analysis = await analyze(append(signed, { 50: '<< /Certs [] >>' }, `/Padding (${'z'.repeat(MIB + 100)})`));
+    // One permitted object change (a DSS update) so the update carries an
+    // xref section; the trailer gains a huge key. The change must be a real,
+    // permitted one: a violation elsewhere would decide the step on its own.
+    const analysis = await analyze(append(signed, { 50: '<< /Certs [] /VRI << >> >>' }, `/Padding (${'z'.repeat(MIB + 100)})`));
     expect(analysis.verdict).toBe('indeterminate');
     expect(findings(analysis).some((f) => f.objectNumber === 0 && f.verdict === 'incomplete')).toBe(true);
   });

@@ -1,0 +1,1018 @@
+{
+  "schemaVersion": 1,
+  "entries": [
+    {
+      "id": "01",
+      "sha256": "266213657afa20eca491650b54c81d5b131cc8feb41674d0de08ede1dbbea487",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-13-trusted",
+      "policyVersion": 4,
+      "relationship": "matches-observed-behavior",
+      "modifications": [
+        "unchanged"
+      ],
+      "rationale": "Unchanged control: the signature seals the last revision."
+    },
+    {
+      "id": "02",
+      "sha256": "952e897eeb6706538ad9ea72a97185ea4284a9e12daee38a89f460ad1303a9e5",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-13-trusted",
+      "policyVersion": 4,
+      "relationship": "engine-specific-definition",
+      "modifications": [
+        "unchanged"
+      ],
+      "rationale": "An object written again with the sealed value is not a modification; Acrobat reports the revision as \"not altered\" with \"subsequent changes\", we report no effective change."
+    },
+    {
+      "id": "03",
+      "sha256": "ef4ca1a2e9351f9b26e6a312a16b78f0567c20f852a66281a600385e808ca2df",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-13-trusted",
+      "policyVersion": 4,
+      "relationship": "engine-specific-definition",
+      "modifications": [
+        "unchanged"
+      ],
+      "rationale": "An object written again with the sealed value is not a modification; Acrobat reports the revision as \"not altered\" with \"subsequent changes\", we report no effective change."
+    },
+    {
+      "id": "04",
+      "sha256": "c8db24c52b9eb06f3379ebe608de45e536f9fdb5da4a1bbfb106b22c3bfdd50c",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-13-trusted",
+      "policyVersion": 4,
+      "relationship": "engine-specific-definition",
+      "modifications": [
+        "unchanged"
+      ],
+      "rationale": "An object written again with the sealed value is not a modification; Acrobat reports the revision as \"not altered\" with \"subsequent changes\", we report no effective change."
+    },
+    {
+      "id": "05",
+      "sha256": "07e1ce771b96d1d85aadf7cf0c84bd6103b65b0bc9f02f7b92fc39a5277bd5ea",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-13-trusted",
+      "policyVersion": 4,
+      "relationship": "engine-specific-definition",
+      "modifications": [
+        "unchanged"
+      ],
+      "rationale": "An object written again with the sealed value is not a modification; Acrobat reports the revision as \"not altered\" with \"subsequent changes\", we report no effective change."
+    },
+    {
+      "id": "06",
+      "sha256": "f0f86b21f573bbe870ebac929421710ca7de638c98d4c8b0f221eaddf4d34291",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-13-trusted",
+      "policyVersion": 4,
+      "relationship": "engine-specific-definition",
+      "modifications": [
+        "unchanged"
+      ],
+      "rationale": "An object written again with the sealed value is not a modification; Acrobat reports the revision as \"not altered\" with \"subsequent changes\", we report no effective change."
+    },
+    {
+      "id": "07",
+      "sha256": "d5b7901ad83c9eee925baa173397a5c228f063f8e65a765c4bec8823000a9020",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-13-trusted",
+      "policyVersion": 4,
+      "relationship": "engine-specific-definition",
+      "modifications": [
+        "unchanged"
+      ],
+      "rationale": "An object written again with the sealed value is not a modification; Acrobat reports the revision as \"not altered\" with \"subsequent changes\", we report no effective change."
+    },
+    {
+      "id": "08",
+      "sha256": "e99ed76c2365e2df09af07e54a55693030a3581c8e5a4877cf3c9b7e803d1bdb",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-13-trusted",
+      "policyVersion": 4,
+      "relationship": "matches-observed-behavior",
+      "modifications": [
+        "permitted"
+      ],
+      "rationale": "An ordinary fill (/V and /AP) after an approval signature."
+    },
+    {
+      "id": "09",
+      "sha256": "2c239891d0c1b7d30da91b1b598248dedc61e5939c797e8d9a68beda3badf669",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-13-trusted",
+      "policyVersion": 4,
+      "relationship": "matches-observed-behavior",
+      "modifications": [
+        "permitted"
+      ],
+      "rationale": "ReadOnly added on its own after an approval signature."
+    },
+    {
+      "id": "10",
+      "sha256": "6a02911114baed23b65a4a1d1f9740854dd83e5794d4f526a929fdbfc1c0c755",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-13-trusted",
+      "policyVersion": 4,
+      "relationship": "matches-observed-behavior",
+      "modifications": [
+        "permitted"
+      ],
+      "rationale": "A field moved (/Rect) after an approval signature (\"Form Fields with Property Changes\")."
+    },
+    {
+      "id": "11",
+      "sha256": "b14d8d7f2d67d57a0365b35e86ca7715a977c6c1e0f740f36474ef04b62f5d73",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-13-trusted",
+      "policyVersion": 4,
+      "relationship": "matches-observed-behavior",
+      "modifications": [
+        "permitted"
+      ],
+      "rationale": "A field hidden (/F) after an approval signature (\"Form Fields with Property Changes\")."
+    },
+    {
+      "id": "12",
+      "sha256": "c68bfe4b5ca49c853cd2f89ded838175688951ffff452a28d352ea199e337463",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-13-trusted",
+      "policyVersion": 4,
+      "relationship": "intentional-stricter-policy",
+      "modifications": [
+        "forbidden"
+      ],
+      "rationale": "Acrobat accepts a validation action (/AA) added to a signed form field; an action on a signed form is executable content and stays forbidden."
+    },
+    {
+      "id": "13",
+      "sha256": "2b057bde97eddb21248f22ff2384f584c151c25129b14ce28264a778970c20fd",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-13-trusted",
+      "policyVersion": 4,
+      "relationship": "matches-observed-behavior",
+      "modifications": [
+        "forbidden"
+      ],
+      "rationale": "Renaming a field is a structure change; Acrobat reports it as a field deleted and a field added."
+    },
+    {
+      "id": "14",
+      "sha256": "16dff3b2ef9d7b9ccdf4efa78e3c0b6f1d8e89ae5bdfd9d5c670257fec0edfcf",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-13-trusted",
+      "policyVersion": 4,
+      "relationship": "matches-observed-behavior",
+      "modifications": [
+        "forbidden"
+      ],
+      "rationale": "Signed page content changed."
+    },
+    {
+      "id": "15",
+      "sha256": "eb122d6fa54c006ef2f685e4a6de886e7136e77153677cccf9c604a8f0558942",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-13-trusted",
+      "policyVersion": 4,
+      "relationship": "engine-specific-definition",
+      "modifications": [
+        "unchanged"
+      ],
+      "rationale": "The page changed and was byte-restored later; the current document equals the sealed one (Acrobat: valid, \"subsequent changes\")."
+    },
+    {
+      "id": "16",
+      "sha256": "62450b6d6c390022c4288fda3a76748ae514f006f5a71477ab98940aee254c61",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-13-trusted",
+      "policyVersion": 4,
+      "relationship": "matches-observed-behavior",
+      "modifications": [
+        "permitted"
+      ],
+      "rationale": "A fill whose appearance font, with indirect descendants, is shared with /AcroForm /DR: every use of the font is a permitted one."
+    },
+    {
+      "id": "17",
+      "sha256": "19007f65679ce509a2ccb95e75b4f97aad0b93412cb7e18aa6224223a47b7a02",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-13-trusted",
+      "policyVersion": 4,
+      "relationship": "matches-observed-behavior",
+      "modifications": [
+        "permitted",
+        "unchanged"
+      ],
+      "rationale": "A second approval signature after the first; the second seals the last revision."
+    },
+    {
+      "id": "18",
+      "sha256": "1659b9888f2a76883d9b07fdbe928dff62a58ea69c9ce4246c8a4fcc77b8f9bc",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-13-trusted",
+      "policyVersion": 4,
+      "relationship": "matches-observed-behavior",
+      "modifications": [
+        "permitted",
+        "unchanged"
+      ],
+      "rationale": "The tooltip (/TU) of the field being signed changed with the second signature."
+    },
+    {
+      "id": "19",
+      "sha256": "1fc55f93e24932b05b8d6346fb2b8276c63a4e77783025983efc6165fb331112",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-13-trusted",
+      "policyVersion": 4,
+      "relationship": "matches-observed-behavior",
+      "modifications": [
+        "permitted",
+        "unchanged"
+      ],
+      "rationale": "A /Lock installed on the field with the second signature."
+    },
+    {
+      "id": "20",
+      "sha256": "409d4f7629f4f37b63a9eb6dfe45f4b44dbf53c152241593959ba0cfa9d9b8c2",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-13-trusted",
+      "policyVersion": 4,
+      "relationship": "matches-observed-behavior",
+      "modifications": [
+        "permitted",
+        "unchanged"
+      ],
+      "rationale": "The second signature's value carries indirect /Prop_Build children."
+    },
+    {
+      "id": "21",
+      "sha256": "5a957a14be8db2e9773e0ed523a7186e8bed8291a404134509fff383c11d2a42",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-13-trusted",
+      "policyVersion": 4,
+      "relationship": "matches-observed-behavior",
+      "modifications": [
+        "permitted",
+        "unchanged"
+      ],
+      "rationale": "Staged fills with ReadOnly and /DA, fonts shared with /DR, an identical /Info rewrite, then a second signature with a lock and a tooltip change."
+    },
+    {
+      "id": "22",
+      "sha256": "f72cd96ebbeda6181abf6eff1a28ce18f78409a88a0f85752c7c6444f0e85ced",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-13-trusted",
+      "policyVersion": 4,
+      "relationship": "matches-observed-behavior",
+      "modifications": [
+        "unchanged"
+      ],
+      "rationale": "Unchanged control: the signature seals the last revision."
+    },
+    {
+      "id": "23",
+      "sha256": "d5ae7869ab3c45ba82744c90c849ca1e49ed108ddd761719e7f86f5e3f54c471",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-13-trusted",
+      "policyVersion": 4,
+      "relationship": "engine-specific-definition",
+      "modifications": [
+        "unchanged"
+      ],
+      "rationale": "An object written again with the sealed value is not a modification; Acrobat reports the revision as \"not altered\" with \"subsequent changes\", we report no effective change."
+    },
+    {
+      "id": "24",
+      "sha256": "189aa7320704ca95b22d437ecb7b2f0c49f65a729c1b4a627fe0a5bbde3028d9",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-13-trusted",
+      "policyVersion": 4,
+      "relationship": "matches-observed-behavior",
+      "modifications": [
+        "permitted",
+        "unchanged"
+      ],
+      "rationale": "Case 21 with AES-128 encryption."
+    },
+    {
+      "id": "25",
+      "sha256": "0ea9b558109511df95080ed34fb55fc46ba8f076a45cda72c3d0fa67197f7c84",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-13-trusted",
+      "policyVersion": 4,
+      "relationship": "matches-observed-behavior",
+      "modifications": [
+        "forbidden"
+      ],
+      "rationale": "P=1 certification permits nothing; a fill invalidates it."
+    },
+    {
+      "id": "26",
+      "sha256": "c2c37841ddc2d8af1e7a8a0e8310df1b344c96a922ca72c4da03c332245082cc",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-13-trusted",
+      "policyVersion": 4,
+      "relationship": "matches-observed-behavior",
+      "modifications": [
+        "permitted"
+      ],
+      "rationale": "A fill under P=2 certification."
+    },
+    {
+      "id": "27",
+      "sha256": "5892fc60cfa3cab9f11e97b40bd869e1d126ab46323f44d6cb18d51551a5130e",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-13-trusted",
+      "policyVersion": 4,
+      "relationship": "matches-observed-behavior",
+      "modifications": [
+        "permitted"
+      ],
+      "rationale": "An annotation change under P=3 certification."
+    },
+    {
+      "id": "28",
+      "sha256": "fceeb4b1f66e069690e9c67c053e236e48c5b0ac9012af96feb5616cce73e41a",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-13-trusted",
+      "policyVersion": 4,
+      "relationship": "matches-observed-behavior",
+      "modifications": [
+        "forbidden"
+      ],
+      "rationale": "A field locked by the signature was filled."
+    },
+    {
+      "id": "29",
+      "sha256": "9c2213429c8388473921bf9d0b11ab923ba7eb01d94936fd510c4d2729124817",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-13-trusted",
+      "policyVersion": 4,
+      "relationship": "engine-specific-definition",
+      "modifications": [
+        "unchanged"
+      ],
+      "rationale": "The tampered bytes fail the integrity check, which is judged separately from modifications; no revision follows the signature, so there is nothing to judge as a modification."
+    },
+    {
+      "id": "30",
+      "sha256": "2560d759fd409d741ee9822df3b2d79210e20d662f41259bb2ba6aef16e5b181",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-13-trusted",
+      "policyVersion": 4,
+      "relationship": "intentional-stricter-policy",
+      "modifications": [
+        "forbidden"
+      ],
+      "rationale": "Acrobat accepts a fill whose changed glyph also draws signed page content, which visibly changes the page; a changed resource must be permitted by every use, and the page's use is not."
+    },
+    {
+      "id": "31",
+      "sha256": "dc908b7eb0133a04dfef7224e76fd4e78f9d4430c2b3a407a54790ffc05a2e70",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-13-v2-trusted",
+      "policyVersion": 4,
+      "relationship": "matches-observed-behavior",
+      "modifications": [
+        "unchanged"
+      ],
+      "rationale": "Unchanged control: the signature seals the last revision."
+    },
+    {
+      "id": "32",
+      "sha256": "27889e660903dce8662ce78d3168c2adaf2f32bdead0393d9e55f0a05a50e114",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-13-v2-trusted",
+      "policyVersion": 4,
+      "relationship": "matches-observed-behavior",
+      "modifications": [
+        "unchanged"
+      ],
+      "rationale": "Unchanged control: the signature seals the last revision."
+    },
+    {
+      "id": "33",
+      "sha256": "184b3593f93ffd2f5203562d2b1d255fe5b95c3935a37d00b1bac1e851fd417d",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-13-v2-trusted",
+      "policyVersion": 4,
+      "relationship": "matches-observed-behavior",
+      "modifications": [
+        "unchanged"
+      ],
+      "rationale": "Unchanged control: the signature seals the last revision."
+    },
+    {
+      "id": "34",
+      "sha256": "2f428d2788946e2313ebd7261bc647bf84f68e10d984814ca23450ccd3f50196",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-13-v2-trusted",
+      "policyVersion": 4,
+      "relationship": "matches-observed-behavior",
+      "modifications": [
+        "forbidden"
+      ],
+      "rationale": "A glyph used only by signed page content changed."
+    },
+    {
+      "id": "35",
+      "sha256": "3155441d7cb9f796e62ca1e69c526b6af7f437dc9b5c245dbc5fdf6da03ea180",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-13-v2-trusted",
+      "policyVersion": 4,
+      "relationship": "matches-observed-behavior",
+      "modifications": [
+        "unchanged"
+      ],
+      "rationale": "Unchanged control: the signature seals the last revision."
+    },
+    {
+      "id": "36",
+      "sha256": "0cee9d939b67caf3265e54a766836dc85be866dc1754c4888d0fbff3e7c70ff0",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-13-v2-trusted",
+      "policyVersion": 4,
+      "relationship": "matches-observed-behavior",
+      "modifications": [
+        "forbidden"
+      ],
+      "rationale": "A glyph used by signed page content changed; registering the font in /DR does not permit it."
+    },
+    {
+      "id": "37",
+      "sha256": "f103c5d1d856cda0a132455cc11283ed281e80a45f69187d63aa1eac75580d90",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-13-v2-trusted",
+      "policyVersion": 4,
+      "relationship": "matches-observed-behavior",
+      "modifications": [
+        "permitted"
+      ],
+      "rationale": "A fill with its own font; the page font is untouched."
+    },
+    {
+      "id": "38",
+      "sha256": "499f093523c605c816f0920417faa1224685e4e4d43fa08d335cace85cec7534",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-13-v2-trusted",
+      "policyVersion": 4,
+      "relationship": "matches-observed-behavior",
+      "modifications": [
+        "unchanged"
+      ],
+      "rationale": "Unchanged control: the signature seals the last revision."
+    },
+    {
+      "id": "39",
+      "sha256": "e1d0035a556d2c1b47a71b3ff321644ae82fa211986c35c89bf73c597a8579c3",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-13-v2-trusted",
+      "policyVersion": 4,
+      "relationship": "intentional-stricter-policy",
+      "modifications": [
+        "forbidden"
+      ],
+      "rationale": "Acrobat reports \"not modified\" although the field/page-shared glyph changes both; same rule as 30."
+    },
+    {
+      "id": "40",
+      "sha256": "7ed2e487f31d2a5ffb2076006129806de6faad4a45677c29d1ccf0a951cdcd89",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-13-v2-trusted",
+      "policyVersion": 4,
+      "relationship": "matches-observed-behavior",
+      "modifications": [
+        "unchanged"
+      ],
+      "rationale": "Unchanged control: the signature seals the last revision."
+    },
+    {
+      "id": "41",
+      "sha256": "aa3b9841fb2767ae5c7d02a7b449f1b034e5f1c9bf200d0911c89061cae03578",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-13-v2-trusted",
+      "policyVersion": 4,
+      "relationship": "matches-observed-behavior",
+      "modifications": [
+        "forbidden"
+      ],
+      "rationale": "Under P=2 a fill whose font also draws signed page content is rejected."
+    },
+    {
+      "id": "42",
+      "sha256": "e3fb5b4a8c5525606f05a78ab7d223f49ba119bab306a6632640bd7f392fe89a",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-13-v2-trusted",
+      "policyVersion": 4,
+      "relationship": "matches-observed-behavior",
+      "modifications": [
+        "permitted",
+        "unchanged"
+      ],
+      "rationale": "The page was changed and restored before the second signature; the first signature sees only the second signature added."
+    },
+    {
+      "id": "43",
+      "sha256": "a1cfa0d454c7f03f956357ade7f0d8c4115ac499945e64086ed3eb1eeb028bf4",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-13-v2-trusted",
+      "policyVersion": 4,
+      "relationship": "matches-observed-behavior",
+      "modifications": [
+        "forbidden",
+        "unchanged"
+      ],
+      "rationale": "The first signature sees its page changed; the second seals the changed page and nothing follows it."
+    },
+    {
+      "id": "44",
+      "sha256": "a7526defafff0c1b2df45a8607799a41ebcfcdc27054f5270ce37b1335bb9230",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-13-v2-trusted",
+      "policyVersion": 4,
+      "relationship": "matches-observed-behavior",
+      "modifications": [
+        "permitted",
+        "forbidden"
+      ],
+      "rationale": "Restoring the page recovers the first signature (it sees a second signature added over its sealed page) and takes the second signature's changed page away."
+    },
+    {
+      "id": "45",
+      "sha256": "ff4b0fd196a303cd599a9358ecee0839f1a9d04c56daec90fb0422dff318e7b2",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-13-v2-trusted",
+      "policyVersion": 4,
+      "relationship": "matches-observed-behavior",
+      "modifications": [
+        "forbidden"
+      ],
+      "rationale": "A restored page whose decoded stream bytes differ (an added comment) is a changed page."
+    },
+    {
+      "id": "46",
+      "sha256": "94ee426d9fea09c479897d979256b6955d4fb0b91bfd9c751d1a6353c36d6038",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-13-v2-trusted",
+      "policyVersion": 4,
+      "relationship": "matches-observed-behavior",
+      "modifications": [
+        "forbidden"
+      ],
+      "rationale": "The page stream was restored but the glyph it draws with stays changed."
+    },
+    {
+      "id": "47",
+      "sha256": "8a0773a5b275232868f9a83e735c1e045825b2909346c9cda954a1dffb28d101",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-13-v2-trusted",
+      "policyVersion": 4,
+      "relationship": "matches-observed-behavior",
+      "modifications": [
+        "unchanged"
+      ],
+      "rationale": "Identical rewrite(s) of the page and/or the sealed widget: Acrobat \"not modified\"."
+    },
+    {
+      "id": "48",
+      "sha256": "e8b1642d68baf49c235b7f2284b605b7829ab3bd0a573b968779947e01697724",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-13-v2-trusted",
+      "policyVersion": 4,
+      "relationship": "matches-observed-behavior",
+      "modifications": [
+        "unchanged"
+      ],
+      "rationale": "Unchanged control: the signature seals the last revision."
+    },
+    {
+      "id": "49",
+      "sha256": "3a37e729e646901d9d831e7b664fc331ca6861dd88b8ba7fdacf8d15855e528d",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-13-v2-trusted",
+      "policyVersion": 4,
+      "relationship": "intentional-stricter-policy",
+      "modifications": [
+        "forbidden"
+      ],
+      "rationale": "Acrobat accepts moving a field covered by the signature's own FieldMDP lock; a locked field that can move is not the guarantee the lock promises."
+    },
+    {
+      "id": "50",
+      "sha256": "893924ca7fbfcc2afcdfdab67f61c250de12a800958aab6eea91e0f6074486a5",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-13-v2-trusted",
+      "policyVersion": 4,
+      "relationship": "matches-observed-behavior",
+      "modifications": [
+        "forbidden"
+      ],
+      "rationale": "Under P=2 moving a field (/Rect) is not form fill-in."
+    },
+    {
+      "id": "51",
+      "sha256": "3ec5179c0fee43f4a7f9a013166e7f269133d19416704088a416ab8e3519c034",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-13-v2-trusted",
+      "policyVersion": 4,
+      "relationship": "matches-observed-behavior",
+      "modifications": [
+        "forbidden"
+      ],
+      "rationale": "Hiding a locked field (/F) is a change to the locked field."
+    },
+    {
+      "id": "52",
+      "sha256": "3546f0132d448cf34f7dfe9c44685cf108d2db455a4b1ffa26f4c8207ede084b",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-13-v2-trusted",
+      "policyVersion": 4,
+      "relationship": "intentional-stricter-policy",
+      "modifications": [
+        "forbidden"
+      ],
+      "rationale": "Case 30 without the Square annotation; same rule as 30."
+    },
+    {
+      "id": "53",
+      "sha256": "5158c883d1d0e6e53b90fb371eb2b25c92f252ceb61730fb17e0f0cd02da7d06",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-14-v3-trusted",
+      "policyVersion": 4,
+      "relationship": "matches-observed-behavior",
+      "modifications": [
+        "unchanged"
+      ],
+      "rationale": "Unchanged control: the signature seals the last revision."
+    },
+    {
+      "id": "54",
+      "sha256": "a5e825d98b7ecd5e03c0a1678a7d91a1974b65dcef6c1c715c4decc51238c753",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-14-v3-trusted",
+      "policyVersion": 4,
+      "relationship": "matches-observed-behavior",
+      "modifications": [
+        "unchanged"
+      ],
+      "rationale": "Identical rewrite(s) of the page and/or the sealed widget: Acrobat \"not modified\"."
+    },
+    {
+      "id": "55",
+      "sha256": "ad8d0137d40fbc7a720b473782d52ba0881c538a690bf6b28240d88d951779f0",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-14-v3-trusted",
+      "policyVersion": 4,
+      "relationship": "matches-observed-behavior",
+      "modifications": [
+        "unchanged"
+      ],
+      "rationale": "Identical rewrite(s) of the page and/or the sealed widget: Acrobat \"not modified\"."
+    },
+    {
+      "id": "56",
+      "sha256": "58b3945de9f19b2b4212dd845595482f8d7ffc492059e67f9c7ae30371885b34",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-14-v3-trusted",
+      "policyVersion": 4,
+      "relationship": "matches-observed-behavior",
+      "modifications": [
+        "unchanged"
+      ],
+      "rationale": "Identical rewrite(s) of the page and/or the sealed widget: Acrobat \"not modified\"."
+    },
+    {
+      "id": "57",
+      "sha256": "2936a12a149e18cf7477f46ca7ef3e07c23d66bace89f8bcd41173dc9edff0ee",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-14-v3-trusted",
+      "policyVersion": 4,
+      "relationship": "matches-observed-behavior",
+      "modifications": [
+        "unchanged"
+      ],
+      "rationale": "Identical rewrite(s) of the page and/or the sealed widget: Acrobat \"not modified\"."
+    },
+    {
+      "id": "58",
+      "sha256": "6568703971663df4f21fb004cd3318d43faf8dc7446137854ceb98a8ad68bf4d",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-14-v3-trusted",
+      "policyVersion": 4,
+      "relationship": "matches-observed-behavior",
+      "modifications": [
+        "unchanged"
+      ],
+      "rationale": "Unchanged control: the signature seals the last revision."
+    },
+    {
+      "id": "59",
+      "sha256": "dcc48ec83187be12ea1e0fced180e456da5ce7110c3cea232f5282ccd2654172",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-14-v3-trusted",
+      "policyVersion": 4,
+      "relationship": "matches-observed-behavior",
+      "modifications": [
+        "unchanged"
+      ],
+      "rationale": "Identical rewrite(s) of the page and/or the sealed widget: Acrobat \"not modified\"."
+    },
+    {
+      "id": "60",
+      "sha256": "720c776e772804e9c730578554005b463db48daba61604550a8839190bc442b9",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-14-v3-trusted",
+      "policyVersion": 4,
+      "relationship": "matches-observed-behavior",
+      "modifications": [
+        "unchanged"
+      ],
+      "rationale": "Identical rewrite(s) of the page and/or the sealed widget: Acrobat \"not modified\"."
+    },
+    {
+      "id": "61",
+      "sha256": "31df7fcc706d486f3f1a04bb0a2fbd18a138b36200188e801a80b66e6094e432",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-14-v3-trusted",
+      "policyVersion": 4,
+      "relationship": "matches-observed-behavior",
+      "modifications": [
+        "unchanged"
+      ],
+      "rationale": "A dictionary reserialised with reordered keys and different whitespace holds the same value: Acrobat \"not modified\"."
+    },
+    {
+      "id": "62",
+      "sha256": "8d0c67f1bd2595ba479c47c12cc277df3c7171fc206d38e21e5af7beca70f53a",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-14-v3-trusted",
+      "policyVersion": 4,
+      "relationship": "matches-observed-behavior",
+      "modifications": [
+        "unchanged"
+      ],
+      "rationale": "A dictionary reserialised with reordered keys and different whitespace holds the same value: Acrobat \"not modified\"."
+    },
+    {
+      "id": "63",
+      "sha256": "97678d9ddc30c3ddfeafb9a93183540f5403e2a77685f26a571fdc369120c7dd",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-14-v3-trusted",
+      "policyVersion": 4,
+      "relationship": "matches-observed-behavior",
+      "modifications": [
+        "unchanged"
+      ],
+      "rationale": "Unchanged control: the signature seals the last revision."
+    },
+    {
+      "id": "64",
+      "sha256": "2f918ba7879dacc1fce3ea93aa18cbc53e7a18515a99d3bdd13c8a1a2d16ffb6",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-14-v3-trusted",
+      "policyVersion": 4,
+      "relationship": "matches-observed-behavior",
+      "modifications": [
+        "permitted"
+      ],
+      "rationale": "ReadOnly added on its own under a P=2 certification (\"permitted changes\")."
+    },
+    {
+      "id": "65",
+      "sha256": "f31a834cb4c16c8bd1edd9d3308d0dd6a910c10dbff61c81f36d8ebba3bcdd34",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-14-v3-trusted",
+      "policyVersion": 4,
+      "relationship": "matches-observed-behavior",
+      "modifications": [
+        "permitted"
+      ],
+      "rationale": "Under P=2 a default-appearance (/DA) change is accepted as form fill-in."
+    },
+    {
+      "id": "66",
+      "sha256": "769e04ae1bb9ae20f1bfd5b53d1829a686a81c879cafac9609f06c905524dd51",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-14-v3-trusted",
+      "policyVersion": 4,
+      "relationship": "matches-observed-behavior",
+      "modifications": [
+        "forbidden"
+      ],
+      "rationale": "Under P=2 a tooltip (/TU) change is not form fill-in."
+    },
+    {
+      "id": "67",
+      "sha256": "9b8bcb38194ee6ab4d1bb4e6527c80a82ebb6d9641ae7f4145874fb5b819ebf6",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-14-v3-trusted",
+      "policyVersion": 4,
+      "relationship": "matches-observed-behavior",
+      "modifications": [
+        "forbidden"
+      ],
+      "rationale": "Under P=2 hiding a field (/F) is not form fill-in."
+    },
+    {
+      "id": "68",
+      "sha256": "8ce2c3024b9ce44497be385be48c9e3c0c9588dd68c5c45c457d5af8be539135",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-14-v3-trusted",
+      "policyVersion": 4,
+      "relationship": "matches-observed-behavior",
+      "modifications": [
+        "permitted"
+      ],
+      "rationale": "Under P=2 an appearance stream rewritten with the same value and drawing is accepted."
+    },
+    {
+      "id": "69",
+      "sha256": "572f5e3e5504345452dad62682c1d490956bea9bacc08e18e5a2d152e8a45d16",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-14-v3-trusted",
+      "policyVersion": 4,
+      "relationship": "matches-observed-behavior",
+      "modifications": [
+        "forbidden",
+        "unchanged"
+      ],
+      "rationale": "Under P=2 the second signature's /Lock and /TU on its field are not form fill-in; the second signature seals the last revision."
+    },
+    {
+      "id": "70",
+      "sha256": "3712a5d6df9113edb6048bc88a14b597de4e5234d7620b808e0d2b8590539552",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-14-v3-trusted",
+      "policyVersion": 4,
+      "relationship": "engine-specific-definition",
+      "modifications": [
+        "unchanged"
+      ],
+      "rationale": "An identical rewrite under a P=2 certification: Acrobat \"permitted changes\", we report no effective change."
+    },
+    {
+      "id": "71",
+      "sha256": "965876a41a5e968884aedcd5435078b33b14507ad7604dd9a22afde8cdcf1c9b",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-14-v3-trusted",
+      "policyVersion": 4,
+      "relationship": "engine-specific-definition",
+      "modifications": [
+        "unchanged"
+      ],
+      "rationale": "An identical rewrite under a P=2 certification: Acrobat \"permitted changes\", we report no effective change."
+    },
+    {
+      "id": "72",
+      "sha256": "a6922ff25482eb6746c098fdd55c12c436062ecb87e9b6feb8bd3a7b4463c659",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-14-v3-trusted",
+      "policyVersion": 4,
+      "relationship": "matches-observed-behavior",
+      "modifications": [
+        "unchanged"
+      ],
+      "rationale": "Unchanged control: the signature seals the last revision."
+    },
+    {
+      "id": "73",
+      "sha256": "079965a6785ee38185048d6d2caa52028e7ef450ec3eee2b151759796a9bd4bc",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-14-v3-trusted",
+      "policyVersion": 4,
+      "relationship": "matches-observed-behavior",
+      "modifications": [
+        "forbidden"
+      ],
+      "rationale": "A locked field's default appearance (/DA) changed."
+    },
+    {
+      "id": "74",
+      "sha256": "01205cf3f531e90324f2e9c18b236743a47ffe9b4996f1fe7fab4b16812d9e52",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-14-v3-trusted",
+      "policyVersion": 4,
+      "relationship": "matches-observed-behavior",
+      "modifications": [
+        "forbidden"
+      ],
+      "rationale": "A locked field's tooltip (/TU) changed."
+    },
+    {
+      "id": "75",
+      "sha256": "a46e5201b96c43d8cd0e9d133516d616ee5545757cda86b72b0df02148c78ed1",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-14-v3-trusted",
+      "policyVersion": 4,
+      "relationship": "intentional-stricter-policy",
+      "modifications": [
+        "forbidden"
+      ],
+      "rationale": "Acrobat accepts a locked field's appearance stream rewritten with the same drawing; an appearance change on a locked field can misrepresent its value and the drawing is not verified."
+    },
+    {
+      "id": "76",
+      "sha256": "1f3af6161bfa37e89b77e31e31acac9725d1d6bcaa864ad50989342b69334fb2",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-14-v3-trusted",
+      "policyVersion": 4,
+      "relationship": "engine-specific-definition",
+      "modifications": [
+        "permitted"
+      ],
+      "rationale": "ReadOnly added on a field locked by the signature: the one change a lock tolerates (Acrobat \"not modified\"; we report a permitted change)."
+    },
+    {
+      "id": "77",
+      "sha256": "81e0863ff2cf2dca63a6bf5f177a0bd4ceb73ca852696fcc9751494c3de46d3b",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-14-v3-trusted",
+      "policyVersion": 4,
+      "relationship": "matches-observed-behavior",
+      "modifications": [
+        "unchanged"
+      ],
+      "rationale": "A locked field rewritten identically: Acrobat \"not modified\"."
+    },
+    {
+      "id": "78",
+      "sha256": "21c0bea74ec01ae94827d97013359d66d87ce95daac73423827c5ec59d3bc7f2",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-14-v3-trusted",
+      "policyVersion": 4,
+      "relationship": "matches-observed-behavior",
+      "modifications": [
+        "unchanged"
+      ],
+      "rationale": "Unchanged control: the signature seals the last revision."
+    },
+    {
+      "id": "79",
+      "sha256": "2c514bb74de5e4e6670e66ec8e02f871ceb55a586d5e93045af2ea0ac3ac25da",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-14-v3-trusted",
+      "policyVersion": 4,
+      "relationship": "intentional-stricter-policy",
+      "modifications": [
+        "forbidden"
+      ],
+      "rationale": "Acrobat accepts a fill whose changed glyph also draws a locked field's appearance; the locked field's use of the resource denies the change."
+    },
+    {
+      "id": "80",
+      "sha256": "0ef2691cde4008f6412f65d7b89639847cb079b97000273c93f5caa9dbb8e545",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-14-v3-trusted",
+      "policyVersion": 4,
+      "relationship": "matches-observed-behavior",
+      "modifications": [
+        "forbidden"
+      ],
+      "rationale": "A locked field was filled."
+    },
+    {
+      "id": "81",
+      "sha256": "c9635ee7e7e85c959832edc15a8a5ff3f6e698b795c2746958f6bbd45a841da6",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-14-v3-trusted",
+      "policyVersion": 4,
+      "relationship": "matches-observed-behavior",
+      "modifications": [
+        "unchanged"
+      ],
+      "rationale": "The locked field was filled and its dictionary byte-restored: the sealed value holds again (Acrobat \"not modified\")."
+    },
+    {
+      "id": "82",
+      "sha256": "d8d9cb6439467e8f9c2e096bd9658582276344bb3cfb28cc541fcc96ec3d0587",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-14-v3-trusted",
+      "policyVersion": 4,
+      "relationship": "matches-observed-behavior",
+      "modifications": [
+        "forbidden"
+      ],
+      "rationale": "Signed page content changed under a certification."
+    },
+    {
+      "id": "83",
+      "sha256": "98c6647198f718c06818f1c5747a95144bd79f5823a5b594099c3fef9456c048",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-14-v3-trusted",
+      "policyVersion": 4,
+      "relationship": "matches-observed-behavior",
+      "modifications": [
+        "forbidden"
+      ],
+      "rationale": "A certification replays every revision after it: the page change of revision 1 invalidates it even though revision 2 restored the page (Acrobat: invalid on reopen and explicit revalidation)."
+    },
+    {
+      "id": "84",
+      "sha256": "3cefa842cd7d8b095dc7a1754810e3f76b1b9b23c462fd4966782f983863ad4c",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-14-v3-trusted",
+      "policyVersion": 4,
+      "relationship": "matches-observed-behavior",
+      "modifications": [
+        "forbidden",
+        "unchanged"
+      ],
+      "rationale": "The first signature's locked field was filled; the second seals that state and nothing follows it."
+    },
+    {
+      "id": "85",
+      "sha256": "36fa67f25cbcc03ee83d9a4add4b7897b446009cc73583e48900b11db4e0f232",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-14-v3-trusted",
+      "policyVersion": 4,
+      "relationship": "matches-observed-behavior",
+      "modifications": [
+        "permitted",
+        "permitted"
+      ],
+      "rationale": "Each signature is judged against the revision it sealed. SignatureOne: its locked field holds the sealed value again and a second signature was added in between (Acrobat: valid, \"not modified\"). SignatureTwo declares no lock, so the restoring fill in its window is an ordinary fill (Acrobat: valid, \"Form Fields Filled In\")."
+    },
+    {
+      "id": "86",
+      "sha256": "b324489dc1b6ef6b81f4ecbb87daab79512935714d770fdf23a11d7fd2149af2",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-14-v3-trusted",
+      "policyVersion": 4,
+      "relationship": "matches-observed-behavior",
+      "modifications": [
+        "forbidden"
+      ],
+      "rationale": "A text field was added after an approval signature (\"Form Fields Added\")."
+    },
+    {
+      "id": "87",
+      "sha256": "af9ae1bb3f2ecbeb2f881ea66c9c49d17e50d304e8e2aa2d45d12af4f962ae9b",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-14-v3-trusted",
+      "policyVersion": 4,
+      "relationship": "matches-observed-behavior",
+      "modifications": [
+        "forbidden"
+      ],
+      "rationale": "A text field was deleted after an approval signature (\"Form Fields Deleted\")."
+    },
+    {
+      "id": "88",
+      "sha256": "bdef80ca9a49798700eb675bf43bdf8941c42a2047816465da39be2fac6829a5",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-14-v3-trusted",
+      "policyVersion": 4,
+      "relationship": "matches-observed-behavior",
+      "modifications": [
+        "permitted"
+      ],
+      "rationale": "A Square annotation added after an approval signature (\"Annotations Created\"): commenting is allowed."
+    },
+    {
+      "id": "89",
+      "sha256": "41eb0ed3307e2e20b81a7733756203d303c074cae24f5aad744651802aabe173",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-14-v3-trusted",
+      "policyVersion": 4,
+      "relationship": "matches-observed-behavior",
+      "modifications": [
+        "unchanged"
+      ],
+      "rationale": "Unchanged control: the signature seals the last revision."
+    },
+    {
+      "id": "90",
+      "sha256": "6a75de59267d8f656ab48d2f459d98b5d10b5cd9b91303b9452a1d87c97fdeab",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-14-v3-trusted",
+      "policyVersion": 4,
+      "relationship": "matches-observed-behavior",
+      "modifications": [
+        "permitted"
+      ],
+      "rationale": "A Square annotation deleted after an approval signature (\"Annotations Deleted\")."
+    },
+    {
+      "id": "91",
+      "sha256": "53cb154ed56e06fea13b1c737ba78dfd7c1d4b3adda3ebf744ba33a976f3497d",
+      "observationRunId": "acrobat-reader-26.2.21869-macos-arm64-2026-09-14-v3-trusted",
+      "policyVersion": 4,
+      "relationship": "matches-observed-behavior",
+      "modifications": [
+        "permitted"
+      ],
+      "rationale": "A Square annotation recoloured after an approval signature (\"Annotations Modified\")."
+    }
+  ]
+}

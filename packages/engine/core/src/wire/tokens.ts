@@ -33,6 +33,8 @@ export interface AnalysisToken {
   exploratoryLevel?: ModificationLevel;
   /** The judging policy version the caller expects (`SIGNATURE_POLICY_VERSION`); keys the cache. */
   policyVersion?: number;
+  /** `full` carries every pairwise step; default `summary`. */
+  detail?: 'summary' | 'full';
 }
 
 export const encodeAnalysisToken = (input: AnalysisToken): string =>
@@ -42,6 +44,7 @@ export const encodeAnalysisToken = (input: AnalysisToken): string =>
     'since.revision': 'revisionIndex' in input.since ? input.since.revisionIndex : undefined,
     level: input.exploratoryLevel,
     policy: input.policyVersion ?? SIGNATURE_POLICY_VERSION,
+    detail: input.detail,
   });
 
 export const decodeAnalysisToken = (raw: string): AnalysisToken => {
@@ -59,8 +62,16 @@ export const decodeAnalysisToken = (raw: string): AnalysisToken => {
         : { revisionIndex: decodeNonNegativeInteger(sinceRevision!, 'since.revision') },
     ...(t.level !== undefined ? { exploratoryLevel: decodeModificationLevel(t.level) } : {}),
     ...(t.policy !== undefined ? { policyVersion: decodePositiveInteger(t.policy, 'policy') } : {}),
+    ...(t.detail !== undefined ? { detail: decodeDetail(t.detail) } : {}),
   };
 };
+
+function decodeDetail(raw: string): 'summary' | 'full' {
+  if (raw !== 'summary' && raw !== 'full') {
+    throw new Error('token field "detail" must be summary|full');
+  }
+  return raw;
+}
 
 const MODIFICATION_LEVELS: ReadonlyArray<ModificationLevel> = ['none', 'lta', 'fill', 'annotate'];
 function decodeModificationLevel(raw: string): ModificationLevel {

@@ -142,10 +142,10 @@ const NO_CHANGES: ObjectChange[] = [];
 
 describe('evaluateStep: the edge-claim law', () => {
   test('restrictions come from the older revision: approval baseline, certification, locks', () => {
-    // Nothing signed: nothing forbids. An approval signature: judged the way a
-    // validator reads it — form fill-in and signing keep it, anything else does not.
+    // Nothing signed: nothing forbids. An approval signature: judged the way
+    // Acrobat reads it — form fill-in, signing and commenting keep it.
     expect(restrictionsOf(structure({ signatures: [] })).level).toBe('annotate');
-    expect(restrictionsOf(structure()).level).toBe('fill');
+    expect(restrictionsOf(structure()).level).toBe('annotate');
     expect(
       restrictionsOf(
         structure({ signatures: [signature(0, 30, { docMdp: 2, catalogCertification: true })] }),
@@ -159,7 +159,84 @@ describe('evaluateStep: the edge-claim law', () => {
     expect(locked.locks).toHaveLength(1);
   });
 
-  test('no changes is unchanged; an identical rewrite is forbidden at any level (conservative: Acrobat rejected one)', () => {
+  test('a failed read is missing evidence, never a value: two "null"s do not make an identical rewrite', () => {
+    const before = structure();
+    // Both sides serialise as "null", but the new side could not be read.
+    const unreadable = change(
+      20,
+      { old: 'null', new: 'null' },
+      { old: [edge(10, 'Fields/[0]')], new: [edge(10, 'Fields/[0]')] },
+      { read: { old: 'ok', new: 'failed' } },
+    );
+    const step = evaluateStep({ older: 1, newer: 2, changes: [unreadable], before, after: before });
+    expect(step.verdict).toBe('indeterminate');
+    expect(step.findings.map((f) => f.rule)).not.toContain('identical-rewrite');
+    expect(step.findings.some((f) => f.verdict === 'incomplete')).toBe(true);
+    // A real null object rewritten as null, both sides read: that IS an identical rewrite.
+    const realNull = change(
+      20,
+      { old: 'null', new: 'null' },
+      { old: [edge(10, 'Fields/[0]')], new: [edge(10, 'Fields/[0]')] },
+      { read: { old: 'ok', new: 'ok' } },
+    );
+    expect(
+      evaluateStep({ older: 1, newer: 2, changes: [realNull], before, after: before }).findings.map(
+        (f) => f.rule,
+      ),
+    ).toContain('identical-rewrite');
+  });
+
+  test('a proven violation decides even when other evidence is incomplete', () => {
+    const before = structure();
+    const pageContent = change(
+      3,
+      { old: '<</Type /Page/Parent 2 0 R/Contents 40 0 R>>', new: '<</Type /Page/Parent 2 0 R/Contents 41 0 R>>' },
+      { old: [edge(2, 'Kids/[0]')], new: [edge(2, 'Kids/[0]')] },
+    );
+    const tooBig = change(
+      50,
+      { old: '<</X 1>>', new: '<</X 2>>' },
+      { old: [edge(1, 'Big')], new: [edge(1, 'Big')] },
+      { value: { old: null, new: null, truncated: true } },
+    );
+    const step = evaluateStep({ older: 1, newer: 2, changes: [pageContent, tooBig], before, after: before });
+    expect(step.findings.some((f) => f.verdict === 'forbidden')).toBe(true);
+    expect(step.findings.some((f) => f.verdict === 'incomplete')).toBe(true);
+    expect(step.verdict).toBe('forbidden');
+  });
+
+  test('a sealed revision Acrobat cannot verify later changes to is judged indeterminate, not by the change', () => {
+    const before = structure();
+    // An ordinary permitted fill.
+    const fill = change(
+      20,
+      { old: '<</FT /Tx/T (name)/V (a)>>', new: '<</FT /Tx/T (name)/V (b)>>' },
+      { old: [edge(10, 'Fields/[0]')], new: [edge(10, 'Fields/[0]')] },
+    );
+    const healthy = { sparseXref: false, bareReferences: 0, referrersComplete: true };
+    expect(
+      evaluateStep({ older: 1, newer: 2, changes: [fill], before, after: before, health: { old: healthy, new: healthy } }).verdict,
+    ).toBe('permitted');
+    for (const sick of [
+      { ...healthy, sparseXref: true },
+      { ...healthy, bareReferences: 1 },
+    ]) {
+      const step = evaluateStep({ older: 1, newer: 2, changes: [fill], before, after: before, health: { old: sick, new: healthy } });
+      expect(step.verdict).toBe('indeterminate');
+      expect(step.findings.find((f) => f.rule === 'base-unverifiable')).toMatchObject({ verdict: 'incomplete', objectNumber: 0 });
+      expect(step.findings.find((f) => f.rule === 'base-unverifiable')!.detail).toMatch(/Acrobat/);
+    }
+    // The newer revision's health is not the sealed revision's problem...
+    expect(
+      evaluateStep({ older: 1, newer: 2, changes: [fill], before, after: before, health: { old: healthy, new: { ...healthy, sparseXref: true } } }).verdict,
+    ).toBe('permitted');
+    // ...but an incomplete reachability walk on either side leaves every use unproven.
+    const walked = evaluateStep({ older: 1, newer: 2, changes: [fill], before, after: before, health: { old: healthy, new: { ...healthy, referrersComplete: false } } });
+    expect(walked.verdict).toBe('indeterminate');
+    expect(walked.findings.some((f) => f.rule === 'unexplained' && f.verdict === 'incomplete')).toBe(true);
+  });
+
+  test('no changes is unchanged; under P=1 an identical rewrite is still forbidden (not established)', () => {
     const before = structure({
       signatures: [signature(0, 30, { docMdp: 1, catalogCertification: true })],
     });
@@ -175,30 +252,34 @@ describe('evaluateStep: the edge-claim law', () => {
     expect(step.levelInForce).toBe('lta');
     expect(step.verdict).toBe('forbidden');
     expect(step.findings[0].rule).toBe('identical-rewrite');
-    expect(step.findings[0].detail).toMatch(/without a change in value/);
+    expect(step.findings[0].detail).toMatch(/sealed value under level 'lta'/);
   });
 
-  test('a page rewritten identically after an approval signature is forbidden, as Acrobat says', () => {
-    const before = structure(); // one approval signature: judged at fill
+  test('a page rewritten identically after an approval signature is no change, as Acrobat says (corpus v1/04, v2/47)', () => {
+    const before = structure(); // one approval signature: judged at the annotate baseline
     const samePage = change(
       3,
       { old: '<</Type /Page/Parent 2 0 R/Annots [30 0 R]>>', new: '<</Type /Page/Parent 2 0 R/Annots [30 0 R]>>' },
       { old: [edge(2, 'Kids/[0]')], new: [edge(2, 'Kids/[0]')] },
     );
     const step = evaluateStep({ older: 1, newer: 2, changes: [samePage], before, after: before });
-    expect(step.levelInForce).toBe('fill');
-    expect(step.verdict).toBe('forbidden');
-    expect(step.findings.map((f) => f.rule)).toEqual(['identical-rewrite']);
-    // And at every level: a rewrite is a rewrite.
-    const p3 = structure({
-      signatures: [signature(0, 30, { docMdp: 3, catalogCertification: true })],
-    });
-    expect(
-      evaluateStep({ older: 1, newer: 2, changes: [samePage], before: p3, after: p3 }).verdict,
-    ).toBe('forbidden');
+    expect(step.levelInForce).toBe('annotate');
+    expect(step.verdict).toBe('unchanged');
+    expect(step.findings).toEqual([
+      expect.objectContaining({ rule: 'identical-rewrite', verdict: 'permitted', objectNumber: 3 }),
+    ]);
+    // Under a P=2 or P=3 certification as well (v3/70, 71).
+    for (const permission of [2, 3] as const) {
+      const certified = structure({
+        signatures: [signature(0, 30, { docMdp: permission, catalogCertification: true })],
+      });
+      expect(
+        evaluateStep({ older: 1, newer: 2, changes: [samePage], before: certified, after: certified }).verdict,
+      ).toBe('unchanged');
+    }
   });
 
-  test('an identical rewrite before the first signature is permitted: nothing was sealed', () => {
+  test('an identical rewrite before the first signature is no change either', () => {
     const unsigned = structure({ signatures: [signature(0, 30, { signed: false })] });
     const samePage = change(
       3,
@@ -206,7 +287,7 @@ describe('evaluateStep: the edge-claim law', () => {
       { old: [edge(2, 'Kids/[0]')], new: [edge(2, 'Kids/[0]')] },
     );
     const step = evaluateStep({ older: 0, newer: 1, changes: [samePage], before: unsigned, after: unsigned });
-    expect(step.verdict).toBe('permitted');
+    expect(step.verdict).toBe('unchanged');
     expect(step.findings).toEqual([
       expect.objectContaining({ rule: 'identical-rewrite', verdict: 'permitted', objectNumber: 3 }),
     ]);
@@ -484,7 +565,7 @@ describe('evaluateStep: the edge-claim law', () => {
     expect(locked.locks).toHaveLength(1);
   });
 
-  test('a /Lock added to an EXISTING signature field while signing it is forbidden (pyHanko, Acrobat)', () => {
+  test('a /Lock added to an EXISTING signature field while signing it: permitted after an approval signature (corpus v1/19), forbidden under P=2 (v3/69)', () => {
     const before = structure({
       fields: [
         ...structure().fields,
@@ -537,12 +618,34 @@ describe('evaluateStep: the edge-claim law', () => {
       ),
     ];
     const step = evaluateStep({ older: 1, newer: 2, changes: signing, before, after });
-    expect(step.verdict).toBe('forbidden');
+    expect(step.verdict).toBe('permitted');
+    expect(step.findings.some((f) => f.objectNumber === 63 && f.verdict === 'permitted')).toBe(true);
+
+    // The same signing under a P=2 certification: the lock is not form fill-in.
+    const certifiedBefore = structure({
+      fields: before.fields,
+      signatures: [
+        signature(0, 30, { docMdp: 2, catalogCertification: true }),
+        before.signatures[1],
+      ],
+    });
+    const certifiedAfter = structure({
+      fields: before.fields,
+      signatures: [signature(0, 30, { docMdp: 2, catalogCertification: true }), after.signatures[1]],
+    });
+    const certified = evaluateStep({
+      older: 1,
+      newer: 2,
+      changes: signing,
+      before: certifiedBefore,
+      after: certifiedAfter,
+    });
+    expect(certified.verdict).toBe('forbidden');
     expect(
-      step.findings.find((f) => f.objectNumber === 60 && f.verdict === 'forbidden')?.detail,
+      certified.findings.find((f) => f.objectNumber === 60 && f.verdict === 'forbidden')?.detail,
     ).toContain('Lock');
     // One cause, not a cascade: the /V and /Lock edges are still claimed.
-    expect(step.findings.filter((f) => f.verdict === 'forbidden')).toHaveLength(1);
+    expect(certified.findings.filter((f) => f.verdict === 'forbidden')).toHaveLength(1);
   });
 
   test('a certification after an existing signature, or /Perms out of place, is forbidden', () => {
@@ -606,7 +709,7 @@ describe('evaluateStep: the edge-claim law', () => {
     );
   });
 
-  test('annotations are permitted at annotate and forbidden at fill; widgets are never annotations', () => {
+  test('annotations are permitted at annotate (the approval baseline) and forbidden at fill; widgets are never annotations', () => {
     const changes = [
       change(
         3,
@@ -633,11 +736,13 @@ describe('evaluateStep: the edge-claim law', () => {
         after: certifiedAnnotate,
       }).verdict,
     ).toBe('permitted');
-    // An approval signature is judged at the baseline (fill): the annotation invalidates it, as in Acrobat.
+    // An approval signature is judged at the baseline (annotate): Acrobat keeps
+    // it valid with "Annotations Created" (corpus v3/88), and so do we.
     const approval = structure();
     expect(
       evaluateStep({ older: 1, newer: 2, changes, before: approval, after: approval }).verdict,
-    ).toBe('forbidden');
+    ).toBe('permitted');
+    // A P=2 certification declared only form fill-in: the annotation is forbidden.
     const certified = structure({
       signatures: [signature(0, 30, { docMdp: 2, catalogCertification: true })],
     });

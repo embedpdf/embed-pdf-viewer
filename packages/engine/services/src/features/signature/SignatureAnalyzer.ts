@@ -1,25 +1,31 @@
 import type {
-  SignatureSnapshot,
   AnalyzeInput,
   ChangeAnalysis,
+  DocumentFieldLock,
   ModificationLevel,
   ObjectChange,
   ObjectChangeKind,
   ObjectChangeType,
+  ObjectReadStatus,
   ObjectReferrer,
   PdfRevision,
   RevisionAnalysis,
+  RevisionHealth,
   RevisionStructure,
+  SignatureSnapshot,
 } from '@embedpdf/engine-core/runtime';
 import {
+  assessmentOf,
+  combine,
   EdgeResolver,
   EngineError,
   EngineErrorCode,
-  SIGNATURE_POLICY_VERSION,
-  USAGE_INCOMPLETE,
   evaluateStep,
   parsePdfValue,
-  worstVerdict,
+  restrictionsFor,
+  sameEffectiveValue,
+  SIGNATURE_POLICY_VERSION,
+  USAGE_INCOMPLETE,
 } from '@embedpdf/engine-core/runtime';
 import { deriveProtection } from '@embedpdf/engine-core/runtime';
 import { NULL_PTR, type PdfRuntimeModule, type Ptr } from '@embedpdf/engine-runtime';
@@ -55,6 +61,8 @@ const KIND_BY_CODE: Record<number, ObjectChangeKind> = {
 };
 const DIFF_OLD = 0;
 const DIFF_NEW = 1;
+/** EPDF_DIFF_READ_OK / FAILED / ABSENT. */
+const READ_BY_CODE: Record<number, ObjectReadStatus> = { 0: 'ok', 1: 'failed', 2: 'absent' };
 
 /** The objects an edge may be anchored at: the trailer, the structure of the revision, and every changed object. */
 function anchorSet(s: RevisionStructure, changed: ReadonlySet<number>): Set<number> {
@@ -110,6 +118,7 @@ export class SignatureAnalyzer {
     const snapshot = reader.readSnapshot();
     const version = reader.version();
     const mode = input.exploratoryLevel ? 'exploratory' : 'authoritative';
+    const detail = input.detail ?? 'summary';
     // Which bytes are judged, truthfully: the working copy only when a save
     // would change the document — the saver's pass decides that once the
     // working copy is opened below (an annotation added and removed again
@@ -139,14 +148,30 @@ export class SignatureAnalyzer {
       sinceRevision = input.since.revisionIndex;
     }
     if (!snapshot.chainValid) {
+      const current = {
+        verdict: 'indeterminate' as const,
+        complete: false,
+        findings: [
+          {
+            rule: 'revision-chain',
+            verdict: 'incomplete' as const,
+            objectNumber: 0,
+            detail: 'the cross-reference chain is broken or was rebuilt: no revision can be told from another',
+          },
+        ],
+        method: 'net-state' as const,
+      };
       return {
         mode,
         policyVersion: SIGNATURE_POLICY_VERSION,
         basis: { version, editsVersion, source: 'persisted' },
         since: { revisionIndex: sinceRevision, signatureIndex: sinceSignature },
         until: { revisionIndex: sinceRevision },
-        steps: [],
+        restrictions: [],
+        current: { ...current, primary: current.findings[0] },
+        later: { revisionCount: 0, undoneObjectNumbers: [] },
         verdict: 'indeterminate',
+        steps: [],
       };
     }
     if (
@@ -192,53 +217,142 @@ export class SignatureAnalyzer {
         }
       }
 
-      // One prefix document per revision, oldest first.
-      const prefixes: Ptr[] = [];
-      const structures: RevisionStructure[] = [];
-      for (let r = sinceRevision; r <= untilRevision; r++) {
-        const prefix = this.runtime.fn.EPDFDoc_OpenRevision(target, BigInt(revisions[r].end));
-        if (prefix === NULL_PTR) {
-          throw new EngineError(
-            EngineErrorCode.MalformedPdf,
-            `revision ${r} does not open as a document`,
-          );
+      // The two revisions that decide the verdict: the sealed one and the
+      // judged one, opened as their own prefix documents from the target's
+      // bytes (the judged one IS the target when it is the last revision).
+      // Nothing in between is opened for the net state.
+      const pair = new CloseStack();
+      let before: RevisionStructure;
+      let after: RevisionStructure;
+      let changes: ObjectChange[] = [];
+      let health: { old: RevisionHealth; new: RevisionHealth } | undefined;
+      try {
+        const sealed = this.openPrefix(target, revisions, sinceRevision, pair);
+        const judged =
+          untilRevision === revisions.length - 1
+            ? target
+            : this.openPrefix(target, revisions, untilRevision, pair);
+        before = readStructure(this.runtime, sealed);
+        after = untilRevision === sinceRevision ? before : readStructure(this.runtime, judged);
+        if (untilRevision > sinceRevision) {
+          ({ changes, health } = this.compare(sealed, judged, before, after));
         }
-        stack.push(() => this.runtime.fn.FPDF_CloseDocument(prefix));
-        prefixes.push(prefix);
-        structures.push(readStructure(this.runtime, prefix));
+      } finally {
+        pair.close();
       }
 
-      const steps: RevisionAnalysis[] = [];
-      for (let i = 0; i + 1 < prefixes.length; i++) {
-        const changes = this.compare(
-          prefixes[i],
-          prefixes[i + 1],
-          structures[i],
-          structures[i + 1],
-        );
-        steps.push(
-          evaluateStep({
-            older: sinceRevision + i,
-            newer: sinceRevision + i + 1,
-            changes,
-            before: structures[i],
-            after: structures[i + 1],
-            levelOverride: input.exploratoryLevel as ModificationLevel | undefined,
-          }),
-        );
+      const judgedSignature =
+        sinceSignature === null ? null : (before.signatures[sinceSignature] ?? null);
+      const restrictions = restrictionsFor(before, judgedSignature);
+      const levelOverride = input.exploratoryLevel as ModificationLevel | undefined;
+      const net = evaluateStep({
+        older: sinceRevision,
+        newer: untilRevision,
+        changes,
+        before,
+        after,
+        health,
+        restrictions: { level: restrictions.level, locks: restrictions.locks },
+        levelOverride,
+      });
+
+      // A certification's window is also replayed revision by revision
+      // (corpus v3/82-83): an intermediate violation invalidates it even
+      // when the final state no longer shows it. Approval and lock windows
+      // are judged on their net state alone (v2/15, 42, 44; v3/81, 85).
+      const certifies = restrictions.anchors.some((r) => r.source === 'docmdp' && r.own);
+      const intermediate = untilRevision - sinceRevision;
+      let steps: RevisionAnalysis[];
+      if (intermediate <= 1) {
+        steps = intermediate === 1 ? [net] : [];
+      } else if (certifies || detail === 'full') {
+        steps = this.walkSteps(target, revisions, sinceRevision, untilRevision, before, {
+          level: restrictions.level,
+          locks: restrictions.locks,
+          levelOverride,
+        });
+      } else {
+        steps = [];
       }
+      const current = certifies
+        ? { ...combine(net, steps), method: 'net-state+replay' as const }
+        : { ...assessmentOf(net), method: 'net-state' as const };
       return {
         mode,
         policyVersion: SIGNATURE_POLICY_VERSION,
         basis: { version, editsVersion, source: basisSource },
         since: { revisionIndex: sinceRevision, signatureIndex: sinceSignature },
         until: { revisionIndex: untilRevision },
+        restrictions: restrictions.anchors,
+        current,
+        later: {
+          revisionCount: intermediate,
+          undoneObjectNumbers: changes.filter(sameEffectiveValue).map((c) => c.objectNumber),
+        },
+        verdict: current.verdict,
         steps,
-        verdict: worstVerdict(steps),
       };
     } finally {
       stack.close();
     }
+  }
+
+  /** Revision `index` of `target`'s bytes as its own document, owned by `stack`. */
+  private openPrefix(target: Ptr, revisions: PdfRevision[], index: number, stack: CloseStack): Ptr {
+    const prefix = this.runtime.fn.EPDFDoc_OpenRevision(target, BigInt(revisions[index].end));
+    if (prefix === NULL_PTR) {
+      throw new EngineError(EngineErrorCode.MalformedPdf, `revision ${index} does not open as a document`);
+    }
+    stack.push(() => this.runtime.fn.FPDF_CloseDocument(prefix));
+    return prefix;
+  }
+
+  /**
+   * Every pairwise step between `since` and `until`, two prefix documents
+   * open at a time whatever the revision count. `sealedStructure` is the
+   * structure of `since` (already read); every later structure is read once
+   * and dropped with its document.
+   */
+  private walkSteps(
+    target: Ptr,
+    revisions: PdfRevision[],
+    since: number,
+    until: number,
+    sealedStructure: RevisionStructure,
+    restrictions: { level: ModificationLevel; locks: DocumentFieldLock[]; levelOverride?: ModificationLevel },
+  ): RevisionAnalysis[] {
+    const { fn } = this.runtime;
+    const steps: RevisionAnalysis[] = [];
+    let older = this.openPrefix(target, revisions, since, new CloseStack());
+    let olderStructure = sealedStructure;
+    try {
+      for (let r = since + 1; r <= until; r++) {
+        const newer = r === revisions.length - 1 ? target : this.openPrefix(target, revisions, r, new CloseStack());
+        try {
+          const newerStructure = readStructure(this.runtime, newer);
+          const { changes, health } = this.compare(older, newer, olderStructure, newerStructure);
+          steps.push(
+            evaluateStep({
+              older: r - 1,
+              newer: r,
+              changes,
+              before: olderStructure,
+              after: newerStructure,
+              health,
+              restrictions: { level: restrictions.level, locks: restrictions.locks },
+              levelOverride: restrictions.levelOverride,
+            }),
+          );
+          olderStructure = newerStructure;
+        } finally {
+          fn.FPDF_CloseDocument(older);
+          older = newer;
+        }
+      }
+    } finally {
+      if (older !== target) fn.FPDF_CloseDocument(older);
+    }
+    return steps;
   }
 
   /**
@@ -344,7 +458,7 @@ export class SignatureAnalyzer {
     newer: Ptr,
     before: RevisionStructure,
     after: RevisionStructure,
-  ): ObjectChange[] {
+  ): { changes: ObjectChange[]; health: { old: RevisionHealth; new: RevisionHealth } } {
     const { fn, mem } = this.runtime;
     const diff = fn.EPDFDoc_CompareRevisions(older, newer);
     if (diff === NULL_PTR) {
@@ -404,16 +518,42 @@ export class SignatureAnalyzer {
               generation: { old: oldGen < 0 ? null : oldGen, new: newGen < 0 ? null : newGen },
               value: { old: oldParsed, new: newParsed, truncated },
               raw: { old: oldValue.text, new: newValue.text },
+              // A live mapping whose bytes do not parse serialises as "null"
+              // but reads as failed: the evaluator treats that as missing
+              // evidence, never as a value equal to another failed read.
+              read: {
+                old: READ_BY_CODE[fn.EPDFObjectDiff_GetReadStatus(diff, i, DIFF_OLD)] ?? 'failed',
+                new: READ_BY_CODE[fn.EPDFObjectDiff_GetReadStatus(diff, i, DIFF_NEW)] ?? 'failed',
+              },
               streamDataChanged: Number(mem.peek(streamPtr, 'i32')) !== 0,
               usage: { old: [], new: [] },
             });
           }
         },
       );
-      return this.withAnchoredUsage(diff, changes, before, after);
+      return {
+        changes: this.withAnchoredUsage(diff, changes, before, after),
+        health: { old: this.readHealth(diff, DIFF_OLD), new: this.readHealth(diff, DIFF_NEW) },
+      };
     } finally {
       fn.EPDFObjectDiff_Close(diff);
     }
+  }
+
+  /** What the fork learned about one revision as a whole (see `RevisionHealth`). */
+  private readHealth(diff: Ptr, which: number): RevisionHealth {
+    const { fn, mem } = this.runtime;
+    return withScratchN(mem, [4, 4, 4], ([sparsePtr, barePtr, completePtr]) => {
+      for (const p of [sparsePtr, barePtr, completePtr]) mem.poke(p, 'i32', 0);
+      if (!fn.EPDFObjectDiff_GetRevisionHealth(diff, which, sparsePtr, barePtr, completePtr)) {
+        throw new EngineError(EngineErrorCode.Unknown, 'failed to read revision health');
+      }
+      return {
+        sparseXref: Number(mem.peek(sparsePtr, 'i32')) !== 0,
+        bareReferences: Number(mem.peek(barePtr, 'i32')) >>> 0,
+        referrersComplete: Number(mem.peek(completePtr, 'i32')) !== 0,
+      };
+    });
   }
 
   /**

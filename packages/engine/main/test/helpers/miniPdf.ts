@@ -44,10 +44,28 @@ export function append(base: Uint8Array, objects: Objects, trailerExtra = ''): U
   }
   const xref = text.length;
   text += 'xref\n';
-  for (const [n, offset] of Object.entries(entries)) {
-    text += `${n} 1\n${String(offset).padStart(10, '0')} 00000 n \n`;
-  }
   const size = Math.max(oldSize, ...Object.keys(objects).map((n) => Number(n) + 1));
+  // A dense section, the way every mainstream writer emits one: numbers the
+  // update allocates past the old /Size but does not define get free
+  // entries, never a hole. A table with holes below /Size is what Acrobat
+  // calls corrupted once a revision follows a signature, and the analysis
+  // reports it as such (`base-unverifiable`).
+  const numbers = new Set<number>(Object.keys(entries).map(Number));
+  for (let n = oldSize; n < size; n++) numbers.add(n);
+  const sorted = [...numbers].sort((a, b) => a - b);
+  for (let i = 0; i < sorted.length; ) {
+    let j = i;
+    while (j + 1 < sorted.length && sorted[j + 1] === sorted[j] + 1) j++;
+    text += `${sorted[i]} ${j - i + 1}\n`;
+    for (let k = i; k <= j; k++) {
+      const offset = entries[sorted[k]];
+      text +=
+        offset !== undefined
+          ? `${String(offset).padStart(10, '0')} 00000 n \n`
+          : '0000000000 00000 f \n';
+    }
+    i = j + 1;
+  }
   text += `trailer\n<< /Root 1 0 R /Size ${size} /Prev ${prev}${trailerExtra ? ' ' + trailerExtra : ''} >>\nstartxref\n${xref}\n%%EOF\n`;
   return bytesOf(text);
 }

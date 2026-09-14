@@ -1,0 +1,524 @@
+{
+  "id": null,
+  "corpusVersion": "role-probes-v2",
+  "observedAt": null,
+  "observer": {
+    "application": "Adobe Acrobat Reader",
+    "build": "26.2.21869.0",
+    "buildSource": "user-reported",
+    "applicationBundleVersion": "26.002.21869",
+    "applicationBundleVersionSource": "installed application Info.plist CFBundleShortVersionString",
+    "architecture": "arm64",
+    "processor": "Apple M1 Max",
+    "osVersion": "macOS 26.6",
+    "osBuild": "25G72",
+    "osVersionSource": "sw_vers",
+    "agm": "8.0.3",
+    "coolType": "11.0.0",
+    "jp2k": "5.0.0.59456",
+    "componentVersionsSource": "user-reported"
+  },
+  "settings": {
+    "certificateTrust": null,
+    "validationTime": null,
+    "revocation": null,
+    "javascript": null
+  },
+  "cases": [
+    {
+      "id": "31",
+      "file": "31-no-annotation-control.pdf",
+      "sha256": "dc908b7eb0133a04dfef7224e76fd4e78f9d4430c2b3a407a54790ffc05a2e70",
+      "question": "Does removing the Square remove the baseline annotation category?",
+      "status": "unobserved",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "32",
+      "file": "32-explicit-annotation-appearance-control.pdf",
+      "sha256": "27889e660903dce8662ce78d3168c2adaf2f32bdead0393d9e55f0a05a50e114",
+      "question": "Does an explicit Square appearance remove the baseline annotation category?",
+      "status": "unobserved",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "33",
+      "file": "33-page-font-only-control.pdf",
+      "sha256": "184b3593f93ffd2f5203562d2b1d255fe5b95c3935a37d00b1bac1e851fd417d",
+      "question": "Is the unchanged page-only Type3 font control accepted?",
+      "status": "unobserved",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "34",
+      "file": "34-page-font-only-changed.pdf",
+      "sha256": "2f428d2788946e2313ebd7261bc647bf84f68e10d984814ca23450ccd3f50196",
+      "question": "Does changing a font used only by page content invalidate the signature?",
+      "status": "unobserved",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "35",
+      "file": "35-shared-page-font-control.pdf",
+      "sha256": "3155441d7cb9f796e62ca1e69c526b6af7f437dc9b5c245dbc5fdf6da03ea180",
+      "question": "Is the unchanged page/default-form shared font accepted?",
+      "status": "unobserved",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "36",
+      "file": "36-shared-font-without-fill.pdf",
+      "sha256": "0cee9d939b67caf3265e54a766836dc85be866dc1754c4888d0fbff3e7c70ff0",
+      "question": "Does registering the font in form defaults affect a glyph-only rewrite?",
+      "status": "unobserved",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "37",
+      "file": "37-cloned-font-for-fill.pdf",
+      "sha256": "f103c5d1d856cda0a132455cc11283ed281e80a45f69187d63aa1eac75580d90",
+      "question": "Is filling with a separate changed font accepted while the page font remains unchanged?",
+      "status": "unobserved",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "38",
+      "file": "38-shared-font-initial-a-control.pdf",
+      "sha256": "499f093523c605c816f0920417faa1224685e4e4d43fa08d335cace85cec7534",
+      "question": "Is the unchanged page/field/default shared font accepted with initial field value A?",
+      "status": "unobserved",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "39",
+      "file": "39-shared-font-appearance-without-value-change.pdf",
+      "sha256": "e1d0035a556d2c1b47a71b3ff321644ae82fa211986c35c89bf73c597a8579c3",
+      "question": "Does a shared glyph and appearance rewrite remain accepted without changing the field value?",
+      "status": "unobserved",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "40",
+      "file": "40-p2-shared-font-control.pdf",
+      "sha256": "7ed2e487f31d2a5ffb2076006129806de6faad4a45677c29d1ccf0a951cdcd89",
+      "question": "Is the unchanged P2 shared-font control accepted?",
+      "status": "unobserved",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "41",
+      "file": "41-p2-shared-font-fill.pdf",
+      "sha256": "aa3b9841fb2767ae5c7d02a7b449f1b034e5f1c9bf200d0911c89061cae03578",
+      "question": "Does explicit P2 certification reject the shared-font page change?",
+      "status": "unobserved",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "42",
+      "file": "42-page-restored-then-signed.pdf",
+      "sha256": "e3fb5b4a8c5525606f05a78ab7d223f49ba119bab306a6632640bd7f392fe89a",
+      "question": "Are both signatures accepted when the restored state receives a second signature?",
+      "status": "unobserved",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        },
+        {
+          "field": "SignatureTwo",
+          "signatureIndex": 1,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "43",
+      "file": "43-changed-page-second-signature.pdf",
+      "sha256": "a1cfa0d454c7f03f956357ade7f0d8c4115ac499945e64086ed3eb1eeb028bf4",
+      "question": "How are both signatures judged when the changed page is signed?",
+      "status": "unobserved",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        },
+        {
+          "field": "SignatureTwo",
+          "signatureIndex": 1,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "44",
+      "file": "44-signed-changed-page-restored.pdf",
+      "sha256": "a7526defafff0c1b2df45a8607799a41ebcfcdc27054f5270ce37b1335bb9230",
+      "question": "Does restoration recover the first signature while invalidating the second?",
+      "status": "unobserved",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        },
+        {
+          "field": "SignatureTwo",
+          "signatureIndex": 1,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "45",
+      "file": "45-page-restored-equivalent-stream.pdf",
+      "sha256": "ff4b0fd196a303cd599a9358ecee0839f1a9d04c56daec90fb0422dff318e7b2",
+      "question": "Is a visually identical restoration with different decoded stream bytes accepted?",
+      "status": "unobserved",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "46",
+      "file": "46-page-restored-resource-still-changed.pdf",
+      "sha256": "94ee426d9fea09c479897d979256b6955d4fb0b91bfd9c751d1a6353c36d6038",
+      "question": "Does restoring the page stream leave a shared-font page change detectable?",
+      "status": "unobserved",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "47",
+      "file": "47-page-and-sealed-widget-identical.pdf",
+      "sha256": "8a0773a5b275232868f9a83e735c1e045825b2909346c9cda954a1dffb28d101",
+      "question": "Are identical page and sealed-widget rewrites accepted together?",
+      "status": "unobserved",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "48",
+      "file": "48-locked-field-control.pdf",
+      "sha256": "e8b1642d68baf49c235b7f2284b605b7829ab3bd0a573b968779947e01697724",
+      "question": "Is the unchanged locked-field control accepted?",
+      "status": "unobserved",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "49",
+      "file": "49-locked-field-moved.pdf",
+      "sha256": "3a37e729e646901d9d831e7b664fc331ca6861dd88b8ba7fdacf8d15855e528d",
+      "question": "Is moving a locked field rejected?",
+      "status": "unobserved",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "50",
+      "file": "50-p2-field-moved.pdf",
+      "sha256": "893924ca7fbfcc2afcdfdab67f61c250de12a800958aab6eea91e0f6074486a5",
+      "question": "Is moving an unlocked field accepted under explicit P2 certification?",
+      "status": "unobserved",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "51",
+      "file": "51-locked-field-hidden.pdf",
+      "sha256": "3ec5179c0fee43f4a7f9a013166e7f269133d19416704088a416ab8e3519c034",
+      "question": "Is hiding a locked field rejected?",
+      "status": "unobserved",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "52",
+      "file": "52-shared-font-filled-without-annotation.pdf",
+      "sha256": "3546f0132d448cf34f7dfe9c44685cf108d2db455a4b1ffa26f4c8207ede084b",
+      "question": "Does the original shared-font acceptance reproduce without the Square annotation?",
+      "status": "unobserved",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    }
+  ]
+}
