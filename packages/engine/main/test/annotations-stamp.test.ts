@@ -332,6 +332,73 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
     expect(re.rect.right).toBeCloseTo(flat.right, 0);
   });
 
+  test('opacity: defaults to 1, round-trips through create/read, and persists across save', async () => {
+    const page = handle.page(PAGE_OBJECT_NUMBER);
+    const png = makePng(4, 4, [255, 0, 0, 255]);
+
+    const noOpacity = await page.annotations.create({
+      subtype: 'stamp',
+      rect: { left: 400, bottom: 400, right: 440, top: 440 },
+      source: png,
+    });
+    expect((noOpacity.created as StampAnnotationDTO).opacity).toBe(1);
+
+    const { created } = await page.annotations.create({
+      subtype: 'stamp',
+      rect: { left: 450, bottom: 400, right: 490, top: 440 },
+      source: png,
+      opacity: 0.4,
+    });
+    expect((created as StampAnnotationDTO).opacity).toBeCloseTo(0.4, 2);
+
+    const list = await page.annotations.list();
+    const re = list.annotations.find(
+      (a) =>
+        a.ref.kind === 'objectNumber' &&
+        created.ref.kind === 'objectNumber' &&
+        a.ref.annotObjectNumber === created.ref.annotObjectNumber,
+    ) as StampAnnotationDTO;
+    expect(re.opacity).toBeCloseTo(0.4, 2);
+
+    const saved = await handle.download();
+    const reopened = await engine.open({ kind: 'bytes', id: 'stamp-opacity-reopen', bytes: saved });
+    try {
+      const reopenedList = await reopened.page(PAGE_OBJECT_NUMBER).annotations.list();
+      const stamps = reopenedList.annotations.filter(
+        (a): a is StampAnnotationDTO => a.subtype === 'stamp',
+      );
+      expect(stamps.some((s) => Math.abs(s.opacity - 0.4) < 0.02)).toBe(true);
+    } finally {
+      await reopened.close();
+    }
+  });
+
+  test('opacity: a patch updates /CA without touching the appearance content', async () => {
+    const page = handle.page(PAGE_OBJECT_NUMBER);
+    const png = makePng(4, 4, [0, 128, 0, 255]);
+    const { created } = await page.annotations.create({
+      subtype: 'stamp',
+      rect: { left: 500, bottom: 400, right: 540, top: 440 },
+      source: png,
+      opacity: 1,
+    });
+
+    const updated = await page.annotations.update(created.ref, {
+      subtype: 'stamp',
+      opacity: 0.25,
+    });
+    expect((updated.updated as StampAnnotationDTO).opacity).toBeCloseTo(0.25, 2);
+
+    const list = await page.annotations.list();
+    const re = list.annotations.find(
+      (a) =>
+        a.ref.kind === 'objectNumber' &&
+        created.ref.kind === 'objectNumber' &&
+        a.ref.annotObjectNumber === created.ref.annotObjectNumber,
+    ) as StampAnnotationDTO;
+    expect(re.opacity).toBeCloseTo(0.25, 2);
+  });
+
   test('unsupported source bytes reject with InvalidArg before any transport', async () => {
     const page = handle.page(PAGE_OBJECT_NUMBER);
     await expect(
