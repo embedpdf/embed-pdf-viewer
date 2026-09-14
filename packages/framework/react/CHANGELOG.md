@@ -1,5 +1,17 @@
 # @embedpdf/react
 
+## 3.0.0-next.13
+
+### Minor Changes
+
+- [#812](https://github.com/embedpdf/embed-pdf-viewer/pull/812) by [@bobsingor](https://github.com/bobsingor) – Add the `@embedpdf/react/signature` entry point with hooks for signing, signature
+  snapshots, validation verdicts, protection, target fields, events, and saved
+  signature libraries.
+
+  Make signature widgets selectable for signing or inspection, and allow
+  `useStampLibraries()` to filter libraries by kind. Use the stamp capability
+  contract in signature hooks to preserve plugin dependency boundaries.
+
 ## 3.0.0-next.12
 
 ### Minor Changes

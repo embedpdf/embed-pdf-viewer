@@ -1,5 +1,11 @@
 # @embedpdf/viewer
 
+## 3.0.0-next.13
+
+### Minor Changes
+
+- [#812](https://github.com/embedpdf/embed-pdf-viewer/pull/812) by [@bobsingor](https://github.com/bobsingor) – Expose `SignatureToken`, signer adapters, personal key stores, and signature customization types through the viewer's core entry point so applications can configure and control signing from the viewer package.
+
 ## 3.0.0-next.12
 
 ### Patch Changes

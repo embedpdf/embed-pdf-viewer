@@ -1,5 +1,11 @@
 # @cloudpdf/sdk
 
+## 3.0.0-next.13
+
+### Minor Changes
+
+- [#812](https://github.com/embedpdf/embed-pdf-viewer/pull/812) by [@bobsingor](https://github.com/bobsingor) – Add generated `doc.signatures` and `doc.versions` clients, request and response types, and package subpath exports. Support preparing, completing, and aborting signatures; reading signature facts and modification analysis; and downloading document versions, signed revisions, signature contents, and digests.
+
 ## 3.0.0-next.12
 
 ### Minor Changes

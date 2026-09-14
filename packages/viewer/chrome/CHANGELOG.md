@@ -1,5 +1,13 @@
 # @embedpdf/viewer-chrome
 
+## 3.0.0-next.13
+
+### Minor Changes
+
+- [#812](https://github.com/embedpdf/embed-pdf-viewer/pull/812) by [@bobsingor](https://github.com/bobsingor) – Add signature and initials libraries with drawn, typed, and imported artwork, plus signature-field authoring, signing dialogs, and visual-only filling. Configure signers, trust anchors, certification options, and signing modes.
+
+  Add signature inspection with validation details, signed revision downloads, and notices when pending edits would invalidate a signature. Support filtering the stamps sidebar by library kind and showing quick-access stamps in the toolbar.
+
 ## 3.0.0-next.12
 
 ### Minor Changes

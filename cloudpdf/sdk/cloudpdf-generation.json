@@ -1,11 +1,11 @@
 {
   "language": "typescript",
-  "canonicalVersion": "3.0.0-next.12",
-  "sdkVersion": "3.0.0-next.12",
+  "canonicalVersion": "3.0.0-next.13",
+  "sdkVersion": "3.0.0-next.13",
   "source": {
     "repository": "embedpdf/embed-pdf-viewer",
     "openapi": "cloudpdf/contract/openapi.json",
-    "openapiSha256": "a9945b85e1b496624d103eeef8ebfe3d2f8f0159765a577ed04715ceac5628ec",
+    "openapiSha256": "ab656bce39cb61369cca4745915b945e74b8e0d7c7371c9876bd09ac086557fd",
     "gitCommit": null,
     "gitCommitIsDirty": null
   },
