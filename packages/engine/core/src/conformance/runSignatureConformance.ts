@@ -143,7 +143,7 @@ export function runSignatureConformance(
           expect(sig.byteRange![2] + sig.byteRange![3]).toBe(snapshot.revisions[i + 1].end);
         }
         // Approval signatures without a certification: nothing declared, judged at the baseline.
-        expect(snapshot.protection.judged).toBe('fill');
+        expect(snapshot.protection.judged).toBe('annotate');
         expect(snapshot.protection.enforced).toBeNull();
         expect(snapshot.protection.certification).toBeNull();
         expect(snapshot.protection.fieldLocks).toEqual([]);
@@ -271,7 +271,7 @@ export function runSignatureConformance(
         const sig = snapshot.signatures[0];
         expect(sig.fieldName).toBe(fixture.fieldName);
         expect(sig.fieldMdp).toEqual({ action: 'include', fields: [fixture.lockedField] });
-        expect(snapshot.protection.judged).toBe('fill');
+        expect(snapshot.protection.judged).toBe('annotate');
         expect(snapshot.protection.enforced).toBeNull();
         // The FieldMDP, and the /Lock the authoring engine mirrors it with
         // when it wrote the field — both name the same fields.
@@ -331,7 +331,7 @@ export function runSignatureConformance(
         }
         expect(snapshot.revisions.every((r) => r.signatureIndex === null)).toBe(true);
         // Signed, so judged at the approval baseline — even a partial one is a signature.
-        expect(snapshot.protection.judged).toBe('fill');
+        expect(snapshot.protection.judged).toBe('annotate');
         expect(snapshot.protection.enforced).toBeNull();
         let caught: unknown;
         try {
@@ -383,7 +383,7 @@ function runAnalysisTests(
       expect(analysis.until.revisionIndex).toBe(2);
       expect(analysis.steps).toHaveLength(1);
       const [step] = analysis.steps;
-      expect(step.levelInForce).toBe('fill');
+      expect(step.levelInForce).toBe('annotate');
       expect(step.verdict).toBe('permitted');
       expect(step.changes.length > 0).toBe(true);
       const rules = new Set(
@@ -454,8 +454,14 @@ function runAnalysisTests(
       expect(
         await caughtCode(() => partial.signatures!.analyze({ since: { signatureIndex: 0 } })),
       ).toBe(EngineErrorCode.InvalidArg);
+      // A revision-anchored analysis over two later revisions: the net
+      // state is judged in summary mode; `full` also carries every step.
       const byRevision = await partial.signatures!.analyze({ since: { revisionIndex: 0 } });
-      expect(byRevision.steps).toHaveLength(2);
+      expect(byRevision.later.revisionCount).toBe(2);
+      expect(byRevision.steps).toHaveLength(0);
+      const inFull = await partial.signatures!.analyze({ since: { revisionIndex: 0 }, detail: 'full' });
+      expect(inFull.steps).toHaveLength(2);
+      expect(inFull.current.verdict).toBe(byRevision.current.verdict);
     } finally {
       await partial.close();
     }
@@ -600,7 +606,7 @@ function runSigningTests(
       expect(result.signature.contentsSize).toBe(FAKE_CMS.byteLength);
       expect(result.previous).toEqual(prepared.expectedVersion);
       expect(result.version.sha256 === v0.sha256).toBe(false);
-      expect(result.protection.judged).toBe('fill');
+      expect(result.protection.judged).toBe('annotate');
       expect(result.protection.enforced).toBeNull();
       expect(result.meta.affectedPages.length >= 1).toBe(true);
 

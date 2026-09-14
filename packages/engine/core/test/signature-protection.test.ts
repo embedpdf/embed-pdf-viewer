@@ -47,7 +47,7 @@ describe('deriveProtection: enforced vs judged', () => {
     const p = deriveProtection([sig({})]);
     expect(p.enforced).toBeNull();
     expect(p.judged).toBe(APPROVAL_BASELINE);
-    expect(APPROVAL_BASELINE).toBe('fill');
+    expect(APPROVAL_BASELINE).toBe('annotate');
     // Only a rewrite is refused: it erases signatures instead of invalidating them.
     expect([...protectedCapabilities(p)]).toEqual(['doc.download.flattened']);
   });

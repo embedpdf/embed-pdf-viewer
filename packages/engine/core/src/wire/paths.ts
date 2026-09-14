@@ -634,6 +634,7 @@ export interface AnalysisQueryInput {
   /** Revision index the analysis ends at; default the last. */
   until?: number;
   exploratoryLevel?: ModificationLevel;
+  detail?: 'summary' | 'full';
 }
 
 export function analysisQueryString(query: AnalysisQueryInput): string {
@@ -643,6 +644,7 @@ export function analysisQueryString(query: AnalysisQueryInput): string {
   else params.set('since.revision', String(query.since.revisionIndex));
   if (query.until !== undefined) params.set('until', String(query.until));
   if (query.exploratoryLevel !== undefined) params.set('level', query.exploratoryLevel);
+  if (query.detail !== undefined) params.set('detail', query.detail);
   // The judging policy version: a cache key on the immutable version URL, so
   // a policy bump never serves a verdict judged the old way.
   params.set('policy', String(SIGNATURE_POLICY_VERSION));

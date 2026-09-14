@@ -1,9 +1,11 @@
 /**
  * Judgement follows the validator the recipient uses. After an approval
- * signature, form filling and further signatures keep it valid; an
- * annotation does not (Acrobat's rule). A P=3 certification changes that.
- * And a verdict can be about the bytes a save WOULD write (`working-copy`),
- * which is what a viewer must show before the file leaves it.
+ * signature, form filling, further signatures and annotations keep it valid
+ * (Acrobat: "Form Fill-in, Signing and Commenting are allowed"; corpus
+ * `signature-compat` v3/88-91), reported as permitted changes. A P=2
+ * certification narrows that to form fill-in. And a verdict can be about the
+ * bytes a save WOULD write (`working-copy`), which is what a viewer must show
+ * before the file leaves it.
  */
 import { readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
@@ -51,7 +53,7 @@ async function inkOn(doc: Awaited<ReturnType<Engine['open']>>) {
 }
 
 describe('what a validator concludes', () => {
-  test('an approval signature: an annotation after it reads invalid; nothing is refused', async () => {
+  test('an approval signature: an annotation after it is a permitted change; nothing is refused', async () => {
     const doc = await engine.open(
       { kind: 'bytes', id: 'judge-approval', bytes: base },
       { scope: ['*'] },
@@ -59,7 +61,7 @@ describe('what a validator concludes', () => {
     try {
       const signed = await sign(doc, { field: { kind: 'fqn', name: 'sig' }, signer });
       // Declared nothing, judged at the baseline; annotations are not refused.
-      expect(signed.protection).toMatchObject({ enforced: null, judged: 'fill' });
+      expect(signed.protection).toMatchObject({ enforced: null, judged: 'annotate' });
       expect(doc.security.allows('doc.annotate.modify')).toBe(true);
 
       // The persisted bytes: the signature seals the last revision.
@@ -67,19 +69,19 @@ describe('what a validator concludes', () => {
       expect(v.summary).toBe('valid');
       expect(v.modifications).toEqual({ verdict: 'unchanged', basis: 'persisted' });
 
-      // An unsaved ink stroke: the loaded bytes still say valid; the bytes a
-      // save would write say invalid — and the verdict says which it judged.
+      // An unsaved ink stroke: the loaded bytes still say unchanged; the bytes
+      // a save would write say "changed, permitted" — and the verdict says
+      // which it judged.
       await inkOn(doc);
       [v] = await validateSignatures(doc, { trust });
       expect(v.summary).toBe('valid');
-      expect(v.modifications.basis).toBe('persisted');
+      expect(v.modifications).toEqual({ verdict: 'unchanged', basis: 'persisted' });
       [v] = await validateSignatures(doc, { trust, until: 'working-copy' });
-      expect(v.summary).toBe('invalid');
+      expect(v.summary).toBe('valid');
       expect(v.modifications.basis).toBe('working-copy');
-      expect(v.modifications.verdict).toBe('forbidden');
-      expect(v.modifications.detail).toMatch(/annotation/);
+      expect(v.modifications.verdict).toBe('permitted');
 
-      // Saved and reopened: the file itself is invalid, judged on its bytes.
+      // Saved and reopened: the file itself carries a permitted change, judged on its bytes.
       const saved = await doc.download();
       const reopened = await engine.open(
         { kind: 'bytes', id: 'judge-approval-saved', bytes: saved },
@@ -88,11 +90,11 @@ describe('what a validator concludes', () => {
       try {
         const analysis = await reopened.signatures!.analyze({ since: { signatureIndex: 0 } });
         expect(analysis.steps).toHaveLength(1);
-        expect(analysis.steps[0]!.levelInForce).toBe('fill');
-        expect(analysis.verdict).toBe('forbidden');
+        expect(analysis.steps[0]!.levelInForce).toBe('annotate');
+        expect(analysis.verdict).toBe('permitted');
         const [r] = await validateSignatures(reopened, { trust });
-        expect(r.summary).toBe('invalid');
-        expect(r.modifications.basis).toBe('persisted');
+        expect(r.summary).toBe('valid');
+        expect(r.modifications).toEqual({ verdict: 'permitted', basis: 'persisted', laterRevisions: 1 });
         // Still possible to annotate: nothing was declared. Only a rewrite is refused.
         expect(reopened.security.allows('doc.annotate.modify')).toBe(true);
         expect(reopened.security.allows('doc.download.flattened')).toBe(false);
@@ -144,8 +146,8 @@ describe('what a validator concludes', () => {
         strokeWidth: 2,
       } as never);
       let [v] = await validateSignatures(doc, { trust, until: 'working-copy' });
-      expect(v.summary).toBe('invalid');
-      expect(v.modifications.basis).toBe('working-copy');
+      expect(v.summary).toBe('valid');
+      expect(v.modifications).toMatchObject({ verdict: 'permitted', basis: 'working-copy' });
 
       await doc.page(page.pageObjectNumber).annotations.delete(created.created.ref);
       [v] = await validateSignatures(doc, { trust, until: 'working-copy' });
@@ -160,8 +162,8 @@ describe('what a validator concludes', () => {
       // what equals the loaded document, never a real change.
       await inkOn(doc);
       [v] = await validateSignatures(doc, { trust, until: 'working-copy' });
-      expect(v.summary).toBe('invalid');
-      expect(v.modifications.basis).toBe('working-copy');
+      expect(v.summary).toBe('valid');
+      expect(v.modifications).toMatchObject({ verdict: 'permitted', basis: 'working-copy' });
       const changed = await doc.download();
       expect(changed.byteLength).toBeGreaterThan(signedBytes.byteLength);
     } finally {
@@ -242,7 +244,8 @@ describe('what a validator concludes', () => {
         strokeWidth: 2,
       } as never);
       verdicts = await validateSignatures(doc, { trust, until: 'working-copy' });
-      expect(verdicts.map((x) => x.summary)).toEqual(['invalid', 'invalid']);
+      expect(verdicts.map((x) => x.summary)).toEqual(['valid', 'valid']);
+      expect(verdicts.map((x) => x.modifications.verdict)).toEqual(['permitted', 'permitted']);
 
       await doc.page(page.pageObjectNumber).annotations.delete(created.created.ref);
       verdicts = await validateSignatures(doc, { trust, until: 'working-copy' });

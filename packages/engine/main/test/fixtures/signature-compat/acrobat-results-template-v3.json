@@ -1,0 +1,881 @@
+{
+  "id": null,
+  "corpusVersion": "role-probes-v3",
+  "observedAt": null,
+  "observer": {
+    "application": "Adobe Acrobat Reader",
+    "build": "26.2.21869.0",
+    "buildSource": "user-reported",
+    "applicationBundleVersion": "26.002.21869",
+    "applicationBundleVersionSource": "installed application Info.plist CFBundleShortVersionString",
+    "architecture": "arm64",
+    "processor": "Apple M1 Max",
+    "osVersion": "macOS 26.6",
+    "osBuild": "25G72",
+    "osVersionSource": "sw_vers",
+    "agm": "8.0.3",
+    "coolType": "11.0.0",
+    "jp2k": "5.0.0.59456",
+    "componentVersionsSource": "user-reported"
+  },
+  "settings": {
+    "certificateTrust": null,
+    "validationTime": null,
+    "revocation": null,
+    "javascript": null
+  },
+  "cases": [
+    {
+      "id": "53",
+      "file": "53-approval-control.pdf",
+      "sha256": "5158c883d1d0e6e53b90fb371eb2b25c92f252ceb61730fb17e0f0cd02da7d06",
+      "question": "Unchanged merged-widget approval control.",
+      "status": "unobserved",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "54",
+      "file": "54-identical-page-widget-control.pdf",
+      "sha256": "a5e825d98b7ecd5e03c0a1678a7d91a1974b65dcef6c1c715c4decc51238c753",
+      "question": "Does identical rewriting change judgment with this isolated Size/ID combination?",
+      "status": "unobserved",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "55",
+      "file": "55-identical-page-widget-phantom-size.pdf",
+      "sha256": "ad8d0137d40fbc7a720b473782d52ba0881c538a690bf6b28240d88d951779f0",
+      "question": "Does identical rewriting change judgment with this isolated Size/ID combination?",
+      "status": "unobserved",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "56",
+      "file": "56-identical-page-widget-changed-id.pdf",
+      "sha256": "58b3945de9f19b2b4212dd845595482f8d7ffc492059e67f9c7ae30371885b34",
+      "question": "Does identical rewriting change judgment with this isolated Size/ID combination?",
+      "status": "unobserved",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "57",
+      "file": "57-identical-page-widget-size-and-id.pdf",
+      "sha256": "2936a12a149e18cf7477f46ca7ef3e07c23d66bace89f8bcd41173dc9edff0ee",
+      "question": "Does identical rewriting change judgment with this isolated Size/ID combination?",
+      "status": "unobserved",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "58",
+      "file": "58-separate-widget-control.pdf",
+      "sha256": "6568703971663df4f21fb004cd3318d43faf8dc7446137854ceb98a8ad68bf4d",
+      "question": "Unchanged signature with a separate Kids widget.",
+      "status": "unobserved",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "59",
+      "file": "59-separate-sealed-widget-identical.pdf",
+      "sha256": "dcc48ec83187be12ea1e0fced180e456da5ce7110c3cea232f5282ccd2654172",
+      "question": "Does separate widget ownership change the identical-rewrite result?",
+      "status": "unobserved",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "60",
+      "file": "60-separate-widget-page-size-and-id.pdf",
+      "sha256": "720c776e772804e9c730578554005b463db48daba61604550a8839190bc442b9",
+      "question": "Does separate widget ownership change the identical-rewrite result?",
+      "status": "unobserved",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "61",
+      "file": "61-value-identical-page-reserialized.pdf",
+      "sha256": "31df7fcc706d486f3f1a04bb0a2fbd18a138b36200188e801a80b66e6094e432",
+      "question": "Are reordered keys and changed whitespace accepted when dictionary values are identical?",
+      "status": "unobserved",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "62",
+      "file": "62-value-identical-valueone-reserialized.pdf",
+      "sha256": "8d0c67f1bd2595ba479c47c12cc277df3c7171fc206d38e21e5af7beca70f53a",
+      "question": "Are reordered keys and changed whitespace accepted when dictionary values are identical?",
+      "status": "unobserved",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "63",
+      "file": "63-p2-control.pdf",
+      "sha256": "97678d9ddc30c3ddfeafb9a93183540f5403e2a77685f26a571fdc369120c7dd",
+      "question": "Unchanged P2 certification control.",
+      "status": "unobserved",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "64",
+      "file": "64-p2-readonly.pdf",
+      "sha256": "2f918ba7879dacc1fce3ea93aa18cbc53e7a18515a99d3bdd13c8a1a2d16ffb6",
+      "question": "Is /Ff alone accepted under P2?",
+      "status": "unobserved",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "65",
+      "file": "65-p2-default-appearance.pdf",
+      "sha256": "f31a834cb4c16c8bd1edd9d3308d0dd6a910c10dbff61c81f36d8ebba3bcdd34",
+      "question": "Is /DA alone accepted under P2?",
+      "status": "unobserved",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "66",
+      "file": "66-p2-tooltip.pdf",
+      "sha256": "769e04ae1bb9ae20f1bfd5b53d1829a686a81c879cafac9609f06c905524dd51",
+      "question": "Is /TU alone accepted under P2?",
+      "status": "unobserved",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "67",
+      "file": "67-p2-hidden.pdf",
+      "sha256": "9b8bcb38194ee6ab4d1bb4e6527c80a82ebb6d9641ae7f4145874fb5b819ebf6",
+      "question": "Is /F alone accepted under P2?",
+      "status": "unobserved",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "68",
+      "file": "68-p2-appearance-same-value.pdf",
+      "sha256": "8ce2c3024b9ce44497be385be48c9e3c0c9588dd68c5c45c457d5af8be539135",
+      "question": "Is a regenerated AP stream with unchanged V and drawing accepted under P2?",
+      "status": "unobserved",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "69",
+      "file": "69-p2-second-signature-lock-tooltip.pdf",
+      "sha256": "572f5e3e5504345452dad62682c1d490956bea9bacc08e18e5a2d152e8a45d16",
+      "question": "Are Lock and TU installed with a second signature accepted under P2?",
+      "status": "unobserved",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        },
+        {
+          "field": "SignatureTwo",
+          "signatureIndex": 1,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "70",
+      "file": "70-p2-identical-page.pdf",
+      "sha256": "3712a5d6df9113edb6048bc88a14b597de4e5234d7620b808e0d2b8590539552",
+      "question": "Is an identical page rewrite accepted under P2?",
+      "status": "unobserved",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "71",
+      "file": "71-p2-identical-valueone.pdf",
+      "sha256": "965876a41a5e968884aedcd5435078b33b14507ad7604dd9a22afde8cdcf1c9b",
+      "question": "Is an identical ValueOne rewrite accepted under P2?",
+      "status": "unobserved",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "72",
+      "file": "72-locked-field-control.pdf",
+      "sha256": "a6922ff25482eb6746c098fdd55c12c436062ecb87e9b6feb8bd3a7b4463c659",
+      "question": "Unchanged ValueOne Include lock; Ff is zero.",
+      "status": "unobserved",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "73",
+      "file": "73-locked-default-appearance.pdf",
+      "sha256": "079965a6785ee38185048d6d2caa52028e7ef450ec3eee2b151759796a9bd4bc",
+      "question": "Is /DA alone accepted on an explicitly locked field?",
+      "status": "unobserved",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "74",
+      "file": "74-locked-tooltip.pdf",
+      "sha256": "01205cf3f531e90324f2e9c18b236743a47ffe9b4996f1fe7fab4b16812d9e52",
+      "question": "Is /TU alone accepted on an explicitly locked field?",
+      "status": "unobserved",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "75",
+      "file": "75-locked-appearance-same-value.pdf",
+      "sha256": "a46e5201b96c43d8cd0e9d133516d616ee5545757cda86b72b0df02148c78ed1",
+      "question": "Is AP regeneration accepted on the locked field when V and drawing stay the same?",
+      "status": "unobserved",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "76",
+      "file": "76-locked-readonly.pdf",
+      "sha256": "1f3af6161bfa37e89b77e31e31acac9725d1d6bcaa864ad50989342b69334fb2",
+      "question": "Is /Ff alone accepted on an explicitly locked field?",
+      "status": "unobserved",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "77",
+      "file": "77-locked-field-identical.pdf",
+      "sha256": "81e0863ff2cf2dca63a6bf5f177a0bd4ceb73ca852696fcc9751494c3de46d3b",
+      "question": "Is an identical locked-field rewrite accepted?",
+      "status": "unobserved",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "78",
+      "file": "78-locked-shared-font-control.pdf",
+      "sha256": "21c0bea74ec01ae94827d97013359d66d87ce95daac73423827c5ec59d3bc7f2",
+      "question": "Unchanged A values with a font shared by locked and unlocked appearances, never page content.",
+      "status": "unobserved",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "79",
+      "file": "79-unlocked-fill-changes-locked-font.pdf",
+      "sha256": "2c514bb74de5e4e6670e66ec8e02f871ceb55a586d5e93045af2ea0ac3ac25da",
+      "question": "Does an unlocked fill hide a changed glyph used by a locked appearance?",
+      "status": "unobserved",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "80",
+      "file": "80-locked-value-changed-control.pdf",
+      "sha256": "0ef2691cde4008f6412f65d7b89639847cb079b97000273c93f5caa9dbb8e545",
+      "question": "Intermediate forbidden-fill control before restoration.",
+      "status": "unobserved",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "81",
+      "file": "81-locked-value-restored.pdf",
+      "sha256": "c9635ee7e7e85c959832edc15a8a5ff3f6e698b795c2746958f6bbd45a841da6",
+      "question": "Does exact field/value/AP restoration recover a locked-field violation?",
+      "status": "unobserved",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "82",
+      "file": "82-p2-page-changed-control.pdf",
+      "sha256": "d8d9cb6439467e8f9c2e096bd9658582276344bb3cfb28cc541fcc96ec3d0587",
+      "question": "Intermediate prohibited page-content change under P2.",
+      "status": "unobserved",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "83",
+      "file": "83-p2-page-restored.pdf",
+      "sha256": "98c6647198f718c06818f1c5747a95144bd79f5823a5b594099c3fef9456c048",
+      "question": "Does exact page-content restoration recover P2 certification?",
+      "status": "unobserved",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "84",
+      "file": "84-locked-change-second-signature-control.pdf",
+      "sha256": "3cefa842cd7d8b095dc7a1754810e3f76b1b9b23c462fd4966782f983863ad4c",
+      "question": "Judge each signature before restoring the changed locked value.",
+      "status": "unobserved",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        },
+        {
+          "field": "SignatureTwo",
+          "signatureIndex": 1,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "85",
+      "file": "85-locked-signed-change-restored.pdf",
+      "sha256": "36fa67f25cbcc03ee83d9a4add4b7897b446009cc73583e48900b11db4e0f232",
+      "question": "Does restoration recover the first signature and invalidate the second under a pre-existing lock?",
+      "status": "unobserved",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        },
+        {
+          "field": "SignatureTwo",
+          "signatureIndex": 1,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "86",
+      "file": "86-approval-text-field-added.pdf",
+      "sha256": "b324489dc1b6ef6b81f4ecbb87daab79512935714d770fdf23a11d7fd2149af2",
+      "question": "Is adding a text field accepted under approval?",
+      "status": "unobserved",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "87",
+      "file": "87-approval-text-field-deleted.pdf",
+      "sha256": "af9ae1bb3f2ecbeb2f881ea66c9c49d17e50d304e8e2aa2d45d12af4f962ae9b",
+      "question": "Is removing a text field from both Fields and Annots accepted?",
+      "status": "unobserved",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "88",
+      "file": "88-approval-square-added.pdf",
+      "sha256": "bdef80ca9a49798700eb675bf43bdf8941c42a2047816465da39be2fac6829a5",
+      "question": "Is adding an explicit-appearance Square accepted under approval?",
+      "status": "unobserved",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "89",
+      "file": "89-approval-square-control.pdf",
+      "sha256": "41eb0ed3307e2e20b81a7733756203d303c074cae24f5aad744651802aabe173",
+      "question": "Unchanged explicit-appearance Square control.",
+      "status": "unobserved",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "90",
+      "file": "90-approval-square-deleted.pdf",
+      "sha256": "6a75de59267d8f656ab48d2f459d98b5d10b5cd9b91303b9452a1d87c97fdeab",
+      "question": "Is removing a Square accepted under approval?",
+      "status": "unobserved",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "91",
+      "file": "91-approval-square-colour-modified.pdf",
+      "sha256": "53cb154ed56e06fea13b1c737ba78dfd7c1d4b3adda3ebf744ba33a976f3497d",
+      "question": "Is changing C and its explicit AP to red accepted under approval?",
+      "status": "unobserved",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    }
+  ]
+}

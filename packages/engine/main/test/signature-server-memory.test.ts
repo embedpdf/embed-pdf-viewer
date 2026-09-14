@@ -29,8 +29,11 @@ let engine: LocalEngine | null = null;
 let dir: string;
 let basePath: string;
 let ownedBufferSaves = 0;
+/** Revision prefix documents open right now, and the most that were open at once. */
+const prefixes = new Set<unknown>();
+let maxLivePrefixes = 0;
 
-/** The runtime with every owned-buffer save counted; everything else untouched. */
+/** The runtime with every owned-buffer save counted and every revision prefix document tracked; everything else untouched. */
 function spied(runtime: PdfRuntimeModule): PdfRuntimeModule {
   const fn = new Proxy(runtime.fn as unknown as Record<string, unknown>, {
     get(target, key, receiver) {
@@ -38,6 +41,20 @@ function spied(runtime: PdfRuntimeModule): PdfRuntimeModule {
       if (typeof key === 'string' && (OWNED_BUFFER_SAVES as readonly string[]).includes(key)) {
         return (...args: unknown[]) => {
           ownedBufferSaves += 1;
+          return (value as (...a: unknown[]) => unknown)(...args);
+        };
+      }
+      if (key === 'EPDFDoc_OpenRevision') {
+        return (...args: unknown[]) => {
+          const ptr = (value as (...a: unknown[]) => unknown)(...args);
+          prefixes.add(ptr);
+          maxLivePrefixes = Math.max(maxLivePrefixes, prefixes.size);
+          return ptr;
+        };
+      }
+      if (key === 'FPDF_CloseDocument') {
+        return (...args: unknown[]) => {
+          prefixes.delete(args[0]);
           return (value as (...a: unknown[]) => unknown)(...args);
         };
       }
@@ -74,6 +91,28 @@ const scratchFiles = async (tag: string) => (await readdir(dir)).filter((f) => f
 const mib = (n: number) => `${(n / 1024 / 1024).toFixed(1)} MiB`;
 
 describe('server memory contract', () => {
+  test('an analysis over many revisions keeps at most two prefix documents open', async () => {
+    if (!engine) return;
+    // Four revisions, two signatures (corpus v3/85): the first signature's
+    // window spans three later revisions. The net state needs the sealed and
+    // the judged revision; a full replay walks two at a time.
+    const corpusPath = resolve(here, 'fixtures', 'signature-compat', 'v3', '85-locked-signed-change-restored.pdf');
+    const doc = await engine.open({ kind: 'layerFile', id: 'handles', basePath: corpusPath }, { scope: ['*'] });
+    try {
+      for (const detail of ['summary', 'full'] as const) {
+        prefixes.clear();
+        maxLivePrefixes = 0;
+        const analysis = await doc.signatures!.analyze({ since: { signatureIndex: 0 }, detail });
+        expect(analysis.later.revisionCount).toBe(3);
+        expect(analysis.steps).toHaveLength(detail === 'full' ? 3 : 0);
+        expect(maxLivePrefixes).toBeLessThanOrEqual(2);
+        expect(prefixes.size).toBe(0);
+      }
+    } finally {
+      await doc.close();
+    }
+  });
+
   test('a large edit is prepared and judged through files, never through an owned buffer', async () => {
     if (!engine) return;
     const doc = await engine.open({ kind: 'layerFile', id: 'memory', basePath }, { scope: ['*'] });

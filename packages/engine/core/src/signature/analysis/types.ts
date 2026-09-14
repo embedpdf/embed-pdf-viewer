@@ -1,5 +1,12 @@
 import type { FormFieldFamily } from '../../forms/field';
-import type { BaseVersionInfo, DocumentFieldLock, ModificationLevel, SignatureDTO } from '../types';
+import type {
+  BaseVersionInfo,
+  DocMdpPermission,
+  DocumentFieldLock,
+  FieldLockSpec,
+  ModificationLevel,
+  SignatureDTO,
+} from '../types';
 
 /**
  * The shallow serialisation of a PDF object as the fork's revision diff
@@ -35,6 +42,29 @@ export interface ObjectReferrer {
 }
 
 export type ObjectChangeType = 'added' | 'modified' | 'freed';
+
+/**
+ * What reading the object from one revision's bytes came to. `failed` is a
+ * live mapping whose bytes do not parse (or a stream whose data cannot be
+ * read): the side is present and its value is NOT evidence - two failed
+ * reads are never "the same value".
+ */
+export type ObjectReadStatus = 'ok' | 'failed' | 'absent';
+
+/**
+ * Facts about one revision as a whole that decide whether later changes to
+ * it can be judged at all. Acrobat treats a document with a sparse
+ * cross-reference table (object numbers below /Size with no entry of any
+ * kind) or a reachable bare-reference object (an indirect object whose
+ * whole body is a reference) as corrupted the moment any revision follows
+ * the signed one; a verdict on such a base would disagree with it.
+ */
+export interface RevisionHealth {
+  sparseXref: boolean;
+  bareReferences: number;
+  /** False when the reachability walk hit its budget: usage on that side is a lower bound. */
+  referrersComplete: boolean;
+}
 export type ObjectChangeKind =
   | 'dictionary'
   | 'stream'
@@ -68,6 +98,8 @@ export interface ObjectChange {
   value: { old: PdfValue | null; new: PdfValue | null; truncated: boolean };
   /** The serialisation as emitted, for exact comparison. */
   raw: { old: string | null; new: string | null };
+  /** Per-side read status; absent on older transports (then `ok` for present sides). */
+  read?: { old: ObjectReadStatus; new: ObjectReadStatus };
   streamDataChanged: boolean;
   /** Anchored inbound edges per side (see `ObjectReferrer`). */
   usage: { old: ObjectReferrer[]; new: ObjectReferrer[] };
@@ -132,6 +164,32 @@ export interface RevisionAnalysis {
   changes: ObjectChange[];
 }
 
+/**
+ * A restriction in force for the judged window: a DocMDP certification or a
+ * FieldMDP/lock, and whose it is. A FieldMDP lock is a promise the locking
+ * signature makes about its own window and binds no other signature's
+ * verdict (corpus v3/85); a certification's level is inherited by every
+ * later window as well (conservative until observed otherwise).
+ */
+export interface RestrictionAnchor {
+  signatureIndex: number;
+  revisionIndex: number;
+  source: 'docmdp' | 'fieldmdp' | 'lock';
+  /** Declared by the signature being judged, as opposed to inherited. */
+  own: boolean;
+  permission?: DocMdpPermission;
+  fields?: FieldLockSpec;
+}
+
+/** One judgement with its evidence status; `complete: false` never coexists with a passing verdict. */
+export interface Assessment {
+  verdict: StepVerdict;
+  complete: boolean;
+  /** The finding that decided a forbidden or indeterminate verdict, or the most notable permitted one. */
+  primary?: ChangeFinding;
+  findings: ChangeFinding[];
+}
+
 export interface AnalyzeInput {
   /** Start from the revision a signature seals, or from any revision. */
   since: { signatureIndex: number } | { revisionIndex: number };
@@ -146,18 +204,47 @@ export interface AnalyzeInput {
    * is tagged `mode: 'exploratory'` and never becomes a verdict.
    */
   exploratoryLevel?: ModificationLevel;
+  /**
+   * `summary` (default): the verdict and its findings. `full`: also every
+   * pairwise step between `since` and `until`, with each step's changes
+   * (large; for diagnostics and tooling).
+   */
+  detail?: 'summary' | 'full';
 }
 
+/**
+ * How the judged revision stands against the revision the signature
+ * sealed. The verdict is the NET state - `until` compared with `since`
+ * directly - the way Acrobat judges an approval signature (a page changed
+ * and byte-restored later is unchanged; corpus v2/15, 42, 44, v3/81, 85).
+ * A certification window replays every intervening revision as well
+ * (v3/82-83), and any step's violation joins the verdict.
+ */
 export interface ChangeAnalysis {
   mode: 'authoritative' | 'exploratory';
   policyVersion: number;
   basis: { version: BaseVersionInfo; editsVersion: number; source: 'persisted' | 'working-copy' };
   since: { revisionIndex: number; signatureIndex: number | null };
   until: { revisionIndex: number };
-  /** Pairwise, every intervening revision. */
-  steps: RevisionAnalysis[];
-  /** The worst step. */
+  /** The restrictions this window was judged under (see `RestrictionAnchor`). */
+  restrictions: RestrictionAnchor[];
+  /** THE verdict, with the findings behind it. */
+  current: Assessment & { method: 'net-state' | 'net-state+replay' };
+  /** Facts about the revisions between `since` and `until`; never a verdict. */
+  later: {
+    revisionCount: number;
+    /** Objects rewritten after `since` that hold the sealed value again in `until`. */
+    undoneObjectNumbers: number[];
+  };
+  /** Equals `current.verdict`: one field for every consumer that only needs the answer. */
   verdict: StepVerdict;
+  /**
+   * The pairwise steps: the single step when one revision follows `since`,
+   * every step of a certification replay, or every step with
+   * `detail: 'full'`. Empty otherwise (a multi-revision approval window in
+   * summary mode is judged on its net state alone).
+   */
+  steps: RevisionAnalysis[];
 }
 
 /** Everything one pairwise step needs; JSON in, JSON out. */
@@ -167,6 +254,14 @@ export interface StepInput {
   changes: ObjectChange[];
   before: RevisionStructure;
   after: RevisionStructure;
+  /** What the transport learned about each revision as a whole (see `RevisionHealth`). */
+  health?: { old: RevisionHealth; new: RevisionHealth };
+  /**
+   * The restrictions to judge under. Absent: derived from every signature
+   * in `before` (a revision-anchored analysis). Present: the judged
+   * signature's own locks and the inherited certification level.
+   */
+  restrictions?: { level: ModificationLevel; locks: DocumentFieldLock[] };
   /** Overrides the level derived from `before` (exploratory mode only). */
   levelOverride?: ModificationLevel;
 }

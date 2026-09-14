@@ -387,7 +387,10 @@ describe('judging what a save would write', () => {
         modifications: { verdict: 'unchanged', basis: 'persisted' },
       });
 
-      // An unsaved ink stroke: the plugin re-judges the working copy on its own.
+      // An unsaved ink stroke: the plugin re-judges the working copy on its
+      // own. Commenting is allowed after an approval signature (Acrobat's
+      // reading; corpus v3/88), so the verdict is "changed, permitted" and
+      // nothing warns.
       const page = (await doc.pages.list()).pages[0]!;
       const ink = () =>
         doc.page(page.pageObjectNumber).annotations.create({
@@ -402,7 +405,28 @@ describe('judging what a save would write', () => {
           color: { r: 0, g: 0, b: 0 },
           strokeWidth: 2,
         } as never);
-      const first = await ink();
+      const stroke = await ink();
+      await new Promise((r) => setTimeout(r, 700));
+      expect(signature.verdictOf(SIG)).toMatchObject({
+        summary: 'valid',
+        modifications: { verdict: 'permitted', basis: 'working-copy' },
+      });
+      expect(events.filter((e) => e.type === 'invalidating')).toHaveLength(0);
+
+      // Remove the stroke: the document is the loaded one again, and the
+      // plugin re-judges it as such — unchanged on the persisted basis (the
+      // appearance stream left behind is an orphan the save never writes).
+      await doc.page(page.pageObjectNumber).annotations.delete(stroke.created.ref);
+      await new Promise((r) => setTimeout(r, 700));
+      expect(signature.verdictOf(SIG)).toMatchObject({
+        summary: 'valid',
+        modifications: { verdict: 'unchanged', basis: 'persisted' },
+      });
+
+      // A new form field after an approval signature is not fill-in, signing
+      // or commenting (corpus v3/86: "Form Fields Added", invalid): the
+      // working copy is judged forbidden and the plugin warns, once.
+      await doc.forms.createField({ family: 'text', name: 'late_field' } as never);
       await new Promise((r) => setTimeout(r, 700));
       expect(signature.verdictOf(SIG)).toMatchObject({
         summary: 'invalid',
@@ -412,10 +436,10 @@ describe('judging what a save would write', () => {
       expect(warnings).toHaveLength(1);
       // The field ref is the durable one the snapshot carries (object number).
       expect(warnings[0]).toMatchObject({ field: { kind: 'objectNumber' } });
-      expect((warnings[0] as { detail: string }).detail).toMatch(/annotation/);
+      expect((warnings[0] as { detail: string }).detail).toMatch(/field/i);
 
-      // A second stroke changes nothing about the verdict: no second warning.
-      const second = await ink();
+      // A second forbidden edit changes nothing about the verdict: no second warning.
+      await doc.forms.createField({ family: 'text', name: 'later_field' } as never);
       await new Promise((r) => setTimeout(r, 700));
       expect(events.filter((e) => e.type === 'invalidating')).toHaveLength(1);
 
@@ -423,19 +447,6 @@ describe('judging what a save would write', () => {
       const persisted = await signature.validate({ until: 'persisted' });
       expect(persisted[0]!.summary).toBe('valid');
       expect(persisted[0]!.modifications.basis).toBe('persisted');
-
-      // Remove both strokes: the document is the loaded one again, and the
-      // plugin re-judges it as such — valid on the persisted basis, and no
-      // further warning (the appearance streams left behind are orphans the
-      // save never writes).
-      await doc.page(page.pageObjectNumber).annotations.delete(first.created.ref);
-      await doc.page(page.pageObjectNumber).annotations.delete(second.created.ref);
-      await new Promise((r) => setTimeout(r, 700));
-      expect(signature.verdictOf(SIG)).toMatchObject({
-        summary: 'valid',
-        modifications: { verdict: 'unchanged', basis: 'persisted' },
-      });
-      expect(events.filter((e) => e.type === 'invalidating')).toHaveLength(1);
     } finally {
       await dispose();
       await doc.close();

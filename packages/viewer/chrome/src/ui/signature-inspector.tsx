@@ -137,7 +137,9 @@ export function SignatureInspector() {
         {row(
           t('demo.inspectChanges'),
           modifications === 'unchanged'
-            ? t('demo.verdictUnchanged')
+            ? verdict?.modifications.undone
+              ? t('demo.verdictRestored')
+              : t('demo.verdictUnchanged')
             : modifications === 'permitted'
               ? t('demo.verdictPermitted')
               : modifications === 'forbidden'
@@ -145,6 +147,9 @@ export function SignatureInspector() {
                 : '—',
           modifications === 'forbidden' ? 'text-red-600' : 'text-fg',
         )}
+        {verdict?.modifications.laterRevisions
+          ? row(t('demo.inspectLaterRevisions'), String(verdict.modifications.laterRevisions))
+          : null}
       </div>
       <div className="mt-3 flex justify-end gap-2">
         <button

@@ -1471,7 +1471,17 @@ export const SignatureAbortResultSchema: z.ZodType<SignatureAbortResult> = z.obj
   status: z.enum(['aborted', 'already-completed', 'unknown']),
 });
 
-/** The analysis verdict with its steps carried verbatim (the step DTOs are large and evolving). */
+const ChangeFindingSchema = z.object({
+  rule: z.string(),
+  verdict: z.enum(['permitted', 'forbidden', 'incomplete']),
+  objectNumber: z.number().int().nonnegative(),
+  edge: z.string().optional(),
+  detail: z.string().optional(),
+});
+
+const AnalysisDetailSchema = z.enum(['summary', 'full']);
+
+/** The analysis: one verdict (`current`) with its findings, the restrictions it was judged under, and facts about the revisions in between. */
 export const ChangeAnalysisSchema = z.object({
   mode: z.enum(['authoritative', 'exploratory']),
   policyVersion: z.number().int(),
@@ -1485,8 +1495,31 @@ export const ChangeAnalysisSchema = z.object({
     signatureIndex: z.number().int().nonnegative().nullable(),
   }),
   until: z.object({ revisionIndex: z.number().int().nonnegative() }),
-  steps: z.array(z.unknown()),
+  restrictions: z.array(
+    z.object({
+      signatureIndex: z.number().int().nonnegative(),
+      revisionIndex: z.number().int().nonnegative(),
+      source: z.enum(['docmdp', 'fieldmdp', 'lock']),
+      own: z.boolean(),
+      permission: z.union([z.literal(1), z.literal(2), z.literal(3)]).optional(),
+      fields: z.unknown().optional(),
+    }),
+  ),
+  current: z.object({
+    verdict: z.enum(['unchanged', 'permitted', 'forbidden', 'indeterminate']),
+    complete: z.boolean(),
+    primary: ChangeFindingSchema.optional(),
+    findings: z.array(ChangeFindingSchema),
+    method: z.enum(['net-state', 'net-state+replay']),
+  }),
+  later: z.object({
+    revisionCount: z.number().int().nonnegative(),
+    undoneObjectNumbers: z.array(z.number().int().nonnegative()),
+  }),
+  /** Equals `current.verdict`. */
   verdict: z.enum(['unchanged', 'permitted', 'forbidden', 'indeterminate']),
+  /** The step DTOs are large and evolving; carried verbatim. */
+  steps: z.array(z.unknown()),
 }) as unknown as z.ZodType<ChangeAnalysis>;
 
 const SignatureAttributionSchema = z.object({
@@ -1534,6 +1567,7 @@ export const LayerAnalysisQuerySchema = z
     'since.signature': optionalIndex,
     'since.revision': optionalIndex,
     level: ModificationLevelSchema.optional(),
+    detail: AnalysisDetailSchema.optional(),
   })
   .refine((q) => (q['since.signature'] === undefined) !== (q['since.revision'] === undefined), {
     message: 'exactly one of since.signature / since.revision is required',
@@ -1547,6 +1581,7 @@ export const VersionAnalysisQuerySchema = z
     'since.revision': optionalIndex,
     until: optionalIndex,
     level: ModificationLevelSchema.optional(),
+    detail: AnalysisDetailSchema.optional(),
     /** The judging policy version the caller expects — a cache key, not an input (version responses are immutable). */
     policy: optionalIndex,
   })
@@ -1567,6 +1602,7 @@ export function analyzeInputFromQuery(
     since,
     ...(until !== undefined ? { until } : {}),
     ...(query.level !== undefined ? { exploratoryLevel: query.level } : {}),
+    ...(query.detail !== undefined ? { detail: query.detail } : {}),
   };
 }
 

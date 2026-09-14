@@ -1,0 +1,551 @@
+{
+  "schemaVersion": 1,
+  "id": "acrobat-reader-26.2.21869-macos-arm64-2026-09-14-morning-round5",
+  "observedAt": "2026-09-14",
+  "timezone": "Asia/Jerusalem",
+  "observer": {
+    "application": "Adobe Acrobat Reader",
+    "build": "26.2.21869.0",
+    "buildSource": "user-reported",
+    "applicationBundleVersion": "26.002.21869",
+    "applicationBundleVersionSource": "installed application Info.plist CFBundleShortVersionString",
+    "architecture": "arm64",
+    "processor": "Apple M1 Max",
+    "osVersion": "macOS 26.6",
+    "osBuild": "25G72",
+    "osVersionSource": "sw_vers",
+    "agm": "8.0.3",
+    "coolType": "11.0.0",
+    "jp2k": "5.0.0.59456",
+    "componentVersionsSource": "user-reported"
+  },
+  "method": {
+    "source": "direct-acrobat-ui",
+    "sequence": ["U1", "U2", "U3", "U4", "U5", "U2", "U4"],
+    "description": "Opened each exact supplied PDF, expanded the Signatures panel, inspected modification-category rows, opened native Signature Properties, and clicked Validate Signature. U2 and U4 were each closed, reopened and explicitly revalidated; all transcribed property messages repeated exactly.",
+    "propertyTranscription": "Literal message text with surrounding whitespace removed. Decorative images, memory addresses, controls and generic section titles omitted.",
+    "screenshots": "Inspected interactively; no standalone observation screenshots saved.",
+    "fixtureEditsOrSaves": false,
+    "pdfHashesCheckedBeforeAndAfter": true,
+    "previousRoundFilesModified": false
+  },
+  "settings": {
+    "certificateTrust": [
+      {
+        "displayedSigner": "EmbedPDF PUBLIC TEST KEY ONLY",
+        "certificateSha256": "0f13f8fc08b2c73b9142fdd9fa9bffcc7c939e134dde6a6bb7ce4d7d91b22d74",
+        "trusted": true,
+        "evidence": "Source of Trust obtained from manually imported trusted identity. The signer's identity is valid."
+      }
+    ],
+    "validationTime": "Time at which the signature was created; confirmed in all five properties dialogs.",
+    "revocationObserved": "Revocation checking is not performed for Certificates that you have directly trusted.",
+    "otherPreferences": "Not re-inspected. No preferences or trust settings were changed by the assistant during this round."
+  },
+  "cases": [
+    {
+      "id": "U1",
+      "file": "morning-U1-dense+977-fixed-signed-plus-orphan.pdf",
+      "fileRelativeToObservationDirectory": "morning-U1-dense+977-fixed-signed-plus-orphan.pdf",
+      "sha256": "896ecbc91dc088050c246d73c5619ed86f390c8777413bfba2d3c05e1e9819c1",
+      "byteLength": 927513,
+      "probeDescription": "Dense xref; object 977 replaced with the dictionary held by 976; no base-trailer Info",
+      "status": "observed",
+      "signatureField": "signature_1",
+      "signatureIndex": 0,
+      "fieldLocationMessage": "Field: signature_1 on page 2",
+      "overallStatus": "Signature is VALID, signed by EmbedPDF PUBLIC TEST KEY ONLY.",
+      "modificationMessage": "The revision of the document that was covered by this signature has not been altered; however, there have been subsequent changes to the document.",
+      "changeCategories": [
+        {
+          "label": "Annotations Modified",
+          "items": [
+            "Square annot on page 1",
+            "Circle annot on page 1",
+            "PolyLine annot on page 1",
+            "Polygon annot on page 1",
+            "Ink annot on page 1"
+          ]
+        }
+      ],
+      "changeCategoriesObservation": "Five annotation rows displayed in the expanded Signatures panel.",
+      "signer": "EmbedPDF PUBLIC TEST KEY ONLY",
+      "signerTrusted": true,
+      "signerTrustMessage": "Source of Trust obtained from manually imported trusted identity. The signer's identity is valid.",
+      "permissionMessage": "The certifier has specified that Form Fill-in, Signing and Commenting are allowed for this document. No other changes are permitted.",
+      "integrityMessage": null,
+      "propertiesText": [
+        "Signature is VALID, signed by EmbedPDF PUBLIC TEST KEY ONLY.  Signing Time:  2026/09/14 12:42:19 +03'00' Source of Trust obtained from manually imported trusted identity.",
+        "Reason:  base bisection 3",
+        "The revision of the document that was covered by this signature has not been altered; however, there have been subsequent changes to the document.",
+        "The certifier has specified that Form Fill-in, Signing and Commenting are allowed for this document. No other changes are permitted.",
+        "The signer's identity is valid.",
+        "Signing time is from the clock on the signer's computer.",
+        "Signature was validated as of the signing time:\r2026/09/14 12:42:19 +03'00' Validity Summary",
+        "Path validation checks were successful.",
+        "Revocation checking is not performed for Certificates that you have directly trusted."
+      ],
+      "explicitlyRevalidated": true,
+      "reopenedAndRechecked": false,
+      "recheckResultRepeated": null,
+      "initialPanelDisplay": {
+        "banner": "Signed and all signatures are valid.",
+        "modificationMessage": "Document has not been modified since this signature was applied",
+        "note": "Initial panel presentation before explicit Validate Signature; final property reading above is used as the observation."
+      }
+    },
+    {
+      "id": "U2",
+      "file": "morning-U2-dense+catalog-info-removed-signed-plus-orphan.pdf",
+      "fileRelativeToObservationDirectory": "morning-U2-dense+catalog-info-removed-signed-plus-orphan.pdf",
+      "sha256": "1e097ee935efae3422069f653af41748251558d4bb5ecd684245cce4bd3c4769",
+      "byteLength": 927413,
+      "probeDescription": "Dense xref; catalog Info removed; bare-reference object 977 retained without incoming references",
+      "status": "observed",
+      "signatureField": "signature_1",
+      "signatureIndex": 0,
+      "fieldLocationMessage": "Field: signature_1 on page 2",
+      "overallStatus": "Signature is VALID, signed by EmbedPDF PUBLIC TEST KEY ONLY.",
+      "modificationMessage": "The revision of the document that was covered by this signature has not been altered; however, there have been subsequent changes to the document.",
+      "changeCategories": [
+        {
+          "label": "Annotations Modified",
+          "items": [
+            "Square annot on page 1",
+            "Circle annot on page 1",
+            "PolyLine annot on page 1",
+            "Polygon annot on page 1",
+            "Ink annot on page 1"
+          ]
+        }
+      ],
+      "changeCategoriesObservation": "Five annotation rows displayed in the expanded Signatures panel.",
+      "signer": "EmbedPDF PUBLIC TEST KEY ONLY",
+      "signerTrusted": true,
+      "signerTrustMessage": "Source of Trust obtained from manually imported trusted identity. The signer's identity is valid.",
+      "permissionMessage": "The certifier has specified that Form Fill-in, Signing and Commenting are allowed for this document. No other changes are permitted.",
+      "integrityMessage": null,
+      "propertiesText": [
+        "Signature is VALID, signed by EmbedPDF PUBLIC TEST KEY ONLY.  Signing Time:  2026/09/14 12:42:19 +03'00' Source of Trust obtained from manually imported trusted identity.",
+        "Reason:  base bisection 3",
+        "The revision of the document that was covered by this signature has not been altered; however, there have been subsequent changes to the document.",
+        "The certifier has specified that Form Fill-in, Signing and Commenting are allowed for this document. No other changes are permitted.",
+        "The signer's identity is valid.",
+        "Signing time is from the clock on the signer's computer.",
+        "Signature was validated as of the signing time:\r2026/09/14 12:42:19 +03'00' Validity Summary",
+        "Path validation checks were successful.",
+        "Revocation checking is not performed for Certificates that you have directly trusted."
+      ],
+      "explicitlyRevalidated": true,
+      "reopenedAndRechecked": true,
+      "recheckResultRepeated": true,
+      "initialPanelDisplay": {
+        "banner": "Signed and all signatures are valid.",
+        "modificationMessage": "Document has not been modified since this signature was applied",
+        "note": "Initial panel presentation before explicit Validate Signature; final property reading above is used as the observation."
+      }
+    },
+    {
+      "id": "U3",
+      "file": "morning-U3-sparse+977-fixed-signed-plus-orphan.pdf",
+      "fileRelativeToObservationDirectory": "morning-U3-sparse+977-fixed-signed-plus-orphan.pdf",
+      "sha256": "cdac3ae4c5b33c642c02251cf8f0db41acaa25fa048a7022f4cca698cbee12e4",
+      "byteLength": 916471,
+      "probeDescription": "Rebuilt sparse xref; object 977 replaced with the dictionary held by 976",
+      "status": "observed",
+      "signatureField": "signature_1",
+      "signatureIndex": 0,
+      "fieldLocationMessage": "Field: signature_1 on page 2",
+      "overallStatus": "Signature is INVALID.",
+      "modificationMessage": "The document has been altered or corrupted since the Signature was applied.",
+      "changeCategories": [],
+      "changeCategoriesObservation": "No modification-category rows displayed in the expanded Signatures panel.",
+      "signer": "EmbedPDF PUBLIC TEST KEY ONLY",
+      "signerTrusted": true,
+      "signerTrustMessage": "Source of Trust obtained from manually imported trusted identity. The signer's identity is valid.",
+      "permissionMessage": "The certifier has specified that Form Fill-in, Signing and Commenting are allowed for this document. No other changes are permitted.",
+      "integrityMessage": null,
+      "propertiesText": [
+        "Signature is INVALID.  Signing Time:  2026/09/14 12:42:19 +03'00' Source of Trust obtained from manually imported trusted identity.",
+        "Reason:  base bisection 3",
+        "The document has been altered or corrupted since the Signature was applied.",
+        "The certifier has specified that Form Fill-in, Signing and Commenting are allowed for this document. No other changes are permitted.",
+        "The signer's identity is valid.",
+        "Signing time is from the clock on the signer's computer.",
+        "Signature was validated as of the signing time:\r2026/09/14 12:42:19 +03'00' Validity Summary",
+        "Path validation checks were successful.",
+        "Revocation checking is not performed for Certificates that you have directly trusted."
+      ],
+      "explicitlyRevalidated": true,
+      "reopenedAndRechecked": false,
+      "recheckResultRepeated": null,
+      "banner": "At least one signature is invalid."
+    },
+    {
+      "id": "U4",
+      "file": "morning-U4-sparse+catalog-info-removed-signed-plus-orphan.pdf",
+      "fileRelativeToObservationDirectory": "morning-U4-sparse+catalog-info-removed-signed-plus-orphan.pdf",
+      "sha256": "70e9eb1526513900d05320ce79287dfc908b2ed4a538c3266cd7ae719ff7a8c4",
+      "byteLength": 916382,
+      "probeDescription": "Rebuilt sparse xref; catalog Info removed; bare-reference object 977 retained without incoming references",
+      "status": "observed",
+      "signatureField": "signature_1",
+      "signatureIndex": 0,
+      "fieldLocationMessage": "Field: signature_1 on page 2",
+      "overallStatus": "Signature is INVALID.",
+      "modificationMessage": "The document has been altered or corrupted since the Signature was applied.",
+      "changeCategories": [],
+      "changeCategoriesObservation": "No modification-category rows displayed in the expanded Signatures panel.",
+      "signer": "EmbedPDF PUBLIC TEST KEY ONLY",
+      "signerTrusted": true,
+      "signerTrustMessage": "Source of Trust obtained from manually imported trusted identity. The signer's identity is valid.",
+      "permissionMessage": "The certifier has specified that Form Fill-in, Signing and Commenting are allowed for this document. No other changes are permitted.",
+      "integrityMessage": null,
+      "propertiesText": [
+        "Signature is INVALID.  Signing Time:  2026/09/14 12:42:19 +03'00' Source of Trust obtained from manually imported trusted identity.",
+        "Reason:  base bisection 3",
+        "The document has been altered or corrupted since the Signature was applied.",
+        "The certifier has specified that Form Fill-in, Signing and Commenting are allowed for this document. No other changes are permitted.",
+        "The signer's identity is valid.",
+        "Signing time is from the clock on the signer's computer.",
+        "Signature was validated as of the signing time:\r2026/09/14 12:42:19 +03'00' Validity Summary",
+        "Path validation checks were successful.",
+        "Revocation checking is not performed for Certificates that you have directly trusted."
+      ],
+      "explicitlyRevalidated": true,
+      "reopenedAndRechecked": true,
+      "recheckResultRepeated": true,
+      "banner": "At least one signature is invalid."
+    },
+    {
+      "id": "U5",
+      "file": "morning-U5-sparse-rebuilt-control-signed-plus-orphan.pdf",
+      "fileRelativeToObservationDirectory": "morning-U5-sparse-rebuilt-control-signed-plus-orphan.pdf",
+      "sha256": "21bc94b570bd821dd429e337acc490efa3318f1f9a98d3747785672f44b632a1",
+      "byteLength": 916332,
+      "probeDescription": "Rebuilt sparse xref control; all active base object bytes unchanged",
+      "status": "observed",
+      "signatureField": "signature_1",
+      "signatureIndex": 0,
+      "fieldLocationMessage": "Field: signature_1 on page 2",
+      "overallStatus": "Signature is INVALID.",
+      "modificationMessage": "The document has been altered or corrupted since the Signature was applied.",
+      "changeCategories": [],
+      "changeCategoriesObservation": "No modification-category rows displayed in the expanded Signatures panel.",
+      "signer": "EmbedPDF PUBLIC TEST KEY ONLY",
+      "signerTrusted": true,
+      "signerTrustMessage": "Source of Trust obtained from manually imported trusted identity. The signer's identity is valid.",
+      "permissionMessage": "The certifier has specified that Form Fill-in, Signing and Commenting are allowed for this document. No other changes are permitted.",
+      "integrityMessage": null,
+      "propertiesText": [
+        "Signature is INVALID.  Signing Time:  2026/09/14 12:42:20 +03'00' Source of Trust obtained from manually imported trusted identity.",
+        "Reason:  base bisection 3",
+        "The document has been altered or corrupted since the Signature was applied.",
+        "The certifier has specified that Form Fill-in, Signing and Commenting are allowed for this document. No other changes are permitted.",
+        "The signer's identity is valid.",
+        "Signing time is from the clock on the signer's computer.",
+        "Signature was validated as of the signing time:\r2026/09/14 12:42:20 +03'00' Validity Summary",
+        "Path validation checks were successful.",
+        "Revocation checking is not performed for Certificates that you have directly trusted."
+      ],
+      "explicitlyRevalidated": true,
+      "reopenedAndRechecked": false,
+      "recheckResultRepeated": null,
+      "banner": "At least one signature is invalid."
+    }
+  ],
+  "independentVerification": {
+    "method": "Strict pyHanko parsing, complete PDF manifest hashes, base-prefix structural checks (no base hashes supplied), OpenSSL cms -verify -binary -noverify (chain trust excluded).",
+    "opensslVersion": "OpenSSL 3.5.2 5 Aug 2025 (Library: OpenSSL 3.5.2 5 Aug 2025)",
+    "cases": [
+      {
+        "id": "U1",
+        "file": "morning-U1-dense+977-fixed-signed-plus-orphan.pdf",
+        "sha256": "896ecbc91dc088050c246d73c5619ed86f390c8777413bfba2d3c05e1e9819c1",
+        "byteLength": 927513,
+        "basePrefixSha256": "eabdc294c50020a79a6b437fd77e3801b81f52969b88da8170d9c60a3ed52256",
+        "basePrefixByteLength": 920220,
+        "basePrefixHashVerifiedAgainstManifest": false,
+        "revisionCount": 3,
+        "signatureField": "signature_1",
+        "signedRevision": 1,
+        "byteRange": [0, 922536, 926614, 689],
+        "detachedCmsValid": true,
+        "certificateSha256": ["0f13f8fc08b2c73b9142fdd9fa9bffcc7c939e134dde6a6bb7ce4d7d91b22d74"],
+        "finalLineEndingPresent": true,
+        "finalRevisionOnlyObject": [1245, 0],
+        "finalTrailerUnchangedExceptSizeAndPrev": true,
+        "orphanHasNoIncomingReference": true,
+        "precedingObjectsChecked": 526,
+        "signedTrailerInfo": [1244, 0],
+        "object977": {
+          "baseKind": "dictionary",
+          "baseMatches976Dictionary": true,
+          "bareReferenceTarget": null,
+          "catalogInfoPresent": true,
+          "baseIncomingReferences": [[183, 0]],
+          "baseBareReferenceObjects": [],
+          "unchangedInSigningRevision": true,
+          "signedIncomingReferences": [[183, 0]]
+        },
+        "baseFacts": {
+          "header": "%PDF-1.7\r\n",
+          "headerPrefixHex": "255044462d312e370d0a",
+          "idByteLengths": [4, 16],
+          "trailerInfo": null,
+          "xrefSubsectionCount": 1,
+          "xrefEntryCount": 1237,
+          "denseXref": true,
+          "inUseEntryCount": 519,
+          "freeEntryCount": 718
+        },
+        "baseObjectChunksChangedFromOriginal": [[977, 0]],
+        "baseObjectComparisonMethod": "Parse each of the 519 active base objects from its xref offset to its endobj and compare the exact bytes against round-3 S1. Old, superseded object definitions between active objects are excluded."
+      },
+      {
+        "id": "U2",
+        "file": "morning-U2-dense+catalog-info-removed-signed-plus-orphan.pdf",
+        "sha256": "1e097ee935efae3422069f653af41748251558d4bb5ecd684245cce4bd3c4769",
+        "byteLength": 927413,
+        "basePrefixSha256": "2d5c4a6cff10f3f9c9cf09ef091b269b6557c6f2ef941b208ef0cbc8a27eec15",
+        "basePrefixByteLength": 920134,
+        "basePrefixHashVerifiedAgainstManifest": false,
+        "revisionCount": 3,
+        "signatureField": "signature_1",
+        "signedRevision": 1,
+        "byteRange": [0, 922436, 926514, 689],
+        "detachedCmsValid": true,
+        "certificateSha256": ["0f13f8fc08b2c73b9142fdd9fa9bffcc7c939e134dde6a6bb7ce4d7d91b22d74"],
+        "finalLineEndingPresent": true,
+        "finalRevisionOnlyObject": [1245, 0],
+        "finalTrailerUnchangedExceptSizeAndPrev": true,
+        "orphanHasNoIncomingReference": true,
+        "precedingObjectsChecked": 526,
+        "signedTrailerInfo": [1244, 0],
+        "object977": {
+          "baseKind": "indirect-reference",
+          "baseMatches976Dictionary": false,
+          "bareReferenceTarget": [976, 0],
+          "catalogInfoPresent": false,
+          "baseIncomingReferences": [],
+          "baseBareReferenceObjects": [[977, 0]],
+          "unchangedInSigningRevision": true,
+          "signedIncomingReferences": []
+        },
+        "baseFacts": {
+          "header": "%PDF-1.7\r\n",
+          "headerPrefixHex": "255044462d312e370d0a",
+          "idByteLengths": [4, 16],
+          "trailerInfo": null,
+          "xrefSubsectionCount": 1,
+          "xrefEntryCount": 1237,
+          "denseXref": true,
+          "inUseEntryCount": 519,
+          "freeEntryCount": 718
+        },
+        "baseObjectChunksChangedFromOriginal": [[183, 0]],
+        "baseObjectComparisonMethod": "Parse each of the 519 active base objects from its xref offset to its endobj and compare the exact bytes against round-3 S1. Old, superseded object definitions between active objects are excluded."
+      },
+      {
+        "id": "U3",
+        "file": "morning-U3-sparse+977-fixed-signed-plus-orphan.pdf",
+        "sha256": "cdac3ae4c5b33c642c02251cf8f0db41acaa25fa048a7022f4cca698cbee12e4",
+        "byteLength": 916471,
+        "basePrefixSha256": "0fa9a59b76bcba2318d724df94cb776ca16eb82294edf62f1b5c4e9fad55a75b",
+        "basePrefixByteLength": 909178,
+        "basePrefixHashVerifiedAgainstManifest": false,
+        "revisionCount": 3,
+        "signatureField": "signature_1",
+        "signedRevision": 1,
+        "byteRange": [0, 911494, 915572, 689],
+        "detachedCmsValid": true,
+        "certificateSha256": ["0f13f8fc08b2c73b9142fdd9fa9bffcc7c939e134dde6a6bb7ce4d7d91b22d74"],
+        "finalLineEndingPresent": true,
+        "finalRevisionOnlyObject": [1245, 0],
+        "finalTrailerUnchangedExceptSizeAndPrev": true,
+        "orphanHasNoIncomingReference": true,
+        "precedingObjectsChecked": 526,
+        "signedTrailerInfo": [1244, 0],
+        "object977": {
+          "baseKind": "dictionary",
+          "baseMatches976Dictionary": true,
+          "bareReferenceTarget": null,
+          "catalogInfoPresent": true,
+          "baseIncomingReferences": [[183, 0]],
+          "baseBareReferenceObjects": [],
+          "unchangedInSigningRevision": true,
+          "signedIncomingReferences": [[183, 0]]
+        },
+        "baseFacts": {
+          "header": "%PDF-1.7\r\n",
+          "headerPrefixHex": "255044462d312e370d0a",
+          "idByteLengths": [4, 16],
+          "trailerInfo": null,
+          "xrefSubsectionCount": 479,
+          "xrefEntryCount": 520,
+          "denseXref": false,
+          "inUseEntryCount": 519,
+          "freeEntryCount": 1
+        },
+        "baseObjectChunksChangedFromOriginal": [[977, 0]],
+        "baseObjectComparisonMethod": "Parse each of the 519 active base objects from its xref offset to its endobj and compare the exact bytes against round-3 S1. Old, superseded object definitions between active objects are excluded."
+      },
+      {
+        "id": "U4",
+        "file": "morning-U4-sparse+catalog-info-removed-signed-plus-orphan.pdf",
+        "sha256": "70e9eb1526513900d05320ce79287dfc908b2ed4a538c3266cd7ae719ff7a8c4",
+        "byteLength": 916382,
+        "basePrefixSha256": "9ee1b3472123dcbb15470087a981b99f596dd1e6818164b6f1b9904d08a97528",
+        "basePrefixByteLength": 909092,
+        "basePrefixHashVerifiedAgainstManifest": false,
+        "revisionCount": 3,
+        "signatureField": "signature_1",
+        "signedRevision": 1,
+        "byteRange": [0, 911394, 915472, 689],
+        "detachedCmsValid": true,
+        "certificateSha256": ["0f13f8fc08b2c73b9142fdd9fa9bffcc7c939e134dde6a6bb7ce4d7d91b22d74"],
+        "finalLineEndingPresent": true,
+        "finalRevisionOnlyObject": [1245, 0],
+        "finalTrailerUnchangedExceptSizeAndPrev": true,
+        "orphanHasNoIncomingReference": true,
+        "precedingObjectsChecked": 526,
+        "signedTrailerInfo": [1244, 0],
+        "object977": {
+          "baseKind": "indirect-reference",
+          "baseMatches976Dictionary": false,
+          "bareReferenceTarget": [976, 0],
+          "catalogInfoPresent": false,
+          "baseIncomingReferences": [],
+          "baseBareReferenceObjects": [[977, 0]],
+          "unchangedInSigningRevision": true,
+          "signedIncomingReferences": []
+        },
+        "baseFacts": {
+          "header": "%PDF-1.7\r\n",
+          "headerPrefixHex": "255044462d312e370d0a",
+          "idByteLengths": [4, 16],
+          "trailerInfo": null,
+          "xrefSubsectionCount": 479,
+          "xrefEntryCount": 520,
+          "denseXref": false,
+          "inUseEntryCount": 519,
+          "freeEntryCount": 1
+        },
+        "baseObjectChunksChangedFromOriginal": [[183, 0]],
+        "baseObjectComparisonMethod": "Parse each of the 519 active base objects from its xref offset to its endobj and compare the exact bytes against round-3 S1. Old, superseded object definitions between active objects are excluded."
+      },
+      {
+        "id": "U5",
+        "file": "morning-U5-sparse-rebuilt-control-signed-plus-orphan.pdf",
+        "sha256": "21bc94b570bd821dd429e337acc490efa3318f1f9a98d3747785672f44b632a1",
+        "byteLength": 916332,
+        "basePrefixSha256": "2e539f62b5fa605fc33b038ff31f019c94123342115a0c1e52d741ca2f737997",
+        "basePrefixByteLength": 909039,
+        "basePrefixHashVerifiedAgainstManifest": false,
+        "revisionCount": 3,
+        "signatureField": "signature_1",
+        "signedRevision": 1,
+        "byteRange": [0, 911355, 915433, 689],
+        "detachedCmsValid": true,
+        "certificateSha256": ["0f13f8fc08b2c73b9142fdd9fa9bffcc7c939e134dde6a6bb7ce4d7d91b22d74"],
+        "finalLineEndingPresent": true,
+        "finalRevisionOnlyObject": [1245, 0],
+        "finalTrailerUnchangedExceptSizeAndPrev": true,
+        "orphanHasNoIncomingReference": true,
+        "precedingObjectsChecked": 526,
+        "signedTrailerInfo": [1244, 0],
+        "object977": {
+          "baseKind": "indirect-reference",
+          "baseMatches976Dictionary": false,
+          "bareReferenceTarget": [976, 0],
+          "catalogInfoPresent": true,
+          "baseIncomingReferences": [[183, 0]],
+          "baseBareReferenceObjects": [[977, 0]],
+          "unchangedInSigningRevision": true,
+          "signedIncomingReferences": [[183, 0]]
+        },
+        "baseFacts": {
+          "header": "%PDF-1.7\r\n",
+          "headerPrefixHex": "255044462d312e370d0a",
+          "idByteLengths": [4, 16],
+          "trailerInfo": null,
+          "xrefSubsectionCount": 479,
+          "xrefEntryCount": 520,
+          "denseXref": false,
+          "inUseEntryCount": 519,
+          "freeEntryCount": 1
+        },
+        "baseObjectChunksChangedFromOriginal": [],
+        "baseObjectComparisonMethod": "Parse each of the 519 active base objects from its xref offset to its endobj and compare the exact bytes against round-3 S1. Old, superseded object definitions between active objects are excluded."
+      }
+    ],
+    "historicalObjectChecks": [
+      {
+        "id": "T5",
+        "fileRelativeToRound5": "../morning-variants-4/morning-T5-dense+info-signed-plus-orphan.pdf",
+        "sha256": "31b8ee089761ba0fb2259e9d5aac096e9bf75688906fe99165870eac8a0426e2",
+        "revisions": [
+          {
+            "revision": 0,
+            "catalogInfo": [977, 0],
+            "pointedObjectKind": "indirect-reference",
+            "pointedObjectReference": [976, 0],
+            "pointedNumberValue": null,
+            "pointedDictionaryHasModDate": false
+          },
+          {
+            "revision": 1,
+            "catalogInfo": [977, 0],
+            "pointedObjectKind": "dictionary",
+            "pointedObjectReference": null,
+            "pointedNumberValue": null,
+            "pointedDictionaryHasModDate": true
+          }
+        ]
+      },
+      {
+        "id": "S5",
+        "fileRelativeToRound5": "../morning-variants-3/morning-S5-qpdf-rewrite-signed-plus-orphan.pdf",
+        "sha256": "1a5ca892f968d3a9ddf7a28f50d279599935ac9370c6a32efdc9d4df9c6d8f03",
+        "revisions": [
+          {
+            "revision": 0,
+            "catalogInfo": [2, 0],
+            "pointedObjectKind": "number",
+            "pointedObjectReference": null,
+            "pointedNumberValue": 976,
+            "pointedDictionaryHasModDate": false
+          },
+          {
+            "revision": 1,
+            "catalogInfo": [2, 0],
+            "pointedObjectKind": "number",
+            "pointedObjectReference": null,
+            "pointedNumberValue": 976,
+            "pointedDictionaryHasModDate": false
+          }
+        ]
+      }
+    ],
+    "baseObjectComparisonReference": {
+      "fileRelativeToRound5": "../morning-variants-3/morning-S1-dense-xref-signed-plus-orphan.pdf",
+      "sha256": "0ce928f818374ad84d7f5f6d2d62a3b9a9095fb4feb25174ecdae3fddfbf91c8"
+    }
+  },
+  "interpretation": {
+    "observed": "U1 and U2 VALID with subsequent changes. U3, U4 and U5 INVALID, altered or corrupted. All identities trusted. U2 and U4 repeat after reopen and explicit revalidation.",
+    "localConclusion": "The results support two contributing structural factors in this ebook/workflow: gaps in the base xref coverage and the catalog-reachable bare-reference object 977. With dense xref coverage, either repairing active object 977 or removing its only incoming reference succeeds.",
+    "reachabilityBoundary": "U2 retains an active bare-reference object 977 and passes. A rule based merely on the presence of any bare-reference object anywhere in the file would therefore contradict this observation.",
+    "controlLimit": "U5 retains the rejection with its rebuilt sparse table and unchanged active base objects. This shows the rebuild did not resolve this case; it does not establish universal neutrality for every possible rebuild.",
+    "t5Confirmed": "In frozen round-4 T5, object 977 changes from reference 976 0 R in the base to a dictionary containing ModDate in the signing revision.",
+    "qpdfCorrection": "Frozen round-3 S5 does not redirect the catalog Info to the original dictionary. Its catalog Info is 2 0 R; object 2 contains the number 976 in both the base and signed revisions. This removes the bare-reference shape, but is not a dictionary-chain repair.",
+    "categoryCaution": "The five Annotations Modified rows are literal Acrobat output. Independent checks show only one new unreferenced object after signing; they do not demonstrate five actual post-signature annotation edits.",
+    "policyBoundary": "Any proposed base-unverifiable diagnostic needs to respect active xref resolution and reachability. These observations support a diagnostic for demonstrated structures; they do not by themselves prove that every PDF with a sparse table or every bare-reference object will fail in all Acrobat versions.",
+    "limitations": [
+      "Only supplied pyHanko-signed files with one later orphan-object revision were tested in this round.",
+      "No standalone signed-only controls were supplied or opened.",
+      "No base_sha256 values were supplied; complete-file hashes were verified, and base-prefix hashes computed for reference.",
+      "The external proposal was not reviewed or edited in this round. No policy implementation or demo-ebook normalization was performed."
+    ]
+  }
+}

@@ -278,6 +278,8 @@ export const en: Locale = {
         'This change will invalidate {field} when the document is saved. Undo it to keep the signature.',
       verdictIndeterminate: 'Could not be verified',
       verdictUnchanged: 'None',
+      verdictRestored: 'Changed, then restored',
+      inspectLaterRevisions: 'Revisions after signing',
       verdictPermitted: 'Permitted',
       verdictForbidden: 'Not permitted',
     },

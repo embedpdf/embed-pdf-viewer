@@ -1,5 +1,6 @@
 import type { DocumentFieldLock, ModificationLevel } from '../types';
 import type { PdfValue } from './types';
+import { conclude } from './verdict';
 import { deriveProtection, levelAllows, lockCovers } from '../protection';
 import { changedKeys, dictEntries, pdfValueEquals, refsOf } from './pdf-value';
 import type {
@@ -33,16 +34,62 @@ const TRAILER_KEYS = new Set([
 ]);
 const CATALOG_KEYS = new Set(['Metadata', 'Extensions', 'Version', 'DSS', 'AcroForm', 'Perms']);
 const ACROFORM_KEYS = new Set(['DR', 'DA', 'Q', 'SigFlags', 'NeedAppearances', 'Fields']);
-const FILL_FIELD_KEYS = new Set(['V', 'AS', 'AP', 'I', 'DA', 'Ff', 'RV']);
-const FILL_WIDGET_KEYS = new Set(['AS', 'AP', 'DA']);
-// Signing an EXISTING field may set its value, appearance and ReadOnly, nothing
-// else. /Lock is authoring-time metadata: adding it to a field that already
-// exists under an earlier signature is a field-dictionary change no earlier
-// signature permits (pyHanko and Acrobat reject it); the FieldMDP transform
-// in the signature value carries the lock on its own.
-const SIGNED_FIELD_KEYS = new Set(['V', 'AP', 'AS', 'Ff']);
+/**
+ * What a form field may change after a signature, by the level in force.
+ * Every key here has a corpus case behind it (`signature-compat`); a key
+ * not listed is forbidden until one does.
+ *
+ *   annotate (an approval signature: "Form Fill-in, Signing and Commenting
+ *   are allowed"): everything but the field's identity and its place in
+ *   the tree. v1/08 /V+/AP, 09 /Ff, 10 /Rect, 11 /F, 18 /TU, 21 /DA; 13 /T
+ *   forbidden. /AA (v1/12) and /A are accepted by Acrobat and deliberately
+ *   NOT listed: an action on a signed form is executable content.
+ *
+ *   fill (a P=2 certification): value and appearance. v1/26 /V+/AP, v3/64
+ *   /Ff (ReadOnly added), 65 /DA, 68 /AP stream; v3/66 /TU, 67 /F, v2/50
+ *   /Rect forbidden.
+ */
+const FIELD_KEYS_BY_LEVEL: Record<'annotate' | 'fill', ReadonlySet<string>> = {
+  annotate: new Set([
+    'V', 'AS', 'AP', 'I', 'DA', 'Ff', 'RV', 'MK', 'Q', 'TU', 'F', 'Rect', 'BS', 'Opt', 'DV', 'MaxLen',
+  ]),
+  fill: new Set(['V', 'AS', 'AP', 'I', 'RV', 'DA', 'Ff']),
+};
+/** A separate widget dictionary: the presentation subset of the same tables. */
+const WIDGET_KEYS_BY_LEVEL: Record<'annotate' | 'fill', ReadonlySet<string>> = {
+  annotate: new Set(['AS', 'AP', 'DA', 'MK', 'Q', 'TU', 'F', 'Rect', 'BS']),
+  fill: new Set(['AS', 'AP', 'DA']),
+};
+/**
+ * Signing an EXISTING field: its value, appearance and ReadOnly at any
+ * level; after an approval signature also its tooltip and a /Lock installed
+ * with the signature (v1/18, 19: both valid; under P=2 the combination is
+ * rejected, v3/69, so neither is allowed at `fill`).
+ */
+const SIGNED_FIELD_KEYS_BY_LEVEL: Record<'annotate' | 'fill', ReadonlySet<string>> = {
+  annotate: new Set(['V', 'AP', 'AS', 'Ff', 'TU', 'Lock']),
+  fill: new Set(['V', 'AP', 'AS', 'Ff']),
+};
 const SIGNED_WIDGET_KEYS = new Set(['AP', 'AS']);
 const FF_READ_ONLY = 1;
+
+function fieldKeysFor(level: ModificationLevel): ReadonlySet<string> {
+  return level === 'annotate' ? FIELD_KEYS_BY_LEVEL.annotate : FIELD_KEYS_BY_LEVEL.fill;
+}
+function widgetKeysFor(level: ModificationLevel): ReadonlySet<string> {
+  return level === 'annotate' ? WIDGET_KEYS_BY_LEVEL.annotate : WIDGET_KEYS_BY_LEVEL.fill;
+}
+function signedFieldKeysFor(level: ModificationLevel): ReadonlySet<string> {
+  return level === 'annotate' ? SIGNED_FIELD_KEYS_BY_LEVEL.annotate : SIGNED_FIELD_KEYS_BY_LEVEL.fill;
+}
+
+/**
+ * Rules whose permitted findings do not make a revision a CHANGE of the
+ * document: an object written again with the sealed value, an object nobody
+ * references, a cross-reference container, the trailer's own bookkeeping.
+ * A window with nothing else is `unchanged` (Acrobat: "not modified").
+ */
+const NON_EFFECTIVE_RULES = new Set(['identical-rewrite', 'orphan', 'xref-container', 'trailer']);
 
 /** The level a step runs at, and the locks it enforces: what the OLDER revision's signatures established. */
 export function restrictionsOf(before: RevisionStructure): {
@@ -64,10 +111,11 @@ export function restrictionsOf(before: RevisionStructure): {
  */
 export function evaluateStep(input: StepInput): RevisionAnalysis {
   const changes = withEvidenceCheck(input.changes);
-  const { level, locks } = restrictionsOf(input.before);
+  const { level, locks } = input.restrictions ?? restrictionsOf(input.before);
   const levelInForce = input.levelOverride ?? level;
   const ctx = new StepContext({ ...input, changes }, levelInForce, locks);
 
+  ruleRevisionHealth(ctx);
   ruleXrefContainer(ctx);
   ruleIdenticalRewrite(ctx);
   // Locks first: a frozen object is condemned before any rule could vouch for it.
@@ -84,14 +132,10 @@ export function evaluateStep(input: StepInput): RevisionAnalysis {
   ruleAnnotation(ctx);
   ruleUnexplained(ctx);
 
-  const verdict: StepVerdict =
-    changes.length === 0
-      ? 'unchanged'
-      : ctx.findings.some((f) => f.verdict === 'incomplete')
-        ? 'indeterminate'
-        : ctx.findings.some((f) => f.verdict === 'forbidden')
-          ? 'forbidden'
-          : 'permitted';
+  const verdict: StepVerdict = conclude(
+    ctx.findings,
+    ctx.findings.some((f) => f.verdict === 'permitted' && !NON_EFFECTIVE_RULES.has(f.rule)),
+  );
 
   return {
     older: input.older,
@@ -113,10 +157,70 @@ export function evaluateStep(input: StepInput): RevisionAnalysis {
 function withEvidenceCheck(changes: ObjectChange[]): ObjectChange[] {
   return changes.map((c) => {
     if (c.value.truncated || c.kind === 'xref' || c.kind === 'objstm') return c;
-    const missingOld = c.present.old && c.value.old === null;
-    const missingNew = c.present.new && c.value.new === null;
+    const missingOld = c.present.old && (c.value.old === null || c.read?.old === 'failed');
+    const missingNew = c.present.new && (c.value.new === null || c.read?.new === 'failed');
     return missingOld || missingNew ? { ...c, value: { ...c.value, truncated: true } } : c;
   });
+}
+
+/**
+ * The transport's verdict on each revision as a whole. A sealed revision
+ * Acrobat cannot judge later changes to (sparse cross-reference table, a
+ * reachable bare-reference object) makes every step over it indeterminate:
+ * our verdict would otherwise disagree with the validator recipients use,
+ * and for a reason that has nothing to do with the change. An incomplete
+ * reachability walk on either side leaves every use unproven.
+ */
+function ruleRevisionHealth(ctx: StepContext): void {
+  const health = ctx.input.health;
+  if (!health) return;
+  const base = health.old;
+  if (base.sparseXref || base.bareReferences > 0) {
+    const why = [
+      base.sparseXref ? 'its cross-reference table has no entry for some object numbers below /Size' : null,
+      base.bareReferences > 0
+        ? `${base.bareReferences} reachable indirect object(s) consist of a bare reference`
+        : null,
+    ]
+      .filter((x) => x !== null)
+      .join('; ');
+    ctx.findings.push({
+      rule: 'base-unverifiable',
+      verdict: 'incomplete',
+      objectNumber: 0,
+      detail: `the signed revision cannot be verified against later changes by Acrobat (${why}); no verdict is given rather than one Acrobat would contradict`,
+    });
+  }
+  for (const side of SIDES) {
+    if (!health[side].referrersComplete) {
+      ctx.findings.push({
+        rule: 'unexplained',
+        verdict: 'incomplete',
+        objectNumber: 0,
+        detail: `the ${side === 'old' ? 'older' : 'newer'} revision's reachability walk hit its budget; not every use of a changed object is known`,
+      });
+    }
+  }
+}
+
+/**
+ * Same effective value on both sides: same canonical serialisation (keys
+ * sorted, whitespace normalised - Acrobat compares dictionaries by value,
+ * corpus v3/61-62), same stream data (by bytes, v2/45), and both sides
+ * actually read. A failed read serialises as "null" and would match another
+ * failed read - evidence of nothing.
+ */
+export function sameEffectiveValue(c: ObjectChange): boolean {
+  return (
+    c.change === 'modified' &&
+    !c.value.truncated &&
+    c.read?.old !== 'failed' &&
+    c.read?.new !== 'failed' &&
+    c.raw.old !== null &&
+    c.raw.new !== null &&
+    c.raw.old === c.raw.new &&
+    !c.streamDataChanged
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -155,8 +259,12 @@ class StepContext {
   readonly byNum = new Map<number, ObjectChange>();
   readonly before: RoleIndex;
   readonly after: RoleIndex;
-  /** `${objectNumber}:${side}:${edge}` → rule. */
-  private readonly claims = new Map<string, string>();
+  /**
+   * `${objectNumber}:${side}:${edge}` → the rule that inspected the use, and
+   * whether it allowed it. A claim explains an edge in the report; only an
+   * ALLOWING claim can vouch for a shared object joining a subtree.
+   */
+  private readonly claims = new Map<string, { rule: string; allow: boolean }>();
   /** Objects a lock forbids touching this step. */
   readonly locked = new Set<number>();
 
@@ -178,26 +286,38 @@ class StepContext {
     return levelAllows(this.level, needed);
   }
 
-  claimEdge(c: ObjectChange, side: Side, edge: ObjectReferrer, rule: string): void {
+  claimEdge(c: ObjectChange, side: Side, edge: ObjectReferrer, rule: string, allow = true): void {
     if (this.locked.has(c.objectNumber)) return;
     const key = `${c.objectNumber}:${side}:${edgeKey(edge)}`;
-    if (!this.claims.has(key)) this.claims.set(key, rule);
+    if (!this.claims.has(key)) this.claims.set(key, { rule, allow });
   }
 
-  claimAll(c: ObjectChange, rule: string): void {
-    for (const side of SIDES) for (const e of c.usage[side]) this.claimEdge(c, side, e, rule);
+  claimAll(c: ObjectChange, rule: string, allow = true): void {
+    for (const side of SIDES) for (const e of c.usage[side]) this.claimEdge(c, side, e, rule, allow);
   }
 
-  /** Claim the references that are the same in both revisions; a reference gained or lost stays unexplained. */
-  claimStable(c: ObjectChange, rule: string): void {
+  /**
+   * Claim the references that are the same in both revisions; a reference
+   * gained or lost stays unexplained. `allow: false` explains a condemned
+   * object's edges (one cause in the report, not a cascade) without letting
+   * anything hang off it.
+   */
+  claimStable(c: ObjectChange, rule: string, allow = true): void {
     const oldKeys = new Set(c.usage.old.map(edgeKey));
     const newKeys = new Set(c.usage.new.map(edgeKey));
-    for (const e of c.usage.old) if (newKeys.has(edgeKey(e))) this.claimEdge(c, 'old', e, rule);
-    for (const e of c.usage.new) if (oldKeys.has(edgeKey(e))) this.claimEdge(c, 'new', e, rule);
+    for (const e of c.usage.old)
+      if (newKeys.has(edgeKey(e))) this.claimEdge(c, 'old', e, rule, allow);
+    for (const e of c.usage.new)
+      if (oldKeys.has(edgeKey(e))) this.claimEdge(c, 'new', e, rule, allow);
   }
 
   isClaimed(c: ObjectChange, side: Side, edge: ObjectReferrer): boolean {
     return this.claims.has(`${c.objectNumber}:${side}:${edgeKey(edge)}`);
+  }
+
+  /** The use was inspected by a rule that allowed it. */
+  isAllowed(c: ObjectChange, side: Side, edge: ObjectReferrer): boolean {
+    return this.claims.get(`${c.objectNumber}:${side}:${edgeKey(edge)}`)?.allow === true;
   }
 
   permitted(c: ObjectChange, rule: string, detail?: string): void {
@@ -205,13 +325,18 @@ class StepContext {
     this.findings.push({ rule, verdict: 'permitted', objectNumber: c.objectNumber, detail });
   }
 
+  /**
+   * A violation is only proven on evidence: a rule condemning an object
+   * whose value could not be read or inspected is reporting what it could
+   * not see, and that is `incomplete`, never `forbidden`.
+   */
   forbidden(c: ObjectChange, rule: string, detail: string, edge?: ObjectReferrer): void {
     this.findings.push({
       rule,
-      verdict: 'forbidden',
+      verdict: c.value.truncated ? 'incomplete' : 'forbidden',
       objectNumber: c.objectNumber,
       edge: edge ? edgeKey(edge) : undefined,
-      detail,
+      detail: c.value.truncated ? `${detail} (judged on missing evidence: not proven)` : detail,
     });
   }
 
@@ -239,6 +364,7 @@ class StepContext {
       grew = false;
       for (const c of this.changes) {
         if (roots.has(c.objectNumber) || joined.has(c.objectNumber)) continue;
+        if (this.locked.has(c.objectNumber)) continue;
         const edges = c.usage[side];
         if (edges.length === 0) continue;
         const inside = edges.filter(
@@ -246,9 +372,14 @@ class StepContext {
         );
         if (inside.length === 0) continue;
         for (const e of inside) this.claimEdge(c, side, e, rule);
-        // Only an object referenced from nowhere else joins the subtree:
-        // a shared resource keeps its other references unexplained.
-        if (inside.length === edges.length) {
+        // A changed object joins the subtree - and brings its own children
+        // in - only when EVERY use of it is allowed: by this subtree, or by
+        // another rule that permitted the owner (a font shared between a
+        // filled field's appearance and /AcroForm /DR, corpus v1/16, 21). A
+        // use nobody allowed - a signed page's content (v1/30, v2/39, 52),
+        // a locked field's appearance (v3/79) - keeps the object, and
+        // everything under it, unexplained.
+        if (edges.every((e) => inside.includes(e) || this.isAllowed(c, side, e))) {
           joined.add(c.objectNumber);
           grew = true;
         }
@@ -257,9 +388,7 @@ class StepContext {
   }
 
   isIdentical(c: ObjectChange): boolean {
-    return (
-      c.raw.old !== null && c.raw.new !== null && c.raw.old === c.raw.new && !c.streamDataChanged
-    );
+    return sameEffectiveValue(c);
   }
 
   /** Signatures signed in the newer revision but not the older: this step's signing events. */
@@ -296,36 +425,28 @@ function ruleXrefContainer(ctx: StepContext): void {
 }
 
 /**
- * An object rewritten in a later revision without a change in value.
- * Acrobat rejected a revision made of such rewrites (a page and a signed
- * widget, after an approval signature): its check is cross-reference
- * based, and a rewrite is a modification whatever the bytes say. Whether it
- * rejects every identical rewrite, of every object, at every level, is not
- * established (the delta plan's Acrobat matrix); until it is, the
- * conservative reading holds at every level and the finding says so. Our
- * own writer never produces one — a save writes what changed — so this
- * fires on files other producers wrote. Claimed here so the object-kind
- * rules skip it.
+ * An object written again with the value the sealed revision holds is not
+ * a modification: Acrobat compares objects by value and reports such a
+ * revision as "not modified" for every role tried - document information,
+ * a custom catalog entry, a page, the signed signature's own widget, a text
+ * field, an annotation, the encryption dictionary, reserialised with keys
+ * reordered, under a certification, under a field lock (corpus v1/02-07,
+ * 23, v2/47, v3/54-62, 70, 71, 77). Under P=1 nothing is established and
+ * the rewrite stays forbidden. Claimed here so the object-kind rules skip
+ * it; the verdict treats it as no effective change.
  */
 function ruleIdenticalRewrite(ctx: StepContext): void {
-  // A rewrite can only be a modification OF something: a signature sealed
-  // before this step. Before the first signature nothing is sealed, and no
-  // validator judges the step.
-  const sealed = ctx.input.before.signatures.some((s) => s.signed);
   for (const c of ctx.changes) {
-    if (c.change !== 'modified' || !ctx.isIdentical(c)) continue;
-    ctx.claimAll(c, 'identical-rewrite');
-    if (sealed) {
+    if (!ctx.isIdentical(c)) continue;
+    if (ctx.allows('fill')) {
+      ctx.claimAll(c, 'identical-rewrite');
+      ctx.permitted(c, 'identical-rewrite', 'written again with the sealed value');
+    } else {
+      ctx.claimAll(c, 'identical-rewrite', false);
       ctx.forbidden(
         c,
         'identical-rewrite',
-        'rewritten without a change in value after a signature; a validator counts any rewrite of a sealed object as a modification (conservative: not yet established per object and level)',
-      );
-    } else {
-      ctx.permitted(
-        c,
-        'identical-rewrite',
-        'rewritten without a change in value before any signature: nothing was sealed',
+        `written again with the sealed value under level '${ctx.level}' (not established for this level)`,
       );
     }
   }
@@ -367,6 +488,7 @@ function onlyEdges(c: ObjectChange, test: (e: ObjectReferrer) => boolean): boole
 
 function ruleInfo(ctx: StepContext): void {
   for (const c of ctx.changes) {
+    if (ctx.isIdentical(c)) continue;
     if (c.objectNumber !== 0 && onlyEdges(c, (e) => e.parent === 0 && e.label === 'Info')) {
       ctx.claimAll(c, 'info');
       ctx.permitted(c, 'info', 'document information dictionary');
@@ -377,6 +499,7 @@ function ruleInfo(ctx: StepContext): void {
 function ruleMetadata(ctx: StepContext): void {
   const roots = new Set([ctx.input.before.root, ctx.input.after.root]);
   for (const c of ctx.changes) {
+    if (ctx.isIdentical(c)) continue;
     if (onlyEdges(c, (e) => roots.has(e.parent) && e.label === 'Metadata')) {
       ctx.claimAll(c, 'metadata');
       ctx.permitted(c, 'metadata', 'XMP metadata stream');
@@ -577,6 +700,7 @@ function ruleSignatureAdded(ctx: StepContext): void {
   const beforeProtection = deriveProtection(ctx.input.before.signatures);
   const afterProtection = deriveProtection(ctx.input.after.signatures);
   const parents = new Set<number>();
+  const values = new Set<number>();
   for (const { fieldObjectNumber, sig } of events) {
     const needed: ModificationLevel = sig.kind === 'timestamp' ? 'lta' : 'fill';
     if (!ctx.allows(needed)) {
@@ -594,15 +718,15 @@ function ruleSignatureAdded(ctx: StepContext): void {
     for (const w of field?.widgets ?? []) parents.add(w);
 
     // A field added in this very step was judged, and its edges claimed, by
-    // signature-field-added; the whitelist below is for signing an EXISTING
-    // field, where every key but the signing ones must stay put.
+    // signature-field-added; the table below is for signing an EXISTING
+    // field. Before the first signature nothing governs the document, and
+    // the /Lock mirror written at authoring time is legitimate whatever the
+    // level.
     const fieldIsNew = addedThisStep.has(fieldObjectNumber);
-    // Before the first signature nothing governs the document, and the /Lock
-    // mirror written at authoring time is legitimate; after one, it is not.
     const allowedFieldKeys =
       beforeProtection.judged === null
-        ? new Set([...SIGNED_FIELD_KEYS, 'Lock'])
-        : SIGNED_FIELD_KEYS;
+        ? new Set([...signedFieldKeysFor(ctx.level), 'Lock'])
+        : signedFieldKeysFor(ctx.level);
     const fc = ctx.byNum.get(fieldObjectNumber);
     if (fc && fieldIsNew) {
       ctx.permitted(fc, rule, `new field "${sig.fieldName}" signed`);
@@ -613,13 +737,13 @@ function ruleSignatureAdded(ctx: StepContext): void {
       // the cause once, not once per reference to the field.
       if (bad.length > 0) {
         ctx.forbidden(fc, rule, `signature field keys changed: ${bad.join(', ')}`);
-        ctx.claimStable(fc, rule);
+        ctx.claimStable(fc, rule, false);
       } else if (
         changed.has('Ff') &&
         !readOnlyOnlyChange(fc, ctx.before.fieldByObj.get(fieldObjectNumber)?.flags)
       ) {
         ctx.forbidden(fc, rule, 'signature field flags changed beyond ReadOnly');
-        ctx.claimStable(fc, rule);
+        ctx.claimStable(fc, rule, false);
       } else {
         ctx.claimStable(fc, rule);
         ctx.permitted(fc, rule, `field "${sig.fieldName}" signed`);
@@ -634,7 +758,7 @@ function ruleSignatureAdded(ctx: StepContext): void {
       );
       if (bad.length > 0) {
         ctx.forbidden(wc, rule, `signature widget keys changed: ${bad.join(', ')}`);
-        ctx.claimStable(wc, rule);
+        ctx.claimStable(wc, rule, false);
         continue;
       }
       ctx.claimStable(wc, rule);
@@ -659,6 +783,7 @@ function ruleSignatureAdded(ctx: StepContext): void {
             ctx.claimEdge(c, 'new', e, rule);
         }
         ctx.permitted(c, rule, 'signature value');
+        values.add(c.objectNumber);
       } else if (asLock.length > 0) {
         const isLock = type === undefined || (type.t === 'name' && type.v === 'SigFieldLock');
         if (!isLock) continue;
@@ -677,9 +802,12 @@ function ruleSignatureAdded(ctx: StepContext): void {
       }
     }
   }
-  // Appearance streams and their resources, through the signed field or its widget.
+  // Appearance streams and their resources, through the signed field or its
+  // widget; and the signature value's own indirect children (/Prop_Build and
+  // the like, v1/20), which the value dictionary brings with it.
   for (const side of SIDES)
     ctx.claimSubtree(side, parents, (label) => label === 'AP' || label.startsWith('AP/'), rule);
+  if (values.size > 0) ctx.claimSubtree('new', values, () => true, rule);
 }
 
 /**
@@ -698,13 +826,8 @@ function readOnlyOnlyChange(c: ObjectChange, effectiveBefore?: number): boolean 
 
 function ruleFormFill(ctx: StepContext): void {
   const rule = 'form-fill';
-  const newlyLocked = new Set<string>();
-  for (const { sig } of ctx.newlySigned()) {
-    for (const spec of [sig.fieldMdp, sig.lock]) {
-      if (!spec) continue;
-      for (const f of ctx.input.after.fields) if (lockCovers(spec, f.name)) newlyLocked.add(f.name);
-    }
-  }
+  const fieldKeys = fieldKeysFor(ctx.level);
+  const widgetKeys = widgetKeysFor(ctx.level);
   const parents = new Set<number>();
   const fields = new Map<number, RevisionField>([
     ...ctx.before.fieldByObj,
@@ -755,35 +878,38 @@ function ruleFormFill(ctx: StepContext): void {
     let ok = true;
     if (fc && !ctx.isIdentical(fc)) {
       const changed = changedKeys(fc.value.old, fc.value.new);
-      const bad = [...changed].filter((k) => !FILL_FIELD_KEYS.has(k));
+      const bad = [...changed].filter((k) => !fieldKeys.has(k));
       if (bad.length > 0) {
         ctx.forbidden(fc, rule, `field "${field.name}" keys changed: ${bad.join(', ')}`);
+        ctx.claimStable(fc, rule, false);
         ok = false;
       } else if (
         changed.has('Ff') &&
-        !(
-          readOnlyOnlyChange(fc, ctx.before.fieldByObj.get(num)?.flags) &&
-          newlyLocked.has(field.name)
-        )
+        !readOnlyOnlyChange(fc, ctx.before.fieldByObj.get(num)?.flags)
       ) {
-        ctx.forbidden(
-          fc,
-          rule,
-          `field "${field.name}" flags changed (only a lock landing in this revision may set ReadOnly)`,
-        );
+        // ReadOnly may be ADDED, on its own (v1/09, v3/64, 76); no other bit
+        // has a case behind it.
+        ctx.forbidden(fc, rule, `field "${field.name}" flags changed beyond adding ReadOnly`);
+        ctx.claimStable(fc, rule, false);
         ok = false;
       } else {
         ctx.claimStable(fc, rule);
-        ctx.permitted(fc, rule, `field "${field.name}" filled`);
+        const properties = [...changed].filter((k) => k !== 'V' && k !== 'AP' && k !== 'AS' && k !== 'I' && k !== 'RV');
+        ctx.permitted(
+          fc,
+          rule,
+          properties.length > 0
+            ? `field "${field.name}" ${changed.has('V') || changed.has('AS') ? 'filled, ' : ''}properties changed: ${properties.join(', ')}`
+            : `field "${field.name}" filled`,
+        );
       }
     }
     for (const wc of widgetChanges) {
       if (ctx.isIdentical(wc)) continue;
-      const bad = [...changedKeys(wc.value.old, wc.value.new)].filter(
-        (k) => !FILL_WIDGET_KEYS.has(k),
-      );
+      const bad = [...changedKeys(wc.value.old, wc.value.new)].filter((k) => !widgetKeys.has(k));
       if (bad.length > 0) {
         ctx.forbidden(wc, rule, `widget of "${field.name}" keys changed: ${bad.join(', ')}`);
+        ctx.claimStable(wc, rule, false);
         ok = false;
         continue;
       }
@@ -891,12 +1017,29 @@ function ruleFieldLock(ctx: StepContext): void {
     const field = lockedFields.find(
       (f) => f.objectNumber === c.objectNumber || f.widgets.includes(c.objectNumber),
     );
+    // A locked field may still gain ReadOnly and nothing else (v3/76: "not
+    // modified"). Its value, appearance, tooltip, visibility and placement
+    // are frozen (v1/28, v2/51, v3/73, 74, 80; 49 and 75 are accepted by
+    // Acrobat and kept frozen on purpose: a lock that lets the field move
+    // or redraw is not the guarantee it promises).
+    if (field && field.objectNumber === c.objectNumber) {
+      const changed = changedKeys(c.value.old, c.value.new);
+      if (
+        changed.size === 1 &&
+        changed.has('Ff') &&
+        readOnlyOnlyChange(c, ctx.before.fieldByObj.get(c.objectNumber)?.flags)
+      ) {
+        ctx.claimStable(c, 'field-lock');
+        ctx.permitted(c, 'field-lock', `ReadOnly set on locked field "${field.name}"`);
+        continue;
+      }
+    }
     ctx.locked.add(c.objectNumber);
     ctx.forbidden(
       c,
       'field-lock',
       field
-        ? `field "${field.name}" is locked by an earlier signature`
+        ? `field "${field.name}" is locked by the signature`
         : 'part of a locked field changed',
     );
   }

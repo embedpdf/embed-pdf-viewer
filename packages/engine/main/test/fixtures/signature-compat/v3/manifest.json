@@ -1,0 +1,1267 @@
+{
+  "schemaVersion": 1,
+  "corpusVersion": "role-probes-v3",
+  "source": "synthetic-from-scratch",
+  "generator": {
+    "pyhanko": "0.37.0",
+    "cryptography": "50.0.1",
+    "signingTime": "2026-09-13T12:00:00+00:00"
+  },
+  "certificateSha256": "0f13f8fc08b2c73b9142fdd9fa9bffcc7c939e134dde6a6bb7ce4d7d91b22d74",
+  "cases": [
+    {
+      "id": "53",
+      "file": "53-approval-control.pdf",
+      "question": "Unchanged merged-widget approval control.",
+      "control": null,
+      "profile": "approval",
+      "facts": {
+        "sha256": "5158c883d1d0e6e53b90fb371eb2b25c92f252ceb61730fb17e0f0cd02da7d06",
+        "byteLength": 20331,
+        "revisionCount": 1,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              2918,
+              19304,
+              1027
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": {
+        "status": "unobserved"
+      }
+    },
+    {
+      "id": "54",
+      "file": "54-identical-page-widget-control.pdf",
+      "question": "Does identical rewriting change judgment with this isolated Size/ID combination?",
+      "control": "53",
+      "profile": "approval",
+      "facts": {
+        "sha256": "a5e825d98b7ecd5e03c0a1678a7d91a1974b65dcef6c1c715c4decc51238c753",
+        "byteLength": 20878,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              2918,
+              19304,
+              1027
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": {
+        "status": "unobserved"
+      },
+      "mutation": {
+        "kind": "identical-object-rewrites",
+        "objectNumbers": [
+          6,
+          8
+        ]
+      },
+      "trailerProbe": {
+        "sizeExtra": 0,
+        "changedId1": false
+      }
+    },
+    {
+      "id": "55",
+      "file": "55-identical-page-widget-phantom-size.pdf",
+      "question": "Does identical rewriting change judgment with this isolated Size/ID combination?",
+      "control": "53",
+      "profile": "approval",
+      "facts": {
+        "sha256": "ad8d0137d40fbc7a720b473782d52ba0881c538a690bf6b28240d88d951779f0",
+        "byteLength": 20878,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              2918,
+              19304,
+              1027
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": {
+        "status": "unobserved"
+      },
+      "mutation": {
+        "kind": "identical-object-rewrites",
+        "objectNumbers": [
+          6,
+          8
+        ]
+      },
+      "trailerProbe": {
+        "sizeExtra": 2,
+        "changedId1": false
+      }
+    },
+    {
+      "id": "56",
+      "file": "56-identical-page-widget-changed-id.pdf",
+      "question": "Does identical rewriting change judgment with this isolated Size/ID combination?",
+      "control": "53",
+      "profile": "approval",
+      "facts": {
+        "sha256": "58b3945de9f19b2b4212dd845595482f8d7ffc492059e67f9c7ae30371885b34",
+        "byteLength": 20894,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              2918,
+              19304,
+              1027
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": {
+        "status": "unobserved"
+      },
+      "mutation": {
+        "kind": "identical-object-rewrites",
+        "objectNumbers": [
+          6,
+          8
+        ]
+      },
+      "trailerProbe": {
+        "sizeExtra": 0,
+        "changedId1": true
+      }
+    },
+    {
+      "id": "57",
+      "file": "57-identical-page-widget-size-and-id.pdf",
+      "question": "Does identical rewriting change judgment with this isolated Size/ID combination?",
+      "control": "53",
+      "profile": "approval",
+      "facts": {
+        "sha256": "2936a12a149e18cf7477f46ca7ef3e07c23d66bace89f8bcd41173dc9edff0ee",
+        "byteLength": 20894,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              2918,
+              19304,
+              1027
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": {
+        "status": "unobserved"
+      },
+      "mutation": {
+        "kind": "identical-object-rewrites",
+        "objectNumbers": [
+          6,
+          8
+        ]
+      },
+      "trailerProbe": {
+        "sizeExtra": 2,
+        "changedId1": true
+      }
+    },
+    {
+      "id": "58",
+      "file": "58-separate-widget-control.pdf",
+      "question": "Unchanged signature with a separate Kids widget.",
+      "control": null,
+      "profile": "approval",
+      "facts": {
+        "sha256": "6568703971663df4f21fb004cd3318d43faf8dc7446137854ceb98a8ad68bf4d",
+        "byteLength": 20405,
+        "revisionCount": 1,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              2972,
+              19358,
+              1047
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": {
+        "status": "unobserved"
+      }
+    },
+    {
+      "id": "59",
+      "file": "59-separate-sealed-widget-identical.pdf",
+      "question": "Does separate widget ownership change the identical-rewrite result?",
+      "control": "58",
+      "profile": "approval",
+      "facts": {
+        "sha256": "dcc48ec83187be12ea1e0fced180e456da5ce7110c3cea232f5282ccd2654172",
+        "byteLength": 20709,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              2972,
+              19358,
+              1047
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": {
+        "status": "unobserved"
+      },
+      "mutation": {
+        "kind": "identical-object-rewrites",
+        "objectNumbers": [
+          18
+        ]
+      },
+      "trailerProbe": {
+        "sizeExtra": 0,
+        "changedId1": false
+      }
+    },
+    {
+      "id": "60",
+      "file": "60-separate-widget-page-size-and-id.pdf",
+      "question": "Does separate widget ownership change the identical-rewrite result?",
+      "control": "58",
+      "profile": "approval",
+      "facts": {
+        "sha256": "720c776e772804e9c730578554005b463db48daba61604550a8839190bc442b9",
+        "byteLength": 20919,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              2972,
+              19358,
+              1047
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": {
+        "status": "unobserved"
+      },
+      "mutation": {
+        "kind": "identical-object-rewrites",
+        "objectNumbers": [
+          6,
+          18
+        ]
+      },
+      "trailerProbe": {
+        "sizeExtra": 2,
+        "changedId1": true
+      }
+    },
+    {
+      "id": "61",
+      "file": "61-value-identical-page-reserialized.pdf",
+      "question": "Are reordered keys and changed whitespace accepted when dictionary values are identical?",
+      "control": "53",
+      "profile": "approval",
+      "facts": {
+        "sha256": "31df7fcc706d486f3f1a04bb0a2fbd18a138b36200188e801a80b66e6094e432",
+        "byteLength": 20707,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              2918,
+              19304,
+              1027
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": {
+        "status": "unobserved"
+      },
+      "serializationProbe": {
+        "objectNumber": 6
+      }
+    },
+    {
+      "id": "62",
+      "file": "62-value-identical-valueone-reserialized.pdf",
+      "question": "Are reordered keys and changed whitespace accepted when dictionary values are identical?",
+      "control": "53",
+      "profile": "approval",
+      "facts": {
+        "sha256": "8d0c67f1bd2595ba479c47c12cc277df3c7171fc206d38e21e5af7beca70f53a",
+        "byteLength": 20771,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              2918,
+              19304,
+              1027
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": {
+        "status": "unobserved"
+      },
+      "serializationProbe": {
+        "objectNumber": 13
+      }
+    },
+    {
+      "id": "63",
+      "file": "63-p2-control.pdf",
+      "question": "Unchanged P2 certification control.",
+      "control": null,
+      "profile": "DocMDP-P2",
+      "facts": {
+        "sha256": "97678d9ddc30c3ddfeafb9a93183540f5403e2a77685f26a571fdc369120c7dd",
+        "byteLength": 20491,
+        "revisionCount": 1,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              2947,
+              19333,
+              1158
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": {
+        "status": "unobserved"
+      }
+    },
+    {
+      "id": "64",
+      "file": "64-p2-readonly.pdf",
+      "question": "Is /Ff alone accepted under P2?",
+      "control": "63",
+      "profile": "DocMDP-P2",
+      "facts": {
+        "sha256": "2f918ba7879dacc1fce3ea93aa18cbc53e7a18515a99d3bdd13c8a1a2d16ffb6",
+        "byteLength": 20910,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              2947,
+              19333,
+              1158
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": {
+        "status": "unobserved"
+      },
+      "propertyProbe": "/Ff"
+    },
+    {
+      "id": "65",
+      "file": "65-p2-default-appearance.pdf",
+      "question": "Is /DA alone accepted under P2?",
+      "control": "63",
+      "profile": "DocMDP-P2",
+      "facts": {
+        "sha256": "f31a834cb4c16c8bd1edd9d3308d0dd6a910c10dbff61c81f36d8ebba3bcdd34",
+        "byteLength": 20915,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              2947,
+              19333,
+              1158
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": {
+        "status": "unobserved"
+      },
+      "propertyProbe": "/DA"
+    },
+    {
+      "id": "66",
+      "file": "66-p2-tooltip.pdf",
+      "question": "Is /TU alone accepted under P2?",
+      "control": "63",
+      "profile": "DocMDP-P2",
+      "facts": {
+        "sha256": "769e04ae1bb9ae20f1bfd5b53d1829a686a81c879cafac9609f06c905524dd51",
+        "byteLength": 20917,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              2947,
+              19333,
+              1158
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": {
+        "status": "unobserved"
+      },
+      "propertyProbe": "/TU"
+    },
+    {
+      "id": "67",
+      "file": "67-p2-hidden.pdf",
+      "question": "Is /F alone accepted under P2?",
+      "control": "63",
+      "profile": "DocMDP-P2",
+      "facts": {
+        "sha256": "9b8bcb38194ee6ab4d1bb4e6527c80a82ebb6d9641ae7f4145874fb5b819ebf6",
+        "byteLength": 20910,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              2947,
+              19333,
+              1158
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": {
+        "status": "unobserved"
+      },
+      "propertyProbe": "/F"
+    },
+    {
+      "id": "68",
+      "file": "68-p2-appearance-same-value.pdf",
+      "question": "Is a regenerated AP stream with unchanged V and drawing accepted under P2?",
+      "control": "63",
+      "profile": "DocMDP-P2",
+      "facts": {
+        "sha256": "8ce2c3024b9ce44497be385be48c9e3c0c9588dd68c5c45c457d5af8be539135",
+        "byteLength": 20996,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              2947,
+              19333,
+              1158
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": {
+        "status": "unobserved"
+      }
+    },
+    {
+      "id": "69",
+      "file": "69-p2-second-signature-lock-tooltip.pdf",
+      "question": "Are Lock and TU installed with a second signature accepted under P2?",
+      "control": "63",
+      "profile": "DocMDP-P2",
+      "facts": {
+        "sha256": "572f5e3e5504345452dad62682c1d490956bea9bacc08e18e5a2d152e8a45d16",
+        "byteLength": 38062,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              2947,
+              19333,
+              1158
+            ],
+            "digestMatches": true
+          },
+          {
+            "field": "SignatureTwo",
+            "signedRevision": 1,
+            "byteRange": [
+              0,
+              20780,
+              37166,
+              896
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": {
+        "status": "unobserved"
+      }
+    },
+    {
+      "id": "70",
+      "file": "70-p2-identical-page.pdf",
+      "question": "Is an identical page rewrite accepted under P2?",
+      "control": "63",
+      "profile": "DocMDP-P2",
+      "facts": {
+        "sha256": "3712a5d6df9113edb6048bc88a14b597de4e5234d7620b808e0d2b8590539552",
+        "byteLength": 20836,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              2947,
+              19333,
+              1158
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": {
+        "status": "unobserved"
+      },
+      "mutation": {
+        "kind": "identical-object-rewrite",
+        "objectNumber": 6
+      }
+    },
+    {
+      "id": "71",
+      "file": "71-p2-identical-valueone.pdf",
+      "question": "Is an identical ValueOne rewrite accepted under P2?",
+      "control": "63",
+      "profile": "DocMDP-P2",
+      "facts": {
+        "sha256": "965876a41a5e968884aedcd5435078b33b14507ad7604dd9a22afde8cdcf1c9b",
+        "byteLength": 20870,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              2947,
+              19333,
+              1158
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": {
+        "status": "unobserved"
+      },
+      "mutation": {
+        "kind": "identical-object-rewrite",
+        "objectNumber": 13
+      }
+    },
+    {
+      "id": "72",
+      "file": "72-locked-field-control.pdf",
+      "question": "Unchanged ValueOne Include lock; Ff is zero.",
+      "control": null,
+      "profile": "approval-FieldMDP",
+      "facts": {
+        "sha256": "a6922ff25482eb6746c098fdd55c12c436062ecb87e9b6feb8bd3a7b4463c659",
+        "byteLength": 20580,
+        "revisionCount": 1,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              2999,
+              19385,
+              1195
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": {
+        "status": "unobserved"
+      }
+    },
+    {
+      "id": "73",
+      "file": "73-locked-default-appearance.pdf",
+      "question": "Is /DA alone accepted on an explicitly locked field?",
+      "control": "72",
+      "profile": "approval-FieldMDP",
+      "facts": {
+        "sha256": "079965a6785ee38185048d6d2caa52028e7ef450ec3eee2b151759796a9bd4bc",
+        "byteLength": 21004,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              2999,
+              19385,
+              1195
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": {
+        "status": "unobserved"
+      },
+      "propertyProbe": "/DA"
+    },
+    {
+      "id": "74",
+      "file": "74-locked-tooltip.pdf",
+      "question": "Is /TU alone accepted on an explicitly locked field?",
+      "control": "72",
+      "profile": "approval-FieldMDP",
+      "facts": {
+        "sha256": "01205cf3f531e90324f2e9c18b236743a47ffe9b4996f1fe7fab4b16812d9e52",
+        "byteLength": 21006,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              2999,
+              19385,
+              1195
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": {
+        "status": "unobserved"
+      },
+      "propertyProbe": "/TU"
+    },
+    {
+      "id": "75",
+      "file": "75-locked-appearance-same-value.pdf",
+      "question": "Is AP regeneration accepted on the locked field when V and drawing stay the same?",
+      "control": "72",
+      "profile": "approval-FieldMDP",
+      "facts": {
+        "sha256": "a46e5201b96c43d8cd0e9d133516d616ee5545757cda86b72b0df02148c78ed1",
+        "byteLength": 21085,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              2999,
+              19385,
+              1195
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": {
+        "status": "unobserved"
+      }
+    },
+    {
+      "id": "76",
+      "file": "76-locked-readonly.pdf",
+      "question": "Is /Ff alone accepted on an explicitly locked field?",
+      "control": "72",
+      "profile": "approval-FieldMDP",
+      "facts": {
+        "sha256": "1f3af6161bfa37e89b77e31e31acac9725d1d6bcaa864ad50989342b69334fb2",
+        "byteLength": 20999,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              2999,
+              19385,
+              1195
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": {
+        "status": "unobserved"
+      },
+      "propertyProbe": "/Ff"
+    },
+    {
+      "id": "77",
+      "file": "77-locked-field-identical.pdf",
+      "question": "Is an identical locked-field rewrite accepted?",
+      "control": "72",
+      "profile": "approval-FieldMDP",
+      "facts": {
+        "sha256": "81e0863ff2cf2dca63a6bf5f177a0bd4ceb73ca852696fcc9751494c3de46d3b",
+        "byteLength": 20959,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              2999,
+              19385,
+              1195
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": {
+        "status": "unobserved"
+      },
+      "mutation": {
+        "kind": "identical-object-rewrite",
+        "objectNumber": 13
+      }
+    },
+    {
+      "id": "78",
+      "file": "78-locked-shared-font-control.pdf",
+      "question": "Unchanged A values with a font shared by locked and unlocked appearances, never page content.",
+      "control": null,
+      "profile": "approval-FieldMDP",
+      "facts": {
+        "sha256": "21c0bea74ec01ae94827d97013359d66d87ce95daac73423827c5ec59d3bc7f2",
+        "byteLength": 21555,
+        "revisionCount": 1,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              3874,
+              20260,
+              1295
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": {
+        "status": "unobserved"
+      }
+    },
+    {
+      "id": "79",
+      "file": "79-unlocked-fill-changes-locked-font.pdf",
+      "question": "Does an unlocked fill hide a changed glyph used by a locked appearance?",
+      "control": "78",
+      "profile": "approval-FieldMDP",
+      "facts": {
+        "sha256": "2c514bb74de5e4e6670e66ec8e02f871ceb55a586d5e93045af2ea0ac3ac25da",
+        "byteLength": 22341,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              3874,
+              20260,
+              1295
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": {
+        "status": "unobserved"
+      }
+    },
+    {
+      "id": "80",
+      "file": "80-locked-value-changed-control.pdf",
+      "question": "Intermediate forbidden-fill control before restoration.",
+      "control": "72",
+      "profile": "approval-FieldMDP",
+      "facts": {
+        "sha256": "0ef2691cde4008f6412f65d7b89639847cb079b97000273c93f5caa9dbb8e545",
+        "byteLength": 21253,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              2999,
+              19385,
+              1195
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": {
+        "status": "unobserved"
+      }
+    },
+    {
+      "id": "81",
+      "file": "81-locked-value-restored.pdf",
+      "question": "Does exact field/value/AP restoration recover a locked-field violation?",
+      "control": "80",
+      "profile": "approval-FieldMDP",
+      "facts": {
+        "sha256": "c9635ee7e7e85c959832edc15a8a5ff3f6e698b795c2746958f6bbd45a841da6",
+        "byteLength": 21632,
+        "revisionCount": 3,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              2999,
+              19385,
+              1195
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": {
+        "status": "unobserved"
+      }
+    },
+    {
+      "id": "82",
+      "file": "82-p2-page-changed-control.pdf",
+      "question": "Intermediate prohibited page-content change under P2.",
+      "control": "63",
+      "profile": "DocMDP-P2",
+      "facts": {
+        "sha256": "d8d9cb6439467e8f9c2e096bd9658582276344bb3cfb28cc541fcc96ec3d0587",
+        "byteLength": 21156,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              2947,
+              19333,
+              1158
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": {
+        "status": "unobserved"
+      }
+    },
+    {
+      "id": "83",
+      "file": "83-p2-page-restored.pdf",
+      "question": "Does exact page-content restoration recover P2 certification?",
+      "control": "82",
+      "profile": "DocMDP-P2",
+      "facts": {
+        "sha256": "98c6647198f718c06818f1c5747a95144bd79f5823a5b594099c3fef9456c048",
+        "byteLength": 21821,
+        "revisionCount": 3,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              2947,
+              19333,
+              1158
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": {
+        "status": "unobserved"
+      }
+    },
+    {
+      "id": "84",
+      "file": "84-locked-change-second-signature-control.pdf",
+      "question": "Judge each signature before restoring the changed locked value.",
+      "control": "80",
+      "profile": "approval-FieldMDP",
+      "facts": {
+        "sha256": "3cefa842cd7d8b095dc7a1754810e3f76b1b9b23c462fd4966782f983863ad4c",
+        "byteLength": 38568,
+        "revisionCount": 3,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              2999,
+              19385,
+              1195
+            ],
+            "digestMatches": true
+          },
+          {
+            "field": "SignatureTwo",
+            "signedRevision": 2,
+            "byteRange": [
+              0,
+              21454,
+              37840,
+              728
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": {
+        "status": "unobserved"
+      }
+    },
+    {
+      "id": "85",
+      "file": "85-locked-signed-change-restored.pdf",
+      "question": "Does restoration recover the first signature and invalidate the second under a pre-existing lock?",
+      "control": "84",
+      "profile": "approval-FieldMDP",
+      "facts": {
+        "sha256": "36fa67f25cbcc03ee83d9a4add4b7897b446009cc73583e48900b11db4e0f232",
+        "byteLength": 38947,
+        "revisionCount": 4,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              2999,
+              19385,
+              1195
+            ],
+            "digestMatches": true
+          },
+          {
+            "field": "SignatureTwo",
+            "signedRevision": 2,
+            "byteRange": [
+              0,
+              21454,
+              37840,
+              728
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": {
+        "status": "unobserved"
+      }
+    },
+    {
+      "id": "86",
+      "file": "86-approval-text-field-added.pdf",
+      "question": "Is adding a text field accepted under approval?",
+      "control": "53",
+      "profile": "approval",
+      "facts": {
+        "sha256": "b324489dc1b6ef6b81f4ecbb87daab79512935714d770fdf23a11d7fd2149af2",
+        "byteLength": 21361,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              2918,
+              19304,
+              1027
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": {
+        "status": "unobserved"
+      }
+    },
+    {
+      "id": "87",
+      "file": "87-approval-text-field-deleted.pdf",
+      "question": "Is removing a text field from both Fields and Annots accepted?",
+      "control": "53",
+      "profile": "approval",
+      "facts": {
+        "sha256": "af9ae1bb3f2ecbeb2f881ea66c9c49d17e50d304e8e2aa2d45d12af4f962ae9b",
+        "byteLength": 20853,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              2918,
+              19304,
+              1027
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": {
+        "status": "unobserved"
+      }
+    },
+    {
+      "id": "88",
+      "file": "88-approval-square-added.pdf",
+      "question": "Is adding an explicit-appearance Square accepted under approval?",
+      "control": "53",
+      "profile": "approval",
+      "facts": {
+        "sha256": "bdef80ca9a49798700eb675bf43bdf8941c42a2047816465da39be2fac6829a5",
+        "byteLength": 21085,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              2918,
+              19304,
+              1027
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": {
+        "status": "unobserved"
+      }
+    },
+    {
+      "id": "89",
+      "file": "89-approval-square-control.pdf",
+      "question": "Unchanged explicit-appearance Square control.",
+      "control": null,
+      "profile": "approval",
+      "facts": {
+        "sha256": "41eb0ed3307e2e20b81a7733756203d303c074cae24f5aad744651802aabe173",
+        "byteLength": 20531,
+        "revisionCount": 1,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              3098,
+              19484,
+              1047
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": {
+        "status": "unobserved"
+      }
+    },
+    {
+      "id": "90",
+      "file": "90-approval-square-deleted.pdf",
+      "question": "Is removing a Square accepted under approval?",
+      "control": "89",
+      "profile": "approval",
+      "facts": {
+        "sha256": "6a75de59267d8f656ab48d2f459d98b5d10b5cd9b91303b9452a1d87c97fdeab",
+        "byteLength": 20916,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              3098,
+              19484,
+              1047
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": {
+        "status": "unobserved"
+      }
+    },
+    {
+      "id": "91",
+      "file": "91-approval-square-colour-modified.pdf",
+      "question": "Is changing C and its explicit AP to red accepted under approval?",
+      "control": "89",
+      "profile": "approval",
+      "facts": {
+        "sha256": "53cb154ed56e06fea13b1c737ba78dfd7c1d4b3adda3ebf744ba33a976f3497d",
+        "byteLength": 21084,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              3098,
+              19484,
+              1047
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": {
+        "status": "unobserved"
+      }
+    }
+  ]
+}

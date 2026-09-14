@@ -1,0 +1,30 @@
+[
+  {
+    "file": "morning-B2-page-only-corpus-append.pdf",
+    "sha256": "25770114ea575d9e068ce7fd98761f2be2f61141d298c3c6948c49eeba69e44d"
+  },
+  {
+    "file": "morning-C2-widget-only-corpus-append.pdf",
+    "sha256": "345dff7fca8c460eb1b41b95fdfa6764b407298020230626787462d837a95d6a"
+  },
+  {
+    "file": "morning-D2-page-and-widget-corpus-append.pdf",
+    "sha256": "7d857fd01eb6d158b4ee69f1a0bedd2671eb2b76c9aeddbf2737b7900efcf785"
+  },
+  {
+    "file": "morning-E2-font-dict-only-corpus-append.pdf",
+    "sha256": "877fff34479f214476cd7e26da06e1ae9bc72aae53ed29943dd24532409f5bc8"
+  },
+  {
+    "file": "morning-F2-orphan-object-corpus-append-style.pdf",
+    "sha256": "ed93a47c1473c76f0e0a670680cd5cabe760a0a471cc8158e2ad8f1d08937154"
+  },
+  {
+    "file": "morning-H-ebook-signed-with-corpus-key.pdf",
+    "sha256": "99de7179d0deab496efa0e076bbafe1324c0678fe013a82c3f56d238e944529c"
+  },
+  {
+    "file": "morning-I2-corpus-key-signed-plus-orphan-corpus-append.pdf",
+    "sha256": "ab4a80a3259dd608f0b6ef1b06674d15e2dee6598568ca66a17d6bd5292eea8c"
+  }
+]

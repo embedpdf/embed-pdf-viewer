@@ -16,7 +16,8 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import type { Kysely } from 'kysely';
 import { buildDetachedCms, createTestSigner, profileFor } from '@embedpdf/core-signature';
 import type { SignatureSubFilter } from '@embedpdf/engine-core/runtime';
-import { decodePrepared, SignaturePreparedWireSchema, toBase64 } from '@embedpdf/engine-core/wire';
+import { SIGNATURE_POLICY_VERSION } from '@embedpdf/engine-core/runtime';
+import { decodePrepared, encodeAnalysisToken, SignaturePreparedWireSchema, toBase64 } from '@embedpdf/engine-core/wire';
 import {
   createSqliteDb,
   FsObjectStore,
@@ -275,6 +276,50 @@ describe('digital signatures over the wire (native runtime)', () => {
     // The audit trail carries the completion; a subscriber refetches.
     const audit = await fx.db.selectFrom('audit_log').select(['kind', 'artifact_sha']).where('doc_id', '=', docId).orderBy('id', 'desc').limit(1).executeTakeFirst();
     expect(audit).toMatchObject({ kind: 'signature.completed', artifact_sha: completed.version.sha256 });
+  });
+
+  test('analysis URLs: the policy version is a served cache key, and only settled verdicts are immutable', async () => {
+    const docId = 'doc-sign-native-analysis';
+    await seed(docId);
+    const layer = `/v1/docs/${docId}/layers/alice`;
+    const signer = await createTestSigner({ commonName: 'Analysis Signer' });
+    const prepared = decodePrepared(SignaturePreparedWireSchema.parse(await json(
+      await call('POST', `${layer}/signatures/prepare`, docId, 'alice', prepareForm({ field: { kind: 'fqn', name: 'sig' } })),
+    )));
+    const cms = await buildDetachedCms({ digest: prepared.digest, hash: prepared.algorithm, profile: profileFor(prepared.subFilter as SignatureSubFilter), signer });
+    const completed = await json<{ version: { sha256: string } }>(
+      await call('POST', `${layer}/signatures/${prepared.signingId}/complete`, docId, 'alice',
+        JSON.stringify({ cms: toBase64(cms), expectedVersion: prepared.expectedVersion }), 'application/json'),
+    );
+    const sha = completed.version.sha256;
+    const versionUrl = (q: string) => `/v1/docs/${docId}/versions/analysis/${sha}?${q}`;
+
+    // The current policy: a settled verdict, cached for a year.
+    const ok = await call('GET', versionUrl(`since.signature=0&policy=${SIGNATURE_POLICY_VERSION}`), docId, 'alice');
+    expect(ok.headers.get('cache-control')).toContain('immutable');
+    const analysis = await json<{ policyVersion: number; mode: string; verdict: string }>(ok);
+    expect(analysis).toMatchObject({ policyVersion: SIGNATURE_POLICY_VERSION, mode: 'authoritative', verdict: 'unchanged' });
+    // No policy at all (an older client): served, since it asked for nothing in particular.
+    expect((await call('GET', versionUrl('since.signature=0'), docId, 'alice')).status).toBe(200);
+    // Another policy: refused, and never cached under that key.
+    const stale = await call('GET', versionUrl(`since.signature=0&policy=${SIGNATURE_POLICY_VERSION + 1}`), docId, 'alice');
+    expect(stale.status).toBe(400);
+    expect(stale.headers.get('cache-control')).toContain('no-store');
+    expect(stale.headers.get('cache-control')).not.toContain('immutable');
+    // Exploratory: an answer to a what-if, not a verdict; never immutable.
+    const exploratory = await call('GET', versionUrl(`since.signature=0&level=fill&policy=${SIGNATURE_POLICY_VERSION}`), docId, 'alice');
+    expect((await json<{ mode: string }>(exploratory)).mode).toBe('exploratory');
+    expect(exploratory.headers.get('cache-control')).toContain('no-store');
+
+    // The layer twin: the token carries the policy.
+    const manifest = await json<{ docVersion: number }>(await call('GET', `${layer}/manifest`, docId, 'alice'));
+    const tokenFor = (policyVersion: number) => encodeAnalysisToken({ docVersion: manifest.docVersion, since: { signatureIndex: 0 }, policyVersion });
+    const layerOk = await call('GET', `${layer}/signatures/analysis@${tokenFor(SIGNATURE_POLICY_VERSION)}`, docId, 'alice');
+    expect(layerOk.headers.get('cache-control')).toContain('immutable');
+    expect((await json<{ policyVersion: number }>(layerOk)).policyVersion).toBe(SIGNATURE_POLICY_VERSION);
+    const layerStale = await call('GET', `${layer}/signatures/analysis@${tokenFor(SIGNATURE_POLICY_VERSION + 1)}`, docId, 'alice');
+    expect(layerStale.status).toBe(400);
+    expect(layerStale.headers.get('cache-control')).toContain('no-store');
   });
 
   test('abort frees the layer; expiry is swept; a sibling behind the head cannot sign', async () => {
