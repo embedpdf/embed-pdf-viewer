@@ -44,6 +44,8 @@ import {
   PdfStrikeOutAnnoObject,
   PdfUnderlineAnnoObject,
   PdfFile,
+  PdfFileUrl,
+  PdfOpenDocumentUrlOptions,
   PdfSegmentObject,
   AppearanceMode,
   PdfImageObject,
@@ -141,6 +143,7 @@ import { DocumentContext, PageContext, PdfCache } from './cache';
 import { MemoryManager } from './core/memory-manager';
 import { WasmPointer } from './types/branded';
 import { FontFallbackManager, FontFallbackConfig } from './font-fallback';
+import { exact_buffer, PdfRangeLoader, PdfRangeRepresentationChangedError } from './range-loader';
 
 /**
  * Format of bitmap
@@ -188,6 +191,7 @@ export enum PdfiumErrorCode {
 
 export interface PdfiumEngineOptions {
   logger?: Logger;
+  rangeLoading?: boolean;
   /**
    * Font fallback configuration for handling missing fonts in PDFs.
    * When enabled, PDFium will request fallback fonts from configured URLs
@@ -201,6 +205,8 @@ export interface PdfiumEngineOptions {
  * Pdf engine that based on pdfium wasm
  */
 export class PdfiumNative implements IPdfiumExecutor {
+  readonly supportsRangeLoading: boolean;
+
   /**
    * pdf documents that opened
    */
@@ -235,8 +241,9 @@ export class PdfiumNative implements IPdfiumExecutor {
     private pdfiumModule: WrappedPdfiumModule,
     options: PdfiumEngineOptions = {},
   ) {
-    const { logger = new NoopLogger(), fontFallback } = options;
+    const { logger = new NoopLogger(), fontFallback, rangeLoading = false } = options;
 
+    this.supportsRangeLoading = rangeLoading && typeof XMLHttpRequest !== 'undefined';
     this.logger = logger;
     this.memoryManager = new MemoryManager(this.pdfiumModule, this.logger);
     this.cache = new PdfCache(this.pdfiumModule, this.memoryManager);
@@ -276,6 +283,7 @@ export class PdfiumNative implements IPdfiumExecutor {
       this.fontFallbackManager = null;
     }
 
+    this.cache.closeAllDocuments();
     this.pdfiumModule.FPDF_DestroyLibrary();
     if (this.memoryLeakCheckInterval) {
       clearInterval(this.memoryLeakCheckInterval);
@@ -327,6 +335,235 @@ export class PdfiumNative implements IPdfiumExecutor {
     }
   }
 
+  private finishOpenDocument(
+    id: string,
+    filePtr: number,
+    docPtr: number,
+    normalizeRotation: boolean,
+    operation: string,
+    disposeFile?: () => void,
+    assert_read_success?: () => void,
+  ): PdfTask<PdfDocumentObject> {
+    const pages: PdfPageObject[] = [];
+    let document_owned = false;
+
+    try {
+      const pageCount = this.pdfiumModule.FPDF_GetPageCount(docPtr);
+      assert_read_success?.();
+      let sizePtr = WasmPointer(0);
+      let boxPtr = WasmPointer(0);
+
+      try {
+        sizePtr = this.memoryManager.malloc(8);
+        boxPtr = this.memoryManager.malloc(16);
+        for (let index = 0; index < pageCount; index++) {
+          const result = normalizeRotation
+            ? this.pdfiumModule.EPDF_GetPageSizeByIndexNormalized(docPtr, index, sizePtr)
+            : this.pdfiumModule.FPDF_GetPageSizeByIndexF(docPtr, index, sizePtr);
+          assert_read_success?.();
+
+          if (!result) {
+            const lastError = this.pdfiumModule.FPDF_GetLastError();
+            this.logger.perf(LOG_SOURCE, LOG_CATEGORY, operation, 'End', id);
+            return PdfTaskHelper.reject({
+              code: lastError,
+              message: `${normalizeRotation ? 'EPDF_GetPageSizeByIndexNormalized' : 'FPDF_GetPageSizeByIndexF'} failed`,
+            });
+          }
+
+          pages.push({
+            index,
+            size: {
+              width: this.pdfiumModule.pdfium.getValue(sizePtr, 'float'),
+              height: this.pdfiumModule.pdfium.getValue(sizePtr + 4, 'float'),
+            },
+            rotation: this.pdfiumModule.EPDF_GetPageRotationByIndex(docPtr, index) as Rotation,
+            objectNumber: this.pdfiumModule.EPDFDoc_GetPageObjectNumberByIndex(docPtr, index),
+            boxes: this.readPageBoxes(docPtr, index, boxPtr),
+          });
+          assert_read_success?.();
+        }
+      } finally {
+        if (sizePtr) this.memoryManager.free(sizePtr);
+        if (boxPtr) this.memoryManager.free(boxPtr);
+      }
+
+      const pdfDoc: PdfDocumentObject = {
+        id,
+        pageCount,
+        pages,
+        isEncrypted: this.pdfiumModule.EPDF_IsEncrypted(docPtr),
+        isOwnerUnlocked: this.pdfiumModule.EPDF_IsOwnerUnlocked(docPtr),
+        permissions: this.pdfiumModule.FPDF_GetDocPermissions(docPtr),
+        normalizedRotation: normalizeRotation,
+      };
+      assert_read_success?.();
+
+      this.cache.setDocument(id, filePtr, docPtr, normalizeRotation, disposeFile);
+      document_owned = true;
+      this.logger.perf(LOG_SOURCE, LOG_CATEGORY, operation, 'End', id);
+      return PdfTaskHelper.resolve(pdfDoc);
+    } finally {
+      if (!document_owned) {
+        this.pdfiumModule.FPDF_CloseDocument(docPtr);
+        if (disposeFile) disposeFile();
+        else if (filePtr) this.memoryManager.free(WasmPointer(filePtr));
+      }
+    }
+  }
+
+  private fetchFullDocument(
+    file: PdfFileUrl,
+    options?: PdfOpenDocumentUrlOptions,
+  ): PdfTask<PdfDocumentObject> {
+    const task = new Task<PdfDocumentObject, PdfErrorReason>();
+    (async () => {
+      try {
+        const response = await fetch(file.url, options?.requestOptions);
+        if (!response.ok) throw new Error(`Could not fetch PDF: ${response.statusText}`);
+        this.openDocumentBuffer(
+          { id: file.id, content: await response.arrayBuffer() },
+          { password: options?.password, normalizeRotation: options?.normalizeRotation },
+        ).wait(
+          (document) => task.resolve(document),
+          (error) => task.fail(error),
+        );
+      } catch (error) {
+        task.reject({
+          code: PdfErrorCode.LoadDoc,
+          message: error instanceof Error ? error.message : String(error),
+        });
+      }
+    })();
+    return task;
+  }
+
+  openDocumentUrl(file: PdfFileUrl, options?: PdfOpenDocumentUrlOptions) {
+    if (!this.supportsRangeLoading) {
+      return PdfTaskHelper.reject<PdfDocumentObject>({
+        code: PdfErrorCode.NotSupport,
+        message: 'Range loading is only available in the PDFium worker engine',
+      });
+    }
+
+    try {
+      const source = new PdfRangeLoader(file.url, options?.requestOptions);
+      const content = source.content;
+      if (content) {
+        return this.openDocumentBuffer(
+          { id: file.id, content },
+          { password: options?.password, normalizeRotation: options?.normalizeRotation },
+        );
+      }
+      return this.openDocumentFromLoader(file.id, source.file_length, source.read.bind(source), {
+        password: options?.password,
+        normalizeRotation: options?.normalizeRotation,
+      });
+    } catch (error) {
+      if (error instanceof PdfRangeRepresentationChangedError && error.content.length) {
+        return this.openDocumentBuffer(
+          { id: file.id, content: exact_buffer(error.content) },
+          { password: options?.password, normalizeRotation: options?.normalizeRotation },
+        );
+      }
+      return this.fetchFullDocument(file, options);
+    }
+  }
+
+  private openDocumentFromLoader(
+    id: string,
+    fileLength: number,
+    callback: (offset: number, length: number) => Uint8Array,
+    options?: PdfOpenDocumentBufferOptions,
+  ): PdfTask<PdfDocumentObject> {
+    if (!fileLength || fileLength > 0xffffffff) {
+      return PdfTaskHelper.reject({
+        code: PdfErrorCode.LoadDoc,
+        message: 'PDF range loading requires a file smaller than 4 GiB',
+      });
+    }
+
+    let opening = true;
+    let opening_read_error: Error | undefined;
+    const readBlock = (_context: number, rawOffset: number, bufferPtr: number, length: number) => {
+      if (opening_read_error) return 0;
+      try {
+        const data = callback(rawOffset >>> 0, length);
+        if (data.length !== length) {
+          const error = new Error('PDF range read returned the wrong byte count');
+          if (!opening) throw error;
+          opening_read_error = error;
+          return 0;
+        }
+        new Uint8Array(this.pdfiumModule.pdfium.HEAPU8.buffer, bufferPtr, length).set(data);
+        return 1;
+      } catch (error) {
+        this.logger.error(LOG_SOURCE, LOG_CATEGORY, 'PDF range read failed', error);
+        if (!opening) throw error;
+        opening_read_error = error instanceof Error ? error : new Error(String(error));
+        return 0;
+      }
+    };
+    const assert_read_success = () => {
+      if (opening_read_error) throw opening_read_error;
+    };
+
+    const callbackPtr = this.pdfiumModule.pdfium.addFunction(readBlock, 'iiiii');
+    let fileAccessPtr = 0;
+    let docPtr = 0;
+    let disposed = false;
+    const disposeFile = () => {
+      if (disposed) return;
+      disposed = true;
+      this.pdfiumModule.pdfium.removeFunction(callbackPtr);
+      if (fileAccessPtr) this.memoryManager.free(WasmPointer(fileAccessPtr));
+    };
+
+    const operation = 'OpenDocumentRange';
+    try {
+      fileAccessPtr = this.memoryManager.malloc(12);
+      this.pdfiumModule.pdfium.setValue(fileAccessPtr, fileLength, 'i32');
+      this.pdfiumModule.pdfium.setValue(fileAccessPtr + 4, callbackPtr, 'i32');
+      this.pdfiumModule.pdfium.setValue(fileAccessPtr + 8, 0, 'i32');
+
+      this.logger.perf(LOG_SOURCE, LOG_CATEGORY, operation, 'Begin', id);
+      docPtr = this.pdfiumModule.FPDF_LoadCustomDocument(fileAccessPtr, options?.password ?? '');
+      assert_read_success();
+      if (!docPtr) {
+        const lastError = this.pdfiumModule.FPDF_GetLastError();
+        disposeFile();
+        this.logger.perf(LOG_SOURCE, LOG_CATEGORY, operation, 'End', id);
+        return PdfTaskHelper.reject({
+          code: lastError,
+          message: 'FPDF_LoadCustomDocument failed',
+        });
+      }
+
+      const task = this.finishOpenDocument(
+        id,
+        fileAccessPtr,
+        docPtr,
+        options?.normalizeRotation ?? false,
+        operation,
+        disposeFile,
+        assert_read_success,
+      );
+      opening = false;
+      opening_read_error = undefined;
+      return task;
+    } catch (error) {
+      const document_owned = Boolean(docPtr && this.cache.getContext(id)?.docPtr === docPtr);
+      if (!document_owned && !disposed) {
+        if (docPtr) this.pdfiumModule.FPDF_CloseDocument(docPtr);
+        disposeFile();
+      }
+      if (error === opening_read_error) {
+        this.logger.perf(LOG_SOURCE, LOG_CATEGORY, operation, 'End', id);
+      }
+      throw error;
+    }
+  }
+
   /**
    * {@inheritDoc @embedpdf/models!PdfEngine.openDocument}
    *
@@ -358,76 +595,13 @@ export class PdfiumNative implements IPdfiumExecutor {
       });
     }
 
-    const pageCount = this.pdfiumModule.FPDF_GetPageCount(docPtr);
-
-    const pages: PdfPageObject[] = [];
-    const sizePtr = this.memoryManager.malloc(8);
-    // FS_RECTF is { float left, top, right, bottom } = 16 bytes.
-    const boxPtr = this.memoryManager.malloc(16);
-    for (let index = 0; index < pageCount; index++) {
-      // Use normalized size function when normalizeRotation is enabled
-      const result = normalizeRotation
-        ? this.pdfiumModule.EPDF_GetPageSizeByIndexNormalized(docPtr, index, sizePtr)
-        : this.pdfiumModule.FPDF_GetPageSizeByIndexF(docPtr, index, sizePtr);
-
-      if (!result) {
-        const lastError = this.pdfiumModule.FPDF_GetLastError();
-        this.logger.error(
-          LOG_SOURCE,
-          LOG_CATEGORY,
-          `${normalizeRotation ? 'EPDF_GetPageSizeByIndexNormalized' : 'FPDF_GetPageSizeByIndexF'} failed with ${lastError}`,
-        );
-        this.memoryManager.free(sizePtr);
-        this.memoryManager.free(boxPtr);
-        this.pdfiumModule.FPDF_CloseDocument(docPtr);
-        this.memoryManager.free(filePtr);
-        this.logger.perf(LOG_SOURCE, LOG_CATEGORY, `OpenDocumentBuffer`, 'End', file.id);
-        return PdfTaskHelper.reject<PdfDocumentObject>({
-          code: lastError,
-          message: `${normalizeRotation ? 'EPDF_GetPageSizeByIndexNormalized' : 'FPDF_GetPageSizeByIndexF'} failed`,
-        });
-      }
-
-      const rotation = this.pdfiumModule.EPDF_GetPageRotationByIndex(docPtr, index) as Rotation;
-      const objectNumber = this.pdfiumModule.EPDFDoc_GetPageObjectNumberByIndex(docPtr, index);
-      const boxes = this.readPageBoxes(docPtr, index, boxPtr);
-
-      const page = {
-        index,
-        size: {
-          width: this.pdfiumModule.pdfium.getValue(sizePtr, 'float'),
-          height: this.pdfiumModule.pdfium.getValue(sizePtr + 4, 'float'),
-        },
-        rotation,
-        objectNumber,
-        boxes,
-      };
-
-      pages.push(page);
-    }
-    this.memoryManager.free(sizePtr);
-    this.memoryManager.free(boxPtr);
-
-    // Query security state
-    const isEncrypted = this.pdfiumModule.EPDF_IsEncrypted(docPtr);
-    const isOwnerUnlocked = this.pdfiumModule.EPDF_IsOwnerUnlocked(docPtr);
-    const permissions = this.pdfiumModule.FPDF_GetDocPermissions(docPtr);
-
-    const pdfDoc: PdfDocumentObject = {
-      id: file.id,
-      pageCount,
-      pages,
-      isEncrypted,
-      isOwnerUnlocked,
-      permissions,
-      normalizedRotation: normalizeRotation,
-    };
-
-    this.cache.setDocument(file.id, filePtr, docPtr, normalizeRotation);
-
-    this.logger.perf(LOG_SOURCE, LOG_CATEGORY, `OpenDocumentBuffer`, 'End', file.id);
-
-    return PdfTaskHelper.resolve(pdfDoc);
+    return this.finishOpenDocument(
+      file.id,
+      filePtr,
+      docPtr,
+      normalizeRotation,
+      'OpenDocumentBuffer',
+    );
   }
 
   /**
@@ -10451,11 +10625,7 @@ export class PdfiumNative implements IPdfiumExecutor {
    *
    * @private
    */
-  private readPageBoxes(
-    docPtr: number,
-    index: number,
-    boxPtr: number,
-  ): PdfPageBoxes | undefined {
+  private readPageBoxes(docPtr: number, index: number, boxPtr: number): PdfPageBoxes | undefined {
     const readBox = (boxType: number): Box | undefined => {
       const ok = this.pdfiumModule.EPDF_GetPageBoxByIndex(docPtr, index, boxType, boxPtr);
       if (!ok) {

@@ -7,6 +7,8 @@ import {
   PdfTask,
   PdfErrorReason,
   PdfFile,
+  PdfFileUrl,
+  PdfOpenDocumentUrlOptions,
   PdfOpenDocumentBufferOptions,
   PdfMetadataObject,
   PdfBookmarksObject,
@@ -73,6 +75,7 @@ const LOG_CATEGORY = 'Worker';
  */
 type MessageType =
   | 'destroy'
+  | 'openDocumentUrl'
   | 'openDocumentBuffer'
   | 'getMetadata'
   | 'setMetadata'
@@ -147,6 +150,7 @@ type MessageType =
  * - Progress tracking
  */
 export class RemoteExecutor implements IPdfiumExecutor {
+  readonly supportsRangeLoading = true;
   private static READY_TASK_ID = '0';
   private pendingRequests = new Map<string, Task<any, any>>();
   private requestCounter = 0;
@@ -295,6 +299,13 @@ export class RemoteExecutor implements IPdfiumExecutor {
   }
 
   // ========== IPdfExecutor Implementation ==========
+
+  openDocumentUrl(
+    file: PdfFileUrl,
+    options?: PdfOpenDocumentUrlOptions,
+  ): PdfTask<PdfDocumentObject> {
+    return this.send<PdfDocumentObject>('openDocumentUrl', [file, options]);
+  }
 
   openDocumentBuffer(
     file: PdfFile,
