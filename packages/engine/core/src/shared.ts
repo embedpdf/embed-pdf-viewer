@@ -109,7 +109,29 @@ export type { CachePins } from './dto/CachePins';
 export { DEFAULT_PDF_SAVE_MODE } from './dto/PdfSaveMode';
 export type { SessionKind } from './dto/SessionKind';
 export type { PdfSaveMode } from './dto/PdfSaveMode';
-export type { FontHandle, FontKey, FontSpec } from './dto/FontSpec';
+export type {
+  FontEmbeddingPermission,
+  FontHandle,
+  FontIdentityInfo,
+  FontKey,
+  FontSpec,
+} from './dto/FontSpec';
+export type {
+  RichTextAlign,
+  RichTextBody,
+  RichTextDecoration,
+  RichTextDirection,
+  RichTextDocument,
+  RichTextDocumentInput,
+  RichTextMargins,
+  RichTextParagraph,
+  RichTextParagraphProps,
+  RichTextRun,
+  RichTextRunStyle,
+  RichTextScript,
+  RichTextSource,
+} from './dto/RichText';
+export { richTextPlainText, richTextParagraphsFromPlainText } from './dto/RichText';
 
 export { EngineError, serializeError, deserializeError } from './errors/EngineError';
 export type { SerializedEngineError, EngineErrorOptions } from './errors/EngineError';

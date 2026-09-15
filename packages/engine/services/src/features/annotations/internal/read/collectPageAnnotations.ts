@@ -9,6 +9,7 @@ import { readContextFor } from './annotationReadContext';
 import { pickReader } from './annotationReaderRegistry';
 import { joinWidgetFieldNumbers } from './joinWidgetField';
 import { readAnnotationBase } from './readAnnotationBase';
+import type { FontRegistrar } from '../../../fonts/FontRegistrar';
 import type { DocumentSession } from '../../../../document-session/DocumentSession';
 import { throwIfAborted } from '../../../../shared/abort';
 import { ActionReadBudgetTracker } from '../../../actions/ActionModelReader';
@@ -31,15 +32,16 @@ export function collectPageAnnotations(input: {
   count: number;
   getAnnotPtrAt: (index: number) => Ptr;
   signal: AbortSignal;
+  fonts?: FontRegistrar;
 }): AnnotationListPageSnapshot {
-  const { runtime, session, pageObjectNumber, count, getAnnotPtrAt, signal } = input;
+  const { runtime, session, pageObjectNumber, count, getAnnotPtrAt, signal, fonts } = input;
   const { fn, mem } = runtime;
 
   const annotations: AnnotationDTO[] = [];
   let hasWeak = false;
   const revision = session.pageState(pageObjectNumber).revision;
   const actionBudget = new ActionReadBudgetTracker();
-  const readCtx = readContextFor(session);
+  const readCtx = readContextFor(session, fonts);
 
   for (let i = 0; i < count; i++) {
     throwIfAborted(signal);

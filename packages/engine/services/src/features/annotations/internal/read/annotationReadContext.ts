@@ -1,5 +1,6 @@
 import type { Ptr } from '@embedpdf/engine-runtime';
 
+import type { FontRegistrar } from '../../../fonts/FontRegistrar';
 import type { DocumentSession } from '../../../../document-session/DocumentSession';
 
 /**
@@ -11,9 +12,15 @@ import type { DocumentSession } from '../../../../document-session/DocumentSessi
  */
 export interface AnnotationReadContext {
   readonly docPtr: Ptr;
+  /** This thread's font registry, when the host has one: a FreeText body
+   *  face reads back as the registered `key` whose identity matches. */
+  readonly fonts?: FontRegistrar;
 }
 
 /** Build the read context both read paths (list loop, mutator read-back) use. */
-export function readContextFor(session: DocumentSession): AnnotationReadContext {
-  return { docPtr: session.requireDocPtr() };
+export function readContextFor(
+  session: DocumentSession,
+  fonts?: FontRegistrar,
+): AnnotationReadContext {
+  return { docPtr: session.requireDocPtr(), ...(fonts ? { fonts } : {}) };
 }

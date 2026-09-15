@@ -196,6 +196,7 @@ export const en: Locale = {
       redactConfirmCollateral: '{count} other annotations will also be removed.',
       redactApply: 'Apply',
       redactApplying: 'Applying…',
+      formatLabel: 'Format',
       redactLabelTitle: 'Redaction label',
       redactLabelPlaceholder: 'e.g. REDACTED',
       redactLabelRepeat: 'Repeat label across region',

@@ -14,7 +14,9 @@ import type {
   PdfLinkTarget,
   PdfRect,
   PdfActionTree,
+  RichTextParagraph,
 } from '@embedpdf/engine-core/runtime';
+import type { TextFormat, TextSelection } from './rich-text';
 import type { AnnotationToolInput, ResolvedTool } from './tools';
 import type {
   AnnotationFlags,
@@ -142,6 +144,13 @@ export interface AnnotationState {
   /** Bumps on every arm/disarm — the render layer's cue to rebuild (or drop)
    *  the ghost preview object URL. Never rendered itself. */
   stampArmEpoch: number;
+  /**
+   * The text editor's selection inside the annotation being edited (flat
+   * offsets over its plain projection), or null. In the store because it is
+   * READ by the property surface: while a range is held, the range keys
+   * (`getSelectionProps`) report and take the RUNS, not the body.
+   */
+  textSelection: TextSelection | null;
 }
 
 /** The armed tool's would-be placement under the cursor (content space). */
@@ -190,6 +199,7 @@ export type AnnotationAction =
   | { type: 'SET_HYDRATION'; hydration: AnnotationHydration }
   | { type: 'SET_CHROME'; patch: ChromeSettingsPatch }
   | { type: 'SET_TOOL_GHOST'; ghost: ToolGhost | null }
+  | { type: 'SET_TEXT_SELECTION'; selection: TextSelection | null }
   | { type: 'STAMP_ARM_CHANGED' };
 
 /** A plugin (forms, links) marks some annotations as interactive: while engaged,
@@ -255,13 +265,19 @@ export type SelectionFlags = { [K in keyof AnnotationFlags]: boolean | null };
  * A free-text annotation projected for the framework: the box (content space,
  * live gesture applied) + the plain text + an `editing` flag + a ready-to-spread
  * CSS style. The framework renders ONE editable element from this and nothing
- * more — all the mapping (fonts, colours, alignment) is done here, once.
+ * more — all the mapping (fonts, colours, alignment) is done here, once. The
+ * element paints the TEXT only: the box's fill and border are the vector
+ * scene's (`pageItems`), the same for a plain box and a callout, so the live
+ * view matches the baked appearance.
  */
 export interface TextItem {
   id: Id;
   ref: AnnotationRef | null;
   box: Rect;
   contents: string;
+  /** The rich paragraphs the editor renders and edits (run deltas over the
+   *  body, which `css` carries). `contents` is their plain projection. */
+  richText: { paragraphs: RichTextParagraph[] };
   editing: boolean;
   /** Applied rotation (deg, CW). `box` is the UNROTATED text box; the framework
    *  rotates the editable element about its centre by this. 0/undefined = none. */
@@ -272,10 +288,12 @@ export interface TextItem {
     fontSize: number;
     lineHeight: number;
     color: string;
+    /** The body's formatting (runs override it as inline spans). */
+    fontWeight: number;
+    fontStyle: 'normal' | 'italic';
+    textDecoration: 'none' | 'underline';
     align: 'left' | 'center' | 'right';
     padding: number;
-    /** `/C` box background as a CSS colour, or null for transparent. */
-    background: string | null;
   };
 }
 
@@ -407,6 +425,14 @@ export interface AnnotationCapability {
    * `{ print: false }`, `{ hidden: true }`.
    */
   updateSelectionFlags(patch: Partial<AnnotationFlags>): void;
+  /**
+   * Flip a rich-text format on the selection — the editor's Cmd/Ctrl+B/I/U
+   * and a toolbar toggle: the text range's runs while the editor holds one,
+   * else the selected free-text bodies. Reads the current state the way
+   * {@link getSelectionProps} reports it and writes its inverse through
+   * {@link updateSelection}.
+   */
+  toggleTextFormat(format: TextFormat): void;
   /**
    * The selection's `/F` flag state: per-flag `true`/`false`, or `null` when
    * the selected annotations disagree (indeterminate). `null` overall when
@@ -810,6 +836,19 @@ export interface AnnotationHostCapability extends AnnotationCapability {
   ): boolean;
   /** Apply the editor's plain text — optimistic locally, debounced to the engine. */
   setContents(ref: AnnotationRef, text: string): void;
+  /** Apply the editor's rich paragraphs (run deltas over the body) —
+   *  optimistic locally, debounced to the engine. The commit is plain
+   *  `contents` while nothing overrides the body on a plain annotation, else
+   *  `richText`. */
+  setRichText(ref: AnnotationRef, doc: { paragraphs: RichTextParagraph[] }): void;
+  /** The editor's selection inside the annotation (flat offsets over the
+   *  plain projection), or null when the editor holds none. While a RANGE is
+   *  held, `updateSelection`'s font/size/colour/format keys restyle the
+   *  range's runs instead of the body. */
+  setTextSelection(ref: AnnotationRef, range: { start: number; end: number } | null): void;
+  /** The CSS family list for a face family a run names ("Helvetica" → a web
+   *  stack, a registered family → its key, mounted by `mountWebFont`). */
+  cssFontFamily(family: string): string;
   /** Leave text-edit (flush any pending write). */
   endTextEdit(): void;
   // ── hit-testing & cursor (consumed by the interaction edit handler) ──

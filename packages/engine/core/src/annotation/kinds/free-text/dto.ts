@@ -1,12 +1,13 @@
+import type { RichTextDocument, RichTextSource } from '../../../dto/RichText';
 import type { CalloutLine, PdfRect } from '../../../geometry/primitives';
 import type { AnnotationBase } from '../../base';
 import type {
   AnnotationBorderStyle,
   Color,
+  FreeTextFont,
   FreeTextIntent,
   LineEnding,
   PdfRectDifferences,
-  StandardFont,
   TextAlignment,
 } from '../../primitives';
 
@@ -26,12 +27,24 @@ export type FreeTextAnnotationDTO = AnnotationBase & {
   intent: FreeTextIntent;
 
   // text (`/DA`)
-  /** `/DA` font. */
-  fontFamily: StandardFont;
+  /**
+   * The body face: a standard font name, the `key` of a registered font
+   * whose family/weight/italic match the body, or — for a face the
+   * document embeds but this session did not register — its family name.
+   */
+  fontFamily: FreeTextFont;
   /** `/DA` font size, in points. */
   fontSize: number;
   /** `/Q` horizontal text alignment. */
   textAlign: TextAlignment;
+  /**
+   * The rich text, always present: the annotation's `/RC` when it has one,
+   * else a one-run document synthesised from `/Contents` and `/DA`.
+   * `richTextSource` says which, so a client cannot mistake a synthesised
+   * document for authored rich text.
+   */
+  richText: RichTextDocument;
+  richTextSource: RichTextSource;
 
   // colours
   /** `/DA` colour: the border colour and the default text colour. */

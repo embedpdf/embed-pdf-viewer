@@ -8,8 +8,10 @@ import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runti
 
 import { FPDFANNOT_COLORTYPE } from '../colorType';
 import { freeTextIntentFromName } from '../freeTextIntent';
+import { freeTextFontForFace, readEngineRichText } from '../richTextWire';
 import { standardFontFromCode, DEFAULT_STANDARD_FONT } from '../standardFont';
 import { textAlignmentFromCode } from '../textAlignment';
+import type { AnnotationReadContext } from './annotationReadContext';
 import {
   readAnnotColor,
   readAnnotOpacity,
@@ -41,11 +43,47 @@ export function readFreeText(
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
   base: AnnotationBase,
+  _subtypeCode?: number,
+  ctx?: AnnotationReadContext,
 ): FreeTextAnnotationDTO {
   const da = readDefaultAppearance(fn, mem, annotPtr);
   const color = da?.color ?? { ...DEFAULT_FREETEXT_COLOR };
-  const fontFamily = da ? standardFontFromCode(da.fontCode) : DEFAULT_STANDARD_FONT;
-  const fontSize = da && da.fontSize > 0 ? da.fontSize : DEFAULT_FONT_SIZE;
+  // The rich text is always there: the annotation's own /RC, else a one-run
+  // document the engine synthesises from /Contents + /DA. Its body is the
+  // face the /DA names, resolved by identity — so a registered font reads
+  // back as its key (the `standardFontFromCode` path only knows the 14).
+  const rich = readEngineRichText(fn, mem, annotPtr);
+  const fonts = ctx?.fonts;
+  const fontFamily = rich
+    ? freeTextFontForFace(
+        rich.document.body,
+        fonts ? (family, weight, italic) => fonts.keyForFace(family, weight, italic) : undefined,
+      )
+    : da
+      ? standardFontFromCode(da.fontCode)
+      : DEFAULT_STANDARD_FONT;
+  const fontSize =
+    rich && rich.document.body.size > 0
+      ? rich.document.body.size
+      : da && da.fontSize > 0
+        ? da.fontSize
+        : DEFAULT_FONT_SIZE;
+  const richText = rich?.document ?? {
+    body: {
+      family: 'Helvetica',
+      weight: 400,
+      italic: false,
+      size: fontSize,
+      color: '#000000',
+      decoration: [],
+      script: 'normal',
+      letterSpacing: 0,
+      horizontalScale: 1,
+      align: 'left',
+      dir: 'ltr',
+    },
+    paragraphs: [{ runs: [{ text: base.contents ?? '' }] }],
+  };
 
   // `TextColor` overrides text only; surface it as `fontColor` solely when it
   // is present AND differs from the `/DA` colour (otherwise text follows `color`).
@@ -58,7 +96,12 @@ export function readFreeText(
   const ca = readAnnotOpacity(fn, mem, annotPtr);
   const opacity = ca == null ? 1 : Math.max(0, Math.min(1, ca));
 
-  const textAlign = textAlignmentFromCode(readTextAlignment(fn, annotPtr));
+  // The rich body's alignment is what the appearance paints (it wins over
+  // /Q); a plain box's synthesised body carries /Q, so both agree. Justify
+  // has no /Q value and reads back as the /Q alignment.
+  const quadding = textAlignmentFromCode(readTextAlignment(fn, annotPtr));
+  const textAlign =
+    rich && rich.document.body.align !== 'justify' ? rich.document.body.align : quadding;
   const intent = freeTextIntentFromName(readIntent(fn, mem, annotPtr));
 
   const points = readCalloutLine(fn, mem, annotPtr);
@@ -81,6 +124,8 @@ export function readFreeText(
     fontFamily,
     fontSize,
     textAlign,
+    richText,
+    richTextSource: rich?.source ?? 'contents',
     color,
     ...(fontColor !== undefined ? { fontColor } : {}),
     interiorColor: background ?? null,

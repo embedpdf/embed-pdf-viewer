@@ -5,21 +5,20 @@
  * the plugin (not the portable core) because the font→CSS stack mapping and the
  * engine `Color`→CSS seam are web concerns, shared across every web framework.
  */
-import { initialTextStyle, textBoxes, type Model, type ViewEnv } from '@embedpdf/core-annotation';
+import {
+  initialTextStyle,
+  textBoxes,
+  textPlateInset,
+  type Model,
+  type ViewEnv,
+} from '@embedpdf/core-annotation';
+import { cssFontFamilyForFont, isRichSource, richDocOf, stripBodyDefaults } from './rich-text';
 import type { TextItem } from './types';
 
-/** Map a free-text `/DA` font to a CSS font-family. A standard PDF font → a web
- *  stack with the same metrics; anything else is a registered font key → mount it
- *  as a `@font-face` of that family (see the framework `mountWebFont` helper). */
-const STANDARD_FONT_CSS: Record<string, string> = {
-  helvetica: 'Helvetica, Arial, sans-serif',
-  'helvetica-bold': 'Helvetica, Arial, sans-serif',
-  courier: '"Courier New", Courier, monospace',
-  'times-roman': '"Times New Roman", Times, serif',
-  symbol: 'serif',
-  'zapf-dingbats': 'serif',
-};
-const cssFontFor = (font: string): string => STANDARD_FONT_CSS[font] ?? `"${font}", sans-serif`;
+/** The rich engine's line advance for the standard families: ascent +
+ *  descent (1.0 × size for Helvetica, Times and Courier) + Acrobat's 0.2 ×
+ *  size leading (the measured line model, plan §4.4). */
+const RICH_LINE_HEIGHT = 1.2;
 
 /** Project the model's free-text boxes into render-ready {@link TextItem}s — the
  *  core geometry (`textBoxes`) joined with the DTO-derived CSS. Pure; memoized by
@@ -30,27 +29,40 @@ export function buildTextItems(m: Model, pon: number, view?: ViewEnv): TextItem[
     // `text`/`style` are the OPTIMISTIC content projections (a props edit lands
     // here before the engine round-trips), so the editor restyles instantly.
     const t = a?.text ?? initialTextStyle;
-    // The text plate inset MIRRORS the engine's AP generator, so the DOM text
-    // sits exactly where the baked text will land (WYSIWYG across the
-    // baked↔live swap): callout body = border + 2 (`kCalloutTextPadding`),
-    // plain free-text body = border width (two half-width deflates).
+    // The text plate MIRRORS the engine's AP generator, so the DOM text sits
+    // exactly where the baked text will land (WYSIWYG across the baked↔live
+    // swap): the box deflated by twice the border width — plain box, callout,
+    // CPVT and rich engine alike (`textPlateInset`, Acrobat's rule). A rich
+    // (`/RC`) annotation additionally lays out at the rich engine's line
+    // advance, 1.2 × size (ascent + descent + Acrobat's leading).
     const sw = a?.style.strokeWidth ?? 0;
-    const isCallout = a?.geom.t === 'text' && !!a.geom.callout;
+    const rich = !!a && isRichSource(a);
+    const doc = a ? richDocOf(a) : null;
     return {
       id: tb.id,
       ref: a?.ref ?? null,
       box: tb.box,
       contents: a?.data?.contents ?? '',
+      // Paragraph alignment/direction equal to the body's is inherited, not
+      // an override: the element carries the body's (`css.align`), so a
+      // block must not pin itself to a resolved value — or the Align
+      // buttons (which move the body) would stop moving the text.
+      richText: {
+        paragraphs: doc ? stripBodyDefaults(doc.paragraphs, doc.body) : [{ runs: [{ text: '' }] }],
+      },
       editing: tb.editing,
       ...(tb.rot ? { rot: tb.rot } : {}),
       css: {
-        fontFamily: cssFontFor(t.fontFamily),
+        fontFamily: cssFontFamilyForFont(t.fontFamily),
         fontSize: t.fontSize,
-        lineHeight: t.fontSize, // CPVT lays out free-text at line-height ≈ font size
+        // CPVT lays out plain free-text at line-height ≈ font size.
+        lineHeight: rich ? t.fontSize * RICH_LINE_HEIGHT : t.fontSize,
         color: t.fontColor,
+        fontWeight: t.bold ? 700 : 400,
+        fontStyle: t.italic ? 'italic' : 'normal',
+        textDecoration: t.underline ? 'underline' : 'none',
         align: t.textAlign,
-        padding: isCallout ? sw + 2 : sw,
-        background: a?.style.interiorColor ?? null,
+        padding: textPlateInset(sw),
       },
     };
   });

@@ -7,6 +7,7 @@ import { EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule } from '@embedpdf/engine-runtime';
 
 import type { DocumentSession } from '../../document-session/DocumentSession';
+import type { FontRegistrar } from '../fonts/FontRegistrar';
 import { throwIfAborted } from '../../shared/abort';
 import { collectPageAnnotations } from './internal/read/collectPageAnnotations';
 
@@ -24,6 +25,8 @@ export class RawAnnotationReader {
   constructor(
     private readonly runtime: PdfRuntimeModule,
     private readonly session: DocumentSession,
+    /** This thread's font registry: FreeText faces read back as keys. */
+    private readonly fonts?: FontRegistrar,
   ) {}
 
   listAll(signal: AbortSignal): AnnotationListSnapshotAllPages {
@@ -59,6 +62,7 @@ export class RawAnnotationReader {
       count,
       getAnnotPtrAt: (i) => fn.EPDFPage_GetAnnotRaw(docPtr, record.pageIndex, i),
       signal,
+      ...(this.fonts ? { fonts: this.fonts } : {}),
     });
   }
 }

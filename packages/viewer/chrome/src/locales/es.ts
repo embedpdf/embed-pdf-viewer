@@ -198,6 +198,7 @@ export const es: Locale = {
       redactConfirmCollateral: 'También se eliminarán {count} otras anotaciones.',
       redactApply: 'Aplicar',
       redactApplying: 'Aplicando…',
+      formatLabel: 'Formato',
       redactLabelTitle: 'Etiqueta de redacción',
       redactLabelPlaceholder: 'p. ej. REDACTADO',
       redactLabelRepeat: 'Repetir etiqueta en toda la región',

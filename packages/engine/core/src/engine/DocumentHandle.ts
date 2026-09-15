@@ -1,6 +1,7 @@
 import type { DocumentActionsService } from './DocumentActionsService';
 import type { DocumentAnnotationsService } from './DocumentAnnotationsService';
 import type { DocumentAttachmentsService } from './DocumentAttachmentsService';
+import type { DocumentFontSettings } from './DocumentFontSettings';
 import type { DocumentFormsService } from './DocumentFormsService';
 import type { DocumentPagesService } from './DocumentPagesService';
 import type { DocumentRedactionService } from './DocumentRedactionService';
@@ -39,6 +40,13 @@ export interface DocumentHandle {
   readonly attachments?: DocumentAttachmentsService;
   /** The document's interactive form (AcroForm): fields, values, interchange. */
   readonly forms: DocumentFormsService;
+  /**
+   * Font embedding and text layout settings of this document (session
+   * state). Optional: the local engine implements it; engines that do not
+   * lay text out in-process omit it — feature-detect with
+   * `doc.fonts !== undefined`.
+   */
+  readonly fonts?: DocumentFontSettings;
   /**
    * CATALOG-level `/PieceInfo` private application data (ISO 32000 §14.5)
    * — e.g. a stamp library's display name. Optional: the local engine

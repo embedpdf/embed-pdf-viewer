@@ -10,10 +10,10 @@ import {
 import { buildTextItems } from './text-item';
 
 /** The DOM text plate must sit exactly where the engine's AP generator lays
- *  the baked text, so the baked↔live swap is pixel-invisible:
- *    callout body inset = borderWidth + 2 (`kCalloutTextPadding`)
- *    plain free-text body inset = borderWidth (two half-width deflates)
- *  (cpdf_generateap.cpp, GenerateFreeTextAP — both branches). */
+ *  the baked text, so the baked↔live swap is pixel-invisible: the box
+ *  deflated by twice the border width on every side, plain box and callout
+ *  alike (`FreeTextPlate` in cpdf_generateap.cpp — Acrobat's rule, plan
+ *  `2026-09-15-free-text-plate-inset.md`). */
 
 const PON = 1;
 const FLAGS: AnnotationFlags = {
@@ -48,7 +48,7 @@ const freeText = (id: string, geom: Extract<Geom, { t: 'text' }>, strokeWidth: n
 });
 
 describe('buildTextItems — text plate mirrors the AP generator', () => {
-  it('callout padding = strokeWidth + 2; plain free-text padding = strokeWidth', () => {
+  it('the plate inset is twice the border width, callout and plain box alike', () => {
     const callout = freeText(
       'C1',
       {
@@ -64,12 +64,58 @@ describe('buildTextItems — text plate mirrors the AP generator', () => {
     m = update(m, { t: 'beginTextEdit', id: 'C1' })[0];
     const [c] = buildTextItems(m, PON);
     expect(c!.id).toBe('C1');
-    expect(c!.css.padding).toBe(8); // 6 + kCalloutTextPadding(2)
+    expect(c!.css.padding).toBe(12); // 2 × 6: Acrobat's plate rule
 
     m = update(m, { t: 'endTextEdit' })[0];
     m = update(m, { t: 'beginTextEdit', id: 'P1' })[0];
     const [p] = buildTextItems(m, PON);
     expect(p!.id).toBe('P1');
-    expect(p!.css.padding).toBe(3); // border width, no extra padding
+    expect(p!.css.padding).toBe(6); // 2 × 3
+  });
+});
+
+describe('buildTextItems — the editor document', () => {
+  it('renders paragraph alignment equal to the body as inherited', () => {
+    const a = freeText('A1', { t: 'text', rect: { x: 10, y: 10, width: 80, height: 30 } }, 1);
+    (a as { text?: unknown }).text = {
+      fontFamily: 'helvetica',
+      fontSize: 12,
+      fontColor: '#000000',
+      textAlign: 'center',
+    };
+    (a as { data?: unknown }).data = {
+      subtype: 'free-text',
+      contents: 'one\rtwo',
+      richTextSource: 'rc',
+      richText: {
+        body: {
+          family: 'Helvetica',
+          weight: 400,
+          italic: false,
+          size: 12,
+          color: '#000000',
+          decoration: [],
+          script: 'normal',
+          letterSpacing: 0,
+          horizontalScale: 1,
+          align: 'center',
+          dir: 'ltr',
+        },
+        // An echo that resolved every paragraph (older engines), and one
+        // paragraph that really differs.
+        paragraphs: [
+          { align: 'center', dir: 'ltr', runs: [{ text: 'one' }] },
+          { align: 'right', dir: 'ltr', runs: [{ text: 'two' }] },
+        ],
+      },
+    };
+    let m = update(initialModel, { t: 'loaded', annots: [a] })[0];
+    m = update(m, { t: 'beginTextEdit', id: 'A1' })[0];
+    const [item] = buildTextItems(m, PON);
+    expect(item!.css.align).toBe('center');
+    expect(item!.richText.paragraphs).toEqual([
+      { runs: [{ text: 'one' }] },
+      { align: 'right', runs: [{ text: 'two' }] },
+    ]);
   });
 });

@@ -20,7 +20,8 @@ import {
   type TextStyle,
 } from '@embedpdf/core-annotation';
 
-import { boxEmit, type KindProjection } from '../projection';
+import { hasBodyFormatting, isRichSource, richDocOf } from '../../rich-text';
+import { boxEmit, type KindProjection, type Wire } from '../projection';
 import {
   colorToCss,
   contentToPdfPoint,
@@ -37,13 +38,45 @@ type FreeTextDTO = Extract<AnnotationDTO, { subtype: 'free-text' }>;
 /** Free-text `/DA` fields → content {@link TextStyle}. An absent `fontColor`
  *  falls back to the `/DA` colour — the same rule the CPVT renderer applies. */
 function textFromDTO(dto: FreeTextDTO): TextStyle {
+  // The rich body carries the formatting the `/DA` cannot: its weight,
+  // italic and decoration read back as the toggles (absent = off).
+  const body = dto.richText?.body;
   return {
     fontFamily: dto.fontFamily,
     fontSize: dto.fontSize,
     fontColor: colorToCss(dto.fontColor ?? dto.color),
     textAlign: dto.textAlign,
+    ...(body && body.weight >= 600 ? { bold: true } : {}),
+    ...(body?.italic ? { italic: true } : {}),
+    ...(body?.decoration.includes('underline') ? { underline: true } : {}),
   };
 }
+
+/**
+ * A formatting toggle is a BODY change (runs are deltas over it), so it
+ * lowers as a rich write carrying the current paragraphs — and every toggle
+ * lowers the same COMPLETE body (the current one with the three toggles
+ * applied: a partial body means engine defaults, which would reset the
+ * size, face and colour), so a patch of several merges cleanly. Nothing is
+ * emitted while the annotation is plain and every toggle is off: a plain
+ * `/Contents` annotation must not grow an `/RC` from a no-op.
+ */
+const formattingBody = (a: Annot): Wire => {
+  if (!hasBodyFormatting(a.text) && !isRichSource(a)) return {};
+  const doc = richDocOf(a);
+  const t = a.text;
+  return {
+    richText: {
+      body: {
+        ...doc.body,
+        weight: t?.bold ? 700 : 400,
+        italic: !!t?.italic,
+        decoration: t?.underline ? ['underline'] : [],
+      },
+      paragraphs: doc.paragraphs,
+    },
+  };
+};
 
 /**
  * The engine geometry for a callout: the overall `/Rect` (text box ∪ leader ∪
@@ -143,6 +176,7 @@ export const freeText: KindProjection = {
     if (cf) return { ...cf };
     return boxEmit(a, crop);
   },
+  prop: { bold: formattingBody, italic: formattingBody, underline: formattingBody },
   // `/IT` + the initial `/Contents` are create-only statements; while typing,
   // the debounced text-edit write owns `contents`.
   draftExtras: (a, crop) => ({
