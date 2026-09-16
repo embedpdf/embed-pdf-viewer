@@ -47,6 +47,7 @@ export const stampHandlerFactory: HandlerFactory<PdfStampAnnoObject> = {
         type: PdfAnnotationSubtype.STAMP,
         name: tool.defaults.name ?? PdfAnnotationName.Image,
         subject: tool.defaults.subject ?? 'Stamp',
+        opacity: tool.defaults.opacity ?? 1,
         flags: tool.defaults.flags ?? ['print'],
         pageIndex: context.pageIndex,
         id: uuidV4(),
