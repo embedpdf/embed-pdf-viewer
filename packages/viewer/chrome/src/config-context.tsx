@@ -44,12 +44,41 @@ export interface SignaturesCustomization {
   }>;
 }
 
+/** A font for free-text annotations beyond the standard 14. */
+export interface AnnotationFontSpec {
+  /** The stable id a free-text `fontFamily` carries — the engine key AND the
+   *  CSS family the live editor renders with. Not one of the 14 standard names. */
+  readonly key: string;
+  /** Where the TTF/OTF bytes come from (same-origin or CORS-enabled). */
+  readonly url: string;
+  /** The picker's label. */
+  readonly label: string;
+  /** Family / style refinements for fallback matching; inferred from the file
+   *  when omitted. */
+  readonly familyName?: string;
+  readonly weight?: number;
+  readonly italic?: boolean;
+}
+
+export interface AnnotationsCustomization {
+  /**
+   * Fonts the free-text style panel offers beyond the standard 14. Each is
+   * fetched once when the viewer mounts, registered on the viewer's engine
+   * under its `key`, and mounted as a `@font-face` of the same name — so the
+   * DOM editor shows the face the appearance stream will bake. A font whose
+   * URL fails is skipped with a console warning. On the cloud engine (no
+   * `engine.fonts`) they are not offered: fonts there are a server policy.
+   */
+  readonly fonts?: ReadonlyArray<AnnotationFontSpec>;
+}
+
 export interface ResolvedViewerConfig {
   readonly chrome: ChromeSchema;
   /** User-registered icons — additive over the built-in set. */
   readonly icons: Readonly<Record<string, IconDef>>;
   readonly stamps: StampsCustomization;
   readonly signatures: SignaturesCustomization;
+  readonly annotations: AnnotationsCustomization;
 }
 
 const DEFAULT_CONFIG: ResolvedViewerConfig = {
@@ -57,6 +86,7 @@ const DEFAULT_CONFIG: ResolvedViewerConfig = {
   icons: {},
   stamps: {},
   signatures: {},
+  annotations: {},
 };
 
 const ViewerConfigContext = createContext<ResolvedViewerConfig>(DEFAULT_CONFIG);
@@ -89,4 +119,8 @@ export function useStampsConfig(): StampsCustomization {
 
 export function useSignaturesConfig(): SignaturesCustomization {
   return useContext(ViewerConfigContext).signatures;
+}
+
+export function useAnnotationsConfig(): AnnotationsCustomization {
+  return useContext(ViewerConfigContext).annotations;
 }

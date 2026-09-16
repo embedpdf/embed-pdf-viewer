@@ -6,8 +6,11 @@ export interface DocVersionsAnalysis200Response {
     basis: DocVersionsAnalysis200Response.Basis;
     since: DocVersionsAnalysis200Response.Since;
     until: DocVersionsAnalysis200Response.Until;
-    steps: unknown[];
+    restrictions: DocVersionsAnalysis200Response.Restrictions.Item[];
+    current: DocVersionsAnalysis200Response.Current;
+    later: DocVersionsAnalysis200Response.Later;
     verdict: DocVersionsAnalysis200Response.Verdict;
+    steps: unknown[];
 }
 
 export namespace DocVersionsAnalysis200Response {
@@ -43,6 +46,95 @@ export namespace DocVersionsAnalysis200Response {
 
     export interface Until {
         revisionIndex: number;
+    }
+
+    export type Restrictions = Restrictions.Item[];
+
+    export namespace Restrictions {
+        export interface Item {
+            signatureIndex: number;
+            revisionIndex: number;
+            source: Item.Source;
+            own: boolean;
+            permission?: number | undefined;
+            fields?: unknown | undefined;
+        }
+
+        export namespace Item {
+            export const Source = {
+                Docmdp: "docmdp",
+                Fieldmdp: "fieldmdp",
+                Lock: "lock",
+            } as const;
+            export type Source = (typeof Source)[keyof typeof Source];
+        }
+    }
+
+    export interface Current {
+        verdict: Current.Verdict;
+        complete: boolean;
+        primary?: Current.Primary | undefined;
+        findings: Current.Findings.Item[];
+        method: Current.Method;
+    }
+
+    export namespace Current {
+        export const Verdict = {
+            Unchanged: "unchanged",
+            Permitted: "permitted",
+            Forbidden: "forbidden",
+            Indeterminate: "indeterminate",
+        } as const;
+        export type Verdict = (typeof Verdict)[keyof typeof Verdict];
+
+        export interface Primary {
+            rule: string;
+            verdict: Primary.Verdict;
+            objectNumber: number;
+            edge?: string | undefined;
+            detail?: string | undefined;
+        }
+
+        export namespace Primary {
+            export const Verdict = {
+                Permitted: "permitted",
+                Forbidden: "forbidden",
+                Incomplete: "incomplete",
+            } as const;
+            export type Verdict = (typeof Verdict)[keyof typeof Verdict];
+        }
+
+        export type Findings = Findings.Item[];
+
+        export namespace Findings {
+            export interface Item {
+                rule: string;
+                verdict: Item.Verdict;
+                objectNumber: number;
+                edge?: string | undefined;
+                detail?: string | undefined;
+            }
+
+            export namespace Item {
+                export const Verdict = {
+                    Permitted: "permitted",
+                    Forbidden: "forbidden",
+                    Incomplete: "incomplete",
+                } as const;
+                export type Verdict = (typeof Verdict)[keyof typeof Verdict];
+            }
+        }
+
+        export const Method = {
+            NetState: "net-state",
+            NetStateReplay: "net-state+replay",
+        } as const;
+        export type Method = (typeof Method)[keyof typeof Method];
+    }
+
+    export interface Later {
+        revisionCount: number;
+        undoneObjectNumbers: number[];
     }
 
     export const Verdict = {

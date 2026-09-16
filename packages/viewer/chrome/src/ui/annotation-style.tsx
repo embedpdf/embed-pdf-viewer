@@ -36,6 +36,7 @@ import { useOptionalCapability } from '@embedpdf/react/runtime';
 import { RedactionToken } from '@embedpdf/react/redaction';
 import { useT } from '@embedpdf/react/i18n';
 import { Icon } from './icons';
+import { useAnnotationFonts } from './annotation-fonts';
 import { AnnotationFlagsSection } from './annotation-flags';
 
 // ── app-level vocabulary (a viewer's decision, like v2's color presets) ──────
@@ -432,11 +433,16 @@ function LineEndingSelect({
 
 // ── font family picker ───────────────────────────────────────────────────────
 function FontFamilySelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  const current = FONT_OPTIONS.find((o) => o.v === value);
+  // The standard faces plus the configured fonts that are registered and
+  // mounted (`annotations.fonts`) — a registered key is a `fontFamily` value
+  // like any standard name.
+  const configured = useAnnotationFonts();
+  const options = [...FONT_OPTIONS, ...configured.map((f) => ({ v: f.key, label: f.label }))];
+  const current = options.find((o) => o.v === value);
   return (
     <DropdownShell trigger={<span className="text-fg text-sm">{current?.label ?? value}</span>}>
       {(close) =>
-        FONT_OPTIONS.map((o) => (
+        options.map((o) => (
           <OptionRow
             key={o.v}
             selected={o.v === value}

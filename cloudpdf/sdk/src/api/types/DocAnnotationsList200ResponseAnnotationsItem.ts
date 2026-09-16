@@ -1381,9 +1381,10 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
         updatedBy?: string | undefined;
         actions?: CloudPDF.PdfAnnotationActions | undefined;
         intent: DocAnnotationsList200ResponseAnnotationsItemFreeText.Intent;
-        fontFamily: DocAnnotationsList200ResponseAnnotationsItemFreeText.FontFamily;
+        fontFamily: string;
         fontSize: number;
         textAlign: DocAnnotationsList200ResponseAnnotationsItemFreeText.TextAlign;
+        richText: DocAnnotationsList200ResponseAnnotationsItemFreeText.RichText;
         color: DocAnnotationsList200ResponseAnnotationsItemFreeText.Color;
         fontColor?: DocAnnotationsList200ResponseAnnotationsItemFreeText.FontColor | undefined;
         interiorColor: DocAnnotationsList200ResponseAnnotationsItemFreeText.InteriorColor | null;
@@ -1454,29 +1455,156 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
             FreeTextCallout: "free-text-callout",
         } as const;
         export type Intent = (typeof Intent)[keyof typeof Intent];
-        export const FontFamily = {
-            Courier: "courier",
-            CourierBold: "courier-bold",
-            CourierBoldOblique: "courier-bold-oblique",
-            CourierOblique: "courier-oblique",
-            Helvetica: "helvetica",
-            HelveticaBold: "helvetica-bold",
-            HelveticaBoldOblique: "helvetica-bold-oblique",
-            HelveticaOblique: "helvetica-oblique",
-            TimesRoman: "times-roman",
-            TimesBold: "times-bold",
-            TimesBoldItalic: "times-bold-italic",
-            TimesItalic: "times-italic",
-            Symbol: "symbol",
-            ZapfDingbats: "zapf-dingbats",
-        } as const;
-        export type FontFamily = (typeof FontFamily)[keyof typeof FontFamily];
         export const TextAlign = {
             Left: "left",
             Center: "center",
             Right: "right",
         } as const;
         export type TextAlign = (typeof TextAlign)[keyof typeof TextAlign];
+
+        export interface RichText {
+            body: RichText.Body;
+            paragraphs: RichText.Paragraphs.Item[];
+        }
+
+        export namespace RichText {
+            export interface Body {
+                family: string;
+                weight: number;
+                italic: boolean;
+                size: number;
+                color: string;
+                decoration: Body.Decoration.Item[];
+                script: Body.Script;
+                letterSpacing: number;
+                horizontalScale: number;
+                unknown?: string | undefined;
+                align: Body.Align;
+                dir: Body.Dir;
+                lineHeight?: number | undefined;
+                margins?: Body.Margins | undefined;
+                textIndent?: number | undefined;
+            }
+
+            export namespace Body {
+                export type Decoration = Decoration.Item[];
+
+                export namespace Decoration {
+                    export const Item = {
+                        Underline: "underline",
+                        LineThrough: "line-through",
+                        Word: "word",
+                    } as const;
+                    export type Item = (typeof Item)[keyof typeof Item];
+                }
+
+                export const Script = {
+                    Normal: "normal",
+                    Sub: "sub",
+                    Super: "super",
+                } as const;
+                export type Script = (typeof Script)[keyof typeof Script];
+                export const Align = {
+                    Left: "left",
+                    Center: "center",
+                    Right: "right",
+                    Justify: "justify",
+                } as const;
+                export type Align = (typeof Align)[keyof typeof Align];
+                export const Dir = {
+                    Ltr: "ltr",
+                    Rtl: "rtl",
+                } as const;
+                export type Dir = (typeof Dir)[keyof typeof Dir];
+
+                export interface Margins {
+                    top: number;
+                    bottom: number;
+                    left: number;
+                    right: number;
+                }
+            }
+
+            export type Paragraphs = Paragraphs.Item[];
+
+            export namespace Paragraphs {
+                export interface Item {
+                    align?: Item.Align | undefined;
+                    dir?: Item.Dir | undefined;
+                    lineHeight?: number | undefined;
+                    margins?: Item.Margins | undefined;
+                    textIndent?: number | undefined;
+                    unknown?: string | undefined;
+                    runs: Item.Runs.Item[];
+                }
+
+                export namespace Item {
+                    export const Align = {
+                        Left: "left",
+                        Center: "center",
+                        Right: "right",
+                        Justify: "justify",
+                    } as const;
+                    export type Align = (typeof Align)[keyof typeof Align];
+                    export const Dir = {
+                        Ltr: "ltr",
+                        Rtl: "rtl",
+                    } as const;
+                    export type Dir = (typeof Dir)[keyof typeof Dir];
+
+                    export interface Margins {
+                        top: number;
+                        bottom: number;
+                        left: number;
+                        right: number;
+                    }
+
+                    export type Runs = Runs.Item[];
+
+                    export namespace Runs {
+                        export interface Item {
+                            text: string;
+                            style?: Item.Style | undefined;
+                        }
+
+                        export namespace Item {
+                            export interface Style {
+                                family?: string | undefined;
+                                weight?: number | undefined;
+                                italic?: boolean | undefined;
+                                size?: number | undefined;
+                                color?: string | undefined;
+                                decoration?: Style.Decoration.Item[] | undefined;
+                                script?: Style.Script | undefined;
+                                letterSpacing?: number | undefined;
+                                horizontalScale?: number | undefined;
+                                unknown?: string | undefined;
+                            }
+
+                            export namespace Style {
+                                export type Decoration = Decoration.Item[];
+
+                                export namespace Decoration {
+                                    export const Item = {
+                                        Underline: "underline",
+                                        LineThrough: "line-through",
+                                        Word: "word",
+                                    } as const;
+                                    export type Item = (typeof Item)[keyof typeof Item];
+                                }
+
+                                export const Script = {
+                                    Normal: "normal",
+                                    Sub: "sub",
+                                    Super: "super",
+                                } as const;
+                                export type Script = (typeof Script)[keyof typeof Script];
+                            }
+                        }
+                    }
+                }
+            }
+        }
 
         export interface Color {
             r: number;

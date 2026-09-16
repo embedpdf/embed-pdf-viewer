@@ -811,6 +811,262 @@ export function runAnnotationMutationConformance(
       }
     });
 
+    // ── rich text (/RC + /DS): the same document model on every engine ──
+    // `richText` is a body (family/weight/italic/size/colour/decoration/
+    // align/dir) plus paragraphs of runs whose `style` overrides it. Every
+    // FreeText reads it back; a draft or patch may write it. The rules under
+    // test are the engine's patch table, so the cloud (HTTP -> server ->
+    // native runtime) and the local WASM engine must agree row for row.
+
+    test('rich text: a plain draft reads back body-style paragraphs and a body from its font', async () => {
+      const doc = await openFixture(engine, opts);
+      try {
+        const page = doc.page(fix.pageObjectNumber);
+        const created = await page.annotations.create({
+          subtype: 'free-text',
+          intent: 'free-text',
+          contents: 'Plain\rtext',
+          rect: shapeRect,
+          fontFamily: 'helvetica-bold',
+          fontSize: 18,
+          textAlign: 'center',
+          color: { r: 0, g: 0, b: 0 },
+        } satisfies FreeTextDraft);
+        expect(created.created.subtype).toBe('free-text');
+        if (created.created.subtype === 'free-text') {
+          const rich = created.created.richText;
+          expect(created.created.fontFamily).toBe('helvetica-bold');
+          expect(rich.body.family).toBe('Helvetica');
+          expect(rich.body.weight).toBe(700);
+          expect(rich.body.italic).toBe(false);
+          expect(rich.body.size).toBe(18);
+          expect(rich.body.align).toBe('center');
+          // One paragraph per line break, one unstyled run each; a paragraph
+          // names alignment only where it differs from the body.
+          expect(rich.paragraphs).toEqual([
+            { runs: [{ text: 'Plain' }] },
+            { runs: [{ text: 'text' }] },
+          ]);
+        }
+      } finally {
+        await doc.close();
+      }
+    });
+
+    test('rich text: a draft with runs round-trips the body, the runs and the plain projection', async () => {
+      const doc = await openFixture(engine, opts);
+      try {
+        const page = doc.page(fix.pageObjectNumber);
+        const created = await page.annotations.create({
+          subtype: 'free-text',
+          intent: 'free-text',
+          rect: shapeRect,
+          fontFamily: 'helvetica',
+          fontSize: 12,
+          textAlign: 'left',
+          color: { r: 0, g: 0, b: 255 },
+          richText: {
+            body: { family: 'Helvetica', size: 18, color: '#102030' },
+            paragraphs: [
+              {
+                runs: [
+                  { text: 'Hello ' },
+                  { text: 'bold', style: { weight: 700 } },
+                  { text: ' red', style: { color: '#FF0000' } },
+                ],
+              },
+              { align: 'center', runs: [{ text: 'H' }, { text: '2', style: { script: 'sub' } }] },
+            ],
+          },
+        } satisfies FreeTextDraft);
+        expect(AnnotationCreateResultSchema.safeParse(created).success).toBe(true);
+        expect(created.created.subtype).toBe('free-text');
+        if (created.created.subtype === 'free-text') {
+          const dto = created.created;
+          // `contents` is the projection: paragraphs joined by \r, runs concatenated.
+          expect(dto.contents).toBe('Hello bold red\rH2');
+          // The body became the /DA font and size; the /DA colour stayed the draft's.
+          expect(dto.fontFamily).toBe('helvetica');
+          expect(dto.fontSize).toBe(18);
+          expect(dto.color).toMatchObject({ r: 0, g: 0, b: 255 });
+          expect(dto.richText.body.color).toBe('#102030');
+          expect(dto.richText.paragraphs[0]!.runs).toEqual([
+            { text: 'Hello ' },
+            { text: 'bold', style: { weight: 700 } },
+            { text: ' red', style: { color: '#FF0000' } },
+          ]);
+          expect(dto.richText.paragraphs[1]!.align).toBe('center');
+          expect(dto.richText.paragraphs[1]!.runs[1]).toEqual({
+            text: '2',
+            style: { script: 'sub' },
+          });
+        }
+        // The list read agrees with the create echo.
+        const listed = (await page.annotations.list()).annotations.find(
+          (a) => a.index === created.created.index,
+        );
+        expect(listed?.subtype).toBe('free-text');
+        if (listed?.subtype === 'free-text') {
+          expect(listed.richText.paragraphs[0]!.runs[1]).toEqual({
+            text: 'bold',
+            style: { weight: 700 },
+          });
+        }
+      } finally {
+        await doc.close();
+      }
+    });
+
+    test('rich text: paragraphs-only patch keeps the body; contents-only rewrites body-style paragraphs', async () => {
+      const doc = await openFixture(engine, opts);
+      try {
+        const page = doc.page(fix.pageObjectNumber);
+        const created = await page.annotations.create({
+          subtype: 'free-text',
+          intent: 'free-text',
+          rect: shapeRect,
+          fontFamily: 'helvetica',
+          fontSize: 14,
+          textAlign: 'center',
+          color: { r: 0, g: 0, b: 0 },
+          richText: {
+            body: { family: 'Helvetica', size: 14 },
+            paragraphs: [{ runs: [{ text: 'a' }, { text: 'b', style: { weight: 700 } }] }],
+          },
+        } satisfies FreeTextDraft);
+        const ref = created.created.ref;
+        // The editor's commit: paragraphs only, no body — the body (and its
+        // alignment) stays what the annotation had.
+        const restyled = await page.annotations.update(ref, {
+          subtype: 'free-text',
+          richText: {
+            paragraphs: [{ runs: [{ text: 'ab', style: { italic: true } }, { text: 'c' }] }],
+          },
+        });
+        expect(AnnotationUpdateResultSchema.safeParse(restyled).success).toBe(true);
+        expect(restyled.updated.subtype).toBe('free-text');
+        if (restyled.updated.subtype === 'free-text') {
+          expect(restyled.updated.contents).toBe('abc');
+          expect(restyled.updated.richText.body.size).toBe(14);
+          expect(restyled.updated.richText.body.align).toBe('center');
+          expect(restyled.updated.textAlign).toBe('center');
+          expect(restyled.updated.richText.paragraphs[0]!.runs[0]).toEqual({
+            text: 'ab',
+            style: { italic: true },
+          });
+        }
+        // A plain-text client's rewrite: body-style paragraphs, one per line
+        // break — run formatting is gone by design.
+        const rewritten = await page.annotations.update(ref, {
+          subtype: 'free-text',
+          contents: 'one\rtwo',
+        });
+        expect(rewritten.updated.subtype).toBe('free-text');
+        if (rewritten.updated.subtype === 'free-text') {
+          expect(rewritten.updated.contents).toBe('one\rtwo');
+          expect(rewritten.updated.richText.paragraphs).toEqual([
+            { runs: [{ text: 'one' }] },
+            { runs: [{ text: 'two' }] },
+          ]);
+          expect(rewritten.updated.richText.body.size).toBe(14);
+        }
+        expect(rewritten.meta.weakRefsInvalidated).toBe(false);
+      } finally {
+        await doc.close();
+      }
+    });
+
+    test('rich text: fontSize / fontColor / fontFamily move the body while runs keep their deltas', async () => {
+      const doc = await openFixture(engine, opts);
+      try {
+        const page = doc.page(fix.pageObjectNumber);
+        const created = await page.annotations.create({
+          subtype: 'free-text',
+          intent: 'free-text',
+          rect: shapeRect,
+          fontFamily: 'helvetica',
+          fontSize: 14,
+          textAlign: 'left',
+          color: { r: 0, g: 0, b: 0 },
+          richText: {
+            body: { family: 'Helvetica', size: 14 },
+            paragraphs: [{ runs: [{ text: 'a' }, { text: 'b', style: { size: 30 } }] }],
+          },
+        } satisfies FreeTextDraft);
+        const updated = await page.annotations.update(created.created.ref, {
+          subtype: 'free-text',
+          fontSize: 20,
+          fontColor: { r: 255, g: 0, b: 0 },
+          fontFamily: 'times-bold',
+        });
+        expect(updated.updated.subtype).toBe('free-text');
+        if (updated.updated.subtype === 'free-text') {
+          const dto = updated.updated;
+          expect(dto.fontSize).toBe(20);
+          expect(dto.fontFamily).toBe('times-bold');
+          expect(dto.richText.body.size).toBe(20);
+          expect(dto.richText.body.color).toBe('#FF0000');
+          expect(dto.richText.body.family).toBe('Times');
+          expect(dto.richText.body.weight).toBe(700);
+          // The run's own size is a delta over the body: it survives the move.
+          expect(dto.richText.paragraphs[0]!.runs[1]).toEqual({ text: 'b', style: { size: 30 } });
+        }
+      } finally {
+        await doc.close();
+      }
+    });
+
+    test('rich text: contents and richText that disagree reject with InvalidArg; agreeing writes the runs', async () => {
+      const doc = await openFixture(engine, opts);
+      try {
+        const page = doc.page(fix.pageObjectNumber);
+        const created = await page.annotations.create({
+          subtype: 'free-text',
+          intent: 'free-text',
+          contents: 'x',
+          rect: shapeRect,
+          fontFamily: 'helvetica',
+          fontSize: 14,
+          textAlign: 'left',
+          color: { r: 0, g: 0, b: 0 },
+        } satisfies FreeTextDraft);
+        const ref = created.created.ref;
+        let caught: unknown;
+        try {
+          await page.annotations.update(ref, {
+            subtype: 'free-text',
+            contents: 'stale',
+            richText: { paragraphs: [{ runs: [{ text: 'fresh' }] }] },
+          });
+        } catch (err) {
+          caught = err;
+        }
+        expect(EngineError.is(caught, EngineErrorCode.InvalidArg)).toBe(true);
+        // The refused write left the annotation untouched.
+        const after = (await page.annotations.list()).annotations.find(
+          (a) => a.index === created.created.index,
+        );
+        expect(after?.contents).toBe('x');
+        const agreed = await page.annotations.update(ref, {
+          subtype: 'free-text',
+          contents: 'fresh',
+          richText: {
+            paragraphs: [{ runs: [{ text: 'fr' }, { text: 'esh', style: { weight: 700 } }] }],
+          },
+        });
+        expect(agreed.updated.subtype).toBe('free-text');
+        if (agreed.updated.subtype === 'free-text') {
+          expect(agreed.updated.contents).toBe('fresh');
+          expect(agreed.updated.richText.paragraphs[0]!.runs[1]).toEqual({
+            text: 'esh',
+            style: { weight: 700 },
+          });
+        }
+      } finally {
+        await doc.close();
+      }
+    });
+
     test('create redact (area + text) round-trips label + colour fields', async () => {
       const doc = await openFixture(engine, opts);
       try {

@@ -51,7 +51,7 @@ import {
   type ResolvedViewerConfig,
   type StampsCustomization,
 } from './config-context';
-import type { SignaturesCustomization } from './config-context';
+import type { AnnotationsCustomization, SignaturesCustomization } from './config-context';
 import { createViewerHandle, type ViewerHandle } from './handle';
 import { ICON_PATHS, type IconDef } from './ui/icons';
 import { ThemeProvider, type ThemePreference } from './ui/theme';
@@ -122,6 +122,9 @@ export interface ViewerCustomization {
    *  ask), which marks a person keeps, and script faces for typed marks. With
    *  no signer, a mark placed on a field is drawn in without sealing. */
   signatures?: SignaturesCustomization;
+  /** Annotations: fonts the free-text style panel offers beyond the standard
+   *  14 — fetched, registered on the engine and mounted for the live editor. */
+  annotations?: AnnotationsCustomization;
   /** Light/dark preference (string shorthand), or the full theme config with
    *  `--ep-*` token overrides. Tokens are applied by the DELIVERY (the custom
    *  element adopts them into its shadow root); direct consumers of this
@@ -196,6 +199,7 @@ export function FullViewer({
   chrome,
   stamps,
   signatures,
+  annotations,
   theme,
   themeTarget,
   onViewer,
@@ -242,6 +246,7 @@ export function FullViewer({
       icons: icons ?? {},
       stamps: stamps ?? {},
       signatures: signatures ?? {},
+      annotations: annotations ?? {},
       i18n: { locales, loaders, initial },
     };
   });

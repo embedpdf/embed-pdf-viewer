@@ -1804,6 +1804,9 @@ importers:
       '@embedpdf/react':
         specifier: workspace:*
         version: link:../../framework/react
+      '@embedpdf/web':
+        specifier: workspace:*
+        version: link:../../framework/web
       react:
         specifier: '>=18'
         version: 18.3.1

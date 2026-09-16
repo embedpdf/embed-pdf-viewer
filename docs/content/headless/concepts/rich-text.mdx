@@ -1,0 +1,138 @@
+---
+title: Rich text
+description: How free-text annotations are edited — a rich document of runs, one shared editor binding, and a plugin that routes formatting to the selected text or the whole box.
+---
+
+import { Callout } from '@/components/docs/callout';
+
+# Rich text
+
+A free-text annotation carries a rich document: a **body** style and
+**paragraphs of runs**, where a run's `style` holds only what it overrides
+(a bold word in a regular box is one run with `{ weight: 700 }`). The engine
+stores it the way Acrobat does (`/RC` + `/DS`), lays it out, and reads it
+back as `richText` on every free text — see
+[Annotation types](/docs/engine/core-concepts/annotation-types#rich-text)
+for the model and the patch rules. This page is about _editing_ it in the
+browser.
+
+The example puts a formatted box on the page; double-click it, select a
+word, and use the buttons — or `Ctrl`/`Cmd`+`B`, `I`, `U` while typing:
+
+<Example name="annotation/rich-text" mode="open" />
+
+## One editor, every framework
+
+Editing is split in three layers, so no framework carries its own text
+editor:
+
+- **The plugin decides** (`@embedpdf/plugin-annotation`, DOM-free). Its
+  `textItems(pon)` projection hands the framework one editable element per
+  free text: the box, `richText.paragraphs`, and the body as ready-to-spread
+  CSS (font, size, colour, weight, style, decoration, alignment, the text
+  inset). It owns the text truth, the debounced engine write, and where a
+  formatting change lands.
+- **The binding does the DOM** (`attachRichTextEditor` in `@embedpdf/web`).
+  It renders paragraphs as blocks and styled runs as inline-styled spans,
+  serialises typing back into runs from inline styles, maps the selection to
+  flat offsets and back, keeps the caret across a restyle, holds still during
+  IME composition, pastes as plain text and forwards the format shortcuts.
+  It knows nothing about plugins: it talks to a small structural host.
+- **The framework glues** (~50 lines). React's `AnnotationLayer` renders a
+  `FreeText` element that attaches the binding once, updates it when the
+  item changes, and keeps focus in step with the plugin's edit state. Angular,
+  Vue and Svelte do the same with their own effects — the binding's handle is
+  already shaped like a Svelte action (`{ update, detach }`).
+
+## Formatting the selection
+
+Everything a toolbar needs is on the public annotation capability and works
+the same whether the user is typing or has a box selected:
+
+```ts
+const annotation = useAnnotation();
+
+// The flat property vocabulary — free text declares bold/italic/underline
+// next to fontFamily/fontSize/fontColor, so a schema-driven panel renders
+// the toggles from `getSelectionProps().specs` with no new code.
+annotation.updateSelection({ bold: true });
+annotation.updateSelection({ fontSize: 24, fontColor: '#c00000' });
+
+// Flip a format: reads the state `getSelectionProps` reports, writes its inverse.
+annotation.toggleTextFormat('italic');
+```
+
+The routing rule: **while the text editor holds a non-empty selection, the
+range keys — `fontFamily`, `fontSize`, `fontColor`, `bold`, `italic`,
+`underline` — restyle that range's runs; otherwise they restyle the body of
+every selected free text.** `getSelectionProps()` reports the same way: with a
+range held, `values.bold` is whether every selected run is bold and `mixed`
+lists the keys the runs disagree on; a bare caret and a selected box report the
+body. Keys that aren't text (opacity, border, background) always apply to
+the annotation.
+
+A formatting change on the body is written as a rich body patch; a change on
+a range commits the paragraphs and keeps the body. Typing commits the
+paragraphs after a short pause, on every restyle, and when editing ends —
+the engine never sees a half-typed document.
+
+<Callout type="info">
+  A run that already overrides a property keeps its override when the body moves: turn the whole box
+  red and the one blue word stays blue. Clearing a run's override (so it follows the body again) is
+  a deliberate act — write the paragraphs without that property.
+</Callout>
+
+## Fonts in the DOM
+
+The engine embeds a registered font in the PDF; the browser needs the same
+face as a `@font-face` under the font's **key**, which is the CSS family the
+plugin emits for it. `mountWebFont` from `@embedpdf/web` does that with the
+bytes you registered:
+
+```ts
+import { mountWebFont } from '@embedpdf/web';
+
+await engine.fonts.register({ key: 'brand-sans', data });
+const unmount = await mountWebFont('brand-sans', data);
+```
+
+The standard 14 map to web stacks with matching metrics (Helvetica →
+`Helvetica, Arial, sans-serif`, and so on). The full viewer does the fetch,
+the registration and the mount from one `annotations.fonts` option — see
+[Custom fonts](/docs/engine/core-concepts/custom-fonts#show-the-font-in-the-browser-too).
+
+## Writing the glue for another framework
+
+If you render free text yourself, the plugin's host lens gives you the three
+calls the binding's host needs, and the binding gives you the rest:
+
+```ts
+import { attachRichTextEditor } from '@embedpdf/web';
+
+const binding = attachRichTextEditor(
+  element,
+  {
+    onInput: (doc) => anno.setRichText(item.ref, doc), // typing → optimistic model + debounced write
+    onSelectionChange: (range) => anno.setTextSelection(item.ref, range), // the range the toolbar restyles
+    onCommand: (format) => anno.toggleTextFormat(format), // Ctrl/Cmd+B/I/U
+    cssFontFamily: (family) => anno.cssFontFamily(family), // a run's face → a CSS family list
+  },
+  { document: item.richText, scale },
+);
+
+// Later, when the item or the zoom changes (the binding skips its own echo,
+// so the caret never jumps while typing):
+binding.update({ document: item.richText, scale });
+// On teardown:
+binding.detach();
+```
+
+Set `contentEditable` from `item.editing`, focus the element when the plugin
+enters edit, and stop `pointerdown` from bubbling to the stage so the browser
+owns caret placement inside the box. That is the whole per-framework
+surface; the React version in `@embedpdf/react` is the reference.
+
+Two limits are by design: the browser's native undo stack does not span a
+formatting change applied through the plugin, and the DOM's line wrapping
+approximates the engine's — the appearance stream the engine bakes is the
+truth, and it is what every other viewer shows.
