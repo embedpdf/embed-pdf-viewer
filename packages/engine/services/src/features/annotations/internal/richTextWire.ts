@@ -9,7 +9,6 @@ import {
   type RichTextDocumentInput,
   type RichTextParagraph,
   type RichTextRunStyle,
-  type RichTextSource,
   type StandardFont,
 } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
@@ -162,11 +161,9 @@ interface EngineRichText {
   paragraphs?: Array<Record<string, unknown> & { runs?: Array<Record<string, unknown>> }>;
 }
 
-/** The engine's JSON, parsed into the DTO shape (`source` split off,
+/** The engine's JSON, parsed into the DTO shape (its `source` and
  *  `diagnostics` dropped). `null` when it is not what the engine writes. */
-export function parseEngineRichText(
-  json: string,
-): { document: RichTextDocument; source: RichTextSource } | null {
+export function parseEngineRichText(json: string): RichTextDocument | null {
   let raw: EngineRichText;
   try {
     raw = JSON.parse(json) as EngineRichText;
@@ -188,10 +185,7 @@ export function parseEngineRichText(
       runs: (runs ?? []).map((r) => r as unknown as RichTextParagraph['runs'][number]),
     } as RichTextParagraph;
   });
-  return {
-    document: { body, paragraphs },
-    source: raw.source === 'rc' ? 'rc' : 'contents',
-  };
+  return { body, paragraphs };
 }
 
 /** Read an annotation's rich text through `EPDFAnnot_GetRichTextJSON`. */
@@ -199,7 +193,7 @@ export function readEngineRichText(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-): { document: RichTextDocument; source: RichTextSource } | null {
+): RichTextDocument | null {
   const json = readUtf8String(mem, (buf, cap) => fn.EPDFAnnot_GetRichTextJSON(annotPtr, buf, cap));
   return json ? parseEngineRichText(json) : null;
 }

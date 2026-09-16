@@ -58,7 +58,7 @@ describe('rich text FreeText (local engine)', () => {
     await engine.destroy();
   });
 
-  test('every FreeText reads back with richText; a plain one says so', async () => {
+  test('every FreeText reads back with richText, a plain one as body-style paragraphs', async () => {
     engine = await createLocalEngine({ runtime: { prefer: 'wasm' } });
     const doc = await engine.open({ kind: 'bytes', id: 'rt-plain', bytes: annotationsPdf });
     const created = await doc.page(PAGE).annotations.create({
@@ -71,7 +71,6 @@ describe('rich text FreeText (local engine)', () => {
       rect: RECT,
     });
     const dto = created.created as FreeTextAnnotationDTO;
-    expect(dto.richTextSource).toBe('contents');
     expect(dto.fontFamily).toBe('helvetica-bold');
     expect(dto.richText.body.family).toBe('Helvetica');
     expect(dto.richText.body.weight).toBe(700);
@@ -80,6 +79,10 @@ describe('rich text FreeText (local engine)', () => {
       'Plain',
       'text',
     ]);
+    // One engine, one shape: a plain draft is born with /RC and /DS too.
+    const saved = latin1(await doc.download());
+    expect(saved).toContain('xfa:APIVersion="EmbedPDF:1.0"');
+    expect(saved).toContain('/DS');
     await doc.close();
   });
 
@@ -109,7 +112,6 @@ describe('rich text FreeText (local engine)', () => {
       },
     });
     const dto = created.created as FreeTextAnnotationDTO;
-    expect(dto.richTextSource).toBe('rc');
     expect(dto.contents).toBe('Hello bold red\rH2');
     // The body became the /DA font and size; the /DA colour stayed the draft's.
     expect(dto.fontFamily).toBe('helvetica');
@@ -144,7 +146,6 @@ describe('rich text FreeText (local engine)', () => {
     });
     const ref = created.created.ref;
     const plain = created.created as FreeTextAnnotationDTO;
-    expect(plain.richTextSource).toBe('contents');
     expect(plain.textAlign).toBe('center');
     expect(plain.richText.body.align).toBe('center');
     // The first bold: paragraphs only, no body, no alignment (the editor's commit).
@@ -156,7 +157,6 @@ describe('rich text FreeText (local engine)', () => {
         },
       })
     ).updated as FreeTextAnnotationDTO;
-    expect(rich.richTextSource).toBe('rc');
     expect(rich.textAlign).toBe('center');
     expect(rich.richText.body.align).toBe('center');
     expect(rich.richText.paragraphs[0]!.align).toBeUndefined();
@@ -193,7 +193,6 @@ describe('rich text FreeText (local engine)', () => {
       contents: 'one\rtwo',
     });
     const dto = updated.updated as FreeTextAnnotationDTO;
-    expect(dto.richTextSource).toBe('rc');
     expect(dto.contents).toBe('one\rtwo');
     // A paragraph names alignment/direction only where it differs from the body.
     expect(dto.richText.paragraphs).toEqual([
@@ -264,7 +263,6 @@ describe('rich text FreeText (local engine)', () => {
       richText: { paragraphs: [{ runs: [{ text: 'fresh' }] }] },
     });
     expect((updated.updated as FreeTextAnnotationDTO).contents).toBe('fresh');
-    expect((updated.updated as FreeTextAnnotationDTO).richTextSource).toBe('rc');
     await doc.close();
   });
 
@@ -312,7 +310,7 @@ describe('rich text FreeText (local engine)', () => {
     await doc.close();
   });
 
-  test('doc.fonts settings: FULL embeds the whole program, the rich engine takes plain boxes', async () => {
+  test('doc.fonts settings: FULL embeds the whole program', async () => {
     engine = await createLocalEngine({ runtime: { prefer: 'wasm' } });
     await engine.fonts.register({ key: 'roboto', familyName: 'Roboto', data: roboto });
     const doc = await engine.open({ kind: 'bytes', id: 'rt-settings', bytes: annotationsPdf });
@@ -338,18 +336,7 @@ describe('rich text FreeText (local engine)', () => {
     const fullSave = await doc.download();
     expect(fullSave.byteLength).toBeGreaterThan(subsetSave.byteLength * 3);
 
-    await doc.fonts!.setFreeTextLayout('rich');
     await doc.fonts!.setTypographicFeatures(true);
-    const richEngine = await doc.page(PAGE).annotations.create({
-      subtype: 'free-text',
-      intent: 'free-text',
-      fontFamily: 'helvetica',
-      fontSize: 18,
-      textAlign: 'left',
-      contents: 'Rich engine',
-      rect: { left: 50, bottom: 150, right: 350, top: 220 },
-    });
-    expect((richEngine.created as FreeTextAnnotationDTO).richTextSource).toBe('contents');
     await doc.close();
   });
 });

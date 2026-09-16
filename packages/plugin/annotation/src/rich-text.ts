@@ -15,7 +15,6 @@
  *     commits as `contents`; anything else as `richText`
  */
 import {
-  isPlainRichText,
   locateOffset,
   paragraphsFromPlainText,
   type Annot,
@@ -223,34 +222,18 @@ export function richDocOf(a: Annot, fonts?: FontLookup): RichTextDocument {
   };
 }
 
-/** Whether the engine lays this annotation out with the rich engine (its
- *  source is `/RC`), which sets the DOM editor's line height and inset. */
-export function isRichSource(a: Annot): boolean {
-  return a.data?.subtype === 'free-text' && a.data.richTextSource === 'rc';
-}
-
-/** Does the text style itself carry formatting only a rich body can hold? */
-export function hasBodyFormatting(t: TextStyle | undefined): boolean {
-  return !!t && (!!t.bold || !!t.italic || !!t.underline);
-}
-
 /**
- * The write a text edit commits: a document nothing overrides, on an
- * annotation the engine keeps as plain `/Contents`, stays plain (no `/RC`
- * is born from typing); everything else replaces the rich paragraphs (the
- * body is omitted — it stays what the props path last wrote).
+ * The write a text edit commits: the rich paragraphs, with paragraph
+ * properties equal to the body's stripped (they are inherited, not
+ * overrides) and the body omitted — it stays what the props path last
+ * wrote. One engine, one path: plain and formatted text alike.
  */
 export function textCommitPatch(
   a: Annot,
   paragraphs: RichTextParagraph[],
   fonts?: FontLookup,
-): { contents: string } | { richText: { paragraphs: RichTextParagraph[] } } {
-  const stripped = stripBodyDefaults(paragraphs, richDocOf(a, fonts).body);
-  const plain =
-    isPlainRichText({ paragraphs: stripped }) && !isRichSource(a) && !hasBodyFormatting(a.text);
-  return plain
-    ? { contents: stripped.map((p) => p.runs.map((r) => r.text).join('')).join('\r') }
-    : { richText: { paragraphs: stripped } };
+): { richText: { paragraphs: RichTextParagraph[] } } {
+  return { richText: { paragraphs: stripBodyDefaults(paragraphs, richDocOf(a, fonts).body) } };
 }
 
 /**

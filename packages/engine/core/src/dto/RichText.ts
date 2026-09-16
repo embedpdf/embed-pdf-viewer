@@ -84,10 +84,6 @@ export interface RichTextDocumentInput {
   paragraphs: RichTextParagraph[];
 }
 
-/** Where a DTO's `richText` came from: the annotation's own `/RC`, or a
- *  one-run document synthesised from `/Contents` + `/DA`. */
-export type RichTextSource = 'rc' | 'contents';
-
 /** The plain-text projection of a rich document: paragraphs joined by `\r`,
  *  runs concatenated — what the engine writes to `/Contents`. */
 export function richTextPlainText(doc: { paragraphs: readonly RichTextParagraph[] }): string {

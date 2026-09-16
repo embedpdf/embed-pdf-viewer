@@ -10,13 +10,6 @@ import type { AbortablePromise } from '../promise/AbortablePromise';
 export type FontEmbeddingPolicy = 'default' | 'subset' | 'full';
 
 /**
- * Which engine lays out a plain FreeText (one without `/RC`): the classic
- * CPVT engine (the default) or the rich text engine that also draws `/RC`.
- * An annotation with `/RC` always uses the rich engine.
- */
-export type FreeTextLayoutEngine = 'cpvt' | 'rich';
-
-/**
  * Per-document font and text-layout settings: session state of this
  * document handle, never written to the file, applied to appearances
  * generated after the call. Local engine only (`doc.fonts` is undefined on
@@ -30,5 +23,4 @@ export interface DocumentFontSettings {
    * ligatures, and parity with what Acrobat draws wins.
    */
   setTypographicFeatures(enabled: boolean): AbortablePromise<void>;
-  setFreeTextLayout(layout: FreeTextLayoutEngine): AbortablePromise<void>;
 }

@@ -118,26 +118,18 @@ describe('documents', () => {
     expect(doc.body.family).toBe('Helvetica');
   });
 
-  it('commits plain text while nothing is rich, rich paragraphs otherwise', () => {
+  it('commits the rich paragraphs, with paragraph properties equal to the body stripped', () => {
     const plain = [{ runs: [{ text: 'hello' }] }];
     const styled = [{ runs: [{ text: 'hel', style: { weight: 700 } }, { text: 'lo' }] }];
-    const contentsAnnot = annot({
-      data: { subtype: 'free-text', richTextSource: 'contents' },
-    } as never);
-    const rcAnnot = annot({ data: { subtype: 'free-text', richTextSource: 'rc' } } as never);
-    expect(textCommitPatch(contentsAnnot, plain)).toEqual({ contents: 'hello' });
-    expect(textCommitPatch(contentsAnnot, styled)).toEqual({ richText: { paragraphs: styled } });
-    expect(textCommitPatch(rcAnnot, plain)).toEqual({ richText: { paragraphs: plain } });
-    // A bold BODY is rich too, even with unstyled runs.
-    expect(textCommitPatch(annot({ text: { ...text, bold: true } }), plain)).toEqual({
-      richText: { paragraphs: plain },
-    });
-    // Paragraph align/dir equal to the body's (the engine echoes them
-    // resolved, the editor round-trips them) are not overrides.
+    const a = annot({ data: { subtype: 'free-text' } } as never);
+    expect(textCommitPatch(a, plain)).toEqual({ richText: { paragraphs: plain } });
+    expect(textCommitPatch(a, styled)).toEqual({ richText: { paragraphs: styled } });
+    // Paragraph align/dir equal to the body's (the editor round-trips what it
+    // renders) are not overrides; a differing one is kept.
     const echoed = [{ align: 'left' as const, dir: 'ltr' as const, runs: [{ text: 'hello' }] }];
-    expect(textCommitPatch(contentsAnnot, echoed)).toEqual({ contents: 'hello' });
+    expect(textCommitPatch(a, echoed)).toEqual({ richText: { paragraphs: plain } });
     const centred = [{ align: 'center' as const, dir: 'ltr' as const, runs: [{ text: 'hello' }] }];
-    expect(textCommitPatch(contentsAnnot, centred)).toEqual({
+    expect(textCommitPatch(a, centred)).toEqual({
       richText: { paragraphs: [{ align: 'center', runs: [{ text: 'hello' }] }] },
     });
   });

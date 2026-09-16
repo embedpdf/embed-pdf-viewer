@@ -56,19 +56,19 @@ export function readFreeText(
   const fonts = ctx?.fonts;
   const fontFamily = rich
     ? freeTextFontForFace(
-        rich.document.body,
+        rich.body,
         fonts ? (family, weight, italic) => fonts.keyForFace(family, weight, italic) : undefined,
       )
     : da
       ? standardFontFromCode(da.fontCode)
       : DEFAULT_STANDARD_FONT;
   const fontSize =
-    rich && rich.document.body.size > 0
-      ? rich.document.body.size
+    rich && rich.body.size > 0
+      ? rich.body.size
       : da && da.fontSize > 0
         ? da.fontSize
         : DEFAULT_FONT_SIZE;
-  const richText = rich?.document ?? {
+  const richText = rich ?? {
     body: {
       family: 'Helvetica',
       weight: 400,
@@ -100,8 +100,7 @@ export function readFreeText(
   // /Q); a plain box's synthesised body carries /Q, so both agree. Justify
   // has no /Q value and reads back as the /Q alignment.
   const quadding = textAlignmentFromCode(readTextAlignment(fn, annotPtr));
-  const textAlign =
-    rich && rich.document.body.align !== 'justify' ? rich.document.body.align : quadding;
+  const textAlign = rich && rich.body.align !== 'justify' ? rich.body.align : quadding;
   const intent = freeTextIntentFromName(readIntent(fn, mem, annotPtr));
 
   const points = readCalloutLine(fn, mem, annotPtr);
@@ -125,7 +124,6 @@ export function readFreeText(
     fontSize,
     textAlign,
     richText,
-    richTextSource: rich?.source ?? 'contents',
     color,
     ...(fontColor !== undefined ? { fontColor } : {}),
     interiorColor: background ?? null,

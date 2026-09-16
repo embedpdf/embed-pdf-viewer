@@ -1,6 +1,5 @@
 import type {
   RichTextDocumentInput,
-  RichTextSource,
   AnnotationDTO,
   AnnotationFlags,
   AnnotationRef,
@@ -732,11 +731,6 @@ export type Msg =
   // The editor's rich result (runs of deltas over the body), applied
   // optimistically like `setText`; `contents` follows as the projection.
   | { t: 'setRichText'; id: Id; doc: RichTextDocumentInput }
-  // The engine's echo of a text commit: where the text now lives (`/RC` or
-  // plain `/Contents`). ONLY that field is taken — the echoed contents may
-  // already be behind the keyboard, so they never overwrite the optimistic
-  // document.
-  | { t: 'setRichTextSource'; id: Id; source: RichTextSource }
   | { t: 'endTextEdit' };
 
 export type Effect =

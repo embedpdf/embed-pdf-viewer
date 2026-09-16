@@ -86,7 +86,6 @@ describe('buildTextItems — the editor document', () => {
     (a as { data?: unknown }).data = {
       subtype: 'free-text',
       contents: 'one\rtwo',
-      richTextSource: 'rc',
       richText: {
         body: {
           family: 'Helvetica',

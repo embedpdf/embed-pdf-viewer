@@ -81,7 +81,6 @@ export const FreeTextDTOSchema: z.ZodType<FreeTextAnnotationDTO> = z.object({
   fontSize: z.number().positive(),
   textAlign: TextAlignmentSchema,
   richText: RichTextDocumentSchema,
-  richTextSource: z.enum(['rc', 'contents']),
   color: ColorSchema,
   fontColor: ColorSchema.optional(),
   interiorColor: ColorSchema.nullable(),

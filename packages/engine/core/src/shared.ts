@@ -129,7 +129,6 @@ export type {
   RichTextRun,
   RichTextRunStyle,
   RichTextScript,
-  RichTextSource,
 } from './dto/RichText';
 export { richTextPlainText, richTextParagraphsFromPlainText } from './dto/RichText';
 

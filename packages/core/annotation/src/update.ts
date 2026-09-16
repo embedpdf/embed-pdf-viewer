@@ -10,7 +10,6 @@ import type {
   AnnotationRef,
   InkIntent,
   RichTextDocumentInput,
-  RichTextSource,
 } from '@embedpdf/engine-core/runtime';
 import { expandGroups, groupMembers } from './group';
 import { canMove, groupUnionBounds, hitTest, isSelectable } from './hit';
@@ -398,8 +397,6 @@ export function update(m: Model, msg: Msg): [Model, Effect[]] {
       return setText(m, msg.id, msg.text);
     case 'setRichText':
       return setRichText(m, msg.id, msg.doc);
-    case 'setRichTextSource':
-      return setRichTextSource(m, msg.id, msg.source);
     case 'endTextEdit':
       return m.editing ? [{ ...m, editing: null }, []] : [m, []];
   }
@@ -443,17 +440,6 @@ function setRichText(m: Model, id: Id, doc: RichTextDocumentInput): [Model, Effe
     data: { ...a.data, richText, contents: plainTextOf(richText) },
   });
   return [{ ...m, byId: { ...m.byId, [id]: next } }, []];
-}
-
-function setRichTextSource(m: Model, id: Id, source: RichTextSource): [Model, Effect[]] {
-  const a = m.byId[id];
-  if (!a || !a.data || a.data.subtype !== 'free-text' || a.data.richTextSource === source) {
-    return [m, []];
-  }
-  return [
-    { ...m, byId: { ...m.byId, [id]: { ...a, data: { ...a.data, richTextSource: source } } } },
-    [],
-  ];
 }
 
 function editPointer(

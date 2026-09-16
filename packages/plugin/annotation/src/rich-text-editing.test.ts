@@ -66,7 +66,6 @@ const freeTextDTO = (
       },
       paragraphs,
     },
-    richTextSource: 'contents',
     color: { r: 0, g: 0, b: 0 },
     interiorColor: null,
     opacity: 1,
@@ -124,7 +123,7 @@ afterEach(() => {
 });
 
 describe('the editor document', () => {
-  it('applies rich paragraphs optimistically and commits plain contents while nothing is rich', async () => {
+  it('applies rich paragraphs optimistically and commits them, debounced', async () => {
     const h = await loaded(freeTextDTO('hello'));
     h.capability.beginTextEdit(REF);
     h.capability.setRichText(REF, { paragraphs: [{ runs: [{ text: 'hello world' }] }] });
@@ -134,26 +133,28 @@ describe('the editor document', () => {
     ]);
     expect(h.update).not.toHaveBeenCalled(); // debounced
     vi.advanceTimersByTime(300);
-    expect(h.update).toHaveBeenCalledWith(REF, { subtype: 'free-text', contents: 'hello world' });
+    // One engine, one path: plain text commits as rich paragraphs too.
+    expect(h.update).toHaveBeenCalledWith(REF, {
+      subtype: 'free-text',
+      richText: { paragraphs: [{ runs: [{ text: 'hello world' }] }] },
+    });
+    // The editor's metrics are the rich engine's from the start: line
+    // advance 1.2 × size, text inset 2 × the border width.
+    const item = h.capability.textItems(PON)[0]!;
+    expect(item.css.lineHeight).toBeCloseTo(14.4);
+    expect(item.css.padding).toBe(2);
   });
 
-  it('commits rich paragraphs once a run overrides the body, and takes the echoed source only', async () => {
+  it('never re-ingests the commit echo (it may be behind the keyboard)', async () => {
     const h = await loaded(freeTextDTO('hello'));
-    h.update.mockResolvedValue({
-      updated: freeTextDTO('stale', { richTextSource: 'rc' }),
-      appearance: { changed: true },
-    });
+    h.update.mockResolvedValue({ updated: freeTextDTO('stale'), appearance: { changed: true } });
     h.capability.beginTextEdit(REF);
     const paragraphs = [{ runs: [{ text: 'hel', style: { weight: 700 } }, { text: 'lo' }] }];
     h.capability.setRichText(REF, { paragraphs });
     vi.advanceTimersByTime(300);
     expect(h.update).toHaveBeenCalledWith(REF, { subtype: 'free-text', richText: { paragraphs } });
-    await vi.waitFor(() => expect(h.data().richTextSource).toBe('rc'));
-    expect(h.data().contents).toBe('hello'); // the echo never overwrites typing
-    // Rich metrics follow: the rich engine's line advance and text inset.
-    const item = h.capability.textItems(PON)[0]!;
-    expect(item.css.lineHeight).toBeCloseTo(14.4);
-    expect(item.css.padding).toBe(2);
+    await vi.waitFor(() => expect(h.update).toHaveBeenCalledTimes(1));
+    expect(h.data().contents).toBe('hello');
   });
 
   it('flushes the pending write and drops the selection on endTextEdit', async () => {
@@ -164,7 +165,10 @@ describe('the editor document', () => {
     h.capability.setRichText(REF, { paragraphs: [{ runs: [{ text: 'bye' }] }] });
     h.capability.endTextEdit();
     expect(h.update).toHaveBeenCalledTimes(1);
-    expect(h.update).toHaveBeenCalledWith(REF, { subtype: 'free-text', contents: 'bye' });
+    expect(h.update).toHaveBeenCalledWith(REF, {
+      subtype: 'free-text',
+      richText: { paragraphs: [{ runs: [{ text: 'bye' }] }] },
+    });
     expect(h.state().textSelection).toBeNull();
     expect(h.state().model.editing).toBeNull();
     vi.advanceTimersByTime(300);

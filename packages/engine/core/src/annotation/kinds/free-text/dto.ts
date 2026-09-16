@@ -1,4 +1,4 @@
-import type { RichTextDocument, RichTextSource } from '../../../dto/RichText';
+import type { RichTextDocument } from '../../../dto/RichText';
 import type { CalloutLine, PdfRect } from '../../../geometry/primitives';
 import type { AnnotationBase } from '../../base';
 import type {
@@ -38,13 +38,13 @@ export type FreeTextAnnotationDTO = AnnotationBase & {
   /** `/Q` horizontal text alignment. */
   textAlign: TextAlignment;
   /**
-   * The rich text, always present: the annotation's `/RC` when it has one,
-   * else a one-run document synthesised from `/Contents` and `/DA`.
-   * `richTextSource` says which, so a client cannot mistake a synthesised
-   * document for authored rich text.
+   * The text, as a rich document — always. The annotation's `/RC` when it has
+   * one, else the same shape synthesised from `/Contents`, `/DA` and `/Q`
+   * (one paragraph per line, no run deltas). `contents` is its plain
+   * projection. Every write goes back through the rich path, so a box has
+   * no "plain mode" to fall out of.
    */
   richText: RichTextDocument;
-  richTextSource: RichTextSource;
 
   // colours
   /** `/DA` colour: the border colour and the default text colour. */

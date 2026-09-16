@@ -12,7 +12,7 @@ import {
   type Model,
   type ViewEnv,
 } from '@embedpdf/core-annotation';
-import { cssFontFamilyForFont, isRichSource, richDocOf, stripBodyDefaults } from './rich-text';
+import { cssFontFamilyForFont, richDocOf, stripBodyDefaults } from './rich-text';
 import type { TextItem } from './types';
 
 /** The rich engine's line advance for the standard families: ascent +
@@ -31,12 +31,11 @@ export function buildTextItems(m: Model, pon: number, view?: ViewEnv): TextItem[
     const t = a?.text ?? initialTextStyle;
     // The text plate MIRRORS the engine's AP generator, so the DOM text sits
     // exactly where the baked text will land (WYSIWYG across the baked↔live
-    // swap): the box deflated by twice the border width — plain box, callout,
-    // CPVT and rich engine alike (`textPlateInset`, Acrobat's rule). A rich
-    // (`/RC`) annotation additionally lays out at the rich engine's line
-    // advance, 1.2 × size (ascent + descent + Acrobat's leading).
+    // swap): the box deflated by twice the border width, plain box and
+    // callout alike (`textPlateInset`, Acrobat's rule), at the rich engine's
+    // line advance, 1.2 × size (ascent + descent + Acrobat's leading) — the
+    // one engine every box lays out through.
     const sw = a?.style.strokeWidth ?? 0;
-    const rich = !!a && isRichSource(a);
     const doc = a ? richDocOf(a) : null;
     return {
       id: tb.id,
@@ -55,8 +54,7 @@ export function buildTextItems(m: Model, pon: number, view?: ViewEnv): TextItem[
       css: {
         fontFamily: cssFontFamilyForFont(t.fontFamily),
         fontSize: t.fontSize,
-        // CPVT lays out plain free-text at line-height ≈ font size.
-        lineHeight: rich ? t.fontSize * RICH_LINE_HEIGHT : t.fontSize,
+        lineHeight: t.fontSize * RICH_LINE_HEIGHT,
         color: t.fontColor,
         fontWeight: t.bold ? 700 : 400,
         fontStyle: t.italic ? 'italic' : 'normal',

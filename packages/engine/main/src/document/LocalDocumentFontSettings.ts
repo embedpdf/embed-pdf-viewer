@@ -6,7 +6,6 @@ import {
   type DocumentFontSettings,
   type DocumentSetFontSettingsWorkerRequest,
   type FontEmbeddingPolicy,
-  type FreeTextLayoutEngine,
   type WorkerResultPayload,
 } from '@embedpdf/engine-core/runtime';
 
@@ -34,10 +33,6 @@ export class LocalDocumentFontSettings implements DocumentFontSettings {
 
   setTypographicFeatures(enabled: boolean): AbortablePromise<void> {
     return this.send({ typographicFeatures: enabled });
-  }
-
-  setFreeTextLayout(layout: FreeTextLayoutEngine): AbortablePromise<void> {
-    return this.send({ freeTextLayout: layout });
   }
 
   private send(

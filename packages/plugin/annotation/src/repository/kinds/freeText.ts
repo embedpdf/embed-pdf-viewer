@@ -20,7 +20,7 @@ import {
   type TextStyle,
 } from '@embedpdf/core-annotation';
 
-import { hasBodyFormatting, isRichSource, richDocOf } from '../../rich-text';
+import { richDocOf } from '../../rich-text';
 import { boxEmit, type KindProjection, type Wire } from '../projection';
 import {
   colorToCss,
@@ -57,12 +57,9 @@ function textFromDTO(dto: FreeTextDTO): TextStyle {
  * lowers as a rich write carrying the current paragraphs — and every toggle
  * lowers the same COMPLETE body (the current one with the three toggles
  * applied: a partial body means engine defaults, which would reset the
- * size, face and colour), so a patch of several merges cleanly. Nothing is
- * emitted while the annotation is plain and every toggle is off: a plain
- * `/Contents` annotation must not grow an `/RC` from a no-op.
+ * size, face and colour), so a patch of several merges cleanly.
  */
 const formattingBody = (a: Annot): Wire => {
-  if (!hasBodyFormatting(a.text) && !isRichSource(a)) return {};
   const doc = richDocOf(a);
   const t = a.text;
   return {

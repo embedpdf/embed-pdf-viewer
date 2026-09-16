@@ -17,7 +17,6 @@ export type { FontService } from './engine/FontService';
 export type {
   DocumentFontSettings,
   FontEmbeddingPolicy,
-  FreeTextLayoutEngine,
 } from './engine/DocumentFontSettings';
 export type { DocumentHandle } from './engine/DocumentHandle';
 export type {

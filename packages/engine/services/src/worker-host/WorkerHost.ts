@@ -1530,12 +1530,6 @@ export class WorkerHost {
         throw new EngineError(EngineErrorCode.InvalidArg, 'EPDFDoc_SetTypographicFeatures failed');
       }
     }
-    if (req.freeTextLayout !== undefined) {
-      const code = { cpvt: 0, rich: 1 }[req.freeTextLayout];
-      if (!fn.EPDFDoc_SetFreeTextLayout(docPtr, code)) {
-        throw new EngineError(EngineErrorCode.InvalidArg, 'EPDFDoc_SetFreeTextLayout failed');
-      }
-    }
     return wirePack({ tag: 'document.setFontSettings' });
   }
 

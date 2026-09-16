@@ -1021,7 +1021,6 @@ export interface DocumentSetFontSettingsWorkerRequest {
   layerName?: string;
   embeddingPolicy?: 'default' | 'subset' | 'full';
   typographicFeatures?: boolean;
-  freeTextLayout?: 'cpvt' | 'rich';
 }
 
 export interface CloseWorkerRequest {

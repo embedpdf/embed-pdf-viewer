@@ -956,10 +956,9 @@ export function createAnnotationCapability(
   // ── the text commit: ONE debounced write per annotation for both editors ──
   // The model is the truth while typing (`setText`/`setRichText` apply
   // optimistically); the engine sees it after a pause, on every restyle,
-  // and on leaving edit. The write is the plain `contents` or the rich
-  // paragraphs by the commit rule (`textCommitPatch`); its echo is NOT
-  // re-ingested — it may already be behind the keyboard — except for where
-  // the text now lives, which sets the editor's rich metrics.
+  // and on leaving edit. The write is the rich paragraphs
+  // (`textCommitPatch`); its echo is NOT re-ingested — it may already be
+  // behind the keyboard.
   const commitText = (ref: AnnotationRef): void => {
     const key = refKey(ref);
     clearTimeout(textTimers.get(key));
@@ -972,11 +971,7 @@ export function createAnnotationCapability(
       ?.page(pon)
       .annotations.update(ref, { subtype: 'free-text', ...patch })
       .then(
-        (res) => {
-          if (res.updated.subtype === 'free-text' && res.updated.richTextSource) {
-            apply({ t: 'setRichTextSource', id: key, source: res.updated.richTextSource });
-          }
-        },
+        () => {},
         () => {},
       );
   };
