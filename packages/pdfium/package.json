@@ -53,8 +53,7 @@
     "prewasm": "node ./scripts/generate-exported-functions.js && node ./scripts/generate-exported-runtime-methods.js",
     "wasm": "make build && pnpm run wasm:copy",
     "wasm:copy": "cpy \"./docker/dist/{pdfium.cjs,pdfium.js,pdfium.wasm,functions.ts,runtime-methods.ts}\" ./src/vendor --flat",
-    "build:all": "pnpm run wasm && pnpm run build",
-    "test:redaction": "node --test tests/redaction.test.mjs"
+    "build:all": "pnpm run wasm && pnpm run build"
   },
   "files": [
     "dist",
