@@ -620,9 +620,12 @@ function FreeText({ item, page }: { item: TextItem; page: PageContextValue }) {
   // Model → DOM: the binding skips its own echo (so the caret never jumps
   // while typing) and re-renders — caret restored — for a restyle, a remote
   // edit, or a zoom.
+  // Runs on every item change: the binding re-renders only when the document
+  // differs, and otherwise just re-states the line model for the element's
+  // (possibly restyled) font.
   useEffect(() => {
     binding.current?.update({ document: item.richText, scale });
-  }, [item.richText, scale]);
+  }, [item, scale]);
   // The element IS the engine's text PLATE (`SetPlateRect` + its `re W n`
   // clip): positioned at the padding inset with ZERO CSS padding, so the
   // scrollport's edge is the plate edge. CSS padding does NOT clip overflow —
@@ -696,7 +699,8 @@ function FreeText({ item, page }: { item: TextItem; page: PageContextValue }) {
         height: plate.height,
         fontFamily: item.css.fontFamily,
         fontSize: item.css.fontSize * scale,
-        lineHeight: `${item.css.lineHeight * scale}px`,
+        // No line-height here: the binding states the engine's line model on
+        // the element per face (ascent + descent + Acrobat's leading).
         color: item.css.color,
         fontWeight: item.css.fontWeight,
         fontStyle: item.css.fontStyle,

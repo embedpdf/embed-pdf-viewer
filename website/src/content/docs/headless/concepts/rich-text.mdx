@@ -98,7 +98,7 @@ await engine.fonts.register({ key: 'brand-sans', data });
 const unmount = await mountWebFont('brand-sans', data);
 ```
 
-The standard 14 map to web stacks with matching metrics (Helvetica →
+Standard PDF fonts use browser font stacks (Helvetica →
 `Helvetica, Arial, sans-serif`, and so on). The full viewer does the fetch,
 the registration and the mount from one `annotations.fonts` option — see
 [Custom fonts](/docs/engine/core-concepts/custom-fonts#show-the-font-in-the-browser-too).
@@ -133,8 +133,3 @@ Set `contentEditable` from `item.editing`, focus the element when the plugin
 enters edit, and stop `pointerdown` from bubbling to the stage so the browser
 owns caret placement inside the box. That is the whole per-framework
 surface; the React version in `@embedpdf/react` is the reference.
-
-Two limits are by design: the browser's native undo stack does not span a
-formatting change applied through the plugin, and the DOM's line wrapping
-approximates the engine's — the appearance stream the engine bakes is the
-truth, and it is what every other viewer shows.

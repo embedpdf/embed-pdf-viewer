@@ -40,6 +40,7 @@ export async function mountWebFont(
     holders.delete(key);
     return () => {};
   }
+  notifyFontChange(doc);
   return () => release(holders, key);
 }
 
@@ -50,6 +51,29 @@ interface Holder {
 }
 
 const HOLDERS = new WeakMap<Document, Map<string, Holder>>();
+const LISTENERS = new WeakMap<Document, Set<() => void>>();
+
+/** Internal: refresh editor styles for CSS loads and explicitly mounted faces.
+ * Adding an already loaded FontFace does not trigger `loadingdone`. */
+export function observeWebFonts(doc: Document, onChange: () => void): () => void {
+  let listeners = LISTENERS.get(doc);
+  if (!listeners) {
+    listeners = new Set();
+    LISTENERS.set(doc, listeners);
+  }
+  listeners.add(onChange);
+  doc.fonts?.addEventListener('loadingdone', onChange);
+  doc.fonts?.addEventListener('loadingerror', onChange);
+  return () => {
+    listeners.delete(onChange);
+    doc.fonts?.removeEventListener('loadingdone', onChange);
+    doc.fonts?.removeEventListener('loadingerror', onChange);
+  };
+}
+
+function notifyFontChange(doc: Document): void {
+  for (const listener of LISTENERS.get(doc) ?? []) listener();
+}
 
 function holdersOf(doc: Document): Map<string, Holder> {
   let map = HOLDERS.get(doc);
@@ -71,4 +95,5 @@ function release(holders: Map<string, Holder>, key: string): void {
   } catch {
     // a detached document: nothing to remove from
   }
+  notifyFontChange(holder.doc);
 }
