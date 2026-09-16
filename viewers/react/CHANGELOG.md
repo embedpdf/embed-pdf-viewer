@@ -1,5 +1,7 @@
 # @embedpdf/react-pdf-viewer
 
+## 2.15.1
+
 ## 2.15.0
 
 ## 2.14.4
