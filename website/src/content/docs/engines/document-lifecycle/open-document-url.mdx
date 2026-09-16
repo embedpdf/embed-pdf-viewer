@@ -8,7 +8,7 @@ searchable: true
 
 import { Callout } from '@/components/callout'
 
-Opens a PDF document from a given URL by downloading the entire file.
+Opens a PDF document from a URL using HTTP byte-range loading when supported.
 
 ## Signature
 
@@ -18,30 +18,35 @@ openDocumentUrl(file: PdfFileUrl, options?: PdfOpenDocumentUrlOptions): PdfTask<
 
 ## Description
 
-This function initiates the process of loading a PDF file from a remote URL. It fetches the complete file content into memory before opening it.
+The PDFium worker engine requests aligned byte ranges as PDFium needs them and caches each downloaded range for the document lifetime. This lets pages render without downloading the complete file. If a range request fails, loading falls back to a complete response when it matches the already-read bytes. A changed representation rejects the current operation instead of mixing revisions.
+
+The direct engine uses full-fetch loading because synchronous network reads would block the browser's main thread. Requests with `credentials: 'omit'` or a custom engine `fetcher` also retain full-fetch loading.
 
 <Callout>
-**Note on Loading Strategy**
-Currently, this function **always** downloads the entire PDF file. Support for progressive loading via HTTP range requests is planned for a future release. The `mode` option is reserved for this future enhancement and will have no effect on the current behavior.
+  **Server Requirements** For incremental loading, the PDF endpoint must respond
+  to `Range` requests with `206 Partial Content` and a valid `Content-Range`
+  header. A strong `ETag` or `Last-Modified` header enables `If-Range`
+  protection between requests. A `200 OK` response remains supported through
+  automatic full-fetch fallback.
 </Callout>
 
 ## Parameters
 
-| Name | Type | Description |
-| :--- | :--- | :--- |
-| **`file`** | `PdfFileUrl` | An object containing a unique `id` you provide and the `url` of the PDF file. Example: `{ id: 'unique-doc-id', url: 'https://example.com/document.pdf' }` |
-| **`options`** | `PdfOpenDocumentUrlOptions` | (Optional) An object to configure loading. Can include a `password` for encrypted files. |
+| Name          | Type                        | Description                                                                                                                                               |
+| :------------ | :-------------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`file`**    | `PdfFileUrl`                | An object containing a unique `id` you provide and the `url` of the PDF file. Example: `{ id: 'unique-doc-id', url: 'https://example.com/document.pdf' }` |
+| **`options`** | `PdfOpenDocumentUrlOptions` | (Optional) An object to configure loading. Can include a `password` for encrypted files.                                                                  |
 
 ### `PdfOpenDocumentUrlOptions`
 
 ```typescript
 export interface PdfOpenDocumentUrlOptions {
-  password?: string;
+  password?: string
   /**
-   * NOTE: This option is reserved for future use. Currently, only the 'full-fetch'
-   * behavior is implemented regardless of the selected mode.
+   * `auto` and `range-request` use range loading in the worker engine.
+   * `full-fetch` always downloads the complete file before opening it.
    */
-  mode?: 'auto' | 'range-request' | 'full-fetch';
+  mode?: 'auto' | 'range-request' | 'full-fetch'
   /**
    * HTTP request options for fetching the PDF
    */
@@ -49,15 +54,15 @@ export interface PdfOpenDocumentUrlOptions {
     /**
      * Custom HTTP headers to include in all requests
      */
-    headers?: Record<string, string>;
+    headers?: Record<string, string>
     /**
      * Controls whether cookies are sent with requests
      * - 'omit': Never send cookies (default)
      * - 'same-origin': Send cookies for same-origin requests
      * - 'include': Always send cookies (requires CORS)
      */
-    credentials?: RequestCredentials;
-  };
+    credentials?: RequestCredentials
+  }
 }
 ```
 
@@ -76,19 +81,20 @@ See [Concepts: Tasks](../tasks.md) for more on how to handle asynchronous operat
 ```typescript
 // Assuming 'engine' is an initialized PdfiumEngine instance
 
-const fileUrl = { id: 'my-doc', url: '/path/to/document.pdf' };
+const fileUrl = { id: 'my-doc', url: '/path/to/document.pdf' }
 
 try {
   // Use .toPromise() to work with async/await
-  const document = await engine.openDocumentUrl(fileUrl, { password: 'my-secret-password' }).toPromise();
+  const document = await engine
+    .openDocumentUrl(fileUrl, { password: 'my-secret-password' })
+    .toPromise()
 
-  console.log(`Successfully opened document with ${document.pageCount} pages.`);
+  console.log(`Successfully opened document with ${document.pageCount} pages.`)
 
   // Now you can use the 'document' object with other engine methods
   // e.g., engine.renderPage(document, document.pages[0]);
-
 } catch (error) {
-  console.error('Failed to open document:', error);
+  console.error('Failed to open document:', error)
 }
 ```
 
@@ -96,45 +102,59 @@ try {
 
 ```typescript
 // Load a PDF that requires authentication
-const fileUrl = { id: 'secure-doc', url: 'https://api.example.com/documents/123.pdf' };
+const fileUrl = {
+  id: 'secure-doc',
+  url: 'https://api.example.com/documents/123.pdf',
+}
 
-const document = await engine.openDocumentUrl(fileUrl, {
-  requestOptions: {
-    headers: {
-      'Authorization': 'Bearer your-access-token-here',
-      'X-Custom-Header': 'custom-value'
-    }
-  }
-}).toPromise();
+const document = await engine
+  .openDocumentUrl(fileUrl, {
+    requestOptions: {
+      headers: {
+        Authorization: 'Bearer your-access-token-here',
+        'X-Custom-Header': 'custom-value',
+      },
+    },
+  })
+  .toPromise()
 ```
 
 ### Using Cookies for Authentication
 
 ```typescript
 // Load a PDF using cookie-based authentication
-const fileUrl = { id: 'session-doc', url: 'https://example.com/documents/secure.pdf' };
+const fileUrl = {
+  id: 'session-doc',
+  url: 'https://example.com/documents/secure.pdf',
+}
 
-const document = await engine.openDocumentUrl(fileUrl, {
-  requestOptions: {
-    credentials: 'include' // Sends cookies with the request
-  }
-}).toPromise();
+const document = await engine
+  .openDocumentUrl(fileUrl, {
+    requestOptions: {
+      credentials: 'include', // Sends cookies with the request
+    },
+  })
+  .toPromise()
 
-console.log(`Opened document with ${document.pageCount} pages using session cookies.`);
+console.log(
+  `Opened document with ${document.pageCount} pages using session cookies.`,
+)
 ```
 
 <Callout type="warning">
 **CORS and Credentials**
 
 When using `credentials: 'include'` to send cookies with cross-origin requests, the server must:
+
 - Include `Access-Control-Allow-Credentials: true` in the response headers
 - Specify the exact origin in `Access-Control-Allow-Origin` (wildcards are not allowed)
 - Properly handle preflight OPTIONS requests for CORS
 
 For same-origin requests, use `credentials: 'same-origin'` which is more restrictive and secure.
+
 </Callout>
 
 ## See Also
 
-  - [Open Document from Buffer](open-document-buffer.md)
-  - [Close Document](close-document.md)
+- [Open Document from Buffer](open-document-buffer.md)
+- [Close Document](close-document.md)
