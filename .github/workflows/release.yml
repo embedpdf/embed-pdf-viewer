@@ -51,6 +51,9 @@ jobs:
       - name: Install deps
         run: pnpm install --frozen-lockfile
 
+      - name: Test PDFium redaction
+        run: pnpm --filter @embedpdf/pdfium test:redaction
+
       - name: Build packages
         run: pnpm run build:viewers
 
