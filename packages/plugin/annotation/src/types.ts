@@ -284,9 +284,10 @@ export interface TextItem {
   rot?: number;
   css: {
     fontFamily: string;
-    /** Content units (the framework multiplies by the page scale). */
+    /** Content units (the framework multiplies by the page scale). The line
+     *  height is NOT here: the editor binding states the engine's line model
+     *  per face on the element itself (`@embedpdf/web`, `lineModelFor`). */
     fontSize: number;
-    lineHeight: number;
     color: string;
     /** The body's formatting (runs override it as inline spans). */
     fontWeight: number;

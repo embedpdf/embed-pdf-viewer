@@ -141,7 +141,6 @@ describe('the editor document', () => {
     // The editor's metrics are the rich engine's from the start: line
     // advance 1.2 × size, text inset 2 × the border width.
     const item = h.capability.textItems(PON)[0]!;
-    expect(item.css.lineHeight).toBeCloseTo(14.4);
     expect(item.css.padding).toBe(2);
   });
 

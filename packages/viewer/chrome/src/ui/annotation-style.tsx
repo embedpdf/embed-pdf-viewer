@@ -463,15 +463,33 @@ function FontFamilySelect({ value, onChange }: { value: string; onChange: (v: st
 function FontSizeCombo({ value, onChange }: { value: number; onChange: (n: number) => void }) {
   const [open, setOpen] = useState(false);
   const rootRef = useOutsideClose(open, () => setOpen(false));
+  // Typed text is a DRAFT until Enter or blur (Escape discards): committing
+  // per keystroke would apply "2" on the way to "24" — to the selected text
+  // while editing. Presets commit at once.
+  const [draft, setDraft] = useState<string | null>(null);
+  const commit = () => {
+    if (draft === null) return;
+    const n = parseInt(draft, 10);
+    setDraft(null);
+    if (Number.isFinite(n) && n > 0 && n !== value) onChange(n);
+  };
   return (
     <div ref={rootRef} className="relative w-full">
       <input
         type="number"
         min={1}
-        value={value}
-        onChange={(e) => {
-          const n = parseInt(e.target.value, 10);
-          if (Number.isFinite(n) && n > 0) onChange(n);
+        value={draft ?? value}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            commit();
+            setOpen(false);
+          } else if (e.key === 'Escape') {
+            setDraft(null);
+            setOpen(false);
+          }
         }}
         onClick={() => setOpen(true)}
         className="border-border bg-surface text-fg w-full rounded border px-2 py-1.5 pr-7 text-sm"
@@ -491,6 +509,7 @@ function FontSizeCombo({ value, onChange }: { value: number; onChange: (n: numbe
               key={sz}
               selected={sz === value}
               onClick={() => {
+                setDraft(null);
                 onChange(sz);
                 setOpen(false);
               }}

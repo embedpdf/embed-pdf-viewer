@@ -22,6 +22,8 @@ type FakeNode = EditorNode & { parentNode: FakeNode | null; childNodes: FakeNode
 
 function emptyStyle(): EditorStyle {
   return {
+    marginTop: '',
+    lineHeight: '',
     fontWeight: '',
     fontStyle: '',
     textDecoration: '',
@@ -120,6 +122,23 @@ describe('renderRichText', () => {
     expect(second!.childNodes.map((n) => n.nodeName)).toEqual(['#text', 'BR', '#text']);
     // An empty paragraph gets the caret placeholder.
     expect(third!.childNodes.map((n) => n.nodeName)).toEqual(['BR']);
+  });
+
+  it('raises the first block by the first-line shift and gives a run its face line height', () => {
+    const el = root();
+    renderRichText(
+      el,
+      {
+        paragraphs: [
+          { runs: [{ text: 'a' }, { text: 'b', style: { family: 'MyFont' } }] },
+          { runs: [{ text: 'c' }] },
+        ],
+      },
+      { scale: 1, cssFontFamily, firstLineShift: 1.4, lineHeightFor: () => 1.371 },
+    );
+    expect(el.childNodes[0]!.style!.marginTop).toBe('-1.4px');
+    expect(el.childNodes[1]!.style!.marginTop).toBe('');
+    expect(el.childNodes[0]!.childNodes[1]!.style!.lineHeight).toBe('1.371');
   });
 
   it('maps script, family, decoration and letter spacing to CSS', () => {
@@ -445,6 +464,40 @@ describe('attachRichTextEditor', () => {
     el.childNodes[0]!.childNodes[0]!.nodeValue = 'hello world';
     el.dispatch('input');
     expect(h1.inputs).toEqual([{ paragraphs: [{ runs: [{ text: 'hello world' }] }] }]);
+    binding.detach();
+  });
+
+  it('states the line model from the element font and keeps the shift on the first block', () => {
+    const { el } = fakeEditor();
+    // The framework sets the body font; the binding derives the engine's line
+    // model from it (no canvas here: a one-em Helvetica, shift = half-leading).
+    el.style!.fontFamily = 'Helvetica, Arial, sans-serif';
+    el.style!.fontSize = '20px';
+    const h1 = host();
+    const binding = attachRichTextEditor(el as unknown as HTMLElement, h1, {
+      document: { paragraphs: [{ runs: [{ text: 'ab' }] }] },
+      scale: 1,
+    });
+    expect(el.style!.lineHeight).toBe('1.2');
+    expect(el.childNodes[0]!.style!.marginTop).toBe('-2px');
+    // Enter in Chrome: a second block carrying the first block's inline style.
+    const clone = element('div', { marginTop: '-2px' });
+    clone.appendChild(text('b'));
+    el.appendChild(clone);
+    el.childNodes[0]!.childNodes[0]!.nodeValue = 'a';
+    el.dispatch('input');
+    expect(el.childNodes[0]!.style!.marginTop).toBe('-2px');
+    expect(el.childNodes[1]!.style!.marginTop).toBe('');
+    expect(h1.inputs[0]).toEqual({
+      paragraphs: [{ runs: [{ text: 'a' }] }, { runs: [{ text: 'b' }] }],
+    });
+    // A body restyle changes the element's font under the same document: the
+    // line model follows on update without re-rendering the text.
+    const block = el.childNodes[0];
+    el.style!.fontSize = '40px';
+    binding.update({ document: h1.inputs[0]!, scale: 1 });
+    expect(el.childNodes[0]).toBe(block);
+    expect(el.childNodes[0]!.style!.marginTop).toBe('-4px');
     binding.detach();
   });
 

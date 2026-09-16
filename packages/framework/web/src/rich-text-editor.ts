@@ -28,6 +28,8 @@
  * the engine's layout, the appearance stream is the truth.
  */
 
+import { firstLineShiftFor, lineModelFor } from './web-font-metrics';
+
 export type RichTextEditorDecoration = 'underline' | 'line-through' | 'word';
 export type RichTextEditorScript = 'normal' | 'sub' | 'super';
 export type RichTextEditorAlign = 'left' | 'center' | 'right' | 'justify';
@@ -103,6 +105,8 @@ const ELEMENT_NODE = 1;
 const TEXT_NODE = 3;
 
 export interface EditorStyle {
+  marginTop?: string;
+  lineHeight?: string;
   fontWeight: string;
   fontStyle: string;
   textDecoration: string;
@@ -301,11 +305,20 @@ function sameDelta(
 export function renderRichText(
   root: EditorRoot,
   doc: RichTextEditorDocument,
-  options: { scale: number; cssFontFamily: (family: string) => string },
+  options: {
+    scale: number;
+    cssFontFamily: (family: string) => string;
+    /** The engine's line advance ratio for a run's CSS family (Acrobat's
+     *  line model per face — see `web-font-metrics`); set on every styled
+     *  run so its line box scales with its own face and size. */
+    lineHeightFor?: (cssFamily: string) => number;
+    /** Screen px to raise the first line by (see `firstLineShiftFor`). */
+    firstLineShift?: number;
+  },
 ): void {
   const factory = root.ownerDocument;
   if (!factory) return;
-  const blocks: EditorNode[] = [];
+  const blocks: EditorElement[] = [];
   const paragraphs = doc.paragraphs.length ? doc.paragraphs : [{ runs: [{ text: '' }] }];
   for (const paragraph of paragraphs) {
     const block = factory.createElement('div');
@@ -319,6 +332,9 @@ export function renderRichText(
       if (run.style && Object.keys(run.style).length) {
         container = factory.createElement('span');
         applyStyleDelta(container.style, run.style, options.scale, options.cssFontFamily);
+        if (run.style.family !== undefined && options.lineHeightFor) {
+          container.style.lineHeight = String(options.lineHeightFor(container.style.fontFamily));
+        }
         block.appendChild(container);
       }
       const pieces = run.text.split(/\r\n|\r|\n/);
@@ -336,11 +352,24 @@ export function renderRichText(
     if (endsWithBreak || !lastChild(block)) block.appendChild(factory.createElement('br'));
     blocks.push(block);
   }
+  if (options.firstLineShift && blocks[0]) {
+    blocks[0].style.marginTop = `${-options.firstLineShift}px`;
+  }
   if (root.replaceChildren) {
     root.replaceChildren(...blocks);
   } else {
     while (root.firstChild && root.removeChild) root.removeChild(root.firstChild);
     for (const block of blocks) root.appendChild(block);
+  }
+}
+
+/** The first-line shift as a negative top margin on the first block and
+ *  nothing on the others (see {@link RichTextEditorProps.firstLineShift}). */
+export function applyFirstLineShift(root: EditorNode, shift: number | undefined): void {
+  for (let i = 0; i < root.childNodes.length; i++) {
+    const node = root.childNodes[i]!;
+    if (!node.style) continue;
+    node.style.marginTop = i === 0 && shift ? `${-shift}px` : '';
   }
 }
 
@@ -630,14 +659,40 @@ export function attachRichTextEditor(
     sel.addRange(domRange);
   };
 
+  // The element's own face and size decide its line model: the engine's
+  // advance as a unitless line height (per face, so a larger or different
+  // run grows its own line), and the first-line shift.
+  const elementFont = (): { family: string; size: number } => {
+    const inline = el.style;
+    const computed = typeof getComputedStyle === 'function' ? getComputedStyle(el) : null;
+    const family = inline.fontFamily || computed?.fontFamily || 'Helvetica';
+    const size = parseFloat(inline.fontSize || computed?.fontSize || '16') || 16;
+    return { family, size };
+  };
+  const applyLineModel = (): number => {
+    const { family, size } = elementFont();
+    el.style.lineHeight = String(lineModelFor(family).lineHeight);
+    return firstLineShiftFor(family, size);
+  };
+
   const render = (document: RichTextEditorDocument, keepSelection: boolean) => {
     const selection = keepSelection ? currentSelection() : null;
-    renderRichText(root, document, { scale: props.scale, cssFontFamily: host.cssFontFamily });
+    const firstLineShift = applyLineModel();
+    renderRichText(root, document, {
+      scale: props.scale,
+      cssFontFamily: host.cssFontFamily,
+      lineHeightFor: (cssFamily) => lineModelFor(cssFamily).lineHeight,
+      firstLineShift,
+    });
     rendered = document;
     if (selection) select(selection);
   };
 
   const serialiseAndReport = () => {
+    // Enter splits a block by CLONING its style attribute, so the first
+    // block's shift would ride onto the new paragraph: keep it on the first
+    // block alone, whatever the browser produced.
+    applyFirstLineShift(root, applyLineModel());
     const document = serializeRichText(root, props.scale);
     rendered = document;
     host.onInput(document);
@@ -693,7 +748,11 @@ export function attachRichTextEditor(
       if (composing) return;
       if (!rendered || scaleChanged || !documentsEqual(next.document, rendered)) {
         render(next.document, activeElement() === el);
+        return;
       }
+      // The element's font may have changed under an unchanged document (a
+      // body restyle): the line model follows it without touching the DOM text.
+      applyFirstLineShift(root, applyLineModel());
     },
     selection: currentSelection,
     select,

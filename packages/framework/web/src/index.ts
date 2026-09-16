@@ -60,6 +60,7 @@ export type { WheelSample } from './wheel';
 export { indexedDbByteStore } from './byte-store';
 export type { ByteStore, IndexedDbByteStoreOptions } from './byte-store';
 export {
+  applyFirstLineShift,
   attachRichTextEditor,
   offsetOfPosition,
   positionOfOffset,
@@ -88,3 +89,5 @@ export type {
   RichTextEditorStyle,
 } from './rich-text-editor';
 export { mountWebFont } from './web-font';
+export { firstLineShiftFor, lineModelFor, webFontMetrics } from './web-font-metrics';
+export type { LineModel, WebFontMetrics } from './web-font-metrics';

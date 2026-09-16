@@ -12,12 +12,19 @@ import {
   type Model,
   type ViewEnv,
 } from '@embedpdf/core-annotation';
-import { cssFontFamilyForFont, richDocOf, stripBodyDefaults } from './rich-text';
+import {
+  cssFontFamilyForFont,
+  engineAscentForFont,
+  richDocOf,
+  stripBodyDefaults,
+} from './rich-text';
 import type { TextItem } from './types';
 
-/** The rich engine's line advance for the standard families: ascent +
- *  descent (1.0 × size for Helvetica, Times and Courier) + Acrobat's 0.2 ×
- *  size leading (the measured line model, plan §4.4). */
+/** The rich engine's line advance for the standard families as a ratio of
+ *  the size: ascent + descent (1.0 × size for Helvetica, Times and Courier)
+ *  + Acrobat's 0.2 × size leading (the measured line model, plan §4.4). A
+ *  RATIO, not a length: each run's line box then scales with its own size,
+ *  so a larger run makes its line taller exactly as the engine does. */
 const RICH_LINE_HEIGHT = 1.2;
 
 /** Project the model's free-text boxes into render-ready {@link TextItem}s — the
@@ -54,7 +61,8 @@ export function buildTextItems(m: Model, pon: number, view?: ViewEnv): TextItem[
       css: {
         fontFamily: cssFontFamilyForFont(t.fontFamily),
         fontSize: t.fontSize,
-        lineHeight: t.fontSize * RICH_LINE_HEIGHT,
+        lineHeight: RICH_LINE_HEIGHT,
+        ascent: engineAscentForFont(t.fontFamily),
         color: t.fontColor,
         fontWeight: t.bold ? 700 : 400,
         fontStyle: t.italic ? 'italic' : 'normal',
