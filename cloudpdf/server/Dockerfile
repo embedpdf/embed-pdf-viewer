@@ -83,13 +83,14 @@ RUN set -eux; \
     test -f "packages/engine/runtime/npm/$TARGET/lib/pdf-runtime.node"; \
     test -f "packages/engine/runtime/npm/$TARGET/lib/libembedpdf.so"
 
-# Build the server and its workspace dependency closure. The `<pkg>...`
-# suffix selects @cloudpdf/server + everything it depends on, and pnpm runs
-# recursive builds in topological order (dependencies first). The external
-# @embedpdf/* deps must have their dist/types built both for the server's
-# dts build and for runtime import resolution after deploy. (We avoid turbo
-# here: its Rust binary hits EINTR creating .turbo dirs under QEMU emulation.)
-RUN pnpm --filter "@cloudpdf/server..." run build
+# Build the server and its production workspace dependency closure in
+# topological order (dependencies first). --filter-prod excludes
+# core-signature's test-only local engine dependency, whose browser worker
+# needs a staged WASM payload. Build tools remain available from the full
+# dependency install above. The external @embedpdf/* deps need dist/types
+# for the server's dts build and runtime imports after deploy. (We avoid
+# turbo here: its Rust binary hits EINTR creating .turbo dirs under QEMU.)
+RUN pnpm --filter-prod "@cloudpdf/server..." run build
 
 # Assemble a self-contained production app directory in /prod (dist + prod
 # node_modules incl. the native package, sharp, sqlite). --legacy is required:

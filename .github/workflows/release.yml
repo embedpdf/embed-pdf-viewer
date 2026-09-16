@@ -32,6 +32,10 @@ on:
         description: 'Merged Changesets PR to reuse for release notes on a publish retry'
         required: false
         type: string
+      recover_server_run_id:
+        description: 'Recover images/chart after npm succeeded: original Release run ID (leave release_pr_number empty)'
+        required: false
+        type: string
 
 concurrency:
   group: release-next
@@ -46,11 +50,49 @@ env:
   CI: true
 
 jobs:
+  # A new run supplies the repaired Dockerfile, while application source and
+  # native payloads stay pinned to the run that already published to npm.
+  recover-server:
+    if: github.event_name == 'workflow_dispatch' && inputs.recover_server_run_id != ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      source_sha: ${{ steps.recovery.outputs.source_sha }}
+      run_id: ${{ steps.recovery.outputs.run_id }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test server recovery preflight
+        run: node --test scripts/resolve-server-recovery.test.mjs
+      - name: Validate server release recovery
+        id: recovery
+        uses: actions/github-script@v7
+        env:
+          RECOVER_SERVER_RUN_ID: ${{ inputs.recover_server_run_id }}
+          RELEASE_PR_NUMBER: ${{ inputs.release_pr_number }}
+        with:
+          script: |
+            if (process.env.RELEASE_PR_NUMBER) {
+              throw new Error('Use either recover_server_run_id or release_pr_number, not both.');
+            }
+            const { resolveServerRecovery } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/resolve-server-recovery.mjs`);
+            const recovery = await resolveServerRecovery({
+              github, repository: context.repo, runId: process.env.RECOVER_SERVER_RUN_ID,
+            });
+            core.setOutput('source_sha', recovery.sourceSha);
+            core.setOutput('run_id', recovery.runId);
+            await core.summary.addHeading('Server release recovery')
+              .addRaw(`Recovering @cloudpdf/server ${recovery.version} from run ${recovery.runId}, source ${recovery.sourceSha}. Only the Dockerfile and its ignore file come from this new run; npm publishing is skipped.`)
+              .write();
+
   build-runtime:
+    if: inputs.recover_server_run_id == ''
     uses: ./.github/workflows/build-engine-runtime.yml
     secrets: inherit
 
   release:
+    if: inputs.recover_server_run_id == ''
     needs: build-runtime
     runs-on: ubuntu-latest
     outputs:
@@ -275,8 +317,16 @@ jobs:
   # it (see cloudpdf/server/Dockerfile). Each build pushes by digest only;
   # merge-image below assembles the manifest and owns every tag.
   publish-image:
-    needs: [build-runtime, release]
-    if: needs.release.outputs.did_publish == 'true' && contains(needs.release.outputs.published, '@cloudpdf/server')
+    needs: [build-runtime, release, recover-server]
+    # The unused path is skipped in both modes, so override the implicit
+    # success() check while still requiring the selected path to succeed.
+    if: >-
+      !cancelled() &&
+      ((needs.build-runtime.result == 'success' && needs.release.result == 'success' &&
+        needs.release.outputs.did_publish == 'true' && contains(needs.release.outputs.published, '@cloudpdf/server')) ||
+       needs.recover-server.result == 'success')
+    outputs:
+      source_sha: ${{ steps.source.outputs.sha }}
     strategy:
       fail-fast: false
       matrix:
@@ -291,15 +341,38 @@ jobs:
     permissions:
       contents: read
       packages: write
+      actions: read
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Save repaired Docker build files
+        if: needs.recover-server.result == 'success'
+        run: |
+          mkdir -p "$RUNNER_TEMP/server-image-build"
+          cp cloudpdf/server/Dockerfile cloudpdf/server/Dockerfile.dockerignore "$RUNNER_TEMP/server-image-build/"
+
+      - name: Checkout original release source
+        if: needs.recover-server.result == 'success'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.recover-server.outputs.source_sha }}
+
+      - name: Apply repaired Docker build files
+        if: needs.recover-server.result == 'success'
+        run: cp "$RUNNER_TEMP/server-image-build/"* cloudpdf/server/
+
+      - name: Record application source
+        id: source
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Download ${{ matrix.target }} native runtime
         uses: actions/download-artifact@v7
         with:
           name: engine-runtime-${{ matrix.target }}
           path: packages/engine/runtime/npm/${{ matrix.target }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ needs.recover-server.outputs.run_id || github.run_id }}
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
@@ -315,6 +388,8 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ghcr.io/embedpdf/cloudpdf-server
+          labels: |
+            org.opencontainers.image.revision=${{ steps.source.outputs.sha }}
 
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v3
@@ -355,6 +430,9 @@ jobs:
   # moves `latest`.
   merge-image:
     needs: publish-image
+    if: ${{ !cancelled() && needs.publish-image.result == 'success' }}
+    outputs:
+      source_sha: ${{ needs.publish-image.outputs.source_sha }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -362,6 +440,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.publish-image.outputs.source_sha }}
 
       - name: Read server version
         id: ver
@@ -388,10 +468,12 @@ jobs:
 
       - name: Create multi-arch manifest
         working-directory: /tmp/digests
+        env:
+          SOURCE_SHA: ${{ needs.publish-image.outputs.source_sha }}
         # GA: swap the `next` and `sha-*` tags for `:${minor}` and `:latest`
         # per the promotion checklist.
         run: |
-          short_sha="$(printf '%s' '${{ github.sha }}' | cut -c1-7)"
+          short_sha="${SOURCE_SHA:0:7}"
           docker buildx imagetools create \
             -t 'ghcr.io/embedpdf/cloudpdf-server:${{ steps.ver.outputs.version }}' \
             -t 'ghcr.io/embedpdf/cloudpdf-server:next' \
@@ -409,8 +491,8 @@ jobs:
   # exactly like the npm `next` dist-tag. One-time setup: flip the
   # `charts/cloudpdf-server` GHCR package to public, like the image.
   publish-chart:
-    needs: [release, merge-image]
-    if: needs.release.outputs.did_publish == 'true' && contains(needs.release.outputs.published, '@cloudpdf/server')
+    needs: merge-image
+    if: ${{ !cancelled() && needs.merge-image.result == 'success' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -418,6 +500,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.merge-image.outputs.source_sha }}
 
       - name: Set up Helm
         uses: azure/setup-helm@v4
@@ -443,9 +527,10 @@ jobs:
   # package registry; it opens one generated-source PR per language repository.
   sync-sdks:
     needs: merge-image
-    if: vars.SDK_REPOSITORY_SYNC_ENABLED == 'true'
+    if: ${{ !cancelled() && needs.merge-image.result == 'success' && vars.SDK_REPOSITORY_SYNC_ENABLED == 'true' }}
     uses: ./.github/workflows/sdk-generate.yml
     with:
+      source_ref: ${{ needs.merge-image.outputs.source_sha }}
       sync_repositories: true
       auto_merge: ${{ vars.SDK_AUTO_MERGE == 'true' }}
     secrets:
