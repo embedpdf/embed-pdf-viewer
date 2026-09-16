@@ -9,17 +9,16 @@
  * Courier 0.627/0.373); any other face — a registered font, an embedded
  * one — uses its own `hhea` table.
  *
- * The browser reads the same `hhea` table through the canvas
- * (`fontBoundingBoxAscent/Descent`), so for a registered font its
- * measurement IS the engine's metrics; for the standard 14 the browser
- * substitutes a different face (Arial for Helvetica…), so those come from
- * the table. A unitless `line-height` of ascent + descent + 0.2 then gives
- * every run's line box the engine's advance, per face.
+ * Canvas provides browser metrics, which can be rounded or differ from the
+ * font program's metrics. They approximate the registered font's line model;
+ * standard families use the engine's known values below. CSS still chooses
+ * wrapping and combines mixed runs differently from the engine.
  *
  * One thing CSS cannot express: it centres a line's leading (half above the
  * glyphs), and the substitute face's ascent differs from the engine's, so
- * the FIRST baseline lands lower than the engine's by the half-leading plus
- * that ascent gap. The binding raises the first block by exactly that.
+ * the first baseline can land lower by the half-leading plus that ascent
+ * gap. The binding compensates using the body's face and size; mixed runs
+ * remain approximate.
  */
 
 export interface WebFontMetrics {
@@ -29,7 +28,7 @@ export interface WebFontMetrics {
   descent: number;
 }
 
-/** A face's line model: the engine's ascent and its line advance ratio. */
+/** A face's approximate CSS line model. */
 export interface LineModel {
   ascent: number;
   descent: number;
@@ -66,26 +65,31 @@ export function firstFamily(cssFamily: string): string {
   return (cssFamily.split(',')[0] ?? '').trim().replace(/^["']|["']$/g, '');
 }
 
-const CACHE = new Map<string, WebFontMetrics>();
+// Reuse the canvas, never its measurements: a font can be registered,
+// replaced or removed after a fallback face was measured. FontFaceSet.check
+// also returns true for missing fonts, so it cannot validate a result cache.
+const CONTEXTS = new WeakMap<Document, CanvasRenderingContext2D>();
 
 /**
  * The browser's own ascent and descent for a CSS family list, per em,
  * measured through a canvas. `null` when the platform cannot measure
- * (no canvas, no `fontBoundingBoxAscent`). A family the document has not
- * finished loading measures the fallback face and is not cached.
+ * (no canvas, no `fontBoundingBoxAscent`). Reads the currently resolved face
+ * on every call, including while the intended font is loading.
  */
 export function webFontMetrics(
   cssFamily: string,
   doc: Document | undefined = typeof document === 'undefined' ? undefined : document,
+  face: { weight?: number | string; style?: string } = {},
 ): WebFontMetrics | null {
-  const cached = CACHE.get(cssFamily);
-  if (cached) return cached;
   if (!doc) return null;
-  const canvas = doc.createElement('canvas');
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return null;
-  const font = `100px ${cssFamily}`;
-  ctx.font = font;
+  let ctx = CONTEXTS.get(doc);
+  if (!ctx) {
+    const context = doc.createElement('canvas').getContext('2d');
+    if (!context) return null;
+    ctx = context;
+    CONTEXTS.set(doc, ctx);
+  }
+  ctx.font = `${face.style ?? 'normal'} ${face.weight ?? 400} 100px ${cssFamily}`;
   const m = ctx.measureText('Hg') as TextMetrics & {
     fontBoundingBoxAscent?: number;
     fontBoundingBoxDescent?: number;
@@ -93,24 +97,15 @@ export function webFontMetrics(
   if (typeof m.fontBoundingBoxAscent !== 'number' || typeof m.fontBoundingBoxDescent !== 'number') {
     return null;
   }
-  const metrics = {
+  return {
     ascent: m.fontBoundingBoxAscent / 100,
     descent: m.fontBoundingBoxDescent / 100,
   };
-  let loaded = true;
-  try {
-    loaded = !doc.fonts || doc.fonts.check(font);
-  } catch {
-    loaded = true;
-  }
-  if (loaded) CACHE.set(cssFamily, metrics);
-  return metrics;
 }
 
 /**
- * The engine's line model for a CSS family list: the standard families'
- * table, else the face's own metrics as the browser measures them (the same
- * `hhea` the engine reads). `measure` is injectable for tests.
+ * The standard families' engine metrics, or a browser approximation for
+ * other families. `measure` is injectable for tests and resolved face styles.
  */
 export function lineModelFor(
   cssFamily: string,

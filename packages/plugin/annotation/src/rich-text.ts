@@ -176,22 +176,6 @@ export function cssFontFamilyForFace(family: string, fonts?: FontLookup): string
   return `"${family}", sans-serif`;
 }
 
-/** The engine's ascent ratios for the standard families (the measured
- *  Acrobat line model: where the first baseline sits below the plate top).
- *  Symbol and ZapfDingbats are not measured; a registered font's ascent is
- *  the web font's own, which the engine reads from the same program. */
-const ENGINE_ASCENT: Partial<Record<StandardFamily, number>> = {
-  Helvetica: 0.83,
-  Times: 0.784,
-  Courier: 0.627,
-};
-
-/** The engine's ascent ratio for a DTO font's face, or null when unknown. */
-export function engineAscentForFont(font: string): number | null {
-  const standard = STANDARD_FACES[font];
-  return standard ? (ENGINE_ASCENT[standard.family] ?? null) : null;
-}
-
 /** The CSS family list for a DTO font (a standard kebab name or a key). */
 export function cssFontFamilyForFont(font: string, fonts?: FontLookup): string {
   const standard = STANDARD_FACES[font];

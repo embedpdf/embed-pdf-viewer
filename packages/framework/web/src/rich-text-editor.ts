@@ -28,7 +28,13 @@
  * the engine's layout, the appearance stream is the truth.
  */
 
-import { firstLineShiftFor, lineModelFor } from './web-font-metrics';
+import { observeWebFonts } from './web-font';
+import {
+  firstLineShiftFor,
+  lineModelFor,
+  webFontMetrics,
+  type WebFontMetrics,
+} from './web-font-metrics';
 
 export type RichTextEditorDecoration = 'underline' | 'line-through' | 'word';
 export type RichTextEditorScript = 'normal' | 'sub' | 'super';
@@ -305,16 +311,7 @@ function sameDelta(
 export function renderRichText(
   root: EditorRoot,
   doc: RichTextEditorDocument,
-  options: {
-    scale: number;
-    cssFontFamily: (family: string) => string;
-    /** The engine's line advance ratio for a run's CSS family (Acrobat's
-     *  line model per face — see `web-font-metrics`); set on every styled
-     *  run so its line box scales with its own face and size. */
-    lineHeightFor?: (cssFamily: string) => number;
-    /** Screen px to raise the first line by (see `firstLineShiftFor`). */
-    firstLineShift?: number;
-  },
+  options: { scale: number; cssFontFamily: (family: string) => string },
 ): void {
   const factory = root.ownerDocument;
   if (!factory) return;
@@ -332,9 +329,6 @@ export function renderRichText(
       if (run.style && Object.keys(run.style).length) {
         container = factory.createElement('span');
         applyStyleDelta(container.style, run.style, options.scale, options.cssFontFamily);
-        if (run.style.family !== undefined && options.lineHeightFor) {
-          container.style.lineHeight = String(options.lineHeightFor(container.style.fontFamily));
-        }
         block.appendChild(container);
       }
       const pieces = run.text.split(/\r\n|\r|\n/);
@@ -352,9 +346,6 @@ export function renderRichText(
     if (endsWithBreak || !lastChild(block)) block.appendChild(factory.createElement('br'));
     blocks.push(block);
   }
-  if (options.firstLineShift && blocks[0]) {
-    blocks[0].style.marginTop = `${-options.firstLineShift}px`;
-  }
   if (root.replaceChildren) {
     root.replaceChildren(...blocks);
   } else {
@@ -363,8 +354,7 @@ export function renderRichText(
   }
 }
 
-/** The first-line shift as a negative top margin on the first block and
- *  nothing on the others (see {@link RichTextEditorProps.firstLineShift}). */
+/** Keep the baseline adjustment on the first block after Enter clones it. */
 export function applyFirstLineShift(root: EditorNode, shift: number | undefined): void {
   for (let i = 0; i < root.childNodes.length; i++) {
     const node = root.childNodes[i]!;
@@ -659,31 +649,52 @@ export function attachRichTextEditor(
     sel.addRange(domRange);
   };
 
-  // The element's own face and size decide its line model: the engine's
-  // advance as a unitless line height (per face, so a larger or different
-  // run grows its own line), and the first-line shift.
-  const elementFont = (): { family: string; size: number } => {
-    const inline = el.style;
-    const computed = typeof getComputedStyle === 'function' ? getComputedStyle(el) : null;
-    const family = inline.fontFamily || computed?.fontFamily || 'Helvetica';
-    const size = parseFloat(inline.fontSize || computed?.fontSize || '16') || 16;
-    return { family, size };
-  };
-  const applyLineModel = (): number => {
-    const { family, size } = elementFont();
-    el.style.lineHeight = String(lineModelFor(family).lineHeight);
-    return firstLineShiftFor(family, size);
+  // Read resolved faces in the element's own document (including iframe
+  // fonts). Refresh styles without replacing nodes, selection or composition.
+  const refreshLineModel = () => {
+    const bodyStyle = doc.defaultView?.getComputedStyle(el) ?? el.style;
+    const body = {
+      family: bodyStyle.fontFamily || 'Helvetica',
+      weight: bodyStyle.fontWeight || '400',
+      style: bodyStyle.fontStyle || 'normal',
+    };
+    const size = parseFloat(bodyStyle.fontSize || '16') || 16;
+    // Deduplicate measurements only within this synchronous refresh. They
+    // must be measured again after fonts or their descriptors change.
+    const measured = new Map<string, WebFontMetrics | null>();
+    const measureFor = (face: typeof body) => (family: string) => {
+      const key = JSON.stringify([family, face.weight, face.style]);
+      if (!measured.has(key)) measured.set(key, webFontMetrics(family, doc, face));
+      return measured.get(key)!;
+    };
+    // Read all computed styles before writing line heights to avoid forcing
+    // a style recalculation for each run. Native editing may nest spans.
+    const runs = Array.from(el.querySelectorAll<HTMLElement>('span, b, strong, i, em')).map(
+      (node) => {
+        const style = doc.defaultView?.getComputedStyle(node) ?? node.style;
+        const face = {
+          family: style.fontFamily || body.family,
+          weight: style.fontWeight || body.weight,
+          style: style.fontStyle || body.style,
+        };
+        return { node, lineHeight: lineModelFor(face.family, measureFor(face)).lineHeight };
+      },
+    );
+    const measure = measureFor(body);
+    const lineHeight = lineModelFor(body.family, measure).lineHeight;
+    const shift = firstLineShiftFor(body.family, size, measure);
+    el.style.lineHeight = String(lineHeight);
+    for (const run of runs) run.node.style.lineHeight = String(run.lineHeight);
+    applyFirstLineShift(root, shift);
   };
 
   const render = (document: RichTextEditorDocument, keepSelection: boolean) => {
     const selection = keepSelection ? currentSelection() : null;
-    const firstLineShift = applyLineModel();
     renderRichText(root, document, {
       scale: props.scale,
       cssFontFamily: host.cssFontFamily,
-      lineHeightFor: (cssFamily) => lineModelFor(cssFamily).lineHeight,
-      firstLineShift,
     });
+    refreshLineModel();
     rendered = document;
     if (selection) select(selection);
   };
@@ -692,7 +703,7 @@ export function attachRichTextEditor(
     // Enter splits a block by CLONING its style attribute, so the first
     // block's shift would ride onto the new paragraph: keep it on the first
     // block alone, whatever the browser produced.
-    applyFirstLineShift(root, applyLineModel());
+    refreshLineModel();
     const document = serializeRichText(root, props.scale);
     rendered = document;
     host.onInput(document);
@@ -737,6 +748,7 @@ export function attachRichTextEditor(
   doc.addEventListener('selectionchange', onSelectionChange);
 
   render(initial.document, false);
+  const stopObservingFonts = observeWebFonts(doc, refreshLineModel);
 
   return {
     update(next: RichTextEditorProps) {
@@ -752,11 +764,12 @@ export function attachRichTextEditor(
       }
       // The element's font may have changed under an unchanged document (a
       // body restyle): the line model follows it without touching the DOM text.
-      applyFirstLineShift(root, applyLineModel());
+      refreshLineModel();
     },
     selection: currentSelection,
     select,
     detach() {
+      stopObservingFonts();
       el.removeEventListener('input', onInput);
       el.removeEventListener('compositionstart', onCompositionStart);
       el.removeEventListener('compositionend', onCompositionEnd);

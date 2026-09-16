@@ -12,20 +12,8 @@ import {
   type Model,
   type ViewEnv,
 } from '@embedpdf/core-annotation';
-import {
-  cssFontFamilyForFont,
-  engineAscentForFont,
-  richDocOf,
-  stripBodyDefaults,
-} from './rich-text';
+import { cssFontFamilyForFont, richDocOf, stripBodyDefaults } from './rich-text';
 import type { TextItem } from './types';
-
-/** The rich engine's line advance for the standard families as a ratio of
- *  the size: ascent + descent (1.0 × size for Helvetica, Times and Courier)
- *  + Acrobat's 0.2 × size leading (the measured line model, plan §4.4). A
- *  RATIO, not a length: each run's line box then scales with its own size,
- *  so a larger run makes its line taller exactly as the engine does. */
-const RICH_LINE_HEIGHT = 1.2;
 
 /** Project the model's free-text boxes into render-ready {@link TextItem}s — the
  *  core geometry (`textBoxes`) joined with the DTO-derived CSS. Pure; memoized by
@@ -36,12 +24,8 @@ export function buildTextItems(m: Model, pon: number, view?: ViewEnv): TextItem[
     // `text`/`style` are the OPTIMISTIC content projections (a props edit lands
     // here before the engine round-trips), so the editor restyles instantly.
     const t = a?.text ?? initialTextStyle;
-    // The text plate MIRRORS the engine's AP generator, so the DOM text sits
-    // exactly where the baked text will land (WYSIWYG across the baked↔live
-    // swap): the box deflated by twice the border width, plain box and
-    // callout alike (`textPlateInset`, Acrobat's rule), at the rich engine's
-    // line advance, 1.2 × size (ascent + descent + Acrobat's leading) — the
-    // one engine every box lays out through.
+    // Match the engine's text plate inset. Browser font metrics and line
+    // heights belong to the shared editor binding.
     const sw = a?.style.strokeWidth ?? 0;
     const doc = a ? richDocOf(a) : null;
     return {
@@ -61,8 +45,6 @@ export function buildTextItems(m: Model, pon: number, view?: ViewEnv): TextItem[
       css: {
         fontFamily: cssFontFamilyForFont(t.fontFamily),
         fontSize: t.fontSize,
-        lineHeight: RICH_LINE_HEIGHT,
-        ascent: engineAscentForFont(t.fontFamily),
         color: t.fontColor,
         fontWeight: t.bold ? 700 : 400,
         fontStyle: t.italic ? 'italic' : 'normal',

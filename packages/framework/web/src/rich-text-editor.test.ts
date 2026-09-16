@@ -124,23 +124,6 @@ describe('renderRichText', () => {
     expect(third!.childNodes.map((n) => n.nodeName)).toEqual(['BR']);
   });
 
-  it('raises the first block by the first-line shift and gives a run its face line height', () => {
-    const el = root();
-    renderRichText(
-      el,
-      {
-        paragraphs: [
-          { runs: [{ text: 'a' }, { text: 'b', style: { family: 'MyFont' } }] },
-          { runs: [{ text: 'c' }] },
-        ],
-      },
-      { scale: 1, cssFontFamily, firstLineShift: 1.4, lineHeightFor: () => 1.371 },
-    );
-    expect(el.childNodes[0]!.style!.marginTop).toBe('-1.4px');
-    expect(el.childNodes[1]!.style!.marginTop).toBe('');
-    expect(el.childNodes[0]!.childNodes[1]!.style!.lineHeight).toBe('1.371');
-  });
-
   it('maps script, family, decoration and letter spacing to CSS', () => {
     const el = root();
     renderRichText(
@@ -379,9 +362,33 @@ function fakeEventTarget() {
   };
 }
 
-function fakeEditor() {
+function fakeEditor(metrics?: (font: string) => { ascent: number; descent: number }) {
   const el = root() as EditorRoot & FakeNode & ReturnType<typeof fakeEventTarget>;
   Object.assign(el, fakeEventTarget());
+  Object.assign(el, {
+    querySelectorAll(selector: string) {
+      const tags = selector
+        .toUpperCase()
+        .split(',')
+        .map((tag) => tag.trim());
+      const nodes: FakeNode[] = [];
+      const visit = (node: FakeNode) => {
+        for (const child of node.childNodes) {
+          if (tags.includes(child.nodeName)) nodes.push(child);
+          visit(child);
+        }
+      };
+      visit(el);
+      return nodes;
+    },
+  });
+  const context = {
+    font: '',
+    measureText: vi.fn(() => {
+      const m = metrics!(context.font);
+      return { fontBoundingBoxAscent: m.ascent * 100, fontBoundingBoxDescent: m.descent * 100 };
+    }),
+  };
   let range: {
     startContainer: EditorNode;
     startOffset: number;
@@ -402,6 +409,7 @@ function fakeEditor() {
   };
   const document = {
     ...fakeEventTarget(),
+    fonts: fakeEventTarget(),
     activeElement: null as unknown,
     getSelection: () => selection,
     createRange: () => {
@@ -426,9 +434,14 @@ function fakeEditor() {
     },
     execCommand: vi.fn(),
   };
-  (el as { ownerDocument: unknown }).ownerDocument = Object.assign(document, factory);
+  (el as { ownerDocument: unknown }).ownerDocument = Object.assign(document, factory, {
+    createElement: (tag: string) =>
+      tag === 'canvas'
+        ? Object.assign(element(tag), { getContext: () => (metrics ? context : null) })
+        : element(tag),
+  });
   (el as { getRootNode?: unknown }).getRootNode = () => document;
-  return { el, document, selection, currentRange: () => range };
+  return { el, document, selection, context, currentRange: () => range };
 }
 
 function host(): RichTextEditorHost & {
@@ -452,6 +465,45 @@ function host(): RichTextEditorHost & {
 
 describe('attachRichTextEditor', () => {
   const initial: RichTextEditorDocument = { paragraphs: [{ runs: [{ text: 'hello' }] }] };
+
+  it('refreshes body and run faces after fonts load without replacing text or composition', () => {
+    let loaded = false;
+    const { el, document, context } = fakeEditor((font) => {
+      if (!loaded) return { ascent: 0.8, descent: 0.2 };
+      return font.includes('700') ? { ascent: 1.1, descent: 0.3 } : { ascent: 0.9, descent: 0.3 };
+    });
+    el.style!.fontFamily = 'Custom';
+    el.style!.fontSize = '20px';
+    el.style!.fontStyle = 'italic';
+    const h1 = host();
+    const rich = { paragraphs: [{ runs: [{ text: 'a' }, { text: 'b', style: { weight: 700 } }] }] };
+    const binding = attachRichTextEditor(el as unknown as HTMLElement, h1, {
+      document: rich,
+      scale: 1,
+    });
+    const block = el.childNodes[0]!;
+    const span = block.childNodes[1]!;
+    expect(el.style!.lineHeight).toBe('1.2');
+    expect(span.style!.lineHeight).toBe('1.2');
+    binding.select({ start: 1, end: 2 });
+    el.dispatch('compositionstart');
+    loaded = true;
+    document.fonts.dispatch('loadingdone');
+    expect(el.style!.lineHeight).toBe('1.4');
+    expect(span.style!.lineHeight).toBe('1.6');
+    expect(el.childNodes[0]).toBe(block);
+    expect(block.childNodes[1]).toBe(span);
+    expect(binding.selection()).toEqual({ start: 1, end: 2 });
+    expect(h1.inputs).toEqual([]);
+    expect(context.font).toContain('italic');
+    el.dispatch('compositionend');
+    expect(h1.inputs).toHaveLength(1);
+    binding.detach();
+    loaded = false;
+    document.fonts.dispatch('loadingdone');
+    expect(el.style!.lineHeight).toBe('1.4');
+    expect(document.fonts.listeners.get('loadingdone')?.size).toBe(0);
+  });
 
   it('renders on attach and serialises on input', () => {
     const { el } = fakeEditor();

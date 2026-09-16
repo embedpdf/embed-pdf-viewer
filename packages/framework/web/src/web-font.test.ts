@@ -1,15 +1,15 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { mountWebFont } from './web-font';
+import { mountWebFont, observeWebFonts } from './web-font';
 
 /** A `Document` with a font set, and a `FontFace` that loads at once. */
 function fakeDocument() {
   const faces = new Set<{ family: string }>();
   const doc = {
-    fonts: {
+    fonts: Object.assign(new EventTarget(), {
       add: (face: { family: string }) => faces.add(face),
       delete: (face: { family: string }) => faces.delete(face),
-    },
+    }),
   } as unknown as Document;
   return { doc, faces };
 }
@@ -30,6 +30,32 @@ class FakeFontFace {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('mountWebFont', () => {
+  it('notifies only the owning document on mounts, final unmounts and CSS loads', async () => {
+    vi.stubGlobal('FontFace', FakeFontFace);
+    const { doc } = fakeDocument();
+    const other = fakeDocument().doc;
+    const changed = vi.fn();
+    const otherChanged = vi.fn();
+    const stop = observeWebFonts(doc, changed);
+    const stopOther = observeWebFonts(other, otherChanged);
+    const first = await mountWebFont('brand-sans', new Uint8Array([1]), { document: doc });
+    const second = await mountWebFont('brand-sans', new Uint8Array([1]), { document: doc });
+    expect(changed).toHaveBeenCalledTimes(1);
+    first();
+    expect(changed).toHaveBeenCalledTimes(1);
+    second();
+    expect(changed).toHaveBeenCalledTimes(2);
+    doc.fonts.dispatchEvent(new Event('loadingdone'));
+    doc.fonts.dispatchEvent(new Event('loadingerror'));
+    expect(changed).toHaveBeenCalledTimes(4);
+    expect(otherChanged).not.toHaveBeenCalled();
+    stop();
+    doc.fonts.dispatchEvent(new Event('loadingdone'));
+    const unmount = await mountWebFont('brand-sans', new Uint8Array([1]), { document: doc });
+    unmount();
+    expect(changed).toHaveBeenCalledTimes(4);
+    stopOther();
+  });
   it('mounts the bytes as a @font-face named by the key, refcounted per document', async () => {
     vi.stubGlobal('FontFace', FakeFontFace);
     const { doc, faces } = fakeDocument();

@@ -98,7 +98,7 @@ await engine.fonts.register({ key: 'brand-sans', data });
 const unmount = await mountWebFont('brand-sans', data);
 ```
 
-The standard 14 map to web stacks with matching metrics (Helvetica →
+Standard PDF fonts use browser font stacks (Helvetica →
 `Helvetica, Arial, sans-serif`, and so on). The full viewer does the fetch,
 the registration and the mount from one `annotations.fonts` option — see
 [Custom fonts](/docs/engine/core-concepts/custom-fonts#show-the-font-in-the-browser-too).
@@ -133,37 +133,3 @@ Set `contentEditable` from `item.editing`, focus the element when the plugin
 enters edit, and stop `pointerdown` from bubbling to the stage so the browser
 owns caret placement inside the box. That is the whole per-framework
 surface; the React version in `@embedpdf/react` is the reference.
-
-## How close the editor is to the engine
-
-The engine lays a line out the way Acrobat does: the line box is the face's
-ascent + descent (its `hhea` metrics) plus a constant 0.2 × size of leading,
-the baseline sits at the ascent, and the leading goes below. The standard
-14 carry no font program, so the engine uses the metrics of Acrobat's
-bundled substitutes (Helvetica 0.83 + 0.17, Times 0.784 + 0.216, Courier
-0.627 + 0.373); a registered font uses its own `hhea` table. None of this is
-in ISO 32000 — the `/RC` vocabulary allows `line-height` but Acrobat never
-writes one for free text — it is measured Acrobat behaviour.
-
-The binding states that model in CSS, on the element and on every run that
-names a face: a unitless `line-height` of ascent + descent + 0.2, so a
-larger or differently-faced run grows its own line exactly as the engine
-does. For a registered font the browser reads the same `hhea` table the
-engine does (`fontBoundingBoxAscent`), so the ratio comes from the face
-itself; for the standard 14 the browser substitutes another face, so the
-engine's numbers are used. CSS then still centres a line's leading, half of
-it above the glyphs, while Acrobat puts it all below — the binding raises
-the first line by that half-leading (plus the substitute face's ascent gap)
-so the first baseline lands where the appearance stream's does. Nothing of
-this reaches a framework: it sets the font family, size and colour, and the
-binding does the rest.
-
-What remains approximate, by design: a line whose largest run is bigger
-than the body sits 0.1 × the extra size lower in the editor (CSS cannot
-place leading per line), the engine takes a line's descent from its last
-run where CSS takes the largest, and wrapping is the browser's decision
-with the browser's font widths. The browser's native undo stack also does
-not span a formatting change applied through the plugin. The appearance
-stream the engine bakes is the truth, and it is what every other viewer
-shows; an editor laid out by the engine itself would be the only way past
-these.

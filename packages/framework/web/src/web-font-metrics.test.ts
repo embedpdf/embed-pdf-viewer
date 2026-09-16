@@ -1,11 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
-import { firstLineShiftFor, lineModelFor } from './web-font-metrics';
+import { firstLineShiftFor, lineModelFor, webFontMetrics } from './web-font-metrics';
 
 const measured: Record<string, { ascent: number; descent: number }> = {
   'Helvetica, Arial, sans-serif': { ascent: 0.905, descent: 0.212 }, // Chrome resolved Arial
   '"Courier New", Courier, monospace': { ascent: 0.833, descent: 0.3 },
-  '"roboto", sans-serif': { ascent: 0.927, descent: 0.244 }, // the registered font's own hhea
+  '"roboto", sans-serif': { ascent: 0.927, descent: 0.244 }, // an approximate browser measurement
 };
 const measure = (f: string) => measured[f] ?? null;
 
@@ -20,7 +20,7 @@ describe('lineModelFor', () => {
     expect(lineModelFor('"Courier New", Courier, monospace', measure).ascent).toBe(0.627);
   });
 
-  it('uses the face itself for a registered font: its hhea plus the 0.2 leading', () => {
+  it('uses browser measurements plus leading for a registered font', () => {
     expect(lineModelFor('"roboto", sans-serif', measure)).toEqual({
       ascent: 0.927,
       descent: 0.244,
@@ -45,11 +45,51 @@ describe('firstLineShiftFor', () => {
     );
   });
 
-  it('reduces to the half-leading for a registered font (same metrics on both sides)', () => {
+  it('reduces to half-leading when the model uses the browser metrics', () => {
     expect(firstLineShiftFor('"roboto", sans-serif', 100, measure)).toBeCloseTo(10, 2); // 0.2 / 2 em
   });
 
   it('assumes a one-em content area when nothing can be measured', () => {
     expect(firstLineShiftFor('x', 100, () => null)).toBeCloseTo(10, 2);
+  });
+});
+
+describe('webFontMetrics', () => {
+  function documentWithMetrics(read: (font: string) => { ascent: number; descent: number }) {
+    const context = {
+      font: '',
+      measureText: vi.fn(() => {
+        const m = read(context.font);
+        return { fontBoundingBoxAscent: m.ascent * 100, fontBoundingBoxDescent: m.descent * 100 };
+      }),
+    };
+    const createElement = vi.fn(() => ({ getContext: () => context }));
+    return { doc: { createElement } as unknown as Document, createElement, context };
+  }
+
+  it('remeasures after a fallback is replaced, reusing only the canvas', () => {
+    let current = { ascent: 0.8, descent: 0.2 };
+    const { doc, createElement } = documentWithMetrics(() => current);
+    expect(webFontMetrics('Custom', doc)).toEqual(current);
+    current = { ascent: 1.1, descent: 0.3 };
+    expect(webFontMetrics('Custom', doc)).toEqual(current);
+    current = { ascent: 0.8, descent: 0.2 }; // unmounted
+    expect(webFontMetrics('Custom', doc)).toEqual(current);
+    expect(createElement).toHaveBeenCalledTimes(1);
+  });
+
+  it('uses each document and the requested weight and style', () => {
+    const regular = { ascent: 0.8, descent: 0.2 };
+    const boldItalic = { ascent: 1.1, descent: 0.3 };
+    const first = documentWithMetrics((font) =>
+      font.startsWith('italic 700') ? boldItalic : regular,
+    );
+    const second = documentWithMetrics(() => ({ ascent: 0.9, descent: 0.3 }));
+    expect(webFontMetrics('Custom', first.doc)).toEqual(regular);
+    expect(webFontMetrics('Custom', first.doc, { weight: 700, style: 'italic' })).toEqual(
+      boldItalic,
+    );
+    expect(webFontMetrics('Custom', second.doc)).toEqual({ ascent: 0.9, descent: 0.3 });
+    expect(webFontMetrics('Custom', first.doc)).toEqual(regular);
   });
 });
