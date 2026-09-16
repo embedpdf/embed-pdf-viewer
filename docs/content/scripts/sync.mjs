@@ -49,6 +49,7 @@ const MOUNTS = {
     { from: 'samples/selection', to: 'src/samples/selection' },
     { from: 'samples/page-edit', to: 'src/samples/page-edit' },
     { from: 'samples/stamp', to: 'src/samples/stamp' },
+    { from: 'samples/annotation', to: 'src/samples/annotation' },
     { from: 'samples/signature', to: 'src/samples/signature' },
     { from: 'samples/getting-started', to: 'src/samples/getting-started' },
     { from: 'samples/viewer', to: 'src/samples/viewer' },
