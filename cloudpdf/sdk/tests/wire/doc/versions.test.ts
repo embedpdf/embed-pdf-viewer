@@ -69,8 +69,26 @@ describe("VersionsClient", () => {
             basis: { version: { sha256: "sha256", byteLength: 1 }, editsVersion: 1, source: "persisted" },
             since: { revisionIndex: 1, signatureIndex: 1 },
             until: { revisionIndex: 1 },
-            steps: [{ key: "value" }],
+            restrictions: [
+                {
+                    signatureIndex: 1,
+                    revisionIndex: 1,
+                    source: "docmdp",
+                    own: true,
+                    permission: 1.1,
+                    fields: { key: "value" },
+                },
+            ],
+            current: {
+                verdict: "unchanged",
+                complete: true,
+                primary: { rule: "rule", verdict: "permitted", objectNumber: 1, edge: "edge", detail: "detail" },
+                findings: [{ rule: "rule", verdict: "permitted", objectNumber: 1 }],
+                method: "net-state",
+            },
+            later: { revisionCount: 1, undoneObjectNumbers: [1] },
             verdict: "unchanged",
+            steps: [{ key: "value" }],
         };
 
         server

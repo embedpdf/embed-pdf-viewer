@@ -1,9 +1,18 @@
-import { type Color, type FreeTextDraft, type FreeTextPatch } from '@embedpdf/engine-core/runtime';
+import {
+  EngineError,
+  EngineErrorCode,
+  richTextParagraphsFromPlainText,
+  type Color,
+  type FreeTextDraft,
+  type FreeTextPatch,
+  type RichTextDocumentInput,
+} from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
 import { FPDFANNOT_COLORTYPE } from '../colorType';
 import { freeTextIntentToName } from '../freeTextIntent';
 import { readDefaultAppearance } from '../read/annotationReadPrimitives';
+import { engineRichTextJson, faceForFreeTextFont, readEngineRichText } from '../richTextWire';
 import { DEFAULT_STANDARD_FONT, standardFontFromCode } from '../standardFont';
 import { textAlignmentToCode } from '../textAlignment';
 import type { AnnotationWriteContext } from './annotationWriteContext';
@@ -30,6 +39,35 @@ import { writeBoxTransformMetadata } from './writeAnnotationTransformMetadata';
  * with a black mark.
  */
 const DEFAULT_FREETEXT_COLOR: Color = { r: 0, g: 0, b: 0 };
+
+/**
+ * Write rich text through the engine's rich writer: `/RC`, `/DS`, `/DA`,
+ * `/Contents` and the appearance, all or nothing. Faces in the input are
+ * resolved from keys / standard names to the identities the engine names.
+ */
+function writeRichText(
+  fn: PdfFunctions,
+  annotPtr: Ptr,
+  input: RichTextDocumentInput,
+  ctx: AnnotationWriteContext | undefined,
+): void {
+  const json = engineRichTextJson(input, ctx?.describeRegisteredFont);
+  if (!fn.EPDFAnnot_SetRichTextJSON(annotPtr, json)) {
+    throw new EngineError(
+      EngineErrorCode.InvalidArg,
+      'rich text could not be written (empty rect, or a font resource could not be built)',
+    );
+  }
+}
+
+/** `#RRGGBB` for a rich body colour. */
+function hexColor(color: Color): string {
+  const hex = (n: number) =>
+    Math.max(0, Math.min(255, Math.round(n)))
+      .toString(16)
+      .padStart(2, '0');
+  return `#${hex(color.r)}${hex(color.g)}${hex(color.b)}`.toUpperCase();
+}
 
 /**
  * Apply a free-text draft to a freshly-created annotation. Colour model:
@@ -97,6 +135,19 @@ export function applyFreeTextDraft(
     rotation: draft.rotation,
     unrotatedRect: draft.unrotatedRect,
   });
+
+  // Rich text last, always: a box is born with all four forms (/RC, /DS,
+  // /DA, /Contents) and its appearance, Acrobat's shape — from the draft's
+  // rich document, else from its plain contents as body-style paragraphs.
+  // The body becomes the body style (the /DA font and size follow it; the
+  // /DA colour written above is kept). Must come after the geometry, which
+  // the layout needs.
+  writeRichText(
+    fn,
+    annotPtr,
+    draft.richText ?? { paragraphs: richTextParagraphsFromPlainText(draft.contents ?? '') },
+    ctx,
+  );
 }
 
 /**
@@ -146,19 +197,64 @@ export function applyFreeTextPatch(
 
   applyBorderPatch(fn, mem, annotPtr, patch);
 
-  if (patch.fontFamily !== undefined || patch.fontSize !== undefined || patch.color !== undefined) {
+  // The patch table (plan §4.7, one engine since D4): every text write goes
+  // through the rich document — the body style lives there and the engine
+  // derives /DA from it — so the legacy /DA read-modify-write only carries
+  // the DA COLOUR (the border and leader), and the font, size, text colour
+  // and alignment are body-style changes.
+  const current = readEngineRichText(fn, mem, annotPtr);
+  if (patch.color !== undefined) {
     const cur = readDefaultAppearance(fn, mem, annotPtr);
     applyDefaultAppearance(
       fn,
       annotPtr,
-      patch.fontFamily ?? (cur ? standardFontFromCode(cur.fontCode) : DEFAULT_STANDARD_FONT),
-      patch.fontSize ?? (cur && cur.fontSize > 0 ? cur.fontSize : 12),
-      patch.color ?? cur?.color ?? DEFAULT_FREETEXT_COLOR,
+      cur ? standardFontFromCode(cur.fontCode) : DEFAULT_STANDARD_FONT,
+      cur && cur.fontSize > 0 ? cur.fontSize : 12,
+      patch.color,
       ctx,
     );
   }
   if (patch.fontColor !== undefined) {
     setAnnotColor(fn, annotPtr, patch.fontColor, FPDFANNOT_COLORTYPE.TextColor);
+  }
+  {
+    if (patch.richText !== undefined) {
+      // Rich replacement: everything regenerated. (`contents`, if also
+      // given, was checked against its projection before the write.)
+      writeRichText(fn, annotPtr, patch.richText, ctx);
+    } else if (patch.contents !== undefined) {
+      // Plain-text replacement: body-style paragraphs, one per line break.
+      // Run formatting is lost by design — a plain-text client cannot
+      // preserve what it cannot see.
+      writeRichText(
+        fn,
+        annotPtr,
+        { paragraphs: richTextParagraphsFromPlainText(patch.contents ?? '') },
+        ctx,
+      );
+    } else if (
+      current &&
+      (patch.fontFamily !== undefined ||
+        patch.fontSize !== undefined ||
+        patch.fontColor !== undefined ||
+        patch.textAlign !== undefined)
+    ) {
+      // Default-style change: the body moves; runs are deltas, so every run
+      // that did not override the property follows. Alignment is a body
+      // property too: the /RC body's text-align wins over /Q on
+      // regeneration, so /Q alone (set below) would not move a rich box.
+      const body = { ...current.body };
+      if (patch.fontFamily !== undefined) {
+        const face = faceForFreeTextFont(patch.fontFamily, ctx?.describeRegisteredFont);
+        body.family = face.family;
+        if (face.weight !== undefined) body.weight = face.weight;
+        if (face.italic !== undefined) body.italic = face.italic;
+      }
+      if (patch.fontSize !== undefined) body.size = patch.fontSize;
+      if (patch.fontColor !== undefined) body.color = hexColor(patch.fontColor);
+      if (patch.textAlign !== undefined) body.align = patch.textAlign;
+      writeRichText(fn, annotPtr, { body, paragraphs: current.paragraphs }, ctx);
+    }
   }
 
   if (patch.textAlign !== undefined) {

@@ -1,3 +1,4 @@
+import type { RichTextDocumentInput } from '../../../dto/RichText';
 import type { CalloutLine, PdfRect } from '../../../geometry/primitives';
 import type { AnnotationDraftBase } from '../../draft-base';
 import type {
@@ -24,6 +25,12 @@ export interface FreeTextDraft extends AnnotationDraftBase {
   fontFamily: FreeTextFont;
   fontSize: number;
   textAlign: TextAlignment;
+  /**
+   * Rich text (`/RC`). When given, its body is the annotation's body style
+   * (the `/DA` font and size follow it) and its paragraphs are the text;
+   * `contents`, if also given, must equal its plain projection.
+   */
+  richText?: RichTextDocumentInput;
 
   /** `/Rect` bounding box — required (computed by the caller/plugin). */
   rect: PdfRect;

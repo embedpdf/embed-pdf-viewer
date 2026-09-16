@@ -14,6 +14,10 @@ export { AbortError, isAbortError } from './promise/AbortError';
 
 export type { Engine, EngineFactory } from './engine/Engine';
 export type { FontService } from './engine/FontService';
+export type {
+  DocumentFontSettings,
+  FontEmbeddingPolicy,
+} from './engine/DocumentFontSettings';
 export type { DocumentHandle } from './engine/DocumentHandle';
 export type {
   DocumentEvent,
@@ -164,6 +168,8 @@ export type {
   FontsAddFallbackWorkerRequest,
   FontsClearFallbacksWorkerRequest,
   FontsClearWorkerRequest,
+  FontsAuthorizeEditingWorkerRequest,
+  DocumentSetFontSettingsWorkerRequest,
   CloseWorkerRequest,
   LayerCloseWorkerRequest,
   AbortWorkerRequest,

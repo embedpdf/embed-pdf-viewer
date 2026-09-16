@@ -4,6 +4,7 @@ import {
   EngineErrorCode,
   wirePack,
   type FontHandle,
+  type FontIdentityInfo,
   type FontKey,
   type FontService,
   type FontSpec,
@@ -61,12 +62,6 @@ export class LocalFontService implements FontService {
     const familyName = spec.familyName ?? '';
     const weight = spec.weight ?? 0;
     const italic = spec.italic === undefined ? -1 : spec.italic ? 1 : 0;
-    const handle: FontHandle = {
-      key,
-      familyName,
-      weight,
-      italic: spec.italic ?? false,
-    };
 
     return AbortablePromise.run<FontHandle>(async (signal) => {
       // Copy for replay BEFORE the transfer neuters `bytes`.
@@ -92,10 +87,25 @@ export class LocalFontService implements FontService {
         { priority: Priority.HIGH },
       );
       forwardAbort(signal, submission);
-      await submission;
+      const payload = await submission;
+      // The runtime resolved the identity (inferred family, weight, italic)
+      // and the licence: the handle carries what the document will name.
+      const handle: FontHandle = { key, ...payload.identity };
       this.fonts.set(key, { handle, italic, weight, familyName, bytes: replayCopy });
       return handle;
     });
+  }
+
+  /**
+   * Fold the identity the worker resolved into a seeded handle (boot fonts
+   * register by raw transport send and seed first, see `registerBootFonts`).
+   *
+   * @internal — not part of the public FontService contract.
+   */
+  applyIdentity(key: FontKey, identity: FontIdentityInfo): void {
+    const entry = this.fonts.get(key);
+    if (!entry) return;
+    entry.handle = { key, ...identity };
   }
 
   /**
@@ -113,11 +123,16 @@ export class LocalFontService implements FontService {
     let entry = this.fonts.get(key);
     if (!entry) {
       entry = {
+        // Provisional until the worker's `fonts.register` result arrives
+        // (see applyIdentity): the permission is the common case.
         handle: {
           key,
           familyName: spec.familyName ?? '',
           weight: spec.weight ?? 0,
           italic: spec.italic ?? false,
+          embeddingPermission: 'installable',
+          editingAuthorized: true,
+          instanced: false,
         },
         italic: spec.italic === undefined ? -1 : spec.italic ? 1 : 0,
         weight: spec.weight ?? 0,
@@ -158,6 +173,28 @@ export class LocalFontService implements FontService {
       forwardAbort(signal, submission);
       await submission;
       if (!this.fallbacks.includes(key)) this.fallbacks.push(key);
+    });
+  }
+
+  authorizeEditing(font: FontHandle | FontKey): AbortablePromise<FontHandle> {
+    const key = typeof font === 'string' ? font : font.key;
+    const entry = this.fonts.get(key);
+    if (!entry) {
+      return AbortablePromise.rejectReason(
+        new EngineError(EngineErrorCode.InvalidArg, `font not registered: ${key}`),
+      );
+    }
+    return AbortablePromise.run<FontHandle>(async (signal) => {
+      const submission = this.queue.enqueue<
+        Extract<WorkerResultPayload, { tag: 'fonts.authorizeEditing' }>
+      >({
+        buildPack: (jobId: JobId) =>
+          wirePack({ kind: 'fonts.authorizeEditing', jobId, fontKey: key }),
+      });
+      forwardAbort(signal, submission);
+      const payload = await submission;
+      entry.handle = { key, ...payload.identity };
+      return entry.handle;
     });
   }
 
@@ -217,6 +254,17 @@ export class LocalFontService implements FontService {
       await this.queue.enqueue({
         buildPack: (jobId: JobId) => wirePack({ kind: 'fonts.addFallback', jobId, fontKey: key }),
       });
+    }
+    for (const [key, font] of this.fonts) {
+      if (
+        font.handle.embeddingPermission === 'preview-and-print' &&
+        font.handle.editingAuthorized
+      ) {
+        await this.queue.enqueue({
+          buildPack: (jobId: JobId) =>
+            wirePack({ kind: 'fonts.authorizeEditing', jobId, fontKey: key }),
+        });
+      }
     }
   }
 }

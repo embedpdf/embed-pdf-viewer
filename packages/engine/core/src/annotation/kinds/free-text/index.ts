@@ -8,7 +8,13 @@ import { PdfAnnotationSubtypeCode } from '../../subtype';
 export type { FreeTextAnnotationDTO } from './dto';
 export type { FreeTextDraft } from './draft';
 export type { FreeTextPatch } from './patch';
-export { FreeTextDTOSchema, FreeTextDraftSchema, FreeTextPatchSchema } from './schema';
+export {
+  FreeTextDTOSchema,
+  FreeTextDraftSchema,
+  FreeTextPatchSchema,
+  RichTextDocumentInputSchema,
+  RichTextDocumentSchema,
+} from './schema';
 
 export const FreeTextKind: AnnotationKindModule<
   'free-text',

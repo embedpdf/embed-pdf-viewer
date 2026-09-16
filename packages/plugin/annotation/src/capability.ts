@@ -49,6 +49,7 @@ import {
   sharedProps,
   styleFromProps,
   update,
+  applyStyleToRange,
   annotContentsEditable,
   annotDeletable,
   annotTransformable,
@@ -67,6 +68,7 @@ import {
   type Id,
   type Model,
   type Msg,
+  type AnnotationPropsPatch,
   type PropKey,
   type Rect,
   type RenderItem,
@@ -85,6 +87,15 @@ import {
   writableTarget,
 } from './repository';
 import { createAnnotationHoverFeed } from './hover-feed';
+import {
+  RANGE_KEYS,
+  cssFontFamilyForFace,
+  rangeProps,
+  richDocOf,
+  runDeltaForProps,
+  textCommitPatch,
+  type TextSelection,
+} from './rich-text';
 import { buildTextItems } from './text-item';
 import { ARMED_STAMP_TOOL_ID, buildToolRegistry, isTouchDirect } from './tools';
 import { previewBucket } from './types';
@@ -134,8 +145,11 @@ export function createAnnotationCapability(
   config: AnnotationConfig = {},
 ): AnnotationHostCapability {
   const behaviors: Behavior[] = [];
-  /** Per-annotation debounce timer for the engine `contents` write while typing. */
+  /** Per-annotation debounce timer for the engine text write while typing. */
   const textTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  /** The registered fonts, for face ↔ key mapping (the local engine's list;
+   *  the cloud engine registers none). */
+  const fonts = () => ctx.engine?.fonts?.list() ?? [];
 
   // The resolved tool table (built-ins + config overrides). A tool is a named
   // authoring preset: it maps its id → a routing subtype, a `defaults` key
@@ -330,10 +344,24 @@ export function createAnnotationCapability(
   };
   // The selection's property schema + values — memoized by model identity so a
   // subscribed sidebar re-renders only when the model actually changed.
-  let selPropsCache: { model: Model; v: SelectionProps } | null = null;
+  /** The editor's text RANGE inside the annotation being edited, or null
+   *  (no editor selection, a bare caret, or a selection left behind by a
+   *  previous edit). The one condition that routes the range keys to runs. */
+  const activeTextRange = (m: Model): TextSelection | null => {
+    const ts = ctx.getState().textSelection;
+    return ts && m.editing === ts.id && ts.end > ts.start && m.byId[ts.id] ? ts : null;
+  };
+  let selPropsCache: {
+    model: Model;
+    range: TextSelection | null;
+    v: SelectionProps;
+  } | null = null;
   const memoSelectionProps = (): SelectionProps => {
     const m = model();
-    if (selPropsCache && selPropsCache.model === m) return selPropsCache.v;
+    const range = activeTextRange(m);
+    if (selPropsCache && selPropsCache.model === m && selPropsCache.range === range) {
+      return selPropsCache.v;
+    }
     const members = m.selected.map((id) => m.byId[id]).filter((a): a is Annot => !!a);
     const specs = sharedProps(members.map((a) => a.subtype));
     const values: Partial<AnnotationProps> = {};
@@ -350,8 +378,21 @@ export function createAnnotationCapability(
       if (members.some((a) => JSON.stringify(valueOf(a, spec.key)) !== firstJson))
         mixed.push(spec.key);
     }
+    // While the editor holds a range in the (sole) selected free text, the
+    // range keys report the RUNS it covers, resolved against the body — the
+    // same values `updateSelection` would restyle.
+    if (range && members.length === 1 && members[0]!.id === range.id) {
+      const rp = rangeProps(richDocOf(members[0]!, fonts), range, fonts);
+      for (const spec of specs) {
+        if (!RANGE_KEYS.includes(spec.key)) continue;
+        (values as Record<PropKey, unknown>)[spec.key] = rp.values[spec.key];
+        const i = mixed.indexOf(spec.key);
+        if (i >= 0) mixed.splice(i, 1);
+        if (rp.mixed.includes(spec.key)) mixed.push(spec.key);
+      }
+    }
     const v: SelectionProps = { specs, values, mixed };
-    selPropsCache = { model: m, v };
+    selPropsCache = { model: m, range, v };
     return v;
   };
   // The navigation plane's feed: clickable link areas per page — standalone
@@ -910,6 +951,47 @@ export function createAnnotationCapability(
     if (pon == null) throw new Error('[annotation] cannot resolve page for ref');
     const res = await doc.page(pon).annotations.update(ref, patch);
     syncDTO(res.updated, 'vector');
+  };
+
+  // ── the text commit: ONE debounced write per annotation for both editors ──
+  // The model is the truth while typing (`setText`/`setRichText` apply
+  // optimistically); the engine sees it after a pause, on every restyle,
+  // and on leaving edit. The write is the rich paragraphs
+  // (`textCommitPatch`); its echo is NOT re-ingested — it may already be
+  // behind the keyboard.
+  const commitText = (ref: AnnotationRef): void => {
+    const key = refKey(ref);
+    clearTimeout(textTimers.get(key));
+    textTimers.delete(key);
+    const a = model().byId[key];
+    const pon = ponForRef(ref);
+    if (!a || pon == null) return;
+    const patch = textCommitPatch(a, richDocOf(a, fonts).paragraphs, fonts);
+    ctx.doc
+      ?.page(pon)
+      .annotations.update(ref, { subtype: 'free-text', ...patch })
+      .then(
+        () => {},
+        () => {},
+      );
+  };
+  const scheduleTextCommit = (ref: AnnotationRef): void => {
+    const key = refKey(ref);
+    clearTimeout(textTimers.get(key));
+    textTimers.set(
+      key,
+      setTimeout(() => commitText(ref), TEXT_COMMIT_DEBOUNCE_MS),
+    );
+  };
+  const flushTextCommits = (): void => {
+    for (const key of [...textTimers.keys()]) {
+      const a = model().byId[key];
+      if (a?.ref) commitText(a.ref);
+      else {
+        clearTimeout(textTimers.get(key));
+        textTimers.delete(key);
+      }
+    }
   };
 
   function apply(msg: Msg): void {
@@ -1672,6 +1754,40 @@ export function createAnnotationCapability(
     return out;
   };
 
+  // Restyle the selection: ONE flat props patch through the pure core (the
+  // same `update → patch effect → toPatch` path every gesture takes). Each
+  // member takes the keys its kind declares and ignores the rest; the model
+  // updates optimistically, the engine writes fire per member and re-sync.
+  const updateSelection = (patch: AnnotationPropsPatch): void => {
+    const m = model();
+    const range = activeTextRange(m);
+    if (range) {
+      // The editor holds a range: font/size/colour/format restyle the
+      // RUNS it covers (a delta over the body, through the pure run
+      // algebra); whatever is left restyles the annotation as usual.
+      const a = m.byId[range.id]!;
+      const { delta, rest } = runDeltaForProps(patch, fonts);
+      if (Object.keys(delta).length) {
+        const next = applyStyleToRange(
+          { paragraphs: richDocOf(a, fonts).paragraphs },
+          range,
+          delta,
+        );
+        apply({ t: 'setRichText', id: range.id, doc: next });
+        if (a.ref) scheduleTextCommit(a.ref);
+      }
+      if (Object.keys(rest).length) {
+        flushTextCommits(); // the props write must not overtake the text
+        apply({ t: 'setProps', patch: rest });
+      }
+      return;
+    }
+    // A body restyle of the annotation being typed in: land the text first
+    // so the engine's body rewrite carries the latest paragraphs.
+    if (m.editing) flushTextCommits();
+    apply({ t: 'setProps', patch });
+  };
+
   return {
     // ── data API: create / update / delete (engine-routed, ref-addressed) ──
     create: async (pon, draft: AnnotationDraft): Promise<AnnotationRef> => {
@@ -1755,15 +1871,16 @@ export function createAnnotationCapability(
       };
     },
     update: (ref: AnnotationRef, patch: AnnotationPatch) => updateOne(ref, patch),
-    // Restyle the selection: ONE flat props patch through the pure core (the
-    // same `update → patch effect → toPatch` path every gesture takes). Each
-    // member takes the keys its kind declares and ignores the rest; the model
-    // updates optimistically, the engine writes fire per member and re-sync.
-    updateSelection: (patch) => apply({ t: 'setProps', patch }),
+    updateSelection,
+    toggleTextFormat: (format) => {
+      const current = memoSelectionProps().values[format];
+      updateSelection({ [format]: !current } as AnnotationPropsPatch);
+    },
     // Flag writes take their own message (NOT the props path): they must never
     // flip a member to vector or re-bake its /AP, and they must work on a
     // LOCKED annotation — unlocking is the point.
     updateSelectionFlags: (patch) => apply({ t: 'setFlags', patch }),
+
     getSelectionFlags: () => memoSelectionFlags(),
     delete: async (ref: AnnotationRef): Promise<void> => {
       const doc = ctx.doc;
@@ -2213,43 +2330,33 @@ export function createAnnotationCapability(
     },
     setContents: (ref, text) => {
       apply({ t: 'setText', id: refKey(ref), text }); // optimistic, no engine churn
-      const key = refKey(ref);
-      clearTimeout(textTimers.get(key));
-      textTimers.set(
-        key,
-        setTimeout(() => {
-          textTimers.delete(key);
-          const pon = ponForRef(ref);
-          if (pon != null) {
-            ctx.doc
-              ?.page(pon)
-              .annotations.update(ref, { subtype: 'free-text', contents: text })
-              .then(
-                () => {},
-                () => {},
-              );
-          }
-        }, TEXT_COMMIT_DEBOUNCE_MS),
-      );
+      scheduleTextCommit(ref);
     },
-    endTextEdit: () => {
-      // flush any pending debounced write immediately, then leave edit mode
-      for (const t of textTimers.values()) clearTimeout(t);
-      const id = model().editing;
-      const a = id ? model().byId[id] : null;
-      if (a?.ref) {
-        const pon = ponForRef(a.ref);
-        const text = a.data?.contents ?? '';
-        if (pon != null)
-          ctx.doc
-            ?.page(pon)
-            .annotations.update(a.ref, { subtype: 'free-text', contents: text })
-            .then(
-              () => {},
-              () => {},
-            );
+    setRichText: (ref, doc) => {
+      apply({ t: 'setRichText', id: refKey(ref), doc: { paragraphs: doc.paragraphs } });
+      scheduleTextCommit(ref);
+    },
+    setTextSelection: (ref, range) => {
+      const id = refKey(ref);
+      const prev = ctx.getState().textSelection;
+      const next: TextSelection | null = range ? { id, start: range.start, end: range.end } : null;
+      if (
+        (prev === null) === (next === null) &&
+        (!prev ||
+          !next ||
+          (prev.id === next.id && prev.start === next.start && prev.end === next.end))
+      ) {
+        return;
       }
-      textTimers.clear();
+      ctx.dispatch({ type: 'SET_TEXT_SELECTION', selection: next });
+    },
+    cssFontFamily: (family) => cssFontFamilyForFace(family, fonts),
+    endTextEdit: () => {
+      // Land any pending text write immediately, then leave edit mode.
+      flushTextCommits();
+      if (ctx.getState().textSelection) {
+        ctx.dispatch({ type: 'SET_TEXT_SELECTION', selection: null });
+      }
       apply({ t: 'endTextEdit' });
     },
 

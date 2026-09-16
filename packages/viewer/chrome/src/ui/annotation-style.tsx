@@ -22,6 +22,7 @@ import {
   useSelectionProps,
   useAnnotationDefaults,
   useAnnotationSelected,
+  type PropKey,
   type PropSpec,
   type AnnotationPropsPatch,
   type Border,
@@ -35,6 +36,7 @@ import { useOptionalCapability } from '@embedpdf/react/runtime';
 import { RedactionToken } from '@embedpdf/react/redaction';
 import { useT } from '@embedpdf/react/i18n';
 import { Icon } from './icons';
+import { useAnnotationFonts } from './annotation-fonts';
 import { AnnotationFlagsSection } from './annotation-flags';
 
 // ── app-level vocabulary (a viewer's decision, like v2's color presets) ──────
@@ -431,11 +433,16 @@ function LineEndingSelect({
 
 // ── font family picker ───────────────────────────────────────────────────────
 function FontFamilySelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  const current = FONT_OPTIONS.find((o) => o.v === value);
+  // The standard faces plus the configured fonts that are registered and
+  // mounted (`annotations.fonts`) — a registered key is a `fontFamily` value
+  // like any standard name.
+  const configured = useAnnotationFonts();
+  const options = [...FONT_OPTIONS, ...configured.map((f) => ({ v: f.key, label: f.label }))];
+  const current = options.find((o) => o.v === value);
   return (
     <DropdownShell trigger={<span className="text-fg text-sm">{current?.label ?? value}</span>}>
       {(close) =>
-        FONT_OPTIONS.map((o) => (
+        options.map((o) => (
           <OptionRow
             key={o.v}
             selected={o.v === value}
@@ -524,11 +531,14 @@ function Toggle({
   active,
   title,
   onClick,
+  keepFocus,
   children,
 }: {
   active: boolean;
   title: string;
   onClick: () => void;
+  /** Don't take focus on press — a text editor's selection survives the click. */
+  keepFocus?: boolean;
   children: ReactNode;
 }) {
   return (
@@ -536,6 +546,7 @@ function Toggle({
       type="button"
       title={title}
       onClick={onClick}
+      onMouseDown={keepFocus ? (e) => e.preventDefault() : undefined}
       className={`flex h-9 w-9 items-center justify-center rounded border transition-colors ${
         active
           ? 'border-accent bg-accent text-on-accent'
@@ -544,6 +555,54 @@ function Toggle({
     >
       {children}
     </button>
+  );
+}
+
+// ── rich-text formatting: bold / italic / underline in one row ──────────────
+type FormatSpec = Extract<PropSpec, { key: 'bold' | 'italic' | 'underline' }>;
+const isFormatSpec = (spec: PropSpec): spec is FormatSpec =>
+  spec.key === 'bold' || spec.key === 'italic' || spec.key === 'underline';
+
+/**
+ * The format toggles a free-text kind declares, in one row. While the text
+ * editor holds a range they read and write that range's runs (the plugin
+ * routes `updateSelection`); otherwise the annotation's body. The buttons
+ * keep focus in the editor so the range survives the click.
+ */
+function FormatToggles({
+  specs,
+  values,
+  mixed,
+  onChange,
+}: {
+  specs: FormatSpec[];
+  values: Partial<Record<PropKey, unknown>>;
+  mixed: PropKey[];
+  onChange: (patch: AnnotationPropsPatch) => void;
+}) {
+  const t = useT();
+  return (
+    <Field
+      label={t('demo.formatLabel', { fallback: 'Format' })}
+      mixed={specs.some((s) => mixed.includes(s.key))}
+    >
+      <div className="flex gap-2">
+        {specs.map((spec) => {
+          const active = values[spec.key] === true && !mixed.includes(spec.key);
+          return (
+            <Toggle
+              key={spec.key}
+              title={spec.label}
+              active={active}
+              keepFocus
+              onClick={() => onChange({ [spec.key]: !active } as AnnotationPropsPatch)}
+            >
+              <Icon name={spec.key} size={18} />
+            </Toggle>
+          );
+        })}
+      </div>
+    </Field>
   );
 }
 
@@ -686,6 +745,13 @@ function PropControl({
         </Field>
       );
     }
+    // The rich-text format toggles render as ONE row (see `FormatToggles`);
+    // each spec is still declared by the kind, so a kind without rich text
+    // never shows them.
+    case 'bold':
+    case 'italic':
+    case 'underline':
+      return null;
     case 'blendMode':
       return (
         <Field label={spec.label} mixed={mixed}>
@@ -745,15 +811,25 @@ export function AnnotationStylePanel() {
       <p className="text-fg-muted mb-4 text-[11px] font-semibold uppercase tracking-wide">
         {context}
       </p>
-      {specs.map((spec) => (
-        <PropControl
-          key={spec.key}
-          spec={spec}
-          value={values[spec.key]}
-          mixed={hasSel && sel.mixed.includes(spec.key)}
-          onChange={write}
-        />
-      ))}
+      {specs.map((spec) =>
+        spec.key === 'bold' ? (
+          <FormatToggles
+            key="format"
+            specs={specs.filter((s): s is FormatSpec => isFormatSpec(s))}
+            values={values}
+            mixed={hasSel ? sel.mixed : []}
+            onChange={write}
+          />
+        ) : (
+          <PropControl
+            key={spec.key}
+            spec={spec}
+            value={values[spec.key]}
+            mixed={hasSel && sel.mixed.includes(spec.key)}
+            onChange={write}
+          />
+        ),
+      )}
       {/* Redaction label (`/OverlayText` + `/Repeat`) — kind content, not a
           style prop, so it writes through the redaction plugin's setLabel. */}
       <RedactionLabelSection />

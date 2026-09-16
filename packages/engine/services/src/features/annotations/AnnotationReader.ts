@@ -2,6 +2,7 @@ import type { AnnotationListPageSnapshot, PageObjectNumber } from '@embedpdf/eng
 import type { PdfRuntimeModule } from '@embedpdf/engine-runtime';
 
 import type { DocumentSession } from '../../document-session/DocumentSession';
+import type { FontRegistrar } from '../fonts/FontRegistrar';
 import { throwIfAborted } from '../../shared/abort';
 import { collectPageAnnotations } from './internal/read/collectPageAnnotations';
 
@@ -19,6 +20,8 @@ export class AnnotationReader {
   constructor(
     private readonly runtime: PdfRuntimeModule,
     private readonly session: DocumentSession,
+    /** This thread's font registry: FreeText faces read back as keys. */
+    private readonly fonts?: FontRegistrar,
   ) {}
 
   list(pageObjectNumber: PageObjectNumber, signal: AbortSignal): AnnotationListPageSnapshot {
@@ -36,6 +39,7 @@ export class AnnotationReader {
         count,
         getAnnotPtrAt: (i) => fn.FPDFPage_GetAnnot(pagePtr, i),
         signal,
+        ...(this.fonts ? { fonts: this.fonts } : {}),
       });
     } finally {
       pool.release(pageObjectNumber);

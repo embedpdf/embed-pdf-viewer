@@ -29,6 +29,7 @@ import {
   geomBounds,
   geomHit,
   geomScene,
+  textPlateInset,
   quadIntersectsRect,
   geomVisualBounds,
   geomHandles,
@@ -1028,9 +1029,7 @@ describe('annotation-core', () => {
   it('scene() paints markup per subtype in the core (no framework logic): highlight fills+multiply, squiggly strokes a path', () => {
     const quads: Geom = {
       t: 'quads',
-      quads: [
-        textQuadFromRect({ x: 0, y: 0, width: 100, height: 12 }),
-      ],
+      quads: [textQuadFromRect({ x: 0, y: 0, width: 100, height: 12 })],
     };
     const mk = (subtype: string): RenderItem => ({
       id: 'x',
@@ -1050,7 +1049,11 @@ describe('annotation-core', () => {
       selected: false,
     });
     const hi = scene(mk('highlight'));
-    expect(hi[0]).toMatchObject({ kind: 'poly', closed: true, paint: { fill: '#ffd400', blend: 'multiply' } });
+    expect(hi[0]).toMatchObject({
+      kind: 'poly',
+      closed: true,
+      paint: { fill: '#ffd400', blend: 'multiply' },
+    });
     const sq = scene(mk('squiggly'));
     expect(sq[0].kind).toBe('path');
     expect(sq[0].paint.stroke).toBe('#ffd400');
@@ -1340,9 +1343,7 @@ describe('annotation-core', () => {
       subtype: 'highlight',
       geom: {
         t: 'quads',
-        quads: [
-          textQuadFromRect({ x: 10, y: 10, width: 80, height: 20 }),
-        ],
+        quads: [textQuadFromRect({ x: 10, y: 10, width: 80, height: 20 })],
       },
       style: {
         color: '#ffcc00',
@@ -1518,9 +1519,7 @@ describe('annotation-core', () => {
       subtype: 'highlight',
       geom: {
         t: 'quads',
-        quads: [
-          textQuadFromRect({ x: 0, y: 0, width: 100, height: 100 }),
-        ],
+        quads: [textQuadFromRect({ x: 0, y: 0, width: 100, height: 100 })],
       },
       style: {
         color: '#ffcc00',
@@ -1581,6 +1580,70 @@ describe('annotation-core callout', () => {
     expect(pts[1]).toEqual({ x: 120, y: 120 }); // knee
     // knee is left of + below the box centre → left-edge midpoint of the box
     expect(pts[2]).toEqual({ x: 200, y: 120 });
+  });
+
+  it('textPlateInset is twice the border width (the engine plate rule)', () => {
+    expect(textPlateInset(1)).toBe(2);
+    expect(textPlateInset(2.5)).toBe(5);
+    expect(textPlateInset(12)).toBe(24);
+    expect(textPlateInset(0)).toBe(0); // ours only: Acrobat's thinnest border is 1
+    expect(textPlateInset(-3)).toBe(0);
+  });
+
+  it('geomScene draws the box (fill + border) for a plain text box, like a callout', () => {
+    // The live view paints what the AP generator bakes: the border inset by
+    // half the stroke so its outer edge sits ON the rect. The framework's
+    // editable element owns only the text.
+    const plain: Extract<Geom, { t: 'text' }> = {
+      t: 'text',
+      rect: { x: 100, y: 100, width: 200, height: 60 },
+    };
+    expect(geomScene(plain, 2)).toEqual([
+      { kind: 'rect', rect: { x: 101, y: 101, width: 198, height: 58 } },
+    ]);
+    // No border width: the box is still the scene's (its fill), uninset.
+    expect(geomScene(plain, 0)).toEqual([
+      { kind: 'rect', rect: { x: 100, y: 100, width: 200, height: 60 } },
+    ]);
+    // A tilted box draws as its rotated corner ring.
+    const tilted = geomScene({ ...plain, rot: 90 }, 2);
+    expect(tilted).toHaveLength(1);
+    expect(tilted[0]!.kind).toBe('poly');
+    // A callout: leader + arrow first, then the same box.
+    const callout = geomScene(calloutGeom(), 2);
+    expect(callout[0]).toMatchObject({ kind: 'poly', closed: false });
+    expect(callout[callout.length - 1]).toEqual({
+      kind: 'rect',
+      rect: { x: 201, y: 101, width: 118, height: 38 },
+    });
+  });
+
+  it('a live plain text box keeps a vector item whose scene is its box', () => {
+    // Typing flips the box to vector: the DOM element shows the text, and the
+    // scene must still paint the fill + border (the baked raster is gone).
+    const ptr = (phase: 'down' | 'up'): Msg => ({
+      t: 'createPointer',
+      phase,
+      subtype: 'free-text',
+      in: { pon: PON, point: { x: 100, y: 100 }, shift: false },
+    });
+    let m = run(initialModel, [ptr('down'), ptr('up')]);
+    const id = m.order[0]!;
+    const a = m.byId[id]!;
+    if (a.geom.t !== 'text' || a.geom.callout) throw new Error('expected a plain text box');
+    m = update(m, { t: 'setText', id, text: 'hello' })[0];
+    expect(m.byId[id]!.source).toBe('vector');
+    const items = pageItems(m, PON);
+    expect(items.map((i) => i.id)).toEqual([id]);
+    expect(items[0]!.source).toBe('vector');
+    const nodes = scene(items[0]!);
+    expect(nodes).toHaveLength(1);
+    expect(nodes[0]).toMatchObject({
+      kind: 'rect',
+      paint: { stroke: a.style.color, width: a.style.strokeWidth },
+    });
+    // The editable element is still projected for the text.
+    expect(textBoxes(m, PON).map((b) => b.id)).toEqual([id]);
   });
 
   it('geomVisualBounds wraps the box, the leader, AND the arrow at the tip', () => {
@@ -1648,8 +1711,10 @@ describe('annotation-core callout', () => {
     expect(nodes.some((n) => n.kind === 'rect')).toBe(true);
     // and there is an arrow ending node beyond the bare leader + box
     expect(nodes.length).toBeGreaterThan(2);
-    // a plain text box paints nothing
-    expect(geomScene({ t: 'text', rect: { x: 0, y: 0, width: 10, height: 10 } }, 1)).toEqual([]);
+    // a plain text box paints its box too (fill + border, no leader)
+    expect(geomScene({ t: 'text', rect: { x: 0, y: 0, width: 10, height: 10 } }, 1)).toEqual([
+      { kind: 'rect', rect: { x: 0.5, y: 0.5, width: 9, height: 9 } },
+    ]);
   });
 
   it('the 3-click flow (tip → knee → box) commits a callout and opens it for editing', () => {
@@ -2278,9 +2343,7 @@ describe('annotation-core — selectionAnchor carries the knob alongside a centr
     const hi: Annot = {
       ...square('s2', {
         t: 'quads',
-        quads: [
-          textQuadFromRect({ x: 10, y: 10, width: 80, height: 12 }),
-        ],
+        quads: [textQuadFromRect({ x: 10, y: 10, width: 80, height: 12 })],
       }),
       subtype: 'highlight',
     };

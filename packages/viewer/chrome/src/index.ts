@@ -9,7 +9,12 @@
  */
 export { FullViewer, themeConfigOf } from './viewer';
 export type { FullViewerProps, ThemeConfig, ThemeTokens, ViewerCustomization } from './viewer';
-export type { SignaturesCustomization, StampsCustomization } from './config-context';
+export type {
+  AnnotationFontSpec,
+  AnnotationsCustomization,
+  SignaturesCustomization,
+  StampsCustomization,
+} from './config-context';
 // The prop types a delivery needs to speak FullViewer's contract.
 export type { Engine, EngineFactory, InitialDocument } from '@embedpdf/react/runtime';
 

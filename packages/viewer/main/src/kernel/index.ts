@@ -67,6 +67,8 @@ export {
   webCryptoSigner,
 } from '@embedpdf/viewer-chrome';
 export type {
+  AnnotationFontSpec,
+  AnnotationsCustomization,
   Mark,
   SignatureMode,
   SignaturesCustomization,

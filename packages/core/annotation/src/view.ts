@@ -128,11 +128,11 @@ function effSource(m: Model, id: Id): 'baked' | 'vector' {
   // gesture — the bitmap stretches with `effApBox` and tilts via the item's
   // live `rot`, then the engine's re-fit appearance replaces it on commit.
   if (capsFor(a.subtype).opaqueBody) return a.source;
-  // A callout under TEXT EDIT renders fully live (scene leader/border + DOM
-  // text): the flat baked raster can't hide just its text, so any blend
-  // doubles it. Geometry gestures flip below; editing joins them here. (A
-  // plain free-text needs no rule — it leaves the render list while live.)
-  if (m.editing === id && a.geom.t === 'text' && a.geom.callout) return 'vector';
+  // A text box under TEXT EDIT renders fully live (scene fill/border — and a
+  // callout's leader — + DOM text): the flat baked raster can't hide just
+  // its text, so any blend doubles it. Geometry gestures flip below; editing
+  // joins them here.
+  if (m.editing === id && a.geom.t === 'text') return 'vector';
   const d = m.draft;
   // A live resize/rotate/group transform must render LIVE — the baked raster
   // can't stretch or tilt — even before the commit flips `source`.
@@ -156,12 +156,12 @@ export function pageItems(m: Model, pon: number, view?: ViewEnv): RenderItem[] {
   // what you see.
   for (const id of paintOrder(m, pon)) {
     const a = m.byId[id];
-    // Live (editing / resizing) free-text is rendered by the framework as an editable
-    // element (see `textBoxes`); a baked, idle box renders as its engine /AP image —
-    // the SAME path shapes use. So only skip text while it's live. A callout is the
-    // exception: even while live, its leader/arrow/box-border draw via the vector
-    // scene (only its TEXT is the DOM element), so it stays in the render list.
-    if (a.geom.t === 'text' && !a.geom.callout && textIsLive(m, id)) continue;
+    // Free text stays in the render list in EVERY state, like a shape: a baked,
+    // idle box renders as its engine /AP image; a live one (editing / resizing /
+    // restyled) renders its box — fill + border, and a callout's leader — via
+    // the vector scene, while only its TEXT is the framework's editable element
+    // (see `textBoxes`). Dropping the live plain box here is what used to lose
+    // its border and background the moment it was touched.
     const geom = effGeom(m, id, view);
     const style = effStyle(a, view);
     // Blit box + rotation for the baked raster (see `effAp`): opaqueBody kinds

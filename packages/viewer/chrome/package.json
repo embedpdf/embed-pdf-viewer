@@ -43,7 +43,8 @@
   },
   "dependencies": {
     "@embedpdf/default-stamps": "workspace:*",
-    "@embedpdf/react": "workspace:*"
+    "@embedpdf/react": "workspace:*",
+    "@embedpdf/web": "workspace:*"
   },
   "peerDependencies": {
     "react": ">=18",

@@ -59,3 +59,32 @@ export { wheelZoomFactor } from './wheel';
 export type { WheelSample } from './wheel';
 export { indexedDbByteStore } from './byte-store';
 export type { ByteStore, IndexedDbByteStoreOptions } from './byte-store';
+export {
+  attachRichTextEditor,
+  offsetOfPosition,
+  positionOfOffset,
+  renderRichText,
+  serializeRichText,
+  styleDeltaOf,
+} from './rich-text-editor';
+export type {
+  EditorDocumentFactory,
+  EditorElement,
+  EditorNode,
+  EditorPosition,
+  EditorRoot,
+  EditorStyle,
+  RichTextEditorAlign,
+  RichTextEditorBinding,
+  RichTextEditorCommand,
+  RichTextEditorDecoration,
+  RichTextEditorDocument,
+  RichTextEditorHost,
+  RichTextEditorParagraph,
+  RichTextEditorProps,
+  RichTextEditorRange,
+  RichTextEditorRun,
+  RichTextEditorScript,
+  RichTextEditorStyle,
+} from './rich-text-editor';
+export { mountWebFont } from './web-font';

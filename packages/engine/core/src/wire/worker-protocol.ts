@@ -1,3 +1,4 @@
+import type { FontIdentityInfo } from '../dto/FontSpec';
 import type {
   AnnotationListPageSnapshot,
   AnnotationListSnapshotAllPages,
@@ -1001,6 +1002,27 @@ export interface FontsClearWorkerRequest {
   jobId: WorkerJobId;
 }
 
+/** The application asserts a licence permitting editing with a font. */
+export interface FontsAuthorizeEditingWorkerRequest {
+  kind: 'fonts.authorizeEditing';
+  jobId: WorkerJobId;
+  fontKey: string;
+}
+
+/**
+ * Per-document font and text-layout settings (session state on the host's
+ * document, never written to the file). Every member is optional: only the
+ * ones given change.
+ */
+export interface DocumentSetFontSettingsWorkerRequest {
+  kind: 'document.setFontSettings';
+  jobId: WorkerJobId;
+  docId: string;
+  layerName?: string;
+  embeddingPolicy?: 'default' | 'subset' | 'full';
+  typographicFeatures?: boolean;
+}
+
 export interface CloseWorkerRequest {
   kind: 'close';
   jobId: WorkerJobId;
@@ -1132,6 +1154,8 @@ export type WorkerRequest =
   | FontsAddFallbackWorkerRequest
   | FontsClearFallbacksWorkerRequest
   | FontsClearWorkerRequest
+  | FontsAuthorizeEditingWorkerRequest
+  | DocumentSetFontSettingsWorkerRequest
   | CloseWorkerRequest
   | LayerCloseWorkerRequest
   | AbortWorkerRequest
@@ -1391,10 +1415,12 @@ export type WorkerResultPayload =
       security: DocumentSecurityProbeInfo;
       protection?: DocumentProtection | null;
     }
-  | { tag: 'fonts.register'; fontKey: string }
+  | { tag: 'fonts.register'; fontKey: string; identity: FontIdentityInfo }
   | { tag: 'fonts.addFallback' }
   | { tag: 'fonts.clearFallbacks' }
   | { tag: 'fonts.clear' }
+  | { tag: 'fonts.authorizeEditing'; identity: FontIdentityInfo }
+  | { tag: 'document.setFontSettings' }
   | { tag: 'close' }
   | { tag: 'shutdown' };
 

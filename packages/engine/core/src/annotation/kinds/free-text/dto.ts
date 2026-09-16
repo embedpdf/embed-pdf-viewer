@@ -1,12 +1,13 @@
+import type { RichTextDocument } from '../../../dto/RichText';
 import type { CalloutLine, PdfRect } from '../../../geometry/primitives';
 import type { AnnotationBase } from '../../base';
 import type {
   AnnotationBorderStyle,
   Color,
+  FreeTextFont,
   FreeTextIntent,
   LineEnding,
   PdfRectDifferences,
-  StandardFont,
   TextAlignment,
 } from '../../primitives';
 
@@ -26,12 +27,24 @@ export type FreeTextAnnotationDTO = AnnotationBase & {
   intent: FreeTextIntent;
 
   // text (`/DA`)
-  /** `/DA` font. */
-  fontFamily: StandardFont;
+  /**
+   * The body face: a standard font name, the `key` of a registered font
+   * whose family/weight/italic match the body, or — for a face the
+   * document embeds but this session did not register — its family name.
+   */
+  fontFamily: FreeTextFont;
   /** `/DA` font size, in points. */
   fontSize: number;
   /** `/Q` horizontal text alignment. */
   textAlign: TextAlignment;
+  /**
+   * The text, as a rich document — always. The annotation's `/RC` when it has
+   * one, else the same shape synthesised from `/Contents`, `/DA` and `/Q`
+   * (one paragraph per line, no run deltas). `contents` is its plain
+   * projection. Every write goes back through the rich path, so a box has
+   * no "plain mode" to fall out of.
+   */
+  richText: RichTextDocument;
 
   // colours
   /** `/DA` colour: the border colour and the default text colour. */

@@ -30,6 +30,7 @@ export type {
   TextItem,
   ToolGhost,
 } from './types';
+export type { Face, TextFormat, TextSelection } from './rich-text';
 export type {
   AnnotationDTO,
   AnnotationRef,

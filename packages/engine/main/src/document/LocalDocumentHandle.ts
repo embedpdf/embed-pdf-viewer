@@ -28,6 +28,7 @@ import type { ScopeGuard } from '../scope';
 import { LocalDocumentActionsService } from './LocalDocumentActionsService';
 import { LocalDocumentAnnotationsService } from './LocalDocumentAnnotationsService';
 import { LocalDocumentAttachmentsService } from './LocalDocumentAttachmentsService';
+import { LocalDocumentFontSettings } from './LocalDocumentFontSettings';
 import { LocalDocumentFormsService } from './LocalDocumentFormsService';
 import { LocalDocumentPagesService } from './LocalDocumentPagesService';
 import { LocalDocumentRedactionService } from './LocalDocumentRedactionService';
@@ -52,6 +53,7 @@ export class LocalDocumentHandle implements DocumentHandle {
   readonly attachments: LocalDocumentAttachmentsService;
   readonly actions: DocumentActionsService;
   readonly forms: LocalDocumentFormsService;
+  readonly fonts: LocalDocumentFontSettings;
   readonly search: LocalDocumentSearchService;
   readonly pages: DocumentPagesService;
   readonly redaction: DocumentRedactionService;
@@ -97,6 +99,7 @@ export class LocalDocumentHandle implements DocumentHandle {
     this.attachments = new LocalDocumentAttachmentsService(id, queue, view, guard, this.publisher);
     this.actions = new LocalDocumentActionsService(id, queue, view, guard);
     this.forms = new LocalDocumentFormsService(id, queue, view, guard, this.publisher);
+    this.fonts = new LocalDocumentFontSettings(id, queue, view, guard);
     this.search = new LocalDocumentSearchService(id, queue, view, guard);
     this.pages = new LocalDocumentPagesService(id, queue, view, guard, this.publisher);
     this.redaction = new LocalDocumentRedactionService(id, queue, view, guard, this.publisher);
@@ -268,7 +271,8 @@ export class LocalDocumentHandle implements DocumentHandle {
     const docId = this.id;
     const submission = this.queue.enqueue<WorkerResultPayload>(
       {
-        buildPack: (jobId: JobId) => wirePack({ kind: 'document.saveFile', jobId, docId, mode, path }),
+        buildPack: (jobId: JobId) =>
+          wirePack({ kind: 'document.saveFile', jobId, docId, mode, path }),
       },
       { priority: Priority.HIGH },
     );

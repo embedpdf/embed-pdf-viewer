@@ -5,7 +5,12 @@
  * handler `createPointer`). Geometry lives in the `Geom` union; all the per-kind
  * math is in geometry.ts. Effects (create/patch/delete) are the only impurities.
  */
-import type { AnnotationFlags, AnnotationRef, InkIntent } from '@embedpdf/engine-core/runtime';
+import type {
+  AnnotationFlags,
+  AnnotationRef,
+  InkIntent,
+  RichTextDocumentInput,
+} from '@embedpdf/engine-core/runtime';
 import { expandGroups, groupMembers } from './group';
 import { canMove, groupUnionBounds, hitTest, isSelectable } from './hit';
 import { isSubstrateOnly } from './plane';
@@ -45,7 +50,14 @@ import {
   uprightRotation,
 } from './geometry';
 import { clickCreateGeom, resolveClickPlacement } from './placement';
-import { applyProps, initialTextStyle, kindTakesLink, styleFromProps, textStyleFromProps } from './props';
+import {
+  applyProps,
+  initialTextStyle,
+  kindTakesLink,
+  styleFromProps,
+  textStyleFromProps,
+} from './props';
+import { normalizeRuns, paragraphsFromPlainText, plainTextOf } from './richtext';
 import { computeMoveSnap } from './snap';
 import { straightenInkStroke } from './ink';
 import type {
@@ -383,6 +395,8 @@ export function update(m: Model, msg: Msg): [Model, Effect[]] {
         : [m, []];
     case 'setText':
       return setText(m, msg.id, msg.text);
+    case 'setRichText':
+      return setRichText(m, msg.id, msg.doc);
     case 'endTextEdit':
       return m.editing ? [{ ...m, editing: null }, []] : [m, []];
   }
@@ -395,7 +409,36 @@ export function update(m: Model, msg: Msg): [Model, Effect[]] {
 function setText(m: Model, id: Id, text: string): [Model, Effect[]] {
   const a = m.byId[id];
   if (!a) return [m, []];
-  const next = toVector({ ...a, data: a.data ? { ...a.data, contents: text } : a.data });
+  // The rich projection follows plain text: body-style paragraphs, one per
+  // line break, so an editor rendering `richText` shows what was typed.
+  const data =
+    a.data && a.data.subtype === 'free-text'
+      ? {
+          ...a.data,
+          contents: text,
+          richText: { ...a.data.richText, paragraphs: paragraphsFromPlainText(text) },
+        }
+      : a.data
+        ? { ...a.data, contents: text }
+        : a.data;
+  const next = toVector({ ...a, data });
+  return [{ ...m, byId: { ...m.byId, [id]: next } }, []];
+}
+
+/** Apply the editor's rich document optimistically. The DTO's body is kept
+ *  (a partial input body layers on it); `contents` is the projection. */
+function setRichText(m: Model, id: Id, doc: RichTextDocumentInput): [Model, Effect[]] {
+  const a = m.byId[id];
+  if (!a || !a.data || a.data.subtype !== 'free-text') return [m, []];
+  const normalized = normalizeRuns(doc);
+  const richText = {
+    body: { ...a.data.richText.body, ...(normalized.body ?? {}) },
+    paragraphs: normalized.paragraphs,
+  };
+  const next = toVector({
+    ...a,
+    data: { ...a.data, richText, contents: plainTextOf(richText) },
+  });
   return [{ ...m, byId: { ...m.byId, [id]: next } }, []];
 }
 

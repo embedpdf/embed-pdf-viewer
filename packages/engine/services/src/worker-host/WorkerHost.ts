@@ -39,6 +39,8 @@ import {
   type FontsAddFallbackWorkerRequest,
   type FontsClearFallbacksWorkerRequest,
   type FontsClearWorkerRequest,
+  type FontsAuthorizeEditingWorkerRequest,
+  type DocumentSetFontSettingsWorkerRequest,
   type AnnotationsListFullPageWorkerRequest,
   type AnnotationsListRawAllWorkerRequest,
   type AnnotationsListRawPageWorkerRequest,
@@ -480,6 +482,12 @@ export class WorkerHost {
         case 'fonts.clear':
           resultPack = this.handleFontsClear(msg);
           break;
+        case 'fonts.authorizeEditing':
+          resultPack = this.handleFontsAuthorizeEditing(msg);
+          break;
+        case 'document.setFontSettings':
+          resultPack = this.handleDocumentSetFontSettings(msg);
+          break;
         case 'layer.close':
           resultPack = this.handleLayerClose(msg);
           break;
@@ -789,7 +797,7 @@ export class WorkerHost {
     signal: AbortSignal,
   ): WirePack<WorkerResultPayload> {
     const session = this.requireSession(req);
-    const reader = new RawAnnotationReader(this.runtime, session);
+    const reader = new RawAnnotationReader(this.runtime, session, this.fonts);
     const snapshot = reader.listAll(signal);
     return wirePack({ tag: 'annotations.listRawAll', snapshot });
   }
@@ -799,7 +807,7 @@ export class WorkerHost {
     signal: AbortSignal,
   ): WirePack<WorkerResultPayload> {
     const session = this.requireSession(req);
-    const reader = new RawAnnotationReader(this.runtime, session);
+    const reader = new RawAnnotationReader(this.runtime, session, this.fonts);
     const snapshot = reader.listOne(req.pageObjectNumber, signal);
     return wirePack({ tag: 'annotations.listRawPage', snapshot });
   }
@@ -809,7 +817,7 @@ export class WorkerHost {
     signal: AbortSignal,
   ): WirePack<WorkerResultPayload> {
     const session = this.requireSession(req);
-    const reader = new AnnotationReader(this.runtime, session);
+    const reader = new AnnotationReader(this.runtime, session, this.fonts);
     const snapshot = reader.list(req.pageObjectNumber, signal);
     return wirePack({ tag: 'annotations.listFullPage', snapshot });
   }
@@ -1340,9 +1348,10 @@ export class WorkerHost {
     // added and removed again leaves the document as loaded.
     if (req.mode === 'incremental') {
       const snap = new DocumentSaver(this.runtime, session).snapshot();
-      return wirePack({ tag: 'document.saveBuffer', bytes: snap.bytes, size: snap.bytes.byteLength }, [
-        snap.bytes,
-      ]);
+      return wirePack(
+        { tag: 'document.saveBuffer', bytes: snap.bytes, size: snap.bytes.byteLength },
+        [snap.bytes],
+      );
     }
     const saved = new DocumentSaver(this.runtime, session).saveStandaloneToBuffer(req.mode);
     return wirePack({ tag: 'document.saveBuffer', bytes: saved.bytes, size: saved.size }, [
@@ -1487,7 +1496,41 @@ export class WorkerHost {
       req.italic,
       new Uint8Array(req.data),
     );
-    return wirePack({ tag: 'fonts.register', fontKey: req.fontKey });
+    return wirePack({
+      tag: 'fonts.register',
+      fontKey: req.fontKey,
+      identity: this.fonts.describe(req.fontKey),
+    });
+  }
+
+  private handleFontsAuthorizeEditing(
+    req: FontsAuthorizeEditingWorkerRequest,
+  ): WirePack<WorkerResultPayload> {
+    return wirePack({
+      tag: 'fonts.authorizeEditing',
+      identity: this.fonts.authorizeEditing(req.fontKey),
+    });
+  }
+
+  /** Per-document font and text-layout settings (session state). */
+  private handleDocumentSetFontSettings(
+    req: DocumentSetFontSettingsWorkerRequest,
+  ): WirePack<WorkerResultPayload> {
+    const session = this.requireSession(req);
+    const docPtr = session.requireDocPtr();
+    const { fn } = this.runtime;
+    if (req.embeddingPolicy !== undefined) {
+      const code = { default: 0, subset: 1, full: 2 }[req.embeddingPolicy];
+      if (!fn.EPDFDoc_SetFontEmbeddingPolicy(docPtr, code)) {
+        throw new EngineError(EngineErrorCode.InvalidArg, 'EPDFDoc_SetFontEmbeddingPolicy failed');
+      }
+    }
+    if (req.typographicFeatures !== undefined) {
+      if (!fn.EPDFDoc_SetTypographicFeatures(docPtr, req.typographicFeatures)) {
+        throw new EngineError(EngineErrorCode.InvalidArg, 'EPDFDoc_SetTypographicFeatures failed');
+      }
+    }
+    return wirePack({ tag: 'document.setFontSettings' });
   }
 
   private handleFontsAddFallback(

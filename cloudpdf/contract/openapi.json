@@ -10030,16 +10030,135 @@
             "required": ["revisionIndex"],
             "additionalProperties": false
           },
-          "steps": {
+          "restrictions": {
             "type": "array",
-            "items": {}
+            "items": {
+              "type": "object",
+              "properties": {
+                "signatureIndex": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "revisionIndex": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "source": {
+                  "type": "string",
+                  "enum": ["docmdp", "fieldmdp", "lock"]
+                },
+                "own": {
+                  "type": "boolean"
+                },
+                "permission": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "enum": [1]
+                    },
+                    {
+                      "type": "number",
+                      "enum": [2]
+                    },
+                    {
+                      "type": "number",
+                      "enum": [3]
+                    }
+                  ]
+                },
+                "fields": {}
+              },
+              "required": ["signatureIndex", "revisionIndex", "source", "own"],
+              "additionalProperties": false
+            }
+          },
+          "current": {
+            "type": "object",
+            "properties": {
+              "verdict": {
+                "type": "string",
+                "enum": ["unchanged", "permitted", "forbidden", "indeterminate"]
+              },
+              "complete": {
+                "type": "boolean"
+              },
+              "primary": {
+                "type": "object",
+                "properties": {
+                  "rule": {
+                    "type": "string"
+                  },
+                  "verdict": {
+                    "type": "string",
+                    "enum": ["permitted", "forbidden", "incomplete"]
+                  },
+                  "objectNumber": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "edge": {
+                    "type": "string"
+                  },
+                  "detail": {
+                    "type": "string"
+                  }
+                },
+                "required": ["rule", "verdict", "objectNumber"],
+                "additionalProperties": false
+              },
+              "findings": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/DocSignaturesAnalysis200Response/properties/current/properties/primary"
+                }
+              },
+              "method": {
+                "type": "string",
+                "enum": ["net-state", "net-state+replay"]
+              }
+            },
+            "required": ["verdict", "complete", "findings", "method"],
+            "additionalProperties": false
+          },
+          "later": {
+            "type": "object",
+            "properties": {
+              "revisionCount": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "undoneObjectNumbers": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            },
+            "required": ["revisionCount", "undoneObjectNumbers"],
+            "additionalProperties": false
           },
           "verdict": {
             "type": "string",
             "enum": ["unchanged", "permitted", "forbidden", "indeterminate"]
+          },
+          "steps": {
+            "type": "array",
+            "items": {}
           }
         },
-        "required": ["mode", "policyVersion", "basis", "since", "until", "steps", "verdict"],
+        "required": [
+          "mode",
+          "policyVersion",
+          "basis",
+          "since",
+          "until",
+          "restrictions",
+          "current",
+          "later",
+          "verdict",
+          "steps"
+        ],
         "additionalProperties": false
       },
       "DocSignaturesAnalysis400Response": {
@@ -11810,16 +11929,135 @@
             "required": ["revisionIndex"],
             "additionalProperties": false
           },
-          "steps": {
+          "restrictions": {
             "type": "array",
-            "items": {}
+            "items": {
+              "type": "object",
+              "properties": {
+                "signatureIndex": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "revisionIndex": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "source": {
+                  "type": "string",
+                  "enum": ["docmdp", "fieldmdp", "lock"]
+                },
+                "own": {
+                  "type": "boolean"
+                },
+                "permission": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "enum": [1]
+                    },
+                    {
+                      "type": "number",
+                      "enum": [2]
+                    },
+                    {
+                      "type": "number",
+                      "enum": [3]
+                    }
+                  ]
+                },
+                "fields": {}
+              },
+              "required": ["signatureIndex", "revisionIndex", "source", "own"],
+              "additionalProperties": false
+            }
+          },
+          "current": {
+            "type": "object",
+            "properties": {
+              "verdict": {
+                "type": "string",
+                "enum": ["unchanged", "permitted", "forbidden", "indeterminate"]
+              },
+              "complete": {
+                "type": "boolean"
+              },
+              "primary": {
+                "type": "object",
+                "properties": {
+                  "rule": {
+                    "type": "string"
+                  },
+                  "verdict": {
+                    "type": "string",
+                    "enum": ["permitted", "forbidden", "incomplete"]
+                  },
+                  "objectNumber": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "edge": {
+                    "type": "string"
+                  },
+                  "detail": {
+                    "type": "string"
+                  }
+                },
+                "required": ["rule", "verdict", "objectNumber"],
+                "additionalProperties": false
+              },
+              "findings": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/DocVersionsAnalysis200Response/properties/current/properties/primary"
+                }
+              },
+              "method": {
+                "type": "string",
+                "enum": ["net-state", "net-state+replay"]
+              }
+            },
+            "required": ["verdict", "complete", "findings", "method"],
+            "additionalProperties": false
+          },
+          "later": {
+            "type": "object",
+            "properties": {
+              "revisionCount": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "undoneObjectNumbers": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            },
+            "required": ["revisionCount", "undoneObjectNumbers"],
+            "additionalProperties": false
           },
           "verdict": {
             "type": "string",
             "enum": ["unchanged", "permitted", "forbidden", "indeterminate"]
+          },
+          "steps": {
+            "type": "array",
+            "items": {}
           }
         },
-        "required": ["mode", "policyVersion", "basis", "since", "until", "steps", "verdict"],
+        "required": [
+          "mode",
+          "policyVersion",
+          "basis",
+          "since",
+          "until",
+          "restrictions",
+          "current",
+          "later",
+          "verdict",
+          "steps"
+        ],
         "additionalProperties": false
       },
       "DocVersionsAnalysis400Response": {
@@ -13902,22 +14140,7 @@
                     },
                     "fontFamily": {
                       "type": "string",
-                      "enum": [
-                        "courier",
-                        "courier-bold",
-                        "courier-bold-oblique",
-                        "courier-oblique",
-                        "helvetica",
-                        "helvetica-bold",
-                        "helvetica-bold-oblique",
-                        "helvetica-oblique",
-                        "times-roman",
-                        "times-bold",
-                        "times-bold-italic",
-                        "times-italic",
-                        "symbol",
-                        "zapf-dingbats"
-                      ]
+                      "minLength": 1
                     },
                     "fontSize": {
                       "type": "number",
@@ -13927,6 +14150,186 @@
                     "textAlign": {
                       "type": "string",
                       "enum": ["left", "center", "right"]
+                    },
+                    "richText": {
+                      "type": "object",
+                      "properties": {
+                        "body": {
+                          "type": "object",
+                          "properties": {
+                            "family": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "weight": {
+                              "type": "integer",
+                              "minimum": 100,
+                              "maximum": 900
+                            },
+                            "italic": {
+                              "type": "boolean"
+                            },
+                            "size": {
+                              "type": "number",
+                              "minimum": 0
+                            },
+                            "color": {
+                              "type": "string",
+                              "pattern": "^#[0-9a-fA-F]{6}$"
+                            },
+                            "decoration": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "enum": ["underline", "line-through", "word"]
+                              }
+                            },
+                            "script": {
+                              "type": "string",
+                              "enum": ["normal", "sub", "super"]
+                            },
+                            "letterSpacing": {
+                              "type": "number"
+                            },
+                            "horizontalScale": {
+                              "type": "number",
+                              "exclusiveMinimum": true,
+                              "minimum": 0
+                            },
+                            "unknown": {
+                              "type": "string"
+                            },
+                            "align": {
+                              "type": "string",
+                              "enum": ["left", "center", "right", "justify"]
+                            },
+                            "dir": {
+                              "type": "string",
+                              "enum": ["ltr", "rtl"]
+                            },
+                            "lineHeight": {
+                              "type": "number",
+                              "exclusiveMinimum": true,
+                              "minimum": 0
+                            },
+                            "margins": {
+                              "type": "object",
+                              "properties": {
+                                "top": {
+                                  "type": "number"
+                                },
+                                "bottom": {
+                                  "type": "number"
+                                },
+                                "left": {
+                                  "type": "number"
+                                },
+                                "right": {
+                                  "type": "number"
+                                }
+                              },
+                              "required": ["top", "bottom", "left", "right"],
+                              "additionalProperties": false
+                            },
+                            "textIndent": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "family",
+                            "weight",
+                            "italic",
+                            "size",
+                            "color",
+                            "decoration",
+                            "script",
+                            "letterSpacing",
+                            "horizontalScale",
+                            "align",
+                            "dir"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "paragraphs": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "align": {
+                                "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/11/properties/richText/properties/body/properties/align"
+                              },
+                              "dir": {
+                                "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/11/properties/richText/properties/body/properties/dir"
+                              },
+                              "lineHeight": {
+                                "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/11/properties/richText/properties/body/properties/lineHeight"
+                              },
+                              "margins": {
+                                "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/11/properties/richText/properties/body/properties/margins"
+                              },
+                              "textIndent": {
+                                "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/11/properties/richText/properties/body/properties/textIndent"
+                              },
+                              "unknown": {
+                                "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/11/properties/richText/properties/body/properties/unknown"
+                              },
+                              "runs": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "text": {
+                                      "type": "string"
+                                    },
+                                    "style": {
+                                      "type": "object",
+                                      "properties": {
+                                        "family": {
+                                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/11/properties/richText/properties/body/properties/family"
+                                        },
+                                        "weight": {
+                                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/11/properties/richText/properties/body/properties/weight"
+                                        },
+                                        "italic": {
+                                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/11/properties/richText/properties/body/properties/italic"
+                                        },
+                                        "size": {
+                                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/11/properties/richText/properties/body/properties/size"
+                                        },
+                                        "color": {
+                                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/11/properties/richText/properties/body/properties/color"
+                                        },
+                                        "decoration": {
+                                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/11/properties/richText/properties/body/properties/decoration"
+                                        },
+                                        "script": {
+                                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/11/properties/richText/properties/body/properties/script"
+                                        },
+                                        "letterSpacing": {
+                                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/11/properties/richText/properties/body/properties/letterSpacing"
+                                        },
+                                        "horizontalScale": {
+                                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/11/properties/richText/properties/body/properties/horizontalScale"
+                                        },
+                                        "unknown": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "additionalProperties": false
+                                    }
+                                  },
+                                  "required": ["text"],
+                                  "additionalProperties": false
+                                }
+                              }
+                            },
+                            "required": ["runs"],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": ["body", "paragraphs"],
+                      "additionalProperties": false
                     },
                     "color": {
                       "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/color"
@@ -14036,6 +14439,7 @@
                     "fontFamily",
                     "fontSize",
                     "textAlign",
+                    "richText",
                     "color",
                     "interiorColor",
                     "opacity",
@@ -14596,7 +15000,23 @@
                       "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/4/properties/borderStyle"
                     },
                     "fontFamily": {
-                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/11/properties/fontFamily"
+                      "type": "string",
+                      "enum": [
+                        "courier",
+                        "courier-bold",
+                        "courier-bold-oblique",
+                        "courier-oblique",
+                        "helvetica",
+                        "helvetica-bold",
+                        "helvetica-bold-oblique",
+                        "helvetica-oblique",
+                        "times-roman",
+                        "times-bold",
+                        "times-bold-italic",
+                        "times-italic",
+                        "symbol",
+                        "zapf-dingbats"
+                      ]
                     },
                     "fontSize": {
                       "type": "number",
@@ -14750,7 +15170,7 @@
                       "type": "boolean"
                     },
                     "fontFamily": {
-                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/11/properties/fontFamily"
+                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/16/properties/fontFamily"
                     },
                     "fontSize": {
                       "type": "number",
@@ -16714,22 +17134,7 @@
                           },
                           "fontFamily": {
                             "type": "string",
-                            "enum": [
-                              "courier",
-                              "courier-bold",
-                              "courier-bold-oblique",
-                              "courier-oblique",
-                              "helvetica",
-                              "helvetica-bold",
-                              "helvetica-bold-oblique",
-                              "helvetica-oblique",
-                              "times-roman",
-                              "times-bold",
-                              "times-bold-italic",
-                              "times-italic",
-                              "symbol",
-                              "zapf-dingbats"
-                            ]
+                            "minLength": 1
                           },
                           "fontSize": {
                             "type": "number",
@@ -16739,6 +17144,186 @@
                           "textAlign": {
                             "type": "string",
                             "enum": ["left", "center", "right"]
+                          },
+                          "richText": {
+                            "type": "object",
+                            "properties": {
+                              "body": {
+                                "type": "object",
+                                "properties": {
+                                  "family": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "weight": {
+                                    "type": "integer",
+                                    "minimum": 100,
+                                    "maximum": 900
+                                  },
+                                  "italic": {
+                                    "type": "boolean"
+                                  },
+                                  "size": {
+                                    "type": "number",
+                                    "minimum": 0
+                                  },
+                                  "color": {
+                                    "type": "string",
+                                    "pattern": "^#[0-9a-fA-F]{6}$"
+                                  },
+                                  "decoration": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "enum": ["underline", "line-through", "word"]
+                                    }
+                                  },
+                                  "script": {
+                                    "type": "string",
+                                    "enum": ["normal", "sub", "super"]
+                                  },
+                                  "letterSpacing": {
+                                    "type": "number"
+                                  },
+                                  "horizontalScale": {
+                                    "type": "number",
+                                    "exclusiveMinimum": true,
+                                    "minimum": 0
+                                  },
+                                  "unknown": {
+                                    "type": "string"
+                                  },
+                                  "align": {
+                                    "type": "string",
+                                    "enum": ["left", "center", "right", "justify"]
+                                  },
+                                  "dir": {
+                                    "type": "string",
+                                    "enum": ["ltr", "rtl"]
+                                  },
+                                  "lineHeight": {
+                                    "type": "number",
+                                    "exclusiveMinimum": true,
+                                    "minimum": 0
+                                  },
+                                  "margins": {
+                                    "type": "object",
+                                    "properties": {
+                                      "top": {
+                                        "type": "number"
+                                      },
+                                      "bottom": {
+                                        "type": "number"
+                                      },
+                                      "left": {
+                                        "type": "number"
+                                      },
+                                      "right": {
+                                        "type": "number"
+                                      }
+                                    },
+                                    "required": ["top", "bottom", "left", "right"],
+                                    "additionalProperties": false
+                                  },
+                                  "textIndent": {
+                                    "type": "number"
+                                  }
+                                },
+                                "required": [
+                                  "family",
+                                  "weight",
+                                  "italic",
+                                  "size",
+                                  "color",
+                                  "decoration",
+                                  "script",
+                                  "letterSpacing",
+                                  "horizontalScale",
+                                  "align",
+                                  "dir"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "paragraphs": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "align": {
+                                      "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/11/properties/richText/properties/body/properties/align"
+                                    },
+                                    "dir": {
+                                      "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/11/properties/richText/properties/body/properties/dir"
+                                    },
+                                    "lineHeight": {
+                                      "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/11/properties/richText/properties/body/properties/lineHeight"
+                                    },
+                                    "margins": {
+                                      "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/11/properties/richText/properties/body/properties/margins"
+                                    },
+                                    "textIndent": {
+                                      "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/11/properties/richText/properties/body/properties/textIndent"
+                                    },
+                                    "unknown": {
+                                      "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/11/properties/richText/properties/body/properties/unknown"
+                                    },
+                                    "runs": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "object",
+                                        "properties": {
+                                          "text": {
+                                            "type": "string"
+                                          },
+                                          "style": {
+                                            "type": "object",
+                                            "properties": {
+                                              "family": {
+                                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/11/properties/richText/properties/body/properties/family"
+                                              },
+                                              "weight": {
+                                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/11/properties/richText/properties/body/properties/weight"
+                                              },
+                                              "italic": {
+                                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/11/properties/richText/properties/body/properties/italic"
+                                              },
+                                              "size": {
+                                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/11/properties/richText/properties/body/properties/size"
+                                              },
+                                              "color": {
+                                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/11/properties/richText/properties/body/properties/color"
+                                              },
+                                              "decoration": {
+                                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/11/properties/richText/properties/body/properties/decoration"
+                                              },
+                                              "script": {
+                                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/11/properties/richText/properties/body/properties/script"
+                                              },
+                                              "letterSpacing": {
+                                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/11/properties/richText/properties/body/properties/letterSpacing"
+                                              },
+                                              "horizontalScale": {
+                                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/11/properties/richText/properties/body/properties/horizontalScale"
+                                              },
+                                              "unknown": {
+                                                "type": "string"
+                                              }
+                                            },
+                                            "additionalProperties": false
+                                          }
+                                        },
+                                        "required": ["text"],
+                                        "additionalProperties": false
+                                      }
+                                    }
+                                  },
+                                  "required": ["runs"],
+                                  "additionalProperties": false
+                                }
+                              }
+                            },
+                            "required": ["body", "paragraphs"],
+                            "additionalProperties": false
                           },
                           "color": {
                             "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/color"
@@ -16848,6 +17433,7 @@
                           "fontFamily",
                           "fontSize",
                           "textAlign",
+                          "richText",
                           "color",
                           "interiorColor",
                           "opacity",
@@ -17408,7 +17994,23 @@
                             "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/4/properties/borderStyle"
                           },
                           "fontFamily": {
-                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/11/properties/fontFamily"
+                            "type": "string",
+                            "enum": [
+                              "courier",
+                              "courier-bold",
+                              "courier-bold-oblique",
+                              "courier-oblique",
+                              "helvetica",
+                              "helvetica-bold",
+                              "helvetica-bold-oblique",
+                              "helvetica-oblique",
+                              "times-roman",
+                              "times-bold",
+                              "times-bold-italic",
+                              "times-italic",
+                              "symbol",
+                              "zapf-dingbats"
+                            ]
                           },
                           "fontSize": {
                             "type": "number",
@@ -17562,7 +18164,7 @@
                             "type": "boolean"
                           },
                           "fontFamily": {
-                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/11/properties/fontFamily"
+                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/16/properties/fontFamily"
                           },
                           "fontSize": {
                             "type": "number",

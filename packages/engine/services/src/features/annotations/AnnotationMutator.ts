@@ -29,6 +29,7 @@ import type { FontRegistrar } from '../fonts';
 import { captureOrStampStableId } from './internal/identity/captureOrStampStableId';
 import { resolveAnnotPtr } from './internal/identity/resolveAnnotationPointer';
 import { computeMutationImpact } from './internal/mutations/computeMutationImpact';
+import { assertRichTextAgreement } from './internal/richTextWire';
 import { readContextFor } from './internal/read/annotationReadContext';
 import { readAnnotString } from './internal/read/annotationReadPrimitives';
 import {
@@ -102,7 +103,12 @@ export class AnnotationMutator {
   private writeContext(pagePtr: Ptr, resources?: WireResourceMap): AnnotationWriteContext {
     const fonts = this.fonts;
     return {
-      ...(fonts ? { resolveRegisteredFontId: (key: string) => fonts.idFor(key) } : {}),
+      ...(fonts
+        ? {
+            resolveRegisteredFontId: (key: string) => fonts.idFor(key),
+            describeRegisteredFont: (key: string) => fonts.describeOrUndefined(key),
+          }
+        : {}),
       docPtr: this.session.requireDocPtr(),
       pagePtr,
       ...(resources ? { resources } : {}),
@@ -126,6 +132,7 @@ export class AnnotationMutator {
       this.ensureKnownWeakStateFromPage(pageObjectNumber, pagePtr);
       const writeCtx = this.writeContext(pagePtr, resources);
       preflightDraft(draft, writeCtx);
+      assertRichTextAgreement(draft);
       // `create` is append-only: PDFium drops the new annotation at
       // `index = previousCount`, so no existing index ever shifts. Per
       // the locked rule in `computeMutationImpact`, that means create is
@@ -202,7 +209,7 @@ export class AnnotationMutator {
           pageObjectNumber,
           newIndex,
           pageStateBefore.revision,
-          readContextFor(this.session),
+          readContextFor(this.session, this.fonts),
         );
         joinWidgetFieldNumbers(this.runtime, this.session, [dto]);
       } finally {
@@ -246,6 +253,7 @@ export class AnnotationMutator {
 
       const writeCtx = this.writeContext(pagePtr, resources);
       preflightPatch(patch, writeCtx);
+      assertRichTextAgreement(patch);
 
       this.ensureKnownWeakStateFromPage(ref.pageObjectNumber, pagePtr);
       const pageStateBefore = this.session.pageState(ref.pageObjectNumber);
@@ -282,7 +290,7 @@ export class AnnotationMutator {
         ref.pageObjectNumber,
         preIndex,
         pageStateBefore.revision,
-        readContextFor(this.session),
+        readContextFor(this.session, this.fonts),
       );
 
       // Apply caller-supplied subtype-specific writes.
@@ -366,7 +374,7 @@ export class AnnotationMutator {
         ref.pageObjectNumber,
         newIndex,
         pageStateBefore.revision,
-        readContextFor(this.session),
+        readContextFor(this.session, this.fonts),
       );
       joinWidgetFieldNumbers(this.runtime, this.session, [dto]);
 
@@ -691,7 +699,7 @@ export class AnnotationMutator {
             pageObjectNumber,
             newIdx,
             bumpedRev,
-            readContextFor(this.session),
+            readContextFor(this.session, this.fonts),
           );
         } finally {
           fn.FPDFPage_CloseAnnot(annotPtr);
