@@ -8,6 +8,10 @@ name: SDK Generate
 on:
   workflow_call:
     inputs:
+      source_ref:
+        description: 'Released source commit (defaults to the triggering commit)'
+        required: false
+        type: string
       languages:
         description: 'Comma-separated subset (default: all)'
         required: false
@@ -81,6 +85,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_ref || github.sha }}
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -95,6 +101,8 @@ jobs:
         language: [typescript, python, php, csharp, go, java, ruby]
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_ref || github.sha }}
 
       - uses: actions/setup-node@v4
         with:
@@ -280,6 +288,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_ref || github.sha }}
 
       - uses: actions/setup-node@v4
         with:
