@@ -17,8 +17,9 @@ export const HighlightIcon = ({
     stroke-linecap="round"
     stroke-linejoin="round"
     class={className}
-    role="img"
+    role={title ? 'img' : undefined}
     aria-label={title}
+    aria-hidden={title ? undefined : true}
   >
     <path stroke="none" d="M0 0h24v24H0z" fill="none" />
     <rect x="2" y="6" width="20" height="16" rx="2" fill={primaryColor} stroke="none" />

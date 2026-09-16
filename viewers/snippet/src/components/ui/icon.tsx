@@ -91,8 +91,9 @@ function renderCustomIcon(
       stroke-linecap={config.strokeLinecap}
       stroke-linejoin={config.strokeLinejoin}
       class={className}
-      role="img"
+      role={title ? 'img' : undefined}
       aria-label={title}
+      aria-hidden={title ? undefined : true}
     >
       {config.paths.map((path, i) => {
         const strokeColor = resolveIconColor(path.stroke, primaryColor, secondaryColor);

@@ -17,8 +17,9 @@ export const InkHighlighterIcon = ({
     stroke-linecap="round"
     stroke-width={strokeWidth}
     class={className}
-    role="img"
+    role={title ? 'img' : undefined}
     aria-label={title}
+    aria-hidden={title ? undefined : true}
   >
     <path stroke="none" d="M0 0h24v24H0z" fill="none" />
     <path stroke="currentColor" d="M3 19h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" />

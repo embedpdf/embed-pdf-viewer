@@ -18,8 +18,9 @@ export const ZigzagIcon = ({
     stroke-linecap="round"
     stroke-linejoin="round"
     class={className}
-    role="img"
+    role={title ? 'img' : undefined}
     aria-label={title}
+    aria-hidden={title ? undefined : true}
   >
     <path d="M12 2.4L21.36 11.76L2.64 12.24L12 21.6" />
   </svg>
