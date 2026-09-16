@@ -1,5 +1,24 @@
 # @embedpdf/engine-core
 
+## 3.0.0-next.13
+
+### Minor Changes
+
+- [#812](https://github.com/embedpdf/embed-pdf-viewer/pull/812) by [@bobsingor](https://github.com/bobsingor) – Add digital signature and document version types, signing permissions, events,
+  wire schemas, and the optional `DocumentSignaturesService` API. Support
+  signature-field authoring and appearances, file-backed layer inputs, file
+  downloads, and configurable session and signed-document policies.
+
+  Add revision change analysis and protection helpers that distinguish declared
+  editing restrictions from the rules used to judge later modifications.
+
+  Prevent excessive processing time when decoding malformed base64 containing long
+  runs of padding characters.
+
+- [#817](https://github.com/embedpdf/embed-pdf-viewer/pull/817) by [@bobsingor](https://github.com/bobsingor) – Add rich-text document types and schemas for FreeText annotation reads, drafts, and patches, including paragraph settings and per-run style overrides. FreeText reads now include a rich-text representation even for plain text, and custom font keys are accepted in response schemas.
+
+  Add optional document font settings for embedding policy and typographic features, font identity and embedding-permission metadata, and explicit editing authorization for registered fonts.
+
 ## 3.0.0-next.12
 
 ### Minor Changes

@@ -1,5 +1,13 @@
 # @embedpdf/web
 
+## 3.0.0-next.13
+
+### Minor Changes
+
+- [#817](https://github.com/embedpdf/embed-pdf-viewer/pull/817) by [@bobsingor](https://github.com/bobsingor) – Add a framework-independent rich-text editor binding with styled paragraph rendering, DOM serialization, selection mapping, formatting commands, and plain-text paste handling.
+
+  Export `mountWebFont()` to load font bytes for live editors and release shared font faces only after their last consumer unmounts.
+
 ## 3.0.0-next.12
 
 ### Minor Changes

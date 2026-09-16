@@ -1,5 +1,19 @@
 # @embedpdf/engine
 
+## 3.0.0-next.13
+
+### Minor Changes
+
+- [#817](https://github.com/embedpdf/embed-pdf-viewer/pull/817) by [@bobsingor](https://github.com/bobsingor) – Support reading and authoring rich-text FreeText annotations through the local engine. Expose document-level font embedding and typographic settings through `doc.fonts`.
+
+  Return resolved font identities and embedding permissions from registration, and add `engine.fonts.authorizeEditing()` for applications authorized to edit with preview-and-print fonts.
+
+- [#812](https://github.com/embedpdf/embed-pdf-viewer/pull/812) by [@bobsingor](https://github.com/bobsingor) – Add `doc.signatures` for signature inspection, revision analysis, and two-phase signing with externally supplied CMS data. Support signature-field creation and visual appearances, expose the saved document version, and update the same document handle after signing.
+
+  Open documents as immutable bases with editable layers by default, with `sessionKind: 'plain'` available for unsigned documents. Preserve the loaded bytes on unchanged incremental downloads and add Node file-backed layer opens and `downloadToFile()`.
+
+  Enforce declared signature restrictions by default, distinguish them from modification verdicts, and expose `signedDocumentPolicy` for applications that need to permit invalidating edits.
+
 ## 3.0.0-next.12
 
 ### Minor Changes

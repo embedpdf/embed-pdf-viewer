@@ -1,5 +1,15 @@
 # @embedpdf/plugin-annotation
 
+## 3.0.0-next.13
+
+### Minor Changes
+
+- [#817](https://github.com/embedpdf/embed-pdf-viewer/pull/817) by [@bobsingor](https://github.com/bobsingor) – Add selection-aware rich-text editing for FreeText annotations. Font, size, color, bold, italic, and underline changes apply to selected text while editing, or to the annotation's default style otherwise.
+
+  Expose text-format commands and selection state, preserve styled runs through debounced writes, and map registered font families to the live editor's mounted fonts.
+
+- [#812](https://github.com/embedpdf/embed-pdf-viewer/pull/812) by [@bobsingor](https://github.com/bobsingor) – Refresh widget appearances after visual signature fills and signing, and reload annotations when a new document version is published. Add box styling for signature widgets and expose annotation interaction priorities and the armed-stamp tool ID for cooperating plugins.
+
 ## 3.0.0-next.12
 
 ### Minor Changes

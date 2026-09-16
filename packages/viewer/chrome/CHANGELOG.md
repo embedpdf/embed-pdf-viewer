@@ -1,5 +1,17 @@
 # @embedpdf/viewer-chrome
 
+## 3.0.0-next.13
+
+### Minor Changes
+
+- [#817](https://github.com/embedpdf/embed-pdf-viewer/pull/817) by [@bobsingor](https://github.com/bobsingor) – Add bold, italic, and underline controls to the FreeText style panel while preserving the active text selection.
+
+  Support `annotations.fonts` for additional font choices. Fonts are fetched, registered with the engine, and mounted for the live editor before appearing in the picker, so editing and PDF output use the same font bytes.
+
+- [#812](https://github.com/embedpdf/embed-pdf-viewer/pull/812) by [@bobsingor](https://github.com/bobsingor) – Add signature and initials libraries with drawn, typed, and imported artwork, plus signature-field authoring, signing dialogs, and visual-only filling. Configure signers, trust anchors, certification options, and signing modes.
+
+  Add signature inspection with validation details, signed revision downloads, and notices when pending edits would invalidate a signature. Support filtering the stamps sidebar by library kind and showing quick-access stamps in the toolbar.
+
 ## 3.0.0-next.12
 
 ### Minor Changes
