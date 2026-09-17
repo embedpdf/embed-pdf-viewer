@@ -1,3 +1,4 @@
+import { writeMeasurementFields } from './writeMeasurementFields';
 import type { LineDraft, LinePatch } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
@@ -24,6 +25,7 @@ export function applyLineDraft(
   draft: LineDraft,
 ): void {
   applyAnnotationBaseDraft(fn, mem, annotPtr, draft);
+  writeMeasurementFields(fn, mem, annotPtr, draft);
   setAnnotRect(fn, mem, annotPtr, draft.rect);
   applyFilledStyleDraft(fn, mem, annotPtr, draft);
   setLine(fn, mem, annotPtr, draft.linePoints);
@@ -39,6 +41,7 @@ export function applyLinePatch(
   patch: LinePatch,
 ): void {
   applyAnnotationBasePatch(fn, mem, annotPtr, patch);
+  writeMeasurementFields(fn, mem, annotPtr, patch);
   if (patch.rect !== undefined) {
     setAnnotRect(fn, mem, annotPtr, patch.rect);
   }

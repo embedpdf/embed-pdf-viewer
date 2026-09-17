@@ -1,3 +1,4 @@
+import type { PageMeasurementViewport } from '@embedpdf/engine-core/runtime';
 import { randomUUID } from 'node:crypto';
 import { mkdtemp, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -857,6 +858,27 @@ export class DocumentService {
       }
     }
     this.releaseLayerArtifactHandle(key);
+  }
+
+  async readPageViewports(
+    ctx: OpenContext,
+    docId: string,
+    layerName: string,
+    pageObjectNumber: number,
+    signal?: AbortSignal,
+  ): Promise<PageMeasurementViewport[]> {
+    await this.ensureLayerOnPool(ctx, docId, layerName);
+    const result = await this.readOnPool(
+      ctx,
+      docId,
+      layerName,
+      (jobId: WorkerJobId) =>
+        wirePack({ kind: 'measure.viewports' as const, jobId, docId, layerName, pageObjectNumber }),
+      signal,
+    );
+    if (result.tag !== 'measure.viewports')
+      throw new EngineError(EngineErrorCode.WireFormat, 'Unexpected viewport response');
+    return result.viewports;
   }
 
   async readLayerMetadata(

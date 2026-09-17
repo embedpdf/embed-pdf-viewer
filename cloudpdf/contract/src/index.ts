@@ -1,3 +1,8 @@
+import {
+  PageScaleInputSchema,
+  PageScaleResultSchema,
+  PageMeasurementViewportSchema,
+} from '@embedpdf/engine-core/wire';
 import type { DocCapability } from '@embedpdf/engine-core/runtime';
 import {
   AnnotationListPageSnapshotSchema,
@@ -776,7 +781,7 @@ export type TenantSuspendRequest = z.infer<typeof TenantSuspendRequestSchema>;
 export const adminCredentials = ['api-token', 'tenant-jwt', 'doc-jwt'] as const;
 export type AdminCredential = (typeof adminCredentials)[number];
 
-export type AdminOperationMethod = 'GET' | 'POST' | 'PATCH' | 'DELETE';
+export type AdminOperationMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
 export interface AdminOperationHeader {
   name: string;
@@ -1883,6 +1888,41 @@ export const docOperations = {
     body: { contentType: 'application/json', schema: looseJson },
     responses: {
       200: { contentType: 'application/json', schema: MutationResponseSchema },
+      400: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+      404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+    },
+  },
+  'doc.pages.viewports': {
+    operationId: 'doc.pages.viewports',
+    title: 'Read measurement viewports',
+    summary: 'Read page measurement viewports in drawing order from the current layer.',
+    method: 'GET',
+    path: wireTemplates.layerPageViewports,
+    credentials: docCredentials,
+    scope: [],
+    docCapabilities: ['doc.open'],
+    requestHeaders: [documentPasswordHeader],
+    params: DocPageParamsSchema,
+    responses: {
+      200: { contentType: 'application/json', schema: z.array(PageMeasurementViewportSchema) },
+      404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+    },
+  },
+  'doc.pages.setScale': {
+    operationId: 'doc.pages.setScale',
+    title: 'Set page measurement scale',
+    summary:
+      'Upsert or remove EmbedPDF calibration while preserving foreign viewports. Existing annotation scales are unchanged.',
+    method: 'PUT',
+    path: wireTemplates.layerPageScale,
+    credentials: docCredentials,
+    scope: [],
+    docCapabilities: ['doc.annotate.modify'],
+    requestHeaders: [documentPasswordHeader],
+    params: DocPageParamsSchema,
+    body: { contentType: 'application/json', schema: PageScaleInputSchema },
+    responses: {
+      200: { contentType: 'application/json', schema: PageScaleResultSchema },
       400: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
       404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
     },

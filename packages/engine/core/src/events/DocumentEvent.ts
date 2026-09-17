@@ -1,3 +1,4 @@
+import type { PageScaleResult } from '../mutation/PageScaleResult';
 import type { FormEffectsResult } from '../forms/effects';
 import type { PdfRotation } from '../geometry/primitives';
 import type { PageObjectNumber } from '../identity/PageObjectNumber';
@@ -80,6 +81,7 @@ export interface EventOrigin {
  * provenance-aware features (undo, attribution toasts, camera etiquette).
  */
 export type DocumentEvent =
+  | ({ type: 'page.viewportsChanged'; origin: EventOrigin } & PageScaleResult)
   | ({
       type: 'annotation.created';
       pageObjectNumber: PageObjectNumber;

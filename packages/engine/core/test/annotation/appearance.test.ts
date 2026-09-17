@@ -17,6 +17,56 @@ const rect = (left: number, bottom: number, right: number, top: number) => ({
   top,
 });
 
+describe('measurement appearance impact', () => {
+  it.each(['line', 'polyline', 'polygon'])(
+    'contents paints only when the %s caption is enabled',
+    (subtype) => {
+      const change = patch({ subtype, contents: '6 m' });
+      expect(
+        appearanceImpactOf(dto({ subtype, contents: '3 m', caption: { enabled: true } }), change),
+      ).toBe('regenerate');
+      expect(
+        appearanceImpactOf(dto({ subtype, contents: '3 m', caption: { enabled: false } }), change),
+      ).toBe('inert');
+      expect(appearanceImpactOf(dto({ subtype, contents: '3 m' }), change)).toBe('inert');
+    },
+  );
+  it('a shape translation preserves pixels only when its manual caption also moves', () => {
+    const current = dto({
+      subtype: 'polygon',
+      rect: rect(0, 0, 100, 100),
+      vertices: [
+        { x: 0, y: 0 },
+        { x: 100, y: 0 },
+        { x: 100, y: 100 },
+      ],
+      caption: { enabled: true, center: { x: 50, y: 20 } },
+    });
+    const moved = {
+      subtype: 'polygon',
+      rect: rect(10, 20, 110, 120),
+      vertices: [
+        { x: 10, y: 20 },
+        { x: 110, y: 20 },
+        { x: 110, y: 120 },
+      ],
+    };
+    expect(appearanceImpactOf(current, patch(moved))).toBe('regenerate');
+    expect(
+      appearanceImpactOf(
+        current,
+        patch({ ...moved, caption: { enabled: true, center: { x: 60, y: 40 } } }),
+      ),
+    ).toBe('translation');
+    expect(
+      appearanceImpactOf(
+        current,
+        patch({ ...moved, caption: { enabled: false, center: { x: 60, y: 40 } } }),
+      ),
+    ).toBe('regenerate');
+  });
+});
+
 /** A solid green square at (100,100)-(200,200) with the tri-state fields total. */
 const squareDto = (over: Record<string, unknown> = {}) =>
   dto({
@@ -97,10 +147,7 @@ describe('appearanceImpactOf — value diffing (inert)', () => {
     // from /C + /Name alone — a status change never repaints anything.
     const note = dto({ subtype: 'text', rect: rect(0, 0, 20, 20), icon: 'note' });
     expect(
-      appearanceImpactOf(
-        note,
-        patch({ subtype: 'text', state: 'accepted', stateModel: 'review' }),
-      ),
+      appearanceImpactOf(note, patch({ subtype: 'text', state: 'accepted', stateModel: 'review' })),
     ).toBe('inert');
   });
 

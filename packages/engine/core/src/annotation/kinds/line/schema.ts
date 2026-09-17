@@ -1,3 +1,11 @@
+import {
+  PdfMeasurementSchema,
+  PdfMeasureWriteSchema,
+  LineIntentSchema,
+  LineDimensionCaptionSchema,
+  LineCaptionPatchSchema,
+  LineLeaderSchema,
+} from '../../../dto/Measure.schema';
 import { z } from 'zod';
 
 import { LinePointsSchema, PdfRectSchema } from '../../../geometry/schemas';
@@ -13,6 +21,10 @@ import type { LineAnnotationDTO } from './dto';
 import type { LinePatch } from './patch';
 
 export const LineDTOSchema: z.ZodType<LineAnnotationDTO> = z.object({
+  intent: LineIntentSchema.optional(),
+  measure: PdfMeasurementSchema.optional(),
+  caption: LineDimensionCaptionSchema.optional(),
+  leader: LineLeaderSchema.optional(),
   ...AnnotationBaseShape,
   ...FilledStyleDTOShape,
   linePoints: LinePointsSchema,
@@ -22,6 +34,10 @@ export const LineDTOSchema: z.ZodType<LineAnnotationDTO> = z.object({
 }) as unknown as z.ZodType<LineAnnotationDTO>;
 
 export const LineDraftSchema: z.ZodType<LineDraft> = z.object({
+  intent: LineIntentSchema.nullable().optional(),
+  measure: PdfMeasureWriteSchema.nullable().optional(),
+  caption: LineDimensionCaptionSchema.nullable().optional(),
+  leader: LineLeaderSchema.nullable().optional(),
   ...FilledStyleDraftShape,
   ...AnnotationDraftBaseShape,
   linePoints: LinePointsSchema,
@@ -32,6 +48,10 @@ export const LineDraftSchema: z.ZodType<LineDraft> = z.object({
 });
 
 export const LinePatchSchema: z.ZodType<LinePatch> = z.object({
+  intent: LineIntentSchema.nullable().optional(),
+  measure: PdfMeasureWriteSchema.nullable().optional(),
+  caption: LineCaptionPatchSchema.nullable().optional(),
+  leader: LineLeaderSchema.nullable().optional(),
   ...FilledStylePatchShape,
   ...AnnotationPatchBaseShape,
   linePoints: LinePointsSchema.optional(),

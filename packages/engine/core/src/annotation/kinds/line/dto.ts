@@ -1,9 +1,19 @@
+import type {
+  PdfMeasurement,
+  LineIntent,
+  LineDimensionCaption,
+  LineLeader,
+} from '../../../dto/Measure';
 import type { LinePoints } from '../../../geometry/primitives';
 import type { AnnotationBase } from '../../base';
 import type { LineEndings } from '../../primitives';
 import type { FilledStyleFields } from '../style.shared';
 
 export type LineAnnotationDTO = AnnotationBase & {
+  intent?: LineIntent;
+  measure?: PdfMeasurement;
+  caption?: LineDimensionCaption;
+  leader?: LineLeader;
   subtype: 'line';
   /** `/L` the two endpoints of the line. */
   linePoints: LinePoints;

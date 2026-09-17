@@ -1,0 +1,197 @@
+import type { ConformanceOptions, ConformanceTestRunner } from './runMetadataConformance';
+import type { Engine } from '../engine/Engine';
+import type { DocumentEvent } from '../events/DocumentEvent';
+import type { AnnotationDraft } from '../shared';
+import { refKey } from '../annotation/relationships';
+import { EngineErrorCode } from '../errors/EngineErrorCode';
+import { AbortError } from '../promise/AbortError';
+import { measureFromKnownLength, measurementReadout } from '../measure';
+
+/** Shared numerical, persistence and calibration contract for local and HTTP engines. */
+export function runMeasurementConformance(
+  runner: ConformanceTestRunner,
+  opts: ConformanceOptions,
+): void {
+  const { describe, test, beforeAll, afterAll, expect } = runner;
+  describe(`measurement conformance: ${opts.label}`, () => {
+    let engine: Engine;
+    beforeAll(async () => {
+      engine = await opts.makeEngine();
+    });
+    afterAll(async () => {
+      await engine?.destroy();
+    });
+    const open = async () =>
+      opts.openKind === 'bytes'
+        ? engine.open({ kind: 'bytes', id: opts.fixture.id, bytes: await opts.fixture.bytes() })
+        : engine.open({ kind: 'id', id: opts.fixture.cloudId ?? opts.fixture.id });
+    const scale = measureFromKnownLength(100, { value: 3, unit: 'm' });
+    const rect = { left: 0, bottom: 0, right: 100, top: 100 };
+    const vertices = [
+      { x: 0, y: 0 },
+      { x: 100, y: 0 },
+      { x: 100, y: 100 },
+    ];
+
+    test('geometry derives contents while caption patches retain placement', async () => {
+      const doc = await open();
+      try {
+        const page = doc.page((await doc.pages.list()).pages[0].pageObjectNumber);
+        const created = (
+          await page.annotations.create({
+            subtype: 'line',
+            intent: 'LineDimension',
+            rect,
+            measure: scale,
+            linePoints: { start: vertices[0], end: vertices[1] },
+            caption: { enabled: true, offset: { along: 10, perpendicular: 20 } },
+          })
+        ).created;
+        const inert = await page.annotations.update(created.ref, {
+          subtype: 'line',
+          contents: '999 m',
+        });
+        expect(inert.updated.contents).toBe('3 m');
+        expect(inert.appearance).toEqual({ action: 'preserved', changed: false });
+        const changed = await page.annotations.update(created.ref, {
+          subtype: 'line',
+          linePoints: { start: vertices[0], end: { x: 200, y: 0 } },
+        });
+        expect(changed.updated.contents).toBe('6 m');
+        expect(changed.appearance.changed).toBe(true);
+        const hidden = await page.annotations.update(created.ref, {
+          subtype: 'line',
+          caption: { enabled: false },
+        });
+        expect(hidden.updated).toMatchObject({
+          contents: '6 m',
+          caption: { enabled: false, offset: { along: 10, perpendicular: 20 } },
+        });
+        expect(hidden.appearance.changed).toBe(true);
+        const reset = await page.annotations.update(created.ref, {
+          subtype: 'line',
+          caption: { enabled: true, offset: null },
+          measure: null,
+        });
+        expect(reset.updated.contents).toBe('6 m');
+        expect(
+          reset.updated.subtype === 'line' && reset.updated.caption?.offset === undefined,
+        ).toBe(true);
+        expect(measurementReadout(reset.updated)).toEqual({ unavailable: 'no-measure' });
+      } finally {
+        await doc.close();
+      }
+    });
+
+    test('all three kinds derive labels, save, reopen and retain captions', async () => {
+      let doc = await open();
+      try {
+        const pon = (await doc.pages.list()).pages[0].pageObjectNumber;
+        const drafts: AnnotationDraft[] = [
+          {
+            subtype: 'line',
+            rect,
+            intent: 'LineDimension',
+            // Both coordinates and /C cross float32 rounding boundaries.
+            measure: measureFromKnownLength(1, { value: 1.00000001, unit: 'm' }),
+            contents: 'wrong',
+            linePoints: { start: vertices[0], end: { x: 3.4450000001, y: 0 } },
+            caption: { enabled: true, offset: { along: 10, perpendicular: 20 } },
+          },
+          {
+            subtype: 'polyline',
+            rect,
+            intent: 'PolyLineDimension',
+            measure: scale,
+            contents: 'wrong',
+            vertices,
+            caption: { enabled: true, center: { x: 0, y: 0 } },
+          },
+          {
+            subtype: 'polygon',
+            rect,
+            intent: 'PolygonDimension',
+            measure: scale,
+            contents: 'wrong',
+            vertices,
+            caption: { enabled: true, center: { x: 50, y: 30 } },
+          },
+        ];
+        const saved = [];
+        for (const draft of drafts) {
+          const preview = measurementReadout(draft);
+          const a = (await doc.page(pon).annotations.create(draft)).created;
+          expect(a.contents).toBe('label' in preview ? preview.label : undefined);
+          saved.push(a);
+        }
+        const bytes = opts.openKind === 'bytes' ? await doc.download() : undefined;
+        await doc.close();
+        doc = bytes
+          ? await engine.open({ kind: 'bytes', id: `${opts.fixture.id}-saved`, bytes })
+          : await open();
+        const page = doc.page((await doc.pages.list()).pages[0].pageObjectNumber);
+        const list = (await page.annotations.list()).annotations;
+        for (const before of saved) {
+          const a = list.find((a) => refKey(a.ref) === refKey(before.ref))!;
+          expect(a.contents).toBe(before.contents);
+          if (a.subtype !== 'line' && a.subtype !== 'polygon' && a.subtype !== 'polyline')
+            throw new Error('Missing dimension');
+          expect(a.caption).toEqual('caption' in before ? before.caption : undefined);
+          const result = await page.annotations.update(a.ref, {
+            subtype: a.subtype,
+            color: { r: 0, g: 0, b: 255 },
+          });
+          expect(result.updated.contents).toBe(before.contents);
+        }
+      } finally {
+        await doc.close();
+      }
+    });
+
+    test('calibration updates only viewports and emits one event per write', async () => {
+      const doc = await open();
+      try {
+        const pon = (await doc.pages.list()).pages[0].pageObjectNumber;
+        const page = doc.page(pon);
+        if (!page.measure) throw new Error('Measurement service is required');
+        const foreign = (await page.measure.viewports()).filter((v) => !v.owned);
+        const annotations = (await page.annotations.list()).annotations;
+        const events: DocumentEvent[] = [];
+        const off = doc.events.subscribe((event) => events.push(event));
+        try {
+          await page.measure.setScale(scale);
+          expect((await page.measure.viewports()).filter((v) => v.owned)).toHaveLength(1);
+          expect((await page.annotations.list()).annotations).toEqual(annotations);
+          await page.measure.setScale(null);
+          expect(await page.measure.viewports()).toEqual(foreign);
+          const changes = events.filter((e) => e.type === 'page.viewportsChanged');
+          expect(changes).toHaveLength(2);
+          for (const event of changes)
+            expect(event).toMatchObject({ pageObjectNumber: pon, meta: { affectedPages: [] } });
+        } finally {
+          off();
+        }
+      } finally {
+        await doc.close();
+      }
+    });
+
+    test('invalid and immediately aborted calibration leaves the previous scale intact', async () => {
+      const doc = await open();
+      try {
+        const page = doc.page((await doc.pages.list()).pages[0].pageObjectNumber);
+        await page.measure!.setScale(scale);
+        const before = await page.measure!.viewports();
+        await expect(
+          page.measure!.setScale({ ...scale, x: [{ unit: 'm', conversion: 0 }] }),
+        ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg });
+        const pending = page.measure!.setScale(null);
+        pending.abort('conformance');
+        await expect(pending).rejects.toBeInstanceOf(AbortError);
+        expect(await page.measure!.viewports()).toEqual(before);
+      } finally {
+        await doc.close();
+      }
+    });
+  });
+}

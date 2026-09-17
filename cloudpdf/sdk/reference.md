@@ -2434,6 +2434,112 @@ await client.doc.metadata.get({
 </details>
 
 ## Doc Pages
+<details><summary><code>client.doc.pages.<a href="/src/api/resources/doc/resources/pages/client/Client.ts">setScale</a>({ ...params }) -> CloudPDF.DocPagesSetScale200Response</code></summary>
+<dl>
+<dd>
+
+#### 🔌 Usage
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+```typescript
+await client.doc.pages.setScale({
+    docId: "docId",
+    layerName: "layerName",
+    pon: 1
+});
+
+```
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### ⚙️ Parameters
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+**request:** `CloudPDF.doc.DocPagesSetScaleRequest`
+
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**requestOptions:** `PagesClient.RequestOptions`
+
+</dd>
+</dl>
+</dd>
+</dl>
+
+
+</dd>
+</dl>
+</details>
+
+<details><summary><code>client.doc.pages.<a href="/src/api/resources/doc/resources/pages/client/Client.ts">viewports</a>({ ...params }) -> CloudPDF.DocPagesViewports200Response</code></summary>
+<dl>
+<dd>
+
+#### 🔌 Usage
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+```typescript
+await client.doc.pages.viewports({
+    docId: "docId",
+    layerName: "layerName",
+    pon: 1
+});
+
+```
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### ⚙️ Parameters
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+**request:** `CloudPDF.doc.ViewportsPagesRequest`
+
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**requestOptions:** `PagesClient.RequestOptions`
+
+</dd>
+</dl>
+</dd>
+</dl>
+
+
+</dd>
+</dl>
+</details>
+
 <details><summary><code>client.doc.pages.<a href="/src/api/resources/doc/resources/pages/client/Client.ts">delete</a>({ ...params }) -> CloudPDF.DocPagesDelete200Response</code></summary>
 <dl>
 <dd>

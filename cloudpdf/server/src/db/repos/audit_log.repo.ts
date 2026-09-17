@@ -3,6 +3,7 @@ import type { Kysely, Transaction } from 'kysely';
 import type { Database as Schema } from '../schema';
 
 export type AuditMutationKind =
+  | 'measure.setScale'
   | 'annot.create'
   | 'annot.update'
   | 'annot.delete'

@@ -1,3 +1,5 @@
+import type { PageScaleResult } from '../mutation/PageScaleResult';
+import type { PdfMeasure, PageMeasurementViewport } from '../dto/Measure';
 import type { FontIdentityInfo } from '../dto/FontSpec';
 import type {
   AnnotationListPageSnapshot,
@@ -876,6 +878,23 @@ export interface PagesInsertBlankWorkerRequest {
  * `update`/`clear` are mutations (a layer session persists an artifact);
  * `read`/`applications` are plain reads.
  */
+export interface MeasureViewportsWorkerRequest {
+  kind: 'measure.viewports';
+  jobId: WorkerJobId;
+  docId: string;
+  layerName?: string;
+  pageObjectNumber: PageObjectNumber;
+}
+export interface MeasureSetScaleWorkerRequest {
+  kind: 'measure.setScale';
+  jobId: WorkerJobId;
+  docId: string;
+  layerName?: string;
+  pageObjectNumber: PageObjectNumber;
+  measure: PdfMeasure | null;
+  artifactPath?: string;
+}
+
 export interface PieceInfoReadWorkerRequest {
   kind: 'pieceInfo.read';
   jobId: WorkerJobId;
@@ -1124,6 +1143,8 @@ export type WorkerRequest =
   | AttachmentsCreateWorkerRequest
   | AttachmentsDeleteWorkerRequest
   | AnnotationsReadFileWorkerRequest
+  | MeasureViewportsWorkerRequest
+  | MeasureSetScaleWorkerRequest
   | PieceInfoReadWorkerRequest
   | PieceInfoUpdateWorkerRequest
   | PieceInfoApplicationsWorkerRequest
@@ -1372,6 +1393,13 @@ export type WorkerResultPayload =
   | {
       tag: 'pages.insertBlank';
       result: PageInsertResult;
+      artifact?: LayerArtifactWorkerPayload;
+      artifactFile?: LayerArtifactFileWorkerPayload;
+    }
+  | { tag: 'measure.viewports'; viewports: PageMeasurementViewport[] }
+  | {
+      tag: 'measure.setScale';
+      result: PageScaleResult;
       artifact?: LayerArtifactWorkerPayload;
       artifactFile?: LayerArtifactFileWorkerPayload;
     }

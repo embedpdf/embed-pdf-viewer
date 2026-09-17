@@ -11,6 +11,7 @@ import { LocalPageGeometryService } from './LocalPageGeometryService';
 import { LocalPageRenderService } from './LocalPageRenderService';
 import { LocalPageTextService } from './LocalPageTextService';
 import { LocalPieceInfoService } from './LocalPieceInfoService';
+import { LocalPageMeasureService } from './LocalPageMeasureService';
 import type { LocalImageEncoder } from '../render/BrowserImageEncoder';
 import type { ScopeGuard } from '../scope';
 import type { WorkerQueue } from '../worker/WorkerQueue';
@@ -30,6 +31,7 @@ export class LocalPageHandle implements PageHandle {
   readonly geometry: LocalPageGeometryService;
   readonly render: LocalPageRenderService;
   readonly pieceInfo: LocalPieceInfoService;
+  readonly measure: LocalPageMeasureService;
 
   constructor(
     readonly pageObjectNumber: PageObjectNumber,
@@ -64,5 +66,13 @@ export class LocalPageHandle implements PageHandle {
       renderPolicy,
     );
     this.pieceInfo = new LocalPieceInfoService(docId, queue, view, guard, pageObjectNumber);
+    this.measure = new LocalPageMeasureService(
+      docId,
+      pageObjectNumber,
+      queue,
+      view,
+      guard,
+      publisher,
+    );
   }
 }

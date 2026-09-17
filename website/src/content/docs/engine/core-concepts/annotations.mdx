@@ -55,6 +55,68 @@ const { created } = await page.annotations.create({
 // `created` is the new annotation. Keep `created.ref` to edit it later.
 ```
 
+## Measurements
+
+Measurements use the existing annotation types and editing methods. Set the
+dimension intent and attach a rectilinear `measure` dictionary:
+
+| Measurement | `subtype` | `intent` | Geometry |
+| --- | --- | --- | --- |
+| Distance | `line` | `LineDimension` | `linePoints` |
+| Perimeter | `polyline` | `PolyLineDimension` | `vertices` |
+| Area | `polygon` | `PolygonDimension` | `vertices` |
+
+The pure helpers exported by `@embedpdf/engine-core` include
+`measureFromKnownLength`, `measureFromRatio`, `measurementReadout`, and
+`formatMeasurement`. A known-length calibration takes a length in PDF user-space
+units and its real-world value and unit. A ratio calibration also accepts the
+page's `userUnit`. The readout reports the formatted label and numeric value, or
+an `unavailable` reason when the imported scale or geometry cannot be interpreted.
+Polygon readouts also include a formatted perimeter when distance formats exist.
+
+The engine derives `contents` on creation and when geometry, measure, intent, or
+contents is updated. Supplying a different contents string cannot override an
+available measurement result. A style-only edit preserves the stored label;
+missing or unsupported scales leave it unchanged. Preview calculations normalize
+coordinates and conversion factors to the same float precision used by the PDF
+runtime.
+
+### Captions and placement
+
+Set `caption.enabled` to paint the saved label into the annotation's appearance.
+Imported polygons and polylines keep their existing appearance behavior until
+explicitly enabled.
+
+- A line caption uses `position: 'inline' | 'top'` and an optional
+  `offset: { along, perpendicular }`. These are displacements in PDF units along
+  the directed line and its positive 90-degree normal.
+- A polygon or polyline caption uses an optional `center: { x, y }`. This is an
+  absolute point in PDF user space: y increases upward and the original page
+  origin is retained. The point `(0, 0)` is a valid manual placement.
+- Caption patches merge with saved placement. Hiding a caption retains its
+  position; `offset: null` or `center: null` restores automatic placement, and
+  `caption: null` clears the caption settings.
+- A manual shape center follows a verified translation or rotation of all
+  vertices. Editing individual vertices leaves it fixed. An explicit center in
+  the patch takes precedence.
+
+### Page calibration
+
+Both local and cloud engines expose `page.measure`. Its `viewports()` method
+returns the page's measurement regions in drawing order; `viewportForPoint`
+selects the last containing region, including regions with unsupported measures.
+The `owned` flag identifies EmbedPDF's calibration viewport.
+
+`setScale(measure)` saves a full-page calibration, while `setScale(null)` removes
+it. Other producers' viewports survive both operations. Calibration emits
+`page.viewportsChanged`, persists with the document or layer, and leaves existing
+annotations' scale snapshots unchanged. To recalibrate an existing annotation,
+update its `measure` explicitly.
+
+Reading viewports requires `doc.open`; changing calibration requires
+`doc.annotate.modify`. Foreign measures such as `/GEO` remain readable and are
+preserved in the PDF, but cannot be authored through the measurement API.
+
 ## Updating and deleting
 
 You never build an identity by hand. Every annotation you read or create comes with a

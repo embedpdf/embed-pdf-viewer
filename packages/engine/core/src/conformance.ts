@@ -1,4 +1,5 @@
 export { runMetadataConformance } from './conformance/runMetadataConformance';
+export { runMeasurementConformance } from './conformance/runMeasurementConformance';
 export type {
   ConformanceTestRunner,
   ConformanceExpect,
