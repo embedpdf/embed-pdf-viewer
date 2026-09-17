@@ -8,7 +8,7 @@
   } from '@embedpdf/core';
   import { type Snippet } from 'svelte';
   import AutoMount from './AutoMount.svelte';
-  import { pdfContext, type PDFContextState } from '../hooks';
+  import { createPdfContext, setPdfContext, type PDFContextState } from '../hooks';
 
   export type { PluginBatchRegistrations };
 
@@ -53,6 +53,11 @@
     children,
     autoMountDomElements = true,
   }: EmbedPDFProps = $props();
+
+  // This instance's own context. Publishing it here means everything rendered
+  // below resolves this registry, so sibling <EmbedPDF> instances stay isolated.
+  const pdfContext = createPdfContext();
+  setPdfContext(pdfContext);
 
   let latestInit = onInitialized;
 

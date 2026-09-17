@@ -43,12 +43,17 @@
     "build": "pnpm run clean && concurrently -c auto -n base,react,preact,vue,svelte \"vite build --mode base\" \"vite build --mode react\" \"vite build --mode preact\" \"vite build --mode vue\" \"vite build --mode svelte\"",
     "clean": "rimraf dist",
     "lint": "eslint src --color",
-    "lint:fix": "eslint src --color --fix"
+    "lint:fix": "eslint src --color --fix",
+    "test": "vitest run"
   },
   "devDependencies": {
     "@embedpdf/build": "workspace:*",
+    "@sveltejs/vite-plugin-svelte": "^6.2.0",
     "@types/react": "^18.2.0",
-    "typescript": "^5.0.0"
+    "jsdom": "^26.1.0",
+    "svelte": "^5.39.5",
+    "typescript": "^5.0.0",
+    "vitest": "^3.2.4"
   },
   "dependencies": {
     "@embedpdf/engines": "workspace:*",
