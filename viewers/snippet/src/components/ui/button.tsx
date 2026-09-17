@@ -27,6 +27,7 @@ export function Button({
       id={id}
       ref={elementRef}
       onClick={onClick}
+      disabled={disabled}
       className={`flex h-[32px] w-auto min-w-[32px] items-center justify-center rounded-md p-[5px] transition-colors ${
         active
           ? 'bg-interactive-selected text-accent ring-accent border-none shadow ring'
