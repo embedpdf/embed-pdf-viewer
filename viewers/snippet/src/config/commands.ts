@@ -302,6 +302,7 @@ export const commands: Record<string, Command<State>> = {
       const uiState = state.plugins['ui']?.documents[documentId];
       return uiState?.openMenus['zoom-menu'] !== undefined;
     },
+    activeAriaState: 'expanded',
   },
 
   'zoom:toggle-menu-mobile': {
@@ -320,6 +321,7 @@ export const commands: Record<string, Command<State>> = {
       const uiState = state.plugins['ui']?.documents[documentId];
       return uiState?.openMenus['zoom-menu'] !== undefined;
     },
+    activeAriaState: 'expanded',
   },
   // ─────────────────────────────────────────────────────────
   // Pan Command
@@ -339,6 +341,7 @@ export const commands: Record<string, Command<State>> = {
     },
     active: ({ state, documentId }) =>
       state.plugins['pan']?.documents[documentId]?.isPanMode ?? false,
+    activeAriaState: 'pressed',
   },
 
   // ─────────────────────────────────────────────────────────
@@ -365,6 +368,7 @@ export const commands: Record<string, Command<State>> = {
     },
     active: ({ state, documentId }) =>
       state.plugins['interaction-manager']?.documents[documentId]?.activeMode === 'pointerMode',
+    activeAriaState: 'pressed',
   },
 
   'left-action-menu:overflow-menu': {
@@ -388,6 +392,7 @@ export const commands: Record<string, Command<State>> = {
       const uiState = state.plugins['ui']?.documents[documentId];
       return uiState?.openMenus['left-action-menu'] !== undefined;
     },
+    activeAriaState: 'expanded',
   },
 
   // ─────────────────────────────────────────────────────────
@@ -436,6 +441,7 @@ export const commands: Record<string, Command<State>> = {
       const uiState = state.plugins['ui']?.documents[documentId];
       return uiState?.openMenus['document-menu'] !== undefined;
     },
+    activeAriaState: 'expanded',
   },
 
   'document:open': {
@@ -565,6 +571,7 @@ export const commands: Record<string, Command<State>> = {
     active: ({ state, documentId }) => {
       return isSidebarOpen(state.plugins, documentId, 'left', 'main', 'sidebar-panel');
     },
+    activeAriaState: 'expanded',
   },
 
   'panel:toggle-search': {
@@ -586,6 +593,7 @@ export const commands: Record<string, Command<State>> = {
     active: ({ state, documentId }) => {
       return isSidebarOpen(state.plugins, documentId, 'right', 'main', 'search-panel');
     },
+    activeAriaState: 'expanded',
   },
 
   'panel:toggle-comment': {
@@ -606,6 +614,7 @@ export const commands: Record<string, Command<State>> = {
     active: ({ state, documentId }) => {
       return isSidebarOpen(state.plugins, documentId, 'right', 'main', 'comment-panel');
     },
+    activeAriaState: 'expanded',
   },
 
   'panel:toggle-redaction': {
@@ -626,6 +635,7 @@ export const commands: Record<string, Command<State>> = {
     active: ({ state, documentId }) => {
       return isSidebarOpen(state.plugins, documentId, 'right', 'main', 'redaction-panel');
     },
+    activeAriaState: 'expanded',
   },
 
   'panel:toggle-annotation-style': {
@@ -646,6 +656,7 @@ export const commands: Record<string, Command<State>> = {
     active: ({ state, documentId }) => {
       return isSidebarOpen(state.plugins, documentId, 'left', 'main', 'annotation-panel');
     },
+    activeAriaState: 'expanded',
     disabled: ({ state, documentId }) => {
       return lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations);
     },
@@ -673,6 +684,7 @@ export const commands: Record<string, Command<State>> = {
       const uiState = state.plugins['ui']?.documents[documentId];
       return uiState?.openMenus['page-settings-menu'] !== undefined;
     },
+    activeAriaState: 'expanded',
   },
 
   'spread:none': {
@@ -1108,6 +1120,7 @@ export const commands: Record<string, Command<State>> = {
     active: ({ state, documentId }) => {
       return isSidebarOpen(state.plugins, documentId, 'left', 'main', 'rubber-stamp-panel');
     },
+    activeAriaState: 'expanded',
     disabled: ({ state, documentId }) => {
       return lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations);
     },
@@ -1131,6 +1144,7 @@ export const commands: Record<string, Command<State>> = {
     active: ({ state, documentId }) => {
       return isSidebarOpen(state.plugins, documentId, 'left', 'main', 'signature-panel');
     },
+    activeAriaState: 'expanded',
     disabled: ({ state, documentId }) => {
       return lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations);
     },
@@ -1204,6 +1218,7 @@ export const commands: Record<string, Command<State>> = {
         undefined
       );
     },
+    activeAriaState: 'expanded',
   },
 
   // ─────────────────────────────────────────────────────────
@@ -2126,6 +2141,7 @@ export const commands: Record<string, Command<State>> = {
       const ui = state.plugins['ui']?.documents[documentId];
       return ui?.openMenus['annotation-tools-menu'] !== undefined;
     },
+    activeAriaState: 'expanded',
     disabled: ({ state, documentId }) => {
       return lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations);
     },
@@ -2149,6 +2165,7 @@ export const commands: Record<string, Command<State>> = {
       const ui = state.plugins['ui']?.documents[documentId];
       return ui?.openMenus['shapes-tools-menu'] !== undefined;
     },
+    activeAriaState: 'expanded',
     disabled: ({ state, documentId }) => {
       return lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations);
     },
@@ -2172,6 +2189,7 @@ export const commands: Record<string, Command<State>> = {
       const ui = state.plugins['ui']?.documents[documentId];
       return ui?.openMenus['form-tools-menu'] !== undefined;
     },
+    activeAriaState: 'expanded',
     disabled: ({ state, documentId }) => {
       return lacksPermission(state, documentId, PdfPermissionFlag.ModifyAnnotations);
     },
@@ -2213,6 +2231,7 @@ export const commands: Record<string, Command<State>> = {
     active: ({ state, documentId }) => {
       return isSidebarOpen(state.plugins, documentId, 'left', 'main', 'annotation-panel');
     },
+    activeAriaState: 'expanded',
     visible: ({ registry, documentId }) => {
       const scope = registry
         .getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)
@@ -2305,6 +2324,7 @@ export const commands: Record<string, Command<State>> = {
     active: ({ state, documentId }) => {
       return isSidebarOpen(state.plugins, documentId, 'right', 'main', 'widget-edit-panel');
     },
+    activeAriaState: 'expanded',
     visible: ({ registry, documentId }) => {
       const scope = registry
         .getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)
@@ -2334,6 +2354,7 @@ export const commands: Record<string, Command<State>> = {
     active: ({ state, documentId }) => {
       return isSidebarOpen(state.plugins, documentId, 'right', 'main', 'comment-panel');
     },
+    activeAriaState: 'expanded',
     visible: ({ registry, documentId }) => {
       const scope = registry
         .getPlugin<AnnotationPlugin>(ANNOTATION_PLUGIN_ID)

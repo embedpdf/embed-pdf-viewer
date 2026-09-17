@@ -225,6 +225,7 @@ export class CommandsPlugin extends BasePlugin<
       icon: this.resolveDynamic(command.icon, state, resolvedDocId),
       iconProps: this.resolveDynamic(command.iconProps, state, resolvedDocId),
       active: this.resolveDynamic(command.active, state, resolvedDocId) ?? false,
+      activeAriaState: command.activeAriaState,
       disabled: isDisabled,
       visible: this.resolveDynamic(command.visible, state, resolvedDocId) ?? true,
       shortcuts,
