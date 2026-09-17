@@ -1,12 +1,20 @@
 import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
 import { useScrollCapability } from '@embedpdf/plugin-scroll/preact';
+import { PrintProgress } from '@embedpdf/plugin-print';
 import { usePrintCapability } from '@embedpdf/plugin-print/preact';
 import { PdfPrintOptions } from '@embedpdf/models';
 import { Dialog } from './ui/dialog';
 import { Button } from './ui/button';
 import { Spinner } from './ui/loading-indicator';
 import { useTranslations } from '@embedpdf/plugin-i18n/preact';
+
+const printProgressKeys: Record<PrintProgress['stage'], string> = {
+  preparing: 'print.loading',
+  'document-ready': 'print.documentReady',
+  'iframe-ready': 'print.ready',
+  printing: 'print.dialogOpened',
+};
 
 type PageSelection = 'all' | 'current' | 'custom';
 
@@ -26,7 +34,7 @@ export function PrintModal({ documentId, isOpen, onClose, onExited }: PrintModal
   const [customPages, setCustomPages] = useState('');
   const [includeAnnotations, setIncludeAnnotations] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
-  const [loadingMessage, setLoadingMessage] = useState('');
+  const [printStage, setPrintStage] = useState<PrintProgress['stage']>('preparing');
 
   const scrollMetrics = scroll?.forDocument(documentId).getMetrics();
   const currentPage = scrollMetrics?.currentPage || 1;
@@ -39,7 +47,7 @@ export function PrintModal({ documentId, isOpen, onClose, onExited }: PrintModal
       setCustomPages('');
       setIncludeAnnotations(true);
       setIsLoading(false);
-      setLoadingMessage('');
+      setPrintStage('preparing');
     }
   }, [isOpen]);
 
@@ -59,32 +67,32 @@ export function PrintModal({ documentId, isOpen, onClose, onExited }: PrintModal
 
     try {
       setIsLoading(true);
-      setLoadingMessage(translate('print.loading'));
+      setPrintStage('preparing');
 
       const task = printCapability?.forDocument(documentId).print(options);
 
       if (task) {
         task.onProgress((progress) => {
-          setLoadingMessage(progress.message);
+          setPrintStage(progress.stage);
         });
 
         task.wait(
           () => {
             setIsLoading(false);
-            setLoadingMessage('');
+            setPrintStage('preparing');
             onClose?.();
           },
           (error) => {
             console.error('Print failed:', error);
             setIsLoading(false);
-            setLoadingMessage('');
+            setPrintStage('preparing');
           },
         );
       }
     } catch (err) {
       console.error('Print failed:', err);
       setIsLoading(false);
-      setLoadingMessage('');
+      setPrintStage('preparing');
     }
   };
 
@@ -161,7 +169,7 @@ export function PrintModal({ documentId, isOpen, onClose, onExited }: PrintModal
                 />
                 {selection === 'custom' && customPages.trim() && totalPages > 0 && (
                   <p className="text-fg-muted mt-1 text-xs">
-                    {translate('print.current', { params: { totalPages } })}
+                    {translate('print.total', { params: { totalPages } })}
                   </p>
                 )}
               </div>
@@ -189,7 +197,7 @@ export function PrintModal({ documentId, isOpen, onClose, onExited }: PrintModal
         {isLoading && (
           <div className="bg-state-info-light flex items-center space-x-3 rounded-md p-3">
             <Spinner className="text-accent" />
-            <span className="text-accent text-sm">{loadingMessage}</span>
+            <span className="text-accent text-sm">{translate(printProgressKeys[printStage])}</span>
           </div>
         )}
 
