@@ -370,34 +370,35 @@ export class PdfiumNative implements IPdfiumExecutor {
         ? this.pdfiumModule.EPDF_GetPageSizeByIndexNormalized(docPtr, index, sizePtr)
         : this.pdfiumModule.FPDF_GetPageSizeByIndexF(docPtr, index, sizePtr);
 
-      if (!result) {
+      // A single unreadable page (e.g. a malformed page dictionary PDFium
+      // cannot parse) must not fail the whole document. Fall back to a 0x0
+      // size for that page and keep going.
+      let size: { width: number; height: number };
+      if (result) {
+        size = {
+          width: this.pdfiumModule.pdfium.getValue(sizePtr, 'float'),
+          height: this.pdfiumModule.pdfium.getValue(sizePtr + 4, 'float'),
+        };
+      } else {
         const lastError = this.pdfiumModule.FPDF_GetLastError();
-        this.logger.error(
+        this.logger.warn(
           LOG_SOURCE,
           LOG_CATEGORY,
-          `${normalizeRotation ? 'EPDF_GetPageSizeByIndexNormalized' : 'FPDF_GetPageSizeByIndexF'} failed with ${lastError}`,
+          `${normalizeRotation ? 'EPDF_GetPageSizeByIndexNormalized' : 'FPDF_GetPageSizeByIndexF'} failed for page ${index} with ${lastError}; using 0x0 fallback`,
         );
-        this.memoryManager.free(sizePtr);
-        this.memoryManager.free(boxPtr);
-        this.pdfiumModule.FPDF_CloseDocument(docPtr);
-        this.memoryManager.free(filePtr);
-        this.logger.perf(LOG_SOURCE, LOG_CATEGORY, `OpenDocumentBuffer`, 'End', file.id);
-        return PdfTaskHelper.reject<PdfDocumentObject>({
-          code: lastError,
-          message: `${normalizeRotation ? 'EPDF_GetPageSizeByIndexNormalized' : 'FPDF_GetPageSizeByIndexF'} failed`,
-        });
+        size = { width: 0, height: 0 };
       }
 
-      const rotation = this.pdfiumModule.EPDF_GetPageRotationByIndex(docPtr, index) as Rotation;
+      // EPDF_GetPageRotationByIndex returns -1 on error; clamp to 0 so the
+      // downstream `rotation & 3` math never treats a failed read as 270°.
+      const quarterTurns = this.pdfiumModule.EPDF_GetPageRotationByIndex(docPtr, index);
+      const rotation = (quarterTurns >= 1 && quarterTurns <= 3 ? quarterTurns : 0) as Rotation;
       const objectNumber = this.pdfiumModule.EPDFDoc_GetPageObjectNumberByIndex(docPtr, index);
       const boxes = this.readPageBoxes(docPtr, index, boxPtr);
 
       const page = {
         index,
-        size: {
-          width: this.pdfiumModule.pdfium.getValue(sizePtr, 'float'),
-          height: this.pdfiumModule.pdfium.getValue(sizePtr + 4, 'float'),
-        },
+        size,
         rotation,
         objectNumber,
         boxes,
