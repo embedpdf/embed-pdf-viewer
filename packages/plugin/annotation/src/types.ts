@@ -635,6 +635,8 @@ export interface AnnotationCapability {
   markupFromSelection(subtype: Subtype, preset?: string): boolean;
 
   // ── multi-click creation drafts (polygon, polyline, …) ──
+  /** Whether a drawing gesture is active, including placement between clicks. */
+  hasCreationDraft(): boolean;
   /** Commit the in-progress multi-click creation draft (no-op when there is
    *  none, or it can't finish yet — see `creationDraftAnchor().canFinish`). */
   finishCreationDraft(): void;
@@ -794,6 +796,8 @@ export interface AnnotationHostCapability extends AnnotationCapability {
   ): { pon: PageObjectNumber; bounds: Rect; knob?: Vec } | null;
   /** The anchor + action state for a live multi-click creation draft, or null. */
   creationDraftAnchor(): CreationDraftAnchor | null;
+  /** Home page while a distance draft is placing its dimension line. */
+  distanceCreationPage(): number | null;
   /** Cache key for a page's baked appearances: the COMMITTED id + AP box of every
    *  baked annotation (gesture previews excluded). Changes exactly once per
    *  committed create/geometry-edit, so the render layer refetches rasters then —

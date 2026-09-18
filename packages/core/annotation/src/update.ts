@@ -1,3 +1,4 @@
+import { annotationSelectionFrame } from './selection';
 /**
  * The pure annotation core: update(model, msg) → [model, effects].
  *
@@ -11,7 +12,7 @@ import type {
   InkIntent,
   RichTextDocumentInput,
 } from '@embedpdf/engine-core/runtime';
-import { moveDistanceCaption, type DistanceAppearance } from './measurement';
+import { distanceLeaderLength, moveDistanceCaption, type DistanceAppearance } from './measurement';
 import { expandGroups, groupMembers } from './group';
 import { canMove, groupUnionBounds, hitTest, isSelectable } from './hit';
 import { isSubstrateOnly } from './plane';
@@ -42,8 +43,6 @@ import {
   normalizeDeg,
   quadIntersectsRect,
   rectFromPoints,
-  selectionCenter,
-  selectionQuad,
   shapeRectFor,
   transposedAboutCenter,
   unionRect,
@@ -227,8 +226,7 @@ function unionBoundsOf(m: Model, ids: Id[], view?: ViewEnv): Rect | null {
   for (const id of ids) {
     const a = m.byId[id];
     if (!a) continue;
-    const g = anchoredGeom(a.geom, anchorModeOf(a), view);
-    corners.push(...selectionQuad(g, a.style.strokeWidth, a.style.border));
+    corners.push(...annotationSelectionFrame(a, view).corners);
   }
   return corners.length ? unionRect(corners) : null;
 }
@@ -254,7 +252,7 @@ function clampMoveDelta(
 
 /** The page an edit draft is anchored to — every edit gesture lives on ONE page. */
 function editDraftPon(m: Model, d: Draft): number | null {
-  const id = d.g === 'handle' ? d.id : 'ids' in d && d.ids.length ? d.ids[0] : null;
+  const id = 'id' in d ? d.id : 'ids' in d && d.ids.length ? d.ids[0] : null;
   return id != null ? (m.byId[id]?.pon ?? null) : null;
 }
 const geomEqual = (a: Geom, b: Geom): boolean => JSON.stringify(a) === JSON.stringify(b);
@@ -476,6 +474,15 @@ function editDown(m: Model, input: PointerInput): [Model, Effect[]] {
       [],
     ];
   }
+  if (hit.t === 'handle' && (hit.handle === 'leader-start' || hit.handle === 'leader-end')) {
+    return [
+      {
+        ...m,
+        draft: { g: 'leader', id: hit.id, start: input.point, delta: 0 },
+      },
+      [],
+    ];
+  }
   if (hit.t === 'handle') {
     // The handle gesture runs in VIEW space: `base` is the PROJECTED geometry
     // the user grabbed (identity for un-flagged annotations), and the commit
@@ -578,6 +585,13 @@ function editMove(m: Model, input: PointerInput): [Model, Effect[]] {
     return [{ ...m, draft: { ...d, delta, guides } }, []];
   }
   const point = clampPointToBox(input.point, input.pageBox);
+  if (d.g === 'leader') {
+    const annotation = m.byId[d.id];
+    const start = distanceLeaderLength(annotation.geom, d.start);
+    const current = distanceLeaderLength(annotation.geom, point);
+
+    return [{ ...m, draft: { ...d, delta: current - start } }, []];
+  }
   if (d.g === 'caption')
     return [
       { ...m, draft: { ...d, delta: { x: point.x - d.start.x, y: point.y - d.start.y } } },
@@ -598,6 +612,30 @@ function editMove(m: Model, input: PointerInput): [Model, Effect[]] {
 
 function editUp(m: Model): [Model, Effect[]] {
   const d = m.draft!;
+  if (d.g === 'leader') {
+    const annotation = m.byId[d.id];
+    if (!annotation?.measure || d.delta === 0) {
+      return [{ ...m, draft: null }, []];
+    }
+
+    const measure = annotation.measure;
+    const updated: Annot = {
+      ...annotation,
+      source: 'vector',
+      measure: {
+        ...measure,
+        leader: {
+          ...measure.leader,
+          length: (measure.leader?.length ?? 0) + d.delta,
+        },
+      },
+    };
+
+    return [
+      { ...m, draft: null, byId: { ...m.byId, [updated.id]: updated } },
+      [{ fx: 'patch', id: updated.id, scope: { kind: 'leader' } }],
+    ];
+  }
   if (d.g === 'caption') {
     const a = m.byId[d.id];
     if (!a?.measure || (!d.delta.x && !d.delta.y)) return [{ ...m, draft: null }, []];
@@ -716,6 +754,123 @@ function toggleSelection(base: Id[], ids: Id[]): Id[] {
   return [...next];
 }
 
+/**
+ * Distance creation has two stages. Releasing the endpoint drag only advances
+ * to offset placement; the following click is the sole persistence boundary.
+ */
+function distancePointer(
+  model: Model,
+  phase: 'down' | 'move' | 'up',
+  input: PointerInput,
+  preset: string,
+  measure?: DistanceAppearance,
+  flags?: Partial<AnnotationFlags>,
+): [Model, Effect[]] {
+  const draft = model.draft;
+
+  if (draft?.g !== 'create-distance') {
+    if (phase !== 'down' || !measure) {
+      return [model, []];
+    }
+
+    return [
+      {
+        ...model,
+        selected: [],
+        draft: {
+          g: 'create-distance',
+          step: 'endpoints',
+          subtype: 'line',
+          preset,
+          pon: input.pon,
+          from: input.point,
+          to: input.point,
+          measure: {
+            ...measure,
+            leader: { ...measure.leader, length: 0 },
+          },
+          ...(flags ? { flags } : {}),
+        },
+      },
+      [],
+    ];
+  }
+
+  // Even the final placement click belongs to the draft's original page.
+  if (input.pon !== draft.pon) {
+    return [model, []];
+  }
+
+  if (draft.step === 'endpoints') {
+    if (phase === 'down') {
+      return [model, []];
+    }
+
+    const nextDraft = { ...draft, to: input.point };
+    if (phase === 'move') {
+      return [{ ...model, draft: nextDraft }, []];
+    }
+
+    const length = Math.hypot(nextDraft.to.x - nextDraft.from.x, nextDraft.to.y - nextDraft.from.y);
+    if (length < MIN_DRAG) {
+      return [{ ...model, draft: null }, []];
+    }
+
+    return [{ ...model, draft: { ...nextDraft, step: 'offset' } }, []];
+  }
+
+  if (phase === 'up') {
+    return [model, []];
+  }
+
+  const defaults = defaultsFor(model, draft.preset);
+  const geom: Geom = {
+    t: 'line',
+    a: draft.from,
+    b: draft.to,
+    ends: defaults.lineEndings,
+  };
+  const appearance: DistanceAppearance = {
+    ...draft.measure,
+    leader: {
+      ...draft.measure.leader,
+      length: distanceLeaderLength(geom, input.point),
+    },
+  };
+
+  if (phase === 'move') {
+    return [{ ...model, draft: { ...draft, measure: appearance } }, []];
+  }
+
+  const id = `tmp:${model.seq + 1}`;
+  const annotation: Annot = {
+    id,
+    ref: null,
+    pon: draft.pon,
+    subtype: 'line',
+    geom,
+    measure: appearance,
+    style: {
+      ...styleFromProps(defaults),
+      interiorColor: defaults.interiorColor ?? defaults.color,
+    },
+    flags: { ...DRAWN_FLAGS, ...draft.flags },
+    source: 'vector',
+  };
+
+  return [
+    {
+      ...model,
+      seq: model.seq + 1,
+      byId: { ...model.byId, [id]: annotation },
+      order: [...model.order, id],
+      selected: [id],
+      draft: null,
+    },
+    [{ fx: 'create', id }],
+  ];
+}
+
 function createPointer(
   m: Model,
   phase: 'down' | 'move' | 'up',
@@ -736,6 +891,9 @@ function createPointer(
   if (phase !== 'down' && m.draft && 'pon' in m.draft && m.draft.pon !== input.pon) return [m, []];
   // Shapes can't be drawn past the page edge — the pointer pins to it.
   if (input.pageBox) input = { ...input, point: clampPointToBox(input.point, input.pageBox) };
+  if (m.draft?.g === 'create-distance' || (measure && !capture)) {
+    return distancePointer(m, phase, input, preset, measure, flags);
+  }
   if (subtype === 'free-text-callout') return calloutPointer(m, phase, input, preset, flags);
   if (phase === 'down') {
     if (isPolySubtype(subtype)) {
@@ -1437,7 +1595,7 @@ function rotateSelection(m: Model, deltaDeg: number): [Model, Effect[]] {
   let pivot: Vec;
   if (ids.length === 1) {
     const a = m.byId[ids[0]];
-    pivot = selectionCenter(a.geom, a.style.strokeWidth);
+    pivot = annotationSelectionFrame(a).center;
   } else {
     const pon = m.byId[ids[0]].pon;
     const union = groupUnionBounds({ ...m, selected: ids }, pon);
@@ -1464,7 +1622,10 @@ function resetRotation(m: Model): [Model, Effect[]] {
   for (const id of m.selected) {
     const a = byId[id];
     if (!a || !annotTransformable(a) || geomRotation(a.geom) === 0) continue;
-    byId[id] = ownGeometry({ ...a, geom: geomResetRotation(a.geom) });
+    byId[id] = ownGeometry({
+      ...a,
+      geom: geomResetRotation(a.geom, annotationSelectionFrame(a).center),
+    });
     fx.push(patchFx(id, byId[id], a.geom));
   }
   return fx.length ? [{ ...m, byId }, fx] : [m, []];
@@ -1516,8 +1677,8 @@ export function annotsInBox(
     // AABB is a coarse superset whose empty corners cover most of a tilted
     // shape's unrotated footprint, so testing the AABB selected shapes the
     // marquee never touched.
-    const g = anchoredGeom(annot.geom, anchorModeOf(annot), view);
-    return quadIntersectsRect(selectionQuad(g, annot.style.strokeWidth, annot.style.border), box);
+    const frame = annotationSelectionFrame(annot, view);
+    return quadIntersectsRect(frame.corners, box);
   });
 }
 
@@ -1608,7 +1769,9 @@ function bumpAp(m: Model, ids: Id[]): Model {
 function draftIds(draft: Draft | null): Set<Id> {
   if (!draft) return new Set();
   if (draft.g === 'move') return new Set(draft.ids);
-  if (draft.g === 'handle' || draft.g === 'caption') return new Set([draft.id]);
+  if (draft.g === 'handle' || draft.g === 'caption' || draft.g === 'leader') {
+    return new Set([draft.id]);
+  }
   if (draft.g === 'rotate' || draft.g === 'group') return new Set(draft.ids);
   return new Set();
 }

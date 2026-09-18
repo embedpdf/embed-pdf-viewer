@@ -9,6 +9,7 @@
 import type { AnnotationDTO, PdfRect } from '@embedpdf/engine-core/runtime';
 import {
   distanceLabel,
+  distanceLayout,
   geomPdfBounds,
   geomRotation,
   pdfToContentPoint,
@@ -37,6 +38,19 @@ const polyCloudy = (a: Annot): Wire =>
 /** The visual-bounds `/Rect` (stroke + border included) of a stroke geom. */
 const visualRect = (a: Annot, crop: PdfRect): Wire => {
   const g = a.geom;
+  if (a.measure) {
+    const bounds = distanceLayout(g, a.measure, a.style.strokeWidth)?.visualBounds;
+    if (bounds) {
+      return {
+        rect: {
+          left: crop.left + bounds.x,
+          right: crop.left + bounds.x + bounds.width,
+          top: crop.top - bounds.y,
+          bottom: crop.top - bounds.y - bounds.height,
+        },
+      };
+    }
+  }
   if (g.t === 'line' || g.t === 'ink') return { rect: geomPdfBounds(g, a.style.strokeWidth, crop) };
   if (g.t === 'poly') return { rect: geomPdfBounds(g, a.style.strokeWidth, crop, a.style.border) };
   return {};

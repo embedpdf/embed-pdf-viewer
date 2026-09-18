@@ -952,8 +952,8 @@ export function createAnnotationCapability(
    * changed the appearance (create / restyle / resize), `'baked'` when the AP is
    * still authoritative (a move, which preserves it, or a remote edit).
    * `bumpAp` marks the upsert as confirming an engine /AP re-bake with new
-   * content, so the annotation's `apVersion` — and with it the page's
-   * appearance epoch — advances and the shell fetches the fresh raster.
+   * content, advancing the annotation's `apVersion`. Only baked annotations
+   * contribute to the page's appearance epoch and trigger a raster fetch.
    */
   const syncDTO = (
     dto: Parameters<typeof fromDTO>[0],
@@ -972,7 +972,7 @@ export function createAnnotationCapability(
     const pon = ponForRef(ref);
     if (pon == null) throw new Error('[annotation] cannot resolve page for ref');
     const res = await doc.page(pon).annotations.update(ref, patch);
-    syncDTO(res.updated, isDimension(res.updated) ? 'baked' : 'vector', res.appearance?.changed);
+    syncDTO(res.updated, 'vector', res.appearance?.changed);
   };
 
   // ── the text commit: ONE debounced write per annotation for both editors ──
@@ -1653,8 +1653,7 @@ export function createAnnotationCapability(
               id: refKey(res.created.ref),
               ref: res.created.ref,
             });
-            // Dimensions use native text metrics after commit; other drawings stay live.
-            syncDTO(res.created, isDimension(res.created) ? 'baked' : 'vector');
+            syncDTO(res.created, 'vector');
           },
           () => apply({ t: 'createFailed', tempId: fx.id }),
         );
@@ -1699,7 +1698,7 @@ export function createAnnotationCapability(
         .annotations.update(a.ref, patch)
         .then(
           (res) => {
-            syncDTO(res.updated, a.measure ? 'baked' : a.source, res.appearance.changed);
+            syncDTO(res.updated, a.source, res.appearance.changed);
             // Attached link children follow their parent's COMMITTED geometry
             // — scheduled after the parent's own write resolves, from ONE
             // place, so no gesture ever has to know the children exist.
@@ -2040,6 +2039,10 @@ export function createAnnotationCapability(
     chrome: (pon, scale, rotation, zoom) => memoChrome(pon, scale, rotation, zoom),
     selectionAnchor: (scale, rotation, zoom) => memoAnchor(scale, rotation, zoom),
     creationDraftAnchor: () => memoDraftAnchor(),
+    distanceCreationPage: () => {
+      const draft = model().draft;
+      return draft?.g === 'create-distance' && draft.step === 'offset' ? draft.pon : null;
+    },
     selection: () => model().selected,
     hitKind: (pon, point, scale, rotation, zoom, touch) =>
       hitTest(
@@ -2211,7 +2214,15 @@ export function createAnnotationCapability(
       // input bag; the core captures them on the draft at DOWN.
       const crop = cropOf(pon);
       const cache = pageViewports.get(pon);
-      if (t?.intent === 'LineDimension' && phase === 'down' && (!crop || !cache?.viewports)) return;
+      const continuingDistance = model().draft?.g === 'create-distance';
+      if (
+        t?.intent === 'LineDimension' &&
+        phase === 'down' &&
+        !continuingDistance &&
+        (!crop || !cache?.viewports)
+      ) {
+        return;
+      }
       const viewport =
         crop && cache?.viewports
           ? viewportForPoint(cache.viewports, { x: point.x + crop.left, y: crop.top - point.y })
@@ -2231,6 +2242,7 @@ export function createAnnotationCapability(
       if (
         measure &&
         phase === 'down' &&
+        !continuingDistance &&
         !isReadout(
           measurementReadout({
             subtype: 'line',
@@ -2264,6 +2276,7 @@ export function createAnnotationCapability(
         },
       });
     },
+    hasCreationDraft: () => model().draft?.g.startsWith('create-') ?? false,
     finishCreationDraft: () => apply({ t: 'finishCreationDraft' }),
     finishInkDraft: () => apply({ t: 'finishInkDraft' }),
     cancelCreationDraft: () => apply({ t: 'cancel' }),

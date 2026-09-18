@@ -967,6 +967,67 @@ describe('remote delivery — echo-driven appearance invalidation', () => {
   });
 });
 
+describe.each([
+  { name: 'line', intent: undefined },
+  { name: 'distance', intent: 'LineDimension' as const },
+])('$name rendering after local edits', ({ intent }) => {
+  const dto = {
+    ...base(72),
+    subtype: 'line',
+    intent,
+    rect: { left: 100, bottom: 680, right: 300, top: 700 },
+    linePoints: { start: { x: 100, y: 700 }, end: { x: 300, y: 700 } },
+    color: { r: 0, g: 0, b: 0 },
+    strokeWidth: 1,
+    opacity: 1,
+    caption: { enabled: true },
+    leader: { length: -20 },
+    contents: '200 pt',
+  } as AnnotationDTO;
+
+  it('switches an imported annotation to vector after a programmatic update', async () => {
+    const h = harness();
+    h.list.mockResolvedValueOnce({ annotations: [dto] });
+    await h.capability.reloadPage(PON);
+    expect(h.capability.pageItems(PON)[0].source).toBe('baked');
+
+    const updated = { ...dto, strokeWidth: 2 };
+    h.update.mockResolvedValueOnce({ updated, appearance: { changed: true } });
+    await h.capability.update(dto.ref, { subtype: 'line', strokeWidth: 2 });
+
+    expect(h.capability.get(dto.ref)).toEqual(updated);
+    expect(h.capability.pageItems(PON)[0].source).toBe('vector');
+    expect(h.capability.appearanceEpoch(PON)).toBe('');
+  });
+
+  it('preserves vector rendering through consecutive local edits and engine responses', async () => {
+    const h = harness();
+    h.list.mockResolvedValueOnce({ annotations: [dto] });
+    await h.capability.reloadPage(PON);
+    h.capability.select(dto.ref);
+
+    for (const strokeWidth of [2, 3]) {
+      const updated = { ...dto, strokeWidth };
+      let finishWrite!: (result: unknown) => void;
+      h.update.mockReturnValueOnce(
+        new Promise((resolve) => {
+          finishWrite = resolve;
+        }),
+      );
+      h.capability.updateSelection({ strokeWidth });
+      expect(h.capability.pageItems(PON)[0].source).toBe('vector');
+      const epoch = h.capability.appearanceEpoch(PON);
+      expect(epoch).toBe('');
+
+      finishWrite({ updated, appearance: { changed: true } });
+      await vi.waitFor(() => expect(h.capability.get(dto.ref)).toEqual(updated));
+
+      expect(h.capability.pageItems(PON)[0].source).toBe('vector');
+      expect(h.capability.appearanceEpoch(PON)).toBe(epoch);
+    }
+  });
+});
+
 describe('distance authoring and recalibration', () => {
   it('uses the viewport at the first point, retaining that snapshot throughout the drag', async () => {
     const h = harness();
@@ -996,6 +1057,8 @@ describe('distance authoring and recalibration', () => {
     h.capability.setPageViewports(PON, [], fallback);
     h.capability.createPointer('distance', 'move', PON, { x: 220, y: 20 });
     h.capability.createPointer('distance', 'up', PON, { x: 220, y: 20 });
+    expect(h.capability.distanceCreationPage()).toBe(PON);
+    h.capability.createPointer('distance', 'down', PON, { x: 220, y: 8 });
     expect(h.create).toHaveBeenCalledWith(
       expect.objectContaining({
         intent: 'LineDimension',
@@ -1006,6 +1069,8 @@ describe('distance authoring and recalibration', () => {
       }),
     );
     await vi.waitFor(() => expect(h.capability.get(ref(71))).toBeTruthy());
+    expect(h.capability.pageItems(PON)[0].source).toBe('vector');
+    expect(h.capability.appearanceEpoch(PON)).toBe('');
     expect(h.capability.comments.permissionsFor(ref(71)).canEditText).toBe(false);
     await expect(h.capability.comments.edit(ref(71), 'fake value')).rejects.toThrow('derived');
   });

@@ -13,8 +13,10 @@ import { createMeasurementCapability } from './capability';
 import { initialMeasurementState, measurementReducer } from './reducer';
 import type { MeasurementAction, MeasurementState } from './types';
 import { selectPageScale, withUnit } from './scale';
+
 const crop = { left: -20, bottom: -40, right: 580, top: 760 };
 const scale = measureFromKnownLength(100, { value: 3, unit: 'm' });
+
 function harness(options: { allowed?: boolean; legacy?: boolean } = {}) {
   let state = initialMeasurementState;
   const cleanups: (() => void)[] = [];
@@ -73,8 +75,8 @@ function harness(options: { allowed?: boolean; legacy?: boolean } = {}) {
     cleanup: (cb: () => void) => cleanups.push(cb),
     subscribe: () => () => {},
   } as unknown as PluginContext<MeasurementState, MeasurementAction>;
-  const effects = createMeasurementEffects(ctx, {}),
-    cap = createMeasurementCapability(ctx, {}, effects);
+  const effects = createMeasurementEffects(ctx, {});
+  const cap = createMeasurementCapability(ctx, {}, effects);
   effects.start();
   return {
     cap,
@@ -130,7 +132,9 @@ describe('measurement workflow', () => {
     const h = harness();
     await h.cap.prepare(1);
     h.write.mockImplementation(async (pon) => {
-      if (pon === 1) throw new Error('denied');
+      if (pon === 1) {
+        throw new Error('denied');
+      }
     });
     await expect(h.cap.setPageScale(1, scale)).rejects.toThrow('denied');
     expect(h.remeasurePage).not.toHaveBeenCalled();

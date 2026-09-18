@@ -79,6 +79,7 @@ export const es: Locale = {
         redact: 'Redactar',
       },
       annotate: {
+        cancelCreation: 'Cancelar dibujo',
         highlight: 'Resaltar',
         strikeout: 'Tachar',
         underline: 'Subrayar',

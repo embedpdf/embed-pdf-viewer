@@ -34,17 +34,24 @@ export function createMeasurementEffects(ctx: Context, config: MeasurementConfig
   const scaleListeners = new Set<(e: { pon: number; report: ScaleChangeReport }) => void>();
   const meta = (pon: number) => ctx.document()?.pages.find((p) => p.pageObjectNumber === pon);
   const live = () => {
-    if (disposed || !ctx.doc) throw new EngineError(EngineErrorCode.DocNotOpen);
+    if (disposed || !ctx.doc) {
+      throw new EngineError(EngineErrorCode.DocNotOpen);
+    }
   };
   const assertAllowed = () => {
     live();
-    if (!ctx.doc!.security.allows('doc.annotate.modify'))
+    if (!ctx.doc!.security.allows('doc.annotate.modify')) {
       throw new PermissionDenied('doc.annotate.modify', 'measurement');
+    }
   };
   const publish = (pon: number, viewports: PageMeasurementViewport[]) => {
-    if (disposed) return;
+    if (disposed) {
+      return;
+    }
     const page = meta(pon);
-    if (!page) return;
+    if (!page) {
+      return;
+    }
     const fallback = defaultMeasure(config, page.userUnit);
     anno.setPageViewports(pon, viewports, fallback);
     ctx.dispatch({
@@ -57,25 +64,38 @@ export function createMeasurementEffects(ctx: Context, config: MeasurementConfig
   const refresh = (pon: number): Promise<void> => {
     live();
     const page = meta(pon);
-    if (!page) return Promise.reject(new EngineError(EngineErrorCode.NotFound, 'Page not found'));
+    if (!page) {
+      return Promise.reject(new EngineError(EngineErrorCode.NotFound, 'Page not found'));
+    }
     const epoch = (epochs.get(pon) ?? 0) + 1;
     epochs.set(pon, epoch);
     // Disable creation until calibration is known; never race a default into an imported viewport.
     anno.setPageViewports(pon, undefined, defaultMeasure(config, page.userUnit));
     const previous = ctx.getState().pages[pon];
-    ctx.dispatch({ type: 'PAGE_SCALE', pon, viewports: previous?.viewports ?? [], scale: {
-      ...(previous?.scale ?? { measure: null, source: 'default', persistent: !!ctx.doc!.page(pon).measure }),
-      ready: false,
-    } });
+    ctx.dispatch({
+      type: 'PAGE_SCALE',
+      pon,
+      viewports: previous?.viewports ?? [],
+      scale: {
+        ...(previous?.scale ?? {
+          measure: null,
+          source: 'default',
+          persistent: !!ctx.doc!.page(pon).measure,
+        }),
+        ready: false,
+      },
+    });
     const service = ctx.doc!.page(pon).measure;
     const request = (async () => {
       try {
         const viewports = service
           ? await service.viewports()
           : (ctx.getState().pages[pon]?.viewports ?? []);
-        if (!disposed && epochs.get(pon) === epoch) publish(pon, viewports);
+        if (!disposed && epochs.get(pon) === epoch) {
+          publish(pon, viewports);
+        }
       } catch (error) {
-        if (!disposed && epochs.get(pon) === epoch)
+        if (!disposed && epochs.get(pon) === epoch) {
           ctx.dispatch({
             type: 'PAGE_SCALE',
             pon,
@@ -88,9 +108,12 @@ export function createMeasurementEffects(ctx: Context, config: MeasurementConfig
               error: serializeError(error),
             },
           });
+        }
         throw error;
       } finally {
-        if (epochs.get(pon) === epoch) reading.delete(pon);
+        if (epochs.get(pon) === epoch) {
+          reading.delete(pon);
+        }
       }
     })();
     reading.set(pon, request);
@@ -106,7 +129,9 @@ export function createMeasurementEffects(ctx: Context, config: MeasurementConfig
     queues.set(pon, result);
     void result
       .finally(() => {
-        if (queues.get(pon) === result) queues.delete(pon);
+        if (queues.get(pon) === result) {
+          queues.delete(pon);
+        }
       })
       .catch(() => {});
     return result;
@@ -164,7 +189,9 @@ export function createMeasurementEffects(ctx: Context, config: MeasurementConfig
               assertWritableMeasure(scale);
               return await save(pon, scale, opts);
             } catch (error) {
-              if (!opts.allPages) throw error;
+              if (!opts.allPages) {
+                throw error;
+              }
               return {
                 pon,
                 updated: [],
@@ -180,12 +207,16 @@ export function createMeasurementEffects(ctx: Context, config: MeasurementConfig
       ctx.dispatch({ type: 'REPORTS', reports });
       return reports;
     } finally {
-      if (!disposed) ctx.dispatch({ type: 'PENDING', delta: -1 });
+      if (!disposed) {
+        ctx.dispatch({ type: 'PENDING', delta: -1 });
+      }
     }
   };
   const start = () => {
     const doc = ctx.doc;
-    if (!doc) return;
+    if (!doc) {
+      return;
+    }
     ctx.cleanup(() => {
       disposed = true;
       epochs.clear();
@@ -195,11 +226,15 @@ export function createMeasurementEffects(ctx: Context, config: MeasurementConfig
     });
     ctx.cleanup(
       anno.onDraftCaptured((draft) => {
-        if (draft.tool !== 'calibrate' || !doc.security.allows('doc.annotate.modify')) return;
-        const a = measurementPoint(draft.from),
-          b = measurementPoint(draft.to);
+        if (draft.tool !== 'calibrate' || !doc.security.allows('doc.annotate.modify')) {
+          return;
+        }
+        const a = measurementPoint(draft.from);
+        const b = measurementPoint(draft.to);
         const userSpaceLength = Math.hypot(b.x - a.x, b.y - a.y);
-        if (!(userSpaceLength > 0)) return;
+        if (!(userSpaceLength > 0)) {
+          return;
+        }
         const request = { pon: draft.pon, from: a, to: b, userSpaceLength };
         interaction.activateTool('pointer');
         ctx.dispatch({ type: 'CALIBRATION', request });
@@ -213,29 +248,36 @@ export function createMeasurementEffects(ctx: Context, config: MeasurementConfig
       }),
     );
     const hydrate = () => {
-      for (const page of ctx.document()?.pages ?? [])
+      for (const page of ctx.document()?.pages ?? []) {
         void refresh(page.pageObjectNumber).catch(() => {});
+      }
     };
     ctx.cleanup(
       doc.events.subscribe((event) => {
-        if (event.type === 'page.viewportsChanged')
+        if (event.type === 'page.viewportsChanged') {
           void refresh(event.pageObjectNumber).catch(() => {});
-        else if (event.type === 'stream.desynced' || event.type === 'document.versioned') hydrate();
+        } else if (event.type === 'stream.desynced' || event.type === 'document.versioned') {
+          hydrate();
+        }
       }),
     );
     // Covers pages inserted after this document-scoped instance was created.
     let pages = '';
     const reconcile = () => {
       const next = (ctx.document()?.pages ?? []).map((p) => p.pageObjectNumber).join(',');
-      if (next === pages) return;
+      if (next === pages) {
+        return;
+      }
       pages = next;
       for (const page of ctx.document()?.pages ?? [])
-        if (!ctx.getState().pages[page.pageObjectNumber])
+        if (!ctx.getState().pages[page.pageObjectNumber]) {
           void prepare(page.pageObjectNumber).catch(() => {});
+        }
     };
     ctx.cleanup(ctx.subscribe(reconcile));
     reconcile();
   };
   return { start, prepare, change, calibrationListeners, scaleListeners };
 }
+
 export type MeasurementEffects = ReturnType<typeof createMeasurementEffects>;

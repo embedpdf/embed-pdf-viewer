@@ -584,6 +584,14 @@ export const defaultCommands: CommandDef[] = [
 
   // ── annotation selection (the floating strip's verbs) ──────────────────
   {
+    id: 'annotation:cancel-creation',
+    labelKey: 'commands.annotate.cancelCreation',
+    categories: ['annotation'],
+    shortcut: 'Escape',
+    enabled: (c) => anno(c)?.hasCreationDraft() ?? false,
+    run: (c) => anno(c)?.cancelCreationDraft(),
+  },
+  {
     id: 'annotation:delete',
     labelKey: 'commands.annotate.delete',
     icon: 'trash',

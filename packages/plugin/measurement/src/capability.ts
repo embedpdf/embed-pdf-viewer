@@ -19,8 +19,10 @@ import type {
   PageScale,
   SetScaleOptions,
 } from './types';
+
 const LOADING: PageScale = { measure: null, source: 'default', ready: false, persistent: false };
 const UNITS = Object.keys(METRES) as Array<keyof typeof METRES>;
+
 export function createMeasurementCapability(
   ctx: PluginContext<MeasurementState, MeasurementAction>,
   config: MeasurementConfig,
@@ -35,8 +37,9 @@ export function createMeasurementCapability(
       : [pon];
   const scaleOf = (pon: number): PdfMeasure => {
     const scale = ctx.getState().pages[pon]?.scale.measure;
-    if (!scale || scale.subtype !== 'RL')
+    if (!scale || scale.subtype !== 'RL') {
       throw new RangeError('Calibrate this page before changing its units or precision');
+    }
     return scale;
   };
   const presets = config.presets ?? DEFAULT_PRESETS;
@@ -49,8 +52,8 @@ export function createMeasurementCapability(
     prepare: effects.prepare,
     setPageScale: (pon, measure, opts = {}) => effects.change(pons(pon, opts), () => measure, opts),
     calibrate: (pon, from, to, real, opts = {}) => {
-      const a = measurementPoint(from),
-        b = measurementPoint(to);
+      const a = measurementPoint(from);
+      const b = measurementPoint(to);
       const scale = measureFromKnownLength(Math.hypot(b.x - a.x, b.y - a.y), real);
       return effects.change(pons(pon, opts), () => scale, opts);
     },
@@ -66,7 +69,9 @@ export function createMeasurementCapability(
       }),
     setPreset: (pon, id, opts = {}) => {
       const preset = presets.find((p) => p.id === id);
-      if (!preset) return Promise.reject(new RangeError('Unknown scale preset'));
+      if (!preset) {
+        return Promise.reject(new RangeError('Unknown scale preset'));
+      }
       return effects.change(
         pons(pon, opts),
         (p) =>

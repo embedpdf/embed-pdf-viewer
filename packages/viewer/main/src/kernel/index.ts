@@ -46,6 +46,7 @@ export {
   FormToken,
   I18nToken,
   InteractionToken,
+  MeasurementToken,
   MetadataToken,
   RedactionToken,
   SearchToken,

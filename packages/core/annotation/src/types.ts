@@ -219,6 +219,7 @@ export type PropKey = keyof AnnotationProps;
 export type PatchScope =
   | { kind: 'geometry' }
   | { kind: 'caption' }
+  | { kind: 'leader' }
   | { kind: 'props'; keys: PropKey[] };
 
 /** A partial property write. `lineEndings` merges per side (set just `end`
@@ -381,6 +382,17 @@ export type Draft =
       flags?: Partial<AnnotationFlags>;
     }
   | {
+      g: 'create-distance';
+      step: 'endpoints' | 'offset';
+      subtype: 'line';
+      preset: string;
+      pon: PageObjectNumber;
+      from: Vec;
+      to: Vec;
+      measure: DistanceAppearance;
+      flags?: Partial<AnnotationFlags>;
+    }
+  | {
       g: 'create-line';
       measure?: DistanceAppearance;
       capture?: string;
@@ -474,6 +486,7 @@ export type Draft =
       view?: ViewEnv;
     }
   | { g: 'caption'; id: Id; start: Vec; delta: Vec }
+  | { g: 'leader'; id: Id; start: Vec; delta: number }
   | { g: 'marquee'; pon: PageObjectNumber; from: Vec; to: Vec };
 
 /** A live text-markup preview (the in-progress selection rendered as the markup it

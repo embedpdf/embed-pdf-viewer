@@ -260,7 +260,9 @@ describe('annotation edit handler — double-click / long-press routing', () => 
     const { anno, calls } = makeEditAnno(true);
     const h = createEditHandler(anno, interaction);
     expect(
-      h.onDown(sample({ phase: 'down', clickCount: 2, page: { pon: PAGE_1, point: { x: 1, y: 2 } } })),
+      h.onDown(
+        sample({ phase: 'down', clickCount: 2, page: { pon: PAGE_1, point: { x: 1, y: 2 } } }),
+      ),
     ).toBe(true);
     expect(calls).toEqual(['beginTextEditAt']);
   });
@@ -269,8 +271,56 @@ describe('annotation edit handler — double-click / long-press routing', () => 
     const { anno, calls } = makeEditAnno(false);
     const h = createEditHandler(anno, interaction);
     expect(
-      h.onDown(sample({ phase: 'down', clickCount: 2, page: { pon: PAGE_1, point: { x: 1, y: 2 } } })),
+      h.onDown(
+        sample({ phase: 'down', clickCount: 2, page: { pon: PAGE_1, point: { x: 1, y: 2 } } }),
+      ),
     ).toBe(true);
     expect(calls).toEqual(['beginTextEditAt', 'edit:down']); // the press proceeded
+  });
+});
+
+describe('distance placement — release, hover, click', () => {
+  it('keeps the origin page after release and commits once, including over a page gap', () => {
+    const calls: Call[] = [];
+    let placementPage: number | null = null;
+    const anno = {
+      toolSubtype: () => 'line',
+      tool: () => undefined,
+      distanceCreationPage: () => placementPage,
+      createPointer: (_tool: string, phase: string, pon: number, point: Vec) => {
+        calls.push({ phase, pon, point });
+        if (phase === 'up') placementPage = pon;
+        else if (phase === 'down' && placementPage !== null) placementPage = null;
+      },
+    } as unknown as AnnotationHostCapability;
+    const drawInteraction = {
+      activeToolId: () => 'distance',
+      onToolChange: () => () => {},
+    } as unknown as InteractionCapability;
+    const handler = createDrawHandler(anno, drawInteraction);
+
+    handler.onDown(down());
+    handler.onUp?.(sample({ phase: 'up', page: { pon: PAGE_1, point: { x: 400, y: 730 } } }));
+    handler.onHover?.(
+      sample({
+        page: { pon: PAGE_2, point: { x: 400, y: 20 } },
+        project: (pon) => (pon === PAGE_1 ? { x: 400, y: 820 } : null),
+      }),
+    );
+    expect(calls.at(-1)).toEqual({ phase: 'move', pon: PAGE_1, point: { x: 400, y: 820 } });
+
+    handler.onDown(sample({ phase: 'down', project: () => ({ x: 400, y: 800 }) }));
+    expect(calls.at(-1)).toEqual({ phase: 'down', pon: PAGE_1, point: { x: 400, y: 800 } });
+    const committedCalls = calls.length;
+    handler.onUp?.(sample({ phase: 'up' }));
+    expect(calls).toHaveLength(committedCalls);
+  });
+
+  it('lets the placement click pass through the edit handler over an existing annotation', () => {
+    const { anno, calls } = makeAnno();
+    anno.distanceCreationPage = () => PAGE_1;
+    const handler = createEditHandler(anno, interaction);
+    expect(handler.onDown(down())).toBe(false);
+    expect(calls).toHaveLength(0);
   });
 });

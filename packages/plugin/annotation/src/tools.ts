@@ -398,6 +398,7 @@ export const DEFAULT_TOOLS: AnnotationToolInput[] = [
     id: 'distance',
     extends: 'line',
     intent: 'LineDimension',
+    clickCreate: false,
     defaults: { strokeWidth: 1, lineEndings: { start: 'closed-arrow', end: 'closed-arrow' } },
     measurement: {
       caption: { enabled: true, position: 'inline' },

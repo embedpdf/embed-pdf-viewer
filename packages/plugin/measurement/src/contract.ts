@@ -1,4 +1,5 @@
 export { MeasurementToken } from './types';
+
 export type {
   MeasurementCapability,
   MeasurementConfig,

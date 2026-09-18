@@ -1,13 +1,11 @@
-import { distanceCaptionAt, distanceLayout } from './measurement';
+import { annotationSelectionFrame } from './selection';
+import { distanceCaptionHit, distanceHandles, distanceHit, distanceLayout } from './measurement';
 import {
   geomHandles,
   geomHit,
-  obbFromGeom,
   placeRotateKnob,
   pointInQuad,
   rectHandlesFor,
-  selectionCenter,
-  selectionQuad,
   unionRect,
 } from './geometry';
 import { capsFor, isMarkup } from './kinds';
@@ -112,7 +110,7 @@ const inRect = (b: Rect, p: Vec): boolean =>
 // highlighted, tilt included (a rotated box is grabbable across its tilted body, not
 // just its unrotated footprint; a thin arrow's whole outline box, arrowhead and all).
 const inBounds = (a: Annot, p: Vec, view: ViewEnv | undefined): boolean =>
-  pointInQuad(p, selectionQuad(hitGeomOf(a, view), hitStrokeOf(a, view), a.style.border));
+  pointInQuad(p, annotationSelectionFrame(a, view).corners);
 
 /**
  * The union of the SELECTION bounds of every selected, movable annotation on a
@@ -129,7 +127,7 @@ function selectionUnionBounds(m: Model, pon: number, view: ViewEnv | undefined):
   const corners: Vec[] = [];
   for (const id of sel) {
     const a = m.byId[id];
-    corners.push(...selectionQuad(hitGeomOf(a, view), hitStrokeOf(a, view), a.style.border));
+    corners.push(...annotationSelectionFrame(a, view).corners);
   }
   return unionRect(corners);
 }
@@ -141,7 +139,7 @@ export function groupUnionBounds(m: Model, pon: number, view?: ViewEnv): Rect | 
   for (const id of m.selected) {
     const a = m.byId[id];
     if (!a || a.pon !== pon) continue;
-    corners.push(...selectionQuad(hitGeomOf(a, view), hitStrokeOf(a, view), a.style.border));
+    corners.push(...annotationSelectionFrame(a, view).corners);
   }
   return corners.length ? unionRect(corners) : null;
 }
@@ -168,42 +166,41 @@ export function hitTest(
     const a = m.byId[m.selected[0]];
     if (a.pon === pon) {
       // The rotate knob (checked first — it floats outside the box, clear of
-      // the handles), placed on the PROJECTED geometry so it sits exactly
+      // the handles), placed on the projected selection frame so it sits exactly
       // where the chrome drew it — a screen-anchored body rotates too (the
       // gesture edits its authored tilt; `noRotate` only exempts it from the
       // PAGE's rotation). Locked suppresses it. `placeRotateKnob` keeps it
       // inside `pageBox`.
       if (capsFor(a.subtype).rotatable && annotTransformable(a)) {
-        const hg = hitGeomOf(a, view);
-        const obb = obbFromGeom(hg, hitStrokeOf(a, view), a.style.border);
-        if (obb) {
-          const knob = placeRotateKnob(obb.corners, geom.knobOffset, pageBox);
-          if (
-            Math.abs(knob.at.x - p.x) <= geom.knobTol &&
-            Math.abs(knob.at.y - p.y) <= geom.knobTol
-          ) {
-            return {
-              t: 'rotate',
-              ids: [a.id],
-              // VIEW-space pivot: the projected shape's centre — the point the
-              // user sees the shape turn about (the commit conjugates back).
-              pivot: selectionCenter(hg, hitStrokeOf(a, view)),
-            };
-          }
+        const frame = annotationSelectionFrame(a, view);
+        const knob = placeRotateKnob(frame.corners, geom.knobOffset, pageBox);
+        if (
+          Math.abs(knob.at.x - p.x) <= geom.knobTol &&
+          Math.abs(knob.at.y - p.y) <= geom.knobTol
+        ) {
+          return { t: 'rotate', ids: [a.id], pivot: frame.center };
         }
       }
       if (hasHandles(m, a)) {
-        const caption =
-          a.measure && distanceCaptionAt(hitGeomOf(a, view), a.measure, hitStrokeOf(a, view));
-        if (
-          caption &&
-          Math.abs(caption.x - p.x) <= geom.handleTol &&
-          Math.abs(caption.y - p.y) <= geom.handleTol
-        )
+        const geometry = hitGeomOf(a, view);
+        const distance = a.measure && distanceLayout(geometry, a.measure, hitStrokeOf(a, view));
+        const handles = distance ? distanceHandles(distance) : geomHandles(geometry);
+        if (distance) {
+          // Nearby endpoint and leader hit areas overlap at small offsets.
+          // The closest visible handle wins, regardless of declaration order.
+          const distanceToPointer = (handle: (typeof handles)[number]) =>
+            Math.hypot(handle.at.x - p.x, handle.at.y - p.y);
+          handles.sort((left, right) => distanceToPointer(left) - distanceToPointer(right));
+        }
+
+        // The text is the drag target. It owns no visible handle, and wins
+        // before the annotation's sticky body bounds.
+        if (distance && distanceCaptionHit(distance, p, Math.min(2, geom.handleTol / 3))) {
           return { t: 'handle', id: a.id, handle: 'caption', cursor: 'move' };
+        }
         // Handles live on the PROJECTED geometry — the handle gesture then
         // runs entirely in view space (see the `handle` draft).
-        for (const h of geomHandles(hitGeomOf(a, view))) {
+        for (const h of handles) {
           if (
             Math.abs(h.at.x - p.x) <= geom.handleTol &&
             Math.abs(h.at.y - p.y) <= geom.handleTol
@@ -267,26 +264,18 @@ export function hitTest(
     // A SELECTED annotation is sticky-grabbable from anywhere in its bounds, but
     // only if it can actually move; otherwise it's grabbed on its stroke/fill like
     // an unselected one (so a selectable-but-anchored kind still re-selects cleanly).
+    const geometry = hitGeomOf(a, view);
+    const strokeWidth = hitStrokeOf(a, view);
+    const distance = a.measure && distanceLayout(geometry, a.measure, strokeWidth);
     const hit =
       m.selected.includes(id) && canMove(m, id)
         ? inBounds(a, p, view)
-        : geomHit(hitGeomOf(a, view), p, strokeMargin, isFilled(a), hitStrokeOf(a, view));
-    if (hit) return { t: 'annot', id };
-    if (a.measure) {
-      const l = distanceLayout(hitGeomOf(a, view), a.measure, hitStrokeOf(a, view));
-      if (
-        l &&
-        (geomHit(
-          { t: 'line', a: l.start, b: l.end },
-          p,
-          strokeMargin,
-          false,
-          hitStrokeOf(a, view),
-        ) ||
-          (a.measure.caption.enabled &&
-            Math.hypot(p.x - l.center.x, p.y - l.center.y) < Math.max(l.height, l.textWidth / 2)))
-      )
-        return { t: 'annot', id };
+        : distance
+          ? distanceHit(distance, p, strokeWidth, strokeMargin)
+          : geomHit(geometry, p, strokeMargin, isFilled(a), strokeWidth);
+
+    if (hit) {
+      return { t: 'annot', id };
     }
   }
   // Nothing under the point directly — but a multi-selection is grabbable across

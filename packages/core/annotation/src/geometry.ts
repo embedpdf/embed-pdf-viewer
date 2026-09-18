@@ -426,13 +426,13 @@ export function fitStampBox(center: Vec, desired: Size, page: Size, rotCW: numbe
 }
 
 /** Reset a geom to its as-authored orientation (`rot → 0`). Box: drop `rot`.
- *  Vertex: spin the points by `-rot` about their centroid so they return to the
- *  orientation they were drawn at, in place. */
-export function geomResetRotation(g: Geom): Geom {
+ *  Vertex: spin the points by `-rot` about the supplied selection center.
+ *  Geometry-only callers retain the centroid default. */
+export function geomResetRotation(g: Geom, pivot?: Vec): Geom {
   const rot = geomRotation(g);
   if (!rot) return g;
   if (g.t === 'rect' || g.t === 'text' || g.t === 'caret') return { ...g, rot: 0 };
-  const c = centroidOf(g);
+  const c = pivot ?? centroidOf(g);
   const rotated = geomRotateAbout(g, c, -rot);
   // geomRotateAbout already set rot = normalize(rot - rot) = 0.
   return rotated;

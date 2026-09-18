@@ -1,10 +1,12 @@
 import type { MeasurementAction, MeasurementState } from './types';
+
 export const initialMeasurementState: MeasurementState = {
   pages: {},
   pending: 0,
   calibration: null,
   reports: [],
 };
+
 export function measurementReducer(s: MeasurementState, a: MeasurementAction): MeasurementState {
   switch (a.type) {
     case 'PAGE_SCALE':

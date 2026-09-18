@@ -13,15 +13,19 @@ import { useT } from '@embedpdf/react/i18n';
 
 const control =
   'border-border bg-surface text-fg w-full rounded-md border px-2 py-1.5 text-sm disabled:opacity-50';
+
 const button =
   'border-border text-fg hover:bg-hover rounded-md border px-3 py-1.5 text-sm disabled:opacity-50';
+
 const useCurrentPon = () => useSelector(StageToken, (c) => c.pages()[c.currentPage()]?.pon ?? -1);
 
 export function MeasurementScaleButton() {
-  const t = useT(),
-    pon = useCurrentPon();
-  const scale = usePageScale(pon),
-    surface = useSurface('measurement');
+  const t = useT();
+
+  const pon = useCurrentPon();
+  const scale = usePageScale(pon);
+
+  const surface = useSurface('measurement');
   return (
     <button
       className={button}
@@ -37,10 +41,13 @@ export function MeasurementScaleButton() {
 }
 
 export function MeasurementSection() {
-  const t = useT(),
-    pon = useCurrentPon(),
-    measurement = useMeasurement(),
-    scale = usePageScale(pon);
+  const t = useT();
+
+  const pon = useCurrentPon();
+
+  const measurement = useMeasurement();
+
+  const scale = usePageScale(pon);
   const anno = useCapability(AnnotationToken);
   const selected = useSelector(AnnotationToken, (c) => c.selection());
   const readouts = useSelector(
@@ -53,8 +60,9 @@ export function MeasurementSection() {
     (a, b) => JSON.stringify(a) === JSON.stringify(b),
   );
   const reports = useSelector(MeasurementToken, (c) => c.lastReports());
-  const [allPages, setAllPages] = useState(false),
-    [recalculate, setRecalculate] = useState(true);
+  const [allPages, setAllPages] = useState(false);
+
+  const [recalculate, setRecalculate] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const disabled = measurement.busy || !measurement.canCalibratePage || !scale.ready;
   const rectilinear = scale.measure?.subtype === 'RL' ? scale.measure : null;
@@ -203,14 +211,17 @@ export function MeasurementSection() {
 }
 
 export function CalibrationDialog() {
-  const t = useT(),
-    measurement = useMeasurement();
+  const t = useT();
+
+  const measurement = useMeasurement();
   const request = useSelector(MeasurementToken, (c) => c.calibrationRequest());
   const input = useRef<HTMLInputElement>(null);
-  const [value, setValue] = useState(''),
-    [unit, setUnit] = useState<LengthUnit>('m');
-  const [allPages, setAllPages] = useState(false),
-    [recalculate, setRecalculate] = useState(true);
+  const [value, setValue] = useState('');
+
+  const [unit, setUnit] = useState<LengthUnit>('m');
+  const [allPages, setAllPages] = useState(false);
+
+  const [recalculate, setRecalculate] = useState(true);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     setValue('');

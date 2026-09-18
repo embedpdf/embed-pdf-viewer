@@ -12,7 +12,9 @@ import type {
   SerializedEngineError,
 } from '@embedpdf/engine-core/runtime';
 import type { RecalibrationReport } from '@embedpdf/plugin-annotation/contract/host';
+
 export type { RecalibrationReport } from '@embedpdf/plugin-annotation/contract/host';
+
 export type {
   LengthUnit,
   AreaUnit,
@@ -28,14 +30,17 @@ export interface ScalePreset {
   real: number;
   unit: LengthUnit;
 }
+
 export interface MeasurementConfig {
   defaultScale?: 'metric' | 'imperial' | PdfMeasure;
   presets?: ScalePreset[];
 }
+
 export interface SetScaleOptions {
   recalculate?: boolean;
   allPages?: boolean;
 }
+
 export interface PageScale {
   measure: PdfMeasurement | null;
   source: 'owned' | 'foreign' | 'default';
@@ -43,6 +48,7 @@ export interface PageScale {
   persistent: boolean;
   error?: SerializedEngineError;
 }
+
 export interface CalibrationRequest {
   pon: number;
   from: PdfPoint;
@@ -62,17 +68,20 @@ export type ScaleChangeReport =
       failed: [];
       scaleError: SerializedEngineError;
     };
+
 export interface MeasurementState {
   pages: Record<number, { viewports: PageMeasurementViewport[]; scale: PageScale }>;
   pending: number;
   calibration: CalibrationRequest | null;
   reports: ScaleChangeReport[];
 }
+
 export type MeasurementAction =
   | { type: 'PAGE_SCALE'; pon: number; viewports: PageMeasurementViewport[]; scale: PageScale }
   | { type: 'PENDING'; delta: number }
   | { type: 'CALIBRATION'; request: CalibrationRequest | null }
   | { type: 'REPORTS'; reports: ScaleChangeReport[] };
+
 export interface MeasurementCapability {
   canCalibrate(): boolean;
   canMeasure(pon: number): boolean;
@@ -113,4 +122,5 @@ export interface MeasurementCapability {
   onCalibrationRequested(cb: (request: CalibrationRequest) => void): () => void;
   onScaleChanged(cb: (event: { pon: number; report: ScaleChangeReport }) => void): () => void;
 }
+
 export const MeasurementToken = createCapabilityToken<MeasurementCapability>('measurement');

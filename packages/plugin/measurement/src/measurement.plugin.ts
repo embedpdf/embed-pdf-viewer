@@ -11,6 +11,7 @@ import type {
   MeasurementConfig,
   MeasurementState,
 } from './types';
+
 export const measurementPlugin = (config: MeasurementConfig = {}) => {
   // A plugin definition is reused across documents. Drivers are keyed by the
   // bound instance, never one mutable closure shared between document tabs.

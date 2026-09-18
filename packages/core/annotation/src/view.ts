@@ -1,9 +1,10 @@
+import { annotationSelectionFrame } from './selection';
 /**
  * Pure view selectors. `pageItems` is the per-annotation render list (live gesture
  * applied) for customRenderer wrapping; `chrome` is the selection overlay
  * (handles carry their resize cursor, group box, marquee).
  */
-import { distanceCaptionAt, moveDistanceCaption } from './measurement';
+import { distanceHandles, distanceLayout, moveDistanceCaption } from './measurement';
 import {
   chordThrough,
   geomHandles,
@@ -13,14 +14,11 @@ import {
   geomTranslate,
   geomVisualBounds,
   groupResizeFactors,
-  obbFromGeom,
   placeRotateKnob,
   rectFromPoints,
   rectHandlesFor,
   normalizeDeg,
   rotatePoint,
-  selectionBounds,
-  selectionQuad,
   shapeRectFor,
   unionRect,
   ROTATE_KNOB_OFFSET,
@@ -51,6 +49,32 @@ const polyPreviewPoints = (points: Vec[], cur: Vec): Vec[] => {
   return last && (cur.x !== last.x || cur.y !== last.y) ? [...points, cur] : points;
 };
 
+function effMeasure(m: Model, id: Id) {
+  const annotation = m.byId[id];
+  const draft = m.draft;
+  const measure = annotation.measure;
+
+  if (!measure || !draft || !('id' in draft) || draft.id !== id) {
+    return measure;
+  }
+
+  if (draft.g === 'caption') {
+    return moveDistanceCaption(annotation.geom, measure, draft.delta);
+  }
+
+  if (draft.g === 'leader') {
+    return {
+      ...measure,
+      leader: {
+        ...measure.leader,
+        length: (measure.leader?.length ?? 0) + draft.delta,
+      },
+    };
+  }
+
+  return measure;
+}
+
 /**
  * The gesture-effective geometry, in VIEW space: PROJECT FIRST (screen-
  * anchored bodies to their effective footprint — the identity for everyone
@@ -61,14 +85,6 @@ const polyPreviewPoints = (points: Vec[], cur: Vec): Vec[] => {
  * `unanchoredGeom`, so preview ≡ commit by construction. THE geometry every
  * selector below hands out, so render/chrome/bounds agree with hit.
  */
-function effMeasure(m: Model, id: Id) {
-  const a = m.byId[id],
-    d = m.draft;
-  return a.measure && d?.g === 'caption' && d.id === id
-    ? moveDistanceCaption(a.geom, a.measure, d.delta)
-    : a.measure;
-}
-
 function effGeom(m: Model, id: Id, view: ViewEnv | undefined): Geom {
   const a = m.byId[id];
   const g = anchoredGeom(a.geom, anchorModeOf(a), view);
@@ -145,7 +161,8 @@ function effSource(m: Model, id: Id): 'baked' | 'vector' {
   const d = m.draft;
   // A live resize/rotate/group transform must render LIVE — the baked raster
   // can't stretch or tilt — even before the commit flips `source`.
-  if ((d?.g === 'handle' || d?.g === 'caption') && d.id === id) return 'vector';
+  if ((d?.g === 'handle' || d?.g === 'caption' || d?.g === 'leader') && d.id === id)
+    return 'vector';
   if ((d?.g === 'rotate' || d?.g === 'group') && d.ids.includes(id)) return 'vector';
   return a.source;
 }
@@ -178,17 +195,19 @@ export function pageItems(m: Model, pon: number, view?: ViewEnv): RenderItem[] {
     // projected through the anchor similarity for screen-anchored bodies and
     // composed with any engine-stripped `apRot`.
     const ap = effAp(m, id, view);
+    const measure = effMeasure(m, id);
+    const distance = measure && distanceLayout(geom, measure, style.strokeWidth);
     items.push({
       id,
       ref: a.ref,
       subtype: a.subtype,
       geom,
-      box: geomVisualBounds(geom, style.strokeWidth, style.border),
+      box: distance?.visualBounds ?? geomVisualBounds(geom, style.strokeWidth, style.border),
       apBox: ap.box,
       style,
       ...(a.text ? { text: a.text } : {}),
       ...(a.label ? { label: a.label } : {}),
-      measure: effMeasure(m, id),
+      measure,
       source: effSource(m, id),
       selected: m.selected.includes(id),
       ...(m.hovered === id ? { hovered: true } : {}),
@@ -201,6 +220,7 @@ export function pageItems(m: Model, pon: number, view?: ViewEnv): RenderItem[] {
   if (
     (d?.g === 'create-rect' ||
       d?.g === 'create-line' ||
+      d?.g === 'create-distance' ||
       d?.g === 'create-poly' ||
       d?.g === 'create-ink') &&
     d.pon === pon
@@ -211,13 +231,16 @@ export function pageItems(m: Model, pon: number, view?: ViewEnv): RenderItem[] {
     // from the cursor; a 0-drag draws nothing (skipped, like a solid 0×0).
     const def = defaultsFor(m, d.preset ?? d.subtype);
     const style = styleFromProps(def);
+    if (d.g === 'create-distance' && style.interiorColor == null) {
+      style.interiorColor = style.color;
+    }
     const dragged = d.g === 'create-rect' ? rectFromPoints(d.from, d.to) : null;
     const geom: Geom | null =
       d.g === 'create-rect'
         ? dragged && (dragged.width > 0 || dragged.height > 0)
           ? { t: 'rect', rect: shapeRectFor(dragged, d.ellipse, style), ellipse: d.ellipse }
           : null
-        : d.g === 'create-line'
+        : d.g === 'create-line' || d.g === 'create-distance'
           ? { t: 'line', a: d.from, b: d.to, ends: def.lineEndings }
           : d.g === 'create-poly'
             ? {
@@ -227,18 +250,21 @@ export function pageItems(m: Model, pon: number, view?: ViewEnv): RenderItem[] {
                 ends: d.closed ? undefined : def.lineEndings,
               }
             : { t: 'ink', strokes: d.strokes };
-    if (geom)
+    if (geom) {
+      const measure = d.g === 'create-line' || d.g === 'create-distance' ? d.measure : undefined;
+      const distance = measure && distanceLayout(geom, measure, style.strokeWidth);
       items.push({
         id: DRAFT_ID,
         ref: null,
-        ...(d.g === 'create-line' ? { measure: d.measure } : {}),
+        measure,
         subtype: d.subtype,
         geom,
-        box: geomVisualBounds(geom, style.strokeWidth, style.border),
+        box: distance?.visualBounds ?? geomVisualBounds(geom, style.strokeWidth, style.border),
         style,
         source: 'ghost',
         selected: false,
       });
+    }
   }
   // Callout creation ghost: the in-progress leader (tip → cur, then tip → knee →
   // box) and the text-box preview, painted through the SAME vector scene.
@@ -346,14 +372,18 @@ const boxCorners = (r: Rect): [Vec, Vec, Vec, Vec] => [
   { x: r.x, y: r.y + r.height },
 ];
 
-/**
- * The union of the selection's bounds on `pon`, reading each member through
- * `geomOf` — `effGeom` for the group chrome, so the outline/handles/knob RIDE
- * a live move/scale exactly like single-selection chrome; the COMMITTED
- * geometry for a rotate gesture's rest anchor. Hit-testing keeps its own
- * committed union (hit.ts `groupUnionBounds`): hits only happen between
- * gestures, where the two are identical.
- */
+/** Project the complete annotation after applying the current gesture. */
+function effectiveSelectionFrame(m: Model, id: Id, geometry: Geom, view?: ViewEnv) {
+  const annotation = m.byId[id];
+  return annotationSelectionFrame({
+    ...annotation,
+    geom: geometry,
+    style: effStyle(annotation, view),
+    measure: effMeasure(m, id),
+  });
+}
+
+/** Union of the effective frames; group chrome and rotation use this box. */
 function unionBoundsOf(
   m: Model,
   pon: number,
@@ -364,7 +394,7 @@ function unionBoundsOf(
   for (const id of m.selected) {
     const a = m.byId[id];
     if (!a || a.pon !== pon) continue;
-    corners.push(...selectionQuad(geomOf(id), effStyle(a, view).strokeWidth, a.style.border));
+    corners.push(...effectiveSelectionFrame(m, id, geomOf(id), view).corners);
   }
   return corners.length ? unionRect(corners) : null;
 }
@@ -390,8 +420,8 @@ function placeSelectionKnob(
     // the PROJECTED stroke width (`effStyle`) — with the raw width, the knob
     // drifts off the outline as zoom grows.
     if (!capsFor(a.subtype).rotatable || !annotTransformable(a)) return null;
-    const obb = obbFromGeom(geomOf(sel[0]), effStyle(a, view).strokeWidth, a.style.border);
-    return obb ? placeRotateKnob(obb.corners, knobOffset, pageBox) : null;
+    const frame = effectiveSelectionFrame(m, a.id, geomOf(a.id), view);
+    return placeRotateKnob(frame.corners, knobOffset, pageBox);
   }
   if (sel.length > 1 && groupCaps(m, sel).rotatable) {
     const union = unionBoundsOf(m, pon, geomOf, view);
@@ -491,18 +521,13 @@ export function chrome(
     const style = effStyle(a, view);
     const caps = capsFor(a.subtype);
     const rot = geomRotation(g);
-    // Oriented chrome follows the GEOMETRY, not the caps: any tilted kind with
-    // an OBB — a caret riding rotated text included — outlines on its tilt.
-    // The rotate KNOB stays caps-gated (`placeSelectionKnob` / `hitTest`), so
-    // an oriented outline never implies a rotate affordance.
-    const obb = obbFromGeom(g, style.strokeWidth, a.style.border);
-    if (obb && rot !== 0) {
-      nodes.push({ kind: 'obb', corners: obb.corners, angle: obb.angle });
+    const measure = effMeasure(m, a.id);
+    const distance = measure && distanceLayout(g, measure, style.strokeWidth);
+    const frame = effectiveSelectionFrame(m, a.id, g, view);
+    if (frame.angle !== 0) {
+      nodes.push({ kind: 'obb', corners: frame.corners, angle: frame.angle });
     } else {
-      nodes.push({
-        kind: 'outline',
-        rect: selectionBounds(g, style.strokeWidth, a.style.border),
-      });
+      nodes.push({ kind: 'outline', rect: unionRect(frame.corners) });
     }
     // handles for kinds that resize (box) or vertex-edit; anchored/markup show
     // a bare outline — and so do locked (frozen) annotations, the SAME gate
@@ -512,11 +537,15 @@ export function chrome(
     // additionally tilts each handle GLYPH so it rides the box's orientation.
     // Suppressed during a live rotate (`rd`) — guides own that mode.
     if (!rd && annotTransformable(a) && (caps.resizable || caps.vertexEditable)) {
-      const measure = effMeasure(m, a.id);
-      const caption = measure && distanceCaptionAt(g, measure, style.strokeWidth);
-      if (caption) nodes.push({ kind: 'handle', at: caption, cursor: 'move' });
-      for (const h of geomHandles(g))
-        nodes.push({ kind: 'handle', at: h.at, cursor: h.cursor, ...(rot ? { rot } : {}) });
+      const handles = distance ? distanceHandles(distance) : geomHandles(g);
+      for (const handle of handles) {
+        nodes.push({
+          kind: 'handle',
+          at: handle.at,
+          cursor: handle.cursor,
+          ...(rot ? { rot } : {}),
+        });
+      }
     }
   } else if (sel.length > 1 && !rd) {
     // The LIVE union (draft-effective geometry): the outline and its handles
@@ -552,12 +581,8 @@ export function selectionBoundsOnPage(m: Model, pon: number, view?: ViewEnv): Re
   // The rotated AABB: the axis-aligned box that encloses the ORIENTED selection
   // quad. For a tilted shape this tracks the live `rot`, so the upright floating
   // menu floats above the whole tilted shape instead of the (fixed) unrotated box.
-  const corners = sel.flatMap((id) =>
-    selectionQuad(
-      effGeom(m, id, view),
-      effStyle(m.byId[id], view).strokeWidth,
-      m.byId[id].style.border,
-    ),
+  const corners = sel.flatMap(
+    (id) => effectiveSelectionFrame(m, id, effGeom(m, id, view), view).corners,
   );
   return unionRect(corners);
 }
