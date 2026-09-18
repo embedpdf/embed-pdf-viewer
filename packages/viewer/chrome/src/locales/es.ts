@@ -7,6 +7,29 @@ export const es: Locale = {
   code: 'es',
   name: 'Español',
   translations: {
+    measurement: {
+      title: 'Mediciones',
+      distance: 'Distancia',
+      calibrate: 'Calibrar escala',
+      scale: 'Escala',
+      custom: 'Personalizada',
+      unavailable: 'No disponible',
+      instructions:
+        'Dibuja una distancia o calibra con una longitud conocida. Arrastra el control de la etiqueta para moverla.',
+      sessionOnly: 'Este motor conserva la calibración de página solo durante esta sesión.',
+      allPages: 'Aplicar a todas las páginas',
+      recalculate: 'Recalcular las mediciones existentes',
+      preset: 'Escala predefinida',
+      choosePreset: 'Elegir una escala',
+      unit: 'Unidad',
+      precision: 'Precisión',
+      selection: 'Mediciones seleccionadas',
+      report: '{updated} actualizadas · {skipped} omitidas · {failed} fallidas',
+      knownLength: 'Introduce la longitud real representada por la línea que acabas de dibujar.',
+      length: 'Longitud conocida',
+      apply: 'Aplicar escala',
+      applying: 'Aplicando…',
+    },
     commands: {
       zoom: {
         in: 'Acercar',
@@ -46,6 +69,7 @@ export const es: Locale = {
         counterclockwise: 'Girar a la izquierda',
       },
       mode: {
+        measure: 'Medir',
         group: 'Modo',
         view: 'Ver',
         annotate: 'Anotar',

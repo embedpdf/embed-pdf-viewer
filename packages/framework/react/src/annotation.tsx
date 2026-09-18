@@ -235,6 +235,7 @@ function sceneNodes(item: RenderItem): React.ReactNode[] {
           key={i}
           x={n.at.x}
           y={n.at.y}
+          transform={n.rotation ? `rotate(${n.rotation} ${n.at.x} ${n.at.y})` : undefined}
           fontSize={n.fontSize}
           {...(n.fontFamily ? { fontFamily: n.fontFamily } : {})}
           {...a}

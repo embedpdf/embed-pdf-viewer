@@ -1,3 +1,4 @@
+import { distanceCaptionAt, distanceLayout } from './measurement';
 import {
   geomHandles,
   geomHit,
@@ -192,6 +193,14 @@ export function hitTest(
         }
       }
       if (hasHandles(m, a)) {
+        const caption =
+          a.measure && distanceCaptionAt(hitGeomOf(a, view), a.measure, hitStrokeOf(a, view));
+        if (
+          caption &&
+          Math.abs(caption.x - p.x) <= geom.handleTol &&
+          Math.abs(caption.y - p.y) <= geom.handleTol
+        )
+          return { t: 'handle', id: a.id, handle: 'caption', cursor: 'move' };
         // Handles live on the PROJECTED geometry — the handle gesture then
         // runs entirely in view space (see the `handle` draft).
         for (const h of geomHandles(hitGeomOf(a, view))) {
@@ -263,6 +272,22 @@ export function hitTest(
         ? inBounds(a, p, view)
         : geomHit(hitGeomOf(a, view), p, strokeMargin, isFilled(a), hitStrokeOf(a, view));
     if (hit) return { t: 'annot', id };
+    if (a.measure) {
+      const l = distanceLayout(hitGeomOf(a, view), a.measure, hitStrokeOf(a, view));
+      if (
+        l &&
+        (geomHit(
+          { t: 'line', a: l.start, b: l.end },
+          p,
+          strokeMargin,
+          false,
+          hitStrokeOf(a, view),
+        ) ||
+          (a.measure.caption.enabled &&
+            Math.hypot(p.x - l.center.x, p.y - l.center.y) < Math.max(l.height, l.textWidth / 2)))
+      )
+        return { t: 'annot', id };
+    }
   }
   // Nothing under the point directly — but a multi-selection is grabbable across
   // its WHOLE union box (the gaps between members included), so a drag there moves

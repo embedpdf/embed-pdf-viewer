@@ -8,6 +8,7 @@
  */
 import type { AnnotationDTO, PdfRect } from '@embedpdf/engine-core/runtime';
 import {
+  distanceLabel,
   geomPdfBounds,
   geomRotation,
   pdfToContentPoint,
@@ -61,9 +62,7 @@ const strokeProps: KindProjection['prop'] = {
   strokeWidth: withRect((a) => ({ strokeWidth: a.style.strokeWidth })),
   border: withRect((a) => ({ ...borderSlice(a.style), ...polyCloudy(a) })),
   lineEndings: withRect((a) =>
-    (a.geom.t === 'line' || a.geom.t === 'poly') && a.geom.ends
-      ? { lineEndings: a.geom.ends }
-      : {},
+    (a.geom.t === 'line' || a.geom.t === 'poly') && a.geom.ends ? { lineEndings: a.geom.ends } : {},
   ),
 };
 
@@ -71,6 +70,18 @@ export const line: KindProjection = {
   ingest: (dto, crop) => {
     const d = dto as Extract<AnnotationDTO, { subtype: 'line' }>;
     return {
+      ...(d.intent === 'LineDimension'
+        ? {
+            measure: {
+              intent: d.intent,
+              measure: d.measure ?? null,
+              caption: d.caption ?? { enabled: false },
+              leader: d.leader ?? undefined,
+              crop,
+              text: d.contents ?? '',
+            },
+          }
+        : {}),
       geom: {
         t: 'line',
         a: pdfToContentPoint(d.linePoints.start, crop),
@@ -84,12 +95,23 @@ export const line: KindProjection = {
     const g = a.geom;
     if (g.t !== 'line') return null;
     return {
+      ...(a.measure ? { contents: distanceLabel(g, a.measure) } : {}),
       linePoints: { start: contentToPdfPoint(g.a, crop), end: contentToPdfPoint(g.b, crop) },
       ...visualRect(a, crop),
       ...advisoryRotation(g),
     };
   },
   prop: strokeProps,
+  draftExtras: (a) =>
+    a.measure
+      ? {
+          intent: a.measure.intent,
+          measure: a.measure.measure?.subtype === 'RL' ? a.measure.measure : null,
+          caption: a.measure.caption,
+          leader: a.measure.leader,
+          subject: 'Distance',
+        }
+      : {},
 };
 
 const polyProjection = (closed: boolean): KindProjection => ({

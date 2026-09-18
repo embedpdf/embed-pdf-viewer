@@ -41,6 +41,7 @@ export interface IconAccent {
 }
 
 export const ICON_PATHS: Record<string, readonly PathSpec[]> = {
+  ruler: ['M3 8h18v8H3z', 'M7 8v4M11 8v2M15 8v4M19 8v2'],
   alertTriangle: [
     'M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z',
   ],

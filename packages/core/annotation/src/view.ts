@@ -3,6 +3,7 @@
  * applied) for customRenderer wrapping; `chrome` is the selection overlay
  * (handles carry their resize cursor, group box, marquee).
  */
+import { distanceCaptionAt, moveDistanceCaption } from './measurement';
 import {
   chordThrough,
   geomHandles,
@@ -60,6 +61,14 @@ const polyPreviewPoints = (points: Vec[], cur: Vec): Vec[] => {
  * `unanchoredGeom`, so preview ≡ commit by construction. THE geometry every
  * selector below hands out, so render/chrome/bounds agree with hit.
  */
+function effMeasure(m: Model, id: Id) {
+  const a = m.byId[id],
+    d = m.draft;
+  return a.measure && d?.g === 'caption' && d.id === id
+    ? moveDistanceCaption(a.geom, a.measure, d.delta)
+    : a.measure;
+}
+
 function effGeom(m: Model, id: Id, view: ViewEnv | undefined): Geom {
   const a = m.byId[id];
   const g = anchoredGeom(a.geom, anchorModeOf(a), view);
@@ -136,7 +145,7 @@ function effSource(m: Model, id: Id): 'baked' | 'vector' {
   const d = m.draft;
   // A live resize/rotate/group transform must render LIVE — the baked raster
   // can't stretch or tilt — even before the commit flips `source`.
-  if (d?.g === 'handle' && d.id === id) return 'vector';
+  if ((d?.g === 'handle' || d?.g === 'caption') && d.id === id) return 'vector';
   if ((d?.g === 'rotate' || d?.g === 'group') && d.ids.includes(id)) return 'vector';
   return a.source;
 }
@@ -179,6 +188,7 @@ export function pageItems(m: Model, pon: number, view?: ViewEnv): RenderItem[] {
       style,
       ...(a.text ? { text: a.text } : {}),
       ...(a.label ? { label: a.label } : {}),
+      measure: effMeasure(m, id),
       source: effSource(m, id),
       selected: m.selected.includes(id),
       ...(m.hovered === id ? { hovered: true } : {}),
@@ -221,6 +231,7 @@ export function pageItems(m: Model, pon: number, view?: ViewEnv): RenderItem[] {
       items.push({
         id: DRAFT_ID,
         ref: null,
+        ...(d.g === 'create-line' ? { measure: d.measure } : {}),
         subtype: d.subtype,
         geom,
         box: geomVisualBounds(geom, style.strokeWidth, style.border),
@@ -501,6 +512,9 @@ export function chrome(
     // additionally tilts each handle GLYPH so it rides the box's orientation.
     // Suppressed during a live rotate (`rd`) — guides own that mode.
     if (!rd && annotTransformable(a) && (caps.resizable || caps.vertexEditable)) {
+      const measure = effMeasure(m, a.id);
+      const caption = measure && distanceCaptionAt(g, measure, style.strokeWidth);
+      if (caption) nodes.push({ kind: 'handle', at: caption, cursor: 'move' });
       for (const h of geomHandles(g))
         nodes.push({ kind: 'handle', at: h.at, cursor: h.cursor, ...(rot ? { rot } : {}) });
     }

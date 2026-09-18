@@ -1,3 +1,4 @@
+import type { DistanceAppearance } from './measurement';
 import type {
   RichTextDocumentInput,
   AnnotationDTO,
@@ -215,7 +216,10 @@ export type PropKey = keyof AnnotationProps;
  * verbatim. Text content never rides this effect (the debounced text-edit
  * write owns `contents`).
  */
-export type PatchScope = { kind: 'geometry' } | { kind: 'props'; keys: PropKey[] };
+export type PatchScope =
+  | { kind: 'geometry' }
+  | { kind: 'caption' }
+  | { kind: 'props'; keys: PropKey[] };
 
 /** A partial property write. `lineEndings` merges per side (set just `end`
  *  without knowing `start`); every other key overwrites. */
@@ -236,6 +240,7 @@ export interface Annot {
   /** Redaction label (`/OverlayText` + `/Repeat`) — redact kind only. A
    *  projection of `data` like `text`; the hover preview scene draws it. */
   label?: { text: string; repeat: boolean };
+  measure?: DistanceAppearance;
   /** `/Name` icon — present only for icon kinds (text note, file attachment).
    *  Like `style`, a projection of `data`, editable via `setProps`. */
   icon?: string;
@@ -377,6 +382,8 @@ export type Draft =
     }
   | {
       g: 'create-line';
+      measure?: DistanceAppearance;
+      capture?: string;
       subtype: Subtype;
       preset?: string;
       pon: PageObjectNumber;
@@ -466,6 +473,7 @@ export type Draft =
       cur: Rect;
       view?: ViewEnv;
     }
+  | { g: 'caption'; id: Id; start: Vec; delta: Vec }
   | { g: 'marquee'; pon: PageObjectNumber; from: Vec; to: Vec };
 
 /** A live text-markup preview (the in-progress selection rendered as the markup it
@@ -606,6 +614,8 @@ export type Msg =
   | { t: 'marqueePointer'; phase: 'down' | 'move' | 'up'; in: PointerInput }
   | {
       t: 'createPointer';
+      measure?: DistanceAppearance;
+      capture?: string;
       phase: 'down' | 'move' | 'up';
       subtype: Subtype;
       /** The authoring tool's `defaults` key (see {@link Draft}). Defaults to `subtype`. */
@@ -734,6 +744,7 @@ export type Msg =
   | { t: 'endTextEdit' };
 
 export type Effect =
+  | { fx: 'captured'; tool: string; pon: number; geom: Geom }
   | { fx: 'create'; id: Id }
   | { fx: 'createGroup'; primary: Id; members: Id[] }
   /** `apChanged` is set (to `true`) ONLY when this patch INVALIDATED a baked
@@ -799,6 +810,7 @@ export interface RenderItem {
   hovered?: boolean;
   /** Redaction label projection (redact kind only) — see {@link Annot.label}. */
   label?: { text: string; repeat: boolean };
+  measure?: DistanceAppearance;
   /**
    * Applied rotation (deg, CW), or 0/undefined. For BOX kinds (`rect`/`text`)
    * `box` is the UNROTATED visual box and the renderer applies this rotation
@@ -858,7 +870,15 @@ export type SceneNode =
   /** Painted (non-interactive) text — `at` is the BASELINE start point in
    *  content units. Editable text (free text) stays a framework element;
    *  this is for pure pixels, e.g. a redaction label preview. */
-  | { kind: 'text'; at: Vec; text: string; fontSize: number; fontFamily?: string; paint: Paint };
+  | {
+      kind: 'text';
+      at: Vec;
+      text: string;
+      fontSize: number;
+      fontFamily?: string;
+      rotation?: number;
+      paint: Paint;
+    };
 
 /** Pure geometry settings for recognising and axis-snapping a freehand stroke. */
 export interface InkStraightenOptions {

@@ -179,9 +179,7 @@ describe('repository — Replace Text authoring', () => {
       intent: 'strikeout-text-edit',
       geom: {
         t: 'quads',
-        quads: [
-          textQuadFromRect({ x: 10, y: 20, width: 80, height: 15 }),
-        ],
+        quads: [textQuadFromRect({ x: 10, y: 20, width: 80, height: 15 })],
       },
       style,
       flags: DRAWN_FLAGS,
@@ -223,6 +221,7 @@ describe('repository — Replace Text authoring', () => {
       rect: { left: 94, right: 100, bottom: 741, top: 747 },
     });
 
+    if (caret.geom.t !== 'caret') throw new Error('Expected caret projection');
     const upright: Annot = { ...caret, geom: { t: 'caret', rect: caret.geom.rect } };
     // Tri-state flatten: upright carets STATE null so a stale pair can't linger.
     expect(toCreateDraft(upright, CROP)).toMatchObject({
@@ -738,7 +737,11 @@ describe('repository — /Rect derives from line endings (the clipped-arrowhead 
       ...none,
       geom: { ...none.geom, ends: { start: 'open-arrow', end: 'open-arrow' } },
     } as typeof none;
-    const patch = toScopedPatch(arrows, { kind: 'props', keys: ['lineEndings'] }, CROP) as RectPatch;
+    const patch = toScopedPatch(
+      arrows,
+      { kind: 'props', keys: ['lineEndings'] },
+      CROP,
+    ) as RectPatch;
     expect(patch.lineEndings).toEqual({ start: 'open-arrow', end: 'open-arrow' });
     // The derivation rides along — the sparse patch can never change an input
     // of /Rect without re-emitting it (else the /AP re-bakes into the stale

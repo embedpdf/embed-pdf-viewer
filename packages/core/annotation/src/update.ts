@@ -11,6 +11,7 @@ import type {
   InkIntent,
   RichTextDocumentInput,
 } from '@embedpdf/engine-core/runtime';
+import { moveDistanceCaption, type DistanceAppearance } from './measurement';
 import { expandGroups, groupMembers } from './group';
 import { canMove, groupUnionBounds, hitTest, isSelectable } from './hit';
 import { isSubstrateOnly } from './plane';
@@ -317,6 +318,8 @@ export function update(m: Model, msg: Msg): [Model, Effect[]] {
         msg.straightenInk,
         msg.clickCreate,
         msg.flags,
+        msg.measure,
+        msg.capture,
       );
     case 'finishInkDraft':
       return finishInkCreate(m);
@@ -467,6 +470,12 @@ function editDown(m: Model, input: PointerInput): [Model, Effect[]] {
     input.inert,
     viewOf(input),
   );
+  if (hit.t === 'handle' && hit.handle === 'caption') {
+    return [
+      { ...m, draft: { g: 'caption', id: hit.id, start: input.point, delta: { x: 0, y: 0 } } },
+      [],
+    ];
+  }
   if (hit.t === 'handle') {
     // The handle gesture runs in VIEW space: `base` is the PROJECTED geometry
     // the user grabbed (identity for un-flagged annotations), and the commit
@@ -569,6 +578,11 @@ function editMove(m: Model, input: PointerInput): [Model, Effect[]] {
     return [{ ...m, draft: { ...d, delta, guides } }, []];
   }
   const point = clampPointToBox(input.point, input.pageBox);
+  if (d.g === 'caption')
+    return [
+      { ...m, draft: { ...d, delta: { x: point.x - d.start.x, y: point.y - d.start.y } } },
+      [],
+    ];
   if (d.g === 'handle')
     return [{ ...m, draft: { ...d, cur: geomDragHandle(d.base, d.handle, point) } }, []];
   // Rotation reads the pointer as an ANGLE about the pivot — the raw point is
@@ -584,6 +598,25 @@ function editMove(m: Model, input: PointerInput): [Model, Effect[]] {
 
 function editUp(m: Model): [Model, Effect[]] {
   const d = m.draft!;
+  if (d.g === 'caption') {
+    const a = m.byId[d.id];
+    if (!a?.measure || (!d.delta.x && !d.delta.y)) return [{ ...m, draft: null }, []];
+    return [
+      {
+        ...m,
+        draft: null,
+        byId: {
+          ...m.byId,
+          [a.id]: {
+            ...a,
+            source: 'vector',
+            measure: moveDistanceCaption(a.geom, a.measure, d.delta),
+          },
+        },
+      },
+      [{ fx: 'patch', id: a.id, scope: { kind: 'caption' } }],
+    ];
+  }
   if (d.g === 'handle') {
     // A grab that didn't actually resize leaves the appearance untouched → keep
     // it baked, no engine write.
@@ -694,6 +727,8 @@ function createPointer(
   straightenInk?: InkStraightenOptions,
   clickCreate?: ClickCreate | false,
   flags?: Partial<AnnotationFlags>,
+  measure?: DistanceAppearance,
+  capture?: string,
 ): [Model, Effect[]] {
   // An in-progress creation is anchored to its page: a move/up sample from
   // another page is a foreign frame — ignore it. (A DOWN on another page is a
@@ -740,6 +775,8 @@ function createPointer(
       subtype === 'line'
         ? {
             g: 'create-line',
+            measure,
+            capture,
             subtype,
             preset,
             pon: input.pon,
@@ -882,6 +919,8 @@ function createPointer(
     }
   }
   if (!geom) return [{ ...m, draft: null }, []];
+  if (d.g === 'create-line' && d.capture)
+    return [{ ...m, draft: null }, [{ fx: 'captured', tool: d.capture, pon: d.pon, geom }]];
 
   const id = `tmp:${m.seq + 1}`;
   const annot: Annot = {
@@ -889,6 +928,7 @@ function createPointer(
     ref: null,
     pon: d.pon,
     subtype: d.subtype,
+    ...(d.g === 'create-line' && d.measure ? { measure: d.measure } : {}),
     geom,
     style,
     // A text kind carries its text styling from birth, so the tool's font
@@ -1568,7 +1608,7 @@ function bumpAp(m: Model, ids: Id[]): Model {
 function draftIds(draft: Draft | null): Set<Id> {
   if (!draft) return new Set();
   if (draft.g === 'move') return new Set(draft.ids);
-  if (draft.g === 'handle') return new Set([draft.id]);
+  if (draft.g === 'handle' || draft.g === 'caption') return new Set([draft.id]);
   if (draft.g === 'rotate' || draft.g === 'group') return new Set(draft.ids);
   return new Set();
 }

@@ -40,6 +40,12 @@ export { StageToken } from '@embedpdf/react/stage';
 export { SearchToken } from '@embedpdf/react/search';
 export { SelectionToken } from '@embedpdf/react/selection';
 export { FormToken } from '@embedpdf/react/form';
+export { MeasurementToken } from '@embedpdf/react/measurement';
+export type {
+  MeasurementCapability,
+  MeasurementConfig,
+  ScaleChangeReport,
+} from '@embedpdf/react/measurement';
 export { RedactionToken } from '@embedpdf/react/redaction';
 // Stamp LIBRARIES are workspace state an embedder seeds: `viewer.get(StampToken)
 // .importLibraryPdf(companyStamps)` puts their own stamps in the stamps sidebar.

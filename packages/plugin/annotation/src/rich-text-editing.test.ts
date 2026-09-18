@@ -81,6 +81,7 @@ function harness() {
   const update = vi.fn();
   const list = vi.fn();
   const ctx = {
+    cleanup: () => {},
     getState: () => state,
     dispatch: (action: AnnotationAction) => {
       state = annotationReducer(state, action);

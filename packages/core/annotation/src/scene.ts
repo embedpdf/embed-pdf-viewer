@@ -9,6 +9,7 @@
  * underline/strikeout/squiggly STROKE, widths derived from the line height), so it
  * has its own small painter — but it still emits the same generic SceneNodes.
  */
+import { distanceScene } from './measurement';
 import { textQuadBounds, textQuadRing } from '@embedpdf/core-geometry';
 import { geomScene } from './geometry';
 import type {
@@ -244,6 +245,7 @@ export function scene(item: RenderItem): SceneNode[] {
   // border a PDF authored shows through the page raster). Selection chrome
   // still outlines it, so an editable link is findable when selected.
   if (item.subtype === 'link') return [];
+  if (item.measure) return distanceScene(item.geom, item.measure, item.style);
   if (item.subtype === 'redact') return redactScene(item);
   if (item.geom.t === 'quads') return markupScene(item.subtype, item.geom.quads, item.style);
   if (item.geom.t === 'caret') {

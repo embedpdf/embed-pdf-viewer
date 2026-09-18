@@ -9,6 +9,7 @@
  *   zoom widget → viewers/snippet/src/components/custom-zoom-toolbar.tsx
  *   mode select → viewers/snippet/src/components/mode-select-button.tsx
  */
+import { MeasurementScaleButton } from './measurement';
 import { useEffect, useState } from 'react';
 import { useOptionalCapability, useOptionalSelector } from '@embedpdf/react/runtime';
 import { Toolbar } from '@embedpdf/react/toolbar';
@@ -398,6 +399,7 @@ export function AppToolbar({ bar, className }: { bar: BarSchema; className?: str
       className={className}
       renderCommand={(cmd, variant, run) => <CommandButton cmd={cmd} variant={variant} run={run} />}
       renderCustom={{
+        'measurement-scale': () => <MeasurementScaleButton />,
         'zoom-controls': (variant) => (variant === 'inline' ? <ZoomControls /> : <ZoomButton />),
         'quick-stamps': () => <QuickStamps />,
       }}

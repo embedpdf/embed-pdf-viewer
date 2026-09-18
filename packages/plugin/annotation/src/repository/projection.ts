@@ -10,7 +10,7 @@ export type Wire = Record<string, unknown>;
 /** The kind-specific slice a DTO ingest contributes on top of the generic
  *  base (id/ref/flags/relationships) that `fromDTO` builds for every kind. */
 export type IngestSlice = { geom: Annot['geom'] } & Partial<
-  Pick<Annot, 'text' | 'icon' | 'label' | 'link' | 'intent'>
+  Pick<Annot, 'text' | 'icon' | 'label' | 'link' | 'intent' | 'measure'>
 >;
 
 /**

@@ -97,6 +97,7 @@ function harness() {
     (_action: 'update' | 'delete', _target: { userId?: string; groupId?: string }) => true,
   );
   const ctx = {
+    cleanup: () => {},
     getState: () => state,
     dispatch: (action: AnnotationAction) => {
       state = annotationReducer(state, action);
@@ -582,7 +583,10 @@ describe('the comments lens', () => {
       ...over,
     }) as unknown as AnnotationDTO;
   const rootAt = (n: number, top: number): AnnotationDTO =>
-    ({ ...hydrationSquare(n), rect: { left: 100, bottom: top - 60, right: 180, top } }) as AnnotationDTO;
+    ({
+      ...hydrationSquare(n),
+      rect: { left: 100, bottom: top - 60, right: 180, top },
+    }) as AnnotationDTO;
   const page2Root = (n: number): AnnotationDTO =>
     ({
       ...hydrationSquare(n),
@@ -618,9 +622,9 @@ describe('the comments lens', () => {
     await seed(h);
     const threads = h.capability.comments.threads();
     // Page 1 first (top-of-page before lower), then page 2.
-    expect(threads.map((t) => (t.root.ref.kind === 'objectNumber' ? t.root.ref.annotObjectNumber : -1))).toEqual([
-      20, 25, 30,
-    ]);
+    expect(
+      threads.map((t) => (t.root.ref.kind === 'objectNumber' ? t.root.ref.annotObjectNumber : -1)),
+    ).toEqual([20, 25, 30]);
     const t20 = threads[0]!;
     expect(t20.replies).toHaveLength(1);
     expect(t20.review.byReviewer['alice']?.state).toBe('accepted');
@@ -813,7 +817,7 @@ describe('the twin law — authority fused into presentation and gestures', () =
   const stamped = (n: number, userId?: string): AnnotationDTO =>
     ({ ...hydrationSquare(n), ...(userId ? { userId } : {}) }) as AnnotationDTO;
 
-  it("a foreign record renders the LOCKED treatment: selectable, zero handles", async () => {
+  it('a foreign record renders the LOCKED treatment: selectable, zero handles', async () => {
     const h = harness();
     selfOnly(h);
     h.list.mockResolvedValueOnce({ annotations: [stamped(20, 'me'), stamped(21, 'alice')] });
@@ -960,5 +964,121 @@ describe('remote delivery — echo-driven appearance invalidation', () => {
       moved: [hydrationSquare(70)],
     } as unknown as DocumentEvent);
     expect(h.state().model.byId['obj:70']!.apVersion ?? 0).toBe(0);
+  });
+});
+
+describe('distance authoring and recalibration', () => {
+  it('uses the viewport at the first point, retaining that snapshot throughout the drag', async () => {
+    const h = harness();
+    const { measureFromKnownLength } = await import('@embedpdf/engine-core/runtime');
+    const fallback = measureFromKnownLength(100, { value: 1, unit: 'm' });
+    const region = measureFromKnownLength(100, { value: 10, unit: 'ft' });
+    h.capability.setPageViewports(
+      PON,
+      [{ owned: false, bbox: { left: 0, right: 60, bottom: 700, top: 800 }, measure: region }],
+      fallback,
+    );
+    const dto = {
+      ...base(71),
+      color: { r: 0, g: 0, b: 0 },
+      strokeWidth: 1,
+      opacity: 1,
+      borderStyle: 'solid',
+      subtype: 'line',
+      intent: 'LineDimension',
+      rect: CROP,
+      linePoints: { start: { x: 20, y: 780 }, end: { x: 220, y: 780 } },
+      measure: region,
+      caption: { enabled: true },
+    } as AnnotationDTO;
+    h.create.mockResolvedValue({ created: dto });
+    h.capability.createPointer('distance', 'down', PON, { x: 20, y: 20 });
+    h.capability.setPageViewports(PON, [], fallback);
+    h.capability.createPointer('distance', 'move', PON, { x: 220, y: 20 });
+    h.capability.createPointer('distance', 'up', PON, { x: 220, y: 20 });
+    expect(h.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        intent: 'LineDimension',
+        measure: region,
+        contents: '20 ft',
+        caption: { enabled: true, position: 'inline' },
+        leader: { length: 12, extension: 5, offset: 0 },
+      }),
+    );
+    await vi.waitFor(() => expect(h.capability.get(ref(71))).toBeTruthy());
+    expect(h.capability.comments.permissionsFor(ref(71)).canEditText).toBe(false);
+    await expect(h.capability.comments.edit(ref(71), 'fake value')).rejects.toThrow('derived');
+  });
+  it('does not create over a winning foreign viewport or before viewport hydration', async () => {
+    const h = harness();
+    const { measureFromRatio } = await import('@embedpdf/engine-core/runtime');
+    h.capability.createPointer('distance', 'down', PON, { x: 20, y: 20 });
+    expect(h.state().model.draft).toBeNull();
+    h.capability.setPageViewports(
+      PON,
+      [
+        { owned: true, bbox: CROP, measure: measureFromRatio(1, 1, 'm') },
+        { owned: false, bbox: CROP, measure: { subtype: 'GEO' } },
+      ],
+      measureFromRatio(1, 1, 'm'),
+    );
+    h.capability.createPointer('distance', 'down', PON, { x: 20, y: 20 });
+    expect(h.state().model.draft).toBeNull();
+  });
+  it('captures calibration with modify authority even without create authority', () => {
+    const h = harness(),
+      captured = vi.fn();
+    h.allowsAnnotationCreate.mockReturnValue(false);
+    h.capability.onDraftCaptured(captured);
+    h.capability.createPointer('calibrate', 'down', PON, { x: 20, y: 20 });
+    h.capability.createPointer('calibrate', 'move', PON, { x: 120, y: 20 });
+    h.capability.createPointer('calibrate', 'up', PON, { x: 120, y: 20 });
+    expect(captured).toHaveBeenCalledWith({
+      tool: 'calibrate',
+      pon: PON,
+      from: { x: 20, y: 780 },
+      to: { x: 120, y: 780 },
+    });
+    expect(h.create).not.toHaveBeenCalled();
+    h.allows.mockReturnValue(false);
+    h.capability.createPointer('calibrate', 'down', PON, { x: 20, y: 20 });
+    expect(h.state().model.draft).toBeNull();
+  });
+  it('reports locked, foreign, unauthorized and failed annotations independently', async () => {
+    const h = harness();
+    const { measureFromKnownLength } = await import('@embedpdf/engine-core/runtime');
+    const scale = measureFromKnownLength(100, { value: 2, unit: 'm' });
+    const dtos = [80, 81, 82, 83, 84].map(
+      (n) =>
+        ({
+          ...base(n),
+          color: { r: 0, g: 0, b: 0 },
+          strokeWidth: 1,
+          opacity: 1,
+          borderStyle: 'solid',
+          subtype: 'line',
+          rect: CROP,
+          intent: 'LineDimension',
+          measure: n === 82 ? { subtype: 'GEO' } : scale,
+          caption: { enabled: true },
+          linePoints: { start: { x: 0, y: 0 }, end: { x: 100, y: 0 } },
+          flags: { ...NO_FLAGS, locked: n === 81 },
+          userId: n === 83 ? 'other' : 'me',
+        }) as AnnotationDTO,
+    );
+    h.listRawAll.mockResolvedValue(snapshot(dtos));
+    h.allowsAnnotationMutation.mockImplementation((_action, target) => target.userId !== 'other');
+    h.update.mockImplementation(async (r: AnnotationRef) => {
+      if (r.kind === 'objectNumber' && r.annotObjectNumber === 84) throw new Error('write failed');
+      return { updated: dtos[0], appearance: { changed: true } };
+    });
+    const report = await h.capability.remeasurePage(PON, scale);
+    expect(report.updated).toEqual([ref(80)]);
+    expect(report.skipped).toEqual([
+      { ref: ref(81), reason: 'locked' },
+      { ref: ref(82), reason: 'foreign-measure' },
+      { ref: ref(83), reason: 'no-authority' },
+    ]);
+    expect(report.failed).toMatchObject([{ ref: ref(84), error: { message: 'write failed' } }]);
   });
 });

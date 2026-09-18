@@ -13,6 +13,10 @@ import type {
   CommentThread,
   PdfLinkTarget,
   PdfRect,
+  PdfPoint,
+  PdfMeasure,
+  PageMeasurementViewport,
+  SerializedEngineError,
   PdfActionTree,
   RichTextParagraph,
 } from '@embedpdf/engine-core/runtime';
@@ -391,6 +395,27 @@ export interface CommentsApi {
   permissionsFor(ref: AnnotationRef): CommentPermissions;
 }
 
+export interface RecalibrationReport {
+  pon: number;
+  scale: PdfMeasure;
+  /** Page-wide read failure: no complete annotation set was available to recalculate. */
+  error?: SerializedEngineError;
+  updated: AnnotationRef[];
+  skipped: {
+    ref: AnnotationRef;
+    reason: 'no-authority' | 'locked' | 'foreign-measure' | 'unavailable';
+  }[];
+  failed: { ref: AnnotationRef; error: SerializedEngineError }[];
+}
+
+export interface CapturedAnnotationDraft {
+  tool: string;
+  pon: number;
+  /** Original PDF user space, matching the engine API. */
+  from: PdfPoint;
+  to: PdfPoint;
+}
+
 export interface AnnotationCapability {
   // ── data API: the mutation vocabulary (engine-core types, addressable by ref) ──
   /**
@@ -732,6 +757,14 @@ export type FilePickerProvider = (req: FilePromptRequest) => Promise<AttachmentF
  * use `/internal`. Never use either from application code.
  */
 export interface AnnotationHostCapability extends AnnotationCapability {
+  /** Page viewport cache, in original PDF coordinates. Undefined clears readiness. */
+  setPageViewports(
+    pon: number,
+    viewports: PageMeasurementViewport[] | undefined,
+    fallback: PdfMeasure,
+  ): void;
+  remeasurePage(pon: number, scale: PdfMeasure): Promise<RecalibrationReport>;
+  onDraftCaptured(cb: (draft: CapturedAnnotationDraft) => void): () => void;
   // ── render projection (consumed by the framework render layer) ──
   /** `view` (the page's scale + total display rotation, from its transform)
    *  projects screen-anchored (`noZoom`/`noRotate`) bodies to their effective

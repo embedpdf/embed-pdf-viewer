@@ -19,7 +19,12 @@ import type {
   PropKey,
   Subtype,
 } from '@embedpdf/core-annotation';
-import type { BinarySource, InkIntent } from '@embedpdf/engine-core/runtime';
+import type {
+  BinarySource,
+  InkIntent,
+  LineDimensionCaption,
+  LineLeader,
+} from '@embedpdf/engine-core/runtime';
 
 /**
  * How a stamp-family tool resolves the image bytes it places — pure DATA, so a
@@ -223,7 +228,9 @@ export interface AnnotationToolDef<K extends ToolAuthoringKind = ToolAuthoringKi
   /** What a committed text selection authors. Omit for pointer/click tools. */
   selection?: SelectionAuthoring;
   /** PDF `/IT` authored by an intent-bearing ink preset. */
-  intent?: K extends 'ink' ? InkIntent : never;
+  intent?: K extends 'ink' ? InkIntent : K extends 'line' ? 'LineDimension' : never;
+  /** Distance appearance defaults; offsets use the directed PDF line axes. */
+  measurement?: { caption: LineDimensionCaption; leader?: LineLeader };
   /** Ink-only stroke grouping and straightening policy. */
   ink?: K extends 'ink' ? InkAuthoringOptions : never;
   /**
@@ -251,7 +258,8 @@ export interface AnnotationToolDef<K extends ToolAuthoringKind = ToolAuthoringKi
    */
   ghost?: GhostPolicy;
   /** Opaque presentation hints (label/icon…) for a toolbar or cursor that builds
-   *  itself from the tool table. Never read by the plugin or the interaction hub. */
+   *  itself from the tool table. `capture: true` captures a line gesture without
+   *  creating an annotation (used by calibration). */
   meta?: Record<string, unknown>;
 }
 
@@ -259,6 +267,8 @@ export interface BuiltinToolKindMap {
   square: 'square';
   circle: 'circle';
   line: 'line';
+  distance: 'line';
+  calibrate: 'line';
   polygon: 'polygon';
   polyline: 'polyline';
   ink: 'ink';
@@ -320,7 +330,8 @@ export interface ResolvedTool {
   flags?: Partial<AnnotationFlags>;
   source?: StampSourceSpec;
   selection?: SelectionAuthoring;
-  intent?: InkIntent;
+  intent?: InkIntent | 'LineDimension';
+  measurement?: { caption: LineDimensionCaption; leader?: LineLeader };
   ink?: InkAuthoringOptions;
   /** Counter-rotate creations against the page's display rotation (see
    *  {@link AnnotationToolDef.upright}). */
@@ -382,6 +393,24 @@ export const DEFAULT_TOOLS: AnnotationToolInput[] = [
     enables: DRAW_TAGS,
     defaults: { strokeWidth: 6 },
     clickCreate: { length: 80 },
+  },
+  {
+    id: 'distance',
+    extends: 'line',
+    intent: 'LineDimension',
+    defaults: { strokeWidth: 1, lineEndings: { start: 'closed-arrow', end: 'closed-arrow' } },
+    measurement: {
+      caption: { enabled: true, position: 'inline' },
+      leader: { length: 12, extension: 5, offset: 0 },
+    },
+  },
+  {
+    id: 'calibrate',
+    extends: 'line',
+    enables: ['annotation-draw'],
+    defaults: { strokeWidth: 1 },
+    clickCreate: false,
+    meta: { capture: true },
   },
   {
     id: 'polygon',
@@ -649,6 +678,7 @@ export function buildToolRegistry(
       source: def.source ?? base?.source,
       selection: def.selection ?? base?.selection,
       intent: def.intent ?? base?.intent,
+      measurement: def.measurement ?? base?.measurement,
       ink: base?.ink || def.ink ? { ...base?.ink, ...def.ink } : undefined,
       upright: def.upright ?? base?.upright ?? false,
       clickCreate: def.clickCreate ?? base?.clickCreate ?? false,

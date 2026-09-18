@@ -176,6 +176,8 @@ export function toPatch(a: Annot, crop: PdfRect): AnnotationPatch | null {
  */
 export function toScopedPatch(a: Annot, scope: PatchScope, crop: PdfRect): AnnotationPatch | null {
   const kind = projectionOf(a.subtype);
+  if (scope.kind === 'caption')
+    return a.measure ? { subtype: 'line', caption: a.measure.caption } : null;
   if (scope.kind === 'geometry') {
     const geo = kind.geometry(a, crop);
     return geo ? ({ subtype: wireSubtypeOf(a), ...geo } as AnnotationPatch) : toPatch(a, crop);
