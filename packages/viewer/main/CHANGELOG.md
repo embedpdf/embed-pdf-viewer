@@ -1,5 +1,11 @@
 # @embedpdf/viewer
 
+## 3.0.0-next.14
+
+### Minor Changes
+
+- [#827](https://github.com/embedpdf/embed-pdf-viewer/pull/827) by [@bobsingor](https://github.com/bobsingor) – Export MeasurementToken through every viewer entry point so applications can access page calibration and measurement controls through the viewer handle.
+
 ## 3.0.0-next.13
 
 ### Minor Changes

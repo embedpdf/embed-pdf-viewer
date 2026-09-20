@@ -1,5 +1,11 @@
 # @embedpdf/react
 
+## 3.0.0-next.14
+
+### Minor Changes
+
+- [#827](https://github.com/embedpdf/embed-pdf-viewer/pull/827) by [@bobsingor](https://github.com/bobsingor) – Add the measurement feature entry with reactive calibration, page-scale, and readout hooks. Render rotated distance captions and use the standard square handles for measurement endpoints and leaders during annotation gestures.
+
 ## 3.0.0-next.13
 
 ### Minor Changes

@@ -1,5 +1,11 @@
 # @cloudpdf/sdk
 
+## 3.0.0-next.14
+
+### Minor Changes
+
+- [#827](https://github.com/embedpdf/embed-pdf-viewer/pull/827) by [@bobsingor](https://github.com/bobsingor) – Add generated page viewport and scale APIs and measurement annotation types.
+
 ## 3.0.0-next.13
 
 ### Minor Changes

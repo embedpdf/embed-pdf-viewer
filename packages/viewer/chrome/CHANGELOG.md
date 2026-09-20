@@ -1,5 +1,15 @@
 # @embedpdf/viewer-chrome
 
+## 3.0.0-next.14
+
+### Minor Changes
+
+- [#827](https://github.com/embedpdf/embed-pdf-viewer/pull/827) by [@bobsingor](https://github.com/bobsingor) – Add a Measure toolbar with distance drawing, a scale sidebar, and known-length calibration controls. Support Escape to cancel an unfinished drawing, with English and Spanish labels.
+
+  Use distinct calibration and scale-setting icons that inherit the viewer's theme and active-state colors.
+
+  Add Perimeter and Area tools, dynamic stroke-colored measurement icons across toolbar and cursor, separate area-unit controls, selected area/perimeter readouts, and a reset-label-position action.
+
 ## 3.0.0-next.13
 
 ### Minor Changes

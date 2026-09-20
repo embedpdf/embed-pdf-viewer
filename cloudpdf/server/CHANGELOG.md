@@ -1,5 +1,13 @@
 # @cloudpdf/server
 
+## 3.0.0-next.14
+
+### Minor Changes
+
+- [#827](https://github.com/embedpdf/embed-pdf-viewer/pull/827) by [@bobsingor](https://github.com/bobsingor) – Persist page measurement calibration in layer artifacts with authorization and audit events. Calibration advances the document version while retaining existing page cache versions and annotation scales.
+
+- [#800](https://github.com/embedpdf/embed-pdf-viewer/pull/800) by [@LazyCompiler](https://github.com/LazyCompiler) – The layer search routes (`/v1/docs/:docId/layers/:layerName/search/{rects,full}/data`) accept `ignoreWhitespace=true` alongside the other query flags and forward it to the engine, so a cloud search for `invoice` finds a letter-spaced `i n v o i c e`. Combining it with `regex=true` is rejected with `InvalidArg`, and the flag is carried by the search tokens that page through results.
+
 ## 3.0.0-next.13
 
 ### Minor Changes
