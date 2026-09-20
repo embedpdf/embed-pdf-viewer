@@ -205,6 +205,11 @@ export const FormFieldDraftSchema: z.ZodType<FormFieldDraft> = z.discriminatedUn
     options: z.array(FormFieldOptionInputSchema).optional(),
     widget: WidgetPlacementSchema.optional(),
   }),
+  z.object({
+    ...FormFieldDraftBaseShape,
+    family: z.literal('signature'),
+    widget: WidgetPlacementSchema.optional(),
+  }),
 ]) as unknown as z.ZodType<FormFieldDraft>;
 
 const FormFieldPatchBaseShape = {

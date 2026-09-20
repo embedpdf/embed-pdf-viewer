@@ -21,12 +21,26 @@ import {
   type FormsListWorkerRequest,
   type FormsRepairWorkerRequest,
   type FormsUpdateFieldWorkerRequest,
+  type FormsSetSignatureAppearanceWorkerRequest,
   type FormsResetWorkerRequest,
   type FormsSetValueWorkerRequest,
+  type SignaturesListWorkerRequest,
+  type SignaturesPrepareWorkerRequest,
+  type SignaturesCompleteWorkerRequest,
+  type SignaturesAbortWorkerRequest,
+  type SignaturesAnalyzeWorkerRequest,
+  type SignaturesFinalizeCandidateWorkerRequest,
+  type SignaturesContentsWorkerRequest,
+  type SignaturesDigestWorkerRequest,
+  type SignaturesRevisionBytesWorkerRequest,
+  type DocumentVersionWorkerRequest,
+  type DocumentProtection,
   type FontsRegisterWorkerRequest,
   type FontsAddFallbackWorkerRequest,
   type FontsClearFallbacksWorkerRequest,
   type FontsClearWorkerRequest,
+  type FontsAuthorizeEditingWorkerRequest,
+  type DocumentSetFontSettingsWorkerRequest,
   type AnnotationsListFullPageWorkerRequest,
   type AnnotationsListRawAllWorkerRequest,
   type AnnotationsListRawPageWorkerRequest,
@@ -44,6 +58,10 @@ import {
   type PagesMoveWorkerRequest,
   type PagesRotateWorkerRequest,
   type PagesDeleteWorkerRequest,
+  type PagesSetNameWorkerRequest,
+  type AnnotationsFlattenWorkerRequest,
+  type AnnotationsExportAppearanceWorkerRequest,
+  type PagesRemoveNameWorkerRequest,
   type PagesExtractWorkerRequest,
   type PagesInsertBlankWorkerRequest,
   type PagesInsertWorkerRequest,
@@ -91,6 +109,7 @@ import { DocumentActionsReader } from '../features/actions';
 import {
   AnnotationReader,
   AnnotationAppearanceReader,
+  AnnotationFlattener,
   AnnotationMutator,
   RawAnnotationReader,
 } from '../features/annotations';
@@ -112,8 +131,17 @@ import { PageRenderReader } from '../features/render';
 import { DocumentSaver } from '../features/save';
 import { SearchReader } from '../features/search';
 import { SecurityReader } from '../features/security';
+import {
+  CandidateFinalizer,
+  SignatureAnalyzer,
+  SignatureMutator,
+  SignatureReader,
+  disposeSignatureModel,
+  hasSignedSignature,
+} from '../features/signature';
 import { PageTextReader } from '../features/text';
 import { ensureInitialized, destroyLibrary } from '../runtime/lifecycle/bootstrap';
+import { generateUuid } from '../shared/uuid';
 
 /** The image a {@link WorkerImageEncoder} produced. `bytes` must OWN its
  *  buffer (a fresh allocation, not a pooled `Buffer` slab view) — it is
@@ -139,6 +167,13 @@ export interface WorkerImageEncoder {
 
 export interface WorkerHostOptions {
   imageEncoder?: WorkerImageEncoder;
+  /**
+   * Where a file-backed session (a file base) writes its signing candidate
+   * between `prepare` and `complete`. Defaults to beside the base file
+   * (`<base>.signing-<id>.pdf`); a server maps it into its storage layout so
+   * the sealed file can be published by rename.
+   */
+  signingCandidatePath?: (basePath: string, signingId: string) => string;
 }
 
 /**
@@ -226,6 +261,11 @@ export class WorkerHost {
     // so they do not receive the signal.
     let resultPack: WirePack<WorkerResultPayload>;
     try {
+      // A parked signing candidate freezes the session: every mutating kind
+      // is refused at DISPATCH, before any native write, until the signing
+      // completes or aborts. Reads keep seeing the live document, which the
+      // candidate never changed.
+      this.assertNoPendingSigning(msg);
       switch (msg.kind) {
         case 'open.fatMem':
         case 'open.layerMemBase':
@@ -265,6 +305,36 @@ export class WorkerHost {
         case 'annotations.move':
           resultPack = this.handleAnnotationsMove(msg, ctrl.signal);
           break;
+        case 'signatures.list':
+          resultPack = this.handleSignaturesList(msg);
+          break;
+        case 'signatures.contents':
+          resultPack = this.handleSignaturesContents(msg);
+          break;
+        case 'signatures.digest':
+          resultPack = this.handleSignaturesDigest(msg);
+          break;
+        case 'signatures.revisionBytes':
+          resultPack = this.handleSignaturesRevisionBytes(msg);
+          break;
+        case 'document.version':
+          resultPack = this.handleDocumentVersion(msg);
+          break;
+        case 'signatures.prepare':
+          resultPack = this.handleSignaturesPrepare(msg);
+          break;
+        case 'signatures.complete':
+          resultPack = this.handleSignaturesComplete(msg);
+          break;
+        case 'signatures.abort':
+          resultPack = this.handleSignaturesAbort(msg);
+          break;
+        case 'signatures.analyze':
+          resultPack = this.handleSignaturesAnalyze(msg);
+          break;
+        case 'signatures.finalizeCandidate':
+          resultPack = this.handleSignaturesFinalizeCandidate(msg);
+          break;
         case 'forms.list':
           resultPack = this.handleFormsList(msg, ctrl.signal);
           break;
@@ -292,6 +362,9 @@ export class WorkerHost {
         case 'forms.updateField':
           resultPack = this.handleFormsUpdateField(msg, ctrl.signal);
           break;
+        case 'forms.setSignatureAppearance':
+          resultPack = this.handleFormsSetSignatureAppearance(msg, ctrl.signal);
+          break;
         case 'forms.deleteField':
           resultPack = this.handleFormsDeleteField(msg, ctrl.signal);
           break;
@@ -312,6 +385,18 @@ export class WorkerHost {
           break;
         case 'pages.delete':
           resultPack = this.handlePagesDelete(msg, ctrl.signal);
+          break;
+        case 'pages.setName':
+          resultPack = this.handlePagesSetName(msg, ctrl.signal);
+          break;
+        case 'annotations.flatten':
+          resultPack = this.handleAnnotationsFlatten(msg, ctrl.signal);
+          break;
+        case 'annotations.exportAppearance':
+          resultPack = this.handleAnnotationsExportAppearance(msg, ctrl.signal);
+          break;
+        case 'pages.removeName':
+          resultPack = this.handlePagesRemoveName(msg, ctrl.signal);
           break;
         case 'pages.flatten':
           resultPack = this.handlePagesFlatten(msg, ctrl.signal);
@@ -397,6 +482,12 @@ export class WorkerHost {
         case 'fonts.clear':
           resultPack = this.handleFontsClear(msg);
           break;
+        case 'fonts.authorizeEditing':
+          resultPack = this.handleFontsAuthorizeEditing(msg);
+          break;
+        case 'document.setFontSettings':
+          resultPack = this.handleDocumentSetFontSettings(msg);
+          break;
         case 'layer.close':
           resultPack = this.handleLayerClose(msg);
           break;
@@ -437,10 +528,13 @@ export class WorkerHost {
       throw new EngineError(EngineErrorCode.InvalidArg, `document session already open: ${key}`);
     }
     const session = new DocumentSession(this.runtime);
+    session.signedDocumentPolicy = req.signedDocumentPolicy ?? 'protect';
+    session.password = req.password;
     if (req.kind === 'open.fatMem') {
+      session.sessionKind = req.sessionKind ?? 'layer';
       const bytes = new Uint8Array(req.bytes);
       try {
-        session.openFromHandle(openFatMemoryDocument(this.runtime, bytes, req.password));
+        this.openSignedAware(session, bytes, req.password);
       } catch (error) {
         // Password failures are a STATE, not an error: park the session with
         // the already-transferred bytes and answer with a security probe that
@@ -461,6 +555,7 @@ export class WorkerHost {
         key: req.baseKey,
         bytes: new Uint8Array(req.baseBytes),
         password: req.password,
+        knownSha256: req.baseSha256,
       });
       session.openFromHandle(openLayerDocument(this.runtime, base, req.layer, req.password));
     } else {
@@ -468,6 +563,7 @@ export class WorkerHost {
         key: req.baseKey,
         path: req.basePath,
         password: req.password,
+        knownSha256: req.baseSha256,
       });
       session.openFromHandle(openLayerDocument(this.runtime, base, req.layer, req.password));
     }
@@ -479,7 +575,193 @@ export class WorkerHost {
         session,
         req.password ?? '',
       ),
+      protection: this.probeProtection(session),
     });
+  }
+
+  /**
+   * Open plain bytes into `session` in the shape it asked for. The default,
+   * `layer`, makes the bytes an immutable base with a fresh layer on top:
+   * reads fall through to the base, a write promotes only what it touches,
+   * a save appends exactly that, and a signature keeps its validity across
+   * later edits because the signature dictionary is never rewritten. The
+   * `plain` shape keeps one in-memory document — unless the bytes already
+   * carry a signature value, which always opens as a layer, because a plain
+   * save rewrites every loaded object into the new revision and strict
+   * validators reject that. Auto-layered sessions serialize no artifact per
+   * mutation: the caller never asked for one.
+   */
+  private openSignedAware(
+    session: DocumentSession,
+    bytes: Uint8Array,
+    password: string | null,
+  ): void {
+    if (session.sessionKind === 'plain') {
+      const plain = openFatMemoryDocument(this.runtime, bytes, password);
+      // A SIGNED signature, not merely a signature field: an unsigned form
+      // with empty signature fields is an ordinary document and honours the
+      // plain request. (FPDF_GetSignatureCount counts fields.)
+      let signed = false;
+      try {
+        signed = hasSignedSignature(this.runtime, plain.docPtr);
+      } catch {
+        signed = false;
+      }
+      if (!signed) {
+        session.openFromHandle(plain);
+        return;
+      }
+      plain.close();
+    }
+    // The base registry reports a password failure the way a plain open
+    // does, so a locked document parks and unlocks exactly as before.
+    const base = this.baseDocuments.acquireMemoryBase({
+      key: `signed-open:${generateUuid()}`,
+      bytes,
+      password,
+    });
+    session.openFromHandle(openLayerDocument(this.runtime, base, { kind: 'fresh' }, password));
+    session.persistLayerArtifact = false;
+  }
+
+  /**
+   * What the document's signatures forbid, read at open and after an
+   * unlock so the main-thread guard can subtract capabilities before the
+   * first mutation. A document whose signature model cannot be built
+   * still opens: protection is then `null` (nothing is known to be
+   * signed), and the reads report the failure on their own.
+   */
+  private probeProtection(session: DocumentSession): DocumentProtection | null {
+    try {
+      return new SignatureReader(this.runtime, session).readProtection();
+    } catch {
+      return null;
+    }
+  }
+
+  private handleSignaturesList(req: SignaturesListWorkerRequest): WirePack<WorkerResultPayload> {
+    const session = this.requireSession(req);
+    const snapshot = req.workingCopy
+      ? new SignatureAnalyzer(this.runtime, session).readWorkingCopySnapshot()
+      : new SignatureReader(this.runtime, session).readSnapshot();
+    return wirePack({ tag: 'signatures.list', snapshot });
+  }
+
+  private handleSignaturesContents(
+    req: SignaturesContentsWorkerRequest,
+  ): WirePack<WorkerResultPayload> {
+    const session = this.requireSession(req);
+    const bytes = new SignatureReader(this.runtime, session).readContents(req.ref);
+    return wirePack({ tag: 'signatures.contents', bytes }, [bytes]);
+  }
+
+  private handleSignaturesDigest(
+    req: SignaturesDigestWorkerRequest,
+  ): WirePack<WorkerResultPayload> {
+    const session = this.requireSession(req);
+    const digest = new SignatureReader(this.runtime, session).digest(req.ref, req.algorithm);
+    return wirePack({ tag: 'signatures.digest', digest }, [digest]);
+  }
+
+  private handleSignaturesRevisionBytes(
+    req: SignaturesRevisionBytesWorkerRequest,
+  ): WirePack<WorkerResultPayload> {
+    const session = this.requireSession(req);
+    const bytes = new SignatureReader(this.runtime, session).revisionBytes(req.revisionIndex);
+    return wirePack({ tag: 'signatures.revisionBytes', bytes, size: bytes.byteLength }, [bytes]);
+  }
+
+  private handleDocumentVersion(req: DocumentVersionWorkerRequest): WirePack<WorkerResultPayload> {
+    const session = this.requireSession(req);
+    const version = new SignatureReader(this.runtime, session).version();
+    return wirePack({ tag: 'document.version', version });
+  }
+
+  private handleSignaturesPrepare(
+    req: SignaturesPrepareWorkerRequest,
+  ): WirePack<WorkerResultPayload> {
+    const session = this.requireSession(req);
+    // The live document is untouched: no mutation, no artifact.
+    const result = new SignatureMutator(
+      this.runtime,
+      session,
+      this.baseDocuments,
+      this.options.signingCandidatePath,
+    ).prepare(req.input);
+    return wirePack({ tag: 'signatures.prepare', result });
+  }
+
+  private handleSignaturesComplete(
+    req: SignaturesCompleteWorkerRequest,
+  ): WirePack<WorkerResultPayload> {
+    const session = this.requireSession(req);
+    const result = new SignatureMutator(
+      this.runtime,
+      session,
+      this.baseDocuments,
+      this.options.signingCandidatePath,
+    ).complete(req.input);
+    if (result.status === 'already-completed') {
+      return wirePack({ tag: 'signatures.complete', result });
+    }
+    // The install already advanced the mutation sequence; finishMutation
+    // only adds the (now empty) layer artifact for layer sessions.
+    return this.finishMutation(session, { tag: 'signatures.complete', result }, req.artifactPath);
+  }
+
+  private handleSignaturesAnalyze(
+    req: SignaturesAnalyzeWorkerRequest,
+  ): WirePack<WorkerResultPayload> {
+    const session = this.requireSession(req);
+    const analysis = new SignatureAnalyzer(this.runtime, session).analyze(req.input);
+    return wirePack({ tag: 'signatures.analyze', analysis });
+  }
+
+  /**
+   * Session-less, like `document.renderPageFile`: the candidate file is
+   * the caller's, patched in place and read back through a transient
+   * session that is never stored in `this.sessions`.
+   */
+  private handleSignaturesFinalizeCandidate(
+    req: SignaturesFinalizeCandidateWorkerRequest,
+  ): WirePack<WorkerResultPayload> {
+    const finalized = new CandidateFinalizer(this.runtime, this.baseDocuments).finalize({
+      path: req.path,
+      byteRange: req.byteRange,
+      contentsSize: req.contentsSize,
+      fieldObjectNumber: req.fieldObjectNumber,
+      cms: new Uint8Array(req.cms),
+      password: req.password ?? null,
+    });
+    return wirePack({ tag: 'signatures.finalizeCandidate', ...finalized });
+  }
+
+  private handleSignaturesAbort(req: SignaturesAbortWorkerRequest): WirePack<WorkerResultPayload> {
+    const session = this.requireSession(req);
+    const result = new SignatureMutator(
+      this.runtime,
+      session,
+      this.baseDocuments,
+      this.options.signingCandidatePath,
+    ).abort(req.signingId);
+    return wirePack({ tag: 'signatures.abort', result });
+  }
+
+  /**
+   * The dispatch fence for a parked signing candidate. Only mutating kinds
+   * are refused; a request for a session that is not open falls through
+   * to its handler's own `DocNotOpen`.
+   */
+  private assertNoPendingSigning(msg: WorkerRequest): void {
+    if (!MUTATING_KINDS.has(msg.kind) || !('docId' in msg)) return;
+    const layerName = 'layerName' in msg ? msg.layerName : undefined;
+    const session = this.sessions.get(sessionKey(msg.docId, layerName));
+    if (session?.pendingSigning) {
+      throw new EngineError(
+        EngineErrorCode.SigningPending,
+        `a signing is pending (${session.pendingSigning.prepared.signingId}); complete or abort it before mutating the document`,
+      );
+    }
   }
 
   private handleMetadataRead(
@@ -515,7 +797,7 @@ export class WorkerHost {
     signal: AbortSignal,
   ): WirePack<WorkerResultPayload> {
     const session = this.requireSession(req);
-    const reader = new RawAnnotationReader(this.runtime, session);
+    const reader = new RawAnnotationReader(this.runtime, session, this.fonts);
     const snapshot = reader.listAll(signal);
     return wirePack({ tag: 'annotations.listRawAll', snapshot });
   }
@@ -525,7 +807,7 @@ export class WorkerHost {
     signal: AbortSignal,
   ): WirePack<WorkerResultPayload> {
     const session = this.requireSession(req);
-    const reader = new RawAnnotationReader(this.runtime, session);
+    const reader = new RawAnnotationReader(this.runtime, session, this.fonts);
     const snapshot = reader.listOne(req.pageObjectNumber, signal);
     return wirePack({ tag: 'annotations.listRawPage', snapshot });
   }
@@ -535,7 +817,7 @@ export class WorkerHost {
     signal: AbortSignal,
   ): WirePack<WorkerResultPayload> {
     const session = this.requireSession(req);
-    const reader = new AnnotationReader(this.runtime, session);
+    const reader = new AnnotationReader(this.runtime, session, this.fonts);
     const snapshot = reader.list(req.pageObjectNumber, signal);
     return wirePack({ tag: 'annotations.listFullPage', snapshot });
   }
@@ -588,6 +870,38 @@ export class WorkerHost {
     return this.finishMutation(session, { tag: 'annotations.delete', result }, req.artifactPath);
   }
 
+  private handleAnnotationsFlatten(
+    req: AnnotationsFlattenWorkerRequest,
+    signal: AbortSignal,
+  ): WirePack<WorkerResultPayload> {
+    const session = this.requireSession(req);
+    const result = new AnnotationFlattener(this.runtime, session).flatten(
+      req.pageObjectNumber,
+      req.refs,
+      req.usage,
+      signal,
+    );
+    if (result.meta === null) return wirePack({ tag: 'annotations.flatten', result });
+    return this.finishMutation(session, { tag: 'annotations.flatten', result }, req.artifactPath);
+  }
+
+  private handleAnnotationsExportAppearance(
+    req: AnnotationsExportAppearanceWorkerRequest,
+    signal: AbortSignal,
+  ): WirePack<WorkerResultPayload> {
+    const session = this.requireSession(req);
+    const exported = new AnnotationFlattener(this.runtime, session).exportAppearance(
+      req.pageObjectNumber,
+      req.refs,
+      signal,
+    );
+    // A read: no finishMutation, no layer artifact. Bytes transfer zero-copy.
+    return wirePack(
+      { tag: 'annotations.exportAppearance', bytes: exported.bytes, size: exported.size },
+      [exported.bytes],
+    );
+  }
+
   private handleAnnotationsMove(
     req: AnnotationsMoveWorkerRequest,
     signal: AbortSignal,
@@ -636,6 +950,33 @@ export class WorkerHost {
     const mutator = new PagesMutator(this.runtime, session);
     const result = mutator.delete(req.pageObjectNumbers, signal);
     return this.finishMutation(session, { tag: 'pages.delete', result }, req.artifactPath);
+  }
+
+  private handlePagesSetName(
+    req: PagesSetNameWorkerRequest,
+    signal: AbortSignal,
+  ): WirePack<WorkerResultPayload> {
+    const session = this.requireSession(req);
+    const mutator = new PagesMutator(this.runtime, session);
+    const result = mutator.setName(
+      {
+        name: req.name,
+        pageObjectNumber: req.pageObjectNumber,
+        ...(req.replace !== undefined ? { replace: req.replace } : {}),
+      },
+      signal,
+    );
+    return this.finishMutation(session, { tag: 'pages.setName', result }, req.artifactPath);
+  }
+
+  private handlePagesRemoveName(
+    req: PagesRemoveNameWorkerRequest,
+    signal: AbortSignal,
+  ): WirePack<WorkerResultPayload> {
+    const session = this.requireSession(req);
+    const mutator = new PagesMutator(this.runtime, session);
+    const result = mutator.removeName({ name: req.name }, signal);
+    return this.finishMutation(session, { tag: 'pages.removeName', result }, req.artifactPath);
   }
 
   private handlePagesFlatten(
@@ -693,7 +1034,11 @@ export class WorkerHost {
   ): WirePack<WorkerResultPayload> {
     const session = this.requireSession(req);
     const inserter = new PagesInserter(this.runtime, session);
-    const result = inserter.insertBlank({ size: req.size, count: req.count }, req.destIndex, signal);
+    const result = inserter.insertBlank(
+      { size: req.size, count: req.count },
+      req.destIndex,
+      signal,
+    );
     return this.finishMutation(session, { tag: 'pages.insertBlank', result }, req.artifactPath);
   }
 
@@ -996,6 +1341,18 @@ export class WorkerHost {
     req: DocumentSaveBufferWorkerRequest,
   ): WirePack<WorkerResultPayload> {
     const session = this.requireSession(req);
+    // A save that changes nothing returns the loaded bytes verbatim: a
+    // signed file must come back exactly as it was sealed. Whether anything
+    // changed is the saver's answer (`snapshot`): the session's counter when
+    // nothing was mutated, the fork's save pass otherwise — an annotation
+    // added and removed again leaves the document as loaded.
+    if (req.mode === 'incremental') {
+      const snap = new DocumentSaver(this.runtime, session).snapshot();
+      return wirePack(
+        { tag: 'document.saveBuffer', bytes: snap.bytes, size: snap.bytes.byteLength },
+        [snap.bytes],
+      );
+    }
     const saved = new DocumentSaver(this.runtime, session).saveStandaloneToBuffer(req.mode);
     return wirePack({ tag: 'document.saveBuffer', bytes: saved.bytes, size: saved.size }, [
       saved.bytes,
@@ -1006,6 +1363,23 @@ export class WorkerHost {
     req: DocumentSaveFileWorkerRequest,
   ): WirePack<WorkerResultPayload> {
     const session = this.requireSession(req);
+    // The no-op save law for files: a session whose document is still the
+    // one it was opened with streams its loaded bytes — for a layer, the
+    // base PLUS the loaded delta, never the base file alone — verbatim. The
+    // decision is the saver's (see handleDocumentSaveBuffer); when its pass
+    // wrote nothing, nothing reached the file yet.
+    const unchanged =
+      req.mode === 'incremental' &&
+      (!session.hasUnsavedEdits() ||
+        new DocumentSaver(this.runtime, session).saveStandaloneToFileEx(req.path, req.mode)
+          .unchangedSinceLoad);
+    if (unchanged) {
+      new DocumentSaver(this.runtime, session).copyLoadedBytesToFile(req.path);
+      return wirePack({ tag: 'document.saveFile', path: req.path });
+    }
+    if (req.mode === 'incremental') {
+      return wirePack({ tag: 'document.saveFile', path: req.path });
+    }
     const saved = new DocumentSaver(this.runtime, session).saveStandaloneToFile(req.path, req.mode);
     return wirePack({ tag: 'document.saveFile', path: saved.path });
   }
@@ -1096,9 +1470,8 @@ export class WorkerHost {
     const parked = this.sessions.get(sessionKey(req.docId));
     let session: DocumentSession;
     if (parked?.isLocked()) {
-      parked.openFromHandle(
-        openFatMemoryDocument(this.runtime, parked.lockedBytes(), req.password),
-      );
+      this.openSignedAware(parked, parked.lockedBytes(), req.password);
+      parked.password = req.password;
       session = parked;
     } else {
       session = this.requireSession(req);
@@ -1108,7 +1481,11 @@ export class WorkerHost {
       req.password,
       req.mode ?? 'any',
     );
-    return wirePack({ tag: 'document.checkPasswordPermissions', security });
+    return wirePack({
+      tag: 'document.checkPasswordPermissions',
+      security,
+      protection: this.probeProtection(session),
+    });
   }
 
   private handleFontsRegister(req: FontsRegisterWorkerRequest): WirePack<WorkerResultPayload> {
@@ -1119,7 +1496,41 @@ export class WorkerHost {
       req.italic,
       new Uint8Array(req.data),
     );
-    return wirePack({ tag: 'fonts.register', fontKey: req.fontKey });
+    return wirePack({
+      tag: 'fonts.register',
+      fontKey: req.fontKey,
+      identity: this.fonts.describe(req.fontKey),
+    });
+  }
+
+  private handleFontsAuthorizeEditing(
+    req: FontsAuthorizeEditingWorkerRequest,
+  ): WirePack<WorkerResultPayload> {
+    return wirePack({
+      tag: 'fonts.authorizeEditing',
+      identity: this.fonts.authorizeEditing(req.fontKey),
+    });
+  }
+
+  /** Per-document font and text-layout settings (session state). */
+  private handleDocumentSetFontSettings(
+    req: DocumentSetFontSettingsWorkerRequest,
+  ): WirePack<WorkerResultPayload> {
+    const session = this.requireSession(req);
+    const docPtr = session.requireDocPtr();
+    const { fn } = this.runtime;
+    if (req.embeddingPolicy !== undefined) {
+      const code = { default: 0, subset: 1, full: 2 }[req.embeddingPolicy];
+      if (!fn.EPDFDoc_SetFontEmbeddingPolicy(docPtr, code)) {
+        throw new EngineError(EngineErrorCode.InvalidArg, 'EPDFDoc_SetFontEmbeddingPolicy failed');
+      }
+    }
+    if (req.typographicFeatures !== undefined) {
+      if (!fn.EPDFDoc_SetTypographicFeatures(docPtr, req.typographicFeatures)) {
+        throw new EngineError(EngineErrorCode.InvalidArg, 'EPDFDoc_SetTypographicFeatures failed');
+      }
+    }
+    return wirePack({ tag: 'document.setFontSettings' });
   }
 
   private handleFontsAddFallback(
@@ -1154,6 +1565,7 @@ export class WorkerHost {
     const session = this.sessions.get(key);
     if (session) {
       disposeFormModel(this.runtime, session);
+      disposeSignatureModel(this.runtime, session);
       session.close();
       this.sessions.delete(key);
     }
@@ -1164,6 +1576,7 @@ export class WorkerHost {
     for (const [key, session] of Array.from(this.sessions.entries())) {
       if (!sessionKeyBelongsToDoc(key, req.docId)) continue;
       disposeFormModel(this.runtime, session);
+      disposeSignatureModel(this.runtime, session);
       session.close();
       this.sessions.delete(key);
     }
@@ -1175,6 +1588,7 @@ export class WorkerHost {
       this.destroyed = true;
       for (const session of this.sessions.values()) {
         disposeFormModel(this.runtime, session);
+        disposeSignatureModel(this.runtime, session);
         session.close();
       }
       this.sessions.clear();
@@ -1308,6 +1722,28 @@ export class WorkerHost {
     );
   }
 
+  private handleFormsSetSignatureAppearance(
+    req: FormsSetSignatureAppearanceWorkerRequest,
+    signal: AbortSignal,
+  ): WirePack<WorkerResultPayload> {
+    const session = this.requireSession(req);
+    const { field, pages } = new FormMutator(this.runtime, session).setSignatureAppearance(
+      req.ref,
+      new Uint8Array(req.pdf),
+      req.pageIndex,
+      signal,
+    );
+    const meta: MutationMeta = {
+      affectedPages: pages.map((pon) => session.pageState(pon)),
+      cacheDelta: null,
+    };
+    return this.finishMutation(
+      session,
+      { tag: 'forms.setSignatureAppearance', result: { field, meta } },
+      req.artifactPath,
+    );
+  }
+
   private handleFormsDeleteField(
     req: FormsDeleteFieldWorkerRequest,
     signal: AbortSignal,
@@ -1391,11 +1827,12 @@ export class WorkerHost {
     if (
       !payload.tag.startsWith('forms.') &&
       payload.tag !== 'pages.flatten' &&
-      payload.tag !== 'redaction.apply'
+      payload.tag !== 'redaction.apply' &&
+      payload.tag !== 'signatures.complete'
     ) {
       session.noteMutation();
     }
-    if (session.kind !== 'layer') {
+    if (session.kind !== 'layer' || !session.persistLayerArtifact) {
       return wirePack(payload);
     }
     const saved = this.saveLayerArtifact(session, artifactPath);
@@ -1422,6 +1859,40 @@ interface LayerArtifactSave {
 const EMPTY_FORM_META: MutationMeta = { affectedPages: [], cacheDelta: null };
 
 const BASE_SESSION_SUFFIX = '__base__';
+
+/** Every request kind that writes to a session's document. */
+const MUTATING_KINDS: ReadonlySet<WorkerRequest['kind']> = new Set<WorkerRequest['kind']>([
+  'metadata.update',
+  'annotations.create',
+  'annotations.update',
+  'annotations.delete',
+  'annotations.move',
+  'annotations.flatten',
+  'forms.setValue',
+  'forms.reset',
+  'forms.applyEffects',
+  'forms.import',
+  'forms.repair',
+  'forms.createField',
+  'forms.updateField',
+  'forms.setSignatureAppearance',
+  'forms.deleteField',
+  'forms.attachWidget',
+  'forms.detachWidget',
+  'pages.move',
+  'pages.rotate',
+  'pages.delete',
+  'pages.setName',
+  'pages.removeName',
+  'pages.flatten',
+  'pages.insert',
+  'pages.insertBlank',
+  'redaction.apply',
+  'attachments.create',
+  'attachments.delete',
+  'pieceInfo.update',
+  'pieceInfo.clear',
+]);
 
 function sessionKey(docId: string, layerName?: string): string {
   return `${docId}::${layerName ? `layer:${layerName}` : BASE_SESSION_SUFFIX}`;

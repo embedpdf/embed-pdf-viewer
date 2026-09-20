@@ -1,0 +1,217 @@
+---
+title: Signatures
+description: Sign a signature field with a mark — drawn, typed, uploaded — through a signer you bring; fill it visually without sealing; validate what is signed; drop an armed mark onto a field.
+---
+
+import { Callout } from '@/components/docs/callout';
+
+# Signatures
+
+A signature field is signed with two things: a **mark** (what the reader sees
+in the field) and a **key** (what seals the bytes). The signature plugin owns
+the act and nothing else. Marks are stamp-library assets — a person's
+signature and initials are one library of kind `signatures`, drawn, typed or
+uploaded through the stamp plugin — and the key is a _signer port_ you
+configure. The mark's page is drawn into the field by the engine; the plugin
+composes nothing.
+
+Register `signaturePlugin()` beside `formPlugin()` and `stampPlugin()`, read
+the capability with `useSignature()`:
+
+<Example name="signature/basic" mode="open" />
+
+```ts
+import { signaturePlugin, personalSigner, indexedDbKeyStore } from '@embedpdf/react/signature';
+
+signaturePlugin({
+  // The key holder. A thunk resolves per signing (prompt a PIN, fetch a token…).
+  signer: () =>
+    personalSigner({ subject: 'Ada Lovelace', store: indexedDbKeyStore('my-app-keys') }),
+  // Anchors for validation; without them every verdict tops out at "valid, signer unknown".
+  trust: { anchors: async () => [rootCertificateDer] },
+  // 'sign' (default with a signer) | 'visual' (default without) | 'ask'
+  mode: 'sign',
+});
+```
+
+## The destination decides
+
+One call places a mark; where it lands says what happens:
+
+```ts
+const signature = useSignature();
+
+// A signature field: sign it (mode 'sign'), draw the mark in without sealing
+// (mode 'visual'), or emit `ask` for your own dialog (mode 'ask').
+await signature.placeMark({ assetId }, { field: { kind: 'fqn', name: 'sig' } });
+
+// Anywhere else: a stamp, exactly as the stamp plugin would place it.
+await signature.placeMark({ assetId }, { pageObjectNumber, at: { x: 120, y: 90 } });
+```
+
+The pointer follows the same rule. With the interaction hub and the stamp
+plugin present, a mark armed from a `signatures` library (`stamp.armAsset`)
+and clicked over an **unsigned** signature field goes into the field; over a
+signed field the click is consumed and nothing happens; everywhere else the
+annotation plugin drops it as a stamp. Preview's behaviour, with cryptography
+behind it.
+
+A mark is a stamp-plugin asset or bytes you bring:
+
+```ts
+type Mark = { assetId: string } | { source: BinarySource }; // PNG, JPEG, or a one-page PDF
+```
+
+## Sign, fill, clear
+
+```ts
+// Seal: the mark becomes the widget's appearance, the signer signs the digest.
+const result = await signature.signField({
+  field: { kind: 'fqn', name: 'sig' },
+  mark: { assetId },
+  attribution: { reason: 'Approved', location: 'Amsterdam' }, // /Name defaults to the certificate's subject
+  certify: { permission: 2 }, // optional: the certification signature (needs doc.sign.certify)
+});
+result.version; // the new saved version the sealed bytes became
+
+// Visual only: the mark is drawn into an unsigned field; nothing is sealed.
+await signature.fillField(field, { source: pngBytes });
+await signature.clearField(field);
+```
+
+`signField` runs the engine's two-phase signing (`prepare` → your signer →
+`complete`) through `@embedpdf/core-signature`; any failure aborts the
+candidate, so a document is never left with a pending signing. A signed
+field refuses both `fillField` and `clearField`: its appearance is part of
+what was signed.
+
+<Callout type="info">
+
+Signing needs `doc.sign` (a certification also `doc.sign.certify`); a visual fill
+needs `doc.forms.fill`. `canSign()`, `canFill()` and `canCertify()` mirror those for
+your buttons.
+
+</Callout>
+
+## Signer ports
+
+The engine never holds a key. A port is either a **raw signer** (you hold the
+key; the CMS is built here) or a **CMS signer** (a service builds it; only the
+digest leaves):
+
+```ts
+import {
+  webCryptoSigner,
+  remoteSigner,
+  personalSigner,
+  createTestSigner,
+} from '@embedpdf/react/signature';
+
+// Bring your own key and certificate chain.
+webCryptoSigner({ privateKey, certificateChain: [leafDer, issuerDer] });
+
+// Your signing service or HSM turns the digest into a detached CMS.
+remoteSigner({
+  sign: ({ digest, algorithm, subFilter }) => api.sign(digest, algorithm, subFilter),
+});
+
+// One self-signed identity per person, the private key non-extractable in IndexedDB.
+await personalSigner({ subject: 'Ada Lovelace', store: indexedDbKeyStore('embedpdf-signers') });
+
+// Throwaway, for tests and demos.
+await createTestSigner({ commonName: 'Demo' });
+```
+
+A personal signer is Preview's experience with real cryptography behind it:
+a reader who trusts the certificate validates the signature; every other
+reader sees "validity unknown", the honest answer for a self-issued identity.
+
+## Reading and validating
+
+```ts
+signature.snapshot(); // revisions, every signature field, the protection in force
+signature.signatureOf({ kind: 'fqn', name: 'sig' }); // one field's facts (or by { annotObjectNumber })
+signature.protection(); // what the document's signatures forbid from now on
+
+const verdicts = await signature.validate(); // integrity · cryptography · trust · changes since
+signature.verdictOf(field)?.summary; // 'valid' | 'valid-untrusted' | 'invalid' | 'indeterminate'
+
+const analysis = await signature.analyze({ since: { signatureIndex: 0 } }); // what changed, rule by rule
+const bytes = await signature.revisionBytes(dto.revisionIndex); // the exact bytes the signature covers
+```
+
+The plugin judges the **working copy** by default: unsaved edits count, so the verdict is the one
+the file a save produces will get. `validate({ until: 'persisted' })` judges the loaded bytes only;
+`verdict.modifications.basis` says which bytes a verdict is about. After every annotation or form
+edit the plugin re-judges on its own, and the moment an unsaved edit turns a signature that held into
+one a save would invalidate, it emits `invalidating` once — the warning Acrobat shows.
+
+```ts
+signature.onChanged((e) => {
+  if (e.type === 'invalidating') toast(`This change will invalidate ${e.field} when saved`);
+});
+```
+
+What invalidates what is the engine's judgement (see the engine's signatures page): after a plain
+approval signature, form fill-in and further signatures keep it valid, an annotation does not. A
+signer who wants comments to stay valid certifies with `P=3` — with `allowCertify` on, the first
+signature emits `ask` in mode `sign` too, so a chrome can offer that choice.
+
+The plugin also re-reads and re-validates on `document.versioned` — a signature completed here or,
+on the cloud, in another session.
+
+## The target and the chrome's intents
+
+"Select the field, then pick a mark" is one piece of state: the **target**.
+A "sign here" control sets it; the next mark picked goes there. The plugin
+also emits the intents a chrome turns into surfaces:
+
+```ts
+signature.setTarget(field); // the next mark goes here; null clears
+signature.onChanged((e) => {
+  // 'signed' | 'filled' | 'cleared' | 'validated' | 'protectionChanged'
+  // 'target'  → open your signatures panel
+  // 'ask'     → mode 'ask': open your sign dialog, then signField / fillField
+  // 'inspect' → a signed field was activated: show its verdict
+});
+```
+
+The React form view already wires the widgets: an unsigned signature field
+renders a "sign here" control that sets the target; a signed one emits
+`inspect`.
+
+## A person is a library
+
+The marks live in the stamp plugin, as one library per person of kind
+`signatures` holding a `signature` asset and, optionally, `initials`:
+
+```ts
+const libraryId = await stamp.createLibrary('Ada Lovelace', { kind: 'signatures' });
+await stamp.addAsset({
+  libraryId,
+  name: 'signature',
+  label: 'Signature',
+  mark: { kind: 'ink', strokes },
+});
+await stamp.addAsset({
+  libraryId,
+  name: 'initials',
+  label: 'Initials',
+  mark: { kind: 'text', text: 'AL', fontFamily: 'times-italic' },
+});
+
+useSignerRows(); // [{ libraryId, name, signatures, initials }] — derived, nothing stored beyond the file
+```
+
+Rename, export and delete are the library verbs; persistence is whatever
+store you gave `persistStampLibraries`. The file is Acrobat-readable like any
+stamp library.
+
+## Permissions
+
+Signing rides `doc.sign` and, for a certification, `doc.sign.certify`. A
+visual fill is a form write (`doc.forms.fill`). Reading signatures rides
+`doc.forms.read`; `revisionBytes` egresses content and is gated by
+`doc.download`. On a signed document the engine additionally enforces what
+its signatures forbid (`ProtectedDocument`); `protection()` tells you before
+you try.

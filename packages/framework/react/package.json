@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/react",
-  "version": "3.0.0-next.11",
+  "version": "3.0.0-next.13",
   "private": false,
   "description": "React adapter for EmbedPDF v3: one generic reactive binding + structural components (Viewer, Stage, PageView) + headless layers & hooks. The whole framework surface.",
   "type": "module",
@@ -29,6 +29,7 @@
     "./search": "./src/search.tsx",
     "./selection": "./src/selection.tsx",
     "./shell": "./src/shell.ts",
+    "./signature": "./src/signature.tsx",
     "./stage": "./src/stage.tsx",
     "./stamp": "./src/stamp.tsx",
     "./toolbar": "./src/toolbar.tsx",
@@ -120,6 +121,10 @@
         "import": "./dist/shell.js",
         "require": "./dist/shell.cjs"
       },
+      "./signature": {
+        "import": "./dist/signature.js",
+        "require": "./dist/signature.cjs"
+      },
       "./stage": {
         "import": "./dist/stage.js",
         "require": "./dist/stage.cjs"
@@ -165,8 +170,10 @@
     "@embedpdf/plugin-search": "workspace:*",
     "@embedpdf/plugin-selection": "workspace:*",
     "@embedpdf/plugin-shell": "workspace:*",
+    "@embedpdf/plugin-signature": "workspace:*",
     "@embedpdf/plugin-stage": "workspace:*",
     "@embedpdf/plugin-stamp": "workspace:*",
+    "@embedpdf/core-signature": "workspace:*",
     "@embedpdf/plugin-view-manager": "workspace:*",
     "@embedpdf/core-stage": "workspace:*",
     "@embedpdf/core-ui": "workspace:*",

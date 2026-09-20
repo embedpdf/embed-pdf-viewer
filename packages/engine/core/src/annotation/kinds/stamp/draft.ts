@@ -23,7 +23,13 @@ export interface StampDraft extends AnnotationDraftBase {
   rect: PdfRect;
   /** What the stamp displays: PNG, JPEG, or single-page PDF bytes. */
   source: BinarySource;
-  /** `/Name` — advisory stamp label ('Approved', 'Draft', …). */
+  /**
+   * `/Name` — the stamp's identifier: a standard name ('Approved', 'Draft',
+   * …) or any custom name such as an Acrobat library identifier
+   * ('#LBGiYhk8V_oAfmqAPENiwD'). Written as a PDF name object; the engine
+   * escapes it. Predefined sets are a reader's rendering concern, so nothing
+   * is validated beyond non-empty.
+   */
   name?: string;
   /** Scaling of the content into `rect`. Default `'contain'` (preserves aspect). */
   fit?: StampFit;

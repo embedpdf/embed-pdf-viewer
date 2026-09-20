@@ -1,5 +1,19 @@
 # @embedpdf/web
 
+## 3.0.0-next.13
+
+### Minor Changes
+
+- [#817](https://github.com/embedpdf/embed-pdf-viewer/pull/817) by [@bobsingor](https://github.com/bobsingor) – Add a framework-independent rich-text editor binding with styled paragraph rendering, DOM serialization, selection mapping, formatting commands, and plain-text paste handling.
+
+  Export `mountWebFont()` to load font bytes for live editors and release shared font faces only after their last consumer unmounts.
+
+## 3.0.0-next.12
+
+### Minor Changes
+
+- [#803](https://github.com/embedpdf/embed-pdf-viewer/pull/803) by [@bobsingor](https://github.com/bobsingor) – `indexedDbByteStore(dbName, { storeName? })` is the browser's bytes-by-id store: one IndexedDB object store with `list`, `put`, and `delete`. It is the adapter for any plugin's DOM-free persistence port (structurally `StampLibraryStore` from `@embedpdf/plugin-stamp`), written once here so every framework binding shares it.
+
 ## 3.0.0-next.11
 
 ### Minor Changes

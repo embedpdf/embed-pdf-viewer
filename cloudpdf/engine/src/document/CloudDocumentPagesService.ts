@@ -10,7 +10,10 @@ import {
   type PageInsertResult,
   type PageListSnapshot,
   type PageMoveResult,
+  type PageNameInput,
+  type PageNameResult,
   type PageObjectNumber,
+  type PageRemoveNameInput,
   type PageRotateResult,
   type PageRotation,
 } from '@embedpdf/engine-core/runtime';
@@ -20,6 +23,7 @@ import {
   PageInsertResultSchema,
   PageListSnapshotSchema,
   PageMoveResultSchema,
+  PageNameResultSchema,
   PageRotateResultSchema,
   wirePaths,
 } from '@embedpdf/engine-core/wire';
@@ -123,6 +127,53 @@ export class CloudDocumentPagesService implements DocumentPagesService {
     });
   }
 
+  setName(input: PageNameInput): AbortablePromise<PageNameResult> {
+    return this.runNameMutation(
+      wirePaths.layerPagesNames(this.docId, this.layerName),
+      input,
+      input.name,
+      input.pageObjectNumber,
+    );
+  }
+
+  removeName(input: PageRemoveNameInput): AbortablePromise<PageNameResult> {
+    return this.runNameMutation(
+      wirePaths.layerPagesNamesDelete(this.docId, this.layerName),
+      input,
+      input.name,
+      null,
+    );
+  }
+
+  /**
+   * Named pages are LAYOUT: both verbs share the page-move patch exactly —
+   * docVersion + layoutVersion advance, no per-page pin changes, so the
+   * cached manifest is patched in place and the fresh layout is published.
+   */
+  private runNameMutation(
+    path: string,
+    body: PageNameInput | PageRemoveNameInput,
+    name: string,
+    pageObjectNumber: PageObjectNumber | null,
+  ): AbortablePromise<PageNameResult> {
+    if (this.isClosed()) {
+      return AbortablePromise.rejectReason(
+        new EngineError(EngineErrorCode.DocNotOpen, `document ${this.docId} is closed`),
+      );
+    }
+    return AbortablePromise.run<PageNameResult>(async (signal) => {
+      const result = await this.http.postJson(
+        path,
+        body,
+        (raw) => PageNameResultSchema.parse(raw),
+        signal,
+      );
+      if (result.cache) this.manifest.applyPageStructure(result.cache);
+      this.publisher.publishLocal({ type: 'pages.named', name, pageObjectNumber, ...result });
+      return result;
+    });
+  }
+
   rotate(
     pageObjectNumbers: PageObjectNumber[],
     rotation: PageRotation,
@@ -183,10 +234,9 @@ export class CloudDocumentPagesService implements DocumentPagesService {
       // The multipart mutation envelope: the JSON the plain request would
       // have been rides the `body` part; the source PDF is `resource:source`.
       const buffer = bytes instanceof ArrayBuffer ? bytes : copyToExactBuffer(bytes);
-      const form = buildMutationForm(
-        destIndex !== undefined ? { destIndex } : {},
-        { source: { bytes: buffer, mimeType: 'application/pdf', name: 'source.pdf' } },
-      );
+      const form = buildMutationForm(destIndex !== undefined ? { destIndex } : {}, {
+        source: { bytes: buffer, mimeType: 'application/pdf', name: 'source.pdf' },
+      });
       const result = await this.http.postMultipartJson(
         wirePaths.layerPagesInsert(this.docId, this.layerName),
         form,

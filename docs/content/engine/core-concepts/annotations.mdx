@@ -196,6 +196,40 @@ sharper raster (`scale`).
   raw engine.
 </Callout>
 
+## Flattening chosen annotations
+
+`pages.flatten` bakes every annotation of a page into its content. The
+per-page annotation service does the same for a *chosen set*, and reports
+what happened to each:
+
+```ts
+const result = await page.annotations.flatten!([refA, refB], 'display');
+result.results; // [{ ref: refA, status: 'applied' }, { ref: refB, status: 'skipped' }]
+```
+
+`applied` annotations are painted into the page and removed; `skipped` ones
+stay where they were — hidden for the usage (`'display'` or `'print'`), a
+Popup, or without a usable normal appearance — so a caller can say "2 of 3
+flattened". A ref on another page rejects the whole call before anything is
+mutated. Gated like `pages.flatten`: `doc.pages.modify` and
+`doc.annotate.modify`.
+
+## Exporting appearances as a PDF
+
+The same plan aimed at a fresh page: the normal appearances of the given
+annotations, flattened into a **new** single-page PDF sized to their union
+rect — vector, positions preserved, exactly as this page shows them. The
+source document is untouched.
+
+```ts
+const bytes = await page.annotations.exportAppearance!([refA, refB]);
+// …a one-page PDF: hand it to a stamp library, or download it.
+```
+
+All-or-nothing: any ref that is not on the page, hidden, or without an
+appearance rejects the call with `InvalidArg`. A derived read that egresses
+content, so it is gated by `doc.download` like `pages.extract`.
+
 ## Edit sessions (cloud)
 
 On the cloud, structural edits addressed by **index** (a delete or move that shifts the

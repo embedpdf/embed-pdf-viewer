@@ -17,15 +17,15 @@
  *      instead, and Vite lib mode would inline the 6 MB binary as base64.
  *
  *   2. `vite build --mode snippet` — the CDN artifact (`dist/embedpdf.js`),
- *      fully self-contained: engine bundled, `embedpdf.wasm` copied to dist as
- *      the snippet's self-located sibling (src/snippet.ts), and the engine's
- *      wasm-url module stubbed out (the snippet never consults the default,
- *      and the stub keeps the binary out of the JS).
+ *      fully self-contained: engine bundled, `embedpdf.wasm` EMITTED into
+ *      dist by Vite from an explicit `?url&no-inline` asset import (the
+ *      snippet door's own, and the engine's default via the alias below), so
+ *      every chunk references it by a correct relative URL — the folder is
+ *      the unit of delivery, from jsDelivr or an internal server alike.
  */
-import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { defineConfig, type PluginOption } from 'vite';
+import { defineConfig } from 'vite';
 import tailwindcss from '@tailwindcss/vite';
 
 // Absolute file paths, resolved from THIS package: the react imports being
@@ -33,24 +33,6 @@ import tailwindcss from '@tailwindcss/vite';
 // node_modules have no preact (pnpm is strict) — a bare-specifier replacement
 // would re-resolve from the importer and fail.
 const preact = (specifier: string) => fileURLToPath(import.meta.resolve(specifier));
-
-// The snippet artifact carries its own embedpdf.wasm at the dist root: the
-// snippet entry defaults to this SIBLING (self-locating — see src/snippet.ts),
-// which is what makes air-gapping the snippet "copy the folder". Copied
-// verbatim from the exact wasm32 package this build resolves.
-const copyEmbedPdfWasm = (): PluginOption => ({
-  name: 'copy-embedpdf-wasm',
-  apply: 'build',
-  generateBundle() {
-    this.emitFile({
-      type: 'asset',
-      fileName: 'embedpdf.wasm',
-      source: fs.readFileSync(
-        fileURLToPath(import.meta.resolve('@embedpdf/engine-runtime-wasm32/embedpdf.wasm')),
-      ),
-    });
-  },
-});
 
 export default defineConfig(({ mode }) => {
   const snippet = mode === 'snippet';
@@ -60,7 +42,7 @@ export default defineConfig(({ mode }) => {
     ? { embedpdf: 'src/doors/snippet.ts' }
     : { index: 'src/doors/local.ts', core: 'src/doors/core.ts' };
   return {
-    plugins: [tailwindcss(), ...(snippet ? [copyEmbedPdfWasm()] : [])],
+    plugins: [tailwindcss()],
     resolve: {
       alias: [
         { find: 'react-dom/client', replacement: preact('preact/compat/client') },
@@ -71,10 +53,12 @@ export default defineConfig(({ mode }) => {
         ...(snippet
           ? [
               {
-                find: '@embedpdf/engine-runtime-wasm32/wasm-url',
+                // The engine's default wasm location becomes an EMITTED asset
+                // (build/wasm-url-asset.js) instead of 6 MB of base64.
                 // Anchored on the package dir: vite executes this config from
                 // a .vite-temp copy, so import.meta-relative paths break.
-                replacement: path.resolve(process.cwd(), 'build/wasm-url-stub.js'),
+                find: '@embedpdf/engine-runtime-wasm32/wasm-url',
+                replacement: path.resolve(process.cwd(), 'build/wasm-url-asset.js'),
               },
             ]
           : []),
@@ -105,13 +89,24 @@ export default defineConfig(({ mode }) => {
       },
       rollupOptions: {
         // npm pass only: the engine (and its lazily-imported worker-source
-        // module) stays a bare import for the consumer's bundler to process.
+        // module) stays a bare import for the consumer's bundler to process —
+        // and so does `@embedpdf/default-stamps/library`, whose lazy locale
+        // modules then become chunks of THE CONSUMER's build (one copy, next
+        // to their other code) instead of being duplicated into this dist.
+        // The snippet pass bundles them: its folder is the unit of delivery.
         external: snippet
           ? undefined
-          : (id: string) => id === '@embedpdf/engine' || id.startsWith('@embedpdf/engine/'),
+          : (id: string) =>
+              id === '@embedpdf/engine' ||
+              id.startsWith('@embedpdf/engine/') ||
+              id.startsWith('@embedpdf/default-stamps/'),
         // Chunks land in chunks/, imported RELATIVELY from the entry —
-        // relocatable as a folder.
-        output: { chunkFileNames: 'chunks/[name]-[hash].js' },
+        // relocatable as a folder. The snippet's one emitted asset keeps its
+        // plain name: `dist/embedpdf.wasm`, the documented sibling.
+        output: {
+          chunkFileNames: 'chunks/[name]-[hash].js',
+          ...(snippet ? { assetFileNames: '[name][extname]' } : {}),
+        },
       },
     },
     server: { port: 5230, strictPort: true },

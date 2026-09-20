@@ -1,5 +1,23 @@
 # @cloudpdf/contract
 
+## 3.0.0-next.13
+
+### Minor Changes
+
+- [#817](https://github.com/embedpdf/embed-pdf-viewer/pull/817) by [@bobsingor](https://github.com/bobsingor) – Expose structured FreeText rich text in OpenAPI annotation responses, including paragraph and run styles and custom font family names.
+
+  Update signature and version analysis response schemas with applicable restrictions, current-state findings, and information about later revisions and reverted objects.
+
+- [#812](https://github.com/embedpdf/embed-pdf-viewer/pull/812) by [@bobsingor](https://github.com/bobsingor) – Add API contracts and OpenAPI schemas for preparing, completing, aborting, listing, and analyzing digital signatures. Add document version history, immutable version downloads, signed revision downloads, and signature contents and digest endpoints, with signing permissions and version conflict responses.
+
+## 3.0.0-next.12
+
+### Minor Changes
+
+- [#803](https://github.com/embedpdf/embed-pdf-viewer/pull/803) by [@bobsingor](https://github.com/bobsingor) – Add `doc.annotations.flatten` and `doc.annotations.exportAppearance` to the public contract.
+
+  Add `doc.pages.setName` and `doc.pages.removeName` for registering, renaming, and removing named pages (`/Names /Pages` entries) on a layer.
+
 ## 3.0.0-next.11
 
 ### Minor Changes

@@ -6,5 +6,7 @@ export default {
   insert: 'Insert',
   'insert-blank': 'Insert Blank',
   move: 'Move',
+  'set-name': 'Set Name',
+  'remove-name': 'Remove Name',
   rotate: 'Rotate',
 };

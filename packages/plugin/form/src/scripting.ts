@@ -9,12 +9,9 @@ import type {
   PdfActionTree,
 } from '@embedpdf/engine-core/runtime';
 import {
-  createScriptHost,
   DEFAULT_SCRIPT_BUDGET,
   javaScriptProgramFromActionTree,
-  resolveScriptIdentity,
   scriptFieldsFromSnapshot,
-  seedFrom,
   type ScriptBudget,
   type ScriptDiagnostic,
   type ScriptExecutionError,
@@ -27,7 +24,7 @@ import {
 } from '@embedpdf/core-acrojs';
 import type { DocumentMeta } from '@embedpdf/core';
 
-import type { FormCommitResult, FormScriptingOptions, FormUiEffect } from './types';
+import type { FormCommitResult, FormUiEffect } from './types';
 
 interface Overlay {
   original: ScriptFieldInput[];
@@ -36,75 +33,23 @@ interface Overlay {
   appearances: Map<string, { ref: FormFieldRef; text: string }>;
 }
 
-export type FormScriptingControllerOptions = {
-  doc: DocumentHandle;
-  document(): DocumentMeta | null;
-} & (
-  | {
-      /** The shared realm's transaction port ({@link ScriptTransaction}) —
-       *  the actions plugin's per-document host. The K/V/C/F pipeline runs
-       *  WHOLLY inside one transaction: snapshot fetch, every pass, and the
-       *  engine commit — the commit-inside-the-boundary law. */
-      transaction<T>(body: (txn: ScriptTransaction) => Promise<T>): Promise<T>;
-      budget?: ScriptBudget;
-    }
-  | {
-      /** Standalone convenience (stamp's detached documents, direct tests):
-       *  the controller builds and OWNS its own realm via
-       *  {@link createFormScriptingHost}; `dispose()` releases it. */
-      config: FormScriptingOptions;
-    }
-);
-
 /**
- * A STANDALONE realm for one document, configured with the legacy
- * `FormScriptingOptions` vocabulary — stamp's detached stamp-asset documents
- * and direct controller tests construct their own host here; viewer
- * documents get theirs from `actionsPlugin({ javascript })`.
+ * The controller never owns a realm. It rides a realm PORT — this document's
+ * own (the actions plugin's per-document host) or a detached one minted by
+ * the actions plugin for a document that is not displayed (stamp's
+ * asset documents). Either way the owner disposes the realm; `dispose()`
+ * here only fences further transactions.
  */
-export function createFormScriptingHost(options: {
+export interface FormScriptingControllerOptions {
   doc: DocumentHandle;
   document(): DocumentMeta | null;
-  config: FormScriptingOptions;
-}): {
+  /** The realm's transaction port ({@link ScriptTransaction}). The K/V/C/F
+   *  pipeline runs WHOLLY inside one transaction: snapshot fetch, every
+   *  pass, and the engine commit — the commit-inside-the-boundary law. */
   transaction<T>(body: (txn: ScriptTransaction) => Promise<T>): Promise<T>;
-  dispose(): void;
-} {
-  const { doc, config } = options;
-  const host = createScriptHost({
-    sandboxFactory:
-      config.sandboxFactory ??
-      (() =>
-        import('@embedpdf/core-js-sandbox').then(({ createQuickJsSandbox }) =>
-          createQuickJsSandbox(),
-        )),
-    document: () => {
-      const meta = options.document();
-      return {
-        id: doc.id,
-        fileName: config.fileName?.() ?? meta?.name ?? doc.id,
-        pageCount: meta?.pageCount ?? 0,
-        pageNumber: 0,
-      };
-    },
-    identity: () => resolveScriptIdentity(doc, config.identity),
-    environment: (sequence) => {
-      const nowMs = config.now?.() ?? Date.now();
-      return {
-        nowMs,
-        utcOffsetMinutes: config.utcOffsetMinutes?.() ?? -new Date(nowMs).getTimezoneOffset(),
-        randomSeed: config.randomSeed?.() ?? seedFrom(doc.id, sequence),
-      };
-    },
-    bootSources: async () => {
-      const actions = doc.actions ? await doc.actions.read() : null;
-      return (
-        actions?.nameTreeScripts.map(({ action }) => javaScriptProgramFromActionTree(action)) ?? []
-      );
-    },
-    ...(config.budget ? { budget: config.budget } : {}),
-  });
-  return { transaction: host.transaction.bind(host), dispose: () => host.dispose() };
+  /** The transaction aggregate (output bytes, wall-clock across passes);
+   *  the realm owner hands over the same budget its runs enforce. */
+  budget?: ScriptBudget;
 }
 
 const refKey = (ref: FormFieldRef): string =>
@@ -272,30 +217,16 @@ export class FormScriptingController {
   private disposed = false;
   private readonly transaction: <T>(body: (txn: ScriptTransaction) => Promise<T>) => Promise<T>;
   private readonly transactionBudget: ScriptBudget | undefined;
-  private readonly ownedHost: { dispose(): void } | null;
 
   constructor(private readonly options: FormScriptingControllerOptions) {
-    if ('transaction' in options) {
-      this.transaction = options.transaction.bind(options);
-      this.transactionBudget = options.budget;
-      this.ownedHost = null;
-    } else {
-      const host = createFormScriptingHost({
-        doc: options.doc,
-        document: () => options.document(),
-        config: options.config,
-      });
-      this.transaction = host.transaction;
-      this.transactionBudget = options.config.budget;
-      this.ownedHost = host;
-    }
+    this.transaction = options.transaction.bind(options);
+    this.transactionBudget = options.budget;
   }
 
-  /** A shared realm belongs to its HOST (the actions plugin) — this only
-   *  fences further transactions; a standalone-owned realm is released. */
+  /** The realm belongs to its OWNER (the actions plugin, or the caller that
+   *  minted a detached one) — this only fences further transactions. */
   dispose(): void {
     this.disposed = true;
-    this.ownedHost?.dispose();
   }
 
   async commit(ref: FormFieldRef, proposed: FormFieldValue): Promise<FormCommitResult> {
@@ -312,7 +243,6 @@ export class FormScriptingController {
   async recalculate(): Promise<FormCommitResult> {
     return this.transact(undefined);
   }
-
 
   private async transact(
     refInput: FormFieldRef | undefined,
@@ -412,7 +342,10 @@ export class FormScriptingController {
       const remaining = budget.maxExecutionMs - executionMs;
       return remaining <= 0 ? null : { ...budget, maxExecutionMs: remaining };
     };
-    const world = (fields: ScriptFieldInput[], event: ScriptWorldInput['event']): ScriptWorldInput => ({
+    const world = (
+      fields: ScriptFieldInput[],
+      event: ScriptWorldInput['event'],
+    ): ScriptWorldInput => ({
       fields,
       pageNumber,
       event,
@@ -478,12 +411,15 @@ export class FormScriptingController {
         );
       }
       if (program) {
-        const activated = await run(program, world(overlay.fields, {
+        const activated = await run(
+          program,
+          world(overlay.fields, {
             kind: 'widget-activate',
             target: ref,
             source: ref,
             value: targetInput.value,
-          }));
+          }),
+        );
         if (activated.error) return this.failed(uiEffects, diagnostics, activated.error);
         applyEffects(overlay, activated.output!.formEffects);
       }
@@ -509,7 +445,9 @@ export class FormScriptingController {
         // `event.value`, empty `change`) so AF* and commit validators see
         // what Adobe's library expects.
         const oldValue = String(targetInput.value ?? '');
-        const typing = await run(program, world(overlay.fields, {
+        const typing = await run(
+          program,
+          world(overlay.fields, {
             kind: 'field-keystroke',
             target: ref,
             source: ref,
@@ -518,7 +456,8 @@ export class FormScriptingController {
             selStart: 0,
             selEnd: oldValue.length,
             willCommit: false,
-          }));
+          }),
+        );
         if (typing.error && typing.error.kind !== 'exception') {
           return this.failed(uiEffects, diagnostics, typing.error);
         }
@@ -541,7 +480,9 @@ export class FormScriptingController {
             event.change +
             base.slice(Math.max(event.selStart, event.selEnd));
         }
-        const commit = await run(program, world(overlay.fields, {
+        const commit = await run(
+          program,
+          world(overlay.fields, {
             kind: 'field-keystroke',
             target: ref,
             source: ref,
@@ -550,7 +491,8 @@ export class FormScriptingController {
             selStart: 0,
             selEnd: 0,
             willCommit: true,
-          }));
+          }),
+        );
         if (commit.error && commit.error.kind !== 'exception') {
           return this.failed(uiEffects, diagnostics, commit.error);
         }
@@ -586,13 +528,16 @@ export class FormScriptingController {
         );
       }
       if (program) {
-        const validation = await run(program, world(overlay.fields, {
+        const validation = await run(
+          program,
+          world(overlay.fields, {
             kind: 'field-validate',
             target: ref,
             source: ref,
             value: proposedValue,
             willCommit: true,
-          }));
+          }),
+        );
         if (validation.error && validation.error.kind !== 'exception') {
           return this.failed(uiEffects, diagnostics, validation.error);
         }

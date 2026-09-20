@@ -10,4 +10,6 @@ export default {
   metadata: 'Metadata',
   pages: 'Pages',
   redactions: 'Redactions',
+  signatures: 'Digital signatures',
+  versions: 'Versions',
 };

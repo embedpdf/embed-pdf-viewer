@@ -1,0 +1,25 @@
+{
+  "name": "@embedpdf/bundler-matrix-angular",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "matrix:build": "ng build --configuration production",
+    "matrix:build:assets": "ng build --configuration assets",
+    "matrix:build:portable": "ng build --configuration portable"
+  },
+  "dependencies": {
+    "@embedpdf/bundler-probe": "workspace:*",
+    "@angular/common": "~20.2.0",
+    "@angular/compiler": "~20.2.0",
+    "@angular/core": "~20.2.0",
+    "@angular/platform-browser": "~20.2.0",
+    "rxjs": "^7.8.0"
+  },
+  "devDependencies": {
+    "@angular/build": "~20.2.0",
+    "@angular/cli": "~20.2.0",
+    "typescript": "~5.8.3",
+    "@embedpdf/engine-runtime-wasm32": "workspace:*"
+  }
+}

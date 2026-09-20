@@ -233,3 +233,32 @@ const bytes = await doc.pages.extract!([ponA, ponB]);
 Structure verbs are gated by the document's `doc.pages.assemble` capability
 (PDF permission bit 11); `extract` egresses content, so it is gated by
 `doc.download` instead.
+
+## Named pages
+
+A PDF can give a page a name in its catalog's `/Names /Pages` tree — the
+mechanism behind Acrobat's stamp libraries, where every page is one stamp
+named `identifier=label`. The engine treats the names as page-identity data:
+they ride the layout, so `pages.list()` returns them and a name change bumps
+the same version an insert or delete does.
+
+```ts
+const layout = await doc.pages.list();
+layout.namedPages; // [{ name: 'Approved=Approved', target: { kind: 'page', pageObjectNumber } }, …]
+
+// Register (or retarget) a name; `replace` drops another key in the same job — a rename.
+await doc.pages.setName!({ name: 'Draft=Concept', pageObjectNumber: pon, replace: 'Draft=Draft' });
+
+// Drop the registration; the page stays.
+await doc.pages.removeName!({ name: 'Draft=Concept' });
+```
+
+Entries are reported in key order with what they resolve to: a `page` in
+the page tree, a hidden `/Type /Template` outside it (`template` — never
+listed as a page, never renderable), or `dangling` when the value points
+nowhere. Deleting a page removes its registrations, so the last case only
+appears in files authored elsewhere. The engine never interprets the text
+of a name; the `identifier=label` convention belongs to the stamp plugin.
+
+Both verbs are structure mutations gated by `doc.pages.assemble`; a
+`pages.named` event follows every change.

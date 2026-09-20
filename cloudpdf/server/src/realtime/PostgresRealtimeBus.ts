@@ -1,9 +1,11 @@
 import { Client } from 'pg';
-import type { AuditDocKey } from '../db/repos/audit_log.repo';
+
 import { docChannelKey, type RealtimeBus } from './RealtimeBus';
+import type { AuditDocKey } from '../db/repos/audit_log.repo';
 
 const CHANNEL = 'cloudpdf_audit_v1';
 const REVOKE_CHANNEL = 'cloudpdf_revoked_v1';
+const BASE_CHANNEL = 'cloudpdf_base_v1';
 
 /**
  * Cross-replica doorbell over Postgres LISTEN/NOTIFY — the rendezvous is the
@@ -32,6 +34,7 @@ const REVOKE_CHANNEL = 'cloudpdf_revoked_v1';
 export class PostgresRealtimeBus implements RealtimeBus {
   private readonly listeners = new Map<string, Set<() => void>>();
   private readonly revocationListeners = new Set<(jti: string, expiresAt: number) => void>();
+  private readonly baseListeners = new Set<(key: AuditDocKey) => void>();
   private client: Client | null = null;
   private closed = false;
   private connecting: Promise<void> | null = null;
@@ -81,6 +84,17 @@ export class PostgresRealtimeBus implements RealtimeBus {
     await this.notify(REVOKE_CHANNEL, JSON.stringify({ jti, expiresAt }));
   }
 
+  async publishBaseChanged(key: AuditDocKey): Promise<void> {
+    await this.notify(BASE_CHANNEL, JSON.stringify({ tenantId: key.tenantId, docId: key.docId }));
+  }
+
+  subscribeBaseChanged(listener: (key: AuditDocKey) => void): () => void {
+    this.baseListeners.add(listener);
+    return () => {
+      this.baseListeners.delete(listener);
+    };
+  }
+
   subscribeRevocation(listener: (jti: string, expiresAt: number) => void): () => void {
     this.revocationListeners.add(listener);
     return () => {
@@ -107,6 +121,7 @@ export class PostgresRealtimeBus implements RealtimeBus {
     if (this.retryTimer) clearTimeout(this.retryTimer);
     this.listeners.clear();
     this.revocationListeners.clear();
+    this.baseListeners.clear();
     const client = this.client;
     this.client = null;
     if (client) await client.end().catch(() => {});
@@ -137,6 +152,12 @@ export class PostgresRealtimeBus implements RealtimeBus {
           for (const listener of [...this.revocationListeners]) {
             listener(parsed.jti, typeof parsed.expiresAt === 'number' ? parsed.expiresAt : 0);
           }
+        } else if (msg.channel === BASE_CHANNEL) {
+          const parsed = JSON.parse(msg.payload) as { tenantId?: string; docId?: string };
+          if (typeof parsed.tenantId !== 'string' || typeof parsed.docId !== 'string') return;
+          for (const listener of [...this.baseListeners]) {
+            listener({ tenantId: parsed.tenantId, docId: parsed.docId });
+          }
         }
       } catch (err) {
         this.onError(err);
@@ -151,6 +172,7 @@ export class PostgresRealtimeBus implements RealtimeBus {
     await client.connect();
     await client.query(`LISTEN ${CHANNEL}`);
     await client.query(`LISTEN ${REVOKE_CHANNEL}`);
+    await client.query(`LISTEN ${BASE_CHANNEL}`);
     this.client = client;
     this.retryDelayMs = 500;
 

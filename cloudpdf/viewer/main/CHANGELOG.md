@@ -1,5 +1,13 @@
 # @cloudpdf/viewer
 
+## 3.0.0-next.13
+
+## 3.0.0-next.12
+
+### Patch Changes
+
+- [#803](https://github.com/embedpdf/embed-pdf-viewer/pull/803) by [@bobsingor](https://github.com/bobsingor) – The `cloudpdf.js` artifact carries the built-in stamp library as lazy sibling chunks in its own folder instead of inlining eight locale PDFs as base64. Nothing is fetched from a third party; set `stamps.defaultLibrary` to self-host or disable it.
+
 ## 3.0.0-next.11
 
 ## 3.0.0-next.10

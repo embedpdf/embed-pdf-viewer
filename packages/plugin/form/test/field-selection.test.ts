@@ -60,7 +60,11 @@ describe('resolveFieldSelection — the shared ISO selection (Tables 239-242)', 
   });
 
   it('objectNumber targets select the field dictionary', () => {
-    const { selected } = resolveFieldSelection(all, [{ kind: 'objectNumber', objectNumber: 42 }], false);
+    const { selected } = resolveFieldSelection(
+      all,
+      [{ kind: 'objectNumber', objectNumber: 42 }],
+      false,
+    );
     expect(selected.map((f) => f.name)).toEqual(['byNumber']);
   });
 
@@ -98,13 +102,18 @@ describe('buildSubmitEntries — the ISO dataset matrix', () => {
     const { list, diagnose } = diagnostics();
     const entries = buildSubmitEntries(
       [field('secret', { noExport: true }), field('plain')],
-      intent({ fields: [{ kind: 'name', name: 'secret' }, { kind: 'name', name: 'plain' }] }),
+      intent({
+        fields: [
+          { kind: 'name', name: 'secret' },
+          { kind: 'name', name: 'plain' },
+        ],
+      }),
       diagnose,
     );
     expect(entries).toEqual([{ name: 'plain', value: 'plain-value' }]);
-    expect(list.some((d) => d.code === 'submit-entry-unsupported' && /NoExport/.test(d.message))).toBe(
-      true,
-    );
+    expect(
+      list.some((d) => d.code === 'submit-entry-unsupported' && /NoExport/.test(d.message)),
+    ).toBe(true);
   });
 
   it('an explicitly listed push-button is DIAGNOSED, never silent', () => {

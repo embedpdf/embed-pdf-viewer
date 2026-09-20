@@ -24,7 +24,6 @@
  *        bundler-emitted workers (Vite `?worker`) keep their bundler-managed
  *        asset next to the worker chunk.
  */
-import { WASM32_VERSION } from './generated/wasm32-version';
 
 /**
  * How to deliver a Web Worker:
@@ -45,30 +44,28 @@ export interface WasmSourceOptions {
   wasmBinary?: ArrayBuffer | Uint8Array;
   /** Base directory for self-hosted runtime assets; `embedpdf.wasm` is appended. */
   assetsUrl?: string;
+  /**
+   * The bytes, produced on demand at boot — what `@embedpdf/engine/portable`
+   * passes: the binary carried through the module graph as a lazy chunk of
+   * the app. Explicit like the three above (it never falls back to anything
+   * else), but costs nothing until the engine actually boots.
+   */
+  wasmLoader?: () => Promise<ArrayBuffer | Uint8Array>;
 }
 
 /** The wire shape sent to the worker's init message. */
 export interface ResolvedWasmSource {
   wasmUrl?: string;
-  /**
-   * CDN safety net for the DEFAULT (bundler-resolved) `wasmUrl` — its presence
-   * encodes provenance: only the bundler-default source ever carries it, so
-   * the worker knows it may retry, and ONLY on a failed fetch (see
-   * bootstrap.ts). Explicit sources never fall back: if you self-host and it
-   * breaks, silently phoning a CDN would violate the reason you self-hosted.
-   */
-  fallbackWasmUrl?: string;
   wasmBinary?: ArrayBuffer;
 }
-
-export const DEFAULT_WASM_URL = `https://cdn.jsdelivr.net/npm/@embedpdf/engine-runtime-wasm32@${WASM32_VERSION}/lib/embedpdf.wasm`;
 
 /**
  * Resolve the caller's wasm options into what the worker init carries.
  * Explicit sources only — the inline blob worker's bundler-resolved default
  * lives in {@link resolveInlineWasmSource}; every other worker delivery
  * self-resolves the wasm as a sibling of the worker script when no explicit
- * source is given (hence the empty result).
+ * source is given (hence the empty result). A `wasmLoader` is explicit too,
+ * but asynchronous: see {@link resolveWasmSourceAsync}.
  */
 export function resolveWasmSource(options: WasmSourceOptions): ResolvedWasmSource {
   if (options.wasmBinary !== undefined) {
@@ -84,43 +81,69 @@ export function resolveWasmSource(options: WasmSourceOptions): ResolvedWasmSourc
   return {};
 }
 
+/** {@link resolveWasmSource} plus the asynchronous explicit source, `wasmLoader`. */
+export async function resolveWasmSourceAsync(
+  options: WasmSourceOptions,
+): Promise<ResolvedWasmSource> {
+  const explicit = resolveWasmSource(options);
+  if (explicit.wasmUrl !== undefined || explicit.wasmBinary !== undefined) return explicit;
+  if (options.wasmLoader) return { wasmBinary: toStandaloneBuffer(await options.wasmLoader()) };
+  return {};
+}
+
 /**
  * Resolve the wasm source for the inline blob worker, which cannot
- * self-resolve (a blob URL has no meaningful location). Explicit options win;
- * otherwise the default is SIBLING-FIRST:
+ * self-resolve (a blob URL has no meaningful location). Explicit options
+ * win; otherwise the default is the SIBLING the consumer's bundler emitted:
+ * `@embedpdf/engine-runtime-wasm32/wasm-url`, a static
+ * `new URL('./lib/embedpdf.wasm', import.meta.url)` that webpack, Vite,
+ * Rspack, Parcel, and Turbopack resolve at build time, shipping the wasm
+ * inside the consumer's own build — served from their origin, compiled
+ * streaming by the worker.
  *
- *   1. `@embedpdf/engine-runtime-wasm32/wasm-url` — a static
- *      `new URL('./lib/embedpdf.wasm', import.meta.url)` that bundlers resolve
- *      at build time, shipping the wasm inside the consumer's own build.
- *   2. the version-pinned jsDelivr URL as `fallbackWasmUrl` — used by the
- *      worker only when fetching (1) fails (a toolchain that left the URL
- *      pointing somewhere the wasm is not).
- *
- * The import CANNOT fail under a bundler — an unresolvable specifier is a
- * build-time error there (desired: it fails loudly at build). The catch only
- * covers native-ESM/no-bundler runtimes without the package installed, where
- * the pinned CDN URL becomes the primary source.
+ * There is deliberately NOTHING after that. A toolchain that cannot carry
+ * the asset (Angular's application builder, plain esbuild) fails here with
+ * the two fixes named: `@embedpdf/engine/portable`, which carries the wasm
+ * through the module graph instead, or `assetsUrl` to a self-hosted copy.
+ * No CDN is ever contacted: a request that leaves the app's origin is
+ * something the app configures, never something the engine decides.
  */
 export async function resolveInlineWasmSource(
   options: WasmSourceOptions,
 ): Promise<ResolvedWasmSource> {
   const explicit = resolveWasmSource(options);
   if (explicit.wasmUrl !== undefined || explicit.wasmBinary !== undefined) return explicit;
+  if (options.wasmLoader) return { wasmBinary: toStandaloneBuffer(await options.wasmLoader()) };
+  const sibling = await siblingWasmUrl();
+  if (sibling === null) throw new Error(NO_SIBLING_MESSAGE);
+  // Not always absolute: webpack's RelativeURL runtime yields a root-relative
+  // href like `/_next/static/media/embedpdf.<hash>.wasm`, which a blob:
+  // worker cannot resolve (see toAbsoluteUrl).
+  return { wasmUrl: toAbsoluteUrl(sibling) };
+}
+
+const NO_SIBLING_MESSAGE =
+  'embedpdf.wasm has no default location in this build: the bundler-resolved ' +
+  '`@embedpdf/engine-runtime-wasm32/wasm-url` module is unavailable. Either import ' +
+  '`localEngine` from `@embedpdf/engine/portable` (the wasm travels inside your build as ' +
+  'a lazy chunk — works with every bundler), or self-host the file and pass `assetsUrl` / ' +
+  '`wasmUrl` / `wasmBinary`. See https://www.embedpdf.com/docs/viewer/self-hosting';
+
+/**
+ * The bundler-resolved sibling URL, or null when this build has none. The
+ * module cannot fail to RESOLVE under a bundler (that is a build-time error,
+ * as it should be); it can fail to EVALUATE — an output format where
+ * `import.meta.url` is undefined makes its `new URL()` throw — or export a
+ * non-string where a bundled artifact aliased it away. Both mean "no
+ * sibling", never "crash the engine".
+ */
+async function siblingWasmUrl(): Promise<string | null> {
   try {
-    // Bundled artifacts (the snippet, cloud builds) alias this module to a
-    // stub exporting undefined — they provide their own explicit source, so a
-    // non-string lands on the CDN primary like a missing module would.
-    const sibling: unknown = (await import('@embedpdf/engine-runtime-wasm32/wasm-url')).default;
-    if (typeof sibling === 'string' && sibling.length > 0) {
-      // Not always absolute: webpack's RelativeURL runtime yields a
-      // root-relative href like `/_next/static/media/embedpdf.<hash>.wasm`,
-      // which a blob: worker cannot resolve (see toAbsoluteUrl).
-      return { wasmUrl: toAbsoluteUrl(sibling), fallbackWasmUrl: DEFAULT_WASM_URL };
-    }
+    const href: unknown = (await import('@embedpdf/engine-runtime-wasm32/wasm-url')).default;
+    return typeof href === 'string' && href.length > 0 ? href : null;
   } catch {
-    // Native-ESM runtime without the package installed — see doc above.
+    return null;
   }
-  return { wasmUrl: DEFAULT_WASM_URL };
 }
 
 /**

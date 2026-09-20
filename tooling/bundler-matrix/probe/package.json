@@ -1,0 +1,15 @@
+{
+  "name": "@embedpdf/bundler-probe",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "What every bundler-matrix app runs: boot the zero-config local engine, open an embedded one-page PDF, render it, load a default stamp library — and report. Plain ESM on purpose: the matrix tests the packages as consumers get them.",
+  "exports": {
+    ".": "./probe.js",
+    "./portable": "./portable.js"
+  },
+  "dependencies": {
+    "@embedpdf/engine": "workspace:*",
+    "@embedpdf/default-stamps": "workspace:*"
+  }
+}

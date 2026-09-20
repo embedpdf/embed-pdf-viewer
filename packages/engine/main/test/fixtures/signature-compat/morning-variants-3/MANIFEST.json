@@ -1,0 +1,32 @@
+[
+  {
+    "file": "morning-S1-dense-xref-signed-plus-orphan.pdf",
+    "sha256": "0ce928f818374ad84d7f5f6d2d62a3b9a9095fb4feb25174ecdae3fddfbf91c8",
+    "base_sha256": "e034f3605b477842b25b9131e53e504a167d5c743e04c5f8193d7412002aec9f"
+  },
+  {
+    "file": "morning-S2-16-byte-id-signed-plus-orphan.pdf",
+    "sha256": "c44167daf3cde63f7918f64818431381872ec224deaeef017b09dcf04163644a",
+    "base_sha256": "b54749ec4609c93fe6683b3cc96d495aafaea5927d52ca84bb9474d4b52f0807"
+  },
+  {
+    "file": "morning-S3-info-in-trailer-signed-plus-orphan.pdf",
+    "sha256": "78f26a34661398e297c5b94ee1c7547cece59b5a4033c56295ce376dd11e266e",
+    "base_sha256": "60800d615cd23aa429ab0494aaf53b7b1b7b0890c7db59573e2b484f083a795e"
+  },
+  {
+    "file": "morning-S4-header-lf-signed-plus-orphan.pdf",
+    "sha256": "270ef049f5f25412a80bb9111ae9369d5e7bbd9f5e3c2d940fcec4c6361b0445",
+    "base_sha256": "421e2308890ccd58020fc261eb3c0394a8169441a8c2e72dbca38afd5519ea44"
+  },
+  {
+    "file": "morning-S5-qpdf-rewrite-signed-plus-orphan.pdf",
+    "sha256": "1a5ca892f968d3a9ddf7a28f50d279599935ac9370c6a32efdc9d4df9c6d8f03",
+    "base_sha256": "bd1481ce5d75882ab6060f168117c1b64f67e1a9fa28449d1c2e47493df26279"
+  },
+  {
+    "file": "morning-S6-dense-id-info-lf-signed-plus-orphan.pdf",
+    "sha256": "2a4df57424f6cef55378a722625a16d3f6dce181484f279be55f1719c7de7aec",
+    "base_sha256": "173c6530b6cdd03b829e8191fa5b0c3291f3552035c96ff4f2e36a354cc89833"
+  }
+]

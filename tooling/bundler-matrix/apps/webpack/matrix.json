@@ -1,0 +1,4 @@
+{
+  "toolchain": "webpack 5",
+  "dist": "dist"
+}

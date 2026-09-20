@@ -8,8 +8,8 @@ import type {
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
 import { readAttachmentFileInfo } from '../../../attachments/internal/attachmentPrimitives';
-import { FILE_CODE_TO_ICON } from '../annotationIcon';
-import { readAnnotColor, readAnnotOpacity } from './annotationReadPrimitives';
+import { FILE_NAME_TO_ICON } from '../annotationIcon';
+import { readAnnotColor, readAnnotOpacity, readAnnotName } from './annotationReadPrimitives';
 
 /** Default `/C` — matches the generator's default icon fill and the writer default. */
 const DEFAULT_FILE_ATTACHMENT_COLOR: Color = { r: 255, g: 255, b: 0 };
@@ -33,7 +33,8 @@ export function readFileAttachment(
   const color = readAnnotColor(fn, mem, annotPtr) ?? { ...DEFAULT_FILE_ATTACHMENT_COLOR };
   const ca = readAnnotOpacity(fn, mem, annotPtr);
   const opacity = ca == null ? 1 : Math.max(0, Math.min(1, ca));
-  const icon = FILE_CODE_TO_ICON[fn.EPDFAnnot_GetName(annotPtr)] ?? DEFAULT_FILE_ATTACHMENT_ICON;
+  const icon =
+    FILE_NAME_TO_ICON[readAnnotName(fn, mem, annotPtr) ?? ''] ?? DEFAULT_FILE_ATTACHMENT_ICON;
 
   const attachmentPtr = fn.FPDFAnnot_GetFileAttachment(annotPtr);
   const file: AttachmentFileInfo = attachmentPtr

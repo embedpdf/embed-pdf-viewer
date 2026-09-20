@@ -1,5 +1,13 @@
 # @embedpdf/plugin-stamp
 
+## 3.0.0-next.13
+
+### Minor Changes
+
+- [#812](https://github.com/embedpdf/embed-pdf-viewer/pull/812) by [@bobsingor](https://github.com/bobsingor) – Add persistent library kinds and filtering so stamps, signatures, and custom collections can share the library system. Support renaming and recategorizing libraries, authoring marks from drawn strokes, typed text, images, or PDF pages, and querying the currently armed asset for signature-field placement.
+
+## 3.0.0-next.12
+
 ## 3.0.0-next.11
 
 ### Minor Changes

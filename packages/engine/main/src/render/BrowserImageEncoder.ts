@@ -247,7 +247,7 @@ function warnWorkerFallback(error: unknown): void {
       'encoding (slower under load). If your Content-Security-Policy blocks blob: ' +
       "workers, self-host @embedpdf/engine's workers/encoder-worker.js and pass " +
       "`encoderWorker: '/path/encoder-worker.js'` to localEngine(). " +
-      'See https://www.embedpdf.com/docs/self-hosting —',
+      'See https://www.embedpdf.com/docs/viewer/self-hosting —',
     error,
   );
 }

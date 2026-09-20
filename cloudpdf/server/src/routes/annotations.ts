@@ -1,3 +1,4 @@
+import { Buffer } from 'node:buffer';
 import { randomBytes } from 'node:crypto';
 
 import {
@@ -18,11 +19,15 @@ import {
   type PageNetworkRenderFormat,
   type PdfBits,
   type WorkerJobId,
+  type AnnotationAppearanceExportInput,
+  type AnnotationFlattenInput,
 } from '@embedpdf/engine-core/runtime';
 import {
   AnnotationAppearancesQuerySchema,
   AnnotationDraftSchema,
   AnnotationPatchSchema,
+  AnnotationAppearanceExportInputSchema,
+  AnnotationFlattenInputSchema,
   AnnotationRefSchema,
   annotationRenderOptionsFromImageOptions,
   decodeAnnotationAppearancesRenderToken,
@@ -495,6 +500,74 @@ export async function registerAnnotationRoutes(
         { docId, layerName, pageObjectNumber, refs, toIndex: rawToIndex },
         abortSignalFromRequest(req),
       );
+    },
+  );
+
+  // Selective flatten: `pages.flatten` for a chosen set of THIS page's
+  // annotations — the whole-page verb's gates, one page's content and
+  // annotation pins bumped, persisted like a page flatten.
+  app.post(
+    '/v1/docs/:docId/layers/:layerName/annotations/pages/:pon/items/flatten',
+    async (req, reply) => {
+      const { docId, layerName, pon } = req.params as {
+        docId: string;
+        layerName: string;
+        pon: string;
+      };
+      const pageObjectNumber = parsePageObjectNumber(pon);
+      const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
+      const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
+      const ctx = requireLayerCapability(req, docId, layerName, 'doc.pages.modify', pdfBits);
+      requireLayerCapability(req, docId, layerName, 'doc.annotate.modify', pdfBits);
+      const raw = (req.body ?? {}) as { refs?: unknown; usage?: unknown };
+      const body = parseOrInvalidArg<AnnotationFlattenInput>(
+        AnnotationFlattenInputSchema as unknown as SchemaLike<AnnotationFlattenInput>,
+        { refs: raw.refs, usage: raw.usage ?? 'display' },
+        'request body',
+      );
+      for (const ref of body.refs) assertRefMatchesPage(ref, pageObjectNumber);
+
+      setNoStore(reply);
+      return layerService.flattenAnnotations(
+        ctx,
+        { docId, layerName, pageObjectNumber, refs: body.refs, usage: body.usage },
+        abortSignalFromRequest(req),
+      );
+    },
+  );
+
+  // The chosen annotations' appearances as ONE single-page PDF: a derived
+  // read that egresses content, gated by `doc.download` like pages/extract.
+  app.post(
+    '/v1/docs/:docId/layers/:layerName/annotations/pages/:pon/items/appearance',
+    async (req, reply) => {
+      const { docId, layerName, pon } = req.params as {
+        docId: string;
+        layerName: string;
+        pon: string;
+      };
+      const pageObjectNumber = parsePageObjectNumber(pon);
+      const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
+      const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
+      const ctx = requireLayerCapability(req, docId, layerName, 'doc.download', pdfBits);
+      const body = parseOrInvalidArg<AnnotationAppearanceExportInput>(
+        AnnotationAppearanceExportInputSchema as unknown as SchemaLike<AnnotationAppearanceExportInput>,
+        req.body,
+        'request body',
+      );
+      for (const ref of body.refs) assertRefMatchesPage(ref, pageObjectNumber);
+
+      const bytes = await documentService.exportAnnotationAppearance(
+        ctx,
+        docId,
+        layerName,
+        pageObjectNumber,
+        body.refs,
+        abortSignalFromRequest(req),
+      );
+      setNoStore(reply);
+      reply.type('application/pdf');
+      return reply.send(Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength));
     },
   );
 

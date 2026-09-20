@@ -23,6 +23,53 @@ plugins, toolbar, and document lifecycle for you.
 
 <Example name="viewer/getting-started/basic" />
 
+## Built-in stamps
+
+The Insert tab's stamps panel loads the standard rubber stamps from
+`@embedpdf/default-stamps` the first time it opens — one Acrobat-compatible
+PDF per locale, shipped as a lazy chunk of your own build (the CDN snippet
+carries it in its folder), in the language negotiated from the viewer's
+locale and the browser's. Nothing is fetched from a third party. The
+`stamps` option decides where that library comes from:
+
+```ts
+stamps: {
+  defaultLibrary: false;
+} // no built-in library, no request (air-gapped)
+stamps: {
+  defaultLibrary: 'https://your.cdn/stamps/{locale}/stamps.pdf';
+} // self-host
+```
+
+A self-hosted URL is used exactly as given. Libraries a user creates —
+stamps made from selected annotations, PDFs imported into the panel — are
+kept in the browser across reloads. For the whole picture — the engine's
+WebAssembly, workers, CSP — see [Self-hosting & air-gapped
+deployments](./self-hosting).
+
+## Fonts for text annotations
+
+Text annotations use the 14 standard PDF fonts out of the box. To offer more — a brand
+typeface, a script the standard fonts don't cover — list them under `annotations.fonts`:
+
+```ts
+annotations: {
+  fonts: [
+    { key: 'brand-sans', url: '/fonts/BrandSans-Regular.ttf', label: 'Brand Sans' },
+    { key: 'noto-sc', url: '/fonts/NotoSansSC-Regular.otf', label: 'Noto Sans SC' },
+  ];
+}
+```
+
+Each font is fetched once when the viewer mounts, registered on the engine under its
+`key` (a glyph subset is embedded in the PDF when you save), and mounted as a `@font-face`
+of the same name so the text editor shows the very face the document will carry. The
+style panel then lists it by `label`, next to bold, italic and underline (also
+`Ctrl`/`Cmd`+`B`/`I`/`U` while typing), which apply to the selected text or to the whole
+box. A `key` must not be one of the standard names (`helvetica`, `times-roman`, …); a
+URL that fails to load is skipped with a console warning. Fonts on the cloud engine are a
+server policy, so the option applies to the built-in local engine.
+
 ## Where to go next
 
 - Configure the toolbar and available viewer controls.

@@ -18,7 +18,9 @@ import {
   type AnnotationRef,
   type AnnotationCreateResult,
   type AnnotationDeleteResult,
+  type AnnotationFlattenResult,
   type AnnotationMoveResult,
+  type PageFlattenUsage,
   type AnnotationUpdateResult,
   type AttachmentContent,
   type DocumentEventInit,
@@ -33,6 +35,7 @@ import {
   AnnotationDeleteResultSchema,
   AnnotationListPageSnapshotSchema,
   AnnotationAppearanceManifestSchema,
+  AnnotationFlattenResultSchema,
   AnnotationMoveResultSchema,
   AnnotationUpdateResultSchema,
   annotationAppearancesImageOptionsToWire,
@@ -400,6 +403,72 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
       );
       return this.absorbMutation(result, 'annotation.moved');
     });
+  }
+
+  flatten(
+    refs: AnnotationRef[],
+    usage: PageFlattenUsage = 'display',
+  ): AbortablePromise<AnnotationFlattenResult> {
+    if (this.isClosed()) {
+      return AbortablePromise.rejectReason(
+        new EngineError(EngineErrorCode.DocNotOpen, `document ${this.docId} is closed`),
+      );
+    }
+    for (const r of refs) {
+      if (r.pageObjectNumber !== this.pageObjectNumber) {
+        return AbortablePromise.rejectReason(
+          new EngineError(
+            EngineErrorCode.InvalidArg,
+            `flatten ref points at page ${r.pageObjectNumber}; service is bound to page ${this.pageObjectNumber}`,
+          ),
+        );
+      }
+    }
+    const path = wirePaths.layerPageAnnotationsFlatten(
+      this.docId,
+      this.layerName,
+      this.pageObjectNumber,
+    );
+    return AbortablePromise.run<AnnotationFlattenResult>(async (signal) => {
+      const result = await this.http.postJson(
+        path,
+        { refs, usage },
+        (raw) => AnnotationFlattenResultSchema.parse(raw),
+        signal,
+      );
+      // Nothing applied means no artifact and no coherence bump.
+      if (result.meta === null) return result;
+      // Flatten bakes annotations into page content, so both planes flip.
+      this.manifest.apply(result.meta, ['content', 'annotations']);
+      this.publisher.publishLocal({ type: 'annotations.flattened', ...result });
+      return result;
+    });
+  }
+
+  exportAppearance(refs: AnnotationRef[]): AbortablePromise<Uint8Array> {
+    if (this.isClosed()) {
+      return AbortablePromise.rejectReason(
+        new EngineError(EngineErrorCode.DocNotOpen, `document ${this.docId} is closed`),
+      );
+    }
+    for (const r of refs) {
+      if (r.pageObjectNumber !== this.pageObjectNumber) {
+        return AbortablePromise.rejectReason(
+          new EngineError(
+            EngineErrorCode.InvalidArg,
+            `exportAppearance ref points at page ${r.pageObjectNumber}; service is bound to page ${this.pageObjectNumber}`,
+          ),
+        );
+      }
+    }
+    // A read (gated by doc.download server-side): no absorb, no event.
+    return AbortablePromise.run<Uint8Array>(async (signal) =>
+      this.http.postJsonBytes(
+        wirePaths.layerPageAnnotationsAppearance(this.docId, this.layerName, this.pageObjectNumber),
+        { refs },
+        signal,
+      ),
+    );
   }
 
   /**

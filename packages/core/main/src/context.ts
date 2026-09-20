@@ -85,6 +85,8 @@ export function createPluginContext(
       services.resolveCapability(token, otherDocumentId),
     tryGet: <T>(token: CapabilityToken<T>): T | null =>
       services.tryResolveCapability(token, documentId),
+    tryForDocument: <T>(token: CapabilityToken<T>, otherDocumentId: string): T | null =>
+      services.tryResolveCapability(token, otherDocumentId),
     cleanup: (teardown) => ownScope.defer(teardown),
   };
 }

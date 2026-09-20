@@ -50,12 +50,37 @@ export interface FontSpec {
   data: Uint8Array | ArrayBuffer;
 }
 
-/** A successfully registered font. Returned by {@link FontService.register}. */
-export interface FontHandle {
-  readonly key: FontKey;
-  /** Resolved base font name (the inferred name when `familyName` was empty). */
+/**
+ * The OS/2 `fsType` embedding permission of a registered font. Registration
+ * refuses restricted and bitmap-only fonts outright. A preview-and-print font
+ * renders existing text and may be embedded, but may not author NEW text
+ * (a FreeText naming it fails, and missing-glyph fallback skips it) until
+ * the application asserts a licence with {@link FontService.authorizeEditing}.
+ */
+export type FontEmbeddingPermission = 'installable' | 'editable' | 'preview-and-print';
+
+/**
+ * What the runtime resolved at registration. This is the persistent
+ * identity of the face: a saved document names it by family, weight and
+ * italic (the font descriptor's `/FontFamily`, `/FontWeight`,
+ * `/ItalicAngle`), and a rich text body reads back with the same values, so
+ * a host can map them back to its own `key`.
+ */
+export interface FontIdentityInfo {
+  /** The family as registered, else the font's own family name. */
   readonly familyName: string;
-  /** Resolved style weight (the inferred weight when `0`/omitted was passed). */
+  /** 100..900. */
   readonly weight: number;
   readonly italic: boolean;
+  readonly embeddingPermission: FontEmbeddingPermission;
+  /** Whether new text may be authored with the font (see the permission). */
+  readonly editingAuthorized: boolean;
+  /** True when the registered program is a static instance made from a
+   *  variable font at registration (axes pinned, `wght` to the weight). */
+  readonly instanced: boolean;
+}
+
+/** A successfully registered font. Returned by {@link FontService.register}. */
+export interface FontHandle extends FontIdentityInfo {
+  readonly key: FontKey;
 }

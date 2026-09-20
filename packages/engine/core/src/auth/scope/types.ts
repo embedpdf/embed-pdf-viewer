@@ -46,7 +46,11 @@ export type DocCapability =
   | 'doc.attachments.modify' // add/remove /EmbeddedFiles entries (PDF bit 4)
 
   // Redaction apply (destructive content modification, PDF bit 4)
-  | 'doc.redact';
+  | 'doc.redact'
+
+  // Digital signatures
+  | 'doc.sign' // prepare/complete/abort an approval signature or document timestamp (PDF bit 6 or bit 9: filling in a signature field IS form fill)
+  | 'doc.sign.certify'; // additionally make it the certification signature (/Perms /DocMDP) — grant-minted only, never expanded from PDF bits
 
 /**
  * Single-entity collaboration vocabulary. Only annotations are

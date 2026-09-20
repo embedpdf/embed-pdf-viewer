@@ -4,34 +4,103 @@ import {
   resolveBinarySource,
   sniffBinaryMetadata,
   type BinarySource,
+  type AnnotationRef,
   type DocumentHandle,
   type Engine,
   type PageImageHandle,
   type PieceInfoEntry,
-  type PieceInfoPatch,
 } from '@embedpdf/engine-core/runtime';
-import { type PluginContext } from '@embedpdf/core';
-import { AnnotationToken } from '@embedpdf/plugin-annotation/contract';
-import type { FormCommitResult } from '@embedpdf/plugin-form/contract';
+import { createEventHook, type PluginContext } from '@embedpdf/core';
+import { javaScriptProgramFromActionTree } from '@embedpdf/core-acrojs';
+import { ActionsToken as ActionsHostToken } from '@embedpdf/plugin-actions/contract/host';
+import {
+  AnnotationToken,
+  type StampPlacement,
+  type StampPreviewProvider,
+} from '@embedpdf/plugin-annotation/contract';
+import { AnnotationToken as AnnotationHostToken } from '@embedpdf/plugin-annotation/contract/host';
 import { createFormScriptingController } from '@embedpdf/plugin-form/scripting';
 
+import { blankLibraryPdf } from './blank-library';
+import {
+  assetIdFor,
+  customStampName,
+  DEFAULT_LIBRARY_KIND,
+  libraryKindFromPdfName,
+  parseStampKey,
+  stampKey,
+  stampLibraryPieceInfo,
+  stampPieceInfo,
+  STAMP_LIBRARY_PIECEINFO_APP,
+  STAMP_PIECEINFO_APP,
+} from './convention';
 import type {
   AddAssetInput,
   ImportLibraryOptions,
+  MarkSource,
   StampAction,
   StampAsset,
   StampAssetPreview,
   StampCapability,
   StampConfig,
   StampLibrary,
+  StampLibraryChange,
+  StampLibraryQuery,
   StampAssetKind,
   StampState,
 } from './types';
 
 const DEFAULT_PREVIEW_WIDTH = 256;
-const LIBRARY_PIECEINFO_APP = 'EMBD_StampLibrary';
-const STAMP_PIECEINFO_APP = 'EMBD_Stamp';
-const STAMP_SCHEMA_VERSION = 1;
+
+/** `#rrggbb` → the engine's sRGB triplet. */
+const hexColor = (hex: string): { r: number; g: number; b: number } => {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
+  if (!m) throw new EngineError(EngineErrorCode.InvalidArg, `[stamp] mark color must be #rrggbb, got '${hex}'`);
+  const n = parseInt(m[1], 16);
+  return { r: (n >> 16) & 0xff, g: (n >> 8) & 0xff, b: n & 0xff };
+};
+
+/** An exact ArrayBuffer over a view (the engine's binary idiom). */
+const toArrayBuffer = (bytes: Uint8Array): ArrayBuffer => {
+  const out = new ArrayBuffer(bytes.byteLength);
+  new Uint8Array(out).set(bytes);
+  return out;
+};
+
+/** The rect an ink mark occupies, padded by its stroke. */
+const inkBounds = (
+  strokes: ReadonlyArray<ReadonlyArray<{ x: number; y: number }>>,
+  strokeWidth: number,
+): { left: number; bottom: number; right: number; top: number } => {
+  let left = Infinity;
+  let bottom = Infinity;
+  let right = -Infinity;
+  let top = -Infinity;
+  for (const stroke of strokes) {
+    for (const { x, y } of stroke) {
+      if (x < left) left = x;
+      if (x > right) right = x;
+      if (y < bottom) bottom = y;
+      if (y > top) top = y;
+    }
+  }
+  if (!Number.isFinite(left)) {
+    throw new EngineError(EngineErrorCode.InvalidArg, '[stamp] an ink mark needs at least one point');
+  }
+  const pad = strokeWidth;
+  return { left: left - pad, bottom: bottom - pad, right: right + pad, top: top + pad };
+};
+
+/** A generous box for typed text; the export crops to the glyphs. */
+const textBounds = (
+  text: string,
+  fontSize: number,
+): { left: number; bottom: number; right: number; top: number } => ({
+  left: 0,
+  bottom: 0,
+  right: Math.max(1, text.length) * fontSize * 0.75 + fontSize,
+  top: fontSize * 1.6,
+});
 
 /** Session-unique ids. Assets are session-scoped for now (no persistence),
  *  so a timestamp + counter is enough — durable ids come with the store port. */
@@ -57,9 +126,6 @@ const entryStringArray = (
   return entry?.type === 'string-array' ? [...entry.value] : undefined;
 };
 
-const kindToPdfName = (kind: StampAssetKind): string =>
-  kind === 'signature' ? 'Signature' : kind === 'initials' ? 'Initials' : 'Stamp';
-
 const kindFromPdfName = (name: string | undefined): StampAssetKind | undefined => {
   switch (name?.toLowerCase()) {
     case 'stamp':
@@ -72,33 +138,6 @@ const kindFromPdfName = (name: string | undefined): StampAssetKind | undefined =
       return undefined;
   }
 };
-
-const metadataPatch = (
-  id: string,
-  name: string,
-  kind: StampAssetKind,
-  subject?: string,
-  categories?: readonly string[],
-): PieceInfoPatch => ({
-  Version: STAMP_SCHEMA_VERSION,
-  Id: id,
-  Name: name,
-  Kind: { name: kindToPdfName(kind) },
-  Subject: subject ?? null,
-  Categories: categories ?? null,
-});
-
-const libraryMetadataPatch = (
-  id: string,
-  name: string,
-  categories?: readonly string[],
-): PieceInfoPatch => ({
-  Version: STAMP_SCHEMA_VERSION,
-  Id: id,
-  Name: name,
-  Kind: { name: 'StampLibrary' },
-  Categories: categories ?? null,
-});
 
 export function createStampCapability(
   ctx: PluginContext<StampState, StampAction>,
@@ -141,17 +180,11 @@ export function createStampCapability(
     return assetEngineRef;
   };
 
-  const openAssetDocument = async (
-    bytes: Uint8Array,
-    identity?: DocumentHandle['security']['identity'],
-  ): Promise<DocumentHandle> => {
+  const openAssetDocument = async (bytes: Uint8Array): Promise<DocumentHandle> => {
     try {
       return await (
         await assetEngine()
-      ).open(
-        { kind: 'bytes', id: uid('stamp-import'), bytes },
-        { scope: ['*'], ...(identity ? { identity } : {}) },
-      );
+      ).open({ kind: 'bytes', id: uid('stamp-import'), bytes }, { scope: ['*'] });
     } catch (err) {
       // A cloud kernel engine rejects 'bytes' with InvalidArg — turn the
       // generic contract error into the configuration fix.
@@ -191,13 +224,71 @@ export function createStampCapability(
     return id;
   };
 
-  const createLooseLibrary = (name: string): string => {
-    const id = uid('stamp-lib');
+  const libraryChanged = createEventHook<StampLibraryChange>((error) =>
+    globalThis.console?.error('[stamp] onLibraryChanged observer failed:', error),
+  );
+
+  /** Thumbnail render of one library page (the small picker image). */
+  const renderThumbnail = async (
+    handle: ReturnType<DocumentHandle['page']>,
+  ): Promise<StampAssetPreview> =>
+    imageToPreview(
+      await handle.render.image({
+        viewport: { kind: 'width', width: config.previewWidth ?? DEFAULT_PREVIEW_WIDTH },
+        background: 'transparent',
+        includeAnnotations: true,
+        format: 'png',
+      }),
+    );
+
+  const createLibrary = async (
+    name: string,
+    opts?: { id?: string; kind?: string; categories?: string[] },
+  ): Promise<string> => {
+    const kind = opts?.kind ?? DEFAULT_LIBRARY_KIND;
+    const taken = new Set(Object.keys(ctx.getState().libraries));
+    const id = allocateId(opts?.id, 'stamp-lib', taken);
+    const doc = await openAssetDocument(blankLibraryPdf());
+    let bytes: Uint8Array;
+    try {
+      requireCanonicalServices(doc);
+      await doc.metadata.update({ title: name });
+      await doc.pieceInfo!.update(
+        STAMP_LIBRARY_PIECEINFO_APP,
+        stampLibraryPieceInfo(id, { kind, categories: opts?.categories }),
+      );
+      bytes = await doc.download();
+    } finally {
+      await doc.close();
+    }
+    libraryBinaries.set(id, bytes);
     ctx.dispatch({
       type: 'LIBRARY_ADDED',
-      library: { id, name, storage: 'loose', assetIds: [] },
+      library: {
+        id,
+        name,
+        kind,
+        assetIds: [],
+        ...(opts?.categories ? { categories: opts.categories } : {}),
+      },
     });
+    libraryChanged.emit({ libraryId: id, reason: 'created' });
     return id;
+  };
+
+  const requireCanonicalServices = (doc: DocumentHandle): void => {
+    if (!doc.pieceInfo) {
+      throw new EngineError(
+        EngineErrorCode.NotImplemented,
+        '[stamp] canonical PDF libraries need an asset engine with pieceInfo',
+      );
+    }
+    if (!doc.pages.setName || !doc.pages.removeName) {
+      throw new EngineError(
+        EngineErrorCode.NotImplemented,
+        '[stamp] canonical PDF libraries need an asset engine with named pages (pages.setName)',
+      );
+    }
   };
 
   const importLibraryPdf = async (
@@ -225,101 +316,150 @@ export function createStampCapability(
         }
       | undefined;
     try {
-      if (!doc.pieceInfo) {
-        throw new EngineError(
-          EngineErrorCode.NotImplemented,
-          '[stamp] canonical PDF libraries need an asset engine with pieceInfo',
-        );
-      }
-      const snapshot = await doc.pages.list();
-      if (snapshot.pageCount === 0) {
+      requireCanonicalServices(doc);
+      const layout = await doc.pages.list();
+      if (layout.pageCount === 0) {
         throw new EngineError(
           EngineErrorCode.InvalidArg,
           '[stamp] a canonical stamp library PDF must contain at least one page',
         );
       }
+      const byPon = new Map(layout.pages.map((page) => [page.pageObjectNumber, page]));
 
-      // Discover and validate every required service before the first write.
-      const pages = snapshot.pages.map((layout) => {
-        const handle = doc.page(layout.pageObjectNumber);
+      // ── library identity: /Title (Acrobat) → v1 PieceInfo → caller fallback ──
+      const catalogEntries =
+        (await doc.pieceInfo!.read(STAMP_LIBRARY_PIECEINFO_APP))?.entries ?? {};
+      const state = ctx.getState();
+      const takenLibraryIds = new Set(Object.keys(state.libraries));
+      const libraryId = allocateId(entryString(catalogEntries, 'Id'), 'stamp-lib', takenLibraryIds);
+      const docMeta = await doc.metadata.read();
+      const libraryName =
+        (docMeta.title && docMeta.title.length > 0 ? docMeta.title : undefined) ??
+        entryString(catalogEntries, 'Name') ??
+        opts?.name ??
+        'Stamps';
+      if (!docMeta.title) await doc.metadata.update({ title: libraryName });
+      const libraryCategories = opts?.categories ?? entryStringArray(catalogEntries, 'Categories');
+      const libraryLocale = entryString(catalogEntries, 'Locale');
+      // What the file is for: the caller's word, else the file's, else a plain stamp library.
+      const libraryKind =
+        opts?.libraryKind ?? libraryKindFromPdfName(entryName(catalogEntries, 'Kind'));
+
+      // ── the registry: /Names /Pages keys `identifier=label` → pages ──
+      const registry = (layout.namedPages ?? []).filter(
+        (entry): entry is typeof entry & { target: { kind: 'page' } } =>
+          entry.target.kind === 'page',
+      );
+      const hidden = (layout.namedPages ?? []).filter((entry) => entry.target.kind !== 'page');
+      if (hidden.length > 0) {
+        globalThis.console?.warn(
+          `[stamp] library '${libraryName}' carries ${hidden.length} hidden-template or dangling registration(s); they are not stamps and were ignored`,
+        );
+      }
+
+      type Descriptor = { pageObjectNumber: number; index: number; name: string; label: string };
+      let descriptors: Descriptor[];
+      if (registry.length > 0) {
+        const seen = new Set<string>();
+        descriptors = registry.map((entry) => {
+          const { name, label } = parseStampKey(entry.name);
+          if (!name) {
+            throw new EngineError(
+              EngineErrorCode.InvalidArg,
+              `[stamp] library '${libraryName}': empty stamp identifier in key '${entry.name}'`,
+            );
+          }
+          if (seen.has(name)) {
+            throw new EngineError(
+              EngineErrorCode.InvalidArg,
+              `[stamp] library '${libraryName}': duplicate stamp identifier '${name}'`,
+            );
+          }
+          seen.add(name);
+          const page = byPon.get(entry.target.pageObjectNumber)!;
+          return { pageObjectNumber: page.pageObjectNumber, index: page.index, name, label };
+        });
+        // Display order is PAGE order, never the tree's key-sorted order.
+        descriptors.sort((a, b) => a.index - b.index);
+      } else if (layout.namedPages === undefined) {
+        throw new EngineError(
+          EngineErrorCode.NotImplemented,
+          '[stamp] the asset engine reports no named-page registry (an older engine); upgrade it to import libraries',
+        );
+      } else {
+        // A plain PDF: every page is a stamp. Register it so the canonical
+        // copy is Acrobat-readable on export. v1 PieceInfo keys are honoured
+        // as a fallback for libraries written before the registry.
+        descriptors = [];
+        for (const page of layout.pages) {
+          const v1 = (await doc.page(page.pageObjectNumber).pieceInfo?.read(STAMP_PIECEINFO_APP))
+            ?.entries;
+          const name = (v1 && entryString(v1, 'Name')) ?? `Stamp${page.index + 1}`;
+          const label = (v1 && entryString(v1, 'Subject')) ?? opts?.assetName?.(page.index) ?? name;
+          descriptors.push({
+            pageObjectNumber: page.pageObjectNumber,
+            index: page.index,
+            name,
+            label,
+          });
+        }
+        for (const d of descriptors) {
+          await doc.pages.setName!({
+            name: stampKey(d.name, d.label),
+            pageObjectNumber: d.pageObjectNumber,
+          });
+        }
+      }
+
+      await doc.pieceInfo!.update(
+        STAMP_LIBRARY_PIECEINFO_APP,
+        stampLibraryPieceInfo(libraryId, {
+          kind: libraryKind,
+          categories: libraryCategories,
+          locale: libraryLocale,
+        }),
+      );
+
+      const assets: NonNullable<typeof imported>['assets'] = [];
+      for (const d of descriptors) {
+        const handle = doc.page(d.pageObjectNumber);
         if (!handle.pieceInfo) {
           throw new EngineError(
             EngineErrorCode.NotImplemented,
             '[stamp] canonical PDF libraries need page pieceInfo support',
           );
         }
-        return {
-          layout,
-          handle,
-          metadata: null as Awaited<ReturnType<typeof handle.pieceInfo.read>>,
-        };
-      });
-
-      const catalogMetadata = await doc.pieceInfo.read(LIBRARY_PIECEINFO_APP);
-      for (const page of pages) {
-        page.metadata = await page.handle.pieceInfo!.read(STAMP_PIECEINFO_APP);
-      }
-
-      const state = ctx.getState();
-      const takenLibraryIds = new Set(Object.keys(state.libraries));
-      const takenAssetIds = new Set(Object.keys(state.assets));
-      const catalogEntries = catalogMetadata?.entries ?? {};
-      const libraryId = allocateId(entryString(catalogEntries, 'Id'), 'stamp-lib', takenLibraryIds);
-      const libraryName = opts?.name ?? entryString(catalogEntries, 'Name') ?? 'Stamps';
-      const libraryCategories = opts?.categories ?? entryStringArray(catalogEntries, 'Categories');
-
-      const descriptors = pages.map(({ layout, handle, metadata: pageMetadata }) => {
-        const entries = pageMetadata?.entries ?? {};
-        const id = allocateId(entryString(entries, 'Id'), 'stamp', takenAssetIds);
+        const entries = (await handle.pieceInfo.read(STAMP_PIECEINFO_APP))?.entries ?? {};
         const kind = opts?.kind ?? kindFromPdfName(entryName(entries, 'Kind')) ?? 'stamp';
-        return {
-          handle,
-          asset: {
-            id,
-            libraryId,
-            kind,
-            name:
-              opts?.assetName?.(layout.index) ??
-              entryString(entries, 'Name') ??
-              `Stamp ${layout.index + 1}`,
-            size: { width: layout.size.width, height: layout.size.height },
-            format: 'pdf' as const,
-            pageObjectNumber: layout.pageObjectNumber,
-            subject: entryString(entries, 'Subject'),
-            categories: entryStringArray(entries, 'Categories'),
-          },
+        const subject = entryString(entries, 'SubjectOverride');
+        const categories = entryStringArray(entries, 'Categories');
+        const page = byPon.get(d.pageObjectNumber)!;
+        const asset: StampAsset = {
+          id: assetIdFor(libraryId, d.name),
+          libraryId,
+          kind,
+          name: d.name,
+          label: d.label,
+          size: { width: page.size.width, height: page.size.height },
+          pageObjectNumber: d.pageObjectNumber,
+          ...(subject !== undefined ? { subject } : {}),
+          ...(categories !== undefined ? { categories } : {}),
         };
-      });
-
-      await doc.pieceInfo.update(
-        LIBRARY_PIECEINFO_APP,
-        libraryMetadataPatch(libraryId, libraryName, libraryCategories),
-      );
-
-      const assets: NonNullable<typeof imported>['assets'] = [];
-      for (const descriptor of descriptors) {
-        const { asset, handle } = descriptor;
-        await handle.pieceInfo!.update(
+        await handle.pieceInfo.update(
           STAMP_PIECEINFO_APP,
-          metadataPatch(asset.id, asset.name, asset.kind, asset.subject, asset.categories),
+          stampPieceInfo(kind, { subject, categories }),
         );
-        // One canonical page → one derived placement PDF plus a transparent
-        // preview. Extract after metadata so the cache carries the same id.
-        const bytes = await doc.pages.extract([asset.pageObjectNumber!]);
-        const image = await handle.render.image({
-          viewport: { kind: 'width', width: config.previewWidth ?? DEFAULT_PREVIEW_WIDTH },
-          background: 'transparent',
-          includeAnnotations: true,
-          format: 'png',
-        });
-        assets.push({ asset, bytes, preview: imageToPreview(image) });
+        // One canonical page → one derived placement PDF plus a thumbnail.
+        const bytes = await doc.pages.extract([d.pageObjectNumber]);
+        assets.push({ asset, bytes, preview: await renderThumbnail(handle) });
       }
 
       imported = {
         library: {
           id: libraryId,
           name: libraryName,
-          storage: 'canonical-pdf',
+          kind: libraryKind,
+          ...(libraryLocale ? { locale: libraryLocale } : {}),
           categories: libraryCategories,
           assetIds: [],
         },
@@ -336,20 +476,110 @@ export function createStampCapability(
       binaries.set(asset.id, { bytes, preview });
       ctx.dispatch({ type: 'ASSET_ADDED', asset });
     }
+    libraryChanged.emit({ libraryId: imported.library.id, reason: 'imported' });
     return imported.library.id;
   };
 
+  /**
+   * A drawn or typed mark rendered to a one-page PDF: the annotation is
+   * authored on a scratch page and exported the way "stamp from selection"
+   * exports — a fresh page the size of the mark, paths kept as paths, the
+   * font subset-embedded. Self-contained and Acrobat-readable.
+   */
+  const renderMark = async (
+    mark: Extract<MarkSource, { kind: 'ink' | 'text' }>,
+  ): Promise<Uint8Array> => {
+    const doc = await openAssetDocument(blankLibraryPdf());
+    try {
+      const layout = await doc.pages.list();
+      const scratch = layout.pages[0];
+      if (!scratch) throw new EngineError(EngineErrorCode.Unknown, '[stamp] no scratch page');
+      const page = doc.page(scratch.pageObjectNumber);
+      if (!page.annotations.exportAppearance) {
+        throw new EngineError(
+          EngineErrorCode.NotImplemented,
+          '[stamp] authoring a mark needs an asset engine that can export annotation appearances',
+        );
+      }
+      const color = hexColor(mark.color ?? '#1d2b53');
+      const created =
+        mark.kind === 'ink'
+          ? await page.annotations.create({
+              subtype: 'ink',
+              inkList: mark.strokes.map((stroke) => stroke.map(({ x, y }) => ({ x, y }))),
+              rect: inkBounds(mark.strokes, mark.strokeWidth ?? 2),
+              color,
+              strokeWidth: mark.strokeWidth ?? 2,
+            })
+          : await page.annotations.create({
+              subtype: 'free-text',
+              intent: 'free-text',
+              contents: mark.text,
+              fontFamily: mark.fontFamily,
+              fontSize: mark.fontSize ?? 36,
+              textAlign: 'left',
+              rect: textBounds(mark.text, mark.fontSize ?? 36),
+              fontColor: color,
+              strokeWidth: 0,
+            });
+      return new Uint8Array(await page.annotations.exportAppearance([created.created.ref]));
+    } finally {
+      await doc.close();
+    }
+  };
+
+  /** One page of a PDF as a single-page PDF (a `pdf` mark with `pageIndex`). */
+  const extractPage = async (bytes: Uint8Array, pageIndex: number): Promise<Uint8Array> => {
+    const doc = await openAssetDocument(bytes);
+    try {
+      const layout = await doc.pages.list();
+      const page = layout.pages[pageIndex];
+      if (!page) {
+        throw new EngineError(
+          EngineErrorCode.InvalidArg,
+          `[stamp] the PDF has no page ${pageIndex} (${layout.pageCount} pages)`,
+        );
+      }
+      return await doc.pages.extract([page.pageObjectNumber]);
+    } finally {
+      await doc.close();
+    }
+  };
+
+  /** The bytes an asset is made from: the caller's `source`, or its `mark` authored into one. */
+  const resolveAssetSource = async (
+    input: AddAssetInput,
+  ): Promise<{ bytes: ArrayBuffer; mimeType?: string }> => {
+    if ((input.source === undefined) === (input.mark === undefined)) {
+      throw new EngineError(
+        EngineErrorCode.InvalidArg,
+        '[stamp] addAsset takes exactly one of `source` / `mark`',
+      );
+    }
+    if (input.source !== undefined) return resolveBinarySource(input.source);
+    const mark = input.mark!;
+    switch (mark.kind) {
+      case 'image':
+        return resolveBinarySource(mark.source);
+      case 'pdf': {
+        const resolved = await resolveBinarySource(mark.source);
+        if (mark.pageIndex === undefined) return resolved;
+        return { bytes: toArrayBuffer(await extractPage(new Uint8Array(resolved.bytes), mark.pageIndex)) };
+      }
+      case 'ink':
+      case 'text':
+        return { bytes: toArrayBuffer(await renderMark(mark)) };
+    }
+  };
+
   const addAsset = async (input: AddAssetInput): Promise<string> => {
-    const targetLibrary = input.libraryId
-      ? (ctx.getState().libraries[input.libraryId] ?? null)
-      : null;
-    if (input.libraryId && !targetLibrary) {
+    if (input.libraryId && !ctx.getState().libraries[input.libraryId]) {
       throw new EngineError(
         EngineErrorCode.NotFound,
         `[stamp] unknown library '${input.libraryId}'`,
       );
     }
-    const resolved = await resolveBinarySource(input.source);
+    const resolved = await resolveAssetSource(input);
     const meta = sniffBinaryMetadata(resolved.bytes);
     if (!meta) {
       throw new EngineError(
@@ -358,6 +588,22 @@ export function createStampCapability(
       );
     }
     const isPdf = meta.mimeType === 'application/pdf';
+    const name = input.name ?? customStampName();
+    const label = input.label ?? name;
+    if (name.length === 0 || name.includes('=')) {
+      throw new EngineError(
+        EngineErrorCode.InvalidArg,
+        `[stamp] invalid stamp identifier '${name}': must be non-empty and contain no '='`,
+      );
+    }
+    const rasterSize =
+      input.size ?? ('width' in meta ? { width: meta.width, height: meta.height } : null);
+    if (!isPdf && (!rasterSize || rasterSize.width <= 0 || rasterSize.height <= 0)) {
+      throw new EngineError(
+        EngineErrorCode.InvalidArg,
+        '[stamp] a raster asset needs a positive `size` (its page size in points)',
+      );
+    }
 
     let suppliedPreview: StampAssetPreview | null = null;
     if (input.preview) {
@@ -368,140 +614,155 @@ export function createStampCapability(
       };
     }
 
-    if (targetLibrary?.storage === 'canonical-pdf') {
-      if (!isPdf) {
+    // No library named → one of its own, named after the label.
+    const libraryId = input.libraryId ?? (await createLibrary(label));
+
+    return mutateLibrary(libraryId, async () => {
+      const liveLibrary = ctx.getState().libraries[libraryId];
+      if (!liveLibrary) {
         throw new EngineError(
-          EngineErrorCode.InvalidArg,
-          '[stamp] raster assets cannot be appended to a canonical PDF library',
+          EngineErrorCode.NotFound,
+          `[stamp] library '${libraryId}' no longer exists`,
         );
       }
-      return mutateLibrary(targetLibrary.id, async () => {
-        const liveLibrary = ctx.getState().libraries[targetLibrary.id];
-        if (liveLibrary?.storage !== 'canonical-pdf') {
-          throw new EngineError(
-            EngineErrorCode.NotFound,
-            `[stamp] canonical library '${targetLibrary.id}' no longer exists`,
-          );
-        }
-        const canonicalBytes = libraryBinaries.get(liveLibrary.id);
-        if (!canonicalBytes) {
-          throw new EngineError(
-            EngineErrorCode.Unknown,
-            `[stamp] canonical bytes are missing for library '${liveLibrary.id}'`,
-          );
-        }
+      const assetId = assetIdFor(liveLibrary.id, name);
+      if (ctx.getState().assets[assetId]) {
+        throw new EngineError(
+          EngineErrorCode.InvalidArg,
+          `[stamp] library '${liveLibrary.name}' already has a stamp named '${name}'`,
+        );
+      }
+      const canonicalBytes = libraryBinaries.get(liveLibrary.id);
+      if (!canonicalBytes) {
+        throw new EngineError(
+          EngineErrorCode.Unknown,
+          `[stamp] canonical bytes are missing for library '${liveLibrary.id}'`,
+        );
+      }
 
-        const assetId = uid('stamp');
-        const doc = await openAssetDocument(canonicalBytes);
-        let appended:
-          | {
-              asset: StampAsset;
-              bytes: Uint8Array;
-              preview: StampAssetPreview;
-              canonical: Uint8Array;
-            }
-          | undefined;
-        try {
+      const doc = await openAssetDocument(canonicalBytes);
+      let appended:
+        | {
+            asset: StampAsset;
+            bytes: Uint8Array;
+            preview: StampAssetPreview;
+            canonical: Uint8Array;
+          }
+        | undefined;
+      try {
+        requireCanonicalServices(doc);
+        let pageObjectNumber: number;
+        if (isPdf) {
           const result = await doc.pages.insert(new Uint8Array(resolved.bytes));
           if (result.insertedPageObjectNumbers.length !== 1) {
             throw new EngineError(
               EngineErrorCode.InvalidArg,
-              '[stamp] a canonical library asset must be a single-page PDF',
+              '[stamp] a library asset must be a single-page PDF',
             );
           }
-          const pageObjectNumber = result.insertedPageObjectNumbers[0];
-          const layout = result.layout.pages.find(
-            (candidate) => candidate.pageObjectNumber === pageObjectNumber,
-          );
-          const page = doc.page(pageObjectNumber);
-          if (!layout || !page.pieceInfo) {
+          pageObjectNumber = result.insertedPageObjectNumbers[0];
+        } else {
+          // Raster → page: a blank page the image's size, the image placed
+          // to fill it, flattened into content. From here on it is a page
+          // like any other — exportable, persistable, Acrobat-readable.
+          if (!doc.pages.flatten) {
             throw new EngineError(
               EngineErrorCode.NotImplemented,
-              '[stamp] canonical PDF libraries need page layout and pieceInfo support',
+              '[stamp] raster assets need an asset engine with pages.flatten',
             );
           }
-          const asset: StampAsset = {
-            id: assetId,
-            libraryId: liveLibrary.id,
-            kind: input.kind ?? 'stamp',
-            name: input.name,
-            size: { width: layout.size.width, height: layout.size.height },
-            format: 'pdf',
-            pageObjectNumber,
-            subject: input.subject,
-            categories: input.categories,
-          };
-          await page.pieceInfo.update(
-            STAMP_PIECEINFO_APP,
-            metadataPatch(asset.id, asset.name, asset.kind, asset.subject, asset.categories),
-          );
-          const bytes = await doc.pages.extract([pageObjectNumber]);
-          let preview = suppliedPreview;
-          if (!preview) {
-            preview = imageToPreview(
-              await page.render.image({
-                viewport: { kind: 'width', width: config.previewWidth ?? DEFAULT_PREVIEW_WIDTH },
-                background: 'transparent',
-                includeAnnotations: true,
-                format: 'png',
-              }),
+          const blank = await doc.pages.insertBlank({ size: rasterSize! });
+          pageObjectNumber = blank.insertedPageObjectNumbers[0];
+          await doc.page(pageObjectNumber).annotations.create({
+            subtype: 'stamp',
+            rect: { left: 0, bottom: 0, right: rasterSize!.width, top: rasterSize!.height },
+            source: new Uint8Array(resolved.bytes),
+            fit: 'fill',
+          });
+          const flattened = await doc.pages.flatten([pageObjectNumber], 'display');
+          if (flattened.results.some(({ status }) => status !== 'applied')) {
+            throw new EngineError(
+              EngineErrorCode.Unknown,
+              '[stamp] flattening the raster into its page failed',
             );
           }
-          appended = { asset, bytes, preview, canonical: await doc.download() };
-        } finally {
-          await doc.close();
         }
+        const layout = (await doc.pages.list()).pages.find(
+          (candidate) => candidate.pageObjectNumber === pageObjectNumber,
+        );
+        const page = doc.page(pageObjectNumber);
+        if (!layout || !page.pieceInfo) {
+          throw new EngineError(
+            EngineErrorCode.NotImplemented,
+            '[stamp] canonical PDF libraries need page layout and pieceInfo support',
+          );
+        }
+        // Insert copies the page only — register it in the same mutation.
+        await doc.pages.setName!({ name: stampKey(name, label), pageObjectNumber });
+        const asset: StampAsset = {
+          id: assetId,
+          libraryId: liveLibrary.id,
+          kind: input.kind ?? 'stamp',
+          name,
+          label,
+          size: { width: layout.size.width, height: layout.size.height },
+          pageObjectNumber,
+          ...(input.subject !== undefined ? { subject: input.subject } : {}),
+          ...(input.categories !== undefined ? { categories: input.categories } : {}),
+        };
+        await page.pieceInfo.update(
+          STAMP_PIECEINFO_APP,
+          stampPieceInfo(asset.kind, { subject: asset.subject, categories: asset.categories }),
+        );
+        const bytes = await doc.pages.extract([pageObjectNumber]);
+        const preview = suppliedPreview ?? (await renderThumbnail(page));
+        appended = { asset, bytes, preview, canonical: await doc.download() };
+      } finally {
+        await doc.close();
+      }
 
-        libraryBinaries.set(liveLibrary.id, appended.canonical);
-        binaries.set(appended.asset.id, { bytes: appended.bytes, preview: appended.preview });
-        ctx.dispatch({ type: 'ASSET_ADDED', asset: appended.asset });
-        return appended.asset.id;
-      });
-    }
+      libraryBinaries.set(liveLibrary.id, appended.canonical);
+      binaries.set(appended.asset.id, { bytes: appended.bytes, preview: appended.preview });
+      ctx.dispatch({ type: 'ASSET_ADDED', asset: appended.asset });
+      libraryChanged.emit({ libraryId: liveLibrary.id, reason: 'asset-added' });
+      return appended.asset.id;
+    });
+  };
 
-    const size =
-      input.size ?? ('width' in meta ? { width: meta.width, height: meta.height } : null);
-    if (!size) {
+  const addAssetFromAnnotations = async (
+    documentId: string,
+    pageObjectNumber: number,
+    refs: AnnotationRef[],
+    input: Omit<AddAssetInput, 'source' | 'size'>,
+  ): Promise<string> => {
+    const doc = ctx.documentHandle(documentId);
+    if (!doc) {
       throw new EngineError(
-        EngineErrorCode.InvalidArg,
-        '[stamp] a PDF asset needs `size` (its page size in points) — PDF bytes carry no sniffable dimensions',
+        EngineErrorCode.NotFound,
+        `[stamp] target document '${documentId}' is not open`,
       );
     }
-    let preview = suppliedPreview;
-    if (!preview && !isPdf) {
-      preview = { bytes: new Uint8Array(resolved.bytes), mimeType: meta.mimeType };
+    const page = doc.page(pageObjectNumber);
+    if (!page.annotations.exportAppearance) {
+      throw new EngineError(
+        EngineErrorCode.NotImplemented,
+        "[stamp] this document's engine cannot export annotation appearances",
+      );
     }
-    const commitLooseAsset = (libraryId: string): string => {
-      const asset: StampAsset = {
-        id: uid('stamp'),
-        libraryId,
-        kind: input.kind ?? 'stamp',
-        name: input.name,
-        size,
-        format: isPdf ? 'pdf' : meta.mimeType === 'image/png' ? 'png' : 'jpeg',
-        subject: input.subject,
-        categories: input.categories,
-      };
-      binaries.set(asset.id, { bytes: new Uint8Array(resolved.bytes), preview });
-      ctx.dispatch({ type: 'ASSET_ADDED', asset });
-      return asset.id;
-    };
-    if (!targetLibrary) return commitLooseAsset(createLooseLibrary(input.name));
-    return mutateLibrary(targetLibrary.id, async () => {
-      const liveLibrary = ctx.getState().libraries[targetLibrary.id];
-      if (liveLibrary?.storage !== 'loose') {
-        throw new EngineError(
-          EngineErrorCode.NotFound,
-          `[stamp] loose library '${targetLibrary.id}' no longer exists`,
-        );
-      }
-      return commitLooseAsset(liveLibrary.id);
-    });
+    // The engine flattens the selection into a fresh single-page PDF —
+    // the same placement whole-page flatten uses, aimed at a new page.
+    const source = await page.annotations.exportAppearance(refs);
+    return addAsset({ ...input, source });
   };
 
   const dropLibrary = (id: string): void => {
     const library = ctx.getState().libraries[id];
-    if (library) for (const assetId of library.assetIds) binaries.delete(assetId);
+    if (library) {
+      for (const assetId of library.assetIds) {
+        binaries.delete(assetId);
+        ghostRenders.delete(assetId);
+      }
+    }
     libraryBinaries.delete(id);
     ctx.dispatch({ type: 'LIBRARY_REMOVED', libraryId: id });
   };
@@ -513,69 +774,164 @@ export function createStampCapability(
       const asset = ctx.getState().assets[id];
       if (!asset) return;
       const library = ctx.getState().libraries[asset.libraryId];
-      if (library?.storage === 'canonical-pdf') {
-        if (library.assetIds.length === 1) {
-          dropLibrary(library.id);
-          return;
-        }
-        if (asset.pageObjectNumber === undefined) {
-          throw new EngineError(
-            EngineErrorCode.Unknown,
-            `[stamp] canonical asset '${id}' has no page object number`,
-          );
-        }
-        const canonicalBytes = libraryBinaries.get(library.id);
-        if (!canonicalBytes) {
-          throw new EngineError(
-            EngineErrorCode.Unknown,
-            `[stamp] canonical bytes are missing for library '${library.id}'`,
-          );
-        }
-        const doc = await openAssetDocument(canonicalBytes);
-        let rewritten: Uint8Array | undefined;
-        try {
-          await doc.pages.delete([asset.pageObjectNumber]);
-          rewritten = await doc.download();
-        } finally {
-          await doc.close();
-        }
-        libraryBinaries.set(library.id, rewritten);
+      if (!library) return;
+      const canonicalBytes = libraryBinaries.get(library.id);
+      if (!canonicalBytes) {
+        throw new EngineError(
+          EngineErrorCode.Unknown,
+          `[stamp] canonical bytes are missing for library '${library.id}'`,
+        );
       }
+      // The page goes; the engine drops its registry entry inside the
+      // delete. The unregistered blank keeps the file valid when this was
+      // the last stamp — a library with no stamps is still a library.
+      const doc = await openAssetDocument(canonicalBytes);
+      let rewritten: Uint8Array | undefined;
+      try {
+        await doc.pages.delete([asset.pageObjectNumber]);
+        rewritten = await doc.download();
+      } finally {
+        await doc.close();
+      }
+      libraryBinaries.set(library.id, rewritten);
       binaries.delete(id);
+      ghostRenders.delete(id);
       ctx.dispatch({ type: 'ASSET_REMOVED', assetId: id });
+      libraryChanged.emit({ libraryId: library.id, reason: 'asset-removed' });
     });
   };
 
   const removeLibrary = (id: string): Promise<void> =>
-    mutateLibrary(id, async () => dropLibrary(id));
+    mutateLibrary(id, async () => {
+      const existed = ctx.getState().libraries[id] !== undefined;
+      dropLibrary(id);
+      if (existed) libraryChanged.emit({ libraryId: id, reason: 'removed' });
+    });
 
-  const surfaceScriptingResult = (result: FormCommitResult): void => {
-    try {
-      for (const effect of result.uiEffects) config.scripting?.onUiEffect?.(effect);
-      for (const diagnostic of result.diagnostics) {
-        config.scripting?.onDiagnostic?.(diagnostic);
+  const updateAsset = async (
+    id: string,
+    patch: { label?: string; subject?: string | null; categories?: string[] },
+  ): Promise<void> => {
+    const initial = ctx.getState().assets[id];
+    if (!initial) throw new EngineError(EngineErrorCode.NotFound, `[stamp] unknown asset '${id}'`);
+    return mutateLibrary(initial.libraryId, async () => {
+      const asset = ctx.getState().assets[id];
+      const library = asset ? ctx.getState().libraries[asset.libraryId] : undefined;
+      if (!asset || !library) {
+        throw new EngineError(EngineErrorCode.NotFound, `[stamp] unknown asset '${id}'`);
       }
-      if (result.error) config.scripting?.onError?.(result.error);
-    } catch (error) {
-      globalThis.console?.error('[stamp] scripting observer failed:', error);
+      const next: StampAsset = {
+        ...asset,
+        ...(patch.label !== undefined ? { label: patch.label } : {}),
+        ...(patch.categories !== undefined ? { categories: patch.categories } : {}),
+      };
+      if (patch.subject === null) delete next.subject;
+      else if (patch.subject !== undefined) next.subject = patch.subject;
+
+      const canonicalBytes = libraryBinaries.get(library.id);
+      if (!canonicalBytes) {
+        throw new EngineError(
+          EngineErrorCode.Unknown,
+          `[stamp] canonical bytes are missing for library '${library.id}'`,
+        );
+      }
+      const doc = await openAssetDocument(canonicalBytes);
+      let rewritten: Uint8Array | undefined;
+      try {
+        requireCanonicalServices(doc);
+        if (next.label !== asset.label) {
+          // A relabel is a registry rename — one job, the identifier untouched.
+          await doc.pages.setName!({
+            name: stampKey(asset.name, next.label),
+            pageObjectNumber: asset.pageObjectNumber,
+            replace: stampKey(asset.name, asset.label),
+          });
+        }
+        const page = doc.page(asset.pageObjectNumber);
+        await page.pieceInfo?.update(
+          STAMP_PIECEINFO_APP,
+          stampPieceInfo(next.kind, { subject: next.subject, categories: next.categories }),
+        );
+        rewritten = await doc.download();
+      } finally {
+        await doc.close();
+      }
+      libraryBinaries.set(library.id, rewritten);
+      ctx.dispatch({ type: 'ASSET_UPDATED', asset: next });
+      libraryChanged.emit({ libraryId: library.id, reason: 'asset-updated' });
+    });
+  };
+
+  const updateLibrary = async (
+    id: string,
+    patch: { name?: string; categories?: string[] },
+  ): Promise<void> => {
+    if (!ctx.getState().libraries[id]) {
+      throw new EngineError(EngineErrorCode.NotFound, `[stamp] unknown library '${id}'`);
     }
+    return mutateLibrary(id, async () => {
+      const library = ctx.getState().libraries[id];
+      if (!library) {
+        throw new EngineError(EngineErrorCode.NotFound, `[stamp] unknown library '${id}'`);
+      }
+      const canonicalBytes = libraryBinaries.get(id);
+      if (!canonicalBytes) {
+        throw new EngineError(
+          EngineErrorCode.Unknown,
+          `[stamp] canonical bytes are missing for library '${id}'`,
+        );
+      }
+      const next: StampLibrary = {
+        ...library,
+        ...(patch.name !== undefined ? { name: patch.name } : {}),
+        ...(patch.categories !== undefined ? { categories: patch.categories } : {}),
+      };
+      const doc = await openAssetDocument(canonicalBytes);
+      let rewritten: Uint8Array | undefined;
+      try {
+        requireCanonicalServices(doc);
+        // The name is the PDF's /Title; kind, id, categories, locale ride PieceInfo.
+        if (next.name !== library.name) await doc.metadata.update({ title: next.name });
+        await doc.pieceInfo!.update(
+          STAMP_LIBRARY_PIECEINFO_APP,
+          stampLibraryPieceInfo(id, {
+            kind: next.kind,
+            categories: next.categories,
+            locale: next.locale,
+          }),
+        );
+        rewritten = await doc.download();
+      } finally {
+        await doc.close();
+      }
+      libraryBinaries.set(id, rewritten);
+      ctx.dispatch({ type: 'LIBRARY_UPDATED', library: next });
+      libraryChanged.emit({ libraryId: id, reason: 'updated' });
+    });
   };
 
   /**
    * Form-backed stamps are executable templates only until placement. Work
    * on an isolated copy so neither the canonical library nor its reusable
    * per-page extraction becomes target/user/time specific.
+   *
+   * The realm comes from the TARGET document's actions plugin — a detached
+   * realm under that document's policy and environment (WP4: its own
+   * sandbox, none of the viewer realm's globals). No actions plugin, or
+   * scripting off, or `dynamic: false` → the template is armed as-is.
    */
   const materializeForPlacement = async (
     documentId: string,
     asset: StampAsset,
     bin: { bytes: Uint8Array; preview: StampAssetPreview | null },
   ): Promise<{ bytes: Uint8Array; preview: StampAssetPreview | null }> => {
-    if (asset.format !== 'pdf' || !config.scripting?.enabled) return bin;
+    if (config.dynamic === false) return bin;
+    const actions = ctx.tryForDocument(ActionsHostToken, documentId);
+    const mintRealm = actions?.createDetachedScriptRealm;
+    if (!actions || !mintRealm) return bin;
 
-    const targetDoc = ctx.documentHandle(documentId);
     const targetMeta = ctx.core().documents[documentId] ?? null;
-    if (!targetDoc || !targetMeta) {
+    if (!targetMeta) {
       throw new EngineError(
         EngineErrorCode.NotFound,
         `[stamp] target document '${documentId}' is not open`,
@@ -587,7 +943,10 @@ export function createStampCapability(
     // whole library PDF, then extract only their selected page after flatten.
     const canonicalBytes = libraryBinaries.get(asset.libraryId);
     const sourceBytes = canonicalBytes ?? bin.bytes;
-    const doc = await openAssetDocument(new Uint8Array(sourceBytes), targetDoc.security.identity);
+    const doc = await openAssetDocument(new Uint8Array(sourceBytes));
+    // Cleanup protection starts the moment the temporary document exists:
+    // realm/controller construction failures must not leak it.
+    let realm: ReturnType<typeof mintRealm> | null = null;
     let scripting: ReturnType<typeof createFormScriptingController> | null = null;
     try {
       const layout = await doc.pages.list();
@@ -621,15 +980,27 @@ export function createStampCapability(
         );
       }
 
-      // The DETACHED stamp-asset document gets its OWN standalone realm —
-      // never the viewer document's shared host (realm isolation; WP4).
+      // Scripts observe the TARGET document's metadata (Acrobat's dynamic
+      // stamp contract: `documentFileName` is the document being stamped)
+      // and boot from the asset document's own name tree.
+      realm = mintRealm.call(actions, {
+        doc,
+        document: () => targetMeta,
+        bootSources: async () => {
+          const tree = doc.actions ? await doc.actions.read() : null;
+          return (
+            tree?.nameTreeScripts.map(({ action }) => javaScriptProgramFromActionTree(action)) ?? []
+          );
+        },
+      });
       scripting = createFormScriptingController({
         doc,
         document: () => targetMeta,
-        config: config.scripting,
+        transaction: realm.transaction.bind(realm),
+        budget: realm.budget,
       });
       const result = await scripting.recalculate();
-      surfaceScriptingResult(result);
+      actions.surfaceScriptCommit(result, { origin: 'user', realm: 'detached' });
       if (result.status === 'failed') {
         throw new EngineError(
           EngineErrorCode.Unknown,
@@ -659,6 +1030,7 @@ export function createStampCapability(
       return { bytes, preview: imageToPreview(image) };
     } finally {
       scripting?.dispose();
+      realm?.dispose();
       await doc.close();
     }
   };
@@ -679,17 +1051,112 @@ export function createStampCapability(
     // page and matching preview at this boundary.
     const annotation = ctx.forDocument(AnnotationToken, documentId);
     await annotation.armStamp({
-      source: placement.bytes,
-      preview: placement.preview
-        ? { data: placement.preview.bytes, mimeType: placement.preview.mimeType }
-        : undefined,
-      intrinsicSize: asset.size,
+      ...stampPayload(asset, placement, placement !== bin),
       targetWidth: opts?.targetWidth,
     });
+    armedByDocument.set(documentId, assetId);
+  };
+
+  /** Which asset this plugin armed per document. The annotation plugin owns
+   *  the arm itself (a tool switch disarms it), so the answer is checked
+   *  against it and forgotten once it no longer holds one. */
+  const armedByDocument = new Map<string, string>();
+  const armedAsset = (documentId: string): StampAsset | null => {
+    const assetId = armedByDocument.get(documentId);
+    if (assetId === undefined) return null;
+    const annotation = ctx.tryForDocument(AnnotationHostToken, documentId);
+    if (!annotation?.hasArmedStamp()) {
+      armedByDocument.delete(documentId);
+      return null;
+    }
+    return ctx.getState().assets[assetId] ?? null;
+  };
+
+  /**
+   * Ghost renders, one per size bucket per asset, rendered lazily on the
+   * asset engine the first time the ghost is shown at that size and kept
+   * until the asset goes away. Materialized (dynamic) placements are
+   * user/time specific and cache only for their own arm (`cacheKey` null).
+   */
+  const ghostRenders = new Map<string, Map<number, Promise<StampAssetPreview | null>>>();
+
+  const renderGhost = async (bytes: Uint8Array, devicePixelWidth: number) => {
+    const doc = await openAssetDocument(new Uint8Array(bytes));
+    try {
+      const layout = await doc.pages.list();
+      const page = layout.pages[0];
+      if (!page) return null;
+      return imageToPreview(
+        await doc.page(page.pageObjectNumber).render.image({
+          viewport: { kind: 'width', width: devicePixelWidth },
+          background: 'transparent',
+          includeAnnotations: true,
+          format: 'png',
+        }),
+      );
+    } finally {
+      await doc.close();
+    }
+  };
+
+  /** A resolution-aware ghost source for placement bytes: the page renders
+   *  at the requested width, cached per bucket under `cacheKey` when given. */
+  const ghostProvider = (
+    bytes: Uint8Array,
+    fallback: StampAssetPreview | null,
+    cacheKey: string | null,
+  ): StampPreviewProvider => {
+    const local = cacheKey ? (ghostRenders.get(cacheKey) ?? new Map()) : new Map();
+    if (cacheKey) ghostRenders.set(cacheKey, local);
+    return (devicePixelWidth) => {
+      let pending = local.get(devicePixelWidth);
+      if (!pending) {
+        pending = renderGhost(bytes, devicePixelWidth).catch((error) => {
+          globalThis.console?.warn('[stamp] ghost render failed, using the thumbnail:', error);
+          return fallback;
+        });
+        local.set(devicePixelWidth, pending);
+      }
+      return pending;
+    };
+  };
+
+  /** The one payload both entry points hand the annotation plugin: artwork,
+   *  a resolution-aware ghost, true size, and the identity a placement
+   *  writes (`/Name` = identifier, `/Subj` = the subject override or label). */
+  const stampPayload = (
+    asset: StampAsset,
+    placement: { bytes: Uint8Array; preview: StampAssetPreview | null },
+    materialized: boolean,
+  ) => ({
+    source: placement.bytes,
+    preview: ghostProvider(placement.bytes, placement.preview, materialized ? null : asset.id),
+    intrinsicSize: asset.size,
+    name: asset.name,
+    subject: asset.subject ?? asset.label,
+  });
+
+  const placeAsset = async (
+    documentId: string,
+    assetId: string,
+    placement: StampPlacement,
+  ): Promise<AnnotationRef> => {
+    const asset = ctx.getState().assets[assetId];
+    const bin = binaries.get(assetId);
+    if (!asset || !bin) {
+      throw new EngineError(EngineErrorCode.NotFound, `[stamp] unknown asset '${assetId}'`);
+    }
+    const materialized = await materializeForPlacement(documentId, asset, bin);
+    const annotation = ctx.forDocument(AnnotationToken, documentId);
+    return annotation.placeStamp(
+      stampPayload(asset, materialized, materialized !== bin),
+      placement,
+    );
   };
 
   ctx.cleanup(() => {
     binaries.clear();
+    ghostRenders.clear();
     libraryBinaries.clear();
     libraryMutationTails.clear();
     const ownedAssetEngine = typeof config.assetEngine === 'function' ? assetEngineRef : null;
@@ -702,9 +1169,15 @@ export function createStampCapability(
   });
 
   return {
-    libraries: () => {
+    libraries: (query?: StampLibraryQuery) => {
       const s = ctx.getState();
-      return s.libraryOrder.map((id) => s.libraries[id]).filter((l) => l != null);
+      const kinds =
+        query?.kind === undefined
+          ? null
+          : new Set(typeof query.kind === 'string' ? [query.kind] : query.kind);
+      return s.libraryOrder
+        .map((id) => s.libraries[id])
+        .filter((l): l is StampLibrary => l != null && (kinds === null || kinds.has(l.kind)));
     },
     library: (id) => ctx.getState().libraries[id] ?? null,
     assets: (libraryId) => {
@@ -720,12 +1193,22 @@ export function createStampCapability(
     asset: (id) => ctx.getState().assets[id] ?? null,
     assetPreview: (id) => binaries.get(id)?.preview ?? null,
     assetBytes: (id) => binaries.get(id)?.bytes ?? null,
-    libraryBytes: (id) => libraryBinaries.get(id) ?? null,
+    exportLibrary: (id) => libraryBinaries.get(id) ?? null,
+    onLibraryChanged: libraryChanged.on,
+    createLibrary,
+    updateLibrary,
     importLibraryPdf,
     addAsset,
+    addAssetFromAnnotations,
+    updateAsset,
     removeAsset,
     removeLibrary,
     armAsset,
-    disarm: (documentId) => ctx.forDocument(AnnotationToken, documentId).disarmStamp(),
+    placeAsset,
+    disarm: (documentId) => {
+      armedByDocument.delete(documentId);
+      ctx.forDocument(AnnotationToken, documentId).disarmStamp();
+    },
+    armedAsset,
   };
 }

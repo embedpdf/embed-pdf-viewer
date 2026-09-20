@@ -1,3 +1,4 @@
+import type { FontIdentityInfo } from '../dto/FontSpec';
 import type {
   AnnotationListPageSnapshot,
   AnnotationListSnapshotAllPages,
@@ -54,15 +55,32 @@ import type {
   FormWidgetLinkResult,
 } from '../mutation/FormMutationResults';
 import type { MetadataUpdateResult } from '../mutation/MetadataUpdateResult';
+import type { AnnotationFlattenResult } from '../mutation/AnnotationFlattenResult';
 import type { PageDeleteResult } from '../mutation/PageDeleteResult';
 import type { PageFlattenResult, PageFlattenUsage } from '../mutation/PageFlattenResult';
 import type { PageInsertResult } from '../mutation/PageInsertResult';
 import type { PageMoveResult } from '../mutation/PageMoveResult';
+import type { PageNameResult } from '../mutation/PageNameResult';
 import type { PageRotateResult } from '../mutation/PageRotateResult';
 import type { RedactionApplyResult, RedactionApplyScope } from '../mutation/RedactionApplyResult';
 import type { WireResourceMap } from '../resource/BinarySource';
 import type { PageState } from '../revision/PageState';
 import type { SearchRequest, SearchSlice } from '../search/types';
+import type { AnalyzeInput, ChangeAnalysis } from '../signature/analysis/types';
+import type {
+  BaseVersionInfo,
+  DigestAlgorithm,
+  DocumentProtection,
+  SignatureAbortResult,
+  SignatureCompleteInput,
+  SignatureCompleteResult,
+  SignatureDTO,
+  SignaturePrepareInput,
+  SignaturePrepared,
+  SignatureSnapshot,
+  SignedDocumentPolicy,
+} from '../signature/types';
+import type { SessionKind } from '../dto/SessionKind';
 
 /**
  * Wire protocol used between an Engine-side queue and any Worker host
@@ -81,6 +99,10 @@ export interface OpenFatMemoryWorkerRequest {
   docId: string;
   bytes: ArrayBuffer;
   password: string | null;
+  /** Default `protect`. */
+  signedDocumentPolicy?: SignedDocumentPolicy;
+  /** Default `layer`: the bytes become an immutable base with a fresh layer on top. */
+  sessionKind?: SessionKind;
 }
 
 export type LayerOpenSource =
@@ -103,6 +125,13 @@ export interface OpenLayerMemoryBaseWorkerRequest {
   baseBytes: ArrayBuffer;
   layer: LayerOpenSource;
   password: string | null;
+  signedDocumentPolicy?: SignedDocumentPolicy;
+  /**
+   * SHA-256 (hex) of the base bytes, when the caller already holds a
+   * verified one. Saves the runtime a full pass over the file; an identity
+   * claim only (a wrong value breaks the caller's own layer artifacts).
+   */
+  baseSha256?: string;
 }
 
 export interface OpenLayerFileBaseWorkerRequest {
@@ -118,12 +147,120 @@ export interface OpenLayerFileBaseWorkerRequest {
   basePath: string;
   layer: LayerOpenSource;
   password: string | null;
+  signedDocumentPolicy?: SignedDocumentPolicy;
+  /** See `OpenLayerMemoryBaseWorkerRequest.baseSha256`. */
+  baseSha256?: string;
 }
 
 export type OpenWorkerRequest =
   | OpenFatMemoryWorkerRequest
   | OpenLayerMemoryBaseWorkerRequest
   | OpenLayerFileBaseWorkerRequest;
+
+// ---------------------------------------------------------------------------
+// Digital signatures (read side) and the saved version.
+// ---------------------------------------------------------------------------
+
+export interface SignaturesListWorkerRequest {
+  kind: 'signatures.list';
+  jobId: WorkerJobId;
+  docId: string;
+  layerName?: string;
+  /**
+   * Read the session's WORKING COPY (its unsaved state as one more revision
+   * over the loaded bytes) instead of the loaded bytes. The cloud server
+   * sets it: its layer sessions keep every committed edit in memory, so the
+   * layer's durable state IS the working copy. No-op without unsaved edits.
+   */
+  workingCopy?: boolean;
+}
+
+export interface SignaturesContentsWorkerRequest {
+  kind: 'signatures.contents';
+  jobId: WorkerJobId;
+  docId: string;
+  layerName?: string;
+  ref: FormFieldRef;
+}
+
+export interface SignaturesDigestWorkerRequest {
+  kind: 'signatures.digest';
+  jobId: WorkerJobId;
+  docId: string;
+  layerName?: string;
+  ref: FormFieldRef;
+  algorithm: DigestAlgorithm;
+}
+
+export interface SignaturesRevisionBytesWorkerRequest {
+  kind: 'signatures.revisionBytes';
+  jobId: WorkerJobId;
+  docId: string;
+  layerName?: string;
+  revisionIndex: number;
+}
+
+export interface DocumentVersionWorkerRequest {
+  kind: 'document.version';
+  jobId: WorkerJobId;
+  docId: string;
+  layerName?: string;
+}
+
+export interface SignaturesPrepareWorkerRequest {
+  kind: 'signatures.prepare';
+  jobId: WorkerJobId;
+  docId: string;
+  layerName?: string;
+  input: SignaturePrepareInput;
+}
+
+export interface SignaturesCompleteWorkerRequest {
+  kind: 'signatures.complete';
+  jobId: WorkerJobId;
+  docId: string;
+  layerName?: string;
+  input: SignatureCompleteInput;
+  artifactPath?: string;
+}
+
+export interface SignaturesAbortWorkerRequest {
+  kind: 'signatures.abort';
+  jobId: WorkerJobId;
+  docId: string;
+  layerName?: string;
+  signingId: string;
+}
+
+export interface SignaturesAnalyzeWorkerRequest {
+  kind: 'signatures.analyze';
+  jobId: WorkerJobId;
+  docId: string;
+  layerName?: string;
+  input: AnalyzeInput;
+}
+
+/**
+ * Session-less: install a CMS into a signing candidate FILE and verify the
+ * result. The server rebuilds the candidate (base ⊕ durable tail) on
+ * whichever replica completes the signing, so this never addresses a
+ * session: the file is patched in place, opened into a transient session
+ * for the checks, and closed. The caller keeps the sealed file.
+ */
+export interface SignaturesFinalizeCandidateWorkerRequest {
+  kind: 'signatures.finalizeCandidate';
+  jobId: WorkerJobId;
+  /** The candidate on the worker's filesystem; its /Contents hole is patched in place. */
+  path: string;
+  /** The /ByteRange the prepare reported — the fence every check is made against. */
+  byteRange: [number, number, number, number];
+  /** The reserved /Contents size the prepare reported (the hole holds twice as many hex digits). */
+  contentsSize: number;
+  fieldObjectNumber: number;
+  /** The detached CMS over the prepared digest. */
+  cms: ArrayBuffer;
+  password?: string | null;
+}
 
 export interface MetadataReadWorkerRequest {
   kind: 'metadata.read';
@@ -240,6 +377,30 @@ export interface AnnotationsDeleteWorkerRequest {
   artifactPath?: string;
 }
 
+/** Flatten a chosen set of one page's annotations into its content — see
+ *  `AnnotationFlattenInput`. A content + annotation mutation of that page. */
+export interface AnnotationsFlattenWorkerRequest {
+  kind: 'annotations.flatten';
+  jobId: WorkerJobId;
+  docId: string;
+  layerName?: string;
+  pageObjectNumber: PageObjectNumber;
+  refs: AnnotationRef[];
+  usage: PageFlattenUsage;
+  artifactPath?: string;
+}
+
+/** Flatten a chosen set of one page's annotation appearances into a NEW
+ *  single-page PDF (bytes). A read: no artifact, no revision. */
+export interface AnnotationsExportAppearanceWorkerRequest {
+  kind: 'annotations.exportAppearance';
+  jobId: WorkerJobId;
+  docId: string;
+  layerName?: string;
+  pageObjectNumber: PageObjectNumber;
+  refs: AnnotationRef[];
+}
+
 /**
  * Batch annotation reorder. Refs are resolved on the worker BEFORE the
  * move so the impact computation has a single before-state and one
@@ -341,6 +502,18 @@ export interface FormsUpdateFieldWorkerRequest {
   layerName?: string;
   ref: FormFieldRef;
   patch: FormFieldPatch;
+  artifactPath?: string;
+}
+
+/** Draw a PDF page into every widget of an unsigned signature field (the visual fill). */
+export interface FormsSetSignatureAppearanceWorkerRequest {
+  kind: 'forms.setSignatureAppearance';
+  jobId: WorkerJobId;
+  docId: string;
+  layerName?: string;
+  ref: FormFieldRef;
+  pdf: ArrayBuffer;
+  pageIndex: number;
   artifactPath?: string;
 }
 
@@ -544,6 +717,28 @@ export interface PagesDeleteWorkerRequest {
   docId: string;
   layerName?: string;
   pageObjectNumbers: PageObjectNumber[];
+  artifactPath?: string;
+}
+
+/** Register/rename a `/Names /Pages` entry — see `PageNameInput`. */
+export interface PagesSetNameWorkerRequest {
+  kind: 'pages.setName';
+  jobId: WorkerJobId;
+  docId: string;
+  layerName?: string;
+  name: string;
+  pageObjectNumber: PageObjectNumber;
+  replace?: string;
+  artifactPath?: string;
+}
+
+/** Remove a `/Names /Pages` entry — see `PageRemoveNameInput`. */
+export interface PagesRemoveNameWorkerRequest {
+  kind: 'pages.removeName';
+  jobId: WorkerJobId;
+  docId: string;
+  layerName?: string;
+  name: string;
   artifactPath?: string;
 }
 
@@ -807,6 +1002,27 @@ export interface FontsClearWorkerRequest {
   jobId: WorkerJobId;
 }
 
+/** The application asserts a licence permitting editing with a font. */
+export interface FontsAuthorizeEditingWorkerRequest {
+  kind: 'fonts.authorizeEditing';
+  jobId: WorkerJobId;
+  fontKey: string;
+}
+
+/**
+ * Per-document font and text-layout settings (session state on the host's
+ * document, never written to the file). Every member is optional: only the
+ * ones given change.
+ */
+export interface DocumentSetFontSettingsWorkerRequest {
+  kind: 'document.setFontSettings';
+  jobId: WorkerJobId;
+  docId: string;
+  layerName?: string;
+  embeddingPolicy?: 'default' | 'subset' | 'full';
+  typographicFeatures?: boolean;
+}
+
 export interface CloseWorkerRequest {
   kind: 'close';
   jobId: WorkerJobId;
@@ -886,6 +1102,7 @@ export type WorkerRequest =
   | FormsRepairWorkerRequest
   | FormsCreateFieldWorkerRequest
   | FormsUpdateFieldWorkerRequest
+  | FormsSetSignatureAppearanceWorkerRequest
   | FormsDeleteFieldWorkerRequest
   | FormsAttachWidgetWorkerRequest
   | FormsDetachWidgetWorkerRequest
@@ -893,6 +1110,10 @@ export type WorkerRequest =
   | PagesMoveWorkerRequest
   | PagesRotateWorkerRequest
   | PagesDeleteWorkerRequest
+  | AnnotationsFlattenWorkerRequest
+  | AnnotationsExportAppearanceWorkerRequest
+  | PagesSetNameWorkerRequest
+  | PagesRemoveNameWorkerRequest
   | PagesFlattenWorkerRequest
   | RedactionApplyWorkerRequest
   | PagesExtractWorkerRequest
@@ -919,17 +1140,58 @@ export type WorkerRequest =
   | DocumentRenderPageFileWorkerRequest
   | DocumentRenderPageFileEncodedWorkerRequest
   | DocumentCheckPasswordPermissionsWorkerRequest
+  | SignaturesListWorkerRequest
+  | SignaturesContentsWorkerRequest
+  | SignaturesDigestWorkerRequest
+  | SignaturesRevisionBytesWorkerRequest
+  | DocumentVersionWorkerRequest
+  | SignaturesPrepareWorkerRequest
+  | SignaturesCompleteWorkerRequest
+  | SignaturesAbortWorkerRequest
+  | SignaturesAnalyzeWorkerRequest
+  | SignaturesFinalizeCandidateWorkerRequest
   | FontsRegisterWorkerRequest
   | FontsAddFallbackWorkerRequest
   | FontsClearFallbacksWorkerRequest
   | FontsClearWorkerRequest
+  | FontsAuthorizeEditingWorkerRequest
+  | DocumentSetFontSettingsWorkerRequest
   | CloseWorkerRequest
   | LayerCloseWorkerRequest
   | AbortWorkerRequest
   | ShutdownWorkerRequest;
 
 export type WorkerResultPayload =
-  | { tag: 'open'; docId: string; security: DocumentSecurityProbeInfo }
+  | {
+      tag: 'open';
+      docId: string;
+      security: DocumentSecurityProbeInfo;
+      /** What the document's signatures forbid; `null` when unsigned or not probed (a locked open). */
+      protection?: DocumentProtection | null;
+    }
+  | { tag: 'signatures.list'; snapshot: SignatureSnapshot }
+  | { tag: 'signatures.contents'; bytes: ArrayBuffer }
+  | { tag: 'signatures.digest'; digest: ArrayBuffer }
+  | { tag: 'signatures.revisionBytes'; bytes: ArrayBuffer; size: number }
+  | { tag: 'document.version'; version: BaseVersionInfo }
+  | { tag: 'signatures.prepare'; result: SignaturePrepared }
+  | {
+      tag: 'signatures.complete';
+      result: SignatureCompleteResult;
+      artifact?: LayerArtifactWorkerPayload;
+      artifactFile?: LayerArtifactFileWorkerPayload;
+    }
+  | { tag: 'signatures.abort'; result: SignatureAbortResult }
+  | { tag: 'signatures.analyze'; analysis: ChangeAnalysis }
+  | {
+      tag: 'signatures.finalizeCandidate';
+      /** The installed signature as the sealed file reports it. */
+      signature: SignatureDTO;
+      /** What the sealed file's signatures forbid from now on. */
+      protection: DocumentProtection;
+      /** The version the sealed file IS (hash and length of the whole file). */
+      version: BaseVersionInfo;
+    }
   | { tag: 'metadata.read'; metadata: DocumentMetadata }
   | { tag: 'actions.read'; snapshot: DocumentActionsSnapshot }
   | {
@@ -961,6 +1223,13 @@ export type WorkerResultPayload =
       artifact?: LayerArtifactWorkerPayload;
       artifactFile?: LayerArtifactFileWorkerPayload;
     }
+  | {
+      tag: 'annotations.flatten';
+      result: AnnotationFlattenResult;
+      artifact?: LayerArtifactWorkerPayload;
+      artifactFile?: LayerArtifactFileWorkerPayload;
+    }
+  | { tag: 'annotations.exportAppearance'; bytes: ArrayBuffer; size: number }
   | {
       tag: 'annotations.move';
       result: AnnotationMoveResult;
@@ -1012,6 +1281,12 @@ export type WorkerResultPayload =
       artifactFile?: LayerArtifactFileWorkerPayload;
     }
   | {
+      tag: 'forms.setSignatureAppearance';
+      result: FormFieldUpdateResult;
+      artifact?: LayerArtifactWorkerPayload;
+      artifactFile?: LayerArtifactFileWorkerPayload;
+    }
+  | {
       tag: 'forms.deleteField';
       result: FormFieldDeleteResult;
       artifact?: LayerArtifactWorkerPayload;
@@ -1045,6 +1320,18 @@ export type WorkerResultPayload =
   | {
       tag: 'pages.delete';
       result: PageDeleteResult;
+      artifact?: LayerArtifactWorkerPayload;
+      artifactFile?: LayerArtifactFileWorkerPayload;
+    }
+  | {
+      tag: 'pages.setName';
+      result: PageNameResult;
+      artifact?: LayerArtifactWorkerPayload;
+      artifactFile?: LayerArtifactFileWorkerPayload;
+    }
+  | {
+      tag: 'pages.removeName';
+      result: PageNameResult;
       artifact?: LayerArtifactWorkerPayload;
       artifactFile?: LayerArtifactFileWorkerPayload;
     }
@@ -1123,11 +1410,17 @@ export type WorkerResultPayload =
       pageCount: number;
       image: EncodedImageWire;
     }
-  | { tag: 'document.checkPasswordPermissions'; security: DocumentSecurityProbeInfo }
-  | { tag: 'fonts.register'; fontKey: string }
+  | {
+      tag: 'document.checkPasswordPermissions';
+      security: DocumentSecurityProbeInfo;
+      protection?: DocumentProtection | null;
+    }
+  | { tag: 'fonts.register'; fontKey: string; identity: FontIdentityInfo }
   | { tag: 'fonts.addFallback' }
   | { tag: 'fonts.clearFallbacks' }
   | { tag: 'fonts.clear' }
+  | { tag: 'fonts.authorizeEditing'; identity: FontIdentityInfo }
+  | { tag: 'document.setFontSettings' }
   | { tag: 'close' }
   | { tag: 'shutdown' };
 

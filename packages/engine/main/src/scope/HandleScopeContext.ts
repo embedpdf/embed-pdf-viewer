@@ -1,4 +1,9 @@
-import type { IdentityClaims, PdfBits } from '@embedpdf/engine-core/runtime';
+import type {
+  DocumentProtection,
+  IdentityClaims,
+  PdfBits,
+  SignedDocumentPolicy,
+} from '@embedpdf/engine-core/runtime';
 
 /**
  * Per-handle authorization context built at `LocalEngine.open()` time
@@ -15,4 +20,11 @@ export interface HandleScopeContext {
   readonly scope: ReadonlyArray<string>;
   readonly identity: IdentityClaims;
   readonly pdfBits: PdfBits;
+  /**
+   * What the document's signatures forbid, as probed at open. The second
+   * document-derived input beside `pdfBits`; `null` when unsigned or when
+   * the engine runs with `signedDocumentPolicy: 'permit'`.
+   */
+  readonly protection: DocumentProtection | null;
+  readonly signedDocumentPolicy: SignedDocumentPolicy;
 }

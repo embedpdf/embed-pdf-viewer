@@ -5,13 +5,7 @@ import {
   type PluginContext,
   type Unsubscribe,
 } from '@embedpdf/core';
-import {
-  createScriptHost,
-  javaScriptProgramFromActionTree,
-  resolveScriptIdentity,
-  scriptFieldsFromSnapshot,
-  seedFrom,
-} from '@embedpdf/core-acrojs';
+import { javaScriptProgramFromActionTree, scriptFieldsFromSnapshot } from '@embedpdf/core-acrojs';
 import type {
   ScriptAnnotInput,
   ScriptColorArray,
@@ -36,6 +30,7 @@ import type {
   SubmitFormPayload,
 } from '@embedpdf/engine-core/runtime';
 
+import { createScriptRealmFactory } from './script-environment';
 import { eventOf, originOf } from './types';
 import type {
   ActionContext,
@@ -65,6 +60,8 @@ import type {
   DocumentTriggerEvent,
   FormCommitSink,
   PageStateReport,
+  ScriptCommitSurface,
+  ScriptRealmKind,
   ScriptSurfaceResult,
   SubmitIntent,
   SubmitResolver,
@@ -320,44 +317,23 @@ export function createActionsCapability(
   };
 
   // ── the ONE per-document ScriptHost (D8) ────────────────────────────────
+  // Policy (`enabled`) decides whether a realm factory exists; the factory
+  // carries the session environment and mints this document's own realm
+  // here, and detached realms on demand (host lens) — one environment, any
+  // number of isolated realms.
   const js = config.javascript;
+  const realms = js?.enabled && ctx.doc ? createScriptRealmFactory(js, ctx.doc) : null;
   const scriptHost =
-    js?.enabled && ctx.doc
-      ? createScriptHost({
-          sandboxFactory:
-            js.sandboxFactory ??
-            (() =>
-              import('@embedpdf/core-js-sandbox').then(({ createQuickJsSandbox }) =>
-                createQuickJsSandbox(),
-              )),
-          document: () => {
-            const meta = ctx.document();
-            return {
-              id: ctx.documentId ?? 'document',
-              fileName: js.fileName?.() ?? meta?.name ?? 'document.pdf',
-              pageCount: meta?.pageCount ?? 0,
-              pageNumber: 0,
-            };
-          },
-          identity: () =>
-            ctx.doc
-              ? resolveScriptIdentity(ctx.doc, js.identity)
-              : { name: '', loginName: '', corporation: '', email: '' },
-          environment: (sequence) => {
-            const nowMs = js.now?.() ?? Date.now();
-            return {
-              nowMs,
-              utcOffsetMinutes: js.utcOffsetMinutes?.() ?? -new Date(nowMs).getTimezoneOffset(),
-              randomSeed: js.randomSeed?.() ?? seedFrom(ctx.documentId ?? 'document', sequence),
-            };
-          },
+    realms && ctx.doc
+      ? realms.realmFor({
+          doc: ctx.doc,
+          document: () => ctx.document(),
           bootSources: async () => {
             const snapshot = await readDocumentActions();
             return (snapshot?.nameTreeScripts ?? []).map(({ action }) =>
               javaScriptProgramFromActionTree(action),
             );
           },
-          ...(js.budget ? { budget: js.budget } : {}),
         })
       : null;
   if (scriptHost) ctx.cleanup(() => scriptHost.dispose());
@@ -371,6 +347,17 @@ export function createActionsCapability(
   const surfaceScriptResult = (result: ScriptSurfaceResult): void => {
     const uiContext = { origin: result.origin, phase: result.phase };
     for (const effect of result.uiEffects) {
+      // A DETACHED realm has no document surface: the document it scripted
+      // is not displayed, and this door's print/goto/submit act on THIS
+      // document. Only alerts have a valid target (the user); everything
+      // else is suppressed, observably — never routed to the wrong document.
+      if (result.realm === 'detached' && effect.kind !== 'alert') {
+        scriptDiagnosticHook.emit({
+          code: 'ui-effect-suppressed',
+          message: `script ${effect.kind} request from a detached realm suppressed: no document surface`,
+        });
+        continue;
+      }
       if (effect.kind === 'submitForm') {
         // Form-pipeline scripted submit: same door, DETACHED (the form
         // queue must not await into submit sinks). Policy + sinks +
@@ -426,6 +413,28 @@ export function createActionsCapability(
     }
     for (const diagnostic of result.diagnostics) scriptDiagnosticHook.emit(diagnostic);
     if (result.error) scriptErrorHook.emit(result.error);
+  };
+
+  /** A K/V/C/F commit surfaces as up to two results: the boot phase (only
+   *  when it produced effects) and the user phase (always — it carries the
+   *  diagnostics and the error). */
+  const surfaceScriptCommit = (
+    commit: ScriptCommitSurface,
+    context: { origin: ActionOrigin; realm: ScriptRealmKind },
+  ): void => {
+    const phases: Array<'boot' | 'user'> = ['boot', 'user'];
+    for (const phase of phases) {
+      const uiEffects = commit.uiEffects.filter((effect) => effect.phase === phase);
+      if (uiEffects.length === 0 && phase === 'boot') continue;
+      surfaceScriptResult({
+        uiEffects,
+        diagnostics: phase === 'user' ? commit.diagnostics : [],
+        ...(phase === 'user' && commit.error ? { error: commit.error } : {}),
+        origin: context.origin,
+        phase,
+        realm: context.realm,
+      });
+    }
   };
 
   /** Script `doc.submitForm(...)` → the one normalized intent. Script field
@@ -614,8 +623,7 @@ export function createActionsCapability(
         });
       } else {
         const entries: AnnotCommitEntry[] = output.annotEffects.map((effect) => ({
-          annotObjectNumber:
-            effect.ref.kind === 'objectNumber' ? effect.ref.annotObjectNumber : -1,
+          annotObjectNumber: effect.ref.kind === 'objectNumber' ? effect.ref.annotObjectNumber : -1,
           ...(effect.ref.kind === 'objectNumber'
             ? { pageObjectNumber: effect.ref.pageObjectNumber }
             : {}),
@@ -691,6 +699,7 @@ export function createActionsCapability(
             ...(boot.error ? { error: boot.error } : {}),
             origin: actionCtx.origin,
             phase: 'boot',
+            realm: 'document',
           });
           if (boot.formEffects.length || boot.annotEffects.length) {
             built = await scriptWorldFor(pon);
@@ -706,6 +715,7 @@ export function createActionsCapability(
           ...(output.error ? { error: output.error } : {}),
           origin: actionCtx.origin,
           phase: 'user',
+          realm: 'document',
         });
         if (output.error) return { status: 'failed', error: output.error.message };
         const failure = await commitScriptOutput(output, diagnose);
@@ -1022,7 +1032,10 @@ export function createActionsCapability(
     return result;
   };
 
-  const execute = (tree: PdfActionTree, actionCtx: ActionContext): Promise<ActionDispatchResult> => {
+  const execute = (
+    tree: PdfActionTree,
+    actionCtx: ActionContext,
+  ): Promise<ActionDispatchResult> => {
     // BEFORE enqueueing: a real user gesture arms the open-sequence latch
     // (its barrier op then lands ahead of this action in the queue) and
     // resets the cascade budget.
@@ -1197,8 +1210,11 @@ export function createActionsCapability(
           }
           const tree = annotation?.actions?.[event];
           if (!tree?.root && !tree?.incomplete) return { status: 'inert', steps: [], diagnostics };
-          const source: ActionSource =
-            trigger.source ?? { kind: 'annotation', annotation: trigger.ref, pon: trigger.pon };
+          const source: ActionSource = trigger.source ?? {
+            kind: 'annotation',
+            annotation: trigger.ref,
+            pon: trigger.pon,
+          };
           return await runSteps([{ source, tree }], origin, eventOf(trigger), diagnostics);
         }
         case 'page': {
@@ -1460,7 +1476,8 @@ export function createActionsCapability(
     if (docPrintEventActive) {
       diagnose({
         code: 'reentrant-print',
-        message: 'print request during a document print event — suppressed (one dialog per request)',
+        message:
+          'print request during a document print event — suppressed (one dialog per request)',
       });
       return { status: 'blocked', detail: 'reentrant print suppressed' };
     }
@@ -1527,10 +1544,7 @@ export function createActionsCapability(
         if (uiAdapter === adapter) uiAdapter = null;
       };
     },
-    runDocumentVerb: <T>(
-      verb: 'save' | 'print',
-      operation: () => Promise<T> | T,
-    ): Promise<T> =>
+    runDocumentVerb: <T>(verb: 'save' | 'print', operation: () => Promise<T> | T): Promise<T> =>
       enqueue(async () => {
         jsNodesThisDispatch = 0; // one D11 aggregate for the whole verb op
         const diagnose = (diagnostic: ActionDiagnostic): void => diagnosticHook.emit(diagnostic);
@@ -1596,14 +1610,28 @@ export function createActionsCapability(
         if (formCommitSink === sink) formCommitSink = null;
       };
     },
-    ...(scriptHost
+    ...(scriptHost && realms
       ? {
-          scriptTransaction: <T>(
-            body: (txn: import('@embedpdf/core-acrojs').ScriptTransaction) => Promise<T>,
-          ) => scriptHost.transaction(body),
+          scriptRealm: {
+            transaction: <T>(
+              body: (txn: import('@embedpdf/core-acrojs').ScriptTransaction) => Promise<T>,
+            ) => scriptHost.transaction(body),
+            budget: realms.budget,
+          },
+          createDetachedScriptRealm: (target) => {
+            const host = realms.realmFor(target);
+            return {
+              transaction: <T>(
+                body: (txn: import('@embedpdf/core-acrojs').ScriptTransaction) => Promise<T>,
+              ) => host.transaction(body),
+              budget: realms.budget,
+              dispose: () => host.dispose(),
+            };
+          },
         }
       : {}),
     surfaceScriptResult,
+    surfaceScriptCommit,
     reportPageState,
     registerSubmitResolver: (resolver): Unsubscribe => {
       submitResolver = resolver;

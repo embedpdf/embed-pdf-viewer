@@ -86,9 +86,9 @@ describe('corpus acceptance (skips without the local JS tests folder)', () => {
         const docStatus = form.snapshot()?.fields.find((f) => f.name === 'docStatus');
         // The script wrote through the ScriptHost executor + the form
         // commit sink (lifecycle origin).
-        expect(
-          docStatus?.valueEntry.kind === 'scalar' ? docStatus.valueEntry.value : '',
-        ).toContain('OpenAction');
+        expect(docStatus?.valueEntry.kind === 'scalar' ? docStatus.valueEntry.value : '').toContain(
+          'OpenAction',
+        );
         // Its app.alert carries the origin axis — the provider's default
         // matrix suppresses it; embedder handlers (like this one) see it.
         const alert = uiEffects.find((e) => e.kind === 'alert');
@@ -101,7 +101,7 @@ describe('corpus acceptance (skips without the local JS tests folder)', () => {
   );
 
   it.skipIf(!existsSync(DOC_02))(
-    "02: hover colors — THE Phase-3 gate on the real corpus document",
+    '02: hover colors — THE Phase-3 gate on the real corpus document',
     async () => {
       const engine = await createLocalEngine({ runtime: { prefer: 'wasm' } });
       const kernel = createKernel({
@@ -165,7 +165,7 @@ describe('corpus acceptance (skips without the local JS tests folder)', () => {
   );
 
   it.skipIf(!existsSync(DOC_03))(
-    "03: the native tooltip works with scripting OFF (the corpus actions-≠-JS proof)",
+    '03: the native tooltip works with scripting OFF (the corpus actions-≠-JS proof)',
     async () => {
       const engine = await createLocalEngine({ runtime: { prefer: 'wasm' } });
       const kernel = createKernel({

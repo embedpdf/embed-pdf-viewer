@@ -22,6 +22,8 @@ describe("PagesClient", () => {
                     previousDocVersion: 1,
                     docVersion: 1,
                     annotationsVersion: 1,
+                    layerVersion: 1,
+                    working: true,
                     pages: [{ pageObjectNumber: 1, cache: { contentVersion: 1, annotationVersion: 1 } }],
                 },
             },
@@ -119,6 +121,8 @@ describe("PagesClient", () => {
                     previousDocVersion: 1,
                     docVersion: 1,
                     annotationsVersion: 1,
+                    layerVersion: 1,
+                    working: true,
                     pages: [{ pageObjectNumber: 1, cache: { contentVersion: 1, annotationVersion: 1 } }],
                 },
             },
@@ -216,6 +220,8 @@ describe("PagesClient", () => {
                     previousDocVersion: 1,
                     docVersion: 1,
                     annotationsVersion: 1,
+                    layerVersion: 1,
+                    working: true,
                     pages: [{ pageObjectNumber: 1, cache: { contentVersion: 1, annotationVersion: 1 } }],
                 },
             },
@@ -313,6 +319,8 @@ describe("PagesClient", () => {
                     previousDocVersion: 1,
                     docVersion: 1,
                     annotationsVersion: 1,
+                    layerVersion: 1,
+                    working: true,
                     pages: [{ pageObjectNumber: 1, cache: { contentVersion: 1, annotationVersion: 1 } }],
                 },
             },
@@ -393,6 +401,204 @@ describe("PagesClient", () => {
         }).rejects.toThrow(CloudPDF.NotFoundError);
     });
 
+    test("setName (1)", async () => {
+        const server = mockServerPool.createServer();
+        const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
+        const rawRequestBody = { key: "value" };
+        const rawResponseBody = {
+            meta: {
+                affectedPages: [
+                    {
+                        pageObjectNumber: 1,
+                        revision: { docSessionId: "docSessionId", pageObjectNumber: 1, generation: 1 },
+                        weakAnnotationState: { kind: "unknown" },
+                    },
+                ],
+                cacheDelta: {
+                    previousDocVersion: 1,
+                    docVersion: 1,
+                    annotationsVersion: 1,
+                    layerVersion: 1,
+                    working: true,
+                    pages: [{ pageObjectNumber: 1, cache: { contentVersion: 1, annotationVersion: 1 } }],
+                },
+            },
+        };
+
+        server
+            .mockEndpoint()
+            .post("/v1/docs/docId/layers/layerName/pages/names")
+            .jsonBody(rawRequestBody)
+            .respondWith()
+            .statusCode(200)
+            .jsonBody(rawResponseBody)
+            .build();
+
+        const response = await client.doc.pages.setName({
+            docId: "docId",
+            layerName: "layerName",
+            body: {
+                key: "value",
+            },
+        });
+        expect(response).toEqual(rawResponseBody);
+    });
+
+    test("setName (2)", async () => {
+        const server = mockServerPool.createServer();
+        const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
+        const rawRequestBody = { string: { key: "value" } };
+        const rawResponseBody = { key: "value" };
+
+        server
+            .mockEndpoint()
+            .post("/v1/docs/docId/layers/layerName/pages/names")
+            .jsonBody(rawRequestBody)
+            .respondWith()
+            .statusCode(400)
+            .jsonBody(rawResponseBody)
+            .build();
+
+        await expect(async () => {
+            return await client.doc.pages.setName({
+                docId: "docId",
+                layerName: "layerName",
+                body: {
+                    string: {
+                        key: "value",
+                    },
+                },
+            });
+        }).rejects.toThrow(CloudPDF.BadRequestError);
+    });
+
+    test("setName (3)", async () => {
+        const server = mockServerPool.createServer();
+        const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
+        const rawRequestBody = { string: { key: "value" } };
+        const rawResponseBody = { key: "value" };
+
+        server
+            .mockEndpoint()
+            .post("/v1/docs/docId/layers/layerName/pages/names")
+            .jsonBody(rawRequestBody)
+            .respondWith()
+            .statusCode(404)
+            .jsonBody(rawResponseBody)
+            .build();
+
+        await expect(async () => {
+            return await client.doc.pages.setName({
+                docId: "docId",
+                layerName: "layerName",
+                body: {
+                    string: {
+                        key: "value",
+                    },
+                },
+            });
+        }).rejects.toThrow(CloudPDF.NotFoundError);
+    });
+
+    test("removeName (1)", async () => {
+        const server = mockServerPool.createServer();
+        const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
+        const rawRequestBody = { key: "value" };
+        const rawResponseBody = {
+            meta: {
+                affectedPages: [
+                    {
+                        pageObjectNumber: 1,
+                        revision: { docSessionId: "docSessionId", pageObjectNumber: 1, generation: 1 },
+                        weakAnnotationState: { kind: "unknown" },
+                    },
+                ],
+                cacheDelta: {
+                    previousDocVersion: 1,
+                    docVersion: 1,
+                    annotationsVersion: 1,
+                    layerVersion: 1,
+                    working: true,
+                    pages: [{ pageObjectNumber: 1, cache: { contentVersion: 1, annotationVersion: 1 } }],
+                },
+            },
+        };
+
+        server
+            .mockEndpoint()
+            .post("/v1/docs/docId/layers/layerName/pages/names/delete")
+            .jsonBody(rawRequestBody)
+            .respondWith()
+            .statusCode(200)
+            .jsonBody(rawResponseBody)
+            .build();
+
+        const response = await client.doc.pages.removeName({
+            docId: "docId",
+            layerName: "layerName",
+            body: {
+                key: "value",
+            },
+        });
+        expect(response).toEqual(rawResponseBody);
+    });
+
+    test("removeName (2)", async () => {
+        const server = mockServerPool.createServer();
+        const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
+        const rawRequestBody = { string: { key: "value" } };
+        const rawResponseBody = { key: "value" };
+
+        server
+            .mockEndpoint()
+            .post("/v1/docs/docId/layers/layerName/pages/names/delete")
+            .jsonBody(rawRequestBody)
+            .respondWith()
+            .statusCode(400)
+            .jsonBody(rawResponseBody)
+            .build();
+
+        await expect(async () => {
+            return await client.doc.pages.removeName({
+                docId: "docId",
+                layerName: "layerName",
+                body: {
+                    string: {
+                        key: "value",
+                    },
+                },
+            });
+        }).rejects.toThrow(CloudPDF.BadRequestError);
+    });
+
+    test("removeName (3)", async () => {
+        const server = mockServerPool.createServer();
+        const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
+        const rawRequestBody = { string: { key: "value" } };
+        const rawResponseBody = { key: "value" };
+
+        server
+            .mockEndpoint()
+            .post("/v1/docs/docId/layers/layerName/pages/names/delete")
+            .jsonBody(rawRequestBody)
+            .respondWith()
+            .statusCode(404)
+            .jsonBody(rawResponseBody)
+            .build();
+
+        await expect(async () => {
+            return await client.doc.pages.removeName({
+                docId: "docId",
+                layerName: "layerName",
+                body: {
+                    string: {
+                        key: "value",
+                    },
+                },
+            });
+        }).rejects.toThrow(CloudPDF.NotFoundError);
+    });
+
     test("rotate (1)", async () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
@@ -410,6 +616,8 @@ describe("PagesClient", () => {
                     previousDocVersion: 1,
                     docVersion: 1,
                     annotationsVersion: 1,
+                    layerVersion: 1,
+                    working: true,
                     pages: [{ pageObjectNumber: 1, cache: { contentVersion: 1, annotationVersion: 1 } }],
                 },
             },

@@ -9,6 +9,8 @@ import {
   type PageDeleteInput,
   type PageFlattenInput,
   type PageMoveInput,
+  type PageNameInput,
+  type PageRemoveNameInput,
   type PageRotateInput,
   type WorkerJobId,
 } from '@embedpdf/engine-core/runtime';
@@ -22,7 +24,9 @@ import {
   PageInsertBlankInputSchema,
   PageInsertInputSchema,
   PageMoveInputSchema,
+  PageNameInputSchema,
   PageNetworkRenderFormatSchema,
+  PageRemoveNameInputSchema,
   PageRotateInputSchema,
   PageRenderAnnotatedQuerySchema,
   PageRenderQuerySchema,
@@ -52,16 +56,6 @@ import {
   setNoStore,
   type SchemaLike,
 } from './_helpers';
-import { requireSharedDocRead } from './_planeGuard';
-import {
-  requireLayerCapability,
-  requireLayerDocAccessOnly,
-  requireLayerResource,
-} from '../app/jwt-plugin';
-import type { SharpImageEncoder } from '../render/SharpImageEncoder';
-import type { DerivedRenderService } from '../services/DerivedRenderService';
-import type { DocumentService, OpenContext } from '../services/DocumentService';
-import type { LayerService } from '../services/LayerService';
 
 interface PageRouteDeps {
   documentService: DocumentService;
@@ -487,6 +481,53 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
         layerName,
         pageObjectNumbers: body.pageObjectNumbers,
       },
+      abortSignalFromRequest(req),
+    );
+  });
+
+  // Named pages are LAYOUT: registering/renaming/removing a `/Names /Pages`
+  // entry is a page-structure mutation like move/rotate/delete (same gate,
+  // same docVersion + layoutVersion bump, read back via /layout).
+  app.post('/v1/docs/:docId/layers/:layerName/pages/names', async (req, reply) => {
+    const { docId, layerName } = req.params as {
+      docId: string;
+      layerName: string;
+    };
+    const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
+    const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
+    const ctx = requireLayerCapability(req, docId, layerName, 'doc.pages.assemble', pdfBits);
+    const body = parseOrInvalidArg<PageNameInput>(
+      PageNameInputSchema as unknown as SchemaLike<PageNameInput>,
+      req.body,
+      'request body',
+    );
+
+    setNoStore(reply);
+    return layerService.setPageName(
+      ctx,
+      { docId, layerName, ...body },
+      abortSignalFromRequest(req),
+    );
+  });
+
+  app.post('/v1/docs/:docId/layers/:layerName/pages/names/delete', async (req, reply) => {
+    const { docId, layerName } = req.params as {
+      docId: string;
+      layerName: string;
+    };
+    const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
+    const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
+    const ctx = requireLayerCapability(req, docId, layerName, 'doc.pages.assemble', pdfBits);
+    const body = parseOrInvalidArg<PageRemoveNameInput>(
+      PageRemoveNameInputSchema as unknown as SchemaLike<PageRemoveNameInput>,
+      req.body,
+      'request body',
+    );
+
+    setNoStore(reply);
+    return layerService.removePageName(
+      ctx,
+      { docId, layerName, name: body.name },
       abortSignalFromRequest(req),
     );
   });

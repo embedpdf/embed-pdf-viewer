@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/engine-runtime",
-  "version": "3.0.0-next.11",
+  "version": "3.0.0-next.13",
   "private": false,
   "description": "Low-level PDF execution runtime for EmbedPDF, backed by EmbedPDF's fork of PDFium and distributed as WASM and native platform packages.",
   "type": "module",
@@ -56,7 +56,7 @@
     "embedpdf"
   ],
   "scripts": {
-    "build": "rollup -c",
+    "build": "rollup -c && node build/generate-wasm-inline.mjs",
     "build:target": "bash ./scripts/build-target.sh",
     "build:local": "bash ./scripts/build-all-local.sh",
     "clean": "rimraf dist build/libpdfium build/generated npm/*/lib",

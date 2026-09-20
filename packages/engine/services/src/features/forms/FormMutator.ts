@@ -11,8 +11,9 @@ import type {
   FormWidgetRef,
   MutationMeta,
   WidgetPlacement,
+  PageObjectNumber,
 } from '@embedpdf/engine-core/runtime';
-import { EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
+import { EngineError, EngineErrorCode, fieldLockFor } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
 import type { DocumentSession } from '../../document-session/DocumentSession';
@@ -21,9 +22,13 @@ import { withScratch, withScratchN } from '../../runtime/memory/scratch';
 import { createUnattachedWidget } from './internal/authorWidget';
 import { flagMasks } from './internal/fieldFlagBits';
 import { acquireFormModel } from './internal/formModelCache';
+import { bakeWidgetAppearance } from '../signature/internal/appearance';
+import { readSignaturesFromModel, withSignatureModel } from '../signature/internal/readSignatureModel';
 import { withWideStringArray } from './internal/wideStringArray';
 import { readFieldAt, readFormSnapshot } from './internal/readFormSnapshot';
-import { resolveFieldRef } from './internal/resolveFieldRef';
+import { resolveFieldRef, type ResolvedField } from './internal/resolveFieldRef';
+import { SignatureReader } from '../signature/SignatureReader';
+import { readUtf16String } from '../../runtime/memory/strings';
 
 // Mirrors EPDF_FORMFIELD_FAMILY_* in public/epdf_form.h.
 const FAMILY_CODE = {
@@ -32,6 +37,7 @@ const FAMILY_CODE = {
   text: 4,
   combobox: 5,
   listbox: 6,
+  signature: 7,
 } as const;
 
 /** Widgets a single value write can touch; far above any real form. */
@@ -68,7 +74,7 @@ export class FormMutator {
     throwIfAborted(signal);
     const model = acquireFormModel(this.runtime, this.session);
     const resolved = resolveFieldRef(this.runtime, model, ref);
-    this.assertWritable(resolved.fieldObjectNumber);
+    this.assertWritable(resolved);
 
     const before = readFieldAt(this.runtime, model, resolved.fieldIndex, this.session.requireDocPtr());
     const allowed = FAMILY_BY_VALUE_TYPE[value.type];
@@ -87,7 +93,7 @@ export class FormMutator {
     throwIfAborted(signal);
     const model = acquireFormModel(this.runtime, this.session);
     const resolved = resolveFieldRef(this.runtime, model, ref);
-    this.assertWritable(resolved.fieldObjectNumber);
+    this.assertWritable(resolved);
 
     const changed = this.withChangedWidgets((buf, cap, countPtr) =>
       this.runtime.fn.EPDFForm_ResetField(
@@ -259,6 +265,57 @@ export class FormMutator {
     return { field: this.readBackField(fieldObjectNumber) };
   }
 
+  /**
+   * Draw a PDF page into every widget of an UNSIGNED signature field: the
+   * visual "sign" of a viewer without a signer. The field's value stays
+   * empty and nothing is sealed; a signed field is refused (its appearance
+   * is part of what the signature covers). Pages whose widgets changed are
+   * reported so their renders re-pin.
+   */
+  setSignatureAppearance(
+    ref: FormFieldRef,
+    pdf: Uint8Array,
+    pageIndex: number,
+    signal: AbortSignal,
+  ): { field: FormFieldDTO; pages: PageObjectNumber[] } {
+    throwIfAborted(signal);
+    const docPtr = this.session.requireDocPtr();
+    const model = acquireFormModel(this.runtime, this.session);
+    const resolved = resolveFieldRef(this.runtime, model, ref);
+    this.assertWritable(resolved);
+    const before = readFieldAt(this.runtime, model, resolved.fieldIndex, docPtr);
+    if (before.family !== 'signature') {
+      throw new EngineError(
+        EngineErrorCode.InvalidArg,
+        `'${before.name}' is a ${before.family} field, not a signature field`,
+      );
+    }
+    const signed = withSignatureModel(this.runtime, docPtr, (signatures) =>
+      readSignaturesFromModel(this.runtime, signatures).some(
+        (s) =>
+          s.signed &&
+          s.field.kind === 'objectNumber' &&
+          s.field.fieldObjectNumber === resolved.fieldObjectNumber,
+      ),
+    );
+    if (signed) {
+      throw new EngineError(
+        EngineErrorCode.InvalidArg,
+        `'${before.name}' is signed; its appearance is sealed with the signature`,
+      );
+    }
+    if (before.widgets.length === 0) {
+      throw new EngineError(EngineErrorCode.InvalidArg, `'${before.name}' has no widget to draw into`);
+    }
+    for (const widget of before.widgets) {
+      bakeWidgetAppearance(this.runtime, docPtr, widget, pdf, pageIndex);
+    }
+    this.session.noteMutation();
+    const pages = [...new Set(before.widgets.map((w) => w.pageObjectNumber))];
+    for (const pon of pages) this.session.bumpRevision(pon);
+    return { field: this.readBackField(resolved.fieldObjectNumber), pages };
+  }
+
   updateField(
     ref: FormFieldRef,
     patch: FormFieldPatch,
@@ -269,7 +326,7 @@ export class FormMutator {
     const docPtr = this.session.requireDocPtr();
     const model = acquireFormModel(this.runtime, this.session);
     const resolved = resolveFieldRef(this.runtime, model, ref);
-    this.assertWritable(resolved.fieldObjectNumber);
+    this.assertWritable(resolved);
     const before = readFieldAt(this.runtime, model, resolved.fieldIndex, this.session.requireDocPtr());
     if (before.family !== patch.family) {
       throw new EngineError(
@@ -349,7 +406,7 @@ export class FormMutator {
     const { fn, mem } = this.runtime;
     const model = acquireFormModel(this.runtime, this.session);
     const resolved = resolveFieldRef(this.runtime, model, ref);
-    this.assertWritable(resolved.fieldObjectNumber);
+    this.assertWritable(resolved);
     const before = readFieldAt(this.runtime, model, resolved.fieldIndex, this.session.requireDocPtr());
 
     const ok = withScratchN(mem, [256 * 4, 4], ([buf, countPtr]) => {
@@ -386,7 +443,7 @@ export class FormMutator {
     const { fn } = this.runtime;
     const model = acquireFormModel(this.runtime, this.session);
     const resolved = resolveFieldRef(this.runtime, model, ref);
-    this.assertWritable(resolved.fieldObjectNumber);
+    this.assertWritable(resolved);
     const before = readFieldAt(this.runtime, model, resolved.fieldIndex, this.session.requireDocPtr());
     const toggle = before.family === 'checkbox' || before.family === 'radio';
     const state = toggle ? (onState ?? (before.family === 'checkbox' ? 'Yes' : '')) : '';
@@ -422,7 +479,7 @@ export class FormMutator {
     const { fn } = this.runtime;
     const model = acquireFormModel(this.runtime, this.session);
     const resolved = resolveFieldRef(this.runtime, model, ref);
-    this.assertWritable(resolved.fieldObjectNumber);
+    this.assertWritable(resolved);
     if (
       !fn.EPDFForm_DetachWidget(
         this.session.requireDocPtr(),
@@ -503,11 +560,42 @@ export class FormMutator {
     return readFieldAt(this.runtime, fresh, fieldIndex, this.session.requireDocPtr());
   }
 
-  private assertWritable(fieldObjectNumber: number): void {
-    if (fieldObjectNumber === 0) {
+  private assertWritable(resolved: ResolvedField): void {
+    if (resolved.fieldObjectNumber === 0) {
       throw new EngineError(
         EngineErrorCode.InvalidArg,
         'form field is stored as a direct object and cannot be written',
+      );
+    }
+    this.assertNotLockedBySignature(resolved);
+  }
+
+  /**
+   * A field an earlier signature froze (its FieldMDP, or the /Lock of a
+   * signed field) refuses every write: document-derived authority, the
+   * same way encryption bits are. Off under `signedDocumentPolicy:
+   * 'permit'`. A document whose signature model cannot be built is not
+   * known to be locked.
+   */
+  private assertNotLockedBySignature(resolved: ResolvedField): void {
+    if (this.session.signedDocumentPolicy !== 'protect') return;
+    let protection;
+    try {
+      protection = new SignatureReader(this.runtime, this.session).readProtection();
+    } catch {
+      return;
+    }
+    if (protection.fieldLocks.length === 0) return;
+    const model = acquireFormModel(this.runtime, this.session);
+    const name =
+      readUtf16String(this.runtime.mem, (buf, cap) =>
+        this.runtime.fn.EPDFForm_GetFieldName(model, resolved.fieldIndex, buf, cap),
+      ) ?? '';
+    const lock = fieldLockFor(protection, name);
+    if (lock) {
+      throw new EngineError(
+        EngineErrorCode.ProtectedDocument,
+        `form field "${name}" is locked by signature ${lock.signatureIndex} (${lock.source === 'fieldmdp' ? 'FieldMDP' : '/Lock'})`,
       );
     }
   }

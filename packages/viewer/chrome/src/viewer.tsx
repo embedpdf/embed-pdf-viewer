@@ -27,9 +27,11 @@ import { pageEditPlugin } from '@embedpdf/react/page-edit';
 import { feedbackPlugin, interactionPlugin, vibrationFeedback } from '@embedpdf/react/interaction';
 import { selectionPlugin } from '@embedpdf/react/selection';
 import { annotationPlugin } from '@embedpdf/react/annotation';
+import { stampPlugin } from '@embedpdf/react/stamp';
 import { redactionPlugin } from '@embedpdf/react/redaction';
 import { actionsPlugin } from '@embedpdf/react/actions';
 import { formPlugin } from '@embedpdf/react/form';
+import { signaturePlugin } from '@embedpdf/react/signature';
 import { linkPlugin } from '@embedpdf/react/link';
 import { searchPlugin } from '@embedpdf/react/search';
 import { i18nPlugin, negotiateLocale, useT } from '@embedpdf/react/i18n';
@@ -44,7 +46,12 @@ import { defaultChrome } from './config/chrome';
 import { defaultCommands } from './config/commands';
 import { demoToolsPlugin } from './config/demo-tools.plugin';
 import { en } from './locales/en';
-import { ViewerConfigProvider, type ResolvedViewerConfig } from './config-context';
+import {
+  ViewerConfigProvider,
+  type ResolvedViewerConfig,
+  type StampsCustomization,
+} from './config-context';
+import type { AnnotationsCustomization, SignaturesCustomization } from './config-context';
 import { createViewerHandle, type ViewerHandle } from './handle';
 import { ICON_PATHS, type IconDef } from './ui/icons';
 import { ThemeProvider, type ThemePreference } from './ui/theme';
@@ -106,6 +113,18 @@ export interface ViewerCustomization {
   /** The structure — a value you OWN: the default (pass nothing), a transform
    *  of it, or your own schema. Never merged. */
   chrome?: ChromeSchema | ((base: ChromeSchema, helpers: ChromeHelpers) => ChromeSchema);
+  /** The stamps sidebar's built-in library. `false`: none (air-gapped, no
+   *  request). A string: a URL template with a `{locale}` slot for a
+   *  self-hosted copy of `@embedpdf/default-stamps`. Default: the copy that
+   *  ships with the viewer, as a lazy chunk of your own build — no CDN. */
+  stamps?: StampsCustomization;
+  /** Digital signatures: the signer, trust anchors, the mode (sign / visual /
+   *  ask), which marks a person keeps, and script faces for typed marks. With
+   *  no signer, a mark placed on a field is drawn in without sealing. */
+  signatures?: SignaturesCustomization;
+  /** Annotations: fonts the free-text style panel offers beyond the standard
+   *  14 — fetched, registered on the engine and mounted for the live editor. */
+  annotations?: AnnotationsCustomization;
   /** Light/dark preference (string shorthand), or the full theme config with
    *  `--ep-*` token overrides. Tokens are applied by the DELIVERY (the custom
    *  element adopts them into its shadow root); direct consumers of this
@@ -178,6 +197,9 @@ export function FullViewer({
   locale = 'auto',
   disabledCategories,
   chrome,
+  stamps,
+  signatures,
+  annotations,
   theme,
   themeTarget,
   onViewer,
@@ -222,6 +244,9 @@ export function FullViewer({
       commands: resolvedCommands,
       chrome: resolvedChrome,
       icons: icons ?? {},
+      stamps: stamps ?? {},
+      signatures: signatures ?? {},
+      annotations: annotations ?? {},
       i18n: { locales, loaders, initial },
     };
   });
@@ -278,15 +303,42 @@ export function FullViewer({
           extends: 'line',
           defaults: { lineEndings: { start: 'none', end: 'open-arrow' } },
         },
+        // The Insert tab's Image button: a `stamp` preset whose payload comes
+        // from the file-picker port, narrowed to rasters. Click the spot, the
+        // dialog opens, the picture lands there. Its own tool id (not `stamp`)
+        // keeps it out of the stamp panel's armed state and gives it its own
+        // cursor icon.
+        {
+          id: 'image',
+          extends: 'stamp',
+          source: { kind: 'prompt', accept: 'image/png,image/jpeg' },
+        },
       ],
     }),
+    // Stamp LIBRARIES (workspace-scoped): named reusable assets — the built-in
+    // set plus any PDF the user imports, each page one vector stamp. The
+    // stamps sidebar is the picker; placement rides annotation's armed stamp.
+    stampPlugin(),
     // The action engine: /A and /AA trees dispatch through one policy-gated
     // executor spine, and THE JavaScript switch lives here (the per-document
-    // ScriptHost realm; form's K/V/C/F pipeline rides its transaction port).
-    actionsPlugin({ javascript: { enabled: true } }),
+    // ScriptHost realm; form's K/V/C/F pipeline rides its transaction port,
+    // stamp's dynamic templates evaluate in detached realms it mints).
+    actionsPlugin({
+      javascript: { enabled: true, identity: { name: 'John Doe', corporation: 'Acme Inc' } },
+    }),
     // Forms: fillable under the default pointer/pan (widgets render as fill
     // controls), editable under the Form tab's 'form-edit' + palette tools.
     formPlugin(),
+    // Signatures: the ACT — a mark (a signatures-library asset) dropped on a
+    // signature field signs it through the configured signer, or is drawn in
+    // without sealing when there is none. Marks themselves are the stamp
+    // plugin's; the panel lists libraries of kind 'signatures'.
+    signaturePlugin({
+      mode: resolved.signatures.mode,
+      signer: resolved.signatures.signer,
+      trust: resolved.signatures.trust,
+      allowCertify: resolved.signatures.allowCertify,
+    }),
     // Links: navigable under the default pointer/pan ('link-nav'), editable
     // under the link tool — the annotation plane then owns them (select, move,
     // retarget via the style panel's Link control).

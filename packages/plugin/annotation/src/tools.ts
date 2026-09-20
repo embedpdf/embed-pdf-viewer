@@ -44,6 +44,16 @@ export interface PromptSourceSpec {
   accept?: string;
 }
 
+/**
+ * The tool `armStamp` activates — and the only tool an armed payload survives
+ * onto (plus the legacy `annotation-stamp` tag, honoured for embedder configs
+ * written before the tags were unified). Placement consults the armed payload
+ * BEFORE the active tool's own `source` spec, so a payload must not outlive
+ * its tool onto a sibling stamp preset: an `image` preset's click has to open
+ * its own picker, not silently place whatever the stamp panel last armed.
+ */
+export const ARMED_STAMP_TOOL_ID = 'stamp';
+
 /** Declarative result of committing a text selection while a tool is active. */
 export type SelectionAuthoring =
   | { kind: 'markup' }
@@ -87,6 +97,9 @@ export const TOOL_DEFAULT_KEYS = {
     'fontFamily',
     'fontSize',
     'fontColor',
+    'bold',
+    'italic',
+    'underline',
     'textAlign',
     'opacity',
     'interiorColor',
@@ -98,6 +111,9 @@ export const TOOL_DEFAULT_KEYS = {
     'fontFamily',
     'fontSize',
     'fontColor',
+    'bold',
+    'italic',
+    'underline',
     'textAlign',
     'opacity',
     'interiorColor',
@@ -141,6 +157,9 @@ export const TOOL_DEFAULT_KEYS = {
     'textAlign',
   ],
   'widget-toggle': ['color', 'interiorColor', 'strokeWidth', 'border'],
+  // The bare box every other widget family ingests as (a signature field's
+  // widget among them): box styling only — no text to style.
+  'widget-box': ['color', 'interiorColor', 'strokeWidth', 'border'],
 } as const satisfies Record<string, readonly PropKey[]>;
 
 export type ToolAuthoringKind = keyof typeof TOOL_DEFAULT_KEYS;
@@ -499,7 +518,7 @@ export const DEFAULT_TOOLS: AnnotationToolInput[] = [
   // embedder can pass fixed bytes instead). `accept` narrows the dialog to
   // what the engine's stamp sniffer takes anyway.
   {
-    id: 'stamp',
+    id: ARMED_STAMP_TOOL_ID,
     subtype: 'stamp',
     cursor: 'copy',
     enables: ['annotation-place', 'annotation-edit'],

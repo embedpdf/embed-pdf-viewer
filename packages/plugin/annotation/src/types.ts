@@ -14,7 +14,9 @@ import type {
   PdfLinkTarget,
   PdfRect,
   PdfActionTree,
+  RichTextParagraph,
 } from '@embedpdf/engine-core/runtime';
+import type { TextFormat, TextSelection } from './rich-text';
 import type { AnnotationToolInput, ResolvedTool } from './tools';
 import type {
   AnnotationFlags,
@@ -142,6 +144,13 @@ export interface AnnotationState {
   /** Bumps on every arm/disarm — the render layer's cue to rebuild (or drop)
    *  the ghost preview object URL. Never rendered itself. */
   stampArmEpoch: number;
+  /**
+   * The text editor's selection inside the annotation being edited (flat
+   * offsets over its plain projection), or null. In the store because it is
+   * READ by the property surface: while a range is held, the range keys
+   * (`getSelectionProps`) report and take the RUNS, not the body.
+   */
+  textSelection: TextSelection | null;
 }
 
 /** The armed tool's would-be placement under the cursor (content space). */
@@ -190,6 +199,7 @@ export type AnnotationAction =
   | { type: 'SET_HYDRATION'; hydration: AnnotationHydration }
   | { type: 'SET_CHROME'; patch: ChromeSettingsPatch }
   | { type: 'SET_TOOL_GHOST'; ghost: ToolGhost | null }
+  | { type: 'SET_TEXT_SELECTION'; selection: TextSelection | null }
   | { type: 'STAMP_ARM_CHANGED' };
 
 /** A plugin (forms, links) marks some annotations as interactive: while engaged,
@@ -255,27 +265,36 @@ export type SelectionFlags = { [K in keyof AnnotationFlags]: boolean | null };
  * A free-text annotation projected for the framework: the box (content space,
  * live gesture applied) + the plain text + an `editing` flag + a ready-to-spread
  * CSS style. The framework renders ONE editable element from this and nothing
- * more — all the mapping (fonts, colours, alignment) is done here, once.
+ * more — all the mapping (fonts, colours, alignment) is done here, once. The
+ * element paints the TEXT only: the box's fill and border are the vector
+ * scene's (`pageItems`), the same for a plain box and a callout, so the live
+ * view matches the baked appearance.
  */
 export interface TextItem {
   id: Id;
   ref: AnnotationRef | null;
   box: Rect;
   contents: string;
+  /** The rich paragraphs the editor renders and edits (run deltas over the
+   *  body, which `css` carries). `contents` is their plain projection. */
+  richText: { paragraphs: RichTextParagraph[] };
   editing: boolean;
   /** Applied rotation (deg, CW). `box` is the UNROTATED text box; the framework
    *  rotates the editable element about its centre by this. 0/undefined = none. */
   rot?: number;
   css: {
     fontFamily: string;
-    /** Content units (the framework multiplies by the page scale). */
+    /** Content units (the framework multiplies by the page scale). The line
+     *  height is NOT here: the editor binding states the engine's line model
+     *  per face on the element itself (`@embedpdf/web`, `lineModelFor`). */
     fontSize: number;
-    lineHeight: number;
     color: string;
+    /** The body's formatting (runs override it as inline spans). */
+    fontWeight: number;
+    fontStyle: 'normal' | 'italic';
+    textDecoration: 'none' | 'underline';
     align: 'left' | 'center' | 'right';
     padding: number;
-    /** `/C` box background as a CSS colour, or null for transparent. */
-    background: string | null;
   };
 }
 
@@ -408,6 +427,14 @@ export interface AnnotationCapability {
    */
   updateSelectionFlags(patch: Partial<AnnotationFlags>): void;
   /**
+   * Flip a rich-text format on the selection — the editor's Cmd/Ctrl+B/I/U
+   * and a toolbar toggle: the text range's runs while the editor holds one,
+   * else the selected free-text bodies. Reads the current state the way
+   * {@link getSelectionProps} reports it and writes its inverse through
+   * {@link updateSelection}.
+   */
+  toggleTextFormat(format: TextFormat): void;
+  /**
    * The selection's `/F` flag state: per-flag `true`/`false`, or `null` when
    * the selected annotations disagree (indeterminate). `null` overall when
    * nothing is selected. Stable reference between model changes.
@@ -538,6 +565,13 @@ export interface AnnotationCapability {
   /** Drop the armed stamp payload (a tool change away from 'stamp' does this too). */
   disarmStamp(): void;
   /**
+   * Place a stamp WITHOUT the pointer: the same validation, fit, page clamp,
+   * `/Name`, and `/Subj` a click after {@link armStamp} produces — the one
+   * placement law, exposed for code. Resolves to the created annotation's
+   * ref; the placement is selected like a click's.
+   */
+  placeStamp(input: StampToolInput, placement: StampPlacement): Promise<AnnotationRef>;
+  /**
    * Install the ONE file-picker port every click-then-pick tool resolves
    * through (see {@link FilePickerProvider}) — the stamp `'prompt'` source and
    * the file-attachment tool today. The framework adapter installs a
@@ -594,14 +628,18 @@ export interface StampToolInput {
   source: BinarySource;
   /** Placed width in PDF points (height follows the intrinsic aspect). Default 150. */
   targetWidth?: number;
+  /** The placed annotation's `/Name` — the stamp identifier (standard or custom). */
+  name?: string;
+  /** The placed annotation's `/Subj`. */
+  subject?: string;
   /**
-   * A browser-paintable render of `source` for the hover ghost (PNG/JPEG).
-   * Required for the ghost when `source` is PDF bytes — the browser cannot
-   * paint those; the caller (e.g. a stamp library) supplies its cached page
-   * render. Raster sources default to the source itself; omit everywhere
-   * else and the tool simply shows no ghost.
+   * The hover ghost's image. Either fixed bytes (PNG/JPEG) or — for vector
+   * sources, which are only ever right at ONE on-screen size — a
+   * {@link StampPreviewProvider} the ghost asks for a render at the device
+   * pixel width it is displayed at. Raster sources default to themselves;
+   * omit and the tool simply shows no ghost.
    */
-  preview?: BinarySource;
+  preview?: BinarySource | StampPreviewProvider;
   /**
    * The source's intrinsic size in PDF points. Raster sources are measured
    * from their own header, but PDF bytes carry no sniffable dimensions —
@@ -616,6 +654,39 @@ export interface StampToolInput {
 export interface ArmedStampPreview {
   bytes: Uint8Array;
   mimeType?: string;
+}
+
+/**
+ * Resolution-aware ghost preview: "give me this stamp at `devicePixelWidth`
+ * pixels wide". The annotation plugin buckets the request (see
+ * {@link previewBucket}) and caches per bucket for the arm's lifetime, so a
+ * zoom gesture never renders per frame and one render serves a zoom range.
+ * A stamp library renders its page lazily through its asset engine; a raster
+ * returns itself (it cannot get sharper than its pixels).
+ */
+export type StampPreviewProvider = (devicePixelWidth: number) => Promise<ArmedStampPreview | null>;
+
+/**
+ * Ghost render buckets: powers of two from 128 px up to `cap`. The same policy
+ * the page renderer uses — one bitmap per size class, never per zoom step.
+ */
+export function previewBucket(devicePixelWidth: number, cap = 4096): number {
+  const px = Math.max(128, Math.ceil(devicePixelWidth));
+  return Math.min(cap, 2 ** Math.ceil(Math.log2(px)));
+}
+
+/**
+ * Where a programmatic stamp placement lands — the inputs a click supplies.
+ * The box is fitted and clamped exactly as the click path does it.
+ */
+export interface StampPlacement {
+  pageObjectNumber: PageObjectNumber;
+  /** Anchor in page points (content space): the placement is centred here. */
+  at: Vec;
+  /** Placed width in PDF points; default the payload's intrinsic size. */
+  targetWidth?: number;
+  /** Content rotation, degrees clockwise. Default 0. */
+  rotation?: number;
 }
 
 /**
@@ -766,6 +837,19 @@ export interface AnnotationHostCapability extends AnnotationCapability {
   ): boolean;
   /** Apply the editor's plain text — optimistic locally, debounced to the engine. */
   setContents(ref: AnnotationRef, text: string): void;
+  /** Apply the editor's rich paragraphs (run deltas over the body) —
+   *  optimistic locally, debounced to the engine. The commit is plain
+   *  `contents` while nothing overrides the body on a plain annotation, else
+   *  `richText`. */
+  setRichText(ref: AnnotationRef, doc: { paragraphs: RichTextParagraph[] }): void;
+  /** The editor's selection inside the annotation (flat offsets over the
+   *  plain projection), or null when the editor holds none. While a RANGE is
+   *  held, `updateSelection`'s font/size/colour/format keys restyle the
+   *  range's runs instead of the body. */
+  setTextSelection(ref: AnnotationRef, range: { start: number; end: number } | null): void;
+  /** The CSS family list for a face family a run names ("Helvetica" → a web
+   *  stack, a registered family → its key, mounted by `mountWebFont`). */
+  cssFontFamily(family: string): string;
   /** Leave text-edit (flush any pending write). */
   endTextEdit(): void;
   // ── hit-testing & cursor (consumed by the interaction edit handler) ──
@@ -935,8 +1019,13 @@ export interface AnnotationHostCapability extends AnnotationCapability {
    *  Vector ghosts also ride {@link pageItems}; only `kind: 'image'` ghosts
    *  need the framework's blit. */
   toolGhost(pon: PageObjectNumber): ToolGhost | null;
-  /** The armed stamp's paintable preview bytes, or null (no ghost to show). */
-  armedStampPreview(): ArmedStampPreview | null;
+  /**
+   * The armed stamp's paintable preview at (roughly) `devicePixelWidth`
+   * pixels wide — bucketed and cached per bucket for the arm's lifetime —
+   * or null when there is no ghost to show. Omit the width for the
+   * smallest bucket.
+   */
+  armedStampPreview(devicePixelWidth?: number): Promise<ArmedStampPreview | null>;
   /** Bumps on arm/disarm — keys the render layer's preview object-URL lifetime. */
   stampArmEpoch(): number;
   /**

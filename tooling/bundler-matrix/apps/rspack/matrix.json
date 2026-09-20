@@ -1,0 +1,4 @@
+{
+  "toolchain": "Rspack 1",
+  "dist": "dist"
+}

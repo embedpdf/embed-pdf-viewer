@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { createQuickJsSandbox } from '@embedpdf/core-js-sandbox';
 import { createLocalEngine } from '@embedpdf/engine';
 import { createFormScriptingController } from '../src/scripting';
+import { standaloneRealm } from './helpers/standalone-realm';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const fixturePath = resolve(
@@ -27,20 +28,23 @@ describe('recalc probe', () => {
       { scope: ['*'] },
     );
     const pages = await doc.pages.list();
+    const document = () => ({
+      id: doc.id,
+      name: 'demo.pdf',
+      pageCount: pages.pageCount,
+      pages: pages.pages,
+      revision: 0,
+    });
+    const realm = standaloneRealm(doc, document, {
+      now: () => Date.UTC(2026, 6, 15, 9, 30, 0),
+      utcOffsetMinutes: () => 0,
+      sandboxFactory: () => createQuickJsSandbox(),
+    });
     const controller = createFormScriptingController({
       doc,
-      document: () => ({
-        id: doc.id,
-        name: 'demo.pdf',
-        pageCount: pages.pageCount,
-        pages: pages.pages,
-        revision: 0,
-      }),
-      config: {
-        now: () => Date.UTC(2026, 6, 15, 9, 30, 0),
-        utcOffsetMinutes: () => 0,
-      },
-      sandboxFactory: () => createQuickJsSandbox(),
+      document,
+      transaction: realm.transaction,
+      budget: realm.budget,
     });
     const snap = await doc.forms.list();
     const guests = snap.fields.find((f) => f.name === 'guests')!;
@@ -64,6 +68,7 @@ describe('recalc probe', () => {
     const total = after.fields.find((f) => f.name === 'total_amount');
     console.log('total_amount value entry:', JSON.stringify(total?.valueEntry ?? total?.value));
     controller.dispose();
+    realm.dispose();
     await doc.close();
     await engine.destroy();
     expect(true).toBe(true);

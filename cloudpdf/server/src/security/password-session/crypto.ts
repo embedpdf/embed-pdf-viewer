@@ -124,6 +124,9 @@ function deriveFinalKey(input: {
   rowSalt: Buffer;
   binding: PasswordSessionBinding;
 }): Buffer {
+  // The JWT unlock key is an issuer-generated random secret, independent
+  // of the PDF password encrypted by this envelope. HMAC/HKDF combine key
+  // material here; this is not a password verifier or password-based KDF.
   const unlockIkm = createHmac('sha256', input.serverSecret).update(input.unlockKey).digest();
   try {
     const wrapKey = hkdfBuffer({

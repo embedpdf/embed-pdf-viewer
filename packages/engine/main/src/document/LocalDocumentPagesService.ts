@@ -9,6 +9,9 @@ import {
   type PageInsertResult,
   type PageListSnapshot,
   type PageMoveResult,
+  type PageNameInput,
+  type PageNameResult,
+  type PageRemoveNameInput,
   type PageObjectNumber,
   type PageRotateResult,
   type PageRotation,
@@ -122,6 +125,78 @@ export class LocalDocumentPagesService implements DocumentPagesService {
         type: 'pages.moved',
         pageObjectNumbers,
         destIndex,
+        ...payload.result,
+      });
+      return payload.result;
+    });
+  }
+
+  setName(input: PageNameInput): AbortablePromise<PageNameResult> {
+    return this.runNameJob(
+      { kind: 'pages.setName', ...input },
+      'pages.setName',
+      input.name,
+      input.pageObjectNumber,
+    );
+  }
+
+  removeName(input: PageRemoveNameInput): AbortablePromise<PageNameResult> {
+    return this.runNameJob(
+      { kind: 'pages.removeName', name: input.name },
+      'pages.removeName',
+      input.name,
+      null,
+    );
+  }
+
+  /**
+   * Named pages are LAYOUT: both verbs are page-structure mutations mapped
+   * to the cloud's POST /pages/names and /pages/names/delete (gated by
+   * `doc.pages.assemble`, like every page-structure verb) and publish one
+   * `pages.named` event carrying the fresh layout.
+   */
+  private runNameJob(
+    request:
+      | {
+          kind: 'pages.setName';
+          name: string;
+          pageObjectNumber: PageObjectNumber;
+          replace?: string;
+        }
+      | { kind: 'pages.removeName'; name: string },
+    tag: 'pages.setName' | 'pages.removeName',
+    name: string,
+    pageObjectNumber: PageObjectNumber | null,
+  ): AbortablePromise<PageNameResult> {
+    if (this.view.isClosed()) {
+      return AbortablePromise.rejectReason(
+        new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.docId}`),
+      );
+    }
+    try {
+      this.guard.assertCapability('doc.pages.assemble');
+    } catch (err) {
+      return AbortablePromise.rejectReason(err);
+    }
+    const docId = this.docId;
+    const submission = this.queue.enqueue<WorkerResultPayload>(
+      {
+        buildPack: (jobId: JobId) => wirePack({ ...request, jobId, docId }),
+      },
+      { priority: Priority.HIGH },
+    );
+    return AbortablePromise.run<PageNameResult>(async (signal) => {
+      const onAbort = () => submission.abort(signal.reason);
+      if (signal.aborted) onAbort();
+      else signal.addEventListener('abort', onAbort, { once: true });
+      const payload = await submission;
+      if (payload.tag !== tag) {
+        throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload tag: ${payload.tag}`);
+      }
+      this.publisher.publishLocal({
+        type: 'pages.named',
+        name,
+        pageObjectNumber,
         ...payload.result,
       });
       return payload.result;

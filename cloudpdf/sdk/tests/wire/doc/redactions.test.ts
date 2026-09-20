@@ -22,6 +22,8 @@ describe("RedactionsClient", () => {
                     previousDocVersion: 1,
                     docVersion: 1,
                     annotationsVersion: 1,
+                    layerVersion: 1,
+                    working: true,
                     pages: [{ pageObjectNumber: 1, cache: { contentVersion: 1, annotationVersion: 1 } }],
                 },
             },

@@ -41,10 +41,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { PdfAnnotationEventKind } from '@embedpdf/plugin-actions/contract';
 import type { AnnotationRef } from '@embedpdf/plugin-annotation/contract';
 import { FormToken } from '@embedpdf/plugin-form';
-import type {
-  FillItem,
-  FormFieldDTO,
-} from '@embedpdf/plugin-form';
+import { SignatureToken } from '@embedpdf/plugin-signature/contract';
+import type { FormFieldRef, FillItem, FormFieldDTO } from '@embedpdf/plugin-form';
 import { InteractionToken } from '@embedpdf/plugin-interaction/contract';
 import { StageToken } from '@embedpdf/plugin-stage/contract';
 import type { Rect } from '@embedpdf/core-annotation';
@@ -55,6 +53,7 @@ import {
   shallowArray,
   useCapability,
   useOptionalCapability,
+  useOptionalSelector,
   usePage,
   useSelector,
 } from './runtime';
@@ -144,8 +143,6 @@ function useWidgetActivation(key: string, annotationRef: AnnotationRef | null): 
   }, [form, key]);
 }
 
-
-
 /* ══════════════════════════ behavior widgets ══════════════════════════ */
 
 /** The baked /AP raster, blitted by its OWN box (exactly like BakedImage). */
@@ -217,7 +214,63 @@ function FormWidget({ item, page, appearance }: AnnotationRendererProps) {
       return <ChoiceWidget fill={fill} item={item} page={page} appearance={appearance} />;
     case 'button':
       return <ButtonWidget fill={fill} item={item} page={page} appearance={appearance} />;
+    case 'signature':
+      return <SignatureWidget fill={fill} item={item} page={page} appearance={appearance} />;
   }
+}
+
+/** The form plugin's field key → the engine ref (the inverse of `fieldKeyOf`). */
+const fieldRefOfKey = (key: string): FormFieldRef =>
+  key.startsWith('obj:')
+    ? { kind: 'objectNumber', fieldObjectNumber: Number(key.slice(4)) }
+    : { kind: 'fqn', name: key.slice(4) };
+
+/**
+ * A signature field's widget: the picture (the mark drawn into it, once
+ * there is one) with a click target on top. Unsigned → "sign here": the
+ * field becomes the signature plugin's TARGET, so the next mark picked
+ * from a signatures panel goes into it. Signed → `inspect`: the chrome shows
+ * what the signature says. Without the signature plugin the widget is
+ * picture only — the field plane has no fill control of its own here.
+ */
+function SignatureWidget({ fill, item, page, appearance }: WidgetProps<'signature'>) {
+  const signature = useOptionalCapability(SignatureToken);
+  const wrap = useIsolated<HTMLDivElement>();
+  const events = useWidgetEvents(fill.key, item.ref);
+  const b = viewBox(item.box, page);
+  const ref = fieldRefOfKey(fill.key);
+  // The signature plugin's snapshot is the authority on signed-ness (it
+  // re-reads on every new version); the field plane's /V is the fallback.
+  const signed = useOptionalSelector(
+    SignatureToken,
+    (c) => c.signatureOf(ref)?.signed ?? fill.signed,
+    fill.signed,
+  );
+  const actionable = signature != null && (signed || !fill.disabled);
+  return (
+    <div
+      ref={wrap}
+      {...events}
+      style={{ position: 'absolute', left: b.left, top: b.top, width: b.width, height: b.height }}
+    >
+      <Picture page={page} appearance={appearance} apBox={item.apBox} frame={b} />
+      {actionable ? (
+        <button
+          type="button"
+          aria-label={fill.label}
+          data-signed={signed ? '' : undefined}
+          onClick={() => (signed ? signature.inspect(ref) : signature.setTarget(ref))}
+          style={{
+            ...fillControl,
+            padding: 0,
+            border: 0,
+            background: 'transparent',
+            cursor: 'pointer',
+          }}
+        />
+      ) : null}
+    </div>
+  );
 }
 
 function ButtonWidget({ fill, item, page, appearance }: WidgetProps<'button'>) {
@@ -722,36 +775,36 @@ function FillToggle({
     // runs); the enabled button below chains toggle-then-/A itself and
     // stops propagation so the click never double-activates.
     <FillEventBox item={item} page={page} cursor={item.disabled ? 'default' : 'pointer'} activate>
-    <button
-      role={item.kind}
-      aria-checked={item.checked}
-      aria-label={item.label}
-      disabled={item.disabled}
-      onClick={(e) => {
-        e.stopPropagation();
-        // Checkbox re-click clears; radio click always selects its state.
-        // Acrobat's order: the VALUE change first, THEN the /A.
-        void Promise.resolve(
-          form.toggle(item.key, item.kind === 'checkbox' && item.checked ? null : item.onState),
-        ).then(activate, activate);
-      }}
-      style={{
-        ...controlBase,
-        ...fillControl,
-        cursor: 'inherit',
-        display: 'grid',
-        placeItems: 'center',
-        padding: 0,
-        borderRadius: item.kind === 'radio' ? '50%' : 2,
-        fontSize: glyphSize,
-        lineHeight: 1,
-        color: '#1f2a44',
-        // A disabled control suppresses clicks — the box must receive them.
-        ...(item.disabled ? { pointerEvents: 'none' as const } : {}),
-      }}
-    >
-      {item.checked ? (item.kind === 'radio' ? '●' : '✓') : ''}
-    </button>
+      <button
+        role={item.kind}
+        aria-checked={item.checked}
+        aria-label={item.label}
+        disabled={item.disabled}
+        onClick={(e) => {
+          e.stopPropagation();
+          // Checkbox re-click clears; radio click always selects its state.
+          // Acrobat's order: the VALUE change first, THEN the /A.
+          void Promise.resolve(
+            form.toggle(item.key, item.kind === 'checkbox' && item.checked ? null : item.onState),
+          ).then(activate, activate);
+        }}
+        style={{
+          ...controlBase,
+          ...fillControl,
+          cursor: 'inherit',
+          display: 'grid',
+          placeItems: 'center',
+          padding: 0,
+          borderRadius: item.kind === 'radio' ? '50%' : 2,
+          fontSize: glyphSize,
+          lineHeight: 1,
+          color: '#1f2a44',
+          // A disabled control suppresses clicks — the box must receive them.
+          ...(item.disabled ? { pointerEvents: 'none' as const } : {}),
+        }}
+      >
+        {item.checked ? (item.kind === 'radio' ? '●' : '✓') : ''}
+      </button>
     </FillEventBox>
   );
 }
@@ -849,6 +902,44 @@ function FillButton({
   );
 }
 
+/** The standalone layer's signature control: the same target/inspect
+ *  hand-off as {@link SignatureWidget}, over the page raster. */
+function FillSignature({
+  item,
+  page,
+}: {
+  item: Extract<FillItem, { control: 'signature' }>;
+  page: PageContextValue;
+}) {
+  const signature = useOptionalCapability(SignatureToken);
+  const ref = fieldRefOfKey(item.key);
+  const signed = useOptionalSelector(
+    SignatureToken,
+    (c) => c.signatureOf(ref)?.signed ?? item.signed,
+    item.signed,
+  );
+  const actionable = signature != null && (signed || !item.disabled);
+  return (
+    <FillEventBox item={item} page={page} cursor={actionable ? 'pointer' : 'default'}>
+      {actionable ? (
+        <button
+          type="button"
+          aria-label={item.label}
+          data-signed={signed ? '' : undefined}
+          onClick={() => (signed ? signature.inspect(ref) : signature.setTarget(ref))}
+          style={{
+            ...fillControl,
+            padding: 0,
+            border: 0,
+            background: 'transparent',
+            cursor: 'inherit',
+          }}
+        />
+      ) : null}
+    </FillEventBox>
+  );
+}
+
 /**
  * Fill-mode form controls for one page, positioned from the form model's own
  * widget geometry — the ANNOTATION-LESS path (a fill-only viewer whose page
@@ -880,6 +971,8 @@ export function FormLayer() {
           <FillChoice key={`${item.key}:${item.annotObjectNumber}`} item={item} page={page} />
         ) : item.control === 'button' ? (
           <FillButton key={`${item.key}:${item.annotObjectNumber}`} item={item} page={page} />
+        ) : item.control === 'signature' ? (
+          <FillSignature key={`${item.key}:${item.annotObjectNumber}`} item={item} page={page} />
         ) : null,
       )}
     </div>

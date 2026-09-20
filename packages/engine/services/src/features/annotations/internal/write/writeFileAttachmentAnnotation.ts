@@ -9,7 +9,7 @@ import { EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
 import { writeAttachmentFilePayload } from '../../../attachments/internal/attachmentPrimitives';
-import { FILE_ICON_TO_CODE } from '../annotationIcon';
+import { FILE_ICON_TO_NAME } from '../annotationIcon';
 import type { AnnotationWriteContext } from './annotationWriteContext';
 import { setAnnotColor, setAnnotOpacity, setAnnotRect } from './annotationWritePrimitives';
 import { applyAnnotationBaseDraft, applyAnnotationBasePatch } from './writeAnnotationBase';
@@ -94,9 +94,9 @@ export function isFileAttachmentSubtype(subtype: string): subtype is 'file-attac
 function setFileAttachmentIcon(
   fn: PdfFunctions,
   annotPtr: Ptr,
-  icon: keyof typeof FILE_ICON_TO_CODE,
+  icon: keyof typeof FILE_ICON_TO_NAME,
 ): void {
-  if (!fn.EPDFAnnot_SetName(annotPtr, FILE_ICON_TO_CODE[icon])) {
+  if (!fn.EPDFAnnot_SetName(annotPtr, FILE_ICON_TO_NAME[icon])) {
     throw new EngineError(EngineErrorCode.Unknown, 'EPDFAnnot_SetName returned false');
   }
 }

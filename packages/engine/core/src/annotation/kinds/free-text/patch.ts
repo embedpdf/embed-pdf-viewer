@@ -1,3 +1,4 @@
+import type { RichTextDocumentInput } from '../../../dto/RichText';
 import type { CalloutLine, PdfRect } from '../../../geometry/primitives';
 import type { AnnotationPatchBase } from '../../patch-base';
 import type {
@@ -18,6 +19,16 @@ export interface FreeTextPatch extends AnnotationPatchBase {
   fontFamily?: FreeTextFont;
   fontSize?: number;
   textAlign?: TextAlignment;
+  /**
+   * Rich replacement: `/RC`, `/DS`, `/DA`, `/Contents` and the appearance
+   * are all regenerated. A patch that also carries `contents` must agree
+   * with the rich text's plain projection (`InvalidArg` otherwise). A
+   * `contents`-only patch on an annotation with `/RC` rewrites the rich
+   * text as body-style paragraphs: run formatting is lost by design.
+   * `fontFamily` / `fontSize` / `fontColor` on such an annotation change the
+   * body style; runs are deltas, so every run that did not override follows.
+   */
+  richText?: RichTextDocumentInput;
 
   rect?: PdfRect;
 

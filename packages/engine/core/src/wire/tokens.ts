@@ -1,7 +1,9 @@
 import { decodeToken, encodeToken, type TokenInput, type TokenQuery } from './token';
 
 export type { TokenInput } from './token';
+import { SIGNATURE_POLICY_VERSION } from '../signature/protection';
 import {
+  AnalysisTokenSchema,
   AnnotationAppearancesRenderTokenSchema,
   AnnotationTokenSchema,
   AnnotationsAllTokenSchema,
@@ -16,11 +18,74 @@ import {
   SearchTokenSchema,
 } from './tokenSchemas';
 import type { PdfSaveMode } from '../dto/PdfSaveMode';
+import type { ModificationLevel } from '../signature/types';
 import type { SearchQuery, SearchSliceBudget } from '../search/types';
 
 export interface DownloadToken {
   docVersion: number;
   mode: PdfSaveMode;
+}
+
+/** The layer analysis token: the pin plus the flat `AnalyzeInput` (until = the working copy). */
+export interface AnalysisToken {
+  docVersion: number;
+  since: { signatureIndex: number } | { revisionIndex: number };
+  exploratoryLevel?: ModificationLevel;
+  /** The judging policy version the caller expects (`SIGNATURE_POLICY_VERSION`); keys the cache. */
+  policyVersion?: number;
+  /** `full` carries every pairwise step; default `summary`. */
+  detail?: 'summary' | 'full';
+}
+
+export const encodeAnalysisToken = (input: AnalysisToken): string =>
+  encodeToken(AnalysisTokenSchema, {
+    docVersion: input.docVersion,
+    'since.signature': 'signatureIndex' in input.since ? input.since.signatureIndex : undefined,
+    'since.revision': 'revisionIndex' in input.since ? input.since.revisionIndex : undefined,
+    level: input.exploratoryLevel,
+    policy: input.policyVersion ?? SIGNATURE_POLICY_VERSION,
+    detail: input.detail,
+  });
+
+export const decodeAnalysisToken = (raw: string): AnalysisToken => {
+  const t = decodeToken(AnalysisTokenSchema, raw);
+  const sinceSignature = t['since.signature'];
+  const sinceRevision = t['since.revision'];
+  if ((sinceSignature === undefined) === (sinceRevision === undefined)) {
+    throw new Error('analysis token needs exactly one of "since.signature" / "since.revision"');
+  }
+  return {
+    docVersion: decodePositiveInteger(t.docVersion, 'docVersion'),
+    since:
+      sinceSignature !== undefined
+        ? { signatureIndex: decodeNonNegativeInteger(sinceSignature, 'since.signature') }
+        : { revisionIndex: decodeNonNegativeInteger(sinceRevision!, 'since.revision') },
+    ...(t.level !== undefined ? { exploratoryLevel: decodeModificationLevel(t.level) } : {}),
+    ...(t.policy !== undefined ? { policyVersion: decodePositiveInteger(t.policy, 'policy') } : {}),
+    ...(t.detail !== undefined ? { detail: decodeDetail(t.detail) } : {}),
+  };
+};
+
+function decodeDetail(raw: string): 'summary' | 'full' {
+  if (raw !== 'summary' && raw !== 'full') {
+    throw new Error('token field "detail" must be summary|full');
+  }
+  return raw;
+}
+
+const MODIFICATION_LEVELS: ReadonlyArray<ModificationLevel> = ['none', 'lta', 'fill', 'annotate'];
+function decodeModificationLevel(raw: string): ModificationLevel {
+  if (!(MODIFICATION_LEVELS as readonly string[]).includes(raw)) {
+    throw new Error(`token field "level" must be one of ${MODIFICATION_LEVELS.join('|')}`);
+  }
+  return raw as ModificationLevel;
+}
+
+function decodeNonNegativeInteger(raw: string | undefined, field: string): number {
+  if (raw === undefined) throw new Error(`token is missing "${field}"`);
+  if (!/^(0|[1-9][0-9]*)$/.test(raw))
+    throw new Error(`token field "${field}" must be a non-negative integer`);
+  return Number(raw);
 }
 
 export const encodeDocToken = (docVersion: number): string =>

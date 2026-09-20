@@ -181,6 +181,9 @@ export interface PluginContext<S, A extends Action = Action> {
   get<T>(token: CapabilityToken<T>): T;
   forDocument<T>(token: CapabilityToken<T>, documentId: string): T;
   tryGet<T>(token: CapabilityToken<T>): T | null;
+  /** `forDocument` for an OPTIONAL dependency: null when the plugin is not
+   *  installed or that document is not ready, never a throw. */
+  tryForDocument<T>(token: CapabilityToken<T>, documentId: string): T | null;
   /**
    * Register a resource teardown owned by this plugin instance. Document-
    * scoped callbacks run when that document closes; workspace callbacks run

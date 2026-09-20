@@ -1,4 +1,4 @@
-import { DEFAULT_LAYER_NAME, wirePaths } from '@embedpdf/engine-core/wire';
+import { randomUUID } from 'node:crypto';
 import { mkdtemp, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -24,12 +24,17 @@ import {
   type AnnotationRef,
   type WirePack,
   type WorkerRequest,
+  type AnalyzeInput,
+  type ChangeAnalysis,
+  type SignatureSnapshot,
 } from '@embedpdf/engine-core/runtime';
+import { DEFAULT_LAYER_NAME, wirePaths } from '@embedpdf/engine-core/wire';
 import type { DocumentManifest, LayerScopes } from '@embedpdf/engine-core/wire';
 
 import type { LayerStateService } from './LayerStateService';
 import type { EngineCounters } from '../app/engine-counters';
 import { pinnedLayerName, type RequestJwtContext } from '../app/jwt-plugin';
+import type { BaseVersionRow, BaseVersionsRepo } from '../db/repos/base_versions.repo';
 import type { DocumentsRepo, DocumentRow } from '../db/repos/documents.repo';
 import type {
   PasswordSessionFacts,
@@ -90,6 +95,8 @@ export interface DocumentHead {
 export type { DocumentManifest } from '@embedpdf/engine-core/wire';
 
 export interface DocumentServiceOptions {
+  /** The base version catalog (migration 030): the head's row supplies the manifest's pointers and byte length. */
+  baseVersions: BaseVersionsRepo;
   documents: DocumentsRepo;
   cache: BaseFileCache;
   storage: ObjectStore;
@@ -180,6 +187,7 @@ export interface UnlockLayerAccessResult {
  */
 export class DocumentService {
   private readonly documents: DocumentsRepo;
+  private readonly baseVersions: BaseVersionsRepo;
   private readonly cache: BaseFileCache;
   private readonly storage: ObjectStore;
   private readonly pool: EnginePool;
@@ -233,6 +241,7 @@ export class DocumentService {
 
   constructor(opts: DocumentServiceOptions) {
     this.documents = opts.documents;
+    this.baseVersions = opts.baseVersions;
     this.counters = opts.counters;
     this.cache = opts.cache;
     this.storage = opts.storage;
@@ -445,10 +454,7 @@ export class DocumentService {
     const docId = row.id;
     const baseSha = requireBaseSha(row);
 
-    let handle: LocalFileHandle | null = await this.cache.acquire({
-      sha: baseSha,
-      key: StorageKeys.basePdf(row.tenantId, row.id),
-    });
+    let handle: LocalFileHandle | null = await this.acquireBaseFile(row, baseSha);
     try {
       const build = (jobId: WorkerJobId) =>
         wirePack({
@@ -459,6 +465,9 @@ export class DocumentService {
           basePath: handle!.path,
           layer: { kind: 'fresh' as const },
           password,
+          // The cache verified this hash against the bytes on disk; the
+          // runtime takes it instead of hashing the file a third time.
+          baseSha256: baseSha,
         });
       const result = await this.pool.runOpen(docId, baseSha, build);
       if (this.counters) this.counters.docOpens += 1;
@@ -466,7 +475,7 @@ export class DocumentService {
         throw new EngineError(EngineErrorCode.WireFormat, `unexpected open payload: ${result.tag}`);
       }
       const head = buildHead(row, this.cdnAccessRequired);
-      this.replaceBaseHandle(docId, handle);
+      this.replaceBaseHandle(docId, baseSha, handle);
       handle = null;
       return head;
     } finally {
@@ -485,7 +494,12 @@ export class DocumentService {
     const pages = await this.layerState.ensureBasePages(docId, () =>
       this.loadDurableBasePageStates(ctx, docId),
     );
-    return this.layerState.buildBaseManifest(head, pages);
+    const version = await this.layerState.baseVersionFacts(
+      docId,
+      head.baseSha,
+      head.storageSizeBytes,
+    );
+    return this.layerState.buildBaseManifest(head, pages, version);
   }
 
   async getLayerHead(ctx: OpenContext, docId: string, layerName: string): Promise<DocumentHead> {
@@ -527,25 +541,33 @@ export class DocumentService {
     const password = await this.passwordForOpen(ctx, row, layerName);
     const head = await this.openOnPool(ctx, docId, password);
     const layer = await this.layerState.repos.layers.findByDocAndName(docId, layerName);
+    const headVersion = await this.layerState.baseVersionFacts(
+      docId,
+      head.baseSha,
+      head.storageSizeBytes,
+    );
     if (!layer) {
       const pages = await this.layerState.ensureBasePages(docId, () =>
         this.loadDurableBasePageStates(ctx, docId),
       );
       // No layer row yet -> immutable base view: docVersion from head, the
-      // geometry pointer at its initial epoch (1) — and every plane
-      // trivially INHERITED, so every visitor's never-written layer
-      // resolves all reads at the shared base URLs.
+      // plane pointers the HEAD VERSION publishes (the initial epochs for a
+      // never-published document) — and every plane trivially INHERITED,
+      // so every visitor's never-written layer resolves all reads at the
+      // shared base URLs.
       return this.layerState.buildLayerManifest(
         docId,
-        head.baseSha,
+        headVersion,
         layerName,
         {
           docVersion: head.docVersion,
-          layoutVersion: 1,
-          metadataVersion: 1,
-          attachmentsVersion: 1,
-          annotationsVersion: 1,
+          layoutVersion: headVersion.layoutVersion,
+          metadataVersion: headVersion.metadataVersion,
+          attachmentsVersion: headVersion.attachmentsVersion,
+          annotationsVersion: headVersion.annotationsVersion,
           lastAuditId: 0,
+          currentVersion: 0,
+          currentArtifactKey: null,
         },
         pages,
         this.layerState.computeLayerScopes(null, [], []),
@@ -556,16 +578,24 @@ export class DocumentService {
       this.loadDurableBasePageStates(ctx, docId),
     );
     const pages = await this.layerState.ensureLayerPagesFromBase({ layerId: layer.id, docId });
+    // The layer's OWN base version (law 2): behind the head once a sibling
+    // published, until the layer is rebased.
+    const layerBaseSha = layer.baseSha ?? head.baseSha;
+    const layerVersion =
+      layerBaseSha === head.baseSha
+        ? headVersion
+        : await this.layerState.baseVersionFacts(docId, layerBaseSha, null);
     // Plane scopes: annotation writes own `annotations` only (renders/
     // text/geometry keep sharing); move/rotate own `layout` only (normalized
-    // artifacts survive); flatten/redaction/page-set changes own `content`.
+    // artifacts survive); flatten/redaction/page-set changes own `content`;
+    // a layer behind the head owns everything.
     return this.layerState.buildLayerManifest(
       docId,
-      head.baseSha,
+      layerVersion,
       layerName,
       layer,
       pages,
-      this.layerState.computeLayerScopes(layer, pages, basePages),
+      this.layerState.computeLayerScopes(layer, pages, basePages, headVersion),
     );
   }
 
@@ -853,6 +883,58 @@ export class DocumentService {
       );
     }
     return result.metadata;
+  }
+
+  /**
+   * The layer's signature snapshot, read through the session's working copy
+   * (decision 18: the server session keeps every committed edit in memory,
+   * so its working copy IS the layer's durable state). Ensures the session
+   * embodies the durable layer version first — a read never validates
+   * freshness by itself, and a session left over from before a publish
+   * on another replica would otherwise describe the old base.
+   */
+  async readLayerSignatures(
+    ctx: OpenContext,
+    docId: string,
+    layerName: string,
+    signal?: AbortSignal,
+  ): Promise<SignatureSnapshot> {
+    await this.ensureLayerOnPool(ctx, docId, layerName);
+    const result = await this.readOnPool(
+      ctx,
+      docId,
+      layerName,
+      (jobId: WorkerJobId) =>
+        wirePack({ kind: 'signatures.list' as const, jobId, docId, layerName, workingCopy: true }),
+      signal,
+    );
+    if (result.tag !== 'signatures.list') {
+      throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload: ${result.tag}`);
+    }
+    return result.snapshot;
+  }
+
+  /** The layer's pending edits judged against its base; same freshness rule as {@link readLayerSignatures}. */
+  async analyzeLayerSignatures(
+    ctx: OpenContext,
+    docId: string,
+    layerName: string,
+    input: AnalyzeInput,
+    signal?: AbortSignal,
+  ): Promise<ChangeAnalysis> {
+    await this.ensureLayerOnPool(ctx, docId, layerName);
+    const result = await this.readOnPool(
+      ctx,
+      docId,
+      layerName,
+      (jobId: WorkerJobId) =>
+        wirePack({ kind: 'signatures.analyze' as const, jobId, docId, layerName, input }),
+      signal,
+    );
+    if (result.tag !== 'signatures.analyze') {
+      throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload: ${result.tag}`);
+    }
+    return result.analysis;
   }
 
   /**
@@ -1349,6 +1431,40 @@ export class DocumentService {
     return new Uint8Array(result.bytes);
   }
 
+  /**
+   * The chosen annotations' normal appearances as ONE single-page PDF —
+   * `pages.extract`'s sibling for the annotation plane: a READ over the
+   * current layer state (the worker flattens into a scratch document; the
+   * source is untouched), so no write queue, no artifact, no audit row.
+   */
+  async exportAnnotationAppearance(
+    ctx: OpenContext,
+    docId: string,
+    layerName: string,
+    pageObjectNumber: number,
+    refs: AnnotationRef[],
+    signal?: AbortSignal,
+  ): Promise<Uint8Array> {
+    await this.ensureLayerOnPool(ctx, docId, layerName);
+    const build = (jobId: WorkerJobId) =>
+      wirePack({
+        kind: 'annotations.exportAppearance' as const,
+        jobId,
+        docId,
+        layerName,
+        pageObjectNumber,
+        refs,
+      });
+    const result = await this.pool.run(docId, build, signal);
+    if (result.tag !== 'annotations.exportAppearance') {
+      throw new EngineError(
+        EngineErrorCode.WireFormat,
+        `unexpected annotations.exportAppearance payload: ${result.tag}`,
+      );
+    }
+    return new Uint8Array(result.bytes);
+  }
+
   async saveLayerDownloadToTemp(
     ctx: OpenContext,
     docId: string,
@@ -1439,7 +1555,7 @@ export class DocumentService {
     // `layerOpens`.
     for (const docId of scope.docIds) {
       this.heads.delete(docId);
-      this.releaseBaseHandle(docId);
+      this.releaseBaseHandles(docId);
       const prefix = `${docId}::`;
       for (const key of Array.from(this.layerSessionVersions.keys())) {
         if (key.startsWith(prefix)) this.layerSessionVersions.delete(key);
@@ -1458,7 +1574,7 @@ export class DocumentService {
   onPoolEvict(evt: { docId: string }): void {
     this.heads.delete(evt.docId);
     this.forgetLayerSessions(evt.docId);
-    this.releaseBaseHandle(evt.docId);
+    this.releaseBaseHandles(evt.docId);
   }
 
   /**
@@ -1613,13 +1729,15 @@ export class DocumentService {
       // we treat that as success.
     } finally {
       this.forgetLayerSessions(docId);
-      this.releaseBaseHandle(docId);
+      this.releaseBaseHandles(docId);
     }
   }
 
   releaseAllBaseHandles(): void {
-    for (const docId of Array.from(this.baseHandles.keys())) {
-      this.releaseBaseHandle(docId);
+    for (const key of Array.from(this.baseHandles.keys())) {
+      const handle = this.baseHandles.get(key)!;
+      this.baseHandles.delete(key);
+      handle.release();
     }
     for (const key of Array.from(this.layerArtifactHandles.keys())) {
       this.releaseLayerArtifactHandle(key);
@@ -1663,16 +1781,15 @@ export class DocumentService {
     const row = await this.requireReadyRow(ctx, docId);
     const openPassword = password ?? (await this.passwordForOpen(ctx, row, layerName));
     const head = await this.openOnPool(ctx, docId, openPassword);
-    const handle = this.baseHandles.get(docId);
-    if (!handle) {
-      throw new EngineError(
-        EngineErrorCode.DocOpenFailed,
-        `base file handle missing for open document: ${docId}`,
-      );
-    }
 
     const sessionKey = layerSessionKey(docId, layerName);
     const layer = await this.layerState.repos.layers.findByDocAndName(docId, layerName);
+    // Law 2: a layer session materializes over the LAYER's base version,
+    // which sits behind the head once a sibling published. Its file is
+    // held beside the head's, keyed by sha, until the document closes or
+    // a publish forgets every session over the old base.
+    const layerBaseSha = layer?.baseSha ?? head.baseSha;
+    const handle = await this.baseHandleFor(row, layerBaseSha);
     let layerHandle: LocalFileHandle | null = null;
     const layerOpen = layer
       ? await this.readLayerOpenSource(layer)
@@ -1685,10 +1802,11 @@ export class DocumentService {
         jobId,
         docId,
         layerName,
-        baseKey: head.baseSha,
+        baseKey: layerBaseSha,
         basePath: handle.path,
         layer: layerSource,
         password: openPassword,
+        baseSha256: layerBaseSha,
       };
       return wirePack(request);
     };
@@ -1720,14 +1838,11 @@ export class DocumentService {
     source: { kind: 'fresh' } | { kind: 'artifact-file'; path: string };
     handle: LocalFileHandle | null;
   }> {
-    if (layer.currentVersion === 0 && !layer.currentArtifactKey) {
-      return { source: { kind: 'fresh' }, handle: null };
-    }
+    // No artifact key means a fresh layer over its base at ANY version: a
+    // publish consumes the signing layer's edits into the new base version
+    // and clears the artifact while `current_version` keeps counting (law 3).
     if (!layer.currentArtifactKey) {
-      throw new EngineError(
-        EngineErrorCode.DocOpenFailed,
-        `layer version ${layer.currentVersion} is missing its artifact key`,
-      );
+      return { source: { kind: 'fresh' }, handle: null };
     }
     if (!layer.currentArtifactSha) {
       throw new EngineError(
@@ -1763,16 +1878,176 @@ export class DocumentService {
     }
   }
 
-  private replaceBaseHandle(docId: string, handle: LocalFileHandle): void {
-    this.releaseBaseHandle(docId);
-    this.baseHandles.set(docId, handle);
+  private replaceBaseHandle(docId: string, sha: string, handle: LocalFileHandle): void {
+    this.releaseBaseHandles(docId);
+    this.baseHandles.set(baseHandleKey(docId, sha), handle);
   }
 
-  private releaseBaseHandle(docId: string): void {
-    const handle = this.baseHandles.get(docId);
-    if (!handle) return;
-    this.baseHandles.delete(docId);
-    handle.release();
+  /** Release every base version held for the document: the head's and any layer's behind it. */
+  private releaseBaseHandles(docId: string): void {
+    for (const key of Array.from(this.baseHandles.keys())) {
+      if (!key.startsWith(`${docId}@`)) continue;
+      const handle = this.baseHandles.get(key)!;
+      this.baseHandles.delete(key);
+      handle.release();
+    }
+  }
+
+  /**
+   * The held file of one base version of an open document, acquired on
+   * first use. Two layer opens racing for the same behind-head version
+   * both acquire (the cache refcounts); the loser releases its copy.
+   */
+  private async baseHandleFor(row: DocumentRow, sha: string): Promise<LocalFileHandle> {
+    const key = baseHandleKey(row.id, sha);
+    const held = this.baseHandles.get(key);
+    if (held) return held;
+    const acquired = await this.acquireBaseFile(row, sha);
+    const raced = this.baseHandles.get(key);
+    if (raced) {
+      acquired.release();
+      return raced;
+    }
+    this.baseHandles.set(key, acquired);
+    return acquired;
+  }
+
+  /**
+   * The local file of one base version, from the sha-keyed cache. The
+   * catalog row names the object key; a version without a row (or with
+   * `storageKey` null) is the legacy per-document base object.
+   */
+  private async acquireBaseFile(row: DocumentRow, sha: string): Promise<LocalFileHandle> {
+    const version = await this.baseVersions.find(row.id, sha);
+    const key = version?.storageKey ?? StorageKeys.basePdf(row.tenantId, row.id);
+    return this.cache.acquire({ sha, key });
+  }
+
+  /** The document's version catalog, oldest first, and its head. */
+  async listVersions(
+    ctx: OpenContext,
+    docId: string,
+  ): Promise<{ head: string; versions: BaseVersionRow[] }> {
+    const row = await this.requireReadyRow(ctx, docId);
+    const head = requireBaseSha(row);
+    const versions = await this.baseVersions.listForDocument(docId);
+    if (versions.length === 0) {
+      // Committed before the catalog existed and never signed: version 1 is the head itself.
+      return { head, versions: [legacyVersionRow(row, head)] };
+    }
+    return { head, versions };
+  }
+
+  /** One catalogued version of the document; `NotFound` for a sha that is not one of its versions. */
+  async requireVersion(ctx: OpenContext, docId: string, sha: string): Promise<BaseVersionRow> {
+    const row = await this.requireReadyRow(ctx, docId);
+    const version = await this.baseVersions.find(docId, sha);
+    if (version) return version;
+    if (row.baseSha === sha) return legacyVersionRow(row, sha);
+    throw new EngineError(EngineErrorCode.NotFound, `${sha} is not a version of ${docId}`);
+  }
+
+  /**
+   * One engine read over a base VERSION: the version's file opened into a
+   * private transient session (a version is not a layer, and never the
+   * live document), the read dispatched to it, the session closed. The
+   * session id is unique per call so concurrent reads of one version
+   * never share or close each other's session.
+   */
+  async readVersionOnPool(
+    ctx: OpenContext,
+    docId: string,
+    sha: string,
+    build: (sessionId: string, jobId: WorkerJobId) => WirePack<WorkerRequest>,
+    signal?: AbortSignal,
+  ): Promise<WorkerResultPayload> {
+    const row = await this.requireReadyRow(ctx, docId);
+    const version = await this.requireVersion(ctx, docId, sha);
+    const password = await this.passwordForOpen(ctx, row, pinnedLayerName(ctx));
+    const handle = await this.acquireBaseFile(row, version.sha256);
+    const sessionId = `${docId}#${version.sha256}#${randomUUID()}`;
+    try {
+      const opened = await this.pool.runOpen(
+        sessionId,
+        version.sha256,
+        (jobId: WorkerJobId) =>
+          wirePack({
+            kind: 'open.layerFileBase' as const,
+            jobId,
+            docId: sessionId,
+            baseKey: version.sha256,
+            basePath: handle.path,
+            layer: { kind: 'fresh' as const },
+            password,
+            baseSha256: version.sha256,
+          }),
+        signal,
+      );
+      if (opened.tag !== 'open') {
+        throw new EngineError(EngineErrorCode.WireFormat, `unexpected open payload: ${opened.tag}`);
+      }
+      return await this.pool.run(
+        sessionId,
+        (jobId: WorkerJobId) => build(sessionId, jobId),
+        signal,
+      );
+    } finally {
+      await this.pool.close(sessionId).catch(() => undefined);
+      handle.release();
+    }
+  }
+
+  /** The local file of one base version of a document the caller may read (signing rebuilds a candidate from it). */
+  async acquireBaseFileFor(ctx: OpenContext, docId: string, sha: string): Promise<LocalFileHandle> {
+    const row = await this.requireReadyRow(ctx, docId);
+    return this.acquireBaseFile(row, sha);
+  }
+
+  /** The password the caller's session opens the document with (`null` when it needs none). */
+  async passwordFor(ctx: OpenContext, docId: string, layerName: string): Promise<string | null> {
+    const row = await this.requireReadyRow(ctx, docId);
+    return this.passwordForOpen(ctx, row, layerName);
+  }
+
+  /**
+   * The binding and JWT unlock key needed to rebind the caller's session
+   * inside the publishing transaction. This context contains no PDF
+   * password: the repository decrypts and re-encrypts it under the new
+   * version's binding. `null` when the document needs no password session
+   * (unencrypted, or an api token that supplies the password per request).
+   */
+  async sessionRebindContext(
+    ctx: OpenContext,
+    docId: string,
+    layerName: string,
+  ): Promise<{ binding: PasswordSessionBinding; unlockKey: string } | null> {
+    const row = await this.requireReadyRow(ctx, docId);
+    if (!requiresPasswordSession(row) || ctx.sub === 'api-token' || !this.passwordSessions)
+      return null;
+    return {
+      binding: this.passwordSessionBinding(ctx, row, layerName),
+      unlockKey: this.requireUnlockKey(ctx),
+    };
+  }
+
+  /**
+   * After a version was published (a signature completed): every session
+   * over the old base is garbage — the head, the layer sessions, the
+   * held files. The next open routes by the new sha. Other replicas hear
+   * it through the realtime bus; correctness never depends on that (a
+   * stale head only makes a later prepare record a stale fence, which
+   * the completion rejects).
+   */
+  async onBaseVersionPublished(docId: string): Promise<void> {
+    this.heads.delete(docId);
+    this.forgetLayerSessions(docId);
+    try {
+      await this.pool.close(docId);
+    } catch {
+      // Best effort: an evicted document is already gone from the pool.
+    } finally {
+      this.releaseBaseHandles(docId);
+    }
   }
 
   private replaceLayerArtifactHandle(key: string, handle: LocalFileHandle | null): void {
@@ -1830,6 +2105,30 @@ function buildHead(row: DocumentRow, cdnAccessRequired: boolean): DocumentHead {
       ...(reasons.length > 0 ? { endpoint: wirePaths.access(row.id, DEFAULT_LAYER_NAME) } : {}),
     },
   };
+}
+
+/** The catalog row a pre-catalog document's head stands for: version 1 at the legacy key. */
+function legacyVersionRow(row: DocumentRow, sha: string): BaseVersionRow {
+  return {
+    tenantId: row.tenantId,
+    docId: row.id,
+    sha256: sha,
+    byteLength: row.storageSizeBytes ?? 0,
+    number: 1,
+    parentSha256: null,
+    producerKind: 'upload',
+    producerRef: null,
+    storageKey: null,
+    layoutVersion: 1,
+    metadataVersion: 1,
+    attachmentsVersion: 1,
+    annotationsVersion: 1,
+    createdAt: row.createdAt,
+  };
+}
+
+function baseHandleKey(docId: string, sha: string): string {
+  return `${docId}@${sha}`;
 }
 
 function requireBaseSha(row: DocumentRow): string {

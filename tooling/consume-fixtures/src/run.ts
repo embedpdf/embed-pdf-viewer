@@ -246,6 +246,28 @@ for (const [owner, packed] of Object.entries(packedManifests)) {
 if (closureFailed) process.exit(1);
 console.log('✔ packed publication graph is closed over public workspace packages');
 
+// Existing v2 viewers fetch unversioned manifest URLs from this package.
+// Check the actual tarball before either a prerelease or stable publish:
+// all legacy manifests must ship and still address the correct PDF pages.
+const defaultStampsTarball = tarballs['@embedpdf/default-stamps'];
+if (!defaultStampsTarball) throw new Error('Missing @embedpdf/default-stamps tarball');
+const defaultStampsDir = path.join(tmp, 'default-stamps');
+fs.mkdirSync(defaultStampsDir);
+sh('tar', ['-xzf', defaultStampsTarball, '-C', defaultStampsDir], tmp);
+execFileSync(
+  'pnpm',
+  ['--filter', '@embedpdf/plugin-stamp', 'exec', 'vitest', 'run', 'test/default-stamps.test.ts'],
+  {
+    cwd: repoRoot,
+    env: {
+      ...process.env,
+      EMBEDPDF_DEFAULT_STAMPS_DIR: path.join(defaultStampsDir, 'package'),
+    },
+    stdio: 'inherit',
+  },
+);
+console.log('✔ packed default stamps preserve v2 manifests and PDF page mappings');
+
 // ── 3. run fixtures ─────────────────────────────────────────────────────────
 const results: Record<string, { ok: boolean; detail?: string }> = {};
 for (const fixture of FIXTURES) {

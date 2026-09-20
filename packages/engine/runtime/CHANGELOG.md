@@ -1,5 +1,42 @@
 # @embedpdf/engine-runtime
 
+## 3.0.0-next.13
+
+### Minor Changes
+
+- [#817](https://github.com/embedpdf/embed-pdf-viewer/pull/817) by [@bobsingor](https://github.com/bobsingor) – Add native and WASM APIs to read FreeText rich text as JSON, author it from JSON or XHTML, and generate appearances with multiple fonts, run styles, and text decorations.
+
+  Support CFF font resources, document-level embedding and typographic policies, variable-font instancing, and font embedding-permission enforcement. Preserve registered font identities in saved annotation resources and expose identity and editing-authorization APIs.
+
+- [#812](https://github.com/embedpdf/embed-pdf-viewer/pull/812) by [@bobsingor](https://github.com/bobsingor) – Add native and WASM APIs for signature inspection, revision comparison, byte-range digests, incremental signing, and signature-field appearances.
+
+  Make incremental layer saves omit unchanged objects and detect reverted edits, including after reopening a layer. Add file-backed layer and overlay reads, share immutable stream data, and compare stream contents in chunks to reduce copying and memory use.
+
+  Fix signature appearance placement, make newly authored form widgets printable, and resolve named pages through the current layer view.
+
+### Patch Changes
+
+- [#820](https://github.com/embedpdf/embed-pdf-viewer/pull/820) by [@bobsingor](https://github.com/bobsingor) – Fix native and WASM text redaction when multiple regions intersect the same text
+  object. Later regions no longer leave targeted text searchable or copyable in
+  saved PDFs or remove neighboring text. Preserve the positions of remaining text,
+  including vertical text.
+
+  Remove stale replacement and alternate text associated with redacted content,
+  correct redaction inside transformed nested forms, and preserve unredacted uses
+  of shared images and forms.
+
+  Fixes [#801](https://github.com/embedpdf/embed-pdf-viewer/issues/801).
+
+## 3.0.0-next.12
+
+### Minor Changes
+
+- [#803](https://github.com/embedpdf/embed-pdf-viewer/pull/803) by [@bobsingor](https://github.com/bobsingor) – `EPDFPage_FlattenAnnotations` flattens a chosen set of a page's annotations with a per-entry status (applied, skipped, not-on-page), replacing the single-annotation `EPDFAnnot_Flatten`. `EPDFPage_ExportAnnotationsAsDocument` flattens a set's appearances into a new single-page document sized to their union rect, replacing `EPDFAnnot_ExportAppearanceAsDocument` and `EPDFAnnot_ExportMultipleAppearancesAsDocument`, which mishandled rotated appearances and the rect fit. Whole-page flatten, selective flatten, and export now share one candidate plan and one placement writer (ISO 32000-2 12.5.5 fit, `/Matrix` honored, no content re-parsing); resources shared between exported appearances are cloned once.
+
+  New named-page functions: `EPDFDoc_GetNamedPageCount`, `EPDFDoc_GetNamedPageAt` (key as UTF-16 plus the value's object number and kind: page, template, or dangling), `EPDFDoc_SetNamedPage` (create or replace, pages in the page tree only), `EPDFDoc_RemoveNamedPage`, and `EPDFDoc_RemoveNamedPagesForPage`. `EPDFDoc_DeletePageByObjectNumber` now removes the `/Names /Pages` registrations of the page it deletes. The name-tree index search reports a pair whose value is a missing object (with a null value) instead of hiding it and desynchronizing later indices.
+
+  Annotation `/Name` is text: `EPDFAnnot_SetName` takes any name, writes a name object (escaping applied by the serializer), and never touches `/AP`; `EPDFAnnot_GetName` fills a text buffer. The `FPDF_ANNOT_NAME` enum, its subtype validation, and the sentinel that removed `/Name` together with `/AP` are removed — remove `/Name` with `EPDFAnnot_RemoveKey(annot, "Name")`.
+
 ## 3.0.0-next.11
 
 ### Minor Changes

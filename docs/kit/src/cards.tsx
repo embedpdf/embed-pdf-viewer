@@ -6,6 +6,7 @@ import {
   PuzzleIcon,
   Search01Icon,
   ServerStack01Icon,
+  StampIcon,
   TaskEdit01Icon,
   TextSelectionIcon,
 } from '@hugeicons/core-free-icons';
@@ -67,6 +68,7 @@ const GRID_CARD_ICONS = {
   annotation: HighlighterIcon,
   form: TaskEdit01Icon,
   search: Search01Icon,
+  stamp: StampIcon,
   engine: CpuIcon,
   server: ServerStack01Icon,
   plugin: PuzzleIcon,
@@ -97,7 +99,9 @@ export function CardGrid({
   columns?: keyof typeof GRID_COLUMNS;
 }) {
   return (
-    <div className={`mt-[22px] grid items-stretch gap-3.5 ${GRID_COLUMNS[columns]}`}>{children}</div>
+    <div className={`mt-[22px] grid items-stretch gap-3.5 ${GRID_COLUMNS[columns]}`}>
+      {children}
+    </div>
   );
 }
 

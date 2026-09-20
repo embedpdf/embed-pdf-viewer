@@ -14,7 +14,7 @@ import {
 } from './handler';
 import { wireMarkup } from './markup';
 import { annotationReducer, initialAnnotationState } from './reducer';
-import { isTouchDirect } from './tools';
+import { ARMED_STAMP_TOOL_ID, isTouchDirect } from './tools';
 import { AnnotationToken } from './types';
 import type {
   AnnotationAction,
@@ -87,9 +87,18 @@ export const annotationPlugin = (config: AnnotationConfig = {}) =>
         // (form widgets under a fill tool) drop out of the selection — no
         // stranded chrome on a fill control.
         annotation.pruneEngagedSelection();
-        // Leaving the stamp family drops any armed payload — bytes are tool state,
-        // not document state (any stamp tool keeps it; a non-stamp tool clears it).
-        if (!interaction.activeTool().enables.has('annotation-stamp')) annotation.disarmStamp();
+        // Leaving the armed stamp's own tool drops the payload — bytes are tool
+        // state, not document state. It has to be the TOOL, not a capability
+        // tag: `armStamp` activates ARMED_STAMP_TOOL_ID and every built-in
+        // stamp tool carries `annotation-place`, so tag-matching either
+        // disarmed the payload on the very activation that armed it, or let it
+        // survive onto a sibling preset whose own `source` it would then
+        // hijack. The legacy `annotation-stamp` tag still holds a payload, for
+        // embedder tools written before the tags were unified.
+        const active = interaction.activeTool();
+        if (active.id !== ARMED_STAMP_TOOL_ID && !active.enables.has('annotation-stamp')) {
+          annotation.disarmStamp();
+        }
       });
 
       // Markup is opt-in: wire the selection→annotation BRIDGE only when a

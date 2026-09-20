@@ -26,41 +26,15 @@ import type {
   PdfAnnotationEventKind,
   SubmitIntent,
 } from '@embedpdf/plugin-actions/contract';
-import type {
-  ScriptBudget,
-  ScriptDiagnostic,
-  ScriptExecutionError,
-  ScriptIdentity,
-  ScriptUiEffect,
-} from '@embedpdf/core-acrojs';
-import type { ScriptSandboxFactory } from '@embedpdf/core-js-sandbox';
+import type { ScriptDiagnostic, ScriptExecutionError, ScriptUiEffect } from '@embedpdf/core-acrojs';
 import { createCapabilityToken } from '@embedpdf/core';
 
 import type { FillItem } from './core/fill-items';
-import type { Box, FieldKey, Model } from './core/model';
+import type { Box, FieldKey, Model, WidgetHit } from './core/model';
+import type { AuthorableFormFamily } from './tools';
 
 export interface FormState {
   model: Model;
-}
-
-/**
- * Standalone-realm configuration for `createFormScriptingHost` — stamp's
- * detached documents and direct controller tests. Viewer documents configure
- * scripting on `actionsPlugin({ javascript })` instead (D8), and every UI
- * effect/diagnostic surfaces through the actions port (D9).
- */
-export interface FormScriptingOptions {
-  /** Override the lazy QuickJS factory (tests or another isolated VM). */
-  sandboxFactory?: ScriptSandboxFactory;
-  /** Optional embedder identity fields layered over engine/JWT identity. */
-  identity?: Partial<ScriptIdentity> | (() => Partial<ScriptIdentity>);
-  /** Target document filename exposed as `this.documentFileName`. */
-  fileName?: () => string;
-  /** Injected deterministic transaction environment. */
-  now?: () => number;
-  utcOffsetMinutes?: () => number;
-  randomSeed?: () => number;
-  budget?: ScriptBudget;
 }
 
 /** The scripting switch moved to `actionsPlugin({ javascript })` (D8). */
@@ -98,10 +72,9 @@ export type FormUiEffect = ScriptUiEffect & {
   origin?: ActionOrigin;
 };
 
-
 /** Input for {@link FormCapability.placeField}. */
 export interface PlaceFieldInput {
-  family: Exclude<FormFieldFamily, 'pushbutton' | 'signature' | 'unknown'>;
+  family: AuthorableFormFamily;
   pageObjectNumber: number;
   /** Content-space LOGICAL field box (no visual padding semantics). */
   box: Box;
@@ -146,6 +119,15 @@ export interface FormCapability {
 
   field(key: FieldKey): FormFieldDTO | null;
   fieldForWidget(annotObjectNumber: number): FormFieldDTO | null;
+  /**
+   * The widget under a content-space point on a page (any family), with
+   * its field — the hit test a sibling plugin runs on a pointer sample
+   * before deciding what a click means (a mark dropped over a signature
+   * field). The model's own geometry answers when it is loaded; until then
+   * the annotation plane's live boxes do, so the first click on a page
+   * already resolves. The smallest containing widget wins.
+   */
+  widgetAt(pageObjectNumber: number, point: { x: number; y: number }): WidgetHit | null;
 
   /** Commit a text value (call on blur/Enter — keystrokes stay local). */
   setText(key: FieldKey, value: string): Promise<void>;
@@ -263,4 +245,4 @@ export interface FormHostCapability extends FormCapability {
 export const FormToken = createCapabilityToken<FormHostCapability>('form');
 
 export type { FillItem } from './core/fill-items';
-export type { Box, FieldKey } from './core/model';
+export type { Box, FieldKey, WidgetHit } from './core/model';

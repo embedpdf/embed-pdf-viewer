@@ -1,0 +1,22 @@
+[
+  {
+    "file": "morning-U1-dense+977-fixed-signed-plus-orphan.pdf",
+    "sha256": "896ecbc91dc088050c246d73c5619ed86f390c8777413bfba2d3c05e1e9819c1"
+  },
+  {
+    "file": "morning-U2-dense+catalog-info-removed-signed-plus-orphan.pdf",
+    "sha256": "1e097ee935efae3422069f653af41748251558d4bb5ecd684245cce4bd3c4769"
+  },
+  {
+    "file": "morning-U3-sparse+977-fixed-signed-plus-orphan.pdf",
+    "sha256": "cdac3ae4c5b33c642c02251cf8f0db41acaa25fa048a7022f4cca698cbee12e4"
+  },
+  {
+    "file": "morning-U4-sparse+catalog-info-removed-signed-plus-orphan.pdf",
+    "sha256": "70e9eb1526513900d05320ce79287dfc908b2ed4a538c3266cd7ae719ff7a8c4"
+  },
+  {
+    "file": "morning-U5-sparse-rebuilt-control-signed-plus-orphan.pdf",
+    "sha256": "21bc94b570bd821dd429e337acc490efa3318f1f9a98d3747785672f44b632a1"
+  }
+]

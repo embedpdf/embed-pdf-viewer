@@ -1,0 +1,52 @@
+{
+  "name": "@embedpdf/default-stamps",
+  "version": "1.0.0-next.0",
+  "private": false,
+  "description": "The standard rubber-stamp library as Acrobat-compatible PDFs, one per locale: title, /Names /Pages registry (identifier=label), vector artwork. Import with @embedpdf/plugin-stamp or drop into Acrobat's Stamps folder.",
+  "type": "module",
+  "sideEffects": false,
+  "files": [
+    "de",
+    "en",
+    "es",
+    "fr",
+    "ja",
+    "nl",
+    "sv",
+    "zh-CN",
+    "library.js",
+    "library.d.ts",
+    "locales",
+    "README.md"
+  ],
+  "exports": {
+    "./de/stamps.pdf": "./de/stamps.pdf",
+    "./en/stamps.pdf": "./en/stamps.pdf",
+    "./es/stamps.pdf": "./es/stamps.pdf",
+    "./fr/stamps.pdf": "./fr/stamps.pdf",
+    "./ja/stamps.pdf": "./ja/stamps.pdf",
+    "./nl/stamps.pdf": "./nl/stamps.pdf",
+    "./sv/stamps.pdf": "./sv/stamps.pdf",
+    "./zh-CN/stamps.pdf": "./zh-CN/stamps.pdf",
+    "./library": {
+      "types": "./library.d.ts",
+      "default": "./library.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/embedpdf/embed-pdf-viewer.git",
+    "directory": "packages/default-stamps"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "clean": "rimraf locales"
+  },
+  "devDependencies": {
+    "rimraf": "^5.0.0"
+  }
+}

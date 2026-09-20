@@ -14,7 +14,6 @@ import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runti
 
 import { F32_BYTES } from '../../../../runtime/memory/structs';
 import { readAnnotRect } from '../read/annotationReadPrimitives';
-import { STAMP_NAME_TO_CODE } from '../stampName';
 import type { AnnotationWriteContext } from './annotationWriteContext';
 import { setAnnotRect } from './annotationWritePrimitives';
 import { applyAnnotationBaseDraft, applyAnnotationBasePatch } from './writeAnnotationBase';
@@ -33,13 +32,13 @@ const STAMP_FIT_TO_CODE: Record<StampFit, number> = {
  * creating an annotation or strengthening a weak annotation id.
  */
 export function preflightStampDraft(draft: StampWireDraft, ctx?: AnnotationWriteContext): void {
-  if (draft.name !== undefined) requireStampNameCode(draft.name);
+  if (draft.name !== undefined) requireStampName(draft.name);
   requireStampFit(draft.fit ?? 'contain');
   requireStampContent(draft.source, ctx);
 }
 
 export function preflightStampPatch(patch: StampWirePatch, ctx?: AnnotationWriteContext): void {
-  if (patch.name !== undefined) requireStampNameCode(patch.name);
+  if (patch.name !== undefined && patch.name !== null) requireStampName(patch.name);
   requireStampFit(patch.fit ?? 'contain');
   if (patch.source !== undefined) requireStampContent(patch.source, ctx);
 }
@@ -91,7 +90,11 @@ export function applyStampPatch(
   ctx?: AnnotationWriteContext,
 ): void {
   applyAnnotationBasePatch(fn, mem, annotPtr, patch);
-  if (patch.name !== undefined) {
+  if (patch.name === null) {
+    // Removal is the generic key removal — the reader then reports the
+    // spec default; the appearance (the artwork) is untouched.
+    fn.EPDFAnnot_RemoveKey(annotPtr, 'Name');
+  } else if (patch.name !== undefined) {
     setStampName(fn, annotPtr, patch.name);
   }
   if (patch.source !== undefined) {
@@ -141,25 +144,19 @@ export function isStampSubtype(subtype: string): subtype is 'stamp' {
   return subtype === 'stamp';
 }
 
+/** Any non-empty name: standard ('Approved') or custom ('#LBGiYhk8V…') —
+ *  the fork writes a name object and escapes it; predefined sets are a
+ *  reader concern (ISO 32000-2 table 187 allows additional names). */
 function setStampName(fn: PdfFunctions, annotPtr: Ptr, name: string): void {
-  const code = STAMP_NAME_TO_CODE[name];
-  if (code === undefined) {
-    throw new EngineError(EngineErrorCode.Unknown, 'stamp name preflight invariant broken');
-  }
-  if (!fn.EPDFAnnot_SetName(annotPtr, code)) {
+  if (!fn.EPDFAnnot_SetName(annotPtr, name)) {
     throw new EngineError(EngineErrorCode.Unknown, 'EPDFAnnot_SetName returned false');
   }
 }
 
-function requireStampNameCode(name: string): number {
-  const code = STAMP_NAME_TO_CODE[name];
-  if (code === undefined) {
-    throw new EngineError(
-      EngineErrorCode.InvalidArg,
-      `unknown stamp name '${name}'; supported names: ${Object.keys(STAMP_NAME_TO_CODE).join(', ')}`,
-    );
+function requireStampName(name: string): void {
+  if (name.length === 0) {
+    throw new EngineError(EngineErrorCode.InvalidArg, 'stamp name must be non-empty');
   }
-  return code;
 }
 
 function requireStampFit(fit: StampFit): void {

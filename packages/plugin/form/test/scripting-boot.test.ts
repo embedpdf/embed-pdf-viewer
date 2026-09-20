@@ -11,6 +11,7 @@ import type { ScriptSandbox } from '@embedpdf/core-js-sandbox';
 import type { ScriptInput, ScriptOutput } from '@embedpdf/core-acrojs';
 
 import { createFormScriptingController } from '../src/scripting';
+import { standaloneRealm } from './helpers/standalone-realm';
 
 const okEvent = (value: unknown = '') => ({
   rc: true,
@@ -108,10 +109,15 @@ const snapshot = (): FormSnapshot =>
 describe('FormScriptingController — boot failures degrade, never brick', () => {
   it('a throwing boot script still lets the user commit (and again after)', async () => {
     const applied: FormEffect[][] = [];
+    const doc = makeDoc(applied);
+    const realm = standaloneRealm(doc, () => null, {
+      sandboxFactory: async () => failingBootSandbox(),
+    });
     const controller = createFormScriptingController({
-      doc: makeDoc(applied),
+      doc,
       document: () => null,
-      config: { sandboxFactory: async () => failingBootSandbox() },
+      transaction: realm.transaction,
+      budget: realm.budget,
     });
 
     const first = await controller.commit(
@@ -147,10 +153,14 @@ describe('FormScriptingController — boot failures degrade, never brick', () =>
     (doc.actions as { read: () => Promise<never> }).read = async () => {
       throw new Error('actions unavailable');
     };
+    const realm = standaloneRealm(doc, () => null, {
+      sandboxFactory: async () => failingBootSandbox(),
+    });
     const controller = createFormScriptingController({
       doc,
       document: () => null,
-      config: { sandboxFactory: async () => failingBootSandbox() },
+      transaction: realm.transaction,
+      budget: realm.budget,
     });
     const result = await controller.commit(
       { kind: 'objectNumber', fieldObjectNumber: 7 },

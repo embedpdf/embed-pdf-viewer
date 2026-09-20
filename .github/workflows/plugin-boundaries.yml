@@ -49,3 +49,7 @@ jobs:
 
       - name: Check plugin boundaries
         run: pnpm check:plugin-boundaries
+      # No public-CDN or other off-origin URL literal ships in viewer or engine
+      # source — the code half of docs/viewer/self-hosting's guarantee.
+      - name: No off-origin URL literals in shipped source
+        run: pnpm check:network-literals

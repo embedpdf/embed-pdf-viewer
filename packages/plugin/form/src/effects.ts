@@ -51,6 +51,13 @@ export function registerFormEffects(ctx: EffectContext<FormState, FormAction>): 
       void refresh();
       return;
     }
+    // The session moved to new saved bytes (a completed signature, here or
+    // elsewhere): field values changed under us — a signature field now
+    // carries its /V — so re-read the snapshot.
+    if (event.type === 'document.versioned' || event.type === 'signature.completed') {
+      void refresh();
+      return;
+    }
     if (!event.type.startsWith('form.') || !('origin' in event)) return;
     const structural = STRUCTURAL.has(event.type);
     // Own non-structural writes already landed via the capability.

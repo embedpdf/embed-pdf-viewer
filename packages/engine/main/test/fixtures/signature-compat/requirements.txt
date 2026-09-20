@@ -1,0 +1,2 @@
+pyHanko==0.37.0
+cryptography==50.0.1

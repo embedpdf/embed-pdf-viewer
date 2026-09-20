@@ -1,0 +1,15 @@
+{
+  "name": "@embedpdf/bundler-matrix-vite",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "matrix:build": "vite build"
+  },
+  "dependencies": {
+    "@embedpdf/bundler-probe": "workspace:*"
+  },
+  "devDependencies": {
+    "vite": "^6.0.0"
+  }
+}

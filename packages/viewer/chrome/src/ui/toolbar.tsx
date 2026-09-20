@@ -20,6 +20,7 @@ import type {
 } from '@embedpdf/react/toolbar';
 import { useCommands } from '@embedpdf/react/commands';
 import type { ResolvedCommand } from '@embedpdf/react/commands';
+import { QuickStamps } from './quick-stamps';
 import { useMenus } from '@embedpdf/react/shell';
 import { useT } from '@embedpdf/react/i18n';
 import { StageToken } from '@embedpdf/react/stage';
@@ -398,6 +399,7 @@ export function AppToolbar({ bar, className }: { bar: BarSchema; className?: str
       renderCommand={(cmd, variant, run) => <CommandButton cmd={cmd} variant={variant} run={run} />}
       renderCustom={{
         'zoom-controls': (variant) => (variant === 'inline' ? <ZoomControls /> : <ZoomButton />),
+        'quick-stamps': () => <QuickStamps />,
       }}
       renderCollapsed={(view) => (view.id === 'modes' ? <CollapsedModes view={view} /> : undefined)}
       renderGroupTrigger={(view) => <GroupTrigger view={view} />}

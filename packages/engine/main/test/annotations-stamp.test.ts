@@ -343,35 +343,40 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
     ).rejects.toMatchObject({ code: expect.anything() });
   });
 
-  test('invalid stamp name rejects before create or base-patch writes', async () => {
+  test('any non-empty stamp name is accepted; an empty one rejects before any write', async () => {
     const page = handle.page(PAGE_OBJECT_NUMBER);
     const beforeCreate = await page.annotations.list();
 
+    // `/Name` is the stamp's identifier, not an enum: a standard name or an
+    // Acrobat library identifier. Only the empty name is invalid.
     await expect(
       page.annotations.create({
         subtype: 'stamp',
         rect: { left: 20, bottom: 100, right: 80, top: 130 },
         source: makePng(2, 1, [255, 0, 0, 255]),
-        name: 'DefinitelyNotAStandardStampName',
+        name: '',
       }),
     ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg });
 
     const afterRejectedCreate = await page.annotations.list();
     expect(afterRejectedCreate.annotations).toHaveLength(beforeCreate.annotations.length);
 
+    const customName = '#LBGiYhk8V_oAfmqAPENiwD';
     const { created } = await page.annotations.create({
       subtype: 'stamp',
       rect: { left: 20, bottom: 100, right: 80, top: 130 },
       source: makePng(2, 1, [0, 128, 0, 255]),
-      name: 'Approved',
+      name: customName,
       contents: 'before',
     });
+    expect(created.subtype).toBe('stamp');
+    if (created.subtype === 'stamp') expect(created.name).toBe(customName);
 
     await expect(
       page.annotations.update(created.ref, {
         subtype: 'stamp',
         contents: 'must-not-land',
-        name: 'DefinitelyNotAStandardStampName',
+        name: '',
       }),
     ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg });
 
@@ -383,5 +388,6 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
         annotation.ref.annotObjectNumber === created.ref.annotObjectNumber,
     );
     expect(reread?.contents).toBe('before');
+    if (reread?.subtype === 'stamp') expect(reread.name).toBe(customName);
   });
 });

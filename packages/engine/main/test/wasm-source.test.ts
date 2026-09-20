@@ -1,16 +1,15 @@
 import { describe, expect, test } from 'vitest';
 
-import { DEFAULT_WASM_URL, resolveInlineWasmSource, resolveWasmSource } from '../src/wasm-source';
+import { resolveInlineWasmSource, resolveWasmSource } from '../src/wasm-source';
 
 describe('resolveWasmSource (explicit sources only)', () => {
   test('nothing configured resolves to nothing — non-inline deliveries self-resolve', () => {
     expect(resolveWasmSource({})).toEqual({});
   });
 
-  test('wasmUrl passes through, with no fallback attached', () => {
+  test('wasmUrl passes through', () => {
     const resolved = resolveWasmSource({ wasmUrl: 'https://example.test/embedpdf.wasm' });
     expect(resolved.wasmUrl).toBe('https://example.test/embedpdf.wasm');
-    expect(resolved.fallbackWasmUrl).toBeUndefined();
   });
 
   test('assetsUrl appends embedpdf.wasm, trailing slash or not', () => {
@@ -44,22 +43,21 @@ describe('resolveWasmSource (explicit sources only)', () => {
 });
 
 describe('resolveInlineWasmSource (the inline blob worker default)', () => {
-  test('explicit options win and never carry a fallback', async () => {
+  test('explicit options win', async () => {
     const resolved = await resolveInlineWasmSource({
       wasmUrl: 'https://example.test/embedpdf.wasm',
     });
-    expect(resolved.wasmUrl).toBe('https://example.test/embedpdf.wasm');
-    expect(resolved.fallbackWasmUrl).toBeUndefined();
+    expect(resolved).toEqual({ wasmUrl: 'https://example.test/embedpdf.wasm' });
   });
 
-  test('the default is sibling-first: the bundler-resolved wasm32 URL with the pinned CDN as fallback', async () => {
+  test('the default is the bundler-emitted sibling — a URL for the worker to stream, and nothing after it', async () => {
     const resolved = await resolveInlineWasmSource({});
     // In node the wasm-url module resolves at runtime to a file: URL of the
     // real workspace binary — a bundler would have rewritten it to an emitted
-    // asset URL. Either way, the primary is NOT the CDN.
+    // asset URL. Either way: one URL, no bytes, no fallback of any kind.
     expect(resolved.wasmUrl).toMatch(/embedpdf\.wasm$/);
-    expect(resolved.wasmUrl).not.toBe(DEFAULT_WASM_URL);
-    expect(resolved.fallbackWasmUrl).toBe(DEFAULT_WASM_URL);
+    expect(resolved.wasmUrl).not.toMatch(/jsdelivr|unpkg|cdn/);
     expect(resolved.wasmBinary).toBeUndefined();
+    expect(Object.keys(resolved)).toEqual(['wasmUrl']);
   });
 });

@@ -1,38 +1,38 @@
 import type { FileAttachmentIcon, NoteIcon } from '@embedpdf/engine-core/runtime';
 
 /**
- * `/Name` icon ↔ `FPDF_ANNOT_NAME` enum code mapping for text and
- * file-attachment annotations (`EPDFAnnot_SetName` / `EPDFAnnot_GetName`).
- * Codes mirror the `FPDF_ANNOT_NAME` enum in `public/fpdf_annot.h` —
- * same pattern as `stampName.ts` (whose stamp block starts at 13, right
- * after these) keeping engine-core PDFium-free.
+ * `/Name` icon vocabulary ↔ PDF name mapping for text and file-attachment
+ * annotations (ISO 32000-2 tables 175 and 184). The wire speaks the
+ * kebab-case ids; `EPDFAnnot_SetName` / `EPDFAnnot_GetName` speak the PDF
+ * names. An unknown PDF name reads as the subtype's default (the reader
+ * draws the default glyph for names it does not know — spec behavior).
  */
 
-export const NOTE_ICON_TO_CODE: Readonly<Record<NoteIcon, number>> = Object.freeze({
-  comment: 0,
-  key: 1,
-  note: 2,
-  help: 3,
-  'new-paragraph': 4,
-  paragraph: 5,
-  insert: 6,
+export const NOTE_ICON_TO_NAME: Readonly<Record<NoteIcon, string>> = Object.freeze({
+  comment: 'Comment',
+  key: 'Key',
+  note: 'Note',
+  help: 'Help',
+  'new-paragraph': 'NewParagraph',
+  paragraph: 'Paragraph',
+  insert: 'Insert',
 });
 
-export const NOTE_CODE_TO_ICON: Readonly<Record<number, NoteIcon>> = Object.freeze(
+export const NOTE_NAME_TO_ICON: Readonly<Record<string, NoteIcon>> = Object.freeze(
   Object.fromEntries(
-    Object.entries(NOTE_ICON_TO_CODE).map(([icon, code]) => [code, icon as NoteIcon]),
+    Object.entries(NOTE_ICON_TO_NAME).map(([icon, name]) => [name, icon as NoteIcon]),
   ),
 );
 
-export const FILE_ICON_TO_CODE: Readonly<Record<FileAttachmentIcon, number>> = Object.freeze({
-  graph: 7,
-  'push-pin': 8,
-  paperclip: 9,
-  tag: 10,
+export const FILE_ICON_TO_NAME: Readonly<Record<FileAttachmentIcon, string>> = Object.freeze({
+  graph: 'Graph',
+  'push-pin': 'PushPin',
+  paperclip: 'Paperclip',
+  tag: 'Tag',
 });
 
-export const FILE_CODE_TO_ICON: Readonly<Record<number, FileAttachmentIcon>> = Object.freeze(
+export const FILE_NAME_TO_ICON: Readonly<Record<string, FileAttachmentIcon>> = Object.freeze(
   Object.fromEntries(
-    Object.entries(FILE_ICON_TO_CODE).map(([icon, code]) => [code, icon as FileAttachmentIcon]),
+    Object.entries(FILE_ICON_TO_NAME).map(([icon, name]) => [name, icon as FileAttachmentIcon]),
   ),
 );

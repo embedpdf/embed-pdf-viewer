@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { createQuickJsSandbox } from '@embedpdf/core-js-sandbox';
 import { createLocalEngine } from '@embedpdf/engine';
 import { createFormScriptingController } from '../src/scripting';
+import { standaloneRealm } from './helpers/standalone-realm';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const fixturePath = resolve(here, 'fixtures', 'EmbedPDF_Dynamic_Approval_Stamp.pdf');
@@ -22,27 +23,30 @@ describe('plugin-form dynamic-stamp acceptance', () => {
       { scope: ['*'] },
     );
     const pages = await doc.pages.list();
+    const document = () => ({
+      id: doc.id,
+      name: 'proposal.pdf',
+      pageCount: pages.pageCount,
+      pages: pages.pages,
+      revision: 0,
+    });
+    const realm = standaloneRealm(doc, document, {
+      identity: {
+        name: 'Alex Morgan',
+        loginName: 'alex',
+        corporation: 'EmbedPDF',
+        email: 'alex@example.com',
+      },
+      now: () => Date.UTC(2026, 6, 15, 9, 30, 0),
+      utcOffsetMinutes: () => 180,
+      randomSeed: () => 7,
+      sandboxFactory: createQuickJsSandbox,
+    });
     const controller = createFormScriptingController({
       doc,
-      document: () => ({
-        id: doc.id,
-        name: 'proposal.pdf',
-        pageCount: pages.pageCount,
-        pages: pages.pages,
-        revision: 0,
-      }),
-      config: {
-        identity: {
-          name: 'Alex Morgan',
-          loginName: 'alex',
-          corporation: 'EmbedPDF',
-          email: 'alex@example.com',
-        },
-        now: () => Date.UTC(2026, 6, 15, 9, 30, 0),
-        utcOffsetMinutes: () => 180,
-        randomSeed: () => 7,
-        sandboxFactory: createQuickJsSandbox,
-      },
+      document,
+      transaction: realm.transaction,
+      budget: realm.budget,
     });
 
     try {
@@ -67,6 +71,7 @@ describe('plugin-form dynamic-stamp acceptance', () => {
       });
     } finally {
       controller.dispose();
+      realm.dispose();
       await doc.close();
       await engine.destroy();
     }

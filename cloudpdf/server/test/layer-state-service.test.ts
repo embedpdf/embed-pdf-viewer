@@ -4,6 +4,8 @@ import {
   createSqliteDb,
   migrate,
   sqliteMigrations,
+  BaseVersionsRepo,
+  DocumentsRepo,
   DocumentPagesRepo,
   LayerPagesRepo,
   LayersRepo,
@@ -22,6 +24,8 @@ describe('LayerStateService durable authority', () => {
       documentPages: new DocumentPagesRepo(db),
       layers: new LayersRepo(db),
       layerPages: new LayerPagesRepo(db),
+      documents: new DocumentsRepo(db),
+      baseVersions: new BaseVersionsRepo(db),
     });
   });
 

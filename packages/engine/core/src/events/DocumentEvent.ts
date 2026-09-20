@@ -21,12 +21,16 @@ import type {
   FormWidgetLinkResult,
 } from '../mutation/FormMutationResults';
 import type { MetadataUpdateResult } from '../mutation/MetadataUpdateResult';
+import type { AnnotationFlattenResult } from '../mutation/AnnotationFlattenResult';
 import type { PageDeleteResult } from '../mutation/PageDeleteResult';
 import type { PageFlattenResult, PageFlattenUsage } from '../mutation/PageFlattenResult';
 import type { RedactionApplyResult } from '../mutation/RedactionApplyResult';
 import type { PageInsertResult } from '../mutation/PageInsertResult';
 import type { PageMoveResult } from '../mutation/PageMoveResult';
+import type { PageNameResult } from '../mutation/PageNameResult';
 import type { PageRotateResult } from '../mutation/PageRotateResult';
+import type { FormFieldRef } from '../identity/FormFieldRef';
+import type { BaseVersionInfo, SignatureCompleteResult } from '../signature/types';
 
 /**
  * Provenance of a `DocumentEvent` — WHOSE HAND caused the mutation, never
@@ -97,6 +101,10 @@ export type DocumentEvent =
       origin: EventOrigin;
     } & AnnotationMoveResult)
   | ({
+      type: 'annotations.flattened';
+      origin: EventOrigin;
+    } & AnnotationFlattenResult)
+  | ({
       type: 'pages.moved';
       /** Locally: the moved block. Remotely the audit row only records the
        *  outcome, so this is the full new order — consumers should read
@@ -124,6 +132,14 @@ export type DocumentEvent =
       destIndex?: number;
       origin: EventOrigin;
     } & PageInsertResult)
+  | ({
+      type: 'pages.named';
+      /** The decoded key that was registered, renamed, or removed. */
+      name: string;
+      /** The page it now points at; `null` when the registration was removed. */
+      pageObjectNumber: PageObjectNumber | null;
+      origin: EventOrigin;
+    } & PageNameResult)
   | ({ type: 'attachment.created'; origin: EventOrigin } & AttachmentCreateResult)
   | ({ type: 'attachment.deleted'; origin: EventOrigin } & AttachmentDeleteResult)
   | ({ type: 'metadata.updated'; origin: EventOrigin } & MetadataUpdateResult)
@@ -146,6 +162,34 @@ export type DocumentEvent =
       type: 'redaction.applied';
       origin: EventOrigin;
     } & RedactionApplyResult)
+  | {
+      /** A signing candidate was parked: the document is read-only until it completes or aborts. */
+      type: 'signature.prepared';
+      signingId: string;
+      field: FormFieldRef;
+      origin: EventOrigin;
+    }
+  | ({
+      /** The sealed bytes are installed; `version` is what they became. */
+      type: 'signature.completed';
+      signingId: string;
+      origin: EventOrigin;
+    } & SignatureCompleteResult)
+  | {
+      type: 'signature.aborted';
+      signingId: string;
+      origin: EventOrigin;
+    }
+  | {
+      /**
+       * The session moved to a new saved version (a completed signature,
+       * here or in another session). Byte-level facts — revisions,
+       * coverage, digests, verdicts — must be re-read.
+       */
+      type: 'document.versioned';
+      version: BaseVersionInfo;
+      origin: EventOrigin;
+    }
   | {
       /**
        * Cloud only: the live event stream fell too far behind to replay

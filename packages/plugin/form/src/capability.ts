@@ -35,10 +35,12 @@ import {
   fieldByKey,
   fieldForWidget as coreFieldForWidget,
   update,
+  widgetAt as coreWidgetAt,
   type Box,
   type FieldKey,
   type Model,
   type Msg,
+  type WidgetHit,
 } from './core/model';
 import { createSerialMutationQueue } from './mutationQueue';
 import { createFormScriptingController } from './scripting';
@@ -102,13 +104,14 @@ export function createFormCapability(
   // port's PRESENCE is the "JavaScript is on" signal (D8 — the switch lives
   // on actionsPlugin({ javascript }); form owns only the K/V/C/F pipeline).
   const actionsHost = ctx.tryGet(ActionsHostToken);
-  const scriptPort = actionsHost?.scriptTransaction?.bind(actionsHost) ?? null;
+  const realm = actionsHost?.scriptRealm ?? null;
   const scripting =
-    scriptPort && ctx.doc
+    realm && ctx.doc
       ? createFormScriptingController({
           doc: ctx.doc,
           document: () => ctx.document(),
-          transaction: scriptPort,
+          transaction: realm.transaction.bind(realm),
+          budget: realm.budget,
         })
       : null;
   if (scripting) ctx.cleanup(() => scripting.dispose());
@@ -116,19 +119,7 @@ export function createFormCapability(
   /** Every script surface (UI effects, diagnostics, errors) flows through
    *  the actions plugin's ONE port — origin/phase attached (D9). */
   const surfaceViaActions = (result: FormCommitResult, origin: ActionOrigin): void => {
-    if (!actionsHost) return;
-    const phases: Array<'boot' | 'user'> = ['boot', 'user'];
-    for (const phase of phases) {
-      const uiEffects = result.uiEffects.filter((effect) => effect.phase === phase);
-      if (uiEffects.length === 0 && phase === 'boot') continue;
-      actionsHost.surfaceScriptResult({
-        uiEffects,
-        diagnostics: phase === 'user' ? result.diagnostics : [],
-        ...(phase === 'user' && result.error ? { error: result.error } : {}),
-        origin,
-        phase,
-      });
-    }
+    actionsHost?.surfaceScriptCommit(result, { origin, realm: 'document' });
   };
 
   // Authority reads for the twins, the hydration gate, the fused fill
@@ -186,6 +177,34 @@ export function createFormCapability(
       .finally(() => {
         geomLoading.delete(pon);
       });
+  };
+
+  // ── widget hit test ─────────────────────────────────────────────────────
+  // The model's geometry when the page has it (and kick the lazy load so the
+  // next call does); otherwise the annotation plane's live boxes — it is
+  // whole-document hydrated, so a first click on a page already resolves.
+  const widgetAt = (pon: number, point: { x: number; y: number }): WidgetHit | null => {
+    const m = model();
+    ensureGeom(pon);
+    if (m.geom[pon]) return coreWidgetAt(m, pon, point);
+    if (!annotationHost) return null;
+    let best: WidgetHit | null = null;
+    for (const item of annotationHost.pageItems(pon)) {
+      if (!item.subtype.startsWith('widget') || item.ref?.kind !== 'objectNumber') continue;
+      const box = item.box;
+      const inside =
+        point.x >= box.x &&
+        point.x <= box.x + box.width &&
+        point.y >= box.y &&
+        point.y <= box.y + box.height;
+      if (!inside) continue;
+      const field = coreFieldForWidget(m, item.ref.annotObjectNumber);
+      if (!field) continue;
+      if (!best || box.width * box.height < best.box.width * best.box.height) {
+        best = { annotObjectNumber: item.ref.annotObjectNumber, field, box };
+      }
+    }
+    return best;
   };
 
   // ── memoized fill projection ────────────────────────────────────────────
@@ -606,6 +625,7 @@ export function createFormCapability(
     ensureGeom,
     field: (key) => fieldByKey(model(), key),
     fieldForWidget: (annotObjectNumber) => coreFieldForWidget(model(), annotObjectNumber),
+    widgetAt,
     setText: (key, value) => write(key, { type: 'text', value }),
     toggle: (key, onState) => write(key, { type: 'toggle', state: onState }),
     choose: (key, values) => write(key, { type: 'choice', values }),
@@ -666,9 +686,7 @@ export function createFormCapability(
         // then does the legacy form path apply (byte-for-byte no-actions
         // behavior); anything else IS the dispatch outcome, refusals included.
         const noTree =
-          result.status === 'inert' &&
-          result.steps.length === 0 &&
-          result.diagnostics.length === 0;
+          result.status === 'inert' && result.steps.length === 0 && result.diagnostics.length === 0;
         if (!noTree) return { kind: 'dispatched', result };
       }
       return {
@@ -755,9 +773,7 @@ export function createFormCapability(
       await refresh(true);
       if (annotationHost) {
         const pons = new Set(
-          result.changedWidgets
-            .map((widget) => widget.pageObjectNumber)
-            .filter((pon) => pon > 0),
+          result.changedWidgets.map((widget) => widget.pageObjectNumber).filter((pon) => pon > 0),
         );
         for (const pon of pons) await annotationHost.reloadPage(pon);
       }

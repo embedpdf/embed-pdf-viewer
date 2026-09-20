@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
 
-import { DEFAULT_WASM_URL, resolveInlineWasmSource } from '../src/wasm-source';
+import { resolveInlineWasmSource } from '../src/wasm-source';
 
 // Not every bundler emits an absolute URL for the wasm asset: webpack's
 // RelativeURL runtime (used by Next.js) yields a ROOT-RELATIVE href like
@@ -16,10 +16,11 @@ afterEach(() => {
 });
 
 describe('resolveInlineWasmSource with a bundler-relative sibling URL', () => {
-  test('absolutizes against the page location, keeping the CDN fallback', async () => {
+  test('absolutizes against the page location — a URL, streamed by the worker, nothing else', async () => {
     vi.stubGlobal('location', { href: 'https://app.test/some/page' });
     const resolved = await resolveInlineWasmSource({});
-    expect(resolved.wasmUrl).toBe('https://app.test/_next/static/media/embedpdf.abc123.wasm');
-    expect(resolved.fallbackWasmUrl).toBe(DEFAULT_WASM_URL);
+    expect(resolved).toEqual({
+      wasmUrl: 'https://app.test/_next/static/media/embedpdf.abc123.wasm',
+    });
   });
 });

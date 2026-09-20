@@ -1,0 +1,3 @@
+# Empty on purpose: Parcel picks the nearest lockfile as its project root, and the
+# `@parcel/resolver-default` settings in package.json are only read from that root.
+# A standalone Parcel project has one; this makes the app one too.

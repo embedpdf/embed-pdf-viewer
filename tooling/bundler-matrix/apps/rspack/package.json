@@ -1,0 +1,16 @@
+{
+  "name": "@embedpdf/bundler-matrix-rspack",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "matrix:build": "rspack build --mode production"
+  },
+  "dependencies": {
+    "@embedpdf/bundler-probe": "workspace:*"
+  },
+  "devDependencies": {
+    "@rspack/core": "^1.5.0",
+    "@rspack/cli": "^1.5.0"
+  }
+}

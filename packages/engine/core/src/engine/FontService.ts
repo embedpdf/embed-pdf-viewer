@@ -47,6 +47,14 @@ export interface FontService {
   /** Unregister every font and reset the fallback chain. */
   clear(): AbortablePromise<void>;
 
+  /**
+   * Assert that the application holds a licence permitting editing with a
+   * preview-and-print font, so FreeText authoring and missing-glyph fallback
+   * may use it. Resolves to the updated handle (`editingAuthorized: true`).
+   * Rejects with `InvalidArg` for an unregistered key.
+   */
+  authorizeEditing(font: FontHandle | FontKey): AbortablePromise<FontHandle>;
+
   /** Currently registered fonts, in registration order. */
   list(): readonly FontHandle[];
 }

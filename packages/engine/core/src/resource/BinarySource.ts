@@ -26,8 +26,13 @@ export interface BinaryPayload {
 }
 
 /**
- * A resolved binary payload in wire form: bytes detached from any Blob and
- * ready to ship (worker transfer list or multipart part body).
+ * A resolved binary payload in wire form: a PRIVATE COPY of the caller's
+ * bytes, owned by the call and ready to ship (worker transfer list or
+ * multipart part body). Ownership is the whole point: the local engine puts
+ * `bytes` on a postMessage transfer list, which detaches the buffer, and a
+ * `BinarySource` is a borrowed argument — never the caller's buffer to lose.
+ * Blob sources yield fresh bytes by construction; Uint8Array sources are
+ * copied here so a full-span view is not silently aliased and killed.
  */
 export interface WireResource {
   bytes: ArrayBuffer;
@@ -48,18 +53,18 @@ function isBlob(value: unknown): value is Blob {
 }
 
 /**
- * Detach a Uint8Array view into a standalone ArrayBuffer without copying
- * when the view already spans its whole buffer.
+ * Copy a Uint8Array view into a fresh, exactly-sized ArrayBuffer the call
+ * owns. Always copies — even when the view spans its whole buffer — because
+ * the result may be transferred to a worker (detaching it), and the view is
+ * the caller's. Returning `view.buffer` here would let one transfer zero
+ * the caller's bytes (a stamp library's Uint8Array became single-use).
+ * Callers wanting a zero-copy hand-off need an explicit "give" form, as
+ * `pages.insert` has for bare ArrayBuffers; `BinarySource` has none.
  */
-function toStandaloneArrayBuffer(view: Uint8Array): ArrayBuffer {
-  if (
-    view.byteOffset === 0 &&
-    view.buffer instanceof ArrayBuffer &&
-    view.byteLength === view.buffer.byteLength
-  ) {
-    return view.buffer;
-  }
-  return view.slice().buffer as ArrayBuffer;
+function toOwnedArrayBuffer(view: Uint8Array): ArrayBuffer {
+  const copy = new ArrayBuffer(view.byteLength);
+  new Uint8Array(copy).set(view);
+  return copy;
 }
 
 /**
@@ -68,7 +73,7 @@ function toStandaloneArrayBuffer(view: Uint8Array): ArrayBuffer {
  */
 export async function resolveBinarySource(source: BinarySource): Promise<WireResource> {
   if (source instanceof Uint8Array) {
-    return { bytes: toStandaloneArrayBuffer(source) };
+    return { bytes: toOwnedArrayBuffer(source) };
   }
   if (isBlob(source)) {
     const blobName = blobFileName(source);
@@ -82,7 +87,7 @@ export async function resolveBinarySource(source: BinarySource): Promise<WireRes
   const inner =
     data instanceof Uint8Array
       ? {
-          bytes: toStandaloneArrayBuffer(data),
+          bytes: toOwnedArrayBuffer(data),
           mimeType: undefined as string | undefined,
           name: undefined as string | undefined,
         }

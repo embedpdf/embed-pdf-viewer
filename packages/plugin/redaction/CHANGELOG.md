@@ -1,5 +1,9 @@
 # @embedpdf/plugin-redaction
 
+## 3.0.0-next.13
+
+## 3.0.0-next.12
+
 ## 3.0.0-next.11
 
 ### Minor Changes

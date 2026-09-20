@@ -12,6 +12,8 @@ on:
       - 'packages/engine/**'
       - 'cloudpdf/engine/**'
       - 'cloudpdf/server/**'
+      - 'packages/viewer/**'
+      - 'packages/default-stamps/**'
       - '.github/workflows/engine-conformance.yml'
   push:
     branches: [main]
@@ -21,6 +23,8 @@ on:
       - 'packages/engine/**'
       - 'cloudpdf/engine/**'
       - 'cloudpdf/server/**'
+      - 'packages/viewer/**'
+      - 'packages/default-stamps/**'
       - '.github/workflows/engine-conformance.yml'
   workflow_dispatch: {}
 
@@ -94,3 +98,32 @@ jobs:
 
       - name: Engine v3 parity demo (local vs cloud)
         run: pnpm --filter @embedpdf/example-engine-runtime-demo run engine:node
+
+  snippet:
+    name: CDN snippet from a foreign origin
+    needs: build-runtime
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Download engine-runtime artifact (wasm32)
+        uses: actions/download-artifact@v7
+        with:
+          name: engine-runtime-wasm32
+          path: packages/engine/runtime/npm/wasm32
+      - name: Build the viewer and everything it bundles
+        run: pnpm turbo run build --filter=@embedpdf/viewer
+      - name: Install a browser for Playwright
+        run: pnpm --filter @embedpdf/viewer exec playwright-core install --with-deps chromium
+      # The built dist/embedpdf.js loaded as a native ES module from another
+      # origin, exactly as the docs show it: must render, must fetch every
+      # sibling (worker chunk, embedpdf.wasm, lazy chunks) from its own
+      # folder, must not touch any other origin.
+      - name: Snippet cross-origin test
+        run: pnpm --filter @embedpdf/viewer test

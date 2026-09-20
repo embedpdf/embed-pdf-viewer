@@ -1,4 +1,9 @@
-import { createCapabilityToken, type EventHook, type Unsubscribe } from '@embedpdf/core';
+import {
+  createCapabilityToken,
+  type DocumentMeta,
+  type EventHook,
+  type Unsubscribe,
+} from '@embedpdf/core';
 import type {
   ScriptAnnotEffect,
   ScriptBudget,
@@ -11,6 +16,7 @@ import type {
 } from '@embedpdf/core-acrojs';
 import type {
   AnnotationRef,
+  DocumentHandle,
   FormEffect,
   FormEffectsResult,
   FormFieldRef,
@@ -347,12 +353,61 @@ export type AnnotCommitSink = (entries: AnnotCommitEntry[]) => Promise<AnnotComm
 export type FormCommitSink = (effects: FormEffect[]) => Promise<FormEffectsResult>;
 
 /** What a script transaction surfaced besides document effects. */
+/**
+ * Which realm produced a script result. `'document'` = this document's own
+ * realm: every effect targets the viewer document. `'detached'` = a realm
+ * minted for a document that is NOT displayed (a stamp asset): it has no
+ * document surface, so only alerts reach the adapter — print, page
+ * navigation, and submit are suppressed with a diagnostic rather than
+ * acting on the wrong document.
+ */
+export type ScriptRealmKind = 'document' | 'detached';
+
 export interface ScriptSurfaceResult {
   uiEffects: ScriptUiEffect[];
   diagnostics: ScriptDiagnostic[];
   error?: ScriptExecutionError;
   origin: ActionOrigin;
   phase: 'boot' | 'user';
+  realm: ScriptRealmKind;
+}
+
+/** A K/V/C/F transaction's result as the form controller reports it: effects
+ *  carry their own phase (boot effects belong to the first transaction that
+ *  lazily booted the realm). Structurally `FormCommitResult`'s surface half —
+ *  typed here so the actions plane never imports the form package. */
+export interface ScriptCommitSurface {
+  uiEffects: Array<ScriptUiEffect & { phase: 'boot' | 'user' }>;
+  diagnostics: ScriptDiagnostic[];
+  error?: ScriptExecutionError;
+}
+
+// ── script realms (host lens) ───────────────────────────────────────────────
+
+/** What a realm is minted FOR. `doc` is the document the scripts operate on
+ *  (the viewer document, or a detached asset); `document()` is the metadata
+ *  scripts observe (`this.documentFileName` …) — for a detached stamp that is
+ *  the TARGET document's, by Acrobat's dynamic-stamp contract. */
+export interface ScriptRealmTarget {
+  doc: DocumentHandle;
+  document(): DocumentMeta | null;
+  /** Name-tree programs, fetched lazily once per realm build. */
+  bootSources(): Promise<string[]>;
+}
+
+/** The realm transaction port plus the budget consumers apply as their
+ *  transaction aggregate — the same shape whether the realm is this
+ *  document's own (owned by actions) or a detached one (owned by the caller). */
+export interface ScriptRealmPort {
+  /** The body must perform prefetch, runs, sink commits, and reconciliation
+   *  before returning (commit-inside-the-boundary). */
+  transaction<T>(body: (txn: ScriptTransaction) => Promise<T>): Promise<T>;
+  budget: ScriptBudget;
+}
+
+/** A detached realm: the caller OWNS its lifetime. */
+export interface DetachedScriptRealm extends ScriptRealmPort {
+  dispose(): void;
 }
 
 /** Origin/phase context every script-produced UI request carries — the
@@ -508,15 +563,28 @@ export interface ActionsHostCapability extends ActionsCapability {
   registerAnnotCommitSink(sink: AnnotCommitSink): Unsubscribe;
   registerFormCommitSink(sink: FormCommitSink): Unsubscribe;
   /**
-   * The realm transaction port — present ONLY when `javascript.enabled`
-   * (its presence IS form's "scripting on" signal). The body must perform
-   * prefetch, runs, sink commits, and reconciliation before returning
-   * (commit-inside-the-boundary).
+   * THIS document's realm — present ONLY when `javascript.enabled` (its
+   * presence IS form's "scripting on" signal).
    */
-  scriptTransaction?<T>(body: (txn: ScriptTransaction) => Promise<T>): Promise<T>;
+  scriptRealm?: ScriptRealmPort;
+  /**
+   * Mint a realm for a DETACHED document under this document's policy and
+   * environment (same sandbox factory, identity, clock, budget; a fresh
+   * sandbox, so isolated globals). Present ONLY when `javascript.enabled`,
+   * like `scriptRealm`. The caller owns the returned realm's lifetime and
+   * surfaces its results with `realm: 'detached'`.
+   */
+  createDetachedScriptRealm?(target: ScriptRealmTarget): DetachedScriptRealm;
   /** Surface a script transaction's UI effects/diagnostics/error through the
    *  ONE port (adapter matrix + authority print gate + script hooks). */
   surfaceScriptResult(result: ScriptSurfaceResult): void;
+  /** Surface a K/V/C/F commit result: splits boot-phase and user-phase
+   *  effects into their own surfaces (diagnostics and the error ride the
+   *  user phase) — the one place that split lives. */
+  surfaceScriptCommit(
+    commit: ScriptCommitSurface,
+    context: { origin: ActionOrigin; realm: ScriptRealmKind },
+  ): void;
   /** Stage's page-truth push door — see {@link PageStateReport}. */
   reportPageState(report: PageStateReport): void;
   /**

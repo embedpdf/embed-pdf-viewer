@@ -5,6 +5,8 @@ import type { PageDeleteResult } from '../mutation/PageDeleteResult';
 import type { PageInsertBlankSpec } from '../mutation/PageInsertBlankInput';
 import type { PageInsertResult } from '../mutation/PageInsertResult';
 import type { PageMoveResult } from '../mutation/PageMoveResult';
+import type { PageNameInput, PageRemoveNameInput } from '../mutation/PageNameInput';
+import type { PageNameResult } from '../mutation/PageNameResult';
 import type { PageRotateResult } from '../mutation/PageRotateResult';
 import type { PageFlattenResult, PageFlattenUsage } from '../mutation/PageFlattenResult';
 import { AbortablePromise } from '../promise/AbortablePromise';
@@ -61,6 +63,27 @@ export interface DocumentPagesService {
    * recycled; surviving pages keep their identity and revisions.
    */
   delete(pageObjectNumbers: PageObjectNumber[]): AbortablePromise<PageDeleteResult>;
+
+  /**
+   * Register `name` → page in the catalog's `/Names /Pages` tree (create,
+   * or replace what an existing key points at); with `replace`, drop that
+   * other key in the same job (rename). Named pages are LAYOUT — read them
+   * back from `list().namedPages` — so this is a page-structure mutation:
+   * `docVersion` + `layoutVersion` advance, per-page pins do not. Gated like
+   * `move` (`doc.pages.assemble`). Optional while transports ship;
+   * feature-detect with `pages.setName !== undefined`.
+   *
+   * Rejects with `InvalidArg` for an empty name and `NotFound` for a page
+   * that is not in the page tree (hidden templates included).
+   */
+  setName?(input: PageNameInput): AbortablePromise<PageNameResult>;
+
+  /**
+   * Remove one `/Names /Pages` registration; the page itself is untouched.
+   * `NotFound` when no registration has that decoded key. Page DELETION
+   * removes registrations by itself — callers never need to pair the two.
+   */
+  removeName?(input: PageRemoveNameInput): AbortablePromise<PageNameResult>;
 
   /**
    * Paint eligible annotation appearances into page content and remove only

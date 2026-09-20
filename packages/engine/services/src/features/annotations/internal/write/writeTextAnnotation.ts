@@ -2,7 +2,7 @@ import type { Color, TextDraft, TextPatch } from '@embedpdf/engine-core/runtime'
 import { EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
-import { NOTE_ICON_TO_CODE } from '../annotationIcon';
+import { NOTE_ICON_TO_NAME } from '../annotationIcon';
 import { stateModelToPdf, stateToPdf } from '../annotationState';
 import {
   setAnnotColor,
@@ -95,8 +95,8 @@ export function isTextSubtype(subtype: string): subtype is 'text' {
   return subtype === 'text';
 }
 
-function setNoteIcon(fn: PdfFunctions, annotPtr: Ptr, icon: keyof typeof NOTE_ICON_TO_CODE): void {
-  if (!fn.EPDFAnnot_SetName(annotPtr, NOTE_ICON_TO_CODE[icon])) {
+function setNoteIcon(fn: PdfFunctions, annotPtr: Ptr, icon: keyof typeof NOTE_ICON_TO_NAME): void {
+  if (!fn.EPDFAnnot_SetName(annotPtr, NOTE_ICON_TO_NAME[icon])) {
     throw new EngineError(EngineErrorCode.Unknown, 'EPDFAnnot_SetName returned false');
   }
 }

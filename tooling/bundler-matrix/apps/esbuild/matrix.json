@@ -1,0 +1,11 @@
+{
+  "toolchain": "esbuild (plain, esm + splitting)",
+  "dist": "dist",
+  "variants": [
+    {
+      "name": "esbuild+portable",
+      "toolchain": "esbuild + `@embedpdf/engine/portable` (zero config)",
+      "script": "matrix:build:portable"
+    }
+  ]
+}

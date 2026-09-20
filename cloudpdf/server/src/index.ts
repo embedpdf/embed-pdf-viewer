@@ -91,6 +91,10 @@ export type { DocumentRow, CreatePendingInput, CommitInput } from './db/repos/do
 export { TenantsRepo } from './db/repos/tenants.repo';
 export type { TenantRow } from './db/repos/tenants.repo';
 export { DocumentPagesRepo, LayersRepo, LayerPagesRepo } from './db/repos/page_state.repo';
+export { BaseVersionsRepo, INITIAL_BASE_POINTERS } from './db/repos/base_versions.repo';
+export type { BasePlanePointers, BaseVersionRow } from './db/repos/base_versions.repo';
+export { DocumentSigningsRepo } from './db/repos/document_signings.repo';
+export type { SigningRow, InsertPreparedSigning } from './db/repos/document_signings.repo';
 export type {
   DurablePageRow,
   UpsertDurablePageInput,

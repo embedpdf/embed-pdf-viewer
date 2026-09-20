@@ -34,6 +34,17 @@ export const AttachmentsTokenSchema = {
   fields: ['attachmentsVersion'],
 } as const satisfies TokenSchema;
 
+/**
+ * Layer signature analysis: the working copy judged against the base,
+ * pinned by `docVersion`; `since.signature` XOR `since.revision`; `level`
+ * only in exploratory mode.
+ */
+export const AnalysisTokenSchema = {
+  // `policy`: the judging policy version the caller expects — part of the
+  // cache key, so a policy bump never serves a verdict judged the old way.
+  fields: ['docVersion', 'since.signature', 'since.revision', 'level', 'policy', 'detail'],
+} as const;
+
 export const DownloadTokenSchema = {
   fields: ['docVersion', 'mode'],
   maxLength: 128,

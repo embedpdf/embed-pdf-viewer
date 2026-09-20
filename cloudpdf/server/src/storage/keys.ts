@@ -41,6 +41,27 @@ export const StorageKeys = {
     return layerArtifactKey(tenantId, docId, layerName, version);
   },
   /**
+   * An immutable base version (migration 030). Version 1 keeps living at
+   * `basePdf()` (its catalog row has no storage key); every version a
+   * signature publishes is sha-addressed here.
+   */
+  baseVersionPdf(tenantId: string, docId: string, sha256: string): string {
+    if (!/^[0-9a-f]{64}$/.test(sha256)) {
+      throw new Error(`baseVersionPdf: bad sha256 "${sha256}"`);
+    }
+    return `${tenantId}/docs/${shard(docId)}/${docId}/versions/${sha256}.pdf`;
+  },
+  /**
+   * The bytes of a signing candidate past its base: small, and swept with
+   * the signing row it belongs to. Any replica rebuilds base + tail.
+   */
+  signingTail(tenantId: string, docId: string, signingId: string): string {
+    if (!/^[A-Za-z0-9_-]{1,64}$/.test(signingId)) {
+      throw new Error(`signingTail: bad signing id "${signingId}"`);
+    }
+    return `${tenantId}/docs/${shard(docId)}/${docId}/signings/${signingId}.tail`;
+  },
+  /**
    * Base-tier derived render: sha-addressed WITHIN the
    * tenant (cross-tenant sha-sharing would leak document existence), the
    * canonical render token IS the filename — the key is the request. The

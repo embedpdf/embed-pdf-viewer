@@ -25,8 +25,14 @@ import {
   type SelectionProps,
   type FilePickerProvider,
   type TextItem,
+  previewBucket,
 } from '@embedpdf/plugin-annotation';
-import { pickFile } from '@embedpdf/web';
+import {
+  attachRichTextEditor,
+  pickFile,
+  type RichTextEditorBinding,
+  type RichTextEditorHost,
+} from '@embedpdf/web';
 // The render layer is framework code, so it resolves the FULL host lens
 // (pageItems/chrome/appearances/…). Same runtime token as the public one — only
 // the type differs. App code never imports this.
@@ -69,11 +75,7 @@ import {
 } from './runtime';
 import type { PageContextValue, PageLayout } from './runtime';
 
-export {
-  sameAnchor,
-  sameCreationDraftAnchor,
-  type SelectionAnchor,
-} from './annotation-anchors';
+export { sameAnchor, sameCreationDraftAnchor, type SelectionAnchor } from './annotation-anchors';
 export { useAnnotationSelected } from './annotation-hooks';
 
 /** `#rrggbb` → `rgba(...)` — the marquee's translucent fill derives from the
@@ -308,25 +310,36 @@ function ToolGhostImage({ page }: { page: PageContextValue }) {
   const ghost = useSelector(AnnotationHostToken, (c) => c.toolGhost(page.pon));
   const epoch = useSelector(AnnotationHostToken, (c) => c.stampArmEpoch());
   const [url, setUrl] = useState<string | null>(null);
+  // The ghost is a bitmap of vector artwork, right at ONE size: ask for the
+  // bucket that covers the box's DEVICE width (points × device px per point),
+  // so it stays sharp at every zoom and density. The plugin caches per bucket.
+  const bucket =
+    ghost?.kind === 'image' ? previewBucket(ghost.box.width * page.transform.renderScale) : 0;
 
   useEffect(() => {
-    const preview = anno.armedStampPreview();
-    if (!preview) {
+    if (!bucket) {
       setUrl(null);
       return;
     }
-    // Copy into an EXACT ArrayBuffer (the engine idiom): a Uint8Array view may
-    // sit on a larger or shared buffer, which Blob won't accept.
-    const body = new ArrayBuffer(preview.bytes.byteLength);
-    new Uint8Array(body).set(preview.bytes);
-    const blob = new Blob([body], preview.mimeType ? { type: preview.mimeType } : {});
-    const obj = URL.createObjectURL(blob);
-    setUrl(obj);
+    let cancelled = false;
+    let obj: string | null = null;
+    void anno.armedStampPreview(bucket).then((preview) => {
+      if (cancelled || !preview) return;
+      // Copy into an EXACT ArrayBuffer (the engine idiom): a Uint8Array view
+      // may sit on a larger or shared buffer, which Blob won't accept.
+      const body = new ArrayBuffer(preview.bytes.byteLength);
+      new Uint8Array(body).set(preview.bytes);
+      const blob = new Blob([body], preview.mimeType ? { type: preview.mimeType } : {});
+      obj = URL.createObjectURL(blob);
+      // The previous bucket's image stays up until this one resolves — no
+      // flicker while a zoom crosses a bucket boundary.
+      setUrl(obj);
+    });
     return () => {
-      URL.revokeObjectURL(obj);
-      setUrl(null);
+      cancelled = true;
+      if (obj) URL.revokeObjectURL(obj);
     };
-  }, [anno, epoch]);
+  }, [anno, epoch, bucket]);
 
   if (!ghost || ghost.kind !== 'image' || !url) return null;
   const b = boxOf(ghost.box, page);
@@ -561,16 +574,58 @@ function Chrome({ page }: { page: PageContextValue }) {
 
 /**
  * A free-text annotation: the SAME styled element for viewing and editing —
- * `contentEditable` just toggles, so the text never jumps. The plugin handed us a
- * ready-to-spread style (`item.css`); the browser owns layout, caret, selection,
- * IME and clipboard; the plugin owns the text truth + the debounced engine write.
- * This component is the ENTIRE per-framework surface for text editing.
+ * `contentEditable` just toggles, so the text never jumps. The plugin handed us
+ * a ready-to-spread body style (`item.css`) and the rich paragraphs
+ * (`item.richText`); the shared `attachRichTextEditor` binding renders them
+ * as inline-styled spans, serialises typing back, maps the selection to flat
+ * offsets and keeps the caret through a restyle; the browser owns layout,
+ * caret, IME and clipboard; the plugin owns the text truth, the range
+ * routing and the debounced engine write. This component is the ENTIRE
+ * per-framework surface for text editing — React's part is the glue below.
  */
 function FreeText({ item, page }: { item: TextItem; page: PageContextValue }) {
   const anno = useCapability(AnnotationHostToken);
   const ref = React.useRef<HTMLDivElement>(null);
   const box = boxOf(item.box, page);
   const scale = item.box.width > 0 ? box.width / item.box.width : 1; // content units → screen px
+  // The binding outlives renders; the host closes over the LATEST item.
+  const binding = React.useRef<RichTextEditorBinding | null>(null);
+  const latest = React.useRef({ item, scale });
+  latest.current = { item, scale };
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const host: RichTextEditorHost = {
+      onInput: (doc) => {
+        const it = latest.current.item;
+        if (it.ref) anno.setRichText(it.ref, doc);
+      },
+      onSelectionChange: (range) => {
+        const it = latest.current.item;
+        if (it.ref) anno.setTextSelection(it.ref, range);
+      },
+      onCommand: (command) => anno.toggleTextFormat(command),
+      cssFontFamily: (family) => anno.cssFontFamily(family),
+    };
+    const b = attachRichTextEditor(el, host, {
+      document: latest.current.item.richText,
+      scale: latest.current.scale,
+    });
+    binding.current = b;
+    return () => {
+      b.detach();
+      binding.current = null;
+    };
+  }, [anno]);
+  // Model → DOM: the binding skips its own echo (so the caret never jumps
+  // while typing) and re-renders — caret restored — for a restyle, a remote
+  // edit, or a zoom.
+  // Runs on every item change: the binding re-renders only when the document
+  // differs, and otherwise just re-states the line model for the element's
+  // (possibly restyled) font.
+  useEffect(() => {
+    binding.current?.update({ document: item.richText, scale });
+  }, [item, scale]);
   // The element IS the engine's text PLATE (`SetPlateRect` + its `re W n`
   // clip): positioned at the padding inset with ZERO CSS padding, so the
   // scrollport's edge is the plate edge. CSS padding does NOT clip overflow —
@@ -584,14 +639,6 @@ function FreeText({ item, page }: { item: TextItem; page: PageContextValue }) {
     height: Math.max(0, box.height - 2 * pad),
   };
 
-  // DOM ← model, but ONLY when this element isn't being typed in — keeps the caret
-  // stable while you type AND lets a remote (collab) edit land live when idle.
-  useEffect(() => {
-    const el = ref.current;
-    if (el && document.activeElement !== el && el.innerText !== item.contents) {
-      el.innerText = item.contents;
-    }
-  }, [item.contents, item.editing]);
   // Keep DOM focus in sync with the model's `editing` state. Focus follows the
   // model — it never drives it (exit is hub-driven, see the edit handler), so a
   // transient focus-steal by the page surface can't end the edit.
@@ -626,7 +673,6 @@ function FreeText({ item, page }: { item: TextItem; page: PageContextValue }) {
       ref={ref}
       contentEditable={item.editing}
       suppressContentEditableWarning
-      onInput={() => item.ref && anno.setContents(item.ref, ref.current!.innerText)}
       onBlur={(e) => {
         // The gesture that opens the editor fires a native `mousedown` on the
         // non-focusable page surface, which blurs us to <body> (relatedTarget null)
@@ -642,10 +688,6 @@ function FreeText({ item, page }: { item: TextItem; page: PageContextValue }) {
           ref.current.focus();
         }
       }}
-      onPaste={(e) => {
-        e.preventDefault();
-        document.execCommand('insertText', false, e.clipboardData.getData('text/plain'));
-      }}
       style={{
         position: 'absolute',
         left: plate.left,
@@ -657,11 +699,17 @@ function FreeText({ item, page }: { item: TextItem; page: PageContextValue }) {
         height: plate.height,
         fontFamily: item.css.fontFamily,
         fontSize: item.css.fontSize * scale,
-        lineHeight: `${item.css.lineHeight * scale}px`,
+        // No line-height here: the binding states the engine's line model on
+        // the element per face (ascent + descent + Acrobat's leading).
         color: item.css.color,
+        fontWeight: item.css.fontWeight,
+        fontStyle: item.css.fontStyle,
+        textDecoration: item.css.textDecoration,
         textAlign: item.css.align,
         boxSizing: 'border-box',
-        background: item.css.background ?? 'transparent',
+        // The box's fill and border are the vector scene's (below this
+        // layer), so a translucent box is painted once.
+        background: 'transparent',
         whiteSpace: 'pre-wrap',
         overflowWrap: 'break-word',
         overflowY: item.editing ? 'auto' : 'hidden',

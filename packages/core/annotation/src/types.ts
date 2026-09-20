@@ -1,4 +1,5 @@
 import type {
+  RichTextDocumentInput,
   AnnotationDTO,
   AnnotationFlags,
   AnnotationRef,
@@ -11,12 +12,7 @@ import type {
   StrikeoutIntent,
 } from '@embedpdf/engine-core/runtime';
 import type { PageObjectNumber } from '@embedpdf/core';
-import type {
-  PageRotation,
-  Point,
-  Rect as GeometryRect,
-  TextQuad,
-} from '@embedpdf/core-geometry';
+import type { PageRotation, Point, Rect as GeometryRect, TextQuad } from '@embedpdf/core-geometry';
 
 export type { TextQuad } from '@embedpdf/core-geometry';
 
@@ -169,6 +165,15 @@ export interface TextStyle {
   fontSize: number;
   fontColor: string;
   textAlign: TextAlign;
+  /**
+   * The rich body's formatting (free text only): bold = body weight ≥ 600,
+   * italic = the body face's italic, underline = the body's decoration.
+   * Absent = off. Runs override these as deltas (a bold word in a regular
+   * box), which the plugin routes to the editor's text selection instead.
+   */
+  bold?: boolean;
+  italic?: boolean;
+  underline?: boolean;
 }
 
 /**
@@ -723,6 +728,9 @@ export type Msg =
   // write). `setText` flips the annotation to `vector` so the live text shows.
   | { t: 'beginTextEdit'; id: Id }
   | { t: 'setText'; id: Id; text: string }
+  // The editor's rich result (runs of deltas over the body), applied
+  // optimistically like `setText`; `contents` follows as the projection.
+  | { t: 'setRichText'; id: Id; doc: RichTextDocumentInput }
   | { t: 'endTextEdit' };
 
 export type Effect =

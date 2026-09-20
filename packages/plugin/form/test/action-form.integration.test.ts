@@ -8,6 +8,7 @@ import { createLocalEngine } from '@embedpdf/engine';
 import type { FormSnapshot } from '@embedpdf/engine-core/runtime';
 
 import { createFormScriptingController } from '../src/scripting';
+import { standaloneRealm } from './helpers/standalone-realm';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const fixturePath = resolve(here, 'fixtures', 'action_form_fixture.pdf');
@@ -35,21 +36,24 @@ describe('synthetic action form AF library acceptance', () => {
       { scope: ['*'] },
     );
     const pages = await doc.pages.list();
+    const document = () => ({
+      id: doc.id,
+      name: 'action_form_fixture.pdf',
+      pageCount: pages.pageCount,
+      pages: pages.pages,
+      revision: 0,
+    });
+    const realm = standaloneRealm(doc, document, {
+      now: () => Date.UTC(2026, 6, 15, 9, 30, 0),
+      utcOffsetMinutes: () => 180,
+      randomSeed: () => 7,
+      sandboxFactory: createQuickJsSandbox,
+    });
     const controller = createFormScriptingController({
       doc,
-      document: () => ({
-        id: doc.id,
-        name: 'action_form_fixture.pdf',
-        pageCount: pages.pageCount,
-        pages: pages.pages,
-        revision: 0,
-      }),
-      config: {
-        now: () => Date.UTC(2026, 6, 15, 9, 30, 0),
-        utcOffsetMinutes: () => 180,
-        randomSeed: () => 7,
-        sandboxFactory: createQuickJsSandbox,
-      },
+      document,
+      transaction: realm.transaction,
+      budget: realm.budget,
     });
 
     try {
@@ -110,6 +114,7 @@ describe('synthetic action form AF library acceptance', () => {
       expect(scalar(await doc.forms.list(), 'email')).toBe('not-an-email');
     } finally {
       controller.dispose();
+      realm.dispose();
       await doc.close();
       await engine.destroy();
     }

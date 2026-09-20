@@ -92,8 +92,11 @@ npm install @embedpdf/angular @cloudpdf/engine
 first use, so a module-scope `const engine = localEngine()` is safe (even under
 SSR). Hand it to `<Viewer>`: the viewer warms it up on mount and PDFium boots
 in a worker in the background, so the stage and render layer draw the pages the
-moment a document is ready — no worker wiring, no lifecycle to manage. This is
-the whole app:
+moment a document is ready — no worker wiring, no lifecycle to manage. The
+engine's WebAssembly ships inside your build and is served from your own
+origin, whatever bundler you use; see [Self-hosting & air-gapped
+deployments](/docs/viewer/self-hosting) for the full inventory and the strict-CSP
+options. This is the whole app:
 </Engine>
 
 <Engine cloud>

@@ -1,0 +1,454 @@
+{
+  "schemaVersion": 1,
+  "corpusVersion": "role-probes-v2",
+  "capturedAt": "2026-09-13",
+  "source": "Working-tree engine reports; not a released-build claim.",
+  "runtimes": ["wasm", "native-layerFile"],
+  "runtimeCasesEqual": true,
+  "cases": [
+    {
+      "id": "31",
+      "sha256": "dc908b7eb0133a04dfef7224e76fd4e78f9d4430c2b3a407a54790ffc05a2e70",
+      "policyVersion": 3,
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "trust": "trusted",
+          "modifications": {
+            "verdict": "unchanged",
+            "basis": "persisted"
+          },
+          "summary": "valid"
+        }
+      ]
+    },
+    {
+      "id": "32",
+      "sha256": "27889e660903dce8662ce78d3168c2adaf2f32bdead0393d9e55f0a05a50e114",
+      "policyVersion": 3,
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "trust": "trusted",
+          "modifications": {
+            "verdict": "unchanged",
+            "basis": "persisted"
+          },
+          "summary": "valid"
+        }
+      ]
+    },
+    {
+      "id": "33",
+      "sha256": "184b3593f93ffd2f5203562d2b1d255fe5b95c3935a37d00b1bac1e851fd417d",
+      "policyVersion": 3,
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "trust": "trusted",
+          "modifications": {
+            "verdict": "unchanged",
+            "basis": "persisted"
+          },
+          "summary": "valid"
+        }
+      ]
+    },
+    {
+      "id": "34",
+      "sha256": "2f428d2788946e2313ebd7261bc647bf84f68e10d984814ca23450ccd3f50196",
+      "policyVersion": 3,
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "trust": "trusted",
+          "modifications": {
+            "verdict": "forbidden",
+            "detail": "revision 1: object 18, unexplained: was referenced from object 6 at Resources/Font/Shared/CharProcs/A and no rule explains it",
+            "basis": "persisted"
+          },
+          "summary": "invalid"
+        }
+      ]
+    },
+    {
+      "id": "35",
+      "sha256": "3155441d7cb9f796e62ca1e69c526b6af7f437dc9b5c245dbc5fdf6da03ea180",
+      "policyVersion": 3,
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "trust": "trusted",
+          "modifications": {
+            "verdict": "unchanged",
+            "basis": "persisted"
+          },
+          "summary": "valid"
+        }
+      ]
+    },
+    {
+      "id": "36",
+      "sha256": "0cee9d939b67caf3265e54a766836dc85be866dc1754c4888d0fbff3e7c70ff0",
+      "policyVersion": 3,
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "trust": "trusted",
+          "modifications": {
+            "verdict": "forbidden",
+            "detail": "revision 1: object 18, unexplained: was referenced from object 6 at Resources/Font/Shared/CharProcs/A and no rule explains it",
+            "basis": "persisted"
+          },
+          "summary": "invalid"
+        }
+      ]
+    },
+    {
+      "id": "37",
+      "sha256": "f103c5d1d856cda0a132455cc11283ed281e80a45f69187d63aa1eac75580d90",
+      "policyVersion": 3,
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "trust": "trusted",
+          "modifications": {
+            "verdict": "permitted",
+            "basis": "persisted"
+          },
+          "summary": "valid"
+        }
+      ]
+    },
+    {
+      "id": "38",
+      "sha256": "499f093523c605c816f0920417faa1224685e4e4d43fa08d335cace85cec7534",
+      "policyVersion": 3,
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "trust": "trusted",
+          "modifications": {
+            "verdict": "unchanged",
+            "basis": "persisted"
+          },
+          "summary": "valid"
+        }
+      ]
+    },
+    {
+      "id": "39",
+      "sha256": "e1d0035a556d2c1b47a71b3ff321644ae82fa211986c35c89bf73c597a8579c3",
+      "policyVersion": 3,
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "trust": "trusted",
+          "modifications": {
+            "verdict": "forbidden",
+            "detail": "revision 1: object 18, unexplained: was referenced from object 6 at Resources/Font/Shared/CharProcs/A and no rule explains it",
+            "basis": "persisted"
+          },
+          "summary": "invalid"
+        }
+      ]
+    },
+    {
+      "id": "40",
+      "sha256": "7ed2e487f31d2a5ffb2076006129806de6faad4a45677c29d1ccf0a951cdcd89",
+      "policyVersion": 3,
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "trust": "trusted",
+          "modifications": {
+            "verdict": "unchanged",
+            "basis": "persisted"
+          },
+          "summary": "valid"
+        }
+      ]
+    },
+    {
+      "id": "41",
+      "sha256": "aa3b9841fb2767ae5c7d02a7b449f1b034e5f1c9bf200d0911c89061cae03578",
+      "policyVersion": 3,
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "trust": "trusted",
+          "modifications": {
+            "verdict": "forbidden",
+            "detail": "revision 1: object 18, unexplained: was referenced from object 6 at Resources/Font/Shared/CharProcs/A and no rule explains it",
+            "basis": "persisted"
+          },
+          "summary": "invalid"
+        }
+      ]
+    },
+    {
+      "id": "42",
+      "sha256": "e3fb5b4a8c5525606f05a78ab7d223f49ba119bab306a6632640bd7f392fe89a",
+      "policyVersion": 3,
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "trust": "trusted",
+          "modifications": {
+            "verdict": "forbidden",
+            "detail": "revision 1: object 5, unexplained: was referenced from object 6 at Contents and no rule explains it",
+            "basis": "persisted"
+          },
+          "summary": "invalid"
+        },
+        {
+          "field": "SignatureTwo",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "trust": "trusted",
+          "modifications": {
+            "verdict": "unchanged",
+            "basis": "persisted"
+          },
+          "summary": "valid"
+        }
+      ]
+    },
+    {
+      "id": "43",
+      "sha256": "a1cfa0d454c7f03f956357ade7f0d8c4115ac499945e64086ed3eb1eeb028bf4",
+      "policyVersion": 3,
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "trust": "trusted",
+          "modifications": {
+            "verdict": "forbidden",
+            "detail": "revision 1: object 5, unexplained: was referenced from object 6 at Contents and no rule explains it",
+            "basis": "persisted"
+          },
+          "summary": "invalid"
+        },
+        {
+          "field": "SignatureTwo",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "trust": "trusted",
+          "modifications": {
+            "verdict": "unchanged",
+            "basis": "persisted"
+          },
+          "summary": "valid"
+        }
+      ]
+    },
+    {
+      "id": "44",
+      "sha256": "a7526defafff0c1b2df45a8607799a41ebcfcdc27054f5270ce37b1335bb9230",
+      "policyVersion": 3,
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "trust": "trusted",
+          "modifications": {
+            "verdict": "forbidden",
+            "detail": "revision 1: object 5, unexplained: was referenced from object 6 at Contents and no rule explains it",
+            "basis": "persisted"
+          },
+          "summary": "invalid"
+        },
+        {
+          "field": "SignatureTwo",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "trust": "trusted",
+          "modifications": {
+            "verdict": "forbidden",
+            "detail": "revision 3: object 5, unexplained: was referenced from object 6 at Contents and no rule explains it",
+            "basis": "persisted"
+          },
+          "summary": "invalid"
+        }
+      ]
+    },
+    {
+      "id": "45",
+      "sha256": "ff4b0fd196a303cd599a9358ecee0839f1a9d04c56daec90fb0422dff318e7b2",
+      "policyVersion": 3,
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "trust": "trusted",
+          "modifications": {
+            "verdict": "forbidden",
+            "detail": "revision 1: object 5, unexplained: was referenced from object 6 at Contents and no rule explains it",
+            "basis": "persisted"
+          },
+          "summary": "invalid"
+        }
+      ]
+    },
+    {
+      "id": "46",
+      "sha256": "94ee426d9fea09c479897d979256b6955d4fb0b91bfd9c751d1a6353c36d6038",
+      "policyVersion": 3,
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "trust": "trusted",
+          "modifications": {
+            "verdict": "forbidden",
+            "detail": "revision 1: object 5, unexplained: was referenced from object 6 at Contents and no rule explains it",
+            "basis": "persisted"
+          },
+          "summary": "invalid"
+        }
+      ]
+    },
+    {
+      "id": "47",
+      "sha256": "8a0773a5b275232868f9a83e735c1e045825b2909346c9cda954a1dffb28d101",
+      "policyVersion": 3,
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "trust": "trusted",
+          "modifications": {
+            "verdict": "forbidden",
+            "detail": "revision 1: object 6, identical-rewrite: rewritten without a change in value after a signature; a validator counts any rewrite of a sealed object as a modification (conservative: not yet established per object and level)",
+            "basis": "persisted"
+          },
+          "summary": "invalid"
+        }
+      ]
+    },
+    {
+      "id": "48",
+      "sha256": "e8b1642d68baf49c235b7f2284b605b7829ab3bd0a573b968779947e01697724",
+      "policyVersion": 3,
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "trust": "trusted",
+          "modifications": {
+            "verdict": "unchanged",
+            "basis": "persisted"
+          },
+          "summary": "valid"
+        }
+      ]
+    },
+    {
+      "id": "49",
+      "sha256": "3a37e729e646901d9d831e7b664fc331ca6861dd88b8ba7fdacf8d15855e528d",
+      "policyVersion": 3,
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "trust": "trusted",
+          "modifications": {
+            "verdict": "forbidden",
+            "detail": "revision 1: object 13, field-lock: field \"ValueOne\" is locked by an earlier signature",
+            "basis": "persisted"
+          },
+          "summary": "invalid"
+        }
+      ]
+    },
+    {
+      "id": "50",
+      "sha256": "893924ca7fbfcc2afcdfdab67f61c250de12a800958aab6eea91e0f6074486a5",
+      "policyVersion": 3,
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "trust": "trusted",
+          "modifications": {
+            "verdict": "forbidden",
+            "detail": "revision 1: object 13, form-fill: field \"ValueOne\" keys changed: Rect",
+            "basis": "persisted"
+          },
+          "summary": "invalid"
+        }
+      ]
+    },
+    {
+      "id": "51",
+      "sha256": "3ec5179c0fee43f4a7f9a013166e7f269133d19416704088a416ab8e3519c034",
+      "policyVersion": 3,
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "trust": "trusted",
+          "modifications": {
+            "verdict": "forbidden",
+            "detail": "revision 1: object 13, field-lock: field \"ValueOne\" is locked by an earlier signature",
+            "basis": "persisted"
+          },
+          "summary": "invalid"
+        }
+      ]
+    },
+    {
+      "id": "52",
+      "sha256": "3546f0132d448cf34f7dfe9c44685cf108d2db455a4b1ffa26f4c8207ede084b",
+      "policyVersion": 3,
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "integrity": "valid",
+          "cryptography": "valid",
+          "trust": "trusted",
+          "modifications": {
+            "verdict": "forbidden",
+            "detail": "revision 1: object 18, unexplained: was referenced from object 6 at Resources/Font/Shared/CharProcs/A and no rule explains it",
+            "basis": "persisted"
+          },
+          "summary": "invalid"
+        }
+      ]
+    }
+  ]
+}

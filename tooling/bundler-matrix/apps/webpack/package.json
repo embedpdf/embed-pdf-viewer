@@ -1,0 +1,17 @@
+{
+  "name": "@embedpdf/bundler-matrix-webpack",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "matrix:build": "webpack --mode production"
+  },
+  "dependencies": {
+    "@embedpdf/bundler-probe": "workspace:*"
+  },
+  "devDependencies": {
+    "webpack": "^5.99.0",
+    "webpack-cli": "^6.0.0",
+    "html-webpack-plugin": "^5.6.0"
+  }
+}

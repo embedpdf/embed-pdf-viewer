@@ -1,3 +1,4 @@
+import type { NamedPageEntry } from './NamedPage';
 import type { PageLayout } from './PageLayout';
 
 /**
@@ -19,4 +20,11 @@ import type { PageLayout } from './PageLayout';
 export interface PageListSnapshot {
   pageCount: number;
   pages: PageLayout[];
+  /**
+   * The catalog's `/Names /Pages` and `/Names /Templates` registrations, in
+   * tree order — see {@link NamedPageEntry}. Absent when the producing
+   * engine predates the field (an older cloud server): consumers treat
+   * absent as "unknown", never as "no registrations".
+   */
+  namedPages?: NamedPageEntry[];
 }

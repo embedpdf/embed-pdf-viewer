@@ -1,5 +1,13 @@
 # @embedpdf/core
 
+## 3.0.0-next.13
+
+## 3.0.0-next.12
+
+### Minor Changes
+
+- [#803](https://github.com/embedpdf/embed-pdf-viewer/pull/803) by [@bobsingor](https://github.com/bobsingor) – `PluginContext.tryForDocument(token, documentId)` — `forDocument` for an OPTIONAL dependency: null when the plugin is not installed or that document is not ready, never a throw (a workspace plugin reaching a sibling's document-scoped lens without requiring it).
+
 ## 3.0.0-next.11
 
 ### Minor Changes

@@ -46,6 +46,13 @@ export type FillItem = FillItemBase &
         selected: string[];
       }
     | { control: 'button' }
+    /**
+     * A signature field's widget. `signed` = it carries a `/V` (a signature
+     * dictionary): the field is final and its appearance sealed — the
+     * control inspects rather than signs. Unsigned: "sign here" — the
+     * signing act itself belongs to the signature plugin.
+     */
+    | { control: 'signature'; signed: boolean }
   );
 
 const ZERO_BOX: Box = { x: 0, y: 0, width: 0, height: 0 };
@@ -55,7 +62,7 @@ const ZERO_BOX: Box = { x: 0, y: 0, width: 0, height: 0 };
  * caller: the page projection reads the model's widget geometry; a consumer
  * that already owns a live box (the annotation plane's RenderItem) passes it —
  * or nothing, when only the semantics matter. Null for families with no fill
- * control (signature/unknown: rendered by the annotation plane only).
+ * control (unknown: rendered by the annotation plane only).
  */
 export function projectWidget(
   model: Model,
@@ -124,6 +131,8 @@ export function projectWidget(
       };
     case 'pushbutton':
       return { ...base, control: 'button' };
+    case 'signature':
+      return { ...base, control: 'signature', signed: field.valueEntry.kind !== 'none' };
     default:
       return null;
   }

@@ -23,6 +23,7 @@
   },
   "dependencies": {
     "@cloudpdf/engine": "workspace:*",
+    "@embedpdf/default-stamps": "workspace:*",
     "@embedpdf/docs-kit": "workspace:*",
     "@embedpdf/engine": "workspace:*",
     "@embedpdf/react": "workspace:*",

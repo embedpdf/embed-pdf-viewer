@@ -46,6 +46,16 @@ export interface RealtimeBus {
    */
   publishRevocation(jti: string, expiresAt: number): Promise<void>;
   subscribeRevocation(listener: (jti: string, expiresAt: number) => void): () => void;
+  /**
+   * Base-version channel — GLOBAL like revocation: a completed signature
+   * published a new base for the document, and every replica holding
+   * sessions over the old base must forget them
+   * (`DocumentService.onBaseVersionPublished`). Correctness never depends
+   * on delivery: a stale head only makes a later prepare record a stale
+   * fence, which the completion rejects.
+   */
+  publishBaseChanged(key: AuditDocKey): Promise<void>;
+  subscribeBaseChanged(listener: (key: AuditDocKey) => void): () => void;
   close(): Promise<void>;
 }
 
@@ -57,6 +67,18 @@ export const docChannelKey = (key: AuditDocKey): string => `${key.tenantId}::${k
 export class InProcessRealtimeBus implements RealtimeBus {
   private readonly listeners = new Map<string, Set<() => void>>();
   private readonly revocationListeners = new Set<(jti: string, expiresAt: number) => void>();
+  private readonly baseListeners = new Set<(key: AuditDocKey) => void>();
+
+  async publishBaseChanged(key: AuditDocKey): Promise<void> {
+    for (const listener of [...this.baseListeners]) listener(key);
+  }
+
+  subscribeBaseChanged(listener: (key: AuditDocKey) => void): () => void {
+    this.baseListeners.add(listener);
+    return () => {
+      this.baseListeners.delete(listener);
+    };
+  }
 
   async publishMutation(key: AuditDocKey): Promise<void> {
     const set = this.listeners.get(docChannelKey(key));
@@ -92,5 +114,6 @@ export class InProcessRealtimeBus implements RealtimeBus {
   async close(): Promise<void> {
     this.listeners.clear();
     this.revocationListeners.clear();
+    this.baseListeners.clear();
   }
 }

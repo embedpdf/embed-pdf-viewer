@@ -1,0 +1,61 @@
+name: Bundler matrix
+
+# Does the zero-config engine (worker + wasm) and the built-in stamp library
+# work out of the box under each toolchain, without a request leaving the
+# app's origin? tooling/bundler-matrix builds one minimal app per bundler,
+# runs the same probe in each, and prints the truth table. Heavy (eight
+# production builds, a browser), so it runs nightly and on demand, not on
+# every push.
+
+on:
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bundler-matrix-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: true
+
+jobs:
+  build-runtime:
+    uses: ./.github/workflows/build-engine-runtime.yml
+    secrets: inherit
+
+  matrix:
+    name: zero-config truth table
+    needs: build-runtime
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Test the static fixture server
+        run: pnpm --filter @embedpdf/bundler-matrix test
+      - name: Download engine-runtime artifact (wasm32)
+        uses: actions/download-artifact@v7
+        with:
+          name: engine-runtime-wasm32
+          path: packages/engine/runtime/npm/wasm32
+      - name: Build the engine and the default stamps
+        run: pnpm turbo run build --filter=@embedpdf/engine --filter=@embedpdf/default-stamps
+      - name: Install a browser for Playwright
+        run: pnpm --filter @embedpdf/bundler-matrix exec playwright-core install --with-deps chromium
+      - name: Run the matrix
+        run: pnpm --filter @embedpdf/bundler-matrix matrix
+      - name: Keep the results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bundler-matrix-results
+          path: tooling/bundler-matrix/results.json

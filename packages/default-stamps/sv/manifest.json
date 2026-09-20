@@ -1,0 +1,45 @@
+{
+  "id": "standard",
+  "name": "Standardstämplar",
+  "categories": ["sidebar"],
+  "pdf": "stamps.pdf",
+  "stamps": [
+    { "id": "approved", "pageIndex": 0, "name": "Approved", "subject": "Godkänd" },
+    { "id": "not-approved", "pageIndex": 1, "name": "NotApproved", "subject": "Ej godkänd" },
+    { "id": "draft", "pageIndex": 2, "name": "Draft", "subject": "Utkast" },
+    { "id": "final", "pageIndex": 3, "name": "Final", "subject": "Slutgiltig" },
+    { "id": "completed", "pageIndex": 4, "name": "Completed", "subject": "Slutförd" },
+    { "id": "confidential", "pageIndex": 5, "name": "Confidential", "subject": "Konfidentiellt" },
+    {
+      "id": "for-public-release",
+      "pageIndex": 6,
+      "name": "ForPublicRelease",
+      "subject": "För publicering"
+    },
+    {
+      "id": "not-for-public-release",
+      "pageIndex": 7,
+      "name": "NotForPublicRelease",
+      "subject": "Ej för publicering"
+    },
+    { "id": "for-comment", "pageIndex": 8, "name": "ForComment", "subject": "För kommentar" },
+    { "id": "void", "pageIndex": 9, "name": "Void", "subject": "Ogiltig" },
+    {
+      "id": "preliminary-results",
+      "pageIndex": 10,
+      "name": "PreliminaryResults",
+      "subject": "Preliminära resultat"
+    },
+    {
+      "id": "information-only",
+      "pageIndex": 11,
+      "name": "InformationOnly",
+      "subject": "Endast information"
+    },
+    { "id": "witness", "pageIndex": 12, "name": "Witness", "subject": "Vittne" },
+    { "id": "initial-here", "pageIndex": 13, "name": "InitialHere", "subject": "Initialer här" },
+    { "id": "sign-here", "pageIndex": 14, "name": "SignHere", "subject": "Signera här" },
+    { "id": "accepted", "pageIndex": 15, "name": "Accepted", "subject": "Godtagen" },
+    { "id": "rejected", "pageIndex": 16, "name": "Rejected", "subject": "Avvisad" }
+  ]
+}

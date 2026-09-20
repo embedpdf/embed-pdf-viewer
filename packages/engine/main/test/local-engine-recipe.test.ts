@@ -37,7 +37,6 @@ class FakeWorker {
   init: {
     kind: 'init';
     wasmUrl?: string;
-    fallbackWasmUrl?: string;
     wasmBinary?: ArrayBuffer;
   } | null = null;
   /** Listeners keyed by event type — watchWorkerReady also attaches `error`

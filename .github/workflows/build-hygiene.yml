@@ -67,17 +67,14 @@ jobs:
       - name: Build packages
         run: pnpm run build:release
 
-      # Same as release.yml: build-workers.mjs regenerates this tracked
-      # source pin before compiling it into dist. The generated source is
-      # not part of the package, so restore it and judge the rest.
-      - name: Restore build-time WASM version source
-        run: git restore --source=HEAD -- packages/engine/main/src/generated/wasm32-version.ts
-
       - name: Verify build left the worktree clean
         run: |
           status="$(git status --short --untracked-files=all)"
           if [ -n "$status" ]; then
             echo "::error::Building rewrote tracked files — commit the build-normalized form or fix the package's epdf configuration:"
             echo "$status"
+            echo "::group::What changed"
+            git --no-pager diff
+            echo "::endgroup::"
             exit 1
           fi

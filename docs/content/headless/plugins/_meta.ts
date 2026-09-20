@@ -4,4 +4,6 @@ export default {
   render: 'Render',
   selection: 'Selection',
   'page-edit': 'Page edit',
+  stamp: 'Stamps',
+  signature: 'Signatures',
 };

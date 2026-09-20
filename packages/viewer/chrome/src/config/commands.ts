@@ -11,7 +11,9 @@
  *   panels / menus / modals                → declarative shell targets
  *   annotate + shape tools                 → real interaction tools
  *   form tools                             → real form plugin palette (draw-to-place)
- *   insert/redact tools                    → inert interaction tools (demo-tools)
+ *   insert tools                           → real stamp library panel + image/
+ *                                            attachment click-then-pick (signature
+ *                                            still inert, via demo-tools)
  *   history undo/redo                      → disabled (no history plugin in v3 yet)
  */
 import type { CommandDef, IconAccent } from '@embedpdf/react/commands';
@@ -27,9 +29,15 @@ import { ActionsToken } from '@embedpdf/react/actions';
 import { LinkToken, openLinkTarget, type PdfLinkTarget } from '@embedpdf/react/link';
 import { SearchToken } from '@embedpdf/react/search';
 import { RedactionToken } from '@embedpdf/react/redaction';
+import { StampToken } from '@embedpdf/react/stamp';
+import { SignatureToken } from '@embedpdf/react/signature';
+import { I18nToken } from '@embedpdf/react/i18n';
 
 // ── helpers ────────────────────────────────────────────────────────────────
 type Ctx = Parameters<NonNullable<CommandDef['run']>>[0];
+
+/** Where selection-made stamps go: the user's own library, persisted. */
+const CUSTOM_LIBRARY_ID = 'embedpdf-custom';
 
 const stage = (c: Ctx) => c.tryGet(StageToken);
 const interaction = (c: Ctx) => c.tryGet(InteractionToken);
@@ -77,6 +85,11 @@ export interface ToolAccentDefinition {
  * drift apart.
  */
 export const TOOL_ICONS: Record<string, { icon: string; accent?: ToolAccentDefinition }> = {};
+
+// The `stamp` tool has no toolbar button of its own: it is ARMED by the stamps
+// panel (picking a library asset), never activated directly — so its cursor
+// skin is recorded here rather than as a side effect of a `tool()` definition.
+TOOL_ICONS['stamp'] = { icon: 'rubberStamp' };
 
 const toolAccent = (
   c: Ctx,
@@ -479,11 +492,40 @@ export const defaultCommands: CommandDef[] = [
     primary: 'color',
   }),
 
-  // ── insert tools (stamp/attachment real; signature/image inert) ─────────
-  tool('insert:add-stamp', 'stamp', 'commands.insert.stamp', 'rubberStamp'),
+  // ── insert tools (stamp/image/attachment real; signature inert) ─────────
+  // Stamps open a LIBRARY, they are not a file dialog: the panel lists the
+  // reusable named assets the stamp plugin holds, and picking one arms the
+  // annotation plugin's stamp tool with that asset's bytes (stamps-panel.tsx).
+  // Arbitrary image bytes are `insert:add-image` below — a different gesture,
+  // so a different button.
+  {
+    id: 'insert:add-stamp',
+    labelKey: 'commands.insert.stamp',
+    icon: 'rubberStamp',
+    // No stamp plugin → no library to show. No create authority → nothing the
+    // picker could place (the same twin every insert tool's button asks).
+    visible: (c) => c.tryGet(StampToken) != null,
+    enabled: (c) => anno(c)?.canCreate() ?? true,
+    categories: ['panel'],
+    panel: { id: 'stamps', exclusive: 'right' },
+  },
   // File attachment — click the spot, pick the file (the attachment provider).
   tool('insert:add-attachment', 'attachment', 'commands.insert.attachment', 'paperclip'),
-  tool('insert:add-signature', 'signature', 'commands.insert.signature', 'signature'),
+  // Signatures open the PEOPLE panel (libraries of kind 'signatures'): pick a
+  // mark → with a target field it signs (or fills) it, else it arms — a click
+  // on a signature field signs, anywhere else drops a stamp (Preview).
+  {
+    id: 'insert:add-signature',
+    labelKey: 'commands.insert.signature',
+    icon: 'signature',
+    visible: (c) => c.tryGet(StampToken) != null && c.tryGet(SignatureToken) != null,
+    enabled: (c) => anno(c)?.canCreate() ?? true,
+    categories: ['panel'],
+    panel: { id: 'signatures', exclusive: 'right' },
+  },
+  // Image — the click-then-pick placement: click the spot, the file dialog
+  // opens (narrowed to rasters), the picture lands where you clicked. The
+  // tool itself is a `stamp` preset registered in viewer.tsx.
   tool('insert:add-image', 'image', 'commands.insert.image', 'photo'),
 
   // ── form tools (the form plugin's draw-to-place palette) ────────────────
@@ -492,6 +534,7 @@ export const defaultCommands: CommandDef[] = [
   tool('form:add-radio', 'form-radio', 'commands.form.radio', 'formRadio'),
   tool('form:add-select', 'form-combobox', 'commands.form.select', 'formSelect'),
   tool('form:add-listbox', 'form-listbox', 'commands.form.listbox', 'formListbox'),
+  tool('form:add-signature', 'form-signature', 'commands.form.signature', 'signature'),
 
   // ── redaction (v2 parity: the toolbar arms the tool; the panel owns the
   // destructive verbs — Apply All / Clear live in the redaction sidebar) ────
@@ -566,6 +609,61 @@ export const defaultCommands: CommandDef[] = [
     // The kind table decides: no declared editable props → no style button
     // (v2 hardcoded a subtype blocklist for this).
     visible: (c) => (anno(c)?.getSelectionProps().specs.length ?? 0) > 0,
+  },
+  {
+    // The selection becomes a reusable stamp: the engine flattens the
+    // selected appearances into one page (vector, positions kept) and the
+    // stamp plugin files it under the user's own library — persisted like
+    // any library, exportable as a PDF Acrobat reads.
+    id: 'annotation:stamp-from-selection',
+    labelKey: 'commands.annotate.stampFromSelection',
+    icon: 'rubberStampPlus',
+    categories: ['annotation'],
+    run: (c) => {
+      const a = anno(c);
+      const stamp = c.tryGet(StampToken);
+      const documentId = c.documentId;
+      if (!a || !stamp || documentId == null) return;
+      const dtos = a.getSelected();
+      const pon = dtos[0]?.ref.pageObjectNumber;
+      if (pon === undefined) return;
+      const i18n = c.tryGet(I18nToken);
+      const label = i18n?.t('demo.stampsCustomLabel') ?? 'Custom stamp';
+      const libraryName = i18n?.t('demo.stampsCustomLibrary') ?? 'My stamps';
+      const libraryId = CUSTOM_LIBRARY_ID;
+      const ensureLibrary = stamp.library(libraryId)
+        ? Promise.resolve(libraryId)
+        : stamp.createLibrary(libraryName, { id: libraryId, categories: ['custom'] });
+      ensureLibrary
+        .then((id) =>
+          stamp.addAssetFromAnnotations(
+            documentId,
+            pon,
+            dtos.map((d) => d.ref),
+            { libraryId: id, label: `${label} ${stamp.assets(id).length + 1}` },
+          ),
+        )
+        // v2 jumped the sidebar to the custom library; the panel reads the
+        // surface's open props for its picker.
+        .then(() =>
+          c.tryGet(ShellToken)?.open('stamps', {
+            exclusive: 'right',
+            props: { libraryId },
+          }),
+        )
+        .catch((e) => console.warn('[embedpdf] stamp from selection failed', e));
+    },
+    // One page, no widgets (a form field is not artwork), no pending
+    // redaction marks, and a library to put it in. The engine refuses hidden
+    // or appearance-less annotations itself — all-or-nothing, never a stamp
+    // missing a part.
+    visible: (c) =>
+      c.tryGet(StampToken) != null &&
+      hasAnnotationSelection(c) &&
+      !selectionSubtypes(c).has('widget') &&
+      !selectionSubtypes(c).has('redact') &&
+      new Set((anno(c)?.getSelected() ?? []).map((d) => d.ref.pageObjectNumber)).size === 1,
+    enabled: (c) => c.tryGet(DocumentsToken)?.allows('doc.download') ?? true,
   },
   {
     id: 'annotation:group',

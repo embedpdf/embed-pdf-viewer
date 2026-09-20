@@ -1,3 +1,6 @@
+import type { ModificationLevel } from '../signature/types';
+import { SIGNATURE_POLICY_VERSION } from '../signature/protection';
+import type { AnalysisToken } from './tokens';
 /**
  * Single source of truth for cloud HTTP paths. Both @cloudpdf/engine and
  * @cloudpdf/server import these so they cannot drift.
@@ -46,6 +49,7 @@
  */
 import {
   encodeActionsToken,
+  encodeAnalysisToken,
   encodeAnnotationAppearancesRenderToken,
   encodeAnnotationToken,
   encodeAnnotationsAllToken,
@@ -166,6 +170,63 @@ export const wirePaths = {
    *  variant an actions-inheriting layer resolves at. */
   docActions: (docId: string, actionsVersion: number) =>
     `/v1/docs/${encodeURIComponent(docId)}/actions@${encodeActionsToken(actionsVersion)}`,
+
+  // ---------------------------------------------------------------------
+  // Digital signatures. Layer reads pin `docVersion` (a signature is a
+  // layer state change like any other edit); version-scoped reads are
+  // content-addressed by the base sha and immutable forever. The RESOURCE
+  // comes before the sha so each family keeps its own CDN prefix.
+  // ---------------------------------------------------------------------
+
+  /** Immutable layer signature snapshot (base signatures + the layer's fields + protection). */
+  layerSignatures: (docId: string, layerName: string, docVersion: number) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/signatures@${encodeDocToken(docVersion)}`,
+  layerSignaturesCurrent: (docId: string, layerName: string) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/signatures`,
+  /** Immutable: the layer's working copy judged against the base, pinned by `docVersion`. */
+  layerSignaturesAnalysis: (docId: string, layerName: string, token: AnalysisToken) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/signatures/analysis@${encodeAnalysisToken(token)}`,
+  layerSignaturesAnalysisCurrent: (docId: string, layerName: string) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/signatures/analysis`,
+  /** POST (multipart envelope): author and seal a signing candidate. */
+  layerSignaturesPrepare: (docId: string, layerName: string) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/signatures/prepare`,
+  /** POST (JSON): install the CMS and publish the sealed bytes as the next base version. */
+  layerSignatureComplete: (docId: string, layerName: string, signingId: string) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/signatures/${encodeURIComponent(signingId)}/complete`,
+  /** DELETE: discard a pending signing. */
+  layerSignatureAbort: (docId: string, layerName: string, signingId: string) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/signatures/${encodeURIComponent(signingId)}`,
+
+  /** The document's base versions, oldest first (grows; never cached). */
+  docVersions: (docId: string) => `/v1/docs/${encodeURIComponent(docId)}/versions`,
+  /** Immutable: the signature snapshot of one base version. */
+  docVersionSignatures: (docId: string, sha256: string) =>
+    `/v1/docs/${encodeURIComponent(docId)}/versions/signatures/${sha256}`,
+  /** Immutable: a signed field's DER `/Contents` in one base version (`application/pkcs7-signature`). */
+  docVersionSignatureContents: (docId: string, sha256: string, fieldName: string) =>
+    `/v1/docs/${encodeURIComponent(docId)}/versions/signatures/${sha256}/${encodeTokenText(fieldName)}/contents`,
+  /** Immutable: the digest of a signed field's `/ByteRange` in one base version. */
+  docVersionSignatureDigest: (
+    docId: string,
+    sha256: string,
+    fieldName: string,
+    algorithm: 'sha1' | 'sha256' | 'sha384' | 'sha512',
+  ) =>
+    `/v1/docs/${encodeURIComponent(docId)}/versions/signatures/${sha256}/${encodeTokenText(fieldName)}/digest/${algorithm}`,
+  /** Immutable: history between two revisions of one base version. */
+  docVersionAnalysis: (docId: string, sha256: string, query: AnalysisQueryInput) =>
+    `/v1/docs/${encodeURIComponent(docId)}/versions/analysis/${sha256}?${analysisQueryString(query)}`,
+  /** Immutable: the bytes of one base version. */
+  docVersionDownload: (docId: string, sha256: string) =>
+    `/v1/docs/${encodeURIComponent(docId)}/versions/download/${sha256}`,
+  /** Immutable: the byte prefix `[0, end)` of revision `index` of one base version. */
+  docVersionRevision: (docId: string, sha256: string, index: number) =>
+    `/v1/docs/${encodeURIComponent(docId)}/versions/revisions/${sha256}/${index}`,
+
+  /** POST (multipart envelope): draw a PDF page into an unsigned signature field's widgets. */
+  layerFormFieldSignatureAppearance: (docId: string, layerName: string, fieldKey: string) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/form/fields/${encodeURIComponent(fieldKey)}/signature-appearance`,
 
   /** POST: rewrite the document Info dict for the layer (metadata edit). */
   layerMetadataUpdate: (docId: string, layerName: string) =>
@@ -390,6 +451,14 @@ export const wirePaths = {
 
   layerPageAnnotationsMove: (docId: string, layerName: string, pageObjectNumber: number) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/annotations/pages/${pageObjectNumber}/items/move`,
+  /** POST: flatten a chosen set of the page's annotations into its content
+   *  (a content + annotation mutation of that page). */
+  layerPageAnnotationsFlatten: (docId: string, layerName: string, pageObjectNumber: number) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/annotations/pages/${pageObjectNumber}/items/flatten`,
+  /** POST: the chosen annotations' appearances as one single-page PDF — a
+   *  derived read (application/pdf, no-store), gated like pages/extract. */
+  layerPageAnnotationsAppearance: (docId: string, layerName: string, pageObjectNumber: number) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/annotations/pages/${pageObjectNumber}/items/appearance`,
 
   /**
    * GET: the reconciled form snapshot (field tree + widget joins) for the
@@ -483,6 +552,13 @@ export const wirePaths = {
 
   layerPagesDelete: (docId: string, layerName: string) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/pages/delete`,
+  /** POST: register/rename a `/Names /Pages` entry — a page-STRUCTURE
+   *  mutation (docVersion + layoutVersion advance; reads ride `/layout`). */
+  layerPagesNames: (docId: string, layerName: string) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/pages/names`,
+  /** POST: remove a `/Names /Pages` entry (the page stays). */
+  layerPagesNamesDelete: (docId: string, layerName: string) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/pages/names/delete`,
 
   layerPagesFlatten: (docId: string, layerName: string) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/pages/flatten`,
@@ -552,6 +628,29 @@ export const wirePaths = {
  * server's route table is pinned to them by the doc-plane registry
  * conformance test.
  */
+/** The flat query of a version analysis (the contract's dotted keys). */
+export interface AnalysisQueryInput {
+  since: { signatureIndex: number } | { revisionIndex: number };
+  /** Revision index the analysis ends at; default the last. */
+  until?: number;
+  exploratoryLevel?: ModificationLevel;
+  detail?: 'summary' | 'full';
+}
+
+export function analysisQueryString(query: AnalysisQueryInput): string {
+  const params = new URLSearchParams();
+  if ('signatureIndex' in query.since)
+    params.set('since.signature', String(query.since.signatureIndex));
+  else params.set('since.revision', String(query.since.revisionIndex));
+  if (query.until !== undefined) params.set('until', String(query.until));
+  if (query.exploratoryLevel !== undefined) params.set('level', query.exploratoryLevel);
+  if (query.detail !== undefined) params.set('detail', query.detail);
+  // The judging policy version: a cache key on the immutable version URL, so
+  // a policy bump never serves a verdict judged the old way.
+  params.set('policy', String(SIGNATURE_POLICY_VERSION));
+  return params.toString();
+}
+
 export const wireTemplates = {
   docHead: '/v1/docs/:docId/head',
   layerManifest: '/v1/docs/:docId/layers/:layerName/manifest',
@@ -561,17 +660,37 @@ export const wireTemplates = {
   layerAnnotationItemsAll: '/v1/docs/:docId/layers/:layerName/annotations/items',
   layerAnnotationItems: '/v1/docs/:docId/layers/:layerName/annotations/pages/:pon/items',
   layerAnnotationItem: '/v1/docs/:docId/layers/:layerName/annotations/pages/:pon/items/:annotKey',
+  layerAnnotationItemsFlatten:
+    '/v1/docs/:docId/layers/:layerName/annotations/pages/:pon/items/flatten',
+  layerAnnotationItemsAppearance:
+    '/v1/docs/:docId/layers/:layerName/annotations/pages/:pon/items/appearance',
   layerForm: '/v1/docs/:docId/layers/:layerName/form',
   layerFormFieldValue: '/v1/docs/:docId/layers/:layerName/form/fields/:fieldKey/value',
   layerFormFieldReset: '/v1/docs/:docId/layers/:layerName/form/fields/:fieldKey/reset',
+  layerFormFieldSignatureAppearance:
+    '/v1/docs/:docId/layers/:layerName/form/fields/:fieldKey/signature-appearance',
   layerFormData: '/v1/docs/:docId/layers/:layerName/form/data',
   layerPagesMove: '/v1/docs/:docId/layers/:layerName/pages/move',
   layerPagesRotate: '/v1/docs/:docId/layers/:layerName/pages/rotate',
   layerPagesDelete: '/v1/docs/:docId/layers/:layerName/pages/delete',
+  layerPagesNames: '/v1/docs/:docId/layers/:layerName/pages/names',
+  layerPagesNamesDelete: '/v1/docs/:docId/layers/:layerName/pages/names/delete',
   layerPagesFlatten: '/v1/docs/:docId/layers/:layerName/pages/flatten',
   layerPagesInsert: '/v1/docs/:docId/layers/:layerName/pages/insert',
   layerPagesInsertBlank: '/v1/docs/:docId/layers/:layerName/pages/insert-blank',
   layerPagesExtract: '/v1/docs/:docId/layers/:layerName/pages/extract',
   layerRedactionsApply: '/v1/docs/:docId/layers/:layerName/redactions/apply',
   layerDownload: '/v1/docs/:docId/layers/:layerName/download',
+  layerSignatures: '/v1/docs/:docId/layers/:layerName/signatures',
+  layerSignaturesAnalysis: '/v1/docs/:docId/layers/:layerName/signatures/analysis',
+  layerSignaturesPrepare: '/v1/docs/:docId/layers/:layerName/signatures/prepare',
+  layerSignatureComplete: '/v1/docs/:docId/layers/:layerName/signatures/:signingId/complete',
+  layerSignatureAbort: '/v1/docs/:docId/layers/:layerName/signatures/:signingId',
+  docVersions: '/v1/docs/:docId/versions',
+  docVersionSignatures: '/v1/docs/:docId/versions/signatures/:sha',
+  docVersionSignatureContents: '/v1/docs/:docId/versions/signatures/:sha/:fieldKey/contents',
+  docVersionSignatureDigest: '/v1/docs/:docId/versions/signatures/:sha/:fieldKey/digest/:algorithm',
+  docVersionAnalysis: '/v1/docs/:docId/versions/analysis/:sha',
+  docVersionDownload: '/v1/docs/:docId/versions/download/:sha',
+  docVersionRevision: '/v1/docs/:docId/versions/revisions/:sha/:index',
 } as const;

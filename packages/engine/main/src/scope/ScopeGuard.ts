@@ -1,4 +1,8 @@
 import {
+  EngineError,
+  EngineErrorCode,
+  protectedCapabilities,
+  type DocumentProtection,
   PermissionDenied,
   checkAnyCapability,
   checkCapability,
@@ -28,7 +32,25 @@ import type { HandleScopeContext } from './HandleScopeContext';
  * The same scope string produces the same allow/deny on both engines.
  */
 export class ScopeGuard {
-  constructor(private readonly ctx: HandleScopeContext) {}
+  private protection: DocumentProtection | null;
+
+  constructor(private readonly ctx: HandleScopeContext) {
+    this.protection = ctx.signedDocumentPolicy === 'protect' ? ctx.protection : null;
+  }
+
+  /** The signature-derived restrictions this guard subtracts (`null` when none apply). */
+  currentProtection(): DocumentProtection | null {
+    return this.protection;
+  }
+
+  /**
+   * Replace the protection after the document's signatures changed (an
+   * unlock probed them, a signing completed). Ignored under
+   * `signedDocumentPolicy: 'permit'`.
+   */
+  setProtection(protection: DocumentProtection | null): void {
+    this.protection = this.ctx.signedDocumentPolicy === 'protect' ? protection : null;
+  }
 
   /** Identity claims (user_id, group_id, groups, display_name). */
   identity(): HandleScopeContext['identity'] {
@@ -47,7 +69,9 @@ export class ScopeGuard {
    * `/access` effectiveScope).
    */
   effectiveScope(): DocCapability[] {
-    return [...expandRawScope(this.ctx.scope, this.ctx.pdfBits)].sort() as DocCapability[];
+    return [
+      ...expandRawScope(this.ctx.scope, this.ctx.pdfBits, this.protection),
+    ].sort() as DocCapability[];
   }
 
   /**
@@ -57,12 +81,22 @@ export class ScopeGuard {
    * exactly what `assertCapability` would let through.
    */
   can(cap: DocCapability): boolean {
-    return checkCapability(cap, this.ctx.scope, this.ctx.pdfBits);
+    return checkCapability(cap, this.ctx.scope, this.ctx.pdfBits, this.protection);
   }
 
-  /** Throws `PermissionDenied` if the scope doesn't grant `cap`. */
+  /**
+   * Throws if `cap` is not available: `ProtectedDocument` when a signature
+   * in the document took it away (the message names the restriction),
+   * `PermissionDenied` when the scope never granted it.
+   */
   assertCapability(cap: DocCapability): void {
     if (!this.can(cap)) {
+      if (protectedCapabilities(this.protection).has(cap)) {
+        throw new EngineError(
+          EngineErrorCode.ProtectedDocument,
+          describeProtection(cap, this.protection!),
+        );
+      }
       throw new PermissionDenied(cap, 'engine-local');
     }
   }
@@ -74,7 +108,7 @@ export class ScopeGuard {
    * like `/text` which the cloud gates on `doc.text.copy OR doc.text.search`).
    */
   assertAnyCapability(caps: ReadonlyArray<DocCapability>): void {
-    if (!checkAnyCapability(caps, this.ctx.scope, this.ctx.pdfBits)) {
+    if (!checkAnyCapability(caps, this.ctx.scope, this.ctx.pdfBits, this.protection)) {
       throw new PermissionDenied(`one of: ${caps.join(', ')}`, 'engine-local');
     }
   }
@@ -92,6 +126,9 @@ export class ScopeGuard {
    * per-record authorization for UI gating.
    */
   canCollab(action: CollabAction, target: CollabTarget): boolean {
+    // A declared signature constraint outranks the caller's collab
+    // authority, exactly as it outranks a capability grant.
+    if (protectedCapabilities(this.protection).has('doc.annotate.modify')) return false;
     return checkCollab(action, target, this.ctx.scope, this.ctx.identity, this.ctx.pdfBits);
   }
 
@@ -101,6 +138,12 @@ export class ScopeGuard {
   }
 
   assertCollab(action: CollabAction, target: CollabTarget): void {
+    if (protectedCapabilities(this.protection).has('doc.annotate.modify')) {
+      throw new EngineError(
+        EngineErrorCode.ProtectedDocument,
+        describeProtection('doc.annotate.modify', this.protection!),
+      );
+    }
     if (!this.canCollab(action, target)) {
       throw new PermissionDenied(`annotations:${action}`, 'engine-local');
     }
@@ -179,4 +222,11 @@ export class ScopeGuard {
     };
     return actor.userId || actor.groupId || actor.displayName ? actor : undefined;
   }
+}
+
+function describeProtection(cap: DocCapability, protection: DocumentProtection): string {
+  const cause = protection.certification
+    ? `certification signature ${protection.certification.signatureIndex} (permission ${protection.certification.permission})`
+    : `an existing signature (declared level '${protection.enforced ?? 'none declared'}')`;
+  return `the document is signed: ${cause} forbids '${cap}'`;
 }

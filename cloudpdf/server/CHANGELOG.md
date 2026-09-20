@@ -1,5 +1,23 @@
 # @cloudpdf/server
 
+## 3.0.0-next.13
+
+### Minor Changes
+
+- [#812](https://github.com/embedpdf/embed-pdf-viewer/pull/812) by [@bobsingor](https://github.com/bobsingor) – Add durable two-phase digital signing with prepare, complete, abort, and expiry handling. Persist candidate data so completion can run on another replica, verify the supplied CMS, and reject completion when the document or layer has changed.
+
+  Publish each completed signature as an immutable document version while retaining the document ID and version history. Consume the signing layer's edits into the new base and refresh document state across replicas.
+
+  Add signature inspection and analysis routes, immutable version and revision downloads, and visual signature-field appearances. Use files and streaming storage transfers for signing candidates, with configurable temporary storage and signing expiry.
+
+## 3.0.0-next.12
+
+### Minor Changes
+
+- [#803](https://github.com/embedpdf/embed-pdf-viewer/pull/803) by [@bobsingor](https://github.com/bobsingor) – Add `POST /v1/docs/{docId}/layers/{layerName}/annotations/pages/{pon}/items/flatten` (flatten a chosen set of the page's annotations; gated like page flatten and persisted the same way — one page's content and annotation versions advance) and `POST …/items/appearance` (the chosen annotations' appearances as one single-page PDF; gated by `doc.download`, no-store).
+
+  Add `POST /v1/docs/{docId}/layers/{layerName}/pages/names` and `POST …/pages/names/delete` to register, rename, or remove a `/Names /Pages` entry on a layer. Both are page-structure mutations gated by `doc.pages.assemble`: the worker writes a new layer artifact and the doc and layout versions advance, exactly like a page move, with no new resource, version, or cache scope. `/layout` responses now include `namedPages`.
+
 ## 3.0.0-next.11
 
 ### Minor Changes

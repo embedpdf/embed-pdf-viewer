@@ -47,6 +47,7 @@ export const initialAnnotationState = (config: AnnotationConfig = {}): Annotatio
   chrome: mergeChrome(DEFAULT_CHROME, config.chrome ?? {}),
   toolGhost: null,
   stampArmEpoch: 0,
+  textSelection: null,
 });
 
 export const annotationReducer = (
@@ -62,6 +63,8 @@ export const annotationReducer = (
       return { ...state, chrome: mergeChrome(state.chrome, action.patch) };
     case 'SET_TOOL_GHOST':
       return { ...state, toolGhost: action.ghost };
+    case 'SET_TEXT_SELECTION':
+      return { ...state, textSelection: action.selection };
     case 'STAMP_ARM_CHANGED':
       // A new (or dropped) payload invalidates any ghost drawn for the old one.
       return { ...state, stampArmEpoch: state.stampArmEpoch + 1, toolGhost: null };

@@ -1,5 +1,15 @@
 # @embedpdf/core-annotation
 
+## 3.0.0-next.13
+
+### Minor Changes
+
+- [#817](https://github.com/embedpdf/embed-pdf-viewer/pull/817) by [@bobsingor](https://github.com/bobsingor) – Add pure helpers for normalizing rich-text runs, mapping text offsets, and reading or applying styles to a text range. Support rich-text updates and bold, italic, and underline properties in the annotation model while keeping plain contents synchronized.
+
+  Align FreeText and callout text insets, borders, and backgrounds with their PDF appearances.
+
+## 3.0.0-next.12
+
 ## 3.0.0-next.11
 
 ### Minor Changes

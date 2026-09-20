@@ -31,15 +31,6 @@ export interface EngineWorkerInit {
   /** Absolute URL of `embedpdf.wasm`. Omitted = the Emscripten glue resolves it
    *  as a sibling of the worker script (`import.meta.url`). */
   wasmUrl?: string;
-  /**
-   * CDN safety net, present ONLY when `wasmUrl` is the bundler-resolved
-   * default (never for explicit sources). Its presence switches the boot to
-   * fetch the bytes itself, so that only a resource-loading failure (network
-   * error / non-OK response) can trigger the fallback — errors after
-   * bytes-in-hand (compile, instantiate, init) are never retried, because
-   * fetching another copy of the same binary would mask them.
-   */
-  fallbackWasmUrl?: string;
   /** Pre-fetched `embedpdf.wasm` bytes (transferred) — wins over `wasmUrl`. */
   wasmBinary?: ArrayBuffer;
 }
@@ -59,7 +50,7 @@ export function startEngineWorker(scope: DedicatedWorkerGlobalScope): void {
 
 function boot(scope: DedicatedWorkerGlobalScope, init: EngineWorkerInit): void {
   (async () => {
-    const source = await resolveBootSource(init);
+    const source = resolveBootSource(init);
     const runtime = await createPdfRuntime({
       prefer: 'wasm',
       wasmUrl: source.wasmUrl,
@@ -84,58 +75,15 @@ function boot(scope: DedicatedWorkerGlobalScope, init: EngineWorkerInit): void {
 }
 
 /**
- * Turn the init message into what `createPdfRuntime` receives.
- *
- * A `fallbackWasmUrl` (default source only) moves the fetch into OUR hands:
- * fetch the primary, and only if THE FETCH fails (network error / non-OK
- * response), warn — before any CDN traffic — and fetch the fallback. The
- * winning bytes go to Emscripten as `wasmBinary`; anything that fails after
- * that (compile, instantiate, init) surfaces directly, never retried.
- * Explicit sources (no fallback) keep the streaming `locateFile` path.
+ * What `createPdfRuntime` receives: exactly what the main thread decided —
+ * a URL (the Emscripten glue fetches and compiles it streaming) or bytes.
+ * The worker never fetches on its own and never retries elsewhere: a
+ * missing wasm is a build or configuration problem, reported as such.
  */
-async function resolveBootSource(
-  init: EngineWorkerInit,
-): Promise<{ wasmUrl?: string; wasmBinary?: ArrayBuffer }> {
-  if (init.wasmBinary || !init.fallbackWasmUrl || !init.wasmUrl) {
-    return { wasmUrl: init.wasmUrl, wasmBinary: init.wasmBinary };
-  }
-  let primaryFailure: unknown;
-  try {
-    return { wasmBinary: await fetchWasm(init.wasmUrl) };
-  } catch (err) {
-    primaryFailure = err;
-  }
-  console.warn(
-    `[embedpdf] embedpdf.wasm was not found at ${init.wasmUrl} (${describeError(primaryFailure)}). ` +
-      `Falling back to ${init.fallbackWasmUrl}. Your toolchain did not ship the wasm asset with ` +
-      `your build — to avoid the CDN request, self-host the file and pass \`wasmUrl\`/\`assetsUrl\` ` +
-      `to localEngine(). See https://www.embedpdf.com/docs/self-hosting`,
-  );
-  try {
-    return { wasmBinary: await fetchWasm(init.fallbackWasmUrl) };
-  } catch (fallbackFailure) {
-    throw new Error(
-      `failed to fetch embedpdf.wasm from both ${init.wasmUrl} ` +
-        `(${describeError(primaryFailure)}) and the fallback ${init.fallbackWasmUrl} ` +
-        `(${describeError(fallbackFailure)})`,
-    );
-  }
+function resolveBootSource(init: EngineWorkerInit): { wasmUrl?: string; wasmBinary?: ArrayBuffer } {
+  return { wasmUrl: init.wasmUrl, wasmBinary: init.wasmBinary };
 }
 
-async function fetchWasm(url: string): Promise<ArrayBuffer> {
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status}`);
-  }
-  return response.arrayBuffer();
-}
-
-function describeError(err: unknown): string {
-  return String((err as Error)?.message ?? err);
-}
-
-/** Boot failures should teach the fix: the most common one by far is the wasm
- *  fetch failing (offline, air-gapped network, a stale self-hosted path). */
 function describeBootError(err: unknown, init: EngineWorkerInit): string {
   const detail = String((err as Error)?.stack ?? err);
   if (init.wasmBinary) return detail;
@@ -143,8 +91,9 @@ function describeBootError(err: unknown, init: EngineWorkerInit): string {
     ? `failed to load embedpdf.wasm from ${init.wasmUrl}`
     : 'failed to load embedpdf.wasm (resolved relative to the worker script)';
   return (
-    `${source}. If this URL is unreachable (offline, air-gapped, or blocked), ` +
-    `self-host the file and pass \`wasmUrl\`/\`assetsUrl\` to localEngine(), or provide ` +
-    `the bytes via \`wasmBinary\`. See https://www.embedpdf.com/docs/self-hosting — ${detail}`
+    `${source}. Your build did not ship the wasm at that location — either import ` +
+    `\`localEngine\` from \`@embedpdf/engine/portable\` (the wasm travels inside your build), ` +
+    `or self-host the file and pass \`assetsUrl\`/\`wasmUrl\` to localEngine(), or provide ` +
+    `the bytes via \`wasmBinary\`. See https://www.embedpdf.com/docs/viewer/self-hosting — ${detail}`
   );
 }

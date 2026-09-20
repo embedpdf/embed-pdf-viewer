@@ -11,7 +11,8 @@ export interface StampPatch extends AnnotationPatchBase {
   subtype: 'stamp';
   rect?: PdfRect;
   source?: BinarySource;
-  name?: string;
+  /** `/Name`; `null` removes it (the reader then reports the default). */
+  name?: string | null;
   fit?: StampFit;
   rotation?: number | null;
   unrotatedRect?: PdfRect | null;
@@ -22,7 +23,7 @@ export interface StampWirePatch extends AnnotationPatchBase {
   subtype: 'stamp';
   rect?: PdfRect;
   source?: ResourceRef;
-  name?: string;
+  name?: string | null;
   fit?: StampFit;
   rotation?: number | null;
   unrotatedRect?: PdfRect | null;

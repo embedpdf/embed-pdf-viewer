@@ -103,6 +103,13 @@ export interface LayersTable {
   doc_id: string;
   tenant_id: string;
   name: string;
+  /**
+   * The base version this layer's artifact is a delta of — `documents.base_sha`
+   * when the layer was created, unchanged until a signature publishes a new
+   * version through this layer. NULL only for rows migration 030 could not
+   * backfill (a document with no base yet).
+   */
+  base_sha: string | null;
   doc_version: number;
   /**
    * Geometry-pointer epoch for `/layout@layoutVersion`. Bumps only on
@@ -480,6 +487,62 @@ export interface EngineQuarantineAuditTable {
   reason: string;
 }
 
+/** One immutable base PDF of a document (migration 030). */
+export interface BaseVersionsTable {
+  tenant_id: string;
+  doc_id: string;
+  sha256: string;
+  byte_length: number;
+  /** 1-based, gapless per document: parent's number + 1. */
+  number: number;
+  parent_sha256: string | null;
+  producer_kind: 'upload' | 'signature';
+  /** The signing id for `signature` versions. */
+  producer_ref: string | null;
+  /** NULL = the legacy `StorageKeys.basePdf` key (version 1). */
+  storage_key: string | null;
+  layout_version: number;
+  metadata_version: number;
+  attachments_version: number;
+  annotations_version: number;
+  created_at: number;
+}
+
+export type DocumentSigningState = 'prepared' | 'completed' | 'aborted' | 'expired';
+
+/** A durable signing candidate between prepare and complete (migration 030). */
+export interface DocumentSigningsTable {
+  /** The engine's signingId. */
+  id: string;
+  tenant_id: string;
+  doc_id: string;
+  layer_id: string;
+  layer_name: string;
+  state: DocumentSigningState;
+  /** Fence two: the base version the candidate extends. */
+  expected_base_sha: string;
+  /** Fence one: the layer version the candidate includes (the prepare's own bump). */
+  expected_layer_version: number;
+  /** Where the tail starts in the rebuilt candidate. */
+  base_byte_length: number;
+  tail_key: string;
+  tail_sha: string;
+  tail_size: number;
+  field_object_number: number;
+  /** `SignaturePrepared` exactly as answered to the client (wire JSON, digest base64). */
+  prepared_json: string;
+  /** Set on complete: the idempotent replay key. */
+  cms_sha256: string | null;
+  /** `SignatureCompleteResult` (wire JSON). */
+  result_json: string | null;
+  /** The version the completion published. */
+  result_sha: string | null;
+  created_by: string;
+  created_at: number;
+  expires_at: number;
+  finished_at: number | null;
+}
+
 export interface Database {
   tenants: TenantsTable & {
     created_at: Generated<number>;
@@ -494,6 +557,8 @@ export interface Database {
   document_pages: DocumentPagesTable;
   layers: LayersTable;
   layer_pages: LayerPagesTable;
+  base_versions: BaseVersionsTable;
+  document_signings: DocumentSigningsTable;
   weak_annotation_sessions: WeakAnnotationSessionsTable;
   weak_annotation_session_pages: WeakAnnotationSessionPagesTable;
   audit_log: AuditLogTable;

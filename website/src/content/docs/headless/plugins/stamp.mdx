@@ -1,0 +1,243 @@
+---
+title: Stamps
+description: Libraries of reusable stamps — Acrobat-compatible PDFs — placed by click or by code, made from selections, kept across sessions.
+---
+
+{/* Generated from docs/content — edit there, then `pnpm docs:sync`. */}
+
+import { Callout } from '@/components/docs/callout';
+
+# Stamps
+
+A stamp is a piece of artwork you place on a page as a stamp annotation —
+"Approved", a signature, a company mark. The stamp plugin keeps those in
+_libraries_, hands one to the annotation plugin when you arm it, and writes
+the placed annotation the way Acrobat does, so a stamp placed here reads as
+the same stamp there.
+
+Register `stampPlugin()` beside `annotationPlugin()` and read the capability
+with `useStamp()`. The example imports the standard library, lists its
+stamps, and arms one — hover a page to see the ghost, click to place:
+
+<Example name="stamp/basic" mode="open" />
+
+Two things the example shows beyond the calls themselves:
+
+- **The library names itself.** `importLibraryPdf(bytes)` takes no name, no
+  list of stamps, no manifest. The PDF's title is the library's name and its
+  named pages are the stamps; an Acrobat-authored library imports as is.
+- **The ghost stays sharp.** A vector stamp is rendered for the size it is
+  shown at, and re-rendered when the zoom crosses a size step, so a large
+  stamp previewed at 300% is as crisp as the placed one.
+
+## A library is a PDF
+
+Every library is one PDF, in the dialect Acrobat uses for its own stamp
+files:
+
+- the document `/Title` is the library name;
+- the `/Names /Pages` registry lists the stamps as `identifier=label` pairs
+  (`Approved=Goedgekeurd`) — one entry per page;
+- every page is one stamp's artwork, vector or raster.
+
+The identifier is the stamp's durable identity and becomes the placed
+annotation's `/Name`; the label is what a picker shows and becomes the
+placed `/Subj`. Two libraries can share identifiers (a Dutch and an English
+"Approved" are the same stamp with different labels), which is how the
+localized default libraries work.
+
+That one shape gives you the rest for free:
+
+```ts
+const stamp = useStamp();
+
+// Any PDF becomes a library. A plain PDF: one stamp per page, named Stamp1….
+const libraryId = await stamp.importLibraryPdf(bytes);
+
+// The library as the file it is — title, registry, artwork.
+const pdf = stamp.exportLibrary(libraryId); // drop it into Acrobat's Stamps folder
+
+// Add a stamp: a single-page PDF (vector) or a PNG/JPEG (becomes a page).
+await stamp.addAsset({ libraryId, label: 'Paid', source: pngBytes });
+
+// Relabel; the identifier never changes.
+await stamp.updateAsset(assetId, { label: 'PAID' });
+```
+
+There is no manifest because there is nothing left for one to say. What has
+no standard home in a PDF — a stable library id, a locale, a stamp's kind —
+rides `/PieceInfo`, invisible to every other reader.
+
+<Engine cloud>
+
+The document you stamp lives on the server; the library is a PDF the
+_browser_ opens, so the stamp plugin takes its own engine for that. Pass a
+local engine as `assetEngine` — the examples on this page do — and the
+placed annotations still go through the cloud engine like any other.
+
+</Engine>
+
+## Library kinds
+
+A library says what it holds: `kind` is `'stamps'` (the default), `'signatures'`
+(a person's marks — see [Signatures](/docs/headless/plugins/signature)), or a
+name of your own. It rides `/PieceInfo` with the library id, and a picker asks
+for the kinds it lists:
+
+```ts
+await stamp.createLibrary('Acme review marks', { kind: 'toolbar' });
+await stamp.importLibraryPdf(bytes, { libraryKind: 'legal-seals' }); // override what the file says
+
+stamp.libraries({ kind: 'stamps' }); // one kind
+useStampLibraries({ kind: ['stamps', 'legal-seals'] }); // several
+```
+
+## Author a mark
+
+An asset can be **drawn, typed, an image, or a PDF page** — one `mark` in
+place of `source`. Ink and text are rendered by the engine into a page of
+the library (a vector appearance, exactly what a placed annotation would
+show); an image becomes a page carrying it; a PDF page is extracted as is:
+
+```ts
+await stamp.addAsset({
+  libraryId,
+  label: 'Signature',
+  mark: { kind: 'ink', strokes, strokeWidth: 2.5 },
+});
+await stamp.addAsset({
+  libraryId,
+  label: 'Initials',
+  mark: { kind: 'text', text: 'AL', fontFamily: 'times-italic' },
+});
+await stamp.addAsset({ libraryId, label: 'Logo', mark: { kind: 'image', source: pngBytes } });
+await stamp.addAsset({
+  libraryId,
+  label: 'Seal',
+  mark: { kind: 'pdf', source: pdfBytes, pageIndex: 2 },
+});
+
+await stamp.updateLibrary(libraryId, { name: 'Ada Lovelace' }); // rename (/Title)
+stamp.armedAsset(documentId); // the asset armed on a document, while the tool holds it
+```
+
+`fontFamily` is a standard PDF font name or the key of a font registered
+through `engine.fonts` on the asset engine — a script face for typed
+signatures, for instance.
+
+## Place a stamp with code
+
+A click after `armAsset` and a call to `placeAsset` produce the same
+annotation from the same inputs — one placement law, two entry points:
+
+<Example name="stamp/programmatic" mode="open" />
+
+```ts
+const ref = await stamp.placeAsset(documentId, assetId, {
+  pageObjectNumber: pon,
+  at: { x: 120, y: 90 }, // page points, origin top-left: the box is centred here
+  targetWidth: 160, // optional; default the stamp's own size
+  rotation: 0, // optional, degrees clockwise
+});
+```
+
+The box is fitted to the stamp's aspect and clamped to the page, the
+`/Name` and `/Subj` are written, and the new annotation is selected, exactly
+as a click would leave it. `ref` is the created annotation.
+
+## Make a stamp from a selection
+
+Select one or more annotations on a page and turn them into a stamp. The
+engine exports their appearances as one single-page PDF sized to their
+union — vector, positions preserved, exactly what the page shows — and the
+plugin files it as a page of the library you name:
+
+<Example name="stamp/from-selection" mode="open" />
+
+```ts
+const assetId = await stamp.addAssetFromAnnotations(documentId, pon, refs, {
+  libraryId, // omit to create a library named after the label
+  label: 'Custom stamp 1',
+});
+```
+
+The identifier is minted in Acrobat's own form (`#` plus 22 characters), so
+a stamp made here keeps its identity when its library is opened in Acrobat.
+The call is all-or-nothing: a hidden annotation, one without an appearance,
+or one on another page rejects the whole thing — a stamp silently missing a
+part would be worse than an error.
+
+## Keep custom libraries
+
+The plugin knows _when_ a library changes and _what_ its bytes are; where
+they live is your decision. Two calls are all a store needs:
+
+```ts
+stamp.onLibraryChanged(({ libraryId, reason }) => {
+  /* 'created' | 'imported' | 'asset-added' | 'asset-updated' | 'asset-removed' | 'removed' */
+});
+stamp.exportLibrary(libraryId); // the complete PDF
+```
+
+`restoreStampLibraries` and `persistStampLibraries` wire those to a
+`StampLibraryStore` — `list`, `put`, `delete` over bytes by library id.
+`indexedDbByteStore` is the browser default; an in-memory store serves
+tests; your own backend implements the three calls once:
+
+<Example name="stamp/persist" mode="open" />
+
+```ts
+useEffect(() => {
+  void restoreStampLibraries(stamp, store); // import every stored PDF
+  return persistStampLibraries(stamp, store, {
+    except: ['embedpdf-standard'], // libraries you fetch fresh each time
+  });
+}, [stamp]);
+```
+
+Writes are coalesced per library, so a burst of edits saves once, and a
+pending write is flushed when you unsubscribe.
+
+## Dynamic stamps
+
+A stamp PDF can carry form fields — the name, the date, a document title.
+When the actions plugin's JavaScript switch is on, such a _template_ is
+evaluated at placement in a detached script realm with the viewer's
+identity and clock, then flattened into the placed artwork; the library
+page itself is never changed. With scripting off, or without the actions
+plugin, the template is placed as it is.
+
+```ts
+stampPlugin({ dynamic: false }); // keep templates static even with scripting on
+```
+
+`dynamic` is a product choice, not a trust boundary — the actions plugin's
+policy is the one that decides whether scripts run at all.
+
+## Localized default stamps
+
+`@embedpdf/default-stamps` ships the standard set as one library per locale
+(`en`, `de`, `nl`, `fr`, `es`, `zh-CN`, `sv`, `ja`), each registering the same
+identifiers with translated labels. Its `library` entry delivers each locale
+as a lazy module of your own build — no asset to copy, no CDN, nothing
+fetched from anywhere but your origin:
+
+```ts
+import { LOCALES, loadDefaultLibrary } from '@embedpdf/default-stamps/library';
+import { negotiateLocale } from '@embedpdf/react/i18n';
+
+const locale = negotiateLocale(LOCALES, navigator.languages) ?? 'en';
+await stamp.importLibraryPdf(await loadDefaultLibrary(locale)); // "Standaard stempels", id embedpdf-standard
+```
+
+Import two locales and you get two libraries with one identity: the
+placed `/Name` is `Approved` either way, only the `/Subj` differs. The PDFs
+themselves stay in the package (`<locale>/stamps.pdf`) for self-hosting and
+for Acrobat.
+
+## Permissions
+
+Placement writes an annotation, so it needs `doc.annotate.modify` on the
+document. Making a stamp from a selection reads appearances out of the
+document — that egresses content and is gated by `doc.download`. Library
+operations run on the asset engine and touch no document of yours.

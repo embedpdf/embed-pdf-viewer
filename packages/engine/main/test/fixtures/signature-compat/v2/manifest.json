@@ -1,0 +1,691 @@
+{
+  "schemaVersion": 1,
+  "corpusVersion": "role-probes-v2",
+  "source": "synthetic-from-scratch",
+  "generator": {
+    "pyhanko": "0.37.0",
+    "cryptography": "50.0.1",
+    "signingTime": "2026-09-13T12:00:00+00:00"
+  },
+  "certificateSha256": "0f13f8fc08b2c73b9142fdd9fa9bffcc7c939e134dde6a6bb7ce4d7d91b22d74",
+  "cases": [
+    {
+      "id": "31",
+      "file": "31-no-annotation-control.pdf",
+      "question": "Does removing the Square remove the baseline annotation category?",
+      "control": null,
+      "profile": "approval",
+      "facts": {
+        "sha256": "dc908b7eb0133a04dfef7224e76fd4e78f9d4430c2b3a407a54790ffc05a2e70",
+        "byteLength": 20319,
+        "revisionCount": 1,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              2906,
+              19292,
+              1027
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": {
+        "status": "unobserved"
+      }
+    },
+    {
+      "id": "32",
+      "file": "32-explicit-annotation-appearance-control.pdf",
+      "question": "Does an explicit Square appearance remove the baseline annotation category?",
+      "control": null,
+      "profile": "approval",
+      "facts": {
+        "sha256": "27889e660903dce8662ce78d3168c2adaf2f32bdead0393d9e55f0a05a50e114",
+        "byteLength": 20519,
+        "revisionCount": 1,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              3086,
+              19472,
+              1047
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": {
+        "status": "unobserved"
+      }
+    },
+    {
+      "id": "33",
+      "file": "33-page-font-only-control.pdf",
+      "question": "Is the unchanged page-only Type3 font control accepted?",
+      "control": null,
+      "profile": "approval",
+      "facts": {
+        "sha256": "184b3593f93ffd2f5203562d2b1d255fe5b95c3935a37d00b1bac1e851fd417d",
+        "byteLength": 20840,
+        "revisionCount": 1,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              3367,
+              19753,
+              1087
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": {
+        "status": "unobserved"
+      }
+    },
+    {
+      "id": "34",
+      "file": "34-page-font-only-changed.pdf",
+      "question": "Does changing a font used only by page content invalidate the signature?",
+      "control": "33",
+      "profile": "approval",
+      "facts": {
+        "sha256": "2f428d2788946e2313ebd7261bc647bf84f68e10d984814ca23450ccd3f50196",
+        "byteLength": 21150,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              3367,
+              19753,
+              1087
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": {
+        "status": "unobserved"
+      }
+    },
+    {
+      "id": "35",
+      "file": "35-shared-page-font-control.pdf",
+      "question": "Is the unchanged page/default-form shared font accepted?",
+      "control": null,
+      "profile": "approval",
+      "facts": {
+        "sha256": "3155441d7cb9f796e62ca1e69c526b6af7f437dc9b5c245dbc5fdf6da03ea180",
+        "byteLength": 20855,
+        "revisionCount": 1,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              3382,
+              19768,
+              1087
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": {
+        "status": "unobserved"
+      }
+    },
+    {
+      "id": "36",
+      "file": "36-shared-font-without-fill.pdf",
+      "question": "Does registering the font in form defaults affect a glyph-only rewrite?",
+      "control": "35",
+      "profile": "approval",
+      "facts": {
+        "sha256": "0cee9d939b67caf3265e54a766836dc85be866dc1754c4888d0fbff3e7c70ff0",
+        "byteLength": 21165,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              3382,
+              19768,
+              1087
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": {
+        "status": "unobserved"
+      }
+    },
+    {
+      "id": "37",
+      "file": "37-cloned-font-for-fill.pdf",
+      "question": "Is filling with a separate changed font accepted while the page font remains unchanged?",
+      "control": "35",
+      "profile": "approval",
+      "facts": {
+        "sha256": "f103c5d1d856cda0a132455cc11283ed281e80a45f69187d63aa1eac75580d90",
+        "byteLength": 21941,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              3382,
+              19768,
+              1087
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": {
+        "status": "unobserved"
+      }
+    },
+    {
+      "id": "38",
+      "file": "38-shared-font-initial-a-control.pdf",
+      "question": "Is the unchanged page/field/default shared font accepted with initial field value A?",
+      "control": null,
+      "profile": "approval",
+      "facts": {
+        "sha256": "499f093523c605c816f0920417faa1224685e4e4d43fa08d335cace85cec7534",
+        "byteLength": 21093,
+        "revisionCount": 1,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              3600,
+              19986,
+              1107
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": {
+        "status": "unobserved"
+      }
+    },
+    {
+      "id": "39",
+      "file": "39-shared-font-appearance-without-value-change.pdf",
+      "question": "Does a shared glyph and appearance rewrite remain accepted without changing the field value?",
+      "control": "38",
+      "profile": "approval",
+      "facts": {
+        "sha256": "e1d0035a556d2c1b47a71b3ff321644ae82fa211986c35c89bf73c597a8579c3",
+        "byteLength": 21867,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              3600,
+              19986,
+              1107
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": {
+        "status": "unobserved"
+      }
+    },
+    {
+      "id": "40",
+      "file": "40-p2-shared-font-control.pdf",
+      "question": "Is the unchanged P2 shared-font control accepted?",
+      "control": null,
+      "profile": "DocMDP-P2",
+      "facts": {
+        "sha256": "7ed2e487f31d2a5ffb2076006129806de6faad4a45677c29d1ccf0a951cdcd89",
+        "byteLength": 21015,
+        "revisionCount": 1,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              3411,
+              19797,
+              1218
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": {
+        "status": "unobserved"
+      }
+    },
+    {
+      "id": "41",
+      "file": "41-p2-shared-font-fill.pdf",
+      "question": "Does explicit P2 certification reject the shared-font page change?",
+      "control": "40",
+      "profile": "DocMDP-P2",
+      "facts": {
+        "sha256": "aa3b9841fb2767ae5c7d02a7b449f1b034e5f1c9bf200d0911c89061cae03578",
+        "byteLength": 21789,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              3411,
+              19797,
+              1218
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": {
+        "status": "unobserved"
+      }
+    },
+    {
+      "id": "42",
+      "file": "42-page-restored-then-signed.pdf",
+      "question": "Are both signatures accepted when the restored state receives a second signature?",
+      "control": "31",
+      "profile": "approval",
+      "facts": {
+        "sha256": "e3fb5b4a8c5525606f05a78ab7d223f49ba119bab306a6632640bd7f392fe89a",
+        "byteLength": 38960,
+        "revisionCount": 4,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              2906,
+              19292,
+              1027
+            ],
+            "digestMatches": true
+          },
+          {
+            "field": "SignatureTwo",
+            "signedRevision": 3,
+            "byteRange": [
+              0,
+              21848,
+              38234,
+              726
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": {
+        "status": "unobserved"
+      }
+    },
+    {
+      "id": "43",
+      "file": "43-changed-page-second-signature.pdf",
+      "question": "How are both signatures judged when the changed page is signed?",
+      "control": "31",
+      "profile": "approval",
+      "facts": {
+        "sha256": "a1cfa0d454c7f03f956357ade7f0d8c4115ac499945e64086ed3eb1eeb028bf4",
+        "byteLength": 38296,
+        "revisionCount": 3,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              2906,
+              19292,
+              1027
+            ],
+            "digestMatches": true
+          },
+          {
+            "field": "SignatureTwo",
+            "signedRevision": 2,
+            "byteRange": [
+              0,
+              21184,
+              37570,
+              726
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": {
+        "status": "unobserved"
+      }
+    },
+    {
+      "id": "44",
+      "file": "44-signed-changed-page-restored.pdf",
+      "question": "Does restoration recover the first signature while invalidating the second?",
+      "control": "43",
+      "profile": "approval",
+      "facts": {
+        "sha256": "a7526defafff0c1b2df45a8607799a41ebcfcdc27054f5270ce37b1335bb9230",
+        "byteLength": 38966,
+        "revisionCount": 4,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              2906,
+              19292,
+              1027
+            ],
+            "digestMatches": true
+          },
+          {
+            "field": "SignatureTwo",
+            "signedRevision": 2,
+            "byteRange": [
+              0,
+              21184,
+              37570,
+              726
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": {
+        "status": "unobserved"
+      }
+    },
+    {
+      "id": "45",
+      "file": "45-page-restored-equivalent-stream.pdf",
+      "question": "Is a visually identical restoration with different decoded stream bytes accepted?",
+      "control": "31",
+      "profile": "approval",
+      "facts": {
+        "sha256": "ff4b0fd196a303cd599a9358ecee0839f1a9d04c56daec90fb0422dff318e7b2",
+        "byteLength": 21729,
+        "revisionCount": 3,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              2906,
+              19292,
+              1027
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": {
+        "status": "unobserved"
+      }
+    },
+    {
+      "id": "46",
+      "file": "46-page-restored-resource-still-changed.pdf",
+      "question": "Does restoring the page stream leave a shared-font page change detectable?",
+      "control": "35",
+      "profile": "approval",
+      "facts": {
+        "sha256": "94ee426d9fea09c479897d979256b6955d4fb0b91bfd9c751d1a6353c36d6038",
+        "byteLength": 22417,
+        "revisionCount": 3,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              3382,
+              19768,
+              1087
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": {
+        "status": "unobserved"
+      }
+    },
+    {
+      "id": "47",
+      "file": "47-page-and-sealed-widget-identical.pdf",
+      "question": "Are identical page and sealed-widget rewrites accepted together?",
+      "control": "31",
+      "profile": "approval",
+      "facts": {
+        "sha256": "8a0773a5b275232868f9a83e735c1e045825b2909346c9cda954a1dffb28d101",
+        "byteLength": 20866,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              2906,
+              19292,
+              1027
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": {
+        "status": "unobserved"
+      },
+      "mutation": {
+        "kind": "identical-object-rewrites",
+        "objectNumbers": [
+          6,
+          8
+        ]
+      }
+    },
+    {
+      "id": "48",
+      "file": "48-locked-field-control.pdf",
+      "question": "Is the unchanged locked-field control accepted?",
+      "control": null,
+      "profile": "approval-FieldMDP",
+      "facts": {
+        "sha256": "e8b1642d68baf49c235b7f2284b605b7829ab3bd0a573b968779947e01697724",
+        "byteLength": 20568,
+        "revisionCount": 1,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              2987,
+              19373,
+              1195
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": {
+        "status": "unobserved"
+      }
+    },
+    {
+      "id": "49",
+      "file": "49-locked-field-moved.pdf",
+      "question": "Is moving a locked field rejected?",
+      "control": "48",
+      "profile": "approval-FieldMDP",
+      "facts": {
+        "sha256": "3a37e729e646901d9d831e7b664fc331ca6861dd88b8ba7fdacf8d15855e528d",
+        "byteLength": 20980,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              2987,
+              19373,
+              1195
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": {
+        "status": "unobserved"
+      }
+    },
+    {
+      "id": "50",
+      "file": "50-p2-field-moved.pdf",
+      "question": "Is moving an unlocked field accepted under explicit P2 certification?",
+      "control": "40",
+      "profile": "DocMDP-P2",
+      "facts": {
+        "sha256": "893924ca7fbfcc2afcdfdab67f61c250de12a800958aab6eea91e0f6074486a5",
+        "byteLength": 21427,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              3411,
+              19797,
+              1218
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": {
+        "status": "unobserved"
+      }
+    },
+    {
+      "id": "51",
+      "file": "51-locked-field-hidden.pdf",
+      "question": "Is hiding a locked field rejected?",
+      "control": "48",
+      "profile": "approval-FieldMDP",
+      "facts": {
+        "sha256": "3ec5179c0fee43f4a7f9a013166e7f269133d19416704088a416ab8e3519c034",
+        "byteLength": 20979,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              2987,
+              19373,
+              1195
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": {
+        "status": "unobserved"
+      }
+    },
+    {
+      "id": "52",
+      "file": "52-shared-font-filled-without-annotation.pdf",
+      "question": "Does the original shared-font acceptance reproduce without the Square annotation?",
+      "control": "35",
+      "profile": "approval",
+      "facts": {
+        "sha256": "3546f0132d448cf34f7dfe9c44685cf108d2db455a4b1ffa26f4c8207ede084b",
+        "byteLength": 21629,
+        "revisionCount": 2,
+        "encrypted": false,
+        "signatures": [
+          {
+            "field": "SignatureOne",
+            "signedRevision": 0,
+            "byteRange": [
+              0,
+              3382,
+              19768,
+              1087
+            ],
+            "digestMatches": true
+          }
+        ]
+      },
+      "acrobat": {
+        "status": "unobserved"
+      }
+    }
+  ]
+}

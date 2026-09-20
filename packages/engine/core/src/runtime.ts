@@ -14,6 +14,10 @@ export { AbortError, isAbortError } from './promise/AbortError';
 
 export type { Engine, EngineFactory } from './engine/Engine';
 export type { FontService } from './engine/FontService';
+export type {
+  DocumentFontSettings,
+  FontEmbeddingPolicy,
+} from './engine/DocumentFontSettings';
 export type { DocumentHandle } from './engine/DocumentHandle';
 export type {
   DocumentEvent,
@@ -63,6 +67,7 @@ export type { DocumentSearchService } from './engine/DocumentSearchService';
 export type { WeakAnnotationEditSession } from './engine/DocumentAnnotationsService';
 export type { DocumentPagesService } from './engine/DocumentPagesService';
 export type { DocumentRedactionService } from './engine/DocumentRedactionService';
+export type { DocumentSignaturesService } from './engine/DocumentSignaturesService';
 export type { PageAnnotationsService } from './engine/PageAnnotationsService';
 export type { DocumentAttachmentsService } from './engine/DocumentAttachmentsService';
 export type { PieceInfoService } from './engine/PieceInfoService';
@@ -115,9 +120,23 @@ export type {
   DocumentRenderPageFileEncodedWorkerRequest,
   DocumentSecurityProbeInfo,
   PagesListWorkerRequest,
+  SignaturesListWorkerRequest,
+  SignaturesContentsWorkerRequest,
+  SignaturesDigestWorkerRequest,
+  SignaturesRevisionBytesWorkerRequest,
+  DocumentVersionWorkerRequest,
+  SignaturesPrepareWorkerRequest,
+  SignaturesCompleteWorkerRequest,
+  SignaturesAbortWorkerRequest,
+  SignaturesAnalyzeWorkerRequest,
+  SignaturesFinalizeCandidateWorkerRequest,
   PagesMoveWorkerRequest,
   PagesRotateWorkerRequest,
   PagesDeleteWorkerRequest,
+  AnnotationsFlattenWorkerRequest,
+  AnnotationsExportAppearanceWorkerRequest,
+  PagesSetNameWorkerRequest,
+  PagesRemoveNameWorkerRequest,
   PagesExtractWorkerRequest,
   PagesInsertWorkerRequest,
   PagesInsertBlankWorkerRequest,
@@ -141,6 +160,7 @@ export type {
   FormsRepairWorkerRequest,
   FormsCreateFieldWorkerRequest,
   FormsUpdateFieldWorkerRequest,
+  FormsSetSignatureAppearanceWorkerRequest,
   FormsDeleteFieldWorkerRequest,
   FormsAttachWidgetWorkerRequest,
   FormsDetachWidgetWorkerRequest,
@@ -148,6 +168,8 @@ export type {
   FontsAddFallbackWorkerRequest,
   FontsClearFallbacksWorkerRequest,
   FontsClearWorkerRequest,
+  FontsAuthorizeEditingWorkerRequest,
+  DocumentSetFontSettingsWorkerRequest,
   CloseWorkerRequest,
   LayerCloseWorkerRequest,
   AbortWorkerRequest,

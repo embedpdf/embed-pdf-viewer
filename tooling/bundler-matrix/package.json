@@ -1,0 +1,15 @@
+{
+  "name": "@embedpdf/bundler-matrix",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Does the zero-config engine (worker + wasm) and the built-in stamp library work OUT OF THE BOX under each bundler, without a request leaving the app's origin? One minimal app per toolchain, the same probe in each, a production build, a headless browser, a truth table. The gate for every asset-delivery decision.",
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "matrix": "node run.mjs",
+    "matrix:one": "node run.mjs --only"
+  },
+  "devDependencies": {
+    "playwright-core": "^1.63.0"
+  }
+}

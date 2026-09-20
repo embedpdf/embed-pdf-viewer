@@ -1,0 +1,16 @@
+{
+  "name": "@embedpdf/bundler-matrix-esbuild",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "matrix:build": "node build.mjs",
+    "matrix:build:portable": "MATRIX_ENTRY=portable node build.mjs"
+  },
+  "dependencies": {
+    "@embedpdf/bundler-probe": "workspace:*"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0"
+  }
+}

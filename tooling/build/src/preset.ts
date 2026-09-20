@@ -19,6 +19,22 @@ export function presetConfig(overrides: UserConfig = {}): UserConfig {
   const rawEntries = Object.fromEntries(
     raw.map((subpath: string) => [subpath, pkg.exports?.[subpath]]),
   );
+  // epdf.conditions (package.json): extra export CONDITIONS per subpath,
+  // written first (conditions match in order) into BOTH maps, always as dist
+  // paths. For resolvers that must land on a different build of an entry —
+  // e.g. `es2020` (Angular's application builder) → the portable engine.
+  const conditions: Record<string, Record<string, string>> = pkg.epdf?.conditions ?? {};
+  const withConditions = (generated: Record<string, unknown>) => {
+    const out: Record<string, unknown> = { ...generated };
+    for (const [subpath, extra] of Object.entries(conditions)) {
+      const entry = out[subpath];
+      out[subpath] =
+        entry && typeof entry === 'object'
+          ? { ...extra, ...(entry as Record<string, unknown>) }
+          : { ...extra, default: entry };
+    }
+    return out;
+  };
   return {
     entry: entriesFromExports(pkg, raw),
     format: ['esm', 'cjs'],
@@ -37,7 +53,7 @@ export function presetConfig(overrides: UserConfig = {}): UserConfig {
       // epdf.rawExports (package.json): subpaths shipped verbatim in BOTH the
       // dev and publish maps — e.g. a worker entry published as TS source for
       // the consumer's bundler to compile. Never built, never rewritten.
-      customExports: (generated) => ({ ...generated, ...rawEntries }),
+      customExports: (generated) => withConditions({ ...generated, ...rawEntries }),
     },
     publint: true,
     // node16 profile: subpath exports are invisible to legacy node10 module
@@ -55,7 +71,11 @@ export function presetConfig(overrides: UserConfig = {}): UserConfig {
 interface PackageJson {
   name?: string;
   exports?: Record<string, unknown>;
-  epdf?: { rawExports?: string[]; devExports?: true | string };
+  epdf?: {
+    rawExports?: string[];
+    devExports?: true | string;
+    conditions?: Record<string, Record<string, string>>;
+  };
 }
 
 /**

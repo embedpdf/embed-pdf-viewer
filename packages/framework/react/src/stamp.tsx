@@ -10,8 +10,17 @@
 
 // One-line-per-feature: registration travels with the UI.
 export * from '@embedpdf/plugin-stamp';
+// The browser store for `persistStampLibraries` / `restoreStampLibraries`
+// (structurally the plugin's `StampLibraryStore`), written once in `@embedpdf/web`.
+export { indexedDbByteStore } from '@embedpdf/web';
+export type { ByteStore } from '@embedpdf/web';
 import { useEffect, useState } from 'react';
-import { StampToken, type StampAsset, type StampLibrary } from '@embedpdf/plugin-stamp';
+import {
+  StampToken,
+  type StampAsset,
+  type StampLibrary,
+  type StampLibraryQuery,
+} from '@embedpdf/plugin-stamp';
 import { shallowArray, useCapability, useDocumentId, useSelector } from './runtime';
 
 /** The stamp capability (workspace-scoped: one library set for every document). */
@@ -19,8 +28,14 @@ export function useStamp() {
   return useCapability(StampToken);
 }
 
-export function useStampLibraries(): StampLibrary[] {
-  return useSelector(StampToken, (c) => c.libraries(), shallowArray);
+/** Libraries, optionally of one kind or several (`{ kind: 'stamps' }`, `{ kind: ['stamps', 'toolbar'] }`). */
+export function useStampLibraries(query?: StampLibraryQuery): StampLibrary[] {
+  const kinds = query?.kind === undefined ? undefined : ([] as string[]).concat(query.kind).join('\u0000');
+  return useSelector(
+    StampToken,
+    (c) => c.libraries(kinds === undefined ? undefined : { kind: kinds.split('\u0000') }),
+    shallowArray,
+  );
 }
 
 /** Assets of one library, or every asset when `libraryId` is omitted. */

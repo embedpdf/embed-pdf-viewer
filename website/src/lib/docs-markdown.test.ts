@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { renderDocsMarkdown } from './docs-markdown';
 
@@ -15,7 +15,10 @@ const viewerGettingStarted = fs.readFileSync(
 );
 
 describe('renderDocsMarkdown', () => {
+  afterEach(() => vi.unstubAllEnvs());
+
   it('exports only the active Headless integration and expands its complete example', () => {
+    vi.stubEnv('DOCS_INSTALL_CHANNEL', 'next');
     const markdown = renderDocsMarkdown({
       sourceCode: gettingStarted,
       canonicalPath: '/docs/headless/react/getting-started',
@@ -28,7 +31,7 @@ describe('renderDocsMarkdown', () => {
 
     expect(markdown).toContain('title: "Getting Started — React"');
     expect(markdown).toContain('\n---\n\n# Getting Started');
-    expect(markdown).toContain('pnpm add @embedpdf/react @embedpdf/engine');
+    expect(markdown).toContain('pnpm add @embedpdf/react@next @embedpdf/engine@next');
     expect(markdown).toContain("import { localEngine } from '@embedpdf/engine'");
     expect(markdown).toContain('**`basic.tsx`**');
     expect(markdown).not.toContain('@embedpdf/vue');

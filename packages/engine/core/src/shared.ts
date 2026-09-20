@@ -21,6 +21,7 @@ export type {
 export type { DocumentMetadata, DocumentMetadataTrapped } from './dto/DocumentMetadata';
 export type { MetadataPatch } from './dto/MetadataPatch';
 export type { PageListSnapshot } from './dto/PageListSnapshot';
+export type { NamedPageEntry, NamedPageTarget } from './dto/NamedPage';
 export type { PageLayout, PageBoxes, PageRotation } from './dto/PageLayout';
 export type {
   PdfActionType,
@@ -73,11 +74,7 @@ export type {
   RotatedGeometryRun,
   UprightGeometryRun,
 } from './dto/PageGeometrySnapshot';
-export {
-  glyphLooseBounds,
-  glyphLooseQuad,
-  isRotatedGeometryRun,
-} from './dto/PageGeometrySnapshot';
+export { glyphLooseBounds, glyphLooseQuad, isRotatedGeometryRun } from './dto/PageGeometrySnapshot';
 export type {
   PageImageHandle,
   PageImageBlobSource,
@@ -110,8 +107,30 @@ export type {
 } from './dto/AnnotationRender';
 export type { CachePins } from './dto/CachePins';
 export { DEFAULT_PDF_SAVE_MODE } from './dto/PdfSaveMode';
+export type { SessionKind } from './dto/SessionKind';
 export type { PdfSaveMode } from './dto/PdfSaveMode';
-export type { FontHandle, FontKey, FontSpec } from './dto/FontSpec';
+export type {
+  FontEmbeddingPermission,
+  FontHandle,
+  FontIdentityInfo,
+  FontKey,
+  FontSpec,
+} from './dto/FontSpec';
+export type {
+  RichTextAlign,
+  RichTextBody,
+  RichTextDecoration,
+  RichTextDirection,
+  RichTextDocument,
+  RichTextDocumentInput,
+  RichTextMargins,
+  RichTextParagraph,
+  RichTextParagraphProps,
+  RichTextRun,
+  RichTextRunStyle,
+  RichTextScript,
+} from './dto/RichText';
+export { richTextPlainText, richTextParagraphsFromPlainText } from './dto/RichText';
 
 export { EngineError, serializeError, deserializeError } from './errors/EngineError';
 export type { SerializedEngineError, EngineErrorOptions } from './errors/EngineError';
@@ -395,6 +414,83 @@ export type {
   FormEffectsResult,
 } from './forms/effects';
 export type {
+  BaseVersionInfo,
+  DigestAlgorithm,
+  DocMdpPermission,
+  DocumentFieldLock,
+  DocumentProtection,
+  DocumentVersionRef,
+  FieldLockAction,
+  FieldLockSpec,
+  ModificationLevel,
+  PdfRevision,
+  SignatureAbortResult,
+  SignatureAppearanceInput,
+  SignatureCompleteInput,
+  SignatureCompleteResult,
+  SignatureCoverage,
+  SignatureDTO,
+  SignatureKind,
+  SignaturePrepareInput,
+  SignaturePrepared,
+  SignatureSeedValue,
+  SignatureSigner,
+  SignatureSnapshot,
+  SignatureSubFilter,
+  SignedDocumentPolicy,
+} from './signature/types';
+export type {
+  AnalyzeInput,
+  ChangeAnalysis,
+  ChangeFinding,
+  Assessment,
+  ObjectChange,
+  ObjectReadStatus,
+  RestrictionAnchor,
+  RevisionHealth,
+  ObjectChangeKind,
+  ObjectChangeType,
+  ObjectReferrer,
+  PdfValue,
+  RevisionAnalysis,
+  RevisionField,
+  RevisionStructure,
+  StepInput,
+  StepVerdict,
+} from './signature/analysis/types';
+export {
+  changedKeys,
+  dictEntries,
+  evaluateStep,
+  restrictionsFor,
+  sameEffectiveValue,
+  conclude,
+  combine,
+  assessmentOf,
+  primaryFinding,
+  parsePdfValue,
+  pdfValueEquals,
+  refsOf,
+  restrictionsOf,
+  stableStringify,
+  worstVerdict,
+  EdgeResolver,
+  DEFAULT_EDGE_RESOLVER_BUDGET,
+  USAGE_INCOMPLETE,
+} from './signature/analysis';
+export type { EdgeResolverBudget, ResolvedUsage } from './signature/analysis';
+export {
+  SIGNATURE_POLICY_VERSION,
+  deriveProtection,
+  fieldLockFor,
+  levelAllows,
+  levelFromPermission,
+  lockCovers,
+  lockNameCovers,
+  minLevel,
+  protectedCapabilities,
+} from './signature/protection';
+export type {
   FormSetValueResult,
   FormImportResult,
   FormDataExport,
@@ -463,6 +559,14 @@ export { searchContentEpoch, canonicalSearchQuery } from './search/epoch';
 export type { PageMoveInput } from './mutation/PageMoveInput';
 export type { PageMoveResult, PageMoveCache } from './mutation/PageMoveResult';
 export type { PageStructureCache } from './mutation/PageStructureCache';
+export type { PageNameInput, PageRemoveNameInput } from './mutation/PageNameInput';
+export type { PageNameResult } from './mutation/PageNameResult';
+export type {
+  AnnotationFlattenInput,
+  AnnotationFlattenItemResult,
+  AnnotationFlattenResult,
+  AnnotationAppearanceExportInput,
+} from './mutation/AnnotationFlattenResult';
 export type { PageRotateInput } from './mutation/PageRotateInput';
 export type { PageRotateResult } from './mutation/PageRotateResult';
 export type { PageDeleteInput } from './mutation/PageDeleteInput';

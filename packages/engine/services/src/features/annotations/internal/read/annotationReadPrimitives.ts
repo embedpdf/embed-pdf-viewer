@@ -17,7 +17,7 @@ import {
 } from '@embedpdf/engine-runtime';
 
 import { withScratch, withScratchN } from '../../../../runtime/memory/scratch';
-import { readUtf16String } from '../../../../runtime/memory/strings';
+import { readUtf8String, readUtf16String } from '../../../../runtime/memory/strings';
 import {
   F32_BYTES,
   I32_BYTES,
@@ -415,4 +415,16 @@ export function readQuadPoints(fn: PdfFunctions, mem: PdfRuntimeMemory, annotPtr
     }
     return out;
   });
+}
+
+/**
+ * `/Name` as text, whatever its value (`EPDFAnnot_GetName`): a standard
+ * icon/stamp name or a custom identifier. `null` when absent.
+ */
+export function readAnnotName(
+  fn: PdfFunctions,
+  mem: PdfRuntimeMemory,
+  annotPtr: Ptr,
+): string | null {
+  return readUtf8String(mem, (buf, capacity) => fn.EPDFAnnot_GetName(annotPtr, buf, capacity));
 }

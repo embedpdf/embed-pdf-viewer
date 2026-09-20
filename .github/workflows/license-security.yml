@@ -57,13 +57,12 @@ jobs:
         run: pnpm --filter @cloudpdf/server exec vitest run test/licensing.test.ts
 
       - name: Build published server artifact
-        # `...` builds the server's workspace dependency closure first
-        # (admin-api, engine-core, engine-services, engine-runtime) in
-        # topological order — the server bundle inlines engine-core/services
-        # from their dist and the dts build needs the runtime's types. The
-        # native runtime payloads are NOT needed: engine-runtime's own build
-        # is JS-only (payload packages are externalized / have no build).
-        run: pnpm --filter "@cloudpdf/server..." build
+        # Build the server's production workspace dependencies in topological
+        # order. --filter-prod excludes core-signature's test-only dependency
+        # on the local engine, whose browser worker needs a staged WASM payload.
+        # Build tools remain available from the full dependency install above.
+        # The server's runtime wrapper build needs no native or WASM payloads.
+        run: pnpm --filter-prod "@cloudpdf/server..." build
 
       - name: Verify published license API boundary
         run: >-

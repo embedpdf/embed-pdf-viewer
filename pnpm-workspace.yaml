@@ -5,6 +5,8 @@ packages:
   # directory once it has siblings (cloudpdf/viewer/{main,react,vue,...}).
   - 'cloudpdf/**'
   - 'tooling/*'
+  - 'tooling/bundler-matrix/apps/*'
+  - 'tooling/bundler-matrix/probe'
   - 'website'
   # Shared docs machinery + (later) the shared docs corpus — see
   # DOCS-PLATFORM-ARCHITECTURE.md.

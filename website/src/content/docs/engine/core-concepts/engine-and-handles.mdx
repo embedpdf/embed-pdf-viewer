@@ -20,7 +20,11 @@ work. Each layer narrows the scope of what you operate on.
 </Engine>
 
 <Engine local>
-`localEngine()` returns an object implementing the `Engine` interface:
+`localEngine()` returns an object implementing the `Engine` interface. Its
+WebAssembly binary and worker ship inside your build — nothing is fetched from
+a CDN; [Self-hosting & air-gapped deployments](/docs/viewer/self-hosting) lists
+every option (`assetsUrl`, `wasmUrl`, `wasmBinary`, `worker`) and the portable
+entry for toolchains that cannot emit the asset:
 </Engine>
 
 ```ts

@@ -20,6 +20,7 @@ import type {
 
 import { createSerialMutationQueue } from '../src/mutationQueue';
 import { createFormScriptingController } from '../src/scripting';
+import { standaloneRealm } from './helpers/standalone-realm';
 
 const ref = (fieldObjectNumber: number) => ({ kind: 'objectNumber' as const, fieldObjectNumber });
 
@@ -135,15 +136,17 @@ function harness(snapshot: FormSnapshot, nameTreeScript?: string) {
   } as unknown as DocumentHandle;
   const sandbox = new NodeSandbox();
   const factory = vi.fn(async () => sandbox);
+  const realm = standaloneRealm(doc, documentMeta, {
+    now: () => Date.UTC(2026, 6, 15, 9, 30, 0),
+    utcOffsetMinutes: () => 180,
+    randomSeed: () => 7,
+    sandboxFactory: factory,
+  });
   const controller = createFormScriptingController({
     doc,
     document: documentMeta,
-    config: {
-      now: () => Date.UTC(2026, 6, 15, 9, 30, 0),
-      utcOffsetMinutes: () => 180,
-      randomSeed: () => 7,
-      sandboxFactory: factory,
-    },
+    transaction: realm.transaction,
+    budget: realm.budget,
   });
   return { controller, batches, applyEffects, readActions, factory, sandbox, snapshot };
 }
@@ -238,7 +241,8 @@ describe('form scripting transaction', () => {
     };
     const fx = harness(snapshot);
 
-    const result = await fx.controller.activate(ref(2),
+    const result = await fx.controller.activate(
+      ref(2),
       action(`
         getField('status').value = event.name + ':' + event.type;
         app.alert('Summary ready');

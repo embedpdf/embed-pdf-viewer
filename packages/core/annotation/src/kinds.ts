@@ -40,6 +40,11 @@ export type PropSpec =
   | { key: 'lineEndings'; label: string }
   | { key: 'fontFamily'; label: string }
   | { key: 'textAlign'; label: string }
+  /** Rich-text formatting toggles (free text): the body's formatting, or —
+   *  while the text editor has a range — that range's runs. */
+  | { key: 'bold'; label: string }
+  | { key: 'italic'; label: string }
+  | { key: 'underline'; label: string }
   | { key: 'blendMode'; label: string }
   /** `/Name` icon picker for icon kinds; `options` are the legal names. */
   | { key: 'icon'; label: string; options: readonly string[] }
@@ -210,6 +215,9 @@ const TEXT_PROPS: PropSpec[] = [
   { key: 'fontFamily', label: 'Font' },
   { key: 'fontSize', label: 'Font size', min: 4, max: 96, step: 1 },
   { key: 'fontColor', label: 'Text color' },
+  { key: 'bold', label: 'Bold' },
+  { key: 'italic', label: 'Italic' },
+  { key: 'underline', label: 'Underline' },
   { key: 'textAlign', label: 'Align' },
   OPACITY,
   { key: 'interiorColor', label: 'Background' },

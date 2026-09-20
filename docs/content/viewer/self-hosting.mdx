@@ -1,0 +1,153 @@
+---
+title: Self-hosting & air-gapped deployments
+description: Every URL EmbedPDF can request, the setting that controls each, and how to run it with no request leaving your origin.
+---
+
+import { Callout } from '@/components/docs/callout';
+
+# Self-hosting & air-gapped deployments
+
+EmbedPDF ships with the product. Nothing it needs at runtime comes from a
+public CDN unless you point it there: the PDF engine's WebAssembly binary, its
+worker, and the built-in stamp library all travel inside your build or inside
+the artifact you serve. This page is the complete inventory — every URL a
+deployment can touch and the setting that controls it — so an air-gapped or
+strict-CSP deployment is a checklist, not an investigation.
+
+## The inventory
+
+| What                                  | Where it comes from by default                                                                                                              | Setting                              |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ |
+| `embedpdf.wasm` (the engine, ~6.4 MB) | Emitted by your bundler as an asset of your build, streamed from your origin. Under Angular, a lazy JavaScript chunk of your build instead. | `assetsUrl`, `wasmUrl`, `wasmBinary` |
+| The engine worker                     | Spawned from a `blob:` URL built from a script that ships inside `@embedpdf/engine` — no file, no request.                                  | `worker`                             |
+| The image-encoder worker              | Same: inline `blob:` worker, main-thread fallback.                                                                                          | `encoderWorker`                      |
+| Fonts                                 | None are fetched unless you configure them.                                                                                                 | `fonts`, `fallbackFonts`             |
+| The built-in stamp library            | A lazy JavaScript chunk of your build (`@embedpdf/default-stamps`).                                                                         | `stamps.defaultLibrary`              |
+| Your documents                        | Whatever you pass as `src` or open yourself.                                                                                                | —                                    |
+
+<Engine cloud>
+
+With the cloud engine the document lives on your CloudPDF deployment or on
+CloudPDF SaaS, so `baseUrl` is the one network destination the engine itself
+has — and rendering, text, and search happen there, not in the browser. The
+rows above still apply to the parts that run locally (the built-in stamp
+library opens in the browser).
+
+</Engine>
+
+Verify it yourself: open the browser's network panel, filter out your own
+origin, and load a document. The list should be empty. We keep it that way
+with a nightly matrix that builds a minimal app under every major bundler and
+fails on any request that leaves the app's origin.
+
+## The engine's WebAssembly
+
+`localEngine()` with no options is the right call in almost every toolchain.
+Your bundler sees `new URL('./embedpdf.wasm', import.meta.url)` inside
+`@embedpdf/engine-runtime-wasm32`, copies the file into your build output, and
+the worker streams and compiles it from your origin. Verified out of the box:
+Vite, webpack 5, Rspack, Parcel 2, and Next.js with either webpack or Turbopack.
+
+**Angular** resolves packages with the `es2020` export condition, and
+`@embedpdf/engine` routes that condition to its portable build: the same
+`localEngine()`, with the binary carried as a lazy chunk of your build instead
+of an asset. Nothing to configure. It costs the same bytes over the wire and a
+short inflate at boot, and it does not stream-compile. If you want the streamed
+asset instead, copy the file with one `angular.json` entry and say where it is:
+
+```json
+"assets": [
+  { "glob": "embedpdf.wasm", "input": "node_modules/@embedpdf/engine-runtime-wasm32/lib", "output": "/embedpdf" }
+]
+```
+
+```ts
+localEngine({ assetsUrl: '/embedpdf/' });
+```
+
+Under pnpm, add `@embedpdf/engine-runtime-wasm32` to your own dependencies so
+that path exists; npm and yarn hoist it for you.
+
+**Plain esbuild** cannot emit the asset and has no condition to route on.
+Import the portable entry instead:
+
+```ts
+import { localEngine } from '@embedpdf/engine/portable';
+```
+
+**Explicit sources** win over every default and never fall back to anything:
+
+```ts
+localEngine({ assetsUrl: '/vendor/embedpdf/' }); // a directory you serve; embedpdf.wasm is appended
+localEngine({ wasmUrl: '/vendor/embedpdf/engine.wasm' }); // the exact file
+localEngine({ wasmBinary: bytes }); // bytes you already have — no request at all
+```
+
+If the file is missing at boot, the engine fails with a message that names
+these options. It never tries another location on its own.
+
+## Workers and Content-Security-Policy
+
+The default worker is spawned from a `blob:` URL, which needs
+`worker-src blob:` in your policy. A policy that forbids blob workers can
+serve the worker as a file instead: copy `workers/embedpdf-worker.js` and
+`embedpdf.wasm` from `@embedpdf/engine` into one directory you serve and pass
+the script's URL — the worker then finds the wasm as its own sibling:
+
+```ts
+localEngine({ worker: '/vendor/embedpdf/embedpdf-worker.js' });
+```
+
+The image-encoder worker follows the same rule (`encoderWorker`), or set it to
+`false` to encode on the main thread. WebAssembly itself needs
+`script-src 'wasm-unsafe-eval'`.
+
+## The stamps panel
+
+The Insert tab's stamp library is a lazy chunk of your build, one per locale.
+To self-host a copy of `@embedpdf/default-stamps` or to ship no library at
+all:
+
+```ts
+stamps: {
+  defaultLibrary: 'https://files.example.com/stamps/{locale}/stamps.pdf';
+}
+stamps: {
+  defaultLibrary: false;
+}
+```
+
+A URL you give is used exactly as given. Libraries your users create are kept
+in their browser's IndexedDB, never sent anywhere.
+
+## The CDN snippet
+
+The snippet, `dist/embedpdf.js`, is the one artifact designed to be loaded
+from another origin. Its folder is the unit of delivery: the entry, its
+`chunks/`, and `embedpdf.wasm` beside it. Every sibling is referenced by a
+path relative to the folder, so serving that folder from jsDelivr, from your
+own CDN, or from an intranet server is the same operation, and no URL in the
+code names any of them. Copy the folder, never the file alone.
+
+A strict policy for a page that loads it from `https://cdn.example`:
+
+```
+script-src 'self' https://cdn.example 'wasm-unsafe-eval';
+worker-src blob:;
+connect-src 'self' https://cdn.example;
+```
+
+`connect-src` covers the wasm fetch from the folder; add the origins your
+documents come from.
+
+## Toolchain notes
+
+- **Parcel 2** resolves our packages only with `packageExports` enabled in
+  your project's `package.json`: `"@parcel/resolver-default": { "packageExports": true }`.
+- **Turbopack** and **webpack** in Next.js emit the wasm under `_next/static/media`; no configuration.
+
+<Callout type="info">
+  The guarantee behind this page is enforced, not promised: a lint fails the build on any public-CDN
+  URL literal in the viewer or engine source, and the nightly bundler matrix fails on any request
+  that leaves the app's origin.
+</Callout>

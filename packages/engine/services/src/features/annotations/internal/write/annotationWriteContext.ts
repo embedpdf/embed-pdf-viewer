@@ -1,4 +1,4 @@
-import type { WireResourceMap } from '@embedpdf/engine-core/runtime';
+import type { FontIdentityInfo, WireResourceMap } from '@embedpdf/engine-core/runtime';
 import type { Ptr } from '@embedpdf/engine-runtime';
 
 /**
@@ -18,6 +18,13 @@ export interface AnnotationWriteContext {
    * font registry wired (e.g. read-only paths).
    */
   resolveRegisteredFontId?: (fontKey: string) => number;
+  /**
+   * The identity (family, weight, italic) a registered key resolved to, or
+   * undefined for a string that is not a key. Rich text names faces by
+   * identity, so a run's `family` may be a key, a standard name, or a
+   * family; this is how a key is told apart.
+   */
+  describeRegisteredFont?: (fontKey: string) => FontIdentityInfo | undefined;
   /** Document pointer — required by writers that create page objects. */
   docPtr?: Ptr;
   /** Page pointer of the annotation being written. */

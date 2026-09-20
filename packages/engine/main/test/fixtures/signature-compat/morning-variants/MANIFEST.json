@@ -1,0 +1,44 @@
+[
+  {
+    "file": "morning-A-original-rejected.pdf",
+    "sha256": "7ee5dad113f2a8844286a890a3b4409538bf586f7a7430e5a4e05c69d896e8e5",
+    "revisions": 3,
+    "intact": true
+  },
+  {
+    "file": "morning-B-page-only.pdf",
+    "sha256": "0508a97cf1981855960203d9e038b9922464db815e4ae2368e5f31616e44ac37",
+    "revisions": 3,
+    "intact": true
+  },
+  {
+    "file": "morning-C-widget-only.pdf",
+    "sha256": "33daaa50d3006883568d6937e4de645aa8e518a1180fc8e904b80e7cb2a7ea94",
+    "revisions": 3,
+    "intact": true
+  },
+  {
+    "file": "morning-D-page-and-widget-same-size-and-id.pdf",
+    "sha256": "9680d1a99be597c097b9a86932ae49a600e4d65b97da59dba24ef2aea3a5f742",
+    "revisions": 3,
+    "intact": true
+  },
+  {
+    "file": "morning-E-font-dict-only.pdf",
+    "sha256": "25462b52b12138ab0726c5cd2fcec34c2b23263a3baef980532cf3fd8fa8a846",
+    "revisions": 3,
+    "intact": true
+  },
+  {
+    "file": "morning-F-new-orphan-object-only.pdf",
+    "sha256": "3ed6e0ebb94de43d43d4d9470b16343bcf86c72f11e4a7c151b42b17cf3bbff3",
+    "revisions": 3,
+    "intact": true
+  },
+  {
+    "file": "morning-G-valid-control.pdf",
+    "sha256": "5037574407fdf7c778a69f5dbf9c33316f87866b5c8cc7035accd12889e2de35",
+    "revisions": 2,
+    "intact": true
+  }
+]

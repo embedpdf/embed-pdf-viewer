@@ -10,8 +10,11 @@
  * page carries a generated marker; `_meta.ts` files get a comment header.
  *
  * Samples emit per flavor: the engine import/factory lines swap from
- * `engines.mjs`, and each `// [!doc-source <key>]` block swaps to the
- * flavor's form from `documents.mjs`. Sample files carry NO marker (they are
+ * `engines.mjs`, each `// [!doc-source <key>]` block swaps to the
+ * flavor's form from `documents.mjs`, and a `// [!asset-engine]` block (the
+ * browser-side engine a stamp library opens on) swaps to the flavor's
+ * `assetEngine` — the document's own engine locally, a local engine beside
+ * the cloud one on the cloud site. Sample files carry NO marker (they are
  * displayed verbatim in docs code panels); the drift check is their guard.
  *
  * The generator OWNS the target directories: anything there it did not emit
@@ -45,6 +48,9 @@ const MOUNTS = {
     { from: 'samples/render', to: 'src/samples/render' },
     { from: 'samples/selection', to: 'src/samples/selection' },
     { from: 'samples/page-edit', to: 'src/samples/page-edit' },
+    { from: 'samples/stamp', to: 'src/samples/stamp' },
+    { from: 'samples/annotation', to: 'src/samples/annotation' },
+    { from: 'samples/signature', to: 'src/samples/signature' },
     { from: 'samples/getting-started', to: 'src/samples/getting-started' },
     { from: 'samples/viewer', to: 'src/samples/viewer' },
   ],
@@ -149,6 +155,26 @@ function transformSample(source, engine, relative) {
     return `${indent}${entry.cloudSource(name)}\n`;
   });
 
+  // `// [!asset-engine]` … `// [!/asset-engine]`: the engine a stamp library
+  // opens on. Local: the block's own body (the document engine). Cloud: a
+  // local engine beside the cloud one, plus its import.
+  const assetMarker =
+    /^([ \t]*)\/\/ \[!asset-engine\]\n([\s\S]*?)^[ \t]*\/\/ \[!\/asset-engine\]\n/gm;
+  let assetEngineUsed = false;
+  output = output.replace(assetMarker, (whole, indent, body) => {
+    assetEngineUsed = true;
+    if (engine === 'local') return body;
+    const name = body.match(/const (\w+)/)?.[1];
+    if (!name) throw new Error(`${relative}: asset-engine block does not declare a const`);
+    return `${indent}const ${name} = ${flavor.assetEngine.factoryCall};\n`;
+  });
+  if (assetEngineUsed && engine !== 'local' && flavor.assetEngine.importLine) {
+    output = output.replace(
+      flavor.importLine,
+      `${flavor.importLine}\n${flavor.assetEngine.importLine}`,
+    );
+  }
+
   return output;
 }
 
@@ -191,8 +217,7 @@ function buildExpected(engine, frameworks) {
     for (const { relative, source } of metas) {
       const skipped = skippedKeysByDir.get(path.dirname(relative)) ?? new Set();
       const filtered = [...skipped].reduce(
-        (meta, key) =>
-          meta.replace(new RegExp(`^\\s*(?:'${key}'|"${key}"|${key}):.*\\n`, 'm'), ''),
+        (meta, key) => meta.replace(new RegExp(`^\\s*(?:'${key}'|"${key}"|${key}):.*\\n`, 'm'), ''),
         source,
       );
       expected.set(path.join(mount.to, relative), `${META_MARKER}\n${filtered}`);
@@ -206,9 +231,7 @@ function buildExpected(engine, frameworks) {
       const framework = frameworkOf(relative);
       if (framework && !frameworks.includes(framework)) continue;
       const source = fs.readFileSync(absolute, 'utf8');
-      const emitted = framework
-        ? transformSample(source, engine, relative)
-        : source; // _shared chrome, css — engine-neutral lesson scaffolding
+      const emitted = framework ? transformSample(source, engine, relative) : source; // _shared chrome, css — engine-neutral lesson scaffolding
       expected.set(path.join(mount.to, relative), emitted);
     }
   }
@@ -273,7 +296,9 @@ function main() {
   }
   console.log(
     `Synced ${expected.size} files into ${path.relative(process.cwd(), args.target) || '.'} (engine=${args.engine}${
-      args.frameworks.length < ALL_FRAMEWORKS.length ? `, frameworks=${args.frameworks.join(',')}` : ''
+      args.frameworks.length < ALL_FRAMEWORKS.length
+        ? `, frameworks=${args.frameworks.join(',')}`
+        : ''
     }).`,
   );
 }

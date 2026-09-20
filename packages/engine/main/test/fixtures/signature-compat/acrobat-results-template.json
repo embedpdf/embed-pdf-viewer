@@ -1,0 +1,719 @@
+{
+  "id": null,
+  "corpusVersion": "role-probes-v1",
+  "observedAt": null,
+  "observer": {
+    "application": "Adobe Acrobat (edition not yet recorded)",
+    "build": "26.2.21869.0",
+    "architecture": "arm64",
+    "processor": "Apple M1 Max",
+    "osVersion": null,
+    "agm": "8.0.3",
+    "coolType": "11.0.0",
+    "jp2k": "5.0.0.59456"
+  },
+  "settings": {
+    "certificateTrust": null,
+    "validationTime": null,
+    "revocation": null,
+    "javascript": null
+  },
+  "cases": [
+    {
+      "id": "01",
+      "file": "01-approval-control.pdf",
+      "sha256": "266213657afa20eca491650b54c81d5b131cc8feb41674d0de08ede1dbbea487",
+      "status": "unobserved",
+      "question": "Is the unchanged approval signature accepted?",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "02",
+      "file": "02-info-identical.pdf",
+      "sha256": "952e897eeb6706538ad9ea72a97185ea4284a9e12daee38a89f460ad1303a9e5",
+      "status": "unobserved",
+      "question": "Does an exact rewrite of info count as a modification?",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "03",
+      "file": "03-catalog-extra-identical.pdf",
+      "sha256": "ef4ca1a2e9351f9b26e6a312a16b78f0567c20f852a66281a600385e808ca2df",
+      "status": "unobserved",
+      "question": "Does an exact rewrite of catalog-extra count as a modification?",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "04",
+      "file": "04-page-identical.pdf",
+      "sha256": "c8db24c52b9eb06f3379ebe608de45e536f9fdb5da4a1bbfb106b22c3bfdd50c",
+      "status": "unobserved",
+      "question": "Does an exact rewrite of page count as a modification?",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "05",
+      "file": "05-sealed-widget-identical.pdf",
+      "sha256": "07e1ce771b96d1d85aadf7cf0c84bd6103b65b0bc9f02f7b92fc39a5277bd5ea",
+      "status": "unobserved",
+      "question": "Does an exact rewrite of SignatureOne count as a modification?",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "06",
+      "file": "06-text-field-identical.pdf",
+      "sha256": "f0f86b21f573bbe870ebac929421710ca7de638c98d4c8b0f221eaddf4d34291",
+      "status": "unobserved",
+      "question": "Does an exact rewrite of ValueOne count as a modification?",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "07",
+      "file": "07-annotation-identical.pdf",
+      "sha256": "d5b7901ad83c9eee925baa173397a5c228f063f8e65a765c4bec8823000a9020",
+      "status": "unobserved",
+      "question": "Does an exact rewrite of annotation count as a modification?",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "08",
+      "file": "08-fill-and-appearance.pdf",
+      "sha256": "e99ed76c2365e2df09af07e54a55693030a3581c8e5a4877cf3c9b7e803d1bdb",
+      "status": "unobserved",
+      "question": "Is ordinary /V + /AP filling accepted?",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "09",
+      "file": "09-readonly-only.pdf",
+      "sha256": "2c239891d0c1b7d30da91b1b598248dedc61e5939c797e8d9a68beda3badf669",
+      "status": "unobserved",
+      "question": "Is setting ReadOnly alone accepted without a new signature or field lock?",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "10",
+      "file": "10-move-field-rectangle.pdf",
+      "sha256": "6a02911114baed23b65a4a1d1f9740854dd83e5794d4f526a929fdbfc1c0c755",
+      "status": "unobserved",
+      "question": "Is moving an unlocked field accepted as a property change?",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "11",
+      "file": "11-hide-field.pdf",
+      "sha256": "b14d8d7f2d67d57a0365b35e86ca7715a977c6c1e0f740f36474ef04b62f5d73",
+      "status": "unobserved",
+      "question": "Is hiding an unlocked field accepted as a property change?",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "12",
+      "file": "12-field-additional-action.pdf",
+      "sha256": "c68bfe4b5ca49c853cd2f89ded838175688951ffff452a28d352ea199e337463",
+      "status": "unobserved",
+      "question": "Is adding a no-op validation action accepted? Do not enable privileged JavaScript.",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "13",
+      "file": "13-rename-field.pdf",
+      "sha256": "2b057bde97eddb21248f22ff2384f584c151c25129b14ce28264a778970c20fd",
+      "status": "unobserved",
+      "question": "Is changing field identity rejected?",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "14",
+      "file": "14-page-content-changed.pdf",
+      "sha256": "16dff3b2ef9d7b9ccdf4efa78e3c0b6f1d8e89ae5bdfd9d5c670257fec0edfcf",
+      "status": "unobserved",
+      "question": "Is a visible change to signed page content rejected?",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "15",
+      "file": "15-page-content-restored.pdf",
+      "sha256": "eb122d6fa54c006ef2f685e4a6de886e7136e77153677cccf9c604a8f0558942",
+      "status": "unobserved",
+      "question": "Does restoring the signed page after an intervening edit restore acceptance?",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "16",
+      "file": "16-shared-appearance-font.pdf",
+      "sha256": "62450b6d6c390022c4288fda3a76748ae514f006f5a71477ab98940aee254c61",
+      "status": "unobserved",
+      "question": "Is an appearance font with indirect descendants shared with AcroForm /DR accepted?",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "17",
+      "file": "17-second-signature-control.pdf",
+      "sha256": "19007f65679ce509a2ccb95e75b4f97aad0b93412cb7e18aa6224223a47b7a02",
+      "status": "unobserved",
+      "question": "Are two ordinary approvals accepted?",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        },
+        {
+          "field": "SignatureTwo",
+          "signatureIndex": 1,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "18",
+      "file": "18-second-signature-tooltip.pdf",
+      "sha256": "1659b9888f2a76883d9b07fdbe928dff62a58ea69c9ce4246c8a4fcc77b8f9bc",
+      "status": "unobserved",
+      "question": "Is /TU changed on the field being signed accepted?",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        },
+        {
+          "field": "SignatureTwo",
+          "signatureIndex": 1,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "19",
+      "file": "19-second-signature-lock.pdf",
+      "sha256": "1fc55f93e24932b05b8d6346fb2b8276c63a4e77783025983efc6165fb331112",
+      "status": "unobserved",
+      "question": "Is /Lock installed with a second signature accepted?",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        },
+        {
+          "field": "SignatureTwo",
+          "signatureIndex": 1,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "20",
+      "file": "20-signature-build-subtree.pdf",
+      "sha256": "409d4f7629f4f37b63a9eb6dfe45f4b44dbf53c152241593959ba0cfa9d9b8c2",
+      "status": "unobserved",
+      "question": "Are indirect /Prop_Build descendants accepted?",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        },
+        {
+          "field": "SignatureTwo",
+          "signatureIndex": 1,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "21",
+      "file": "21-combined-workflow.pdf",
+      "sha256": "5a957a14be8db2e9773e0ed523a7186e8bed8291a404134509fff383c11d2a42",
+      "status": "unobserved",
+      "question": "Are staged fills, ReadOnly, shared fonts, Info rewrite, and a later locked signature accepted?",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        },
+        {
+          "field": "SignatureTwo",
+          "signatureIndex": 1,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "22",
+      "file": "22-aes128-control.pdf",
+      "sha256": "f72cd96ebbeda6181abf6eff1a28ce18f78409a88a0f85752c7c6444f0e85ced",
+      "status": "unobserved",
+      "question": "Is the AES-128 empty-user-password control accepted?",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "23",
+      "file": "23-aes128-encrypt-identical.pdf",
+      "sha256": "d5ae7869ab3c45ba82744c90c849ca1e49ed108ddd761719e7f86f5e3f54c471",
+      "status": "unobserved",
+      "question": "Does an identical /Encrypt rewrite remain accepted?",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "24",
+      "file": "24-aes128-combined-workflow.pdf",
+      "sha256": "189aa7320704ca95b22d437ecb7b2f0c49f65a729c1b4a627fe0a5bbde3028d9",
+      "status": "unobserved",
+      "question": "Is the combined workflow also accepted with legacy encryption?",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        },
+        {
+          "field": "SignatureTwo",
+          "signatureIndex": 1,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "25",
+      "file": "25-p1-fill.pdf",
+      "sha256": "0ea9b558109511df95080ed34fb55fc46ba8f076a45cda72c3d0fa67197f7c84",
+      "status": "unobserved",
+      "question": "What does form filling do under certification P=1?",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "26",
+      "file": "26-p2-fill.pdf",
+      "sha256": "c2c37841ddc2d8af1e7a8a0e8310df1b344c96a922ca72c4da03c332245082cc",
+      "status": "unobserved",
+      "question": "What does form filling do under certification P=2?",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "27",
+      "file": "27-p3-annotation.pdf",
+      "sha256": "5892fc60cfa3cab9f11e97b40bd869e1d126ab46323f44d6cb18d51551a5130e",
+      "status": "unobserved",
+      "question": "Is changing a square annotation permitted under P=3?",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "28",
+      "file": "28-locked-field-fill.pdf",
+      "sha256": "fceeb4b1f66e069690e9c67c053e236e48c5b0ac9012af96feb5616cce73e41a",
+      "status": "unobserved",
+      "question": "Is filling a locked field rejected despite otherwise being ordinary filling?",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "29",
+      "file": "29-signed-byte-tamper.pdf",
+      "sha256": "9c2213429c8388473921bf9d0b11ab923ba7eb01d94936fd510c4d2729124817",
+      "status": "unobserved",
+      "question": "Does the setup identify a broken cryptographic digest?",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "30",
+      "file": "30-font-shared-with-page.pdf",
+      "sha256": "2560d759fd409d741ee9822df3b2d79210e20d662f41259bb2ba6aef16e5b181",
+      "status": "unobserved",
+      "question": "Does a fill fail validation when its changed font also changes signed page content?",
+      "signatures": [
+        {
+          "field": "SignatureOne",
+          "signatureIndex": 0,
+          "overallStatus": null,
+          "integrityMessage": null,
+          "modificationMessage": null,
+          "changeCategories": [],
+          "signerTrustMessage": null,
+          "lockMessage": null,
+          "screenshot": null
+        }
+      ],
+      "notes": null
+    }
+  ]
+}
