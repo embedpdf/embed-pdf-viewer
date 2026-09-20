@@ -12,7 +12,7 @@ import { createMeasurementEffects } from './effects';
 import { createMeasurementCapability } from './capability';
 import { initialMeasurementState, measurementReducer } from './reducer';
 import type { MeasurementAction, MeasurementState } from './types';
-import { selectPageScale, withUnit } from './scale';
+import { selectPageScale, withAreaUnit, withUnit } from './scale';
 
 const crop = { left: -20, bottom: -40, right: 580, top: 760 };
 const scale = measureFromKnownLength(100, { value: 3, unit: 'm' });
@@ -198,4 +198,21 @@ describe('measurement workflow', () => {
     expect(converted.x).toBe(scale.x);
     expect(converted.distance[0].conversion).toBe(100);
   });
+});
+
+it('changes area units without resetting distance formats or area precision', () => {
+  const original: PdfMeasure = {
+    ...scale,
+    distance: [
+      { unit: 'ft', conversion: 1 },
+      { unit: 'in', conversion: 12, fraction: 'fraction', precision: 16 },
+    ],
+    area: [{ unit: 'm²', conversion: 1, precision: 1000 }],
+  };
+  const updated = withAreaUnit(original, 'ha');
+  expect(updated.distance).toBe(original.distance);
+  expect(updated.x).toBe(original.x);
+  expect(updated.area).toEqual([
+    { unit: 'ha', conversion: 0.0001, precision: 1000, fraction: 'decimal' },
+  ]);
 });

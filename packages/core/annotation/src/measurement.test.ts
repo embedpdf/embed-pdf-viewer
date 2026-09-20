@@ -70,7 +70,10 @@ describe('distance gestures and captions', () => {
     m = update(m, pointer('down', at))[0];
     m = update(m, pointer('move', { x: at.x + 20, y: at.y - 30 }))[0];
     expect(pageItems(m, 1)[0].source).toBe('vector');
-    expect(pageItems(m, 1)[0].measure?.caption.offset).toEqual({ along: 20, perpendicular: 30 });
+    expect((pageItems(m, 1)[0].measure as DistanceAppearance).caption.offset).toEqual({
+      along: 20,
+      perpendicular: 30,
+    });
     const handles = chrome(m, 1).filter((node) => node.kind === 'handle');
     expect(handles).toHaveLength(4);
     expect(handles.some((node) => node.at.x === at.x + 20 && node.at.y === at.y - 30)).toBe(false);
@@ -127,8 +130,8 @@ describe('distance gestures and captions', () => {
     state = update(released, create('move', 190, 160))[0];
     const preview = pageItems(state, 1)[0];
     expect(preview.geom).toMatchObject({ a: { x: 40, y: 100 }, b: { x: 240, y: 100 } });
-    expect(preview.measure?.leader?.length).toBe(-60);
-    expect(distanceLabel(preview.geom, preview.measure!)).toBe('4 m');
+    expect((preview.measure as DistanceAppearance).leader?.length).toBe(-60);
+    expect(distanceLabel(preview.geom, preview.measure as DistanceAppearance)).toBe('4 m');
     expect(update(state, { t: 'cancel' })[0].order).toEqual([]);
 
     const [committed, effects] = update(state, create('down', 190, 160));
@@ -163,12 +166,12 @@ describe('distance gestures and captions', () => {
 
       state = update(state, pointer('down', point))[0];
       state = update(state, pointer('move', { x: point.x + 35, y: 160 }))[0];
-      expect(pageItems(state, 1)[0].measure?.leader?.length).toBe(-60);
+      expect((pageItems(state, 1)[0].measure as DistanceAppearance).leader?.length).toBe(-60);
       expect(pageItems(state, 1)[0].geom).toEqual(geom);
       expect(update(state, { t: 'cancel' })[0].byId.a).toBe(annot);
 
       const [committed, effects] = update(state, pointer('up', point));
-      expect(committed.byId.a.measure?.leader?.length).toBe(-60);
+      expect((committed.byId.a.measure as DistanceAppearance).leader?.length).toBe(-60);
       expect(committed.byId.a.geom).toBe(geom);
       expect(effects).toEqual([{ fx: 'patch', id: 'a', scope: { kind: 'leader' } }]);
     },
@@ -195,7 +198,7 @@ describe('distance gestures and captions', () => {
         },
       },
     };
-    const layout = distanceLayout(geom, state.byId.a.measure!, 1)!;
+    const layout = distanceLayout(geom, state.byId.a.measure as DistanceAppearance, 1)!;
     const nodes = chrome(state, 1);
     const outline = nodes.find((node) => node.kind === 'outline')!;
     expect(outline.kind).toBe('outline');

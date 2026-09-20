@@ -24,6 +24,7 @@ import type {
   InkIntent,
   LineDimensionCaption,
   LineLeader,
+  ShapeDimensionCaption,
 } from '@embedpdf/engine-core/runtime';
 
 /**
@@ -228,9 +229,21 @@ export interface AnnotationToolDef<K extends ToolAuthoringKind = ToolAuthoringKi
   /** What a committed text selection authors. Omit for pointer/click tools. */
   selection?: SelectionAuthoring;
   /** PDF `/IT` authored by an intent-bearing ink preset. */
-  intent?: K extends 'ink' ? InkIntent : K extends 'line' ? 'LineDimension' : never;
-  /** Distance appearance defaults; offsets use the directed PDF line axes. */
-  measurement?: { caption: LineDimensionCaption; leader?: LineLeader };
+  intent?: K extends 'ink'
+    ? InkIntent
+    : K extends 'line'
+      ? 'LineDimension'
+      : K extends 'polygon'
+        ? 'PolygonDimension'
+        : K extends 'polyline'
+          ? 'PolyLineDimension'
+          : never;
+  /** Caption defaults for a measurement preset. Shape centers use absolute PDF coordinates. */
+  measurement?: K extends 'line'
+    ? { caption: LineDimensionCaption; leader?: LineLeader }
+    : K extends 'polygon' | 'polyline'
+      ? { caption: ShapeDimensionCaption }
+      : never;
   /** Ink-only stroke grouping and straightening policy. */
   ink?: K extends 'ink' ? InkAuthoringOptions : never;
   /**
@@ -268,6 +281,8 @@ export interface BuiltinToolKindMap {
   circle: 'circle';
   line: 'line';
   distance: 'line';
+  perimeter: 'polyline';
+  area: 'polygon';
   calibrate: 'line';
   polygon: 'polygon';
   polyline: 'polyline';
@@ -330,8 +345,8 @@ export interface ResolvedTool {
   flags?: Partial<AnnotationFlags>;
   source?: StampSourceSpec;
   selection?: SelectionAuthoring;
-  intent?: InkIntent | 'LineDimension';
-  measurement?: { caption: LineDimensionCaption; leader?: LineLeader };
+  intent?: InkIntent | 'LineDimension' | 'PolyLineDimension' | 'PolygonDimension';
+  measurement?: { caption: LineDimensionCaption | ShapeDimensionCaption; leader?: LineLeader };
   ink?: InkAuthoringOptions;
   /** Counter-rotate creations against the page's display rotation (see
    *  {@link AnnotationToolDef.upright}). */
@@ -426,6 +441,20 @@ export const DEFAULT_TOOLS: AnnotationToolInput[] = [
     cursor: 'crosshair',
     enables: DRAW_TAGS,
     defaults: { strokeWidth: 6 },
+  },
+  {
+    id: 'perimeter',
+    extends: 'polyline',
+    intent: 'PolyLineDimension',
+    defaults: { strokeWidth: 1, lineEndings: { start: 'none', end: 'none' } },
+    measurement: { caption: { enabled: true } },
+  },
+  {
+    id: 'area',
+    extends: 'polygon',
+    intent: 'PolygonDimension',
+    defaults: { strokeWidth: 1 },
+    measurement: { caption: { enabled: true } },
   },
   {
     id: 'ink',

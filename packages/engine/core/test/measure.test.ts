@@ -173,3 +173,67 @@ describe('measurement arithmetic and formatting', () => {
     ).toBe(false);
   });
 });
+
+describe('area boundary validity', () => {
+  const measure = measureFromKnownLength(1, { value: 1, unit: 'm' });
+  const read = (points: number[][]) =>
+    measurementReadout({
+      subtype: 'polygon',
+      intent: 'PolygonDimension',
+      measure,
+      vertices: points.map(([x, y]) => ({ x, y })),
+    });
+
+  test.each([
+    [
+      [0, 0],
+      [10, 10],
+      [10, 0],
+      [0, 10],
+    ],
+    [
+      [0, 0],
+      [10, 10],
+      [20, 20],
+    ],
+    [
+      [0, 0],
+      [10, 0],
+      [5, 0],
+      [10, 10],
+    ],
+    [
+      [0, 0],
+      [10, 0],
+      [10, 0],
+      [10, 10],
+    ],
+    [
+      [0, 0],
+      [10, 0],
+      [0, 10],
+      [5, 0],
+      [10, 10],
+    ],
+  ])('rejects crossing, touching, overlapping and degenerate boundaries: %j', (...points) => {
+    expect(read(points)).toEqual({ unavailable: 'invalid-geometry' });
+  });
+
+  test('accepts either winding, collinear forward edges, a repeated closing vertex and a large origin', () => {
+    const points = [
+      [0, 0],
+      [5, 0],
+      [10, 0],
+      [10, 10],
+      [0, 10],
+      [0, 0],
+    ];
+    for (const ring of [
+      points,
+      [...points].reverse(),
+      points.map(([x, y]) => [x + 10000, y - 20000]),
+    ]) {
+      expect(read(ring)).toMatchObject({ label: '100 m²', perimeter: '40 m' });
+    }
+  });
+});

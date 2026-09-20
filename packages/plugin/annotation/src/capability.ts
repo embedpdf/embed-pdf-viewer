@@ -34,6 +34,7 @@ import type { AnnotCommitResult } from '@embedpdf/plugin-actions/contract/host';
 import { InteractionToken } from '@embedpdf/plugin-interaction/contract';
 import { SelectionToken as SelectionPublicToken } from '@embedpdf/plugin-selection/contract';
 import {
+  type MeasurementAppearance,
   canMove,
   chrome as coreChrome,
   clickCreateGeom,
@@ -2214,41 +2215,47 @@ export function createAnnotationCapability(
       // input bag; the core captures them on the draft at DOWN.
       const crop = cropOf(pon);
       const cache = pageViewports.get(pon);
-      const continuingDistance = model().draft?.g === 'create-distance';
-      if (
-        t?.intent === 'LineDimension' &&
-        phase === 'down' &&
-        !continuingDistance &&
-        (!crop || !cache?.viewports)
-      ) {
+      const draft = model().draft;
+      const continuingMeasurement =
+        (draft?.g === 'create-distance' || draft?.g === 'create-poly') &&
+        draft.pon === pon &&
+        draft.preset === (t?.preset ?? tool);
+      const dimension = t && isDimension(t);
+      if (dimension && phase === 'down' && !continuingMeasurement && (!crop || !cache?.viewports)) {
         return;
       }
       const viewport =
         crop && cache?.viewports
           ? viewportForPoint(cache.viewports, { x: point.x + crop.left, y: crop.top - point.y })
           : undefined;
-      const measure =
-        t?.intent === 'LineDimension' && crop && cache
+      const measure: MeasurementAppearance | undefined =
+        dimension && crop && cache
           ? {
-              intent: 'LineDimension' as const,
+              intent: t.intent as MeasurementAppearance['intent'],
               measure: viewport ? (viewport.measure ?? null) : cache.fallback,
               caption: t.measurement?.caption ?? { enabled: true },
-              leader: t.measurement?.leader,
+              ...(t.intent === 'LineDimension' ? { leader: t.measurement?.leader } : {}),
               crop,
               text: '',
             }
           : undefined;
-      // A foreign/uncalibrated region cannot create a writable distance.
+      // Resolve the scale at the first point. Subsequent points retain the
+      // draft's snapshot, even when the pointer crosses another viewport.
       if (
         measure &&
         phase === 'down' &&
-        !continuingDistance &&
+        !continuingMeasurement &&
         !isReadout(
           measurementReadout({
-            subtype: 'line',
+            subtype: t!.subtype,
             intent: measure.intent,
             measure: measure.measure,
             linePoints: { start: { x: 0, y: 0 }, end: { x: 1, y: 0 } },
+            vertices: [
+              { x: 0, y: 0 },
+              { x: 1, y: 0 },
+              { x: 1, y: 1 },
+            ],
           }),
         )
       )

@@ -115,6 +115,12 @@ export interface MeasurementCapability {
   setPreset(pon: number, id: string, opts?: SetScaleOptions): Promise<ScaleChangeReport[]>;
   presets(): readonly ScalePreset[];
   units(): readonly LengthUnit[];
+  areaUnits(): readonly AreaUnit[];
+  setAreaUnit(
+    pon: number | 'all',
+    unit: AreaUnit,
+    options?: SetScaleOptions,
+  ): Promise<ScaleChangeReport[]>;
   readout(ref: AnnotationRef): MeasurementReadout | MeasurementUnavailable;
   startCalibration(): void;
   calibrationRequest(): CalibrationRequest | null;

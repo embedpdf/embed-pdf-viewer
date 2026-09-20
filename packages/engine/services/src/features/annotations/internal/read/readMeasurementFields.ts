@@ -16,6 +16,7 @@ export function readAnnotationMeasure(
   const measure = readMeasure(fn, mem, fn.EPDFAnnot_GetMeasure(annot));
   return measure ? { measure } : {};
 }
+
 export function readLineCaption(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
@@ -38,6 +39,7 @@ export function readLineCaption(
     };
   });
 }
+
 export function readShapeCaption(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
@@ -58,6 +60,7 @@ export function readShapeCaption(
     };
   });
 }
+
 export function readLineLeader(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,

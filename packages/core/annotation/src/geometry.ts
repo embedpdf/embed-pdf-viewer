@@ -133,7 +133,7 @@ function segDist(p: Vec, a: Vec, b: Vec): number {
   return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
 }
 /** Even-odd point-in-polygon. */
-function pointInPoly(p: Vec, pts: Vec[]): boolean {
+export function pointInPoly(p: Vec, pts: readonly Vec[]): boolean {
   let inside = false;
   for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
     const a = pts[i];

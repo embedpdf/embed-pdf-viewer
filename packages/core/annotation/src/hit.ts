@@ -1,5 +1,6 @@
 import { annotationSelectionFrame } from './selection';
 import { distanceCaptionHit, distanceHandles, distanceHit, distanceLayout } from './measurement';
+import { measurementLayout } from './measurement-shape';
 import {
   geomHandles,
   geomHit,
@@ -183,7 +184,9 @@ export function hitTest(
       }
       if (hasHandles(m, a)) {
         const geometry = hitGeomOf(a, view);
-        const distance = a.measure && distanceLayout(geometry, a.measure, hitStrokeOf(a, view));
+        const distance =
+          a.measure?.intent === 'LineDimension' &&
+          distanceLayout(geometry, a.measure, hitStrokeOf(a, view));
         const handles = distance ? distanceHandles(distance) : geomHandles(geometry);
         if (distance) {
           // Nearby endpoint and leader hit areas overlap at small offsets.
@@ -195,7 +198,10 @@ export function hitTest(
 
         // The text is the drag target. It owns no visible handle, and wins
         // before the annotation's sticky body bounds.
-        if (distance && distanceCaptionHit(distance, p, Math.min(2, geom.handleTol / 3))) {
+        const layout =
+          a.measure &&
+          measurementLayout(geometry, a.measure, { ...a.style, strokeWidth: hitStrokeOf(a, view) });
+        if (layout && distanceCaptionHit(layout, p, Math.min(2, geom.handleTol / 3))) {
           return { t: 'handle', id: a.id, handle: 'caption', cursor: 'move' };
         }
         // Handles live on the PROJECTED geometry — the handle gesture then
@@ -266,13 +272,16 @@ export function hitTest(
     // an unselected one (so a selectable-but-anchored kind still re-selects cleanly).
     const geometry = hitGeomOf(a, view);
     const strokeWidth = hitStrokeOf(a, view);
-    const distance = a.measure && distanceLayout(geometry, a.measure, strokeWidth);
+    const distance =
+      a.measure?.intent === 'LineDimension' && distanceLayout(geometry, a.measure, strokeWidth);
+    const layout = a.measure && measurementLayout(geometry, a.measure, { ...a.style, strokeWidth });
     const hit =
-      m.selected.includes(id) && canMove(m, id)
+      (layout && distanceCaptionHit(layout, p, strokeMargin)) ||
+      (m.selected.includes(id) && canMove(m, id)
         ? inBounds(a, p, view)
         : distance
           ? distanceHit(distance, p, strokeWidth, strokeMargin)
-          : geomHit(geometry, p, strokeMargin, isFilled(a), strokeWidth);
+          : geomHit(geometry, p, strokeMargin, isFilled(a), strokeWidth));
 
     if (hit) {
       return { t: 'annot', id };

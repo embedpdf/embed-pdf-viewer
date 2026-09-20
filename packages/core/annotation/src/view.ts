@@ -4,7 +4,13 @@ import { annotationSelectionFrame } from './selection';
  * applied) for customRenderer wrapping; `chrome` is the selection overlay
  * (handles carry their resize cursor, group box, marquee).
  */
-import { distanceHandles, distanceLayout, moveDistanceCaption } from './measurement';
+import { distanceHandles, distanceLayout } from './measurement';
+import {
+  measurementLayout,
+  moveMeasurementCaption,
+  transformMeasurementCaption,
+  shapeMeasurementReadout,
+} from './measurement-shape';
 import {
   chordThrough,
   geomHandles,
@@ -54,15 +60,15 @@ function effMeasure(m: Model, id: Id) {
   const draft = m.draft;
   const measure = annotation.measure;
 
-  if (!measure || !draft || !('id' in draft) || draft.id !== id) {
+  if (!measure || !draft) {
     return measure;
   }
 
-  if (draft.g === 'caption') {
-    return moveDistanceCaption(annotation.geom, measure, draft.delta);
+  if (draft.g === 'caption' && draft.id === id) {
+    return moveMeasurementCaption(annotation.geom, measure, draft.delta, annotation.style);
   }
 
-  if (draft.g === 'leader') {
+  if (draft.g === 'leader' && draft.id === id && measure.intent === 'LineDimension') {
     return {
       ...measure,
       leader: {
@@ -72,6 +78,24 @@ function effMeasure(m: Model, id: Id) {
     };
   }
 
+  if (draft.g === 'move' && draft.ids.includes(id)) {
+    return transformMeasurementCaption(measure, (point) => ({
+      x: point.x + draft.delta.x,
+      y: point.y + draft.delta.y,
+    }));
+  }
+  if (draft.g === 'rotate' && draft.ids.includes(id)) {
+    return transformMeasurementCaption(measure, (point) =>
+      rotatePoint(point, draft.pivot, rotateDraftDelta(m, draft).delta),
+    );
+  }
+  if (draft.g === 'group' && draft.ids.includes(id)) {
+    const { sx, sy } = groupResizeFactors(draft.base, draft.cur);
+    return transformMeasurementCaption(measure, (point) => ({
+      x: draft.anchor.x + (point.x - draft.anchor.x) * sx,
+      y: draft.anchor.y + (point.y - draft.anchor.y) * sy,
+    }));
+  }
   return measure;
 }
 
@@ -196,7 +220,7 @@ export function pageItems(m: Model, pon: number, view?: ViewEnv): RenderItem[] {
     // composed with any engine-stripped `apRot`.
     const ap = effAp(m, id, view);
     const measure = effMeasure(m, id);
-    const distance = measure && distanceLayout(geom, measure, style.strokeWidth);
+    const distance = measure && measurementLayout(geom, measure, style);
     items.push({
       id,
       ref: a.ref,
@@ -251,8 +275,11 @@ export function pageItems(m: Model, pon: number, view?: ViewEnv): RenderItem[] {
               }
             : { t: 'ink', strokes: d.strokes };
     if (geom) {
-      const measure = d.g === 'create-line' || d.g === 'create-distance' ? d.measure : undefined;
-      const distance = measure && distanceLayout(geom, measure, style.strokeWidth);
+      const measure =
+        d.g === 'create-line' || d.g === 'create-distance' || d.g === 'create-poly'
+          ? d.measure
+          : undefined;
+      const distance = measure && measurementLayout(geom, measure, style);
       items.push({
         id: DRAFT_ID,
         ref: null,
@@ -522,7 +549,8 @@ export function chrome(
     const caps = capsFor(a.subtype);
     const rot = geomRotation(g);
     const measure = effMeasure(m, a.id);
-    const distance = measure && distanceLayout(g, measure, style.strokeWidth);
+    const distance =
+      measure?.intent === 'LineDimension' && distanceLayout(g, measure, style.strokeWidth);
     const frame = effectiveSelectionFrame(m, a.id, g, view);
     if (frame.angle !== 0) {
       nodes.push({ kind: 'obb', corners: frame.corners, angle: frame.angle });
@@ -636,6 +664,12 @@ export function creationDraftAnchor(m: Model): CreationDraftAnchor | null {
     bounds: unionRect(d.points),
     pointCount: d.points.length,
     minPoints,
-    canFinish: d.points.length >= minPoints,
+    canFinish:
+      d.points.length >= minPoints &&
+      (!d.measure ||
+        !(
+          'unavailable' in
+          shapeMeasurementReadout({ t: 'poly', points: d.points, closed: d.closed }, d.measure)
+        )),
   };
 }

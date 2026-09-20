@@ -27,7 +27,7 @@ import { useToolCursor, useTool } from '@embedpdf/react/interaction';
 import { useAnnotationDefaults } from '@embedpdf/react/annotation';
 import { TOOL_ICONS } from '../config/commands';
 import { ICON_PATHS } from './icons';
-import type { IconAccent } from './icons';
+import type { IconAccent, PathSpec } from './icons';
 
 const SIZE = 40;
 const HOTSPOT = { x: 8, y: 28 };
@@ -45,14 +45,24 @@ function iconGlyph(name: string, accent?: IconAccent): string | null {
   const halo: string[] = [];
   const draw: string[] = [];
   for (const p of paths) {
-    const spec = typeof p === 'string' ? { d: p, fill: undefined, stroke: undefined } : p;
+    const spec: Exclude<PathSpec, string> =
+      typeof p === 'string' ? { d: p, fill: undefined, stroke: undefined } : p;
     // Slot rules, mirrored from <Icon>: a fill slot paints from the accent
     // (nothing without one), a stroke slot falls back to the ink, and a
     // fill-only path never gets an outline.
     const fill = spec.fill === true ? INK : spec.fill ? accent?.[spec.fill] : undefined;
     const stroke = spec.stroke ? (accent?.[spec.stroke] ?? INK) : spec.fill ? 'none' : INK;
     halo.push(`<path d="${spec.d}" fill="none" stroke="${HALO}" stroke-width="3.5"/>`);
-    draw.push(`<path d="${spec.d}" fill="${fill ?? 'none'}" stroke="${stroke}"/>`);
+    const decoration = [
+      ['stroke-width', spec.strokeWidth],
+      ['stroke-dasharray', spec.strokeDasharray],
+      ['stroke-opacity', spec.strokeOpacity],
+      ['fill-opacity', spec.fillOpacity],
+    ]
+      .filter(([, value]) => value !== undefined)
+      .map(([key, value]) => `${key}="${value}"`)
+      .join(' ');
+    draw.push(`<path d="${spec.d}" fill="${fill ?? 'none'}" stroke="${stroke}" ${decoration}/>`);
   }
   return halo.join('') + draw.join('');
 }

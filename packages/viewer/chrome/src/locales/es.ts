@@ -10,12 +10,16 @@ export const es: Locale = {
     measurement: {
       title: 'Mediciones',
       distance: 'Distancia',
+      perimeter: 'Perímetro',
+      area: 'Área',
+      areaUnit: 'Unidad de área',
+      resetLabel: 'Restablecer posición de la etiqueta',
       calibrate: 'Calibrar escala',
       scale: 'Escala',
       custom: 'Personalizada',
       unavailable: 'No disponible',
       instructions:
-        'Dibuja una distancia o calibra con una longitud conocida. Arrastra el control de la etiqueta para moverla.',
+        'Arrastra para medir una distancia y haz clic para colocar la línea de cota. Marca los vértices de un perímetro o área y haz doble clic para terminar. Los bordes del área no deben cruzarse; una vista previa no disponible no puede finalizarse. Pulsa Escape para cancelar. Arrastra la etiqueta para moverla.',
       sessionOnly: 'Este motor conserva la calibración de página solo durante esta sesión.',
       allPages: 'Aplicar a todas las páginas',
       recalculate: 'Recalcular las mediciones existentes',

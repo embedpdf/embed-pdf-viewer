@@ -1,4 +1,5 @@
-import type { DistanceAppearance } from './measurement';
+import type { DistanceAppearance, MeasurementAppearance } from './measurement';
+import type { ShapeMeasurementAppearance } from './measurement-shape';
 import type {
   RichTextDocumentInput,
   AnnotationDTO,
@@ -241,7 +242,7 @@ export interface Annot {
   /** Redaction label (`/OverlayText` + `/Repeat`) — redact kind only. A
    *  projection of `data` like `text`; the hover preview scene draws it. */
   label?: { text: string; repeat: boolean };
-  measure?: DistanceAppearance;
+  measure?: MeasurementAppearance;
   /** `/Name` icon — present only for icon kinds (text note, file attachment).
    *  Like `style`, a projection of `data`, editable via `setProps`. */
   icon?: string;
@@ -394,7 +395,7 @@ export type Draft =
     }
   | {
       g: 'create-line';
-      measure?: DistanceAppearance;
+      measure?: MeasurementAppearance;
       capture?: string;
       subtype: Subtype;
       preset?: string;
@@ -408,6 +409,7 @@ export type Draft =
     }
   | {
       g: 'create-poly';
+      measure?: ShapeMeasurementAppearance;
       subtype: Subtype;
       preset?: string;
       pon: PageObjectNumber;
@@ -627,7 +629,7 @@ export type Msg =
   | { t: 'marqueePointer'; phase: 'down' | 'move' | 'up'; in: PointerInput }
   | {
       t: 'createPointer';
-      measure?: DistanceAppearance;
+      measure?: MeasurementAppearance;
       capture?: string;
       phase: 'down' | 'move' | 'up';
       subtype: Subtype;
@@ -823,7 +825,7 @@ export interface RenderItem {
   hovered?: boolean;
   /** Redaction label projection (redact kind only) — see {@link Annot.label}. */
   label?: { text: string; repeat: boolean };
-  measure?: DistanceAppearance;
+  measure?: MeasurementAppearance;
   /**
    * Applied rotation (deg, CW), or 0/undefined. For BOX kinds (`rect`/`text`)
    * `box` is the UNROTATED visual box and the renderer applies this rotation

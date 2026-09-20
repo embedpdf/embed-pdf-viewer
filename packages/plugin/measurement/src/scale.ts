@@ -87,3 +87,24 @@ export function withPrecision(m: PdfMeasure, precision: number): PdfMeasure {
     );
   return { ...m, distance: update(m.distance), area: update(m.area) };
 }
+
+/** Change the area display unit while preserving imported distance formatting. */
+export function withAreaUnit(measure: PdfMeasure, unit: AreaUnit): PdfMeasure {
+  const basis = measure.x[0]?.unit.trim() as LengthUnit;
+  if (!(basis in METRES)) {
+    throw new RangeError('This scale has an unknown base unit; calibrate it first');
+  }
+  const previous = measure.area[measure.area.length - 1];
+  const precision = previous?.fraction === 'fraction' ? 100 : (previous?.precision ?? 100);
+  return {
+    ...measure,
+    area: [
+      {
+        unit: areaUnitLabel(unit),
+        conversion: METRES[basis] ** 2 / squareMetres(unit),
+        precision,
+        fraction: 'decimal',
+      },
+    ],
+  };
+}

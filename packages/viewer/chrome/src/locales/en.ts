@@ -12,12 +12,16 @@ export const en: Locale = {
     measurement: {
       title: 'Measurements',
       distance: 'Distance',
+      perimeter: 'Perimeter',
+      area: 'Area',
+      areaUnit: 'Area unit',
+      resetLabel: 'Reset label position',
       calibrate: 'Calibrate scale',
       scale: 'Scale',
       custom: 'Custom',
       unavailable: 'Unavailable',
       instructions:
-        'Draw a distance or calibrate using a known length. Drag the caption handle to move the label.',
+        'Drag to measure a distance, then click to place its dimension line. Click vertices for a perimeter or area and double-click to finish. Area boundaries must not cross; an unavailable preview cannot be finished. Press Escape to cancel. Drag the label itself to move it.',
       sessionOnly: 'This engine keeps page calibration for this session only.',
       allPages: 'Apply to all pages',
       recalculate: 'Recalculate existing measurements',

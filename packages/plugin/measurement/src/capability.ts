@@ -7,10 +7,11 @@ import {
   measurementPoint,
   measurementReadout,
   METRES,
+  squareOf,
 } from '@embedpdf/engine-core/runtime';
 import type { PdfMeasure } from '@embedpdf/engine-core/runtime';
 import type { MeasurementEffects } from './effects';
-import { DEFAULT_PRESETS, withPrecision, withUnit } from './scale';
+import { DEFAULT_PRESETS, withAreaUnit, withPrecision, withUnit } from './scale';
 import type {
   MeasurementAction,
   MeasurementCapability,
@@ -86,6 +87,9 @@ export function createMeasurementCapability(
     },
     presets: () => presets,
     units: () => UNITS,
+    areaUnits: () => [...UNITS.map(squareOf), 'ha', 'acre'],
+    setAreaUnit: (pon, unit, opts = {}) =>
+      effects.change(pons(pon, opts), (p) => withAreaUnit(scaleOf(p), unit), opts),
     readout: (ref) => {
       const dto = anno.get(ref);
       return dto ? measurementReadout(dto) : { unavailable: 'not-dimension' };

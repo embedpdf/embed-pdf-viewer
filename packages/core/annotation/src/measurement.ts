@@ -9,6 +9,9 @@ import { endingNodes, endingPoints } from './endings';
 import { DISTANCE_CAPTION_SIZE as CAPTION_SIZE, distanceCaptionWidth } from './measurement-font';
 import { geomHit, geomRotation, rotatePoint, selectionQuad, unionRect } from './geometry';
 import type { Geom, Handle, Paint, Quad, Rect, RenderNode, SceneNode, Style, Vec } from './types';
+import type { ShapeMeasurementAppearance } from './measurement-shape';
+
+export type MeasurementAppearance = DistanceAppearance | ShapeMeasurementAppearance;
 
 /**
  * A distance annotation's render projection. Offsets stay in directed PDF line
@@ -357,7 +360,11 @@ export function distanceHandles(layout: DistanceLayout): Handle[] {
   ];
 }
 
-export function distanceCaptionHit(layout: DistanceLayout, point: Vec, margin = 0): boolean {
+export function distanceCaptionHit(
+  layout: { caption: DistanceCaptionLayout | null },
+  point: Vec,
+  margin = 0,
+): boolean {
   const caption = layout.caption;
   if (!caption) {
     return false;
@@ -496,21 +503,30 @@ export function distanceScene(
     } as SceneNode);
   }
 
-  const caption = layout.caption;
+  nodes.push(...measurementCaptionScene(layout.caption, style));
+
+  return nodes;
+}
+
+export function measurementCaptionScene(
+  caption: DistanceCaptionLayout | null,
+  style: Style,
+): SceneNode[] {
   if (caption) {
     const baseline = offsetPoint(caption.center, caption.normal, -CAPTION_SIZE * 0.33);
     const at = offsetPoint(baseline, caption.along, -caption.width / 2);
 
-    nodes.push({
-      kind: 'text',
-      at,
-      text: caption.text,
-      fontSize: CAPTION_SIZE,
-      fontFamily: 'Helvetica, Arial, sans-serif',
-      rotation: (Math.atan2(caption.along.y, caption.along.x) * 180) / Math.PI,
-      paint: { fill: '#000000', opacity: style.opacity },
-    });
+    return [
+      {
+        kind: 'text',
+        at,
+        text: caption.text,
+        fontSize: CAPTION_SIZE,
+        fontFamily: 'Helvetica, Arial, sans-serif',
+        rotation: (Math.atan2(caption.along.y, caption.along.x) * 180) / Math.PI,
+        paint: { fill: '#000000', opacity: style.opacity },
+      },
+    ];
   }
-
-  return nodes;
+  return [];
 }

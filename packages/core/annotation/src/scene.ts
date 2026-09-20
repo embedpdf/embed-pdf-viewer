@@ -9,7 +9,8 @@
  * underline/strikeout/squiggly STROKE, widths derived from the line height), so it
  * has its own small painter — but it still emits the same generic SceneNodes.
  */
-import { distanceScene } from './measurement';
+import { distanceScene, measurementCaptionScene } from './measurement';
+import { shapeMeasurementLayout } from './measurement-shape';
 import { textQuadBounds, textQuadRing } from '@embedpdf/core-geometry';
 import { geomScene } from './geometry';
 import type {
@@ -245,7 +246,8 @@ export function scene(item: RenderItem): SceneNode[] {
   // border a PDF authored shows through the page raster). Selection chrome
   // still outlines it, so an editable link is findable when selected.
   if (item.subtype === 'link') return [];
-  if (item.measure) return distanceScene(item.geom, item.measure, item.style);
+  if (item.measure?.intent === 'LineDimension')
+    return distanceScene(item.geom, item.measure, item.style);
   if (item.subtype === 'redact') return redactScene(item);
   if (item.geom.t === 'quads') return markupScene(item.subtype, item.geom.quads, item.style);
   if (item.geom.t === 'caret') {
@@ -260,7 +262,7 @@ export function scene(item: RenderItem): SceneNode[] {
     })) as SceneNode[];
   }
   const ink = item.geom.t === 'ink'; // freehand: round the pen-stroke ends (caps)
-  return geomScene(item.geom, item.style.strokeWidth, item.style.border).map((n) => {
+  const nodes = geomScene(item.geom, item.style.strokeWidth, item.style.border).map((n) => {
     const closed =
       n.kind === 'rect' ||
       n.kind === 'ellipse' ||
@@ -272,4 +274,9 @@ export function scene(item: RenderItem): SceneNode[] {
     // stay crisp.
     return { ...n, paint: ink ? { ...paint, cap: 'round', join: 'round' } : paint } as SceneNode;
   });
+  if (item.measure) {
+    const layout = shapeMeasurementLayout(item.geom, item.measure, item.style);
+    nodes.push(...measurementCaptionScene(layout?.caption ?? null, item.style));
+  }
+  return nodes;
 }

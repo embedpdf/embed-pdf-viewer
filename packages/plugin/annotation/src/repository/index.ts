@@ -177,10 +177,14 @@ export function toPatch(a: Annot, crop: PdfRect): AnnotationPatch | null {
 export function toScopedPatch(a: Annot, scope: PatchScope, crop: PdfRect): AnnotationPatch | null {
   const kind = projectionOf(a.subtype);
   if (scope.kind === 'caption') {
-    return a.measure ? { subtype: 'line', caption: a.measure.caption } : null;
+    return a.measure
+      ? ({ subtype: wireSubtypeOf(a), caption: a.measure.caption } as AnnotationPatch)
+      : null;
   }
   if (scope.kind === 'leader') {
-    return a.measure ? { subtype: 'line', leader: a.measure.leader } : null;
+    return a.measure?.intent === 'LineDimension'
+      ? { subtype: 'line', leader: a.measure.leader }
+      : null;
   }
   if (scope.kind === 'geometry') {
     const geo = kind.geometry(a, crop);

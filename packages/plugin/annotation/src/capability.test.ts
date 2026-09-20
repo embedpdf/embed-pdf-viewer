@@ -968,21 +968,33 @@ describe('remote delivery — echo-driven appearance invalidation', () => {
 });
 
 describe.each([
-  { name: 'line', intent: undefined },
-  { name: 'distance', intent: 'LineDimension' as const },
-])('$name rendering after local edits', ({ intent }) => {
+  { name: 'line', subtype: 'line' as const, intent: undefined },
+  { name: 'distance', subtype: 'line' as const, intent: 'LineDimension' as const },
+  { name: 'perimeter', subtype: 'polyline' as const, intent: 'PolyLineDimension' as const },
+  { name: 'area', subtype: 'polygon' as const, intent: 'PolygonDimension' as const },
+])('$name rendering after local edits', ({ intent, subtype }) => {
   const dto = {
     ...base(72),
-    subtype: 'line',
+    subtype,
+    vertices: [
+      { x: 100, y: 700 },
+      { x: 300, y: 700 },
+      { x: 300, y: 600 },
+    ],
     intent,
     rect: { left: 100, bottom: 680, right: 300, top: 700 },
     linePoints: { start: { x: 100, y: 700 }, end: { x: 300, y: 700 } },
     color: { r: 0, g: 0, b: 0 },
     strokeWidth: 1,
+    interiorColor: null,
+    borderStyle: 'solid',
     opacity: 1,
     caption: { enabled: true },
     leader: { length: -20 },
+    lineEndings: { start: 'none', end: 'none' },
     contents: '200 pt',
+    inReplyTo: null,
+    replyType: null,
   } as AnnotationDTO;
 
   it('switches an imported annotation to vector after a programmatic update', async () => {
@@ -993,7 +1005,7 @@ describe.each([
 
     const updated = { ...dto, strokeWidth: 2 };
     h.update.mockResolvedValueOnce({ updated, appearance: { changed: true } });
-    await h.capability.update(dto.ref, { subtype: 'line', strokeWidth: 2 });
+    await h.capability.update(dto.ref, { subtype, strokeWidth: 2 });
 
     expect(h.capability.get(dto.ref)).toEqual(updated);
     expect(h.capability.pageItems(PON)[0].source).toBe('vector');
@@ -1145,5 +1157,72 @@ describe('distance authoring and recalibration', () => {
       { ref: ref(83), reason: 'no-authority' },
     ]);
     expect(report.failed).toMatchObject([{ ref: ref(84), error: { message: 'write failed' } }]);
+  });
+});
+
+describe.each(['area', 'perimeter'])('%s scale resolution', (tool) => {
+  it('freezes the first viewport through multiple vertices and writes shape caption defaults', async () => {
+    const h = harness();
+    const { measureFromKnownLength } = await import('@embedpdf/engine-core/runtime');
+    const region = measureFromKnownLength(100, { value: 10, unit: 'm' });
+    const fallback = measureFromKnownLength(100, { value: 1, unit: 'm' });
+    h.capability.setPageViewports(
+      PON,
+      [{ owned: false, bbox: { left: 0, right: 60, bottom: 700, top: 800 }, measure: region }],
+      fallback,
+    );
+    const subtype = tool === 'area' ? 'polygon' : 'polyline';
+    h.create.mockResolvedValue({
+      created: {
+        ...base(75),
+        subtype,
+        rect: CROP,
+        vertices: [
+          { x: 20, y: 780 },
+          { x: 220, y: 780 },
+          { x: 220, y: 680 },
+        ],
+        intent: tool === 'area' ? 'PolygonDimension' : 'PolyLineDimension',
+        measure: region,
+        caption: { enabled: true },
+        color: { r: 239, g: 68, b: 68 },
+        strokeWidth: 1,
+        opacity: 1,
+      },
+    });
+    h.capability.createPointer(tool, 'down', PON, { x: 20, y: 20 });
+    h.capability.setPageViewports(PON, [], fallback);
+    h.capability.createPointer(tool, 'down', PON, { x: 220, y: 20 });
+    h.capability.createPointer(tool, 'down', PON, { x: 220, y: 120 });
+    h.capability.finishCreationDraft();
+    expect(h.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        subtype,
+        measure: region,
+        caption: { enabled: true },
+        contents: tool === 'area' ? '100 m²' : '30 m',
+      }),
+    );
+    await vi.waitFor(() => expect(h.capability.get(ref(75))).toBeTruthy());
+    expect(h.capability.pageItems(PON)[0].source).toBe('vector');
+    expect(h.capability.appearanceEpoch(PON)).toBe('');
+  });
+
+  it('rejects unhydrated, foreign and unauthorized creation without starting a draft', async () => {
+    const h = harness();
+    const { measureFromRatio } = await import('@embedpdf/engine-core/runtime');
+    h.capability.createPointer(tool, 'down', PON, { x: 20, y: 20 });
+    expect(h.state().model.draft).toBeNull();
+    h.capability.setPageViewports(
+      PON,
+      [{ owned: false, bbox: CROP, measure: { subtype: 'GEO' } }],
+      measureFromRatio(1, 1, 'm'),
+    );
+    h.capability.createPointer(tool, 'down', PON, { x: 20, y: 20 });
+    expect(h.state().model.draft).toBeNull();
+    h.capability.setPageViewports(PON, [], measureFromRatio(1, 1, 'm'));
+    h.allowsAnnotationCreate.mockReturnValue(false);
+    h.capability.createPointer(tool, 'down', PON, { x: 20, y: 20 });
+    expect(h.state().model.draft).toBeNull();
   });
 });

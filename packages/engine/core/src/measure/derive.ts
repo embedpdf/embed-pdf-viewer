@@ -1,6 +1,6 @@
 import type { PdfMeasurement } from '../dto/Measure';
 import type { LinePoints, PdfPoint } from '../geometry/primitives';
-import { pathLength, polygonArea, scaleOf } from './compute';
+import { pathLength, polygonArea, scaleOf, validAreaBoundary } from './compute';
 import { formatMeasurement, validNumberFormat } from './format';
 
 export interface DimensionInput {
@@ -62,6 +62,7 @@ export function measurementReadout(
     return { unavailable: 'invalid-geometry' };
   }
   const area = dto.subtype === 'polygon';
+  if (area && !validAreaBoundary(points)) return { unavailable: 'invalid-geometry' };
   const formats = area ? m.area : m.distance;
   if (!formats.length) return { unavailable: area ? 'no-area-format' : 'no-distance-format' };
   if (!formats.every(validNumberFormat)) return { unavailable: 'invalid-format' };

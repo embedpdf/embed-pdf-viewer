@@ -1,7 +1,7 @@
 /** The complete annotation frame shared by selection and transform gestures. */
 import { anchoredGeom, anchoredStrokeWidth, anchorModeOf } from './anchor';
 import { geomRotation, isRotatableGeom, selectionQuad } from './geometry';
-import { distanceSelectionQuad } from './measurement';
+import { measurementSelectionQuad } from './measurement-shape';
 import type { Annot, Quad, Vec, ViewEnv } from './types';
 
 export interface SelectionFrame {
@@ -15,7 +15,7 @@ export function annotationSelectionFrame(annotation: Annot, view?: ViewEnv): Sel
   const geometry = anchoredGeom(annotation.geom, mode, view);
   const strokeWidth = anchoredStrokeWidth(annotation.style.strokeWidth, mode, view);
   const corners = annotation.measure
-    ? distanceSelectionQuad(geometry, annotation.measure, strokeWidth)
+    ? measurementSelectionQuad(geometry, annotation.measure, { ...annotation.style, strokeWidth })
     : selectionQuad(geometry, strokeWidth, annotation.style.border);
 
   // PDF /Rect is a page-aligned rendering envelope. Its conservative padding

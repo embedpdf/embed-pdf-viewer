@@ -49,3 +49,51 @@ export function polygonArea(points: readonly PdfPoint[], scale: MeasuredScale): 
   }
   return Math.abs(twice * scale.sx * scale.sy) / 2;
 }
+
+/** A measured area must have one simple, nonzero boundary. Repeated closing
+ *  vertices are allowed in imported PDFs; crossings and overlapping edges are not. */
+export function validAreaBoundary(points: readonly PdfPoint[]): boolean {
+  const boundary = points.map(measurementPoint);
+  const same = (a: PdfPoint, b: PdfPoint) => a.x === b.x && a.y === b.y;
+  if (boundary.length > 1 && same(boundary[0], boundary[boundary.length - 1])) {
+    boundary.pop();
+  }
+  if (boundary.length < 3 || polygonArea(boundary, { sx: 1, sy: 1 }) === 0) return false;
+
+  const cross = (a: PdfPoint, b: PdfPoint, c: PdfPoint) =>
+    (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+  const onSegment = (a: PdfPoint, b: PdfPoint, p: PdfPoint) =>
+    cross(a, b, p) === 0 &&
+    p.x >= Math.min(a.x, b.x) &&
+    p.x <= Math.max(a.x, b.x) &&
+    p.y >= Math.min(a.y, b.y) &&
+    p.y <= Math.max(a.y, b.y);
+
+  for (let i = 0; i < boundary.length; i++) {
+    const a = boundary[i];
+    const b = boundary[(i + 1) % boundary.length];
+    if (same(a, b)) return false;
+    const next = boundary[(i + 2) % boundary.length];
+    // Adjacent collinear edges may continue forward, but must not double back.
+    const doublesBack = (b.x - a.x) * (next.x - b.x) + (b.y - a.y) * (next.y - b.y) < 0;
+    if (cross(a, b, next) === 0 && doublesBack) {
+      return false;
+    }
+
+    for (let j = i + 1; j < boundary.length; j++) {
+      if (j === i + 1 || (i === 0 && j === boundary.length - 1)) continue;
+      const c = boundary[j];
+      const d = boundary[(j + 1) % boundary.length];
+      if (onSegment(a, b, c) || onSegment(a, b, d) || onSegment(c, d, a) || onSegment(c, d, b)) {
+        return false;
+      }
+      if (
+        Math.sign(cross(a, b, c)) !== Math.sign(cross(a, b, d)) &&
+        Math.sign(cross(c, d, a)) !== Math.sign(cross(c, d, b))
+      ) {
+        return false;
+      }
+    }
+  }
+  return true;
+}

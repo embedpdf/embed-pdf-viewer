@@ -556,7 +556,27 @@ export const defaultCommands: CommandDef[] = [
   },
 
   {
-    ...tool('measurement:distance', 'distance', 'measurement.distance', 'ruler', {
+    ...tool('measurement:distance', 'distance', 'measurement.distance', 'distance', {
+      primary: 'color',
+    }),
+    enabled: (c) => {
+      const s = stage(c);
+      const pon = s?.pages()[s.currentPage()]?.pon;
+      return pon != null && (c.tryGet(MeasurementToken)?.canMeasure(pon) ?? false);
+    },
+  },
+  {
+    ...tool('measurement:perimeter', 'perimeter', 'measurement.perimeter', 'perimeter', {
+      primary: 'color',
+    }),
+    enabled: (c) => {
+      const s = stage(c);
+      const pon = s?.pages()[s.currentPage()]?.pon;
+      return pon != null && (c.tryGet(MeasurementToken)?.canMeasure(pon) ?? false);
+    },
+  },
+  {
+    ...tool('measurement:area', 'area', 'measurement.area', 'area', {
       primary: 'color',
     }),
     enabled: (c) => {
@@ -568,7 +588,7 @@ export const defaultCommands: CommandDef[] = [
   {
     id: 'measurement:calibrate',
     labelKey: 'measurement.calibrate',
-    icon: 'ruler',
+    icon: 'calibrate',
     categories: ['tool'],
     enabled: (c) => c.tryGet(MeasurementToken)?.canCalibrate() ?? false,
     active: (c) => interaction(c)?.activeToolId() === 'calibrate',
@@ -577,7 +597,7 @@ export const defaultCommands: CommandDef[] = [
   {
     id: 'panel:measurement',
     labelKey: 'measurement.title',
-    icon: 'ruler',
+    icon: 'updateScale',
     categories: ['panel'],
     panel: { id: 'measurement', exclusive: 'right' },
   },

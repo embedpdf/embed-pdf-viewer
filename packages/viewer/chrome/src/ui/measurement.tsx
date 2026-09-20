@@ -8,8 +8,11 @@ import {
   useMeasurement,
   usePageScale,
   type LengthUnit,
+  type AreaUnit,
+  type MeasurementReadout,
 } from '@embedpdf/react/measurement';
 import { useT } from '@embedpdf/react/i18n';
+import { Icon } from './icons';
 
 const control =
   'border-border bg-surface text-fg w-full rounded-md border px-2 py-1.5 text-sm disabled:opacity-50';
@@ -28,14 +31,17 @@ export function MeasurementScaleButton() {
   const surface = useSurface('measurement');
   return (
     <button
-      className={button}
+      className={`${button} inline-flex items-center gap-1.5 whitespace-nowrap`}
       onClick={() => surface.open({ exclusive: 'right' })}
       title={t('measurement.title')}
     >
-      {t('measurement.scale')}:{' '}
-      {scale.measure?.subtype === 'RL'
-        ? (scale.measure.ratio ?? t('measurement.custom'))
-        : t('measurement.unavailable')}
+      <Icon name="updateScale" size={20} className="shrink-0" />
+      <span>
+        {t('measurement.scale')}:{' '}
+        {scale.measure?.subtype === 'RL'
+          ? (scale.measure.ratio ?? t('measurement.custom'))
+          : t('measurement.unavailable')}
+      </span>
     </button>
   );
 }
@@ -50,13 +56,27 @@ export function MeasurementSection() {
   const scale = usePageScale(pon);
   const anno = useCapability(AnnotationToken);
   const selected = useSelector(AnnotationToken, (c) => c.selection());
+  const resettable = useSelector(
+    AnnotationToken,
+    (c) =>
+      c
+        .getSelected()
+        .filter(
+          (annotation) =>
+            (annotation.subtype === 'polygon' || annotation.subtype === 'polyline') &&
+            annotation.caption?.center &&
+            c.canEdit(annotation.ref) &&
+            !annotation.flags.lockedContents,
+        ),
+    (a, b) => a.length === b.length && a.every((annotation, i) => annotation === b[i]),
+  );
   const readouts = useSelector(
     MeasurementToken,
     (c) =>
       anno
         .getSelected()
         .map((d) => c.readout(d.ref))
-        .filter((r) => !('unavailable' in r)),
+        .filter((r): r is MeasurementReadout => !('unavailable' in r)),
     (a, b) => JSON.stringify(a) === JSON.stringify(b),
   );
   const reports = useSelector(MeasurementToken, (c) => c.lastReports());
@@ -154,6 +174,31 @@ export function MeasurementSection() {
         </select>
       </label>
       <label>
+        {t('measurement.areaUnit')}
+        <select
+          aria-label={t('measurement.areaUnit')}
+          className={control}
+          value={rectilinear?.area[0]?.unit.trim().replace('²', '2') ?? ''}
+          disabled={disabled || !rectilinear}
+          onChange={(e) =>
+            void run(() => measurement.setAreaUnit(pon, e.target.value as AreaUnit, options))
+          }
+        >
+          {!measurement
+            .areaUnits()
+            .includes(rectilinear?.area[0]?.unit.trim().replace('²', '2') as AreaUnit) && (
+            <option value={rectilinear?.area[0]?.unit.trim().replace('²', '2') ?? ''}>
+              {t('measurement.custom')}
+            </option>
+          )}
+          {measurement.areaUnits().map((unit) => (
+            <option key={unit} value={unit}>
+              {unit.replace('2', '²')}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label>
         {t('measurement.precision')}
         <select
           aria-label={t('measurement.precision')}
@@ -181,9 +226,40 @@ export function MeasurementSection() {
         <section className="border-border-subtle border-t pt-3">
           <h3 className="mb-1 font-medium">{t('measurement.selection')}</h3>
           {readouts.length ? (
-            readouts.map((r, i) => <p key={i}>{'label' in r ? r.label : ''}</p>)
+            readouts.map((readout, i) => (
+              <div key={i} className="mb-2">
+                <p>
+                  {t(`measurement.${readout.kind}`)}: {readout.label}
+                </p>
+                {readout.perimeter && (
+                  <p>
+                    {t('measurement.perimeter')}: {readout.perimeter}
+                  </p>
+                )}
+              </div>
+            ))
           ) : (
             <p className="text-fg-muted">{t('measurement.unavailable')}</p>
+          )}
+          {resettable.length > 0 && (
+            <button
+              className={button}
+              disabled={measurement.busy}
+              onClick={() =>
+                void run(async () => {
+                  for (const annotation of resettable) {
+                    if (annotation.subtype === 'polygon' || annotation.subtype === 'polyline') {
+                      await anno.update(annotation.ref, {
+                        subtype: annotation.subtype,
+                        caption: { center: null },
+                      });
+                    }
+                  }
+                })
+              }
+            >
+              {t('measurement.resetLabel')}
+            </button>
           )}
         </section>
       )}

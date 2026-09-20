@@ -12,7 +12,16 @@ import type {
   InkIntent,
   RichTextDocumentInput,
 } from '@embedpdf/engine-core/runtime';
-import { distanceLeaderLength, moveDistanceCaption, type DistanceAppearance } from './measurement';
+import {
+  distanceLeaderLength,
+  type DistanceAppearance,
+  type MeasurementAppearance,
+} from './measurement';
+import {
+  moveMeasurementCaption,
+  shapeMeasurementReadout,
+  transformMeasurementCaption,
+} from './measurement-shape';
 import { expandGroups, groupMembers } from './group';
 import { canMove, groupUnionBounds, hitTest, isSelectable } from './hit';
 import { isSubstrateOnly } from './plane';
@@ -43,6 +52,7 @@ import {
   normalizeDeg,
   quadIntersectsRect,
   rectFromPoints,
+  rotatePoint,
   shapeRectFor,
   transposedAboutCenter,
   unionRect,
@@ -614,7 +624,7 @@ function editUp(m: Model): [Model, Effect[]] {
   const d = m.draft!;
   if (d.g === 'leader') {
     const annotation = m.byId[d.id];
-    if (!annotation?.measure || d.delta === 0) {
+    if (annotation?.measure?.intent !== 'LineDimension' || d.delta === 0) {
       return [{ ...m, draft: null }, []];
     }
 
@@ -648,7 +658,7 @@ function editUp(m: Model): [Model, Effect[]] {
           [a.id]: {
             ...a,
             source: 'vector',
-            measure: moveDistanceCaption(a.geom, a.measure, d.delta),
+            measure: moveMeasurementCaption(a.geom, a.measure, d.delta, a.style),
           },
         },
       },
@@ -665,6 +675,12 @@ function editUp(m: Model): [Model, Effect[]] {
     // commit maps it back to stored space — the identity when un-flagged.
     const before = m.byId[d.id];
     const stored = unanchoredGeom(d.cur, anchorModeOf(before), d.view);
+    if (before.measure?.intent === 'PolygonDimension') {
+      const readout = shapeMeasurementReadout(stored, before.measure);
+      if ('unavailable' in readout && readout.unavailable === 'invalid-geometry') {
+        return [{ ...m, draft: null }, []];
+      }
+    }
     const a = ownGeometry({ ...before, geom: stored });
     return [{ ...m, byId: { ...m.byId, [d.id]: a }, draft: null }, [patchFx(d.id, a, before.geom)]];
   }
@@ -681,7 +697,10 @@ function editUp(m: Model): [Model, Effect[]] {
       // same composition and unprojects — a screen-anchored member's AUTHORED
       // tilt turns WYSIWYG, exactly as previewed.
       const geom = commitViewGesture(a, d.view, (g) => geomRotateAbout(g, d.pivot, delta));
-      byId[id] = ownGeometry({ ...a, geom });
+      const measure = transformMeasurementCaption(a.measure, (point) =>
+        rotatePoint(point, d.pivot, delta),
+      );
+      byId[id] = ownGeometry({ ...a, geom, measure });
       fx.push(patchFx(id, byId[id], a.geom));
     }
     return [{ ...m, byId, draft: null }, fx];
@@ -695,7 +714,11 @@ function editUp(m: Model): [Model, Effect[]] {
       const a = byId[id];
       if (!a) continue;
       const geom = commitViewGesture(a, d.view, (g) => geomScaleAbout(g, d.anchor, sx, sy));
-      byId[id] = ownGeometry({ ...a, geom });
+      const measure = transformMeasurementCaption(a.measure, (point) => ({
+        x: d.anchor.x + (point.x - d.anchor.x) * sx,
+        y: d.anchor.y + (point.y - d.anchor.y) * sy,
+      }));
+      byId[id] = ownGeometry({ ...a, geom, measure });
       fx.push(patchFx(id, byId[id], a.geom));
     }
     return [{ ...m, byId, draft: null }, fx];
@@ -711,6 +734,10 @@ function editUp(m: Model): [Model, Effect[]] {
       byId[id] = {
         ...a,
         geom: geomTranslate(a.geom, d.delta),
+        measure: transformMeasurementCaption(a.measure, (point) => ({
+          x: point.x + d.delta.x,
+          y: point.y + d.delta.y,
+        })),
         apBox: a.apBox ? translateRect(a.apBox, d.delta) : undefined,
       };
       fx.push({ fx: 'patch', id, scope: { kind: 'geometry' } }); // a move never invalidates the raster
@@ -882,7 +909,7 @@ function createPointer(
   straightenInk?: InkStraightenOptions,
   clickCreate?: ClickCreate | false,
   flags?: Partial<AnnotationFlags>,
-  measure?: DistanceAppearance,
+  measure?: MeasurementAppearance,
   capture?: string,
 ): [Model, Effect[]] {
   // An in-progress creation is anchored to its page: a move/up sample from
@@ -891,8 +918,15 @@ function createPointer(
   if (phase !== 'down' && m.draft && 'pon' in m.draft && m.draft.pon !== input.pon) return [m, []];
   // Shapes can't be drawn past the page edge — the pointer pins to it.
   if (input.pageBox) input = { ...input, point: clampPointToBox(input.point, input.pageBox) };
-  if (m.draft?.g === 'create-distance' || (measure && !capture)) {
-    return distancePointer(m, phase, input, preset, measure, flags);
+  if (m.draft?.g === 'create-distance' || (measure?.intent === 'LineDimension' && !capture)) {
+    return distancePointer(
+      m,
+      phase,
+      input,
+      preset,
+      measure?.intent === 'LineDimension' ? measure : undefined,
+      flags,
+    );
   }
   if (subtype === 'free-text-callout') return calloutPointer(m, phase, input, preset, flags);
   if (phase === 'down') {
@@ -901,6 +935,7 @@ function createPointer(
       if (
         m.draft?.g === 'create-poly' &&
         m.draft.subtype === subtype &&
+        m.draft.preset === preset &&
         m.draft.pon === input.pon
       ) {
         return [
@@ -923,6 +958,7 @@ function createPointer(
             points: [input.point],
             cur: input.point,
             closed: subtype === 'polygon',
+            ...(measure && measure.intent !== 'LineDimension' ? { measure } : {}),
             ...(flags ? { flags } : {}),
           },
         },
@@ -1295,6 +1331,8 @@ function finishPolyCreate(m: Model): [Model, Effect[]] {
     closed: d.closed,
     ends: d.closed ? undefined : def.lineEndings,
   };
+  if (d.measure && 'unavailable' in shapeMeasurementReadout(geom, d.measure)) return [m, []];
+
   const id = `tmp:${m.seq + 1}`;
   const annot: Annot = {
     id,
@@ -1302,6 +1340,7 @@ function finishPolyCreate(m: Model): [Model, Effect[]] {
     pon: d.pon,
     subtype: d.subtype,
     geom,
+    measure: d.measure,
     style: styleFromProps(def),
     flags: { ...DRAWN_FLAGS, ...d.flags },
     source: 'vector',
@@ -1607,7 +1646,13 @@ function rotateSelection(m: Model, deltaDeg: number): [Model, Effect[]] {
   for (const id of ids) {
     const a = byId[id];
     const before = a.geom;
-    byId[id] = ownGeometry({ ...a, geom: geomRotateAbout(before, pivot, deltaDeg) });
+    byId[id] = ownGeometry({
+      ...a,
+      geom: geomRotateAbout(before, pivot, deltaDeg),
+      measure: transformMeasurementCaption(a.measure, (point) =>
+        rotatePoint(point, pivot, deltaDeg),
+      ),
+    });
     fx.push(patchFx(id, byId[id], before));
   }
   return [{ ...m, byId }, fx];
@@ -1625,6 +1670,9 @@ function resetRotation(m: Model): [Model, Effect[]] {
     byId[id] = ownGeometry({
       ...a,
       geom: geomResetRotation(a.geom, annotationSelectionFrame(a).center),
+      measure: transformMeasurementCaption(a.measure, (point) =>
+        rotatePoint(point, annotationSelectionFrame(a).center, -geomRotation(a.geom)),
+      ),
     });
     fx.push(patchFx(id, byId[id], a.geom));
   }

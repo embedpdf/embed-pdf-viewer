@@ -148,7 +148,12 @@ const measureBar: BarSchema = {
   id: 'measure',
   sections: {
     center: [
-      group('measure', { importance: 5 }, ['measurement:distance', 'measurement:calibrate']),
+      group('measure', { importance: 5 }, [
+        'measurement:distance',
+        'measurement:perimeter',
+        'measurement:area',
+        'measurement:calibrate',
+      ]),
       group('scale', { importance: 4 }, [
         custom('measurement-scale', { variants: ['inline'], terminal: 'panel:measurement' }),
       ]),

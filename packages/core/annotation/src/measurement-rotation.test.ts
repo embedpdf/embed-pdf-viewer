@@ -102,12 +102,16 @@ describe('measurement selection frame and rotation', () => {
     expect(hit).toMatchObject({ t: 'rotate', pivot: center });
 
     const armed = pointer(start, 'down', knob.at);
-    const initialCaption = distanceLayout(annotation.geom, annotation.measure!, 2)!.caption!;
+    const initialCaption = distanceLayout(
+      annotation.geom,
+      annotation.measure as DistanceAppearance,
+      2,
+    )!.caption!;
     for (const angle of [30, 89, 91, 137, 180, 269, 271, 359]) {
       const at = rotatePoint(knob.at, center, angle);
       const moving = pointer(armed, 'move', at);
       const item = pageItems(moving, 1)[0];
-      const layout = distanceLayout(item.geom, item.measure!, 2)!;
+      const layout = distanceLayout(item.geom, item.measure as DistanceAppearance, 2)!;
       const rotatedOutline = outlineCorners(moving);
       rotatedOutline.forEach((point, index) => {
         expectPoint(point, rotatePoint(outline[index], center, angle));
