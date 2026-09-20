@@ -126,5 +126,6 @@ function queryIdentity(query: SearchQuery): string {
     query.matchCase ? 1 : 0,
     query.matchDiacritics ? 1 : 0,
     query.wholeWord ? 1 : 0,
+    query.ignoreWhitespace ? 1 : 0,
   ]);
 }

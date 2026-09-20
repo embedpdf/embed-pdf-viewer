@@ -117,5 +117,7 @@ describe('canonicalSearchQuery', () => {
     expect(canonicalSearchQuery(caseSensitive)).toEqual(caseSensitive);
     const regex = { text: 'C\\d+', regex: true } as const;
     expect(canonicalSearchQuery(regex)).toEqual(regex);
+    const whitespaceInsensitive = { text: 'i n v o i c e', ignoreWhitespace: true } as const;
+    expect(canonicalSearchQuery(whitespaceInsensitive)).toEqual(whitespaceInsensitive);
   });
 });

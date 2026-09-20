@@ -214,6 +214,7 @@ export const encodeSearchToken = (input: SearchToken): string => {
     matchCase: q.matchCase ? true : undefined,
     matchDiacritics: q.matchDiacritics ? true : undefined,
     wholeWord: q.wholeWord ? true : undefined,
+    ignoreWhitespace: q.ignoreWhitespace ? true : undefined,
     startPage: input.startPage,
     skip: input.skip > 0 ? input.skip : undefined,
     maxPages: input.budget?.maxPages,
@@ -237,6 +238,7 @@ export const decodeSearchToken = (raw: string): SearchToken => {
     ...(t.matchCase === 'true' ? { matchCase: true } : {}),
     ...(t.matchDiacritics === 'true' ? { matchDiacritics: true } : {}),
     ...(t.wholeWord === 'true' ? { wholeWord: true } : {}),
+    ...(t.ignoreWhitespace === 'true' ? { ignoreWhitespace: true } : {}),
   };
   const maxPages =
     t.maxPages === undefined ? undefined : decodePositiveInteger(t.maxPages, 'maxPages');

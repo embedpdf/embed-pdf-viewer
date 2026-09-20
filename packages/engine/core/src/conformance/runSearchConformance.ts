@@ -270,18 +270,42 @@ export function runSearchConformance(
       }
     });
 
-    test('regex + matchDiacritics is rejected with InvalidArg', async () => {
+    test('ignoreWhitespace keeps every default hit and finds the space-free needle', async () => {
       const doc = await openFixture(engine, opts);
       try {
-        let caught: unknown;
-        try {
-          await doc.search.query({
-            query: { text: fixture.presentRegex, regex: true, matchDiacritics: true },
-          });
-        } catch (err) {
-          caught = err;
+        const key = (m: SearchMatch) => `${m.pageObjectNumber}:${m.charStart}:${m.charCount}`;
+        const plain = await collectAll(doc, { query: { text: fixture.presentLiteral } });
+        // Dropping whitespace can only ADD matches over the collapsing default
+        // fold — every default hit survives, at the same place.
+        const relaxed = await collectAll(doc, {
+          query: { text: fixture.presentLiteral, ignoreWhitespace: true },
+        });
+        const relaxedKeys = new Set(relaxed.matches.map(key));
+        for (const m of plain.matches) expect(relaxedKeys.has(key(m))).toBe(true);
+        // ...and the needle no longer needs the page's spaces.
+        const squashed = await collectAll(doc, {
+          query: { text: fixture.presentLiteral.replace(/\s+/g, ''), ignoreWhitespace: true },
+        });
+        expect(squashed.matches.map(key)).toEqual(relaxed.matches.map(key));
+      } finally {
+        await doc.close();
+      }
+    });
+
+    test('regex + matchDiacritics / ignoreWhitespace are rejected with InvalidArg', async () => {
+      const doc = await openFixture(engine, opts);
+      try {
+        for (const flags of [{ matchDiacritics: true }, { ignoreWhitespace: true }]) {
+          let caught: unknown;
+          try {
+            await doc.search.query({
+              query: { text: fixture.presentRegex, regex: true, ...flags },
+            });
+          } catch (err) {
+            caught = err;
+          }
+          expect(EngineError.is(caught, EngineErrorCode.InvalidArg)).toBe(true);
         }
-        expect(EngineError.is(caught, EngineErrorCode.InvalidArg)).toBe(true);
       } finally {
         await doc.close();
       }

@@ -5,7 +5,8 @@
  *
  * Fold version 1:
  *   - whitespace runs collapse to a single space (any `\s`, including the
- *     spaces some compatibility decompositions emit),
+ *     spaces some compatibility decompositions emit) — or are dropped
+ *     entirely with `dropWhitespace` (ignoreWhitespace),
  *   - each code point is NFKD-decomposed (ligatures split: "ﬁ" → "fi",
  *     "²" → "2"),
  *   - combining marks are stripped unless `keepMarks`,
@@ -30,6 +31,8 @@ export interface FoldOptions {
   keepCase?: boolean;
   /** Preserve combining marks (matchDiacritics). */
   keepMarks?: boolean;
+  /** Drop whitespace instead of collapsing it to one space (ignoreWhitespace). */
+  dropWhitespace?: boolean;
 }
 
 export interface FoldedText {
@@ -64,12 +67,12 @@ export function foldText(original: string, options: FoldOptions = {}): FoldedTex
       if (!options.keepCase) piece = piece.toUpperCase().toLowerCase();
     }
     // A decomposition can itself contain whitespace (U+00A8 → space +
-    // combining diaeresis), so collapse runs at the unit level, not just
-    // for source whitespace.
+    // combining diaeresis), so collapse (or drop) runs at the unit level,
+    // not just for source whitespace.
     for (let u = 0; u < piece.length; u++) {
       const unit = piece[u];
       if (WHITESPACE.test(unit)) {
-        if (lastWasSpace) continue;
+        if (options.dropWhitespace || lastWasSpace) continue;
         units.push(' ');
         map.push(index);
         lastWasSpace = true;

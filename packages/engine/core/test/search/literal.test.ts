@@ -39,6 +39,58 @@ describe('matchLiteral', () => {
     expect(find('hello\n   world', { text: 'hello world' })).toEqual([{ start: 0, length: 14 }]);
   });
 
+  test('by default a needle must carry a space wherever the page does', () => {
+    expect(find('Ref: i n v o i c e 42', { text: 'invoice' })).toEqual([]);
+    expect(find('Invoice 42', { text: 'i n v o i c e' })).toEqual([]);
+  });
+
+  test('ignoreWhitespace finds letter-spaced text and spans the gaps', () => {
+    // The OCR / tracked-out-heading case: "i n v o i c e" on the page, "invoice" typed.
+    expect(find('Ref: i n v o i c e 42', { text: 'invoice', ignoreWhitespace: true })).toEqual([
+      { start: 5, length: 13 },
+    ]);
+  });
+
+  test('ignoreWhitespace drops whitespace on the needle side too', () => {
+    expect(find('Invoice 42', { text: 'i n v o i c e', ignoreWhitespace: true })).toEqual([
+      { start: 0, length: 7 },
+    ]);
+    expect(find('totalamount', { text: 'total amount', ignoreWhitespace: true })).toEqual([
+      { start: 0, length: 11 },
+    ]);
+  });
+
+  test('ignoreWhitespace matches across line wraps without a space in the needle', () => {
+    expect(find('in\nvoice', { text: 'invoice', ignoreWhitespace: true })).toEqual([
+      { start: 0, length: 8 },
+    ]);
+  });
+
+  test('ignoreWhitespace composes with matchCase', () => {
+    expect(
+      find('I n v o i c e', { text: 'invoice', ignoreWhitespace: true, matchCase: true }),
+    ).toEqual([]);
+    expect(
+      find('I n v o i c e', { text: 'Invoice', ignoreWhitespace: true, matchCase: true }),
+    ).toEqual([{ start: 0, length: 13 }]);
+  });
+
+  test('ignoreWhitespace + wholeWord reads boundaries off the original text', () => {
+    // Dropping whitespace glues "i n v o i c e" to the "42" after it on the
+    // folded plane; the original text still has a gap there, so it is a whole word.
+    expect(
+      find('Ref: i n v o i c e 42', { text: 'invoice', ignoreWhitespace: true, wholeWord: true }),
+    ).toEqual([{ start: 5, length: 13 }]);
+    // ...while a hit glued to letters in the ORIGINAL is still rejected.
+    expect(
+      find('the invoices', { text: 'invoice', ignoreWhitespace: true, wholeWord: true }),
+    ).toEqual([]);
+  });
+
+  test('ignoreWhitespace with a whitespace-only needle finds nothing', () => {
+    expect(find('anything', { text: ' \n ', ignoreWhitespace: true })).toEqual([]);
+  });
+
   test('finds ligature text with a plain-letters needle', () => {
     expect(find('ﬁle system', { text: 'file' })).toEqual([{ start: 0, length: 3 }]);
   });

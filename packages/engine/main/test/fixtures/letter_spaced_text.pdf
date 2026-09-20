@@ -1,0 +1,136 @@
+%PDF-1.4
+%‚„œ”
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [6 0 R 8 0 R] /Count 2 >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>
+endobj
+5 0 obj
+<< /Length 950 >>
+stream
+BT
+/F2 22 Tf
+6 Tc
+1 0 0 1 60 762 Tm
+(INVOICE) Tj
+ET
+BT
+/F1 10 Tf
+0 Tc
+1 0 0 1 60 716.4 Tm
+(Whitespace-insensitive search sample) Tj
+ET
+BT
+/F1 12 Tf
+0 Tc
+1 0 0 1 60 680.4 Tm
+(Ref: i n v o i c e 42) Tj
+ET
+BT
+/F2 12 Tf
+0 Tc
+1 0 0 1 60 658.8 Tm
+(Letter-spaced heading: I N V O I C E) Tj
+ET
+BT
+/F1 12 Tf
+0 Tc
+1 0 0 1 60 637.1999999999999 Tm
+(Mixed case for matchCase: I n v o i c e) Tj
+ET
+BT
+/F1 12 Tf
+0 Tc
+1 0 0 1 60 615.5999999999999 Tm
+(Plain for comparison: Invoice 42) Tj
+ET
+BT
+/F1 12 Tf
+0 Tc
+1 0 0 1 60 575.9999999999999 Tm
+(Glued words: totalamount due 1,250.00) Tj
+ET
+BT
+/F1 12 Tf
+0 Tc
+1 0 0 1 60 554.3999999999999 Tm
+(Spaced words: total amount due 1,250.00) Tj
+ET
+BT
+/F1 12 Tf
+0 Tc
+1 0 0 1 60 514.7999999999998 Tm
+(Wrapped across lines, first half ends in) Tj
+ET
+BT
+/F1 12 Tf
+0 Tc
+1 0 0 1 60 493.1999999999998 Tm
+(voice and continues here.) Tj
+ET
+BT
+/F1 12 Tf
+0 Tc
+1 0 0 1 60 453.5999999999998 Tm
+(Whole-word trap: the invoices were sent.) Tj
+ET
+endstream
+endobj
+6 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents 5 0 R >>
+endobj
+7 0 obj
+<< /Length 314 >>
+stream
+BT
+/F2 16 Tf
+0 Tc
+1 0 0 1 60 762 Tm
+(Page two) Tj
+ET
+BT
+/F1 12 Tf
+0 Tc
+1 0 0 1 60 715.2 Tm
+(Second occurrence: i n v o i c e 43) Tj
+ET
+BT
+/F1 12 Tf
+0 Tc
+1 0 0 1 60 693.6 Tm
+(Tabular gaps:   total      amount      99.00) Tj
+ET
+BT
+/F1 12 Tf
+0 Tc
+1 0 0 1 60 654 Tm
+(Nothing to find here: shipping and handling.) Tj
+ET
+endstream
+endobj
+8 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents 7 0 R >>
+endobj
+xref
+0 9
+0000000000 65535 f 
+0000000015 00000 n 
+0000000064 00000 n 
+0000000127 00000 n 
+0000000224 00000 n 
+0000000326 00000 n 
+0000001327 00000 n 
+0000001463 00000 n 
+0000001828 00000 n 
+trailer
+<< /Size 9 /Root 1 0 R >>
+startxref
+1964
+%%EOF

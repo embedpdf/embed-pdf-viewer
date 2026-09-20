@@ -205,14 +205,15 @@ function searchStateFromParams(params: unknown): SearchGetState {
     throw new EngineError(EngineErrorCode.InvalidArg, 'search param "q" is required');
   }
   // One flat query shape — flags are independent params; semantic
-  // validation (regex dialect, regex+matchDiacritics) happens in the
-  // engine's validateSearchQuery, not here.
+  // validation (regex dialect, regex+matchDiacritics/ignoreWhitespace)
+  // happens in the engine's validateSearchQuery, not here.
   const query: SearchQuery = {
     text: q,
     ...(bool('regex') ? { regex: true } : {}),
     ...(bool('matchCase') ? { matchCase: true } : {}),
     ...(bool('matchDiacritics') ? { matchDiacritics: true } : {}),
     ...(bool('wholeWord') ? { wholeWord: true } : {}),
+    ...(bool('ignoreWhitespace') ? { ignoreWhitespace: true } : {}),
   };
 
   const maxPages = int('maxPages', 1);
