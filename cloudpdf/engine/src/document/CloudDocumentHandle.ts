@@ -702,6 +702,9 @@ export class CloudDocumentHandle implements DocumentHandle {
    *  whose hand caused the change. */
   private absorbRemoteEvent(event: DocumentEvent): void {
     switch (event.type) {
+      case 'page.viewportsChanged':
+        this.absorbMutation(event.meta, []);
+        return;
       case 'annotation.created':
       case 'annotation.updated':
       case 'annotation.deleted':

@@ -7,6 +7,11 @@ import {
 import type { PageRotation } from '@embedpdf/core-geometry';
 import {
   buildCommentThreads,
+  isDimension,
+  isReadout,
+  measurementReadout,
+  viewportForPoint,
+  serializeError,
   encodeStableIdKey,
   resolveBinarySource,
   sniffBinaryMetadata,
@@ -19,6 +24,8 @@ import {
   type BinarySource,
   type PdfLinkTarget,
   type PdfRect,
+  type PageMeasurementViewport,
+  type PdfMeasure,
 } from '@embedpdf/engine-core/runtime';
 import { ActionsToken as PublicActionsToken } from '@embedpdf/plugin-actions/contract';
 import { scriptColorToRgb } from '@embedpdf/core-acrojs';
@@ -27,6 +34,7 @@ import type { AnnotCommitResult } from '@embedpdf/plugin-actions/contract/host';
 import { InteractionToken } from '@embedpdf/plugin-interaction/contract';
 import { SelectionToken as SelectionPublicToken } from '@embedpdf/plugin-selection/contract';
 import {
+  type MeasurementAppearance,
   canMove,
   chrome as coreChrome,
   clickCreateGeom,
@@ -101,6 +109,8 @@ import { ARMED_STAMP_TOOL_ID, buildToolRegistry, isTouchDirect } from './tools';
 import { previewBucket } from './types';
 import type { AnnotationToolInput, ResolvedTool } from './tools';
 import type {
+  CapturedAnnotationDraft,
+  RecalibrationReport,
   AnnotationAction,
   AnnotationConfig,
   AnnotationHostCapability,
@@ -161,6 +171,19 @@ export function createAnnotationCapability(
    *  adapter), or null — every click-then-pick tool resolves through this ONE
    *  slot. See {@link FilePickerProvider}. */
   let filePickerProvider: FilePickerProvider | null = null;
+
+  const pageViewports = new Map<
+    number,
+    {
+      viewports: PageMeasurementViewport[] | undefined;
+      fallback: PdfMeasure;
+    }
+  >();
+  const captured = new Set<(draft: CapturedAnnotationDraft) => void>();
+  ctx.cleanup(() => {
+    captured.clear();
+    pageViewports.clear();
+  });
 
   const model = (): Model => ctx.getState().model;
 
@@ -930,8 +953,8 @@ export function createAnnotationCapability(
    * changed the appearance (create / restyle / resize), `'baked'` when the AP is
    * still authoritative (a move, which preserves it, or a remote edit).
    * `bumpAp` marks the upsert as confirming an engine /AP re-bake with new
-   * content, so the annotation's `apVersion` — and with it the page's
-   * appearance epoch — advances and the shell fetches the fresh raster.
+   * content, advancing the annotation's `apVersion`. Only baked annotations
+   * contribute to the page's appearance epoch and trigger a raster fetch.
    */
   const syncDTO = (
     dto: Parameters<typeof fromDTO>[0],
@@ -950,7 +973,7 @@ export function createAnnotationCapability(
     const pon = ponForRef(ref);
     if (pon == null) throw new Error('[annotation] cannot resolve page for ref');
     const res = await doc.page(pon).annotations.update(ref, patch);
-    syncDTO(res.updated, 'vector');
+    syncDTO(res.updated, 'vector', res.appearance?.changed);
   };
 
   // ── the text commit: ONE debounced write per annotation for both editors ──
@@ -1342,7 +1365,10 @@ export function createAnnotationCapability(
     },
 
     edit: async (ref, text) => {
-      const subtype = model().byId[refKey(ref)]?.data?.subtype;
+      const data = model().byId[refKey(ref)]?.data;
+      if (data && isDimension(data))
+        throw new Error('[annotation] measurement contents are derived');
+      const subtype = data?.subtype;
       if (!subtype) throw new Error('[annotation] cannot edit an uncommitted annotation');
       await updateOne(ref, { subtype, contents: text } as AnnotationPatch);
     },
@@ -1417,7 +1443,7 @@ export function createAnnotationCapability(
         canEditText: (() => {
           const m = model();
           const a = m.byId[refKey(ref)];
-          return !!a && annotContentsEditable(a);
+          return !!a && !(a.data && isDimension(a.data)) && annotContentsEditable(a);
         })(),
         canDelete: deletableOne(ref),
         canDeleteThread: t !== null && threadMemberRefs(t).every(deletableOne),
@@ -1538,7 +1564,14 @@ export function createAnnotationCapability(
   function perform(fx: Effect, m: Model): void {
     const doc = ctx.doc;
     if (!doc) return;
-    if (fx.fx === 'createGroup') {
+    if (fx.fx === 'captured') {
+      const crop = cropOf(fx.pon);
+      if (crop && fx.geom.t === 'line') {
+        const pdf = (p: Vec) => ({ x: p.x + crop.left, y: crop.top - p.y });
+        for (const cb of captured)
+          cb({ tool: fx.tool, pon: fx.pon, from: pdf(fx.geom.a), to: pdf(fx.geom.b) });
+      }
+    } else if (fx.fx === 'createGroup') {
       const ids = [fx.primary, ...fx.members];
       const annots = ids.map((id) => m.byId[id]);
       const primary = annots[0];
@@ -1621,7 +1654,6 @@ export function createAnnotationCapability(
               id: refKey(res.created.ref),
               ref: res.created.ref,
             });
-            // We just drew it — render live, not the engine's freshly-baked AP.
             syncDTO(res.created, 'vector');
           },
           () => apply({ t: 'createFailed', tempId: fx.id }),
@@ -1790,6 +1822,56 @@ export function createAnnotationCapability(
 
   return {
     // ── data API: create / update / delete (engine-routed, ref-addressed) ──
+    setPageViewports: (pon, viewports, fallback) => {
+      pageViewports.set(pon, { viewports, fallback });
+    },
+    onDraftCaptured: (cb) => {
+      captured.add(cb);
+      return () => {
+        captured.delete(cb);
+      };
+    },
+    remeasurePage: async (pon, scale) => {
+      await rehydrate();
+      const report: RecalibrationReport = { pon, scale, updated: [], skipped: [], failed: [] };
+      const hydration = ctx.getState().hydration;
+      if (hydration.status !== 'complete') {
+        report.error = serializeError(
+          hydration.status === 'error'
+            ? hydration.error
+            : new Error('Annotation hydration is incomplete'),
+        );
+        return report;
+      }
+      const candidates = Object.values(model().byId).filter(
+        (a) => a.pon === pon && a.data && isDimension(a.data),
+      );
+      for (const a of candidates) {
+        const dto = a.data!,
+          ref = dto.ref;
+        const reason =
+          a.authority?.update === false
+            ? 'no-authority'
+            : !annotTransformable(a) || !annotContentsEditable(a)
+              ? 'locked'
+              : 'measure' in dto && dto.measure && dto.measure.subtype !== 'RL'
+                ? 'foreign-measure'
+                : !isReadout(measurementReadout({ ...dto, measure: scale }))
+                  ? 'unavailable'
+                  : null;
+        if (reason) {
+          report.skipped.push({ ref, reason });
+          continue;
+        }
+        try {
+          await updateOne(ref, { subtype: dto.subtype, measure: scale } as AnnotationPatch);
+          report.updated.push(ref);
+        } catch (error) {
+          report.failed.push({ ref, error: serializeError(error) });
+        }
+      }
+      return report;
+    },
     create: async (pon, draft: AnnotationDraft): Promise<AnnotationRef> => {
       const doc = ctx.doc;
       if (!doc) throw new Error('[annotation] no document bound');
@@ -1958,6 +2040,10 @@ export function createAnnotationCapability(
     chrome: (pon, scale, rotation, zoom) => memoChrome(pon, scale, rotation, zoom),
     selectionAnchor: (scale, rotation, zoom) => memoAnchor(scale, rotation, zoom),
     creationDraftAnchor: () => memoDraftAnchor(),
+    distanceCreationPage: () => {
+      const draft = model().draft;
+      return draft?.g === 'create-distance' && draft.step === 'offset' ? draft.pon : null;
+    },
     selection: () => model().selected,
     hitKind: (pon, point, scale, rotation, zoom, touch) =>
       hitTest(
@@ -2115,19 +2201,73 @@ export function createAnnotationCapability(
     createPointer: (tool, phase, pon, point, finish = false, displayRotation) => {
       // No create authority → creation gestures are inert: no ghost, no
       // draft, no doomed 403. The engine enforces; this keeps pixels honest.
-      if (!allowsCreate()) return;
+      const t = registry.get(tool);
+      if (
+        t?.meta?.capture === true
+          ? !ctx.doc?.security.allows('doc.annotate.modify')
+          : !allowsCreate()
+      )
+        return;
       // Resolve the authoring TOOL to its routing subtype + defaults key. Two
       // tools can share a subtype (line / arrow); `preset` keeps their defaults
       // apart. Unknown id → treat it as a bare subtype (headless/programmatic).
       // The tool's `upright` policy + the sample's display rotation ride the
       // input bag; the core captures them on the draft at DOWN.
-      const t = registry.get(tool);
+      const crop = cropOf(pon);
+      const cache = pageViewports.get(pon);
+      const draft = model().draft;
+      const continuingMeasurement =
+        (draft?.g === 'create-distance' || draft?.g === 'create-poly') &&
+        draft.pon === pon &&
+        draft.preset === (t?.preset ?? tool);
+      const dimension = t && isDimension(t);
+      if (dimension && phase === 'down' && !continuingMeasurement && (!crop || !cache?.viewports)) {
+        return;
+      }
+      const viewport =
+        crop && cache?.viewports
+          ? viewportForPoint(cache.viewports, { x: point.x + crop.left, y: crop.top - point.y })
+          : undefined;
+      const measure: MeasurementAppearance | undefined =
+        dimension && crop && cache
+          ? {
+              intent: t.intent as MeasurementAppearance['intent'],
+              measure: viewport ? (viewport.measure ?? null) : cache.fallback,
+              caption: t.measurement?.caption ?? { enabled: true },
+              ...(t.intent === 'LineDimension' ? { leader: t.measurement?.leader } : {}),
+              crop,
+              text: '',
+            }
+          : undefined;
+      // Resolve the scale at the first point. Subsequent points retain the
+      // draft's snapshot, even when the pointer crosses another viewport.
+      if (
+        measure &&
+        phase === 'down' &&
+        !continuingMeasurement &&
+        !isReadout(
+          measurementReadout({
+            subtype: t!.subtype,
+            intent: measure.intent,
+            measure: measure.measure,
+            linePoints: { start: { x: 0, y: 0 }, end: { x: 1, y: 0 } },
+            vertices: [
+              { x: 0, y: 0 },
+              { x: 1, y: 0 },
+              { x: 1, y: 1 },
+            ],
+          }),
+        )
+      )
+        return;
       apply({
         t: 'createPointer',
+        measure,
+        capture: t?.meta?.capture === true ? tool : undefined,
         phase,
         subtype: t?.subtype ?? (tool as Subtype),
         preset: t?.preset ?? tool,
-        intent: t?.intent,
+        intent: t?.intent === 'ink-highlight' ? t.intent : undefined,
         clickCreate: t?.clickCreate,
         flags: t?.flags,
         deferInkCommit: (t?.ink?.groupStrokesMs ?? 0) > 0,
@@ -2143,6 +2283,7 @@ export function createAnnotationCapability(
         },
       });
     },
+    hasCreationDraft: () => model().draft?.g.startsWith('create-') ?? false,
     finishCreationDraft: () => apply({ t: 'finishCreationDraft' }),
     finishInkDraft: () => apply({ t: 'finishInkDraft' }),
     cancelCreationDraft: () => apply({ t: 'cancel' }),

@@ -19,6 +19,7 @@
     "./i18n": "./src/i18n.ts",
     "./interaction": "./src/interaction.tsx",
     "./link": "./src/link.tsx",
+    "./measurement": "./src/measurement.tsx",
     "./metadata": "./src/metadata.ts",
     "./page-edit": "./src/page-edit.ts",
     "./page-view": "./src/page-view.tsx",
@@ -80,6 +81,10 @@
       "./link": {
         "import": "./dist/link.js",
         "require": "./dist/link.cjs"
+      },
+      "./measurement": {
+        "import": "./dist/measurement.js",
+        "require": "./dist/measurement.cjs"
       },
       "./metadata": {
         "import": "./dist/metadata.js",
@@ -178,7 +183,8 @@
     "@embedpdf/core-stage": "workspace:*",
     "@embedpdf/core-ui": "workspace:*",
     "@embedpdf/web": "workspace:*",
-    "@embedpdf/plugin-actions": "workspace:*"
+    "@embedpdf/plugin-actions": "workspace:*",
+    "@embedpdf/plugin-measurement": "workspace:*"
   },
   "peerDependencies": {
     "react": ">=18",

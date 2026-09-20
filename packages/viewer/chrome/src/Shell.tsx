@@ -47,6 +47,7 @@ import { SelectionStrip } from './ui/selection-strip';
 import { TabBar } from './ui/tab-bar';
 import { ArmedToolCursor } from './ui/tool-cursor';
 import { LeftSidebar, RightSidebar, PageControls } from './ui/panels';
+import { CalibrationDialog } from './ui/measurement';
 import { RedactConfirmModal } from './ui/redact-confirm';
 import { SignDialog } from './ui/sign-dialog';
 import { SignatureBridge } from './ui/signature-bridge';
@@ -234,6 +235,7 @@ export function Shell() {
             </div>
             <RightSidebar />
             <RedactConfirmModal />
+            <CalibrationDialog />
             {/* signatures: plugin intents → surfaces; the dialogs they open */}
             <SignatureBridge />
             <SignDialog />

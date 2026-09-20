@@ -27,6 +27,10 @@ export type PathSpec =
       /** Stroke paint: a slot name = that accent color (currentColor when
        *  the accent is absent). */
       stroke?: 'primary' | 'secondary';
+      strokeWidth?: number;
+      strokeDasharray?: string;
+      strokeOpacity?: number;
+      fillOpacity?: number;
     };
 
 /** A registrable icon: 24×24 stroke path data (Tabler/Lucide-style), exactly
@@ -40,7 +44,36 @@ export interface IconAccent {
   secondary?: string;
 }
 
+const measurementOutline: PathSpec[] = [
+  { d: 'M5 4H19M20 5V19M19 20H5M4 19V5', stroke: 'primary' },
+  {
+    d: 'M3.1 3.1h1.8v1.8H3.1zM19.1 3.1h1.8v1.8h-1.8zM3.1 19.1h1.8v1.8H3.1zM19.1 19.1h1.8v1.8h-1.8z',
+    stroke: 'primary',
+  },
+];
+
 export const ICON_PATHS: Record<string, readonly PathSpec[]> = {
+  ruler: ['M3 8h18v8H3z', 'M7 8v4M11 8v2M15 8v4M19 8v2'],
+  distance: [
+    { d: 'M5 12H19', stroke: 'primary', strokeDasharray: '2 2' },
+    {
+      d: 'M3.5 10.5a1.5 1.5 0 1 0 0 3a1.5 1.5 0 1 0 0-3M20.5 10.5a1.5 1.5 0 1 0 0 3a1.5 1.5 0 1 0 0-3',
+      stroke: 'primary',
+      fill: 'primary',
+      fillOpacity: 0.25,
+    },
+  ],
+  perimeter: measurementOutline,
+  area: [
+    { d: 'M5 4H19V5H20V19H19V20H5V19H4V5H5Z', fill: 'primary', fillOpacity: 0.08 },
+    {
+      d: 'M4.5 7.5L7.5 4.5M4.5 10.5L10.5 4.5M4.5 13.5L13.5 4.5M4.5 16.5L16.5 4.5M4.5 19.5L19.5 4.5M7.5 19.5L19.5 7.5M10.5 19.5L19.5 10.5M13.5 19.5L19.5 13.5M16.5 19.5L19.5 16.5',
+      stroke: 'primary',
+      strokeWidth: 0.6,
+      strokeOpacity: 0.5,
+    },
+    ...measurementOutline,
+  ],
   alertTriangle: [
     'M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z',
   ],
@@ -79,6 +112,11 @@ export const ICON_PATHS: Record<string, readonly PathSpec[]> = {
     'M19 4v16h-12a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12z',
     'M19 16h-12a2 2 0 0 0 -2 2',
     'M9 8h6',
+  ],
+  calibrate: [
+    'M12 12m-7.5 0a7.5 7.5 0 1 0 15 0a7.5 7.5 0 1 0 -15 0',
+    'M12 2.75V7M12 17V21.25M2.75 12H7M17 12H21.25',
+    'M12 12m-2.5 0a2.5 2.5 0 1 0 5 0a2.5 2.5 0 1 0 -5 0',
   ],
   callout: [
     {
@@ -455,6 +493,11 @@ export const ICON_PATHS: Record<string, readonly PathSpec[]> = {
     'M13 14a1 1 0 0 1 1 -1h5a1 1 0 0 1 1 1v5a1 1 0 0 1 -1 1h-5a1 1 0 0 1 -1 -1z',
   ],
   unlock: ['M7 11V7a5 5 0 0 1 9.9-1'],
+  updateScale: [
+    'M3.5 13.5L18.5 7.5L21.25 14.5L6.25 20.5L3.5 13.5Z',
+    'M8 12.8L9 15.2M11.5 11.4L12.2 13.2M15 10L16 12.4',
+    'M4 9.39849C4.10585 8.34804 4.487 7.34411 5.10497 6.48809C5.72294 5.63207 6.55584 4.95427 7.51957 4.52312C8.4833 4.09198 9.54373 3.92277 10.5938 4.03257C11.6438 4.14237 12.6463 4.5273 13.5 5.14849M11.5 6.00003L13.5 5.14849L12.7807 2.96999',
+  ],
   vertical: ['M8 7l4 -4l4 4', 'M8 17l4 4l4 -4', 'M12 3l0 18'],
   viewSettings: [
     'M12 14m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0',
@@ -531,7 +574,18 @@ export function Icon({ name, size = 20, strokeWidth = 2, className, title, accen
         // a stroke slot paints from the accent, inheriting currentColor
         // without one; a fill-ONLY path never gets an outline (the v2 look)
         const stroke = p.stroke ? accent?.[p.stroke] : p.fill ? 'none' : undefined;
-        return <path key={i} d={p.d} fill={fill ?? 'none'} stroke={stroke} />;
+        return (
+          <path
+            key={i}
+            d={p.d}
+            fill={fill ?? 'none'}
+            stroke={stroke}
+            strokeWidth={p.strokeWidth}
+            strokeDasharray={p.strokeDasharray}
+            strokeOpacity={p.strokeOpacity}
+            fillOpacity={p.fillOpacity}
+          />
+        );
       })}
     </svg>
   );

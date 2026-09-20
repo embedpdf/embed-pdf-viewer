@@ -1552,6 +1552,204 @@
         }
       }
     },
+    "/v1/docs/{docId}/layers/{layerName}/pages/{pon}/scale": {
+      "put": {
+        "operationId": "doc.pages.setScale",
+        "x-fern-sdk-group-name": ["doc", "pages"],
+        "x-fern-sdk-method-name": "setScale",
+        "x-docs-title": "Set page measurement scale",
+        "summary": "Upsert or remove EmbedPDF calibration while preserving foreign viewports. Existing annotation scales are unchanged.",
+        "security": [
+          {
+            "apiToken": []
+          },
+          {
+            "docToken": []
+          }
+        ],
+        "x-required-scope": [],
+        "x-required-capability": ["doc.annotate.modify"],
+        "parameters": [
+          {
+            "name": "docId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]+$"
+            }
+          },
+          {
+            "name": "layerName",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "pon",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "X-Document-Password",
+            "in": "header",
+            "required": false,
+            "description": "Base64-encoded password for an encrypted document. Valid only with the API token (403 anywhere else). An encrypted document answers 422 DocPasswordRequired when the header is absent. Viewer doc JWTs use the SDK password-session flow instead.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DocPagesSetScaleRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocPagesSetScale200Response"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocPagesSetScale400Response"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocPagesSetScale404Response"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EngineErrorPayload"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/docs/{docId}/layers/{layerName}/pages/{pon}/viewports": {
+      "get": {
+        "operationId": "doc.pages.viewports",
+        "x-fern-sdk-group-name": ["doc", "pages"],
+        "x-fern-sdk-method-name": "viewports",
+        "x-docs-title": "Read measurement viewports",
+        "summary": "Read page measurement viewports in drawing order from the current layer.",
+        "security": [
+          {
+            "apiToken": []
+          },
+          {
+            "docToken": []
+          }
+        ],
+        "x-required-scope": [],
+        "x-required-capability": ["doc.open"],
+        "parameters": [
+          {
+            "name": "docId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]+$"
+            }
+          },
+          {
+            "name": "layerName",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "pon",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "X-Document-Password",
+            "in": "header",
+            "required": false,
+            "description": "Base64-encoded password for an encrypted document. Valid only with the API token (403 anywhere else). An encrypted document answers 422 DocPasswordRequired when the header is absent. Viewer doc JWTs use the SDK password-session flow instead.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocPagesViewports200Response"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocPagesViewports404Response"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EngineErrorPayload"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/docs/{docId}/layers/{layerName}/pages/delete": {
       "post": {
         "operationId": "doc.pages.delete",
@@ -13353,6 +13551,151 @@
                 {
                   "type": "object",
                   "properties": {
+                    "intent": {
+                      "type": "string",
+                      "enum": ["PolygonCloud", "PolygonDimension"]
+                    },
+                    "measure": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "subtype": {
+                              "type": "string",
+                              "enum": ["RL"]
+                            },
+                            "ratio": {
+                              "type": "string"
+                            },
+                            "x": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "unit": {
+                                    "type": "string"
+                                  },
+                                  "conversion": {
+                                    "type": "number"
+                                  },
+                                  "fraction": {
+                                    "type": "string",
+                                    "enum": ["decimal", "fraction", "round", "truncate"]
+                                  },
+                                  "precision": {
+                                    "type": "integer"
+                                  },
+                                  "fixed": {
+                                    "type": "boolean"
+                                  },
+                                  "thousands": {
+                                    "type": "string"
+                                  },
+                                  "decimal": {
+                                    "type": "string"
+                                  },
+                                  "prefixSpacing": {
+                                    "type": "string"
+                                  },
+                                  "suffixSpacing": {
+                                    "type": "string"
+                                  },
+                                  "labelPosition": {
+                                    "type": "string",
+                                    "enum": ["suffix", "prefix"]
+                                  }
+                                },
+                                "required": ["unit"],
+                                "additionalProperties": false
+                              }
+                            },
+                            "y": {
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/6/properties/measure/anyOf/0/properties/x/items"
+                              }
+                            },
+                            "distance": {
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/6/properties/measure/anyOf/0/properties/x/items"
+                              }
+                            },
+                            "area": {
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/6/properties/measure/anyOf/0/properties/x/items"
+                              }
+                            },
+                            "angle": {
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/6/properties/measure/anyOf/0/properties/x/items"
+                              }
+                            },
+                            "slope": {
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/6/properties/measure/anyOf/0/properties/x/items"
+                              }
+                            },
+                            "origin": {
+                              "type": "object",
+                              "properties": {
+                                "x": {
+                                  "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/6/properties/measure/anyOf/0/properties/x/items/properties/conversion"
+                                },
+                                "y": {
+                                  "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/6/properties/measure/anyOf/0/properties/x/items/properties/conversion"
+                                }
+                              },
+                              "required": ["x", "y"],
+                              "additionalProperties": false
+                            },
+                            "cyx": {
+                              "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/6/properties/measure/anyOf/0/properties/x/items/properties/conversion"
+                            }
+                          },
+                          "required": ["subtype", "x", "distance", "area"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "subtype": {
+                              "type": "string",
+                              "enum": ["GEO"]
+                            }
+                          },
+                          "required": ["subtype"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "subtype": {
+                              "type": "string",
+                              "enum": ["unknown"]
+                            }
+                          },
+                          "required": ["subtype"],
+                          "additionalProperties": false
+                        }
+                      ]
+                    },
+                    "caption": {
+                      "type": "object",
+                      "properties": {
+                        "enabled": {
+                          "type": "boolean"
+                        },
+                        "center": {
+                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/6/properties/measure/anyOf/0/properties/origin"
+                        }
+                      },
+                      "required": ["enabled"],
+                      "additionalProperties": false
+                    },
                     "ref": {
                       "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/ref"
                     },
@@ -13482,6 +13825,16 @@
                 {
                   "type": "object",
                   "properties": {
+                    "intent": {
+                      "type": "string",
+                      "enum": ["PolyLineDimension"]
+                    },
+                    "measure": {
+                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/6/properties/measure"
+                    },
+                    "caption": {
+                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/6/properties/caption"
+                    },
                     "ref": {
                       "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/ref"
                     },
@@ -13630,6 +13983,56 @@
                 {
                   "type": "object",
                   "properties": {
+                    "intent": {
+                      "type": "string",
+                      "enum": ["LineArrow", "LineDimension"]
+                    },
+                    "measure": {
+                      "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/6/properties/measure"
+                    },
+                    "caption": {
+                      "type": "object",
+                      "properties": {
+                        "enabled": {
+                          "type": "boolean"
+                        },
+                        "position": {
+                          "type": "string",
+                          "enum": ["inline", "top"]
+                        },
+                        "offset": {
+                          "type": "object",
+                          "properties": {
+                            "along": {
+                              "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/6/properties/measure/anyOf/0/properties/x/items/properties/conversion"
+                            },
+                            "perpendicular": {
+                              "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/6/properties/measure/anyOf/0/properties/x/items/properties/conversion"
+                            }
+                          },
+                          "required": ["along", "perpendicular"],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": ["enabled"],
+                      "additionalProperties": false
+                    },
+                    "leader": {
+                      "type": "object",
+                      "properties": {
+                        "length": {
+                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/6/properties/measure/anyOf/0/properties/x/items/properties/conversion"
+                        },
+                        "extension": {
+                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/6/properties/measure/anyOf/0/properties/x/items/properties/conversion"
+                        },
+                        "offset": {
+                          "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/6/properties/measure/anyOf/0/properties/x/items/properties/conversion"
+                        }
+                      },
+                      "required": ["length"],
+                      "additionalProperties": false
+                    },
                     "ref": {
                       "$ref": "#/components/schemas/DocAnnotationsList200Response/properties/annotations/items/anyOf/0/properties/ref"
                     },
@@ -16347,6 +16750,151 @@
                       {
                         "type": "object",
                         "properties": {
+                          "intent": {
+                            "type": "string",
+                            "enum": ["PolygonCloud", "PolygonDimension"]
+                          },
+                          "measure": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "subtype": {
+                                    "type": "string",
+                                    "enum": ["RL"]
+                                  },
+                                  "ratio": {
+                                    "type": "string"
+                                  },
+                                  "x": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "unit": {
+                                          "type": "string"
+                                        },
+                                        "conversion": {
+                                          "type": "number"
+                                        },
+                                        "fraction": {
+                                          "type": "string",
+                                          "enum": ["decimal", "fraction", "round", "truncate"]
+                                        },
+                                        "precision": {
+                                          "type": "integer"
+                                        },
+                                        "fixed": {
+                                          "type": "boolean"
+                                        },
+                                        "thousands": {
+                                          "type": "string"
+                                        },
+                                        "decimal": {
+                                          "type": "string"
+                                        },
+                                        "prefixSpacing": {
+                                          "type": "string"
+                                        },
+                                        "suffixSpacing": {
+                                          "type": "string"
+                                        },
+                                        "labelPosition": {
+                                          "type": "string",
+                                          "enum": ["suffix", "prefix"]
+                                        }
+                                      },
+                                      "required": ["unit"],
+                                      "additionalProperties": false
+                                    }
+                                  },
+                                  "y": {
+                                    "type": "array",
+                                    "items": {
+                                      "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/6/properties/measure/anyOf/0/properties/x/items"
+                                    }
+                                  },
+                                  "distance": {
+                                    "type": "array",
+                                    "items": {
+                                      "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/6/properties/measure/anyOf/0/properties/x/items"
+                                    }
+                                  },
+                                  "area": {
+                                    "type": "array",
+                                    "items": {
+                                      "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/6/properties/measure/anyOf/0/properties/x/items"
+                                    }
+                                  },
+                                  "angle": {
+                                    "type": "array",
+                                    "items": {
+                                      "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/6/properties/measure/anyOf/0/properties/x/items"
+                                    }
+                                  },
+                                  "slope": {
+                                    "type": "array",
+                                    "items": {
+                                      "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/6/properties/measure/anyOf/0/properties/x/items"
+                                    }
+                                  },
+                                  "origin": {
+                                    "type": "object",
+                                    "properties": {
+                                      "x": {
+                                        "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/6/properties/measure/anyOf/0/properties/x/items/properties/conversion"
+                                      },
+                                      "y": {
+                                        "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/6/properties/measure/anyOf/0/properties/x/items/properties/conversion"
+                                      }
+                                    },
+                                    "required": ["x", "y"],
+                                    "additionalProperties": false
+                                  },
+                                  "cyx": {
+                                    "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/6/properties/measure/anyOf/0/properties/x/items/properties/conversion"
+                                  }
+                                },
+                                "required": ["subtype", "x", "distance", "area"],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "subtype": {
+                                    "type": "string",
+                                    "enum": ["GEO"]
+                                  }
+                                },
+                                "required": ["subtype"],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "subtype": {
+                                    "type": "string",
+                                    "enum": ["unknown"]
+                                  }
+                                },
+                                "required": ["subtype"],
+                                "additionalProperties": false
+                              }
+                            ]
+                          },
+                          "caption": {
+                            "type": "object",
+                            "properties": {
+                              "enabled": {
+                                "type": "boolean"
+                              },
+                              "center": {
+                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/6/properties/measure/anyOf/0/properties/origin"
+                              }
+                            },
+                            "required": ["enabled"],
+                            "additionalProperties": false
+                          },
                           "ref": {
                             "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/ref"
                           },
@@ -16476,6 +17024,16 @@
                       {
                         "type": "object",
                         "properties": {
+                          "intent": {
+                            "type": "string",
+                            "enum": ["PolyLineDimension"]
+                          },
+                          "measure": {
+                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/6/properties/measure"
+                          },
+                          "caption": {
+                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/6/properties/caption"
+                          },
                           "ref": {
                             "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/ref"
                           },
@@ -16624,6 +17182,56 @@
                       {
                         "type": "object",
                         "properties": {
+                          "intent": {
+                            "type": "string",
+                            "enum": ["LineArrow", "LineDimension"]
+                          },
+                          "measure": {
+                            "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/6/properties/measure"
+                          },
+                          "caption": {
+                            "type": "object",
+                            "properties": {
+                              "enabled": {
+                                "type": "boolean"
+                              },
+                              "position": {
+                                "type": "string",
+                                "enum": ["inline", "top"]
+                              },
+                              "offset": {
+                                "type": "object",
+                                "properties": {
+                                  "along": {
+                                    "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/6/properties/measure/anyOf/0/properties/x/items/properties/conversion"
+                                  },
+                                  "perpendicular": {
+                                    "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/6/properties/measure/anyOf/0/properties/x/items/properties/conversion"
+                                  }
+                                },
+                                "required": ["along", "perpendicular"],
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": ["enabled"],
+                            "additionalProperties": false
+                          },
+                          "leader": {
+                            "type": "object",
+                            "properties": {
+                              "length": {
+                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/6/properties/measure/anyOf/0/properties/x/items/properties/conversion"
+                              },
+                              "extension": {
+                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/6/properties/measure/anyOf/0/properties/x/items/properties/conversion"
+                              },
+                              "offset": {
+                                "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/6/properties/measure/anyOf/0/properties/x/items/properties/conversion"
+                              }
+                            },
+                            "required": ["length"],
+                            "additionalProperties": false
+                          },
                           "ref": {
                             "$ref": "#/components/schemas/DocAnnotationsListAll200Response/properties/pages/items/properties/annotations/items/anyOf/0/properties/ref"
                           },
@@ -20872,6 +21480,569 @@
         "additionalProperties": false
       },
       "DocFormsImportData404Response": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "enum": ["EngineError"]
+          },
+          "code": {
+            "type": "string",
+            "enum": [
+              "Unknown",
+              "InvalidArg",
+              "DocNotOpen",
+              "DocOpenFailed",
+              "DocPasswordRequired",
+              "DocPasswordIncorrect",
+              "SharePasswordRequired",
+              "Aborted",
+              "Network",
+              "Unauthenticated",
+              "Forbidden",
+              "NotFound",
+              "WireFormat",
+              "RuntimeUnavailable",
+              "InvalidReference",
+              "WeakAnnotationSessionConflict",
+              "LayerVersionConflict",
+              "NotImplemented",
+              "MalformedPdf",
+              "SigningPending",
+              "SigningExpired",
+              "SigningVersionMismatch",
+              "SignatureRefused",
+              "ProtectedDocument",
+              "StaleBase"
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "details": {
+            "type": "object",
+            "additionalProperties": {}
+          }
+        },
+        "required": ["name", "code", "message"],
+        "additionalProperties": false
+      },
+      "DocPagesViewports200Response": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "bbox": {
+              "type": "object",
+              "properties": {
+                "left": {
+                  "type": "number"
+                },
+                "bottom": {
+                  "type": "number"
+                },
+                "right": {
+                  "type": "number"
+                },
+                "top": {
+                  "type": "number"
+                }
+              },
+              "required": ["left", "bottom", "right", "top"],
+              "additionalProperties": false
+            },
+            "name": {
+              "type": "string"
+            },
+            "measure": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "subtype": {
+                      "type": "string",
+                      "enum": ["RL"]
+                    },
+                    "ratio": {
+                      "type": "string"
+                    },
+                    "x": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "unit": {
+                            "type": "string"
+                          },
+                          "conversion": {
+                            "type": "number"
+                          },
+                          "fraction": {
+                            "type": "string",
+                            "enum": ["decimal", "fraction", "round", "truncate"]
+                          },
+                          "precision": {
+                            "type": "integer"
+                          },
+                          "fixed": {
+                            "type": "boolean"
+                          },
+                          "thousands": {
+                            "type": "string"
+                          },
+                          "decimal": {
+                            "type": "string"
+                          },
+                          "prefixSpacing": {
+                            "type": "string"
+                          },
+                          "suffixSpacing": {
+                            "type": "string"
+                          },
+                          "labelPosition": {
+                            "type": "string",
+                            "enum": ["suffix", "prefix"]
+                          }
+                        },
+                        "required": ["unit"],
+                        "additionalProperties": false
+                      }
+                    },
+                    "y": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/DocPagesViewports200Response/items/properties/measure/anyOf/0/properties/x/items"
+                      }
+                    },
+                    "distance": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/DocPagesViewports200Response/items/properties/measure/anyOf/0/properties/x/items"
+                      }
+                    },
+                    "area": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/DocPagesViewports200Response/items/properties/measure/anyOf/0/properties/x/items"
+                      }
+                    },
+                    "angle": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/DocPagesViewports200Response/items/properties/measure/anyOf/0/properties/x/items"
+                      }
+                    },
+                    "slope": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/DocPagesViewports200Response/items/properties/measure/anyOf/0/properties/x/items"
+                      }
+                    },
+                    "origin": {
+                      "type": "object",
+                      "properties": {
+                        "x": {
+                          "$ref": "#/components/schemas/DocPagesViewports200Response/items/properties/measure/anyOf/0/properties/x/items/properties/conversion"
+                        },
+                        "y": {
+                          "$ref": "#/components/schemas/DocPagesViewports200Response/items/properties/measure/anyOf/0/properties/x/items/properties/conversion"
+                        }
+                      },
+                      "required": ["x", "y"],
+                      "additionalProperties": false
+                    },
+                    "cyx": {
+                      "$ref": "#/components/schemas/DocPagesViewports200Response/items/properties/measure/anyOf/0/properties/x/items/properties/conversion"
+                    }
+                  },
+                  "required": ["subtype", "x", "distance", "area"],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "subtype": {
+                      "type": "string",
+                      "enum": ["GEO"]
+                    }
+                  },
+                  "required": ["subtype"],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "subtype": {
+                      "type": "string",
+                      "enum": ["unknown"]
+                    }
+                  },
+                  "required": ["subtype"],
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "owned": {
+              "type": "boolean"
+            }
+          },
+          "required": ["bbox", "owned"],
+          "additionalProperties": false
+        }
+      },
+      "DocPagesViewports404Response": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "enum": ["EngineError"]
+          },
+          "code": {
+            "type": "string",
+            "enum": [
+              "Unknown",
+              "InvalidArg",
+              "DocNotOpen",
+              "DocOpenFailed",
+              "DocPasswordRequired",
+              "DocPasswordIncorrect",
+              "SharePasswordRequired",
+              "Aborted",
+              "Network",
+              "Unauthenticated",
+              "Forbidden",
+              "NotFound",
+              "WireFormat",
+              "RuntimeUnavailable",
+              "InvalidReference",
+              "WeakAnnotationSessionConflict",
+              "LayerVersionConflict",
+              "NotImplemented",
+              "MalformedPdf",
+              "SigningPending",
+              "SigningExpired",
+              "SigningVersionMismatch",
+              "SignatureRefused",
+              "ProtectedDocument",
+              "StaleBase"
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "details": {
+            "type": "object",
+            "additionalProperties": {}
+          }
+        },
+        "required": ["name", "code", "message"],
+        "additionalProperties": false
+      },
+      "DocPagesSetScaleRequest": {
+        "type": "object",
+        "properties": {
+          "measure": {
+            "type": "object",
+            "properties": {
+              "subtype": {
+                "type": "string",
+                "enum": ["RL"]
+              },
+              "ratio": {
+                "type": "string"
+              },
+              "x": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "unit": {
+                      "type": "string"
+                    },
+                    "conversion": {
+                      "type": "number"
+                    },
+                    "fraction": {
+                      "type": "string",
+                      "enum": ["decimal", "fraction", "round", "truncate"]
+                    },
+                    "precision": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 2147483647
+                    },
+                    "fixed": {
+                      "type": "boolean"
+                    },
+                    "thousands": {
+                      "type": "string"
+                    },
+                    "decimal": {
+                      "type": "string"
+                    },
+                    "prefixSpacing": {
+                      "type": "string"
+                    },
+                    "suffixSpacing": {
+                      "type": "string"
+                    },
+                    "labelPosition": {
+                      "type": "string",
+                      "enum": ["suffix", "prefix"]
+                    }
+                  },
+                  "required": ["unit", "conversion"],
+                  "additionalProperties": false
+                }
+              },
+              "y": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/DocPagesSetScaleRequest/properties/measure/properties/x/items"
+                }
+              },
+              "distance": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/DocPagesSetScaleRequest/properties/measure/properties/x/items"
+                }
+              },
+              "area": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/DocPagesSetScaleRequest/properties/measure/properties/x/items"
+                }
+              },
+              "angle": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/DocPagesSetScaleRequest/properties/measure/properties/x/items"
+                }
+              },
+              "slope": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/DocPagesSetScaleRequest/properties/measure/properties/x/items"
+                }
+              },
+              "origin": {
+                "type": "object",
+                "properties": {
+                  "x": {
+                    "$ref": "#/components/schemas/DocPagesSetScaleRequest/properties/measure/properties/x/items/properties/conversion"
+                  },
+                  "y": {
+                    "$ref": "#/components/schemas/DocPagesSetScaleRequest/properties/measure/properties/x/items/properties/conversion"
+                  }
+                },
+                "required": ["x", "y"],
+                "additionalProperties": false
+              },
+              "cyx": {
+                "$ref": "#/components/schemas/DocPagesSetScaleRequest/properties/measure/properties/x/items/properties/conversion"
+              }
+            },
+            "required": ["subtype", "x", "distance", "area"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["measure"],
+        "additionalProperties": false
+      },
+      "DocPagesSetScale200Response": {
+        "type": "object",
+        "properties": {
+          "pageObjectNumber": {
+            "type": "integer",
+            "exclusiveMinimum": true,
+            "minimum": 0
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "affectedPages": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "pageObjectNumber": {
+                      "type": "integer",
+                      "exclusiveMinimum": true,
+                      "minimum": 0
+                    },
+                    "revision": {
+                      "type": "object",
+                      "properties": {
+                        "docSessionId": {
+                          "type": "string"
+                        },
+                        "pageObjectNumber": {
+                          "type": "integer",
+                          "exclusiveMinimum": true,
+                          "minimum": 0
+                        },
+                        "generation": {
+                          "type": "integer",
+                          "minimum": 0
+                        }
+                      },
+                      "required": ["docSessionId", "pageObjectNumber", "generation"],
+                      "additionalProperties": false
+                    },
+                    "weakAnnotationState": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": ["unknown"]
+                            }
+                          },
+                          "required": ["kind"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": ["known"]
+                            },
+                            "hasAnyWeakAnnotations": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": ["kind", "hasAnyWeakAnnotations"],
+                          "additionalProperties": false
+                        }
+                      ]
+                    }
+                  },
+                  "required": ["pageObjectNumber", "revision", "weakAnnotationState"],
+                  "additionalProperties": false
+                }
+              },
+              "cacheDelta": {
+                "type": "object",
+                "properties": {
+                  "previousDocVersion": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "minimum": 0
+                  },
+                  "docVersion": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "minimum": 0
+                  },
+                  "annotationsVersion": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "minimum": 0
+                  },
+                  "layerVersion": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "working": {
+                    "type": "boolean"
+                  },
+                  "pages": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "pageObjectNumber": {
+                          "type": "integer",
+                          "exclusiveMinimum": true,
+                          "minimum": 0
+                        },
+                        "cache": {
+                          "type": "object",
+                          "properties": {
+                            "contentVersion": {
+                              "type": "integer",
+                              "exclusiveMinimum": true,
+                              "minimum": 0
+                            },
+                            "annotationVersion": {
+                              "type": "integer",
+                              "exclusiveMinimum": true,
+                              "minimum": 0
+                            }
+                          },
+                          "required": ["contentVersion", "annotationVersion"],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": ["pageObjectNumber", "cache"],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": ["previousDocVersion", "docVersion", "pages"],
+                "additionalProperties": false,
+                "nullable": true
+              }
+            },
+            "required": ["affectedPages", "cacheDelta"],
+            "additionalProperties": false
+          }
+        },
+        "required": ["pageObjectNumber", "meta"],
+        "additionalProperties": false
+      },
+      "DocPagesSetScale400Response": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "enum": ["EngineError"]
+          },
+          "code": {
+            "type": "string",
+            "enum": [
+              "Unknown",
+              "InvalidArg",
+              "DocNotOpen",
+              "DocOpenFailed",
+              "DocPasswordRequired",
+              "DocPasswordIncorrect",
+              "SharePasswordRequired",
+              "Aborted",
+              "Network",
+              "Unauthenticated",
+              "Forbidden",
+              "NotFound",
+              "WireFormat",
+              "RuntimeUnavailable",
+              "InvalidReference",
+              "WeakAnnotationSessionConflict",
+              "LayerVersionConflict",
+              "NotImplemented",
+              "MalformedPdf",
+              "SigningPending",
+              "SigningExpired",
+              "SigningVersionMismatch",
+              "SignatureRefused",
+              "ProtectedDocument",
+              "StaleBase"
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "details": {
+            "type": "object",
+            "additionalProperties": {}
+          }
+        },
+        "required": ["name", "code", "message"],
+        "additionalProperties": false
+      },
+      "DocPagesSetScale404Response": {
         "type": "object",
         "properties": {
           "name": {

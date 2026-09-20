@@ -1,3 +1,4 @@
+import type { PdfMeasure, PageScaleResult } from '@embedpdf/engine-core/runtime';
 import { createHash, randomUUID } from 'node:crypto';
 import { createReadStream, createWriteStream } from 'node:fs';
 import { copyFile, mkdtemp, rm, stat } from 'node:fs/promises';
@@ -163,9 +164,9 @@ const FORM_STRUCTURE_AUDIT_KINDS: ReadonlySet<string> = new Set([
   'form.detachWidget',
 ]);
 
-/** The durable state a form commit produced inside its transaction. Forms
+/** The durable state a document mutation produced inside its transaction. Mutations
  *  are document-scoped, so 0..N pages may have been touched. */
-interface CommittedFormMutation {
+interface CommittedDocumentMutation {
   pages: DurablePageRow[];
   previousLayerDocVersion: number;
   layerDocVersion: number;
@@ -648,6 +649,38 @@ export class LayerService {
    * persists exactly like a page move: a new layer artifact, doc_version +
    * layout_version advance, `layer_pages` rows untouched.
    */
+  async setPageScale(
+    ctx: LayerWriteContext,
+    input: {
+      docId: string;
+      layerName: string;
+      pageObjectNumber: number;
+      measure: PdfMeasure | null;
+    },
+    signal?: AbortSignal,
+  ): Promise<PageScaleResult> {
+    return this.enqueueLayerWrite(ctx, input.docId, input.layerName, async () => {
+      const { layer } = await this.prepareLayerMutation(ctx, input.docId, input.layerName);
+      return this.withTempWorkerFile('layer-artifact', 'artifact.layer', async (artifactPath) => {
+        const payload = await this.requirePool().run(
+          input.docId,
+          (jobId: WorkerJobId) =>
+            wirePack({ kind: 'measure.setScale' as const, jobId, ...input, artifactPath }),
+          signal,
+        );
+        if (payload.tag !== 'measure.setScale')
+          throw new EngineError(EngineErrorCode.WireFormat, 'Unexpected scale response');
+        // The artifact/docVersion advances. Calibration changes no pixels or annotation indices.
+        return this.persistDocumentMutation(ctx, input.docId, input.layerName, layer, {
+          auditKind: 'measure.setScale',
+          impacts: [],
+          result: payload.result,
+          artifact: requireLayerArtifact(payload),
+        });
+      });
+    });
+  }
+
   async setPageName(
     ctx: LayerWriteContext,
     input: {
@@ -1360,7 +1393,7 @@ export class LayerService {
           ? allPageImpacts(materialized)
           : impacts;
 
-        return this.persistFormMutation(ctx, input.docId, input.layerName, layer, {
+        return this.persistDocumentMutation(ctx, input.docId, input.layerName, layer, {
           auditKind: 'form.applyEffects',
           impacts: conservativeImpacts,
           result: result as FormEffectsResult & { meta: MutationMeta },
@@ -1493,7 +1526,13 @@ export class LayerService {
   /** The visual fill of an unsigned signature field: a PDF page drawn into its widgets, nothing sealed. */
   async setSignatureAppearance(
     ctx: LayerWriteContext,
-    input: { docId: string; layerName: string; ref: FormFieldRef; pdf: Uint8Array; pageIndex: number },
+    input: {
+      docId: string;
+      layerName: string;
+      ref: FormFieldRef;
+      pdf: Uint8Array;
+      pageIndex: number;
+    },
     signal?: AbortSignal,
   ): Promise<FormFieldUpdateResult> {
     const pdf = new ArrayBuffer(input.pdf.byteLength);
@@ -1651,7 +1690,7 @@ export class LayerService {
           );
         }
         const result = (payload as unknown as { result: TResult }).result;
-        return this.persistFormMutation(ctx, input.docId, input.layerName, layer, {
+        return this.persistDocumentMutation(ctx, input.docId, input.layerName, layer, {
           auditKind: input.auditKind,
           impacts: input.impacts(result, materialized),
           result,
@@ -1661,7 +1700,7 @@ export class LayerService {
     });
   }
 
-  private async persistFormMutation<TResult extends { meta: MutationMeta }>(
+  private async persistDocumentMutation<TResult extends { meta: MutationMeta }>(
     ctx: LayerWriteContext,
     docId: string,
     layerName: string,
@@ -1676,7 +1715,7 @@ export class LayerService {
     const nextVersion = layer.currentVersion + 1;
     const artifactKey = this.nextArtifactKey(ctx, docId, layerName, nextVersion);
     const uploaded = await this.uploadLayerArtifact(artifactKey, input.artifact);
-    const committed = await this.commitFormMutation({
+    const committed = await this.commitDocumentMutation({
       ctx,
       docId,
       layerName,
@@ -1688,7 +1727,7 @@ export class LayerService {
       artifactSize: uploaded.size,
       nextVersion,
       finalizePayload: (durable) =>
-        this.finalizeFormResult(docId, layerName, input.result, durable),
+        this.finalizeDocumentMutationResult(docId, layerName, input.result, durable),
     });
     this.finishLayerCommit(ctx, docId, layerName, nextVersion, artifactKey, committed.auditId);
     // The response IS the audited payload — one fact for caller and history.
@@ -1700,11 +1739,11 @@ export class LayerService {
    * construction) into the FINALIZED wire result: decorated per-page states
    * and the real cacheDelta from the committed version bumps.
    */
-  private finalizeFormResult<TResult extends { meta: MutationMeta }>(
+  private finalizeDocumentMutationResult<TResult extends { meta: MutationMeta }>(
     docId: string,
     layerName: string,
     raw: TResult,
-    durable: CommittedFormMutation,
+    durable: CommittedDocumentMutation,
   ): TResult {
     const cacheDelta = this.layerState.buildCacheDelta({
       docId,
@@ -1726,13 +1765,13 @@ export class LayerService {
   }
 
   /**
-   * Form commit: advance the layer's `doc_version` (a new artifact always
+   * Document mutation commit: advance the layer's `doc_version` (a new artifact always
    * exists) and bump the affected pages' annotation counters per their
-   * impact kind. Field-plane-only mutations (rename, unplaced create)
+   * impact kind. Non-rendering mutations (field rename, unplaced create, page calibration)
    * legitimately touch zero pages — the layer still advances so the new
    * artifact becomes current.
    */
-  private async commitFormMutation(input: {
+  private async commitDocumentMutation(input: {
     ctx: LayerWriteContext;
     docId: string;
     layerName: string;
@@ -1743,8 +1782,8 @@ export class LayerService {
     artifactSha: string;
     artifactSize: number;
     nextVersion: number;
-    finalizePayload: (durable: CommittedFormMutation) => unknown;
-  }): Promise<{ durable: CommittedFormMutation; payload: unknown; auditId: number }> {
+    finalizePayload: (durable: CommittedDocumentMutation) => unknown;
+  }): Promise<{ durable: CommittedDocumentMutation; payload: unknown; auditId: number }> {
     return this.requireDb()
       .transaction()
       .execute(async (trx) => {
@@ -1785,7 +1824,7 @@ export class LayerService {
         const previousLayerDocVersion = Number(currentLayer.doc_version);
         const layerDocVersion = previousLayerDocVersion + 1;
 
-        const durable: CommittedFormMutation = {
+        const durable: CommittedDocumentMutation = {
           pages: nextPages,
           previousLayerDocVersion,
           layerDocVersion,

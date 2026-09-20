@@ -1,3 +1,8 @@
+import { isDimension } from '@embedpdf/engine-core/runtime';
+import {
+  prepareMeasurementDraft,
+  prepareMeasurementPatch,
+} from './internal/mutations/prepareMeasurementMutation';
 import {
   appearanceImpactOf,
   EngineError,
@@ -133,6 +138,7 @@ export class AnnotationMutator {
       const writeCtx = this.writeContext(pagePtr, resources);
       preflightDraft(draft, writeCtx);
       assertRichTextAgreement(draft);
+      draft = prepareMeasurementDraft(draft);
       // `create` is append-only: PDFium drops the new annotation at
       // `index = previousCount`, so no existing index ever shifts. Per
       // the locked rule in `computeMutationImpact`, that means create is
@@ -258,16 +264,6 @@ export class AnnotationMutator {
       this.ensureKnownWeakStateFromPage(ref.pageObjectNumber, pagePtr);
       const pageStateBefore = this.session.pageState(ref.pageObjectNumber);
 
-      // Apply boundary: validation and cancellation are complete before the
-      // first possible document write (weak-id strengthening below).
-      throwIfAborted(signal);
-
-      // Opportunistic /NM stamp for weak annotations + capture the
-      // resulting stable id for `meta.changed`. Same monotonic /NM
-      // rule that `move()` uses; sharing the helper guarantees the
-      // two paths cannot drift in their identity bookkeeping.
-      const stableId = this.captureOrStampStableId(annotPtr);
-
       // Blend mode lives inside the existing /AP graphics state rather than in
       // the annotation dictionary. Capture it before re-baking so an unrelated
       // patch (colour, geometry, contents...) cannot silently reset it.
@@ -293,8 +289,29 @@ export class AnnotationMutator {
         readContextFor(this.session, this.fonts),
       );
 
+      patch = prepareMeasurementPatch(fn, annotPtr, currentDto, patch);
+
+      // Apply boundary: validation and cancellation are complete before the
+      // first possible document write (weak-id strengthening below).
+      throwIfAborted(signal);
+
+      // Opportunistic /NM stamp for weak annotations + capture the
+      // resulting stable id for `meta.changed`. Same monotonic /NM
+      // rule that `move()` uses; sharing the helper guarantees the
+      // two paths cannot drift in their identity bookkeeping.
+      const stableId = this.captureOrStampStableId(annotPtr);
+
       // Apply caller-supplied subtype-specific writes.
       applyPatch(fn, mem, annotPtr, patch, writeCtx);
+      // A derived plain label supersedes imported rich contents; retaining stale /RC
+      // would show a different value in consumers that prefer rich text.
+      if (
+        patch.contents !== undefined &&
+        patch.contents !== currentDto.contents &&
+        isDimension({ ...currentDto, ...patch })
+      ) {
+        fn.EPDFAnnot_RemoveKey(annotPtr, 'RC');
+      }
       // Apply /IRT + /RT changes (set/relink/clear, or RT-only). Setting a
       // link may promote a weak parent to indirect (non-structural); the
       // strengthened parent id is folded into `meta.changed` below.

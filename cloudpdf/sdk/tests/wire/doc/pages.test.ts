@@ -5,6 +5,161 @@ import { CloudPDFClient } from "../../../src/Client";
 import { mockServerPool } from "../../mock-server/MockServerPool";
 
 describe("PagesClient", () => {
+    test("setScale (1)", async () => {
+        const server = mockServerPool.createServer();
+        const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
+        const rawRequestBody = {};
+        const rawResponseBody = {
+            pageObjectNumber: 1,
+            meta: {
+                affectedPages: [
+                    {
+                        pageObjectNumber: 1,
+                        revision: { docSessionId: "docSessionId", pageObjectNumber: 1, generation: 1 },
+                        weakAnnotationState: { kind: "unknown" },
+                    },
+                ],
+                cacheDelta: {
+                    previousDocVersion: 1,
+                    docVersion: 1,
+                    annotationsVersion: 1,
+                    layerVersion: 1,
+                    working: true,
+                    pages: [{ pageObjectNumber: 1, cache: { contentVersion: 1, annotationVersion: 1 } }],
+                },
+            },
+        };
+
+        server
+            .mockEndpoint()
+            .put("/v1/docs/docId/layers/layerName/pages/1/scale")
+            .jsonBody(rawRequestBody)
+            .respondWith()
+            .statusCode(200)
+            .jsonBody(rawResponseBody)
+            .build();
+
+        const response = await client.doc.pages.setScale({
+            docId: "docId",
+            layerName: "layerName",
+            pon: 1,
+        });
+        expect(response).toEqual(rawResponseBody);
+    });
+
+    test("setScale (2)", async () => {
+        const server = mockServerPool.createServer();
+        const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
+        const rawRequestBody = { measure: null };
+        const rawResponseBody = { key: "value" };
+
+        server
+            .mockEndpoint()
+            .put("/v1/docs/docId/layers/layerName/pages/1/scale")
+            .jsonBody(rawRequestBody)
+            .respondWith()
+            .statusCode(400)
+            .jsonBody(rawResponseBody)
+            .build();
+
+        await expect(async () => {
+            return await client.doc.pages.setScale({
+                docId: "docId",
+                layerName: "layerName",
+                pon: 1,
+                measure: null,
+            });
+        }).rejects.toThrow(CloudPDF.BadRequestError);
+    });
+
+    test("setScale (3)", async () => {
+        const server = mockServerPool.createServer();
+        const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
+        const rawRequestBody = { measure: null };
+        const rawResponseBody = { key: "value" };
+
+        server
+            .mockEndpoint()
+            .put("/v1/docs/docId/layers/layerName/pages/1/scale")
+            .jsonBody(rawRequestBody)
+            .respondWith()
+            .statusCode(404)
+            .jsonBody(rawResponseBody)
+            .build();
+
+        await expect(async () => {
+            return await client.doc.pages.setScale({
+                docId: "docId",
+                layerName: "layerName",
+                pon: 1,
+                measure: null,
+            });
+        }).rejects.toThrow(CloudPDF.NotFoundError);
+    });
+
+    test("viewports (1)", async () => {
+        const server = mockServerPool.createServer();
+        const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
+
+        const rawResponseBody = [
+            {
+                bbox: { left: 1.1, bottom: 1.1, right: 1.1, top: 1.1 },
+                name: "name",
+                measure: {
+                    subtype: "RL",
+                    ratio: "ratio",
+                    x: [{ unit: "unit" }],
+                    y: [{ unit: "unit" }],
+                    distance: [{ unit: "unit" }],
+                    area: [{ unit: "unit" }],
+                    angle: [{ unit: "unit" }],
+                    slope: [{ unit: "unit" }],
+                    origin: { x: 1.1, y: 1.1 },
+                    cyx: 1.1,
+                },
+                owned: true,
+            },
+        ];
+
+        server
+            .mockEndpoint()
+            .get("/v1/docs/docId/layers/layerName/pages/1/viewports")
+            .respondWith()
+            .statusCode(200)
+            .jsonBody(rawResponseBody)
+            .build();
+
+        const response = await client.doc.pages.viewports({
+            docId: "docId",
+            layerName: "layerName",
+            pon: 1,
+        });
+        expect(response).toEqual(rawResponseBody);
+    });
+
+    test("viewports (2)", async () => {
+        const server = mockServerPool.createServer();
+        const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
+
+        const rawResponseBody = { key: "value" };
+
+        server
+            .mockEndpoint()
+            .get("/v1/docs/docId/layers/layerName/pages/1/viewports")
+            .respondWith()
+            .statusCode(404)
+            .jsonBody(rawResponseBody)
+            .build();
+
+        await expect(async () => {
+            return await client.doc.pages.viewports({
+                docId: "docId",
+                layerName: "layerName",
+                pon: 1,
+            });
+        }).rejects.toThrow(CloudPDF.NotFoundError);
+    });
+
     test("delete (1)", async () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });

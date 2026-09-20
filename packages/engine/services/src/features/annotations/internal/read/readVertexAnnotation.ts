@@ -1,3 +1,5 @@
+import { readAnnotationMeasure, readShapeCaption } from './readMeasurementFields';
+import { readIntent } from './annotationReadPrimitives';
 import type {
   AnnotationBase,
   PolygonAnnotationDTO,
@@ -35,8 +37,13 @@ export function readPolygon(
   annotPtr: Ptr,
   base: AnnotationBase,
 ): PolygonAnnotationDTO {
+  const caption = readShapeCaption(fn, mem, annotPtr);
+  const intent = readIntent(fn, mem, annotPtr);
   return {
     ...base,
+    ...readAnnotationMeasure(fn, mem, annotPtr),
+    ...(caption ? { caption } : {}),
+    ...(intent === 'PolygonDimension' || intent === 'PolygonCloud' ? { intent } : {}),
     subtype: 'polygon',
     ...readVertexExtras(fn, mem, annotPtr),
     // Absent /BE reads as explicit `null` (never omission), so a read DTO
@@ -51,8 +58,13 @@ export function readPolyline(
   annotPtr: Ptr,
   base: AnnotationBase,
 ): PolylineAnnotationDTO {
+  const caption = readShapeCaption(fn, mem, annotPtr);
+  const intent = readIntent(fn, mem, annotPtr);
   return {
     ...base,
+    ...readAnnotationMeasure(fn, mem, annotPtr),
+    ...(caption ? { caption } : {}),
+    ...(intent === 'PolyLineDimension' ? { intent } : {}),
     subtype: 'polyline',
     ...readVertexExtras(fn, mem, annotPtr),
     lineEndings: readLineEndings(fn, mem, annotPtr),

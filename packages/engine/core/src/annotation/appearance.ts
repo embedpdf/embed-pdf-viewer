@@ -244,17 +244,30 @@ export function appearanceImpactOf(
   const cur = current as unknown as Record<string, unknown>;
   const pat = patch as unknown as Record<string, unknown>;
   const subtype = patch.subtype;
+  const caption = pat.caption === undefined ? cur.caption : pat.caption;
+  const contentsPainted =
+    CONTENTS_PAINTED.has(subtype) ||
+    (['line', 'polygon', 'polyline'].includes(subtype) &&
+      !!(caption as { enabled?: boolean } | null | undefined)?.enabled);
 
   const touched: string[] = [];
   for (const [key, value] of Object.entries(pat)) {
     if (value === undefined || INERT_KEYS.has(key)) continue;
-    if (key === 'contents' && !CONTENTS_PAINTED.has(subtype)) continue;
+    if (key === 'contents' && !contentsPainted) continue;
     if (key === 'rotation' && ADVISORY_ROTATION.has(subtype)) continue;
     if (!semanticEqual(value, cur[key])) touched.push(key);
   }
   if (touched.length === 0) return 'inert';
 
-  const geometryKeys = TRANSLATABLE_GEOMETRY[subtype];
+  const baseGeometryKeys = TRANSLATABLE_GEOMETRY[subtype];
+  // A manual shape caption is page-space geometry and must ride with a rigid
+  // move. Automatic centers follow the vertices without an explicit patch.
+  const geometryKeys =
+    baseGeometryKeys &&
+    (subtype === 'polygon' || subtype === 'polyline') &&
+    (cur.caption as { center?: unknown } | undefined)?.center
+      ? [...baseGeometryKeys, 'caption']
+      : baseGeometryKeys;
   if (!geometryKeys) return 'regenerate';
   if (!touched.every((k) => geometryKeys.includes(k))) return 'regenerate';
   return isRigidTranslation(cur, pat, subtype, geometryKeys) ? 'translation' : 'regenerate';

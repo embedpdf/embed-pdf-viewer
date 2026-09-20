@@ -22,6 +22,7 @@ import type {
   PageMoveResult,
   PageRotateResult,
   PageRotation,
+  PageScaleResult,
 } from '@embedpdf/engine-core/runtime';
 
 /** The SSE `mutation` event body — the audit row in JSON (the server's
@@ -64,6 +65,8 @@ export function auditRowToEvent(row: AuditEventRow, mySessionId: string): Docume
   };
 
   switch (row.kind) {
+    case 'measure.setScale':
+      return { type: 'page.viewportsChanged', origin, ...(row.payload as PageScaleResult) };
     case 'annot.create':
       return {
         type: 'annotation.created',

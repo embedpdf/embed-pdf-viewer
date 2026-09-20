@@ -4,10 +4,13 @@
  * polygon, the outward curl extent), so it derives from the point geometry
  * PLUS the stroke width, border, and line endings; and their
  * `/EMBD_Metadata/Rotation` is an advisory scalar (the points are already
- * rotated; inert for AP).
+ * rotated; shape measurement captions use it to orient their text).
  */
 import type { AnnotationDTO, PdfRect } from '@embedpdf/engine-core/runtime';
 import {
+  distanceLabel,
+  measurementLayout,
+  shapeMeasurementLabel,
   geomPdfBounds,
   geomRotation,
   pdfToContentPoint,
@@ -36,6 +39,19 @@ const polyCloudy = (a: Annot): Wire =>
 /** The visual-bounds `/Rect` (stroke + border included) of a stroke geom. */
 const visualRect = (a: Annot, crop: PdfRect): Wire => {
   const g = a.geom;
+  if (a.measure) {
+    const bounds = measurementLayout(g, a.measure, a.style)?.visualBounds;
+    if (bounds) {
+      return {
+        rect: {
+          left: crop.left + bounds.x,
+          right: crop.left + bounds.x + bounds.width,
+          top: crop.top - bounds.y,
+          bottom: crop.top - bounds.y - bounds.height,
+        },
+      };
+    }
+  }
   if (g.t === 'line' || g.t === 'ink') return { rect: geomPdfBounds(g, a.style.strokeWidth, crop) };
   if (g.t === 'poly') return { rect: geomPdfBounds(g, a.style.strokeWidth, crop, a.style.border) };
   return {};
@@ -61,9 +77,7 @@ const strokeProps: KindProjection['prop'] = {
   strokeWidth: withRect((a) => ({ strokeWidth: a.style.strokeWidth })),
   border: withRect((a) => ({ ...borderSlice(a.style), ...polyCloudy(a) })),
   lineEndings: withRect((a) =>
-    (a.geom.t === 'line' || a.geom.t === 'poly') && a.geom.ends
-      ? { lineEndings: a.geom.ends }
-      : {},
+    (a.geom.t === 'line' || a.geom.t === 'poly') && a.geom.ends ? { lineEndings: a.geom.ends } : {},
   ),
 };
 
@@ -71,6 +85,18 @@ export const line: KindProjection = {
   ingest: (dto, crop) => {
     const d = dto as Extract<AnnotationDTO, { subtype: 'line' }>;
     return {
+      ...(d.intent === 'LineDimension'
+        ? {
+            measure: {
+              intent: d.intent,
+              measure: d.measure ?? null,
+              caption: d.caption ?? { enabled: false },
+              leader: d.leader ?? undefined,
+              crop,
+              text: d.contents ?? '',
+            },
+          }
+        : {}),
       geom: {
         t: 'line',
         a: pdfToContentPoint(d.linePoints.start, crop),
@@ -84,18 +110,40 @@ export const line: KindProjection = {
     const g = a.geom;
     if (g.t !== 'line') return null;
     return {
+      ...(a.measure?.intent === 'LineDimension' ? { contents: distanceLabel(g, a.measure) } : {}),
       linePoints: { start: contentToPdfPoint(g.a, crop), end: contentToPdfPoint(g.b, crop) },
       ...visualRect(a, crop),
       ...advisoryRotation(g),
     };
   },
   prop: strokeProps,
+  draftExtras: (a) =>
+    a.measure?.intent === 'LineDimension'
+      ? {
+          intent: a.measure.intent,
+          measure: a.measure.measure?.subtype === 'RL' ? a.measure.measure : null,
+          caption: a.measure.caption,
+          leader: a.measure.leader,
+          subject: 'Distance',
+        }
+      : {},
 };
 
 const polyProjection = (closed: boolean): KindProjection => ({
   ingest: (dto, crop) => {
     const d = dto as Extract<AnnotationDTO, { subtype: 'polygon' | 'polyline' }>;
     return {
+      ...(d.intent === 'PolygonDimension' || d.intent === 'PolyLineDimension'
+        ? {
+            measure: {
+              intent: d.intent,
+              measure: d.measure ?? null,
+              caption: d.caption ?? { enabled: false },
+              crop,
+              text: d.contents ?? '',
+            },
+          }
+        : {}),
       geom: {
         t: 'poly',
         points: d.vertices.map((p) => pdfToContentPoint(p, crop)),
@@ -109,12 +157,24 @@ const polyProjection = (closed: boolean): KindProjection => ({
     const g = a.geom;
     if (g.t !== 'poly') return null;
     return {
+      ...(a.measure && a.measure.intent !== 'LineDimension'
+        ? { contents: shapeMeasurementLabel(g, a.measure), caption: a.measure.caption }
+        : {}),
       vertices: g.points.map((p) => contentToPdfPoint(p, crop)),
       ...visualRect(a, crop),
       ...advisoryRotation(g),
     };
   },
   prop: strokeProps,
+  draftExtras: (a) =>
+    a.measure && a.measure.intent !== 'LineDimension'
+      ? {
+          intent: a.measure.intent,
+          measure: a.measure.measure?.subtype === 'RL' ? a.measure.measure : null,
+          caption: a.measure.caption,
+          subject: closed ? 'Area' : 'Perimeter',
+        }
+      : {},
 });
 
 export const polygon: KindProjection = polyProjection(true);

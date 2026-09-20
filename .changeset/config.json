@@ -58,7 +58,8 @@
       "@embedpdf/viewer",
       "@embedpdf/viewer-chrome",
       "@embedpdf/viewer-react",
-      "@embedpdf/web"
+      "@embedpdf/web",
+      "@embedpdf/plugin-measurement"
     ]
   ],
   "linked": [],

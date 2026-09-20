@@ -117,6 +117,9 @@ export function createEditHandler(
       anno.claimsTouchAt(s.page.pon, s.page.point, s.page.scale, s.page.rotation, s.page.zoom),
     onDown: (s) => {
       if (!s.page) return false;
+      // The final distance-placement click belongs to its creation draft even
+      // when it lands over an existing annotation.
+      if (anno.distanceCreationPage?.() != null) return false;
       const touch = s.pointerType === 'touch';
       // While a free-text box is being edited it owns its own pointer events, so a
       // down that reaches the hub at all is a click OUTSIDE the editor — commit and
@@ -389,9 +392,19 @@ export function createDrawHandler(
     priority: ANNOTATION_DRAW_PRIORITY,
     enabledFor: (t) => t.enables.has('annotation-draw'),
     onDown: (s) => {
-      if (!s.page) return false;
       const tool = toolId();
       const st = subtypeOf(tool);
+      const distancePage = anno.distanceCreationPage?.();
+      if (distancePage != null) {
+        const point = pointOn(s, distancePage);
+        if (point) {
+          anno.createPointer(tool, 'down', distancePage, point);
+        }
+        // This click commits on down. Its up must not start another draft.
+        origin = null;
+        return true;
+      }
+      if (!s.page) return false;
       if (st === 'ink' && pendingInk) {
         if (pendingInk.tool === tool && pendingInk.pon === s.page.pon) {
           clearTimeout(pendingInk.timer);
@@ -469,6 +482,14 @@ export function createDrawHandler(
     onHover: (s) => {
       const tool = toolId();
       const st = subtypeOf(tool);
+      const distancePage = anno.distanceCreationPage?.();
+      if (distancePage != null) {
+        const point = pointOn(s, distancePage);
+        if (point) {
+          anno.createPointer(tool, 'move', distancePage, point);
+        }
+        return;
+      }
       // Hover preview for the multi-click tools: poly (while placing vertices) and
       // callout (while placing the tip/knee/box) follow the cursor between clicks.
       if (s.page && ((drawingPoly && isPolyTool(st)) || (drawingCallout && isCalloutTool(st)))) {

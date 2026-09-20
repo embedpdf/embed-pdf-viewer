@@ -544,6 +544,11 @@ export const wirePaths = {
   layerSearchFullCurrent: (docId: string, layerName: string) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/search/full/data`,
 
+  layerPageViewports: (docId: string, layerName: string, pon: number) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/pages/${pon}/viewports`,
+  layerPageScale: (docId: string, layerName: string, pon: number) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/pages/${pon}/scale`,
+
   layerPagesMove: (docId: string, layerName: string) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/pages/move`,
 
@@ -670,6 +675,8 @@ export const wireTemplates = {
   layerFormFieldSignatureAppearance:
     '/v1/docs/:docId/layers/:layerName/form/fields/:fieldKey/signature-appearance',
   layerFormData: '/v1/docs/:docId/layers/:layerName/form/data',
+  layerPageViewports: '/v1/docs/:docId/layers/:layerName/pages/:pon/viewports',
+  layerPageScale: '/v1/docs/:docId/layers/:layerName/pages/:pon/scale',
   layerPagesMove: '/v1/docs/:docId/layers/:layerName/pages/move',
   layerPagesRotate: '/v1/docs/:docId/layers/:layerName/pages/rotate',
   layerPagesDelete: '/v1/docs/:docId/layers/:layerName/pages/delete',

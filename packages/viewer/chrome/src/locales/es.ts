@@ -7,6 +7,33 @@ export const es: Locale = {
   code: 'es',
   name: 'Español',
   translations: {
+    measurement: {
+      title: 'Mediciones',
+      distance: 'Distancia',
+      perimeter: 'Perímetro',
+      area: 'Área',
+      areaUnit: 'Unidad de área',
+      resetLabel: 'Restablecer posición de la etiqueta',
+      calibrate: 'Calibrar escala',
+      scale: 'Escala',
+      custom: 'Personalizada',
+      unavailable: 'No disponible',
+      instructions:
+        'Arrastra para medir una distancia y haz clic para colocar la línea de cota. Marca los vértices de un perímetro o área y haz doble clic para terminar. Los bordes del área no deben cruzarse; una vista previa no disponible no puede finalizarse. Pulsa Escape para cancelar. Arrastra la etiqueta para moverla.',
+      sessionOnly: 'Este motor conserva la calibración de página solo durante esta sesión.',
+      allPages: 'Aplicar a todas las páginas',
+      recalculate: 'Recalcular las mediciones existentes',
+      preset: 'Escala predefinida',
+      choosePreset: 'Elegir una escala',
+      unit: 'Unidad',
+      precision: 'Precisión',
+      selection: 'Mediciones seleccionadas',
+      report: '{updated} actualizadas · {skipped} omitidas · {failed} fallidas',
+      knownLength: 'Introduce la longitud real representada por la línea que acabas de dibujar.',
+      length: 'Longitud conocida',
+      apply: 'Aplicar escala',
+      applying: 'Aplicando…',
+    },
     commands: {
       zoom: {
         in: 'Acercar',
@@ -46,6 +73,7 @@ export const es: Locale = {
         counterclockwise: 'Girar a la izquierda',
       },
       mode: {
+        measure: 'Medir',
         group: 'Modo',
         view: 'Ver',
         annotate: 'Anotar',
@@ -55,6 +83,7 @@ export const es: Locale = {
         redact: 'Redactar',
       },
       annotate: {
+        cancelCreation: 'Cancelar dibujo',
         highlight: 'Resaltar',
         strikeout: 'Tachar',
         underline: 'Subrayar',

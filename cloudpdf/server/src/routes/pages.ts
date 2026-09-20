@@ -1,3 +1,4 @@
+import { PageScaleInputSchema } from '@embedpdf/engine-core/wire';
 import { Buffer } from 'node:buffer';
 
 import {
@@ -404,6 +405,42 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
       });
     },
   );
+
+  app.get('/v1/docs/:docId/layers/:layerName/pages/:pon/viewports', async (req, reply) => {
+    const { docId, layerName, pon } = req.params as {
+      docId: string;
+      layerName: string;
+      pon: string;
+    };
+    const access = requireLayerDocAccessOnly(req, docId, layerName);
+    const bits = await documentService.getEffectivePdfBits(access, docId, layerName);
+    const ctx = requireLayerCapability(req, docId, layerName, 'doc.open', bits);
+    setNoStore(reply);
+    return documentService.readPageViewports(
+      ctx,
+      docId,
+      layerName,
+      parsePageObjectNumber(pon),
+      abortSignalFromRequest(req),
+    );
+  });
+  app.put('/v1/docs/:docId/layers/:layerName/pages/:pon/scale', async (req, reply) => {
+    const { docId, layerName, pon } = req.params as {
+      docId: string;
+      layerName: string;
+      pon: string;
+    };
+    const access = requireLayerDocAccessOnly(req, docId, layerName);
+    const bits = await documentService.getEffectivePdfBits(access, docId, layerName);
+    const ctx = requireLayerCapability(req, docId, layerName, 'doc.annotate.modify', bits);
+    const body = parseOrInvalidArg(PageScaleInputSchema, req.body, 'request body');
+    setNoStore(reply);
+    return layerService.setPageScale(
+      ctx,
+      { docId, layerName, pageObjectNumber: parsePageObjectNumber(pon), measure: body.measure },
+      abortSignalFromRequest(req),
+    );
+  });
 
   app.post('/v1/docs/:docId/layers/:layerName/pages/move', async (req, reply) => {
     const { docId, layerName } = req.params as {

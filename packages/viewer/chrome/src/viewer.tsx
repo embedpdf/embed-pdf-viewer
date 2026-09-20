@@ -28,6 +28,7 @@ import { feedbackPlugin, interactionPlugin, vibrationFeedback } from '@embedpdf/
 import { selectionPlugin } from '@embedpdf/react/selection';
 import { annotationPlugin } from '@embedpdf/react/annotation';
 import { stampPlugin } from '@embedpdf/react/stamp';
+import { measurementPlugin } from '@embedpdf/react/measurement';
 import { redactionPlugin } from '@embedpdf/react/redaction';
 import { actionsPlugin } from '@embedpdf/react/actions';
 import { formPlugin } from '@embedpdf/react/form';
@@ -346,6 +347,7 @@ export function FullViewer({
     // Redaction: marking is the annotation plane's composed `redact` tool; this
     // plugin adds the pending-queue view + the destructive apply.
     redactionPlugin(),
+    measurementPlugin(),
     searchPlugin(),
     demoToolsPlugin(),
     i18nPlugin({

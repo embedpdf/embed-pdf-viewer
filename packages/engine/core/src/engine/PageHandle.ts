@@ -3,6 +3,7 @@ import type { PageGeometryService } from './PageGeometryService';
 import type { PageRenderService } from './PageRenderService';
 import type { PageTextService } from './PageTextService';
 import type { PieceInfoService } from './PieceInfoService';
+import type { PageMeasureService } from './PageMeasureService';
 import type { PageObjectNumber } from '../identity/PageObjectNumber';
 
 /**
@@ -28,4 +29,5 @@ export interface PageHandle {
    * omits it until a cloud consumer ships (the `downloadLayer?` pattern).
    */
   readonly pieceInfo?: PieceInfoService;
+  readonly measure?: PageMeasureService;
 }

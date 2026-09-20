@@ -366,6 +366,15 @@ export class HttpClient {
     return await this.parseJsonResponse(res, parser);
   }
 
+  async putJson<T>(
+    path: string,
+    body: unknown,
+    parser: (raw: unknown) => T,
+    signal: AbortSignal,
+  ): Promise<T> {
+    return this.parseJsonResponse(await this.requestJson(path, 'PUT', body, signal), parser);
+  }
+
   /** POST a JSON body and return the raw binary response (pages.extract). */
   async postJsonBytes(path: string, body: unknown, signal: AbortSignal): Promise<Uint8Array> {
     const res = await this.requestJson(path, 'POST', body, signal);

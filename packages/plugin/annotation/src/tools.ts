@@ -19,7 +19,13 @@ import type {
   PropKey,
   Subtype,
 } from '@embedpdf/core-annotation';
-import type { BinarySource, InkIntent } from '@embedpdf/engine-core/runtime';
+import type {
+  BinarySource,
+  InkIntent,
+  LineDimensionCaption,
+  LineLeader,
+  ShapeDimensionCaption,
+} from '@embedpdf/engine-core/runtime';
 
 /**
  * How a stamp-family tool resolves the image bytes it places — pure DATA, so a
@@ -223,7 +229,21 @@ export interface AnnotationToolDef<K extends ToolAuthoringKind = ToolAuthoringKi
   /** What a committed text selection authors. Omit for pointer/click tools. */
   selection?: SelectionAuthoring;
   /** PDF `/IT` authored by an intent-bearing ink preset. */
-  intent?: K extends 'ink' ? InkIntent : never;
+  intent?: K extends 'ink'
+    ? InkIntent
+    : K extends 'line'
+      ? 'LineDimension'
+      : K extends 'polygon'
+        ? 'PolygonDimension'
+        : K extends 'polyline'
+          ? 'PolyLineDimension'
+          : never;
+  /** Caption defaults for a measurement preset. Shape centers use absolute PDF coordinates. */
+  measurement?: K extends 'line'
+    ? { caption: LineDimensionCaption; leader?: LineLeader }
+    : K extends 'polygon' | 'polyline'
+      ? { caption: ShapeDimensionCaption }
+      : never;
   /** Ink-only stroke grouping and straightening policy. */
   ink?: K extends 'ink' ? InkAuthoringOptions : never;
   /**
@@ -251,7 +271,8 @@ export interface AnnotationToolDef<K extends ToolAuthoringKind = ToolAuthoringKi
    */
   ghost?: GhostPolicy;
   /** Opaque presentation hints (label/icon…) for a toolbar or cursor that builds
-   *  itself from the tool table. Never read by the plugin or the interaction hub. */
+   *  itself from the tool table. `capture: true` captures a line gesture without
+   *  creating an annotation (used by calibration). */
   meta?: Record<string, unknown>;
 }
 
@@ -259,6 +280,10 @@ export interface BuiltinToolKindMap {
   square: 'square';
   circle: 'circle';
   line: 'line';
+  distance: 'line';
+  perimeter: 'polyline';
+  area: 'polygon';
+  calibrate: 'line';
   polygon: 'polygon';
   polyline: 'polyline';
   ink: 'ink';
@@ -320,7 +345,8 @@ export interface ResolvedTool {
   flags?: Partial<AnnotationFlags>;
   source?: StampSourceSpec;
   selection?: SelectionAuthoring;
-  intent?: InkIntent;
+  intent?: InkIntent | 'LineDimension' | 'PolyLineDimension' | 'PolygonDimension';
+  measurement?: { caption: LineDimensionCaption | ShapeDimensionCaption; leader?: LineLeader };
   ink?: InkAuthoringOptions;
   /** Counter-rotate creations against the page's display rotation (see
    *  {@link AnnotationToolDef.upright}). */
@@ -384,6 +410,25 @@ export const DEFAULT_TOOLS: AnnotationToolInput[] = [
     clickCreate: { length: 80 },
   },
   {
+    id: 'distance',
+    extends: 'line',
+    intent: 'LineDimension',
+    clickCreate: false,
+    defaults: { strokeWidth: 1, lineEndings: { start: 'closed-arrow', end: 'closed-arrow' } },
+    measurement: {
+      caption: { enabled: true, position: 'inline' },
+      leader: { length: 12, extension: 5, offset: 0 },
+    },
+  },
+  {
+    id: 'calibrate',
+    extends: 'line',
+    enables: ['annotation-draw'],
+    defaults: { strokeWidth: 1 },
+    clickCreate: false,
+    meta: { capture: true },
+  },
+  {
     id: 'polygon',
     subtype: 'polygon',
     cursor: 'crosshair',
@@ -396,6 +441,20 @@ export const DEFAULT_TOOLS: AnnotationToolInput[] = [
     cursor: 'crosshair',
     enables: DRAW_TAGS,
     defaults: { strokeWidth: 6 },
+  },
+  {
+    id: 'perimeter',
+    extends: 'polyline',
+    intent: 'PolyLineDimension',
+    defaults: { strokeWidth: 1, lineEndings: { start: 'none', end: 'none' } },
+    measurement: { caption: { enabled: true } },
+  },
+  {
+    id: 'area',
+    extends: 'polygon',
+    intent: 'PolygonDimension',
+    defaults: { strokeWidth: 1 },
+    measurement: { caption: { enabled: true } },
   },
   {
     id: 'ink',
@@ -649,6 +708,7 @@ export function buildToolRegistry(
       source: def.source ?? base?.source,
       selection: def.selection ?? base?.selection,
       intent: def.intent ?? base?.intent,
+      measurement: def.measurement ?? base?.measurement,
       ink: base?.ink || def.ink ? { ...base?.ink, ...def.ink } : undefined,
       upright: def.upright ?? base?.upright ?? false,
       clickCreate: def.clickCreate ?? base?.clickCreate ?? false,

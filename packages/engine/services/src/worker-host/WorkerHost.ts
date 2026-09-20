@@ -1,3 +1,8 @@
+import type {
+  MeasureViewportsWorkerRequest,
+  MeasureSetScaleWorkerRequest,
+} from '@embedpdf/engine-core/runtime';
+import { MeasureReader, MeasureMutator } from '../features/measure';
 import {
   EMPTY_TRANSFER,
   EngineError,
@@ -427,6 +432,12 @@ export class WorkerHost {
           break;
         case 'annotations.readFile':
           resultPack = this.handleAnnotationsReadFile(msg, ctrl.signal);
+          break;
+        case 'measure.viewports':
+          resultPack = this.handleMeasureViewports(msg, ctrl.signal);
+          break;
+        case 'measure.setScale':
+          resultPack = this.handleMeasureSetScale(msg, ctrl.signal);
           break;
         case 'pieceInfo.read':
           resultPack = this.handlePieceInfoRead(msg, ctrl.signal);
@@ -1105,6 +1116,35 @@ export class WorkerHost {
     return wirePack(
       { tag: 'annotations.readFile', content },
       content.bytes !== undefined ? [content.bytes] : [],
+    );
+  }
+
+  private handleMeasureViewports(
+    req: MeasureViewportsWorkerRequest,
+    signal: AbortSignal,
+  ): WirePack<WorkerResultPayload> {
+    const session = this.requireSession(req);
+    return wirePack({
+      tag: 'measure.viewports',
+      viewports: new MeasureReader(this.runtime, session).viewports(req.pageObjectNumber, signal),
+    });
+  }
+  private handleMeasureSetScale(
+    req: MeasureSetScaleWorkerRequest,
+    signal: AbortSignal,
+  ): WirePack<WorkerResultPayload> {
+    const session = this.requireSession(req);
+    new MeasureMutator(this.runtime, session).setScale(req.pageObjectNumber, req.measure, signal);
+    return this.finishMutation(
+      session,
+      {
+        tag: 'measure.setScale',
+        result: {
+          pageObjectNumber: req.pageObjectNumber,
+          meta: { affectedPages: [], cacheDelta: null },
+        },
+      },
+      req.artifactPath,
     );
   }
 
@@ -1890,6 +1930,7 @@ const MUTATING_KINDS: ReadonlySet<WorkerRequest['kind']> = new Set<WorkerRequest
   'redaction.apply',
   'attachments.create',
   'attachments.delete',
+  'measure.setScale',
   'pieceInfo.update',
   'pieceInfo.clear',
 ]);

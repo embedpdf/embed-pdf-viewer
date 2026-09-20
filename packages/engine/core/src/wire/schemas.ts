@@ -1628,3 +1628,8 @@ export const DocumentVersionsSchema = z.object({
 export type DocumentVersions = z.infer<typeof DocumentVersionsSchema>;
 
 export { DigestAlgorithmSchema, ModificationLevelSchema };
+
+export const PageScaleResultSchema = z.object({
+  pageObjectNumber: z.number().int().positive(),
+  meta: MutationMetaSchema,
+});

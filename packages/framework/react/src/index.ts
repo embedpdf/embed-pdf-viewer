@@ -15,6 +15,7 @@ export * from './views';
 export * from './page-edit';
 export * from './metadata';
 export * from './redaction';
+export * from './measurement';
 export * from './signature';
 export { FormLayer, useForm, useFormField } from './form';
 export { SearchLayer, useSearch, useSearchState } from './search';

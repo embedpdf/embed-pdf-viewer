@@ -14,6 +14,7 @@ export type CallbackFn<K extends CallbackKind = CallbackKind> = (...args: unknow
 export interface PdfRuntimeMemory {
   alloc(bytes: number): Ptr;
   free(ptr: Ptr): void;
+  /** Returns an independent copy that remains valid after the allocation is freed. */
   readBytes(ptr: Ptr, len: number): Uint8Array;
   writeBytes(ptr: Ptr, data: Uint8Array): void;
   readU8String(ptr: Ptr): string;

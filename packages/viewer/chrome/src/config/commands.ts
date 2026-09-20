@@ -28,6 +28,7 @@ import { fieldKeyOf, FormToken } from '@embedpdf/react/form';
 import { ActionsToken } from '@embedpdf/react/actions';
 import { LinkToken, openLinkTarget, type PdfLinkTarget } from '@embedpdf/react/link';
 import { SearchToken } from '@embedpdf/react/search';
+import { MeasurementToken } from '@embedpdf/react/measurement';
 import { RedactionToken } from '@embedpdf/react/redaction';
 import { StampToken } from '@embedpdf/react/stamp';
 import { SignatureToken } from '@embedpdf/react/signature';
@@ -420,6 +421,7 @@ export const defaultCommands: CommandDef[] = [
   modeCommand('mode:insert', 'commands.mode.insert'),
   modeCommand('mode:form', 'commands.mode.form', 'form-edit'),
   modeCommand('mode:redact', 'commands.mode.redact'),
+  modeCommand('mode:measure', 'commands.mode.measure'),
 
   // ── annotate tools (real interaction tools) ─────────────────────────────
   tool('annotation:add-highlight', 'highlight', 'commands.annotate.highlight', 'highlight', {
@@ -553,7 +555,62 @@ export const defaultCommands: CommandDef[] = [
     panel: { id: 'redaction', exclusive: 'right' },
   },
 
+  {
+    ...tool('measurement:distance', 'distance', 'measurement.distance', 'distance', {
+      primary: 'color',
+    }),
+    enabled: (c) => {
+      const s = stage(c);
+      const pon = s?.pages()[s.currentPage()]?.pon;
+      return pon != null && (c.tryGet(MeasurementToken)?.canMeasure(pon) ?? false);
+    },
+  },
+  {
+    ...tool('measurement:perimeter', 'perimeter', 'measurement.perimeter', 'perimeter', {
+      primary: 'color',
+    }),
+    enabled: (c) => {
+      const s = stage(c);
+      const pon = s?.pages()[s.currentPage()]?.pon;
+      return pon != null && (c.tryGet(MeasurementToken)?.canMeasure(pon) ?? false);
+    },
+  },
+  {
+    ...tool('measurement:area', 'area', 'measurement.area', 'area', {
+      primary: 'color',
+    }),
+    enabled: (c) => {
+      const s = stage(c);
+      const pon = s?.pages()[s.currentPage()]?.pon;
+      return pon != null && (c.tryGet(MeasurementToken)?.canMeasure(pon) ?? false);
+    },
+  },
+  {
+    id: 'measurement:calibrate',
+    labelKey: 'measurement.calibrate',
+    icon: 'calibrate',
+    categories: ['tool'],
+    enabled: (c) => c.tryGet(MeasurementToken)?.canCalibrate() ?? false,
+    active: (c) => interaction(c)?.activeToolId() === 'calibrate',
+    run: (c) => c.tryGet(MeasurementToken)?.startCalibration(),
+  },
+  {
+    id: 'panel:measurement',
+    labelKey: 'measurement.title',
+    icon: 'updateScale',
+    categories: ['panel'],
+    panel: { id: 'measurement', exclusive: 'right' },
+  },
+
   // ── annotation selection (the floating strip's verbs) ──────────────────
+  {
+    id: 'annotation:cancel-creation',
+    labelKey: 'commands.annotate.cancelCreation',
+    categories: ['annotation'],
+    shortcut: 'Escape',
+    enabled: (c) => anno(c)?.hasCreationDraft() ?? false,
+    run: (c) => anno(c)?.cancelCreationDraft(),
+  },
   {
     id: 'annotation:delete',
     labelKey: 'commands.annotate.delete',
@@ -778,6 +835,7 @@ export const MODE_SURFACES = [
   'mode:insert',
   'mode:form',
   'mode:redact',
+  'mode:measure',
 ] as const;
 
 function modeCommand(

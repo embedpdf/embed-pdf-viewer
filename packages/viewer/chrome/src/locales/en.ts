@@ -9,6 +9,33 @@ export const en: Locale = {
   code: 'en',
   name: 'English',
   translations: {
+    measurement: {
+      title: 'Measurements',
+      distance: 'Distance',
+      perimeter: 'Perimeter',
+      area: 'Area',
+      areaUnit: 'Area unit',
+      resetLabel: 'Reset label position',
+      calibrate: 'Calibrate scale',
+      scale: 'Scale',
+      custom: 'Custom',
+      unavailable: 'Unavailable',
+      instructions:
+        'Drag to measure a distance, then click to place its dimension line. Click vertices for a perimeter or area and double-click to finish. Area boundaries must not cross; an unavailable preview cannot be finished. Press Escape to cancel. Drag the label itself to move it.',
+      sessionOnly: 'This engine keeps page calibration for this session only.',
+      allPages: 'Apply to all pages',
+      recalculate: 'Recalculate existing measurements',
+      preset: 'Scale preset',
+      choosePreset: 'Choose a preset',
+      unit: 'Unit',
+      precision: 'Precision',
+      selection: 'Selected measurements',
+      report: '{updated} updated · {skipped} skipped · {failed} failed',
+      knownLength: 'Enter the real length represented by the line you just drew.',
+      length: 'Known length',
+      apply: 'Apply scale',
+      applying: 'Applying…',
+    },
     commands: {
       zoom: {
         in: 'Zoom In',
@@ -43,6 +70,7 @@ export const en: Locale = {
         counterclockwise: 'Rotate Counter-Clockwise',
       },
       mode: {
+        measure: 'Measure',
         group: 'Mode',
         view: 'View',
         annotate: 'Annotate',
@@ -52,6 +80,7 @@ export const en: Locale = {
         redact: 'Redact',
       },
       annotate: {
+        cancelCreation: 'Cancel drawing',
         highlight: 'Highlight',
         strikeout: 'Strikeout',
         underline: 'Underline',

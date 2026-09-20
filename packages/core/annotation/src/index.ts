@@ -154,6 +154,9 @@ export {
   groupResizeFactors,
 } from './geometry';
 export { cloudyPath, cloudyBorderExtent } from './cloudy';
+export * from './measurement';
+export * from './measurement-shape';
+export { annotationSelectionFrame, type SelectionFrame } from './selection';
 export { scene } from './scene';
 export { straightenInkStroke } from './ink';
 export type { BlendMode } from '@embedpdf/engine-core/runtime';

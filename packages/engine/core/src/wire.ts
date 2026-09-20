@@ -360,3 +360,7 @@ export type {
 } from './wire/schemas';
 export { encodeAnalysisToken, decodeAnalysisToken, type AnalysisToken } from './wire/tokens';
 export { analysisQueryString, type AnalysisQueryInput } from './wire/paths';
+
+export * from './dto/Measure.schema';
+
+export { PageScaleResultSchema } from './wire/schemas';

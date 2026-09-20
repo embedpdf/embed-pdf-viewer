@@ -20,6 +20,9 @@ const annotationsPdfPath = resolve(
   'annotations.pdf',
 );
 const robotoPath = resolve(here, 'fixtures', 'Roboto-Regular.ttf');
+// A page whose only font is a producer's cmap-less subset named Helvetica
+// (the fork fixture of the same name).
+const subsetHelveticaPath = resolve(here, 'fixtures', 'freetext_document_subset_helvetica.pdf');
 
 const PAGE = 3;
 const RECT = { left: 50, bottom: 250, right: 350, top: 320 };
@@ -337,6 +340,59 @@ describe('rich text FreeText (local engine)', () => {
     expect(fullSave.byteLength).toBeGreaterThan(subsetSave.byteLength * 3);
 
     await doc.fonts!.setTypographicFeatures(true);
+    await doc.close();
+  });
+
+  test('Helvetica on a document carrying a cmap-less Helvetica subset stays visible', async () => {
+    // The subset (glyf/loca/hmtx only, renumbered) used to be borrowed for the
+    // family: every glyph became glyph 0 and the appearance ended up naming a
+    // font it did not carry, so the saved box was blank. The standard face is
+    // the answer, and the text draws.
+    engine = await createLocalEngine({ runtime: { prefer: 'wasm' } });
+    const bytes = new Uint8Array(await readFile(subsetHelveticaPath));
+    const doc = await engine.open({ kind: 'bytes', id: 'rt-subset', bytes });
+    const page = doc.page((await doc.pages.list()).pages[0]!.pageObjectNumber);
+    const created = await page.annotations.create({
+      subtype: 'free-text',
+      intent: 'free-text',
+      fontFamily: 'helvetica',
+      fontSize: 24,
+      textAlign: 'left',
+      strokeWidth: 0,
+      rect: { left: 20, bottom: 120, right: 280, top: 200 },
+      richText: {
+        body: { family: 'Helvetica', size: 24, color: '#000000' },
+        paragraphs: [{ runs: [{ text: 'Hello world' }] }],
+      },
+    });
+    const dto = created.created as FreeTextAnnotationDTO;
+    expect(dto.fontFamily).toBe('helvetica');
+    expect(dto.richText.paragraphs[0]!.runs).toEqual([{ text: 'Hello world' }]);
+
+    // The appearance draws ink: a border-less box, so every dark pixel is text.
+    const appearances = await page.annotations.renderAppearances({ scale: 1 });
+    const match = appearances.appearances.find(
+      (a) =>
+        a.ref.kind === 'objectNumber' &&
+        created.created.ref.kind === 'objectNumber' &&
+        a.ref.annotObjectNumber === created.created.ref.annotObjectNumber,
+    );
+    expect(match).toBeDefined();
+    const raster = match!.raster;
+    const px = new Uint8Array(raster.data);
+    let ink = 0;
+    for (let y = 0; y < raster.height; y++) {
+      for (let x = 0; x < raster.width; x++) {
+        const at = y * raster.stride + x * 4;
+        if (px[at + 3]! > 128 && px[at]! + px[at + 1]! + px[at + 2]! < 3 * 96) ink++;
+      }
+    }
+    expect(ink).toBeGreaterThan(100);
+
+    // The saved file names the standard face and never borrowed the subset.
+    const saved = latin1(await doc.download());
+    expect(saved).toContain('/Helv 24 Tf');
+    expect(saved).not.toContain('EDocF');
     await doc.close();
   });
 });

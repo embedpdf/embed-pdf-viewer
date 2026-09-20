@@ -750,6 +750,9 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
 
     export interface Polygon {
         subtype: "polygon";
+        intent?: DocAnnotationsList200ResponseAnnotationsItemPolygon.Intent | undefined;
+        measure?: CloudPDF.DocAnnotationsList200ResponseAnnotationsItemPolygonMeasure | undefined;
+        caption?: DocAnnotationsList200ResponseAnnotationsItemPolygon.Caption | undefined;
         ref: CloudPDF.DocAnnotationsList200ResponseAnnotationsItemPolygonRef;
         pageObjectNumber: number;
         index: number;
@@ -782,6 +785,24 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
     }
 
     export namespace DocAnnotationsList200ResponseAnnotationsItemPolygon {
+        export const Intent = {
+            PolygonCloud: "PolygonCloud",
+            PolygonDimension: "PolygonDimension",
+        } as const;
+        export type Intent = (typeof Intent)[keyof typeof Intent];
+
+        export interface Caption {
+            enabled: boolean;
+            center?: Caption.Center | undefined;
+        }
+
+        export namespace Caption {
+            export interface Center {
+                x: number;
+                y: number;
+            }
+        }
+
         export const IdentityQuality = {
             Durable: "durable",
             Weak: "weak",
@@ -865,6 +886,9 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
 
     export interface Polyline {
         subtype: "polyline";
+        intent?: DocAnnotationsList200ResponseAnnotationsItemPolyline.Intent | undefined;
+        measure?: CloudPDF.DocAnnotationsList200ResponseAnnotationsItemPolylineMeasure | undefined;
+        caption?: DocAnnotationsList200ResponseAnnotationsItemPolyline.Caption | undefined;
         ref: CloudPDF.DocAnnotationsList200ResponseAnnotationsItemPolylineRef;
         pageObjectNumber: number;
         index: number;
@@ -897,6 +921,23 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
     }
 
     export namespace DocAnnotationsList200ResponseAnnotationsItemPolyline {
+        export const Intent = {
+            PolyLineDimension: "PolyLineDimension",
+        } as const;
+        export type Intent = (typeof Intent)[keyof typeof Intent];
+
+        export interface Caption {
+            enabled: boolean;
+            center?: Caption.Center | undefined;
+        }
+
+        export namespace Caption {
+            export interface Center {
+                x: number;
+                y: number;
+            }
+        }
+
         export const IdentityQuality = {
             Durable: "durable",
             Weak: "weak",
@@ -1014,6 +1055,10 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
 
     export interface Line {
         subtype: "line";
+        intent?: DocAnnotationsList200ResponseAnnotationsItemLine.Intent | undefined;
+        measure?: CloudPDF.DocAnnotationsList200ResponseAnnotationsItemLineMeasure | undefined;
+        caption?: DocAnnotationsList200ResponseAnnotationsItemLine.Caption | undefined;
+        leader?: DocAnnotationsList200ResponseAnnotationsItemLine.Leader | undefined;
         ref: CloudPDF.DocAnnotationsList200ResponseAnnotationsItemLineRef;
         pageObjectNumber: number;
         index: number;
@@ -1046,6 +1091,37 @@ export namespace DocAnnotationsList200ResponseAnnotationsItem {
     }
 
     export namespace DocAnnotationsList200ResponseAnnotationsItemLine {
+        export const Intent = {
+            LineArrow: "LineArrow",
+            LineDimension: "LineDimension",
+        } as const;
+        export type Intent = (typeof Intent)[keyof typeof Intent];
+
+        export interface Caption {
+            enabled: boolean;
+            position?: Caption.Position | undefined;
+            offset?: Caption.Offset | undefined;
+        }
+
+        export namespace Caption {
+            export const Position = {
+                Inline: "inline",
+                Top: "top",
+            } as const;
+            export type Position = (typeof Position)[keyof typeof Position];
+
+            export interface Offset {
+                along: number;
+                perpendicular: number;
+            }
+        }
+
+        export interface Leader {
+            length: number;
+            extension?: number | undefined;
+            offset?: number | undefined;
+        }
+
         export const IdentityQuality = {
             Durable: "durable",
             Weak: "weak",

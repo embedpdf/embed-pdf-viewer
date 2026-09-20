@@ -624,3 +624,8 @@ export { caps, collab, materializePdfPermissions, pdfPermissions } from './auth/
 // route guards and the cloud SDK consume it, and engine-local must not pull it
 // into its bundle. See ENGINE_CORE_BOUNDARIES.md (or wire/cdn/README.md) for
 // the rationale and where to import from.
+
+export * from './dto/Measure';
+export * from './measure';
+
+export type { PageScaleResult } from './mutation/PageScaleResult';

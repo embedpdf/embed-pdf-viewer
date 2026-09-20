@@ -6,6 +6,7 @@ import { CloudPageAnnotationsService } from './CloudPageAnnotationsService';
 import { CloudPageGeometryService } from './CloudPageGeometryService';
 import { CloudPageRenderService } from './CloudPageRenderService';
 import { CloudPageTextService } from './CloudPageTextService';
+import { CloudPageMeasureService } from './CloudPageMeasureService';
 import type { HttpClient } from '../transport/HttpClient';
 
 export class CloudPageHandle implements PageHandle {
@@ -13,6 +14,7 @@ export class CloudPageHandle implements PageHandle {
   readonly text: CloudPageTextService;
   readonly geometry: CloudPageGeometryService;
   readonly render: CloudPageRenderService;
+  readonly measure: CloudPageMeasureService;
 
   constructor(
     readonly pageObjectNumber: PageObjectNumber,
@@ -24,6 +26,15 @@ export class CloudPageHandle implements PageHandle {
     manifest: ManifestAccessor,
     publisher: SessionEventPublisher,
   ) {
+    this.measure = new CloudPageMeasureService(
+      http,
+      docId,
+      layerName,
+      pageObjectNumber,
+      isClosed,
+      manifest,
+      publisher,
+    );
     this.annotations = new CloudPageAnnotationsService(
       http,
       docId,

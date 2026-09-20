@@ -59,6 +59,7 @@ const mainBar: BarSchema = {
           item('mode:insert', { variants: ['label'], importance: 1 }),
           item('mode:form', { variants: ['label'], importance: 1 }),
           item('mode:redact', { variants: ['label'], importance: 1 }),
+          item('mode:measure', { variants: ['label'], importance: 1 }),
         ],
       }),
     ],
@@ -139,6 +140,24 @@ const formBar: BarSchema = {
       group('choice-fields', { importance: 2 }, ['form:add-select', 'form:add-listbox']),
       group('signature-fields', { importance: 2 }, ['form:add-signature']),
       history,
+    ],
+  },
+};
+
+const measureBar: BarSchema = {
+  id: 'measure',
+  sections: {
+    center: [
+      group('measure', { importance: 5 }, [
+        'measurement:distance',
+        'measurement:perimeter',
+        'measurement:area',
+        'measurement:calibrate',
+      ]),
+      group('scale', { importance: 4 }, [
+        custom('measurement-scale', { variants: ['inline'], terminal: 'panel:measurement' }),
+      ]),
+      style,
     ],
   },
 };
@@ -232,6 +251,7 @@ export const defaultChrome = defineChrome({
     'mode:insert': insertBar,
     'mode:form': formBar,
     'mode:redact': redactBar,
+    'mode:measure': measureBar,
   },
   menus: { document: documentMenu, zoom: zoomMenu, 'page-settings': pageSettingsMenu },
   strips: { annotation: annotationStrip, selection: selectionStrip },

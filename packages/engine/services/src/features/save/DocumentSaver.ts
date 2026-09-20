@@ -2,6 +2,7 @@ import { EngineError, EngineErrorCode, type PdfSaveMode } from '@embedpdf/engine
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
 import { layerSaveError, pdfSaveModeFlags } from './internal/pdfSaveMode';
+import { readSavedBuffer } from './internal/readSavedBuffer';
 import type { DocumentSession } from '../../document-session/DocumentSession';
 import { SignatureReader } from '../signature/SignatureReader';
 
@@ -170,7 +171,7 @@ export class DocumentSaver {
     this.requireLayer();
 
     const { mem, fn } = this.runtime;
-    const sizePtr = mem.alloc(4);
+    const sizePtr = mem.alloc(8);
     const statusPtr = mem.alloc(4);
     const changedPtr = mem.alloc(4);
     let artifactPtr: Ptr | null = null;
@@ -244,7 +245,7 @@ export class DocumentSaver {
     this.requireLayer();
 
     const { mem, fn } = this.runtime;
-    const sizePtr = mem.alloc(4);
+    const sizePtr = mem.alloc(8);
     const statusPtr = mem.alloc(4);
     const changedPtr = mem.alloc(4);
     let deltaPtr: Ptr | null = null;
@@ -307,7 +308,8 @@ export class DocumentSaver {
 
   saveStandaloneToBuffer(mode: PdfSaveMode): { bytes: ArrayBuffer; size: number } {
     const { mem, fn } = this.runtime;
-    const sizePtr = mem.alloc(4);
+    // unsigned long is 64-bit on Unix native targets and 32-bit in WASM.
+    const sizePtr = mem.alloc(8);
     let pdfPtr: Ptr | null = null;
     try {
       mem.poke(sizePtr, 'i32', 0);
@@ -325,10 +327,7 @@ export class DocumentSaver {
         throw new EngineError(EngineErrorCode.DocOpenFailed, 'failed to save document');
       }
 
-      const bytes = mem.readBytes(pdfPtr, size);
-      const buffer = new ArrayBuffer(bytes.byteLength);
-      new Uint8Array(buffer).set(bytes);
-      return { bytes: buffer, size };
+      return { bytes: readSavedBuffer(mem, pdfPtr, size), size };
     } finally {
       if (pdfPtr) fn.EPDF_FreeBuffer(pdfPtr);
       mem.free(sizePtr);
@@ -348,7 +347,7 @@ export class DocumentSaver {
     unchangedSinceLoad: boolean;
   } {
     const { mem, fn } = this.runtime;
-    const sizePtr = mem.alloc(4);
+    const sizePtr = mem.alloc(8);
     const statusPtr = mem.alloc(4);
     let pdfPtr: Ptr | null = null;
     try {
@@ -369,10 +368,11 @@ export class DocumentSaver {
       if (!pdfPtr || size <= 0 || status !== EPDF_SAVE_WRITTEN) {
         throw new EngineError(EngineErrorCode.DocOpenFailed, 'failed to save document');
       }
-      const bytes = mem.readBytes(pdfPtr, size);
-      const buffer = new ArrayBuffer(bytes.byteLength);
-      new Uint8Array(buffer).set(bytes);
-      return { bytes: buffer, size, unchangedSinceLoad: false };
+      return {
+        bytes: readSavedBuffer(mem, pdfPtr, size),
+        size,
+        unchangedSinceLoad: false,
+      };
     } finally {
       if (pdfPtr) fn.EPDF_FreeBuffer(pdfPtr);
       mem.free(statusPtr);
