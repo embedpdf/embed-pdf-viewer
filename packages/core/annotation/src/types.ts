@@ -654,6 +654,23 @@ export type Msg =
     }
   | { t: 'finishInkDraft' }
   | { t: 'finishCreationDraft' }
+  /**
+   * Programmatic creation from page-space geometry — the data API's `create`.
+   * Mints the same optimistic `tmp:` annotation a draw tool commits, from the
+   * preset's defaults with `props` layered on top, and emits the same `create`
+   * effect: ONE commit path for pointer and API. `preset` defaults to `subtype`.
+   */
+  | {
+      t: 'createAnnot';
+      page: PageRef;
+      subtype: Subtype;
+      geom: Geom;
+      preset?: string;
+      props?: AnnotationPropsPatch;
+      flags?: Partial<AnnotationFlags>;
+      /** Select the new annotation (a tool would); default false for API creates. */
+      select?: boolean;
+    }
   | {
       t: 'createCaret';
       page: PageRef;

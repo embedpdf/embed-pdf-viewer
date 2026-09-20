@@ -267,10 +267,10 @@ describe('annotation flags', () => {
   it('the data-API create defaults /F to print when the caller omits flags', async () => {
     const h = harness();
     h.create.mockResolvedValueOnce({ created: squareDTO(24) });
-    await h.capability.create(PAGE, {
+    await h.capability.createRaw(PAGE, {
       subtype: 'square',
       rect: { left: 0, bottom: 0, right: 10, top: 10 },
-    } as Parameters<typeof h.capability.create>[1]);
+    } as Parameters<typeof h.capability.createRaw>[1]);
     expect(h.create.mock.calls[0]![0]).toMatchObject({ flags: { print: true } });
   });
 });

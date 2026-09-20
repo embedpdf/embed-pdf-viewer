@@ -38,6 +38,17 @@ export class PluginError extends Error {
   }
 }
 
+/** The serializable summary of a PluginError, for state and event payloads. */
+export interface PluginErrorInfo {
+  readonly code: PluginErrorCode;
+  readonly message: string;
+  readonly capability: string;
+}
+
+export function toPluginErrorInfo(error: PluginError): PluginErrorInfo {
+  return { code: error.code, message: error.message, capability: error.capability };
+}
+
 export function isPluginError(value: unknown, code?: PluginErrorCode): value is PluginError {
   if (!(value instanceof PluginError)) return false;
   return code === undefined || value.code === code;

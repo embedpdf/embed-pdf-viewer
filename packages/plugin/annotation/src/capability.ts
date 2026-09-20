@@ -3,6 +3,12 @@ import {
   snapAppearanceScale,
   type DocumentEvent,
   type PluginContext,
+  createEventHook,
+  PluginError,
+  toPluginError,
+  originOf,
+  pageRefsEqual,
+  type ChangeOrigin,
 } from '@embedpdf/core';
 import type { PageRotation } from '@embedpdf/core-geometry';
 import {
@@ -108,7 +114,13 @@ import {
 } from './rich-text';
 import { buildTextItems } from './text-item';
 import { ARMED_STAMP_TOOL_ID, buildToolRegistry, isTouchDirect } from './tools';
-import { previewBucket } from './types';
+import { geometryFromInput, type CreateAnnotationInput } from './create-input';
+import {
+  previewBucket,
+  type AnnotationCreatedEvent,
+  type AnnotationDeletedEvent,
+  type AnnotationUpdatedEvent,
+} from './types';
 import type { AnnotationToolInput, ResolvedTool } from './tools';
 import type {
   CapturedAnnotationDraft,
@@ -169,6 +181,37 @@ export function createAnnotationCapability(
   // is kept so `registerTool` can re-resolve `extends` against the same base pool.
   const configTools = config.tools ?? [];
   const registry = buildToolRegistry(configTools);
+
+  // ── confirmed-change events (kernel primitive; one emit per confirmed fact) ──
+  const reportListener = (error: unknown) =>
+    console.error('[annotation] event listener failed:', error);
+  const createdHook = createEventHook<AnnotationCreatedEvent>(reportListener);
+  const updatedHook = createEventHook<AnnotationUpdatedEvent>(reportListener);
+  const deletedHook = createEventHook<AnnotationDeletedEvent>(reportListener);
+  ctx.cleanup(() => {
+    createdHook.dispose();
+    updatedHook.dispose();
+    deletedHook.dispose();
+  });
+  const LOCAL_API: ChangeOrigin = {
+    locality: 'local',
+    trigger: 'api',
+    sessionId: null,
+    actorId: null,
+  };
+  const LOCAL_UNKNOWN: ChangeOrigin = {
+    locality: 'local',
+    trigger: 'unknown',
+    sessionId: null,
+    actorId: null,
+  };
+  const emitChanged = (hook: typeof createdHook, dto: AnnotationDTO, origin: ChangeOrigin): void =>
+    hook.emit({ ref: dto.ref, page: dto.page, subtype: dto.subtype, dto, origin });
+  /** Programmatic creates awaiting their engine confirmation, by optimistic id. */
+  const pendingCreates = new Map<
+    Id,
+    { resolve(ref: AnnotationRef): void; reject(error: unknown): void }
+  >();
   /** The installed file-picker port (a DOM file dialog, wired by the framework
    *  adapter), or null — every click-then-pick tool resolves through this ONE
    *  slot. See {@link FilePickerProvider}. */
@@ -982,6 +1025,7 @@ export function createAnnotationCapability(
     if (pon == null) throw new Error('[annotation] cannot resolve page for ref');
     const res = await doc.page(toPageRef(pon)).annotations.update(ref, patch);
     syncDTO(res.updated, 'vector', res.appearance?.changed);
+    emitChanged(updatedHook, res.updated, LOCAL_API);
   };
 
   // ── the text commit: ONE debounced write per annotation for both editors ──
@@ -1025,10 +1069,11 @@ export function createAnnotationCapability(
     }
   };
 
-  function apply(msg: Msg): void {
+  function apply(msg: Msg): Effect[] {
     const [next, effects] = update(model(), msg);
     ctx.dispatch({ type: 'SET_MODEL', model: next });
     for (const fx of effects) perform(fx, next);
+    return effects;
   }
 
   // ── whole-document hydration ──────────────────────────────────────────
@@ -1158,11 +1203,13 @@ export function createAnnotationCapability(
       case 'annotation.created':
         // A create ships with a freshly baked /AP — fetch it.
         upsertRemote([event.created], true);
+        emitChanged(createdHook, event.created, originOf(event));
         break;
       case 'annotation.updated':
         // The engine's verdict rides the event: preserved moves keep the
         // cached raster, regenerated appearances re-fetch exactly once.
         upsertRemote([event.updated], event.appearance.changed);
+        emitChanged(updatedHook, event.updated, originOf(event));
         break;
       case 'annotation.moved':
         // A z-order move never touches /AP.
@@ -1173,7 +1220,12 @@ export function createAnnotationCapability(
           const key = encodeStableIdKey(event.deleted);
           // Attached link children are model annotations, so a remote child
           // delete is this same plain remove — the `linkOf` lens re-derives.
-          if (model().byId[key]) apply({ t: 'remove', ids: [key] });
+          const gone = model().byId[key];
+          if (gone) {
+            apply({ t: 'remove', ids: [key] });
+            if (gone.ref)
+              deletedHook.emit({ ref: gone.ref, page: gone.page, origin: originOf(event) });
+          }
         }
         break;
       default:
@@ -1666,8 +1718,21 @@ export function createAnnotationCapability(
               ref: res.created.ref,
             });
             syncDTO(res.created, 'vector');
+            // Confirmed: the record is in the model, so the event fires now and
+            // a programmatic create() resolves after it (rule 2 of the contract).
+            emitChanged(
+              createdHook,
+              res.created,
+              pendingCreates.has(fx.id) ? LOCAL_API : LOCAL_UNKNOWN,
+            );
+            pendingCreates.get(fx.id)?.resolve(res.created.ref);
+            pendingCreates.delete(fx.id);
           },
-          () => apply({ t: 'createFailed', tempId: fx.id }),
+          (error: unknown) => {
+            apply({ t: 'createFailed', tempId: fx.id });
+            pendingCreates.get(fx.id)?.reject(error);
+            pendingCreates.delete(fx.id);
+          },
         );
     } else if (fx.fx === 'flags') {
       // A `/F`-only write: the model already holds the MERGED flags, so emit
@@ -1684,7 +1749,10 @@ export function createAnnotationCapability(
           flags: a.flags,
         } as AnnotationPatch)
         .then(
-          (res) => syncDTO(res.updated, a.source),
+          (res) => {
+            syncDTO(res.updated, a.source);
+            emitChanged(updatedHook, res.updated, LOCAL_UNKNOWN);
+          },
           (err) => console.error('[annotation] flags write failed:', err),
         );
     } else if (fx.fx === 'patch') {
@@ -1711,6 +1779,7 @@ export function createAnnotationCapability(
         .then(
           (res) => {
             syncDTO(res.updated, a.source, res.appearance.changed);
+            emitChanged(updatedHook, res.updated, LOCAL_UNKNOWN);
             // Attached link children follow their parent's COMMITTED geometry
             // — scheduled after the parent's own write resolves, from ONE
             // place, so no gesture ever has to know the children exist.
@@ -1732,7 +1801,7 @@ export function createAnnotationCapability(
         .page(fx.ref.page)
         .annotations.delete(fx.ref)
         .then(
-          () => {},
+          () => deletedHook.emit({ ref: fx.ref, page: fx.ref.page, origin: LOCAL_UNKNOWN }),
           () => {},
         );
     }
@@ -1884,7 +1953,61 @@ export function createAnnotationCapability(
       }
       return report;
     },
-    create: async (page, draft: AnnotationDraft): Promise<AnnotationRef> => {
+    create: (input: CreateAnnotationInput): Promise<AnnotationRef> => {
+      if (!allowsCreate()) {
+        return Promise.reject(
+          new PluginError('permission-denied', 'annotation', 'create requires doc.annotate.create'),
+        );
+      }
+      if (!ctx.document()?.pages.some((p) => pageRefsEqual(p.ref, input.page))) {
+        return Promise.reject(
+          new PluginError(
+            'not-found',
+            'annotation',
+            `page ${input.page.pageObjectNumber} is not in this document`,
+          ),
+        );
+      }
+      let staged: { subtype: Subtype; geom: Geom };
+      try {
+        staged = geometryFromInput(input);
+      } catch (error) {
+        return Promise.reject(error);
+      }
+      const tool = input.tool ? registry.get(input.tool) : undefined;
+      if (input.tool && !tool) {
+        return Promise.reject(
+          new PluginError('not-found', 'annotation', `unknown tool '${input.tool}'`),
+        );
+      }
+      return new Promise<AnnotationRef>((resolve, reject) => {
+        // One commit path: the same `createAnnot` → `create` effect a draw tool
+        // takes, so defaults, flags, optimistic staging, engine write and
+        // reconciliation are identical for pointer and API.
+        const effects = apply({
+          t: 'createAnnot',
+          page: input.page,
+          subtype: staged.subtype,
+          geom: staged.geom,
+          preset: tool?.preset ?? input.tool,
+          props: input.props,
+          flags: { ...tool?.flags, ...input.flags },
+          select: input.select ?? false,
+        });
+        const fx = effects.find((e): e is Extract<Effect, { fx: 'create' }> => e.fx === 'create');
+        if (!fx) {
+          reject(
+            new PluginError('operation-failed', 'annotation', 'the annotation could not be staged'),
+          );
+          return;
+        }
+        pendingCreates.set(fx.id, {
+          resolve,
+          reject: (error) => reject(toPluginError('annotation', error)),
+        });
+      });
+    },
+    createRaw: async (page, draft: AnnotationDraft): Promise<AnnotationRef> => {
       const doc = ctx.doc;
       if (!doc) throw new Error('[annotation] no document bound');
       // Default `/F` to `print` (Acrobat parity — without it the annotation
@@ -1895,8 +2018,12 @@ export function createAnnotationCapability(
       const res = await doc.page(page).annotations.create(withFlags);
       // Stamps have no vector render — their engine-baked /AP is the visual.
       syncDTO(res.created, res.created.subtype === 'stamp' ? 'baked' : 'vector');
+      emitChanged(createdHook, res.created, LOCAL_API);
       return res.created.ref;
     },
+    onCreated: createdHook.on,
+    onUpdated: updatedHook.on,
+    onDeleted: deletedHook.on,
     armStamp,
     placeStamp,
     disarmStamp,
@@ -1988,6 +2115,7 @@ export function createAnnotationCapability(
       if (pon == null) throw new Error('[annotation] cannot resolve page for ref');
       await doc.page(toPageRef(pon)).annotations.delete(ref);
       apply({ t: 'remove', ids: [refKey(ref)] });
+      deletedHook.emit({ ref, page: toPageRef(pon), origin: LOCAL_API });
     },
 
     // ── authorization: per-record mirrors of the engine's collab

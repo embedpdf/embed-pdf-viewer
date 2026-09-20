@@ -9,6 +9,12 @@ import type { AnnotationCapability } from './types';
 
 export type {
   AnnotationCapability,
+  AnnotationChangedEvent,
+  AnnotationCreatedEvent,
+  AnnotationDeletedEvent,
+  AnnotationUpdatedEvent,
+  CreateAnnotationInput,
+  CreateAnnotationGeometry,
   AnnotationConfig,
   AnnotationState,
   AnnotationAction,

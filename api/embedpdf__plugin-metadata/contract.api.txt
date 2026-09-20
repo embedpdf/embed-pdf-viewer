@@ -1,5 +1,5 @@
 # @embedpdf/plugin-metadata — ./contract
 
-MetadataCapability [InterfaceDeclaration] (from packages/plugin/metadata/src/types.ts): export interface MetadataCapability{ canEdit(): boolean; current(): DocumentMetadata | null; update(patch: MetadataPatch): Promise<void>; reload(): Promise<void>; }
-MetadataState [InterfaceDeclaration] (from packages/plugin/metadata/src/types.ts): export interface MetadataState{ metadata: DocumentMetadata | null; }
-MetadataToken [VariableDeclaration] (from packages/plugin/metadata/src/types.ts): MetadataToken = createCapabilityToken<MetadataCapability>('metadata')
+MetadataCapability [InterfaceDeclaration]: export interface MetadataCapability{ getSnapshot(): DocumentMetadata | null; getStatus(): ResourceStatus; canEdit(): boolean; update(patch: MetadataPatch, options?: OperationOptions): Promise<MetadataUpdateResult>; refresh(options?: OperationOptions): Promise<void>; readonly onUpdated: EventHook<MetadataUpdatedEvent>; }
+MetadataToken [VariableDeclaration]: MetadataToken = createCapabilityToken<MetadataCapability>('metadata', { hint: "add metadataPlugin() from '@embedpdf/plugin-metadata' to your plugins list", } )
+MetadataUpdatedEvent [InterfaceDeclaration]: export interface MetadataUpdatedEvent{ readonly metadata: DocumentMetadata; readonly previous: DocumentMetadata | null; readonly changedKeys: readonly (keyof DocumentMetadata)[]; readonly origin: ChangeOrigin; }

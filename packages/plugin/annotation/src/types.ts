@@ -1,4 +1,10 @@
-import { createCapabilityToken, type DocumentEvent } from '@embedpdf/core';
+import {
+  createCapabilityToken,
+  type ChangeOrigin,
+  type DocumentEvent,
+  type EventHook,
+} from '@embedpdf/core';
+import type { CreateAnnotationInput } from './create-input';
 import type { AnnotCommitEntry, AnnotCommitResult } from '@embedpdf/plugin-actions/contract/host';
 import type { PageRotation } from '@embedpdf/core-geometry';
 import type {
@@ -417,15 +423,47 @@ export interface CapturedAnnotationDraft {
   to: PdfPoint;
 }
 
+/** A confirmed creation or update: the durable record, whoever caused it. */
+export interface AnnotationChangedEvent {
+  readonly ref: AnnotationRef;
+  readonly page: PageRef;
+  readonly subtype: AnnotationDTO['subtype'];
+  /** The engine record (PDF space) until the page-space read model lands. */
+  readonly dto: AnnotationDTO;
+  readonly origin: ChangeOrigin;
+}
+export type AnnotationCreatedEvent = AnnotationChangedEvent;
+export type AnnotationUpdatedEvent = AnnotationChangedEvent;
+export interface AnnotationDeletedEvent {
+  readonly ref: AnnotationRef;
+  readonly page: PageRef;
+  readonly origin: ChangeOrigin;
+}
+
 export interface AnnotationCapability {
-  // ── data API: the mutation vocabulary (engine-core types, addressable by ref) ──
+  // ── data API: the mutation vocabulary (addressable by ref) ──
   /**
-   * Create an annotation on a page. `draft` is the engine-core draft for its
-   * subtype (PDF-space, sRGB). Resolves to the new annotation's durable `ref`.
-   * The same path the draw tools use, so programmatic and interactive creation
-   * share one optimistic flow + one event stream.
+   * Create an annotation from PAGE-SPACE input (the unrotated page's frame,
+   * origin at the CropBox top-left, y down). The same optimistic commit path
+   * the draw tools use: staged at once, written to the engine, reconciled to
+   * the durable record. Resolves with the durable ref after `onCreated` has
+   * fired. Rejects `permission-denied`, `not-found` (page), `invalid-input`,
+   * `unsupported` (a subtype `create` does not build yet), or the engine's
+   * failure as `operation-failed`.
    */
-  create(page: PageRef, draft: AnnotationDraft): Promise<AnnotationRef>;
+  create(input: CreateAnnotationInput): Promise<AnnotationRef>;
+  /**
+   * The PDF-space escape hatch: `draft` is the engine-core draft for its
+   * subtype (PDF user space, sRGB), written as given. Resolves to the new
+   * annotation's durable `ref`. Prefer `create()`.
+   */
+  createRaw(page: PageRef, draft: AnnotationDraft): Promise<AnnotationRef>;
+  /** A confirmed creation, local or remote. The record is in the model when listeners run. */
+  readonly onCreated: EventHook<AnnotationCreatedEvent>;
+  /** A confirmed update, local or remote. */
+  readonly onUpdated: EventHook<AnnotationUpdatedEvent>;
+  /** A confirmed deletion, local or remote. */
+  readonly onDeleted: EventHook<AnnotationDeletedEvent>;
   /**
    * Patch an existing annotation. `patch` is the engine-core patch for the
    * annotation's subtype — style, endings, contents, geometry are ALL just
@@ -1092,6 +1130,8 @@ export interface AnnotationHostCapability extends AnnotationCapability {
  * The package root re-exports the SAME token narrowed to
  * {@link AnnotationCapability}.
  */
+export type { CreateAnnotationInput, CreateAnnotationGeometry } from './create-input';
+
 export const AnnotationToken = createCapabilityToken<AnnotationHostCapability>('annotation', {
   hint: `add annotationPlugin() from '@embedpdf/plugin-annotation' to your plugins list`,
 });

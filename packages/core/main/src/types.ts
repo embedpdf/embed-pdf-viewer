@@ -67,6 +67,34 @@ export interface OperationOptions {
   readonly signal?: AbortSignal;
 }
 
+/** Load state of a resource a plugin hydrates from the engine. `forbidden` is a permission refusal, not an empty value. */
+export type ResourceStatus = 'idle' | 'loading' | 'ready' | 'forbidden' | 'error';
+
+/**
+ * Where a confirmed change came from, on every plugin event that reports one.
+ * `locality` is whether THIS engine instance caused it; `trigger` is the
+ * user-visible cause when known. Remote changes arrive with `trigger: 'unknown'`
+ * because the transport does not carry it; never infer a gesture from it.
+ */
+export interface ChangeOrigin {
+  readonly locality: 'local' | 'remote';
+  readonly trigger: 'user' | 'api' | 'script' | 'system' | 'unknown';
+  readonly sessionId: string | null;
+  readonly actorId: string | null;
+}
+
+/** The origin of a confirmed engine event, projected onto the plugin vocabulary. */
+export function originOf(event: {
+  origin: { kind: 'local' | 'remote'; sessionId: string; sub: string | null };
+}): ChangeOrigin {
+  return {
+    locality: event.origin.kind === 'remote' ? 'remote' : 'local',
+    trigger: 'unknown',
+    sessionId: event.origin.sessionId,
+    actorId: event.origin.sub ?? null,
+  };
+}
+
 /** Anything `ctx.listen` can subscribe to: an EventHook, or an object with `subscribe`. */
 export type Subscribable<T> =
   | ((listener: (event: T) => void) => Unsubscribe)

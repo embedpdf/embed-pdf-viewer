@@ -1113,7 +1113,7 @@ function SearchControls() {
     return () => clearTimeout(t);
   }, [text, matchCase, wholeWord, regex, patternError, search]);
 
-  const hits = useSelector(SearchToken, (c) => c.hits());
+  const hits = useSelector(SearchToken, (c) => c.listHits());
   const counter =
     hitCount > 0
       ? `${activeIndex + 1}/${hitCount}`
@@ -1133,7 +1133,7 @@ function SearchControls() {
           setListOpen(true);
         }}
         onKeyDown={(e) => {
-          if (e.key === 'Enter') e.shiftKey ? search.prev() : search.next();
+          if (e.key === 'Enter') e.shiftKey ? search.previousHit() : search.nextHit();
           if (e.key === 'Escape') {
             setText('');
             setListOpen(false);
@@ -1160,10 +1160,10 @@ function SearchControls() {
         title="regular expression (RE2-portable dialect)"
         onClick={() => setRegex((v) => !v)}
       />
-      <button onClick={() => search.prev()} title="previous match (shift+Enter)" style={tbBtn}>
+      <button onClick={() => search.previousHit()} title="previous match (shift+Enter)" style={tbBtn}>
         ↑
       </button>
-      <button onClick={() => search.next()} title="next match (Enter)" style={tbBtn}>
+      <button onClick={() => search.nextHit()} title="next match (Enter)" style={tbBtn}>
         ↓
       </button>
       <span
@@ -1196,7 +1196,7 @@ function SearchControls() {
           {hits.slice(0, 100).map((hit, i) => (
             <button
               key={`${hit.page.pageObjectNumber}:${hit.charStart}`}
-              onClick={() => search.goTo(i)}
+              onClick={() => search.goToHit(i)}
               style={{
                 display: 'block',
                 width: '100%',
@@ -1231,7 +1231,7 @@ function SearchControls() {
             {status === 'searching'
               ? `scanning… ${progress.scanned}/${progress.total} pages`
               : `${hitCount} matches${hitCount > 100 ? ' (first 100 shown)' : ''}`}
-            {error && <span style={{ color: '#e5484d' }}>{error}</span>}
+            {error && <span style={{ color: '#e5484d' }}>{error.message}</span>}
             <span style={{ marginLeft: 'auto' }} />
             <button
               onClick={() => setListOpen(false)}

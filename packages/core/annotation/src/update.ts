@@ -340,6 +340,8 @@ export function update(m: Model, msg: Msg): [Model, Effect[]] {
       return createReplaceText(m, msg.page, msg.quads, msg.anchor, msg.preset);
     case 'createMarkup':
       return createMarkup(m, msg.subtype, msg.page, msg.quads, msg.preset, msg.flags);
+    case 'createAnnot':
+      return createAnnot(m, msg);
     case 'setMarkupPreview':
       return setMarkupPreview(m, msg.subtype, msg.quadsByPage, msg.preset);
     case 'clearMarkupPreview':
@@ -1872,4 +1874,43 @@ function reconcile(m: Model, tempId: Id, id: Id, ref: AnnotationRef): Model {
     // keep the just-drawn box in edit mode across the temp→durable id swap
     editing: m.editing === tempId ? id : m.editing,
   };
+}
+
+/**
+ * The data API's create: page-space geometry in, the SAME optimistic
+ * annotation and `create` effect a draw tool commits out. Defaults come from
+ * the preset (a tool id or the bare subtype); `props` override them; line and
+ * open-poly kinds take the preset's line endings when the geometry carries none.
+ */
+function createAnnot(m: Model, msg: Extract<Msg, { t: 'createAnnot' }>): [Model, Effect[]] {
+  const preset = (msg.preset ?? msg.subtype) as Subtype;
+  const def = defaultsFor(m, preset);
+  const geom: Geom =
+    (msg.geom.t === 'line' || (msg.geom.t === 'poly' && !msg.geom.closed)) && !msg.geom.ends
+      ? { ...msg.geom, ends: def.lineEndings }
+      : msg.geom;
+  const id = `tmp:${m.seq + 1}`;
+  const base: Annot = {
+    id,
+    ref: null,
+    page: msg.page,
+    subtype: msg.subtype,
+    geom,
+    style: styleFromProps(def),
+    ...(geom.t === 'text' ? { text: textStyleFromProps(def) } : {}),
+    ...(msg.subtype === 'link' ? { link: def.link ?? null } : {}),
+    flags: { ...DRAWN_FLAGS, ...msg.flags },
+    source: 'vector',
+  };
+  const annot = msg.props ? (applyProps(base, msg.props) ?? base) : base;
+  return [
+    {
+      ...m,
+      seq: m.seq + 1,
+      byId: { ...m.byId, [id]: annot },
+      order: [...m.order, id],
+      ...(msg.select ? { selected: [id] } : {}),
+    },
+    [{ fx: 'create', id }],
+  ];
 }

@@ -2,6 +2,13 @@ import { PluginError, toPluginError } from './errors';
 import type { OperationOptions } from './types';
 
 /** One execution inside a `latest` lane. */
+/** `details` of the `operation-cancelled` error a superseded or cancelled run rejects with. */
+export interface LatestCancellation {
+  readonly runId: string;
+  /** `'superseded'`, `'cancelled'`, the caller's abort reason, or `'instance-closed'`. */
+  readonly reason: string;
+}
+
 export interface LatestRun {
   /** `${lane}#${n}`, unique per run; surfaces in cancellation errors and events. */
   readonly id: string;
@@ -35,7 +42,9 @@ export function createLatestLane(
 
   const closed = () => new PluginError('instance-closed', capability, `${name}: instance closed`);
   const cancelled = (id: string, why: string) =>
-    new PluginError('operation-cancelled', capability, `${name}: ${why}`, { details: id });
+    new PluginError('operation-cancelled', capability, `${name}: ${why}`, {
+      details: { runId: id, reason: why },
+    });
 
   return {
     get running() {
