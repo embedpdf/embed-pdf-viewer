@@ -2467,16 +2467,16 @@ await client.doc.pages.setScale({
 <dl>
 <dd>
 
-**request:** `CloudPDF.doc.DocPagesSetScaleRequest`
-
+**request:** `CloudPDF.doc.DocPagesSetScaleRequest` 
+    
 </dd>
 </dl>
 
 <dl>
 <dd>
 
-**requestOptions:** `PagesClient.RequestOptions`
-
+**requestOptions:** `PagesClient.RequestOptions` 
+    
 </dd>
 </dl>
 </dd>
@@ -2520,16 +2520,16 @@ await client.doc.pages.viewports({
 <dl>
 <dd>
 
-**request:** `CloudPDF.doc.ViewportsPagesRequest`
-
+**request:** `CloudPDF.doc.ViewportsPagesRequest` 
+    
 </dd>
 </dl>
 
 <dl>
 <dd>
 
-**requestOptions:** `PagesClient.RequestOptions`
-
+**requestOptions:** `PagesClient.RequestOptions` 
+    
 </dd>
 </dl>
 </dd>

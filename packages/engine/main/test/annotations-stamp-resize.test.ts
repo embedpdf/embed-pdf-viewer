@@ -74,6 +74,54 @@ describe('vector stamp resizing (wasm)', () => {
     return engine.open({ kind: 'bytes', id: 'stamp-resize', bytes }, { scope: ['*'] });
   }
 
+  test('download preserves imported stamp rotation with default and rewrite options', async () => {
+    // Structural save coverage lives in runtime-src's EPDFStampSaveEmbedderTest.
+    // This checks public update/download routing through the WASM engine.
+    const original = fixture();
+    const doc = await open(original);
+    try {
+      const page = doc.page(3);
+      const ref = (await page.annotations.list()).annotations[0]!.ref;
+      await page.annotations.update(ref, {
+        subtype: 'stamp',
+        rotation: 270,
+        unrotatedRect: { left: 80, bottom: 45, right: 140, top: 75 },
+        rect: { left: 95, bottom: 30, right: 125, top: 90 },
+      });
+      // Render the full annotation through the page renderer: appearance
+      // thumbnails deliberately remove rotation for the viewer to apply it.
+      const render = (document: DocumentHandle) =>
+        document.page(3).render.raw({
+          includeAnnotations: true,
+          target: { kind: 'rect', rect: { left: 0, bottom: -50, right: 520, top: 220 } },
+        });
+      const live = await render(doc);
+      for (const mode of [undefined, 'rewrite'] as const) {
+        const saved = await doc.download(mode ? { mode } : undefined);
+        if (mode !== 'rewrite') {
+          expect(saved.length).toBeGreaterThan(original.length);
+          expect(saved.slice(0, original.length)).toEqual(original);
+        }
+        const reopened = await engine.open(
+          { kind: 'bytes', id: 'stamp-reopened', bytes: saved },
+          { scope: ['*'] },
+        );
+        try {
+          const updated = (await reopened.page(3).annotations.list()).annotations[0]!;
+          expect(updated.subtype).toBe('stamp');
+          if (updated.subtype === 'stamp') expect(updated.rotation).toBe(270);
+          const raster = await render(reopened);
+          expect([raster.width, raster.height]).toEqual([live.width, live.height]);
+          expect(Buffer.from(raster.data).equals(Buffer.from(live.data))).toBe(true);
+        } finally {
+          await reopened.close();
+        }
+      }
+    } finally {
+      await doc.close();
+    }
+  });
+
   test.each([false, true])(
     'cover centers the crop, vertical=%s, including save/reopen',
     async (vertical) => {
