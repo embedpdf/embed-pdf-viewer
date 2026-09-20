@@ -799,3 +799,4 @@ export function normalizeQuad(q: Quad): TextQuad {
     ? { upperStart: a, upperEnd: b, lowerStart: d, lowerEnd: c }
     : { upperStart: b, upperEnd: a, lowerStart: c, lowerEnd: d };
 }
+export * from './page-space';

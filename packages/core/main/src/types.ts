@@ -7,6 +7,8 @@
  * The kernel adds *document scope*: plugins declare a scope and the kernel
  * multiplexes document-scoped plugins per document.
  */
+import type { PageSpace } from '@embedpdf/core-geometry';
+import type { EventHook } from './event-hook';
 import type {
   DocumentHandle,
   Engine,
@@ -14,6 +16,7 @@ import type {
   OpenInput,
   OpenOptions,
   PageLayout,
+  PageRef,
   PageObjectNumber,
   PageRotation,
   PageRotateResult,
@@ -59,6 +62,23 @@ export type {
 
 export type Unsubscribe = () => void;
 
+/** The last parameter of every method that does work: cooperative cancellation. */
+export interface OperationOptions {
+  readonly signal?: AbortSignal;
+}
+
+/** Anything `ctx.listen` can subscribe to: an EventHook, or an object with `subscribe`. */
+export type Subscribable<T> =
+  | ((listener: (event: T) => void) => Unsubscribe)
+  | { subscribe(listener: (event: T) => void): Unsubscribe };
+
+/**
+ * The public name of a page-registry entry: `ref` is the durable identity,
+ * `index` the display order, plus label, size, rotation, userUnit and boxes.
+ * Structurally the engine's `PageLayout`; named for what it is to a developer.
+ */
+export type PageInfo = PageLayout;
+
 /** Every state transition is a plain, serializable action. */
 export interface Action {
   readonly type: string;
@@ -100,6 +120,12 @@ export interface CapabilityToken<T> {
  */
 export interface DocumentMeta {
   readonly id: string;
+  /**
+   * Unique per OPEN of this id: closing and reopening the same document id
+   * yields a new instanceId. Events, refs and leases are checked against it,
+   * so nothing produced by a closed instance can be mistaken for the new one.
+   */
+  readonly instanceId: string;
   readonly name?: string;
   readonly pageCount: number;
   readonly pages: readonly PageLayout[];
@@ -207,6 +233,46 @@ export interface EffectContext<S, A extends Action = Action> extends PluginConte
 }
 
 /**
+ * The context a plugin's `create()` receives. The plain context plus nine
+ * members, each explainable in one sentence at the call site; the lifetime
+ * and error guarantees live inside them, so a controller is plain async code.
+ */
+export interface ControllerContext<S, A extends Action = Action> extends PluginContext<S, A> {
+  /** Unique per open of this document (workspace plugins: `workspace:<id>`). */
+  readonly instanceId: string;
+  /**
+   * GUARDED document handle: every call rejects `instance-closed` once the
+   * instance closed, is aborted at close, and throws `PluginError` instead of
+   * raw engine errors. Workspace plugins have no bound document and must use
+   * `forDocument()`; reading `doc` there throws.
+   */
+  readonly doc: DocumentHandle;
+  /** Mint a capability event; disposed with the instance. Expose only `.on`. */
+  readonly events: {
+    source<T>(): { readonly on: EventHook<T>; emit(event: T): void; dispose(): void };
+  };
+  /** The one owner of page ↔ PDF conversion for a page of THIS document. */
+  readonly geometry: { forPage(ref: PageRef): PageSpace };
+  /** Subscribe for the instance lifetime; the unsubscribe is owned by the kernel. */
+  listen<T>(source: Subscribable<T>, listener: (event: T) => void): void;
+  /** Resolve when the predicate holds (checked on every store change); rejects on cancel or close. */
+  waitFor(predicate: () => boolean, options?: OperationOptions): Promise<void>;
+  /** Per-key submission-order queue for multi-step writes; failures do not poison later work. */
+  serialQueue(key?: string): <T>(operation: () => Promise<T>) => Promise<T>;
+  /** Newest-wins lane for reads a newer call should cancel (visible search, validation). */
+  latest(key: string): import('./lanes').LatestLane;
+  /** Acquire a resource whose disposal the instance owns; a late arrival after close is disposed, not returned. */
+  acquire<R>(
+    get: (lifetime: AbortSignal) => Promise<R>,
+    dispose: (resource: R) => void | Promise<void>,
+  ): Promise<R>;
+  /** Throw `not-found` unless the ref names a page of THIS document. */
+  assertPageRef(ref: PageRef): void;
+  /** The page registry entry for a ref, or null. */
+  getPage(ref: PageRef): PageInfo | null;
+}
+
+/**
  * A plugin definition. `scope` decides multiplexing:
  *   'workspace' (default) — one instance; can see every document.
  *   'document'            — one instance PER open document; authored single-document.
@@ -222,6 +288,13 @@ export interface PluginDef<S = unknown, A extends Action = Action, C = unknown> 
   readonly capability?: (ctx: PluginContext<S, A>) => C;
   readonly init?: (ctx: PluginContext<S, A>) => void | Promise<void>;
   readonly effects?: (ctx: EffectContext<S, A>) => void;
+  /**
+   * The controller hook: build the instance's API and, optionally, the
+   * connections (subscriptions to engine events and sibling capabilities)
+   * that start once every dependency is constructed. Runs once per INSTANCE.
+   * A plugin declares either `create` or `capability`/`effects`, not both.
+   */
+  readonly create?: (ctx: ControllerContext<S, A>) => { api: C; connect?: () => void };
 }
 
 export type AnyPlugin = PluginDef<any, any, any>;
@@ -327,6 +400,20 @@ export interface DocumentsCapability {
    * is absent there). Defaults to the active document.
    */
   downloadLayer(id?: string): Promise<Uint8Array>;
+  /**
+   * The page registry of a document (the active one by default), in display
+   * order. Reference-stable per registry revision: the array only changes
+   * when a structural mutation replaced it.
+   */
+  listPages(documentId?: string): readonly PageInfo[];
+  /** One page by its durable `PageRef`, or null when unknown to THAT document. */
+  getPage(ref: PageRef, documentId?: string): PageInfo | null;
+  /** One page by zero-based display index. */
+  getPageAt(index: number, documentId?: string): PageInfo | null;
+  /** Display index of a page, `-1` when the document does not have it. */
+  getPageIndex(ref: PageRef, documentId?: string): number;
+  /** The registry revision (bumps on rotate/move/delete/insert); `-1` with no document. */
+  getRevision(documentId?: string): number;
   /**
    * Session authority over a document — the sanctioned surface for the ONE
    * chrome exception in permissions.md: kernel-level features with a 1:1

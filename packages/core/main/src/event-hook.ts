@@ -6,7 +6,10 @@ import type { Unsubscribe } from './types';
  * a late subscriber that needs the current value uses a query + selector
  * instead. Payloads are plain serializable objects.
  */
-export type EventHook<T> = (listener: (event: T) => void) => Unsubscribe;
+export type EventHook<T> = (
+  listener: (event: T) => void,
+  options?: { signal?: AbortSignal },
+) => Unsubscribe;
 
 /**
  * The plugin-private pair behind one capability event. Expose `.on` on the
@@ -23,6 +26,9 @@ export interface EventHookSource<T> {
 /**
  * Create one capability event.
  *
+ * Subscribe with `{ signal }` to tie the subscription to an AbortSignal; a
+ * pre-aborted signal never registers.
+ *
  * Delivery contract: synchronous fan-out over a snapshot of the listener set
  * (listeners added or removed during an emit don't affect that emit); a
  * throwing listener is isolated — reported through `onListenerError`, never
@@ -35,10 +41,14 @@ export function createEventHook<T = void>(
 ): EventHookSource<T> {
   let listeners: Set<(event: T) => void> | null = new Set();
   return {
-    on(listener) {
-      if (!listeners) return () => {};
+    on(listener, options) {
+      if (!listeners || options?.signal?.aborted) return () => {};
       listeners.add(listener);
-      return () => void listeners?.delete(listener);
+      const off = () => void listeners?.delete(listener);
+      // An AbortSignal is the framework-neutral lifetime: one controller can
+      // end many subscriptions (rule 8 of the contract).
+      options?.signal?.addEventListener('abort', off, { once: true });
+      return off;
     },
     emit(event) {
       if (!listeners) return;

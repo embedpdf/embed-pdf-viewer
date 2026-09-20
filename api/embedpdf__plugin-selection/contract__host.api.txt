@@ -1,0 +1,8 @@
+# @embedpdf/plugin-selection — ./contract/host
+
+GlyphPointer [InterfaceDeclaration] (from packages/plugin/selection/src/types.ts): export interface GlyphPointer{ page: PageRef; glyph: number; }
+SelectionAction [TypeAliasDeclaration] (from packages/plugin/selection/src/types.ts): export type SelectionAction = |{ type: 'PAGE_LOADED'; page: PageRef} |{ type: 'SET'; selection: SelectionRange; segments: Record<number, SelectionSegment[]>} |{ type: 'CLEAR'} |{ type: 'SET_HIGHLIGHT_HIDDEN'; hidden: boolean} |{ type: 'SET_SELECTING'; selecting: boolean} ;
+SelectionHostCapability [InterfaceDeclaration] (from packages/plugin/selection/src/types.ts): export interface SelectionHostCapability extends SelectionCapability{ ensurePage(page: PageRef): void; isLoaded(page: PageRef): boolean; isOverText(page: PageRef, point: Point): boolean; beginAt(page: PageRef, point: Point): boolean; selectWordAt(page: PageRef, point: Point): boolean; selectLineAt(page: PageRef, point: Point): boolean; extendTo(page: PageRef, point: Point): void; end(): void; setHighlightVisible(visible: boolean): void; highlightVisible(): boolean; }
+SelectionRange [InterfaceDeclaration] (from packages/plugin/selection/src/types.ts): export interface SelectionRange{ anchor: GlyphPointer; focus: GlyphPointer; }
+SelectionState [InterfaceDeclaration] (from packages/plugin/selection/src/types.ts): export interface SelectionState{ selection: SelectionRange | null; segments: Record<number, SelectionSegment[]>; loaded: Record<number, boolean>; highlightHidden: boolean; selecting: boolean; }
+SelectionToken [VariableDeclaration] (from packages/plugin/selection/src/types.ts): SelectionToken = createCapabilityToken<SelectionHostCapability>('selection')

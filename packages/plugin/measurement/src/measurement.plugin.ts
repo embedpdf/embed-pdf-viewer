@@ -12,11 +12,16 @@ import type {
   MeasurementState,
 } from './types';
 
-export const measurementPlugin = (config: MeasurementConfig = {}) => {
-  // A plugin definition is reused across documents. Drivers are keyed by the
-  // bound instance, never one mutable closure shared between document tabs.
-  const drivers = new Map<string, MeasurementEffects>();
-  return definePlugin<MeasurementState, MeasurementAction, MeasurementCapability>({
+/**
+ * Each document instance owns its driver. The driver is looked up by the
+ * capability OBJECT (unique per instance), never by document id: a definition
+ * is an immutable recipe two kernels may share, and two kernels can hold the
+ * same document id at once.
+ */
+const driverOf = new WeakMap<object, MeasurementEffects>();
+
+export const measurementPlugin = (config: MeasurementConfig = {}) =>
+  definePlugin<MeasurementState, MeasurementAction, MeasurementCapability>({
     id: 'measurement',
     scope: 'document',
     token: MeasurementToken,
@@ -25,15 +30,12 @@ export const measurementPlugin = (config: MeasurementConfig = {}) => {
     reduce: measurementReducer,
     capability: (ctx) => {
       const effects = createMeasurementEffects(ctx, config);
-      drivers.set(ctx.documentId!, effects);
-      ctx.cleanup(() => {
-        drivers.delete(ctx.documentId!);
-      });
-      return createMeasurementCapability(ctx, config, effects);
+      const capability = createMeasurementCapability(ctx, config, effects);
+      driverOf.set(capability, effects);
+      return capability;
     },
     effects: (ctx) => {
-      ctx.get(MeasurementToken); // Capabilities are lazy; construct this document's driver first.
-      drivers.get(ctx.documentId!)!.start();
+      // Capabilities are lazy; resolving our own token constructs this document's driver.
+      driverOf.get(ctx.get(MeasurementToken))?.start();
     },
   });
-};

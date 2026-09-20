@@ -1,0 +1,18 @@
+# @embedpdf/plugin-search — ./contract
+
+SearchCapability [InterfaceDeclaration] (from packages/plugin/search/src/types.ts): export interface SearchCapability{ canSearch(mode?: SearchMode): boolean; search(query: SearchQuery, exec?: SearchExecOptions): void; rerun(): void; clear(): void; next(): SearchHit | null; prev(): SearchHit | null; goTo(index: number, reveal?: SearchRevealOptions): SearchHit | null; query(): SearchQuery | null; status(): SearchStatus; hits(): SearchHit[]; hitCount(): number; activeIndex(): number; activeHit(): SearchHit | null; hitsForPage(page: PageRef): SearchHit[]; progress():{ scanned: number; total: number} ; errorMessage(): string | null; findAll(query: SearchQuery, opts?: SearchFindAllOptions): Promise<SearchHit[]>; }
+SearchExecOptions [InterfaceDeclaration] (from packages/plugin/search/src/types.ts): export interface SearchExecOptions{ startPage?: PageRef; }
+SearchFindAllOptions [InterfaceDeclaration] (from packages/plugin/search/src/types.ts): export interface SearchFindAllOptions{ signal?: AbortSignal; mode?: SearchMode; }
+SearchHit [InterfaceDeclaration] (from packages/plugin/search/src/types.ts): export interface SearchHit{ page: PageRef; pageIndex: number; charStart: number; charCount: number; segments: TextSegment[]; bounds?: Rect; snippet?: SearchSnippet; }
+SearchPluginConfig [InterfaceDeclaration] (from packages/plugin/search/src/types.ts): export interface SearchPluginConfig{ reveal?: SearchRevealOptions; }
+SearchQuery [InterfaceDeclaration] (from packages/engine/core/dist/AnnotationListSnapshot-lNlSIkuG.d.ts): interface SearchQuery{ text: string; regex?: boolean; matchCase?: boolean; wholeWord?: boolean; matchDiacritics?: boolean; ignoreWhitespace?: boolean; }
+SearchQueryIssue [TypeAliasDeclaration] (from packages/engine/core/dist/AnnotationListSnapshot-lNlSIkuG.d.ts): type SearchQueryIssue = SearchRegexIssue | 'diacritics-with-regex' | 'ignore-whitespace-with-regex';
+SearchQueryValidation [TypeAliasDeclaration] (from packages/engine/core/dist/AnnotationListSnapshot-lNlSIkuG.d.ts): type SearchQueryValidation ={ ok: true; } |{ ok: false; issue: SearchQueryIssue; message: string; } ;
+SearchRegexValidation [TypeAliasDeclaration] (from packages/engine/core/dist/AnnotationListSnapshot-lNlSIkuG.d.ts): type SearchRegexValidation ={ ok: true; } |{ ok: false; issue: SearchRegexIssue; message: string; } ;
+SearchRevealOptions [InterfaceDeclaration] (from packages/plugin/search/src/types.ts): export interface SearchRevealOptions{ anchor?: RevealAnchor; behavior?: ScrollBehaviorKind; }
+SearchSnippet [InterfaceDeclaration] (from packages/engine/core/dist/AnnotationListSnapshot-lNlSIkuG.d.ts): interface SearchSnippet{ text: string; matchStart: number; matchLength: number; }
+SearchState [InterfaceDeclaration] (from packages/plugin/search/src/types.ts): export interface SearchState{ query: SearchQuery | null; status: SearchStatus; hits: SearchHit[]; hitsByPage: Record<number, number[]>; activeIndex: number; progress:{ scanned: number; total: number} ; error: string | null; }
+SearchStatus [TypeAliasDeclaration] (from packages/plugin/search/src/types.ts): export type SearchStatus = 'idle' | 'searching' | 'complete' | 'error';
+SearchToken [VariableDeclaration] (from packages/plugin/search/src/types.ts): SearchToken = createCapabilityToken<SearchCapability>('search')
+validateSearchQuery [FunctionDeclaration] (from packages/engine/core/dist/AnnotationListSnapshot-lNlSIkuG.d.ts): declare function validateSearchQuery(query: SearchQuery): SearchQueryValidation;
+validateSearchRegex [FunctionDeclaration] (from packages/engine/core/dist/AnnotationListSnapshot-lNlSIkuG.d.ts): declare function validateSearchRegex(pattern: string): SearchRegexValidation;

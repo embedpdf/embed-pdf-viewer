@@ -1,0 +1,7 @@
+# @embedpdf/react — ./metadata
+
+MetadataCapability [InterfaceDeclaration] (from packages/plugin/metadata/src/types.ts): export interface MetadataCapability{ canEdit(): boolean; current(): DocumentMetadata | null; update(patch: MetadataPatch): Promise<void>; reload(): Promise<void>; }
+MetadataState [InterfaceDeclaration] (from packages/plugin/metadata/src/types.ts): export interface MetadataState{ metadata: DocumentMetadata | null; }
+MetadataToken [VariableDeclaration] (from packages/plugin/metadata/src/types.ts): MetadataToken = createCapabilityToken<MetadataCapability>('metadata')
+metadataPlugin [VariableDeclaration] (from packages/plugin/metadata/src/metadata.plugin.ts): metadataPlugin = () => definePlugin<MetadataState, MetadataAction, MetadataCapability>({ id: 'metadata', token: MetadataToken, scope: 'document', initialState: initialMetadataState, reduce: metadataReducer, capability: createMetadataCapability, effects: registerMetadataEffects, } )
+useMetadata [FunctionDeclaration]: export function useMetadata():{ metadata: DocumentMetadata | null; update: (patch: MetadataPatch) => Promise<void>; canEdit: () => boolean; } { const cap = useCapability(MetadataToken); const metadata = useSelector(MetadataToken, (c) => c.current()); return{ metadata, update: cap.update, canEdit: cap.canEdit} ; }

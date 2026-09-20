@@ -6,6 +6,8 @@ import {
   type ContextServices,
   type SessionRef,
 } from './context';
+import type { SliceLease } from './store';
+import { createControllerContext } from './controller';
 import { planPlugins } from './order';
 import { createScope, CancelledError, isCancelled, type Scope } from './scope';
 import {
@@ -37,9 +39,13 @@ import {
 } from './types';
 import {
   CONTINUOUS_RENDER_POLICY,
+  pageRefsEqual,
   type DocumentEvent,
   type EngineRenderPolicy,
+  type PageLayout,
 } from '@embedpdf/engine-core/runtime';
+
+const EMPTY_PAGES: readonly PageLayout[] = Object.freeze([]);
 
 /** The new page registry a document mutation carries, or null for events that
  *  don't change page structure (annotations, metadata). The snapshot is the
@@ -149,8 +155,12 @@ interface DocumentSession extends SessionRef {
   engineOp: { abort(reason?: unknown): void } | null;
   cancel: AbortController;
   capabilities: Map<AnyPlugin, unknown>;
+  /** `connect` halves of `create()`, run in the effects phase. */
+  connectors: Map<AnyPlugin, () => void>;
   close(): Promise<void>;
 }
+
+let instanceCounter = 0;
 
 /** Engine rejections carry AbortError when close() aborts the live call;
  *  match structurally so test fakes with plain promises still work. */
@@ -182,6 +192,9 @@ export function createKernel(opts: {
   const documentScopedPlugins = plan.ordered.filter(isDocumentScoped);
 
   const workspaceCapabilities = new Map<CapabilityToken<unknown>, unknown>();
+  const workspaceLeases = new Map<AnyPlugin, SliceLease<unknown, Action>>();
+  const workspaceConnectors = new Map<AnyPlugin, () => void>();
+  const workspaceCancel = new AbortController();
   const workspaceScope = createScope(report);
   const sessions = new Map<string, DocumentSession>();
 
@@ -248,8 +261,10 @@ export function createKernel(opts: {
   }
 
   function createSession(id: string, name: string | undefined): DocumentSession {
+    const cancel = new AbortController();
     const session: DocumentSession = {
       id,
+      instanceId: `${id}#${++instanceCounter}`,
       name,
       phase: 'opening',
       handle: null,
@@ -257,8 +272,11 @@ export function createKernel(opts: {
       scope: createScope(report),
       operation: null,
       engineOp: null,
-      cancel: new AbortController(),
+      cancel,
+      signal: cancel.signal,
       capabilities: new Map(),
+      connectors: new Map(),
+      leases: new Map(),
       close: () => closeSession(session),
     };
     return session;
@@ -309,6 +327,7 @@ export function createKernel(opts: {
     const closing = (async () => {
       session.phase = 'closing';
       unpublishSlot(session.id); // synchronous: the tab disappears NOW
+      for (const lease of session.leases.values()) lease.revoke(); // write authority ends NOW (G2)
       // Cancel, JOIN the producer, then drain its resources — in that order.
       // After the join, no known producer can register more resources; the
       // scope's late-defer rule covers anything unknowable.
@@ -423,7 +442,20 @@ export function createKernel(opts: {
   function buildDocumentCapability(plugin: AnyPlugin, session: DocumentSession): unknown {
     let capability = session.capabilities.get(plugin);
     if (!capability) {
-      capability = plugin.capability!(createPluginContext(services, plugin, session));
+      if (plugin.create) {
+        const ctx = createControllerContext(
+          services,
+          plugin,
+          session,
+          session.signal,
+          session.scope,
+        );
+        const { api, connect } = plugin.create(ctx);
+        capability = api;
+        if (connect) session.connectors.set(plugin, connect);
+      } else {
+        capability = plugin.capability!(createPluginContext(services, plugin, session));
+      }
       session.capabilities.set(plugin, capability);
     }
     return capability;
@@ -479,6 +511,9 @@ export function createKernel(opts: {
     engine,
     store,
     workspaceScope,
+    workspaceSignal: workspaceCancel.signal,
+    workspaceLeases,
+    report,
     resolveCapability,
     tryResolveCapability: tryResolveInternal,
     documentHandle,
@@ -514,6 +549,7 @@ export function createKernel(opts: {
     checkpoint(session);
     session.stagedMeta = {
       id: session.id,
+      instanceId: session.instanceId,
       name: session.name,
       pageCount: snapshot.pageCount,
       pages: snapshot.pages,
@@ -546,9 +582,17 @@ export function createKernel(opts: {
     session.scope.defer(unsubscribeEvents);
 
     for (const plugin of documentScopedPlugins) {
-      const key = sliceKey(plugin.id, session.id);
-      store.registerSlice(key, reducerOf(plugin), initialStateOf(plugin));
-      session.scope.defer(() => store.removeSlice(key)); // LIFO ⇒ reverse dependency order
+      // The lease is THE write authority for this instance's slice. Revoking it
+      // is the first teardown to run at close (LIFO), synchronously, so nothing
+      // retained by this instance can reach a reopened document's state.
+      const lease = store.lease(
+        sliceKey(plugin.id, session.id),
+        reducerOf(plugin),
+        initialStateOf(plugin),
+        session.instanceId,
+      );
+      session.leases.set(plugin, lease);
+      session.scope.defer(() => lease.revoke()); // LIFO ⇒ reverse dependency order
     }
     for (const plugin of documentScopedPlugins) {
       await plugin.init?.(createPluginContext(services, plugin, session));
@@ -558,6 +602,10 @@ export function createKernel(opts: {
     // it registers fire post-commit and are isolated by the store instead.
     for (const plugin of documentScopedPlugins) {
       plugin.effects?.(createEffectContext(services, plugin, session));
+      if (plugin.create) {
+        buildDocumentCapability(plugin, session); // cheap eager construction, in dependency order
+        session.connectors.get(plugin)?.();
+      }
     }
     checkpoint(session);
   }
@@ -684,6 +732,12 @@ export function createKernel(opts: {
     store.setCore({ order: next }, { type: CORE_ORDER_CHANGED });
   }
 
+  const metaOf = (documentId?: string): DocumentMeta | null => {
+    const core = store.getCore();
+    const id = documentId ?? core.activeId;
+    return id ? (core.documents[id] ?? null) : null;
+  };
+
   const documents: DocumentsCapability = {
     open: openDocument,
     openAll: (docs) => {
@@ -767,6 +821,12 @@ export function createKernel(opts: {
       }
       return handle.downloadLayer();
     },
+    // The page registry, addressed by PageRef (durable) or display index.
+    listPages: (id) => metaOf(id)?.pages ?? EMPTY_PAGES,
+    getPage: (ref, id) => metaOf(id)?.pages.find((p) => pageRefsEqual(p.ref, ref)) ?? null,
+    getPageAt: (index, id) => metaOf(id)?.pages[index] ?? null,
+    getPageIndex: (ref, id) => metaOf(id)?.pages.findIndex((p) => pageRefsEqual(p.ref, ref)) ?? -1,
+    getRevision: (id) => metaOf(id)?.revision ?? -1,
     // The permissions.md chrome exception: print/download are kernel verbs
     // with 1:1 capabilities, so their authority question is answered here.
     allows: (cap, id) => documentHandle(id)?.security.allows(cap) ?? false,
@@ -775,11 +835,27 @@ export function createKernel(opts: {
 
   // ── workspace plugins: seed slices, then build their capabilities ────────────
   for (const plugin of plan.ordered) {
-    if (!isDocumentScoped(plugin))
-      store.registerSlice(plugin.id, reducerOf(plugin), initialStateOf(plugin));
+    if (!isDocumentScoped(plugin)) {
+      workspaceLeases.set(
+        plugin,
+        store.lease(plugin.id, reducerOf(plugin), initialStateOf(plugin)),
+      );
+    }
   }
   for (const plugin of plan.ordered) {
-    if (!isDocumentScoped(plugin) && plugin.token && plugin.capability) {
+    if (isDocumentScoped(plugin)) continue;
+    if (plugin.create) {
+      const ctx = createControllerContext(
+        services,
+        plugin,
+        undefined,
+        workspaceCancel.signal,
+        workspaceScope,
+      );
+      const { api, connect } = plugin.create(ctx);
+      if (plugin.token) workspaceCapabilities.set(plugin.token, api);
+      if (connect) workspaceConnectors.set(plugin, connect);
+    } else if (plugin.token && plugin.capability) {
       workspaceCapabilities.set(
         plugin.token,
         plugin.capability(createPluginContext(services, plugin)),
@@ -810,7 +886,9 @@ export function createKernel(opts: {
           }
           if (status !== 'starting') return;
           for (const plugin of plan.ordered) {
-            if (!isDocumentScoped(plugin)) plugin.effects?.(createEffectContext(services, plugin));
+            if (isDocumentScoped(plugin)) continue;
+            plugin.effects?.(createEffectContext(services, plugin));
+            workspaceConnectors.get(plugin)?.();
           }
           status = 'started';
         } catch (error) {
@@ -827,6 +905,7 @@ export function createKernel(opts: {
       return (destroyPromise ??= (async () => {
         const wasFailed = status === 'failed';
         status = 'destroying'; // an in-flight start exits at its next check
+        workspaceCancel.abort(new CancelledError('kernel destroyed'));
         await startPromise?.catch((error) => {
           if (!isCancelled(error) && !wasFailed) report(error);
         });

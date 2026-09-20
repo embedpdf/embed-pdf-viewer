@@ -1,4 +1,6 @@
 import { definePlugin } from '@embedpdf/core';
+import { AnnotationToken } from '@embedpdf/plugin-annotation/contract';
+import { ActionsToken } from '@embedpdf/plugin-actions/contract';
 import { createStampCapability } from './capability';
 import { initialStampState, stampReducer } from './reducer';
 import { StampToken } from './types';
@@ -17,6 +19,10 @@ export const stampPlugin = (config: StampConfig = {}) =>
     id: 'stamp',
     token: StampToken,
     scope: 'workspace',
+    // Placement and dynamic-stamp evaluation reach a DOCUMENT's annotation and
+    // actions capabilities through ctx.forDocument(); declared so the kernel
+    // can validate the graph, optional because libraries work without either.
+    optional: [AnnotationToken, ActionsToken],
     initialState: initialStampState,
     reduce: stampReducer,
     capability: (ctx) => createStampCapability(ctx, config),

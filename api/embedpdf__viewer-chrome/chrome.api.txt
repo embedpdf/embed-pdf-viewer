@@ -1,0 +1,6 @@
+# @embedpdf/viewer-chrome — ./chrome
+
+defaultChrome [VariableDeclaration]: defaultChrome = defineChrome({ bars:{ main: mainBar} , modeBars:{ 'mode:annotate': annotateBar, 'mode:shapes': shapesBar, 'mode:insert': insertBar, 'mode:form': formBar, 'mode:redact': redactBar, 'mode:measure': measureBar, } , menus:{ document: documentMenu, zoom: zoomMenu, 'page-settings': pageSettingsMenu} , strips:{ annotation: annotationStrip, selection: selectionStrip} , } )
+getMenu [FunctionDeclaration]: export function getMenu(schema: ChromeSchema, id: string): MenuSchema | undefined{ return (schema.menus as Record<string, MenuSchema> | undefined)?.[id]; }
+getModeBar [FunctionDeclaration]: export function getModeBar(schema: ChromeSchema, id: string): BarSchema | undefined{ return (schema.modeBars as Record<string, BarSchema> | undefined)?.[id]; }
+getStrip [FunctionDeclaration]: export function getStrip(schema: ChromeSchema, id: string): BarSchema | undefined{ return (schema.strips as Record<string, BarSchema> | undefined)?.[id]; }

@@ -1,0 +1,11 @@
+# @embedpdf/plugin-selection — ./contract
+
+SelectionCapability [InterfaceDeclaration] (from packages/plugin/selection/src/types.ts): export interface SelectionCapability{ canSelect(): boolean; canCopy(): boolean; select(range: SelectionRangeInput): void; selectAll(): void; clear(): void; snapshot(): SelectionSnapshot; isSelecting(): boolean; menuAnchor(): SelectionMenuAnchor | null; hasSelection(): boolean; selectedPages(): readonly PageRef[]; segmentsForPage(page: PageRef): SelectionSegment[]; rectsForPage(page: PageRef): Rect[]; readText(): Promise<string>; onChange(cb: () => void): () => void; onCommit(cb: () => void): () => void; }
+SelectionEndpoint [InterfaceDeclaration] (from packages/plugin/selection/src/types.ts): export interface SelectionEndpoint{ page: PageRef; glyphQuad: TextQuad; advance: 1 | -1; rect: Rect; }
+SelectionMenuAnchor [InterfaceDeclaration] (from packages/plugin/selection/src/types.ts): export interface SelectionMenuAnchor{ page: PageRef; bounds: Rect; }
+SelectionRangeInput [TypeAliasDeclaration] (from packages/plugin/selection/src/types.ts): export type SelectionRangeInput = TextRange |{ page: PageRef; start: number; count: number} ;
+SelectionSegment [InterfaceDeclaration] (from packages/plugin/selection/src/geometry.ts): export interface SelectionSegment{ quad: TextQuad; rect: Rect; advance: 1 | -1; }
+SelectionSnapshot [InterfaceDeclaration] (from packages/plugin/selection/src/types.ts): export interface SelectionSnapshot{ pages: Array<{ page: PageRef; segments: SelectionSegment[]} >; start: SelectionEndpoint | null; end: SelectionEndpoint | null; direction: 'forward' | 'backward'; range: TextRange | null; }
+SelectionToken [VariableDeclaration]: SelectionToken = SelectionHostToken as unknown as CapabilityToken<SelectionCapability>
+TextPosition [InterfaceDeclaration] (from packages/plugin/selection/src/types.ts): export interface TextPosition{ page: PageRef; index: number; }
+TextRange [InterfaceDeclaration] (from packages/plugin/selection/src/types.ts): export interface TextRange{ start: TextPosition; end: TextPosition; }

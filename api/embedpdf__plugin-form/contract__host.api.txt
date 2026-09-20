@@ -1,0 +1,4 @@
+# @embedpdf/plugin-form — ./contract/host
+
+FormHostCapability [InterfaceDeclaration] (from packages/plugin/form/src/types.ts): export interface FormHostCapability extends FormCapability{ resetFormAction( fields: PdfActionTargetRef[] | null, exclude: boolean, origin?: ActionOrigin, ): Promise<FormCommitResult>; resolveSubmitDataset( intent: SubmitIntent, ctx: ActionContext, diagnose: (diagnostic: ActionDiagnostic) => void, ): Promise<ActionSubmitRequest>; commitScriptFormEffects(effects: FormEffect[]): Promise<FormEffectsResult>; }
+FormToken [VariableDeclaration] (from packages/plugin/form/src/types.ts): FormToken = createCapabilityToken<FormHostCapability>('form')

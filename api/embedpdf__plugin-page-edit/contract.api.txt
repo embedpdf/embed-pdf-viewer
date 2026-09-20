@@ -1,0 +1,5 @@
+# @embedpdf/plugin-page-edit — ./contract
+
+PageEditCapability [InterfaceDeclaration] (from packages/plugin/page-edit/src/types.ts): export interface PageEditCapability{ canEdit(): boolean; rotateBy(page: PageRef, delta: 90 | -90): AbortablePromise<PageRotateResult>; setRotation( pages: readonly PageRef[], rotation: PageRotation, ): AbortablePromise<PageRotateResult>; move(pages: readonly PageRef[], destIndex: number): AbortablePromise<PageMoveResult>; delete(pages: readonly PageRef[]): AbortablePromise<PageDeleteResult>; addBlank(opts?:{ size?: PdfSize; count?: number; placement?: PagePlacement; } ): AbortablePromise<PageInsertResult>; insert( bytes: Uint8Array | ArrayBuffer, opts?:{ placement?: PagePlacement} , ): AbortablePromise<PageInsertResult>; }
+PageEditToken [VariableDeclaration] (from packages/plugin/page-edit/src/types.ts): PageEditToken = createCapabilityToken<PageEditCapability>('page-edit')
+PagePlacement [TypeAliasDeclaration] (from packages/plugin/page-edit/src/types.ts): export type PagePlacement ={ after: PageRef} |{ before: PageRef} |{ index: number} ;

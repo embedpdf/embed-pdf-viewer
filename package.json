@@ -26,7 +26,9 @@
     "api:sync": "node fern/scripts/generate-sdks.mjs && pnpm --filter @cloudpdf/website api:snippets && pnpm --filter @cloudpdf/website api:pages && pnpm --filter @cloudpdf/website api:check",
     "ci:version": "changeset version && pnpm --filter @cloudpdf/contract emit:openapi && pnpm run cloudpdf:sdk:generate && pnpm --filter @cloudpdf/website api:metadata && pnpm --filter @cloudpdf/website api:pages",
     "ci:publish": "node scripts/assert-publish-phase.mjs && node fern/scripts/validate-sdk.mjs typescript && pnpm publish -r --access public --tag next --publish-branch main --report-summary",
-    "check:network-literals": "node tooling/build/src/check-network-literals.mjs"
+    "check:network-literals": "node tooling/build/src/check-network-literals.mjs",
+    "api:snapshot": "node tooling/build/src/api-snapshot.mjs",
+    "api:check": "node tooling/build/src/api-snapshot.mjs --check"
   },
   "devDependencies": {
     "@changesets/cli": "^2.29.6",

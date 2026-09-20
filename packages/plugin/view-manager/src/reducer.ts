@@ -79,9 +79,16 @@ export function viewManagerReducer(
     case 'ADD_DOC': {
       const view = state.views[action.viewId];
       if (!view || view.documentIds.includes(action.documentId)) return state;
-      const documentIds = insertAt(view.documentIds, action.documentId, action.index);
-      const activeDocumentId = view.activeDocumentId ?? action.documentId;
-      return setView(state, { ...view, documentIds, activeDocumentId });
+      // Views PARTITION the open documents: a document already shown in another
+      // pane moves, it is never duplicated (G12).
+      const holder = Object.values(state.views).find((v) =>
+        v.documentIds.includes(action.documentId),
+      );
+      const base = holder ? setView(state, dropDocument(holder, action.documentId)) : state;
+      const target = base.views[action.viewId];
+      const documentIds = insertAt(target.documentIds, action.documentId, action.index);
+      const activeDocumentId = target.activeDocumentId ?? action.documentId;
+      return setView(base, { ...target, documentIds, activeDocumentId });
     }
 
     case 'REMOVE_DOC': {
