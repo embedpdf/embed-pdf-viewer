@@ -1,5 +1,15 @@
 # @embedpdf/engine-core
 
+## 3.0.0-next.14
+
+### Minor Changes
+
+- [#827](https://github.com/embedpdf/embed-pdf-viewer/pull/827) by [@bobsingor](https://github.com/bobsingor) – Add measurement DTOs, page calibration contracts, and shared distance, perimeter, area, and number-format helpers. Caption positions use PDF coordinates and support partial updates and explicit resets.
+
+  Report invalid geometry for crossing, overlapping, or degenerate area boundaries while accepting either winding and an explicit closing vertex.
+
+- [#800](https://github.com/embedpdf/embed-pdf-viewer/pull/800) by [@LazyCompiler](https://github.com/LazyCompiler) – Add the `ignoreWhitespace` flag to `SearchQuery`. A literal query folded with it drops whitespace on both sides instead of collapsing it, so `invoice` finds the letter-spaced `i n v o i c e` that OCR'd scans and tracked-out headings produce, and `total amount` finds `totalamount`. Hits still span the original text including the dropped whitespace, and `wholeWord` boundaries are checked on the original text. The flag is literal-only — `validateSearchQuery` rejects it together with `regex` (`ignore-whitespace-with-regex`) — and it round-trips through search tokens. `foldText` gains the matching `dropWhitespace` option, and the shared search conformance suite covers the flag.
+
 ## 3.0.0-next.13
 
 ### Minor Changes

@@ -1,5 +1,15 @@
 # @embedpdf/engine-services
 
+## 3.0.0-next.14
+
+### Minor Changes
+
+- [#827](https://github.com/embedpdf/embed-pdf-viewer/pull/827) by [@bobsingor](https://github.com/bobsingor) – Read and write PDF measurement dictionaries and viewports, derive labels on geometry or scale edits, and preserve imported labels on style edits. Move manual shape captions with rigid geometry transforms and validate measurement input before native writes.
+
+  Avoid an additional full-document buffer copy when exporting a saved PDF.
+
+- [#800](https://github.com/embedpdf/embed-pdf-viewer/pull/800) by [@LazyCompiler](https://github.com/LazyCompiler) – Local engines honour the `ignoreWhitespace` search flag: a query carrying it re-folds the cached page text with whitespace dropped, so `invoice` finds a letter-spaced `i n v o i c e`, and search cursors key on the flag so a resumed search never mixes hits from the two folds. Combining the flag with `regex` is rejected with `InvalidArg`.
+
 ## 3.0.0-next.13
 
 ### Minor Changes

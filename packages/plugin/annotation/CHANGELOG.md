@@ -1,5 +1,17 @@
 # @embedpdf/plugin-annotation
 
+## 3.0.0-next.14
+
+### Minor Changes
+
+- [#827](https://github.com/embedpdf/embed-pdf-viewer/pull/827) by [@bobsingor](https://github.com/bobsingor) – Add distance and calibration presets, point-based viewport scale selection, and per-annotation recalculation reports. Persist leader and caption edits in native PDF fields, preserve the measured endpoints during offset edits, and keep derived measurement values read-only in comments.
+
+  Use the standard selection spacing for measurement annotations.
+
+  Keep locally created and edited measurements vector-rendered after the engine saves their appearance, matching the existing annotation lifecycle and avoiding repeated switches to raster rendering.
+
+  Add area and perimeter presets with scale snapshots captured at the first vertex. Persist shape captions and derived values through ordinary annotation edits, retaining vector rendering after engine responses.
+
 ## 3.0.0-next.13
 
 ### Minor Changes

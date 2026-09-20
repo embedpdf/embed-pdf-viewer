@@ -1,5 +1,11 @@
 # @embedpdf/engine
 
+## 3.0.0-next.14
+
+### Minor Changes
+
+- [#827](https://github.com/embedpdf/embed-pdf-viewer/pull/827) by [@bobsingor](https://github.com/bobsingor) – Support distance, perimeter, and area measurements through the local engine. Add page measurement viewport reads and calibration writes, with persistence in saved PDFs and layers and viewport change events.
+
 ## 3.0.0-next.13
 
 ### Minor Changes

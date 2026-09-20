@@ -1,5 +1,7 @@
 # @embedpdf/plugin-stamp
 
+## 3.0.0-next.14
+
 ## 3.0.0-next.13
 
 ### Minor Changes

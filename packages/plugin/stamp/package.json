@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/plugin-stamp",
-  "version": "3.0.0-next.13",
+  "version": "3.0.0-next.14",
   "private": false,
   "description": "Stamp libraries as PDFs: import Acrobat-compatible libraries (title + /Names /Pages registry), author assets from pages, rasters, or selected annotations, export the library as a complete PDF, and place stamps by pointer or by code through the annotation plugin.",
   "type": "module",

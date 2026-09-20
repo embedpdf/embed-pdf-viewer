@@ -1,5 +1,7 @@
 # @embedpdf/engine-runtime-wasm32
 
+## 3.0.0-next.14
+
 ## 3.0.0-next.13
 
 ## 3.0.0-next.12
