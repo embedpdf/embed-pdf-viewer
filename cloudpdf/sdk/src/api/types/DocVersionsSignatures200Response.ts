@@ -47,6 +47,7 @@ export namespace DocVersionsSignatures200Response {
 
         export namespace Item {
             export interface Widget {
+                ref: CloudPDF.DocVersionsSignatures200ResponseSignaturesItemWidgetRef | null;
                 annotObjectNumber: number;
                 page: Widget.Page | null;
             }

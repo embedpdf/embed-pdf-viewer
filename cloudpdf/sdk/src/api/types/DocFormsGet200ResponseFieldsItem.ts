@@ -52,6 +52,7 @@ export namespace DocFormsGet200ResponseFieldsItem {
 
         export namespace Widgets {
             export interface Item {
+                ref: CloudPDF.DocFormsGet200ResponseFieldsItemTextWidgetsItemRef | null;
                 annotObjectNumber: number;
                 page: Item.Page | null;
             }
@@ -107,6 +108,7 @@ export namespace DocFormsGet200ResponseFieldsItem {
 
         export namespace Widgets {
             export interface Item {
+                ref: CloudPDF.DocFormsGet200ResponseFieldsItemCheckboxWidgetsItemRef | null;
                 annotObjectNumber: number;
                 page: Item.Page | null;
                 onState: string;
@@ -166,6 +168,7 @@ export namespace DocFormsGet200ResponseFieldsItem {
 
         export namespace Widgets {
             export interface Item {
+                ref: CloudPDF.DocFormsGet200ResponseFieldsItemRadioWidgetsItemRef | null;
                 annotObjectNumber: number;
                 page: Item.Page | null;
                 onState: string;
@@ -226,6 +229,7 @@ export namespace DocFormsGet200ResponseFieldsItem {
 
         export namespace Widgets {
             export interface Item {
+                ref: CloudPDF.DocFormsGet200ResponseFieldsItemComboboxWidgetsItemRef | null;
                 annotObjectNumber: number;
                 page: Item.Page | null;
             }
@@ -292,6 +296,7 @@ export namespace DocFormsGet200ResponseFieldsItem {
 
         export namespace Widgets {
             export interface Item {
+                ref: CloudPDF.DocFormsGet200ResponseFieldsItemListboxWidgetsItemRef | null;
                 annotObjectNumber: number;
                 page: Item.Page | null;
             }
@@ -355,6 +360,7 @@ export namespace DocFormsGet200ResponseFieldsItem {
 
         export namespace Widgets {
             export interface Item {
+                ref: CloudPDF.DocFormsGet200ResponseFieldsItemPushbuttonWidgetsItemRef | null;
                 annotObjectNumber: number;
                 page: Item.Page | null;
             }
@@ -408,6 +414,7 @@ export namespace DocFormsGet200ResponseFieldsItem {
 
         export namespace Widgets {
             export interface Item {
+                ref: CloudPDF.DocFormsGet200ResponseFieldsItemSignatureWidgetsItemRef | null;
                 annotObjectNumber: number;
                 page: Item.Page | null;
             }
@@ -462,6 +469,7 @@ export namespace DocFormsGet200ResponseFieldsItem {
 
         export namespace Widgets {
             export interface Item {
+                ref: CloudPDF.DocFormsGet200ResponseFieldsItemUnknownWidgetsItemRef | null;
                 annotObjectNumber: number;
                 page: Item.Page | null;
             }

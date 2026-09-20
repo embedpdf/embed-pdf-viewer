@@ -39,14 +39,14 @@ import {
   widget,
   widgetKindOf,
 } from './kinds/misc';
-import { pdfToContentRect, refKey, styleFromDTO } from './seam';
+import { pdfToContentRect, annotationKey, styleFromDTO } from './seam';
 import { geomRotation } from '@embedpdf/core-annotation';
 
 export {
   boxGeomFields,
   colorToCss,
   cssToColor,
-  refKey,
+  annotationKey,
   styleFromDTO,
   widgetAppearanceFromProps,
   writableTarget,
@@ -117,7 +117,7 @@ export function fromDTO(
       ? dto.unrotatedRect
       : undefined;
   return {
-    id: refKey(dto.ref),
+    id: annotationKey(dto.ref),
     ref: dto.ref,
     page: dto.page,
     subtype: dto.subtype === 'widget' ? widgetKindOf(dto.fieldFamily) : dto.subtype,
@@ -130,8 +130,8 @@ export function fromDTO(
     // Relationship to a parent annotation. `irt` mirrors `/IRT`; `group` is the
     // primary's key for `/RT /Group` subordinates only (a visual group acts as
     // a unit). `/RT /R` (comment replies) keep `irt` but are NOT a visual group.
-    ...(dto.inReplyTo ? { irt: refKey(dto.inReplyTo) } : {}),
-    ...(dto.replyType === 'group' && dto.inReplyTo ? { group: refKey(dto.inReplyTo) } : {}),
+    ...(dto.inReplyTo ? { irt: annotationKey(dto.inReplyTo) } : {}),
+    ...(dto.replyType === 'group' && dto.inReplyTo ? { group: annotationKey(dto.inReplyTo) } : {}),
     style: styleFromDTO(dto),
     ...slice,
     apBox: pdfToContentRect(strippedRect ?? dto.rect, crop),

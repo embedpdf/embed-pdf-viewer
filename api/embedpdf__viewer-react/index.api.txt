@@ -19,8 +19,8 @@ DocumentsCapability [InterfaceDeclaration] (from packages/core/main/src/types.ts
 DocumentsToken [VariableDeclaration] (from packages/core/main/src/types.ts): DocumentsToken: CapabilityToken<DocumentsCapability> ={ name: 'documents'}
 ElementConfig [InterfaceDeclaration] (from packages/viewer/main/dist/kernel/config.d.ts): export interface ElementConfig extends ViewerConfigBase{ engine?: unknown; }
 EmbedPdfViewerElement [ClassDeclaration] (from packages/viewer/main/dist/kernel/element.d.ts): export declare class EmbedPdfViewerElement extends ElementBase{ #private; static observedAttributes: string[]; static defaultEngineProvider: DefaultEngineProvider | null; set config(config: ElementConfig); get config(): ElementConfig; get viewer(): ViewerHandle | null; connectedCallback(): void; disconnectedCallback(): void; attributeChangedCallback(): void; }
-Engine [InterfaceDeclaration] (from packages/engine/core/dist/Engine-Cx_UfLiP.d.ts): interface Engine{ open(input: OpenInput, options?: OpenOptions): AbortablePromise<DocumentHandle>; destroy(): AbortablePromise<void>; warmup?(): void; readonly fonts?: FontService; }
-EngineFactory [TypeAliasDeclaration] (from packages/engine/core/dist/Engine-Cx_UfLiP.d.ts): type EngineFactory = () => Engine;
+Engine [InterfaceDeclaration] (from packages/engine/core/dist/Engine-CEO1av8x.d.ts): interface Engine{ open(input: OpenInput, options?: OpenOptions): AbortablePromise<DocumentHandle>; destroy(): AbortablePromise<void>; warmup?(): void; readonly fonts?: FontService; }
+EngineFactory [TypeAliasDeclaration] (from packages/engine/core/dist/Engine-CEO1av8x.d.ts): type EngineFactory = () => Engine;
 FormToken [VariableDeclaration] (from packages/plugin/form/src/contract.ts): FormToken = FormHostToken as unknown as CapabilityToken<FormCapability>
 I18nToken [VariableDeclaration] (from packages/plugin/i18n/src/types.ts): I18nToken = createCapabilityToken<I18nCapability>('i18n')
 IconDef [TypeAliasDeclaration] (from packages/viewer/chrome/dist/index.d.ts): type IconDef = readonly PathSpec[];

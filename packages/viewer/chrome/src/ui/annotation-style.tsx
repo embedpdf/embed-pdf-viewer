@@ -16,6 +16,7 @@
  * tokens to this app's semantic ones (bg-surface / text-fg / border-border …).
  */
 import { useEffect, useRef, useState } from 'react';
+import { annotationKey } from '@embedpdf/react/annotation';
 import type { ReactNode } from 'react';
 import {
   useAnnotation,
@@ -870,7 +871,7 @@ function RedactionLabelSection() {
   const selected = useAnnotationSelected();
   const mark = selected.length === 1 && selected[0]!.subtype === 'redact' ? selected[0]! : null;
   const [draft, setDraft] = useState<string | null>(null);
-  useEffect(() => setDraft(null), [mark?.ref && refKeyOfRedact(mark.ref)]);
+  useEffect(() => setDraft(null), [mark?.ref && annotationKey(mark.ref)]);
   if (!redaction || !mark || mark.subtype !== 'redact') return null;
 
   const value = draft ?? mark.overlayText ?? '';
@@ -904,9 +905,4 @@ function RedactionLabelSection() {
       </label>
     </div>
   );
-}
-
-/** Stable key for the effect dep — mirrors the annotation model's ref keys. */
-function refKeyOfRedact(ref: { kind: string } & Record<string, unknown>): string {
-  return JSON.stringify(ref);
 }

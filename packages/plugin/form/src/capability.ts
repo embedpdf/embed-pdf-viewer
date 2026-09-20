@@ -618,10 +618,9 @@ export function createFormCapability(
     if (!doc) return;
     const field = fieldByKey(model(), key);
     const widget = field?.widgets.find((w) => w.annotObjectNumber === annotObjectNumber);
-    await doc.forms.detachWidget(refKeyOf(key), {
-      annotObjectNumber,
-      page: widget?.page ?? null,
-    });
+    if (!widget?.ref)
+      throw new Error(`[form] widget ${annotObjectNumber} has no annotation address`);
+    await doc.forms.detachWidget(refKeyOf(key), widget.ref);
     await refresh(true);
     if (widget?.page) {
       apply({ t: 'clearGeom', pageObjectNumber: widget.page.pageObjectNumber });

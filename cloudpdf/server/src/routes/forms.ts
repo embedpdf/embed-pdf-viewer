@@ -9,7 +9,7 @@ import {
   type FormFieldPatch,
   type FormFieldRef,
   type FormFieldValue,
-  type FormWidgetRef,
+  type AnnotationRef,
 } from '@embedpdf/engine-core/runtime';
 import {
   FormDataFormatSchema,
@@ -17,7 +17,7 @@ import {
   FormFieldDraftSchema,
   FormFieldPatchSchema,
   FormFieldValueSchema,
-  FormWidgetRefSchema,
+  AnnotationRefSchema,
   SignatureAppearanceBodySchema,
 } from '@embedpdf/engine-core/wire';
 import { requireLayerCapability, requireLayerDocAccessOnly } from '../app/jwt-plugin';
@@ -292,8 +292,8 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
       const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
       const ctx = requireLayerCapability(req, docId, layerName, 'doc.forms.modify', pdfBits);
       const body = (req.body ?? {}) as { widget?: unknown; onState?: unknown };
-      const widget = parseOrInvalidArg<FormWidgetRef>(
-        FormWidgetRefSchema as unknown as SchemaLike<FormWidgetRef>,
+      const widget = parseOrInvalidArg<AnnotationRef>(
+        AnnotationRefSchema as unknown as SchemaLike<AnnotationRef>,
         body.widget,
         'body.widget',
       );
@@ -318,8 +318,8 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
       const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
       const ctx = requireLayerCapability(req, docId, layerName, 'doc.forms.modify', pdfBits);
       const body = (req.body ?? {}) as { widget?: unknown };
-      const widget = parseOrInvalidArg<FormWidgetRef>(
-        FormWidgetRefSchema as unknown as SchemaLike<FormWidgetRef>,
+      const widget = parseOrInvalidArg<AnnotationRef>(
+        AnnotationRefSchema as unknown as SchemaLike<AnnotationRef>,
         body.widget,
         'body.widget',
       );

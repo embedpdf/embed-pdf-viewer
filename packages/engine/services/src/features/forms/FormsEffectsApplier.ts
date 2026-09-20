@@ -5,10 +5,15 @@ import type {
   FormFieldDTO,
   FormFieldRef,
   FormFieldValue,
-  FormWidgetRef,
+  FormWidget,
   MutationMeta,
 } from '@embedpdf/engine-core/runtime';
-import { EngineError, EngineErrorCode, serializeError } from '@embedpdf/engine-core/runtime';
+import {
+  EngineError,
+  EngineErrorCode,
+  formWidget,
+  serializeError,
+} from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
 import type { DocumentSession } from '../../document-session/DocumentSession';
@@ -49,7 +54,7 @@ export class FormsEffectsApplier {
     const resultActionBudget = new ActionReadBudgetTracker();
     const preflight = effects.map((effect) => this.preflight(effect, preflightActionBudget));
     const results: FormEffectResult[] = [];
-    const allChangedWidgets = new Map<string, FormWidgetRef>();
+    const allChangedWidgets = new Map<string, FormWidget>();
     let mustFinalize = false;
     let stop = false;
 
@@ -430,18 +435,18 @@ function widgetRefs(
   objectNumbers: number[],
   before: FormFieldDTO[],
   after: FormFieldDTO[],
-): FormWidgetRef[] {
-  const byObjectNumber = new Map<number, FormWidgetRef>();
+): FormWidget[] {
+  const byObjectNumber = new Map<number, FormWidget>();
   for (const field of [...before, ...after]) {
     for (const widget of field.widgets) byObjectNumber.set(widget.annotObjectNumber, widget);
   }
   return [...new Set(objectNumbers)]
     .map((objectNumber) => byObjectNumber.get(objectNumber))
-    .filter((widget): widget is FormWidgetRef => widget !== undefined)
-    .map(({ annotObjectNumber, page }) => ({ annotObjectNumber, page }));
+    .filter((widget): widget is FormWidget => widget !== undefined)
+    .map(({ annotObjectNumber, page }) => formWidget(annotObjectNumber, page));
 }
 
-function rememberWidgets(target: Map<string, FormWidgetRef>, widgets: FormWidgetRef[]): void {
+function rememberWidgets(target: Map<string, FormWidget>, widgets: FormWidget[]): void {
   for (const widget of widgets) {
     target.set(`${widget.page?.pageObjectNumber ?? 0}:${widget.annotObjectNumber}`, widget);
   }

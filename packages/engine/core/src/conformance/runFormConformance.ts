@@ -412,10 +412,7 @@ export function runFormConformance(
 
         // 2. Adopted by a field -> the DTO joins to the field plane.
         const field = await doc.forms.createField({ family: 'text', name: 'loop_field' });
-        await doc.forms.attachWidget(field.field.ref, {
-          annotObjectNumber: widgetRef.annotObjectNumber,
-          page: toPageRef(pon),
-        });
+        await doc.forms.attachWidget(field.field.ref, widgetRef);
         const { annotations } = await page.annotations.list();
         const widgetDto = annotations.find(
           (a) =>
@@ -439,10 +436,7 @@ export function runFormConformance(
         });
 
         // 5. Detach -> inert again -> ordinary annotation delete succeeds.
-        await doc.forms.detachWidget(field.field.ref, {
-          annotObjectNumber: widgetRef.annotObjectNumber,
-          page: toPageRef(pon),
-        });
+        await doc.forms.detachWidget(field.field.ref, widgetRef);
         await page.annotations.delete(widgetRef);
 
         // The field survives, unplaced.

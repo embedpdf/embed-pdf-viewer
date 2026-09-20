@@ -36,13 +36,8 @@ export {
   pdfToContentRect,
 } from '@embedpdf/core-annotation';
 
-export function refKey(ref: AnnotationRef): string {
-  return ref.kind === 'objectNumber'
-    ? `obj:${ref.annotObjectNumber}`
-    : ref.kind === 'nm'
-      ? `nm:${ref.nm}`
-      : `idx:${ref.page.pageObjectNumber}:${ref.index}`;
-}
+// The ONE annotation key (engine-core `annotationKey`): obj:<n> | nm:<page>:<name> | idx:<page>:<i>.
+export { annotationKey } from '@embedpdf/core';
 
 /* ── colour seam (engine Color ↔ CSS hex) ─────────────────────────────────── */
 

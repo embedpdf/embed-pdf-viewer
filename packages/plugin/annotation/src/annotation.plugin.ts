@@ -49,7 +49,7 @@ export const annotationPlugin = (config: AnnotationConfig = {}) =>
 
       // The actions plane's session-visibility door (Hide actions,
       // `annot.hidden`): resolve annotation object numbers to loaded model
-      // ids (the `obj:` refKey seam — O(1), cross-page) and write the
+      // ids (the `obj:` annotationKey seam — O(1), cross-page) and write the
       // session overlay. Session state only — never an engine write.
       const actions = ctx.tryGet(ActionsHostToken);
       if (actions) {

@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import { NO_ANNOTATION_FLAGS } from '../../src/annotation/primitives';
-import { buildThreads, classifyRelation, refKey } from '../../src/annotation/relationships';
+import { buildThreads, classifyRelation } from '../../src/annotation/relationships';
+import { annotationKey, refFromStableId } from '../../src/identity/annotationKey';
 import type { AnnotationDTO } from '../../src/annotation/kinds';
 import type { AnnotationRef } from '../../src/identity/AnnotationRef';
 import type { AnnotationReplyType } from '../../src/annotation/primitives';
@@ -70,12 +71,35 @@ describe('classifyRelation', () => {
   });
 });
 
-describe('refKey', () => {
-  it('is stable and distinct per ref kind', () => {
-    expect(refKey(objRef(7))).toBe('obj:1:7');
+describe('annotationKey', () => {
+  it('drops the page for object numbers (document-unique) and keeps it for names and indexes', () => {
+    expect(annotationKey(objRef(7))).toBe('obj:7');
     expect(
-      refKey({ kind: 'nm', page: { kind: 'objectNumber', pageObjectNumber: PAGE }, nm: 'abc' }),
+      annotationKey({
+        kind: 'nm',
+        page: { kind: 'objectNumber', pageObjectNumber: PAGE },
+        nm: 'abc',
+      }),
     ).toBe('nm:1:abc');
+    expect(
+      annotationKey({
+        kind: 'index',
+        page: { kind: 'objectNumber', pageObjectNumber: PAGE },
+        index: 3,
+        revision: 'r1' as never,
+      }),
+    ).toBe('idx:1:3');
+  });
+
+  it('agrees with the wire member key for durable object numbers', () => {
+    // encodeStableIdKey({ kind: 'objectNumber', value: 7 }) === 'obj:7'
+    expect(annotationKey(objRef(7))).toBe('obj:7');
+  });
+
+  it('refFromStableId rebuilds the address an event split into page + stable id', () => {
+    const page = { kind: 'objectNumber' as const, pageObjectNumber: PAGE };
+    expect(refFromStableId(page, { kind: 'objectNumber', value: 7 })).toEqual(objRef(7));
+    expect(annotationKey(refFromStableId(page, { kind: 'nm', value: 'abc' }))).toBe('nm:1:abc');
   });
 });
 

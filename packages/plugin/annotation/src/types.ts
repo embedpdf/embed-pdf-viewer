@@ -1114,7 +1114,7 @@ export interface AnnotationHostCapability extends AnnotationCapability {
   /**
    * The actions plane's session-visibility write (Hide actions, script
    * `annot.hidden`): resolve annotation OBJECT NUMBERS to loaded model ids
-   * (the `obj:` refKey seam) and merge session-hidden overrides. Returns how
+   * (the `obj:` annotationKey seam) and merge session-hidden overrides. Returns how
    * many resolved — unresolved numbers (unloaded pages, nm/index refs) are
    * the caller's diagnostics. Session state only; never an engine write.
    */

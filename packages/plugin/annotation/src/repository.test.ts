@@ -20,7 +20,7 @@ import {
 import {
   fromDTO,
   linkChildRects,
-  refKey,
+  annotationKey,
   toCreateDraft,
   toPatch,
   toScopedPatch,
@@ -86,8 +86,8 @@ describe('repository.fromDTO — group/relationship mapping', () => {
       annotObjectNumber: 10,
     };
     const sub = fromDTO(squareDTO(11, { inReplyTo: primary, replyType: 'group' }), CROP);
-    expect(sub.irt).toBe(refKey(primary));
-    expect(sub.group).toBe(refKey(primary)); // visual group → acts as a unit
+    expect(sub.irt).toBe(annotationKey(primary));
+    expect(sub.group).toBe(annotationKey(primary)); // visual group → acts as a unit
   });
 
   it('maps a `/RT /R` comment reply to irt only, NOT group (not a visual group)', () => {
@@ -97,7 +97,7 @@ describe('repository.fromDTO — group/relationship mapping', () => {
       annotObjectNumber: 10,
     };
     const reply = fromDTO(squareDTO(12, { inReplyTo: parent, replyType: 'reply' }), CROP);
-    expect(reply.irt).toBe(refKey(parent));
+    expect(reply.irt).toBe(annotationKey(parent));
     expect(reply.group).toBeUndefined();
   });
 });

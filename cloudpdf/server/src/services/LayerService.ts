@@ -37,7 +37,7 @@ import {
   type FormSetValueResult,
   type FormSnapshot,
   type FormWidgetLinkResult,
-  type FormWidgetRef,
+  type FormWidget,
   type IdentityClaims,
   type MetadataPatch,
   type MetadataUpdateResult,
@@ -71,6 +71,7 @@ import {
   type SignaturePrepareInput,
   type SignaturePrepared,
   type SignatureSubFilter,
+  formWidget,
 } from '@embedpdf/engine-core/runtime';
 import {
   SignaturePreparedWireSchema,
@@ -1630,7 +1631,7 @@ export class LayerService {
       docId: string;
       layerName: string;
       ref: FormFieldRef;
-      widget: FormWidgetRef;
+      widget: AnnotationRef;
       onState?: string;
     },
     signal?: AbortSignal,
@@ -1653,7 +1654,7 @@ export class LayerService {
             ...(input.onState ? { onState: input.onState } : {}),
             artifactPath,
           }),
-        impacts: () => widgetImpacts([input.widget], 'update'),
+        impacts: () => widgetImpacts([widgetOfRef(input.widget)], 'update'),
       },
       signal,
     );
@@ -1661,7 +1662,7 @@ export class LayerService {
 
   async detachFormWidget(
     ctx: LayerWriteContext,
-    input: { docId: string; layerName: string; ref: FormFieldRef; widget: FormWidgetRef },
+    input: { docId: string; layerName: string; ref: FormFieldRef; widget: AnnotationRef },
     signal?: AbortSignal,
   ): Promise<FormWidgetLinkResult> {
     return this.runFormMutation(
@@ -1681,7 +1682,7 @@ export class LayerService {
             widget: input.widget,
             artifactPath,
           }),
-        impacts: () => widgetImpacts([input.widget], 'update'),
+        impacts: () => widgetImpacts([widgetOfRef(input.widget)], 'update'),
       },
       signal,
     );
@@ -4429,7 +4430,7 @@ function requireLayerArtifact(payload: unknown): LayerArtifactInput {
  * (`pageObjectNumber === 0`) have no page-visible effect and are skipped.
  */
 function widgetImpacts(
-  widgets: ReadonlyArray<FormWidgetRef>,
+  widgets: ReadonlyArray<FormWidget>,
   kind: MutationImpactKind,
 ): FormPageImpact[] {
   // A widget stored as a direct object has no page to attribute the
@@ -4510,4 +4511,11 @@ function actorFromContext(ctx: LayerWriteContext): AnnotationActor | undefined {
   // No fields set → nothing for the worker to stamp; signal absence.
   if (!actor.userId && !actor.groupId && !actor.displayName) return undefined;
   return actor;
+}
+
+/** The cache-impact view of a widget addressed by ref: an object-number address is a placed widget. */
+function widgetOfRef(ref: AnnotationRef): FormWidget {
+  return ref.kind === 'objectNumber'
+    ? formWidget(ref.annotObjectNumber, ref.page)
+    : formWidget(0, ref.page);
 }

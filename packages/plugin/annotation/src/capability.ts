@@ -8,6 +8,7 @@ import {
   toPluginError,
   originOf,
   pageRefsEqual,
+  refFromStableId,
   type ChangeOrigin,
 } from '@embedpdf/core';
 import type { PageRotation } from '@embedpdf/core-geometry';
@@ -18,7 +19,6 @@ import {
   measurementReadout,
   viewportForPoint,
   serializeError,
-  encodeStableIdKey,
   resolveBinarySource,
   sniffBinaryMetadata,
   type CommentThread,
@@ -96,7 +96,7 @@ import {
   boxGeomFields,
   fromDTO,
   linkChildRects,
-  refKey,
+  annotationKey,
   toCreateDraft,
   toPatch,
   toScopedPatch,
@@ -774,7 +774,7 @@ export function createAnnotationCapability(
         // A stamp has no vector render — the engine-baked /AP IS the visual.
         // Every placement selects its result (the anchor for menus/editing).
         syncDTO(res.created, 'baked');
-        apply({ t: 'select', ids: [refKey(res.created.ref)] });
+        apply({ t: 'select', ids: [annotationKey(res.created.ref)] });
         return res.created.ref;
       });
   };
@@ -961,7 +961,7 @@ export function createAnnotationCapability(
       .then(
         (res) => {
           syncDTO(res.created, 'baked');
-          apply({ t: 'select', ids: [refKey(res.created.ref)] });
+          apply({ t: 'select', ids: [annotationKey(res.created.ref)] });
         },
         (err) => console.error('[annotation] icon placement failed:', err),
       );
@@ -996,7 +996,7 @@ export function createAnnotationCapability(
   /** The page a ref lives on: from the loaded model first (the page it was
    *  ingested on), else the ref's own page address. */
   const ponForRef = (ref: AnnotationRef): number | null =>
-    model().byId[refKey(ref)]?.page.pageObjectNumber ?? ref.page.pageObjectNumber;
+    model().byId[annotationKey(ref)]?.page.pageObjectNumber ?? ref.page.pageObjectNumber;
 
   /**
    * Re-sync one annotation into the model from the authoritative engine DTO,
@@ -1035,7 +1035,7 @@ export function createAnnotationCapability(
   // (`textCommitPatch`); its echo is NOT re-ingested — it may already be
   // behind the keyboard.
   const commitText = (ref: AnnotationRef): void => {
-    const key = refKey(ref);
+    const key = annotationKey(ref);
     clearTimeout(textTimers.get(key));
     textTimers.delete(key);
     const a = model().byId[key];
@@ -1051,7 +1051,7 @@ export function createAnnotationCapability(
       );
   };
   const scheduleTextCommit = (ref: AnnotationRef): void => {
-    const key = refKey(ref);
+    const key = annotationKey(ref);
     clearTimeout(textTimers.get(key));
     textTimers.set(
       key,
@@ -1217,7 +1217,7 @@ export function createAnnotationCapability(
         break;
       case 'annotation.deleted':
         if (event.deleted) {
-          const key = encodeStableIdKey(event.deleted);
+          const key = annotationKey(refFromStableId(event.page, event.deleted));
           // Attached link children are model annotations, so a remote child
           // delete is this same plain remove — the `linkOf` lens re-derives.
           const gone = model().byId[key];
@@ -1288,10 +1288,10 @@ export function createAnnotationCapability(
 
     const byMember = new Map<Id, CommentThread>();
     for (const t of threads) {
-      byMember.set(refKey(t.root.ref), t);
-      for (const r of t.replies) byMember.set(refKey(r.ref), t);
-      for (const g of t.groupedParts) byMember.set(refKey(g.ref), t);
-      for (const s of t.review.statusRefs) byMember.set(refKey(s), t);
+      byMember.set(annotationKey(t.root.ref), t);
+      for (const r of t.replies) byMember.set(annotationKey(r.ref), t);
+      for (const g of t.groupedParts) byMember.set(annotationKey(g.ref), t);
+      for (const s of t.review.statusRefs) byMember.set(annotationKey(s), t);
     }
     return { threads, byMember };
   };
@@ -1314,7 +1314,7 @@ export function createAnnotationCapability(
   };
 
   const threadOf = (ref: AnnotationRef): CommentThread => {
-    const t = threadsIndex().byMember.get(refKey(ref));
+    const t = threadsIndex().byMember.get(annotationKey(ref));
     if (!t) throw new Error('[annotation] no comment thread contains this ref');
     return t;
   };
@@ -1337,7 +1337,7 @@ export function createAnnotationCapability(
     const doc = ctx.doc;
     if (!doc) throw new Error('[annotation] no document bound');
     await doc.page(ref.page).annotations.delete(ref);
-    apply({ t: 'remove', ids: [refKey(ref)] });
+    apply({ t: 'remove', ids: [annotationKey(ref)] });
   };
 
   // Screen-anchored like a sticky note; `print` for Acrobat parity.
@@ -1355,7 +1355,7 @@ export function createAnnotationCapability(
   // `{}`, which any narrowed grant denies — matching the engine, so a
   // control gated here never disagrees with the write's outcome.
   const mutationTarget = (ref: AnnotationRef): { userId?: string; groupId?: string } => {
-    const d = model().byId[refKey(ref)]?.data;
+    const d = model().byId[annotationKey(ref)]?.data;
     return {
       ...(d?.userId !== undefined ? { userId: d.userId } : {}),
       ...(d?.groupId !== undefined ? { groupId: d.groupId } : {}),
@@ -1395,7 +1395,7 @@ export function createAnnotationCapability(
     ctx.doc?.security.allowsAnnotationMutation(action, mutationTarget(ref)) ?? false;
   const deletableOne = (ref: AnnotationRef): boolean => {
     const m = model();
-    const a = m.byId[refKey(ref)];
+    const a = m.byId[annotationKey(ref)];
     return !!a && annotDeletable(a);
   };
   const threadMemberRefs = (t: CommentThread): AnnotationRef[] => [
@@ -1407,7 +1407,7 @@ export function createAnnotationCapability(
 
   const comments: CommentsApi = {
     threads: () => threadsIndex().threads,
-    thread: (ref) => threadsIndex().byMember.get(refKey(ref)) ?? null,
+    thread: (ref) => threadsIndex().byMember.get(annotationKey(ref)) ?? null,
     hydration: () => ctx.getState().hydration,
     rehydrate,
 
@@ -1425,7 +1425,7 @@ export function createAnnotationCapability(
     },
 
     edit: async (ref, text) => {
-      const data = model().byId[refKey(ref)]?.data;
+      const data = model().byId[annotationKey(ref)]?.data;
       if (data && isDimension(data))
         throw new Error('[annotation] measurement contents are derived');
       const subtype = data?.subtype;
@@ -1493,8 +1493,8 @@ export function createAnnotationCapability(
     },
 
     permissionsFor: (ref): CommentPermissions => {
-      const flags = model().byId[refKey(ref)]?.flags;
-      const t = threadsIndex().byMember.get(refKey(ref)) ?? null;
+      const flags = model().byId[annotationKey(ref)]?.flags;
+      const t = threadsIndex().byMember.get(annotationKey(ref)) ?? null;
       return {
         // Replying and setting status CREATE new annotations — gated on
         // the caller's own identity, not the target's owner.
@@ -1502,7 +1502,7 @@ export function createAnnotationCapability(
         canSetStatus: allowsCreate(),
         canEditText: (() => {
           const m = model();
-          const a = m.byId[refKey(ref)];
+          const a = m.byId[annotationKey(ref)];
           return !!a && !(a.data && isDimension(a.data)) && annotContentsEditable(a);
         })(),
         canDelete: deletableOne(ref),
@@ -1660,7 +1660,7 @@ export function createAnnotationCapability(
           apply({
             t: 'created',
             tempId: fx.primary,
-            id: refKey(primaryResult.created.ref),
+            id: annotationKey(primaryResult.created.ref),
             ref: primaryResult.created.ref,
           });
           syncDTO(primaryResult.created, 'vector');
@@ -1677,7 +1677,7 @@ export function createAnnotationCapability(
             apply({
               t: 'created',
               tempId,
-              id: refKey(result.created.ref),
+              id: annotationKey(result.created.ref),
               ref: result.created.ref,
             });
             syncDTO(result.created, 'vector');
@@ -1690,7 +1690,7 @@ export function createAnnotationCapability(
           for (const part of [...committed].reverse()) {
             try {
               await doc.page(primary.page).annotations.delete(part.ref);
-              removeIds.push(refKey(part.ref));
+              removeIds.push(annotationKey(part.ref));
             } catch {
               // `syncDTO` already made this committed annotation visible.
             }
@@ -1714,7 +1714,7 @@ export function createAnnotationCapability(
             apply({
               t: 'created',
               tempId: fx.id,
-              id: refKey(res.created.ref),
+              id: annotationKey(res.created.ref),
               ref: res.created.ref,
             });
             syncDTO(res.created, 'vector');
@@ -1796,7 +1796,7 @@ export function createAnnotationCapability(
     } else if (fx.fx === 'syncLink') {
       void scheduleLinkSync(fx.id, { target: fx.target });
     } else {
-      const deletedId = refKey(fx.ref);
+      const deletedId = annotationKey(fx.ref);
       doc
         .page(fx.ref.page)
         .annotations.delete(fx.ref)
@@ -2114,7 +2114,7 @@ export function createAnnotationCapability(
       const pon = ponForRef(ref);
       if (pon == null) throw new Error('[annotation] cannot resolve page for ref');
       await doc.page(toPageRef(pon)).annotations.delete(ref);
-      apply({ t: 'remove', ids: [refKey(ref)] });
+      apply({ t: 'remove', ids: [annotationKey(ref)] });
       deletedHook.emit({ ref, page: toPageRef(pon), origin: LOCAL_API });
     },
 
@@ -2130,12 +2130,12 @@ export function createAnnotationCapability(
     // the SAME fused predicates the gestures and chrome consume, so a false
     // twin and a bare-outline render can never disagree (permissions.md).
     canEdit: (ref) => {
-      const a = model().byId[refKey(ref)];
+      const a = model().byId[annotationKey(ref)];
       return !!a && annotTransformable(a);
     },
     canDelete: (ref) => {
       const m = model();
-      const a = m.byId[refKey(ref)];
+      const a = m.byId[annotationKey(ref)];
       return !!a && annotDeletable(a);
     },
 
@@ -2143,15 +2143,15 @@ export function createAnnotationCapability(
 
     links: {
       of: (ref) => {
-        const a = model().byId[refKey(ref)];
+        const a = model().byId[annotationKey(ref)];
         if (!a) return null;
         return a.subtype === 'link' ? (a.link ?? null) : linkOf(model(), a.id);
       },
       // The verbs go straight to the reconciler chain (latest-wins per
       // parent) and resolve when the children are COMMITTED — `of` reads
       // the new value the moment the promise settles.
-      set: (ref, target) => scheduleLinkSync(refKey(ref), { target }),
-      clear: (ref) => scheduleLinkSync(refKey(ref), { target: null }),
+      set: (ref, target) => scheduleLinkSync(annotationKey(ref), { target }),
+      clear: (ref) => scheduleLinkSync(annotationKey(ref), { target: null }),
     },
 
     getSelection: (): AnnotationRef[] => {
@@ -2160,7 +2160,8 @@ export function createAnnotationCapability(
     },
 
     // ── DTO-returning reads (canonical engine vocabulary) ──
-    get: (ref: AnnotationRef): AnnotationDTO | null => model().byId[refKey(ref)]?.data ?? null,
+    get: (ref: AnnotationRef): AnnotationDTO | null =>
+      model().byId[annotationKey(ref)]?.data ?? null,
     list: (page: PageRef): AnnotationDTO[] => {
       const pon = page.pageObjectNumber;
       const m = model();
@@ -2503,7 +2504,7 @@ export function createAnnotationCapability(
     deleteSelection: () => apply({ t: 'delete' }),
     deselect: () => apply({ t: 'deselect' }),
     select: (ref, options) => {
-      apply({ t: 'select', ids: [refKey(ref)], add: options?.add });
+      apply({ t: 'select', ids: [annotationKey(ref)], add: options?.add });
     },
     pruneEngagedSelection: () => {
       // Engaged ⇒ hit-test-inert ⇒ must not STAY selected either (a widget
@@ -2600,7 +2601,7 @@ export function createAnnotationCapability(
     // ── free-text (the editable-element layer) ──
     textItems: (page, view) => memoTexts(page, view),
     currentEditing: () => model().editing,
-    beginTextEdit: (ref) => apply({ t: 'beginTextEdit', id: refKey(ref) }),
+    beginTextEdit: (ref) => apply({ t: 'beginTextEdit', id: annotationKey(ref) }),
     beginTextEditAt: (page, point, scale, rotation, zoom) => {
       const pon = page.pageObjectNumber;
       const m = model();
@@ -2626,15 +2627,15 @@ export function createAnnotationCapability(
       return false;
     },
     setContents: (ref, text) => {
-      apply({ t: 'setText', id: refKey(ref), text }); // optimistic, no engine churn
+      apply({ t: 'setText', id: annotationKey(ref), text }); // optimistic, no engine churn
       scheduleTextCommit(ref);
     },
     setRichText: (ref, doc) => {
-      apply({ t: 'setRichText', id: refKey(ref), doc: { paragraphs: doc.paragraphs } });
+      apply({ t: 'setRichText', id: annotationKey(ref), doc: { paragraphs: doc.paragraphs } });
       scheduleTextCommit(ref);
     },
     setTextSelection: (ref, range) => {
-      const id = refKey(ref);
+      const id = annotationKey(ref);
       const prev = ctx.getState().textSelection;
       const next: TextSelection | null = range ? { id, start: range.start, end: range.end } : null;
       if (

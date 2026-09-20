@@ -3,7 +3,7 @@ import { isPluginError, toPageRef, type PluginContext } from '@embedpdf/core';
 import type { AnnotationDTO, AnnotationFlags, AnnotationRef } from '@embedpdf/engine-core/runtime';
 
 import { createAnnotationCapability } from './capability';
-import { refKey } from './repository';
+import { annotationKey } from './repository';
 import { annotationReducer, initialAnnotationState } from './reducer';
 import type { AnnotationAction, AnnotationState } from './types';
 
@@ -94,7 +94,7 @@ describe('create() in page space', () => {
     const h = harness();
     h.create.mockResolvedValueOnce({ created: squareDTO(42) });
     const order: string[] = [];
-    h.capability.onCreated((e) => order.push(`created:${refKey(e.ref)}:${e.origin.trigger}`));
+    h.capability.onCreated((e) => order.push(`created:${annotationKey(e.ref)}:${e.origin.trigger}`));
 
     const pending = h.capability.create({
       subtype: 'square',
@@ -106,7 +106,7 @@ describe('create() in page space', () => {
     expect(h.state().model.order.some((id) => id.startsWith('tmp:'))).toBe(true);
 
     const ref = await pending.then((r) => (order.push('resolved'), r));
-    expect(refKey(ref)).toBe('obj:42');
+    expect(annotationKey(ref)).toBe('obj:42');
     expect(order).toEqual(['created:obj:42:api', 'resolved']);
     // the draft the engine saw: page → PDF through the crop box, props applied
     expect(h.create.mock.calls[0]![0]).toMatchObject({
@@ -242,7 +242,7 @@ describe('create() in page space', () => {
     });
     const log: string[] = [];
     h.capability.onUpdated((e) => log.push(`updated:${e.origin.locality}`));
-    h.capability.onDeleted((e) => log.push(`deleted:${refKey(e.ref)}:${e.origin.locality}`));
+    h.capability.onDeleted((e) => log.push(`deleted:${annotationKey(e.ref)}:${e.origin.locality}`));
 
     h.update.mockResolvedValueOnce({ updated: squareDTO(5), appearance: { changed: false } });
     await h.capability.update(ref, { subtype: 'square', opacity: 0.5 });

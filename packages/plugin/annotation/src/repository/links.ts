@@ -14,7 +14,7 @@ import {
   type Rect,
 } from '@embedpdf/core-annotation';
 
-import { refKey } from './seam';
+import { annotationKey } from './seam';
 
 /** Does this kind's table declare the `link` prop (may it carry an attached
  *  link)? Widgets/caret/redact/file-attachment deliberately don't. */

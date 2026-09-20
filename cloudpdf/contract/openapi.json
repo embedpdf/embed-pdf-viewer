@@ -9850,29 +9850,109 @@
                 "widget": {
                   "type": "object",
                   "properties": {
+                    "ref": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": ["objectNumber"]
+                            },
+                            "page": {
+                              "type": "object",
+                              "properties": {
+                                "kind": {
+                                  "type": "string",
+                                  "enum": ["objectNumber"]
+                                },
+                                "pageObjectNumber": {
+                                  "type": "integer",
+                                  "exclusiveMinimum": true,
+                                  "minimum": 0
+                                }
+                              },
+                              "required": ["kind", "pageObjectNumber"],
+                              "additionalProperties": false
+                            },
+                            "annotObjectNumber": {
+                              "type": "integer",
+                              "exclusiveMinimum": true,
+                              "minimum": 0
+                            }
+                          },
+                          "required": ["kind", "page", "annotObjectNumber"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": ["nm"]
+                            },
+                            "page": {
+                              "$ref": "#/components/schemas/DocSignaturesList200Response/properties/signatures/items/properties/widget/properties/ref/anyOf/0/properties/page"
+                            },
+                            "nm": {
+                              "type": "string"
+                            }
+                          },
+                          "required": ["kind", "page", "nm"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": ["index"]
+                            },
+                            "page": {
+                              "$ref": "#/components/schemas/DocSignaturesList200Response/properties/signatures/items/properties/widget/properties/ref/anyOf/0/properties/page"
+                            },
+                            "index": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "revision": {
+                              "type": "object",
+                              "properties": {
+                                "docSessionId": {
+                                  "type": "string"
+                                },
+                                "page": {
+                                  "$ref": "#/components/schemas/DocSignaturesList200Response/properties/signatures/items/properties/widget/properties/ref/anyOf/0/properties/page"
+                                },
+                                "generation": {
+                                  "type": "integer",
+                                  "minimum": 0
+                                }
+                              },
+                              "required": ["docSessionId", "page", "generation"],
+                              "additionalProperties": false
+                            }
+                          },
+                          "required": ["kind", "page", "index", "revision"],
+                          "additionalProperties": false
+                        }
+                      ],
+                      "nullable": true
+                    },
                     "annotObjectNumber": {
                       "type": "integer",
                       "minimum": 0
                     },
                     "page": {
-                      "type": "object",
-                      "properties": {
-                        "kind": {
-                          "type": "string",
-                          "enum": ["objectNumber"]
-                        },
-                        "pageObjectNumber": {
-                          "type": "integer",
-                          "exclusiveMinimum": true,
-                          "minimum": 0
+                      "allOf": [
+                        {
+                          "$ref": "#/components/schemas/DocSignaturesList200Response/properties/signatures/items/properties/widget/properties/ref/anyOf/0/properties/page"
                         }
-                      },
-                      "required": ["kind", "pageObjectNumber"],
-                      "additionalProperties": false,
+                      ],
                       "nullable": true
                     }
                   },
-                  "required": ["annotObjectNumber", "page"],
+                  "required": ["ref", "annotObjectNumber", "page"],
                   "additionalProperties": false,
                   "nullable": true
                 },
@@ -10811,29 +10891,109 @@
               "widget": {
                 "type": "object",
                 "properties": {
+                  "ref": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "enum": ["objectNumber"]
+                          },
+                          "page": {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": ["objectNumber"]
+                              },
+                              "pageObjectNumber": {
+                                "type": "integer",
+                                "exclusiveMinimum": true,
+                                "minimum": 0
+                              }
+                            },
+                            "required": ["kind", "pageObjectNumber"],
+                            "additionalProperties": false
+                          },
+                          "annotObjectNumber": {
+                            "type": "integer",
+                            "exclusiveMinimum": true,
+                            "minimum": 0
+                          }
+                        },
+                        "required": ["kind", "page", "annotObjectNumber"],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "enum": ["nm"]
+                          },
+                          "page": {
+                            "$ref": "#/components/schemas/DocSignaturesComplete200Response/properties/signature/properties/widget/properties/ref/anyOf/0/properties/page"
+                          },
+                          "nm": {
+                            "type": "string"
+                          }
+                        },
+                        "required": ["kind", "page", "nm"],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "enum": ["index"]
+                          },
+                          "page": {
+                            "$ref": "#/components/schemas/DocSignaturesComplete200Response/properties/signature/properties/widget/properties/ref/anyOf/0/properties/page"
+                          },
+                          "index": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "revision": {
+                            "type": "object",
+                            "properties": {
+                              "docSessionId": {
+                                "type": "string"
+                              },
+                              "page": {
+                                "$ref": "#/components/schemas/DocSignaturesComplete200Response/properties/signature/properties/widget/properties/ref/anyOf/0/properties/page"
+                              },
+                              "generation": {
+                                "type": "integer",
+                                "minimum": 0
+                              }
+                            },
+                            "required": ["docSessionId", "page", "generation"],
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": ["kind", "page", "index", "revision"],
+                        "additionalProperties": false
+                      }
+                    ],
+                    "nullable": true
+                  },
                   "annotObjectNumber": {
                     "type": "integer",
                     "minimum": 0
                   },
                   "page": {
-                    "type": "object",
-                    "properties": {
-                      "kind": {
-                        "type": "string",
-                        "enum": ["objectNumber"]
-                      },
-                      "pageObjectNumber": {
-                        "type": "integer",
-                        "exclusiveMinimum": true,
-                        "minimum": 0
+                    "allOf": [
+                      {
+                        "$ref": "#/components/schemas/DocSignaturesComplete200Response/properties/signature/properties/widget/properties/ref/anyOf/0/properties/page"
                       }
-                    },
-                    "required": ["kind", "pageObjectNumber"],
-                    "additionalProperties": false,
+                    ],
                     "nullable": true
                   }
                 },
-                "required": ["annotObjectNumber", "page"],
+                "required": ["ref", "annotObjectNumber", "page"],
                 "additionalProperties": false,
                 "nullable": true
               },
@@ -11161,24 +11321,10 @@
                   "type": "object",
                   "properties": {
                     "page": {
-                      "$ref": "#/components/schemas/DocSignaturesComplete200Response/properties/signature/properties/widget/properties/page"
+                      "$ref": "#/components/schemas/DocSignaturesComplete200Response/properties/signature/properties/widget/properties/ref/anyOf/0/properties/page"
                     },
                     "revision": {
-                      "type": "object",
-                      "properties": {
-                        "docSessionId": {
-                          "type": "string"
-                        },
-                        "page": {
-                          "$ref": "#/components/schemas/DocSignaturesComplete200Response/properties/signature/properties/widget/properties/page"
-                        },
-                        "generation": {
-                          "type": "integer",
-                          "minimum": 0
-                        }
-                      },
-                      "required": ["docSessionId", "page", "generation"],
-                      "additionalProperties": false
+                      "$ref": "#/components/schemas/DocSignaturesComplete200Response/properties/signature/properties/widget/properties/ref/anyOf/2/properties/revision"
                     },
                     "weakAnnotationState": {
                       "anyOf": [
@@ -11245,7 +11391,7 @@
                       "type": "object",
                       "properties": {
                         "page": {
-                          "$ref": "#/components/schemas/DocSignaturesComplete200Response/properties/signature/properties/widget/properties/page"
+                          "$ref": "#/components/schemas/DocSignaturesComplete200Response/properties/signature/properties/widget/properties/ref/anyOf/0/properties/page"
                         },
                         "cache": {
                           "type": "object",
@@ -11673,29 +11819,109 @@
                 "widget": {
                   "type": "object",
                   "properties": {
+                    "ref": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": ["objectNumber"]
+                            },
+                            "page": {
+                              "type": "object",
+                              "properties": {
+                                "kind": {
+                                  "type": "string",
+                                  "enum": ["objectNumber"]
+                                },
+                                "pageObjectNumber": {
+                                  "type": "integer",
+                                  "exclusiveMinimum": true,
+                                  "minimum": 0
+                                }
+                              },
+                              "required": ["kind", "pageObjectNumber"],
+                              "additionalProperties": false
+                            },
+                            "annotObjectNumber": {
+                              "type": "integer",
+                              "exclusiveMinimum": true,
+                              "minimum": 0
+                            }
+                          },
+                          "required": ["kind", "page", "annotObjectNumber"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": ["nm"]
+                            },
+                            "page": {
+                              "$ref": "#/components/schemas/DocVersionsSignatures200Response/properties/signatures/items/properties/widget/properties/ref/anyOf/0/properties/page"
+                            },
+                            "nm": {
+                              "type": "string"
+                            }
+                          },
+                          "required": ["kind", "page", "nm"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": ["index"]
+                            },
+                            "page": {
+                              "$ref": "#/components/schemas/DocVersionsSignatures200Response/properties/signatures/items/properties/widget/properties/ref/anyOf/0/properties/page"
+                            },
+                            "index": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "revision": {
+                              "type": "object",
+                              "properties": {
+                                "docSessionId": {
+                                  "type": "string"
+                                },
+                                "page": {
+                                  "$ref": "#/components/schemas/DocVersionsSignatures200Response/properties/signatures/items/properties/widget/properties/ref/anyOf/0/properties/page"
+                                },
+                                "generation": {
+                                  "type": "integer",
+                                  "minimum": 0
+                                }
+                              },
+                              "required": ["docSessionId", "page", "generation"],
+                              "additionalProperties": false
+                            }
+                          },
+                          "required": ["kind", "page", "index", "revision"],
+                          "additionalProperties": false
+                        }
+                      ],
+                      "nullable": true
+                    },
                     "annotObjectNumber": {
                       "type": "integer",
                       "minimum": 0
                     },
                     "page": {
-                      "type": "object",
-                      "properties": {
-                        "kind": {
-                          "type": "string",
-                          "enum": ["objectNumber"]
-                        },
-                        "pageObjectNumber": {
-                          "type": "integer",
-                          "exclusiveMinimum": true,
-                          "minimum": 0
+                      "allOf": [
+                        {
+                          "$ref": "#/components/schemas/DocVersionsSignatures200Response/properties/signatures/items/properties/widget/properties/ref/anyOf/0/properties/page"
                         }
-                      },
-                      "required": ["kind", "pageObjectNumber"],
-                      "additionalProperties": false,
+                      ],
                       "nullable": true
                     }
                   },
-                  "required": ["annotObjectNumber", "page"],
+                  "required": ["ref", "annotObjectNumber", "page"],
                   "additionalProperties": false,
                   "nullable": true
                 },
@@ -20294,29 +20520,109 @@
                       "items": {
                         "type": "object",
                         "properties": {
+                          "ref": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "type": "string",
+                                    "enum": ["objectNumber"]
+                                  },
+                                  "page": {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "type": "string",
+                                        "enum": ["objectNumber"]
+                                      },
+                                      "pageObjectNumber": {
+                                        "type": "integer",
+                                        "exclusiveMinimum": true,
+                                        "minimum": 0
+                                      }
+                                    },
+                                    "required": ["kind", "pageObjectNumber"],
+                                    "additionalProperties": false
+                                  },
+                                  "annotObjectNumber": {
+                                    "type": "integer",
+                                    "exclusiveMinimum": true,
+                                    "minimum": 0
+                                  }
+                                },
+                                "required": ["kind", "page", "annotObjectNumber"],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "type": "string",
+                                    "enum": ["nm"]
+                                  },
+                                  "page": {
+                                    "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/widgets/items/properties/ref/anyOf/0/properties/page"
+                                  },
+                                  "nm": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": ["kind", "page", "nm"],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "type": "string",
+                                    "enum": ["index"]
+                                  },
+                                  "page": {
+                                    "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/widgets/items/properties/ref/anyOf/0/properties/page"
+                                  },
+                                  "index": {
+                                    "type": "integer",
+                                    "minimum": 0
+                                  },
+                                  "revision": {
+                                    "type": "object",
+                                    "properties": {
+                                      "docSessionId": {
+                                        "type": "string"
+                                      },
+                                      "page": {
+                                        "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/widgets/items/properties/ref/anyOf/0/properties/page"
+                                      },
+                                      "generation": {
+                                        "type": "integer",
+                                        "minimum": 0
+                                      }
+                                    },
+                                    "required": ["docSessionId", "page", "generation"],
+                                    "additionalProperties": false
+                                  }
+                                },
+                                "required": ["kind", "page", "index", "revision"],
+                                "additionalProperties": false
+                              }
+                            ],
+                            "nullable": true
+                          },
                           "annotObjectNumber": {
                             "type": "integer",
                             "minimum": 0
                           },
                           "page": {
-                            "type": "object",
-                            "properties": {
-                              "kind": {
-                                "type": "string",
-                                "enum": ["objectNumber"]
-                              },
-                              "pageObjectNumber": {
-                                "type": "integer",
-                                "exclusiveMinimum": true,
-                                "minimum": 0
+                            "allOf": [
+                              {
+                                "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/widgets/items/properties/ref/anyOf/0/properties/page"
                               }
-                            },
-                            "required": ["kind", "pageObjectNumber"],
-                            "additionalProperties": false,
+                            ],
                             "nullable": true
                           }
                         },
-                        "required": ["annotObjectNumber", "page"],
+                        "required": ["ref", "annotObjectNumber", "page"],
                         "additionalProperties": false
                       }
                     },
@@ -20405,6 +20711,9 @@
                       "items": {
                         "type": "object",
                         "properties": {
+                          "ref": {
+                            "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/widgets/items/properties/ref"
+                          },
                           "annotObjectNumber": {
                             "$ref": "#/components/schemas/DocFormsGet200Response/properties/fields/items/anyOf/0/properties/widgets/items/properties/annotObjectNumber"
                           },
@@ -20422,6 +20731,7 @@
                           }
                         },
                         "required": [
+                          "ref",
                           "annotObjectNumber",
                           "page",
                           "onState",

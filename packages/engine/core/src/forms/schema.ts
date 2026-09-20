@@ -1,9 +1,10 @@
 import { PageRefSchema } from '../identity/PageRef.schema';
+import { AnnotationRefSchema } from '../annotation/base.schema';
 import { z } from 'zod';
 
 import { WidgetAppearanceSchema } from '../annotation/kinds/widget.shared';
 import { PdfRectSchema } from '../geometry/schemas';
-import type { FormFieldRef, FormWidgetRef } from '../identity/FormFieldRef';
+import type { FormFieldRef, FormWidget } from '../identity/FormFieldRef';
 import type { FormFieldDraft, FormFieldOptionInput, WidgetPlacement } from './draft';
 import type { FormFieldPatch } from './patch';
 import type { FormFieldDTO, FormFieldFlags, FormFieldOption, ToggleFieldWidget } from './field';
@@ -23,13 +24,15 @@ export const FormFieldRefSchema: z.ZodType<FormFieldRef> = z.discriminatedUnion(
   }),
 ]);
 
-const FormWidgetRefShape = {
+const FormWidgetShape = {
+  // The annotation address, present exactly when the widget is indirect AND placed.
+  ref: AnnotationRefSchema.nullable(),
   // 0 = direct (unaddressable) widget; null page = unplaced widget.
   annotObjectNumber: z.number().int().nonnegative(),
   page: PageRefSchema.nullable(),
 };
 
-export const FormWidgetRefSchema: z.ZodType<FormWidgetRef> = z.object(FormWidgetRefShape);
+export const FormWidgetSchema: z.ZodType<FormWidget> = z.object(FormWidgetShape);
 
 export const FormFieldFlagsSchema: z.ZodType<FormFieldFlags> = z.object({
   readOnly: z.boolean(),
@@ -39,7 +42,7 @@ export const FormFieldFlagsSchema: z.ZodType<FormFieldFlags> = z.object({
 });
 
 export const ToggleFieldWidgetSchema: z.ZodType<ToggleFieldWidget> = z.object({
-  ...FormWidgetRefShape,
+  ...FormWidgetShape,
   onState: z.string(),
   exportValue: z.string(),
   checked: z.boolean(),
@@ -69,7 +72,7 @@ const FormFieldBaseShape = {
   valueEntry: FormValueEntrySchema,
   defaultValueEntry: FormValueEntrySchema,
   actions: PdfFieldActionsSchema.optional(),
-  widgets: z.array(FormWidgetRefSchema),
+  widgets: z.array(FormWidgetSchema),
 };
 
 export const FormFieldDTOSchema: z.ZodType<FormFieldDTO> = z.discriminatedUnion('family', [

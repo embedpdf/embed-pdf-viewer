@@ -1,4 +1,4 @@
-import type { FormWidgetRef } from '@embedpdf/engine-core/runtime';
+import type { FormWidget } from '@embedpdf/engine-core/runtime';
 import { EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
 import { NULL_PTR, type PdfRuntimeModule, type Ptr } from '@embedpdf/engine-runtime';
 
@@ -22,7 +22,7 @@ const FIT_CONTAIN = 0;
 export function bakeWidgetAppearance(
   runtime: PdfRuntimeModule,
   docPtr: Ptr,
-  widget: FormWidgetRef,
+  widget: FormWidget,
   pdf: Uint8Array,
   pageIndex: number,
 ): void {

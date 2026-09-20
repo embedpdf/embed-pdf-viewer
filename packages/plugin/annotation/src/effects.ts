@@ -16,12 +16,16 @@
  *     touched, as before.
  */
 import type { DocumentEvent, EffectContext } from '@embedpdf/core';
-import { encodeStableIdKey } from '@embedpdf/engine-core/runtime';
+import { annotationKey } from '@embedpdf/core';
+import type { FormWidget } from '@embedpdf/engine-core/runtime';
 import { update, type Msg } from '@embedpdf/core-annotation';
 
 import { AnnotationToken } from './types';
 import type { AnnotationAction, AnnotationState } from './types';
 import { toPageRef } from '@embedpdf/engine-core/runtime';
+
+/** A widget's model key, or null when the engine could not give it an annotation address. */
+const widgetKey = (w: FormWidget): string | null => (w.ref ? annotationKey(w.ref) : null);
 
 export function registerAnnotationEffects(
   ctx: EffectContext<AnnotationState, AnnotationAction>,
@@ -48,9 +52,7 @@ export function registerAnnotationEffects(
     if (event.type === 'form.valueChanged' || event.type === 'form.effectsApplied') {
       apply({
         t: 'bumpAp',
-        ids: event.changedWidgets
-          .filter((w) => w.annotObjectNumber > 0)
-          .map((w) => encodeStableIdKey({ kind: 'objectNumber', value: w.annotObjectNumber })),
+        ids: event.changedWidgets.map(widgetKey).filter((k): k is string => k !== null),
       });
       return;
     }
@@ -60,9 +62,7 @@ export function registerAnnotationEffects(
     if (event.type === 'form.fieldUpdated') {
       apply({
         t: 'bumpAp',
-        ids: event.field.widgets
-          .filter((w) => w.annotObjectNumber > 0)
-          .map((w) => encodeStableIdKey({ kind: 'objectNumber', value: w.annotObjectNumber })),
+        ids: event.field.widgets.map(widgetKey).filter((k): k is string => k !== null),
       });
       return;
     }
@@ -71,13 +71,8 @@ export function registerAnnotationEffects(
     // (`document.versioned` follows); a remote completion arrives as that
     // event alone, so the versioned handler below re-reads the plane.
     if (event.type === 'signature.completed') {
-      const widget = event.signature.widget;
-      if (widget && widget.annotObjectNumber > 0) {
-        apply({
-          t: 'bumpAp',
-          ids: [encodeStableIdKey({ kind: 'objectNumber', value: widget.annotObjectNumber })],
-        });
-      }
+      const key = event.signature.widget && widgetKey(event.signature.widget);
+      if (key) apply({ t: 'bumpAp', ids: [key] });
       return;
     }
     if (event.type === 'document.versioned') {

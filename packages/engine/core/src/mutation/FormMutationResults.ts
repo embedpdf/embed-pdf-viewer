@@ -1,6 +1,6 @@
 import type { FormFieldDTO } from '../forms/field';
 import type { FormSnapshot } from '../forms/snapshot';
-import type { FormWidgetRef } from '../identity/FormFieldRef';
+import type { FormWidget } from '../identity/FormFieldRef';
 import type { MutationMeta } from './MutationMeta';
 
 /**
@@ -14,7 +14,7 @@ import type { MutationMeta } from './MutationMeta';
 export interface FormSetValueResult {
   /** The field read back after the write. */
   field: FormFieldDTO;
-  changedWidgets: FormWidgetRef[];
+  changedWidgets: FormWidget[];
   meta: MutationMeta;
 }
 
@@ -59,7 +59,7 @@ export interface FormFieldUpdateResult {
  */
 export interface FormFieldDeleteResult {
   deletedFieldObjectNumber: number;
-  removedWidgets: FormWidgetRef[];
+  removedWidgets: FormWidget[];
   meta: MutationMeta;
 }
 

@@ -8,7 +8,8 @@ import { annotationSelectionFrame } from '../../../core/annotation/src';
 import { createLocalEngine } from '../src/index';
 import { createAnnotationCapability } from '../../../plugin/annotation/src/capability';
 import { annotationReducer, initialAnnotationState } from '../../../plugin/annotation/src/reducer';
-import { fromDTO, refKey } from '../../../plugin/annotation/src/repository';
+import { fromDTO } from '../../../plugin/annotation/src/repository';
+import { annotationKey } from '@embedpdf/engine-core/runtime';
 import type { AnnotationAction, AnnotationState } from '../../../plugin/annotation/src/types';
 
 describe.each(['wasm', 'native'] as const)('distance authoring integration (%s)', (prefer) => {
@@ -59,7 +60,7 @@ describe.each(['wasm', 'native'] as const)('distance authoring integration (%s)'
       annotation.createPointer('distance', 'down', page.ref, { x: 250, y: 88 });
       await vi.waitFor(() => expect(annotation.getSelected()).toHaveLength(1));
       const created = annotation.getSelected()[0];
-      const createdId = refKey(created.ref);
+      const createdId = annotationKey(created.ref);
       const expectVector = () => {
         expect(annotation.pageItems(page.ref).find((item) => item.id === createdId)).toMatchObject({
           source: 'vector',

@@ -24,7 +24,7 @@ describe("FormsClient", () => {
                     mappingName: "mappingName",
                     valueEntry: { kind: "none" },
                     defaultValueEntry: { kind: "none" },
-                    widgets: [{ annotObjectNumber: 1, page: null }],
+                    widgets: [{ ref: null, annotObjectNumber: 1, page: null }],
                     value: "value",
                     defaultValue: "defaultValue",
                     maxLength: 1,

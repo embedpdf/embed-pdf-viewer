@@ -1,3 +1,4 @@
+import { formWidget } from '@embedpdf/engine-core/runtime';
 /**
  * The form place handler's gesture semantics — the rules it shares with the
  * annotation handlers: page-anchored projection, the UP sample as the final
@@ -22,7 +23,7 @@ function makeForm(over: Partial<FormCapability> = {}) {
   const placed: PlaceFieldInput[] = [];
   let resolveNext: PlacedField = {
     field: { name: 'text_1' } as PlacedField['field'],
-    widget: { annotObjectNumber: 42, page: PAGE_REF } as PlacedField['widget'],
+    widget: formWidget(42, PAGE_REF) as PlacedField['widget'],
   };
   const form = {
     canDesign: () => true,

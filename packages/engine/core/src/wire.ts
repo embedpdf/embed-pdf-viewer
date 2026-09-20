@@ -137,7 +137,7 @@ export type {
 } from './wire/schemas';
 export {
   FormFieldRefSchema,
-  FormWidgetRefSchema,
+  FormWidgetSchema,
   FormFieldFlagsSchema,
   ToggleFieldWidgetSchema,
   FormFieldOptionSchema,

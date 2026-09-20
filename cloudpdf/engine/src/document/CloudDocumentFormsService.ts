@@ -24,7 +24,8 @@ import {
   type FormSetValueResult,
   type FormSnapshot,
   type FormWidgetLinkResult,
-  type FormWidgetRef,
+  type FormWidget,
+  type AnnotationRef,
   type MutationMeta,
 } from '@embedpdf/engine-core/runtime';
 import {
@@ -218,7 +219,11 @@ export class CloudDocumentFormsService implements DocumentFormsService {
         { r0: { bytes, mimeType: 'application/pdf', name: 'appearance.pdf' } },
       );
       const result = await this.http.postMultipartJson(
-        wirePaths.layerFormFieldSignatureAppearance(this.docId, this.layerName, encodeFieldRefKey(ref)),
+        wirePaths.layerFormFieldSignatureAppearance(
+          this.docId,
+          this.layerName,
+          encodeFieldRefKey(ref),
+        ),
         form,
         (raw) => FormFieldUpdateResultSchema.parse(raw),
         signal,
@@ -242,7 +247,7 @@ export class CloudDocumentFormsService implements DocumentFormsService {
 
   attachWidget(
     ref: FormFieldRef,
-    widget: FormWidgetRef,
+    widget: AnnotationRef,
     options?: { onState?: string },
   ): AbortablePromise<FormWidgetLinkResult> {
     const rejected = this.rejectIfClosed<FormWidgetLinkResult>();
@@ -259,7 +264,7 @@ export class CloudDocumentFormsService implements DocumentFormsService {
     });
   }
 
-  detachWidget(ref: FormFieldRef, widget: FormWidgetRef): AbortablePromise<FormWidgetLinkResult> {
+  detachWidget(ref: FormFieldRef, widget: AnnotationRef): AbortablePromise<FormWidgetLinkResult> {
     const rejected = this.rejectIfClosed<FormWidgetLinkResult>();
     if (rejected) return rejected;
     return AbortablePromise.run<FormWidgetLinkResult>(async (signal) => {

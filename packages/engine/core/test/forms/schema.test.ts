@@ -27,6 +27,11 @@ const RADIO: FormFieldDTO = {
   noToggleToOff: false,
   widgets: [
     {
+      ref: {
+        kind: 'objectNumber',
+        page: { kind: 'objectNumber', pageObjectNumber: 3 },
+        annotObjectNumber: 8,
+      },
       annotObjectNumber: 8,
       page: { kind: 'objectNumber', pageObjectNumber: 3 },
       onState: 'male',
@@ -34,6 +39,11 @@ const RADIO: FormFieldDTO = {
       checked: true,
     },
     {
+      ref: {
+        kind: 'objectNumber',
+        page: { kind: 'objectNumber', pageObjectNumber: 3 },
+        annotObjectNumber: 9,
+      },
       annotObjectNumber: 9,
       page: { kind: 'objectNumber', pageObjectNumber: 3 },
       onState: 'female',
@@ -58,7 +68,17 @@ const LISTBOX: FormFieldDTO = {
     { label: 'Banana', value: 'Banana', selected: false },
     { label: 'Cherry', value: 'Cherry', selected: true },
   ],
-  widgets: [{ annotObjectNumber: 9, page: { kind: 'objectNumber', pageObjectNumber: 3 } }],
+  widgets: [
+    {
+      ref: {
+        kind: 'objectNumber',
+        page: { kind: 'objectNumber', pageObjectNumber: 3 },
+        annotObjectNumber: 9,
+      },
+      annotObjectNumber: 9,
+      page: { kind: 'objectNumber', pageObjectNumber: 3 },
+    },
+  ],
 };
 
 describe('form schemas', () => {

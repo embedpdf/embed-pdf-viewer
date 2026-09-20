@@ -15,7 +15,7 @@ import * as React from 'react';
 import { useEffect, useState } from 'react';
 import {
   AnnotationToken,
-  refKey,
+  annotationKey,
   type AnnotationHydration,
   type AnnotationRef,
   type Behavior,
@@ -841,7 +841,7 @@ export function AnnotationLayer({ renderers }: AnnotationLayerProps = {}) {
             return;
           }
           revokers.push(obj.revoke);
-          map[refKey(ap.ref)] = { url: obj.url, box };
+          map[annotationKey(ap.ref)] = { url: obj.url, box };
         }
         if (!controller.signal.aborted) setUrls(map);
       } catch {
@@ -1083,7 +1083,7 @@ export function useCommentThread(ref: AnnotationRef | null): CommentThreadView |
   if (ref == null) return null;
   const t = api.thread(ref);
   if (!t) return null;
-  return views.find((v) => refKey(v.root.ref) === refKey(t.root.ref)) ?? null;
+  return views.find((v) => annotationKey(v.root.ref) === annotationKey(t.root.ref)) ?? null;
 }
 
 /** Whole-document hydration status — the comments sidebar's honest loading

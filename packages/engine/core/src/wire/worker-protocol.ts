@@ -35,7 +35,7 @@ import type { FormSnapshot } from '../forms/snapshot';
 import type { FormDataFormat, FormFieldValue } from '../forms/value';
 import type { PdfSize, PdfRect } from '../geometry/primitives';
 import type { AnnotationRef } from '../identity/AnnotationRef';
-import type { FormFieldRef, FormWidgetRef } from '../identity/FormFieldRef';
+import type { FormFieldRef, FormWidget } from '../identity/FormFieldRef';
 import type { PageObjectNumber } from '../identity/PageObjectNumber';
 import type { PageRef } from '../identity/PageRef';
 import type {
@@ -535,7 +535,7 @@ export interface FormsAttachWidgetWorkerRequest {
   docId: string;
   layerName?: string;
   ref: FormFieldRef;
-  widget: FormWidgetRef;
+  widget: AnnotationRef;
   onState?: string;
   artifactPath?: string;
 }
@@ -546,7 +546,7 @@ export interface FormsDetachWidgetWorkerRequest {
   docId: string;
   layerName?: string;
   ref: FormFieldRef;
-  widget: FormWidgetRef;
+  widget: AnnotationRef;
   artifactPath?: string;
 }
 

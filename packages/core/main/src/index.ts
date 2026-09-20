@@ -23,6 +23,8 @@ export {
   pageRefsEqual,
   encodePageKey,
   decodePageKey,
+  annotationKey,
+  refFromStableId,
 } from '@embedpdf/engine-core/runtime';
 export type {
   EngineRenderPolicy,

@@ -9,7 +9,8 @@ import { rotatePoint } from '../../../core/annotation/src/geometry';
 import { createLocalEngine } from '../src/index';
 import { createAnnotationCapability } from '../../../plugin/annotation/src/capability';
 import { annotationReducer, initialAnnotationState } from '../../../plugin/annotation/src/reducer';
-import { fromDTO, refKey } from '../../../plugin/annotation/src/repository';
+import { fromDTO } from '../../../plugin/annotation/src/repository';
+import { annotationKey } from '@embedpdf/engine-core/runtime';
 import type { AnnotationAction, AnnotationState } from '../../../plugin/annotation/src/types';
 
 describe.each(['wasm', 'native'] as const)('shape authoring integration (%s)', (prefer) => {
@@ -79,7 +80,8 @@ describe.each(['wasm', 'native'] as const)('shape authoring integration (%s)', (
         };
         const expectVector = () => {
           expect(
-            annotation.pageItems(page.ref).find((item) => item.id === refKey(created.ref))?.source,
+            annotation.pageItems(page.ref).find((item) => item.id === annotationKey(created.ref))
+              ?.source,
           ).toBe('vector');
           expect(annotation.appearanceEpoch(page.ref)).toBe('');
         };

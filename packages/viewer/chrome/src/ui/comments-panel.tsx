@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useCapability } from '@embedpdf/react/runtime';
 import {
   AnnotationToken,
-  refKey,
+  annotationKey,
   useAnnotationSelection,
   useComments,
   useCommentThreads,
@@ -61,10 +61,10 @@ export function CommentsPanel() {
    *  selecting a reply's parent shape highlights the same card. */
   const selectedThreadKey = useMemo(() => {
     for (const id of selection) {
-      const dto = anno.getSelected().find((a) => refKey(a.ref) === id || a.nm === id);
+      const dto = anno.getSelected().find((a) => annotationKey(a.ref) === id || a.nm === id);
       const ref = dto?.ref ?? null;
       const thread = ref ? comments.thread(ref) : null;
-      if (thread) return refKey(thread.root.ref);
+      if (thread) return annotationKey(thread.root.ref);
     }
     return null;
     // `selection` identity changes on every selection write — the right key.
@@ -105,7 +105,8 @@ export function CommentsPanel() {
     return [...groups.entries()].sort((a, b) => a[0] - b[0]);
   }, [threads]);
 
-  if (hydration.status === 'loading') return <Empty icon="comment" text={t('demo.commentsLoading')} />;
+  if (hydration.status === 'loading')
+    return <Empty icon="comment" text={t('demo.commentsLoading')} />;
   if (hydration.status === 'forbidden')
     return <Empty icon="lock" text={t('demo.commentsForbidden')} />;
   if (hydration.status === 'error') {
@@ -142,7 +143,7 @@ export function CommentsPanel() {
             </div>
             <ul className="flex flex-col gap-2">
               {group.map((view) => {
-                const key = refKey(view.root.ref);
+                const key = annotationKey(view.root.ref);
                 return (
                   <ThreadCard
                     key={key}
@@ -255,12 +256,16 @@ function ThreadCard({
           )}
         </div>
 
-        <CommentBody annotationRef={view.root.ref} text={view.root.contents ?? ''} deletable={false} />
+        <CommentBody
+          annotationRef={view.root.ref}
+          text={view.root.contents ?? ''}
+          deletable={false}
+        />
 
         {view.replies.length > 0 && (
           <div className="border-border-subtle flex flex-col gap-2 border-t pt-2">
             {view.replies.map((r) => (
-              <Reply key={refKey(r.ref)} dto={r} />
+              <Reply key={annotationKey(r.ref)} dto={r} />
             ))}
           </div>
         )}
@@ -324,9 +329,7 @@ function Reply({ dto }: { dto: AnnotationDTO }) {
         <span className="text-fg-secondary text-xs font-medium">
           {dto.author ?? t('demo.commentsAnonymous')}
         </span>
-        <span className="text-fg-muted text-[11px]">
-          {dateLabel(dto.modified ?? dto.created)}
-        </span>
+        <span className="text-fg-muted text-[11px]">{dateLabel(dto.modified ?? dto.created)}</span>
       </div>
       <CommentBody annotationRef={dto.ref} text={dto.contents ?? ''} deletable />
     </div>

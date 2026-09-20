@@ -108,13 +108,9 @@ export function createPlaceHandler(
           // annotation page reload, so the ref is selectable. Skip when the
           // world moved on (tool changed) while the engine write ran.
           if (!annotation || interaction.activeToolId() !== toolId) return;
-          const widget = placed.widget;
-          if (!widget || widget.annotObjectNumber <= 0) return;
-          annotation.select({
-            kind: 'objectNumber',
-            annotObjectNumber: widget.annotObjectNumber,
-            page: o.page,
-          });
+          const ref = placed.widget?.ref;
+          if (!ref) return;
+          annotation.select(ref);
         })
         .catch((err) => {
           globalThis.console?.error('[form] placeField failed:', err);

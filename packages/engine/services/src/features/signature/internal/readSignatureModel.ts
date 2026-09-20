@@ -8,6 +8,7 @@ import type {
   SignatureDTO,
   SignatureSeedValue,
 } from '@embedpdf/engine-core/runtime';
+import { formWidget } from '@embedpdf/engine-core/runtime';
 import { EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
 import { NULL_PTR, type PdfRuntimeModule, type Ptr } from '@embedpdf/engine-runtime';
 
@@ -166,10 +167,7 @@ export function readSignaturesFromModel(runtime: PdfRuntimeModule, model: Ptr): 
       fieldName: readWide(runtime, (buf, cap) => fn.EPDFSig_GetFieldName(model, i, buf, cap)) ?? '',
       widget:
         widgetObjNum > 0
-          ? {
-              annotObjectNumber: widgetObjNum,
-              page: widgetPageRef(fn.EPDFSig_GetWidgetPageObjNum(model, i)),
-            }
+          ? formWidget(widgetObjNum, widgetPageRef(fn.EPDFSig_GetWidgetPageObjNum(model, i)))
           : null,
       signed,
       kind: fn.EPDFSig_GetKind(model, i) === KIND_DOC_TIMESTAMP ? 'timestamp' : 'signature',

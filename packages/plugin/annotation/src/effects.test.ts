@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { DocumentEvent, EffectContext } from '@embedpdf/core';
-import { encodeStableIdKey, toPageRef } from '@embedpdf/engine-core/runtime';
+import { annotationKey, formWidget, toPageRef } from '@embedpdf/engine-core/runtime';
 import type { Annot } from '@embedpdf/core-annotation';
 
 import { registerAnnotationEffects } from './effects';
@@ -53,7 +53,7 @@ describe('annotation document effects', () => {
     '%s advances the changed widget appearance version',
     (type) => {
       const annotObjectNumber = 5;
-      const id = encodeStableIdKey({ kind: 'objectNumber', value: annotObjectNumber });
+      const id = annotationKey({ kind: 'objectNumber', page: toPageRef(11), annotObjectNumber });
       const { emit, getState } = harness((state) => ({
         ...state,
         model: {
@@ -66,7 +66,7 @@ describe('annotation document effects', () => {
       emit(
         event({
           type,
-          changedWidgets: [{ annotObjectNumber, page: toPageRef(11) }],
+          changedWidgets: [formWidget(annotObjectNumber, toPageRef(11))],
           origin: { kind: 'local' },
         }),
       );

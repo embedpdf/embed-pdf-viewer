@@ -2,7 +2,7 @@ import type { ConformanceOptions, ConformanceTestRunner } from './runMetadataCon
 import type { Engine } from '../engine/Engine';
 import type { DocumentEvent } from '../events/DocumentEvent';
 import type { AnnotationDraft } from '../shared';
-import { refKey } from '../annotation/relationships';
+import { annotationKey } from '../identity/annotationKey';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
 import { toPageRef } from '../identity/PageRef';
 import { AbortError } from '../promise/AbortError';
@@ -133,7 +133,7 @@ export function runMeasurementConformance(
         const page = doc.page((await doc.pages.list()).pages[0].ref);
         const list = (await page.annotations.list()).annotations;
         for (const before of saved) {
-          const a = list.find((a) => refKey(a.ref) === refKey(before.ref))!;
+          const a = list.find((a) => annotationKey(a.ref) === annotationKey(before.ref))!;
           expect(a.contents).toBe(before.contents);
           if (a.subtype !== 'line' && a.subtype !== 'polygon' && a.subtype !== 'polyline')
             throw new Error('Missing dimension');

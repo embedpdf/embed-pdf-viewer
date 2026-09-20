@@ -3,10 +3,11 @@ import type {
   DigestAlgorithm,
   DocumentProtection,
   FormFieldRef,
-  FormWidgetRef,
+  FormWidget,
   SignatureDTO,
   SignatureSnapshot,
 } from '@embedpdf/engine-core/runtime';
+import { formWidget } from '@embedpdf/engine-core/runtime';
 import { EngineError, EngineErrorCode, deriveProtection } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
@@ -101,7 +102,7 @@ export class SignatureReader {
     index: number;
     fieldObjectNumber: number;
     signed: boolean;
-    widget: FormWidgetRef | null;
+    widget: FormWidget | null;
   } {
     const { fn } = this.runtime;
     const model = acquireSignatureModel(this.runtime, this.session);
@@ -121,10 +122,7 @@ export class SignatureReader {
       signed: fn.EPDFSig_IsSigned(model, index),
       widget:
         widgetObjNum > 0
-          ? {
-              annotObjectNumber: widgetObjNum,
-              page: widgetPageRef(fn.EPDFSig_GetWidgetPageObjNum(model, index)),
-            }
+          ? formWidget(widgetObjNum, widgetPageRef(fn.EPDFSig_GetWidgetPageObjNum(model, index)))
           : null,
     };
   }

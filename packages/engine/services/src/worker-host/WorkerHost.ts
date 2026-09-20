@@ -1818,15 +1818,8 @@ export class WorkerHost {
     // bookkeeping, weak-ref invalidation, and page revisions in ONE place.
     const annotations = new AnnotationMutator(this.runtime, session);
     for (const widget of detachedWidgets) {
-      if (widget.annotObjectNumber <= 0 || widget.page === null) continue;
-      annotations.delete(
-        {
-          kind: 'objectNumber',
-          page: widget.page,
-          annotObjectNumber: widget.annotObjectNumber,
-        },
-        signal,
-      );
+      if (!widget.ref) continue; // direct or unplaced: nothing the annotation plane can delete
+      annotations.delete(widget.ref, signal);
     }
     // The annotation deletes above mutated /Annots after the form
     // mutator's own bump; bump again so the form-model cache rebuilds.

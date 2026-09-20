@@ -1,4 +1,4 @@
-import type { FormFieldRef, FormWidgetRef } from '../identity/FormFieldRef';
+import type { FormFieldRef, FormWidget } from '../identity/FormFieldRef';
 import type { MutationMeta } from '../mutation/MutationMeta';
 
 /**
@@ -112,7 +112,7 @@ export interface SignatureDTO {
   /** Always an `objectNumber` ref: the durable identity. */
   field: FormFieldRef;
   fieldName: string;
-  widget: FormWidgetRef | null;
+  widget: FormWidget | null;
   signed: boolean;
   kind: SignatureKind;
   /** Raw `/Filter` and `/SubFilter` names. */

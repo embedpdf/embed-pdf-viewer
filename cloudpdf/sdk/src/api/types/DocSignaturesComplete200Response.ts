@@ -41,6 +41,7 @@ export namespace DocSignaturesComplete200Response {
 
     export namespace Signature {
         export interface Widget {
+            ref: CloudPDF.DocSignaturesComplete200ResponseSignatureWidgetRef | null;
             annotObjectNumber: number;
             page: Widget.Page | null;
         }
@@ -205,7 +206,7 @@ export namespace DocSignaturesComplete200Response {
 
         export namespace AffectedPages {
             export interface Item {
-                page: Item.Page | null;
+                page: Item.Page;
                 revision: Item.Revision;
                 weakAnnotationState: CloudPDF.DocSignaturesComplete200ResponseMetaAffectedPagesItemWeakAnnotationState;
             }
@@ -225,7 +226,7 @@ export namespace DocSignaturesComplete200Response {
 
                 export interface Revision {
                     docSessionId: string;
-                    page: Revision.Page | null;
+                    page: Revision.Page;
                     generation: number;
                 }
 
@@ -259,7 +260,7 @@ export namespace DocSignaturesComplete200Response {
 
             export namespace Pages {
                 export interface Item {
-                    page: Item.Page | null;
+                    page: Item.Page;
                     cache: Item.Cache;
                 }
 

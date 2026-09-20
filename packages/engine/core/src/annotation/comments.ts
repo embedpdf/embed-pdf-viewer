@@ -35,7 +35,8 @@
 
 import type { AnnotationDTO } from './kinds';
 import type { KnownAnnotationState } from './primitives';
-import { classifyRelation, refKey } from './relationships';
+import { classifyRelation } from './relationships';
+import { annotationKey } from '../identity/annotationKey';
 import type { AnnotationRef } from '../identity/AnnotationRef';
 import type { PageRef } from '../identity/PageRef';
 
@@ -129,10 +130,10 @@ export function buildCommentThreads(
   // entries win over nm aliases on duplicate /NM.
   const byKey = new Map<string, AnnotationDTO>();
   for (const a of eligible) {
-    const key = refKey(a.ref);
+    const key = annotationKey(a.ref);
     if (!byKey.has(key)) byKey.set(key, a);
     if (a.nm) {
-      const aliasKey = refKey({ kind: 'nm', page: a.page, nm: a.nm });
+      const aliasKey = annotationKey({ kind: 'nm', page: a.page, nm: a.nm });
       if (!byKey.has(aliasKey)) byKey.set(aliasKey, a);
     }
   }
@@ -141,9 +142,9 @@ export function buildCommentThreads(
   const children = new Map<string, AnnotationDTO[]>();
   for (const a of eligible) {
     if (!a.inReplyTo) continue;
-    const parent = byKey.get(refKey(a.inReplyTo));
+    const parent = byKey.get(annotationKey(a.inReplyTo));
     if (!parent) continue; // orphan — handled in the promotion pass
-    const parentKey = refKey(parent.ref);
+    const parentKey = annotationKey(parent.ref);
     const list = children.get(parentKey);
     if (list) list.push(a);
     else children.set(parentKey, [a]);
@@ -157,11 +158,11 @@ export function buildCommentThreads(
     const groupedParts: AnnotationDTO[] = [];
     const states: AnnotationDTO[] = [];
 
-    visited.add(refKey(root.ref));
-    const stack = [...(children.get(refKey(root.ref)) ?? [])];
+    visited.add(annotationKey(root.ref));
+    const stack = [...(children.get(annotationKey(root.ref)) ?? [])];
     while (stack.length > 0) {
       const a = stack.pop()!;
-      const key = refKey(a.ref);
+      const key = annotationKey(a.ref);
       if (visited.has(key)) continue; // cycle back-edge — skip
       visited.add(key);
       if (isStateAnnotation(a)) states.push(a);
@@ -193,7 +194,7 @@ export function buildCommentThreads(
   // root in input order. State annotations never promote: a status with no
   // reachable target is dropped.
   for (const a of eligible) {
-    if (visited.has(refKey(a.ref))) continue;
+    if (visited.has(annotationKey(a.ref))) continue;
     if (isStateAnnotation(a)) continue;
     walk(a);
   }

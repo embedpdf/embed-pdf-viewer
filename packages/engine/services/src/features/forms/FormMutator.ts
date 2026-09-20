@@ -8,12 +8,18 @@ import type {
   FormImportResult,
   FormRepairResult,
   FormSetValueResult,
-  FormWidgetRef,
+  FormWidget,
   MutationMeta,
   WidgetPlacement,
   PageObjectNumber,
 } from '@embedpdf/engine-core/runtime';
-import { EngineError, EngineErrorCode, fieldLockFor } from '@embedpdf/engine-core/runtime';
+import {
+  EngineError,
+  EngineErrorCode,
+  fieldLockFor,
+  formWidget,
+} from '@embedpdf/engine-core/runtime';
+import type { AnnotationRef } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
 import type { DocumentSession } from '../../document-session/DocumentSession';
@@ -419,7 +425,7 @@ export class FormMutator {
   deleteField(
     ref: FormFieldRef,
     signal: AbortSignal,
-  ): { deletedFieldObjectNumber: number; detachedWidgets: FormWidgetRef[] } {
+  ): { deletedFieldObjectNumber: number; detachedWidgets: FormWidget[] } {
     throwIfAborted(signal);
     const { fn, mem } = this.runtime;
     const model = acquireFormModel(this.runtime, this.session);
@@ -449,16 +455,13 @@ export class FormMutator {
     this.session.noteMutation();
     return {
       deletedFieldObjectNumber: resolved.fieldObjectNumber,
-      detachedWidgets: before.widgets.map((w) => ({
-        annotObjectNumber: w.annotObjectNumber,
-        page: w.page,
-      })),
+      detachedWidgets: before.widgets.map((w) => formWidget(w.annotObjectNumber, w.page)),
     };
   }
 
   attachWidget(
     ref: FormFieldRef,
-    widget: FormWidgetRef,
+    widget: AnnotationRef,
     onState: string | undefined,
     signal: AbortSignal,
   ): { field: FormFieldDTO } {
@@ -485,7 +488,7 @@ export class FormMutator {
       !fn.EPDFForm_AttachWidget(
         this.session.requireDocPtr(),
         resolved.fieldObjectNumber,
-        widget.annotObjectNumber,
+        widgetObjectNumber(widget),
         state,
       )
     ) {
@@ -500,7 +503,7 @@ export class FormMutator {
 
   detachWidget(
     ref: FormFieldRef,
-    widget: FormWidgetRef,
+    widget: AnnotationRef,
     signal: AbortSignal,
   ): { field: FormFieldDTO } {
     throwIfAborted(signal);
@@ -512,7 +515,7 @@ export class FormMutator {
       !fn.EPDFForm_DetachWidget(
         this.session.requireDocPtr(),
         resolved.fieldObjectNumber,
-        widget.annotObjectNumber,
+        widgetObjectNumber(widget),
       )
     ) {
       throw new EngineError(EngineErrorCode.InvalidArg, 'widget is not attached to this field');
@@ -714,12 +717,9 @@ export class FormMutator {
       this.session.requireDocPtr(),
     );
     const changedSet = new Set(changedObjNums);
-    const changedWidgets: FormWidgetRef[] = field.widgets
+    const changedWidgets: FormWidget[] = field.widgets
       .filter((w) => changedSet.has(w.annotObjectNumber))
-      .map((w) => ({
-        annotObjectNumber: w.annotObjectNumber,
-        page: w.page,
-      }));
+      .map((w) => formWidget(w.annotObjectNumber, w.page));
     return { field, changedWidgets, meta: EMPTY_META };
   }
 }
@@ -734,4 +734,12 @@ function sniffFormat(bytes: Uint8Array): FormDataFormat {
     return c === 0x3c /* '<' */ ? 'xfdf' : 'fdf';
   }
   return 'fdf';
+}
+
+/** Widgets are addressed by object number: a name or index address cannot join a field. */
+function widgetObjectNumber(widget: AnnotationRef): number {
+  if (widget.kind !== 'objectNumber') {
+    throw new EngineError(EngineErrorCode.InvalidArg, 'widget must be addressed by object number');
+  }
+  return widget.annotObjectNumber;
 }

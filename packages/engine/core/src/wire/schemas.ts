@@ -50,7 +50,7 @@ import type { DocumentSecurityState, PdfPermissionInfo } from '../engine/Documen
 import type { SerializedEngineError } from '../errors/EngineError';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
 import type { FormEffectsResult, FormEffect } from '../forms/effects';
-import { FormFieldDTOSchema, FormSnapshotSchema, FormWidgetRefSchema } from '../forms/schema';
+import { FormFieldDTOSchema, FormSnapshotSchema, FormWidgetSchema } from '../forms/schema';
 import { FormFieldRefSchema, FormFieldValueSchema } from '../forms/schema';
 import {
   PdfQuadSchema,
@@ -914,7 +914,7 @@ export const AnnotationMoveResultSchema: z.ZodType<AnnotationMoveResult> = z.obj
 
 export const FormSetValueResultSchema: z.ZodType<FormSetValueResult> = z.object({
   field: FormFieldDTOSchema,
-  changedWidgets: z.array(FormWidgetRefSchema),
+  changedWidgets: z.array(FormWidgetSchema),
   meta: MutationMetaSchema,
 });
 
@@ -935,11 +935,11 @@ export const FormEffectsResultSchema: z.ZodType<FormEffectsResult> = z.object({
       index: z.number().int().nonnegative(),
       status: z.enum(['applied', 'unchanged', 'rejected', 'failed', 'skipped']),
       fields: z.array(FormFieldDTOSchema),
-      changedWidgets: z.array(FormWidgetRefSchema),
+      changedWidgets: z.array(FormWidgetSchema),
       error: EngineErrorPayloadSchema.optional(),
     }),
   ),
-  changedWidgets: z.array(FormWidgetRefSchema),
+  changedWidgets: z.array(FormWidgetSchema),
   meta: MutationMetaSchema.nullable(),
 });
 
@@ -964,7 +964,7 @@ export const FormFieldUpdateResultSchema: z.ZodType<FormFieldUpdateResult> = z.o
 
 export const FormFieldDeleteResultSchema: z.ZodType<FormFieldDeleteResult> = z.object({
   deletedFieldObjectNumber: z.number().int().positive(),
-  removedWidgets: z.array(FormWidgetRefSchema),
+  removedWidgets: z.array(FormWidgetSchema),
   meta: MutationMetaSchema,
 });
 
@@ -1403,7 +1403,7 @@ export const SignatureDTOSchema: z.ZodType<SignatureDTO> = z.object({
   index: z.number().int().nonnegative(),
   field: FormFieldRefSchema,
   fieldName: z.string(),
-  widget: FormWidgetRefSchema.nullable(),
+  widget: FormWidgetSchema.nullable(),
   signed: z.boolean(),
   kind: z.enum(['signature', 'timestamp']),
   filter: z.string().nullable(),
