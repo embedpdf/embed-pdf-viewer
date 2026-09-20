@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { PluginContext } from '@embedpdf/core';
+import { toPageRef, type PluginContext } from '@embedpdf/core';
 import { createInteractionCapability } from './capability';
 import { initialInteractionState, interactionReducer } from './reducer';
 import { builtinTools } from './interaction.plugin';
@@ -25,7 +25,7 @@ function harness(defaultTool = 'pointer') {
 const sample = (phase: 'down' | 'move' | 'up'): PointerSample => ({
   phase,
   viewport: { x: 0, y: 0 },
-  page: { pon: 1, point: { x: 0, y: 0 } },
+  page: { ref: toPageRef(1), point: { x: 0, y: 0 } },
   modifiers: { shift: false, alt: false, ctrl: false, meta: false },
 });
 
@@ -138,7 +138,7 @@ describe('touch consent (wouldClaimTouch) and cancel routing', () => {
     const log: string[] = [];
     cap.registerHandler({
       ...handler('edit', 100, 'annotation-edit', log),
-      claimsTouch: (s) => s.page?.pon === 1,
+      claimsTouch: (s) => s.page?.ref.pageObjectNumber === 1,
     });
     // pan tool does not enable text-select, but DOES enable annotation-edit
     expect(cap.wouldClaimTouch(sample('down'))).toBe(true);

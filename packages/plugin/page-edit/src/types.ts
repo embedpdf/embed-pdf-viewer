@@ -1,7 +1,7 @@
 import {
   createCapabilityToken,
   type AbortablePromise,
-  type PageObjectNumber,
+  type PageRef,
   type PageRotation,
   type PageRotateResult,
   type PageMoveResult,
@@ -17,10 +17,7 @@ import {
  * positions ("at the start"). Omitted → append. Resolved to the engine's
  * index wire by the capability at call time, from the registry.
  */
-export type PagePlacement =
-  | { after: PageObjectNumber }
-  | { before: PageObjectNumber }
-  | { index: number };
+export type PagePlacement = { after: PageRef } | { before: PageRef } | { index: number };
 
 /**
  * Structural page edits, addressed by durable PON (never display index — an
@@ -51,19 +48,22 @@ export interface PageEditCapability {
    * gesture. Reads the page's current rotation from the registry and forwards
    * the resulting absolute rotation to the engine.
    */
-  rotateBy(pon: PageObjectNumber, delta: 90 | -90): AbortablePromise<PageRotateResult>;
+  rotateBy(page: PageRef, delta: 90 | -90): AbortablePromise<PageRotateResult>;
 
   /**
    * Set the ABSOLUTE rotation of one or more pages to a single shared value —
    * the multi-select gesture. Maps 1:1 to the engine.
    */
-  setRotation(pons: PageObjectNumber[], rotation: PageRotation): AbortablePromise<PageRotateResult>;
+  setRotation(
+    pages: readonly PageRef[],
+    rotation: PageRotation,
+  ): AbortablePromise<PageRotateResult>;
 
-  /** Reorder pages (by PON) as a contiguous block starting at `destIndex`. */
-  move(pons: PageObjectNumber[], destIndex: number): AbortablePromise<PageMoveResult>;
+  /** Reorder pages (by page ref) as a contiguous block starting at `destIndex`. */
+  move(pages: readonly PageRef[], destIndex: number): AbortablePromise<PageMoveResult>;
 
-  /** Delete pages by PON. The engine rejects deleting every page. */
-  delete(pons: PageObjectNumber[]): AbortablePromise<PageDeleteResult>;
+  /** Delete pages by page ref. The engine rejects deleting every page. */
+  delete(pages: readonly PageRef[]): AbortablePromise<PageDeleteResult>;
 
   /**
    * Create blank pages — gate the affordance on `canEdit()`, like every

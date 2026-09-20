@@ -115,7 +115,7 @@ export class AnnotationsClient {
      *     await client.doc.annotations.list({
      *         docId: "docId",
      *         layerName: "layerName",
-     *         pon: 1
+     *         pageKey: "pageKey"
      *     })
      */
     public list(
@@ -129,7 +129,7 @@ export class AnnotationsClient {
         request: CloudPDF.doc.ListAnnotationsRequest,
         requestOptions?: AnnotationsClient.RequestOptions,
     ): Promise<core.WithRawResponse<CloudPDF.DocAnnotationsList200Response>> {
-        const { docId, layerName, pon, "X-Document-Password": documentPassword } = request;
+        const { docId, layerName, pageKey, "X-Document-Password": documentPassword } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
@@ -141,7 +141,7 @@ export class AnnotationsClient {
             url: core.url.join(
                 (await core.Supplier.get(this._options.baseUrl)) ??
                     (await core.Supplier.get(this._options.environment)),
-                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/annotations/pages/${core.url.encodePathParam(pon)}/items`,
+                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/annotations/pages/${core.url.encodePathParam(pageKey)}/items`,
             ),
             method: "GET",
             headers: _headers,
@@ -176,7 +176,7 @@ export class AnnotationsClient {
             _response.error,
             _response.rawResponse,
             "GET",
-            "/v1/docs/{docId}/layers/{layerName}/annotations/pages/{pon}/items",
+            "/v1/docs/{docId}/layers/{layerName}/annotations/pages/{pageKey}/items",
         );
     }
 
@@ -195,7 +195,7 @@ export class AnnotationsClient {
      *     await client.doc.annotations.create({
      *         docId: "docId",
      *         layerName: "layerName",
-     *         pon: 1,
+     *         pageKey: "pageKey",
      *         body: {
      *             "key": "value"
      *         }
@@ -212,7 +212,7 @@ export class AnnotationsClient {
         request: CloudPDF.doc.CreateAnnotationsRequest,
         requestOptions?: AnnotationsClient.RequestOptions,
     ): Promise<core.WithRawResponse<CloudPDF.DocAnnotationsCreate200Response>> {
-        const { docId, layerName, pon, "X-Document-Password": documentPassword, body: _body } = request;
+        const { docId, layerName, pageKey, "X-Document-Password": documentPassword, body: _body } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
@@ -224,7 +224,7 @@ export class AnnotationsClient {
             url: core.url.join(
                 (await core.Supplier.get(this._options.baseUrl)) ??
                     (await core.Supplier.get(this._options.environment)),
-                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/annotations/pages/${core.url.encodePathParam(pon)}/items`,
+                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/annotations/pages/${core.url.encodePathParam(pageKey)}/items`,
             ),
             method: "POST",
             headers: _headers,
@@ -264,7 +264,7 @@ export class AnnotationsClient {
             _response.error,
             _response.rawResponse,
             "POST",
-            "/v1/docs/{docId}/layers/{layerName}/annotations/pages/{pon}/items",
+            "/v1/docs/{docId}/layers/{layerName}/annotations/pages/{pageKey}/items",
         );
     }
 
@@ -280,7 +280,7 @@ export class AnnotationsClient {
      *     await client.doc.annotations.delete({
      *         docId: "docId",
      *         layerName: "layerName",
-     *         pon: 1,
+     *         pageKey: "pageKey",
      *         annotKey: "annotKey"
      *     })
      */
@@ -295,7 +295,7 @@ export class AnnotationsClient {
         request: CloudPDF.doc.DeleteAnnotationsRequest,
         requestOptions?: AnnotationsClient.RequestOptions,
     ): Promise<core.WithRawResponse<CloudPDF.DocAnnotationsDelete200Response>> {
-        const { docId, layerName, pon, annotKey, "X-Document-Password": documentPassword } = request;
+        const { docId, layerName, pageKey, annotKey, "X-Document-Password": documentPassword } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
@@ -307,7 +307,7 @@ export class AnnotationsClient {
             url: core.url.join(
                 (await core.Supplier.get(this._options.baseUrl)) ??
                     (await core.Supplier.get(this._options.environment)),
-                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/annotations/pages/${core.url.encodePathParam(pon)}/items/${core.url.encodePathParam(annotKey)}`,
+                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/annotations/pages/${core.url.encodePathParam(pageKey)}/items/${core.url.encodePathParam(annotKey)}`,
             ),
             method: "DELETE",
             headers: _headers,
@@ -342,7 +342,7 @@ export class AnnotationsClient {
             _response.error,
             _response.rawResponse,
             "DELETE",
-            "/v1/docs/{docId}/layers/{layerName}/annotations/pages/{pon}/items/{annotKey}",
+            "/v1/docs/{docId}/layers/{layerName}/annotations/pages/{pageKey}/items/{annotKey}",
         );
     }
 
@@ -359,7 +359,7 @@ export class AnnotationsClient {
      *     await client.doc.annotations.update({
      *         docId: "docId",
      *         layerName: "layerName",
-     *         pon: 1,
+     *         pageKey: "pageKey",
      *         annotKey: "annotKey",
      *         body: {
      *             "key": "value"
@@ -377,7 +377,7 @@ export class AnnotationsClient {
         request: CloudPDF.doc.UpdateAnnotationsRequest,
         requestOptions?: AnnotationsClient.RequestOptions,
     ): Promise<core.WithRawResponse<CloudPDF.DocAnnotationsUpdate200Response>> {
-        const { docId, layerName, pon, annotKey, "X-Document-Password": documentPassword, body: _body } = request;
+        const { docId, layerName, pageKey, annotKey, "X-Document-Password": documentPassword, body: _body } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
@@ -389,7 +389,7 @@ export class AnnotationsClient {
             url: core.url.join(
                 (await core.Supplier.get(this._options.baseUrl)) ??
                     (await core.Supplier.get(this._options.environment)),
-                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/annotations/pages/${core.url.encodePathParam(pon)}/items/${core.url.encodePathParam(annotKey)}`,
+                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/annotations/pages/${core.url.encodePathParam(pageKey)}/items/${core.url.encodePathParam(annotKey)}`,
             ),
             method: "PATCH",
             headers: _headers,
@@ -429,7 +429,7 @@ export class AnnotationsClient {
             _response.error,
             _response.rawResponse,
             "PATCH",
-            "/v1/docs/{docId}/layers/{layerName}/annotations/pages/{pon}/items/{annotKey}",
+            "/v1/docs/{docId}/layers/{layerName}/annotations/pages/{pageKey}/items/{annotKey}",
         );
     }
 
@@ -450,7 +450,7 @@ export class AnnotationsClient {
         request: CloudPDF.doc.ExportAppearanceAnnotationsRequest,
         requestOptions?: AnnotationsClient.RequestOptions,
     ): Promise<core.WithRawResponse<core.BinaryResponse>> {
-        const { docId, layerName, pon, "X-Document-Password": documentPassword, body: _body } = request;
+        const { docId, layerName, pageKey, "X-Document-Password": documentPassword, body: _body } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
@@ -462,7 +462,7 @@ export class AnnotationsClient {
             url: core.url.join(
                 (await core.Supplier.get(this._options.baseUrl)) ??
                     (await core.Supplier.get(this._options.environment)),
-                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/annotations/pages/${core.url.encodePathParam(pon)}/items/appearance`,
+                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/annotations/pages/${core.url.encodePathParam(pageKey)}/items/appearance`,
             ),
             method: "POST",
             headers: _headers,
@@ -500,7 +500,7 @@ export class AnnotationsClient {
             _response.error,
             _response.rawResponse,
             "POST",
-            "/v1/docs/{docId}/layers/{layerName}/annotations/pages/{pon}/items/appearance",
+            "/v1/docs/{docId}/layers/{layerName}/annotations/pages/{pageKey}/items/appearance",
         );
     }
 
@@ -517,7 +517,7 @@ export class AnnotationsClient {
      *     await client.doc.annotations.flatten({
      *         docId: "docId",
      *         layerName: "layerName",
-     *         pon: 1,
+     *         pageKey: "pageKey",
      *         body: {
      *             "key": "value"
      *         }
@@ -534,7 +534,7 @@ export class AnnotationsClient {
         request: CloudPDF.doc.FlattenAnnotationsRequest,
         requestOptions?: AnnotationsClient.RequestOptions,
     ): Promise<core.WithRawResponse<CloudPDF.DocAnnotationsFlatten200Response>> {
-        const { docId, layerName, pon, "X-Document-Password": documentPassword, body: _body } = request;
+        const { docId, layerName, pageKey, "X-Document-Password": documentPassword, body: _body } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
@@ -546,7 +546,7 @@ export class AnnotationsClient {
             url: core.url.join(
                 (await core.Supplier.get(this._options.baseUrl)) ??
                     (await core.Supplier.get(this._options.environment)),
-                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/annotations/pages/${core.url.encodePathParam(pon)}/items/flatten`,
+                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/annotations/pages/${core.url.encodePathParam(pageKey)}/items/flatten`,
             ),
             method: "POST",
             headers: _headers,
@@ -586,7 +586,7 @@ export class AnnotationsClient {
             _response.error,
             _response.rawResponse,
             "POST",
-            "/v1/docs/{docId}/layers/{layerName}/annotations/pages/{pon}/items/flatten",
+            "/v1/docs/{docId}/layers/{layerName}/annotations/pages/{pageKey}/items/flatten",
         );
     }
 }

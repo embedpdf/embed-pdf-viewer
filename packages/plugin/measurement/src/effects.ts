@@ -7,9 +7,10 @@ import {
   EngineErrorCode,
   PermissionDenied,
   measurementPoint,
+  pageRefsEqual,
   serializeError,
 } from '@embedpdf/engine-core/runtime';
-import type { PdfMeasure, PageMeasurementViewport } from '@embedpdf/engine-core/runtime';
+import type { PageRef, PdfMeasure, PageMeasurementViewport } from '@embedpdf/engine-core/runtime';
 import { defaultMeasure, selectPageScale } from './scale';
 import type {
   CalibrationRequest,
@@ -31,8 +32,8 @@ export function createMeasurementEffects(ctx: Context, config: MeasurementConfig
   const reading = new Map<number, Promise<void>>();
   const queues = new Map<number, Promise<unknown>>();
   const calibrationListeners = new Set<(r: CalibrationRequest) => void>();
-  const scaleListeners = new Set<(e: { pon: number; report: ScaleChangeReport }) => void>();
-  const meta = (pon: number) => ctx.document()?.pages.find((p) => p.pageObjectNumber === pon);
+  const scaleListeners = new Set<(e: { page: PageRef; report: ScaleChangeReport }) => void>();
+  const meta = (page: PageRef) => ctx.document()?.pages.find((p) => pageRefsEqual(p.ref, page));
   const live = () => {
     if (disposed || !ctx.doc) {
       throw new EngineError(EngineErrorCode.DocNotOpen);
@@ -44,61 +45,62 @@ export function createMeasurementEffects(ctx: Context, config: MeasurementConfig
       throw new PermissionDenied('doc.annotate.modify', 'measurement');
     }
   };
-  const publish = (pon: number, viewports: PageMeasurementViewport[]) => {
+  const publish = (page: PageRef, viewports: PageMeasurementViewport[]) => {
     if (disposed) {
       return;
     }
-    const page = meta(pon);
-    if (!page) {
+    const layout = meta(page);
+    if (!layout) {
       return;
     }
-    const fallback = defaultMeasure(config, page.userUnit);
-    anno.setPageViewports(pon, viewports, fallback);
+    const fallback = defaultMeasure(config, layout.userUnit);
+    anno.setPageViewports(page, viewports, fallback);
     ctx.dispatch({
       type: 'PAGE_SCALE',
-      pon,
+      page,
       viewports,
-      scale: selectPageScale(viewports, page.boxes.crop, fallback, !!ctx.doc?.page(pon).measure),
+      scale: selectPageScale(viewports, layout.boxes.crop, fallback, !!ctx.doc?.page(page).measure),
     });
   };
-  const refresh = (pon: number): Promise<void> => {
+  const refresh = (page: PageRef): Promise<void> => {
     live();
-    const page = meta(pon);
-    if (!page) {
+    const layout = meta(page);
+    if (!layout) {
       return Promise.reject(new EngineError(EngineErrorCode.NotFound, 'Page not found'));
     }
+    const pon = page.pageObjectNumber;
     const epoch = (epochs.get(pon) ?? 0) + 1;
     epochs.set(pon, epoch);
     // Disable creation until calibration is known; never race a default into an imported viewport.
-    anno.setPageViewports(pon, undefined, defaultMeasure(config, page.userUnit));
+    anno.setPageViewports(page, undefined, defaultMeasure(config, layout.userUnit));
     const previous = ctx.getState().pages[pon];
     ctx.dispatch({
       type: 'PAGE_SCALE',
-      pon,
+      page,
       viewports: previous?.viewports ?? [],
       scale: {
         ...(previous?.scale ?? {
           measure: null,
           source: 'default',
-          persistent: !!ctx.doc!.page(pon).measure,
+          persistent: !!ctx.doc!.page(page).measure,
         }),
         ready: false,
       },
     });
-    const service = ctx.doc!.page(pon).measure;
+    const service = ctx.doc!.page(page).measure;
     const request = (async () => {
       try {
         const viewports = service
           ? await service.viewports()
           : (ctx.getState().pages[pon]?.viewports ?? []);
         if (!disposed && epochs.get(pon) === epoch) {
-          publish(pon, viewports);
+          publish(page, viewports);
         }
       } catch (error) {
         if (!disposed && epochs.get(pon) === epoch) {
           ctx.dispatch({
             type: 'PAGE_SCALE',
-            pon,
+            page,
             viewports: [],
             scale: {
               measure: null,
@@ -119,8 +121,13 @@ export function createMeasurementEffects(ctx: Context, config: MeasurementConfig
     reading.set(pon, request);
     return request;
   };
-  const prepare = (pon: number) =>
-    reading.get(pon) ?? (ctx.getState().pages[pon]?.scale.ready ? Promise.resolve() : refresh(pon));
+  const prepare = (page: PageRef) => {
+    const pon = page.pageObjectNumber;
+    return (
+      reading.get(pon) ??
+      (ctx.getState().pages[pon]?.scale.ready ? Promise.resolve() : refresh(page))
+    );
+  };
   const enqueue = (
     pon: number,
     action: () => Promise<ScaleChangeReport>,
@@ -137,35 +144,35 @@ export function createMeasurementEffects(ctx: Context, config: MeasurementConfig
     return result;
   };
   const save = async (
-    pon: number,
+    page: PageRef,
     scale: PdfMeasure,
     opts: SetScaleOptions,
   ): Promise<ScaleChangeReport> => {
     assertAllowed();
-    await prepare(pon);
+    await prepare(page);
     assertAllowed();
-    const service = ctx.doc!.page(pon).measure;
+    const service = ctx.doc!.page(page).measure;
     if (service) {
       await service.setScale(scale);
       live();
-      await refresh(pon);
+      await refresh(page);
     } else {
-      const page = meta(pon)!;
-      const old = ctx.getState().pages[pon]?.viewports ?? [];
-      publish(pon, [
+      const layout = meta(page)!;
+      const old = ctx.getState().pages[page.pageObjectNumber]?.viewports ?? [];
+      publish(page, [
         ...old.filter((v) => !v.owned),
-        { bbox: page.boxes.crop, name: 'EmbedPDF', owned: true, measure: scale },
+        { bbox: layout.boxes.crop, name: 'EmbedPDF', owned: true, measure: scale },
       ]);
     }
     live();
     const report =
       opts.recalculate === false
-        ? { pon, scale, updated: [], skipped: [], failed: [] }
-        : await anno.remeasurePage(pon, scale);
+        ? { page, scale, updated: [], skipped: [], failed: [] }
+        : await anno.remeasurePage(page, scale);
     live();
     for (const cb of scaleListeners) {
       try {
-        cb({ pon, report });
+        cb({ page, report });
       } catch {
         /* observers do not roll back a committed scale */
       }
@@ -173,27 +180,27 @@ export function createMeasurementEffects(ctx: Context, config: MeasurementConfig
     return report;
   };
   const change = async (
-    pons: number[],
-    measure: (pon: number) => PdfMeasure,
+    pages: readonly PageRef[],
+    measure: (page: PageRef) => PdfMeasure,
     opts: SetScaleOptions = {},
   ): Promise<ScaleChangeReport[]> => {
     assertAllowed();
     ctx.dispatch({ type: 'PENDING', delta: 1 });
     try {
       const reports = await Promise.all(
-        pons.map((pon) =>
-          enqueue(pon, async () => {
+        pages.map((page) =>
+          enqueue(page.pageObjectNumber, async () => {
             try {
-              await prepare(pon);
-              const scale = measure(pon);
+              await prepare(page);
+              const scale = measure(page);
               assertWritableMeasure(scale);
-              return await save(pon, scale, opts);
+              return await save(page, scale, opts);
             } catch (error) {
               if (!opts.allPages) {
                 throw error;
               }
               return {
-                pon,
+                page,
                 updated: [],
                 skipped: [],
                 failed: [],
@@ -235,7 +242,7 @@ export function createMeasurementEffects(ctx: Context, config: MeasurementConfig
         if (!(userSpaceLength > 0)) {
           return;
         }
-        const request = { pon: draft.pon, from: a, to: b, userSpaceLength };
+        const request = { page: draft.page, from: a, to: b, userSpaceLength };
         interaction.activateTool('pointer');
         ctx.dispatch({ type: 'CALIBRATION', request });
         for (const cb of calibrationListeners) {
@@ -249,13 +256,13 @@ export function createMeasurementEffects(ctx: Context, config: MeasurementConfig
     );
     const hydrate = () => {
       for (const page of ctx.document()?.pages ?? []) {
-        void refresh(page.pageObjectNumber).catch(() => {});
+        void refresh(page.ref).catch(() => {});
       }
     };
     ctx.cleanup(
       doc.events.subscribe((event) => {
         if (event.type === 'page.viewportsChanged') {
-          void refresh(event.pageObjectNumber).catch(() => {});
+          void refresh(event.page).catch(() => {});
         } else if (event.type === 'stream.desynced' || event.type === 'document.versioned') {
           hydrate();
         }
@@ -264,14 +271,14 @@ export function createMeasurementEffects(ctx: Context, config: MeasurementConfig
     // Covers pages inserted after this document-scoped instance was created.
     let pages = '';
     const reconcile = () => {
-      const next = (ctx.document()?.pages ?? []).map((p) => p.pageObjectNumber).join(',');
+      const next = (ctx.document()?.pages ?? []).map((p) => p.ref.pageObjectNumber).join(',');
       if (next === pages) {
         return;
       }
       pages = next;
       for (const page of ctx.document()?.pages ?? [])
-        if (!ctx.getState().pages[page.pageObjectNumber]) {
-          void prepare(page.pageObjectNumber).catch(() => {});
+        if (!ctx.getState().pages[page.ref.pageObjectNumber]) {
+          void prepare(page.ref).catch(() => {});
         }
     };
     ctx.cleanup(ctx.subscribe(reconcile));

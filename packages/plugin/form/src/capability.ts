@@ -1,5 +1,6 @@
 import {
   PermissionDenied,
+  pageRefsEqual,
   type AnnotationRef,
   type FormDataFormat,
   type FormFieldDraft,
@@ -7,6 +8,7 @@ import {
   type FormFieldRef,
   type FormFieldValue,
   type FormSnapshot,
+  type PageRef,
   type PdfActionTargetRef,
   type PdfActionTree,
   type PdfRect,
@@ -65,7 +67,7 @@ const toBox = (rect: PdfRect, crop: PdfRect): Box => ({
 });
 
 const sameAnnotationRef = (left: AnnotationRef, right: AnnotationRef): boolean => {
-  if (left.kind !== right.kind || left.pageObjectNumber !== right.pageObjectNumber) return false;
+  if (left.kind !== right.kind || !pageRefsEqual(left.page, right.page)) return false;
   if (left.kind === 'objectNumber' && right.kind === 'objectNumber') {
     return left.annotObjectNumber === right.annotObjectNumber;
   }
@@ -156,14 +158,15 @@ export function createFormCapability(
 
   // ── widget geometry (from the WIDGET plane: one annotations read/page) ──
   const geomLoading = new Set<number>();
-  const ensureGeom = (pon: number): void => {
+  const ensureGeom = (page: PageRef): void => {
     const doc = ctx.doc;
+    const pon = page.pageObjectNumber;
     if (!doc || geomLoading.has(pon) || model().geom[pon]) return;
-    const crop = ctx.document()?.pages.find((p) => p.pageObjectNumber === pon)?.boxes.crop;
+    const crop = ctx.document()?.pages.find((p) => p.ref.pageObjectNumber === pon)?.boxes.crop;
     if (!crop) return;
     geomLoading.add(pon);
     void doc
-      .page(pon)
+      .page(page)
       .annotations.list()
       .then(({ annotations }) => {
         const boxes: Record<number, Box> = {};
@@ -183,13 +186,14 @@ export function createFormCapability(
   // The model's geometry when the page has it (and kick the lazy load so the
   // next call does); otherwise the annotation plane's live boxes — it is
   // whole-document hydrated, so a first click on a page already resolves.
-  const widgetAt = (pon: number, point: { x: number; y: number }): WidgetHit | null => {
+  const widgetAt = (page: PageRef, point: { x: number; y: number }): WidgetHit | null => {
     const m = model();
-    ensureGeom(pon);
+    const pon = page.pageObjectNumber;
+    ensureGeom(page);
     if (m.geom[pon]) return coreWidgetAt(m, pon, point);
     if (!annotationHost) return null;
     let best: WidgetHit | null = null;
-    for (const item of annotationHost.pageItems(pon)) {
+    for (const item of annotationHost.pageItems(page)) {
       if (!item.subtype.startsWith('widget') || item.ref?.kind !== 'objectNumber') continue;
       const box = item.box;
       const inside =
@@ -216,8 +220,9 @@ export function createFormCapability(
     item === null || fillable || item.disabled ? item : { ...item, disabled: true };
 
   const fillCache = new Map<number, { seq: number; fillable: boolean; items: FillItem[] }>();
-  const fillItems = (pon: number): FillItem[] => {
+  const fillItems = (page: PageRef): FillItem[] => {
     const m = model();
+    const pon = page.pageObjectNumber;
     const fillable = can('doc.forms.fill');
     const hit = fillCache.get(pon);
     if (hit && hit.seq === m.seq && hit.fillable === fillable) return hit.items;
@@ -305,7 +310,7 @@ export function createFormCapability(
     if (!doc) return null;
     const loaded = annotationHost?.get(ref);
     if (loaded?.subtype === 'widget') return loaded.actions?.activate ?? null;
-    const { annotations } = await doc.page(ref.pageObjectNumber).annotations.list();
+    const { annotations } = await doc.page(ref.page).annotations.list();
     const annotation = annotations.find((candidate) => sameAnnotationRef(candidate.ref, ref));
     return annotation?.subtype === 'widget' ? (annotation.actions?.activate ?? null) : null;
   };
@@ -473,7 +478,7 @@ export function createFormCapability(
     kind: 'widget',
     field: refKeyOf(key),
     annotation: annotationRef,
-    pon: annotationRef.pageObjectNumber,
+    page: annotationRef.page,
   });
 
   /** One shared hover pump (Exit→Enter as one ordered pair; intermediates
@@ -497,9 +502,14 @@ export function createFormCapability(
     };
   };
 
-  const nudgeAnnotations = (pons: Iterable<number>): void => {
+  const nudgeAnnotations = (pages: Iterable<PageRef>): void => {
     if (!annotationHost) return;
-    for (const pon of new Set(pons)) void annotationHost.reloadPage(pon);
+    const seen = new Set<number>();
+    for (const page of pages) {
+      if (seen.has(page.pageObjectNumber)) continue;
+      seen.add(page.pageObjectNumber);
+      void annotationHost.reloadPage(page);
+    }
   };
 
   /** Content-space box → PDF rect (inverse of `toBox`). */
@@ -514,8 +524,9 @@ export function createFormCapability(
   });
 
   /** The page's content box (`{0,0,w,h}`), for page-bound placement math. */
-  const pageBox = (pon: number): Box | null => {
-    const crop = ctx.document()?.pages.find((p) => p.pageObjectNumber === pon)?.boxes.crop;
+  const pageBox = (page: PageRef): Box | null => {
+    const pon = page.pageObjectNumber;
+    const crop = ctx.document()?.pages.find((p) => p.ref.pageObjectNumber === pon)?.boxes.crop;
     return crop
       ? { x: 0, y: 0, width: crop.right - crop.left, height: crop.top - crop.bottom }
       : null;
@@ -532,20 +543,21 @@ export function createFormCapability(
 
   const placeFieldNow = async (input: PlaceFieldInput): Promise<PlacedField> => {
     const doc = ctx.doc;
-    const pon = input.pageObjectNumber;
-    const crop = ctx.document()?.pages.find((p) => p.pageObjectNumber === pon)?.boxes.crop;
+    const page = input.page;
+    const pon = page.pageObjectNumber;
+    const crop = ctx.document()?.pages.find((p) => p.ref.pageObjectNumber === pon)?.boxes.crop;
     if (!doc || !crop) throw new Error('[form] placeField: document/page not ready');
     // Placement is page-bound: intersect a (possibly overshooting) drag box
     // with the page. Sizing policy is the CALLER's job (the place handler's
     // click policy / drag rect) — a degenerate result is a caller bug.
-    const page = pageBox(pon)!;
-    const x = Math.max(page.x, Math.min(input.box.x, page.width));
-    const y = Math.max(page.y, Math.min(input.box.y, page.height));
+    const bounds = pageBox(page)!;
+    const x = Math.max(bounds.x, Math.min(input.box.x, bounds.width));
+    const y = Math.max(bounds.y, Math.min(input.box.y, bounds.height));
     const box: Box = {
       x,
       y,
-      width: Math.max(0, Math.min(input.box.x + input.box.width, page.width) - x),
-      height: Math.max(0, Math.min(input.box.y + input.box.height, page.height) - y),
+      width: Math.max(0, Math.min(input.box.x + input.box.width, bounds.width) - x),
+      height: Math.max(0, Math.min(input.box.y + input.box.height, bounds.height) - y),
     };
     if (box.width < 1 || box.height < 1) {
       throw new Error('[form] placeField: degenerate box (size the box before placing)');
@@ -553,7 +565,7 @@ export function createFormCapability(
     const { family, appearance } = input;
     const name = autoName(family);
     const placement = {
-      pageObjectNumber: pon,
+      page,
       rect: toPdfRect(box, crop),
       ...(appearance ? { appearance } : {}),
     };
@@ -576,8 +588,8 @@ export function createFormCapability(
     apply({ t: 'clearGeom', pageObjectNumber: pon });
     // AWAIT the annotation-plane reload so the returned widget ref is already
     // selectable — the caller's auto-select needs the model to know it.
-    if (annotationHost) await annotationHost.reloadPage(pon);
-    const widget = result.field.widgets.find((w) => w.pageObjectNumber === pon) ?? null;
+    if (annotationHost) await annotationHost.reloadPage(page);
+    const widget = result.field.widgets.find((w) => w.page?.pageObjectNumber === pon) ?? null;
     return { field: result.field, widget };
   };
 
@@ -592,11 +604,13 @@ export function createFormCapability(
     const doc = ctx.doc;
     if (!doc) return;
     const field = fieldByKey(model(), key);
-    const pons = field?.widgets.map((w) => w.pageObjectNumber).filter((p) => p > 0) ?? [];
+    const pages = field?.widgets.flatMap((w) => (w.page ? [w.page] : [])) ?? [];
     await doc.forms.deleteField(refKeyOf(key));
     await refresh(true);
-    for (const pon of new Set(pons)) apply({ t: 'clearGeom', pageObjectNumber: pon });
-    nudgeAnnotations(pons);
+    for (const pon of new Set(pages.map((p) => p.pageObjectNumber))) {
+      apply({ t: 'clearGeom', pageObjectNumber: pon });
+    }
+    nudgeAnnotations(pages);
   };
 
   const detachWidgetNow = async (key: FieldKey, annotObjectNumber: number): Promise<void> => {
@@ -606,12 +620,12 @@ export function createFormCapability(
     const widget = field?.widgets.find((w) => w.annotObjectNumber === annotObjectNumber);
     await doc.forms.detachWidget(refKeyOf(key), {
       annotObjectNumber,
-      pageObjectNumber: widget?.pageObjectNumber ?? 0,
+      page: widget?.page ?? null,
     });
     await refresh(true);
-    if (widget && widget.pageObjectNumber > 0) {
-      apply({ t: 'clearGeom', pageObjectNumber: widget.pageObjectNumber });
-      nudgeAnnotations([widget.pageObjectNumber]);
+    if (widget?.page) {
+      apply({ t: 'clearGeom', pageObjectNumber: widget.page.pageObjectNumber });
+      nudgeAnnotations([widget.page]);
     }
   };
 
@@ -679,7 +693,7 @@ export function createFormCapability(
         const result = await actions.dispatch({
           scope: 'activate',
           ref: annotationRef,
-          pon: annotationRef.pageObjectNumber,
+          page: annotationRef.page,
           source: widgetSource(key, annotationRef),
         });
         // inert + zero steps + zero diagnostics = no /A tree at all — only
@@ -711,7 +725,7 @@ export function createFormCapability(
         if (flags && !flags.enter && !flags.exit) return;
         widgetHoverPump(actions).hover({
           ref: annotationRef,
-          pon: annotationRef.pageObjectNumber,
+          page: annotationRef.page,
           source,
           ...(flags ? { events: flags } : {}),
         });
@@ -724,7 +738,7 @@ export function createFormCapability(
         scope: 'annotation',
         event,
         ref: annotationRef,
-        pon: annotationRef.pageObjectNumber,
+        page: annotationRef.page,
         source,
       });
     },
@@ -772,10 +786,12 @@ export function createFormCapability(
       // bits, and widget pixels live on that plane).
       await refresh(true);
       if (annotationHost) {
-        const pons = new Set(
-          result.changedWidgets.map((widget) => widget.pageObjectNumber).filter((pon) => pon > 0),
-        );
-        for (const pon of pons) await annotationHost.reloadPage(pon);
+        const seen = new Set<number>();
+        for (const widget of result.changedWidgets) {
+          if (!widget.page || seen.has(widget.page.pageObjectNumber)) continue;
+          seen.add(widget.page.pageObjectNumber);
+          await annotationHost.reloadPage(widget.page);
+        }
       }
       return result;
     },

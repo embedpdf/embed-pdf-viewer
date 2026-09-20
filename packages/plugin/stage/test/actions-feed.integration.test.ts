@@ -3,7 +3,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
-import { createKernel } from '@embedpdf/core';
+import { createKernel, toPageRef } from '@embedpdf/core';
 import { createLocalEngine } from '@embedpdf/engine';
 import { actionsPlugin } from '@embedpdf/plugin-actions';
 import { ActionsToken as ActionsHostToken } from '@embedpdf/plugin-actions/contract/host';
@@ -69,8 +69,8 @@ async function boot() {
     actions.dispatch({
       scope: 'annotation',
       event: 'cursorEnter',
-      ref: { kind: 'objectNumber', pageObjectNumber: pon, annotObjectNumber: 999 },
-      pon,
+      ref: { kind: 'objectNumber', page: toPageRef(pon), annotObjectNumber: 999 },
+      page: toPageRef(pon),
     });
 
   return {

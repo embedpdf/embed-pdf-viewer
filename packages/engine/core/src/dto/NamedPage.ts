@@ -1,10 +1,10 @@
-import type { PageObjectNumber } from '../identity/PageObjectNumber';
+import type { PageRef } from '../identity/PageRef';
 
 /**
  * What a `/Names /Pages` or `/Names /Templates` registration resolves to.
  *
  *   - `page`: a page in the page tree — the normal case; addressable through
- *     `doc.page(pageObjectNumber)` and present in `PageListSnapshot.pages`.
+ *     `doc.page(ref)` and present in `PageListSnapshot.pages`.
  *   - `template`: a `/Type /Template` dictionary OUTSIDE the page tree
  *     (ISO 32000-2 §12.7.7): never listed as a page, never renderable,
  *     `doc.page()` does not accept its object number. Reported so consumers
@@ -14,7 +14,7 @@ import type { PageObjectNumber } from '../identity/PageObjectNumber';
  *     deleted, so this is only observable in files authored elsewhere.
  */
 export type NamedPageTarget =
-  | { kind: 'page'; pageObjectNumber: PageObjectNumber }
+  | { kind: 'page'; page: PageRef }
   | { kind: 'template'; objectNumber: number }
   | { kind: 'dangling' };
 

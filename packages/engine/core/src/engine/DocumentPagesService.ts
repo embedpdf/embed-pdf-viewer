@@ -1,6 +1,6 @@
 import type { PageListSnapshot } from '../dto/PageListSnapshot';
 import type { PdfRotation } from '../geometry/primitives';
-import type { PageObjectNumber } from '../identity/PageObjectNumber';
+import type { PageRef } from '../identity/PageRef';
 import type { PageDeleteResult } from '../mutation/PageDeleteResult';
 import type { PageInsertBlankSpec } from '../mutation/PageInsertBlankInput';
 import type { PageInsertResult } from '../mutation/PageInsertResult';
@@ -19,9 +19,9 @@ import { AbortablePromise } from '../promise/AbortablePromise';
  * structure verbs are `move`, `rotate`, and `delete`; the surface is
  * designed for `insert` to slot in without API churn.
  *
- * Identity rule: pages are addressed by indirect `pageObjectNumber`
- * everywhere except `list()`, which exposes display order through
- * `PageState.pageIndex`. There is no "weak page ref" model — structure
+ * Identity rule: pages are addressed by `PageRef` (the durable object
+ * number) everywhere except `list()`, which exposes display order through
+ * `PageLayout.index`. There is no "weak page ref" model — structure
  * verbs therefore do not bump per-page revisions and do not invalidate
  * any in-flight annotation refs on surviving pages.
  */
@@ -39,11 +39,11 @@ export interface DocumentPagesService {
    * survive — index-based annotation refs the caller is holding remain
    * valid across a page reorder.
    *
-   * @param pageObjectNumbers Pages to move, in the order they should
-   *                          appear after the move.
+   * @param pages Pages to move, in the order they should appear after
+   *              the move.
    * @param destIndex Insertion point in `[0, pageCount - len]`.
    */
-  move(pageObjectNumbers: PageObjectNumber[], destIndex: number): AbortablePromise<PageMoveResult>;
+  move(pages: PageRef[], destIndex: number): AbortablePromise<PageMoveResult>;
 
   /**
    * Set the ABSOLUTE display rotation of the supplied pages (one value
@@ -52,17 +52,14 @@ export interface DocumentPagesService {
    * annotation refs, and `RevisionToken`s all survive untouched. See
    * `PageRotateInput` for why the wire is absolute, never relative.
    */
-  rotate(
-    pageObjectNumbers: PageObjectNumber[],
-    rotation: PdfRotation,
-  ): AbortablePromise<PageRotateResult>;
+  rotate(pages: PageRef[], rotation: PdfRotation): AbortablePromise<PageRotateResult>;
 
   /**
    * Delete pages. Deleting every page is rejected (`InvalidArg`) — a
    * document must keep at least one. Deleted PONs are retired, never
    * recycled; surviving pages keep their identity and revisions.
    */
-  delete(pageObjectNumbers: PageObjectNumber[]): AbortablePromise<PageDeleteResult>;
+  delete(pages: PageRef[]): AbortablePromise<PageDeleteResult>;
 
   /**
    * Register `name` → page in the catalog's `/Names /Pages` tree (create,
@@ -90,10 +87,7 @@ export interface DocumentPagesService {
    * those annotations that were painted. This changes content and annotation
    * liveness, not layout. The default usage is normal display.
    */
-  flatten?(
-    pageObjectNumbers: PageObjectNumber[],
-    usage?: PageFlattenUsage,
-  ): AbortablePromise<PageFlattenResult>;
+  flatten?(pages: PageRef[], usage?: PageFlattenUsage): AbortablePromise<PageFlattenResult>;
 
   /**
    * Export the given pages, in the supplied order, as a standalone PDF
@@ -107,7 +101,7 @@ export interface DocumentPagesService {
    * REQUIRED-parity, delivered: the local engine runs it in the worker,
    * the cloud engine as POST /pages/extract.
    */
-  extract(pageObjectNumbers: PageObjectNumber[]): AbortablePromise<Uint8Array>;
+  extract(pages: PageRef[]): AbortablePromise<Uint8Array>;
 
   /**
    * Insert every page of a standalone PDF (`bytes`) at `destIndex`

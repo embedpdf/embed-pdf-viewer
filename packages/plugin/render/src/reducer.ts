@@ -25,10 +25,10 @@ export const renderReducer = (state: RenderState, a: RenderAction): RenderState 
   if (a.type === 'PAINT_ADVANCED') {
     // A tile resolution/paint advanced the (store-external) tile state —
     // this bump only wakes subscribed layers to recompute `tilePlan`.
-    return { ...state, paintVersions: bump(state.paintVersions, [a.pon]) };
+    return { ...state, paintVersions: bump(state.paintVersions, [a.pageObjectNumber]) };
   }
-  if (a.type !== 'INVALIDATE' || a.pons.length === 0) return state;
+  if (a.type !== 'INVALIDATE' || a.pageObjectNumbers.length === 0) return state;
   return a.scope === 'content'
-    ? { ...state, contentEpochs: bump(state.contentEpochs, a.pons) }
-    : { ...state, annotatedEpochs: bump(state.annotatedEpochs, a.pons) };
+    ? { ...state, contentEpochs: bump(state.contentEpochs, a.pageObjectNumbers) }
+    : { ...state, annotatedEpochs: bump(state.annotatedEpochs, a.pageObjectNumbers) };
 };

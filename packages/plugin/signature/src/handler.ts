@@ -33,7 +33,7 @@ export function createArmedMarkHandler(
       if (!sample.page) return false;
       const armed = stamp.armedAsset(documentId);
       if (!armed || stamp.library(armed.libraryId)?.kind !== SIGNATURES_LIBRARY_KIND) return false;
-      const hit = form.widgetAt(sample.page.pon, sample.page.point);
+      const hit = form.widgetAt(sample.page.ref, sample.page.point);
       if (!hit || hit.field.family !== 'signature') return false;
       // A signed field is final: consume the click (no stamp lands on it) and do nothing.
       if (signature.signatureOf(hit.field.ref)?.signed || hit.field.valueEntry.kind !== 'none') {

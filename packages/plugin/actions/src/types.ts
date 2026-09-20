@@ -22,7 +22,7 @@ import type {
   FormFieldRef,
   FormSubmissionEntry,
   FormSubmissionReceipt,
-  PageObjectNumber,
+  PageRef,
   PdfActionNode,
   PdfActionTargetRef,
   PdfActionTree,
@@ -40,12 +40,12 @@ export type ActionOrigin = 'user' | 'hover' | 'lifecycle';
  *  them: the interim JavaScript executor builds `event.target` from the
  *  widget source's `field`. Provenance only — policy never reads it. */
 export type ActionSource =
-  | { kind: 'widget'; field: FormFieldRef; annotation: AnnotationRef; pon: PageObjectNumber }
-  | { kind: 'link'; annotation?: AnnotationRef; pon?: PageObjectNumber }
+  | { kind: 'widget'; field: FormFieldRef; annotation: AnnotationRef; page: PageRef }
+  | { kind: 'link'; annotation?: AnnotationRef; page?: PageRef }
   /** A non-widget annotation's own /AA event (E/X on squares, stamps, …). */
-  | { kind: 'annotation'; annotation: AnnotationRef; pon: PageObjectNumber }
+  | { kind: 'annotation'; annotation: AnnotationRef; page: PageRef }
   /** A page /AA tree (O/C) inside a page-trigger fan-out. */
-  | { kind: 'page'; pon: PageObjectNumber }
+  | { kind: 'page'; page: PageRef }
   /** The document-open sequence (openDestination / OpenAction). */
   | { kind: 'document' }
   | { kind: 'api' };
@@ -96,15 +96,15 @@ export type PdfAnnotationEventKind =
  * anchor `event.target`); policy never reads it and it cannot change origin.
  */
 export type ActionTrigger =
-  | { scope: 'activate'; ref: AnnotationRef; pon: PageObjectNumber; source?: ActionSource }
+  | { scope: 'activate'; ref: AnnotationRef; page: PageRef; source?: ActionSource }
   | {
       scope: 'annotation';
       event: PdfAnnotationEventKind;
       ref: AnnotationRef;
-      pon: PageObjectNumber;
+      page: PageRef;
       source?: ActionSource;
     }
-  | { scope: 'page'; event: 'open' | 'close' | 'visible' | 'invisible'; pon: PageObjectNumber }
+  | { scope: 'page'; event: 'open' | 'close' | 'visible' | 'invisible'; page: PageRef }
   | { scope: 'document'; event: DocumentTriggerEvent };
 
 /** Trigger → provenance descriptor (the {@link ActionContext.event} axis). */
@@ -231,8 +231,8 @@ export interface ActionTriggerResult {
  * programmatic rounds are capped; a user-caused report resets the counter.
  */
 export interface PageStateReport {
-  currentPon: PageObjectNumber | null;
-  visiblePons: readonly PageObjectNumber[];
+  currentPage: PageRef | null;
+  visiblePages: readonly PageRef[];
   /** False until layout exists; pre-placement reports are ignored. */
   placed: boolean;
   cause: 'user' | 'programmatic';
@@ -331,12 +331,12 @@ export type ActionExecutor = (
 // executor calls them while HOLDING the host transaction); a sink never
 // enqueues and never acquires the host — the proven deadlock class.
 
-/** One annotation-effect commit entry. `pageObjectNumber` may be absent for
- *  bare Hide object-number targets — the sink resolves it from its model
- *  (`obj:N` is a cross-page key there); unresolvable entries fail honestly. */
+/** One annotation-effect commit entry. `page` may be absent for bare Hide
+ *  object-number targets — the sink resolves it from its model (`obj:N` is a
+ *  cross-page key there); unresolvable entries fail honestly. */
 export interface AnnotCommitEntry {
   annotObjectNumber: number;
-  pageObjectNumber?: number;
+  page?: PageRef;
   patch: ScriptAnnotEffect['patch'];
 }
 export interface AnnotCommitResult {

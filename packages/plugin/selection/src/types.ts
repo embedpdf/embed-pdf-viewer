@@ -1,4 +1,5 @@
 import { createCapabilityToken, type PageObjectNumber } from '@embedpdf/core';
+import type { PageRef } from '@embedpdf/engine-core/runtime';
 import type { Point, Rect, TextQuad } from '@embedpdf/core-geometry';
 import type { SelectionSegment } from './geometry';
 
@@ -14,7 +15,7 @@ export type { SelectionSegment } from './geometry';
  * `text/charmap.ts`), which `readText()` applies for you.
  */
 export interface TextPosition {
-  pon: PageObjectNumber;
+  page: PageRef;
   /** Character index, 0-based. */
   index: number;
 }
@@ -32,18 +33,16 @@ export interface TextRange {
 /**
  * What {@link SelectionCapability.select} accepts: a cross-page
  * {@link TextRange}, or a single-page span — the shape of a search hit, so
- * `select({ pon: hit.pageObjectNumber, start: hit.charStart, count: hit.charCount })`
+ * `select({ page: hit.page, start: hit.charStart, count: hit.charCount })`
  * needs no conversion.
  */
-export type SelectionRangeInput =
-  | TextRange
-  | { pon: PageObjectNumber; start: number; count: number };
+export type SelectionRangeInput = TextRange | { page: PageRef; start: number; count: number };
 
 // ── gesture-state vocabulary (host/internal) ────────────────────────────────
 
 /** A glyph address: a page + a flat character index within that page. */
 export interface GlyphPointer {
-  pon: PageObjectNumber;
+  page: PageRef;
   glyph: number;
 }
 
@@ -60,7 +59,7 @@ export interface SelectionRange {
  * re-deriving bidi from geometry. `rect` is the AABB (scroll targets).
  */
 export interface SelectionEndpoint {
-  pon: PageObjectNumber;
+  page: PageRef;
   glyphQuad: TextQuad;
   advance: 1 | -1;
   rect: Rect;
@@ -69,14 +68,14 @@ export interface SelectionEndpoint {
 /** The selection's floating-UI anchor: a page + the selection's union box on
  *  it, in CONTENT space. See {@link SelectionCapability.menuAnchor}. */
 export interface SelectionMenuAnchor {
-  pon: PageObjectNumber;
+  page: PageRef;
   bounds: Rect;
 }
 
 export interface SelectionSnapshot {
   /** Per-page canonical segments — the ONE geometry consumers act on.
    *  Boxes are derived views (`segment.rect`, or `rectsForPage()`). */
-  pages: Array<{ pon: PageObjectNumber; segments: SelectionSegment[] }>;
+  pages: Array<{ page: PageRef; segments: SelectionSegment[] }>;
   start: SelectionEndpoint | null;
   end: SelectionEndpoint | null;
   direction: 'forward' | 'backward';
@@ -109,7 +108,7 @@ export interface SelectionState {
 }
 
 export type SelectionAction =
-  | { type: 'PAGE_LOADED'; pon: PageObjectNumber }
+  | { type: 'PAGE_LOADED'; page: PageRef }
   | { type: 'SET'; selection: SelectionRange; segments: Record<number, SelectionSegment[]> }
   | { type: 'CLEAR' }
   | { type: 'SET_HIGHLIGHT_HIDDEN'; hidden: boolean }
@@ -183,14 +182,14 @@ export interface SelectionCapability {
   /** The pages the current selection covers (those with at least one
    *  segment) — so a cross-page action (e.g. markup creation) can fan out
    *  per page. */
-  selectedPages(): PageObjectNumber[];
+  selectedPages(): readonly PageRef[];
   /** Per-line oriented segments for a page, in content space — build your
    *  own highlight layer from these. */
-  segmentsForPage(pon: PageObjectNumber): SelectionSegment[];
+  segmentsForPage(page: PageRef): SelectionSegment[];
   /** The segments' AABBs — for consumers that genuinely want boxes (scroll,
    *  conservative regions). Never a substitute for the oriented quads in
    *  geometry that gets drawn or persisted. */
-  rectsForPage(pon: PageObjectNumber): Rect[];
+  rectsForPage(page: PageRef): Rect[];
 
   // ── text extraction (requires doc.text.copy) ──
   /**
@@ -231,22 +230,22 @@ export interface SelectionCapability {
 export interface SelectionHostCapability extends SelectionCapability {
   /** Warm a page's text geometry (idempotent; no-op without
    *  `doc.text.select`). Layers call this when a page mounts. */
-  ensurePage(pon: PageObjectNumber): void;
-  isLoaded(pon: PageObjectNumber): boolean;
+  ensurePage(page: PageRef): void;
+  isLoaded(page: PageRef): boolean;
   /** Is a content-space point on (or near) text? Drives the I-beam cursor. */
-  isOverText(pon: PageObjectNumber, point: Point): boolean;
+  isOverText(page: PageRef, point: Point): boolean;
   /** Begin a caret selection at a page point. Returns false if not near any
    *  text — the caller deselects instead of capturing. */
-  beginAt(pon: PageObjectNumber, point: Point): boolean;
+  beginAt(page: PageRef, point: Point): boolean;
   /** Double-click / touch long-press: select the word around the point.
    *  Returns false when the point has no selectable text (geometry not
    *  loaded, or no glyph there) — nothing was selected. */
-  selectWordAt(pon: PageObjectNumber, point: Point): boolean;
+  selectWordAt(page: PageRef, point: Point): boolean;
   /** Triple-click: select the whole visual line around the point. Same
    *  success contract as {@link selectWordAt}. */
-  selectLineAt(pon: PageObjectNumber, point: Point): boolean;
+  selectLineAt(page: PageRef, point: Point): boolean;
   /** Extend the current selection to a page point (drag). */
-  extendTo(pon: PageObjectNumber, point: Point): void;
+  extendTo(page: PageRef, point: Point): void;
   /** The gesture ended (pointer-up) → notify `onCommit` consumers. */
   end(): void;
   /** Suppress / restore the default highlight visual (a consumer drawing its

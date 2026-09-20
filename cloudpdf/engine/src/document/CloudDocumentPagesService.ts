@@ -12,7 +12,7 @@ import {
   type PageMoveResult,
   type PageNameInput,
   type PageNameResult,
-  type PageObjectNumber,
+  type PageRef,
   type PageRemoveNameInput,
   type PageRotateResult,
   type PageRotation,
@@ -47,10 +47,11 @@ function copyToExactBuffer(view: Uint8Array): ArrayBuffer {
  * over HTTP: GET /pages for `list`, POST /pages/move for the reorder.
  *
  * Page identity rule (locked with the user, do not change):
- *   - Pages are addressed exclusively by their indirect
- *     `pageObjectNumber`. The wire never sends a page index for a
- *     mutation. This keeps multi-call client logic from having to
- *     account for index drift between requests.
+ *   - Pages are addressed exclusively by `PageRef` (their indirect
+ *     `pageObjectNumber`); mutation bodies ship `{ pages: PageRef[] }`.
+ *     The wire never sends a page index for a mutation. This keeps
+ *     multi-call client logic from having to account for index drift
+ *     between requests.
  *   - Successful `move()` returns the new `layout` (order + geometry) plus
  *     cloud coherence pins. The server does NOT bump per-page revisions on a
  *     page move (page reorder is intentionally outside the weak-ref staleness
@@ -104,7 +105,7 @@ export class CloudDocumentPagesService implements DocumentPagesService {
     });
   }
 
-  move(pageObjectNumbers: PageObjectNumber[], destIndex: number): AbortablePromise<PageMoveResult> {
+  move(pages: PageRef[], destIndex: number): AbortablePromise<PageMoveResult> {
     if (this.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document ${this.docId} is closed`),
@@ -113,7 +114,7 @@ export class CloudDocumentPagesService implements DocumentPagesService {
     return AbortablePromise.run<PageMoveResult>(async (signal) => {
       const result = await this.http.postJson(
         wirePaths.layerPagesMove(this.docId, this.layerName),
-        { pageObjectNumbers, destIndex },
+        { pages, destIndex },
         (raw) => PageMoveResultSchema.parse(raw),
         signal,
       );
@@ -122,7 +123,7 @@ export class CloudDocumentPagesService implements DocumentPagesService {
       if (result.cache) this.manifest.applyPageStructure(result.cache);
       // Publish AFTER absorb: listeners reading the manifest in their
       // callback must see post-mutation state.
-      this.publisher.publishLocal({ type: 'pages.moved', pageObjectNumbers, destIndex, ...result });
+      this.publisher.publishLocal({ type: 'pages.moved', pages, destIndex, ...result });
       return result;
     });
   }
@@ -132,7 +133,7 @@ export class CloudDocumentPagesService implements DocumentPagesService {
       wirePaths.layerPagesNames(this.docId, this.layerName),
       input,
       input.name,
-      input.pageObjectNumber,
+      input.page,
     );
   }
 
@@ -154,7 +155,7 @@ export class CloudDocumentPagesService implements DocumentPagesService {
     path: string,
     body: PageNameInput | PageRemoveNameInput,
     name: string,
-    pageObjectNumber: PageObjectNumber | null,
+    page: PageRef | null,
   ): AbortablePromise<PageNameResult> {
     if (this.isClosed()) {
       return AbortablePromise.rejectReason(
@@ -169,15 +170,12 @@ export class CloudDocumentPagesService implements DocumentPagesService {
         signal,
       );
       if (result.cache) this.manifest.applyPageStructure(result.cache);
-      this.publisher.publishLocal({ type: 'pages.named', name, pageObjectNumber, ...result });
+      this.publisher.publishLocal({ type: 'pages.named', name, page, ...result });
       return result;
     });
   }
 
-  rotate(
-    pageObjectNumbers: PageObjectNumber[],
-    rotation: PageRotation,
-  ): AbortablePromise<PageRotateResult> {
+  rotate(pages: PageRef[], rotation: PageRotation): AbortablePromise<PageRotateResult> {
     if (this.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document ${this.docId} is closed`),
@@ -186,24 +184,19 @@ export class CloudDocumentPagesService implements DocumentPagesService {
     return AbortablePromise.run<PageRotateResult>(async (signal) => {
       const result = await this.http.postJson(
         wirePaths.layerPagesRotate(this.docId, this.layerName),
-        { pageObjectNumbers, rotation },
+        { pages, rotation },
         (raw) => PageRotateResultSchema.parse(raw),
         signal,
       );
       // Rotation shares the move patch exactly: docVersion + layoutVersion
       // advance, every per-page pin (and its cached render) stays warm.
       if (result.cache) this.manifest.applyPageStructure(result.cache);
-      this.publisher.publishLocal({
-        type: 'pages.rotated',
-        pageObjectNumbers,
-        rotation,
-        ...result,
-      });
+      this.publisher.publishLocal({ type: 'pages.rotated', pages, rotation, ...result });
       return result;
     });
   }
 
-  delete(pageObjectNumbers: PageObjectNumber[]): AbortablePromise<PageDeleteResult> {
+  delete(pages: PageRef[]): AbortablePromise<PageDeleteResult> {
     if (this.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document ${this.docId} is closed`),
@@ -212,14 +205,14 @@ export class CloudDocumentPagesService implements DocumentPagesService {
     return AbortablePromise.run<PageDeleteResult>(async (signal) => {
       const result = await this.http.postJson(
         wirePaths.layerPagesDelete(this.docId, this.layerName),
-        { pageObjectNumbers },
+        { pages },
         (raw) => PageDeleteResultSchema.parse(raw),
         signal,
       );
       // The structural advance plus dropping the deleted pages' manifest
       // rows — a retired PON must not be buildable from the local cache.
-      if (result.cache) this.manifest.applyPageDelete(result.cache, pageObjectNumbers);
-      this.publisher.publishLocal({ type: 'pages.deleted', pageObjectNumbers, ...result });
+      if (result.cache) this.manifest.applyPageDelete(result.cache, pages);
+      this.publisher.publishLocal({ type: 'pages.deleted', pages, ...result });
       return result;
     });
   }
@@ -275,7 +268,7 @@ export class CloudDocumentPagesService implements DocumentPagesService {
     });
   }
 
-  extract(pageObjectNumbers: PageObjectNumber[]): AbortablePromise<Uint8Array> {
+  extract(pages: PageRef[]): AbortablePromise<Uint8Array> {
     if (this.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document ${this.docId} is closed`),
@@ -286,14 +279,14 @@ export class CloudDocumentPagesService implements DocumentPagesService {
     return AbortablePromise.run<Uint8Array>(async (signal) =>
       this.http.postJsonBytes(
         wirePaths.layerPagesExtract(this.docId, this.layerName),
-        { pageObjectNumbers },
+        { pages },
         signal,
       ),
     );
   }
 
   flatten(
-    pageObjectNumbers: PageObjectNumber[],
+    pages: PageRef[],
     usage: PageFlattenUsage = 'display',
   ): AbortablePromise<PageFlattenResult> {
     if (this.isClosed()) {
@@ -304,7 +297,7 @@ export class CloudDocumentPagesService implements DocumentPagesService {
     return AbortablePromise.run<PageFlattenResult>(async (signal) => {
       const result = await this.http.postJson(
         wirePaths.layerPagesFlatten(this.docId, this.layerName),
-        { pageObjectNumbers, usage },
+        { pages, usage },
         (raw) => PageFlattenResultSchema.parse(raw),
         signal,
       );

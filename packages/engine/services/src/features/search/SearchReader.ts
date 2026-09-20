@@ -16,6 +16,7 @@ import {
   buildPageTextLayout,
   textSegmentsForRange,
   validateSearchQuery,
+  toPageRef,
 } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule } from '@embedpdf/engine-runtime';
 
@@ -94,8 +95,7 @@ export class SearchReader {
     } else {
       if (request.startPage !== undefined) {
         // Throws NotFound for an unknown page — same contract as page(pon).
-        this.session.recordByObjectNumber(request.startPage);
-        start = request.startPage;
+        start = this.session.resolvePageRef(request.startPage).pageObjectNumber;
       }
       if (request.skip !== undefined) {
         // Trusted-position resume: the caller pins content versions
@@ -151,7 +151,7 @@ export class SearchReader {
             range.start + range.length,
           );
           matches.push({
-            pageObjectNumber: pon,
+            page: toPageRef(pon),
             charStart: chars.start,
             charCount: chars.end - chars.start,
             segments: textSegmentsForRange(layout, chars.start, chars.end - chars.start),

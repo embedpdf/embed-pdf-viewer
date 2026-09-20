@@ -1,4 +1,4 @@
-import { createCapabilityToken, type PageObjectNumber } from '@embedpdf/core';
+import { createCapabilityToken, type PageRef } from '@embedpdf/core';
 import type { PageRotation, Point } from '@embedpdf/core-geometry';
 
 export type ToolId = string;
@@ -49,7 +49,7 @@ export type PointerKind = 'mouse' | 'pen' | 'touch';
 
 /**
  * One normalized pointer event. `viewport` is the source container's px (the pan
- * handler uses the delta). `page` is the resolved page hit — its `pon` + content
+ * handler uses the delta). `page` is the resolved page hit — its `ref` + content
  * point (y-down, PDF units, via the page's transform) — present when the pointer
  * is over a page, absent over gaps. A viewport source (Stage) resolves `page` per
  * event (so a drag can cross pages); a per-page source (PageView) always sets it.
@@ -68,7 +68,7 @@ export interface PointerSample {
    *  distinct from `scale`, which is a units conversion. Absent when the
    *  source can't say. */
   page?: {
-    pon: PageObjectNumber;
+    ref: PageRef;
     point: Point;
     scale?: number;
     rotation?: PageRotation;
@@ -110,7 +110,7 @@ export interface PointerSample {
    * annotation drag sliding along the page edge). Null when the source can't
    * project onto that page (not laid out / a per-page source's foreign page).
    */
-  project?(pon: PageObjectNumber): Point | null;
+  project?(page: PageRef): Point | null;
 }
 
 /**
@@ -231,8 +231,9 @@ export const InteractionToken = createCapabilityToken<InteractionCapability>('in
  * when it is the same page. Null → this sample can't speak for the home page.
  * Shared by every gesture owner (annotation edit/draw, form placement).
  */
-export const samplePointOn = (s: PointerSample, pon: PageObjectNumber): Point | null =>
-  s.project?.(pon) ?? (s.page?.pon === pon ? s.page.point : null);
+export const samplePointOn = (s: PointerSample, page: PageRef): Point | null =>
+  s.project?.(page) ??
+  (s.page?.ref.pageObjectNumber === page.pageObjectNumber ? s.page.point : null);
 
 export interface InteractionConfig {
   /** Tool active when a document opens. Default `'pointer'`. */

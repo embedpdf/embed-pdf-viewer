@@ -21,7 +21,7 @@ export const searchReducer = (state: SearchState, action: SearchAction): SearchS
       const hits = state.hits.concat(action.hits);
       const hitsByPage = { ...state.hitsByPage };
       for (let i = state.hits.length; i < hits.length; i++) {
-        const pon = hits[i].pon;
+        const pon = hits[i].page.pageObjectNumber;
         hitsByPage[pon] = (hitsByPage[pon] ?? []).concat(i);
       }
       return {

@@ -53,7 +53,21 @@ export namespace DocFormsGet200ResponseFieldsItem {
         export namespace Widgets {
             export interface Item {
                 annotObjectNumber: number;
-                pageObjectNumber: number;
+                page: Item.Page | null;
+            }
+
+            export namespace Item {
+                export interface Page {
+                    kind: Page.Kind;
+                    pageObjectNumber: number;
+                }
+
+                export namespace Page {
+                    export const Kind = {
+                        ObjectNumber: "objectNumber",
+                    } as const;
+                    export type Kind = (typeof Kind)[keyof typeof Kind];
+                }
             }
         }
     }
@@ -94,10 +108,24 @@ export namespace DocFormsGet200ResponseFieldsItem {
         export namespace Widgets {
             export interface Item {
                 annotObjectNumber: number;
-                pageObjectNumber: number;
+                page: Item.Page | null;
                 onState: string;
                 exportValue: string;
                 checked: boolean;
+            }
+
+            export namespace Item {
+                export interface Page {
+                    kind: Page.Kind;
+                    pageObjectNumber: number;
+                }
+
+                export namespace Page {
+                    export const Kind = {
+                        ObjectNumber: "objectNumber",
+                    } as const;
+                    export type Kind = (typeof Kind)[keyof typeof Kind];
+                }
             }
         }
     }
@@ -139,10 +167,24 @@ export namespace DocFormsGet200ResponseFieldsItem {
         export namespace Widgets {
             export interface Item {
                 annotObjectNumber: number;
-                pageObjectNumber: number;
+                page: Item.Page | null;
                 onState: string;
                 exportValue: string;
                 checked: boolean;
+            }
+
+            export namespace Item {
+                export interface Page {
+                    kind: Page.Kind;
+                    pageObjectNumber: number;
+                }
+
+                export namespace Page {
+                    export const Kind = {
+                        ObjectNumber: "objectNumber",
+                    } as const;
+                    export type Kind = (typeof Kind)[keyof typeof Kind];
+                }
             }
         }
     }
@@ -185,7 +227,21 @@ export namespace DocFormsGet200ResponseFieldsItem {
         export namespace Widgets {
             export interface Item {
                 annotObjectNumber: number;
-                pageObjectNumber: number;
+                page: Item.Page | null;
+            }
+
+            export namespace Item {
+                export interface Page {
+                    kind: Page.Kind;
+                    pageObjectNumber: number;
+                }
+
+                export namespace Page {
+                    export const Kind = {
+                        ObjectNumber: "objectNumber",
+                    } as const;
+                    export type Kind = (typeof Kind)[keyof typeof Kind];
+                }
             }
         }
 
@@ -237,7 +293,21 @@ export namespace DocFormsGet200ResponseFieldsItem {
         export namespace Widgets {
             export interface Item {
                 annotObjectNumber: number;
-                pageObjectNumber: number;
+                page: Item.Page | null;
+            }
+
+            export namespace Item {
+                export interface Page {
+                    kind: Page.Kind;
+                    pageObjectNumber: number;
+                }
+
+                export namespace Page {
+                    export const Kind = {
+                        ObjectNumber: "objectNumber",
+                    } as const;
+                    export type Kind = (typeof Kind)[keyof typeof Kind];
+                }
             }
         }
 
@@ -286,7 +356,21 @@ export namespace DocFormsGet200ResponseFieldsItem {
         export namespace Widgets {
             export interface Item {
                 annotObjectNumber: number;
-                pageObjectNumber: number;
+                page: Item.Page | null;
+            }
+
+            export namespace Item {
+                export interface Page {
+                    kind: Page.Kind;
+                    pageObjectNumber: number;
+                }
+
+                export namespace Page {
+                    export const Kind = {
+                        ObjectNumber: "objectNumber",
+                    } as const;
+                    export type Kind = (typeof Kind)[keyof typeof Kind];
+                }
             }
         }
     }
@@ -325,7 +409,21 @@ export namespace DocFormsGet200ResponseFieldsItem {
         export namespace Widgets {
             export interface Item {
                 annotObjectNumber: number;
-                pageObjectNumber: number;
+                page: Item.Page | null;
+            }
+
+            export namespace Item {
+                export interface Page {
+                    kind: Page.Kind;
+                    pageObjectNumber: number;
+                }
+
+                export namespace Page {
+                    export const Kind = {
+                        ObjectNumber: "objectNumber",
+                    } as const;
+                    export type Kind = (typeof Kind)[keyof typeof Kind];
+                }
             }
         }
     }
@@ -365,7 +463,21 @@ export namespace DocFormsGet200ResponseFieldsItem {
         export namespace Widgets {
             export interface Item {
                 annotObjectNumber: number;
-                pageObjectNumber: number;
+                page: Item.Page | null;
+            }
+
+            export namespace Item {
+                export interface Page {
+                    kind: Page.Kind;
+                    pageObjectNumber: number;
+                }
+
+                export namespace Page {
+                    export const Kind = {
+                        ObjectNumber: "objectNumber",
+                    } as const;
+                    export type Kind = (typeof Kind)[keyof typeof Kind];
+                }
             }
         }
     }

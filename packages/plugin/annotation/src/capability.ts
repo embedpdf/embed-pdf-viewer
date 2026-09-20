@@ -25,7 +25,9 @@ import {
   type PdfLinkTarget,
   type PdfRect,
   type PageMeasurementViewport,
+  type PageRef,
   type PdfMeasure,
+  toPageRef,
 } from '@embedpdf/engine-core/runtime';
 import { ActionsToken as PublicActionsToken } from '@embedpdf/plugin-actions/contract';
 import { scriptColorToRgb } from '@embedpdf/core-acrojs';
@@ -206,7 +208,7 @@ export function createAnnotationCapability(
     let out: Set<Id> | undefined;
     for (const id of m.order) {
       const a = m.byId[id];
-      if (!a || a.pon !== pon) continue;
+      if (!a || a.page.pageObjectNumber !== pon) continue;
       if (behaviors.some((b) => b.matches({ subtype: a.subtype, ref: a.ref }) && b.engaged())) {
         (out ??= new Set()).add(id);
       }
@@ -259,7 +261,8 @@ export function createAnnotationCapability(
       v: ChromeNode[];
     }
   >();
-  const memoItems = (pon: number, view?: ViewEnv): RenderItem[] => {
+  const memoItems = (page: PageRef, view?: ViewEnv): RenderItem[] => {
+    const pon = page.pageObjectNumber;
     const m = model();
     const g = ctx.getState().toolGhost;
     const c = itemsCache.get(pon);
@@ -271,10 +274,10 @@ export function createAnnotationCapability(
       c.rotation === view?.rotation
     )
       return c.v;
-    const v = corePageItems(m, pon, view);
+    const v = corePageItems(m, page, view);
     // The armed tool's VECTOR footprint ghost rides the same items pipeline as
     // every draft preview (image ghosts blit through the framework instead).
-    if (g && g.pon === pon && g.kind === 'vector') {
+    if (g && g.page.pageObjectNumber === pon && g.kind === 'vector') {
       const tool = registry.get(g.toolId);
       const style = styleFromProps(defaultsFor(m, tool?.preset ?? g.toolId));
       v.push({
@@ -292,11 +295,12 @@ export function createAnnotationCapability(
     return v;
   };
   const memoChrome = (
-    pon: number,
+    page: PageRef,
     scale?: number,
     rotation?: number,
     zoom?: number,
   ): ChromeNode[] => {
+    const pon = page.pageObjectNumber;
     const m = model();
     const cs = chromeSettings();
     const c = chromeCache.get(pon);
@@ -311,7 +315,7 @@ export function createAnnotationCapability(
       return c.v;
     let v = coreChrome(
       m,
-      pon,
+      page,
       pageBoxOf(pon),
       chromeGeomAt(scale).knobOffset,
       viewEnv(zoom, rotation),
@@ -330,13 +334,13 @@ export function createAnnotationCapability(
     scale: number | undefined;
     rotation: number | undefined;
     zoom: number | undefined;
-    v: { pon: number; bounds: Rect; knob?: Vec } | null;
+    v: { page: PageRef; bounds: Rect; knob?: Vec } | null;
   } | null = null;
   const memoAnchor = (
     scale?: number,
     rotation?: number,
     zoom?: number,
-  ): { pon: number; bounds: Rect; knob?: Vec } | null => {
+  ): { page: PageRef; bounds: Rect; knob?: Vec } | null => {
     const m = model();
     const cs = chromeSettings();
     if (
@@ -350,7 +354,7 @@ export function createAnnotationCapability(
       return anchorCache.v;
     const v = coreSelectionAnchor(
       m,
-      pageBoxOf,
+      (page) => pageBoxOf(page.pageObjectNumber),
       () => chromeGeomAt(scale).knobOffset,
       () => viewEnv(zoom, rotation),
     );
@@ -429,7 +433,7 @@ export function createAnnotationCapability(
     const v: LinkNavItem[] = [];
     for (const id of m.order) {
       const a = m.byId[id];
-      if (!a || a.pon !== pon || a.subtype !== 'link') continue;
+      if (!a || a.page.pageObjectNumber !== pon || a.subtype !== 'link') continue;
       if (!viewable(a.flags, false)) continue; // hidden links don't navigate
       // Standalone links carry their own model `link` (/A); attached children
       // carry the target on their DTO. Rects are the CHILD's own committed
@@ -459,11 +463,12 @@ export function createAnnotationCapability(
     number,
     { model: Model; zoom: number | undefined; rotation: number | undefined; v: TextItem[] }
   >();
-  const memoTexts = (pon: number, view?: ViewEnv): TextItem[] => {
+  const memoTexts = (page: PageRef, view?: ViewEnv): TextItem[] => {
+    const pon = page.pageObjectNumber;
     const m = model();
     const c = textsCache.get(pon);
     if (c && c.model === m && c.zoom === view?.zoom && c.rotation === view?.rotation) return c.v;
-    const v = buildTextItems(m, pon, view);
+    const v = buildTextItems(m, page, view);
     textsCache.set(pon, { model: m, zoom: view?.zoom, rotation: view?.rotation, v });
     return v;
   };
@@ -485,7 +490,7 @@ export function createAnnotationCapability(
     return v;
   };
   const cropOf = (pon: number) =>
-    ctx.document()?.pages.find((p) => p.pageObjectNumber === pon)?.boxes.crop ?? null;
+    ctx.document()?.pages.find((p) => p.ref.pageObjectNumber === pon)?.boxes.crop ?? null;
   /** The page's box in content space (origin at the crop top-left) — the box
    *  pointer gestures clamp to, so annotations stay page-bound. */
   const pageBoxOf = (pon: number): Rect | undefined => {
@@ -613,7 +618,10 @@ export function createAnnotationCapability(
         page,
         rot,
       );
-      ctx.dispatch({ type: 'SET_TOOL_GHOST', ghost: { pon, box, rot, kind: 'image' } });
+      ctx.dispatch({
+        type: 'SET_TOOL_GHOST',
+        ghost: { page: toPageRef(pon), box, rot, kind: 'image' },
+      });
       return;
     }
     // Icon kinds: the fixed 20×20 footprint under the cursor — the SAME box
@@ -653,7 +661,7 @@ export function createAnnotationCapability(
     ctx.dispatch({
       type: 'SET_TOOL_GHOST',
       ghost: {
-        pon,
+        page: toPageRef(pon),
         box: geomVisualBounds(geom, style.strokeWidth, style.border),
         rot: 0,
         kind: 'vector',
@@ -710,7 +718,7 @@ export function createAnnotationCapability(
     const page = { width: crop.right - crop.left, height: crop.top - crop.bottom };
     const box: Rect = fitStampBox(point, desired, page, rotCW);
     return doc
-      .page(pon)
+      .page(toPageRef(pon))
       .annotations.create({
         subtype: 'stamp',
         ...boxGeomFields(box, rotCW, crop),
@@ -755,7 +763,7 @@ export function createAnnotationCapability(
       throw new Error('[annotation] stamp source must be PNG, JPEG, or single-page PDF bytes');
     }
     const placed = createStampAt(
-      placement.pageObjectNumber,
+      placement.page.pageObjectNumber,
       placement.at,
       input.source,
       desiredStampSize(meta, placement.targetWidth ?? input.targetWidth, input.intrinsicSize),
@@ -767,7 +775,7 @@ export function createAnnotationCapability(
     );
     if (!placed) {
       throw new Error(
-        `[annotation] cannot place a stamp on page ${placement.pageObjectNumber}: document or page not ready`,
+        `[annotation] cannot place a stamp on page ${placement.page.pageObjectNumber}: document or page not ready`,
       );
     }
     return placed;
@@ -865,7 +873,7 @@ export function createAnnotationCapability(
       toolId: tool.id,
       subtype: tool.subtype,
       accept: spec?.kind === 'prompt' ? spec.accept : undefined,
-      pon,
+      page: toPageRef(pon),
       point,
     };
     const docAtClick = ctx.doc;
@@ -905,7 +913,7 @@ export function createAnnotationCapability(
       file,
     );
     doc
-      .page(pon)
+      .page(toPageRef(pon))
       .annotations.create(draft)
       .then(
         (res) => {
@@ -942,10 +950,10 @@ export function createAnnotationCapability(
     );
   };
 
-  /** The page a ref lives on: from the loaded model first (covers obj/nm refs
-   *  that don't carry a pon), else the ref itself (index refs do). */
+  /** The page a ref lives on: from the loaded model first (the page it was
+   *  ingested on), else the ref's own page address. */
   const ponForRef = (ref: AnnotationRef): number | null =>
-    model().byId[refKey(ref)]?.pon ?? (ref.kind === 'index' ? ref.pageObjectNumber : null);
+    model().byId[refKey(ref)]?.page.pageObjectNumber ?? ref.page.pageObjectNumber;
 
   /**
    * Re-sync one annotation into the model from the authoritative engine DTO,
@@ -961,7 +969,7 @@ export function createAnnotationCapability(
     source: 'baked' | 'vector',
     bumpAp = false,
   ): void => {
-    const crop = cropOf(dto.pageObjectNumber);
+    const crop = cropOf(dto.page.pageObjectNumber);
     if (crop) apply({ t: 'upsert', annots: [ingestDTO(dto, crop, source)], bumpAp });
   };
 
@@ -972,7 +980,7 @@ export function createAnnotationCapability(
     if (!doc) throw new Error('[annotation] no document bound');
     const pon = ponForRef(ref);
     if (pon == null) throw new Error('[annotation] cannot resolve page for ref');
-    const res = await doc.page(pon).annotations.update(ref, patch);
+    const res = await doc.page(toPageRef(pon)).annotations.update(ref, patch);
     syncDTO(res.updated, 'vector', res.appearance?.changed);
   };
 
@@ -991,7 +999,7 @@ export function createAnnotationCapability(
     if (!a || pon == null) return;
     const patch = textCommitPatch(a, richDocOf(a, fonts).paragraphs, fonts);
     ctx.doc
-      ?.page(pon)
+      ?.page(toPageRef(pon))
       .annotations.update(ref, { subtype: 'free-text', ...patch })
       .then(
         () => {},
@@ -1050,7 +1058,7 @@ export function createAnnotationCapability(
   ): void => {
     const annots: Annot[] = [];
     for (const page of snap.pages) {
-      const crop = cropOf(page.pageState.pageObjectNumber);
+      const crop = cropOf(page.pageState.page.pageObjectNumber);
       if (!crop) continue;
       // Children (replies, states, attached links) enter the substrate as
       // first-class annots; the planes derive (paint cull + lenses).
@@ -1131,7 +1139,7 @@ export function createAnnotationCapability(
     const bump: Annot[] = [];
     const keep: Annot[] = [];
     for (const dto of dtos) {
-      const crop = cropOf(dto.pageObjectNumber);
+      const crop = cropOf(dto.page.pageObjectNumber);
       if (!crop) continue;
       // Another session authored this — trust the engine's baked AP.
       const a = ingestDTO(dto, crop, 'baked');
@@ -1199,7 +1207,7 @@ export function createAnnotationCapability(
   /** Value-stable layout key: display order is all the sort consumes, so
    *  the memo must survive hosts that rebuild the pages array per read. */
   const layoutSignature = (): string =>
-    (ctx.document()?.pages ?? []).map((p) => p.pageObjectNumber).join(',');
+    (ctx.document()?.pages ?? []).map((p) => p.ref.pageObjectNumber).join(',');
 
   const computeThreadsIndex = (): ThreadsIndex => {
     const m = model();
@@ -1215,10 +1223,10 @@ export function createAnnotationCapability(
     // Display order: page position first (live layout), then top of page
     // (PDF user space is y-up — larger `top` sits higher), then creation.
     const pages = ctx.document()?.pages ?? [];
-    const displayIndex = new Map(pages.map((p, i) => [p.pageObjectNumber, i]));
+    const displayIndex = new Map(pages.map((p, i) => [p.ref.pageObjectNumber, i]));
     threads.sort((a, b) => {
-      const pa = displayIndex.get(a.pageObjectNumber) ?? Number.MAX_SAFE_INTEGER;
-      const pb = displayIndex.get(b.pageObjectNumber) ?? Number.MAX_SAFE_INTEGER;
+      const pa = displayIndex.get(a.page.pageObjectNumber) ?? Number.MAX_SAFE_INTEGER;
+      const pb = displayIndex.get(b.page.pageObjectNumber) ?? Number.MAX_SAFE_INTEGER;
       if (pa !== pb) return pa - pb;
       if (a.root.rect.top !== b.root.rect.top) return b.root.rect.top - a.root.rect.top;
       const ca = a.root.created ?? '';
@@ -1268,7 +1276,7 @@ export function createAnnotationCapability(
   ): Promise<AnnotationDTO> => {
     const doc = ctx.doc;
     if (!doc) throw new Error('[annotation] no document bound');
-    const res = await doc.page(pon).annotations.create(draft);
+    const res = await doc.page(toPageRef(pon)).annotations.create(draft);
     syncDTO(res.created, 'baked');
     return res.created;
   };
@@ -1276,7 +1284,7 @@ export function createAnnotationCapability(
   const deleteOne = async (ref: AnnotationRef): Promise<void> => {
     const doc = ctx.doc;
     if (!doc) throw new Error('[annotation] no document bound');
-    await doc.page(ref.pageObjectNumber).annotations.delete(ref);
+    await doc.page(ref.page).annotations.delete(ref);
     apply({ t: 'remove', ids: [refKey(ref)] });
   };
 
@@ -1353,7 +1361,7 @@ export function createAnnotationCapability(
 
     reply: async (ref, text) => {
       const t = threadOf(ref);
-      const created = await createConversationAnnot(t.pageObjectNumber, {
+      const created = await createConversationAnnot(t.page.pageObjectNumber, {
         subtype: 'text',
         rect: t.root.rect,
         icon: 'comment',
@@ -1380,7 +1388,7 @@ export function createAnnotationCapability(
       // exists, else to the root. Readers everywhere (ours included) accept
       // both shapes.
       const previous = userId ? t.review.byReviewer[userId] : undefined;
-      await createConversationAnnot(t.pageObjectNumber, {
+      await createConversationAnnot(t.page.pageObjectNumber, {
         subtype: 'text',
         rect: t.root.rect,
         inReplyTo: previous?.ref ?? t.root.ref,
@@ -1392,7 +1400,7 @@ export function createAnnotationCapability(
 
     setMarked: async (ref, marked) => {
       const t = threadOf(ref);
-      await createConversationAnnot(t.pageObjectNumber, {
+      await createConversationAnnot(t.page.pageObjectNumber, {
         subtype: 'text',
         rect: t.root.rect,
         inReplyTo: t.root.ref,
@@ -1493,9 +1501,9 @@ export function createAnnotationCapability(
     const doc = ctx.doc;
     const a = model().byId[id];
     if (!doc || !a || !a.ref || a.subtype === 'link') return;
-    const crop = cropOf(a.pon);
+    const crop = cropOf(a.page.pageObjectNumber);
     if (!crop) return;
-    const page = doc.page(a.pon);
+    const page = doc.page(a.page);
     // Read-only target arms can't be (re)written: children keep their /A and
     // only their rects follow the parent.
     const target = writableTarget(desired);
@@ -1550,7 +1558,7 @@ export function createAnnotationCapability(
     const doc = ctx.doc;
     if (!doc || !a.ref || !a.data) return;
     const res = await doc
-      .page(a.pon)
+      .page(a.page)
       .annotations.update(a.ref, relationshipPatch(a.data.subtype, rel));
     syncDTO(res.updated, a.source);
   };
@@ -1565,21 +1573,24 @@ export function createAnnotationCapability(
     const doc = ctx.doc;
     if (!doc) return;
     if (fx.fx === 'captured') {
-      const crop = cropOf(fx.pon);
+      const crop = cropOf(fx.page.pageObjectNumber);
       if (crop && fx.geom.t === 'line') {
         const pdf = (p: Vec) => ({ x: p.x + crop.left, y: crop.top - p.y });
         for (const cb of captured)
-          cb({ tool: fx.tool, pon: fx.pon, from: pdf(fx.geom.a), to: pdf(fx.geom.b) });
+          cb({ tool: fx.tool, page: fx.page, from: pdf(fx.geom.a), to: pdf(fx.geom.b) });
       }
     } else if (fx.fx === 'createGroup') {
       const ids = [fx.primary, ...fx.members];
       const annots = ids.map((id) => m.byId[id]);
       const primary = annots[0];
-      if (!primary || annots.some((a) => !a || a.pon !== primary.pon)) {
+      if (
+        !primary ||
+        annots.some((a) => !a || a.page.pageObjectNumber !== primary.page.pageObjectNumber)
+      ) {
         apply({ t: 'remove', ids });
         return;
       }
-      const crop = cropOf(primary.pon);
+      const crop = cropOf(primary.page.pageObjectNumber);
       const drafts = crop
         ? annots.map((a) => (a ? toCreateDraft(a, crop) : null))
         : annots.map(() => null);
@@ -1591,7 +1602,7 @@ export function createAnnotationCapability(
       void (async () => {
         const committed: Array<{ tempId: string; ref: AnnotationRef }> = [];
         try {
-          const page = doc.page(primary.pon);
+          const page = doc.page(primary.page);
           const primaryResult = await page.annotations.create(drafts[0]!);
           committed.push({ tempId: fx.primary, ref: primaryResult.created.ref });
           apply({
@@ -1626,7 +1637,7 @@ export function createAnnotationCapability(
           const removeIds = ids.filter((id) => !committed.some((c) => c.tempId === id));
           for (const part of [...committed].reverse()) {
             try {
-              await doc.page(primary.pon).annotations.delete(part.ref);
+              await doc.page(primary.page).annotations.delete(part.ref);
               removeIds.push(refKey(part.ref));
             } catch {
               // `syncDTO` already made this committed annotation visible.
@@ -1638,11 +1649,11 @@ export function createAnnotationCapability(
       })();
     } else if (fx.fx === 'create') {
       const a = m.byId[fx.id];
-      const crop = a && cropOf(a.pon);
+      const crop = a && cropOf(a.page.pageObjectNumber);
       const draft = a && crop ? toCreateDraft(a, crop) : null;
       if (!a || !draft) return;
       doc
-        .page(a.pon)
+        .page(a.page)
         .annotations.create(draft)
         .then(
           (res) => {
@@ -1667,7 +1678,7 @@ export function createAnnotationCapability(
       const a = m.byId[fx.id];
       if (!a || !a.ref || !a.data) return;
       doc
-        .page(a.pon)
+        .page(a.page)
         .annotations.update(a.ref, {
           subtype: a.data.subtype,
           flags: a.flags,
@@ -1678,7 +1689,7 @@ export function createAnnotationCapability(
         );
     } else if (fx.fx === 'patch') {
       const a = m.byId[fx.id];
-      const crop = a && cropOf(a.pon);
+      const crop = a && cropOf(a.page.pageObjectNumber);
       const patch = a && a.ref && crop ? toScopedPatch(a, fx.scope, crop) : null;
       if (!a || !a.ref || !patch) return;
       // Re-sync from the authoritative DTO, PRESERVING the source the gesture
@@ -1695,7 +1706,7 @@ export function createAnnotationCapability(
       // advisory (a future pre-commit "this will replace an imported
       // appearance" affordance); the echo is the authority.
       doc
-        .page(a.pon)
+        .page(a.page)
         .annotations.update(a.ref, patch)
         .then(
           (res) => {
@@ -1718,7 +1729,7 @@ export function createAnnotationCapability(
     } else {
       const deletedId = refKey(fx.ref);
       doc
-        .page(fx.ref.pageObjectNumber)
+        .page(fx.ref.page)
         .annotations.delete(fx.ref)
         .then(
           () => {},
@@ -1732,11 +1743,11 @@ export function createAnnotationCapability(
     const crop = cropOf(pon);
     if (!doc || !crop) return;
     try {
-      const snap = await doc.page(pon).annotations.list();
+      const snap = await doc.page(toPageRef(pon)).annotations.list();
       // Replace, not merge: drop this page's current annots first so
       // cross-plane deletions (deleteField) actually disappear.
       const m = model();
-      const stale = m.order.filter((id) => m.byId[id]?.pon === pon);
+      const stale = m.order.filter((id) => m.byId[id]?.page.pageObjectNumber === pon);
       if (stale.length) apply({ t: 'remove', ids: stale });
       apply({ t: 'loaded', annots: snap.annotations.map((d) => ingestDTO(d, crop)) });
     } catch {
@@ -1822,8 +1833,8 @@ export function createAnnotationCapability(
 
   return {
     // ── data API: create / update / delete (engine-routed, ref-addressed) ──
-    setPageViewports: (pon, viewports, fallback) => {
-      pageViewports.set(pon, { viewports, fallback });
+    setPageViewports: (page, viewports, fallback) => {
+      pageViewports.set(page.pageObjectNumber, { viewports, fallback });
     },
     onDraftCaptured: (cb) => {
       captured.add(cb);
@@ -1831,9 +1842,10 @@ export function createAnnotationCapability(
         captured.delete(cb);
       };
     },
-    remeasurePage: async (pon, scale) => {
+    remeasurePage: async (page, scale) => {
+      const pon = page.pageObjectNumber;
       await rehydrate();
-      const report: RecalibrationReport = { pon, scale, updated: [], skipped: [], failed: [] };
+      const report: RecalibrationReport = { page, scale, updated: [], skipped: [], failed: [] };
       const hydration = ctx.getState().hydration;
       if (hydration.status !== 'complete') {
         report.error = serializeError(
@@ -1844,7 +1856,7 @@ export function createAnnotationCapability(
         return report;
       }
       const candidates = Object.values(model().byId).filter(
-        (a) => a.pon === pon && a.data && isDimension(a.data),
+        (a) => a.page.pageObjectNumber === pon && a.data && isDimension(a.data),
       );
       for (const a of candidates) {
         const dto = a.data!,
@@ -1872,7 +1884,7 @@ export function createAnnotationCapability(
       }
       return report;
     },
-    create: async (pon, draft: AnnotationDraft): Promise<AnnotationRef> => {
+    create: async (page, draft: AnnotationDraft): Promise<AnnotationRef> => {
       const doc = ctx.doc;
       if (!doc) throw new Error('[annotation] no document bound');
       // Default `/F` to `print` (Acrobat parity — without it the annotation
@@ -1880,7 +1892,7 @@ export function createAnnotationCapability(
       const withFlags = (
         draft.flags ? draft : { ...draft, flags: { print: true } }
       ) as AnnotationDraft;
-      const res = await doc.page(pon).annotations.create(withFlags);
+      const res = await doc.page(page).annotations.create(withFlags);
       // Stamps have no vector render — their engine-baked /AP is the visual.
       syncDTO(res.created, res.created.subtype === 'stamp' ? 'baked' : 'vector');
       return res.created.ref;
@@ -1888,17 +1900,22 @@ export function createAnnotationCapability(
     armStamp,
     placeStamp,
     disarmStamp,
-    placeArmedStamp,
-    requestStampAt,
-    placeAt,
+    placeArmedStamp: (page, point, displayRotation) =>
+      placeArmedStamp(page.pageObjectNumber, point, displayRotation),
+    requestStampAt: (page, point, displayRotation) =>
+      requestStampAt(page.pageObjectNumber, point, displayRotation),
+    placeAt: (page, point, displayRotation) =>
+      placeAt(page.pageObjectNumber, point, displayRotation),
     hasArmedStamp: () => armedStamp != null,
-    ghostHoverAt,
+    ghostHoverAt: (toolId, page, point, displayRotation) =>
+      ghostHoverAt(toolId, page.pageObjectNumber, point, displayRotation),
     clearGhost,
-    setPlacementPreview,
+    setPlacementPreview: (toolId, page, box) =>
+      setPlacementPreview(toolId, page.pageObjectNumber, box),
     clearPlacementPreview: clearGhost,
-    toolGhost: (pon) => {
+    toolGhost: (page) => {
       const g = ctx.getState().toolGhost;
-      return g && g.pon === pon ? g : null;
+      return g && g.page.pageObjectNumber === page.pageObjectNumber ? g : null;
     },
     armedStampPreview: (devicePixelWidth) => {
       const armed = armedStamp;
@@ -1923,7 +1940,7 @@ export function createAnnotationCapability(
       if (!doc) throw new Error('[annotation] no document bound');
       const pon = ponForRef(ref);
       if (pon == null) throw new Error('[annotation] cannot resolve page for ref');
-      const annotations = doc.page(pon).annotations;
+      const annotations = doc.page(toPageRef(pon)).annotations;
       if (!annotations.downloadFile) {
         throw new Error('[annotation] this engine does not support attachment download');
       }
@@ -1969,7 +1986,7 @@ export function createAnnotationCapability(
       if (!doc) throw new Error('[annotation] no document bound');
       const pon = ponForRef(ref);
       if (pon == null) throw new Error('[annotation] cannot resolve page for ref');
-      await doc.page(pon).annotations.delete(ref);
+      await doc.page(toPageRef(pon)).annotations.delete(ref);
       apply({ t: 'remove', ids: [refKey(ref)] });
     },
 
@@ -2016,11 +2033,12 @@ export function createAnnotationCapability(
 
     // ── DTO-returning reads (canonical engine vocabulary) ──
     get: (ref: AnnotationRef): AnnotationDTO | null => model().byId[refKey(ref)]?.data ?? null,
-    list: (pon: number): AnnotationDTO[] => {
+    list: (page: PageRef): AnnotationDTO[] => {
+      const pon = page.pageObjectNumber;
       const m = model();
       return m.order
         .map((id) => m.byId[id])
-        .filter((a) => a?.pon === pon)
+        .filter((a) => a?.page.pageObjectNumber === pon)
         .map((a) => a?.data)
         .filter((d): d is AnnotationDTO => d != null);
     },
@@ -2036,31 +2054,34 @@ export function createAnnotationCapability(
     propsForTool: (toolId) => propsFor(registry.get(toolId)?.propsKind ?? toolId),
 
     // selectors
-    pageItems: (pon, view) => memoItems(pon, view),
-    chrome: (pon, scale, rotation, zoom) => memoChrome(pon, scale, rotation, zoom),
+    pageItems: (page, view) => memoItems(page, view),
+    chrome: (page, scale, rotation, zoom) => memoChrome(page, scale, rotation, zoom),
     selectionAnchor: (scale, rotation, zoom) => memoAnchor(scale, rotation, zoom),
     creationDraftAnchor: () => memoDraftAnchor(),
     distanceCreationPage: () => {
       const draft = model().draft;
-      return draft?.g === 'create-distance' && draft.step === 'offset' ? draft.pon : null;
+      return draft?.g === 'create-distance' && draft.step === 'offset' ? draft.page : null;
     },
     selection: () => model().selected,
-    hitKind: (pon, point, scale, rotation, zoom, touch) =>
-      hitTest(
+    hitKind: (page, point, scale, rotation, zoom, touch) => {
+      const pon = page.pageObjectNumber;
+      return hitTest(
         model(),
-        pon,
+        page,
         point,
         chromeGeomAt(scale, grabBoost(touch)),
         model().hitMargin,
         pageBoxOf(pon),
         inertIdsAt(pon),
         viewEnv(zoom, rotation),
-      ).t,
-    claimsTouchAt: (pon, point, scale, rotation, zoom) => {
+      ).t;
+    },
+    claimsTouchAt: (page, point, scale, rotation, zoom) => {
+      const pon = page.pageObjectNumber;
       const m = model();
       const t = hitTest(
         m,
-        pon,
+        page,
         point,
         chromeGeomAt(scale, TOUCH_GRAB_BOOST),
         m.hitMargin,
@@ -2082,29 +2103,32 @@ export function createAnnotationCapability(
       }
       return false;
     },
-    cursorAt: (pon, point, scale, rotation, zoom) =>
-      cursorAt(
+    cursorAt: (page, point, scale, rotation, zoom) => {
+      const pon = page.pageObjectNumber;
+      return cursorAt(
         model(),
-        pon,
+        page,
         point,
         chromeGeomAt(scale),
         model().hitMargin,
         pageBoxOf(pon),
         inertIdsAt(pon),
         viewEnv(zoom, rotation),
-      ),
+      );
+    },
     hoverAt: (at) => {
       const m = model();
       let id: string | null = null;
       if (at) {
+        const pon = at.page.pageObjectNumber;
         const h = hitTest(
           m,
-          at.pon,
+          at.page,
           at.point,
           chromeGeomAt(at.scale),
           m.hitMargin,
-          pageBoxOf(at.pon),
-          inertIdsAt(at.pon),
+          pageBoxOf(pon),
+          inertIdsAt(pon),
           viewEnv(at.zoom, at.rotation),
         );
         if (h.t === 'annot') id = h.id;
@@ -2119,9 +2143,10 @@ export function createAnnotationCapability(
       }
     },
     behaviorFor: (a) => behaviors.find((b) => b.matches(a) && b.engaged()) ?? null,
-    linkItemsOn: (pon) => memoLinkItems(pon),
+    linkItemsOn: (page) => memoLinkItems(page.pageObjectNumber),
 
-    appearanceEpoch: (pon) => {
+    appearanceEpoch: (page) => {
+      const pon = page.pageObjectNumber;
       // What a baked raster DEPENDS on, and nothing else: which annotations are
       // baked on this page, and each one's /AP content version (`apVersion` —
       // bumped when a size-changing patch RESOLVES, or a remote edit folds in).
@@ -2134,7 +2159,7 @@ export function createAnnotationCapability(
       const parts: string[] = [];
       for (const id of m.order) {
         const a = m.byId[id];
-        if (!a || a.pon !== pon || a.source !== 'baked' || !a.ref) continue;
+        if (!a || a.page.pageObjectNumber !== pon || a.source !== 'baked' || !a.ref) continue;
         // Conversation-plane annotations never paint — a remote reply or
         // status change must not churn the page's raster cache key.
         if (isSubstrateOnly(a)) continue;
@@ -2147,10 +2172,10 @@ export function createAnnotationCapability(
       // `pages`), interpreted by the pure engine-core helper — one lifecycle,
       // one interpretation, no plugin dependency. Identity under continuous.
       snapAppearanceScale(ctx.document()?.renderPolicy ?? CONTINUOUS_RENDER_POLICY, renderScale),
-    appearances: (pon, scale, signal) => {
+    appearances: (page, scale, signal) => {
       const doc = ctx.doc;
       if (!doc) return Promise.resolve([]);
-      const task = doc.page(pon).annotations.renderAppearanceImages({ scale });
+      const task = doc.page(page).annotations.renderAppearanceImages({ scale });
       if (signal) {
         if (signal.aborted) task.abort(signal.reason);
         else signal.addEventListener('abort', () => task.abort(signal.reason), { once: true });
@@ -2160,45 +2185,46 @@ export function createAnnotationCapability(
         () => [],
       );
     },
-    toContentBox: (pon, rect) => {
-      const crop = cropOf(pon);
+    toContentBox: (page, rect) => {
+      const crop = cropOf(page.pageObjectNumber);
       return crop ? pdfToContentRect(rect, crop) : null;
     },
 
     // intents
-    editPointer: (phase, pon, point, shift, scale, rotation, zoom, touch) =>
+    editPointer: (phase, page, point, shift, scale, rotation, zoom, touch) =>
       apply({
         t: 'editPointer',
         phase,
         in: {
-          pon,
+          page,
           point,
           shift,
-          pageBox: pageBoxOf(pon),
+          pageBox: pageBoxOf(page.pageObjectNumber),
           // Touch grabs with the same widened zones the claim used, so the
           // gesture picks up exactly what claimsTouchAt said it would.
           chrome: chromeGeomAt(scale, grabBoost(touch)),
-          inert: inertIdsAt(pon),
+          inert: inertIdsAt(page.pageObjectNumber),
           // the view env (screen-anchored bodies hit/clamp at their footprint)
           ...(zoom != null ? { zoom } : {}),
           ...(rotation != null ? { displayRotation: rotation } : {}),
         },
       }),
-    marqueePointer: (phase, pon, point, shift, scale, rotation, zoom) =>
+    marqueePointer: (phase, page, point, shift, scale, rotation, zoom) =>
       apply({
         t: 'marqueePointer',
         phase,
         in: {
-          pon,
+          page,
           point,
           shift,
-          pageBox: pageBoxOf(pon),
-          inert: inertIdsAt(pon),
+          pageBox: pageBoxOf(page.pageObjectNumber),
+          inert: inertIdsAt(page.pageObjectNumber),
           ...(zoom != null ? { zoom } : {}),
           ...(rotation != null ? { displayRotation: rotation } : {}),
         },
       }),
-    createPointer: (tool, phase, pon, point, finish = false, displayRotation) => {
+    createPointer: (tool, phase, page, point, finish = false, displayRotation) => {
+      const pon = page.pageObjectNumber;
       // No create authority → creation gestures are inert: no ghost, no
       // draft, no doomed 403. The engine enforces; this keeps pixels honest.
       const t = registry.get(tool);
@@ -2218,7 +2244,7 @@ export function createAnnotationCapability(
       const draft = model().draft;
       const continuingMeasurement =
         (draft?.g === 'create-distance' || draft?.g === 'create-poly') &&
-        draft.pon === pon &&
+        draft.page.pageObjectNumber === pon &&
         draft.preset === (t?.preset ?? tool);
       const dimension = t && isDimension(t);
       if (dimension && phase === 'down' && !continuingMeasurement && (!crop || !cache?.viewports)) {
@@ -2273,7 +2299,7 @@ export function createAnnotationCapability(
         deferInkCommit: (t?.ink?.groupStrokesMs ?? 0) > 0,
         straightenInk: t?.ink?.straighten,
         in: {
-          pon,
+          page,
           point,
           shift: false,
           finish,
@@ -2296,13 +2322,13 @@ export function createAnnotationCapability(
       if (!selection || !selection.hasSelection()) return false;
       const snapshot = selection.snapshot();
       let created = false;
-      for (const page of snapshot.pages) {
-        if (!page.segments.length) continue;
+      for (const entry of snapshot.pages) {
+        if (!entry.segments.length) continue;
         apply({
           t: 'createMarkup',
           subtype,
-          pon: page.pon,
-          quads: page.segments.map((s) => s.quad),
+          page: entry.page,
+          quads: entry.segments.map((s) => s.quad),
           preset,
           flags: preset ? registry.get(preset)?.flags : undefined,
         });
@@ -2311,26 +2337,26 @@ export function createAnnotationCapability(
       if (created) selection.clear();
       return created;
     },
-    createMarkup: (subtype, pon, quads, preset) => {
+    createMarkup: (subtype, page, quads, preset) => {
       // Optimistic create — the same self-refusal `createPointer` has.
       if (!allowsCreate()) return;
       // A markup tool's `/F` seed rides along (the preset IS the tool id).
       apply({
         t: 'createMarkup',
         subtype,
-        pon,
+        page,
         quads,
         preset,
         flags: preset ? registry.get(preset)?.flags : undefined,
       });
     },
-    createCaret: (pon, anchor) => {
+    createCaret: (page, anchor) => {
       if (!allowsCreate()) return;
-      apply({ t: 'createCaret', pon, anchor });
+      apply({ t: 'createCaret', page, anchor });
     },
-    createReplaceText: (pon, quads, anchor, preset) => {
+    createReplaceText: (page, quads, anchor, preset) => {
       if (!allowsCreate()) return;
-      apply({ t: 'createReplaceText', pon, quads, anchor, preset });
+      apply({ t: 'createReplaceText', page, quads, anchor, preset });
     },
     previewMarkup: (subtype, quadsByPage, preset) =>
       apply({ t: 'setMarkupPreview', subtype, quadsByPage, preset }),
@@ -2378,8 +2404,8 @@ export function createAnnotationCapability(
       const m = model();
       const members = selectedCommitted();
       if (members.length < 2) return;
-      const pon = members[0].pon;
-      if (members.some((a) => a.pon !== pon)) return; // groups are page-local
+      const pon = members[0].page.pageObjectNumber;
+      if (members.some((a) => a.page.pageObjectNumber !== pon)) return; // groups are page-local
       const ordered = [...members].sort((a, b) => m.order.indexOf(a.id) - m.order.indexOf(b.id));
       const [primary, ...rest] = ordered;
       if (!primary.ref) return;
@@ -2400,7 +2426,8 @@ export function createAnnotationCapability(
       const m = model();
       const members = selectedCommitted();
       if (members.length < 2) return false;
-      if (members.some((a) => a.pon !== members[0].pon)) return false;
+      if (members.some((a) => a.page.pageObjectNumber !== members[0].page.pageObjectNumber))
+        return false;
       // Grouping WRITES a relationship onto every member — each must
       // pass the per-record update check.
       if (!members.every((a) => a.ref != null && allowsMutation('update', a.ref))) return false;
@@ -2425,7 +2452,7 @@ export function createAnnotationCapability(
     // that call it on mount; appearance fetching stays per-page/viewport.
     ensurePage: () => {},
 
-    reloadPage: (pon) => reloadPageNow(pon),
+    reloadPage: (page) => reloadPageNow(page.pageObjectNumber),
 
     hydration: () => ctx.getState().hydration,
     ensureHydrated: () => {
@@ -2443,14 +2470,15 @@ export function createAnnotationCapability(
     },
 
     // ── free-text (the editable-element layer) ──
-    textItems: (pon, view) => memoTexts(pon, view),
+    textItems: (page, view) => memoTexts(page, view),
     currentEditing: () => model().editing,
     beginTextEdit: (ref) => apply({ t: 'beginTextEdit', id: refKey(ref) }),
-    beginTextEditAt: (pon, point, scale, rotation, zoom) => {
+    beginTextEditAt: (page, point, scale, rotation, zoom) => {
+      const pon = page.pageObjectNumber;
       const m = model();
       const h = hitTest(
         m,
-        pon,
+        page,
         point,
         chromeGeomAt(scale),
         m.hitMargin,
@@ -2524,13 +2552,13 @@ export function createAnnotationCapability(
           continue;
         }
         const loaded = model().byId[`obj:${entry.annotObjectNumber}`];
-        const pon = loaded?.pon ?? entry.pageObjectNumber;
+        const pon = loaded?.page.pageObjectNumber ?? entry.page?.pageObjectNumber;
         let ref = loaded?.ref ?? null;
         let subtype: string | undefined = loaded?.subtype;
         if ((!ref || !subtype) && pon !== undefined) {
           // Engine fallback for pages the model hasn't loaded.
           try {
-            const { annotations } = await doc.page(pon).annotations.list();
+            const { annotations } = await doc.page(toPageRef(pon)).annotations.list();
             const dto = annotations.find(
               (candidate) =>
                 candidate.ref.kind === 'objectNumber' &&
@@ -2562,7 +2590,7 @@ export function createAnnotationCapability(
           continue;
         }
         try {
-          await doc.page(pon).annotations.update(ref, patch as never);
+          await doc.page(toPageRef(pon)).annotations.update(ref, patch as never);
           touchedPons.add(pon);
           results.push({ annotObjectNumber: entry.annotObjectNumber, status: 'applied' });
         } catch (error) {

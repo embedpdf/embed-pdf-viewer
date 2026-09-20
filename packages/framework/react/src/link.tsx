@@ -106,7 +106,7 @@ export function LinkLayer({ renderLink }: LinkLayerProps = {}) {
   // sides submit synchronously in DOM event order.
   const actions = useOptionalCapability(ActionsToken);
   const linkPump = useMemo(() => (actions ? createHoverPump(actions.dispatch) : null), [actions]);
-  const items = useSelector(LinkToken, (c) => c.linksOn(page.pon), shallowArray);
+  const items = useSelector(LinkToken, (c) => c.linksOn(page.ref), shallowArray);
   const engaged = useSelector(LinkToken, (c) => c.engaged());
   // One owner per pixel: an ATTACHED link is a property of its parent — while
   // the active tool can edit annotations, the parent owns those pixels and
@@ -119,8 +119,8 @@ export function LinkLayer({ renderLink }: LinkLayerProps = {}) {
   );
 
   useEffect(() => {
-    link.ensurePage(page.pon);
-  }, [link, page.pon]);
+    link.ensurePage(page.ref);
+  }, [link, page.ref]);
 
   // An authoring tool is active → the annotation plane owns links (they're
   // plain editable rects there); no nav anchors, no swallowed pointer events.
@@ -139,9 +139,13 @@ export function LinkLayer({ renderLink }: LinkLayerProps = {}) {
         const chained = (item.activate?.root?.next.length ?? 0) > 0;
         const href =
           item.target.kind === 'uri' && !chained ? sanitizeExternalUri(item.target.uri) : null;
-        const context: LinkActivateContext = { activate: item.activate, ref: item.ref, pon: page.pon };
+        const context: LinkActivateContext = {
+          activate: item.activate,
+          ref: item.ref,
+          page: page.ref,
+        };
         const linkSource: ActionSource | null = item.ref
-          ? { kind: 'link', annotation: item.ref, pon: page.pon }
+          ? { kind: 'link', annotation: item.ref, page: page.ref }
           : null;
         const notify = (event: Exclude<PdfAnnotationEventKind, 'cursorEnter' | 'cursorExit'>) => {
           if (!actions || !item.ref || !linkSource) return;
@@ -149,7 +153,7 @@ export function LinkLayer({ renderLink }: LinkLayerProps = {}) {
             scope: 'annotation',
             event,
             ref: item.ref,
-            pon: page.pon,
+            page: page.ref,
             source: linkSource,
           });
         };
@@ -186,7 +190,7 @@ export function LinkLayer({ renderLink }: LinkLayerProps = {}) {
               if (!linkPump || !item.ref || !item.hoverEvents) return;
               linkPump.hover({
                 ref: item.ref,
-                pon: page.pon,
+                page: page.ref,
                 ...(linkSource ? { source: linkSource } : {}),
                 events: item.hoverEvents,
               });

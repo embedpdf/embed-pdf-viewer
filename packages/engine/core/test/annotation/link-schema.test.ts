@@ -17,17 +17,22 @@ describe('link kind schemas', () => {
     expect(
       PdfDestinationSchema.safeParse({
         kind: 'xyz',
-        pageObjectNumber: 12,
+        page: { kind: 'objectNumber', pageObjectNumber: 12 },
         left: null,
         top: 640,
         zoom: null,
       }).success,
     ).toBe(true);
-    expect(PdfDestinationSchema.safeParse({ kind: 'fit', pageObjectNumber: 3 }).success).toBe(true);
+    expect(
+      PdfDestinationSchema.safeParse({
+        kind: 'fit',
+        page: { kind: 'objectNumber', pageObjectNumber: 3 },
+      }).success,
+    ).toBe(true);
     expect(
       PdfDestinationSchema.safeParse({
         kind: 'fitR',
-        pageObjectNumber: 3,
+        page: { kind: 'objectNumber', pageObjectNumber: 3 },
         left: 0,
         bottom: 0,
         right: 200,
@@ -35,14 +40,20 @@ describe('link kind schemas', () => {
       }).success,
     ).toBe(true);
     // fitR without the full rect is malformed.
-    expect(PdfDestinationSchema.safeParse({ kind: 'fitR', pageObjectNumber: 3 }).success).toBe(
-      false,
-    );
+    expect(
+      PdfDestinationSchema.safeParse({
+        kind: 'fitR',
+        page: { kind: 'objectNumber', pageObjectNumber: 3 },
+      }).success,
+    ).toBe(false);
   });
 
   test('the full target union reads goto-remote/launch/unsupported', () => {
     const arms: PdfLinkTarget[] = [
-      { kind: 'goto', destination: { kind: 'fit', pageObjectNumber: 5 } },
+      {
+        kind: 'goto',
+        destination: { kind: 'fit', page: { kind: 'objectNumber', pageObjectNumber: 5 } },
+      },
       { kind: 'uri', uri: 'https://embedpdf.com' },
       { kind: 'goto-remote', file: 'other.pdf' },
       { kind: 'launch', path: 'app.exe' },
@@ -75,7 +86,11 @@ describe('link kind schemas', () => {
       target: null,
       // v2 parity: a link grouped to another annotation rides the base
       // relationship fields — nothing link-specific.
-      inReplyTo: { kind: 'objectNumber', pageObjectNumber: 4, annotObjectNumber: 77 },
+      inReplyTo: {
+        kind: 'objectNumber',
+        page: { kind: 'objectNumber', pageObjectNumber: 4 },
+        annotObjectNumber: 77,
+      },
       replyType: 'group',
     };
     const parsed = LinkDraftSchema.safeParse(draft);
@@ -97,7 +112,10 @@ describe('link kind schemas', () => {
   test('a patch retargets, clears (null), or leaves (undefined) three-state', () => {
     const retarget: LinkPatch = {
       subtype: 'link',
-      target: { kind: 'goto', destination: { kind: 'xyz', pageObjectNumber: 9, top: 700 } },
+      target: {
+        kind: 'goto',
+        destination: { kind: 'xyz', page: { kind: 'objectNumber', pageObjectNumber: 9 }, top: 700 },
+      },
     };
     const clear: LinkPatch = { subtype: 'link', target: null };
     const leave: LinkPatch = { subtype: 'link', rect: RECT };

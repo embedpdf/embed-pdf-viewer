@@ -2,6 +2,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createStageSurface } from './stage-surface';
 import type { StageSurfaceHost, StageSurfaceHub, StageSurfaceSample } from './stage-surface';
 
+const PAGE_7 = { kind: 'objectNumber', pageObjectNumber: 7 } as const;
+
 // Fake element/window/observers (the repo's fake-DOM pattern — no jsdom): the
 // binding's whole environment is hand-fired, so viewport reporting, DPR
 // re-subscription, sample normalization, and teardown are all assertable.
@@ -62,7 +64,7 @@ function surfaceHarness(opts: { hub?: boolean; source?: string } = {}) {
     doubleTapZoom: vi.fn(),
     setViewport: vi.fn(),
     setDevicePixelRatio: vi.fn(),
-    pageAt: vi.fn((pt: { x: number; y: number }) => ({ pon: 7, point: pt, scale: 1.5 })),
+    pageAt: vi.fn((pt: { x: number; y: number }) => ({ ref: PAGE_7, point: pt, scale: 1.5 })),
     pointOnPage: vi.fn(() => ({ x: 1, y: 2 })),
   } satisfies StageSurfaceHost & Record<string, unknown>;
 
@@ -76,8 +78,8 @@ function surfaceHarness(opts: { hub?: boolean; source?: string } = {}) {
     : null;
 
   const detach = createStageSurface(el, host, { hub, source: opts.source });
-  return { el, elListeners, win, host, hub, dispatched, detach, roCallback, mqListeners,
-    roDisconnectedRef: () => roDisconnected };
+  return { el, elListeners, win, host, hub, dispatched, detach, mqListeners,
+    roCallback: () => roCallback?.(), roDisconnectedRef: () => roDisconnected };
 }
 
 afterEach(() => vi.unstubAllGlobals());
@@ -87,7 +89,7 @@ describe('createStageSurface', () => {
     const h = surfaceHarness();
     expect(h.host.setViewport).toHaveBeenCalledWith({ width: 800, height: 600 });
     (h.el as unknown as { clientWidth: number }).clientWidth = 500;
-    h.roCallback!();
+    h.roCallback();
     expect(h.host.setViewport).toHaveBeenLastCalledWith({ width: 500, height: 600 });
   });
 
@@ -111,10 +113,10 @@ describe('createStageSurface', () => {
     const s = h.dispatched[0];
     expect(s.phase).toBe('down');
     expect(s.viewport).toEqual({ x: 100, y: 200 }); // rect-relative
-    expect(s.page).toEqual({ pon: 7, point: { x: 100, y: 200 }, scale: 1.5 });
+    expect(s.page).toEqual({ ref: PAGE_7, point: { x: 100, y: 200 }, scale: 1.5 });
     expect(s.source).toBe('stage-main'); // the lens identity rides every sample
     expect(s.pointerType).toBe('mouse');
-    expect(s.project(7)).toEqual({ x: 1, y: 2 }); // frame-stable projection
+    expect(s.project(PAGE_7)).toEqual({ x: 1, y: 2 }); // frame-stable projection
   });
 
   it('omits the source when none is configured (single-lens embeds)', () => {

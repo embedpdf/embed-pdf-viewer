@@ -7,6 +7,7 @@ import {
   type PieceInfoPatch,
   type PieceInfoService,
   type PieceInfoSnapshot,
+  type PageRef,
 } from '@embedpdf/engine-core/runtime';
 
 import type { ScopeGuard } from '../scope';
@@ -20,7 +21,7 @@ interface DocClosedView {
 
 /**
  * `/PieceInfo` access for the local engine. ONE class serves both levels —
- * `pageObjectNumber` undefined targets the document catalog, set targets a
+ * `page` undefined targets the document catalog, set targets a
  * page — mirroring the wire protocol's single job family.
  *
  * Authorization: reads ride `doc.open` (session-level read, like
@@ -35,17 +36,17 @@ export class LocalPieceInfoService implements PieceInfoService {
     private readonly queue: WorkerQueue,
     private readonly view: DocClosedView,
     private readonly guard: ScopeGuard,
-    private readonly pageObjectNumber?: PageObjectNumber,
+    private readonly page?: PageRef,
   ) {}
 
   read(application: string): AbortablePromise<PieceInfoSnapshot | null> {
     const rejected = this.gate('doc.open');
     if (rejected) return rejected as AbortablePromise<PieceInfoSnapshot | null>;
-    const { docId, pageObjectNumber } = this;
+    const { docId, page } = this;
     const submission = this.queue.enqueue<WorkerResultPayload>(
       {
         buildPack: (jobId: JobId) =>
-          wirePack({ kind: 'pieceInfo.read', jobId, docId, pageObjectNumber, application }),
+          wirePack({ kind: 'pieceInfo.read', jobId, docId, page, application }),
       },
       { priority: Priority.MEDIUM },
     );
@@ -61,7 +62,7 @@ export class LocalPieceInfoService implements PieceInfoService {
   update(application: string, patch: PieceInfoPatch): AbortablePromise<void> {
     const rejected = this.gate('doc.metadata.modify');
     if (rejected) return rejected as AbortablePromise<void>;
-    const { docId, pageObjectNumber } = this;
+    const { docId, page } = this;
     const submission = this.queue.enqueue<WorkerResultPayload>(
       {
         buildPack: (jobId: JobId) =>
@@ -69,7 +70,7 @@ export class LocalPieceInfoService implements PieceInfoService {
             kind: 'pieceInfo.update',
             jobId,
             docId,
-            pageObjectNumber,
+            page,
             application,
             patch,
           }),
@@ -87,11 +88,11 @@ export class LocalPieceInfoService implements PieceInfoService {
   applications(): AbortablePromise<string[]> {
     const rejected = this.gate('doc.open');
     if (rejected) return rejected as AbortablePromise<string[]>;
-    const { docId, pageObjectNumber } = this;
+    const { docId, page } = this;
     const submission = this.queue.enqueue<WorkerResultPayload>(
       {
         buildPack: (jobId: JobId) =>
-          wirePack({ kind: 'pieceInfo.applications', jobId, docId, pageObjectNumber }),
+          wirePack({ kind: 'pieceInfo.applications', jobId, docId, page }),
       },
       { priority: Priority.MEDIUM },
     );
@@ -107,11 +108,11 @@ export class LocalPieceInfoService implements PieceInfoService {
   clear(application: string): AbortablePromise<void> {
     const rejected = this.gate('doc.metadata.modify');
     if (rejected) return rejected as AbortablePromise<void>;
-    const { docId, pageObjectNumber } = this;
+    const { docId, page } = this;
     const submission = this.queue.enqueue<WorkerResultPayload>(
       {
         buildPack: (jobId: JobId) =>
-          wirePack({ kind: 'pieceInfo.clear', jobId, docId, pageObjectNumber, application }),
+          wirePack({ kind: 'pieceInfo.clear', jobId, docId, page, application }),
       },
       { priority: Priority.HIGH },
     );

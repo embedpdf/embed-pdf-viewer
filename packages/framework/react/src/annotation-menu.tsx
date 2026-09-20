@@ -43,7 +43,7 @@ export function AnnotationMenu({ children, gap = 15, placement = 'top' }: Annota
     (c) => {
       const a = c.selectionAnchor();
       if (!a) return null;
-      const env = projector.viewEnv(a.pon);
+      const env = projector.viewEnv(a.page);
       return env ? c.selectionAnchor(env.scale, env.rotation, env.zoom) : a;
     },
     sameAnchor,
@@ -52,7 +52,7 @@ export function AnnotationMenu({ children, gap = 15, placement = 'top' }: Annota
   return (
     <Anchored
       anchor={{
-        pon: anchor.pon,
+        page: anchor.page,
         bounds: anchor.bounds,
         ...(anchor.knob ? { avoid: [anchor.knob] } : {}),
       }}

@@ -27,6 +27,7 @@ import {
   type CollabTarget,
   type PageAnnotationsService,
   type PageObjectNumber,
+  type PageRef,
 } from '@embedpdf/engine-core/runtime';
 import type { SessionEventPublisher } from '@embedpdf/engine-services';
 
@@ -54,7 +55,7 @@ interface DocClosedView {
 export class LocalPageAnnotationsService implements PageAnnotationsService {
   constructor(
     private readonly docId: string,
-    private readonly pageObjectNumber: PageObjectNumber,
+    private readonly ref: PageRef,
     private readonly queue: WorkerQueue,
     private readonly view: DocClosedView,
     private readonly encoder: LocalImageEncoder,
@@ -77,7 +78,7 @@ export class LocalPageAnnotationsService implements PageAnnotationsService {
       return AbortablePromise.rejectReason(err);
     }
     const docId = this.docId;
-    const pon = this.pageObjectNumber;
+    const ref = this.ref;
     const submission = this.queue.enqueue<WorkerResultPayload>(
       {
         buildPack: (jobId: JobId) =>
@@ -85,7 +86,7 @@ export class LocalPageAnnotationsService implements PageAnnotationsService {
             kind: 'annotations.listFullPage',
             jobId,
             docId,
-            pageObjectNumber: pon,
+            page: ref,
           }),
       },
       { priority: Priority.MEDIUM },
@@ -117,7 +118,7 @@ export class LocalPageAnnotationsService implements PageAnnotationsService {
       return AbortablePromise.rejectReason(err);
     }
     const docId = this.docId;
-    const pon = this.pageObjectNumber;
+    const page = this.ref;
     const submission = this.queue.enqueue<WorkerResultPayload>(
       {
         buildPack: (jobId: JobId) =>
@@ -125,7 +126,7 @@ export class LocalPageAnnotationsService implements PageAnnotationsService {
             kind: 'annotations.readFile',
             jobId,
             docId,
-            pageObjectNumber: pon,
+            page,
             ref,
           }),
       },
@@ -176,7 +177,7 @@ export class LocalPageAnnotationsService implements PageAnnotationsService {
     }
     const effectiveOptions = withAppearanceBudget(this.policy, options);
     const docId = this.docId;
-    const pon = this.pageObjectNumber;
+    const ref = this.ref;
     const submission = this.queue.enqueue<WorkerResultPayload>(
       {
         buildPack: (jobId: JobId) =>
@@ -184,7 +185,7 @@ export class LocalPageAnnotationsService implements PageAnnotationsService {
             kind: 'annotations.renderAppearances',
             jobId,
             docId,
-            pageObjectNumber: pon,
+            page: ref,
             ...(effectiveOptions ? { options: effectiveOptions } : {}),
           }),
       },
@@ -264,7 +265,7 @@ export class LocalPageAnnotationsService implements PageAnnotationsService {
     const actor = this.guard.actorForCreate();
 
     const docId = this.docId;
-    const pon = this.pageObjectNumber;
+    const ref = this.ref;
     return AbortablePromise.run<AnnotationCreateResult>(async (signal) => {
       // Split inline BinarySource fields (stamp images, …) into the wire
       // draft + resource buffers. Async because Blob bytes resolve async.
@@ -282,7 +283,7 @@ export class LocalPageAnnotationsService implements PageAnnotationsService {
                 kind: 'annotations.create',
                 jobId,
                 docId,
-                pageObjectNumber: pon,
+                page: ref,
                 draft: wire,
                 ...(resourceBuffers.length > 0 ? { resources } : {}),
                 ...(actor ? { actor } : {}),
@@ -301,7 +302,7 @@ export class LocalPageAnnotationsService implements PageAnnotationsService {
       }
       this.publisher.publishLocal({
         type: 'annotation.created',
-        pageObjectNumber: pon,
+        page: this.ref,
         ...payload.result,
       });
       return payload.result;
@@ -364,7 +365,7 @@ export class LocalPageAnnotationsService implements PageAnnotationsService {
       }
       this.publisher.publishLocal({
         type: 'annotation.updated',
-        pageObjectNumber: this.pageObjectNumber,
+        page: this.ref,
         ...payload.result,
       });
       return payload.result;
@@ -403,7 +404,7 @@ export class LocalPageAnnotationsService implements PageAnnotationsService {
       }
       this.publisher.publishLocal({
         type: 'annotation.deleted',
-        pageObjectNumber: this.pageObjectNumber,
+        page: this.ref,
         ...payload.result,
       });
       return payload.result;
@@ -425,7 +426,7 @@ export class LocalPageAnnotationsService implements PageAnnotationsService {
       return AbortablePromise.rejectReason(err);
     }
     const docId = this.docId;
-    const pon = this.pageObjectNumber;
+    const ref = this.ref;
     const submission = this.queue.enqueue<WorkerResultPayload>(
       {
         buildPack: (jobId: JobId) =>
@@ -433,7 +434,7 @@ export class LocalPageAnnotationsService implements PageAnnotationsService {
             kind: 'annotations.move',
             jobId,
             docId,
-            pageObjectNumber: pon,
+            page: ref,
             refs,
             toIndex,
           }),
@@ -450,7 +451,7 @@ export class LocalPageAnnotationsService implements PageAnnotationsService {
       }
       this.publisher.publishLocal({
         type: 'annotation.moved',
-        pageObjectNumber: pon,
+        page: this.ref,
         ...payload.result,
       });
       return payload.result;
@@ -475,7 +476,7 @@ export class LocalPageAnnotationsService implements PageAnnotationsService {
       return AbortablePromise.rejectReason(err);
     }
     const docId = this.docId;
-    const pon = this.pageObjectNumber;
+    const ref = this.ref;
     const submission = this.queue.enqueue<WorkerResultPayload>(
       {
         buildPack: (jobId: JobId) =>
@@ -483,7 +484,7 @@ export class LocalPageAnnotationsService implements PageAnnotationsService {
             kind: 'annotations.flatten',
             jobId,
             docId,
-            pageObjectNumber: pon,
+            page: ref,
             refs,
             usage,
           }),
@@ -519,7 +520,7 @@ export class LocalPageAnnotationsService implements PageAnnotationsService {
       return AbortablePromise.rejectReason(err);
     }
     const docId = this.docId;
-    const pon = this.pageObjectNumber;
+    const ref = this.ref;
     const submission = this.queue.enqueue<WorkerResultPayload>(
       {
         buildPack: (jobId: JobId) =>
@@ -527,7 +528,7 @@ export class LocalPageAnnotationsService implements PageAnnotationsService {
             kind: 'annotations.exportAppearance',
             jobId,
             docId,
-            pageObjectNumber: pon,
+            page: ref,
             refs,
           }),
       },
@@ -562,7 +563,7 @@ export class LocalPageAnnotationsService implements PageAnnotationsService {
             kind: 'annotations.listFullPage',
             jobId,
             docId: this.docId,
-            pageObjectNumber: ref.pageObjectNumber,
+            page: ref.page,
           }),
       },
       { priority: Priority.MEDIUM },

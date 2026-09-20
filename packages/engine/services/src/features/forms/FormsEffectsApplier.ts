@@ -438,12 +438,12 @@ function widgetRefs(
   return [...new Set(objectNumbers)]
     .map((objectNumber) => byObjectNumber.get(objectNumber))
     .filter((widget): widget is FormWidgetRef => widget !== undefined)
-    .map(({ annotObjectNumber, pageObjectNumber }) => ({ annotObjectNumber, pageObjectNumber }));
+    .map(({ annotObjectNumber, page }) => ({ annotObjectNumber, page }));
 }
 
 function rememberWidgets(target: Map<string, FormWidgetRef>, widgets: FormWidgetRef[]): void {
   for (const widget of widgets) {
-    target.set(`${widget.pageObjectNumber}:${widget.annotObjectNumber}`, widget);
+    target.set(`${widget.page?.pageObjectNumber ?? 0}:${widget.annotObjectNumber}`, widget);
   }
 }
 

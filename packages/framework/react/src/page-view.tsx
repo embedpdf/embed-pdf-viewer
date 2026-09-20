@@ -11,6 +11,7 @@
  */
 import * as React from 'react';
 import { useId, useMemo, useRef } from 'react';
+import { pageRefsEqual, toPageRef } from '@embedpdf/core';
 import { NO_FRAME, pageTransform, type PageFrame } from '@embedpdf/core-geometry';
 import { observeClientGeometry } from '@embedpdf/web';
 import { ProjectorProvider, type ProjectorBinding, type ViewProjector } from './anchored';
@@ -54,7 +55,13 @@ export function PageView({
   const docId = documentId ?? active;
   const meta = docId ? kernel.getState().core.documents[docId] : undefined;
   const base = meta?.pages[page];
-  const pon = base?.pageObjectNumber ?? page + 1;
+  // The page's address is the kernel's (`PageLayout.ref`); a placeholder
+  // (object number = 1-based index) only until the layout is known — the
+  // surface renders nothing before that anyway. Memoized by the number so the
+  // context's `ref` stays identity-stable across re-renders (layers key
+  // effects on it).
+  const pon = base?.ref.pageObjectNumber ?? page + 1;
+  const pageRef = useMemo(() => toPageRef(pon), [pon]);
   const rotation = base?.rotation ?? 0;
   const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
   // Standalone (no Stage/camera): build the page's transform from the target
@@ -83,13 +90,13 @@ export function PageView({
       makePageContext(
         docId ?? '',
         `page-view:${viewId}`,
-        pon,
+        pageRef,
         page,
         pageFrame,
         transform,
         () => ref.current!.getBoundingClientRect(),
       ),
-    [docId, pon, page, pageFrame, transform, viewId],
+    [docId, pageRef, page, pageFrame, transform, viewId],
   );
   // The PageView's ViewProjector: no camera, so anchored UI positions by
   // MEASURING the DOM (client space → portal + position:fixed, immune to
@@ -102,10 +109,12 @@ export function PageView({
   const projector = useMemo<ViewProjector>(
     () => ({
       space: 'client',
-      toScreen: (p, rect) => (p === ctx.pon && ref.current ? ctx.toClientRect(rect) : null),
-      toScreenPoint: (p, at) => (p === ctx.pon && ref.current ? ctx.toClientPoint(at) : null),
+      toScreen: (p, rect) =>
+        pageRefsEqual(p, ctx.ref) && ref.current ? ctx.toClientRect(rect) : null,
+      toScreenPoint: (p, at) =>
+        pageRefsEqual(p, ctx.ref) && ref.current ? ctx.toClientPoint(at) : null,
       viewEnv: (p) =>
-        p === ctx.pon
+        pageRefsEqual(p, ctx.ref)
           ? {
               scale: ctx.transform.viewScale,
               rotation: ctx.transform.rotation,

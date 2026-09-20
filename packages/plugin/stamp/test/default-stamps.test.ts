@@ -8,7 +8,7 @@ import { readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import type { DocumentHandle, Engine } from '@embedpdf/engine-core/runtime';
+import type { DocumentHandle, Engine, PageRef } from '@embedpdf/engine-core/runtime';
 import type { PluginContext } from '@embedpdf/core';
 import { createLocalEngine } from '@embedpdf/engine';
 import { LOCALES as SHIPPED, loadDefaultLibrary } from '@embedpdf/default-stamps/library';
@@ -250,8 +250,8 @@ function nodeAssetEngine(engine: Engine): Engine {
       return new Proxy(doc, {
         get(targetDoc, property) {
           if (property !== 'page') return bindAll(targetDoc, property);
-          return (pageObjectNumber: number) => {
-            const page = targetDoc.page(pageObjectNumber);
+          return (ref: PageRef) => {
+            const page = targetDoc.page(ref);
             return new Proxy(page, {
               get(targetPage, pageProperty) {
                 if (pageProperty !== 'render') return bindAll(targetPage, pageProperty);
@@ -340,7 +340,7 @@ describe('@embedpdf/default-stamps', () => {
           expect(page).toBeDefined();
           expect(layout.namedPages).toContainEqual({
             name: `${entry.name}=${entry.subject}`,
-            target: { kind: 'page', pageObjectNumber: page!.pageObjectNumber },
+            target: { kind: 'page', page: page!.ref },
           });
         }
       } finally {
@@ -362,7 +362,7 @@ describe('@embedpdf/default-stamps', () => {
         true,
       );
       // Page order == registry order: the n-th asset is the n-th page.
-      const pons = assets.map((asset) => asset.pageObjectNumber);
+      const pons = assets.map((asset) => asset.page.pageObjectNumber);
       expect([...new Set(pons)]).toHaveLength(pons.length);
       for (const asset of assets) {
         expect(asset.size.width).toBeGreaterThan(0);

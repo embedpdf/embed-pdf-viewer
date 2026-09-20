@@ -1,8 +1,8 @@
-import type { PageObjectNumber } from '../identity/PageObjectNumber';
+import type { PageRef } from '../identity/PageRef';
 
 /**
  * Opaque token a client must hand back when addressing an annotation by
- * `(pageObjectNumber, index)`. The engine validates strict equality against
+ * `(page, index)`. The engine validates strict equality against
  * its own `RevisionStore`; mismatches throw `EngineError(InvalidReference)`.
  *
  * Bleed-over prevention: `docSessionId` ties a token to one open session,
@@ -10,14 +10,14 @@ import type { PageObjectNumber } from '../identity/PageObjectNumber';
  */
 export interface RevisionToken {
   docSessionId: string;
-  pageObjectNumber: PageObjectNumber;
+  page: PageRef;
   generation: number;
 }
 
 export function revisionTokensEqual(a: RevisionToken, b: RevisionToken): boolean {
   return (
     a.docSessionId === b.docSessionId &&
-    a.pageObjectNumber === b.pageObjectNumber &&
+    a.page.pageObjectNumber === b.page.pageObjectNumber &&
     a.generation === b.generation
   );
 }

@@ -1,5 +1,12 @@
-import type { PageObjectNumber, PluginContext } from '@embedpdf/core';
-import { type PointIn, type TextQuad, applyPoint, boundsOfRects, pageGeometry, textQuadBounds } from '@embedpdf/core-geometry';
+import type { PageObjectNumber, PageRef, PluginContext } from '@embedpdf/core';
+import {
+  type PointIn,
+  type TextQuad,
+  applyPoint,
+  boundsOfRects,
+  pageGeometry,
+  textQuadBounds,
+} from '@embedpdf/core-geometry';
 import { StageToken } from '@embedpdf/plugin-stage/contract';
 import { EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
 import type {
@@ -64,7 +71,7 @@ export function createSearchCapability(
     const converterFor = (pon: PageObjectNumber): PageConverter | null => {
       let conv = converters.get(pon);
       if (conv !== undefined) return conv;
-      const layout = ctx.document()?.pages.find((p) => p.pageObjectNumber === pon);
+      const layout = ctx.document()?.pages.find((p) => p.ref.pageObjectNumber === pon);
       if (!layout) {
         conv = null; // page vanished mid-search (delete); drop its hits
       } else {
@@ -93,7 +100,7 @@ export function createSearchCapability(
 
     const hits: SearchHit[] = [];
     for (const match of slice.matches) {
-      const conv = converterFor(match.pageObjectNumber);
+      const conv = converterFor(match.page.pageObjectNumber);
       if (!conv) continue;
       const segments = match.segments.map((segment) => {
         const quad = conv.toQuad(segment.quad);
@@ -101,7 +108,7 @@ export function createSearchCapability(
         return { quad, rect: textQuadBounds(quad), advance: segment.advance };
       });
       hits.push({
-        pon: match.pageObjectNumber,
+        page: match.page,
         pageIndex: conv.pageIndex,
         charStart: match.charStart,
         charCount: match.charCount,
@@ -137,7 +144,7 @@ export function createSearchCapability(
    */
   async function collect(
     query: SearchQuery,
-    opts: { startPage?: PageObjectNumber; mode?: SearchMode },
+    opts: { startPage?: PageRef; mode?: SearchMode },
     sink: CollectSink,
   ): Promise<boolean> {
     const doc = ctx.doc;
@@ -194,7 +201,7 @@ export function createSearchCapability(
   }
 
   /** THE SESSION — collect() with state as the sink, generation-guarded. */
-  async function runSession(query: SearchQuery, startPage?: PageObjectNumber): Promise<void> {
+  async function runSession(query: SearchQuery, startPage?: PageRef): Promise<void> {
     const gen = ++generation;
     inflight?.abort('superseded');
     inflight = null;
@@ -207,7 +214,7 @@ export function createSearchCapability(
     // Viewport-first: begin scanning where the user is looking.
     if (startPage === undefined) {
       const stage = ctx.tryGet(StageToken);
-      if (stage) startPage = ctx.document()?.pages[stage.currentPage()]?.pageObjectNumber;
+      if (stage) startPage = ctx.document()?.pages[stage.currentPage()]?.ref;
     }
 
     try {
@@ -324,9 +331,9 @@ export function createSearchCapability(
       const { hits, activeIndex } = ctx.getState();
       return activeIndex >= 0 && activeIndex < hits.length ? hits[activeIndex] : null;
     },
-    hitsForPage: (pon) => {
+    hitsForPage: (page) => {
       const { hits, hitsByPage } = ctx.getState();
-      const indices = hitsByPage[pon];
+      const indices = hitsByPage[page.pageObjectNumber];
       return indices?.length ? indices.map((i) => hits[i]) : EMPTY;
     },
     progress: () => ctx.getState().progress,

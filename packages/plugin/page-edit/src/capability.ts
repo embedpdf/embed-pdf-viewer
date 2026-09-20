@@ -1,10 +1,4 @@
-import type {
-  PluginContext,
-  PageObjectNumber,
-  PageRotation,
-  DocCapability,
-  PdfSize,
-} from '@embedpdf/core';
+import type { PluginContext, PageRef, PageRotation, DocCapability, PdfSize } from '@embedpdf/core';
 import type { PageEditCapability, PagePlacement } from './types';
 
 /**
@@ -31,9 +25,10 @@ export function createPageEditCapability(ctx: PluginContext<unknown>): PageEditC
   };
 
   /** Current absolute rotation of a page from the registry; 0 if unknown. */
-  const rotationOf = (pon: PageObjectNumber): PageRotation => {
-    const page = ctx.document()?.pages.find((p) => p.pageObjectNumber === pon);
-    return page?.rotation ?? 0;
+  const rotationOf = (page: PageRef): PageRotation => {
+    const pon = page.pageObjectNumber;
+    const entry = ctx.document()?.pages.find((p) => p.ref.pageObjectNumber === pon);
+    return entry?.rotation ?? 0;
   };
 
   /**
@@ -45,8 +40,8 @@ export function createPageEditCapability(ctx: PluginContext<unknown>): PageEditC
   const resolvePlacement = (placement?: PagePlacement) => {
     if (!placement) return { destIndex: undefined, anchor: undefined };
     if ('index' in placement) return { destIndex: placement.index, anchor: undefined };
-    const pon = 'after' in placement ? placement.after : placement.before;
-    const anchor = ctx.document()?.pages.find((p) => p.pageObjectNumber === pon);
+    const pon = ('after' in placement ? placement.after : placement.before).pageObjectNumber;
+    const anchor = ctx.document()?.pages.find((p) => p.ref.pageObjectNumber === pon);
     if (!anchor) throw new Error(`[page-edit] placement page not found: ${pon}`);
     return { destIndex: 'after' in placement ? anchor.index + 1 : anchor.index, anchor };
   };
@@ -72,22 +67,22 @@ export function createPageEditCapability(ctx: PluginContext<unknown>): PageEditC
       return ctx.doc?.security.allows(ASSEMBLE_CAPABILITY) ?? false;
     },
 
-    rotateBy(pon, delta) {
+    rotateBy(page, delta) {
       // Wrap to [0, 360) — the double-mod keeps -90 from current 0 landing on 270.
-      const next = ((((rotationOf(pon) + delta) % 360) + 360) % 360) as PageRotation;
-      return requireDoc().pages.rotate([pon], next);
+      const next = ((((rotationOf(page) + delta) % 360) + 360) % 360) as PageRotation;
+      return requireDoc().pages.rotate([page], next);
     },
 
-    setRotation(pons, rotation) {
-      return requireDoc().pages.rotate(pons, rotation);
+    setRotation(pages, rotation) {
+      return requireDoc().pages.rotate([...pages], rotation);
     },
 
-    move(pons, destIndex) {
-      return requireDoc().pages.move(pons, destIndex);
+    move(pages, destIndex) {
+      return requireDoc().pages.move([...pages], destIndex);
     },
 
-    delete(pons) {
-      return requireDoc().pages.delete(pons);
+    delete(pages) {
+      return requireDoc().pages.delete([...pages]);
     },
 
     addBlank(opts = {}) {

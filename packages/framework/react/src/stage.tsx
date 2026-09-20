@@ -12,6 +12,7 @@ import * as React from 'react';
 import { useLayoutEffect, useMemo, useRef } from 'react';
 import { StageToken, createScrollHandler, settingsEqual } from '@embedpdf/plugin-stage';
 import type { StageCapability, VisiblePage } from '@embedpdf/plugin-stage';
+import { toPageRef } from '@embedpdf/core';
 import type { CapabilityToken } from '@embedpdf/core';
 
 /** Which stage lens to bind to. Defaults to the main StageToken — pass a custom
@@ -67,8 +68,13 @@ function PageSurface({
   // like the axis-aligned shadow behind it (no hairline seam).
   const contentLeft = frame.left + (t.viewWidth - t.contentWidth) / 2;
   const contentTop = frame.top + (t.viewHeight - t.contentHeight) / 2;
+  // The page ADDRESS this surface hands its layers. The stage rebuilds
+  // `VisiblePage.ref` every camera frame, so it is memoized by the number:
+  // identity-stable per page, safe for layers to key effects on.
+  const pon = page.ref.pageObjectNumber;
+  const pageRef = useMemo(() => toPageRef(pon), [pon]);
   // The page-view DEMAND is a PULL: the getter closes over
-  // stable references (capability + pon) and reads the stage's live state at
+  // stable references (capability + page address) and reads the stage's live state at
   // call time — visibility is the STAGE's data (`VisiblePage.visibleRect`),
   // not something an adapter re-derives or caches. Absent from the visible
   // set = zero rect ("want nothing"), distinct from PageView's undefined
@@ -80,13 +86,13 @@ function PageSurface({
         // the hosting lens — per-view raster planning keys tile state by it,
         // so a thumbnail rail and the main view never fight over one plan
         stage.lensId(),
-        page.pon,
+        pageRef,
         page.pageIndex,
         frame,
         t,
         () => ref.current!.getBoundingClientRect(),
         () => {
-          const live = stage.visiblePages().find((p) => p.pon === page.pon);
+          const live = stage.visiblePages().find((p) => p.ref.pageObjectNumber === pon);
           return live
             ? { desiredDeviceWidth: live.transform.deviceWidth, visibleRect: live.visibleRect }
             : {
@@ -95,7 +101,7 @@ function PageSurface({
               };
         },
       ),
-    [documentId, page.pon, page.pageIndex, frame, t, stage],
+    [documentId, pageRef, pon, page.pageIndex, frame, t, stage],
   );
   return (
     <div style={{ position: 'absolute', left, top, width: outerW, height: outerH }}>
@@ -235,13 +241,13 @@ export function Stage({
   const projector = useMemo<ViewProjector>(
     () => ({
       space: 'overlay',
-      toScreen: (pon, rect) => stage.pageRectToScreen(pon, rect),
-      toScreenPoint: (pon, at) => {
-        const r = stage.pageRectToScreen(pon, { x: at.x, y: at.y, width: 0, height: 0 });
+      toScreen: (page, rect) => stage.pageRectToScreen(page, rect),
+      toScreenPoint: (page, at) => {
+        const r = stage.pageRectToScreen(page, { x: at.x, y: at.y, width: 0, height: 0 });
         return r ? { x: r.x, y: r.y } : null;
       },
-      viewEnv: (pon) => {
-        const t = stage.pageRect(pon)?.transform;
+      viewEnv: (page) => {
+        const t = stage.pageRect(page)?.transform;
         return t ? { scale: t.viewScale, rotation: t.rotation, zoom: t.zoom } : null;
       },
     }),
@@ -292,7 +298,7 @@ export function Stage({
     >
       {pages.map((p) => (
         <PageSurface
-          key={p.pon} // durable page identity — survives move/delete (matches Angular's `track p.pon`)
+          key={p.ref.pageObjectNumber} // durable page identity — survives move/delete (matches Angular's `track p.ref.pageObjectNumber`)
           documentId={docId ?? ''}
           page={p}
           frame={frame}
@@ -370,7 +376,10 @@ export function usePageList(token: StageTokenProp = StageToken) {
     token,
     (c) => c.pages(),
     (a, b) =>
-      a.length === b.length && a.every((p, i) => p.pon === b[i].pon && p.label === b[i].label),
+      a.length === b.length &&
+      a.every(
+        (p, i) => p.ref.pageObjectNumber === b[i].ref.pageObjectNumber && p.label === b[i].label,
+      ),
   );
   const current = useSelector(
     token,

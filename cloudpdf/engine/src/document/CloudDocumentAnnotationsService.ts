@@ -8,6 +8,7 @@ import {
   type DocumentManifest,
   type ManifestPage,
   type PageObjectNumber,
+  type PageRef,
   type WeakAnnotationEditSession,
 } from '@embedpdf/engine-core/runtime';
 import {
@@ -86,7 +87,7 @@ export class CloudDocumentAnnotationsService implements DocumentAnnotationsServi
     return { ...body, auditHead: body.auditHead ?? manifest.auditHead };
   }
 
-  listRaw(pageObjectNumber: PageObjectNumber): AbortablePromise<AnnotationListPageSnapshot> {
+  listRaw(page: PageRef): AbortablePromise<AnnotationListPageSnapshot> {
     if (this.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document ${this.docId} is closed`),
@@ -96,7 +97,7 @@ export class CloudDocumentAnnotationsService implements DocumentAnnotationsServi
     // with the standard stale-pin retry (404 → refresh manifest → once).
     return AbortablePromise.run<AnnotationListPageSnapshot>((signal) =>
       this.http.getJsonWithRefresh(
-        async (s) => this.versionedPagePath(await this.manifest.get(s), pageObjectNumber),
+        async (s) => this.versionedPagePath(await this.manifest.get(s), page.pageObjectNumber),
         (raw) => AnnotationListPageSnapshotSchema.parse(raw),
         async (s) => {
           await this.manifest.refresh(s);
@@ -110,16 +111,13 @@ export class CloudDocumentAnnotationsService implements DocumentAnnotationsServi
    *  plane routing as `CloudPageAnnotationsService.list()`: an inherited
    *  `annotations` plane reads the doc-level base leaf. */
   private pagePathAt(manifest: DocumentManifest, page: ManifestPage): string {
+    const ref = page.state.page;
     return planesInherited(manifest, ['annotations'])
-      ? wirePaths.docPageAnnotations(
-          this.docId,
-          page.state.pageObjectNumber,
-          page.cache.annotationVersion,
-        )
+      ? wirePaths.docPageAnnotations(this.docId, ref, page.cache.annotationVersion)
       : wirePaths.layerPageAnnotations(
           this.docId,
           this.layerName,
-          page.state.pageObjectNumber,
+          ref,
           page.cache.annotationVersion,
         );
   }
@@ -128,7 +126,7 @@ export class CloudDocumentAnnotationsService implements DocumentAnnotationsServi
     manifest: DocumentManifest,
     pageObjectNumber: PageObjectNumber,
   ): string {
-    const page = manifest.pages.find((p) => p.state.pageObjectNumber === pageObjectNumber);
+    const page = manifest.pages.find((p) => p.state.page.pageObjectNumber === pageObjectNumber);
     if (!page) {
       throw new EngineError(
         EngineErrorCode.NotFound,
@@ -138,9 +136,7 @@ export class CloudDocumentAnnotationsService implements DocumentAnnotationsServi
     return this.pagePathAt(manifest, page);
   }
 
-  beginWeakEdit(
-    pageObjectNumbers: readonly PageObjectNumber[],
-  ): AbortablePromise<WeakAnnotationEditSession> {
+  beginWeakEdit(pages: readonly PageRef[]): AbortablePromise<WeakAnnotationEditSession> {
     if (this.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document ${this.docId} is closed`),
@@ -149,7 +145,7 @@ export class CloudDocumentAnnotationsService implements DocumentAnnotationsServi
     return AbortablePromise.run<WeakAnnotationEditSession>(async (signal) => {
       const response = await this.http.postJson(
         wirePaths.layerWeakAnnotationSession(this.docId, this.layerName),
-        { pageObjectNumbers },
+        { pages },
         (raw) => WeakAnnotationSessionResponseSchema.parse(raw),
         signal,
       );
@@ -162,7 +158,6 @@ export class CloudDocumentAnnotationsService implements DocumentAnnotationsServi
       );
     });
   }
-
 }
 
 class CloudWeakAnnotationEditSession implements WeakAnnotationEditSession {
@@ -191,15 +186,15 @@ class CloudWeakAnnotationEditSession implements WeakAnnotationEditSession {
     return this.response.heartbeatIntervalMs;
   }
 
-  get pageObjectNumbers(): readonly PageObjectNumber[] {
-    return this.response.pageObjectNumbers;
+  get pages(): readonly PageRef[] {
+    return this.response.pages;
   }
 
-  covers(pageObjectNumber: PageObjectNumber): boolean {
-    return this.response.pageObjectNumbers.includes(pageObjectNumber);
+  covers(page: PageRef): boolean {
+    return this.response.pages.some((p) => p.pageObjectNumber === page.pageObjectNumber);
   }
 
-  updatePages(pageObjectNumbers: readonly PageObjectNumber[]): AbortablePromise<void> {
+  updatePages(pages: readonly PageRef[]): AbortablePromise<void> {
     if (this.isClosed() || this.released) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `weak annotation session ${this.id} is closed`),
@@ -208,7 +203,7 @@ class CloudWeakAnnotationEditSession implements WeakAnnotationEditSession {
     return AbortablePromise.run<void>(async (signal) => {
       this.response = await this.http.postJson(
         wirePaths.layerWeakAnnotationSessionPages(this.docId, this.layerName, this.id),
-        { pageObjectNumbers },
+        { pages },
         (raw) => WeakAnnotationSessionResponseSchema.parse(raw),
         signal,
       );

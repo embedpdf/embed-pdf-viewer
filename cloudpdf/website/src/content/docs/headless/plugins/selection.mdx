@@ -46,12 +46,12 @@ programmatic selection updates the highlight and fires the same change signal:
 
 <Example name="selection/programmatic" />
 
-For one page, pass its durable page object number (`pon`), a starting character
-index, and a character count:
+For one page, pass its durable `PageRef` (`page.ref` from `usePageList()`), a
+starting character index, and a character count:
 
 ```ts
 selection.select({
-  pon: page.pon,
+  page: page.ref,
   start: 20,
   count: 40,
 });
@@ -62,7 +62,7 @@ text-offset conversion:
 
 ```ts
 selection.select({
-  pon: hit.pageObjectNumber,
+  page: hit.page,
   start: hit.charStart,
   count: hit.charCount,
 });
@@ -72,8 +72,8 @@ For a range that crosses pages, use `start` and `end` positions:
 
 ```ts
 selection.select({
-  start: { pon: firstPage.pon, index: 120 },
-  end: { pon: lastPage.pon, index: 35 },
+  start: { page: firstPage.ref, index: 120 },
+  end: { page: lastPage.ref, index: 35 },
 });
 ```
 
@@ -103,7 +103,7 @@ direction, and start/end geometry. For common UI, the smaller reads are easier:
 selection.hasSelection();
 selection.selectedPages();
 selection.menuAnchor();
-selection.segmentsForPage(page.pon);
+selection.segmentsForPage(page.ref);
 ```
 
 Use `onChange()` when something should follow the selection while it changes.
@@ -289,8 +289,8 @@ doc.text.copy         denied
 | `isSelecting()`        | Check whether a pointer selection gesture is in progress |
 | `menuAnchor()`         | Get the anchor for selection-scoped floating UI          |
 | `selectedPages()`      | Get pages with materialized selection segments           |
-| `segmentsForPage(pon)` | Get oriented highlight segments for one page             |
-| `rectsForPage(pon)`    | Get simple bounding boxes for one page                   |
+| `segmentsForPage(page)` | Get oriented highlight segments for one page            |
+| `rectsForPage(page)`    | Get simple bounding boxes for one page                  |
 | `readText()`           | Read selected literal text                               |
 | `onChange(callback)`   | Observe selection changes                                |
 | `onCommit(callback)`   | Observe the end of pointer selection gestures            |

@@ -1,4 +1,4 @@
-import { createCapabilityToken, type DocumentEvent, type PageObjectNumber } from '@embedpdf/core';
+import { createCapabilityToken, type DocumentEvent } from '@embedpdf/core';
 import type { AnnotCommitEntry, AnnotCommitResult } from '@embedpdf/plugin-actions/contract/host';
 import type { PageRotation } from '@embedpdf/core-geometry';
 import type {
@@ -18,6 +18,7 @@ import type {
   PageMeasurementViewport,
   SerializedEngineError,
   PdfActionTree,
+  PageRef,
   RichTextParagraph,
 } from '@embedpdf/engine-core/runtime';
 import type { TextFormat, TextSelection } from './rich-text';
@@ -159,7 +160,7 @@ export interface AnnotationState {
 
 /** The armed tool's would-be placement under the cursor (content space). */
 export type ToolGhost = {
-  pon: PageObjectNumber;
+  page: PageRef;
   /** The exact box the click's placement would use. */
   box: Rect;
   /** The tool's upright counter-rotation at this hover (deg, CW). */
@@ -396,7 +397,7 @@ export interface CommentsApi {
 }
 
 export interface RecalibrationReport {
-  pon: number;
+  page: PageRef;
   scale: PdfMeasure;
   /** Page-wide read failure: no complete annotation set was available to recalculate. */
   error?: SerializedEngineError;
@@ -410,7 +411,7 @@ export interface RecalibrationReport {
 
 export interface CapturedAnnotationDraft {
   tool: string;
-  pon: number;
+  page: PageRef;
   /** Original PDF user space, matching the engine API. */
   from: PdfPoint;
   to: PdfPoint;
@@ -424,7 +425,7 @@ export interface AnnotationCapability {
    * The same path the draw tools use, so programmatic and interactive creation
    * share one optimistic flow + one event stream.
    */
-  create(pon: PageObjectNumber, draft: AnnotationDraft): Promise<AnnotationRef>;
+  create(page: PageRef, draft: AnnotationDraft): Promise<AnnotationRef>;
   /**
    * Patch an existing annotation. `patch` is the engine-core patch for the
    * annotation's subtype — style, endings, contents, geometry are ALL just
@@ -521,7 +522,7 @@ export interface AnnotationCapability {
   /** The annotation for a ref, or null if unknown / not yet committed. */
   get(ref: AnnotationRef): AnnotationDTO | null;
   /** Every committed annotation on a page, in z-order. */
-  list(pon: PageObjectNumber): AnnotationDTO[];
+  list(page: PageRef): AnnotationDTO[];
   /** The selected annotations as DTOs (skips not-yet-committed drafts). */
   getSelected(): AnnotationDTO[];
 
@@ -707,7 +708,7 @@ export function previewBucket(devicePixelWidth: number, cap = 4096): number {
  * The box is fitted and clamped exactly as the click path does it.
  */
 export interface StampPlacement {
-  pageObjectNumber: PageObjectNumber;
+  page: PageRef;
   /** Anchor in page points (content space): the placement is centred here. */
   at: Vec;
   /** Placed width in PDF points; default the payload's intrinsic size. */
@@ -730,7 +731,7 @@ export interface FilePromptRequest {
   /** The tool's file-dialog filter hint (from the tool def). UX only —
    *  the engine sniffs/validates the bytes for real. */
   accept?: string;
-  pon: PageObjectNumber;
+  page: PageRef;
   /** The content-space point the placement is centred on. */
   point: Vec;
 }
@@ -761,17 +762,17 @@ export type FilePickerProvider = (req: FilePromptRequest) => Promise<AttachmentF
 export interface AnnotationHostCapability extends AnnotationCapability {
   /** Page viewport cache, in original PDF coordinates. Undefined clears readiness. */
   setPageViewports(
-    pon: number,
+    page: PageRef,
     viewports: PageMeasurementViewport[] | undefined,
     fallback: PdfMeasure,
   ): void;
-  remeasurePage(pon: number, scale: PdfMeasure): Promise<RecalibrationReport>;
+  remeasurePage(page: PageRef, scale: PdfMeasure): Promise<RecalibrationReport>;
   onDraftCaptured(cb: (draft: CapturedAnnotationDraft) => void): () => void;
   // ── render projection (consumed by the framework render layer) ──
   /** `view` (the page's scale + total display rotation, from its transform)
    *  projects screen-anchored (`noZoom`/`noRotate`) bodies to their effective
    *  footprint. Pass it from the page context; absent → stored geometry. */
-  pageItems(pon: PageObjectNumber, view?: ViewEnv): RenderItem[];
+  pageItems(page: PageRef, view?: ViewEnv): RenderItem[];
   /** `scale` (view px per content unit, from the page's transform) converts the
    *  px chrome settings into content units — pass it so the knob stalk and grab
    *  zones are screen-constant. `rotation` (the page's total display rotation)
@@ -779,12 +780,7 @@ export interface AnnotationHostCapability extends AnnotationCapability {
    *  `transform.zoom`, NOT `viewScale`) complete the view env for
    *  screen-anchored bodies. Absent scale → settings are read as content
    *  units. */
-  chrome(
-    pon: PageObjectNumber,
-    scale?: number,
-    rotation?: PageRotation,
-    zoom?: number,
-  ): ChromeNode[];
+  chrome(page: PageRef, scale?: number, rotation?: PageRotation, zoom?: number): ChromeNode[];
   /** The anchor for a selection-aware floating menu: the primary page + the
    *  selection's union box on that page (content space), or null when nothing
    *  selectable is selected. One anchor regardless of cross-page selection.
@@ -793,16 +789,16 @@ export interface AnnotationHostCapability extends AnnotationCapability {
     scale?: number,
     rotation?: PageRotation,
     zoom?: number,
-  ): { pon: PageObjectNumber; bounds: Rect; knob?: Vec } | null;
+  ): { page: PageRef; bounds: Rect; knob?: Vec } | null;
   /** The anchor + action state for a live multi-click creation draft, or null. */
   creationDraftAnchor(): CreationDraftAnchor | null;
   /** Home page while a distance draft is placing its dimension line. */
-  distanceCreationPage(): number | null;
+  distanceCreationPage(): PageRef | null;
   /** Cache key for a page's baked appearances: the COMMITTED id + AP box of every
    *  baked annotation (gesture previews excluded). Changes exactly once per
    *  committed create/geometry-edit, so the render layer refetches rasters then —
    *  and only then (a stamp resize re-fits its AP engine-side, for example). */
-  appearanceEpoch(pon: PageObjectNumber): string;
+  appearanceEpoch(page: PageRef): string;
   /**
    * The scale a baked appearance should render at for a desired device
    * scale — `snapAppearanceScale` over the document's `renderPolicy` (the
@@ -815,18 +811,18 @@ export interface AnnotationHostCapability extends AnnotationCapability {
   bakeScale(renderScale: number): number;
   /** The engine's rendered /AP appearance images for a page — the `baked` visual. */
   appearances(
-    pon: PageObjectNumber,
+    page: PageRef,
     scale: number,
     signal?: AbortSignal,
   ): Promise<AnnotationAppearanceImage[]>;
   /** Convert an engine appearance rect (PDF user space) to a content-space box, so
    *  the renderer places the baked bitmap by its OWN `/Rect` without touching the
    *  PDF↔content seam. Null if the page's crop box is unknown. */
-  toContentBox(pon: PageObjectNumber, rect: PdfRect): Rect | null;
+  toContentBox(page: PageRef, rect: PdfRect): Rect | null;
   /** No-op since whole-document hydration: the model is seeded by
    *  `listRawAll()` at document open. Kept as API for layers that call it
    *  on page mount. */
-  ensurePage(pon: PageObjectNumber): void;
+  ensurePage(page: PageRef): void;
   /**
    * Drop and RE-READ one page's annotations from the engine — the hook for
    * cross-plane mutations (e.g. `doc.forms.createField`/`deleteField`
@@ -834,7 +830,7 @@ export interface AnnotationHostCapability extends AnnotationCapability {
    * when the fresh page is in the model, so a caller can select what it just
    * created.
    */
-  reloadPage(pon: PageObjectNumber): Promise<void>;
+  reloadPage(page: PageRef): Promise<void>;
   // ── whole-document hydration (see the controller in capability.ts) ──
   /** Live hydration status — `loading` covers initial ingest AND a desync
    *  re-ingest. */
@@ -854,7 +850,7 @@ export interface AnnotationHostCapability extends AnnotationCapability {
   // ── free-text (the editable-element layer) ──
   /** The free-text boxes on a page, ready to render as editable elements.
    *  `view` as in {@link pageItems}. */
-  textItems(pon: PageObjectNumber, view?: ViewEnv): TextItem[];
+  textItems(page: PageRef, view?: ViewEnv): TextItem[];
   /** The id of the annotation currently being text-edited, or null. Read live (not
    *  from a stale render) so the editor can tell a real exit from a focus-steal. */
   currentEditing(): Id | null;
@@ -866,7 +862,7 @@ export interface AnnotationHostCapability extends AnnotationCapability {
    *  the caller fall through to a normal press (so a long-press on a highlight
    *  selects it instead of being swallowed by a no-op edit attempt). */
   beginTextEditAt(
-    pon: PageObjectNumber,
+    page: PageRef,
     point: Vec,
     scale?: number,
     rotation?: PageRotation,
@@ -896,7 +892,7 @@ export interface AnnotationHostCapability extends AnnotationCapability {
    *  complete the view env for screen-anchored bodies. Pass all three from
    *  the pointer sample. */
   hitKind(
-    pon: PageObjectNumber,
+    page: PageRef,
     point: Vec,
     scale?: number,
     rotation?: PageRotation,
@@ -914,7 +910,7 @@ export interface AnnotationHostCapability extends AnnotationCapability {
    * Pure read.
    */
   claimsTouchAt(
-    pon: PageObjectNumber,
+    page: PageRef,
     point: Vec,
     scale?: number,
     rotation?: PageRotation,
@@ -922,7 +918,7 @@ export interface AnnotationHostCapability extends AnnotationCapability {
   ): boolean;
   /** The cursor to show at a content point (resize over a handle, move/pointer over a body, else null). */
   cursorAt(
-    pon: PageObjectNumber,
+    page: PageRef,
     point: Vec,
     scale?: number,
     rotation?: PageRotation,
@@ -937,7 +933,7 @@ export interface AnnotationHostCapability extends AnnotationCapability {
    */
   hoverAt(
     at: {
-      pon: PageObjectNumber;
+      page: PageRef;
       point: Vec;
       scale?: number;
       rotation?: PageRotation;
@@ -953,7 +949,7 @@ export interface AnnotationHostCapability extends AnnotationCapability {
    * excluded. THE data feed for the navigation plane (plugin-link);
    * memoized by model identity for selector use.
    */
-  linkItemsOn(pon: PageObjectNumber): LinkNavItem[];
+  linkItemsOn(page: PageRef): LinkNavItem[];
   /** Drop selected annotations whose Behavior is currently ENGAGED — inert
    *  things cannot stay selected. Call after anything that flips engagement
    *  (the plugin wires it to tool changes). */
@@ -961,7 +957,7 @@ export interface AnnotationHostCapability extends AnnotationCapability {
   // ── interaction intents (run the pure core + perform engine effects) ──
   editPointer(
     phase: 'down' | 'move' | 'up',
-    pon: PageObjectNumber,
+    page: PageRef,
     point: Vec,
     shift: boolean,
     scale?: number,
@@ -974,7 +970,7 @@ export interface AnnotationHostCapability extends AnnotationCapability {
   ): void;
   marqueePointer(
     phase: 'down' | 'move' | 'up',
-    pon: PageObjectNumber,
+    page: PageRef,
     point: Vec,
     shift: boolean,
     scale?: number,
@@ -988,7 +984,7 @@ export interface AnnotationHostCapability extends AnnotationCapability {
   createPointer(
     tool: string,
     phase: 'down' | 'move' | 'up',
-    pon: PageObjectNumber,
+    page: PageRef,
     point: Vec,
     finish?: boolean,
     displayRotation?: PageRotation,
@@ -998,32 +994,28 @@ export interface AnnotationHostCapability extends AnnotationCapability {
   /** Create one text-markup annotation on a page from the selected text's
    *  per-line oriented quads (content space) — the `text-selection` create
    *  gesture. Axis-aligned callers build quads with `textQuadFromRect`. */
-  createMarkup(subtype: Subtype, pon: PageObjectNumber, quads: TextQuad[], preset?: string): void;
+  createMarkup(subtype: Subtype, page: PageRef, quads: TextQuad[], preset?: string): void;
   /** Create a caret annotation at a text-selection end anchor. */
-  createCaret(pon: PageObjectNumber, anchor: TextEndAnchor): void;
+  createCaret(page: PageRef, anchor: TextEndAnchor): void;
   /** Create one Adobe-compatible Caret + StrikeOut replace-text group. */
-  createReplaceText(
-    pon: PageObjectNumber,
-    quads: TextQuad[],
-    anchor: TextEndAnchor,
-    preset?: string,
-  ): void;
-  /** Set the live markup preview from the selection's per-page quads (renders a
-   *  ghost that looks like the markup it will become). */
+  createReplaceText(page: PageRef, quads: TextQuad[], anchor: TextEndAnchor, preset?: string): void;
+  /** Set the live markup preview from the selection's per-page quads, keyed by
+   *  page object number (renders a ghost that looks like the markup it will
+   *  become). */
   previewMarkup(subtype: Subtype, quadsByPage: Record<number, TextQuad[]>, preset?: string): void;
   clearMarkupPreview(): void;
   // ── stamp placement (consumed by the interaction stamp handler) ──
   /** Place the armed stamp centred on a content point. Returns false (no
    *  capture) when nothing is armed. `displayRotation` (the click sample's page
    *  rotation) feeds the active tool's `upright` policy. */
-  placeArmedStamp(pon: PageObjectNumber, point: Vec, displayRotation?: PageRotation): boolean;
+  placeArmedStamp(page: PageRef, point: Vec, displayRotation?: PageRotation): boolean;
   /**
    * The one click-to-place entry for every payload-carrying tool (stamp /
    * note / file attachment) — the place handler forwards each down here.
    * Armed payload first, then the active tool's kind routes; returns whether
    * the click was consumed.
    */
-  placeAt(pon: PageObjectNumber, point: Vec, displayRotation?: PageRotation): boolean;
+  placeAt(page: PageRef, point: Vec, displayRotation?: PageRotation): boolean;
   /** Whether a stamp payload is armed — the hover handler's cheap pre-check. */
   hasArmedStamp(): boolean;
   /**
@@ -1033,12 +1025,7 @@ export interface AnnotationHostCapability extends AnnotationCapability {
    * the placement, never an approximation. Tools without a determinable
    * footprint (or with a `false` ghost policy) clear instead.
    */
-  ghostHoverAt(
-    toolId: string,
-    pon: PageObjectNumber,
-    point: Vec,
-    displayRotation?: PageRotation,
-  ): void;
+  ghostHoverAt(toolId: string, page: PageRef, point: Vec, displayRotation?: PageRotation): void;
   /** Drop the hover ghost (pointer left the pages / a gesture started). */
   clearGhost(): void;
   /**
@@ -1048,14 +1035,14 @@ export interface AnnotationHostCapability extends AnnotationCapability {
    * ghost pipeline as every footprint. Sibling plugins call THIS — never the
    * annotation store directly.
    */
-  setPlacementPreview(toolId: string, pon: PageObjectNumber, box: Rect): void;
+  setPlacementPreview(toolId: string, page: PageRef, box: Rect): void;
   /** Drop the placement preview (gesture ended — commit, cancel, or error). */
   clearPlacementPreview(): void;
   // ── ghost projection (consumed by the framework render layer) ──
   /** The armed tool's footprint ghost on a page (content space), or null.
    *  Vector ghosts also ride {@link pageItems}; only `kind: 'image'` ghosts
    *  need the framework's blit. */
-  toolGhost(pon: PageObjectNumber): ToolGhost | null;
+  toolGhost(page: PageRef): ToolGhost | null;
   /**
    * The armed stamp's paintable preview at (roughly) `devicePixelWidth`
    * pixels wide — bucketed and cached per bucket for the arm's lifetime —
@@ -1074,7 +1061,7 @@ export interface AnnotationHostCapability extends AnnotationCapability {
    * counterpart of {@link placeArmedStamp}. `displayRotation` as on
    * {@link placeArmedStamp}.
    */
-  requestStampAt(pon: PageObjectNumber, point: Vec, displayRotation?: PageRotation): boolean;
+  requestStampAt(page: PageRef, point: Vec, displayRotation?: PageRotation): boolean;
   // ── tool registry (consumed by the plugin init + interaction handlers) ──
   /** Every resolved tool (built-ins + config `tools`), for the registration loop. */
   tools(): ResolvedTool[];

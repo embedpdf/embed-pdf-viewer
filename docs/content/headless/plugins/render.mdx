@@ -153,11 +153,11 @@ import { useCapability } from '@embedpdf/react/runtime';
 const render = useCapability(RenderToken);
 
 // After a confirmed operation that changed page pixels:
-render.invalidate({ pons: [pageObjectNumber] }); // 'content' scope: repaint everything
-render.invalidate({ pons: [pon], scope: 'annotations' }); // only baked appearances changed
+render.invalidate({ pages: [page.ref] }); // 'content' scope: repaint everything
+render.invalidate({ pages: [page.ref], scope: 'annotations' }); // only baked appearances changed
 ```
 
-Long-lived custom renders key on `renderEpoch(pon)` — when it bumps, refetch.
+Long-lived custom renders key on `renderEpoch(page.ref)` — when it bumps, refetch.
 
 ## Faster local rendering
 
@@ -186,7 +186,7 @@ import { useCapability } from '@embedpdf/react/runtime';
 
 const render = useCapability(RenderToken);
 
-const image = await render.renderPage(pon, { scale: 0.5 });
+const image = await render.renderPage(page.ref, { scale: 0.5 });
 const { url, revoke } = await image.objectUrl();
 // …use the URL, call revoke() when done
 ```
@@ -194,7 +194,7 @@ const { url, revoke } = await image.objectUrl();
 `renderPage` goes through the same budget, cache, and policy conformance as
 the layers — that is the point. When you need *scale-precise* output instead
 (print, export at exactly 300 dpi), call the engine directly:
-`doc.page(pon).render.image({ viewport: { kind: 'scale', scale } })` — the
+`doc.page(page.ref).render.image({ viewport: { kind: 'scale', scale } })` — the
 engine door is exact and unbudgeted.
 
 ## All the settings

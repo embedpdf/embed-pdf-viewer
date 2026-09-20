@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { deflateSync } from 'node:zlib';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import type { DocumentHandle, Engine, StampAnnotationDTO } from '@embedpdf/engine-core/runtime';
-import { EngineErrorCode, sniffBinaryMetadata } from '@embedpdf/engine-core/runtime';
+import { EngineErrorCode, sniffBinaryMetadata, toPageRef } from '@embedpdf/engine-core/runtime';
 import { createLocalEngine } from '../src/index';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -101,7 +101,7 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
   });
 
   test('create image stamp → DTO round-trips, appearance renders non-empty', async () => {
-    const page = handle.page(PAGE_OBJECT_NUMBER);
+    const page = handle.page(toPageRef(PAGE_OBJECT_NUMBER));
     const png = makePng(8, 4, [255, 0, 0, 255]);
     const rect = { left: 100, bottom: 500, right: 260, top: 580 };
 
@@ -146,7 +146,7 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
   });
 
   test('Blob source resolves (browser-style input)', async () => {
-    const page = handle.page(PAGE_OBJECT_NUMBER);
+    const page = handle.page(toPageRef(PAGE_OBJECT_NUMBER));
     const png = makePng(2, 2, [0, 0, 255, 255]);
     const result = await page.annotations.create({
       subtype: 'stamp',
@@ -160,14 +160,16 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
     const saved = await handle.download();
     const reopened = await engine.open({ kind: 'bytes', id: 'stamp-test-reopen', bytes: saved });
     try {
-      const snapshot = await reopened.page(PAGE_OBJECT_NUMBER).annotations.list();
+      const snapshot = await reopened.page(toPageRef(PAGE_OBJECT_NUMBER)).annotations.list();
       const stamps = snapshot.annotations.filter(
         (a): a is StampAnnotationDTO => a.subtype === 'stamp',
       );
       expect(stamps.length).toBeGreaterThanOrEqual(2);
       expect(stamps.some((s) => s.name === 'Approved')).toBe(true);
 
-      const rendered = await reopened.page(PAGE_OBJECT_NUMBER).annotations.renderAppearances();
+      const rendered = await reopened
+        .page(toPageRef(PAGE_OBJECT_NUMBER))
+        .annotations.renderAppearances();
       expect(rendered.appearances.length).toBeGreaterThan(0);
     } finally {
       await reopened.close();
@@ -175,7 +177,7 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
   });
 
   test('update: geometry-only patch re-fits the existing appearance', async () => {
-    const page = handle.page(PAGE_OBJECT_NUMBER);
+    const page = handle.page(toPageRef(PAGE_OBJECT_NUMBER));
     const png = makePng(4, 4, [0, 128, 0, 255]);
     const { created } = await page.annotations.create({
       subtype: 'stamp',
@@ -191,7 +193,7 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
   });
 
   test('rotated stamp: appearance renders UNROTATED — rect is the logical box, content is flat', async () => {
-    const page = handle.page(PAGE_OBJECT_NUMBER);
+    const page = handle.page(toPageRef(PAGE_OBJECT_NUMBER));
     const png = makePng(8, 4, [255, 0, 0, 255]);
     const unrotated = { left: 300, bottom: 300, right: 400, top: 350 }; // 100×50 landscape
     // 90° CW about the centre (350, 325) → the /Rect AABB is 50×100 portrait.
@@ -239,7 +241,7 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
     // SECOND aspect shrink, so the image landed at ~aspect² size in white
     // padding. Only under rotation (at 0° the two frames coincide). 'fill' hid
     // it; 'contain' (the default, and what the viewer uses) exposes it.
-    const page = handle.page(PAGE_OBJECT_NUMBER);
+    const page = handle.page(toPageRef(PAGE_OBJECT_NUMBER));
     const png = makePng(8, 4, [255, 0, 0, 255]); // 2:1 landscape
     const unrotated = { left: 300, bottom: 400, right: 400, top: 450 }; // 100×50, 2:1 — matches image
     // 90° CW about the centre (350, 425) → AABB 50×100 portrait.
@@ -288,7 +290,7 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
     // states and preserves what it omits. A plain re-position (rect only)
     // KEEPS the rotation; dropping the tilt is stated explicitly with
     // `rotation: null` (the viewer's total projection emits exactly that).
-    const page = handle.page(PAGE_OBJECT_NUMBER);
+    const page = handle.page(toPageRef(PAGE_OBJECT_NUMBER));
     const png = makePng(4, 4, [0, 0, 255, 255]);
     const unrotated = { left: 200, bottom: 200, right: 250, top: 250 };
     const rect = { left: 200, bottom: 200, right: 250, top: 250 }; // square: AABB == box
@@ -333,7 +335,7 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
   });
 
   test('unsupported source bytes reject with InvalidArg before any transport', async () => {
-    const page = handle.page(PAGE_OBJECT_NUMBER);
+    const page = handle.page(toPageRef(PAGE_OBJECT_NUMBER));
     await expect(
       page.annotations.create({
         subtype: 'stamp',
@@ -344,7 +346,7 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
   });
 
   test('any non-empty stamp name is accepted; an empty one rejects before any write', async () => {
-    const page = handle.page(PAGE_OBJECT_NUMBER);
+    const page = handle.page(toPageRef(PAGE_OBJECT_NUMBER));
     const beforeCreate = await page.annotations.list();
 
     // `/Name` is the stamp's identifier, not an enum: a standard name or an

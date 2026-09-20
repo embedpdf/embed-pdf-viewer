@@ -24,6 +24,7 @@ export type {
   AnchoredRect,
   ViewProjector,
 } from './anchored-position';
+export type { PageRef } from './page-ref';
 export { svgCursor } from './cursor';
 export type { SvgCursorOptions } from './cursor';
 export { sanitizeExternalUri } from './external-uri';

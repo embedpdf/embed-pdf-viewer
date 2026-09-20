@@ -165,9 +165,9 @@ export function SignatureInspector() {
     </div>
   );
 
-  if (widget && widget.pageObjectNumber > 0 && box) {
+  if (widget?.page && box) {
     return (
-      <Anchored anchor={{ pon: widget.pageObjectNumber, bounds: box }} placement="bottom" gap={8}>
+      <Anchored anchor={{ page: widget.page, bounds: box }} placement="bottom" gap={8}>
         {card}
       </Anchored>
     );

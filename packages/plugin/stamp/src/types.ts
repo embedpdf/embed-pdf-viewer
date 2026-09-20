@@ -1,6 +1,6 @@
 import type { BinarySource, Engine } from '@embedpdf/engine-core/runtime';
 import { createCapabilityToken, type EventHook } from '@embedpdf/core';
-import type { AnnotationRef, PageObjectNumber } from '@embedpdf/engine-core/runtime';
+import type { AnnotationRef, PageRef } from '@embedpdf/engine-core/runtime';
 import type { StampPlacement } from '@embedpdf/plugin-annotation/contract';
 
 /**
@@ -68,7 +68,7 @@ export interface StampAsset {
   size: { width: number; height: number };
   /** The library page that IS this asset. Every asset is a page: a raster
    *  added to a library becomes a page carrying the image. */
-  pageObjectNumber: number;
+  page: PageRef;
   /** An explicit `/Subj` override (PieceInfo); placements use `label` otherwise. */
   subject?: string;
   categories?: string[];
@@ -251,12 +251,12 @@ export interface StampCapability {
    * their union rect (vector, positions preserved — exactly what the page
    * shows) and added like any PDF asset. The identifier defaults to an
    * Acrobat-style `#…` one so the stamp keeps its identity in Acrobat.
-   * Rejects when any ref is not on `pageObjectNumber`, is hidden, or has no
+   * Rejects when any ref is not on `page`, is hidden, or has no
    * appearance (all-or-nothing: a stamp missing a part is worse than an error).
    */
   addAssetFromAnnotations(
     documentId: string,
-    pageObjectNumber: PageObjectNumber,
+    page: PageRef,
     refs: AnnotationRef[],
     input: Omit<AddAssetInput, 'source' | 'size'>,
   ): Promise<string>;

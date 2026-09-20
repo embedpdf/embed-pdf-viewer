@@ -7,6 +7,7 @@ import type { PageTextSnapshot } from '../dto/PageTextSnapshot';
 import type { Engine } from '../engine/Engine';
 import { EngineError } from '../errors/EngineError';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
+import { toPageRef } from '../identity/PageRef';
 import { AbortError } from '../promise/AbortError';
 import { PageTextSnapshotSchema } from '../wire/schemas';
 
@@ -54,7 +55,7 @@ export function runPageTextConformance(
     test('read() returns a PageTextSnapshot with non-empty text', async () => {
       const doc = await openFixture(engine, opts);
       try {
-        const page = doc.page(opts.fixture.pageObjectNumber);
+        const page = doc.page(toPageRef(opts.fixture.pageObjectNumber));
         const snap = await page.text.read();
         expect(PageTextSnapshotSchema.safeParse(snap).success).toBe(true);
         expect(snap.charCount >= opts.fixture.minCharCount).toBe(true);
@@ -67,7 +68,7 @@ export function runPageTextConformance(
     test('extracted text contains the expected substring', async () => {
       const doc = await openFixture(engine, opts);
       try {
-        const page = doc.page(opts.fixture.pageObjectNumber);
+        const page = doc.page(toPageRef(opts.fixture.pageObjectNumber));
         const snap = await page.text.read();
         expect(snap.text.includes(opts.fixture.expectedSubstring)).toBe(true);
       } finally {
@@ -80,7 +81,7 @@ export function runPageTextConformance(
       try {
         let caught: unknown;
         try {
-          const ghost = doc.page(999_999_999);
+          const ghost = doc.page(toPageRef(999_999_999));
           await ghost.text.read();
         } catch (err) {
           caught = err;
@@ -95,7 +96,7 @@ export function runPageTextConformance(
     test('abort() on read rejects with AbortError', async () => {
       const doc = await openFixture(engine, opts);
       try {
-        const page = doc.page(opts.fixture.pageObjectNumber);
+        const page = doc.page(toPageRef(opts.fixture.pageObjectNumber));
         const p = page.text.read();
         p.abort('test');
         await expect(p).rejects.toBeInstanceOf(AbortError);
@@ -106,7 +107,7 @@ export function runPageTextConformance(
 
     test('read after close throws DocNotOpen', async () => {
       const doc = await openFixture(engine, opts);
-      const page = doc.page(opts.fixture.pageObjectNumber);
+      const page = doc.page(toPageRef(opts.fixture.pageObjectNumber));
       await doc.close();
       let caught: unknown;
       try {

@@ -71,7 +71,7 @@ export const stagePlugin = (options: StagePluginOptions = {}) => {
           const stage = ctx.tryGet(token);
           const layout = ctx
             .document()
-            ?.pages.find((p) => p.pageObjectNumber === node.destination.pageObjectNumber);
+            ?.pages.find((p) => p.ref.pageObjectNumber === node.destination.page.pageObjectNumber);
           if (!stage || !layout) {
             return { status: 'failed', error: 'no stage or destination page available' };
           }

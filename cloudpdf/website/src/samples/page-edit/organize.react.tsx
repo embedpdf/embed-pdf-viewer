@@ -36,21 +36,21 @@ function OrganizeToolbar() {
       <Button
         title="Rotate this page 90° clockwise — written into the document, kept on save"
         disabled={!canEdit}
-        onClick={() => editor.rotateBy(page.pon, 90)}
+        onClick={() => editor.rotateBy(page.ref, 90)}
       >
         ⟳ Rotate page
       </Button>
       <Button
         title="Add a blank page after this one, sized to match it"
         disabled={!canEdit}
-        onClick={() => editor.addBlank({ placement: { after: page.pon } })}
+        onClick={() => editor.addBlank({ placement: { after: page.ref } })}
       >
         + Blank page
       </Button>
       <Button
         title="Delete this page"
         disabled={!canEdit || pageCount < 2}
-        onClick={() => editor.delete([page.pon])}
+        onClick={() => editor.delete([page.ref])}
       >
         Delete page
       </Button>

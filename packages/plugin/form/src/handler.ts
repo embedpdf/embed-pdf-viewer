@@ -3,6 +3,7 @@ import {
   resolveClickPlacement,
   widgetAppearanceFromProps,
 } from '@embedpdf/plugin-annotation/authoring';
+import type { PageRef } from '@embedpdf/engine-core/runtime';
 import type { AnnotationHostCapability } from '@embedpdf/plugin-annotation/contract/host';
 import {
   samplePointOn,
@@ -41,7 +42,7 @@ export function createPlaceHandler(
   interaction: InteractionCapability,
   annotation: AnnotationHostCapability | null,
 ): InteractionHandler {
-  let origin: { pon: number; start: Vec; last: Vec } | null = null;
+  let origin: { page: PageRef; start: Vec; last: Vec } | null = null;
   return {
     id: 'form-place',
     // Above the annotation edit handler (100): while a palette tool is
@@ -53,12 +54,12 @@ export function createPlaceHandler(
       // declining lets edit/pan/text-selection act on the gesture instead.
       if (!s.page || !FORM_TOOL_BY_ID.has(interaction.activeToolId())) return false;
       if (!form.canDesign()) return false;
-      origin = { pon: s.page.pon, start: s.page.point, last: s.page.point };
+      origin = { page: s.page.ref, start: s.page.point, last: s.page.point };
       return true;
     },
     onMove: (s) => {
       if (!origin) return;
-      const point = samplePointOn(s, origin.pon);
+      const point = samplePointOn(s, origin.page);
       if (!point) return;
       origin.last = point;
       const box = rectFrom(origin.start, point);
@@ -67,7 +68,7 @@ export function createPlaceHandler(
       // into the annotation store directly; this is its typed seam.
       if (annotation) {
         if (Math.max(box.width, box.height) >= MIN_DRAG) {
-          annotation.setPlacementPreview(interaction.activeToolId(), origin.pon, box);
+          annotation.setPlacementPreview(interaction.activeToolId(), origin.page, box);
         } else {
           annotation.clearPlacementPreview();
         }
@@ -84,15 +85,15 @@ export function createPlaceHandler(
       // The UP sample is the final point (projection first, like every
       // page-anchored gesture); a release over the gap falls back to the
       // last resolved point.
-      const end = samplePointOn(s, o.pon) ?? o.last;
+      const end = samplePointOn(s, o.page) ?? o.last;
       const dragged = rectFrom(o.start, end);
       const isClick = dragged.width < MIN_DRAG && dragged.height < MIN_DRAG;
-      const pageBox = form.pageBox(o.pon);
+      const pageBox = form.pageBox(o.page);
       const box = isClick ? boxOfClick(o.start, tool.clickCreate, pageBox) : dragged; // placeField clamps a drag to the page
       form
         .placeField({
           family: tool.family,
-          pageObjectNumber: o.pon,
+          page: o.page,
           box,
           // Style from the tool's LIVE defaults when the annotation plane is
           // here to hold them (the user restyled the tool in the panel);
@@ -112,7 +113,7 @@ export function createPlaceHandler(
           annotation.select({
             kind: 'objectNumber',
             annotObjectNumber: widget.annotObjectNumber,
-            pageObjectNumber: o.pon,
+            page: o.page,
           });
         })
         .catch((err) => {

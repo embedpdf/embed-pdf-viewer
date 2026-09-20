@@ -30,10 +30,10 @@ const fixturePath = resolve(
 
 async function activationFor(doc: DocumentHandle, field: FormFieldDTO): Promise<PdfActionTree> {
   const widget = field.widgets[0];
-  if (!widget || widget.annotObjectNumber <= 0 || widget.pageObjectNumber <= 0) {
+  if (!widget || widget.annotObjectNumber <= 0 || !widget.page) {
     throw new Error(`field '${field.name}' has no addressable widget`);
   }
-  const { annotations } = await doc.page(widget.pageObjectNumber).annotations.list();
+  const { annotations } = await doc.page(widget.page).annotations.list();
   const annotation = annotations.find(
     ({ ref }) => ref.kind === 'objectNumber' && ref.annotObjectNumber === widget.annotObjectNumber,
   );

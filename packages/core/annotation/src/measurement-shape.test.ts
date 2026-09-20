@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { measureFromKnownLength } from '@embedpdf/engine-core/runtime';
+import { measureFromKnownLength, toPageRef } from '@embedpdf/engine-core/runtime';
 import { DRAWN_FLAGS } from './flags';
 import { DEFAULT_CHROME_GEOM, geomTranslate, pointInPoly, rotatePoint } from './geometry';
 import { hitTest } from './hit';
@@ -17,6 +17,7 @@ import { initialModel, initialStyle, update } from './update';
 import { chrome, creationDraftAnchor, pageItems } from './view';
 import type { Annot, Geom, Model, Msg, Vec } from './types';
 
+const PAGE = toPageRef(1);
 const crop = { left: -20, bottom: -40, right: 580, top: 760 };
 const appearance: ShapeMeasurementAppearance = {
   intent: 'PolygonDimension',
@@ -37,7 +38,7 @@ function annotation(measure = appearance, geom = geometry): Annot {
   return {
     id: 'shape',
     ref: null,
-    pon: 1,
+    page: toPageRef(1),
     subtype: geom.t === 'poly' && geom.closed ? 'polygon' : 'polyline',
     geom,
     measure,
@@ -58,7 +59,11 @@ function selected(a = annotation()): Model {
 }
 
 function pointer(model: Model, phase: 'down' | 'move' | 'up', point: Vec): Model {
-  return update(model, { t: 'editPointer', phase, in: { pon: 1, point, shift: false } })[0];
+  return update(model, {
+    t: 'editPointer',
+    phase,
+    in: { page: toPageRef(1), point, shift: false },
+  })[0];
 }
 
 function expectPoint(actual: Vec, expected: Vec) {
@@ -78,12 +83,12 @@ describe('area and perimeter authoring', () => {
       subtype: closed ? 'polygon' : 'polyline',
       preset: closed ? 'area' : 'perimeter',
       measure: nextMeasure,
-      in: { pon: 1, point, shift: false },
+      in: { page: toPageRef(1), point, shift: false },
     });
     let model = update(initialModel, create(points[0]))[0];
     model = update(model, create(points[1], { ...measure, measure: null }))[0];
     model = update(model, create(points[2], { ...measure, measure: null }))[0];
-    const ghost = pageItems(model, 1)[0];
+    const ghost = pageItems(model, PAGE)[0];
     expect(ghost.measure?.measure).toEqual(measure.measure);
     expect(
       scene(ghost).some((node) => node.kind === 'text' && node.text === (closed ? '4 m²' : '6 m')),
@@ -130,18 +135,20 @@ describe('area and perimeter authoring', () => {
   it('drags text directly, preserves vertices, and emits only a caption patch', () => {
     let model = selected();
     const center = shapeMeasurementLayout(geometry, appearance, initialStyle)!.caption!.center;
-    expect(hitTest(model, 1, center, DEFAULT_CHROME_GEOM, 6)).toMatchObject({ handle: 'caption' });
-    expect(chrome(model, 1).filter((node) => node.kind === 'handle')).toHaveLength(4);
+    expect(hitTest(model, PAGE, center, DEFAULT_CHROME_GEOM, 6)).toMatchObject({
+      handle: 'caption',
+    });
+    expect(chrome(model, PAGE).filter((node) => node.kind === 'handle')).toHaveLength(4);
     model = pointer(model, 'down', center);
     model = pointer(model, 'move', { x: center.x + 150, y: center.y - 100 });
-    const preview = pageItems(model, 1)[0];
+    const preview = pageItems(model, PAGE)[0];
     expect(preview.source).toBe('vector');
     expect(preview.measure?.caption).toEqual({ enabled: true, center: { x: 330, y: 710 } });
     expect(update(model, { t: 'cancel' })[0].byId.shape.measure).toBe(appearance);
     const [committed, effects] = update(model, {
       t: 'editPointer',
       phase: 'up',
-      in: { pon: 1, point: center, shift: false },
+      in: { page: toPageRef(1), point: center, shift: false },
     });
     expect(committed.byId.shape.geom).toBe(geometry);
     expect(committed.byId.shape.measure).toEqual(preview.measure);
@@ -155,13 +162,13 @@ describe('area and perimeter authoring', () => {
       const initial = selected(annotation(measure));
       const frame = annotationSelectionFrame(initial.byId.shape);
       const caption = shapeMeasurementLayout(geometry, measure, initialStyle)!.caption!;
-      const knob = chrome(initial, 1).find((node) => node.kind === 'rotate-knob');
+      const knob = chrome(initial, PAGE).find((node) => node.kind === 'rotate-knob');
       if (knob?.kind !== 'rotate-knob') throw new Error('Missing rotation knob');
       const armed = pointer(initial, 'down', knob.at);
       for (const angle of [30, 90, 137, 180, 270]) {
         const at = rotatePoint(knob.at, frame.center, angle);
         const moving = pointer(armed, 'move', at);
-        const item = pageItems(moving, 1)[0];
+        const item = pageItems(moving, PAGE)[0];
         if (item.measure?.intent === 'LineDimension' || !item.measure)
           throw new Error('Missing shape');
         const layout = shapeMeasurementLayout(item.geom, item.measure, item.style)!;
@@ -201,12 +208,12 @@ describe('area and perimeter authoring', () => {
         phase: 'down',
         subtype: 'polygon',
         measure: appearance,
-        in: { pon: 1, point, shift: false },
+        in: { page: toPageRef(1), point, shift: false },
       })[0];
     }
     expect(creationDraftAnchor(model)?.canFinish).toBe(false);
     expect(
-      scene(pageItems(model, 1)[0]).some((node) => node.kind === 'text' && node.text === '—'),
+      scene(pageItems(model, PAGE)[0]).some((node) => node.kind === 'text' && node.text === '—'),
     ).toBe(true);
     expect(update(model, { t: 'finishCreationDraft' })[0].order).toEqual([]);
     expect(update(model, { t: 'cancel' })[0].draft).toBeNull();
@@ -216,14 +223,14 @@ describe('area and perimeter authoring', () => {
     const original = selected();
     let model = pointer(original, 'down', points[0]);
     model = pointer(model, 'move', { x: 350, y: 150 });
-    const preview = pageItems(model, 1)[0];
+    const preview = pageItems(model, PAGE)[0];
     expect(shapeMeasurementReadout(preview.geom, appearance)).toMatchObject({
       unavailable: 'invalid-geometry',
     });
     const [committed, effects] = update(model, {
       t: 'editPointer',
       phase: 'up',
-      in: { pon: 1, point: { x: 350, y: 150 }, shift: false },
+      in: { page: toPageRef(1), point: { x: 350, y: 150 }, shift: false },
     });
     expect(committed.byId.shape).toBe(original.byId.shape);
     expect(committed.draft).toBeNull();
@@ -243,7 +250,7 @@ describe('area and perimeter authoring', () => {
       order: ['shape', 'second'],
       selected: ['shape', 'second'],
     };
-    const outline = chrome(model, 1).find((node) => node.kind === 'outline');
+    const outline = chrome(model, PAGE).find((node) => node.kind === 'outline');
     if (outline?.kind !== 'outline') throw new Error('Missing group outline');
     const corner = {
       x: outline.rect.x + outline.rect.width,
@@ -259,7 +266,7 @@ describe('area and perimeter authoring', () => {
       x: draft.anchor.x + (center.x - draft.anchor.x) * (draft.cur.width / draft.base.width),
       y: draft.anchor.y + (center.y - draft.anchor.y) * (draft.cur.height / draft.base.height),
     };
-    const preview = pageItems(model, 1).find((item) => item.id === 'shape')!;
+    const preview = pageItems(model, PAGE).find((item) => item.id === 'shape')!;
     expectPoint(shapeCaptionPoint(preview.measure as ShapeMeasurementAppearance)!, expected);
     const committed = pointer(model, 'up', target);
     expect(committed.byId.shape.measure).toEqual(preview.measure);

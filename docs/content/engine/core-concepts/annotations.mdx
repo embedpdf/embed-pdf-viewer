@@ -10,7 +10,7 @@ import { Cards, Card } from '@/components/docs/cards';
 
 You read and edit annotations through two services: the **document** service
 (`doc.annotations`) for cheap whole-document reads, and the **page** service
-(`doc.page(pon).annotations`) for typed reads and edits. The examples below assume
+(`doc.page(ref).annotations`) for typed reads and edits. The examples below assume
 you already opened a document (see [Quick start](/docs/engine/getting-started/quick-start)).
 
 ## Reading annotations
@@ -21,14 +21,14 @@ For a quick "what's where" overview, the document service has two fast read path
 // Every page, cheapest read.
 const all = await doc.annotations.listRawAll();
 
-// A single page, by its page object number.
-const onePage = await doc.annotations.listRaw(pageObjectNumber);
+// A single page, by its ref.
+const onePage = await doc.annotations.listRaw(pageRef);
 ```
 
 To get the full, typed annotations on one page, use the page service:
 
 ```ts
-const page = doc.page(pageObjectNumber);
+const page = doc.page(pageRef);
 const { annotations } = await page.annotations.list();
 ```
 
@@ -39,7 +39,7 @@ Call `create()` with the annotation you want. Each kind has its own fields — s
 Here's a highlight:
 
 ```ts
-const page = doc.page(pageObjectNumber);
+const page = doc.page(pageRef);
 
 const { created } = await page.annotations.create({
   subtype: 'highlight',
@@ -332,7 +332,7 @@ array) need an active edit session. It proves you're the only one editing those 
 guard against two clients shifting the same page at once.
 
 ```ts
-const session = await doc.annotations.beginWeakEdit([pageObjectNumber]);
+const session = await doc.annotations.beginWeakEdit([pageRef]);
 
 try {
   // …index-addressed structural edits on covered pages…

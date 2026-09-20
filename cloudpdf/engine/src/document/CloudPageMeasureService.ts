@@ -3,6 +3,7 @@ import {
   EngineError,
   EngineErrorCode,
   type PageMeasureService,
+  type PageRef,
   type PdfMeasure,
   type PageMeasurementViewport,
 } from '@embedpdf/engine-core/runtime';
@@ -20,7 +21,7 @@ export class CloudPageMeasureService implements PageMeasureService {
     private readonly http: HttpClient,
     private readonly docId: string,
     private readonly layerName: string,
-    private readonly pon: number,
+    private readonly pageRef: PageRef,
     private readonly isClosed: () => boolean,
     private readonly manifest: ManifestAccessor,
     private readonly publisher: SessionEventPublisher,
@@ -30,7 +31,7 @@ export class CloudPageMeasureService implements PageMeasureService {
       this.check();
       // Viewports have no independent cache pin. Always read the current layer.
       return this.http.getJson(
-        wirePaths.layerPageViewports(this.docId, this.layerName, this.pon),
+        wirePaths.layerPageViewports(this.docId, this.layerName, this.pageRef),
         (raw) => PageMeasurementViewportSchema.array().parse(raw),
         signal,
       );
@@ -42,7 +43,7 @@ export class CloudPageMeasureService implements PageMeasureService {
       signal.throwIfAborted();
       this.check();
       const result = await this.http.putJson(
-        wirePaths.layerPageScale(this.docId, this.layerName, this.pon),
+        wirePaths.layerPageScale(this.docId, this.layerName, this.pageRef),
         { measure },
         (raw) => PageScaleResultSchema.parse(raw),
         signal,

@@ -308,7 +308,7 @@ function BakedImage({
  */
 function ToolGhostImage({ page }: { page: PageContextValue }) {
   const anno = useCapability(AnnotationHostToken);
-  const ghost = useSelector(AnnotationHostToken, (c) => c.toolGhost(page.pon));
+  const ghost = useSelector(AnnotationHostToken, (c) => c.toolGhost(page.ref));
   const epoch = useSelector(AnnotationHostToken, (c) => c.stampArmEpoch());
   const [url, setUrl] = useState<string | null>(null);
   // The ghost is a bitmap of vector artwork, right at ONE size: ask for the
@@ -377,7 +377,7 @@ function Chrome({ page }: { page: PageContextValue }) {
   const zoom = page.transform.zoom;
   const nodes = useSelector(
     AnnotationHostToken,
-    (c) => c.chrome(page.pon, scale, rotation, zoom),
+    (c) => c.chrome(page.ref, scale, rotation, zoom),
     shallowArray,
   );
   const cs = useSelector(AnnotationHostToken, (c) => c.chromeSettings());
@@ -793,20 +793,20 @@ export function AnnotationLayer({ renderers }: AnnotationLayerProps = {}) {
   const viewRotation = page.transform.rotation;
   const items = useSelector(
     AnnotationHostToken,
-    (c) => c.pageItems(page.pon, { zoom: viewZoom, rotation: viewRotation }),
+    (c) => c.pageItems(page.ref, { zoom: viewZoom, rotation: viewRotation }),
     shallowArray,
   );
   const texts = useSelector(
     AnnotationHostToken,
-    (c) => c.textItems(page.pon, { zoom: viewZoom, rotation: viewRotation }),
+    (c) => c.textItems(page.ref, { zoom: viewZoom, rotation: viewRotation }),
     shallowArray,
   );
   const [urls, setUrls] = useState<Record<string, { url: string; box: Rect }>>({});
   useAutoBehaviors(anno, renderers);
 
   useEffect(() => {
-    anno.ensurePage(page.pon);
-  }, [anno, page.pon]);
+    anno.ensurePage(page.ref);
+  }, [anno, page.ref]);
 
   // Baked annotations render from engine rasters — refetch when the page's
   // baked set or an /AP content version changes (a freshly placed stamp, a
@@ -814,7 +814,7 @@ export function AnnotationLayer({ renderers }: AnnotationLayerProps = {}) {
   // or a rotate leaves the epoch untouched (the blit repositions the same
   // pixels), and live gesture previews don't touch it either — so no mid-drag
   // spam.
-  const bakedKey = useSelector(AnnotationHostToken, (c) => c.appearanceEpoch(page.pon));
+  const bakedKey = useSelector(AnnotationHostToken, (c) => c.appearanceEpoch(page.ref));
   // The bake scale conforms to the document's render policy — the plugin's
   // OWN capability over the kernel-materialized fact (no foreign tokens):
   // zoom ticks inside an appearance-lattice rung re-bake NOTHING; crossing
@@ -828,12 +828,12 @@ export function AnnotationLayer({ renderers }: AnnotationLayerProps = {}) {
     const revokers: Array<() => void> = [];
     (async () => {
       try {
-        const imgs = await anno.appearances(page.pon, bakeScale, controller.signal);
+        const imgs = await anno.appearances(page.ref, bakeScale, controller.signal);
         const map: Record<string, { url: string; box: Rect }> = {};
         for (const ap of imgs) {
           // Place the baked bitmap by its OWN /Rect (the box it was rendered into),
           // converted to content space by the plugin — never a recomputed bound.
-          const box = anno.toContentBox(page.pon, ap.rect);
+          const box = anno.toContentBox(page.ref, ap.rect);
           if (!box) continue;
           const obj = await ap.image.objectUrl(controller.signal);
           if (controller.signal.aborted) {
@@ -852,7 +852,7 @@ export function AnnotationLayer({ renderers }: AnnotationLayerProps = {}) {
       controller.abort();
       revokers.forEach((r) => r());
     };
-  }, [anno, page.pon, bakeScale, bakedKey]);
+  }, [anno, page.ref, bakeScale, bakedKey]);
 
   return (
     <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
@@ -1013,7 +1013,7 @@ export function useSelectionFlags(): SelectionFlags | null {
 
 /**
  * A {@link CommentThread} enriched with its page's live display position —
- * the framework-layer join. Identity stays `pageObjectNumber` (like every
+ * the framework-layer join. Identity stays `page` (like every
  * annotation surface); these two fields are PRESENTATION, tracking page
  * moves and deletes.
  */
@@ -1028,7 +1028,7 @@ export interface CommentThreadView extends CommentThread {
    * The root annotation's rect in CONTENT space (y-down, crop-relative,
    * unscaled points) — the space `StageCapability.reveal` takes, so a
    * "jump to this comment" is `stage.reveal(pageIndex, { rect: contentRect })`.
-   * Null when the page is gone. Identity still travels as `pageObjectNumber`;
+   * Null when the page is gone. Identity still travels as `page`;
    * this, like `pageIndex`, is presentation.
    */
   contentRect: Rect | null;
@@ -1039,9 +1039,9 @@ export function enrichCommentThreads(
   threads: readonly CommentThread[],
   pages: readonly PageLayout[],
 ): CommentThreadView[] {
-  const byPon = new Map(pages.map((p) => [p.pageObjectNumber, p] as const));
+  const byPon = new Map(pages.map((p) => [p.ref.pageObjectNumber, p] as const));
   return threads.map((t) => {
-    const page = byPon.get(t.pageObjectNumber);
+    const page = byPon.get(t.page.pageObjectNumber);
     return {
       ...t,
       pageIndex: page ? page.index : -1,

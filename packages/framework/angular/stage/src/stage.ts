@@ -62,7 +62,7 @@ const frameEqual = (a: PageFrame, b: PageFrame) =>
   },
   template: `
     @if (pageTemplate(); as tpl) {
-      @for (p of pages(); track p.pon) {
+      @for (p of pages(); track p.ref.pageObjectNumber) {
         <epdf-page-surface
           [vp]="p"
           [frame]="frame()"

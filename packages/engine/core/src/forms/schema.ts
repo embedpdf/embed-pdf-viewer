@@ -1,3 +1,4 @@
+import { PageRefSchema } from '../identity/PageRef.schema';
 import { z } from 'zod';
 
 import { WidgetAppearanceSchema } from '../annotation/kinds/widget.shared';
@@ -23,9 +24,9 @@ export const FormFieldRefSchema: z.ZodType<FormFieldRef> = z.discriminatedUnion(
 ]);
 
 const FormWidgetRefShape = {
-  // 0 = direct (unaddressable) widget / unplaced widget respectively.
+  // 0 = direct (unaddressable) widget; null page = unplaced widget.
   annotObjectNumber: z.number().int().nonnegative(),
-  pageObjectNumber: z.number().int().nonnegative(),
+  page: PageRefSchema.nullable(),
 };
 
 export const FormWidgetRefSchema: z.ZodType<FormWidgetRef> = z.object(FormWidgetRefShape);
@@ -147,7 +148,7 @@ export const FormDataFormatSchema: z.ZodType<FormDataFormat> = z.enum(['fdf', 'x
 export { WidgetAppearanceSchema };
 
 export const WidgetPlacementSchema: z.ZodType<WidgetPlacement> = z.object({
-  pageObjectNumber: z.number().int().positive(),
+  page: PageRefSchema,
   rect: PdfRectSchema,
   onState: z.string().min(1).optional(),
   appearance: WidgetAppearanceSchema.optional(),

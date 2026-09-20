@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from 'vitest';
-import type { PluginContext } from '@embedpdf/core';
+import { toPageRef, type PluginContext } from '@embedpdf/core';
 import { createSearchCapability } from '../src/capability';
 import { initialSearchState, searchReducer } from '../src/reducer';
 import type { SearchAction, SearchHit, SearchState } from '../src/types';
@@ -16,7 +16,7 @@ const seg = (rect: { x: number; y: number; width: number; height: number }) => (
 });
 
 const hit = (pon: number, charStart: number): SearchHit => ({
-  pon,
+  page: toPageRef(pon),
   pageIndex: 0,
   charStart,
   charCount: 4,
@@ -108,7 +108,7 @@ function mockCtx(slices: unknown[]) {
     document: () => ({
       pages: [
         {
-          pageObjectNumber: 5,
+          ref: toPageRef(5),
           index: 0,
           boxes: { crop: { left: 0, bottom: 0, right: 100, top: 100 } },
           rotation: 0,
@@ -126,7 +126,7 @@ function mockCtx(slices: unknown[]) {
 describe('findAll', () => {
   test('walks the cursor chain, returns every hit, and NEVER touches state', async () => {
     const match = (charStart: number) => ({
-      pageObjectNumber: 5,
+      page: toPageRef(5),
       charStart,
       charCount: 4,
       segments: [
@@ -153,7 +153,7 @@ describe('findAll', () => {
     expect(hits.length).toBe(3);
     expect(hits.map((h) => h.charStart)).toEqual([0, 9, 2]);
     for (const h of hits) {
-      expect(h.pon).toBe(5);
+      expect(h.page).toEqual(toPageRef(5));
       expect(h.pageIndex).toBe(0);
       expect(h.segments.length).toBe(1);
       expect(h.bounds).toBeDefined();

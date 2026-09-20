@@ -32,20 +32,24 @@ Two things the example shows beyond the calls themselves:
 
 ## Pages are addressed by identity, not position
 
-Every verb takes a `pon` — a page object number, the page's durable identity.
-You get it from the Stage's `usePageList()` entries (`page.pon`), as the
-example above does. An *index* shifts the moment a sibling is moved or
-deleted; a PON never does, so a queued edit still hits the page the user
-clicked, even if the document was reorganized in between.
+Every verb takes a `PageRef` — `{ kind: 'objectNumber', pageObjectNumber }`,
+the page's indirect object number, its durable identity. You get it from the
+Stage's `usePageList()` entries (`page.ref`), as the example above does. An
+*index* shifts the moment a sibling is moved or deleted; a ref never does, so
+a queued edit still hits the page the user clicked, even if the document was
+reorganized in between. A deleted page's number is retired, never recycled.
+Anything that points at a page carries the same ref as `page` (a search hit's
+`hit.page`, an annotation's `ref.page`); `toPageRef(n)` builds one from a bare
+number.
 
 ## Rotate a page
 
 ```ts
 const editor = usePageEditor();
 
-editor.rotateBy(pon, 90); // one quarter-turn from wherever the page is now
-editor.rotateBy(pon, -90); // and back
-editor.setRotation([ponA, ponB], 180); // multi-select: one absolute value for all
+editor.rotateBy(page.ref, 90); // one quarter-turn from wherever the page is now
+editor.rotateBy(page.ref, -90); // and back
+editor.setRotation([pageA.ref, pageB.ref], 180); // multi-select: one absolute value for all
 ```
 
 `rotateBy` is the per-thumbnail button: it reads the page's current rotation
@@ -57,7 +61,7 @@ survive untouched.
 
 ```ts
 // Move two pages (in this order) so they start at index 0.
-editor.move([ponB, ponA], 0);
+editor.move([pageB.ref, pageA.ref], 0);
 ```
 
 The supplied pages are detached and re-inserted as one contiguous block at
@@ -67,11 +71,11 @@ move — refs you hold stay valid.
 ## Delete pages
 
 ```ts
-editor.delete([pon]);
+editor.delete([page.ref]);
 ```
 
 The engine rejects deleting every page — a document keeps at least one.
-Deleted PONs are retired, never reused.
+A deleted page's object number is retired, never reused.
 
 ## Add pages
 
@@ -79,7 +83,7 @@ Two ways in, one placement model:
 
 ```ts
 // A blank page after the one the user is looking at, sized to match it.
-editor.addBlank({ placement: { after: pon } });
+editor.addBlank({ placement: { after: page.ref } });
 
 // Three blank US-Letter pages at the very start.
 editor.addBlank({ size: { width: 612, height: 792 }, count: 3, placement: { index: 0 } });
@@ -88,25 +92,25 @@ editor.addBlank({ size: { width: 612, height: 792 }, count: 3, placement: { inde
 editor.insert(bytes);
 
 // Or drop that PDF's pages in front of a specific page.
-editor.insert(bytes, { placement: { before: pon } });
+editor.insert(bytes, { placement: { before: page.ref } });
 ```
 
-`placement` is `{ after: pon }`, `{ before: pon }`, or `{ index }` — omitted
-means append. Prefer the PON forms for anything anchored to a page the user
+`placement` is `{ after: PageRef }`, `{ before: PageRef }`, or `{ index }` —
+omitted means append. Prefer the ref forms for anything anchored to a page the user
 can see: they stay correct even if the document is reordered between the
 click and the call.
 
 When you omit `size`, the new blank page matches the page it sits beside —
-the anchor for PON placements, otherwise the insertion point's neighbour —
+the anchor for ref placements, otherwise the insertion point's neighbour —
 so "add page" fits the document without you guessing at paper sizes. `count`
 creates up to 100 pages in one call.
 
-Both verbs resolve with the fresh PONs in insertion order, so you can select
+Both verbs resolve with the fresh refs in insertion order, so you can select
 or scroll to the new pages right away:
 
 ```ts
-const result = await editor.addBlank({ placement: { after: pon } });
-result.insertedPageObjectNumbers; // → the new pages' identities
+const result = await editor.addBlank({ placement: { after: page.ref } });
+result.insertedPages; // → the new pages' refs
 ```
 
 <Callout type="info">

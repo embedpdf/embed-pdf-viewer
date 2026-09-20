@@ -36,10 +36,12 @@ export function wireMarkup(
           : null;
     selection.setHighlightVisible(previewSubtype == null);
     if (previewSubtype && tool && selection.hasSelection()) {
-      const quadsByPage: Record<number, ReturnType<typeof selection.segmentsForPage>[number]['quad'][]> =
-        {};
-      for (const page of selection.snapshot().pages) {
-        quadsByPage[page.pon] = page.segments.map((s) => s.quad);
+      const quadsByPage: Record<
+        number,
+        ReturnType<typeof selection.segmentsForPage>[number]['quad'][]
+      > = {};
+      for (const entry of selection.snapshot().pages) {
+        quadsByPage[entry.page.pageObjectNumber] = entry.segments.map((s) => s.quad);
       }
       annotation.previewMarkup(previewSubtype, quadsByPage, tool.preset);
     } else {
@@ -57,7 +59,7 @@ export function wireMarkup(
     const snapshot = selection.snapshot();
     if (authoring.kind === 'text-edit' && authoring.operation === 'insert') {
       if (snapshot.end) {
-        annotation.createCaret(snapshot.end.pon, {
+        annotation.createCaret(snapshot.end.page, {
           glyphQuad: snapshot.end.glyphQuad,
           advance: snapshot.end.advance,
         });
@@ -70,16 +72,16 @@ export function wireMarkup(
       // one self-contained Caret + StrikeOut pair per page. The true glyph-cell
       // anchor exists only on the selection's end page; other pages anchor at
       // their last segment's trailing edge.
-      for (const page of snapshot.pages) {
-        const last = page.segments[page.segments.length - 1];
+      for (const entry of snapshot.pages) {
+        const last = entry.segments[entry.segments.length - 1];
         if (!last) continue;
         const anchor =
-          snapshot.end && snapshot.end.pon === page.pon
+          snapshot.end && snapshot.end.page.pageObjectNumber === entry.page.pageObjectNumber
             ? { glyphQuad: snapshot.end.glyphQuad, advance: snapshot.end.advance }
             : { glyphQuad: last.quad, advance: last.advance };
         annotation.createReplaceText(
-          page.pon,
-          page.segments.map((s) => s.quad),
+          entry.page,
+          entry.segments.map((s) => s.quad),
           anchor,
           tool.preset,
         );
@@ -87,11 +89,11 @@ export function wireMarkup(
       selection.clear();
       return;
     }
-    for (const page of snapshot.pages) {
+    for (const entry of snapshot.pages) {
       annotation.createMarkup(
         tool.subtype,
-        page.pon,
-        page.segments.map((s) => s.quad),
+        entry.page,
+        entry.segments.map((s) => s.quad),
         tool.preset,
       );
     }

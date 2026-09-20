@@ -53,7 +53,8 @@ test('calibration persists an artifact and audit payload without bumping page ca
   const engine = makeEngine(),
     doc = await engine.open({ kind: 'id', id });
   try {
-    const page = doc.page((await doc.pages.list()).pages[0].pageObjectNumber);
+    const ref = (await doc.pages.list()).pages[0].ref;
+    const page = doc.page(ref);
     await page.measure!.setScale(measureFromKnownLength(100, { value: 3, unit: 'm' }));
     const before = await fx.db
       .selectFrom('layers')
@@ -92,7 +93,7 @@ test('calibration persists an artifact and audit payload without bumping page ca
       .executeTakeFirstOrThrow();
     const payload = JSON.parse(row.payload_json);
     expect(payload).toMatchObject({
-      pageObjectNumber: page.pageObjectNumber,
+      page: ref,
       meta: { affectedPages: [] },
     });
     expect(
@@ -120,7 +121,7 @@ test('read-only access can inspect calibration but cannot change it', async () =
   const engine = makeEngine(['doc.open']),
     doc = await engine.open({ kind: 'id', id });
   try {
-    const page = doc.page((await doc.pages.list()).pages[0].pageObjectNumber);
+    const page = doc.page((await doc.pages.list()).pages[0].ref);
     const before = await page.measure!.viewports();
     await expect(page.measure!.setScale(null)).rejects.toMatchObject({
       code: EngineErrorCode.Forbidden,

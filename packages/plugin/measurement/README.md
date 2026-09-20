@@ -15,7 +15,7 @@ const plugins = [
   }),
 ];
 const measurements = viewer.get(MeasurementToken);
-await measurements.calibrate(pageObjectNumber, fromPdfPoint, toPdfPoint, {
+await measurements.calibrate(page, fromPdfPoint, toPdfPoint, {
   value: 5,
   unit: 'm',
 });
@@ -43,7 +43,7 @@ rejects before annotation writes; all-pages operations return per-page
 PDF when the engine provides `page.measure`; older engines retain them for the
 session (`pageScale().persistent === false`).
 
-`canCalibrate()` mirrors `doc.annotate.modify`; `canMeasure(pon)` combines
+`canCalibrate()` mirrors `doc.annotate.modify`; `canMeasure(page)` combines
 annotation creation authority and viewport readiness. Per-record permissions and
 PDF flags gate recalculation and caption dragging. Distance contents are derived
 and cannot be edited as comment text.

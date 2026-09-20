@@ -138,6 +138,8 @@ export { EngineErrorCode } from './errors/EngineErrorCode';
 
 export { isValidPageObjectNumber } from './identity/PageObjectNumber';
 export type { PageObjectNumber } from './identity/PageObjectNumber';
+export type { PageRef } from './identity/PageRef';
+export { toPageRef, pageRefsEqual, encodePageKey, decodePageKey } from './identity/PageRef';
 export type { AnnotationStableId } from './identity/AnnotationStableId';
 export { encodeStableIdKey, decodeStableIdKey } from './identity/AnnotationStableId';
 export type { AnnotationRef } from './identity/AnnotationRef';

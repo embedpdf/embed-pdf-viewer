@@ -55,7 +55,7 @@ export function RenderLayer({ annotations = true, tiles = true }: RenderLayerPro
   // the budget — so the deep-zoom backdrop never refetches, and the sub-
   // budget range refetches per settled demand exactly like v2 did.
   const sourceKey = useSelector(RenderToken, (c) =>
-    c.renderSourceKey(page.pon, {
+    c.renderSourceKey(page.ref, {
       scale: page.transform.renderScale,
       includeAnnotations: annotations,
     }),
@@ -70,7 +70,7 @@ export function RenderLayer({ annotations = true, tiles = true }: RenderLayerPro
         // collapses same-key asks in its raster store. A stale-closure scale
         // is harmless by construction: any scale mapping to this key
         // produces this key's canonical request.
-        const image = await render.renderPage(page.pon, {
+        const image = await render.renderPage(page.ref, {
           scale: page.transform.renderScale,
           includeAnnotations: annotations,
           signal: controller.signal,
@@ -95,7 +95,7 @@ export function RenderLayer({ annotations = true, tiles = true }: RenderLayerPro
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- sourceKey IS the
     // render identity; scale/annotations/epoch are folded into it upstream.
-  }, [render, page.pon, sourceKey]);
+  }, [render, page.ref, sourceKey]);
 
   return (
     <>
@@ -146,10 +146,10 @@ function TilePlane({ annotations, fadeMs }: { annotations: boolean; fadeMs: numb
   // handle is reference-stable per view — a clean dependency.
   const tiles = render.tilesFor(page.view);
   const plan = useSelector(RenderToken, () =>
-    tiles.plan(page.pon, demand, { includeAnnotations: annotations }),
+    tiles.plan(page.ref, demand, { includeAnnotations: annotations }),
   );
   // View unmounted its plane: stop in-flight fetches; resolved bytes stay cached.
-  useEffect(() => () => tiles.release(page.pon), [tiles, page.pon]);
+  useEffect(() => () => tiles.release(page.ref), [tiles, page.ref]);
   if (plan.paint.length === 0) return null;
   const t = page.transform;
   const s = t.viewScale;
@@ -186,8 +186,8 @@ function TilePlane({ annotations, fadeMs }: { annotations: boolean; fadeMs: numb
             height: source.rect.height * s,
           }}
           fadeMs={fadeMs}
-          onPainted={() => tiles.painted(page.pon, source.key)}
-          onUnpainted={() => tiles.unpainted(page.pon, source.key)}
+          onPainted={() => tiles.painted(page.ref, source.key)}
+          onUnpainted={() => tiles.unpainted(page.ref, source.key)}
         />
       ))}
     </div>

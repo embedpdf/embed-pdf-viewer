@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { createKernel } from '@embedpdf/core';
 import { createQuickJsSandbox } from '@embedpdf/core-js-sandbox';
 import { createLocalEngine } from '@embedpdf/engine';
-import type { AnnotationRef } from '@embedpdf/engine-core/runtime';
+import { toPageRef, type AnnotationRef } from '@embedpdf/engine-core/runtime';
 import { actionsPlugin } from '@embedpdf/plugin-actions';
 import { ActionsToken as ActionsHostToken } from '@embedpdf/plugin-actions/contract/host';
 import { annotationPlugin } from '@embedpdf/plugin-annotation';
@@ -67,13 +67,13 @@ async function boot(scope?: string[]) {
   await form.refresh();
   const trigger = form.snapshot()?.fields.find((f) => f.name === 'hoverTrigger');
   if (!trigger) throw new Error('hoverTrigger missing');
-  const pon = trigger.widgets[0]!.pageObjectNumber;
-  await annotation.reloadPage(pon);
+  const page = trigger.widgets[0]!.page!;
+  await annotation.reloadPage(page);
 
   const squareStyle = () => {
     // hoverSquare sits at x≈300; the bystander square at x≈450.
     const squares = annotation
-      .pageItems(pon)
+      .pageItems(page)
       .filter((item) => item.subtype === 'square')
       .sort((a, b) => a.geom.rect.x - b.geom.rect.x);
     return {
@@ -83,7 +83,7 @@ async function boot(scope?: string[]) {
   };
   const triggerRef: AnnotationRef = {
     kind: 'objectNumber',
-    pageObjectNumber: pon,
+    page,
     annotObjectNumber: trigger.widgets[0]!.annotObjectNumber,
   };
   const notify = (event: 'cursorEnter' | 'cursorExit') =>
@@ -92,8 +92,8 @@ async function boot(scope?: string[]) {
     actions.dispatch({
       scope: 'annotation',
       event: 'cursorEnter',
-      ref: { kind: 'objectNumber', pageObjectNumber: 999, annotObjectNumber: 1 },
-      pon: 999,
+      ref: { kind: 'objectNumber', page: toPageRef(999), annotObjectNumber: 1 },
+      page: toPageRef(999),
     });
   const statusValue = () => {
     const field = form.snapshot()?.fields.find((f) => f.name === 'eventStatus');

@@ -15,8 +15,8 @@ import type { StageAction, StageCapability, StageState } from './types';
  * 2. The page-state feed (main lens only, actions plugin present): stage is
  *    AUTHORITATIVE for what page the viewer is on; the action engine's
  *    lifecycle coordinator owns WHEN page-lifecycle triggers fire. This feed
- *    pushes `{ currentPon, visiblePons, placed, cause }` snapshots — pons,
- *    not indexes (reorder-safe) — on placement and on every change; the
+ *    pushes `{ currentPage, visiblePages, placed, cause }` snapshots — page
+ *    refs, not indexes (reorder-safe) — on placement and on every change; the
  *    coordinator buffers them behind the document-open barrier and diffs
  *    against its last-emitted state, so this side stays a dumb reporter.
  */
@@ -39,27 +39,30 @@ export function registerStageEffects(
     if (!state.placed) return null;
     const stage = ctx.get(token);
     return {
-      currentPon: stage.pages()[state.cursor]?.pon ?? null,
-      visiblePons: stage.visiblePages().map((page) => page.pon),
+      currentPage: stage.pages()[state.cursor]?.ref ?? null,
+      visiblePages: stage.visiblePages().map((page) => page.ref),
       cause: state.motionCause,
     };
   };
   ctx.watch(
-    // Signature over the REPORTABLE truth: current pon + the visible pon
+    // Signature over the REPORTABLE truth: current page + the visible page
     // set. `cause` is deliberately absent — a cause flip alone is not a
     // page-state change and must not produce a report.
     () => {
       const s = snapshot();
       return s === null
         ? 'unplaced'
-        : `${s.currentPon ?? -1}|${[...s.visiblePons].sort((a, b) => a - b).join(',')}`;
+        : `${s.currentPage?.pageObjectNumber ?? -1}|${s.visiblePages
+            .map((page) => page.pageObjectNumber)
+            .sort((a, b) => a - b)
+            .join(',')}`;
     },
     () => {
       const s = snapshot();
       if (s === null) return;
       actions.reportPageState({
-        currentPon: s.currentPon,
-        visiblePons: s.visiblePons,
+        currentPage: s.currentPage,
+        visiblePages: s.visiblePages,
         placed: true,
         cause: s.cause,
       });

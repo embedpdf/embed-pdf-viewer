@@ -10,12 +10,13 @@ import {
   type ScriptOutput,
 } from '@embedpdf/core-acrojs';
 import type { ScriptSandbox } from '@embedpdf/core-js-sandbox';
-import type {
-  DocumentHandle,
-  FormEffect,
-  FormFieldDTO,
-  FormSnapshot,
-  PdfActionTree,
+import {
+  toPageRef,
+  type DocumentHandle,
+  type FormEffect,
+  type FormFieldDTO,
+  type FormSnapshot,
+  type PdfActionTree,
 } from '@embedpdf/engine-core/runtime';
 
 import { createFormScriptingController } from '../src/scripting';
@@ -52,7 +53,7 @@ const text = (
   multiline: false,
   password: false,
   comb: false,
-  widgets: [{ annotObjectNumber: fieldObjectNumber, pageObjectNumber: 10 }],
+  widgets: [{ annotObjectNumber: fieldObjectNumber, page: toPageRef(10) }],
   ...(actions ? { actions } : {}),
 });
 
@@ -107,7 +108,7 @@ const documentMeta = (): DocumentMeta =>
     id: 'form-doc',
     name: 'proposal.pdf',
     pageCount: 1,
-    pages: [{ pageObjectNumber: 10 }],
+    pages: [{ ref: toPageRef(10) }],
     revision: 0,
   }) as DocumentMeta;
 

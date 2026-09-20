@@ -5,6 +5,7 @@ import type {
 } from '@embedpdf/plugin-interaction/contract';
 import type { PageRotation } from '@embedpdf/core-geometry';
 import type { Subtype, Vec } from '@embedpdf/core-annotation';
+import type { PageRef } from '@embedpdf/engine-core/runtime';
 import type { AnnotationHostCapability } from './types';
 import {
   ANNOTATION_DRAW_PRIORITY,
@@ -26,8 +27,9 @@ const isCalloutTool = (subtype: Subtype): boolean => subtype === 'free-text-call
  * unclamped projection and fall back to the page hit only when it's the same
  * page. Null → this sample can't speak for the home page; ignore it.
  */
-const pointOn = (s: PointerSample, pon: number): Vec | null =>
-  s.project?.(pon) ?? (s.page?.pon === pon ? s.page.point : null);
+const pointOn = (s: PointerSample, page: PageRef): Vec | null =>
+  s.project?.(page) ??
+  (s.page?.ref.pageObjectNumber === page.pageObjectNumber ? s.page.point : null);
 
 /**
  * Click-to-place for every payload-carrying tool (stamp / note / file
@@ -52,7 +54,7 @@ export function createPlaceHandler(anno: AnnotationHostCapability): InteractionH
       if (!s.page) return false;
       // The click sample's display rotation drives the tool's `upright` policy —
       // the placement lands reading horizontally on a rotated page/view.
-      return anno.placeAt(s.page.pon, s.page.point, s.page.rotation);
+      return anno.placeAt(s.page.ref, s.page.point, s.page.rotation);
     },
   };
 }
@@ -71,7 +73,7 @@ export function createGhostHandler(
 ): InteractionHandler {
   const hover = (s: PointerSample): void => {
     if (s.page)
-      anno.ghostHoverAt(interaction.activeToolId(), s.page.pon, s.page.point, s.page.rotation);
+      anno.ghostHoverAt(interaction.activeToolId(), s.page.ref, s.page.point, s.page.rotation);
     else anno.clearGhost();
   };
   return {
@@ -104,7 +106,7 @@ export function createEditHandler(
   // an aborted gesture (second finger → pinch) can REVERT instead of leaving
   // the annotation half-moved. `touch` rides the whole gesture so every phase
   // grabs with the same finger-sized zones the down resolved with.
-  let origin: { pon: number; point: Vec; downPoint: Vec; touch: boolean } | null = null;
+  let origin: { page: PageRef; point: Vec; downPoint: Vec; touch: boolean } | null = null;
   return {
     id: 'annotation-edit',
     priority: ANNOTATION_EDIT_PRIORITY,
@@ -114,7 +116,7 @@ export function createEditHandler(
     // bodies keep scrolling, matching the Markup convention.
     claimsTouch: (s) =>
       !!s.page &&
-      anno.claimsTouchAt(s.page.pon, s.page.point, s.page.scale, s.page.rotation, s.page.zoom),
+      anno.claimsTouchAt(s.page.ref, s.page.point, s.page.scale, s.page.rotation, s.page.zoom),
     onDown: (s) => {
       if (!s.page) return false;
       // The final distance-placement click belongs to its creation draft even
@@ -129,7 +131,7 @@ export function createEditHandler(
       if (wasEditing) anno.endTextEdit();
       if (
         anno.hitKind(
-          s.page.pon,
+          s.page.ref,
           s.page.point,
           s.page.scale,
           s.page.rotation,
@@ -153,14 +155,14 @@ export function createEditHandler(
       // being swallowed by a no-op edit attempt.
       if ((s.clickCount ?? 1) >= 2) {
         if (
-          anno.beginTextEditAt(s.page.pon, s.page.point, s.page.scale, s.page.rotation, s.page.zoom)
+          anno.beginTextEditAt(s.page.ref, s.page.point, s.page.scale, s.page.rotation, s.page.zoom)
         ) {
           return true;
         }
       }
       anno.editPointer(
         'down',
-        s.page.pon,
+        s.page.ref,
         s.page.point,
         s.modifiers.shift,
         s.page.scale,
@@ -168,19 +170,19 @@ export function createEditHandler(
         s.page.zoom,
         touch,
       );
-      origin = { pon: s.page.pon, point: s.page.point, downPoint: s.page.point, touch };
+      origin = { page: s.page.ref, point: s.page.point, downPoint: s.page.point, touch };
       return true;
     },
     onMove: (s) => {
       if (!origin) return;
-      const point = pointOn(s, origin.pon);
+      const point = pointOn(s, origin.page);
       if (!point) return;
       origin.point = point;
       // The sample's scale/rotation ride along (uniform across pages), so a
       // screen-anchored member page-clamps at its effective footprint mid-drag.
       anno.editPointer(
         'move',
-        origin.pon,
+        origin.page,
         point,
         s.modifiers.shift,
         s.page?.scale,
@@ -196,8 +198,8 @@ export function createEditHandler(
       // back on the next interaction). `editUp` doesn't read the point.
       anno.editPointer(
         'up',
-        origin.pon,
-        pointOn(s, origin.pon) ?? origin.point,
+        origin.page,
+        pointOn(s, origin.page) ?? origin.point,
         false,
         undefined,
         undefined,
@@ -211,17 +213,17 @@ export function createEditHandler(
       // Aborted (second finger → pinch): REVERT, don't commit — replay the
       // gesture back to its own down point (every transform is delta-from-
       // down, so this restores the original geometry), then close it there.
-      const { pon, downPoint, touch } = origin;
+      const { page, downPoint, touch } = origin;
       origin = null;
-      anno.editPointer('move', pon, downPoint, false, undefined, undefined, undefined, touch);
-      anno.editPointer('up', pon, downPoint, false, undefined, undefined, undefined, touch);
+      anno.editPointer('move', page, downPoint, false, undefined, undefined, undefined, touch);
+      anno.editPointer('up', page, downPoint, false, undefined, undefined, undefined, touch);
     },
     onHover: (s) => {
       // priority 20 → beats text-select's 'text' (10) over an annotation; null clears.
       interaction.setCursor(
         'annotation',
         s.page
-          ? anno.cursorAt(s.page.pon, s.page.point, s.page.scale, s.page.rotation, s.page.zoom)
+          ? anno.cursorAt(s.page.ref, s.page.point, s.page.scale, s.page.rotation, s.page.zoom)
           : null,
         20,
       );
@@ -230,7 +232,7 @@ export function createEditHandler(
       anno.hoverAt(
         s.page
           ? {
-              pon: s.page.pon,
+              page: s.page.ref,
               point: s.page.point,
               scale: s.page.scale,
               rotation: s.page.rotation,
@@ -248,13 +250,13 @@ export function createEditHandler(
  */
 export function createMarqueeHandler(anno: AnnotationHostCapability): InteractionHandler {
   let anchor: {
-    pon: number;
+    page: PageRef;
     point: Vec;
     vx: number;
     vy: number;
     shift: boolean;
   } | null = null;
-  let last: { pon: number; point: Vec } | null = null;
+  let last: { page: PageRef; point: Vec } | null = null;
   let dragging = false;
 
   // The marquee page's view env at the down sample — the `up` intersects
@@ -267,13 +269,13 @@ export function createMarqueeHandler(anno: AnnotationHostCapability): Interactio
     onDown: (s) => {
       if (!s.page) return false;
       anchor = {
-        pon: s.page.pon,
+        page: s.page.ref,
         point: s.page.point,
         vx: s.viewport.x,
         vy: s.viewport.y,
         shift: s.modifiers.shift,
       };
-      last = { pon: s.page.pon, point: s.page.point };
+      last = { page: s.page.ref, point: s.page.point };
       view = { scale: s.page.scale, rotation: s.page.rotation, zoom: s.page.zoom };
       dragging = false;
       return true;
@@ -283,9 +285,9 @@ export function createMarqueeHandler(anno: AnnotationHostCapability): Interactio
       // Anchored to the page the drag started on; the projected point keeps the
       // marquee growing along the page edge when the cursor overshoots (the
       // core clamps it to the page box).
-      const point = pointOn(s, anchor.pon);
+      const point = pointOn(s, anchor.page);
       if (!point) return;
-      last = { pon: anchor.pon, point };
+      last = { page: anchor.page, point };
       if (!dragging) {
         if (
           Math.hypot(s.viewport.x - anchor.vx, s.viewport.y - anchor.vy) < MARQUEE_DRAG_THRESHOLD_PX
@@ -295,7 +297,7 @@ export function createMarqueeHandler(anno: AnnotationHostCapability): Interactio
         dragging = true;
         anno.marqueePointer(
           'down',
-          anchor.pon,
+          anchor.page,
           anchor.point,
           anchor.shift,
           view.scale,
@@ -305,7 +307,7 @@ export function createMarqueeHandler(anno: AnnotationHostCapability): Interactio
       }
       anno.marqueePointer(
         'move',
-        anchor.pon,
+        anchor.page,
         point,
         anchor.shift,
         view.scale,
@@ -317,7 +319,7 @@ export function createMarqueeHandler(anno: AnnotationHostCapability): Interactio
       if (dragging && anchor && last) {
         anno.marqueePointer(
           'up',
-          anchor.pon,
+          anchor.page,
           last.point,
           anchor.shift,
           view.scale,
@@ -357,10 +359,10 @@ export function createDrawHandler(
   let drawingCallout = false;
   // The active drag's home page (down→up): moves/ups resolve against it, so a
   // shape keeps sizing along the page edge when the cursor overshoots.
-  let origin: { pon: number; point: Vec } | null = null;
+  let origin: { page: PageRef; point: Vec } | null = null;
   let pendingInk: {
     tool: string;
-    pon: number;
+    page: PageRef;
     timer: ReturnType<typeof setTimeout>;
   } | null = null;
   const flushPendingInk = () => {
@@ -406,7 +408,10 @@ export function createDrawHandler(
       }
       if (!s.page) return false;
       if (st === 'ink' && pendingInk) {
-        if (pendingInk.tool === tool && pendingInk.pon === s.page.pon) {
+        if (
+          pendingInk.tool === tool &&
+          pendingInk.page.pageObjectNumber === s.page.ref.pageObjectNumber
+        ) {
           clearTimeout(pendingInk.timer);
           pendingInk = null;
         } else {
@@ -415,10 +420,10 @@ export function createDrawHandler(
       }
       // A down is a fresh intent — it may legitimately start on another page
       // (the core restarts the draft there), so it re-anchors the gesture.
-      origin = { pon: s.page.pon, point: s.page.point };
+      origin = { page: s.page.ref, point: s.page.point };
       if (isPolyTool(st)) {
         const finish = (s.clickCount ?? 1) >= 2;
-        anno.createPointer(tool, 'down', s.page.pon, s.page.point, finish);
+        anno.createPointer(tool, 'down', s.page.ref, s.page.point, finish);
         drawingPoly = !finish;
         return true;
       }
@@ -429,7 +434,7 @@ export function createDrawHandler(
       if (isCalloutTool(st)) drawingCallout = true;
       // The DOWN sample's display rotation rides along for the tool's `upright`
       // policy; the core captures it on the draft (later phases don't carry it).
-      anno.createPointer(tool, 'down', s.page.pon, s.page.point, false, s.page.rotation);
+      anno.createPointer(tool, 'down', s.page.ref, s.page.point, false, s.page.rotation);
       return true;
     },
     onMove: (s) => {
@@ -439,26 +444,26 @@ export function createDrawHandler(
       // callout (a non-poly tool) sizes its text box during the box step. Poly
       // tools take vertices by click, so they ignore drag-moves.
       if (!origin || (isPolyTool(st) && !drawingPoly)) return;
-      const point = pointOn(s, origin.pon);
+      const point = pointOn(s, origin.page);
       if (!point) return;
       origin.point = point;
-      anno.createPointer(tool, 'move', origin.pon, point);
+      anno.createPointer(tool, 'move', origin.page, point);
     },
     onUp: (s) => {
       const tool = toolId();
       const st = subtypeOf(tool);
       if (origin && !isPolyTool(st)) {
         // ALWAYS commit the drag, even released off-page (point pins in core).
-        anno.createPointer(tool, 'up', origin.pon, pointOn(s, origin.pon) ?? origin.point);
+        anno.createPointer(tool, 'up', origin.page, pointOn(s, origin.page) ?? origin.point);
         if (st === 'ink') {
           const groupStrokesMs = anno.tool(tool)?.ink?.groupStrokesMs ?? 0;
           if (groupStrokesMs > 0) {
-            const pon = origin.pon;
+            const page = origin.page;
             const timer = setTimeout(() => {
               pendingInk = null;
               anno.finishInkDraft();
             }, groupStrokesMs);
-            pendingInk = { tool, pon, timer };
+            pendingInk = { tool, page, timer };
           }
         }
       }
@@ -493,7 +498,7 @@ export function createDrawHandler(
       // Hover preview for the multi-click tools: poly (while placing vertices) and
       // callout (while placing the tip/knee/box) follow the cursor between clicks.
       if (s.page && ((drawingPoly && isPolyTool(st)) || (drawingCallout && isCalloutTool(st)))) {
-        anno.createPointer(tool, 'move', s.page.pon, s.page.point);
+        anno.createPointer(tool, 'move', s.page.ref, s.page.point);
       }
     },
   };

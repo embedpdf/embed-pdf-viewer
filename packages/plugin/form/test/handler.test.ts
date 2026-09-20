@@ -9,18 +9,20 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { InteractionCapability, PointerSample } from '@embedpdf/plugin-interaction';
 import type { AnnotationHostCapability } from '@embedpdf/plugin-annotation/internal';
+import { toPageRef, type PageRef } from '@embedpdf/engine-core/runtime';
 
 import { createPlaceHandler } from '../src/handler';
 import type { FormCapability, PlacedField, PlaceFieldInput } from '../src/types';
 
 const PON = 3;
+const PAGE_REF = toPageRef(PON);
 const PAGE = { x: 0, y: 0, width: 300, height: 400 };
 
 function makeForm(over: Partial<FormCapability> = {}) {
   const placed: PlaceFieldInput[] = [];
   let resolveNext: PlacedField = {
     field: { name: 'text_1' } as PlacedField['field'],
-    widget: { annotObjectNumber: 42, pageObjectNumber: PON } as PlacedField['widget'],
+    widget: { annotObjectNumber: 42, page: PAGE_REF } as PlacedField['widget'],
   };
   const form = {
     canDesign: () => true,
@@ -35,12 +37,12 @@ function makeForm(over: Partial<FormCapability> = {}) {
 }
 
 function makeAnnotation() {
-  const previews: Array<{ toolId: string; pon: number; box: unknown }> = [];
+  const previews: Array<{ toolId: string; page: PageRef; box: unknown }> = [];
   const selects: unknown[] = [];
   let clears = 0;
   const annotation = {
-    setPlacementPreview: (toolId: string, pon: number, box: unknown) =>
-      previews.push({ toolId, pon, box }),
+    setPlacementPreview: (toolId: string, page: PageRef, box: unknown) =>
+      previews.push({ toolId, page, box }),
     clearPlacementPreview: () => {
       clears++;
     },
@@ -60,7 +62,7 @@ const sample = (over: Partial<PointerSample>): PointerSample => ({
   ...over,
 });
 const at = (phase: PointerSample['phase'], x: number, y: number): PointerSample =>
-  sample({ phase, page: { pon: PON, point: { x, y } } });
+  sample({ phase, page: { ref: PAGE_REF, point: { x, y } } });
 
 const flush = () => new Promise((r) => setTimeout(r, 0));
 
@@ -75,7 +77,7 @@ describe('form place handler', () => {
     expect(placed).toHaveLength(1);
     expect(placed[0]).toMatchObject({
       family: 'text',
-      pageObjectNumber: PON,
+      page: PAGE_REF,
       // 160×24 centred on the DOWN point (the core's `d.from` rule).
       box: { x: 20, y: 88, width: 160, height: 24 },
     });
@@ -98,11 +100,16 @@ describe('form place handler', () => {
     // Cursor physically over another page; projection speaks for the home page.
     h.onMove?.(
       sample({
-        page: { pon: 99, point: { x: 1, y: 1 } },
-        project: (pon) => (pon === PON ? { x: 90, y: 40 } : null),
+        page: { ref: toPageRef(99), point: { x: 1, y: 1 } },
+        project: (page) => (page.pageObjectNumber === PON ? { x: 90, y: 40 } : null),
       }),
     );
-    h.onUp?.(sample({ phase: 'up', project: (pon) => (pon === PON ? { x: 110, y: 60 } : null) }));
+    h.onUp?.(
+      sample({
+        phase: 'up',
+        project: (page) => (page.pageObjectNumber === PON ? { x: 110, y: 60 } : null),
+      }),
+    );
     await flush();
     expect(placed[0]!.box).toEqual({ x: 10, y: 10, width: 100, height: 50 });
   });
@@ -123,7 +130,7 @@ describe('form place handler', () => {
     h.onMove?.(at('move', 60, 40));
     expect(previews.at(-1)).toMatchObject({
       toolId: 'form-checkbox',
-      pon: PON,
+      page: PAGE_REF,
       box: { x: 10, y: 10, width: 50, height: 30 },
     });
     const before = clears();
@@ -139,9 +146,7 @@ describe('form place handler', () => {
     h.onDown(at('down', 100, 100));
     h.onUp?.(at('up', 100, 100));
     await flush();
-    expect(selects).toEqual([
-      { kind: 'objectNumber', annotObjectNumber: 42, pageObjectNumber: PON },
-    ]);
+    expect(selects).toEqual([{ kind: 'objectNumber', annotObjectNumber: 42, page: PAGE_REF }]);
 
     // Tool changes while the engine write runs → stale, no selection.
     let live = 'form-text';

@@ -7,9 +7,10 @@ import {
   measurementPoint,
   measurementReadout,
   METRES,
+  pageRefsEqual,
   squareOf,
 } from '@embedpdf/engine-core/runtime';
-import type { PdfMeasure } from '@embedpdf/engine-core/runtime';
+import type { PageRef, PdfMeasure } from '@embedpdf/engine-core/runtime';
 import type { MeasurementEffects } from './effects';
 import { DEFAULT_PRESETS, withAreaUnit, withPrecision, withUnit } from './scale';
 import type {
@@ -32,12 +33,10 @@ export function createMeasurementCapability(
   const anno = ctx.get(AnnotationToken);
   const interaction = ctx.get(InteractionToken);
   const canCalibrate = () => ctx.doc?.security.allows('doc.annotate.modify') ?? false;
-  const pons = (pon: number | 'all', opts?: SetScaleOptions) =>
-    pon === 'all' || opts?.allPages
-      ? (ctx.document()?.pages ?? []).map((p) => p.pageObjectNumber)
-      : [pon];
-  const scaleOf = (pon: number): PdfMeasure => {
-    const scale = ctx.getState().pages[pon]?.scale.measure;
+  const targets = (page: PageRef | 'all', opts?: SetScaleOptions): readonly PageRef[] =>
+    page === 'all' || opts?.allPages ? (ctx.document()?.pages ?? []).map((p) => p.ref) : [page];
+  const scaleOf = (page: PageRef): PdfMeasure => {
+    const scale = ctx.getState().pages[page.pageObjectNumber]?.scale.measure;
     if (!scale || scale.subtype !== 'RL') {
       throw new RangeError('Calibrate this page before changing its units or precision');
     }
@@ -46,41 +45,43 @@ export function createMeasurementCapability(
   const presets = config.presets ?? DEFAULT_PRESETS;
   return {
     canCalibrate,
-    canMeasure: (pon) => anno.canCreate() && !!ctx.getState().pages[pon]?.scale.ready,
-    pageScale: (pon) => ctx.getState().pages[pon]?.scale ?? LOADING,
+    canMeasure: (page) =>
+      anno.canCreate() && !!ctx.getState().pages[page.pageObjectNumber]?.scale.ready,
+    pageScale: (page) => ctx.getState().pages[page.pageObjectNumber]?.scale ?? LOADING,
     isBusy: () => ctx.getState().pending > 0,
     lastReports: () => ctx.getState().reports,
     prepare: effects.prepare,
-    setPageScale: (pon, measure, opts = {}) => effects.change(pons(pon, opts), () => measure, opts),
-    calibrate: (pon, from, to, real, opts = {}) => {
+    setPageScale: (page, measure, opts = {}) =>
+      effects.change(targets(page, opts), () => measure, opts),
+    calibrate: (page, from, to, real, opts = {}) => {
       const a = measurementPoint(from);
       const b = measurementPoint(to);
       const scale = measureFromKnownLength(Math.hypot(b.x - a.x, b.y - a.y), real);
-      return effects.change(pons(pon, opts), () => scale, opts);
+      return effects.change(targets(page, opts), () => scale, opts);
     },
-    setUnit: (pon, unit, areaUnit, opts = {}) =>
-      effects.change(pons(pon, opts), (p) => withUnit(scaleOf(p), unit, areaUnit), {
+    setUnit: (page, unit, areaUnit, opts = {}) =>
+      effects.change(targets(page, opts), (p) => withUnit(scaleOf(p), unit, areaUnit), {
         ...opts,
-        allPages: pon === 'all' || opts.allPages,
+        allPages: page === 'all' || opts.allPages,
       }),
-    setPrecision: (pon, precision, opts = {}) =>
-      effects.change(pons(pon, opts), (p) => withPrecision(scaleOf(p), precision), {
+    setPrecision: (page, precision, opts = {}) =>
+      effects.change(targets(page, opts), (p) => withPrecision(scaleOf(p), precision), {
         ...opts,
-        allPages: pon === 'all' || opts.allPages,
+        allPages: page === 'all' || opts.allPages,
       }),
-    setPreset: (pon, id, opts = {}) => {
+    setPreset: (page, id, opts = {}) => {
       const preset = presets.find((p) => p.id === id);
       if (!preset) {
         return Promise.reject(new RangeError('Unknown scale preset'));
       }
       return effects.change(
-        pons(pon, opts),
+        targets(page, opts),
         (p) =>
           measureFromRatio(
             preset.paper,
             preset.real,
             preset.unit,
-            ctx.document()?.pages.find((page) => page.pageObjectNumber === p)?.userUnit ?? 1,
+            ctx.document()?.pages.find((layout) => pageRefsEqual(layout.ref, p))?.userUnit ?? 1,
           ),
         opts,
       );
@@ -88,8 +89,8 @@ export function createMeasurementCapability(
     presets: () => presets,
     units: () => UNITS,
     areaUnits: () => [...UNITS.map(squareOf), 'ha', 'acre'],
-    setAreaUnit: (pon, unit, opts = {}) =>
-      effects.change(pons(pon, opts), (p) => withAreaUnit(scaleOf(p), unit), opts),
+    setAreaUnit: (page, unit, opts = {}) =>
+      effects.change(targets(page, opts), (p) => withAreaUnit(scaleOf(p), unit), opts),
     readout: (ref) => {
       const dto = anno.get(ref);
       return dto ? measurementReadout(dto) : { unavailable: 'not-dimension' };

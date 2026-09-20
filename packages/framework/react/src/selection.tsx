@@ -58,7 +58,7 @@ export function SelectionLayer({ color = 'rgba(33, 150, 243, 0.35)' }: Selection
   const selection = useCapability(SelectionHostToken);
   const segments = useSelector(
     SelectionHostToken,
-    (c) => c.segmentsForPage(page.pon),
+    (c) => c.segmentsForPage(page.ref),
     shallowArray,
   );
   // A consumer (e.g. a markup tool drawing its own preview) can take over the
@@ -69,8 +69,8 @@ export function SelectionLayer({ color = 'rgba(33, 150, 243, 0.35)' }: Selection
   // pointer-down can hit-test without waiting on the engine round-trip.
   // (A no-op without doc.text.select — nothing warms, nothing renders.)
   useEffect(() => {
-    selection.ensurePage(page.pon);
-  }, [selection, page.pon]);
+    selection.ensurePage(page.ref);
+  }, [selection, page.ref]);
 
   if (!visible) return null;
 
@@ -116,7 +116,7 @@ const sameMenuAnchor = (
   if (a === b) return true;
   if (!a || !b) return false;
   return (
-    a.pon === b.pon &&
+    a.page.pageObjectNumber === b.page.pageObjectNumber &&
     a.bounds.x === b.bounds.x &&
     a.bounds.y === b.bounds.y &&
     a.bounds.width === b.bounds.width &&
@@ -172,8 +172,8 @@ const sameEndpoints = (a: Endpoints | null, b: Endpoints | null): boolean => {
   if (a === b) return true;
   if (!a || !b) return false;
   return (
-    a.start.pon === b.start.pon &&
-    a.end.pon === b.end.pon &&
+    a.start.page.pageObjectNumber === b.start.page.pageObjectNumber &&
+    a.end.page.pageObjectNumber === b.end.page.pageObjectNumber &&
     a.start.advance === b.start.advance &&
     a.end.advance === b.end.advance &&
     // corner-wise, so a boundary that ROTATES without moving its bounding box
@@ -187,12 +187,12 @@ const sameEndpoints = (a: Endpoints | null, b: Endpoints | null): boolean => {
  *  page resolution out. (`pageRectToScreen` is the AABB projector — upright
  *  overlays only — and would collapse exactly the orientation handles need.) */
 const handleView = (stage: StageCapability): SelectionHandleView => ({
-  toOverlay: (pon, pt) => {
-    const world = stage.pageToWorld(pon, pt);
+  toOverlay: (page, pt) => {
+    const world = stage.pageToWorld(page, pt);
     return world ? stage.toScreen(world) : null;
   },
   pageAt: (overlay) => stage.pageAt(overlay),
-  pointOnPage: (pon, overlay) => stage.pointOnPage(pon, overlay),
+  pointOnPage: (page, overlay) => stage.pointOnPage(page, overlay),
 });
 
 export interface SelectionHandlesProps {
@@ -229,8 +229,8 @@ export function SelectionHandles({ color = '#2196f3', token = StageToken }: Sele
       const s = c.snapshot();
       if (!s.start || !s.end) return null;
       return {
-        start: { pon: s.start.pon, glyphQuad: s.start.glyphQuad, advance: s.start.advance },
-        end: { pon: s.end.pon, glyphQuad: s.end.glyphQuad, advance: s.end.advance },
+        start: { page: s.start.page, glyphQuad: s.start.glyphQuad, advance: s.start.advance },
+        end: { page: s.end.page, glyphQuad: s.end.glyphQuad, advance: s.end.advance },
       };
     },
     sameEndpoints,
@@ -264,7 +264,7 @@ export function SelectionHandles({ color = '#2196f3', token = StageToken }: Sele
             host,
             view,
             opposite,
-            src.endpoints[role].pon,
+            src.endpoints[role].page,
           );
           setDragging(role);
           return {

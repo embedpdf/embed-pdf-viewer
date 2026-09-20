@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { PageObjectNumber, PluginContext } from '@embedpdf/core';
+import type { PluginContext } from '@embedpdf/core';
+import { toPageRef } from '@embedpdf/engine-core/runtime';
 import type { PageGeometrySnapshot, PageTextSnapshot } from '@embedpdf/engine-core/runtime';
 import { createSelectionCapability } from './capability';
 import { initialSelectionState, selectionReducer } from './reducer';
@@ -49,7 +50,7 @@ function makeHarness(pages: PageFixture[], allow: Set<string>) {
   const registry = () =>
     pages.map((p, index) => ({
       index,
-      pageObjectNumber: p.pon,
+      ref: toPageRef(p.pon),
       rotation: 0,
       userUnit: 1,
       boxes: { crop },
@@ -59,7 +60,7 @@ function makeHarness(pages: PageFixture[], allow: Set<string>) {
     id: 'selection',
     doc: {
       security: { allows: (cap: string) => allow.has(cap) },
-      page: (pon: number) => ({
+      page: ({ pageObjectNumber: pon }: { pageObjectNumber: number }) => ({
         geometry: { read: () => geometryReads(pon) },
         text: { read: () => textReads(pon) },
       }),
@@ -128,7 +129,7 @@ describe('selection capability — permissions', () => {
 
   it('select() throws PermissionDenied without doc.text.select; clear() stays allowed', () => {
     const cap = createSelectionCapability(makeHarness([pageA], NONE).ctx);
-    expect(() => cap.select({ pon: 101 as PageObjectNumber, start: 0, count: 2 })).toThrowError(
+    expect(() => cap.select({ page: toPageRef(101), start: 0, count: 2 })).toThrowError(
       /doc\.text\.select/,
     );
     expect(() => cap.clear()).not.toThrow();
@@ -137,14 +138,14 @@ describe('selection capability — permissions', () => {
   it('ensurePage is inert without doc.text.select (no guaranteed-to-fail reads)', () => {
     const h = makeHarness([pageA], NONE);
     const cap = createSelectionCapability(h.ctx);
-    cap.ensurePage(101 as PageObjectNumber);
+    cap.ensurePage(toPageRef(101));
     expect(h.geometryReads).not.toHaveBeenCalled();
   });
 
   it('readText() rejects with PermissionDenied without doc.text.copy', async () => {
     const h = makeHarness([pageA], SELECT_ONLY);
     const cap = createSelectionCapability(h.ctx);
-    cap.select({ pon: 101 as PageObjectNumber, start: 0, count: 5 });
+    cap.select({ page: toPageRef(101), start: 0, count: 5 });
     await flush();
     await expect(cap.readText()).rejects.toThrowError(/doc\.text\.copy/);
     expect(h.textReads).not.toHaveBeenCalled();
@@ -155,14 +156,14 @@ describe('selection capability — programmatic selection', () => {
   it('select({pon,start,count}) materializes segments and a round-trippable range', async () => {
     const h = makeHarness([pageA], ALL);
     const cap = createSelectionCapability(h.ctx);
-    cap.select({ pon: 101 as PageObjectNumber, start: 1, count: 3 });
+    cap.select({ page: toPageRef(101), start: 1, count: 3 });
     await flush(); // geometry warms, PAGE_LOADED recompute fills segments
     expect(cap.hasSelection()).toBe(true);
-    expect(cap.segmentsForPage(101 as PageObjectNumber).length).toBeGreaterThan(0);
+    expect(cap.segmentsForPage(toPageRef(101)).length).toBeGreaterThan(0);
     const range = cap.snapshot().range!;
     expect(range).toEqual({
-      start: { pon: 101, index: 1 },
-      end: { pon: 101, index: 4 },
+      start: { page: toPageRef(101), index: 1 },
+      end: { page: toPageRef(101), index: 4 },
     });
     // Round trip: the snapshot range is a valid select() input.
     cap.select(range);
@@ -173,9 +174,9 @@ describe('selection capability — programmatic selection', () => {
   it('an empty range clears instead of selecting', async () => {
     const h = makeHarness([pageA], ALL);
     const cap = createSelectionCapability(h.ctx);
-    cap.select({ pon: 101 as PageObjectNumber, start: 2, count: 2 });
+    cap.select({ page: toPageRef(101), start: 2, count: 2 });
     await flush();
-    cap.select({ pon: 101 as PageObjectNumber, start: 2, count: 0 });
+    cap.select({ page: toPageRef(101), start: 2, count: 0 });
     expect(cap.hasSelection()).toBe(false);
   });
 
@@ -185,9 +186,9 @@ describe('selection capability — programmatic selection', () => {
     cap.selectAll();
     await flush();
     const range = cap.snapshot().range!;
-    expect(range.start).toEqual({ pon: 101, index: 0 });
-    expect(range.end).toEqual({ pon: 102, index: 3 }); // clamped to page B's charCount
-    expect(cap.selectedPages()).toEqual([101, 102]);
+    expect(range.start).toEqual({ page: toPageRef(101), index: 0 });
+    expect(range.end).toEqual({ page: toPageRef(102), index: 3 }); // clamped to page B's charCount
+    expect(cap.selectedPages()).toEqual([toPageRef(101), toPageRef(102)]);
   });
 });
 
@@ -195,10 +196,10 @@ describe('selection capability — readText', () => {
   it('slices through the charMap (dropped char contributes nothing)', async () => {
     const h = makeHarness([pageB], ALL);
     const cap = createSelectionCapability(h.ctx);
-    cap.select({ pon: 102 as PageObjectNumber, start: 0, count: 3 });
+    cap.select({ page: toPageRef(102), start: 0, count: 3 });
     await flush();
     await expect(cap.readText()).resolves.toBe('AB');
-    cap.select({ pon: 102 as PageObjectNumber, start: 2, count: 1 });
+    cap.select({ page: toPageRef(102), start: 2, count: 1 });
     await flush();
     await expect(cap.readText()).resolves.toBe('B');
   });
@@ -223,12 +224,12 @@ describe('selection capability — isSelecting (the gesture-in-flight fact)', ()
   it('tracks the drag gesture: true from beginAt, false at end()', async () => {
     const h = makeHarness([pageA], ALL);
     const cap = createSelectionCapability(h.ctx);
-    cap.ensurePage(101 as PageObjectNumber);
+    cap.ensurePage(toPageRef(101));
     await flush();
     expect(cap.isSelecting()).toBe(false);
-    expect(cap.beginAt(101 as PageObjectNumber, { x: 14, y: 5 })).toBe(true);
+    expect(cap.beginAt(toPageRef(101), { x: 14, y: 5 })).toBe(true);
     expect(cap.isSelecting()).toBe(true);
-    cap.extendTo(101 as PageObjectNumber, { x: 30, y: 5 });
+    cap.extendTo(toPageRef(101), { x: 30, y: 5 });
     expect(cap.isSelecting()).toBe(true);
     cap.end();
     expect(cap.isSelecting()).toBe(false);
@@ -238,7 +239,7 @@ describe('selection capability — isSelecting (the gesture-in-flight fact)', ()
   it('programmatic selections are born settled', async () => {
     const h = makeHarness([pageA], ALL);
     const cap = createSelectionCapability(h.ctx);
-    cap.select({ pon: 101 as PageObjectNumber, start: 0, count: 4 });
+    cap.select({ page: toPageRef(101), start: 0, count: 4 });
     await flush();
     expect(cap.isSelecting()).toBe(false);
     expect(cap.menuAnchor()).not.toBeNull();
@@ -247,9 +248,9 @@ describe('selection capability — isSelecting (the gesture-in-flight fact)', ()
   it('derived recomputes never touch the fact mid-gesture', async () => {
     const h = makeHarness([pageA], ALL);
     const cap = createSelectionCapability(h.ctx);
-    cap.ensurePage(101 as PageObjectNumber);
+    cap.ensurePage(toPageRef(101));
     await flush();
-    cap.beginAt(101 as PageObjectNumber, { x: 14, y: 5 });
+    cap.beginAt(toPageRef(101), { x: 14, y: 5 });
     h.bumpRevision(); // rotate/move-style registry refresh → recompute
     expect(cap.isSelecting()).toBe(true);
   });
@@ -257,9 +258,9 @@ describe('selection capability — isSelecting (the gesture-in-flight fact)', ()
   it('clear() resets it', async () => {
     const h = makeHarness([pageA], ALL);
     const cap = createSelectionCapability(h.ctx);
-    cap.ensurePage(101 as PageObjectNumber);
+    cap.ensurePage(toPageRef(101));
     await flush();
-    cap.beginAt(101 as PageObjectNumber, { x: 14, y: 5 });
+    cap.beginAt(toPageRef(101), { x: 14, y: 5 });
     cap.clear();
     expect(cap.isSelecting()).toBe(false);
   });
@@ -270,10 +271,10 @@ describe('selection capability — menuAnchor', () => {
     const h = makeHarness([pageA], ALL);
     const cap = createSelectionCapability(h.ctx);
     expect(cap.menuAnchor()).toBeNull();
-    cap.select({ pon: 101 as PageObjectNumber, start: 1, count: 3 });
+    cap.select({ page: toPageRef(101), start: 1, count: 3 });
     await flush();
     const anchor = cap.menuAnchor()!;
-    expect(anchor.pon).toBe(101);
+    expect(anchor.page).toEqual(toPageRef(101));
     // Glyphs are 8px cells starting at x=10: chars 1..3 span x 18..42.
     expect(anchor.bounds.x).toBeCloseTo(18);
     expect(anchor.bounds.width).toBeCloseTo(24);
@@ -285,7 +286,7 @@ describe('selection capability — menuAnchor', () => {
     const cap = createSelectionCapability(h.ctx);
     cap.selectAll();
     await flush();
-    expect(cap.menuAnchor()!.pon).toBe(102);
+    expect(cap.menuAnchor()!.page).toEqual(toPageRef(102));
   });
 });
 
@@ -293,12 +294,12 @@ describe('selection capability — invalidation', () => {
   it('content mutation (redaction.applied) clears the selection and refetches geometry', async () => {
     const h = makeHarness([pageA], ALL);
     const cap = createSelectionCapability(h.ctx);
-    cap.select({ pon: 101 as PageObjectNumber, start: 0, count: 4 });
+    cap.select({ page: toPageRef(101), start: 0, count: 4 });
     await flush();
     expect(h.geometryReads).toHaveBeenCalledTimes(1);
     h.emitDocEvent('redaction.applied');
     expect(cap.hasSelection()).toBe(false);
-    cap.ensurePage(101 as PageObjectNumber);
+    cap.ensurePage(toPageRef(101));
     await flush();
     expect(h.geometryReads).toHaveBeenCalledTimes(2);
   });

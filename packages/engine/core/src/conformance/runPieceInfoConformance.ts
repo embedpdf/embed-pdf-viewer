@@ -1,6 +1,7 @@
 import type { ConformanceTestRunner, ConformanceOptions } from './runMetadataConformance';
 import type { DocumentHandle } from '../engine/DocumentHandle';
 import type { Engine } from '../engine/Engine';
+import { toPageRef } from '../identity/PageRef';
 
 const APP = 'EMBD_ConformanceTest';
 const SIBLING_APP = 'EMBD_ConformanceSibling';
@@ -73,7 +74,7 @@ export function runPieceInfoConformance(
       const doc = await openFixture(engine, opts);
       try {
         const list = await doc.pages.list();
-        const page = doc.page(list.pages[0].pageObjectNumber);
+        const page = doc.page(list.pages[0].ref);
         await page.pieceInfo!.update(APP, { name: 'Witness', subject: 'Getuige' });
         const snap = await page.pieceInfo!.read(APP);
         expect(snap!.entries).toEqual({
@@ -93,16 +94,18 @@ export function runPieceInfoConformance(
       let reopened: DocumentHandle | null = null;
       try {
         const list = await doc.pages.list();
-        const pon = list.pages[0].pageObjectNumber;
+        const pon = list.pages[0].ref.pageObjectNumber;
         await doc.pieceInfo!.update(APP, { name: 'Standard Stamps' });
-        await doc.page(pon).pieceInfo!.update(APP, { name: 'Witness', subject: 'Getuige' });
+        await doc
+          .page(toPageRef(pon))
+          .pieceInfo!.update(APP, { name: 'Witness', subject: 'Getuige' });
         const bytes = await doc.download();
 
         reopened = await engine.open({ kind: 'bytes', id: `${opts.fixture.id}-pi-reopen`, bytes });
         const relist = await reopened.pages.list();
         const docSnap = await reopened.pieceInfo!.read(APP);
         expect(docSnap!.entries.name).toEqual({ type: 'string', value: 'Standard Stamps' });
-        const pageSnap = await reopened.page(relist.pages[0].pageObjectNumber).pieceInfo!.read(APP);
+        const pageSnap = await reopened.page(relist.pages[0].ref).pieceInfo!.read(APP);
         expect(pageSnap!.entries.subject).toEqual({ type: 'string', value: 'Getuige' });
       } finally {
         if (reopened) await reopened.close();
@@ -141,9 +144,7 @@ export function runPieceInfoConformance(
       try {
         expect(await doc.pieceInfo!.read('EMBD_NeverWritten')).toBe(null);
         const list = await doc.pages.list();
-        expect(
-          await doc.page(list.pages[0].pageObjectNumber).pieceInfo!.read('EMBD_NeverWritten'),
-        ).toBe(null);
+        expect(await doc.page(list.pages[0].ref).pieceInfo!.read('EMBD_NeverWritten')).toBe(null);
       } finally {
         await doc.close();
       }

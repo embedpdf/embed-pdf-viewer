@@ -7,6 +7,7 @@ import {
   EngineErrorCode,
   type DocumentHandle,
   type EngineRenderPolicy,
+  toPageRef,
 } from '@embedpdf/engine-core/runtime';
 import { createLocalEngine, type LocalEngine } from '../src/index';
 
@@ -67,7 +68,7 @@ describe('local render policy (wasm runtime)', () => {
       // …and renders anything, including the scale viewport the enforced
       // lattice rejects below.
       const raster = await plainDoc
-        .page(await firstPon(plainDoc))
+        .page(toPageRef(await firstPon(plainDoc)))
         .render.raw({ viewport: { kind: 'scale', scale: 0.25 } });
       expect(raster.width).toBeGreaterThan(0);
     } finally {
@@ -77,7 +78,7 @@ describe('local render policy (wasm runtime)', () => {
   }, 120_000);
 
   test('enforced: off-lattice full-page renders reject with the policy attached', async () => {
-    const page = doc.page(await firstPon(doc));
+    const page = doc.page(toPageRef(await firstPon(doc)));
 
     // Scale viewports are off the width lattice by construction — the
     // caller must convert through snapFullPageViewport(pageWidth).
@@ -103,7 +104,7 @@ describe('local render policy (wasm runtime)', () => {
   });
 
   test('enforced: rect targets are exempt (tile jurisdiction)', async () => {
-    const page = doc.page(await firstPon(doc));
+    const page = doc.page(toPageRef(await firstPon(doc)));
     const raster = await page.render.raw({
       target: { kind: 'rect', rect: { left: 0, bottom: 0, right: 100, top: 100 } },
       viewport: { kind: 'scale', scale: 1 },
@@ -113,7 +114,7 @@ describe('local render policy (wasm runtime)', () => {
 
   test('enforced: appearance scales snap-or-reject against the appearance lattice', async () => {
     // Page 2 of ebook-annotated.pdf carries annotations with /AP streams.
-    const page = doc.page(2 as never);
+    const page = doc.page(toPageRef(2));
 
     await expect(page.annotations.renderAppearances({ scale: 1.5 })).rejects.toSatisfy(
       (err: unknown) => {
@@ -146,7 +147,7 @@ describe('local render policy (wasm runtime)', () => {
     try {
       await expect(
         tinyDoc
-          .page(await firstPon(tinyDoc))
+          .page(toPageRef(await firstPon(tinyDoc)))
           .render.raw({ viewport: { kind: 'width', width: 320 } }),
       ).rejects.toSatisfy((err: unknown) => {
         expect(EngineError.is(err, EngineErrorCode.InvalidArg)).toBe(true);
@@ -162,5 +163,5 @@ describe('local render policy (wasm runtime)', () => {
 
 async function firstPon(doc: DocumentHandle): Promise<never> {
   const pages = await doc.pages.list();
-  return pages.pages[0]!.pageObjectNumber as never;
+  return pages.pages[0]!.ref.pageObjectNumber as never;
 }

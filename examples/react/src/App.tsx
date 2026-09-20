@@ -1195,7 +1195,7 @@ function SearchControls() {
         >
           {hits.slice(0, 100).map((hit, i) => (
             <button
-              key={`${hit.pon}:${hit.charStart}`}
+              key={`${hit.page.pageObjectNumber}:${hit.charStart}`}
               onClick={() => search.goTo(i)}
               style={{
                 display: 'block',
@@ -1664,7 +1664,7 @@ function ThumbnailSidebar() {
                   >
                     <button
                       style={itemStyle}
-                      onClick={(e) => act(e, () => editor.rotateBy(page.pon, 90))}
+                      onClick={(e) => act(e, () => editor.rotateBy(page.ref, 90))}
                     >
                       ↻ Rotate
                     </button>
@@ -1672,7 +1672,7 @@ function ThumbnailSidebar() {
                     {page.pageIndex > 0 && (
                       <button
                         style={itemStyle}
-                        onClick={(e) => act(e, () => editor.move([page.pon], page.pageIndex - 1))}
+                        onClick={(e) => act(e, () => editor.move([page.ref], page.pageIndex - 1))}
                       >
                         ↑ Move page up
                       </button>
@@ -1680,7 +1680,7 @@ function ThumbnailSidebar() {
                     {page.pageIndex < pageCount - 1 && (
                       <button
                         style={itemStyle}
-                        onClick={(e) => act(e, () => editor.move([page.pon], page.pageIndex + 1))}
+                        onClick={(e) => act(e, () => editor.move([page.ref], page.pageIndex + 1))}
                       >
                         ↓ Move page down
                       </button>
@@ -1689,7 +1689,7 @@ function ThumbnailSidebar() {
                     {pageCount > 1 && (
                       <button
                         style={{ ...itemStyle, color: '#c0322b' }}
-                        onClick={(e) => act(e, () => editor.delete([page.pon]))}
+                        onClick={(e) => act(e, () => editor.delete([page.ref]))}
                       >
                         🗑 Delete
                       </button>

@@ -21,6 +21,7 @@ import { update, type Msg } from '@embedpdf/core-annotation';
 
 import { AnnotationToken } from './types';
 import type { AnnotationAction, AnnotationState } from './types';
+import { toPageRef } from '@embedpdf/engine-core/runtime';
 
 export function registerAnnotationEffects(
   ctx: EffectContext<AnnotationState, AnnotationAction>,
@@ -91,10 +92,10 @@ export function registerAnnotationEffects(
     // installed: a remote collaborator's apply still reconciles this view.)
     if (event.type === 'redaction.applied') {
       const affected = new Set(
-        event.results.filter((r) => r.status === 'applied').map((r) => r.pageObjectNumber),
+        event.results.filter((r) => r.status === 'applied').map((r) => r.page.pageObjectNumber),
       );
       if (affected.size) {
-        for (const pon of affected) void host().reloadPage(pon);
+        for (const pon of affected) void host().reloadPage(toPageRef(pon));
       }
       return;
     }
@@ -109,11 +110,11 @@ export function registerAnnotationEffects(
     // inserted page merges idempotently — correct whether the op was ours
     // or a collaborator's.
     if (event.type === 'pages.deleted') {
-      const gone = new Set<number>(event.pageObjectNumbers);
+      const gone = new Set<number>(event.pages.map((p) => p.pageObjectNumber));
       const m = ctx.getState().model;
       const ids = m.order.filter((id) => {
         const a = m.byId[id];
-        return a !== undefined && gone.has(a.pon);
+        return a !== undefined && gone.has(a.page.pageObjectNumber);
       });
       if (ids.length) apply({ t: 'remove', ids });
       return;
@@ -122,7 +123,7 @@ export function registerAnnotationEffects(
       // A fresh page usually has no annotations, but an insert-from-bytes
       // can carry them. `reloadPage` no-ops harmlessly if the layout for
       // the new page hasn't landed in core state yet (crop unknown).
-      for (const pon of event.insertedPageObjectNumbers) void host().reloadPage(pon);
+      for (const page of event.insertedPages) void host().reloadPage(page);
       return;
     }
     // Only fold in OTHER sessions' edits; our own flow through the capability.

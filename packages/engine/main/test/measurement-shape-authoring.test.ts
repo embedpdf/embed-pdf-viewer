@@ -3,7 +3,7 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { describe, expect, test, vi } from 'vitest';
 import type { PluginContext } from '@embedpdf/core';
-import { measureFromKnownLength } from '@embedpdf/engine-core/runtime';
+import { measureFromKnownLength, toPageRef } from '@embedpdf/engine-core/runtime';
 import { annotationSelectionFrame, shapeMeasurementLayout } from '../../../core/annotation/src';
 import { rotatePoint } from '../../../core/annotation/src/geometry';
 import { createLocalEngine } from '../src/index';
@@ -33,7 +33,7 @@ describe.each(['wasm', 'native'] as const)('shape authoring integration (%s)', (
       try {
         const pages = (await doc.pages.list()).pages;
         const page = pages[0];
-        const pon = page.pageObjectNumber;
+        const pon = page.ref.pageObjectNumber;
         const crop = page.boxes.crop;
         let state = initialAnnotationState();
         const ctx = {
@@ -49,8 +49,12 @@ describe.each(['wasm', 'native'] as const)('shape authoring integration (%s)', (
         } as unknown as PluginContext<AnnotationState, AnnotationAction>;
         const annotation = createAnnotationCapability(ctx);
         const scale = measureFromKnownLength(100, { value: 5, unit: 'm' });
-        await doc.page(pon).measure!.setScale(scale);
-        annotation.setPageViewports(pon, await doc.page(pon).measure!.viewports(), scale);
+        await doc.page(toPageRef(pon)).measure!.setScale(scale);
+        annotation.setPageViewports(
+          page.ref,
+          await doc.page(toPageRef(pon)).measure!.viewports(),
+          scale,
+        );
         for (const preset of annotation.tools()) {
           if (preset.defaults) annotation.setDefaults(preset.preset, preset.defaults);
         }
@@ -60,7 +64,7 @@ describe.each(['wasm', 'native'] as const)('shape authoring integration (%s)', (
           { x: 300, y: 400 },
           { x: 100, y: 400 },
         ]) {
-          annotation.createPointer(tool, 'down', pon, point);
+          annotation.createPointer(tool, 'down', page.ref, point);
         }
         annotation.finishCreationDraft();
         await vi.waitFor(() => expect(annotation.getSelected()).toHaveLength(1));
@@ -75,9 +79,9 @@ describe.each(['wasm', 'native'] as const)('shape authoring integration (%s)', (
         };
         const expectVector = () => {
           expect(
-            annotation.pageItems(pon).find((item) => item.id === refKey(created.ref))?.source,
+            annotation.pageItems(page.ref).find((item) => item.id === refKey(created.ref))?.source,
           ).toBe('vector');
-          expect(annotation.appearanceEpoch(pon)).toBe('');
+          expect(annotation.appearanceEpoch(page.ref)).toBe('');
         };
         expect(created.contents).toBe(tool === 'area' ? '50 m²' : '25 m');
         expect(created.caption).toEqual({ enabled: true });
@@ -87,9 +91,9 @@ describe.each(['wasm', 'native'] as const)('shape authoring integration (%s)', (
         const label = shapeMeasurementLayout(model.geom, model.measure, model.style)!.caption!
           .center;
         const target = { x: 390, y: 275 };
-        annotation.editPointer('down', pon, label, false);
-        annotation.editPointer('move', pon, target, false);
-        annotation.editPointer('up', pon, target, false);
+        annotation.editPointer('down', page.ref, label, false);
+        annotation.editPointer('move', page.ref, target, false);
+        annotation.editPointer('up', page.ref, target, false);
         await vi.waitFor(() =>
           expect(current().caption?.center).toEqual({
             x: crop.left + target.x,
@@ -100,9 +104,9 @@ describe.each(['wasm', 'native'] as const)('shape authoring integration (%s)', (
         expectVector();
 
         // The manual center stays put when only one measured vertex changes.
-        annotation.editPointer('down', pon, { x: 100, y: 300 }, false);
-        annotation.editPointer('move', pon, { x: 80, y: 290 }, false);
-        annotation.editPointer('up', pon, { x: 80, y: 290 }, false);
+        annotation.editPointer('down', page.ref, { x: 100, y: 300 }, false);
+        annotation.editPointer('move', page.ref, { x: 80, y: 290 }, false);
+        annotation.editPointer('up', page.ref, { x: 80, y: 290 }, false);
         await vi.waitFor(() => expect(current().vertices[0].x).toBeCloseTo(crop.left + 80, 3));
         expect(current().caption?.center).toEqual({
           x: crop.left + target.x,
@@ -153,8 +157,9 @@ describe.each(['wasm', 'native'] as const)('shape authoring integration (%s)', (
         ]) {
           const reopened = await engine.open(source, { scope: ['*'] });
           try {
-            const reopenedPon = (await reopened.pages.list()).pages[0].pageObjectNumber;
-            const list = (await reopened.page(reopenedPon).annotations.list()).annotations;
+            const reopenedPon = (await reopened.pages.list()).pages[0].ref.pageObjectNumber;
+            const list = (await reopened.page(toPageRef(reopenedPon)).annotations.list())
+              .annotations;
             const restored = list.find((dto) => dto.nm === created.nm)!;
             expect(restored).toMatchObject({
               subtype: final.subtype,
@@ -170,7 +175,7 @@ describe.each(['wasm', 'native'] as const)('shape authoring integration (%s)', (
             );
             // Rendering requests exercise the generated /AP as well as dictionary persistence.
             const appearance = await reopened
-              .page(reopenedPon)
+              .page(toPageRef(reopenedPon))
               .annotations.renderAppearances({ scale: 1 });
             expect(appearance).toBeTruthy();
           } finally {

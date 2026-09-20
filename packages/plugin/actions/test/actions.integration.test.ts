@@ -5,7 +5,12 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { createKernel, type Kernel } from '@embedpdf/core';
 import { createLocalEngine } from '@embedpdf/engine';
-import type { AnnotationRef, Engine, PdfActionTree } from '@embedpdf/engine-core/runtime';
+import {
+  toPageRef,
+  type AnnotationRef,
+  type Engine,
+  type PdfActionTree,
+} from '@embedpdf/engine-core/runtime';
 
 import { actionsPlugin } from '../src/actions.plugin';
 import { ActionsToken } from '../src/internal';
@@ -111,8 +116,8 @@ describe('plugin-actions integration (real engine)', () => {
       { scope: ['*'] },
     );
     const page = (await opened.pages.list()).pages[0];
-    pon = page.pageObjectNumber;
-    const { annotations } = await opened.page(pon).annotations.list();
+    pon = page.ref.pageObjectNumber;
+    const { annotations } = await opened.page(toPageRef(pon)).annotations.list();
     const byNm = new Map(annotations.map((a) => [a.nm, a]));
     treeOf = (nm: string) => {
       const tree = byNm.get(nm)?.actions?.activate;
@@ -234,7 +239,7 @@ describe('plugin-actions integration (real engine)', () => {
       scope: 'activate',
       // The ref a trigger source really passes: the DTO's own (objectNumber).
       ref: refOf('named-next'),
-      pon,
+      page: toPageRef(pon),
     });
     expect(result.status).toBe('executed');
     expect(lastCallsSince(mark)).toEqual(['named']);

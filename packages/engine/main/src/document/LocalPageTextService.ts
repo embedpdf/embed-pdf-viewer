@@ -6,6 +6,7 @@ import {
   type PageObjectNumber,
   type PageTextService,
   type PageTextSnapshot,
+  type PageRef,
 } from '@embedpdf/engine-core/runtime';
 
 import type { ScopeGuard } from '../scope';
@@ -29,7 +30,7 @@ interface DocClosedView {
 export class LocalPageTextService implements PageTextService {
   constructor(
     private readonly docId: string,
-    private readonly pageObjectNumber: PageObjectNumber,
+    private readonly ref: PageRef,
     private readonly queue: WorkerQueue,
     private readonly view: DocClosedView,
     private readonly guard: ScopeGuard,
@@ -50,7 +51,7 @@ export class LocalPageTextService implements PageTextService {
       return AbortablePromise.rejectReason(err);
     }
     const docId = this.docId;
-    const pon = this.pageObjectNumber;
+    const ref = this.ref;
     const submission = this.queue.enqueue<WorkerResultPayload>(
       {
         buildPack: (jobId: JobId) =>
@@ -58,7 +59,7 @@ export class LocalPageTextService implements PageTextService {
             kind: 'pages.text',
             jobId,
             docId,
-            pageObjectNumber: pon,
+            page: ref,
           }),
       },
       { priority: Priority.MEDIUM },

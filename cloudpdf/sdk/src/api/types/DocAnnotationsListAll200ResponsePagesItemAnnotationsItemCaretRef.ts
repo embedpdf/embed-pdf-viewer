@@ -10,28 +10,82 @@ export type DocAnnotationsListAll200ResponsePagesItemAnnotationsItemCaretRef =
 export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItemCaretRef {
     export interface ObjectNumber {
         kind: "objectNumber";
-        pageObjectNumber: number;
+        page: DocAnnotationsListAll200ResponsePagesItemAnnotationsItemCaretRefObjectNumber.Page;
         annotObjectNumber: number;
+    }
+
+    export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItemCaretRefObjectNumber {
+        export interface Page {
+            kind: Page.Kind;
+            pageObjectNumber: number;
+        }
+
+        export namespace Page {
+            export const Kind = {
+                ObjectNumber: "objectNumber",
+            } as const;
+            export type Kind = (typeof Kind)[keyof typeof Kind];
+        }
     }
 
     export interface Nm {
         kind: "nm";
-        pageObjectNumber: number;
+        page: DocAnnotationsListAll200ResponsePagesItemAnnotationsItemCaretRefNm.Page;
         nm: string;
+    }
+
+    export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItemCaretRefNm {
+        export interface Page {
+            kind: Page.Kind;
+            pageObjectNumber: number;
+        }
+
+        export namespace Page {
+            export const Kind = {
+                ObjectNumber: "objectNumber",
+            } as const;
+            export type Kind = (typeof Kind)[keyof typeof Kind];
+        }
     }
 
     export interface Index {
         kind: "index";
-        pageObjectNumber: number;
+        page: DocAnnotationsListAll200ResponsePagesItemAnnotationsItemCaretRefIndex.Page;
         index: number;
         revision: DocAnnotationsListAll200ResponsePagesItemAnnotationsItemCaretRefIndex.Revision;
     }
 
     export namespace DocAnnotationsListAll200ResponsePagesItemAnnotationsItemCaretRefIndex {
+        export interface Page {
+            kind: Page.Kind;
+            pageObjectNumber: number;
+        }
+
+        export namespace Page {
+            export const Kind = {
+                ObjectNumber: "objectNumber",
+            } as const;
+            export type Kind = (typeof Kind)[keyof typeof Kind];
+        }
+
         export interface Revision {
             docSessionId: string;
-            pageObjectNumber: number;
+            page: Revision.Page;
             generation: number;
+        }
+
+        export namespace Revision {
+            export interface Page {
+                kind: Page.Kind;
+                pageObjectNumber: number;
+            }
+
+            export namespace Page {
+                export const Kind = {
+                    ObjectNumber: "objectNumber",
+                } as const;
+                export type Kind = (typeof Kind)[keyof typeof Kind];
+            }
         }
     }
 }

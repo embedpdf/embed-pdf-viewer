@@ -119,7 +119,7 @@ export function fromDTO(
   return {
     id: refKey(dto.ref),
     ref: dto.ref,
-    pon: dto.pageObjectNumber,
+    page: dto.page,
     subtype: dto.subtype === 'widget' ? widgetKindOf(dto.fieldFamily) : dto.subtype,
     // `/F` verbatim — every behavioral question (visible? selectable? frozen?)
     // is answered by the core's flag predicates, never derived here.

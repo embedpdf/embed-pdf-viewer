@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Annot, TextStyle } from '@embedpdf/core-annotation';
 import type { FontHandle, RichTextDocument } from '@embedpdf/engine-core/runtime';
+import { toPageRef } from '@embedpdf/engine-core/runtime';
 
 import {
   bodyFromTextStyle,
@@ -51,7 +52,7 @@ const annot = (extra: Partial<Annot> = {}): Annot =>
   ({
     id: 'a',
     ref: null,
-    pon: 1,
+    page: toPageRef(1),
     subtype: 'freeText',
     geom: { t: 'text', rect: { x: 0, y: 0, width: 100, height: 20 } },
     style: {

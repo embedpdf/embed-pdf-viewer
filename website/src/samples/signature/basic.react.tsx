@@ -60,16 +60,14 @@ function useSignatureField() {
   const fields = useFormSnapshot()?.fields ?? null;
   const documentId = useDocumentId();
   const firstPage = useKernelValue((k) =>
-    documentId
-      ? (k.getState().core.documents[documentId]?.pages[0]?.pageObjectNumber ?? null)
-      : null,
+    documentId ? (k.getState().core.documents[documentId]?.pages[0]?.ref ?? null) : null,
   );
   useEffect(() => {
     if (!fields || firstPage === null || fields.some((f) => f.family === 'signature')) return;
     form
       .placeField({
         family: 'signature',
-        pageObjectNumber: firstPage,
+        page: firstPage,
         box: { x: 60, y: 620, width: 220, height: 64 },
       })
       .catch((err) => console.error(err));

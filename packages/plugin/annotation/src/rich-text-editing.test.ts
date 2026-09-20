@@ -10,8 +10,10 @@ import type { PluginContext } from '@embedpdf/core';
 import { createAnnotationCapability } from './capability';
 import { annotationReducer, initialAnnotationState } from './reducer';
 import type { AnnotationAction, AnnotationState } from './types';
+import { toPageRef } from '@embedpdf/engine-core/runtime';
 
 const PON = 1;
+const PAGE = toPageRef(PON);
 const CROP = { left: 0, bottom: 0, right: 600, top: 800 };
 const NO_FLAGS: AnnotationFlags = {
   invisible: false,
@@ -25,7 +27,7 @@ const NO_FLAGS: AnnotationFlags = {
   toggleNoView: false,
   lockedContents: false,
 };
-const REF: AnnotationRef = { kind: 'objectNumber', pageObjectNumber: PON, annotObjectNumber: 30 };
+const REF: AnnotationRef = { kind: 'objectNumber', page: PAGE, annotObjectNumber: 30 };
 
 const freeTextDTO = (
   contents: string,
@@ -34,7 +36,7 @@ const freeTextDTO = (
 ): AnnotationDTO =>
   ({
     ref: REF,
-    pageObjectNumber: PON,
+    page: PAGE,
     index: 30,
     identityQuality: 'durable',
     nm: null,
@@ -86,7 +88,7 @@ function harness() {
     dispatch: (action: AnnotationAction) => {
       state = annotationReducer(state, action);
     },
-    document: () => ({ pages: [{ pageObjectNumber: PON, boxes: { crop: CROP } }] }),
+    document: () => ({ pages: [{ ref: PAGE, boxes: { crop: CROP } }] }),
     doc: {
       page: () => ({ annotations: { update, list } }),
       security: {
@@ -106,7 +108,7 @@ function harness() {
 async function loaded(dto: AnnotationDTO) {
   const h = harness();
   h.list.mockResolvedValueOnce({ annotations: [dto] });
-  await h.capability.reloadPage(PON);
+  await h.capability.reloadPage(PAGE);
   await vi.waitFor(() => expect(h.state().model.order.length).toBe(1));
   const id = h.state().model.order[0]!;
   h.update.mockResolvedValue({ updated: dto, appearance: { changed: false } });
@@ -129,7 +131,7 @@ describe('the editor document', () => {
     h.capability.beginTextEdit(REF);
     h.capability.setRichText(REF, { paragraphs: [{ runs: [{ text: 'hello world' }] }] });
     expect(h.data().contents).toBe('hello world');
-    expect(h.capability.textItems(PON)[0]!.richText.paragraphs).toEqual([
+    expect(h.capability.textItems(PAGE)[0]!.richText.paragraphs).toEqual([
       { runs: [{ text: 'hello world' }] },
     ]);
     expect(h.update).not.toHaveBeenCalled(); // debounced
@@ -141,7 +143,7 @@ describe('the editor document', () => {
     });
     // The editor's metrics are the rich engine's from the start: line
     // advance 1.2 × size, text inset 2 × the border width.
-    const item = h.capability.textItems(PON)[0]!;
+    const item = h.capability.textItems(PAGE)[0]!;
     expect(item.css.padding).toBe(2);
   });
 
@@ -221,7 +223,7 @@ describe('the property surface while editing', () => {
     h.capability.toggleTextFormat('bold');
     expect(h.state().model.byId[h.id]!.text!.bold).toBe(true);
     expect(h.capability.getSelectionProps().values.bold).toBe(true);
-    expect(h.capability.textItems(PON)[0]!.css.fontWeight).toBe(700);
+    expect(h.capability.textItems(PAGE)[0]!.css.fontWeight).toBe(700);
     const bodyWrite = h.update.mock.calls.find((c) => c[1].richText?.body);
     // The COMPLETE body rides along: a partial one would mean engine
     // defaults and reset the size, face and colour.

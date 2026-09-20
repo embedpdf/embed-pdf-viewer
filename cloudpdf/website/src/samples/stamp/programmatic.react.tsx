@@ -55,13 +55,13 @@ function PlaceByCode() {
     const asset = assets.find((a) => a.name === identifier);
     if (!asset || !documentId || !page) return;
     const ref = await stamp.placeAsset(documentId, asset.id, {
-      pageObjectNumber: page.pon,
+      page: page.ref,
       at,
       targetWidth: 160,
       rotation,
     });
     setStatus(
-      `placed ${asset.label} on page ${ref.pageObjectNumber === page.pon ? currentPage + 1 : '?'}`,
+      `placed ${asset.label} on page ${ref.page.pageObjectNumber === page.ref.pageObjectNumber ? currentPage + 1 : '?'}`,
     );
   };
 

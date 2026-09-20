@@ -2,6 +2,7 @@ import type { DocCapability, PluginContext } from '@embedpdf/core';
 import { AnnotationToken } from '@embedpdf/plugin-annotation/contract/host';
 import { InteractionToken } from '@embedpdf/plugin-interaction/contract';
 import { SelectionToken } from '@embedpdf/plugin-selection/contract';
+import { toPageRef } from '@embedpdf/engine-core';
 import type {
   AnnotationDTO,
   AnnotationRef,
@@ -32,7 +33,7 @@ const idOf = (ref: AnnotationRef): string =>
     ? `obj:${ref.annotObjectNumber}`
     : ref.kind === 'nm'
       ? `nm:${ref.nm}`
-      : `idx:${ref.pageObjectNumber}:${ref.index}`;
+      : `idx:${ref.page.pageObjectNumber}:${ref.index}`;
 
 type RedactDTO = Extract<AnnotationDTO, { subtype: 'redact' }>;
 
@@ -73,13 +74,13 @@ export function createRedactionCapability(
     return doc.redaction;
   };
 
-  const pons = (): number[] => (ctx.document()?.pages ?? []).map((p) => p.pageObjectNumber);
+  const pons = (): number[] => (ctx.document()?.pages ?? []).map((p) => p.ref.pageObjectNumber);
 
   const pageIndexOf = (pon: number): number =>
-    ctx.document()?.pages.find((p) => p.pageObjectNumber === pon)?.index ?? -1;
+    ctx.document()?.pages.find((p) => p.ref.pageObjectNumber === pon)?.index ?? -1;
 
   const pendingOn = (pon: number): RedactDTO[] =>
-    anno.list(pon).filter((a): a is RedactDTO => a.subtype === 'redact');
+    anno.list(toPageRef(pon)).filter((a): a is RedactDTO => a.subtype === 'redact');
 
   const collectPending = (): RedactionPendingItem[] => {
     const items: RedactionPendingItem[] = [];
@@ -88,7 +89,7 @@ export function createRedactionCapability(
         items.push({
           id: idOf(dto.ref),
           ref: dto.ref,
-          pageObjectNumber: pon,
+          page: toPageRef(pon),
           pageIndex: pageIndexOf(pon),
           kind: dto.quadPoints.length > 0 ? 'text' : 'area',
           overlayText: dto.overlayText,
@@ -176,7 +177,7 @@ export function createRedactionCapability(
         // final overlay, so marked == previewed == applied for oriented text.
         anno.createMarkup(
           'redact',
-          page.pon,
+          page.page,
           page.segments.map((segment) => segment.quad),
           'redact',
         );
@@ -186,7 +187,7 @@ export function createRedactionCapability(
     },
 
     preparePending: async () => {
-      await Promise.all(pons().map((pon) => anno.ensurePage(pon)));
+      await Promise.all(pons().map((pon) => anno.ensurePage(toPageRef(pon))));
     },
     getPending: collectPending,
     pendingCount: () => collectPending().length,
@@ -195,7 +196,7 @@ export function createRedactionCapability(
       const wanted = ids ? new Set(ids) : null;
       let count = 0;
       for (const pon of pons()) {
-        const all = anno.list(pon);
+        const all = anno.list(toPageRef(pon));
         const marks = all.filter(
           (a): a is RedactDTO => a.subtype === 'redact' && (!wanted || wanted.has(idOf(a.ref))),
         );
@@ -240,9 +241,9 @@ export function createRedactionCapability(
     applyAll: async () => {
       // Pages scope: authoritative for the WHOLE document, including marks on
       // pages this client never loaded. Pages without marks report 'unchanged'.
-      const pageObjectNumbers = pons();
-      if (pageObjectNumbers.length === 0) throw new Error('[redaction] document has no pages');
-      return runApply({ kind: 'pages', pageObjectNumbers });
+      const pages = pons().map((pon) => toPageRef(pon));
+      if (pages.length === 0) throw new Error('[redaction] document has no pages');
+      return runApply({ kind: 'pages', pages });
     },
 
     onApplied: (cb) => {

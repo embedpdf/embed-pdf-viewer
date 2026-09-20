@@ -7,7 +7,7 @@ import type * as CloudPDF from "../../../../../../index.js";
  *     {
  *         docId: "docId",
  *         layerName: "layerName",
- *         pon: 1,
+ *         pageKey: "pageKey",
  *         body: {
  *             "string": {
  *                 "key": "value"
@@ -18,7 +18,8 @@ import type * as CloudPDF from "../../../../../../index.js";
 export interface ExportAppearanceAnnotationsRequest {
     docId: string;
     layerName: string;
-    pon: number;
+    /** The page's address, `obj:N`: the page's indirect object number, the durable identity every `PageLayout.ref` carries. Mirrors `annotKey` and `fieldKey`. */
+    pageKey: string;
     /** Base64-encoded password for an encrypted document. Valid only with the API token (403 anywhere else). An encrypted document answers 422 DocPasswordRequired when the header is absent. Viewer doc JWTs use the SDK password-session flow instead. */
     "X-Document-Password"?: string;
     body: CloudPDF.DocAnnotationsExportAppearanceRequest;

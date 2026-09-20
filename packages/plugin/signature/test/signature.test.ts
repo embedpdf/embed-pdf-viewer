@@ -17,7 +17,12 @@ import {
   personalSigner,
   remoteSigner,
 } from '@embedpdf/core-signature';
-import type { DocumentHandle, FormFieldDTO, FormFieldRef } from '@embedpdf/engine-core/runtime';
+import {
+  toPageRef,
+  type DocumentHandle,
+  type FormFieldDTO,
+  type FormFieldRef,
+} from '@embedpdf/engine-core/runtime';
 import { createLocalEngine } from '@embedpdf/engine';
 import { FormToken } from '@embedpdf/plugin-form/contract';
 import type { PointerSample } from '@embedpdf/plugin-interaction/contract';
@@ -65,7 +70,7 @@ function signatureField(over: Partial<FormFieldDTO> = {}): FormFieldDTO {
     mappingName: null,
     valueEntry: { kind: 'none' },
     defaultValueEntry: { kind: 'none' },
-    widgets: [{ annotObjectNumber: 9, pageObjectNumber: 3 }],
+    widgets: [{ annotObjectNumber: 9, page: toPageRef(3) }],
     ...over,
   } as FormFieldDTO;
 }
@@ -111,7 +116,7 @@ const stampStub = (bytes: Uint8Array) => ({
   placeAsset: vi.fn(async () => ({
     kind: 'objectNumber',
     annotObjectNumber: 1,
-    pageObjectNumber: 3,
+    page: toPageRef(3),
   })),
 });
 
@@ -293,10 +298,10 @@ describe('the destination rule', () => {
 
       await ask.placeMark(
         { assetId: 'people:signature' },
-        { pageObjectNumber: 3, at: { x: 10, y: 10 } },
+        { page: toPageRef(3), at: { x: 10, y: 10 } },
       );
       expect(stamp.placeAsset).toHaveBeenCalledWith('doc-1', 'people:signature', {
-        pageObjectNumber: 3,
+        page: toPageRef(3),
         at: { x: 10, y: 10 },
       });
 
@@ -316,7 +321,7 @@ describe('the armed mark over a field', () => {
     ({
       phase: 'down',
       viewport: point,
-      page: { pon, point },
+      page: { ref: toPageRef(pon), point },
       modifiers: {},
     }) as unknown as PointerSample;
 
@@ -393,7 +398,7 @@ describe('judging what a save would write', () => {
       // nothing warns.
       const page = (await doc.pages.list()).pages[0]!;
       const ink = () =>
-        doc.page(page.pageObjectNumber).annotations.create({
+        doc.page(page.ref).annotations.create({
           subtype: 'ink',
           inkList: [
             [
@@ -416,7 +421,7 @@ describe('judging what a save would write', () => {
       // Remove the stroke: the document is the loaded one again, and the
       // plugin re-judges it as such — unchanged on the persisted basis (the
       // appearance stream left behind is an orphan the save never writes).
-      await doc.page(page.pageObjectNumber).annotations.delete(stroke.created.ref);
+      await doc.page(page.ref).annotations.delete(stroke.created.ref);
       await new Promise((r) => setTimeout(r, 700));
       expect(signature.verdictOf(SIG)).toMatchObject({
         summary: 'valid',

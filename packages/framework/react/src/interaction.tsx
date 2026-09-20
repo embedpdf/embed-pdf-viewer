@@ -15,6 +15,7 @@ export * from '@embedpdf/plugin-interaction';
 export { vibrationFeedback, wkFeedback } from '@embedpdf/web';
 import * as React from 'react';
 import { useEffect, useRef } from 'react';
+import { pageRefsEqual } from '@embedpdf/core';
 import { InteractionToken } from '@embedpdf/plugin-interaction';
 import type { Modifiers, PointerSample } from '@embedpdf/plugin-interaction';
 import { svgCursor } from '@embedpdf/web';
@@ -70,7 +71,7 @@ export function PagePointerSource() {
         // context the Stage source resolves via `pageAt` — read off the page
         // transform so a standalone <PageView> drives handlers identically.
         page: {
-          pon: page.pon,
+          ref: page.ref,
           point: page.toContentPoint(e.clientX, e.clientY),
           scale: page.transform.viewScale,
           rotation: page.transform.rotation,
@@ -79,7 +80,8 @@ export function PagePointerSource() {
         // A per-page source can only project onto its OWN page — toContentPoint is
         // already unclamped (the drag listener lives on window), so a gesture
         // anchored here keeps tracking past the page bounds.
-        project: (pon) => (pon === page.pon ? page.toContentPoint(e.clientX, e.clientY) : null),
+        project: (p) =>
+          pageRefsEqual(p, page.ref) ? page.toContentPoint(e.clientX, e.clientY) : null,
         modifiers: mods(e),
         clickCount,
         pointerType: (e.pointerType || 'mouse') as PointerSample['pointerType'],

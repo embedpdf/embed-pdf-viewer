@@ -151,7 +151,7 @@ export function fillItems(model: Model, pageObjectNumber: number): FillItem[] {
 
   for (const field of snapshot.fields) {
     for (const widget of field.widgets) {
-      if (widget.pageObjectNumber !== pageObjectNumber) continue;
+      if (widget.page?.pageObjectNumber !== pageObjectNumber) continue;
       const box = geom[widget.annotObjectNumber];
       if (!box) continue;
       const item = projectWidget(model, field, widget.annotObjectNumber, box);
@@ -173,6 +173,8 @@ export function fillItemForWidget(model: Model, annotObjectNumber: number): Fill
   if (!field) return null;
   const widget = field.widgets.find((w) => w.annotObjectNumber === annotObjectNumber);
   if (!widget) return null;
-  const box = model.geom[widget.pageObjectNumber]?.[annotObjectNumber];
+  const box = widget.page
+    ? model.geom[widget.page.pageObjectNumber]?.[annotObjectNumber]
+    : undefined;
   return projectWidget(model, field, annotObjectNumber, box);
 }

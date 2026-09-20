@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { DocumentEvent, EffectContext } from '@embedpdf/core';
-import { encodeStableIdKey } from '@embedpdf/engine-core/runtime';
+import { encodeStableIdKey, toPageRef } from '@embedpdf/engine-core/runtime';
 import type { Annot } from '@embedpdf/core-annotation';
 
 import { registerAnnotationEffects } from './effects';
@@ -66,7 +66,7 @@ describe('annotation document effects', () => {
       emit(
         event({
           type,
-          changedWidgets: [{ annotObjectNumber, pageObjectNumber: 11 }],
+          changedWidgets: [{ annotObjectNumber, page: toPageRef(11) }],
           origin: { kind: 'local' },
         }),
       );
@@ -79,7 +79,7 @@ describe('annotation document effects', () => {
     const { host, emit } = harness();
     const remote = event({
       type: 'annotation.created',
-      pageObjectNumber: 11,
+      page: toPageRef(11),
       origin: { kind: 'remote', serverId: 45 },
       created: {},
     });
@@ -92,7 +92,7 @@ describe('annotation document effects', () => {
     emit(
       event({
         type: 'annotation.created',
-        pageObjectNumber: 11,
+        page: toPageRef(11),
         origin: { kind: 'local', serverId: null },
         created: {},
       }),
@@ -114,8 +114,8 @@ describe('annotation document effects', () => {
       model: {
         ...state.model,
         byId: {
-          [keep]: { id: keep, pon: 11 } as Annot,
-          [gone]: { id: gone, pon: 12 } as Annot,
+          [keep]: { id: keep, page: toPageRef(11) } as Annot,
+          [gone]: { id: gone, page: toPageRef(12) } as Annot,
         },
         order: [keep, gone],
       },
@@ -124,7 +124,7 @@ describe('annotation document effects', () => {
     emit(
       event({
         type: 'pages.deleted',
-        pageObjectNumbers: [12],
+        pages: [toPageRef(12)],
         origin: { kind: 'remote', serverId: 45 },
       }),
     );
@@ -138,13 +138,13 @@ describe('annotation document effects', () => {
     emit(
       event({
         type: 'pages.inserted',
-        insertedPageObjectNumbers: [21, 22],
+        insertedPages: [toPageRef(21), toPageRef(22)],
         origin: { kind: 'remote', serverId: 45 },
       }),
     );
     expect(host.reloadPage).toHaveBeenCalledTimes(2);
-    expect(host.reloadPage).toHaveBeenCalledWith(21);
-    expect(host.reloadPage).toHaveBeenCalledWith(22);
+    expect(host.reloadPage).toHaveBeenCalledWith(toPageRef(21));
+    expect(host.reloadPage).toHaveBeenCalledWith(toPageRef(22));
   });
 
   it('redaction.applied reloads the applied pages, origin-agnostic', () => {
@@ -154,12 +154,12 @@ describe('annotation document effects', () => {
         type: 'redaction.applied',
         origin: { kind: 'local', serverId: null },
         results: [
-          { status: 'applied', pageObjectNumber: 11 },
-          { status: 'skipped', pageObjectNumber: 12 },
+          { status: 'applied', page: toPageRef(11) },
+          { status: 'skipped', page: toPageRef(12) },
         ],
       }),
     );
     expect(host.reloadPage).toHaveBeenCalledTimes(1);
-    expect(host.reloadPage).toHaveBeenCalledWith(11);
+    expect(host.reloadPage).toHaveBeenCalledWith(toPageRef(11));
   });
 });

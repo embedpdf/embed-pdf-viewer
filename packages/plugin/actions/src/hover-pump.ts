@@ -1,4 +1,4 @@
-import type { AnnotationRef, PageObjectNumber } from '@embedpdf/engine-core/runtime';
+import type { AnnotationRef, PageRef } from '@embedpdf/engine-core/runtime';
 
 import type { ActionSource, ActionTrigger, ActionTriggerResult } from './types';
 
@@ -7,7 +7,7 @@ import type { ActionSource, ActionTrigger, ActionTriggerResult } from './types';
  *  omitted flags default to true. */
 export interface HoverTarget {
   ref: AnnotationRef;
-  pon: PageObjectNumber;
+  page: PageRef;
   /** Optional provenance hint forwarded on the trigger (widget/link feeds). */
   source?: ActionSource;
   events?: { enter?: boolean; exit?: boolean };
@@ -22,7 +22,9 @@ export interface HoverPump {
 
 const sameTarget = (a: HoverTarget | null, b: HoverTarget | null): boolean => {
   if (a === null || b === null) return a === b;
-  if (a.ref.kind !== b.ref.kind || a.pon !== b.pon) return false;
+  if (a.ref.kind !== b.ref.kind || a.page.pageObjectNumber !== b.page.pageObjectNumber) {
+    return false;
+  }
   if (a.ref.kind === 'objectNumber' && b.ref.kind === 'objectNumber') {
     return a.ref.annotObjectNumber === b.ref.annotObjectNumber;
   }
@@ -64,7 +66,7 @@ export function createHoverPump(
           scope: 'annotation',
           event: 'cursorExit',
           ref: from.ref,
-          pon: from.pon,
+          page: from.page,
           ...(from.source ? { source: from.source } : {}),
         }),
       );
@@ -75,7 +77,7 @@ export function createHoverPump(
           scope: 'annotation',
           event: 'cursorEnter',
           ref: to.ref,
-          pon: to.pon,
+          page: to.page,
           ...(to.source ? { source: to.source } : {}),
         }),
       );

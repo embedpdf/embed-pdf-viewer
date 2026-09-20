@@ -1,4 +1,4 @@
-import type { PageObjectNumber } from '../identity/PageObjectNumber';
+import type { PageRef } from '../identity/PageRef';
 
 /**
  * An explicit PDF destination (ISO 32000-1 §12.3.2.2): a page, a location,
@@ -20,22 +20,22 @@ import type { PageObjectNumber } from '../identity/PageObjectNumber';
 export type PdfDestination =
   | {
       kind: 'xyz';
-      pageObjectNumber: PageObjectNumber;
+      page: PageRef;
       left?: number | null;
       top?: number | null;
       zoom?: number | null;
     }
-  | { kind: 'fit'; pageObjectNumber: PageObjectNumber }
-  | { kind: 'fitH'; pageObjectNumber: PageObjectNumber; top?: number | null }
-  | { kind: 'fitV'; pageObjectNumber: PageObjectNumber; left?: number | null }
+  | { kind: 'fit'; page: PageRef }
+  | { kind: 'fitH'; page: PageRef; top?: number | null }
+  | { kind: 'fitV'; page: PageRef; left?: number | null }
   | {
       kind: 'fitR';
-      pageObjectNumber: PageObjectNumber;
+      page: PageRef;
       left: number;
       bottom: number;
       right: number;
       top: number;
     }
-  | { kind: 'fitB'; pageObjectNumber: PageObjectNumber }
-  | { kind: 'fitBH'; pageObjectNumber: PageObjectNumber; top?: number | null }
-  | { kind: 'fitBV'; pageObjectNumber: PageObjectNumber; left?: number | null };
+  | { kind: 'fitB'; page: PageRef }
+  | { kind: 'fitBH'; page: PageRef; top?: number | null }
+  | { kind: 'fitBV'; page: PageRef; left?: number | null };

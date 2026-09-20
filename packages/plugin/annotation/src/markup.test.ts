@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { textQuadFromRect } from '@embedpdf/core-geometry';
 import type { InteractionCapability } from '@embedpdf/plugin-interaction';
 import type { SelectionHostCapability } from '@embedpdf/plugin-selection/internal';
+import { toPageRef, type PageRef } from '@embedpdf/engine-core/runtime';
 
 import { wireMarkup } from './markup';
 import type { AnnotationHostCapability } from './types';
@@ -35,14 +36,24 @@ describe('selection authoring bridge', () => {
       hasSelection: () => true,
       snapshot: () => ({
         pages: [
-          { pon: 1, segments: page1, rects: page1.map((s) => s.rect) },
-          { pon: 2, segments: page2, rects: page2.map((s) => s.rect) },
+          { page: toPageRef(1), segments: page1, rects: page1.map((s) => s.rect) },
+          { page: toPageRef(2), segments: page2, rects: page2.map((s) => s.rect) },
         ],
-        start: { pon: 1, glyphQuad: page1[0].quad, advance: 1 as const, rect: page1[0].rect },
-        end: { pon: 2, glyphQuad: page2[1].quad, advance: 1 as const, rect: page2[1].rect },
+        start: {
+          page: toPageRef(1),
+          glyphQuad: page1[0].quad,
+          advance: 1 as const,
+          rect: page1[0].rect,
+        },
+        end: {
+          page: toPageRef(2),
+          glyphQuad: page2[1].quad,
+          advance: 1 as const,
+          rect: page2[1].rect,
+        },
         direction: 'forward' as const,
       }),
-      segmentsForPage: (pon: number) => (pon === 1 ? page1 : page2),
+      segmentsForPage: (page: PageRef) => (page.pageObjectNumber === 1 ? page1 : page2),
       setHighlightVisible: vi.fn(),
       clear: vi.fn(),
       onChange: (cb: () => void) => {
@@ -71,14 +82,14 @@ describe('selection authoring bridge', () => {
     onCommit();
     expect(annotation.createReplaceText).toHaveBeenNthCalledWith(
       1,
-      1,
+      toPageRef(1),
       page1.map((s) => s.quad),
       { glyphQuad: page1[0].quad, advance: 1 },
       'replace-text',
     );
     expect(annotation.createReplaceText).toHaveBeenNthCalledWith(
       2,
-      2,
+      toPageRef(2),
       page2.map((s) => s.quad),
       { glyphQuad: page2[1].quad, advance: 1 },
       'replace-text',

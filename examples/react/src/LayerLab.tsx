@@ -254,7 +254,7 @@ function RotateButton({ page }: { page: PageContextValue }) {
   if (!editor.canEdit()) return null;
   return (
     <button
-      onClick={() => editor.rotateBy(page.pon, 90)}
+      onClick={() => editor.rotateBy(page.ref, 90)}
       title="Rotate this page 90° (writes to the layer)"
       style={{
         position: 'absolute',

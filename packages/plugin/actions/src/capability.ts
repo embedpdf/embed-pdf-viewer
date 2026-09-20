@@ -16,6 +16,7 @@ import type {
   ScriptUiEffect,
   ScriptWorldInput,
 } from '@embedpdf/core-acrojs';
+import { toPageRef } from '@embedpdf/engine-core/runtime';
 import type {
   AnnotationRef,
   DocumentActionsSnapshot,
@@ -112,10 +113,10 @@ const sameRef = (left: AnnotationRef, right: AnnotationRef): boolean => {
     return left.annotObjectNumber === right.annotObjectNumber;
   }
   if (left.kind === 'nm' && right.kind === 'nm') {
-    return left.pageObjectNumber === right.pageObjectNumber && left.nm === right.nm;
+    return left.page.pageObjectNumber === right.page.pageObjectNumber && left.nm === right.nm;
   }
   if (left.kind === 'index' && right.kind === 'index') {
-    return left.pageObjectNumber === right.pageObjectNumber && left.index === right.index;
+    return left.page.pageObjectNumber === right.page.pageObjectNumber && left.index === right.index;
   }
   return false;
 };
@@ -460,7 +461,7 @@ export function createActionsCapability(
   ): ScriptColorArray => (color ? ['RGB', color.r / 255, color.g / 255, color.b / 255] : ['T']);
 
   const pageIndexOf = (pon: PageObjectNumber): number =>
-    ctx.document()?.pages.findIndex((page) => page.pageObjectNumber === pon) ?? -1;
+    ctx.document()?.pages.findIndex((page) => page.ref.pageObjectNumber === pon) ?? -1;
 
   const scriptWorldFor = async (
     pon: PageObjectNumber,
@@ -468,7 +469,7 @@ export function createActionsCapability(
     const doc = ctx.doc!;
     const snapshot = await doc.forms.list();
     const pageIndex = Math.max(0, pageIndexOf(pon));
-    const { annotations } = await doc.page(pon).annotations.list();
+    const { annotations } = await doc.page(toPageRef(pon)).annotations.list();
     const annots: ScriptAnnotInput[] = annotations
       // Script-addressable = everything EXCEPT link and widget (they are
       // Link/Field objects in Acrobat and separate planes here).
@@ -624,9 +625,7 @@ export function createActionsCapability(
       } else {
         const entries: AnnotCommitEntry[] = output.annotEffects.map((effect) => ({
           annotObjectNumber: effect.ref.kind === 'objectNumber' ? effect.ref.annotObjectNumber : -1,
-          ...(effect.ref.kind === 'objectNumber'
-            ? { pageObjectNumber: effect.ref.pageObjectNumber }
-            : {}),
+          ...(effect.ref.kind === 'objectNumber' ? { page: effect.ref.page } : {}),
           patch: effect.patch,
         }));
         const result = await annotCommitSink(entries);
@@ -656,12 +655,12 @@ export function createActionsCapability(
       const source = actionCtx.source;
       const pon =
         source.kind === 'widget'
-          ? source.pon
+          ? source.page.pageObjectNumber
           : source.kind === 'link' || source.kind === 'annotation'
-            ? (source.pon ?? ctx.document()?.pages[0]?.pageObjectNumber)
+            ? (source.page?.pageObjectNumber ?? ctx.document()?.pages[0]?.ref.pageObjectNumber)
             : source.kind === 'page'
-              ? source.pon
-              : ctx.document()?.pages[0]?.pageObjectNumber;
+              ? source.page.pageObjectNumber
+              : ctx.document()?.pages[0]?.ref.pageObjectNumber;
       if (pon === undefined) return { status: 'inert', reason: 'no page to anchor the world on' };
       const diagnose = (diagnostic: ActionDiagnostic): void => diagnosticHook.emit(diagnostic);
       // Print/submit effects are EXTERNAL: the WP/DP wrap runs action trees
@@ -1080,7 +1079,7 @@ export function createActionsCapability(
     if (hit) return hit;
     const doc = ctx.doc;
     if (!doc) return [];
-    const { annotations } = await doc.page(pon).annotations.list();
+    const { annotations } = await doc.page(toPageRef(pon)).annotations.list();
     const bearing = annotations
       .filter(
         (a) =>
@@ -1117,12 +1116,13 @@ export function createActionsCapability(
     pageActions: PdfPageActions | undefined,
     lifecycle: LifecycleAnnot[],
   ): Array<{ source: ActionSource; tree: PdfActionTree }> => {
-    const pageSource: ActionSource = { kind: 'page', pon };
+    const page = toPageRef(pon);
+    const pageSource: ActionSource = { kind: 'page', page };
     const annotSteps = (key: 'pageOpen' | 'pageClose' | 'pageVisible' | 'pageInvisible') =>
       lifecycle
         .filter((a) => a.actions[key]?.root)
         .map((a) => ({
-          source: { kind: 'annotation', annotation: a.ref, pon } as ActionSource,
+          source: { kind: 'annotation', annotation: a.ref, page } as ActionSource,
           tree: a.actions[key]!,
         }));
     switch (event) {
@@ -1200,7 +1200,7 @@ export function createActionsCapability(
         case 'activate':
         case 'annotation': {
           const event = trigger.scope === 'activate' ? 'activate' : trigger.event;
-          const { annotations } = await doc.page(trigger.pon).annotations.list();
+          const { annotations } = await doc.page(trigger.page).annotations.list();
           const annotation = annotations.find((candidate) => sameRef(candidate.ref, trigger.ref));
           // ISO Table 197 (verified 2026-09-02): "the A entry, if present,
           // takes precedence over [the /AA U entry]" — a shadowed U tree is
@@ -1213,16 +1213,15 @@ export function createActionsCapability(
           const source: ActionSource = trigger.source ?? {
             kind: 'annotation',
             annotation: trigger.ref,
-            pon: trigger.pon,
+            page: trigger.page,
           };
           return await runSteps([{ source, tree }], origin, eventOf(trigger), diagnostics);
         }
         case 'page': {
-          const layout = ctx
-            .document()
-            ?.pages.find((page) => page.pageObjectNumber === trigger.pon);
-          const lifecycle = await lifecycleTreesFor(trigger.pon);
-          const steps = planPageSteps(trigger.event, trigger.pon, layout?.actions, lifecycle);
+          const pon = trigger.page.pageObjectNumber;
+          const layout = ctx.document()?.pages.find((page) => page.ref.pageObjectNumber === pon);
+          const lifecycle = await lifecycleTreesFor(pon);
+          const steps = planPageSteps(trigger.event, pon, layout?.actions, lifecycle);
           return await runSteps(steps, origin, eventOf(trigger), diagnostics);
         }
         case 'document': {
@@ -1278,14 +1277,15 @@ export function createActionsCapability(
 
   const emitForReport = (report: PageStateReport): void => {
     if (report.cause === 'user') cascadeRounds = 0;
-    const nextVisible = new Set(report.visiblePons);
-    const changedCurrent = report.currentPon !== lastEmitted.currentPon;
+    const current = report.currentPage === null ? null : report.currentPage.pageObjectNumber;
+    const nextVisible = new Set(report.visiblePages.map((page) => page.pageObjectNumber));
+    const changedCurrent = current !== lastEmitted.currentPon;
     const leaving = [...lastEmitted.visible].filter((pon) => !nextVisible.has(pon));
     const entering = [...nextVisible].filter((pon) => !lastEmitted.visible.has(pon));
     if (!changedCurrent && leaving.length === 0 && entering.length === 0) return;
     const previousCurrent = lastEmitted.currentPon;
     // Track truth even when suppressed — the budget bounds EMISSION, not state.
-    lastEmitted = { currentPon: report.currentPon, visible: nextVisible };
+    lastEmitted = { currentPon: current, visible: nextVisible };
     if (report.cause === 'programmatic') {
       cascadeRounds += 1;
       if (cascadeRounds > CASCADE_CAP) {
@@ -1300,12 +1300,16 @@ export function createActionsCapability(
     // planPageSteps holds Table 197's PO-after-O / PC-before-C):
     // close(old) → invisible set → visible set → open(new).
     if (changedCurrent && previousCurrent !== null) {
-      void dispatch({ scope: 'page', event: 'close', pon: previousCurrent });
+      void dispatch({ scope: 'page', event: 'close', page: toPageRef(previousCurrent) });
     }
-    for (const pon of leaving) void dispatch({ scope: 'page', event: 'invisible', pon });
-    for (const pon of entering) void dispatch({ scope: 'page', event: 'visible', pon });
-    if (changedCurrent && report.currentPon !== null) {
-      void dispatch({ scope: 'page', event: 'open', pon: report.currentPon });
+    for (const pon of leaving) {
+      void dispatch({ scope: 'page', event: 'invisible', page: toPageRef(pon) });
+    }
+    for (const pon of entering) {
+      void dispatch({ scope: 'page', event: 'visible', page: toPageRef(pon) });
+    }
+    if (changedCurrent && current !== null) {
+      void dispatch({ scope: 'page', event: 'open', page: toPageRef(current) });
     }
   };
 
@@ -1333,10 +1337,10 @@ export function createActionsCapability(
         // first-page /O before a restored view reports would be exactly the
         // phantom open the coordinator exists to prevent; a stage-less
         // 'auto' embedder drives page triggers itself or declares headless.
-        const first = ctx.document()?.pages[0]?.pageObjectNumber;
+        const first = ctx.document()?.pages[0]?.ref.pageObjectNumber;
         if (first !== undefined) {
           lastEmitted = { currentPon: first, visible: lastEmitted.visible };
-          void dispatch({ scope: 'page', event: 'open', pon: first });
+          void dispatch({ scope: 'page', event: 'open', page: toPageRef(first) });
         }
       }
     } catch (error) {

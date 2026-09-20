@@ -8,6 +8,7 @@ import {
 } from '@embedpdf/core-annotation';
 
 import { buildTextItems } from './text-item';
+import { toPageRef } from '@embedpdf/engine-core/runtime';
 
 /** The DOM text plate must sit exactly where the engine's AP generator lays
  *  the baked text, so the baked↔live swap is pixel-invisible: the box
@@ -16,6 +17,7 @@ import { buildTextItems } from './text-item';
  *  `2026-09-15-free-text-plate-inset.md`). */
 
 const PON = 1;
+const PAGE = toPageRef(PON);
 const FLAGS: AnnotationFlags = {
   invisible: false,
   hidden: false,
@@ -32,7 +34,7 @@ const FLAGS: AnnotationFlags = {
 const freeText = (id: string, geom: Extract<Geom, { t: 'text' }>, strokeWidth: number): Annot => ({
   id,
   ref: null,
-  pon: PON,
+  page: PAGE,
   subtype: 'freeText',
   geom,
   style: {
@@ -62,13 +64,13 @@ describe('buildTextItems — text plate mirrors the AP generator', () => {
     let m = update(initialModel, { t: 'loaded', annots: [callout, plain] })[0];
     // textBoxes only emits LIVE text — edit each in turn.
     m = update(m, { t: 'beginTextEdit', id: 'C1' })[0];
-    const [c] = buildTextItems(m, PON);
+    const [c] = buildTextItems(m, PAGE);
     expect(c!.id).toBe('C1');
     expect(c!.css.padding).toBe(12); // 2 × 6: Acrobat's plate rule
 
     m = update(m, { t: 'endTextEdit' })[0];
     m = update(m, { t: 'beginTextEdit', id: 'P1' })[0];
-    const [p] = buildTextItems(m, PON);
+    const [p] = buildTextItems(m, PAGE);
     expect(p!.id).toBe('P1');
     expect(p!.css.padding).toBe(6); // 2 × 3
   });
@@ -110,7 +112,7 @@ describe('buildTextItems — the editor document', () => {
     };
     let m = update(initialModel, { t: 'loaded', annots: [a] })[0];
     m = update(m, { t: 'beginTextEdit', id: 'A1' })[0];
-    const [item] = buildTextItems(m, PON);
+    const [item] = buildTextItems(m, PAGE);
     expect(item!.css.align).toBe('center');
     expect(item!.richText.paragraphs).toEqual([
       { runs: [{ text: 'one' }] },

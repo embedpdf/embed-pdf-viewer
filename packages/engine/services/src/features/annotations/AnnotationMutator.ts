@@ -251,7 +251,7 @@ export class AnnotationMutator {
     throwIfAborted(signal);
     const { fn, mem } = this.runtime;
     const pool = this.session.pagePool();
-    const pagePtr = pool.acquire(ref.pageObjectNumber);
+    const pagePtr = pool.acquire(ref.page.pageObjectNumber);
     let annotPtr: Ptr | null = null;
     try {
       annotPtr = resolveAnnotPtr(this.runtime, this.session, pagePtr, ref);
@@ -261,8 +261,8 @@ export class AnnotationMutator {
       preflightPatch(patch, writeCtx);
       assertRichTextAgreement(patch);
 
-      this.ensureKnownWeakStateFromPage(ref.pageObjectNumber, pagePtr);
-      const pageStateBefore = this.session.pageState(ref.pageObjectNumber);
+      this.ensureKnownWeakStateFromPage(ref.page.pageObjectNumber, pagePtr);
+      const pageStateBefore = this.session.pageState(ref.page.pageObjectNumber);
 
       // Blend mode lives inside the existing /AP graphics state rather than in
       // the annotation dictionary. Capture it before re-baking so an unrelated
@@ -283,7 +283,7 @@ export class AnnotationMutator {
         fn,
         mem,
         annotPtr,
-        ref.pageObjectNumber,
+        ref.page.pageObjectNumber,
         preIndex,
         pageStateBefore.revision,
         readContextFor(this.session, this.fonts),
@@ -322,7 +322,7 @@ export class AnnotationMutator {
           this.session,
           pagePtr,
           annotPtr,
-          ref.pageObjectNumber,
+          ref.page.pageObjectNumber,
           { inReplyTo: patch.inReplyTo, replyType: patch.replyType },
         );
       }
@@ -388,15 +388,15 @@ export class AnnotationMutator {
         fn,
         mem,
         annotPtr,
-        ref.pageObjectNumber,
+        ref.page.pageObjectNumber,
         newIndex,
         pageStateBefore.revision,
         readContextFor(this.session, this.fonts),
       );
       joinWidgetFieldNumbers(this.runtime, this.session, [dto]);
 
-      this.recordWeakStateFromPage(ref.pageObjectNumber, pagePtr);
-      const pageStateAfter = this.session.pageState(ref.pageObjectNumber);
+      this.recordWeakStateFromPage(ref.page.pageObjectNumber, pagePtr);
+      const pageStateAfter = this.session.pageState(ref.page.pageObjectNumber);
       const meta = computeMutationImpact({
         mutation: 'update',
         pageStateBefore,
@@ -406,7 +406,7 @@ export class AnnotationMutator {
       return { updated: dto, appearance, meta };
     } finally {
       if (annotPtr !== null) fn.FPDFPage_CloseAnnot(annotPtr);
-      pool.release(ref.pageObjectNumber);
+      pool.release(ref.page.pageObjectNumber);
     }
   }
 
@@ -432,11 +432,11 @@ export class AnnotationMutator {
     throwIfAborted(signal);
     const { fn, mem } = this.runtime;
     const pool = this.session.pagePool();
-    const pagePtr = pool.acquire(ref.pageObjectNumber);
+    const pagePtr = pool.acquire(ref.page.pageObjectNumber);
     let bumpRequested = false;
     try {
-      this.ensureKnownWeakStateFromPage(ref.pageObjectNumber, pagePtr);
-      const pageStateBefore = this.session.pageState(ref.pageObjectNumber);
+      this.ensureKnownWeakStateFromPage(ref.page.pageObjectNumber, pagePtr);
+      const pageStateBefore = this.session.pageState(ref.page.pageObjectNumber);
       throwIfAborted(signal);
 
       let deleted: AnnotationStableId | null;
@@ -451,7 +451,7 @@ export class AnnotationMutator {
           if (!probe) {
             throw new EngineError(
               EngineErrorCode.InvalidReference,
-              `no annotation with object number ${ref.annotObjectNumber} on page ${ref.pageObjectNumber}`,
+              `no annotation with object number ${ref.annotObjectNumber} on page ${ref.page.pageObjectNumber}`,
             );
           }
           try {
@@ -471,7 +471,7 @@ export class AnnotationMutator {
             if (!probe) {
               throw new EngineError(
                 EngineErrorCode.InvalidReference,
-                `no annotation with /NM '${ref.nm}' on page ${ref.pageObjectNumber}`,
+                `no annotation with /NM '${ref.nm}' on page ${ref.page.pageObjectNumber}`,
               );
             }
             try {
@@ -493,7 +493,7 @@ export class AnnotationMutator {
           if (!annotPtr) {
             throw new EngineError(
               EngineErrorCode.InvalidReference,
-              `index ${ref.index} out of range on page ${ref.pageObjectNumber}`,
+              `index ${ref.index} out of range on page ${ref.page.pageObjectNumber}`,
             );
           }
           let probedObjNum: number;
@@ -526,10 +526,10 @@ export class AnnotationMutator {
       // the finally-bump. Do not gate this on the page's current weak state:
       // old snapshots can still hold index refs from before annotations were
       // strengthened, and delete/move can make those refs point elsewhere.
-      this.session.bumpRevision(ref.pageObjectNumber);
+      this.session.bumpRevision(ref.page.pageObjectNumber);
       bumpRequested = false;
-      this.recordWeakStateFromPage(ref.pageObjectNumber, pagePtr);
-      const pageStateAfter = this.session.pageState(ref.pageObjectNumber);
+      this.recordWeakStateFromPage(ref.page.pageObjectNumber, pagePtr);
+      const pageStateAfter = this.session.pageState(ref.page.pageObjectNumber);
 
       const meta = computeMutationImpact({
         mutation: 'delete',
@@ -539,8 +539,8 @@ export class AnnotationMutator {
       });
       return { deleted, meta };
     } finally {
-      if (bumpRequested) this.session.bumpRevision(ref.pageObjectNumber);
-      pool.release(ref.pageObjectNumber);
+      if (bumpRequested) this.session.bumpRevision(ref.page.pageObjectNumber);
+      pool.release(ref.page.pageObjectNumber);
     }
   }
 
@@ -593,10 +593,10 @@ export class AnnotationMutator {
       );
     }
     for (const r of refs) {
-      if (r.pageObjectNumber !== pageObjectNumber) {
+      if (r.page.pageObjectNumber !== pageObjectNumber) {
         throw new EngineError(
           EngineErrorCode.InvalidArg,
-          `move refs must all target page ${pageObjectNumber}; got ref on page ${r.pageObjectNumber}`,
+          `move refs must all target page ${pageObjectNumber}; got ref on page ${r.page.pageObjectNumber}`,
         );
       }
     }

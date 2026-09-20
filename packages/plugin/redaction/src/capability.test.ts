@@ -1,6 +1,7 @@
 import type { PluginContext } from '@embedpdf/core';
 import { AnnotationToken } from '@embedpdf/plugin-annotation/internal';
 import { SelectionToken } from '@embedpdf/plugin-selection';
+import { toPageRef } from '@embedpdf/engine-core';
 import { describe, expect, it, vi } from 'vitest';
 import { createRedactionCapability } from './capability';
 import type { RedactionAction, RedactionState } from './types';
@@ -21,7 +22,7 @@ describe('redaction selection geometry', () => {
       snapshot: () => ({
         pages: [
           {
-            pon: 7,
+            page: toPageRef(7),
             segments: [{ quad, rect: { x: 5, y: 20, width: 25, height: 25 }, advance: 1 }],
             rects: [{ x: 5, y: 20, width: 25, height: 25 }],
           },
@@ -43,7 +44,7 @@ describe('redaction selection geometry', () => {
 
     const capability = createRedactionCapability(ctx);
     await expect(capability.queueCurrentSelection()).resolves.toBe(true);
-    expect(createMarkup).toHaveBeenCalledWith('redact', 7, [quad], 'redact');
+    expect(createMarkup).toHaveBeenCalledWith('redact', toPageRef(7), [quad], 'redact');
     expect(clear).toHaveBeenCalledOnce();
   });
 });

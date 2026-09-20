@@ -27,6 +27,7 @@ import type {
   EventHook,
   InitialDocument,
   Kernel,
+  PageRef,
 } from '@embedpdf/core';
 // Pure coordinate math from the geometry base — NOT from stage-core. The
 // PageContext seam stays stage-agnostic (it must also serve standalone PageView).
@@ -390,8 +391,12 @@ export const EmbedPDF = Viewer;
  */
 export interface PageContextValue {
   documentId: string;
-  /** Durable page identity (PDF object number) — use for keys / render / annotations. */
-  pon: number;
+  /**
+   * The page's durable address — use for keys / render / annotations (read
+   * `ref.pageObjectNumber` where a map key is needed). Identity-stable for
+   * the surface's lifetime, so layers may key effects on it.
+   */
+  ref: PageRef;
   /** Display index (page N) — use for ordering / human-facing page numbers. */
   pageIndex: number;
   /**
@@ -452,7 +457,7 @@ export function usePage(): PageContextValue {
 export function makePageContext(
   documentId: string,
   view: string,
-  pon: number,
+  ref: PageRef,
   pageIndex: number,
   frame: PageFrame,
   transform: PageTransform,
@@ -462,7 +467,7 @@ export function makePageContext(
   return {
     documentId,
     view,
-    pon,
+    ref,
     pageIndex,
     frame,
     transform,

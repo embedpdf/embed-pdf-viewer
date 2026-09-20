@@ -1,4 +1,5 @@
 import type { PdfDestination } from '@embedpdf/engine-core/runtime';
+import { toPageRef } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
 import { withScratchN } from '../../runtime/memory/scratch';
@@ -27,6 +28,7 @@ export function readDestination(
 ): PdfDestination | null {
   const pageObjectNumber = fn.EPDFDest_GetPageObjectNumber(docPtr, destPtr);
   if (pageObjectNumber === 0) return null;
+  const page = toPageRef(pageObjectNumber);
 
   const view = withScratchN(
     mem,
@@ -43,20 +45,20 @@ export function readDestination(
 
   switch (view.code) {
     case DEST_VIEW.xyz:
-      return { kind: 'xyz', pageObjectNumber, ...readXyzLocation(fn, mem, destPtr) };
+      return { kind: 'xyz', page, ...readXyzLocation(fn, mem, destPtr) };
     case DEST_VIEW.fit:
-      return { kind: 'fit', pageObjectNumber };
+      return { kind: 'fit', page };
     case DEST_VIEW.fitH:
-      return { kind: 'fitH', pageObjectNumber, top: at(0) };
+      return { kind: 'fitH', page, top: at(0) };
     case DEST_VIEW.fitV:
-      return { kind: 'fitV', pageObjectNumber, left: at(0) };
+      return { kind: 'fitV', page, left: at(0) };
     case DEST_VIEW.fitR: {
       // /FitR is only meaningful with the full rect; a malformed one
       // degrades to the whole page rather than inventing coordinates.
-      if (view.params.length < 4) return { kind: 'fit', pageObjectNumber };
+      if (view.params.length < 4) return { kind: 'fit', page };
       return {
         kind: 'fitR',
-        pageObjectNumber,
+        page,
         left: view.params[0]!,
         bottom: view.params[1]!,
         right: view.params[2]!,
@@ -64,11 +66,11 @@ export function readDestination(
       };
     }
     case DEST_VIEW.fitB:
-      return { kind: 'fitB', pageObjectNumber };
+      return { kind: 'fitB', page };
     case DEST_VIEW.fitBH:
-      return { kind: 'fitBH', pageObjectNumber, top: at(0) };
+      return { kind: 'fitBH', page, top: at(0) };
     case DEST_VIEW.fitBV:
-      return { kind: 'fitBV', pageObjectNumber, left: at(0) };
+      return { kind: 'fitBV', page, left: at(0) };
     default:
       return null;
   }

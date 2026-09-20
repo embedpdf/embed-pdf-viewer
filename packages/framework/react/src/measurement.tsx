@@ -1,5 +1,6 @@
+import type { PageRef } from '@embedpdf/core';
 import { MeasurementToken } from '@embedpdf/plugin-measurement';
-import type { MeasurementCapability } from '@embedpdf/plugin-measurement';
+import type { MeasurementCapability, PageScale } from '@embedpdf/plugin-measurement';
 import type { AnnotationRef } from '@embedpdf/plugin-measurement';
 import { useCapability, useSelector } from './runtime';
 
@@ -15,7 +16,14 @@ export function useMeasurement(): MeasurementCapability & {
   return { ...cap, busy, canCalibratePage };
 }
 
-export const usePageScale = (pon: number) => useSelector(MeasurementToken, (c) => c.pageScale(pon));
+/** The page's measurement scale, subscribed. Accepts `null` (no current
+ *  page — an empty document, a lens between pages) and answers `null` then,
+ *  so chrome can stay mounted without inventing a page address. */
+export function usePageScale(page: PageRef): PageScale;
+export function usePageScale(page: PageRef | null): PageScale | null;
+export function usePageScale(page: PageRef | null): PageScale | null {
+  return useSelector(MeasurementToken, (c) => (page ? c.pageScale(page) : null));
+}
 
 export const useMeasurementReadout = (ref: AnnotationRef) =>
   useSelector(

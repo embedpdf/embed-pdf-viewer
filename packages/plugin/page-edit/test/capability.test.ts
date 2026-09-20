@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { toPageRef, type PageRef } from '@embedpdf/core';
 import { createPageEditCapability } from '../src/capability';
 
 /**
@@ -8,7 +9,7 @@ import { createPageEditCapability } from '../src/capability';
  */
 
 type Page = {
-  pageObjectNumber: number;
+  ref: PageRef;
   rotation: 0 | 90 | 180 | 270;
   index?: number;
   size?: { width: number; height: number };
@@ -23,9 +24,9 @@ function makeCtx(
     noDoc?: boolean;
   } = {},
 ) {
-  const rotate = vi.fn((pons: number[], rotation: number) => ({ pons, rotation }));
-  const move = vi.fn((pons: number[], destIndex: number) => ({ pons, destIndex }));
-  const del = vi.fn((pons: number[]) => ({ pons }));
+  const rotate = vi.fn((pages: PageRef[], rotation: number) => ({ pages, rotation }));
+  const move = vi.fn((pages: PageRef[], destIndex: number) => ({ pages, destIndex }));
+  const del = vi.fn((pages: PageRef[]) => ({ pages }));
   const insert = vi.fn((bytes: unknown, destIndex?: number) => ({ bytes, destIndex }));
   const insertBlank = vi.fn((spec: unknown, destIndex?: number) => ({ spec, destIndex }));
   const allows = vi.fn(() => opts.allows ?? true);
@@ -47,55 +48,55 @@ function makeCtx(
 
 /** Three pages in display order, distinct sizes so defaults are observable. */
 const THREE_PAGES: Page[] = [
-  { pageObjectNumber: 10, rotation: 0, index: 0, size: { width: 100, height: 200 } },
-  { pageObjectNumber: 20, rotation: 0, index: 1, size: { width: 300, height: 400 } },
-  { pageObjectNumber: 30, rotation: 0, index: 2, size: { width: 500, height: 600 } },
+  { ref: toPageRef(10), rotation: 0, index: 0, size: { width: 100, height: 200 } },
+  { ref: toPageRef(20), rotation: 0, index: 1, size: { width: 300, height: 400 } },
+  { ref: toPageRef(30), rotation: 0, index: 2, size: { width: 500, height: 600 } },
 ];
 
 describe('PageEditCapability', () => {
   describe('rotateBy — relative gesture → absolute engine call', () => {
     it('adds +90 to the page’s current rotation', () => {
-      const { cap, rotate } = makeCtx({ pages: [{ pageObjectNumber: 7, rotation: 90 }] });
-      cap.rotateBy(7, 90);
-      expect(rotate).toHaveBeenCalledWith([7], 180);
+      const { cap, rotate } = makeCtx({ pages: [{ ref: toPageRef(7), rotation: 90 }] });
+      cap.rotateBy(toPageRef(7), 90);
+      expect(rotate).toHaveBeenCalledWith([toPageRef(7)], 180);
     });
 
     it('wraps past 360 (270 + 90 → 0)', () => {
-      const { cap, rotate } = makeCtx({ pages: [{ pageObjectNumber: 3, rotation: 270 }] });
-      cap.rotateBy(3, 90);
-      expect(rotate).toHaveBeenCalledWith([3], 0);
+      const { cap, rotate } = makeCtx({ pages: [{ ref: toPageRef(3), rotation: 270 }] });
+      cap.rotateBy(toPageRef(3), 90);
+      expect(rotate).toHaveBeenCalledWith([toPageRef(3)], 0);
     });
 
     it('wraps below 0 (0 − 90 → 270), not -90', () => {
-      const { cap, rotate } = makeCtx({ pages: [{ pageObjectNumber: 1, rotation: 0 }] });
-      cap.rotateBy(1, -90);
-      expect(rotate).toHaveBeenCalledWith([1], 270);
+      const { cap, rotate } = makeCtx({ pages: [{ ref: toPageRef(1), rotation: 0 }] });
+      cap.rotateBy(toPageRef(1), -90);
+      expect(rotate).toHaveBeenCalledWith([toPageRef(1)], 270);
     });
 
     it('treats an unknown pon as current rotation 0', () => {
       const { cap, rotate } = makeCtx({ pages: [] });
-      cap.rotateBy(99, 90);
-      expect(rotate).toHaveBeenCalledWith([99], 90);
+      cap.rotateBy(toPageRef(99), 90);
+      expect(rotate).toHaveBeenCalledWith([toPageRef(99)], 90);
     });
   });
 
   describe('passthroughs (PON-addressed, 1:1 with the engine)', () => {
     it('setRotation forwards the absolute value unchanged', () => {
       const { cap, rotate } = makeCtx();
-      cap.setRotation([1, 2], 180);
-      expect(rotate).toHaveBeenCalledWith([1, 2], 180);
+      cap.setRotation([toPageRef(1), toPageRef(2)], 180);
+      expect(rotate).toHaveBeenCalledWith([toPageRef(1), toPageRef(2)], 180);
     });
 
     it('move forwards pons + destIndex', () => {
       const { cap, move } = makeCtx();
-      cap.move([2, 3], 0);
-      expect(move).toHaveBeenCalledWith([2, 3], 0);
+      cap.move([toPageRef(2), toPageRef(3)], 0);
+      expect(move).toHaveBeenCalledWith([toPageRef(2), toPageRef(3)], 0);
     });
 
     it('delete forwards pons', () => {
       const { cap, del } = makeCtx();
-      cap.delete([5]);
-      expect(del).toHaveBeenCalledWith([5]);
+      cap.delete([toPageRef(5)]);
+      expect(del).toHaveBeenCalledWith([toPageRef(5)]);
     });
   });
 
@@ -127,7 +128,7 @@ describe('PageEditCapability', () => {
 
     it('{ after: pon } lands after the anchor and matches ITS size', () => {
       const { cap, insertBlank } = makeCtx({ pages: THREE_PAGES });
-      cap.addBlank({ placement: { after: 20 } });
+      cap.addBlank({ placement: { after: toPageRef(20) } });
       expect(insertBlank).toHaveBeenCalledWith(
         { size: { width: 300, height: 400 }, count: undefined },
         2,
@@ -136,7 +137,7 @@ describe('PageEditCapability', () => {
 
     it('{ before: pon } lands at the anchor index and matches ITS size', () => {
       const { cap, insertBlank } = makeCtx({ pages: THREE_PAGES });
-      cap.addBlank({ placement: { before: 10 } });
+      cap.addBlank({ placement: { before: toPageRef(10) } });
       expect(insertBlank).toHaveBeenCalledWith(
         { size: { width: 100, height: 200 }, count: undefined },
         0,
@@ -159,13 +160,19 @@ describe('PageEditCapability', () => {
 
     it('an explicit size and count always win', () => {
       const { cap, insertBlank } = makeCtx({ pages: THREE_PAGES });
-      cap.addBlank({ size: { width: 612, height: 792 }, count: 3, placement: { after: 10 } });
+      cap.addBlank({
+        size: { width: 612, height: 792 },
+        count: 3,
+        placement: { after: toPageRef(10) },
+      });
       expect(insertBlank).toHaveBeenCalledWith({ size: { width: 612, height: 792 }, count: 3 }, 1);
     });
 
     it('throws when the placement anchor is not in the registry', () => {
       const { cap } = makeCtx({ pages: THREE_PAGES });
-      expect(() => cap.addBlank({ placement: { after: 99 } })).toThrow(/placement page not found/);
+      expect(() => cap.addBlank({ placement: { after: toPageRef(99) } })).toThrow(
+        /placement page not found/,
+      );
     });
   });
 
@@ -180,15 +187,15 @@ describe('PageEditCapability', () => {
     it('resolves a PON placement to the engine index', () => {
       const { cap, insert } = makeCtx({ pages: THREE_PAGES });
       const bytes = new Uint8Array([1, 2, 3]);
-      cap.insert(bytes, { placement: { after: 20 } });
+      cap.insert(bytes, { placement: { after: toPageRef(20) } });
       expect(insert).toHaveBeenCalledWith(bytes, 2);
     });
   });
 
   it('throws on a mutation when no document is bound', () => {
     const { cap } = makeCtx({ noDoc: true });
-    expect(() => cap.rotateBy(1, 90)).toThrow(/no document bound/);
-    expect(() => cap.delete([1])).toThrow(/no document bound/);
+    expect(() => cap.rotateBy(toPageRef(1), 90)).toThrow(/no document bound/);
+    expect(() => cap.delete([toPageRef(1)])).toThrow(/no document bound/);
     expect(() => cap.addBlank()).toThrow(/no document bound/);
     expect(() => cap.insert(new Uint8Array([1]))).toThrow(/no document bound/);
   });

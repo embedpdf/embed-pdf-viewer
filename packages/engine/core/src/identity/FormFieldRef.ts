@@ -1,4 +1,4 @@
-import type { PageObjectNumber } from './PageObjectNumber';
+import type { PageRef } from './PageRef';
 
 /**
  * How callers address a logical form field.
@@ -75,8 +75,8 @@ export interface FormWidgetRef {
    */
   annotObjectNumber: number;
   /**
-   * Object number of the page whose /Annots array references the widget.
-   * `0` when the widget is not reachable from any page ("unplaced").
+   * The page whose /Annots array references the widget; `null` when the
+   * widget is not reachable from any page ("unplaced").
    */
-  pageObjectNumber: PageObjectNumber;
+  page: PageRef | null;
 }

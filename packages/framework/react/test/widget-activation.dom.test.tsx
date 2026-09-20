@@ -109,7 +109,7 @@ describe('widget activation through the DOM (the fake-button pattern)', () => {
       const snapshot = form.snapshot();
       const fake = snapshot?.fields.find((field) => field.name === 'fakeButton');
       expect(fake?.flags.readOnly).toBe(true); // the Test Lab shape, pinned
-      const pon = fake!.widgets[0]!.pageObjectNumber;
+      const page = fake!.widgets[0]!.page!;
 
       const dispatched: ActionDispatchEvent[] = [];
       actions.onAction((event) => dispatched.push(event));
@@ -125,7 +125,7 @@ describe('widget activation through the DOM (the fake-button pattern)', () => {
         makePageContext(
           'buttons',
           'test-view',
-          pon,
+          page,
           0,
           { top: 0, right: 0, bottom: 0, left: 0 },
           transform,

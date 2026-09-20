@@ -1,3 +1,4 @@
+import { encodePageKey, type PageRef } from '../identity/PageRef';
 import type { ModificationLevel } from '../signature/types';
 import { SIGNATURE_POLICY_VERSION } from '../signature/protection';
 import type { AnalysisToken } from './tokens';
@@ -275,11 +276,11 @@ export const wirePaths = {
   layerAnnotationFile: (
     docId: string,
     layerName: string,
-    pageObjectNumber: number,
+    page: PageRef,
     annotKey: string,
     attachmentsVersion: number,
   ) =>
-    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/attachment-files/pages/${pageObjectNumber}/items/${encodeURIComponent(annotKey)}/data@${encodeAttachmentsToken(attachmentsVersion)}`,
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/attachment-files/pages/${encodeURIComponent(encodePageKey(page))}/items/${encodeURIComponent(annotKey)}/data@${encodeAttachmentsToken(attachmentsVersion)}`,
 
   /**
    * Immutable BASE bytes of a FileAttachment annotation's embedded file
@@ -287,13 +288,8 @@ export const wirePaths = {
    * exists in this view) AND the `attachments` plane (the pin); the origin
    * guard requires both inherited.
    */
-  docAnnotationFile: (
-    docId: string,
-    pageObjectNumber: number,
-    annotKey: string,
-    attachmentsVersion: number,
-  ) =>
-    `/v1/docs/${encodeURIComponent(docId)}/attachment-files/pages/${pageObjectNumber}/items/${encodeURIComponent(annotKey)}/data@${encodeAttachmentsToken(attachmentsVersion)}`,
+  docAnnotationFile: (docId: string, page: PageRef, annotKey: string, attachmentsVersion: number) =>
+    `/v1/docs/${encodeURIComponent(docId)}/attachment-files/pages/${encodeURIComponent(encodePageKey(page))}/items/${encodeURIComponent(annotKey)}/data@${encodeAttachmentsToken(attachmentsVersion)}`,
 
   /**
    * GET: full plain-text extraction for a single page at a specific
@@ -302,31 +298,26 @@ export const wirePaths = {
    * retry walks `/head` → `/manifest@docVersion=N` to learn the new
    * `contentVersion`.
    */
-  docPageText: (docId: string, pageObjectNumber: number, contentVersion: number) =>
-    `/v1/docs/${encodeURIComponent(docId)}/text/pages/${pageObjectNumber}/data@${encodeContentToken(contentVersion)}`,
+  docPageText: (docId: string, page: PageRef, contentVersion: number) =>
+    `/v1/docs/${encodeURIComponent(docId)}/text/pages/${encodeURIComponent(encodePageKey(page))}/data@${encodeContentToken(contentVersion)}`,
 
-  layerPageText: (
-    docId: string,
-    layerName: string,
-    pageObjectNumber: number,
-    contentVersion: number,
-  ) =>
-    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/text/pages/${pageObjectNumber}/data@${encodeContentToken(contentVersion)}`,
+  layerPageText: (docId: string, layerName: string, page: PageRef, contentVersion: number) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/text/pages/${encodeURIComponent(encodePageKey(page))}/data@${encodeContentToken(contentVersion)}`,
 
-  layerPageTextCurrent: (docId: string, layerName: string, pageObjectNumber: number) =>
-    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/text/pages/${pageObjectNumber}/data`,
+  layerPageTextCurrent: (docId: string, layerName: string, page: PageRef) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/text/pages/${encodeURIComponent(encodePageKey(page))}/data`,
 
-  docPageGeometry: (docId: string, pageObjectNumber: number, contentVersion: number) =>
-    `/v1/docs/${encodeURIComponent(docId)}/geometry/pages/${pageObjectNumber}/data@${encodeContentToken(contentVersion)}`,
+  docPageGeometry: (docId: string, page: PageRef, contentVersion: number) =>
+    `/v1/docs/${encodeURIComponent(docId)}/geometry/pages/${encodeURIComponent(encodePageKey(page))}/data@${encodeContentToken(contentVersion)}`,
 
-  docPageGeometryCurrent: (docId: string, pageObjectNumber: number) =>
-    `/v1/docs/${encodeURIComponent(docId)}/geometry/pages/${pageObjectNumber}/data`,
+  docPageGeometryCurrent: (docId: string, page: PageRef) =>
+    `/v1/docs/${encodeURIComponent(docId)}/geometry/pages/${encodeURIComponent(encodePageKey(page))}/data`,
 
-  docPageRender: (docId: string, pageObjectNumber: number, token: TokenInput) =>
-    `/v1/docs/${encodeURIComponent(docId)}/render/pages/${pageObjectNumber}/data@${encodeRenderToken(token)}`,
+  docPageRender: (docId: string, page: PageRef, token: TokenInput) =>
+    `/v1/docs/${encodeURIComponent(docId)}/render/pages/${encodeURIComponent(encodePageKey(page))}/data@${encodeRenderToken(token)}`,
 
-  docPageRenderCurrent: (docId: string, pageObjectNumber: number) =>
-    `/v1/docs/${encodeURIComponent(docId)}/render/pages/${pageObjectNumber}/data`,
+  docPageRenderCurrent: (docId: string, page: PageRef) =>
+    `/v1/docs/${encodeURIComponent(docId)}/render/pages/${encodeURIComponent(encodePageKey(page))}/data`,
 
   /**
    * Immutable BASE annotated render (plane-scope model). Its OWN path family,
@@ -338,43 +329,28 @@ export const wirePaths = {
    * `includeAnnotations` key at all; the annotated family's token carries
    * `annotationVersion`, the free family's cannot.
    */
-  docPageRenderAnnotated: (docId: string, pageObjectNumber: number, token: TokenInput) =>
-    `/v1/docs/${encodeURIComponent(docId)}/render/annotated/pages/${pageObjectNumber}/data@${encodeRenderToken(token)}`,
+  docPageRenderAnnotated: (docId: string, page: PageRef, token: TokenInput) =>
+    `/v1/docs/${encodeURIComponent(docId)}/render/annotated/pages/${encodeURIComponent(encodePageKey(page))}/data@${encodeRenderToken(token)}`,
 
-  layerPageGeometry: (
-    docId: string,
-    layerName: string,
-    pageObjectNumber: number,
-    contentVersion: number,
-  ) =>
-    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/geometry/pages/${pageObjectNumber}/data@${encodeContentToken(contentVersion)}`,
+  layerPageGeometry: (docId: string, layerName: string, page: PageRef, contentVersion: number) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/geometry/pages/${encodeURIComponent(encodePageKey(page))}/data@${encodeContentToken(contentVersion)}`,
 
-  layerPageGeometryCurrent: (docId: string, layerName: string, pageObjectNumber: number) =>
-    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/geometry/pages/${pageObjectNumber}/data`,
+  layerPageGeometryCurrent: (docId: string, layerName: string, page: PageRef) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/geometry/pages/${encodeURIComponent(encodePageKey(page))}/data`,
 
-  layerPageRender: (
-    docId: string,
-    layerName: string,
-    pageObjectNumber: number,
-    token: TokenInput,
-  ) =>
-    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/render/pages/${pageObjectNumber}/data@${encodeRenderToken(token)}`,
+  layerPageRender: (docId: string, layerName: string, page: PageRef, token: TokenInput) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/render/pages/${encodeURIComponent(encodePageKey(page))}/data@${encodeRenderToken(token)}`,
 
-  layerPageRenderCurrent: (docId: string, layerName: string, pageObjectNumber: number) =>
-    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/render/pages/${pageObjectNumber}/data`,
+  layerPageRenderCurrent: (docId: string, layerName: string, page: PageRef) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/render/pages/${encodeURIComponent(encodePageKey(page))}/data`,
 
   /** Layer twin of `docPageRenderAnnotated` — the grammar is uniform:
    *  annotatedness is path-only at BOTH tiers. */
-  layerPageRenderAnnotated: (
-    docId: string,
-    layerName: string,
-    pageObjectNumber: number,
-    token: TokenInput,
-  ) =>
-    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/render/annotated/pages/${pageObjectNumber}/data@${encodeRenderToken(token)}`,
+  layerPageRenderAnnotated: (docId: string, layerName: string, page: PageRef, token: TokenInput) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/render/annotated/pages/${encodeURIComponent(encodePageKey(page))}/data@${encodeRenderToken(token)}`,
 
-  layerPageRenderAnnotatedCurrent: (docId: string, layerName: string, pageObjectNumber: number) =>
-    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/render/annotated/pages/${pageObjectNumber}/data`,
+  layerPageRenderAnnotatedCurrent: (docId: string, layerName: string, page: PageRef) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/render/annotated/pages/${encodeURIComponent(encodePageKey(page))}/data`,
 
   /**
    * Immutable BASE annotation list for a single page (plane-scope model):
@@ -383,8 +359,8 @@ export const wirePaths = {
    * through every pristine layer, so 1,000 visitors' sidebars are ONE CDN
    * object served from the base worker session.
    */
-  docPageAnnotations: (docId: string, pageObjectNumber: number, annotationVersion: number) =>
-    `/v1/docs/${encodeURIComponent(docId)}/annotations/pages/${pageObjectNumber}/items@${encodeAnnotationToken(annotationVersion)}`,
+  docPageAnnotations: (docId: string, page: PageRef, annotationVersion: number) =>
+    `/v1/docs/${encodeURIComponent(docId)}/annotations/pages/${encodeURIComponent(encodePageKey(page))}/items@${encodeAnnotationToken(annotationVersion)}`,
 
   /** Immutable BASE whole-document annotation listing (bulk hydration). */
   docAnnotationsAll: (docId: string, annotationsVersion: number) =>
@@ -392,8 +368,8 @@ export const wirePaths = {
 
   /** Immutable BASE appearance batch (twin of
    *  `layerPageAnnotationAppearances` — same `annotations` plane gate). */
-  docPageAnnotationAppearances: (docId: string, pageObjectNumber: number, token: TokenInput) =>
-    `/v1/docs/${encodeURIComponent(docId)}/annotations/pages/${pageObjectNumber}/appearances@${encodeAnnotationAppearancesRenderToken(token)}`,
+  docPageAnnotationAppearances: (docId: string, page: PageRef, token: TokenInput) =>
+    `/v1/docs/${encodeURIComponent(docId)}/annotations/pages/${encodeURIComponent(encodePageKey(page))}/appearances@${encodeAnnotationAppearancesRenderToken(token)}`,
 
   /**
    * GET: full annotation list for a single page at a specific
@@ -404,17 +380,17 @@ export const wirePaths = {
   layerPageAnnotations: (
     docId: string,
     layerName: string,
-    pageObjectNumber: number,
+    page: PageRef,
     annotationVersion: number,
   ) =>
-    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/annotations/pages/${pageObjectNumber}/items@${encodeAnnotationToken(annotationVersion)}`,
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/annotations/pages/${encodeURIComponent(encodePageKey(page))}/items@${encodeAnnotationToken(annotationVersion)}`,
 
   /** Immutable LAYER whole-document annotation listing (bulk hydration). */
   layerAnnotationsAll: (docId: string, layerName: string, annotationsVersion: number) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/annotations/items@${encodeAnnotationsAllToken(annotationsVersion)}`,
 
-  layerPageAnnotationsCurrent: (docId: string, layerName: string, pageObjectNumber: number) =>
-    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/annotations/pages/${pageObjectNumber}/items`,
+  layerPageAnnotationsCurrent: (docId: string, layerName: string, page: PageRef) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/annotations/pages/${encodeURIComponent(encodePageKey(page))}/items`,
 
   /**
    * GET: batch-rendered annotation appearance bitmaps for a single page as a
@@ -431,34 +407,30 @@ export const wirePaths = {
   layerPageAnnotationAppearances: (
     docId: string,
     layerName: string,
-    pageObjectNumber: number,
+    page: PageRef,
     token: TokenInput,
   ) =>
-    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/annotations/pages/${pageObjectNumber}/appearances@${encodeAnnotationAppearancesRenderToken(token)}`,
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/annotations/pages/${encodeURIComponent(encodePageKey(page))}/appearances@${encodeAnnotationAppearancesRenderToken(token)}`,
 
-  layerPageAnnotationAppearancesCurrent: (
-    docId: string,
-    layerName: string,
-    pageObjectNumber: number,
-  ) =>
-    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/annotations/pages/${pageObjectNumber}/appearances`,
+  layerPageAnnotationAppearancesCurrent: (docId: string, layerName: string, page: PageRef) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/annotations/pages/${encodeURIComponent(encodePageKey(page))}/appearances`,
 
-  layerPageAnnotationsCreate: (docId: string, layerName: string, pageObjectNumber: number) =>
-    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/annotations/pages/${pageObjectNumber}/items`,
+  layerPageAnnotationsCreate: (docId: string, layerName: string, page: PageRef) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/annotations/pages/${encodeURIComponent(encodePageKey(page))}/items`,
 
-  layerAnnotationByKey: (docId: string, layerName: string, pageObjectNumber: number, key: string) =>
-    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/annotations/pages/${pageObjectNumber}/items/${encodeURIComponent(key)}`,
+  layerAnnotationByKey: (docId: string, layerName: string, page: PageRef, key: string) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/annotations/pages/${encodeURIComponent(encodePageKey(page))}/items/${encodeURIComponent(key)}`,
 
-  layerPageAnnotationsMove: (docId: string, layerName: string, pageObjectNumber: number) =>
-    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/annotations/pages/${pageObjectNumber}/items/move`,
+  layerPageAnnotationsMove: (docId: string, layerName: string, page: PageRef) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/annotations/pages/${encodeURIComponent(encodePageKey(page))}/items/move`,
   /** POST: flatten a chosen set of the page's annotations into its content
    *  (a content + annotation mutation of that page). */
-  layerPageAnnotationsFlatten: (docId: string, layerName: string, pageObjectNumber: number) =>
-    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/annotations/pages/${pageObjectNumber}/items/flatten`,
+  layerPageAnnotationsFlatten: (docId: string, layerName: string, page: PageRef) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/annotations/pages/${encodeURIComponent(encodePageKey(page))}/items/flatten`,
   /** POST: the chosen annotations' appearances as one single-page PDF — a
    *  derived read (application/pdf, no-store), gated like pages/extract. */
-  layerPageAnnotationsAppearance: (docId: string, layerName: string, pageObjectNumber: number) =>
-    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/annotations/pages/${pageObjectNumber}/items/appearance`,
+  layerPageAnnotationsAppearance: (docId: string, layerName: string, page: PageRef) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/annotations/pages/${encodeURIComponent(encodePageKey(page))}/items/appearance`,
 
   /**
    * GET: the reconciled form snapshot (field tree + widget joins) for the
@@ -544,10 +516,10 @@ export const wirePaths = {
   layerSearchFullCurrent: (docId: string, layerName: string) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/search/full/data`,
 
-  layerPageViewports: (docId: string, layerName: string, pon: number) =>
-    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/pages/${pon}/viewports`,
-  layerPageScale: (docId: string, layerName: string, pon: number) =>
-    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/pages/${pon}/scale`,
+  layerPageViewports: (docId: string, layerName: string, page: PageRef) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/pages/${encodeURIComponent(encodePageKey(page))}/viewports`,
+  layerPageScale: (docId: string, layerName: string, page: PageRef) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/pages/${encodeURIComponent(encodePageKey(page))}/scale`,
 
   layerPagesMove: (docId: string, layerName: string) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/pages/move`,
@@ -660,23 +632,24 @@ export const wireTemplates = {
   docHead: '/v1/docs/:docId/head',
   layerManifest: '/v1/docs/:docId/layers/:layerName/manifest',
   layerMetadata: '/v1/docs/:docId/layers/:layerName/metadata',
-  layerRenderPage: '/v1/docs/:docId/layers/:layerName/render/pages/:pon/data',
-  layerTextPage: '/v1/docs/:docId/layers/:layerName/text/pages/:pon/data',
+  layerRenderPage: '/v1/docs/:docId/layers/:layerName/render/pages/:pageKey/data',
+  layerTextPage: '/v1/docs/:docId/layers/:layerName/text/pages/:pageKey/data',
   layerAnnotationItemsAll: '/v1/docs/:docId/layers/:layerName/annotations/items',
-  layerAnnotationItems: '/v1/docs/:docId/layers/:layerName/annotations/pages/:pon/items',
-  layerAnnotationItem: '/v1/docs/:docId/layers/:layerName/annotations/pages/:pon/items/:annotKey',
+  layerAnnotationItems: '/v1/docs/:docId/layers/:layerName/annotations/pages/:pageKey/items',
+  layerAnnotationItem:
+    '/v1/docs/:docId/layers/:layerName/annotations/pages/:pageKey/items/:annotKey',
   layerAnnotationItemsFlatten:
-    '/v1/docs/:docId/layers/:layerName/annotations/pages/:pon/items/flatten',
+    '/v1/docs/:docId/layers/:layerName/annotations/pages/:pageKey/items/flatten',
   layerAnnotationItemsAppearance:
-    '/v1/docs/:docId/layers/:layerName/annotations/pages/:pon/items/appearance',
+    '/v1/docs/:docId/layers/:layerName/annotations/pages/:pageKey/items/appearance',
   layerForm: '/v1/docs/:docId/layers/:layerName/form',
   layerFormFieldValue: '/v1/docs/:docId/layers/:layerName/form/fields/:fieldKey/value',
   layerFormFieldReset: '/v1/docs/:docId/layers/:layerName/form/fields/:fieldKey/reset',
   layerFormFieldSignatureAppearance:
     '/v1/docs/:docId/layers/:layerName/form/fields/:fieldKey/signature-appearance',
   layerFormData: '/v1/docs/:docId/layers/:layerName/form/data',
-  layerPageViewports: '/v1/docs/:docId/layers/:layerName/pages/:pon/viewports',
-  layerPageScale: '/v1/docs/:docId/layers/:layerName/pages/:pon/scale',
+  layerPageViewports: '/v1/docs/:docId/layers/:layerName/pages/:pageKey/viewports',
+  layerPageScale: '/v1/docs/:docId/layers/:layerName/pages/:pageKey/scale',
   layerPagesMove: '/v1/docs/:docId/layers/:layerName/pages/move',
   layerPagesRotate: '/v1/docs/:docId/layers/:layerName/pages/rotate',
   layerPagesDelete: '/v1/docs/:docId/layers/:layerName/pages/delete',

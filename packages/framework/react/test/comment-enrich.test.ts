@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type { CommentThread } from '@embedpdf/plugin-annotation';
 import { enrichCommentThreads } from '../src/annotation';
-import type { PageLayout } from '../src/runtime';
+import { toPageRef, type PageLayout } from '../src/runtime';
 
-/** The join is presentation-only: identity stays PON; pageIndex/pageLabel
+/** The join is presentation-only: identity stays the page address; pageIndex/pageLabel
  *  come from the CURRENT layout and must track moves/deletes. */
 
 const CROP = { left: 0, bottom: 0, right: 600, top: 800 };
@@ -11,12 +11,12 @@ const CROP = { left: 0, bottom: 0, right: 600, top: 800 };
 /** Root rect in PDF space (y-up, crop-relative): a 20pt box near the top. */
 const thread = (pon: number): CommentThread =>
   ({
-    pageObjectNumber: pon,
+    page: toPageRef(pon),
     root: { rect: { left: 100, bottom: 700, right: 120, top: 720 } },
   }) as unknown as CommentThread;
 
 const page = (pon: number, index: number, label: string | null = null): PageLayout =>
-  ({ pageObjectNumber: pon, index, label, boxes: { crop: CROP } }) as unknown as PageLayout;
+  ({ ref: toPageRef(pon), index, label, boxes: { crop: CROP } }) as unknown as PageLayout;
 
 describe('enrichCommentThreads', () => {
   it('joins pageIndex + pageLabel from the live layout, falling back to 1-based position', () => {
@@ -33,7 +33,7 @@ describe('enrichCommentThreads', () => {
     const after = enrichCommentThreads([thread(10)], [page(30, 0), page(10, 1)]);
     expect(before[0]!.pageIndex).toBe(0);
     expect(after[0]!.pageIndex).toBe(1);
-    expect(after[0]!.pageObjectNumber).toBe(10);
+    expect(after[0]!.page.pageObjectNumber).toBe(10);
   });
 
   it('a thread on a deleted page renders as -1/"?" instead of throwing', () => {

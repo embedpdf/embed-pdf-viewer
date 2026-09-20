@@ -41,7 +41,7 @@ export function refKey(ref: AnnotationRef): string {
     ? `obj:${ref.annotObjectNumber}`
     : ref.kind === 'nm'
       ? `nm:${ref.nm}`
-      : `idx:${ref.pageObjectNumber}:${ref.index}`;
+      : `idx:${ref.page.pageObjectNumber}:${ref.index}`;
 }
 
 /* ── colour seam (engine Color ↔ CSS hex) ─────────────────────────────────── */

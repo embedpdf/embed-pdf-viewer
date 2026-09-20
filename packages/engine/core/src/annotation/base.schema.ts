@@ -1,3 +1,4 @@
+import { PageRefSchema } from '../identity/PageRef.schema';
 import { z } from 'zod';
 
 import type { AnnotationBase } from './base';
@@ -157,24 +158,24 @@ export const AnnotationStableIdSchema: z.ZodType<AnnotationStableId> = z.discrim
 
 export const RevisionTokenSchema: z.ZodType<RevisionToken> = z.object({
   docSessionId: z.string(),
-  pageObjectNumber: z.number().int().positive(),
+  page: PageRefSchema,
   generation: z.number().int().nonnegative(),
 });
 
 export const AnnotationRefSchema: z.ZodType<AnnotationRef> = z.discriminatedUnion('kind', [
   z.object({
     kind: z.literal('objectNumber'),
-    pageObjectNumber: z.number().int().positive(),
+    page: PageRefSchema,
     annotObjectNumber: z.number().int().positive(),
   }),
   z.object({
     kind: z.literal('nm'),
-    pageObjectNumber: z.number().int().positive(),
+    page: PageRefSchema,
     nm: z.string(),
   }),
   z.object({
     kind: z.literal('index'),
-    pageObjectNumber: z.number().int().positive(),
+    page: PageRefSchema,
     index: z.number().int().nonnegative(),
     revision: RevisionTokenSchema,
   }),
@@ -189,7 +190,7 @@ export const AnnotationRefSchema: z.ZodType<AnnotationRef> = z.discriminatedUnio
  */
 export const AnnotationBaseShape = {
   ref: AnnotationRefSchema,
-  pageObjectNumber: z.number().int().positive(),
+  page: PageRefSchema,
   index: z.number().int().nonnegative(),
   identityQuality: z.enum(['durable', 'weak']),
   nm: z.string().nullable(),

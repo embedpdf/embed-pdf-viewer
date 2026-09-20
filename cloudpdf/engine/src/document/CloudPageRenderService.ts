@@ -7,8 +7,8 @@ import {
   type PageImageOptions,
   type PageImageResult,
   type PageNetworkRenderFormat,
-  type PageObjectNumber,
   type PageRaster,
+  type PageRef,
   type PageRenderOptions,
   type PageRenderService,
 } from '@embedpdf/engine-core/runtime';
@@ -23,7 +23,7 @@ export class CloudPageRenderService implements PageRenderService {
     private readonly http: HttpClient,
     private readonly docId: string,
     private readonly layerName: string,
-    private readonly pageObjectNumber: PageObjectNumber,
+    private readonly pageRef: PageRef,
     private readonly isClosed: () => boolean,
     private readonly manifest: ManifestAccessor,
   ) {}
@@ -39,11 +39,12 @@ export class CloudPageRenderService implements PageRenderService {
       const includeAnnotations = options.includeAnnotations ?? true;
       const buildPath = async (s: AbortSignal): Promise<string> => {
         const manifest = await this.manifest.get(s);
-        const page = manifest.pages.find((p) => p.state.pageObjectNumber === this.pageObjectNumber);
+        const pon = this.pageRef.pageObjectNumber;
+        const page = manifest.pages.find((p) => p.state.page.pageObjectNumber === pon);
         if (!page) {
           throw new EngineError(
             EngineErrorCode.NotFound,
-            `no page with object number ${this.pageObjectNumber} in document ${this.docId}`,
+            `no page with object number ${pon} in document ${this.docId}`,
           );
         }
         // `format` flows through `options` and ends up in the token like
@@ -69,17 +70,17 @@ export class CloudPageRenderService implements PageRenderService {
         // visitors → one URL set, one origin render, no layer session.
         if (includeAnnotations) {
           return planesInherited(manifest, ['content', 'annotations'])
-            ? wirePaths.docPageRenderAnnotated(this.docId, this.pageObjectNumber, wireToken)
+            ? wirePaths.docPageRenderAnnotated(this.docId, this.pageRef, wireToken)
             : wirePaths.layerPageRenderAnnotated(
                 this.docId,
                 this.layerName,
-                this.pageObjectNumber,
+                this.pageRef,
                 wireToken,
               );
         }
         return planesInherited(manifest, ['content'])
-          ? wirePaths.docPageRender(this.docId, this.pageObjectNumber, wireToken)
-          : wirePaths.layerPageRender(this.docId, this.layerName, this.pageObjectNumber, wireToken);
+          ? wirePaths.docPageRender(this.docId, this.pageRef, wireToken)
+          : wirePaths.layerPageRender(this.docId, this.layerName, this.pageRef, wireToken);
       };
       // The advertised URL reflects the CURRENT manifest; the blob loader
       // re-resolves per fetch through the 404 → manifest-refresh rail, so a

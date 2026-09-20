@@ -35,7 +35,7 @@ export function SearchLayer({
   blendMode = 'multiply',
 }: SearchLayerProps) {
   const page = usePage();
-  const hits = useSelector(SearchToken, (c) => c.hitsForPage(page.pon), shallowArray);
+  const hits = useSelector(SearchToken, (c) => c.hitsForPage(page.ref), shallowArray);
   const active = useSelector(SearchToken, (c) => c.activeHit());
 
   if (hits.length === 0) return null;

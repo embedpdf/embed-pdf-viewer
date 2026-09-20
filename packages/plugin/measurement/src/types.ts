@@ -6,6 +6,7 @@ import type {
   MeasurementReadout,
   MeasurementUnavailable,
   PageMeasurementViewport,
+  PageRef,
   PdfMeasure,
   PdfMeasurement,
   PdfPoint,
@@ -50,7 +51,7 @@ export interface PageScale {
 }
 
 export interface CalibrationRequest {
-  pon: number;
+  page: PageRef;
   from: PdfPoint;
   to: PdfPoint;
   userSpaceLength: number;
@@ -60,7 +61,7 @@ export interface CalibrationRequest {
 export type ScaleChangeReport =
   | (RecalibrationReport & { scaleError?: never })
   | {
-      pon: number;
+      page: PageRef;
       scale?: never;
       error?: never;
       updated: [];
@@ -77,47 +78,47 @@ export interface MeasurementState {
 }
 
 export type MeasurementAction =
-  | { type: 'PAGE_SCALE'; pon: number; viewports: PageMeasurementViewport[]; scale: PageScale }
+  | { type: 'PAGE_SCALE'; page: PageRef; viewports: PageMeasurementViewport[]; scale: PageScale }
   | { type: 'PENDING'; delta: number }
   | { type: 'CALIBRATION'; request: CalibrationRequest | null }
   | { type: 'REPORTS'; reports: ScaleChangeReport[] };
 
 export interface MeasurementCapability {
   canCalibrate(): boolean;
-  canMeasure(pon: number): boolean;
-  pageScale(pon: number): PageScale;
+  canMeasure(page: PageRef): boolean;
+  pageScale(page: PageRef): PageScale;
   isBusy(): boolean;
   lastReports(): ScaleChangeReport[];
-  prepare(pon: number): Promise<void>;
+  prepare(page: PageRef): Promise<void>;
   setPageScale(
-    pon: number,
+    page: PageRef,
     measure: PdfMeasure,
     opts?: SetScaleOptions,
   ): Promise<ScaleChangeReport[]>;
   calibrate(
-    pon: number,
+    page: PageRef,
     from: PdfPoint,
     to: PdfPoint,
     real: { value: number; unit: LengthUnit },
     opts?: SetScaleOptions,
   ): Promise<ScaleChangeReport[]>;
   setUnit(
-    pon: number | 'all',
+    page: PageRef | 'all',
     unit: LengthUnit,
     areaUnit?: AreaUnit,
     opts?: SetScaleOptions,
   ): Promise<ScaleChangeReport[]>;
   setPrecision(
-    pon: number | 'all',
+    page: PageRef | 'all',
     precision: number,
     opts?: SetScaleOptions,
   ): Promise<ScaleChangeReport[]>;
-  setPreset(pon: number, id: string, opts?: SetScaleOptions): Promise<ScaleChangeReport[]>;
+  setPreset(page: PageRef, id: string, opts?: SetScaleOptions): Promise<ScaleChangeReport[]>;
   presets(): readonly ScalePreset[];
   units(): readonly LengthUnit[];
   areaUnits(): readonly AreaUnit[];
   setAreaUnit(
-    pon: number | 'all',
+    page: PageRef | 'all',
     unit: AreaUnit,
     options?: SetScaleOptions,
   ): Promise<ScaleChangeReport[]>;
@@ -126,7 +127,7 @@ export interface MeasurementCapability {
   calibrationRequest(): CalibrationRequest | null;
   dismissCalibration(): void;
   onCalibrationRequested(cb: (request: CalibrationRequest) => void): () => void;
-  onScaleChanged(cb: (event: { pon: number; report: ScaleChangeReport }) => void): () => void;
+  onScaleChanged(cb: (event: { page: PageRef; report: ScaleChangeReport }) => void): () => void;
 }
 
 export const MeasurementToken = createCapabilityToken<MeasurementCapability>('measurement');

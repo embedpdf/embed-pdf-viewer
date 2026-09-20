@@ -71,11 +71,11 @@ export interface AnnotationThread<T extends AnnotationDTO = AnnotationDTO> {
 export function refKey(ref: AnnotationRef): string {
   switch (ref.kind) {
     case 'objectNumber':
-      return `obj:${ref.pageObjectNumber}:${ref.annotObjectNumber}`;
+      return `obj:${ref.page.pageObjectNumber}:${ref.annotObjectNumber}`;
     case 'nm':
-      return `nm:${ref.pageObjectNumber}:${ref.nm}`;
+      return `nm:${ref.page.pageObjectNumber}:${ref.nm}`;
     case 'index':
-      return `idx:${ref.pageObjectNumber}:${ref.index}`;
+      return `idx:${ref.page.pageObjectNumber}:${ref.index}`;
   }
 }
 
@@ -104,7 +104,7 @@ export function buildThreads(annotations: readonly AnnotationDTO[]): AnnotationT
     // Index under /NM too, so a child that points at the parent by name
     // still resolves when the parent's own ref is objectNumber-form.
     if (a.nm && a.nm.length > 0) {
-      byKey.set(`nm:${a.ref.pageObjectNumber}:${a.nm}`, a);
+      byKey.set(`nm:${a.ref.page.pageObjectNumber}:${a.nm}`, a);
     }
   }
 

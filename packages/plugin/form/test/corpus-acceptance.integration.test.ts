@@ -4,7 +4,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
-import { createKernel } from '@embedpdf/core';
+import { createKernel, toPageRef } from '@embedpdf/core';
 import { createQuickJsSandbox } from '@embedpdf/core-js-sandbox';
 import { createLocalEngine } from '@embedpdf/engine';
 import { actionsPlugin } from '@embedpdf/plugin-actions';
@@ -78,8 +78,8 @@ describe('corpus acceptance (skips without the local JS tests folder)', () => {
         await actions.dispatch({
           scope: 'annotation',
           event: 'cursorEnter',
-          ref: { kind: 'objectNumber', pageObjectNumber: 999, annotObjectNumber: 1 },
-          pon: 999,
+          ref: { kind: 'objectNumber', page: toPageRef(999), annotObjectNumber: 1 },
+          page: toPageRef(999),
         });
         await settle();
         await form.refresh();
@@ -131,24 +131,24 @@ describe('corpus acceptance (skips without the local JS tests folder)', () => {
         await form.refresh();
         const trigger = form.snapshot()?.fields.find((f) => f.widgets.length > 0);
         if (!trigger) throw new Error('no widget field in 02');
-        const pon = trigger.widgets[0]!.pageObjectNumber;
-        await annotation.reloadPage(pon);
+        const page = trigger.widgets[0]!.page!;
+        await annotation.reloadPage(page);
         const hoverSquare = () =>
-          annotation.pageItems(pon).find((item) => item.subtype === 'square');
+          annotation.pageItems(page).find((item) => item.subtype === 'square');
         const before = hoverSquare()?.style.color;
         const drain = () =>
           actions.dispatch({
             scope: 'annotation',
             event: 'cursorEnter',
-            ref: { kind: 'objectNumber', pageObjectNumber: 999, annotObjectNumber: 1 },
-            pon: 999,
+            ref: { kind: 'objectNumber', page: toPageRef(999), annotObjectNumber: 1 },
+            page: toPageRef(999),
           });
         // The first field in 02 is `hoverTarget`'s trigger (obj:5, /AA E/X JS).
         form.notifyWidgetEvent(
           `obj:${trigger.fieldObjectNumber}`,
           {
             kind: 'objectNumber',
-            pageObjectNumber: pon,
+            page,
             annotObjectNumber: trigger.widgets[0]!.annotObjectNumber,
           },
           'cursorEnter',
@@ -191,23 +191,23 @@ describe('corpus acceptance (skips without the local JS tests folder)', () => {
         };
         const trigger = field('nativeTrigger');
         const target = field('nativeTarget');
-        const pon = trigger.widgets[0]!.pageObjectNumber;
-        await annotation.reloadPage(pon);
+        const page = trigger.widgets[0]!.page!;
+        await annotation.reloadPage(page);
         const targetId = `obj:${target.widgets[0]!.annotObjectNumber}`;
-        const painted = () => annotation.pageItems(pon).map((i) => i.id);
+        const painted = () => annotation.pageItems(page).map((i) => i.id);
         const drain = () =>
           actions.dispatch({
             scope: 'annotation',
             event: 'cursorEnter',
-            ref: { kind: 'objectNumber', pageObjectNumber: 999, annotObjectNumber: 1 },
-            pon: 999,
+            ref: { kind: 'objectNumber', page: toPageRef(999), annotObjectNumber: 1 },
+            page: toPageRef(999),
           });
         const notify = (event: 'cursorEnter' | 'cursorExit') =>
           form.notifyWidgetEvent(
             `obj:${trigger.fieldObjectNumber}`,
             {
               kind: 'objectNumber',
-              pageObjectNumber: pon,
+              page,
               annotObjectNumber: trigger.widgets[0]!.annotObjectNumber,
             },
             event,

@@ -5,7 +5,9 @@ import type { CapturedAnnotationDraft } from '@embedpdf/plugin-annotation/contra
 import {
   measureFromKnownLength,
   measureFromRatio,
+  toPageRef,
   type PageMeasurementViewport,
+  type PageRef,
   type PdfMeasure,
 } from '@embedpdf/engine-core/runtime';
 import { createMeasurementEffects } from './effects';
@@ -22,8 +24,8 @@ function harness(options: { allowed?: boolean; legacy?: boolean } = {}) {
   const cleanups: (() => void)[] = [];
   const storage: Record<number, PageMeasurementViewport[]> = { 1: [], 2: [] };
   const setPageViewports = vi.fn();
-  const remeasurePage = vi.fn(async (pon: number, scale: PdfMeasure) => ({
-    pon,
+  const remeasurePage = vi.fn(async (page: PageRef, scale: PdfMeasure) => ({
+    page,
     scale,
     updated: [],
     skipped: [],
@@ -51,15 +53,11 @@ function harness(options: { allowed?: boolean; legacy?: boolean } = {}) {
       state = measurementReducer(state, a);
     },
     document: () => ({
-      pages: [1, 2].map((pageObjectNumber) => ({
-        pageObjectNumber,
-        boxes: { crop },
-        userUnit: pageObjectNumber,
-      })),
+      pages: [1, 2].map((pon) => ({ ref: toPageRef(pon), boxes: { crop }, userUnit: pon })),
     }),
     doc: {
       security: { allows: () => options.allowed !== false },
-      page: (pon: number) => ({
+      page: ({ pageObjectNumber: pon }: PageRef) => ({
         measure: options.legacy
           ? undefined
           : { viewports: () => read(pon), setScale: (m: PdfMeasure) => write(pon, m) },
@@ -95,7 +93,7 @@ function harness(options: { allowed?: boolean; legacy?: boolean } = {}) {
 describe('measurement workflow', () => {
   it('writes the viewport, rereads, then optionally recalculates', async () => {
     const h = harness();
-    await h.cap.prepare(1);
+    await h.cap.prepare(toPageRef(1));
     const trace: string[] = [];
     h.write.mockImplementation(async (_pon, m) => {
       trace.push('write');
@@ -105,23 +103,23 @@ describe('measurement workflow', () => {
       trace.push('read');
       return h.storage[pon];
     });
-    h.remeasurePage.mockImplementation(async (pon, scale) => {
+    h.remeasurePage.mockImplementation(async (page, scale) => {
       trace.push('remeasure');
-      return { pon, scale, updated: [], skipped: [], failed: [] };
+      return { page, scale, updated: [], skipped: [], failed: [] };
     });
-    await h.cap.setPageScale(1, scale);
+    await h.cap.setPageScale(toPageRef(1), scale);
     expect(trace).toEqual(['write', 'read', 'remeasure']);
-    expect(h.cap.pageScale(1)).toMatchObject({ source: 'owned', measure: scale });
-    await h.cap.setPageScale(1, scale, { recalculate: false });
+    expect(h.cap.pageScale(toPageRef(1))).toMatchObject({ source: 'owned', measure: scale });
+    await h.cap.setPageScale(toPageRef(1), scale, { recalculate: false });
     expect(h.remeasurePage).toHaveBeenCalledTimes(1);
   });
   it('refuses calibration without the grant before changing state', async () => {
     const h = harness({ allowed: false });
-    await h.cap.prepare(1);
+    await h.cap.prepare(toPageRef(1));
     expect(h.cap.canCalibrate()).toBe(false);
     h.cap.startCalibration();
     expect(h.activateTool).not.toHaveBeenCalled();
-    await expect(h.cap.setPageScale(1, scale)).rejects.toMatchObject({
+    await expect(h.cap.setPageScale(toPageRef(1), scale)).rejects.toMatchObject({
       name: 'PermissionDenied',
       required: 'doc.annotate.modify',
     });
@@ -130,34 +128,47 @@ describe('measurement workflow', () => {
   });
   it('does not modify annotations after a failed viewport write; all-pages reports partial results', async () => {
     const h = harness();
-    await h.cap.prepare(1);
+    await h.cap.prepare(toPageRef(1));
     h.write.mockImplementation(async (pon) => {
       if (pon === 1) {
         throw new Error('denied');
       }
     });
-    await expect(h.cap.setPageScale(1, scale)).rejects.toThrow('denied');
+    await expect(h.cap.setPageScale(toPageRef(1), scale)).rejects.toThrow('denied');
     expect(h.remeasurePage).not.toHaveBeenCalled();
-    const reports = await h.cap.setPageScale(1, scale, { allPages: true });
-    expect(reports[0]).toMatchObject({ pon: 1, scaleError: { message: 'denied' } });
-    expect(reports[1]).toMatchObject({ pon: 2, updated: [] });
+    const reports = await h.cap.setPageScale(toPageRef(1), scale, { allPages: true });
+    expect(reports[0]).toMatchObject({ page: toPageRef(1), scaleError: { message: 'denied' } });
+    expect(reports[1]).toMatchObject({ page: toPageRef(2), updated: [] });
     expect(h.remeasurePage).toHaveBeenCalledTimes(1);
   });
   it('captures original PDF points and computes float32 user-space length', async () => {
     const h = harness();
-    await h.cap.prepare(1);
-    h.capture({ tool: 'calibrate', pon: 1, from: { x: -20, y: 20 }, to: { x: 80, y: 20 } });
-    expect(h.cap.calibrationRequest()).toMatchObject({ pon: 1, userSpaceLength: 100 });
+    await h.cap.prepare(toPageRef(1));
+    h.capture({
+      tool: 'calibrate',
+      page: toPageRef(1),
+      from: { x: -20, y: 20 },
+      to: { x: 80, y: 20 },
+    });
+    expect(h.cap.calibrationRequest()).toMatchObject({
+      page: toPageRef(1),
+      userSpaceLength: 100,
+    });
     expect(h.activateTool).toHaveBeenCalledWith('pointer');
-    await h.cap.calibrate(1, { x: -20, y: 20 }, { x: 80, y: 20 }, { value: 3, unit: 'm' });
-    expect(h.cap.pageScale(1).measure).toEqual(scale);
+    await h.cap.calibrate(
+      toPageRef(1),
+      { x: -20, y: 20 },
+      { x: 80, y: 20 },
+      { value: 3, unit: 'm' },
+    );
+    expect(h.cap.pageScale(toPageRef(1)).measure).toEqual(scale);
   });
   it('supports session-only engines and scales presets by each page UserUnit', async () => {
     const h = harness({ legacy: true });
-    await h.cap.prepare(1);
-    await h.cap.setPreset(1, 'metric-100', { allPages: true, recalculate: false });
+    await h.cap.prepare(toPageRef(1));
+    await h.cap.setPreset(toPageRef(1), 'metric-100', { allPages: true, recalculate: false });
     expect(h.write).not.toHaveBeenCalled();
-    expect(h.cap.pageScale(2)).toMatchObject({
+    expect(h.cap.pageScale(toPageRef(2))).toMatchObject({
       persistent: false,
       source: 'owned',
       measure: measureFromRatio(1, 100, 'm', 2),
@@ -165,14 +176,14 @@ describe('measurement workflow', () => {
   });
   it('ignores late reads after disposal', async () => {
     const h = harness();
-    await Promise.all([h.cap.prepare(1), h.cap.prepare(2)]);
+    await Promise.all([h.cap.prepare(toPageRef(1)), h.cap.prepare(toPageRef(2))]);
     let resolve!: (v: PageMeasurementViewport[]) => void;
     h.read.mockReturnValueOnce(
       new Promise((r) => {
         resolve = r;
       }),
     );
-    h.event({ type: 'page.viewportsChanged', pageObjectNumber: 1 } as DocumentEvent);
+    h.event({ type: 'page.viewportsChanged', page: toPageRef(1) } as DocumentEvent);
     h.dispose();
     const before = h.state();
     resolve([{ owned: true, bbox: crop, measure: scale }]);

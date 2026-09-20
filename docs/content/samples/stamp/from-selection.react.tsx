@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Viewer, DocumentGate, useDocumentId } from '@embedpdf/react/runtime';
+import { Viewer, DocumentGate, toPageRef, useDocumentId } from '@embedpdf/react/runtime';
 import type { OpenInput } from '@embedpdf/react/runtime';
 import { Stage, stagePlugin } from '@embedpdf/react/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
@@ -74,21 +74,26 @@ function MakeStamp() {
   const [status, setStatus] = useState('draw a shape, select it, make a stamp');
 
   // One page at a time: a stamp is one page of artwork.
-  const pages = new Set(selection.map((ref) => ref.pageObjectNumber));
+  const pages = new Set(selection.map((ref) => ref.page.pageObjectNumber));
   const canMake = selection.length > 0 && pages.size === 1 && documentId !== null;
 
   const make = async () => {
     if (!canMake || !documentId) return;
-    const [pon] = pages;
+    const [pageObjectNumber] = pages;
     // The library is created on first use; the identifier is minted in
     // Acrobat's `#…` form so the stamp keeps its identity there too.
     const libraryId = stamp.library(MY_STAMPS)
       ? MY_STAMPS
       : await stamp.createLibrary('My stamps', { id: MY_STAMPS });
-    const assetId = await stamp.addAssetFromAnnotations(documentId, pon, [...selection], {
-      libraryId,
-      label: `Custom stamp ${mine.length + 1}`,
-    });
+    const assetId = await stamp.addAssetFromAnnotations(
+      documentId,
+      toPageRef(pageObjectNumber),
+      [...selection],
+      {
+        libraryId,
+        label: `Custom stamp ${mine.length + 1}`,
+      },
+    );
     setStatus(`added ${stamp.asset(assetId)?.label ?? assetId}`);
   };
 

@@ -26,6 +26,7 @@
  */
 import { createStageGestureController } from './stage-gestures';
 import type { StageGestureHost, StageGestureSink, StageWheelSample } from './stage-gestures';
+import type { PageRef } from './page-ref';
 
 interface SurfacePoint {
   x: number;
@@ -38,14 +39,14 @@ export interface StageSurfaceHost extends StageGestureHost {
   setDevicePixelRatio(ratio: number): void;
   /** Viewport point → the page under it (with per-page display context), or null over a gap. */
   pageAt(screen: SurfacePoint): {
-    pon: number;
+    ref: PageRef;
     point: SurfacePoint;
     scale?: number;
     rotation?: 0 | 90 | 180 | 270;
     zoom?: number;
   } | null;
   /** Viewport point → a SPECIFIC page's content space, unclamped (frame-stable projection). */
-  pointOnPage(pon: number, screen: SurfacePoint): SurfacePoint | null;
+  pointOnPage(page: PageRef, screen: SurfacePoint): SurfacePoint | null;
 }
 
 /**
@@ -58,13 +59,13 @@ export interface StageSurfaceSample {
   phase: 'down' | 'move' | 'up' | 'cancel';
   viewport: SurfacePoint;
   page?: {
-    pon: number;
+    ref: PageRef;
     point: SurfacePoint;
     scale?: number;
     rotation?: 0 | 90 | 180 | 270;
     zoom?: number;
   };
-  project: (pon: number) => SurfacePoint | null;
+  project: (page: PageRef) => SurfacePoint | null;
   modifiers: { shift: boolean; alt: boolean; ctrl: boolean; meta: boolean };
   clickCount: number;
   pointerType: 'mouse' | 'pen' | 'touch';
@@ -139,7 +140,7 @@ export function createStageSurface(
       page: stage.pageAt(viewport) ?? undefined,
       // Page-anchored gestures (annotation move/resize) track the origin
       // page's frame through this even when the cursor is off that page.
-      project: (pon) => stage.pointOnPage(pon, viewport),
+      project: (page) => stage.pointOnPage(page, viewport),
       modifiers: { shift: e.shiftKey, alt: e.altKey, ctrl: e.ctrlKey, meta: e.metaKey },
       clickCount,
       pointerType: (e.pointerType || 'mouse') as StageSurfaceSample['pointerType'],

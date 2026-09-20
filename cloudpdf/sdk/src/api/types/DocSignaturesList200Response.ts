@@ -48,7 +48,21 @@ export namespace DocSignaturesList200Response {
         export namespace Item {
             export interface Widget {
                 annotObjectNumber: number;
-                pageObjectNumber: number;
+                page: Widget.Page | null;
+            }
+
+            export namespace Widget {
+                export interface Page {
+                    kind: Page.Kind;
+                    pageObjectNumber: number;
+                }
+
+                export namespace Page {
+                    export const Kind = {
+                        ObjectNumber: "objectNumber",
+                    } as const;
+                    export type Kind = (typeof Kind)[keyof typeof Kind];
+                }
             }
 
             export const Kind = {

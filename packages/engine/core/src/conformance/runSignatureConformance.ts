@@ -226,7 +226,7 @@ export function runSignatureConformance(
         const list = await doc.pages.list();
         let caught: unknown;
         try {
-          await doc.pages.delete([list.pages[0].pageObjectNumber]);
+          await doc.pages.delete([list.pages[0].ref]);
         } catch (err) {
           caught = err;
         }
@@ -478,7 +478,7 @@ function runAnalysisTests(
       // A one-page fixture cannot lose its only page; a rotation is a page
       // dictionary change no signature permits either.
       const list = await certified.pages.list();
-      await certified.pages.rotate([list.pages[0].pageObjectNumber], 90);
+      await certified.pages.rotate([list.pages[0].ref], 90);
       const working = await certified.signatures!.analyze({
         since: { signatureIndex: 0 },
         until: 'working-copy',
@@ -710,7 +710,7 @@ function runSigningTests(
       expect(doc.security.allows('doc.pages.assemble')).toBe(false);
       expect(doc.security.allows('doc.forms.fill')).toBe(true);
       const list = await doc.pages.list();
-      expect(await caughtCode(() => doc.pages.delete([list.pages[0].pageObjectNumber]))).toBe(
+      expect(await caughtCode(() => doc.pages.delete([list.pages[0].ref]))).toBe(
         EngineErrorCode.ProtectedDocument,
       );
       expect(await caughtCode(() => doc.download({ mode: 'rewrite' }))).toBe(
@@ -789,7 +789,7 @@ function runSigningTests(
       });
       expect(result.signature.coverage).toBe('whole-revision');
       expect(result.signature.widget).toBeTruthy();
-      const page = doc.page(result.signature.widget!.pageObjectNumber);
+      const page = doc.page(result.signature.widget!.page!);
       const annots = await page.annotations.list();
       const widget = annots.annotations.find(
         (a) =>

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { textQuadFromRect } from '@embedpdf/core-geometry';
+import { toPageRef } from '@embedpdf/engine-core/runtime';
 import {
   DRAWN_FLAGS,
   NO_ANNOTATION_FLAGS,
@@ -19,6 +20,7 @@ import { initialModel, update, DEFAULT_CHROME_GEOM } from './index';
 import type { Annot, Geom, Model, Msg, Vec } from './types';
 
 const PON = 1;
+const PAGE = toPageRef(PON);
 const f = (over: Partial<AnnotationFlags> = {}): AnnotationFlags => ({
   ...NO_ANNOTATION_FLAGS,
   ...over,
@@ -32,10 +34,10 @@ const square = (
   id,
   ref: {
     kind: 'objectNumber',
-    pageObjectNumber: PON,
+    page: PAGE,
     annotObjectNumber: Number(id.replace(/\D/g, '') || 7),
   },
-  pon: PON,
+  page: PAGE,
   subtype: 'square',
   geom: { t: 'rect', rect: { x: 100, y: 100, width: 80, height: 60 }, ellipse: false },
   style: initialModel.style,
@@ -88,19 +90,19 @@ describe('flag predicates (ISO 32000 Table 167)', () => {
         t: 'createPointer',
         phase: 'down',
         subtype: 'square',
-        in: { pon: PON, point: { x: 10, y: 10 }, shift: false },
+        in: { page: PAGE, point: { x: 10, y: 10 }, shift: false },
       },
       {
         t: 'createPointer',
         phase: 'move',
         subtype: 'square',
-        in: { pon: PON, point: { x: 60, y: 50 }, shift: false },
+        in: { page: PAGE, point: { x: 60, y: 50 }, shift: false },
       },
       {
         t: 'createPointer',
         phase: 'up',
         subtype: 'square',
-        in: { pon: PON, point: { x: 60, y: 50 }, shift: false },
+        in: { page: PAGE, point: { x: 60, y: 50 }, shift: false },
       },
     ]);
     const a = m.byId[m.order[0]];
@@ -115,19 +117,19 @@ describe('flag predicates (ISO 32000 Table 167)', () => {
         phase: 'down',
         subtype: 'square',
         flags: { noZoom: true, noRotate: true },
-        in: { pon: PON, point: { x: 10, y: 10 }, shift: false },
+        in: { page: PAGE, point: { x: 10, y: 10 }, shift: false },
       },
       {
         t: 'createPointer',
         phase: 'move',
         subtype: 'square',
-        in: { pon: PON, point: { x: 60, y: 50 }, shift: false },
+        in: { page: PAGE, point: { x: 60, y: 50 }, shift: false },
       },
       {
         t: 'createPointer',
         phase: 'up',
         subtype: 'square',
-        in: { pon: PON, point: { x: 60, y: 50 }, shift: false },
+        in: { page: PAGE, point: { x: 60, y: 50 }, shift: false },
       },
     ]);
     const a = m.byId[m.order[0]];
@@ -143,10 +145,10 @@ describe('flag-driven behavior in the model', () => {
       square('r3', f({ readOnly: true })),
       square('v4', DRAWN_FLAGS),
     ]);
-    expect(paintOrder(m, PON)).toEqual(['r3', 'v4']);
-    expect(pageItems(m, PON).map((i) => i.id)).toEqual(['r3', 'v4']);
+    expect(paintOrder(m, PAGE)).toEqual(['r3', 'v4']);
+    expect(pageItems(m, PAGE).map((i) => i.id)).toEqual(['r3', 'v4']);
     // a click inside the shared footprint resolves to the visible+interactive one
-    const hit = hitTest(m, PON, { x: 102, y: 102 }, DEFAULT_CHROME_GEOM, 6);
+    const hit = hitTest(m, PAGE, { x: 102, y: 102 }, DEFAULT_CHROME_GEOM, 6);
     expect(hit).toEqual({ t: 'annot', id: 'v4' });
     expect(isSelectable(m, 'r3')).toBe(false);
     expect(isSelectable(m, 'v4')).toBe(true);
@@ -155,9 +157,9 @@ describe('flag-driven behavior in the model', () => {
   it('toggleNoView + noView renders only while selected', () => {
     const a = square('t1', f({ noView: true, toggleNoView: true }));
     let m = loaded([a]);
-    expect(pageItems(m, PON)).toEqual([]);
+    expect(pageItems(m, PAGE)).toEqual([]);
     m = { ...m, selected: ['t1'] };
-    expect(pageItems(m, PON).map((i) => i.id)).toEqual(['t1']);
+    expect(pageItems(m, PAGE).map((i) => i.id)).toEqual(['t1']);
   });
 
   it('locked: selectable, no handles/knob, move/props/delete blocked, unlock works', () => {
@@ -166,14 +168,18 @@ describe('flag-driven behavior in the model', () => {
       {
         t: 'editPointer',
         phase: 'down',
-        in: { pon: PON, point: { x: 102, y: 102 }, shift: false },
+        in: { page: PAGE, point: { x: 102, y: 102 }, shift: false },
       },
-      { t: 'editPointer', phase: 'up', in: { pon: PON, point: { x: 102, y: 102 }, shift: false } },
+      {
+        t: 'editPointer',
+        phase: 'up',
+        in: { page: PAGE, point: { x: 102, y: 102 }, shift: false },
+      },
     ]);
     expect(m.selected).toEqual(['l1']); // selectable…
     expect(m.draft).toBeNull(); // …but no move gesture armed
     // chrome shows a bare outline: no resize handles, no rotate knob
-    const nodes = chrome(m, PON);
+    const nodes = chrome(m, PAGE);
     expect(nodes.some((n) => n.kind === 'handle')).toBe(false);
     expect(nodes.some((n) => n.kind === 'rotate-knob')).toBe(false);
     // restyle is blocked, silently (no effect emitted)
@@ -296,9 +302,7 @@ describe('screen-anchored bodies (noZoom / noRotate)', () => {
     // markup quads are bound to page text — no screen anchoring for them.
     const quads: Geom = {
       t: 'quads',
-      quads: [
-        textQuadFromRect({ x: 0, y: 0, width: 10, height: 5 }),
-      ],
+      quads: [textQuadFromRect({ x: 0, y: 0, width: 10, height: 5 })],
     };
     expect(anchoredGeom(quads, { zoom: true, upright: true }, { zoom: 2, rotation: 0 })).toBe(
       quads,
@@ -362,14 +366,14 @@ describe('screen-anchored bodies (noZoom / noRotate)', () => {
     const a = square('nz', f({ print: true, noZoom: true }));
     const m = loaded([a]);
     const view: ViewEnv = { zoom: 2, rotation: 0 };
-    const [item] = pageItems(m, PON, view);
+    const [item] = pageItems(m, PAGE, view);
     if (item.geom.t !== 'rect') throw new Error('expected rect');
     expect(item.geom.rect).toEqual({ x: 100, y: 100, width: 40, height: 30 });
     expect(item.style.strokeWidth).toBe(initialModel.style.strokeWidth / 2);
     // a point inside the EFFECTIVE footprint but outside nothing else hits it…
     const inside = hitTest(
       m,
-      PON,
+      PAGE,
       { x: 101, y: 101 },
       DEFAULT_CHROME_GEOM,
       6,
@@ -382,7 +386,7 @@ describe('screen-anchored bodies (noZoom / noRotate)', () => {
     // quadrant of the unscaled box, outside the halved body + margin).
     const stale = hitTest(
       m,
-      PON,
+      PAGE,
       { x: 170, y: 155 },
       DEFAULT_CHROME_GEOM,
       6,
@@ -419,9 +423,13 @@ describe('screen-anchored bodies (noZoom / noRotate)', () => {
       {
         t: 'editPointer',
         phase: 'move',
-        in: { pon: PON, point: { x: 330, y: 130 }, shift: false },
+        in: { page: PAGE, point: { x: 330, y: 130 }, shift: false },
       },
-      { t: 'editPointer', phase: 'up', in: { pon: PON, point: { x: 330, y: 130 }, shift: false } },
+      {
+        t: 'editPointer',
+        phase: 'up',
+        in: { page: PAGE, point: { x: 330, y: 130 }, shift: false },
+      },
     ]);
     const an = m.byId['an'];
     const pl = m.byId['pl'];
@@ -439,7 +447,7 @@ describe('screen-anchored bodies (noZoom / noRotate)', () => {
     const a = square('an', f({ print: true, noZoom: true, noRotate: true }));
     let m = loaded([a]);
     m = { ...m, selected: ['an'] };
-    const nodes = chrome(m, PON, undefined, undefined, { zoom: 2, rotation: 0 });
+    const nodes = chrome(m, PAGE, undefined, undefined, { zoom: 2, rotation: 0 });
     expect(nodes.some((n) => n.kind === 'handle')).toBe(true);
     expect(nodes.some((n) => n.kind === 'rotate-knob')).toBe(true);
     // the handles sit on the PROJECTED footprint (half-size at 200%)
@@ -458,7 +466,7 @@ describe('screen-anchored bodies (noZoom / noRotate)', () => {
     m = { ...m, selected: ['nz2'] };
     const view = { zoom: 2, rotation: 0 as const };
     const input = (x: number, y: number) => ({
-      pon: PON,
+      page: PAGE,
       point: { x, y },
       shift: false,
       zoom: view.zoom,
@@ -494,14 +502,14 @@ describe('screen-anchored bodies (noZoom / noRotate)', () => {
       {
         t: 'editPointer',
         phase: 'down',
-        in: { pon: PON, point: { x: 140, y: 130 }, shift: false },
+        in: { page: PAGE, point: { x: 140, y: 130 }, shift: false },
       },
       // raw delta lands the anchored box's right edge 2pt from plain's left
       // edge — well inside the 5pt guide threshold, so a plain mover WOULD snap
       {
         t: 'editPointer',
         phase: 'move',
-        in: { pon: PON, point: { x: 258, y: 130 }, shift: false },
+        in: { page: PAGE, point: { x: 258, y: 130 }, shift: false },
       },
     ]);
     if (m.draft?.g !== 'move') throw new Error('expected move draft');
@@ -516,13 +524,13 @@ describe('screen-anchored bodies (noZoom / noRotate)', () => {
       {
         t: 'editPointer',
         phase: 'down',
-        in: { pon: PON, point: { x: 340, y: 130 }, shift: false },
+        in: { page: PAGE, point: { x: 340, y: 130 }, shift: false },
       },
       // plain's left edge lands 2pt from the anchored square's right edge
       {
         t: 'editPointer',
         phase: 'move',
-        in: { pon: PON, point: { x: 222, y: 130 }, shift: false },
+        in: { page: PAGE, point: { x: 222, y: 130 }, shift: false },
       },
     ]);
     if (m2.draft?.g !== 'move') throw new Error('expected move draft');
@@ -534,7 +542,7 @@ describe('screen-anchored bodies (noZoom / noRotate)', () => {
     let m = loaded([a]);
     m = { ...m, selected: ['nz3'] };
     const view = { zoom: 4, rotation: 0 as const };
-    const nodes = chrome(m, PON, undefined, undefined, view);
+    const nodes = chrome(m, PAGE, undefined, undefined, view);
     const outline = nodes.find((n) => n.kind === 'outline');
     const knob = nodes.find((n) => n.kind === 'rotate-knob');
     if (outline?.kind !== 'outline' || knob?.kind !== 'rotate-knob')
@@ -552,7 +560,7 @@ describe('screen-anchored bodies (noZoom / noRotate)', () => {
       source: 'vector',
     });
     const m = loaded([ft]);
-    expect(textBoxes(m, PON)).toEqual([]);
+    expect(textBoxes(m, PAGE)).toEqual([]);
   });
 });
 

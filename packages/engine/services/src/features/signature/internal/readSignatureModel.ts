@@ -14,7 +14,7 @@ import { NULL_PTR, type PdfRuntimeModule, type Ptr } from '@embedpdf/engine-runt
 import { withScratch, withScratchN } from '../../../runtime/memory/scratch';
 import { readUtf16String } from '../../../runtime/memory/strings';
 import { U64_BYTES, peekU64, pokeU64 } from '../../../runtime/memory/u64';
-import { readFormSnapshot } from '../../forms/internal/readFormSnapshot';
+import { readFormSnapshot, widgetPageRef } from '../../forms/internal/readFormSnapshot';
 
 // Mirrors public/epdf_signature.h.
 const KIND_DOC_TIMESTAMP = 1;
@@ -168,7 +168,7 @@ export function readSignaturesFromModel(runtime: PdfRuntimeModule, model: Ptr): 
         widgetObjNum > 0
           ? {
               annotObjectNumber: widgetObjNum,
-              pageObjectNumber: fn.EPDFSig_GetWidgetPageObjNum(model, i),
+              page: widgetPageRef(fn.EPDFSig_GetWidgetPageObjNum(model, i)),
             }
           : null,
       signed,

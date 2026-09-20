@@ -8,6 +8,7 @@ import {
   type DocumentHandle,
   type Engine,
   type PageImageHandle,
+  type PageRef,
   type PieceInfoEntry,
 } from '@embedpdf/engine-core/runtime';
 import { createEventHook, type PluginContext } from '@embedpdf/core';
@@ -55,7 +56,11 @@ const DEFAULT_PREVIEW_WIDTH = 256;
 /** `#rrggbb` → the engine's sRGB triplet. */
 const hexColor = (hex: string): { r: number; g: number; b: number } => {
   const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
-  if (!m) throw new EngineError(EngineErrorCode.InvalidArg, `[stamp] mark color must be #rrggbb, got '${hex}'`);
+  if (!m)
+    throw new EngineError(
+      EngineErrorCode.InvalidArg,
+      `[stamp] mark color must be #rrggbb, got '${hex}'`,
+    );
   const n = parseInt(m[1], 16);
   return { r: (n >> 16) & 0xff, g: (n >> 8) & 0xff, b: n & 0xff };
 };
@@ -85,7 +90,10 @@ const inkBounds = (
     }
   }
   if (!Number.isFinite(left)) {
-    throw new EngineError(EngineErrorCode.InvalidArg, '[stamp] an ink mark needs at least one point');
+    throw new EngineError(
+      EngineErrorCode.InvalidArg,
+      '[stamp] an ink mark needs at least one point',
+    );
   }
   const pad = strokeWidth;
   return { left: left - pad, bottom: bottom - pad, right: right + pad, top: top + pad };
@@ -324,7 +332,7 @@ export function createStampCapability(
           '[stamp] a canonical stamp library PDF must contain at least one page',
         );
       }
-      const byPon = new Map(layout.pages.map((page) => [page.pageObjectNumber, page]));
+      const byPon = new Map(layout.pages.map((page) => [page.ref.pageObjectNumber, page]));
 
       // ── library identity: /Title (Acrobat) → v1 PieceInfo → caller fallback ──
       const catalogEntries =
@@ -357,7 +365,7 @@ export function createStampCapability(
         );
       }
 
-      type Descriptor = { pageObjectNumber: number; index: number; name: string; label: string };
+      type Descriptor = { page: PageRef; index: number; name: string; label: string };
       let descriptors: Descriptor[];
       if (registry.length > 0) {
         const seen = new Set<string>();
@@ -376,8 +384,8 @@ export function createStampCapability(
             );
           }
           seen.add(name);
-          const page = byPon.get(entry.target.pageObjectNumber)!;
-          return { pageObjectNumber: page.pageObjectNumber, index: page.index, name, label };
+          const page = byPon.get(entry.target.page.pageObjectNumber)!;
+          return { page: page.ref, index: page.index, name, label };
         });
         // Display order is PAGE order, never the tree's key-sorted order.
         descriptors.sort((a, b) => a.index - b.index);
@@ -392,22 +400,13 @@ export function createStampCapability(
         // as a fallback for libraries written before the registry.
         descriptors = [];
         for (const page of layout.pages) {
-          const v1 = (await doc.page(page.pageObjectNumber).pieceInfo?.read(STAMP_PIECEINFO_APP))
-            ?.entries;
+          const v1 = (await doc.page(page.ref).pieceInfo?.read(STAMP_PIECEINFO_APP))?.entries;
           const name = (v1 && entryString(v1, 'Name')) ?? `Stamp${page.index + 1}`;
           const label = (v1 && entryString(v1, 'Subject')) ?? opts?.assetName?.(page.index) ?? name;
-          descriptors.push({
-            pageObjectNumber: page.pageObjectNumber,
-            index: page.index,
-            name,
-            label,
-          });
+          descriptors.push({ page: page.ref, index: page.index, name, label });
         }
         for (const d of descriptors) {
-          await doc.pages.setName!({
-            name: stampKey(d.name, d.label),
-            pageObjectNumber: d.pageObjectNumber,
-          });
+          await doc.pages.setName!({ name: stampKey(d.name, d.label), page: d.page });
         }
       }
 
@@ -422,7 +421,7 @@ export function createStampCapability(
 
       const assets: NonNullable<typeof imported>['assets'] = [];
       for (const d of descriptors) {
-        const handle = doc.page(d.pageObjectNumber);
+        const handle = doc.page(d.page);
         if (!handle.pieceInfo) {
           throw new EngineError(
             EngineErrorCode.NotImplemented,
@@ -433,7 +432,7 @@ export function createStampCapability(
         const kind = opts?.kind ?? kindFromPdfName(entryName(entries, 'Kind')) ?? 'stamp';
         const subject = entryString(entries, 'SubjectOverride');
         const categories = entryStringArray(entries, 'Categories');
-        const page = byPon.get(d.pageObjectNumber)!;
+        const page = byPon.get(d.page.pageObjectNumber)!;
         const asset: StampAsset = {
           id: assetIdFor(libraryId, d.name),
           libraryId,
@@ -441,7 +440,7 @@ export function createStampCapability(
           name: d.name,
           label: d.label,
           size: { width: page.size.width, height: page.size.height },
-          pageObjectNumber: d.pageObjectNumber,
+          page: d.page,
           ...(subject !== undefined ? { subject } : {}),
           ...(categories !== undefined ? { categories } : {}),
         };
@@ -450,7 +449,7 @@ export function createStampCapability(
           stampPieceInfo(kind, { subject, categories }),
         );
         // One canonical page → one derived placement PDF plus a thumbnail.
-        const bytes = await doc.pages.extract([d.pageObjectNumber]);
+        const bytes = await doc.pages.extract([d.page]);
         assets.push({ asset, bytes, preview: await renderThumbnail(handle) });
       }
 
@@ -494,7 +493,7 @@ export function createStampCapability(
       const layout = await doc.pages.list();
       const scratch = layout.pages[0];
       if (!scratch) throw new EngineError(EngineErrorCode.Unknown, '[stamp] no scratch page');
-      const page = doc.page(scratch.pageObjectNumber);
+      const page = doc.page(scratch.ref);
       if (!page.annotations.exportAppearance) {
         throw new EngineError(
           EngineErrorCode.NotImplemented,
@@ -540,7 +539,7 @@ export function createStampCapability(
           `[stamp] the PDF has no page ${pageIndex} (${layout.pageCount} pages)`,
         );
       }
-      return await doc.pages.extract([page.pageObjectNumber]);
+      return await doc.pages.extract([page.ref]);
     } finally {
       await doc.close();
     }
@@ -564,7 +563,9 @@ export function createStampCapability(
       case 'pdf': {
         const resolved = await resolveBinarySource(mark.source);
         if (mark.pageIndex === undefined) return resolved;
-        return { bytes: toArrayBuffer(await extractPage(new Uint8Array(resolved.bytes), mark.pageIndex)) };
+        return {
+          bytes: toArrayBuffer(await extractPage(new Uint8Array(resolved.bytes), mark.pageIndex)),
+        };
       }
       case 'ink':
       case 'text':
@@ -651,16 +652,16 @@ export function createStampCapability(
         | undefined;
       try {
         requireCanonicalServices(doc);
-        let pageObjectNumber: number;
+        let page: PageRef;
         if (isPdf) {
           const result = await doc.pages.insert(new Uint8Array(resolved.bytes));
-          if (result.insertedPageObjectNumbers.length !== 1) {
+          if (result.insertedPages.length !== 1) {
             throw new EngineError(
               EngineErrorCode.InvalidArg,
               '[stamp] a library asset must be a single-page PDF',
             );
           }
-          pageObjectNumber = result.insertedPageObjectNumbers[0];
+          page = result.insertedPages[0];
         } else {
           // Raster → page: a blank page the image's size, the image placed
           // to fill it, flattened into content. From here on it is a page
@@ -672,14 +673,14 @@ export function createStampCapability(
             );
           }
           const blank = await doc.pages.insertBlank({ size: rasterSize! });
-          pageObjectNumber = blank.insertedPageObjectNumbers[0];
-          await doc.page(pageObjectNumber).annotations.create({
+          page = blank.insertedPages[0];
+          await doc.page(page).annotations.create({
             subtype: 'stamp',
             rect: { left: 0, bottom: 0, right: rasterSize!.width, top: rasterSize!.height },
             source: new Uint8Array(resolved.bytes),
             fit: 'fill',
           });
-          const flattened = await doc.pages.flatten([pageObjectNumber], 'display');
+          const flattened = await doc.pages.flatten([page], 'display');
           if (flattened.results.some(({ status }) => status !== 'applied')) {
             throw new EngineError(
               EngineErrorCode.Unknown,
@@ -688,17 +689,17 @@ export function createStampCapability(
           }
         }
         const layout = (await doc.pages.list()).pages.find(
-          (candidate) => candidate.pageObjectNumber === pageObjectNumber,
+          (candidate) => candidate.ref.pageObjectNumber === page.pageObjectNumber,
         );
-        const page = doc.page(pageObjectNumber);
-        if (!layout || !page.pieceInfo) {
+        const handle = doc.page(page);
+        if (!layout || !handle.pieceInfo) {
           throw new EngineError(
             EngineErrorCode.NotImplemented,
             '[stamp] canonical PDF libraries need page layout and pieceInfo support',
           );
         }
         // Insert copies the page only — register it in the same mutation.
-        await doc.pages.setName!({ name: stampKey(name, label), pageObjectNumber });
+        await doc.pages.setName!({ name: stampKey(name, label), page });
         const asset: StampAsset = {
           id: assetId,
           libraryId: liveLibrary.id,
@@ -706,16 +707,16 @@ export function createStampCapability(
           name,
           label,
           size: { width: layout.size.width, height: layout.size.height },
-          pageObjectNumber,
+          page,
           ...(input.subject !== undefined ? { subject: input.subject } : {}),
           ...(input.categories !== undefined ? { categories: input.categories } : {}),
         };
-        await page.pieceInfo.update(
+        await handle.pieceInfo.update(
           STAMP_PIECEINFO_APP,
           stampPieceInfo(asset.kind, { subject: asset.subject, categories: asset.categories }),
         );
-        const bytes = await doc.pages.extract([pageObjectNumber]);
-        const preview = suppliedPreview ?? (await renderThumbnail(page));
+        const bytes = await doc.pages.extract([page]);
+        const preview = suppliedPreview ?? (await renderThumbnail(handle));
         appended = { asset, bytes, preview, canonical: await doc.download() };
       } finally {
         await doc.close();
@@ -731,7 +732,7 @@ export function createStampCapability(
 
   const addAssetFromAnnotations = async (
     documentId: string,
-    pageObjectNumber: number,
+    page: PageRef,
     refs: AnnotationRef[],
     input: Omit<AddAssetInput, 'source' | 'size'>,
   ): Promise<string> => {
@@ -742,8 +743,8 @@ export function createStampCapability(
         `[stamp] target document '${documentId}' is not open`,
       );
     }
-    const page = doc.page(pageObjectNumber);
-    if (!page.annotations.exportAppearance) {
+    const handle = doc.page(page);
+    if (!handle.annotations.exportAppearance) {
       throw new EngineError(
         EngineErrorCode.NotImplemented,
         "[stamp] this document's engine cannot export annotation appearances",
@@ -751,7 +752,7 @@ export function createStampCapability(
     }
     // The engine flattens the selection into a fresh single-page PDF —
     // the same placement whole-page flatten uses, aimed at a new page.
-    const source = await page.annotations.exportAppearance(refs);
+    const source = await handle.annotations.exportAppearance(refs);
     return addAsset({ ...input, source });
   };
 
@@ -788,7 +789,7 @@ export function createStampCapability(
       const doc = await openAssetDocument(canonicalBytes);
       let rewritten: Uint8Array | undefined;
       try {
-        await doc.pages.delete([asset.pageObjectNumber]);
+        await doc.pages.delete([asset.page]);
         rewritten = await doc.download();
       } finally {
         await doc.close();
@@ -843,11 +844,11 @@ export function createStampCapability(
           // A relabel is a registry rename — one job, the identifier untouched.
           await doc.pages.setName!({
             name: stampKey(asset.name, next.label),
-            pageObjectNumber: asset.pageObjectNumber,
+            page: asset.page,
             replace: stampKey(asset.name, asset.label),
           });
         }
-        const page = doc.page(asset.pageObjectNumber);
+        const page = doc.page(asset.page);
         await page.pieceInfo?.update(
           STAMP_PIECEINFO_APP,
           stampPieceInfo(next.kind, { subject: next.subject, categories: next.categories }),
@@ -951,25 +952,23 @@ export function createStampCapability(
     try {
       const layout = await doc.pages.list();
       const selectedPage =
-        asset.pageObjectNumber === undefined
+        asset.page === undefined
           ? layout.pageCount === 1
             ? layout.pages[0]
             : undefined
-          : layout.pages.find(
-              ({ pageObjectNumber }) => pageObjectNumber === asset.pageObjectNumber,
-            );
+          : layout.pages.find(({ ref }) => ref.pageObjectNumber === asset.page.pageObjectNumber);
       if (!selectedPage) {
         throw new EngineError(
           EngineErrorCode.InvalidArg,
           canonicalBytes
-            ? `[stamp] canonical page ${asset.pageObjectNumber ?? 'unknown'} no longer exists`
+            ? `[stamp] canonical page ${asset.page?.pageObjectNumber ?? 'unknown'} no longer exists`
             : '[stamp] a loose dynamic stamp asset must contain exactly one page',
         );
       }
       const snapshot = await doc.forms.list();
       const hasSelectedPageField = snapshot.fields.some((field) =>
         field.widgets.some(
-          ({ pageObjectNumber }) => pageObjectNumber === selectedPage.pageObjectNumber,
+          ({ page }) => page?.pageObjectNumber === selectedPage.ref.pageObjectNumber,
         ),
       );
       if (!hasSelectedPageField) return bin;
@@ -1008,20 +1007,20 @@ export function createStampCapability(
         );
       }
 
-      const pageObjectNumber = selectedPage.pageObjectNumber;
-      const flattened = await doc.pages.flatten([pageObjectNumber], 'display');
+      const page = selectedPage.ref;
+      const flattened = await doc.pages.flatten([page], 'display');
       const failed = flattened.results.find(
         ({ status }) => status === 'failed' || status === 'skipped',
       );
       if (failed) {
         throw new EngineError(
           EngineErrorCode.Unknown,
-          `[stamp] dynamic stamp flatten failed for page ${failed.pageObjectNumber}`,
+          `[stamp] dynamic stamp flatten failed for page ${failed.page.pageObjectNumber}`,
         );
       }
 
-      const bytes = await doc.pages.extract([pageObjectNumber]);
-      const image = await doc.page(pageObjectNumber).render.image({
+      const bytes = await doc.pages.extract([page]);
+      const image = await doc.page(page).render.image({
         viewport: { kind: 'width', width: config.previewWidth ?? DEFAULT_PREVIEW_WIDTH },
         background: 'transparent',
         includeAnnotations: false,
@@ -1087,7 +1086,7 @@ export function createStampCapability(
       const page = layout.pages[0];
       if (!page) return null;
       return imageToPreview(
-        await doc.page(page.pageObjectNumber).render.image({
+        await doc.page(page.ref).render.image({
           viewport: { kind: 'width', width: devicePixelWidth },
           background: 'transparent',
           includeAnnotations: true,

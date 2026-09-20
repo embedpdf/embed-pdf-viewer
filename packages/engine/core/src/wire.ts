@@ -364,3 +364,4 @@ export { analysisQueryString, type AnalysisQueryInput } from './wire/paths';
 export * from './dto/Measure.schema';
 
 export { PageScaleResultSchema } from './wire/schemas';
+export { PageRefSchema } from './identity/PageRef.schema';

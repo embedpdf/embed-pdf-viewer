@@ -4,14 +4,20 @@ import type { Annot } from '@embedpdf/core-annotation';
 import type { ActionsCapability, ActionTrigger } from '@embedpdf/plugin-actions';
 
 import { createAnnotationHoverFeed } from './hover-feed';
+import { toPageRef } from '@embedpdf/engine-core/runtime';
 
-const tree = { root: { type: 'named', subtype: 'Named', name: 'x', next: [] }, incomplete: false, warningFlags: 0, warnings: [] };
+const tree = {
+  root: { type: 'named', subtype: 'Named', name: 'x', next: [] },
+  incomplete: false,
+  warningFlags: 0,
+  warnings: [],
+};
 
 const annot = (id: string, over: Partial<Annot> = {}): Annot =>
   ({
     id,
-    ref: { kind: 'objectNumber', pageObjectNumber: 7, annotObjectNumber: Number(id.slice(4)) },
-    pon: 7,
+    ref: { kind: 'objectNumber', page: toPageRef(7), annotObjectNumber: Number(id.slice(4)) },
+    page: toPageRef(7),
     subtype: 'square',
     ...over,
   }) as unknown as Annot;

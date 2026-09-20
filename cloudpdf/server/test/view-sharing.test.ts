@@ -3,6 +3,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
+import { toPageRef } from '@embedpdf/engine-core/runtime';
 import type { FastifyInstance } from 'fastify';
 import type { Kysely } from 'kysely';
 import {
@@ -93,9 +94,9 @@ describe('plane-scoped view sharing', () => {
 
     const sharedReads = [
       `/v1/docs/${docId}/layout@layoutVersion=1`,
-      `/v1/docs/${docId}/annotations/pages/1/items@annotationVersion=1`,
-      `/v1/docs/${docId}/render/pages/1/data@${W320_TOKEN}`,
-      `/v1/docs/${docId}/text/pages/1/data@contentVersion=1`,
+      `/v1/docs/${docId}/annotations/pages/obj:1/items@annotationVersion=1`,
+      `/v1/docs/${docId}/render/pages/obj:1/data@${W320_TOKEN}`,
+      `/v1/docs/${docId}/text/pages/obj:1/data@contentVersion=1`,
       `/v1/docs/${docId}/actions@actionsVersion=1`,
       `/v1/docs/${docId}/metadata@metadataVersion=1`,
     ];
@@ -116,7 +117,7 @@ describe('plane-scoped view sharing', () => {
 
     // The annotated render family shares too — a base's own annotations are
     // visible through every pristine layer (content + annotations planes).
-    const annotated = `${fx.baseUrl}/v1/docs/${docId}/render/annotated/pages/1/data@${W320_ANNOTATED_TOKEN}`;
+    const annotated = `${fx.baseUrl}/v1/docs/${docId}/render/annotated/pages/obj:1/data@${W320_ANNOTATED_TOKEN}`;
     expect(
       (await fetch(annotated, { headers: auth(docToken(tenantId, docId, 'alice')) })).status,
     ).toBe(200);
@@ -138,7 +139,7 @@ describe('plane-scoped view sharing', () => {
     await seedDocument(fx, tenantId, docId);
 
     const created = await fetch(
-      `${fx.baseUrl}/v1/docs/${docId}/layers/alice/annotations/pages/1/items`,
+      `${fx.baseUrl}/v1/docs/${docId}/layers/alice/annotations/pages/obj:1/items`,
       {
         method: 'POST',
         headers: {
@@ -152,7 +153,7 @@ describe('plane-scoped view sharing', () => {
 
     const manifest = await fetchLayerManifest(fx, tenantId, docId, 'alice');
     expect(manifest.scopes).toEqual({ ...ALL_BASE, annotations: 'layer' });
-    const page1 = manifest.pages.find((p) => p.state.pageObjectNumber === 1)!;
+    const page1 = manifest.pages.find((p) => p.state.page.pageObjectNumber === 1)!;
     expect(page1.cache.annotationVersion).toBeGreaterThan(1);
     expect(page1.cache.contentVersion).toBe(1);
 
@@ -161,11 +162,11 @@ describe('plane-scoped view sharing', () => {
 
     // Content-plane reads keep sharing through the annotated layer's token —
     // the most common divergence must not cost raster/text sharing.
-    const render = `${fx.baseUrl}/v1/docs/${docId}/render/pages/1/data@${W320_TOKEN}`;
+    const render = `${fx.baseUrl}/v1/docs/${docId}/render/pages/obj:1/data@${W320_TOKEN}`;
     expect((await fetch(render, { headers: aliceAuth })).status).toBe(200);
     expect(
       (
-        await fetch(`${fx.baseUrl}/v1/docs/${docId}/text/pages/1/data@contentVersion=1`, {
+        await fetch(`${fx.baseUrl}/v1/docs/${docId}/text/pages/obj:1/data@contentVersion=1`, {
           headers: aliceAuth,
         })
       ).status,
@@ -174,12 +175,12 @@ describe('plane-scoped view sharing', () => {
     // Annotation-plane reads flip: shared paths refuse (404 → the SDK's
     // manifest-refresh rail), the layer path serves, and Bob's pristine
     // layer keeps sharing.
-    const sharedItems = `${fx.baseUrl}/v1/docs/${docId}/annotations/pages/1/items@annotationVersion=1`;
+    const sharedItems = `${fx.baseUrl}/v1/docs/${docId}/annotations/pages/obj:1/items@annotationVersion=1`;
     expect((await fetch(sharedItems, { headers: aliceAuth })).status).toBe(404);
     expect((await fetch(sharedItems, { headers: bobAuth })).status).toBe(200);
     expect(
       (
-        await fetch(`${fx.baseUrl}/v1/docs/${docId}/layers/alice/annotations/pages/1/items`, {
+        await fetch(`${fx.baseUrl}/v1/docs/${docId}/layers/alice/annotations/pages/obj:1/items`, {
           headers: aliceAuth,
         })
       ).status,
@@ -187,7 +188,7 @@ describe('plane-scoped view sharing', () => {
 
     // The annotated render family depends on content+annotations → refused
     // for alice, still shared for bob.
-    const annotated = `${fx.baseUrl}/v1/docs/${docId}/render/annotated/pages/1/data@${W320_ANNOTATED_TOKEN}`;
+    const annotated = `${fx.baseUrl}/v1/docs/${docId}/render/annotated/pages/obj:1/data@${W320_ANNOTATED_TOKEN}`;
     expect((await fetch(annotated, { headers: aliceAuth })).status).toBe(404);
     expect((await fetch(annotated, { headers: bobAuth })).status).toBe(200);
   });
@@ -200,7 +201,7 @@ describe('plane-scoped view sharing', () => {
     const rotated = await fetch(`${fx.baseUrl}/v1/docs/${docId}/layers/alice/pages/rotate`, {
       method: 'POST',
       headers: { ...auth(docToken(tenantId, docId, 'alice')), 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pageObjectNumbers: [1], rotation: 90 }),
+      body: JSON.stringify({ pages: [1].map(toPageRef), rotation: 90 }),
     });
     expect(rotated.status).toBe(200);
 
@@ -210,12 +211,12 @@ describe('plane-scoped view sharing', () => {
     expect(alice.scopes).toEqual({ ...ALL_BASE, layout: 'layer' });
 
     const aliceAuth = auth(docToken(tenantId, docId, 'alice'));
-    const render = `${fx.baseUrl}/v1/docs/${docId}/render/pages/1/data@${W320_TOKEN}`;
+    const render = `${fx.baseUrl}/v1/docs/${docId}/render/pages/obj:1/data@${W320_TOKEN}`;
     expect((await fetch(render, { headers: aliceAuth })).status).toBe(200);
     expect(
       (
         await fetch(
-          `${fx.baseUrl}/v1/docs/${docId}/annotations/pages/1/items@annotationVersion=1`,
+          `${fx.baseUrl}/v1/docs/${docId}/annotations/pages/obj:1/items@annotationVersion=1`,
           {
             headers: aliceAuth,
           },
@@ -256,7 +257,7 @@ describe('plane-scoped view sharing', () => {
     const deleted = await fetch(`${fx.baseUrl}/v1/docs/${docId}/layers/alice/pages/delete`, {
       method: 'POST',
       headers: { ...auth(docToken(tenantId, docId, 'alice')), 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pageObjectNumbers: [2] }),
+      body: JSON.stringify({ pages: [2].map(toPageRef) }),
     });
     expect(deleted.status, await deleted.clone().text()).toBe(200);
 
@@ -272,9 +273,9 @@ describe('plane-scoped view sharing', () => {
     // removed content — even for pages the view still contains.
     const aliceAuth = auth(docToken(tenantId, docId, 'alice'));
     const bobAuth = auth(docToken(tenantId, docId, 'bob'));
-    const render = `${fx.baseUrl}/v1/docs/${docId}/render/pages/1/data@${W320_TOKEN}`;
-    const text = `${fx.baseUrl}/v1/docs/${docId}/text/pages/1/data@contentVersion=1`;
-    const items = `${fx.baseUrl}/v1/docs/${docId}/annotations/pages/1/items@annotationVersion=1`;
+    const render = `${fx.baseUrl}/v1/docs/${docId}/render/pages/obj:1/data@${W320_TOKEN}`;
+    const text = `${fx.baseUrl}/v1/docs/${docId}/text/pages/obj:1/data@contentVersion=1`;
+    const items = `${fx.baseUrl}/v1/docs/${docId}/annotations/pages/obj:1/items@annotationVersion=1`;
     for (const url of [render, text, items]) {
       expect((await fetch(url, { headers: aliceAuth })).status, url).toBe(404);
       expect((await fetch(url, { headers: bobAuth })).status, url).toBe(200);
@@ -336,7 +337,7 @@ describe('plane-scoped view sharing', () => {
     );
 
     // Annotation write: exactly the annotations-dependent families go.
-    await fetch(`${fx.baseUrl}/v1/docs/${docId}/layers/alice/annotations/pages/1/items`, {
+    await fetch(`${fx.baseUrl}/v1/docs/${docId}/layers/alice/annotations/pages/obj:1/items`, {
       method: 'POST',
       headers: { ...auth(docToken(tenantId, docId, 'alice')), 'Content-Type': 'application/json' },
       body: JSON.stringify(highlightDraft()),
@@ -352,7 +353,7 @@ describe('plane-scoped view sharing', () => {
     await fetch(`${fx.baseUrl}/v1/docs/${docId}/layers/alice/pages/delete`, {
       method: 'POST',
       headers: { ...auth(docToken(tenantId, docId, 'alice')), 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pageObjectNumbers: [2] }),
+      body: JSON.stringify({ pages: [2].map(toPageRef) }),
     });
     const afterDelete = await accessFor('alice');
     for (const gone of ['page-render', 'page-text', 'page-geometry', 'layout']) {
@@ -380,7 +381,7 @@ describe('plane-scoped view sharing', () => {
       },
     });
     const aliceAuth = auth(docToken(tenantId, docId, 'alice'));
-    const shared = `${fx.baseUrl}/v1/docs/${docId}/text/pages/1/data@contentVersion=1`;
+    const shared = `${fx.baseUrl}/v1/docs/${docId}/text/pages/obj:1/data@contentVersion=1`;
 
     // Locked: the shared read refuses until alice unlocks HER layer.
     const blocked = await fetch(shared, { headers: aliceAuth });
@@ -449,7 +450,7 @@ describe('attachments plane (independent axis)', () => {
     // bump directly — the create route needs a multipart envelope + real
     // engine bake, which the scope computation does not care about.
     const created = await fetch(
-      `${fx.baseUrl}/v1/docs/${docId}/layers/alice/annotations/pages/1/items`,
+      `${fx.baseUrl}/v1/docs/${docId}/layers/alice/annotations/pages/obj:1/items`,
       {
         method: 'POST',
         headers: {
@@ -481,7 +482,7 @@ describe('attachments plane (independent axis)', () => {
     expect((await fetch(attUrl, { headers: auth(docToken(tenantId, docId, 'bob')) })).status).toBe(
       200,
     );
-    const renderUrl = `${fx.baseUrl}/v1/docs/${docId}/render/pages/1/data@${W320_TOKEN}`;
+    const renderUrl = `${fx.baseUrl}/v1/docs/${docId}/render/pages/obj:1/data@${W320_TOKEN}`;
     expect(
       (await fetch(renderUrl, { headers: auth(docToken(tenantId, docId, 'alice')) })).status,
     ).toBe(200);
@@ -508,7 +509,7 @@ describe('attachments plane (independent axis)', () => {
     const deleted = await fetch(`${fx.baseUrl}/v1/docs/${docId}/layers/alice/pages/delete`, {
       method: 'POST',
       headers: { ...auth(docToken(tenantId, docId, 'alice')), 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pageObjectNumbers: [2] }),
+      body: JSON.stringify({ pages: [2].map(toPageRef) }),
     });
     expect(deleted.status).toBe(200);
 
@@ -675,7 +676,7 @@ async function seedDocument(
 interface WireManifest {
   scopes?: Record<string, string>;
   pages: Array<{
-    state: { pageObjectNumber: number };
+    state: { page: { pageObjectNumber: number } };
     cache: { contentVersion: number; annotationVersion: number };
   }>;
 }

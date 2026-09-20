@@ -70,7 +70,7 @@ export function decodeSearchCursor(
     );
   }
   // The cursor owns position; a startPage alongside it is a caller bug.
-  if (request.startPage !== undefined && request.startPage !== state.start) {
+  if (request.startPage !== undefined && request.startPage.pageObjectNumber !== state.start) {
     throw new EngineError(
       EngineErrorCode.InvalidArg,
       'startPage conflicts with the cursor — omit startPage when resuming',

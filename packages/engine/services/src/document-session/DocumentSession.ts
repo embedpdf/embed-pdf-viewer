@@ -14,7 +14,9 @@ import {
   EngineErrorCode,
   knownWeakAnnotationState,
   isValidPageObjectNumber,
+  toPageRef,
 } from '@embedpdf/engine-core/runtime';
+import type { PageRef } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
 import {
@@ -329,6 +331,20 @@ export class DocumentSession {
     return found;
   }
 
+  /**
+   * Resolve a page ADDRESS to its registry record — the one boundary where
+   * a `PageRef` becomes a page object number. Throws `NotFound` for an
+   * unknown page.
+   */
+  resolvePageRef(ref: PageRef): PageRecord {
+    return this.recordByObjectNumber(ref.pageObjectNumber);
+  }
+
+  /** `resolvePageRef` over a batch, preserving order. */
+  resolvePageRefs(refs: readonly PageRef[]): PageObjectNumber[] {
+    return refs.map((ref) => this.resolvePageRef(ref).pageObjectNumber);
+  }
+
   /** All page records, in display order. Forces full enumeration. */
   allRecords(): PageRecord[] {
     this.ensureFullPageRegistry();
@@ -358,7 +374,7 @@ export class DocumentSession {
     this.recordByObjectNumber(pageObjectNumber);
     const weakAnnotationState = this.requireRevisions().weakAnnotationState(pageObjectNumber);
     return {
-      pageObjectNumber,
+      page: toPageRef(pageObjectNumber),
       revision: this.requireRevisions().token(pageObjectNumber),
       weakAnnotationState,
     };

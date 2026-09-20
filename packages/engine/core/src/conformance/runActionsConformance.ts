@@ -2,6 +2,7 @@ import type { DocumentHandle } from '../engine/DocumentHandle';
 import type { Engine } from '../engine/Engine';
 import type { PdfActionNode } from '../dto/PdfAction';
 import { DocumentActionsSnapshotSchema } from '../dto/PdfAction.schema';
+import { toPageRef } from '../identity/PageRef';
 import type { ConformanceFixture, ConformanceTestRunner } from './runMetadataConformance';
 
 /** The script payload rides only the javascript/rendition arms. */
@@ -88,7 +89,7 @@ export function runActionsConformance(
       const doc = await open(engine, opts, opts.fixtures.annotation);
       try {
         const firstPage = (await doc.pages.list()).pages[0];
-        const snapshot = await doc.page(firstPage.pageObjectNumber).annotations.list();
+        const snapshot = await doc.page(firstPage.ref).annotations.list();
         const button = snapshot.annotations.find(
           (annotation) =>
             annotation.ref.kind === 'objectNumber' && annotation.ref.annotObjectNumber === 7,
@@ -117,7 +118,7 @@ export function runActionsConformance(
       const doc = await open(engine, opts, fixture);
       try {
         const firstPage = (await doc.pages.list()).pages[0];
-        const snapshot = await doc.page(firstPage.pageObjectNumber).annotations.list();
+        const snapshot = await doc.page(firstPage.ref).annotations.list();
         const link = snapshot.annotations.find((annotation) => annotation.subtype === 'link');
         expect(link?.subtype).toBe('link');
         if (link?.subtype === 'link') {
@@ -141,7 +142,7 @@ export function runActionsConformance(
         expect(form.fields[0].actions?.format?.root?.type).toBe('javascript');
         expect(scriptOf(form.fields[0].actions?.format?.root)).toMatch(/AFDate_FormatEx/);
         const page = (await doc.pages.list()).pages[0];
-        const widget = (await doc.page(page.pageObjectNumber).annotations.list()).annotations[0];
+        const widget = (await doc.page(page.ref).annotations.list()).annotations[0];
         expect(widget.actions).toBe(undefined);
       } finally {
         await doc.close();
@@ -152,8 +153,8 @@ export function runActionsConformance(
       const doc = await open(engine, opts, opts.fixtures.payloads);
       try {
         const page = (await doc.pages.list()).pages[0];
-        const snapshot = await doc.page(page.pageObjectNumber).annotations.list();
-        const pon = page.pageObjectNumber;
+        const snapshot = await doc.page(page.ref).annotations.list();
+        const pon = page.ref.pageObjectNumber;
         const rootOf = (nm: string) => {
           const annotation = snapshot.annotations.find((candidate) => candidate.nm === nm);
           expect(Boolean(annotation)).toBe(true);
@@ -166,7 +167,14 @@ export function runActionsConformance(
 
         expect(rootOf('goto-fitr')).toMatchObject({
           type: 'goto',
-          destination: { kind: 'fitR', pageObjectNumber: pon, left: 10, bottom: 20, right: 300, top: 400 },
+          destination: {
+            kind: 'fitR',
+            page: toPageRef(pon),
+            left: 10,
+            bottom: 20,
+            right: 300,
+            top: 400,
+          },
         });
         // Dual planes agree by construction: the target IS the tree's projection.
         expect(targetOf('goto-fitr')).toMatchObject({ kind: 'goto', destination: { kind: 'fitR' } });
@@ -248,7 +256,7 @@ export function runActionsConformance(
         expect(chain).toMatchObject({ type: 'javascript', script: "app.alert('chain');" });
         expect(chain?.next[0]).toMatchObject({
           type: 'goto',
-          destination: { kind: 'xyz', pageObjectNumber: pon, left: 5, top: 10, zoom: 1.25 },
+          destination: { kind: 'xyz', page: toPageRef(pon), left: 5, top: 10, zoom: 1.25 },
         });
         expect(chain?.next[0]?.next[0]).toMatchObject({
           type: 'hide',
@@ -264,7 +272,7 @@ export function runActionsConformance(
       const doc = await open(engine, opts, opts.fixtures.payloads);
       try {
         const page = (await doc.pages.list()).pages[0];
-        const snapshot = await doc.page(page.pageObjectNumber).annotations.list();
+        const snapshot = await doc.page(page.ref).annotations.list();
         for (const [nm, subtype] of [
           ['goto-malformed', 'GoTo'],
           ['hide-partial', 'Hide'], // a partial target list must never half-execute
@@ -295,10 +303,10 @@ export function runActionsConformance(
         const snapshot = await doc.actions!.read();
         expect(DocumentActionsSnapshotSchema.safeParse(snapshot).success).toBe(true);
         expect(snapshot.openAction).toBeNull();
-        const pon = (await doc.pages.list()).pages[0].pageObjectNumber;
+        const pon = (await doc.pages.list()).pages[0].ref.pageObjectNumber;
         expect(snapshot.openDestination).toEqual({
           kind: 'xyz',
-          pageObjectNumber: pon,
+          page: toPageRef(pon),
           left: 10,
           top: 700,
           zoom: 1.5,

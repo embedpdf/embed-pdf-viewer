@@ -3,6 +3,7 @@ import type { DocumentHandle } from '../engine/DocumentHandle';
 import type { Engine } from '../engine/Engine';
 import { EngineError } from '../errors/EngineError';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
+import { toPageRef } from '../identity/PageRef';
 import { AbortError } from '../promise/AbortError';
 
 /** `%PDF` — every extracted document must lead with the PDF header. */
@@ -47,14 +48,14 @@ export function runPageExtractConformance(
         const before = await doc.pages.list();
         const target = before.pages[before.pages.length - 1];
 
-        const bytes = await doc.pages.extract([target.pageObjectNumber]);
+        const bytes = await doc.pages.extract([target.ref]);
         expect(bytes.length > PDF_MAGIC.length).toBe(true);
         expect(Array.from(bytes.slice(0, PDF_MAGIC.length))).toEqual(PDF_MAGIC);
 
         // Extract is a READ: the source layout is exactly what it was.
         const after = await doc.pages.list();
-        expect(after.pages.map((p) => p.pageObjectNumber)).toEqual(
-          before.pages.map((p) => p.pageObjectNumber),
+        expect(after.pages.map((p) => p.ref.pageObjectNumber)).toEqual(
+          before.pages.map((p) => p.ref.pageObjectNumber),
         );
         expect(after.pageCount).toBe(before.pageCount);
       } finally {
@@ -72,7 +73,7 @@ export function runPageExtractConformance(
         // Reversed order on purpose: output order is CALLER order.
         const p0 = list.pages[0];
         const p1 = list.pages[1];
-        const bytes = await doc.pages.extract([p1.pageObjectNumber, p0.pageObjectNumber]);
+        const bytes = await doc.pages.extract([p1.ref, p0.ref]);
 
         extracted = await engine.open({ kind: 'bytes', id: `${opts.fixture.id}-extracted`, bytes });
         const out = await extracted.pages.list();
@@ -104,10 +105,10 @@ export function runPageExtractConformance(
       const doc = await openFixture(engine, opts);
       try {
         const list = await doc.pages.list();
-        const pon = list.pages[0].pageObjectNumber;
+        const pon = list.pages[0].ref.pageObjectNumber;
         let caught: unknown;
         try {
-          await doc.pages.extract([pon, pon]);
+          await doc.pages.extract([toPageRef(pon), toPageRef(pon)]);
         } catch (err) {
           caught = err;
         }
@@ -122,12 +123,12 @@ export function runPageExtractConformance(
       try {
         const list = await doc.pages.list();
         let bogus = 0;
-        for (const p of list.pages) bogus = Math.max(bogus, p.pageObjectNumber);
+        for (const p of list.pages) bogus = Math.max(bogus, p.ref.pageObjectNumber);
         bogus += 9999;
 
         let caught: unknown;
         try {
-          await doc.pages.extract([bogus]);
+          await doc.pages.extract([toPageRef(bogus)]);
         } catch (err) {
           caught = err;
         }
@@ -144,7 +145,7 @@ export function runPageExtractConformance(
       const doc = await openFixture(engine, opts);
       try {
         const list = await doc.pages.list();
-        const p = doc.pages.extract([list.pages[0].pageObjectNumber]);
+        const p = doc.pages.extract([list.pages[0].ref]);
         p.abort('test');
         await expect(p).rejects.toBeInstanceOf(AbortError);
       } finally {

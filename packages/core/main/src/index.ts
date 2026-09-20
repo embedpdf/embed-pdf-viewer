@@ -14,9 +14,14 @@ export {
   snapAppearanceScale,
   snapFullPageViewport,
   snapTileScale,
+  toPageRef,
+  pageRefsEqual,
+  encodePageKey,
+  decodePageKey,
 } from '@embedpdf/engine-core/runtime';
 export type {
   EngineRenderPolicy,
+  PageRef,
   PageHandle,
   PageRaster,
   PageRenderOptions,

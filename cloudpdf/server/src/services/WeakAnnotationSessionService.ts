@@ -1,5 +1,10 @@
 import { randomUUID } from 'node:crypto';
-import { EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
+import {
+  EngineError,
+  EngineErrorCode,
+  toPageRef,
+  type PageRef,
+} from '@embedpdf/engine-core/runtime';
 import type {
   WeakAnnotationSessionRow,
   WeakAnnotationSessionScope,
@@ -21,7 +26,8 @@ export interface WeakAnnotationSessionResult {
   sessionId: string;
   expiresAt: number;
   heartbeatIntervalMs: number;
-  pageObjectNumbers: number[];
+  /** The session's pages as wire addresses (`WeakAnnotationSessionResponseSchema`). */
+  pages: PageRef[];
 }
 
 export class WeakAnnotationSessionService {
@@ -159,7 +165,7 @@ export class WeakAnnotationSessionService {
       sessionId: session.id,
       expiresAt: session.expiresAt,
       heartbeatIntervalMs: this.heartbeatIntervalMs,
-      pageObjectNumbers,
+      pages: pageObjectNumbers.map(toPageRef),
     };
   }
 }

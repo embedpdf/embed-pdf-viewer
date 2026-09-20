@@ -233,7 +233,7 @@ Signature fields are ordinary form fields of family `signature`. They can be aut
 await doc.forms.createField({
   family: 'signature',
   name: 'sig',
-  widget: { pageObjectNumber, rect: { left: 50, bottom: 50, right: 250, top: 120 } },
+  widget: { page: pageRef, rect: { left: 50, bottom: 50, right: 250, top: 120 } },
 });
 ```
 

@@ -10,8 +10,16 @@ import {
   snapToDevice,
 } from '@embedpdf/core-geometry';
 import type { Rect } from '@embedpdf/core-geometry';
-import type { PluginContext } from '@embedpdf/core';
-import { FLING_STOP, easeOutCubic, glideStep, rubberIn, rubberOut, springStep, zoomLerp } from './motion';
+import { toPageRef, type PluginContext } from '@embedpdf/core';
+import {
+  FLING_STOP,
+  easeOutCubic,
+  glideStep,
+  rubberIn,
+  rubberOut,
+  springStep,
+  zoomLerp,
+} from './motion';
 import { boxOf, eqSetting, mergeSettings, resolveResponsive } from './responsive';
 import { DEFAULT_RESPONSIVE, SETTINGS_EFFECT, SETTING_KEYS } from './settings';
 import type { SettingEffect } from './settings';
@@ -496,7 +504,12 @@ export function createStageCapability(
     return {
       zoom: displayed.zoom,
       x: axis(displayed.x, clamped.x, v.width, axisTravels(b.x, b.width, v.width, displayed.zoom)),
-      y: axis(displayed.y, clamped.y, v.height, axisTravels(b.y, b.height, v.height, displayed.zoom)),
+      y: axis(
+        displayed.y,
+        clamped.y,
+        v.height,
+        axisTravels(b.y, b.height, v.height, displayed.zoom),
+      ),
     };
   };
   // The elastic write path: NO clamp — used only by the elastic pan and the
@@ -867,7 +880,7 @@ export function createStageCapability(
 
   // pon (durable identity) for a page's display index, from the registry captured at open.
   const ponForIndex = (index: number): number =>
-    ctx.document()?.pages[index]?.pageObjectNumber ?? index + 1;
+    ctx.document()?.pages[index]?.ref.pageObjectNumber ?? index + 1;
 
   // Fallback un-rotated point size from a laid-out box, when the registry entry is
   // momentarily absent. `displaySize` is its own inverse (display box → content
@@ -924,7 +937,7 @@ export function createStageCapability(
         : { x: 0, y: 0, width: 0, height: 0 };
     return {
       ...box,
-      pon: ponForIndex(box.pageIndex),
+      ref: toPageRef(ponForIndex(box.pageIndex)),
       screenX,
       screenY,
       transform,
@@ -1073,9 +1086,16 @@ export function createStageCapability(
       return 'none'; // reacted in full — nothing left for the caller
     }
     ctx.dispatch({ type: 'PATCH', patch });
-    const rank: Record<SettingEffect, number> = { none: 0, reclamp: 1, refit: 2, scene: 3, reflow: 4 };
+    const rank: Record<SettingEffect, number> = {
+      none: 0,
+      reclamp: 1,
+      refit: 2,
+      scene: 3,
+      reflow: 4,
+    };
     let strongest: SettingEffect = 'none';
-    for (const k of keys) if (rank[SETTINGS_EFFECT[k]] > rank[strongest]) strongest = SETTINGS_EFFECT[k];
+    for (const k of keys)
+      if (rank[SETTINGS_EFFECT[k]] > rank[strongest]) strongest = SETTINGS_EFFECT[k];
     if (strongest === 'scene' || strongest === 'reflow') sceneCache = null;
     return strongest;
   };
@@ -1100,13 +1120,14 @@ export function createStageCapability(
     pages: () =>
       (ctx.document()?.pages ?? []).map((p) => ({
         index: p.index,
-        pon: p.pageObjectNumber,
+        ref: p.ref,
         label: p.label ?? null,
       })),
-    pageRect: (pon) => {
+    pageRect: (page) => {
       if (!ctx.getState().placed) return null;
       const meta = ctx.document();
-      const index = meta ? meta.pages.findIndex((p) => p.pageObjectNumber === pon) : -1;
+      const pon = page.pageObjectNumber;
+      const index = meta ? meta.pages.findIndex((p) => p.ref.pageObjectNumber === pon) : -1;
       if (index < 0) return null;
       const sc = buildScene();
       if (!sc.itemCount) return null;
@@ -1122,7 +1143,7 @@ export function createStageCapability(
         const ly = screen.y - p.screenY;
         if (lx >= 0 && ly >= 0 && lx <= p.transform.viewWidth && ly <= p.transform.viewHeight) {
           return {
-            pon: p.pon,
+            ref: p.ref,
             point: p.transform.viewToContent({ x: lx, y: ly }),
             scale: p.transform.viewScale,
             rotation: p.rotation,
@@ -1132,15 +1153,15 @@ export function createStageCapability(
       }
       return null;
     },
-    pointOnPage: (pon, screen) => {
+    pointOnPage: (page, screen) => {
       // `pageAt` minus the containment check: project onto ONE page's plane,
       // valid outside its bounds — the same inverse transform, so no drift.
-      const p = visiblePages().find((v) => v.pon === pon);
+      const p = visiblePages().find((v) => v.ref.pageObjectNumber === page.pageObjectNumber);
       if (!p) return null;
       return p.transform.viewToContent({ x: screen.x - p.screenX, y: screen.y - p.screenY });
     },
-    pageToWorld: (pon, pt) => {
-      const pr = api.pageRect(pon);
+    pageToWorld: (page, pt) => {
+      const pr = api.pageRect(page);
       if (!pr) return null;
       // Place the content point into the page's display box via the SAME
       // quarter-turn matrix the layout/renderer use (`rotateScaleMatrix`) — so
@@ -1152,8 +1173,8 @@ export function createStageCapability(
       const offset = applyPoint(m, pt);
       return { x: pr.x + offset.x, y: pr.y + offset.y };
     },
-    pageRectToScreen: (pon, rect) => {
-      const pr = api.pageRect(pon);
+    pageRectToScreen: (page, rect) => {
+      const pr = api.pageRect(page);
       if (!pr) return null;
       const content = displaySize({ width: pr.width, height: pr.height }, pr.rotation);
       const m = rotateScaleMatrix(pr.contentScale, content.width, content.height, pr.rotation);

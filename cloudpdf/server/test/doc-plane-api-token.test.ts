@@ -241,7 +241,7 @@ describe('API token on the doc plane', () => {
 
     // The API token mutates through the same route a viewer would use.
     const create = await fetch(
-      `${fx.baseUrl}/v1/docs/${docId}/layers/reviews/annotations/pages/1/items`,
+      `${fx.baseUrl}/v1/docs/${docId}/layers/reviews/annotations/pages/obj:1/items`,
       {
         method: 'POST',
         headers: apiHeaders({ 'Content-Type': 'application/json' }),

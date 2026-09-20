@@ -37,7 +37,7 @@ own `@cloudpdf/server` — and every example talks to it over HTTPS.
 - **One `Engine` contract** — `createCloudEngine(...)` returns an object with a
   single `open()` method that resolves to a `DocumentHandle`.
 - **Document handles** — a `DocumentHandle` exposes `metadata`, `annotations`,
-  `pages`, `security`, and a `page(pon)` accessor for per-page work.
+  `pages`, `security`, and a `page(ref)` accessor for per-page work.
 - **Rendering** — request a page as an encoded image (`png`/`webp`) or raw RGBA,
   at any scale or target rectangle.
 - **Text & geometry** — extract a page's plain text or geometry snapshot.
@@ -58,7 +58,8 @@ const engine = createCloudEngine({
 });
 
 const doc = await engine.open({ kind: 'token', token: () => getDocToken() });
-const page = doc.page(/* pageObjectNumber */ 4);
+const { pages } = await doc.pages.list();
+const page = doc.page(pages[0].ref); // pages are addressed by ref, never by index
 const image = await page.render.image({ viewport: { kind: 'width', width: 1200 } });
 
 const { url, revoke } = await image.objectUrl();

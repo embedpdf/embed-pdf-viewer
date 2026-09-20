@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import type { PluginContext } from '@embedpdf/core';
-import type { PdfActionNode, PdfActionTree } from '@embedpdf/engine-core/runtime';
+import { toPageRef, type PdfActionNode, type PdfActionTree } from '@embedpdf/engine-core/runtime';
 
 import { createActionsCapability } from '../src/capability';
 import type {
@@ -39,7 +39,7 @@ const js = (script: string, next: PdfActionNode[] = []): PdfActionNode => ({
 const goto = (next: PdfActionNode[] = []): PdfActionNode => ({
   type: 'goto',
   subtype: 'GoTo',
-  destination: { kind: 'fit', pageObjectNumber: 3 },
+  destination: { kind: 'fit', page: toPageRef(3) },
   next,
 });
 const uri = (value: string, next: PdfActionNode[] = []): PdfActionNode => ({
@@ -49,13 +49,21 @@ const uri = (value: string, next: PdfActionNode[] = []): PdfActionNode => ({
   isMap: false,
   next,
 });
-const named = (name: string): PdfActionNode => ({ type: 'named', subtype: 'Named', name, next: [] });
+const named = (name: string): PdfActionNode => ({
+  type: 'named',
+  subtype: 'Named',
+  name,
+  next: [],
+});
 const hide = (
   targets: Extract<PdfActionNode, { type: 'hide' }>['targets'],
   hidden = true,
 ): PdfActionNode => ({ type: 'hide', subtype: 'Hide', targets, hide: hidden, next: [] });
 
-function harness(config?: ActionsPluginConfig, fields: Array<{ name: string; widgets: number[] }> = []) {
+function harness(
+  config?: ActionsPluginConfig,
+  fields: Array<{ name: string; widgets: number[] }> = [],
+) {
   const dispatch = vi.fn();
   const cleanups: Array<() => void> = [];
   const ctx = {
@@ -67,7 +75,7 @@ function harness(config?: ActionsPluginConfig, fields: Array<{ name: string; wid
             fieldObjectNumber: 100 + index,
             widgets: widgets.map((annotObjectNumber) => ({
               annotObjectNumber,
-              pageObjectNumber: 3,
+              page: toPageRef(3),
             })),
           })),
         }),
@@ -102,10 +110,7 @@ describe('actions dispatcher', () => {
       seen.push((node as Extract<PdfActionNode, { type: 'javascript' }>).script);
       return { status: 'executed' };
     });
-    const result = await capability.execute(
-      tree(js('a', [js('b', [js('c')]), js('d')])),
-      USER,
-    );
+    const result = await capability.execute(tree(js('a', [js('b', [js('c')]), js('d')])), USER);
     expect(seen).toEqual(['a', 'b', 'c', 'd']);
     expect(result.nodes.map((node) => node.path)).toEqual([[], [0], [0, 0], [1]]);
     expect(result.status).toBe('executed');
@@ -135,12 +140,13 @@ describe('actions dispatcher', () => {
     const { capability } = harness();
     const openUri = vi.fn();
     capability.setUiAdapter({ openUri, print: vi.fn() });
-    capability.registerExecutor('goto', vi.fn(() => ({ status: 'executed' as const })));
+    capability.registerExecutor(
+      'goto',
+      vi.fn(() => ({ status: 'executed' as const })),
+    );
     capability.registerExecutor('javascript', (node) => {
       const script = (node as Extract<PdfActionNode, { type: 'javascript' }>).script;
-      return script === 'boom'
-        ? { status: 'failed', error: 'exploded' }
-        : { status: 'executed' };
+      return script === 'boom' ? { status: 'failed', error: 'exploded' } : { status: 'executed' };
     });
     const result = await capability.execute(
       tree(goto([js('boom', [js('after'), uri('https://a.test/')])])),
@@ -266,7 +272,15 @@ describe('actions dispatcher', () => {
       };
     });
     const result = await capability.execute(
-      tree(hide([{ kind: 'name', name: 'note1' }, { kind: 'objectNumber', objectNumber: 7 }], false)),
+      tree(
+        hide(
+          [
+            { kind: 'name', name: 'note1' },
+            { kind: 'objectNumber', objectNumber: 7 },
+          ],
+          false,
+        ),
+      ),
       USER,
     );
     expect(result.status).toBe('executed');

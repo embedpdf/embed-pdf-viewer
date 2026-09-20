@@ -1,4 +1,4 @@
-import { createCapabilityToken, type PageObjectNumber } from '@embedpdf/core';
+import { createCapabilityToken, type PageRef } from '@embedpdf/core';
 import type {
   AnnotationRef,
   PdfActionTree,
@@ -42,7 +42,7 @@ export type LinkActivation =
 export interface LinkActivateContext {
   activate?: PdfActionTree;
   ref?: AnnotationRef;
-  pon?: PageObjectNumber;
+  page?: PageRef;
 }
 
 export interface LinkActivateEvent {
@@ -64,9 +64,9 @@ export interface LinkPluginConfig {
  */
 export interface LinkCapability {
   /** The clickable link areas of a page (content space, y-down). */
-  linksOn(pon: PageObjectNumber): LinkNavItem[];
+  linksOn(page: PageRef): LinkNavItem[];
   /** Lazy-load a page's links (no-op when the annotation plugin owns the data). */
-  ensurePage(pon: PageObjectNumber): void;
+  ensurePage(page: PageRef): void;
   /** Whether the navigation plane currently owns links: the active tool
    *  enables `link-nav` (pointer/pan/form-fill by default). While false —
    *  the link tool or any authoring tool is active — the annotation plane
@@ -82,7 +82,7 @@ export interface LinkState {
 }
 
 export type LinkAction =
-  | { type: 'SET_PAGE'; pon: number; items: LinkNavItem[] }
-  | { type: 'DROP_PAGE'; pon: number };
+  | { type: 'SET_PAGE'; page: PageRef; items: LinkNavItem[] }
+  | { type: 'DROP_PAGE'; page: PageRef };
 
 export const LinkToken = createCapabilityToken<LinkCapability>('link');

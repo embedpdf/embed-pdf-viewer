@@ -154,13 +154,13 @@ const { field } = await doc.forms.createField({
   noToggleToOff: true,
   widgets: [
     {
-      pageObjectNumber,
+      page: pageRef,
       rect: { left: 72, bottom: 640, right: 92, top: 660 },
       onState: 'monthly',
       appearance: { color: { r: 0, g: 0, b: 0 }, strokeWidth: 1 },
     },
     {
-      pageObjectNumber,
+      page: pageRef,
       rect: { left: 72, bottom: 610, right: 92, top: 630 },
       onState: 'yearly',
     },
@@ -201,13 +201,13 @@ const { created } = await page.annotations.create({
 // Adoption wires it to the field plane…
 await doc.forms.attachWidget(field.ref, {
   annotObjectNumber: created.ref.annotObjectNumber,
-  pageObjectNumber,
+  page: created.ref.page,
 });
 
 // …and release returns it to the annotation plane.
 await doc.forms.detachWidget(field.ref, {
   annotObjectNumber: created.ref.annotObjectNumber,
-  pageObjectNumber,
+  page: created.ref.page,
 });
 ```
 

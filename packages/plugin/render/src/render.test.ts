@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { DocumentEvent, EffectContext } from '@embedpdf/core';
+import { toPageRef, type DocumentEvent, type EffectContext, type PageRef } from '@embedpdf/core';
 
 import { createRenderCapability } from './capability';
 import { annotatedPons, registerRenderEffects } from './effects';
@@ -12,14 +12,14 @@ const PONS = [11, 22, 33];
 const event = (partial: Record<string, unknown>): DocumentEvent =>
   partial as unknown as DocumentEvent;
 
-const widget = (pageObjectNumber: number) => ({ annotObjectNumber: 5, pageObjectNumber });
+const widget = (pon: number) => ({ annotObjectNumber: 5, page: toPageRef(pon) });
 
 describe('renderReducer', () => {
   it('bumps each touched pon independently, in the ledger the scope names', () => {
     let s = initialRenderState();
-    s = renderReducer(s, { type: 'INVALIDATE', scope: 'annotations', pons: [11] });
-    s = renderReducer(s, { type: 'INVALIDATE', scope: 'annotations', pons: [11, 22] });
-    s = renderReducer(s, { type: 'INVALIDATE', scope: 'content', pons: [11] });
+    s = renderReducer(s, { type: 'INVALIDATE', scope: 'annotations', pageObjectNumbers: [11] });
+    s = renderReducer(s, { type: 'INVALIDATE', scope: 'annotations', pageObjectNumbers: [11, 22] });
+    s = renderReducer(s, { type: 'INVALIDATE', scope: 'content', pageObjectNumbers: [11] });
     expect(s.annotatedEpochs[11]).toBe(2);
     expect(s.annotatedEpochs[22]).toBe(1);
     expect(s.contentEpochs[11]).toBe(1);
@@ -29,7 +29,9 @@ describe('renderReducer', () => {
 
   it('is a no-op (same reference) for empty bumps and unknown actions', () => {
     const s = initialRenderState();
-    expect(renderReducer(s, { type: 'INVALIDATE', scope: 'content', pons: [] })).toBe(s);
+    expect(renderReducer(s, { type: 'INVALIDATE', scope: 'content', pageObjectNumbers: [] })).toBe(
+      s,
+    );
     expect(renderReducer(s, { type: 'OTHER' } as unknown as RenderAction)).toBe(s);
   });
 });
@@ -40,7 +42,7 @@ describe('annotatedPons — the built-in event→pages map', () => {
   it.each(['annotation.created', 'annotation.updated', 'annotation.deleted', 'annotation.moved'])(
     '%s invalidates its page',
     (type) => {
-      expect(annotatedPons(event({ type, pageObjectNumber: 22 }), allPons)).toEqual([22]);
+      expect(annotatedPons(event({ type, page: toPageRef(22) }), allPons)).toEqual([22]);
     },
   );
 
@@ -91,7 +93,7 @@ describe('effects + capability wired together', () => {
       dispatch: (a: RenderAction) => {
         state = renderReducer(state, a);
       },
-      document: () => ({ pages: PONS.map((pageObjectNumber) => ({ pageObjectNumber })) }),
+      document: () => ({ pages: PONS.map((pon) => ({ ref: toPageRef(pon) })) }),
       doc: {
         events: {
           subscribe: (handler: (e: DocumentEvent) => void) => {
@@ -122,17 +124,17 @@ describe('effects + capability wired together', () => {
 
   it('a confirmed annotation event bumps renderEpoch for that page only', () => {
     const h = harness();
-    expect(h.capability.renderEpoch(22)).toBe(0);
-    h.emit(event({ type: 'annotation.updated', pageObjectNumber: 22 }));
-    expect(h.capability.renderEpoch(22)).toBe(1);
-    expect(h.capability.renderEpoch(11)).toBe(0);
+    expect(h.capability.renderEpoch(toPageRef(22))).toBe(0);
+    h.emit(event({ type: 'annotation.updated', page: toPageRef(22) }));
+    expect(h.capability.renderEpoch(toPageRef(22))).toBe(1);
+    expect(h.capability.renderEpoch(toPageRef(11))).toBe(0);
   });
 
   it('annotation facts never reach base renders (annotated-only scope)', () => {
     const h = harness();
-    h.emit(event({ type: 'annotation.created', pageObjectNumber: 22 }));
-    expect(h.capability.renderEpoch(22, false)).toBe(0);
-    expect(h.capability.renderEpoch(22, true)).toBe(1);
+    h.emit(event({ type: 'annotation.created', page: toPageRef(22) }));
+    expect(h.capability.renderEpoch(toPageRef(22), false)).toBe(0);
+    expect(h.capability.renderEpoch(toPageRef(22), true)).toBe(1);
   });
 
   it('origin is irrelevant — any confirmed event bumps (remote SSE included)', () => {
@@ -140,17 +142,17 @@ describe('effects + capability wired together', () => {
     h.emit(
       event({
         type: 'annotation.moved',
-        pageObjectNumber: 11,
+        page: toPageRef(11),
         origin: { kind: 'remote', sessionId: 'other', sub: 'alice', ts: 1, serverId: 7 },
       }),
     );
-    expect(h.capability.renderEpoch(11)).toBe(1);
+    expect(h.capability.renderEpoch(toPageRef(11))).toBe(1);
   });
 
   it('coarse form events bump every page from the registry', () => {
     const h = harness();
     h.emit(event({ type: 'form.imported' }));
-    for (const pon of PONS) expect(h.capability.renderEpoch(pon)).toBe(1);
+    for (const pon of PONS) expect(h.capability.renderEpoch(toPageRef(pon))).toBe(1);
   });
 
   it('teardown unsubscribes from the event stream', () => {
@@ -161,36 +163,36 @@ describe('effects + capability wired together', () => {
 
   // ── the open door: invalidate() ──────────────────────────────────────────
 
-  it('invalidate({pons, scope: "content"}) reaches BOTH raster products', () => {
+  it('invalidate({pages, scope: "content"}) reaches BOTH raster products', () => {
     const h = harness();
-    h.capability.invalidate({ pons: [22], scope: 'content' });
-    expect(h.capability.renderEpoch(22, false)).toBe(1);
-    expect(h.capability.renderEpoch(22, true)).toBe(1);
-    expect(h.capability.renderEpoch(11, false)).toBe(0);
+    h.capability.invalidate({ pages: [toPageRef(22)], scope: 'content' });
+    expect(h.capability.renderEpoch(toPageRef(22), false)).toBe(1);
+    expect(h.capability.renderEpoch(toPageRef(22), true)).toBe(1);
+    expect(h.capability.renderEpoch(toPageRef(11), false)).toBe(0);
   });
 
-  it('invalidate({pons, scope: "annotations"}) leaves base renders untouched', () => {
+  it('invalidate({pages, scope: "annotations"}) leaves base renders untouched', () => {
     const h = harness();
-    h.capability.invalidate({ pons: [22], scope: 'annotations' });
-    expect(h.capability.renderEpoch(22, false)).toBe(0);
-    expect(h.capability.renderEpoch(22, true)).toBe(1);
+    h.capability.invalidate({ pages: [toPageRef(22)], scope: 'annotations' });
+    expect(h.capability.renderEpoch(toPageRef(22), false)).toBe(0);
+    expect(h.capability.renderEpoch(toPageRef(22), true)).toBe(1);
   });
 
   it('invalidate() defaults to every page, content scope', () => {
     const h = harness();
     h.capability.invalidate();
     for (const pon of PONS) {
-      expect(h.capability.renderEpoch(pon, false)).toBe(1);
-      expect(h.capability.renderEpoch(pon, true)).toBe(1);
+      expect(h.capability.renderEpoch(toPageRef(pon), false)).toBe(1);
+      expect(h.capability.renderEpoch(toPageRef(pon), true)).toBe(1);
     }
   });
 
   it('content and annotation facts compose into one monotonic annotated version', () => {
     const h = harness();
-    h.emit(event({ type: 'annotation.updated', pageObjectNumber: 11 }));
-    h.capability.invalidate({ pons: [11], scope: 'content' });
-    expect(h.capability.renderEpoch(11, true)).toBe(2); // 1 content + 1 annotated
-    expect(h.capability.renderEpoch(11, false)).toBe(1); // content only
+    h.emit(event({ type: 'annotation.updated', page: toPageRef(11) }));
+    h.capability.invalidate({ pages: [toPageRef(11)], scope: 'content' });
+    expect(h.capability.renderEpoch(toPageRef(11), true)).toBe(2); // 1 content + 1 annotated
+    expect(h.capability.renderEpoch(toPageRef(11), false)).toBe(1); // content only
   });
 });
 
@@ -236,8 +238,8 @@ describe('policy conformance', () => {
       // The policy is a DOCUMENT FACT on the kernel registry — the harness
       // supplies it exactly like the kernel does: on the meta, pre-publish.
       document: () => ({
-        pages: PONS.map((pageObjectNumber) => ({
-          pageObjectNumber,
+        pages: PONS.map((pon) => ({
+          ref: toPageRef(pon),
           size: { width: 612, height: 792 },
         })),
         renderPolicy: opts.policy ?? { kind: 'continuous' },
@@ -245,10 +247,10 @@ describe('policy conformance', () => {
       doc: {
         events: { subscribe: () => () => {} },
         security: { allows: () => true },
-        page: (pon: number) => ({
+        page: (ref: PageRef) => ({
           render: {
             image: (options: Record<string, unknown>) => {
-              imageCalls.push({ pon, options });
+              imageCalls.push({ pon: ref.pageObjectNumber, options });
               const t = makeTask();
               tasks.push(t);
               return t.task;
@@ -264,7 +266,7 @@ describe('policy conformance', () => {
 
   it('keys are computable the moment the capability exists — the kernel materialized the fact', () => {
     const h = harness({ policy: LATTICE });
-    expect(h.capability.renderSourceKey(11, { scale: 1 })).toBe('11|w640|a1|e0');
+    expect(h.capability.renderSourceKey(toPageRef(11), { scale: 1 })).toBe('11|w640|a1|e0');
   });
 
   it('continuous conforms to the EXACT device width, capped at the budget', () => {
@@ -272,77 +274,79 @@ describe('policy conformance', () => {
     expect(h.capability.renderPolicy()).toEqual({ kind: 'continuous' });
     // Below the budget: the exact demand (612pt × 0.5 = 306) — resting
     // pixels are never resampled, the dpr-1 crispness rule.
-    expect(h.capability.renderSourceKey(11, { scale: 0.5 })).toBe('11|w306|a1|e0');
-    expect(h.capability.conformViewport(11, 0.5)).toEqual({ kind: 'width', width: 306 });
+    expect(h.capability.renderSourceKey(toPageRef(11), { scale: 0.5 })).toBe('11|w306|a1|e0');
+    expect(h.capability.conformViewport(toPageRef(11), 0.5)).toEqual({ kind: 'width', width: 306 });
     // Past the budget the base holds at maxWidth (default 640) — one stable
     // key at any deeper zoom; sharpness beyond it is the tile plane's job.
-    expect(h.capability.renderSourceKey(11, { scale: 1.53 })).toBe('11|w640|a1|e0');
-    expect(h.capability.renderSourceKey(11, { scale: 8 })).toBe('11|w640|a1|e0');
+    expect(h.capability.renderSourceKey(toPageRef(11), { scale: 1.53 })).toBe('11|w640|a1|e0');
+    expect(h.capability.renderSourceKey(toPageRef(11), { scale: 8 })).toBe('11|w640|a1|e0');
   });
 
   it('continuous with a ladder quantize opts into rung caching', () => {
     const h = harness({ options: { fullPage: { quantize: [320, 640, 1280], maxWidth: 1280 } } });
-    expect(h.capability.renderSourceKey(11, { scale: 0.5 })).toBe('11|w320|a1|e0');
-    expect(h.capability.renderSourceKey(11, { scale: 1 })).toBe('11|w640|a1|e0');
-    expect(h.capability.renderSourceKey(11, { scale: 8 })).toBe('11|w1280|a1|e0');
+    expect(h.capability.renderSourceKey(toPageRef(11), { scale: 0.5 })).toBe('11|w320|a1|e0');
+    expect(h.capability.renderSourceKey(toPageRef(11), { scale: 1 })).toBe('11|w640|a1|e0');
+    expect(h.capability.renderSourceKey(toPageRef(11), { scale: 8 })).toBe('11|w1280|a1|e0');
   });
 
   it('the budget also filters an advertised ladder (mobile-memory knob)', () => {
     const h = harness({ policy: LATTICE, options: { fullPage: { maxWidth: 700 } } });
     // Deployment rungs [320, 640, 1280, 2560] filtered to ≤700 → cap at 640.
-    expect(h.capability.conformViewport(11, 8)).toEqual({ kind: 'width', width: 640 });
+    expect(h.capability.conformViewport(toPageRef(11), 8)).toEqual({ kind: 'width', width: 640 });
   });
 
   it('lattice: scale converts through the page width and snaps UP to the rung', () => {
     const h = harness({ policy: LATTICE });
     // 612pt page at 1× → 612px → w640; at 2× → 1224px → w1280.
-    expect(h.capability.conformViewport(11, 1)).toEqual({ kind: 'width', width: 640 });
-    expect(h.capability.conformViewport(11, 2)).toEqual({ kind: 'width', width: 1280 });
+    expect(h.capability.conformViewport(toPageRef(11), 1)).toEqual({ kind: 'width', width: 640 });
+    expect(h.capability.conformViewport(toPageRef(11), 2)).toEqual({ kind: 'width', width: 1280 });
   });
 
   it('THE identity law: zoom inside a rung produces the SAME key (1.2 → 1.5 = no-op)', () => {
     const h = harness({ policy: LATTICE });
-    const at12 = h.capability.renderSourceKey(11, { scale: 1.2 });
-    const at15 = h.capability.renderSourceKey(11, { scale: 1.5 });
+    const at12 = h.capability.renderSourceKey(toPageRef(11), { scale: 1.2 });
+    const at15 = h.capability.renderSourceKey(toPageRef(11), { scale: 1.5 });
     expect(at12).toBe('11|w1280|a1|e0');
     expect(at15).toBe(at12);
     // …and crossing the rung changes it.
-    expect(h.capability.renderSourceKey(11, { scale: 2.2 })).toBe('11|w2560|a1|e0');
+    expect(h.capability.renderSourceKey(toPageRef(11), { scale: 2.2 })).toBe('11|w2560|a1|e0');
   });
 
   it('epoch bumps mint new keys (staleness is a key change, never a flush)', () => {
     const h = harness({ policy: LATTICE });
-    const before = h.capability.renderSourceKey(11, { scale: 1 });
-    h.capability.invalidate({ pons: [11], scope: 'content' });
-    const after = h.capability.renderSourceKey(11, { scale: 1 });
+    const before = h.capability.renderSourceKey(toPageRef(11), { scale: 1 });
+    h.capability.invalidate({ pages: [toPageRef(11)], scope: 'content' });
+    const after = h.capability.renderSourceKey(toPageRef(11), { scale: 1 });
     expect(after).not.toBe(before);
   });
 
   it('renderPage sends the CONFORMED viewport to the engine', () => {
     const h = harness({ policy: LATTICE });
-    void h.capability.renderPage(11, { scale: 1.2 }).catch(() => {});
+    void h.capability.renderPage(toPageRef(11), { scale: 1.2 }).catch(() => {});
     expect(h.imageCalls).toHaveLength(1);
     expect(h.imageCalls[0]!.options.viewport).toEqual({ kind: 'width', width: 1280 });
   });
 
   it('same-rung asks collapse in the store: two renderPage calls, ONE engine call', async () => {
     const h = harness({ policy: LATTICE });
-    const a = h.capability.renderPage(11, { scale: 1.2 });
-    const b = h.capability.renderPage(11, { scale: 1.5 });
+    const a = h.capability.renderPage(toPageRef(11), { scale: 1.2 });
+    const b = h.capability.renderPage(toPageRef(11), { scale: 1.5 });
     expect(h.imageCalls).toHaveLength(1);
     h.tasks[0]!.resolve({ fake: 'handle' });
     expect(await a).toEqual({ fake: 'handle' });
     expect(await b).toEqual({ fake: 'handle' });
     // A rung re-ask AFTER resolution serves from the LRU — still one call.
-    expect(await h.capability.renderPage(11, { scale: 1.3 })).toEqual({ fake: 'handle' });
+    expect(await h.capability.renderPage(toPageRef(11), { scale: 1.3 })).toEqual({
+      fake: 'handle',
+    });
     expect(h.imageCalls).toHaveLength(1);
   });
 
   it('one consumer aborting a shared in-flight fetch does not kill it for the other', async () => {
     const h = harness({ policy: LATTICE });
     const ac = new AbortController();
-    const doomed = h.capability.renderPage(11, { scale: 1.2, signal: ac.signal });
-    const survivor = h.capability.renderPage(11, { scale: 1.5 });
+    const doomed = h.capability.renderPage(toPageRef(11), { scale: 1.2, signal: ac.signal });
+    const survivor = h.capability.renderPage(toPageRef(11), { scale: 1.5 });
     ac.abort();
     await expect(doomed).rejects.toBeTruthy();
     expect(h.tasks[0]!.task.aborted).toBeUndefined(); // engine call still alive
@@ -353,25 +357,25 @@ describe('policy conformance', () => {
   it('the LAST consumer aborting an unresolved fetch aborts the engine call', async () => {
     const h = harness({ policy: LATTICE });
     const ac = new AbortController();
-    const only = h.capability.renderPage(11, { scale: 1.2, signal: ac.signal });
+    const only = h.capability.renderPage(toPageRef(11), { scale: 1.2, signal: ac.signal });
     ac.abort();
     await expect(only).rejects.toBeTruthy();
     expect(h.tasks[0]!.task.aborted).toBeTruthy();
     // The dead entry is not sticky: the next ask fetches fresh.
-    void h.capability.renderPage(11, { scale: 1.2 }).catch(() => {});
+    void h.capability.renderPage(toPageRef(11), { scale: 1.2 }).catch(() => {});
     expect(h.imageCalls).toHaveLength(2);
   });
 
   it("format is a strategy value: 'bmp' rides into engine calls under continuous", () => {
     const h = harness({ options: { format: 'bmp', quality: 0.9 } });
-    void h.capability.renderPage(11, { scale: 0.5 }).catch(() => {});
+    void h.capability.renderPage(toPageRef(11), { scale: 0.5 }).catch(() => {});
     expect(h.imageCalls[0]!.options.format).toBe('bmp');
     expect(h.imageCalls[0]!.options.quality).toBe(0.9);
   });
 
   it("…and conforms to policy.formats under a lattice — 'bmp' becomes the deployment format", () => {
     const h = harness({ policy: LATTICE, options: { format: 'bmp' } });
-    void h.capability.renderPage(11, { scale: 0.5 }).catch(() => {});
+    void h.capability.renderPage(toPageRef(11), { scale: 0.5 }).catch(() => {});
     // LATTICE advertises formats: ['webp'] — BMP is local-only by contract.
     expect(h.imageCalls[0]!.options.format).toBe('webp');
   });
@@ -379,8 +383,8 @@ describe('policy conformance', () => {
   it('the encode format is part of the raster identity — keys change with it', () => {
     // The cloud policy arrives async after open; a resolved-format change
     // must mint new keys, never serve old-format bytes for the same key.
-    const plain = harness().capability.renderSourceKey(11, { scale: 0.5 });
-    const bmp = harness({ options: { format: 'bmp' } }).capability.renderSourceKey(11, {
+    const plain = harness().capability.renderSourceKey(toPageRef(11), { scale: 0.5 });
+    const bmp = harness({ options: { format: 'bmp' } }).capability.renderSourceKey(toPageRef(11), {
       scale: 0.5,
     });
     expect(plain).toBe('11|w306|a1|e0');
@@ -412,7 +416,7 @@ describe('the twin law (permissions.md) — canRender and the fetch gates', () =
         state = renderReducer(state, a);
       },
       document: () => ({
-        pages: [{ pageObjectNumber: 11, size: { width: 612, height: 792 } }],
+        pages: [{ ref: toPageRef(11), size: { width: 612, height: 792 } }],
       }),
       doc: {
         security: { allows: () => allowed },
@@ -433,14 +437,14 @@ describe('the twin law (permissions.md) — canRender and the fetch gates', () =
   it('a denied session never spends an engine round-trip on a raster', async () => {
     const { capability, image } = makeCtx(false);
     await expect(
-      capability.renderPage(11, { scale: 1, signal: new AbortController().signal }),
+      capability.renderPage(toPageRef(11), { scale: 1, signal: new AbortController().signal }),
     ).rejects.toMatchObject({ name: 'PermissionDenied', required: 'doc.render' });
     expect(image).not.toHaveBeenCalled();
   });
 
   it('an allowed session renders (twin ⇔ verb conformance)', async () => {
     const { capability, image } = makeCtx(true);
-    await capability.renderPage(11, { scale: 1, signal: new AbortController().signal });
+    await capability.renderPage(toPageRef(11), { scale: 1, signal: new AbortController().signal });
     expect(image).toHaveBeenCalledOnce();
   });
 });

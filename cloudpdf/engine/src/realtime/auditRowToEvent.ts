@@ -1,28 +1,29 @@
-import type {
-  AnnotationCreateResult,
-  AnnotationDeleteResult,
-  AnnotationMoveResult,
-  AnnotationUpdateResult,
-  AttachmentCreateResult,
-  AttachmentDeleteResult,
-  DocumentEvent,
-  EventOrigin,
-  FormFieldCreateResult,
-  FormFieldDeleteResult,
-  FormFieldUpdateResult,
-  FormEffectsResult,
-  FormImportResult,
-  FormRepairResult,
-  FormSetValueResult,
-  FormWidgetLinkResult,
-  MetadataUpdateResult,
-  PageDeleteResult,
-  PageFlattenResult,
-  PageInsertResult,
-  PageMoveResult,
-  PageRotateResult,
-  PageRotation,
-  PageScaleResult,
+import {
+  toPageRef,
+  type AnnotationCreateResult,
+  type AnnotationDeleteResult,
+  type AnnotationMoveResult,
+  type AnnotationUpdateResult,
+  type AttachmentCreateResult,
+  type AttachmentDeleteResult,
+  type DocumentEvent,
+  type EventOrigin,
+  type FormFieldCreateResult,
+  type FormFieldDeleteResult,
+  type FormFieldUpdateResult,
+  type FormEffectsResult,
+  type FormImportResult,
+  type FormRepairResult,
+  type FormSetValueResult,
+  type FormWidgetLinkResult,
+  type MetadataUpdateResult,
+  type PageDeleteResult,
+  type PageFlattenResult,
+  type PageInsertResult,
+  type PageMoveResult,
+  type PageRotateResult,
+  type PageRotation,
+  type PageScaleResult,
 } from '@embedpdf/engine-core/runtime';
 
 /** The SSE `mutation` event body — the audit row in JSON (the server's
@@ -50,8 +51,11 @@ export interface AuditEventRow {
  *     is recovered from the layout (it's absolute — every affected page
  *     carries the value).
  *   - move: the originator knows which block it moved; the audit row only
- *     records the resulting order, so `pageObjectNumbers` is the full new
- *     order and `destIndex` is absent (remote consumers use `layout`).
+ *     records the resulting order, so `pages` is the full new order and
+ *     `destIndex` is absent (remote consumers use `layout`).
+ *
+ * The audit row keys pages by object number (its storage identity); the
+ * event carries them as `PageRef` addresses, like every other event.
  */
 export function auditRowToEvent(row: AuditEventRow, mySessionId: string): DocumentEvent | null {
   if (row.originSessionId === mySessionId) return null; // own echo — local publish covered it
@@ -64,52 +68,56 @@ export function auditRowToEvent(row: AuditEventRow, mySessionId: string): Docume
     serverId: row.id,
   };
 
+  // The row's page: its explicit column, else the first affected page.
+  const rowPage = () => toPageRef(row.pageObjectNumber ?? row.affectedPages[0] ?? 0);
+  const affectedPages = () => row.affectedPages.map((pon) => toPageRef(pon));
+
   switch (row.kind) {
     case 'measure.setScale':
       return { type: 'page.viewportsChanged', origin, ...(row.payload as PageScaleResult) };
     case 'annot.create':
       return {
         type: 'annotation.created',
-        pageObjectNumber: row.pageObjectNumber ?? row.affectedPages[0] ?? 0,
+        page: rowPage(),
         origin,
         ...(row.payload as AnnotationCreateResult),
       };
     case 'annot.update':
       return {
         type: 'annotation.updated',
-        pageObjectNumber: row.pageObjectNumber ?? row.affectedPages[0] ?? 0,
+        page: rowPage(),
         origin,
         ...(row.payload as AnnotationUpdateResult),
       };
     case 'annot.delete':
       return {
         type: 'annotation.deleted',
-        pageObjectNumber: row.pageObjectNumber ?? row.affectedPages[0] ?? 0,
+        page: rowPage(),
         origin,
         ...(row.payload as AnnotationDeleteResult),
       };
     case 'annot.move':
       return {
         type: 'annotation.moved',
-        pageObjectNumber: row.pageObjectNumber ?? row.affectedPages[0] ?? 0,
+        page: rowPage(),
         origin,
         ...(row.payload as AnnotationMoveResult),
       };
     case 'pages.move':
       return {
         type: 'pages.moved',
-        pageObjectNumbers: row.affectedPages,
+        pages: affectedPages(),
         origin,
         ...(row.payload as PageMoveResult),
       };
     case 'pages.rotate': {
       const payload = row.payload as PageRotateResult;
       const rotation = (payload.layout.pages.find(
-        (page) => page.pageObjectNumber === row.affectedPages[0],
+        (page) => page.ref.pageObjectNumber === row.affectedPages[0],
       )?.rotation ?? 0) as PageRotation;
       return {
         type: 'pages.rotated',
-        pageObjectNumbers: row.affectedPages,
+        pages: affectedPages(),
         rotation,
         origin,
         ...payload,
@@ -118,7 +126,7 @@ export function auditRowToEvent(row: AuditEventRow, mySessionId: string): Docume
     case 'pages.delete':
       return {
         type: 'pages.deleted',
-        pageObjectNumbers: row.affectedPages,
+        pages: affectedPages(),
         origin,
         ...(row.payload as PageDeleteResult),
       };

@@ -2,7 +2,7 @@ import type { AnnotationFlags, AnnotationReplyType, BlendMode } from './primitiv
 import type { PdfRect } from '../geometry/primitives';
 import type { AnnotationIdentityQuality } from '../identity/AnnotationIdentityQuality';
 import type { AnnotationRef } from '../identity/AnnotationRef';
-import type { PageObjectNumber } from '../identity/PageObjectNumber';
+import type { PageRef } from '../identity/PageRef';
 import type { PdfAnnotationActions } from '../dto/PdfAction';
 
 /**
@@ -14,7 +14,7 @@ import type { PdfAnnotationActions } from '../dto/PdfAction';
  */
 export interface AnnotationBase {
   ref: AnnotationRef;
-  pageObjectNumber: PageObjectNumber;
+  page: PageRef;
   /** Display order inside the page; 0-based. */
   index: number;
   identityQuality: AnnotationIdentityQuality;

@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, beforeAll, describe, test } from 'vitest';
 
+import { toPageRef } from '@embedpdf/engine-core/runtime';
 import { createLocalEngine, type LocalEngine } from '../src/index';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -97,7 +98,7 @@ describe('rotated circle move drift probe', () => {
     let U: R = { left: 100, bottom: 500, right: 220, top: 580 }; // 120×80
 
     let doc = await engine.open({ kind: 'bytes', id: 'probe-0', bytes: pdf });
-    const created = await doc.page(PAGE).annotations.create({
+    const created = await doc.page(toPageRef(PAGE)).annotations.create({
       subtype: 'circle',
       contents: 'drift probe',
       rect: aabb(U, ROT_PDF),
@@ -117,11 +118,11 @@ describe('rotated circle move drift probe', () => {
     );
 
     const dump = async (label: string, d: typeof doc) => {
-      const list = await d.page(PAGE).annotations.list();
+      const list = await d.page(toPageRef(PAGE)).annotations.list();
       const a = list.annotations.find(
         (x) => x.subtype === 'circle' && x.contents === 'drift probe',
       ) as unknown as { ref: unknown; rect: R; unrotatedRect?: R; rotation?: number };
-      const rendered = await d.page(PAGE).annotations.renderAppearances();
+      const rendered = await d.page(toPageRef(PAGE)).annotations.renderAppearances();
       const ap = rendered.appearances.find(
         (p) => JSON.stringify((p as { ref: unknown }).ref) === JSON.stringify(a.ref),
       ) as unknown as { rect: R; raster: { width: number; height: number; data: ArrayBuffer } };
@@ -150,7 +151,7 @@ describe('rotated circle move drift probe', () => {
       const modelRect = a.unrotatedRect ?? a.rect;
       const rot = a.rotation ?? 0;
       U = translate(modelRect, 30, 15);
-      const res = await doc.page(PAGE).annotations.update(
+      const res = await doc.page(toPageRef(PAGE)).annotations.update(
         a.ref as never,
         {
           subtype: 'circle',

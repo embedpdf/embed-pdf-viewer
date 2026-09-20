@@ -4,6 +4,7 @@ import type { DocumentEvent } from '../events/DocumentEvent';
 import type { AnnotationDraft } from '../shared';
 import { refKey } from '../annotation/relationships';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
+import { toPageRef } from '../identity/PageRef';
 import { AbortError } from '../promise/AbortError';
 import { measureFromKnownLength, measurementReadout } from '../measure';
 
@@ -36,7 +37,7 @@ export function runMeasurementConformance(
     test('geometry derives contents while caption patches retain placement', async () => {
       const doc = await open();
       try {
-        const page = doc.page((await doc.pages.list()).pages[0].pageObjectNumber);
+        const page = doc.page((await doc.pages.list()).pages[0].ref);
         const created = (
           await page.annotations.create({
             subtype: 'line',
@@ -86,7 +87,7 @@ export function runMeasurementConformance(
     test('all three kinds derive labels, save, reopen and retain captions', async () => {
       let doc = await open();
       try {
-        const pon = (await doc.pages.list()).pages[0].pageObjectNumber;
+        const pon = (await doc.pages.list()).pages[0].ref.pageObjectNumber;
         const drafts: AnnotationDraft[] = [
           {
             subtype: 'line',
@@ -120,7 +121,7 @@ export function runMeasurementConformance(
         const saved = [];
         for (const draft of drafts) {
           const preview = measurementReadout(draft);
-          const a = (await doc.page(pon).annotations.create(draft)).created;
+          const a = (await doc.page(toPageRef(pon)).annotations.create(draft)).created;
           expect(a.contents).toBe('label' in preview ? preview.label : undefined);
           saved.push(a);
         }
@@ -129,7 +130,7 @@ export function runMeasurementConformance(
         doc = bytes
           ? await engine.open({ kind: 'bytes', id: `${opts.fixture.id}-saved`, bytes })
           : await open();
-        const page = doc.page((await doc.pages.list()).pages[0].pageObjectNumber);
+        const page = doc.page((await doc.pages.list()).pages[0].ref);
         const list = (await page.annotations.list()).annotations;
         for (const before of saved) {
           const a = list.find((a) => refKey(a.ref) === refKey(before.ref))!;
@@ -151,8 +152,8 @@ export function runMeasurementConformance(
     test('calibration updates only viewports and emits one event per write', async () => {
       const doc = await open();
       try {
-        const pon = (await doc.pages.list()).pages[0].pageObjectNumber;
-        const page = doc.page(pon);
+        const pon = (await doc.pages.list()).pages[0].ref.pageObjectNumber;
+        const page = doc.page(toPageRef(pon));
         if (!page.measure) throw new Error('Measurement service is required');
         const foreign = (await page.measure.viewports()).filter((v) => !v.owned);
         const annotations = (await page.annotations.list()).annotations;
@@ -167,7 +168,7 @@ export function runMeasurementConformance(
           const changes = events.filter((e) => e.type === 'page.viewportsChanged');
           expect(changes).toHaveLength(2);
           for (const event of changes)
-            expect(event).toMatchObject({ pageObjectNumber: pon, meta: { affectedPages: [] } });
+            expect(event).toMatchObject({ page: toPageRef(pon), meta: { affectedPages: [] } });
         } finally {
           off();
         }
@@ -179,7 +180,7 @@ export function runMeasurementConformance(
     test('invalid and immediately aborted calibration leaves the previous scale intact', async () => {
       const doc = await open();
       try {
-        const page = doc.page((await doc.pages.list()).pages[0].pageObjectNumber);
+        const page = doc.page((await doc.pages.list()).pages[0].ref);
         await page.measure!.setScale(scale);
         const before = await page.measure!.viewports();
         await expect(

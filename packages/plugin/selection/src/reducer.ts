@@ -13,10 +13,10 @@ export const selectionReducer = (
   action: SelectionAction,
 ): SelectionState => {
   switch (action.type) {
-    case 'PAGE_LOADED':
-      return state.loaded[action.pon]
-        ? state
-        : { ...state, loaded: { ...state.loaded, [action.pon]: true } };
+    case 'PAGE_LOADED': {
+      const pon = action.page.pageObjectNumber;
+      return state.loaded[pon] ? state : { ...state, loaded: { ...state.loaded, [pon]: true } };
+    }
     case 'SET':
       return { ...state, selection: action.selection, segments: action.segments };
     case 'CLEAR':

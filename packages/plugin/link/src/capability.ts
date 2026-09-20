@@ -1,4 +1,4 @@
-import type { PluginContext } from '@embedpdf/core';
+import { pageRefsEqual, type PluginContext } from '@embedpdf/core';
 import type { PdfLinkTarget } from '@embedpdf/engine-core/runtime';
 import { ActionsToken } from '@embedpdf/plugin-actions/contract';
 // The host lens (linkItemsOn) — same runtime token as the public one.
@@ -42,7 +42,7 @@ export function createLinkCapability(
       if (actions && context?.activate) {
         const dispatch = actions.execute(context.activate, {
           origin: 'user',
-          source: { kind: 'link', annotation: context.ref, pon: context.pon },
+          source: { kind: 'link', annotation: context.ref, page: context.page },
           event: { scope: 'activate' },
         });
         return { outcome: 'dispatched', dispatch };
@@ -52,7 +52,7 @@ export function createLinkCapability(
           const stage = ctx.tryGet(StageToken);
           const layout = ctx
             .document()
-            ?.pages.find((p) => p.pageObjectNumber === target.destination.pageObjectNumber);
+            ?.pages.find((p) => pageRefsEqual(p.ref, target.destination.page));
           if (!stage || !layout) {
             // No camera to drive — hand the embedder the explicit destination.
             return { outcome: 'destination', destination: target.destination };
@@ -80,18 +80,18 @@ export function createLinkCapability(
   };
 
   return {
-    linksOn: (pon) => {
+    linksOn: (page) => {
       const host = anno();
-      if (host) return host.linkItemsOn(pon);
-      return ctx.getState().pages[pon] ?? EMPTY;
+      if (host) return host.linkItemsOn(page);
+      return ctx.getState().pages[page.pageObjectNumber] ?? EMPTY;
     },
-    ensurePage: (pon) => {
+    ensurePage: (page) => {
       const host = anno();
       if (host) {
-        host.ensurePage(pon); // the folded model is the source; it lazy-loads
+        host.ensurePage(page); // the folded model is the source; it lazy-loads
         return;
       }
-      if (!(pon in ctx.getState().pages)) loadLinksPage(ctx, pon);
+      if (!(page.pageObjectNumber in ctx.getState().pages)) loadLinksPage(ctx, page);
     },
     engaged: () => ctx.tryGet(InteractionToken)?.activeTool()?.enables.has('link-nav') ?? false,
     activate,

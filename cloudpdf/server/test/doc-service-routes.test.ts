@@ -750,7 +750,7 @@ describe('Phase 6 access route — POST /v1/access', () => {
       },
     });
     const token = docToken(tenantId, docId, { layer: 'default' });
-    const annotationsUrl = `${fx.baseUrl}/v1/docs/${docId}/layers/default/annotations/pages/1/items`;
+    const annotationsUrl = `${fx.baseUrl}/v1/docs/${docId}/layers/default/annotations/pages/obj:1/items`;
 
     const blocked = await fetch(annotationsUrl, {
       headers: { Authorization: `Bearer ${token}` },
@@ -818,7 +818,7 @@ describe('Phase 6 access route — owner-password upgrade (permission-only encry
     // pdf.permissions against the document's bits — so page-text access
     // tracks the effective (post-unlock) bits exactly.
     const token = docToken(tenantId, docId, { layer: 'default', scope: ['pdf.permissions'] });
-    const textUrl = `${fx.baseUrl}/v1/docs/${docId}/text/pages/1/data`;
+    const textUrl = `${fx.baseUrl}/v1/docs/${docId}/text/pages/obj:1/data`;
 
     // Before unlock: user bits lack copy (bit 5) -> page-text denied.
     const before = await fetch(textUrl, { headers: { Authorization: `Bearer ${token}` } });
@@ -929,7 +929,7 @@ describe('Phase 6 access route — owner-password upgrade (permission-only encry
     const docId = 'docperm005';
     await seedDocument(fx, tenantId, docId, { security: PERMISSION_ONLY });
     const token = docToken(tenantId, docId, { layer: 'default', scope: ['pdf.permissions'] });
-    const textUrl = `${fx.baseUrl}/v1/docs/${docId}/text/pages/1/data`;
+    const textUrl = `${fx.baseUrl}/v1/docs/${docId}/text/pages/obj:1/data`;
 
     // Elevate to owner; page-text becomes readable.
     const elevate = await postAccess(docId, token, { password: 'owner', mode: 'any' });
@@ -960,7 +960,7 @@ describe('Phase 6 access route — owner-password upgrade (permission-only encry
     const docId = 'docperm006';
     await seedDocument(fx, tenantId, docId, { security: PERMISSION_ONLY });
     const token = docToken(tenantId, docId, { layer: 'default', scope: ['pdf.permissions'] });
-    const textUrl = `${fx.baseUrl}/v1/docs/${docId}/text/pages/1/data`;
+    const textUrl = `${fx.baseUrl}/v1/docs/${docId}/text/pages/obj:1/data`;
 
     const elevate = await postAccess(docId, token, { password: 'owner', mode: 'any' });
     expect(elevate.status, await elevate.clone().text()).toBe(200);

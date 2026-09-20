@@ -1,5 +1,5 @@
 import { createCapabilityToken } from '@embedpdf/core';
-import type { PageObjectNumber } from '@embedpdf/core';
+import type { PageRef } from '@embedpdf/core';
 import type { PageRotation, PageTransform, Rect } from '@embedpdf/core-geometry';
 import type {
   Alignment,
@@ -224,7 +224,7 @@ export interface StageSettings {
 
 /**
  * A laid-out page handed to the shell.
- *  - PageBox + `pon`: LAYOUT truth (world coords + identity) — the shell uses
+ *  - PageBox + `ref`: LAYOUT truth (world coords + identity) — the shell uses
  *    `x/y/width/height` only to POSITION the page container.
  *  - `transform`: PRESENTATION truth — the single bridge between PDF points,
  *    view px, and device px for this page. Plugins do ALL coordinate work
@@ -233,7 +233,7 @@ export interface StageSettings {
  *    camera/pan-invariant.
  */
 export interface VisiblePage extends PageBox {
-  pon: PageObjectNumber;
+  ref: PageRef;
   /**
    * The page's DISPLAY-box (footprint) top-left in screen px, camera-resolved and
    * snapped to the device grid. The shell positions the page container at this —
@@ -448,9 +448,9 @@ export interface StageCapability {
   /** The display indices of the current item's pages (1 page, or a spread's pages). */
   currentItemPages(): number[];
   /** The full page list with PDF labels — for page thumbnails / worksheet tabs. */
-  pages(): Array<{ index: number; pon: PageObjectNumber; label: string | null }>;
-  /** The laid-out box for a page by its durable pon. */
-  pageRect(pon: PageObjectNumber): VisiblePage | null;
+  pages(): Array<{ index: number; ref: PageRef; label: string | null }>;
+  /** The laid-out box for a page by its durable page ref. */
+  pageRect(page: PageRef): VisiblePage | null;
   /**
    * Screen point (this Stage's container px) → the page under it + its content
    * point, or null over a gap. The viewport-level hit-test the interaction hub
@@ -458,7 +458,7 @@ export interface StageCapability {
    * selection, annotations) AND cross-page drags.
    */
   pageAt(screen: Point): {
-    pon: PageObjectNumber;
+    ref: PageRef;
     point: Point;
     scale: number;
     /** The hit page's TOTAL display rotation (document /Rotate + view rotation). */
@@ -467,26 +467,26 @@ export interface StageCapability {
     zoom: number;
   } | null;
   /**
-   * Screen point → `pon`'s content space, UNCLAMPED — valid even when the point
+   * Screen point → `page`'s content space, UNCLAMPED — valid even when the point
    * is outside the page's bounds (coordinates then fall outside `[0, size]`).
    * The frame-stable projection a page-anchored gesture (annotation move/resize)
    * tracks with, where `pageAt` would re-resolve to whatever page is under the
    * cursor (what a cross-page drag like text selection wants). Null when the
    * page isn't currently laid out.
    */
-  pointOnPage(pon: PageObjectNumber, screen: Point): Point | null;
+  pointOnPage(page: PageRef, screen: Point): Point | null;
   /**
    * Page space (intrinsic PDF points) → world space. Applies the page's placed
    * origin and contentScale — the transform sizing policies introduce. Compose
    * with toScreen for viewport-space overlays anchored to page content.
    */
-  pageToWorld(pon: PageObjectNumber, pt: Point): Point | null;
+  pageToWorld(page: PageRef, pt: Point): Point | null;
   /**
    * Content rect on a page → this Stage viewport's screen-space AABB. Applies page
    * rotation/contentScale and the current camera. Use for upright viewport overlays
    * that need to frame a selected page region.
    */
-  pageRectToScreen(pon: PageObjectNumber, rect: Rect): Rect | null;
+  pageRectToScreen(page: PageRef, rect: Rect): Rect | null;
   toScreen(world: Point): Point;
   toWorld(screen: Point): Point;
   flow(): FlowMode;

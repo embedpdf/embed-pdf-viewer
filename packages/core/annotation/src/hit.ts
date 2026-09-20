@@ -1,3 +1,4 @@
+import type { PageRef } from '@embedpdf/engine-core/runtime';
 import { annotationSelectionFrame } from './selection';
 import { distanceCaptionHit, distanceHandles, distanceHit, distanceLayout } from './measurement';
 import { measurementLayout } from './measurement-shape';
@@ -43,12 +44,13 @@ export type Target =
  *  neither paints nor hits, so an invisible annotation can never eat a click.
  *  Conversation-plane annotations (replies, review-status states) are culled
  *  here too — dialogue lives in the comments UI, never on the page. */
-export function paintOrder(m: Model, pon: number): Id[] {
+export function paintOrder(m: Model, page: PageRef): Id[] {
+  const pon = page.pageObjectNumber;
   const markup: Id[] = [];
   const other: Id[] = [];
   for (const id of m.order) {
     const a = m.byId[id];
-    if (!a || a.pon !== pon) continue;
+    if (!a || a.page.pageObjectNumber !== pon) continue;
     if (!viewable(a.flags, m.selected.includes(id))) continue;
     if (isSubstrateOnly(a)) continue;
     (isMarkup(a.subtype) ? markup : other).push(id);
@@ -120,9 +122,10 @@ const inBounds = (a: Annot, p: Vec, view: ViewEnv | undefined): boolean =>
  * BETWEEN grouped/multi-selected annotations, so dragging the whole selection
  * works from anywhere inside its visible outline (not only on a member).
  */
-function selectionUnionBounds(m: Model, pon: number, view: ViewEnv | undefined): Rect | null {
+function selectionUnionBounds(m: Model, page: PageRef, view: ViewEnv | undefined): Rect | null {
+  const pon = page.pageObjectNumber;
   const sel = m.selected.filter(
-    (id) => m.byId[id]?.pon === pon && isSelectable(m, id) && canMove(m, id),
+    (id) => m.byId[id]?.page.pageObjectNumber === pon && isSelectable(m, id) && canMove(m, id),
   );
   if (sel.length < 2) return null;
   const corners: Vec[] = [];
@@ -135,11 +138,12 @@ function selectionUnionBounds(m: Model, pon: number, view: ViewEnv | undefined):
 
 /** The axis-aligned union of the SELECTION bounds of every selected annotation on
  *  a page (no movable/lock filter) — the box group chrome + group rotate use. */
-export function groupUnionBounds(m: Model, pon: number, view?: ViewEnv): Rect | null {
+export function groupUnionBounds(m: Model, page: PageRef, view?: ViewEnv): Rect | null {
+  const pon = page.pageObjectNumber;
   const corners: Vec[] = [];
   for (const id of m.selected) {
     const a = m.byId[id];
-    if (!a || a.pon !== pon) continue;
+    if (!a || a.page.pageObjectNumber !== pon) continue;
     corners.push(...annotationSelectionFrame(a, view).corners);
   }
   return corners.length ? unionRect(corners) : null;
@@ -155,7 +159,7 @@ export function groupUnionBounds(m: Model, pon: number, view?: ViewEnv): Rect | 
  */
 export function hitTest(
   m: Model,
-  pon: number,
+  page: PageRef,
   p: Vec,
   geom: ChromeGeom,
   strokeMargin: number,
@@ -163,9 +167,10 @@ export function hitTest(
   inert?: ReadonlySet<Id>,
   view?: ViewEnv,
 ): Target {
+  const pon = page.pageObjectNumber;
   if (m.selected.length === 1 && isSelectable(m, m.selected[0])) {
     const a = m.byId[m.selected[0]];
-    if (a.pon === pon) {
+    if (a.page.pageObjectNumber === pon) {
       // The rotate knob (checked first — it floats outside the box, clear of
       // the handles), placed on the projected selection frame so it sits exactly
       // where the chrome drew it — a screen-anchored body rotates too (the
@@ -222,7 +227,7 @@ export function hitTest(
     // members rotate WYSIWYG like everyone else (their authored tilt turns).
     const gc = groupCaps(m, m.selected);
     if (gc.rotatable) {
-      const union = groupUnionBounds(m, pon, view);
+      const union = groupUnionBounds(m, page, view);
       if (union) {
         const corners: [Vec, Vec, Vec, Vec] = [
           { x: union.x, y: union.y },
@@ -236,12 +241,16 @@ export function hitTest(
           Math.abs(knob.at.y - p.y) <= geom.knobTol
         ) {
           const pivot = { x: union.x + union.width / 2, y: union.y + union.height / 2 };
-          return { t: 'rotate', ids: m.selected.filter((id) => m.byId[id]?.pon === pon), pivot };
+          return {
+            t: 'rotate',
+            ids: m.selected.filter((id) => m.byId[id]?.page.pageObjectNumber === pon),
+            pivot,
+          };
         }
       }
     }
     if (gc.resizable) {
-      const union = groupUnionBounds(m, pon, view);
+      const union = groupUnionBounds(m, page, view);
       if (union) {
         for (const h of rectHandlesFor(union)) {
           if (
@@ -250,7 +259,7 @@ export function hitTest(
           ) {
             return {
               t: 'group-handle',
-              ids: m.selected.filter((id) => m.byId[id]?.pon === pon),
+              ids: m.selected.filter((id) => m.byId[id]?.page.pageObjectNumber === pon),
               handle: h.id,
               cursor: h.cursor,
               box: union,
@@ -260,7 +269,7 @@ export function hitTest(
       }
     }
   }
-  const order = paintOrder(m, pon);
+  const order = paintOrder(m, page);
   for (let i = order.length - 1; i >= 0; i--) {
     const id = order[i];
     const a = m.byId[id];
@@ -291,7 +300,7 @@ export function hitTest(
   // its WHOLE union box (the gaps between members included), so a drag there moves
   // the group as a unit instead of clearing it. Resolve to the top-most selected
   // member so `editDown` keeps the selection and arms the move.
-  const union = selectionUnionBounds(m, pon, view);
+  const union = selectionUnionBounds(m, page, view);
   if (union && inRect(union, p)) {
     for (let i = order.length - 1; i >= 0; i--) {
       if (m.selected.includes(order[i]) && canMove(m, order[i]))
@@ -304,7 +313,7 @@ export function hitTest(
 /** The cursor to show on hover: a resize cursor over a handle, move/pointer over a body. */
 export function cursorAt(
   m: Model,
-  pon: number,
+  page: PageRef,
   p: Vec,
   geom: ChromeGeom,
   strokeMargin: number,
@@ -312,7 +321,7 @@ export function cursorAt(
   inert?: ReadonlySet<Id>,
   view?: ViewEnv,
 ): Cursor | null {
-  const t = hitTest(m, pon, p, geom, strokeMargin, pageBox, inert, view);
+  const t = hitTest(m, page, p, geom, strokeMargin, pageBox, inert, view);
   if (t.t === 'handle') return t.cursor;
   if (t.t === 'group-handle') return t.cursor;
   if (t.t === 'rotate') return 'grab';

@@ -20,6 +20,7 @@ import {
   type PageHandle,
   type PageObjectNumber,
   type PdfSaveMode,
+  type PageRef,
 } from '@embedpdf/engine-core/runtime';
 import { EventHub, SessionEventPublisher } from '@embedpdf/engine-services';
 
@@ -139,18 +140,18 @@ export class LocalDocumentHandle implements DocumentHandle {
   }
 
   /**
-   * Returns a `PageHandle` keyed on the page's PDF indirect object
-   * number. We don't validate the page exists synchronously - the worker
-   * does that on the next call. This matches the cloud engine, which
+   * Returns a `PageHandle` keyed on the page's address (object number or
+   * `/Names /Pages` key). We don't validate the page exists synchronously -
+   * the worker resolves the address on every call. This matches the cloud engine, which
    * cannot validate without a round-trip either.
    *
    * `pageIndex` is advisory metadata, reported as `-1`. Display order is
    * geometry, not liveness: clients read it from `pages.list()` (each
-   * `PageLayout.index`), joined to this handle by `pageObjectNumber`.
+   * `PageLayout.index`), joined to this handle by `ref`.
    */
-  page(pageObjectNumber: PageObjectNumber): PageHandle {
+  page(ref: PageRef): PageHandle {
     return new LocalPageHandle(
-      pageObjectNumber,
+      ref,
       -1,
       this.id,
       this.queue,

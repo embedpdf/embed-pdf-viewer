@@ -190,7 +190,7 @@ export function createAnnotation(
   layerName: string,
   contents: string,
 ): Promise<Response> {
-  return fetch(`${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/annotations/pages/1/items`, {
+  return fetch(`${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/annotations/pages/obj:1/items`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${docToken(tenantId, docId, layerName)}`,
@@ -213,7 +213,7 @@ export async function listAnnotations(
   layerName: string,
 ): Promise<{ status: number; body: string }> {
   const res = await fetch(
-    `${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/annotations/pages/1/items`,
+    `${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/annotations/pages/obj:1/items`,
     { headers: { Authorization: `Bearer ${docToken(tenantId, docId, layerName)}` } },
   );
   return { status: res.status, body: await res.text() };

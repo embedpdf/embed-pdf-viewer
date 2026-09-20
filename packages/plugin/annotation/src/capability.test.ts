@@ -7,6 +7,7 @@ import type {
   PdfQuad,
 } from '@embedpdf/engine-core/runtime';
 import type { DocumentEvent, PluginContext } from '@embedpdf/core';
+import { toPageRef } from '@embedpdf/engine-core/runtime';
 
 import { createAnnotationCapability } from './capability';
 import { annotationReducer, initialAnnotationState } from './reducer';
@@ -14,6 +15,8 @@ import type { AnnotationAction, AnnotationState } from './types';
 
 const PON = 1;
 const PON2 = 2;
+const PAGE = toPageRef(PON);
+const PAGE2 = toPageRef(PON2);
 const CROP = { left: 0, bottom: 0, right: 600, top: 800 };
 const NO_FLAGS: AnnotationFlags = {
   invisible: false,
@@ -30,13 +33,13 @@ const NO_FLAGS: AnnotationFlags = {
 
 const ref = (annotObjectNumber: number): AnnotationRef => ({
   kind: 'objectNumber',
-  pageObjectNumber: PON,
+  page: PAGE,
   annotObjectNumber,
 });
 
 const base = (annotObjectNumber: number) => ({
   ref: ref(annotObjectNumber),
-  pageObjectNumber: PON,
+  page: PAGE,
   index: annotObjectNumber,
   identityQuality: 'durable' as const,
   nm: null,
@@ -104,8 +107,8 @@ function harness() {
     },
     document: () => ({
       pages: [
-        { pageObjectNumber: PON, boxes: { crop: CROP } },
-        { pageObjectNumber: PON2, boxes: { crop: CROP } },
+        { ref: PAGE, boxes: { crop: CROP } },
+        { ref: PAGE2, boxes: { crop: CROP } },
       ],
     }),
     doc: {
@@ -146,7 +149,7 @@ describe('Replace Text grouped persistence', () => {
     const rect = { x: 10, y: 20, width: 80, height: 15 };
 
     h.capability.createReplaceText(
-      PON,
+      PAGE,
       [textQuadFromRect(rect)],
       { glyphQuad: textQuadFromRect(rect), advance: 1 },
       'replace-text',
@@ -182,7 +185,7 @@ describe('Replace Text grouped persistence', () => {
     const rect = { x: 10, y: 20, width: 80, height: 15 };
 
     h.capability.createReplaceText(
-      PON,
+      PAGE,
       [textQuadFromRect(rect)],
       { glyphQuad: textQuadFromRect(rect), advance: 1 },
       'replace-text',
@@ -210,7 +213,7 @@ describe('annotation flags', () => {
    *  path (`ensurePage` is a no-op under whole-document hydration). */
   const loadPage = async (h: ReturnType<typeof harness>, dtos: AnnotationDTO[]) => {
     h.list.mockResolvedValueOnce({ annotations: dtos });
-    await h.capability.reloadPage(PON);
+    await h.capability.reloadPage(PAGE);
     await vi.waitFor(() => expect(h.state().model.order.length).toBe(dtos.length));
   };
 
@@ -264,7 +267,7 @@ describe('annotation flags', () => {
   it('the data-API create defaults /F to print when the caller omits flags', async () => {
     const h = harness();
     h.create.mockResolvedValueOnce({ created: squareDTO(24) });
-    await h.capability.create(PON, {
+    await h.capability.create(PAGE, {
       subtype: 'square',
       rect: { left: 0, bottom: 0, right: 10, top: 10 },
     } as Parameters<typeof h.capability.create>[1]);
@@ -280,7 +283,7 @@ describe('claimsTouchAt (touch consent)', () => {
       .mockResolvedValueOnce({ created: strikeoutDTO() });
     const rect = { x: 10, y: 20, width: 80, height: 15 };
     h.capability.createReplaceText(
-      PON,
+      PAGE,
       [textQuadFromRect(rect)],
       { glyphQuad: textQuadFromRect(rect), advance: 1 },
       'replace-text',
@@ -288,15 +291,15 @@ describe('claimsTouchAt (touch consent)', () => {
     await vi.waitFor(() => expect(h.create).toHaveBeenCalledTimes(2));
     expect(h.state().model.selected.length).toBe(2);
     // the strikeout's body IS under the point (the hit-test finds it)…
-    expect(h.capability.hitKind(PON, { x: 50, y: 27 })).toBe('annot');
+    expect(h.capability.hitKind(PAGE, { x: 50, y: 27 })).toBe('annot');
     // …but the claim must refuse: the selection cannot MOVE, so a drag here
     // would be a dead zone — it has to keep scrolling instead.
-    expect(h.capability.claimsTouchAt(PON, { x: 50, y: 27 })).toBe(false);
+    expect(h.capability.claimsTouchAt(PAGE, { x: 50, y: 27 })).toBe(false);
   });
 
   it('empty space never claims', () => {
     const h = harness();
-    expect(h.capability.claimsTouchAt(PON, { x: 300, y: 400 })).toBe(false);
+    expect(h.capability.claimsTouchAt(PAGE, { x: 300, y: 400 })).toBe(false);
   });
 });
 
@@ -325,7 +328,7 @@ const remoteOrigin = (serverId: number) => ({
 const createdEvent = (dto: AnnotationDTO, serverId: number): DocumentEvent =>
   ({
     type: 'annotation.created',
-    pageObjectNumber: PON,
+    page: PAGE,
     origin: remoteOrigin(serverId),
     created: dto,
   }) as unknown as DocumentEvent;
@@ -333,7 +336,7 @@ const createdEvent = (dto: AnnotationDTO, serverId: number): DocumentEvent =>
 const updatedEvent = (dto: AnnotationDTO, serverId: number, changed: boolean): DocumentEvent =>
   ({
     type: 'annotation.updated',
-    pageObjectNumber: PON,
+    page: PAGE,
     origin: remoteOrigin(serverId),
     updated: dto,
     appearance: { changed },
@@ -342,13 +345,13 @@ const updatedEvent = (dto: AnnotationDTO, serverId: number, changed: boolean): D
 const deletedEvent = (annotObjectNumber: number, serverId: number): DocumentEvent =>
   ({
     type: 'annotation.deleted',
-    pageObjectNumber: PON,
+    page: PAGE,
     origin: remoteOrigin(serverId),
     deleted: { kind: 'objectNumber', value: annotObjectNumber },
   }) as unknown as DocumentEvent;
 
 const snapshot = (dtos: AnnotationDTO[], auditHead?: number) => ({
-  pages: [{ pageState: { pageObjectNumber: PON }, annotations: dtos }],
+  pages: [{ pageState: { page: PAGE }, annotations: dtos }],
   ...(auditHead !== undefined ? { auditHead } : {}),
 });
 
@@ -416,7 +419,7 @@ describe('whole-document hydration', () => {
     h.create.mockReturnValue(new Promise(() => {}));
     const rect = { x: 10, y: 20, width: 80, height: 15 };
     h.capability.createReplaceText(
-      PON,
+      PAGE,
       [textQuadFromRect(rect)],
       { glyphQuad: textQuadFromRect(rect), advance: 1 },
       'replace-text',
@@ -451,13 +454,13 @@ describe('links lens — substrate children, no ledger', () => {
   it('links.of derives from the committed child; a remote child delete clears it (no sweep)', async () => {
     const h = harness();
     h.list.mockResolvedValueOnce({ annotations: [hydrationSquare(20), childDTO(21, 20)] });
-    await h.capability.reloadPage(PON);
+    await h.capability.reloadPage(PAGE);
     expect(h.capability.links.of(ref(20))).toEqual(TARGET);
     // The child is substrate: never painted, never hit as itself.
     // A remote session deletes the child → ordinary remove, lens re-derives.
     h.capability.deliverRemoteAnnotationEvent({
       type: 'annotation.deleted',
-      pageObjectNumber: PON,
+      page: PAGE,
       deleted: { kind: 'objectNumber', value: 21 },
       origin: { kind: 'remote', sub: 'alice' },
       ts: Date.now(),
@@ -468,7 +471,7 @@ describe('links lens — substrate children, no ledger', () => {
   it('a linked annotation selects as a SINGLE unit: no ungroup, full selection', async () => {
     const h = harness();
     h.list.mockResolvedValueOnce({ annotations: [hydrationSquare(20), childDTO(21, 20)] });
-    await h.capability.reloadPage(PON);
+    await h.capability.reloadPage(PAGE);
     h.capability.select(ref(20));
     // One selected id — the child never joins the selection…
     expect(h.capability.getSelection()).toEqual([ref(20)]);
@@ -481,7 +484,7 @@ describe('links lens — substrate children, no ledger', () => {
   it('links.set creates the grouped child and resolves when committed; clear deletes it', async () => {
     const h = harness();
     h.list.mockResolvedValueOnce({ annotations: [hydrationSquare(20)] });
-    await h.capability.reloadPage(PON);
+    await h.capability.reloadPage(PAGE);
     h.create.mockResolvedValueOnce({ created: childDTO(30, 20) });
 
     await h.capability.links.set(ref(20), TARGET);
@@ -527,8 +530,8 @@ describe('link nav items — attached vs standalone', () => {
         } as unknown as AnnotationDTO,
       ],
     });
-    await h.capability.reloadPage(PON);
-    const items = h.capability.linkItemsOn(PON);
+    await h.capability.reloadPage(PAGE);
+    const items = h.capability.linkItemsOn(PAGE);
     const byAttached = new Map(items.map((i) => [i.attached, i]));
     expect(items).toHaveLength(2);
     expect(byAttached.get(true)?.target).toEqual({ kind: 'uri', uri: 'https://example.com' });
@@ -540,8 +543,8 @@ describe('conversation plane at the capability boundary', () => {
   it('a remote review-status annotation joins the model but never paints or churns the epoch', async () => {
     const h = harness();
     h.list.mockResolvedValueOnce({ annotations: [hydrationSquare(80)] });
-    await h.capability.reloadPage(PON);
-    const epochBefore = h.capability.appearanceEpoch(PON);
+    await h.capability.reloadPage(PAGE);
+    const epochBefore = h.capability.appearanceEpoch(PAGE);
 
     const statusDto = {
       ...base(81),
@@ -561,8 +564,8 @@ describe('conversation plane at the capability boundary', () => {
     expect(h.state().model.byId['obj:81']).toBeDefined();
     // …but invisible to the page: not painted, and the raster cache key of
     // the page is untouched despite the created-event's bake-fetch default.
-    expect(h.capability.pageItems(PON).map((i) => i.id)).toEqual(['obj:80']);
-    expect(h.capability.appearanceEpoch(PON)).toBe(epochBefore);
+    expect(h.capability.pageItems(PAGE).map((i) => i.id)).toEqual(['obj:80']);
+    expect(h.capability.appearanceEpoch(PAGE)).toBe(epochBefore);
   });
 });
 
@@ -590,8 +593,8 @@ describe('the comments lens', () => {
   const page2Root = (n: number): AnnotationDTO =>
     ({
       ...hydrationSquare(n),
-      ref: { kind: 'objectNumber', pageObjectNumber: PON2, annotObjectNumber: n },
-      pageObjectNumber: PON2,
+      ref: { kind: 'objectNumber', page: PAGE2, annotObjectNumber: n },
+      page: PAGE2,
     }) as AnnotationDTO;
 
   /** Seed: two threads on page 1 (root 20 high, root 25 lower — 20's thread
@@ -612,9 +615,9 @@ describe('the comments lens', () => {
         }),
       ],
     });
-    await h.capability.reloadPage(PON);
+    await h.capability.reloadPage(PAGE);
     h.list.mockResolvedValueOnce({ annotations: [page2Root(30)] });
-    await h.capability.reloadPage(PON2);
+    await h.capability.reloadPage(PAGE2);
   };
 
   it('composes display-ordered threads and resolves any member to its thread', async () => {
@@ -729,7 +732,7 @@ describe('the comments lens', () => {
         } as unknown as AnnotationDTO,
       ],
     });
-    await h.capability.reloadPage(PON);
+    await h.capability.reloadPage(PAGE);
     const result = await h.capability.comments.removeThread(ref(20));
     expect(result.deleted).toEqual([]);
     expect(result.failed.map((f) => f.ref)).toEqual([ref(21)]);
@@ -747,7 +750,7 @@ describe('the comments lens', () => {
         textDto(21, { inReplyTo: ref(20), replyType: 'reply' }),
       ],
     });
-    await h.capability.reloadPage(PON);
+    await h.capability.reloadPage(PAGE);
     const perms = h.capability.comments.permissionsFor(ref(20));
     expect(perms.canEditText).toBe(false); // lockedContents gates text
     expect(perms.canDelete).toBe(true); // …but NOT deletion
@@ -765,7 +768,7 @@ describe('the comments lens', () => {
         } as unknown as AnnotationDTO,
       ],
     });
-    await h.capability.reloadPage(PON);
+    await h.capability.reloadPage(PAGE);
     const perms2 = h.capability.comments.permissionsFor(ref(20));
     expect(perms2.canDelete).toBe(true);
     expect(perms2.canDeleteThread).toBe(false);
@@ -789,7 +792,7 @@ describe('the comments lens', () => {
         }),
       ],
     });
-    await h.capability.reloadPage(PON);
+    await h.capability.reloadPage(PAGE);
     const perms = h.capability.comments.permissionsFor(ref(20));
     // My own root and reply delete fine one-by-one…
     expect(perms.canDelete).toBe(true);
@@ -821,16 +824,16 @@ describe('the twin law — authority fused into presentation and gestures', () =
     const h = harness();
     selfOnly(h);
     h.list.mockResolvedValueOnce({ annotations: [stamped(20, 'me'), stamped(21, 'alice')] });
-    await h.capability.reloadPage(PON);
+    await h.capability.reloadPage(PAGE);
     // Own record: full selection chrome.
     h.capability.select(ref(20));
     expect(
-      h.capability.chrome(PON, 1, 0, 1).filter((n) => n.kind === 'handle').length,
+      h.capability.chrome(PAGE, 1, 0, 1).filter((n) => n.kind === 'handle').length,
     ).toBeGreaterThan(0);
     // Alice's record under `:self`: selectable, but the SAME fused predicate
     // that answers canEdit(false) strips every handle — pixels can't lie.
     h.capability.select(ref(21));
-    expect(h.capability.chrome(PON, 1, 0, 1).filter((n) => n.kind === 'handle')).toHaveLength(0);
+    expect(h.capability.chrome(PAGE, 1, 0, 1).filter((n) => n.kind === 'handle')).toHaveLength(0);
     expect(h.capability.canEdit(ref(21))).toBe(false);
     expect(h.capability.canDelete(ref(21))).toBe(false);
     expect(h.capability.canEdit(ref(20))).toBe(true);
@@ -839,9 +842,9 @@ describe('the twin law — authority fused into presentation and gestures', () =
   it('no create authority → creation gestures are inert (no ghost, no draft, no 403)', async () => {
     const h = harness();
     h.allowsAnnotationCreate.mockReturnValue(false);
-    h.capability.createPointer('square', 'down', PON, { x: 10, y: 10 });
-    h.capability.createPointer('square', 'move', PON, { x: 80, y: 60 });
-    h.capability.createPointer('square', 'up', PON, { x: 80, y: 60 }, true);
+    h.capability.createPointer('square', 'down', PAGE, { x: 10, y: 10 });
+    h.capability.createPointer('square', 'move', PAGE, { x: 80, y: 60 });
+    h.capability.createPointer('square', 'up', PAGE, { x: 80, y: 60 }, true);
     expect(h.state().model.order).toHaveLength(0);
     expect(h.create).not.toHaveBeenCalled();
     expect(h.capability.canCreate()).toBe(false);
@@ -851,10 +854,10 @@ describe('the twin law — authority fused into presentation and gestures', () =
     const h = harness();
     h.allowsAnnotationCreate.mockReturnValue(false);
     const rect = { x: 10, y: 20, width: 80, height: 15 };
-    h.capability.createMarkup('highlight', PON, [textQuadFromRect(rect)], 'highlight');
-    h.capability.createCaret(PON, { glyphQuad: textQuadFromRect(rect), advance: 1 });
+    h.capability.createMarkup('highlight', PAGE, [textQuadFromRect(rect)], 'highlight');
+    h.capability.createCaret(PAGE, { glyphQuad: textQuadFromRect(rect), advance: 1 });
     h.capability.createReplaceText(
-      PON,
+      PAGE,
       [textQuadFromRect(rect)],
       { glyphQuad: textQuadFromRect(rect), advance: 1 },
       'replace-text',
@@ -877,7 +880,7 @@ describe('the twin law — authority fused into presentation and gestures', () =
     const h = harness();
     vi.spyOn(console, 'error').mockImplementation(() => {});
     h.list.mockResolvedValueOnce({ annotations: [stamped(20, 'me')] });
-    await h.capability.reloadPage(PON);
+    await h.capability.reloadPage(PAGE);
     h.capability.select(ref(20));
     const id = h.state().model.order[0]!;
     const before = h.state().model.byId[id]!.style.color;
@@ -903,7 +906,7 @@ describe('per-record authorization (collab-resolver mirrors)', () => {
     h.list.mockResolvedValueOnce({
       annotations: [stamped(20, 'me'), stamped(21, 'alice'), stamped(22)],
     });
-    await h.capability.reloadPage(PON);
+    await h.capability.reloadPage(PAGE);
     expect(h.capability.canEdit(ref(20))).toBe(true);
     expect(h.capability.canEdit(ref(21))).toBe(false);
     expect(h.capability.canDelete(ref(20))).toBe(true);
@@ -918,7 +921,7 @@ describe('per-record authorization (collab-resolver mirrors)', () => {
     const h = harness();
     selfOnly(h);
     h.list.mockResolvedValueOnce({ annotations: [stamped(20, 'me'), stamped(21, 'alice')] });
-    await h.capability.reloadPage(PON);
+    await h.capability.reloadPage(PAGE);
     h.capability.select(ref(20));
     h.capability.select(ref(21), { add: true });
     expect(h.capability.canGroup()).toBe(false);
@@ -926,7 +929,7 @@ describe('per-record authorization (collab-resolver mirrors)', () => {
     const h2 = harness();
     selfOnly(h2);
     h2.list.mockResolvedValueOnce({ annotations: [stamped(20, 'me'), stamped(21, 'me')] });
-    await h2.capability.reloadPage(PON);
+    await h2.capability.reloadPage(PAGE);
     h2.capability.select(ref(20));
     h2.capability.select(ref(21), { add: true });
     expect(h2.capability.canGroup()).toBe(true);
@@ -936,7 +939,7 @@ describe('per-record authorization (collab-resolver mirrors)', () => {
 describe('remote delivery — echo-driven appearance invalidation', () => {
   const seed = async (h: ReturnType<typeof harness>, dto: AnnotationDTO) => {
     h.list.mockResolvedValueOnce({ annotations: [dto] });
-    await h.capability.reloadPage(PON);
+    await h.capability.reloadPage(PAGE);
   };
 
   it('a PRESERVED remote update re-syncs the model without an appearance re-fetch', async () => {
@@ -959,7 +962,7 @@ describe('remote delivery — echo-driven appearance invalidation', () => {
     await seed(h, hydrationSquare(70));
     h.capability.deliverRemoteAnnotationEvent({
       type: 'annotation.moved',
-      pageObjectNumber: PON,
+      page: PAGE,
       origin: remoteOrigin(45),
       moved: [hydrationSquare(70)],
     } as unknown as DocumentEvent);
@@ -1000,22 +1003,22 @@ describe.each([
   it('switches an imported annotation to vector after a programmatic update', async () => {
     const h = harness();
     h.list.mockResolvedValueOnce({ annotations: [dto] });
-    await h.capability.reloadPage(PON);
-    expect(h.capability.pageItems(PON)[0].source).toBe('baked');
+    await h.capability.reloadPage(PAGE);
+    expect(h.capability.pageItems(PAGE)[0].source).toBe('baked');
 
     const updated = { ...dto, strokeWidth: 2 };
     h.update.mockResolvedValueOnce({ updated, appearance: { changed: true } });
     await h.capability.update(dto.ref, { subtype, strokeWidth: 2 });
 
     expect(h.capability.get(dto.ref)).toEqual(updated);
-    expect(h.capability.pageItems(PON)[0].source).toBe('vector');
-    expect(h.capability.appearanceEpoch(PON)).toBe('');
+    expect(h.capability.pageItems(PAGE)[0].source).toBe('vector');
+    expect(h.capability.appearanceEpoch(PAGE)).toBe('');
   });
 
   it('preserves vector rendering through consecutive local edits and engine responses', async () => {
     const h = harness();
     h.list.mockResolvedValueOnce({ annotations: [dto] });
-    await h.capability.reloadPage(PON);
+    await h.capability.reloadPage(PAGE);
     h.capability.select(dto.ref);
 
     for (const strokeWidth of [2, 3]) {
@@ -1027,15 +1030,15 @@ describe.each([
         }),
       );
       h.capability.updateSelection({ strokeWidth });
-      expect(h.capability.pageItems(PON)[0].source).toBe('vector');
-      const epoch = h.capability.appearanceEpoch(PON);
+      expect(h.capability.pageItems(PAGE)[0].source).toBe('vector');
+      const epoch = h.capability.appearanceEpoch(PAGE);
       expect(epoch).toBe('');
 
       finishWrite({ updated, appearance: { changed: true } });
       await vi.waitFor(() => expect(h.capability.get(dto.ref)).toEqual(updated));
 
-      expect(h.capability.pageItems(PON)[0].source).toBe('vector');
-      expect(h.capability.appearanceEpoch(PON)).toBe(epoch);
+      expect(h.capability.pageItems(PAGE)[0].source).toBe('vector');
+      expect(h.capability.appearanceEpoch(PAGE)).toBe(epoch);
     }
   });
 });
@@ -1047,7 +1050,7 @@ describe('distance authoring and recalibration', () => {
     const fallback = measureFromKnownLength(100, { value: 1, unit: 'm' });
     const region = measureFromKnownLength(100, { value: 10, unit: 'ft' });
     h.capability.setPageViewports(
-      PON,
+      PAGE,
       [{ owned: false, bbox: { left: 0, right: 60, bottom: 700, top: 800 }, measure: region }],
       fallback,
     );
@@ -1065,12 +1068,12 @@ describe('distance authoring and recalibration', () => {
       caption: { enabled: true },
     } as AnnotationDTO;
     h.create.mockResolvedValue({ created: dto });
-    h.capability.createPointer('distance', 'down', PON, { x: 20, y: 20 });
-    h.capability.setPageViewports(PON, [], fallback);
-    h.capability.createPointer('distance', 'move', PON, { x: 220, y: 20 });
-    h.capability.createPointer('distance', 'up', PON, { x: 220, y: 20 });
-    expect(h.capability.distanceCreationPage()).toBe(PON);
-    h.capability.createPointer('distance', 'down', PON, { x: 220, y: 8 });
+    h.capability.createPointer('distance', 'down', PAGE, { x: 20, y: 20 });
+    h.capability.setPageViewports(PAGE, [], fallback);
+    h.capability.createPointer('distance', 'move', PAGE, { x: 220, y: 20 });
+    h.capability.createPointer('distance', 'up', PAGE, { x: 220, y: 20 });
+    expect(h.capability.distanceCreationPage()).toEqual(PAGE);
+    h.capability.createPointer('distance', 'down', PAGE, { x: 220, y: 8 });
     expect(h.create).toHaveBeenCalledWith(
       expect.objectContaining({
         intent: 'LineDimension',
@@ -1081,25 +1084,25 @@ describe('distance authoring and recalibration', () => {
       }),
     );
     await vi.waitFor(() => expect(h.capability.get(ref(71))).toBeTruthy());
-    expect(h.capability.pageItems(PON)[0].source).toBe('vector');
-    expect(h.capability.appearanceEpoch(PON)).toBe('');
+    expect(h.capability.pageItems(PAGE)[0].source).toBe('vector');
+    expect(h.capability.appearanceEpoch(PAGE)).toBe('');
     expect(h.capability.comments.permissionsFor(ref(71)).canEditText).toBe(false);
     await expect(h.capability.comments.edit(ref(71), 'fake value')).rejects.toThrow('derived');
   });
   it('does not create over a winning foreign viewport or before viewport hydration', async () => {
     const h = harness();
     const { measureFromRatio } = await import('@embedpdf/engine-core/runtime');
-    h.capability.createPointer('distance', 'down', PON, { x: 20, y: 20 });
+    h.capability.createPointer('distance', 'down', PAGE, { x: 20, y: 20 });
     expect(h.state().model.draft).toBeNull();
     h.capability.setPageViewports(
-      PON,
+      PAGE,
       [
         { owned: true, bbox: CROP, measure: measureFromRatio(1, 1, 'm') },
         { owned: false, bbox: CROP, measure: { subtype: 'GEO' } },
       ],
       measureFromRatio(1, 1, 'm'),
     );
-    h.capability.createPointer('distance', 'down', PON, { x: 20, y: 20 });
+    h.capability.createPointer('distance', 'down', PAGE, { x: 20, y: 20 });
     expect(h.state().model.draft).toBeNull();
   });
   it('captures calibration with modify authority even without create authority', () => {
@@ -1107,18 +1110,18 @@ describe('distance authoring and recalibration', () => {
       captured = vi.fn();
     h.allowsAnnotationCreate.mockReturnValue(false);
     h.capability.onDraftCaptured(captured);
-    h.capability.createPointer('calibrate', 'down', PON, { x: 20, y: 20 });
-    h.capability.createPointer('calibrate', 'move', PON, { x: 120, y: 20 });
-    h.capability.createPointer('calibrate', 'up', PON, { x: 120, y: 20 });
+    h.capability.createPointer('calibrate', 'down', PAGE, { x: 20, y: 20 });
+    h.capability.createPointer('calibrate', 'move', PAGE, { x: 120, y: 20 });
+    h.capability.createPointer('calibrate', 'up', PAGE, { x: 120, y: 20 });
     expect(captured).toHaveBeenCalledWith({
       tool: 'calibrate',
-      pon: PON,
+      page: PAGE,
       from: { x: 20, y: 780 },
       to: { x: 120, y: 780 },
     });
     expect(h.create).not.toHaveBeenCalled();
     h.allows.mockReturnValue(false);
-    h.capability.createPointer('calibrate', 'down', PON, { x: 20, y: 20 });
+    h.capability.createPointer('calibrate', 'down', PAGE, { x: 20, y: 20 });
     expect(h.state().model.draft).toBeNull();
   });
   it('reports locked, foreign, unauthorized and failed annotations independently', async () => {
@@ -1149,7 +1152,7 @@ describe('distance authoring and recalibration', () => {
       if (r.kind === 'objectNumber' && r.annotObjectNumber === 84) throw new Error('write failed');
       return { updated: dtos[0], appearance: { changed: true } };
     });
-    const report = await h.capability.remeasurePage(PON, scale);
+    const report = await h.capability.remeasurePage(PAGE, scale);
     expect(report.updated).toEqual([ref(80)]);
     expect(report.skipped).toEqual([
       { ref: ref(81), reason: 'locked' },
@@ -1167,7 +1170,7 @@ describe.each(['area', 'perimeter'])('%s scale resolution', (tool) => {
     const region = measureFromKnownLength(100, { value: 10, unit: 'm' });
     const fallback = measureFromKnownLength(100, { value: 1, unit: 'm' });
     h.capability.setPageViewports(
-      PON,
+      PAGE,
       [{ owned: false, bbox: { left: 0, right: 60, bottom: 700, top: 800 }, measure: region }],
       fallback,
     );
@@ -1190,10 +1193,10 @@ describe.each(['area', 'perimeter'])('%s scale resolution', (tool) => {
         opacity: 1,
       },
     });
-    h.capability.createPointer(tool, 'down', PON, { x: 20, y: 20 });
-    h.capability.setPageViewports(PON, [], fallback);
-    h.capability.createPointer(tool, 'down', PON, { x: 220, y: 20 });
-    h.capability.createPointer(tool, 'down', PON, { x: 220, y: 120 });
+    h.capability.createPointer(tool, 'down', PAGE, { x: 20, y: 20 });
+    h.capability.setPageViewports(PAGE, [], fallback);
+    h.capability.createPointer(tool, 'down', PAGE, { x: 220, y: 20 });
+    h.capability.createPointer(tool, 'down', PAGE, { x: 220, y: 120 });
     h.capability.finishCreationDraft();
     expect(h.create).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -1204,25 +1207,25 @@ describe.each(['area', 'perimeter'])('%s scale resolution', (tool) => {
       }),
     );
     await vi.waitFor(() => expect(h.capability.get(ref(75))).toBeTruthy());
-    expect(h.capability.pageItems(PON)[0].source).toBe('vector');
-    expect(h.capability.appearanceEpoch(PON)).toBe('');
+    expect(h.capability.pageItems(PAGE)[0].source).toBe('vector');
+    expect(h.capability.appearanceEpoch(PAGE)).toBe('');
   });
 
   it('rejects unhydrated, foreign and unauthorized creation without starting a draft', async () => {
     const h = harness();
     const { measureFromRatio } = await import('@embedpdf/engine-core/runtime');
-    h.capability.createPointer(tool, 'down', PON, { x: 20, y: 20 });
+    h.capability.createPointer(tool, 'down', PAGE, { x: 20, y: 20 });
     expect(h.state().model.draft).toBeNull();
     h.capability.setPageViewports(
-      PON,
+      PAGE,
       [{ owned: false, bbox: CROP, measure: { subtype: 'GEO' } }],
       measureFromRatio(1, 1, 'm'),
     );
-    h.capability.createPointer(tool, 'down', PON, { x: 20, y: 20 });
+    h.capability.createPointer(tool, 'down', PAGE, { x: 20, y: 20 });
     expect(h.state().model.draft).toBeNull();
-    h.capability.setPageViewports(PON, [], measureFromRatio(1, 1, 'm'));
+    h.capability.setPageViewports(PAGE, [], measureFromRatio(1, 1, 'm'));
     h.allowsAnnotationCreate.mockReturnValue(false);
-    h.capability.createPointer(tool, 'down', PON, { x: 20, y: 20 });
+    h.capability.createPointer(tool, 'down', PAGE, { x: 20, y: 20 });
     expect(h.state().model.draft).toBeNull();
   });
 });

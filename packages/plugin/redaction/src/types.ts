@@ -1,5 +1,5 @@
 import { createCapabilityToken } from '@embedpdf/core';
-import type { AnnotationRef, RedactionApplyResult } from '@embedpdf/engine-core';
+import type { AnnotationRef, PageRef, RedactionApplyResult } from '@embedpdf/engine-core';
 
 /**
  * One pending redaction mark — a live projection of a `redact` annotation on
@@ -10,7 +10,7 @@ export interface RedactionPendingItem {
   /** Stable list key derived from the ref. */
   id: string;
   ref: AnnotationRef;
-  pageObjectNumber: number;
+  page: PageRef;
   /** Display index (0-based) from the page registry — for "page N" labels. */
   pageIndex: number;
   /** `area` = rect-only mark (marquee); `text` = per-line quads (selection). */

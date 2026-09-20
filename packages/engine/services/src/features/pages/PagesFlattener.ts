@@ -3,8 +3,14 @@ import type {
   PageFlattenResult,
   PageFlattenUsage,
   PageObjectNumber,
+  PageRef,
 } from '@embedpdf/engine-core/runtime';
-import { EngineError, EngineErrorCode, serializeError } from '@embedpdf/engine-core/runtime';
+import {
+  EngineError,
+  EngineErrorCode,
+  serializeError,
+  toPageRef,
+} from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule } from '@embedpdf/engine-runtime';
 
 import type { DocumentSession } from '../../document-session/DocumentSession';
@@ -22,16 +28,10 @@ export class PagesFlattener {
     private readonly session: DocumentSession,
   ) {}
 
-  flatten(
-    pageObjectNumbers: PageObjectNumber[],
-    usage: PageFlattenUsage,
-    signal: AbortSignal,
-  ): PageFlattenResult {
+  flatten(pages: PageRef[], usage: PageFlattenUsage, signal: AbortSignal): PageFlattenResult {
     throwIfAborted(signal);
+    const pageObjectNumbers = this.session.resolvePageRefs(pages);
     requireUniquePages(pageObjectNumbers);
-    for (const pageObjectNumber of pageObjectNumbers) {
-      this.session.recordByObjectNumber(pageObjectNumber);
-    }
 
     const results: PageFlattenResult['results'] = [];
     const affected = new Set<PageObjectNumber>();
@@ -39,7 +39,7 @@ export class PagesFlattener {
     for (const pageObjectNumber of pageObjectNumbers) {
       if (stop || (signal.aborted && affected.size > 0)) {
         stop = true;
-        results.push({ pageObjectNumber, status: 'skipped' });
+        results.push({ page: toPageRef(pageObjectNumber), status: 'skipped' });
         continue;
       }
       if (signal.aborted) throwIfAborted(signal);
@@ -51,7 +51,11 @@ export class PagesFlattener {
         code = this.runtime.fn.EPDFPage_Flatten(pagePtr, usage === 'print' ? 1 : 0);
       } catch (error) {
         affected.add(pageObjectNumber);
-        results.push({ pageObjectNumber, status: 'failed', error: serializeError(error) });
+        results.push({
+          page: toPageRef(pageObjectNumber),
+          status: 'failed',
+          error: serializeError(error),
+        });
         stop = true;
         continue;
       } finally {
@@ -59,14 +63,14 @@ export class PagesFlattener {
       }
 
       if (code === FLATTEN_NOTHING_TO_DO) {
-        results.push({ pageObjectNumber, status: 'unchanged' });
+        results.push({ page: toPageRef(pageObjectNumber), status: 'unchanged' });
       } else if (code === FLATTEN_SUCCESS) {
         affected.add(pageObjectNumber);
-        results.push({ pageObjectNumber, status: 'applied' });
+        results.push({ page: toPageRef(pageObjectNumber), status: 'applied' });
       } else {
         affected.add(pageObjectNumber);
         results.push({
-          pageObjectNumber,
+          page: toPageRef(pageObjectNumber),
           status: 'failed',
           error: serializeError(
             new EngineError(
@@ -81,7 +85,7 @@ export class PagesFlattener {
       }
     }
 
-    if (affected.size === 0) return { pageObjectNumbers, usage, results, meta: null };
+    if (affected.size === 0) return { pages, usage, results, meta: null };
 
     this.session.noteMutation();
     for (const pageObjectNumber of affected) {
@@ -100,7 +104,7 @@ export class PagesFlattener {
       ),
       cacheDelta: null,
     };
-    return { pageObjectNumbers, usage, results, meta };
+    return { pages, usage, results, meta };
   }
 }
 

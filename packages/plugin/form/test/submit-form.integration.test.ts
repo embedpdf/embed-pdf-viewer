@@ -70,7 +70,7 @@ async function boot() {
     const widget = fieldOf(name).widgets[0]!;
     return {
       kind: 'objectNumber',
-      pageObjectNumber: widget.pageObjectNumber,
+      page: widget.page!,
       annotObjectNumber: widget.annotObjectNumber,
     };
   };

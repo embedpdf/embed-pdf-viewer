@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { FormFieldDTO, FormSnapshot } from '@embedpdf/engine-core/runtime';
+import { toPageRef, type FormFieldDTO, type FormSnapshot } from '@embedpdf/engine-core/runtime';
 import type { PluginContext } from '@embedpdf/core';
 
 import { createFormCapability } from '../src/capability';
@@ -15,7 +15,7 @@ const field = (): FormFieldDTO => ({
   flags: { readOnly: false, required: false, noExport: false, raw: 0 },
   alternateName: null,
   mappingName: null,
-  widgets: [{ annotObjectNumber: 9, pageObjectNumber: 1 }],
+  widgets: [{ annotObjectNumber: 9, page: toPageRef(1) }],
   value: '',
   defaultValue: '',
   maxLength: null,

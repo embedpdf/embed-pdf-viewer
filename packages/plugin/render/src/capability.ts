@@ -1,6 +1,7 @@
 import {
   CONTINUOUS_RENDER_POLICY,
   PermissionDenied,
+  toPageRef,
   type EngineRenderPolicy,
   type PageObjectNumber,
   type PageRenderViewport,
@@ -77,7 +78,7 @@ export function createRenderCapability(
   };
 
   const pageOf = (pon: PageObjectNumber) =>
-    (ctx.document()?.pages ?? []).find((p) => p.pageObjectNumber === pon);
+    (ctx.document()?.pages ?? []).find((p) => p.ref.pageObjectNumber === pon);
 
   const pageWidthOf = (pon: PageObjectNumber): number => {
     const page = pageOf(pon);
@@ -134,7 +135,7 @@ export function createRenderCapability(
       advanceScheduled = false;
       const pons = [...pendingAdvance];
       pendingAdvance.clear();
-      for (const p of pons) ctx.dispatch({ type: 'PAINT_ADVANCED', pon: p });
+      for (const p of pons) ctx.dispatch({ type: 'PAINT_ADVANCED', pageObjectNumber: p });
     });
   };
 
@@ -156,7 +157,7 @@ export function createRenderCapability(
       // session's viewport would otherwise 403 once per tile, forever.
       if (!canRender()) return Promise.reject(new PermissionDenied('doc.render', 'render.tile'));
       const s = strategy();
-      const task = doc.page(pon).render.image({
+      const task = doc.page(toPageRef(pon)).render.image({
         target: { kind: 'rect', rect },
         viewport: { kind: 'scale', scale },
         includeAnnotations,
@@ -168,18 +169,17 @@ export function createRenderCapability(
       return task;
     },
     onAdvance: wake,
-    ...(resolved.debug
-      ? { debug: (msg: string) => console.debug(`[render] ${msg}`) }
-      : {}),
+    ...(resolved.debug ? { debug: (msg: string) => console.debug(`[render] ${msg}`) } : {}),
   });
 
   return {
     canRender,
-    renderPage(pon, { scale, includeAnnotations, signal }) {
+    renderPage(page, { scale, includeAnnotations, signal }) {
       const doc = ctx.doc;
       if (!doc) return Promise.reject(new Error('render: no document bound'));
       if (!canRender())
         return Promise.reject(new PermissionDenied('doc.render', 'render.renderPage'));
+      const pon = page.pageObjectNumber;
       const annotations = includeAnnotations ?? true;
       const viewport = conformViewport(pon, scale);
       const key = baseKey(pon, viewport, annotations);
@@ -187,7 +187,7 @@ export function createRenderCapability(
         key,
         (storeSignal) => {
           const s = strategy();
-          const task = doc.page(pon).render.image({
+          const task = doc.page(page).render.image({
             viewport,
             includeAnnotations: annotations,
             ...(s.format !== undefined ? { format: s.format } : {}),
@@ -203,11 +203,12 @@ export function createRenderCapability(
         signal,
       );
     },
-    renderSourceKey(pon, { scale, includeAnnotations }) {
+    renderSourceKey(page, { scale, includeAnnotations }) {
+      const pon = page.pageObjectNumber;
       const annotations = includeAnnotations ?? true;
       return baseKey(pon, conformViewport(pon, scale), annotations);
     },
-    conformViewport,
+    conformViewport: (page, scale) => conformViewport(page.pageObjectNumber, scale),
     paintSettings() {
       return {
         fadeMs: resolved.tiles.fadeMs,
@@ -221,23 +222,26 @@ export function createRenderCapability(
       let handle = viewTiles.get(view);
       if (!handle) {
         handle = {
-          plan: (pon, demand, opts) => tiles.plan(view, pon, demand, opts?.includeAnnotations ?? true),
-          painted: (pon, key) => tiles.sourcePainted(view, pon, key),
-          unpainted: (pon, key) => tiles.sourceUnpainted(view, pon, key),
-          release: (pon) => tiles.releasePage(view, pon),
+          plan: (page, demand, opts) =>
+            tiles.plan(view, page.pageObjectNumber, demand, opts?.includeAnnotations ?? true),
+          painted: (page, key) => tiles.sourcePainted(view, page.pageObjectNumber, key),
+          unpainted: (page, key) => tiles.sourceUnpainted(view, page.pageObjectNumber, key),
+          release: (page) => tiles.releasePage(view, page.pageObjectNumber),
         };
         viewTiles.set(view, handle);
       }
       return handle;
     },
-    renderEpoch(pon, includeAnnotations = true) {
+    renderEpoch(page, includeAnnotations = true) {
       // The sum of two monotonic counters is itself a valid monotonic version:
       // a content bump reaches BOTH products; an annotation bump only this one.
-      return epochOf(pon, includeAnnotations);
+      return epochOf(page.pageObjectNumber, includeAnnotations);
     },
-    invalidate({ pons, scope = 'content' } = {}) {
-      const target = pons ?? (ctx.document()?.pages ?? []).map((p) => p.pageObjectNumber);
-      if (target.length) ctx.dispatch({ type: 'INVALIDATE', scope, pons: target });
+    invalidate({ pages, scope = 'content' } = {}) {
+      const target =
+        pages?.map((p) => p.pageObjectNumber) ??
+        (ctx.document()?.pages ?? []).map((p) => p.ref.pageObjectNumber);
+      if (target.length) ctx.dispatch({ type: 'INVALIDATE', scope, pageObjectNumbers: target });
     },
   };
 }

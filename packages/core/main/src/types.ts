@@ -94,9 +94,9 @@ export interface CapabilityToken<T> {
 
 /**
  * What the kernel knows about an open document — the page registry captured at open.
- * `pages` is the engine's own snapshot (`PageLayout`: index, pageObjectNumber, size,
- * rotation, label, boxes). The `pageObjectNumber` (pon) is the durable per-page
- * identity; the array index is only display order.
+ * `pages` is the engine's own snapshot (`PageLayout`: index, ref, size,
+ * rotation, label, boxes). `ref` (the page's `PageRef`) is the durable
+ * per-page identity; the array index is only display order.
  */
 export interface DocumentMeta {
   readonly id: string;

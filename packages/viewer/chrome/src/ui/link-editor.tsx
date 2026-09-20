@@ -70,7 +70,7 @@ export function LinkEditorCard({ onClose }: { onClose: () => void }) {
     const layout = meta?.pages[Math.max(0, Number(pageNo) - 1)];
     if (!layout) return;
     anno.updateSelection({
-      link: { kind: 'goto', destination: { kind: 'fit', pageObjectNumber: layout.pageObjectNumber } },
+      link: { kind: 'goto', destination: { kind: 'fit', page: layout.ref } },
     });
     onClose();
   };

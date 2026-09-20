@@ -52,7 +52,7 @@ export class EpdfRenderLayer {
   // byte-for-byte. The policy behind it is a document fact the kernel
   // materialized before publish, so the key is always computable.
   private readonly sourceKey = injectSelector(RenderToken, (c) =>
-    c.renderSourceKey(this.page.pon, {
+    c.renderSourceKey(this.page.ref, {
       scale: this.page.transform().renderScale,
       includeAnnotations: this.annotations(),
     }),
@@ -84,7 +84,7 @@ export class EpdfRenderLayer {
             // The capability conforms this to the policy (lattice → ladder
             // width, continuous → this exact scale) and collapses same-key
             // asks in its raster store.
-            const image = await render.renderPage(this.page.pon, {
+            const image = await render.renderPage(this.page.ref, {
               scale,
               includeAnnotations,
               signal: controller.signal,

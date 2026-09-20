@@ -668,12 +668,12 @@ function FillEventBox({
 }) {
   const events = useWidgetEvents(item.key, {
     kind: 'objectNumber',
-    pageObjectNumber: page.pon,
+    page: page.ref,
     annotObjectNumber: item.annotObjectNumber,
   });
   const onActivate = useWidgetActivation(item.key, {
     kind: 'objectNumber',
-    pageObjectNumber: page.pon,
+    page: page.ref,
     annotObjectNumber: item.annotObjectNumber,
   });
   const css = fillBox(item, page);
@@ -764,7 +764,7 @@ function FillToggle({
   const form = useCapability(FormToken);
   const activate = useWidgetActivation(item.key, {
     kind: 'objectNumber',
-    pageObjectNumber: page.pon,
+    page: page.ref,
     annotObjectNumber: item.annotObjectNumber,
   });
   const css = fillBox(item, page);
@@ -883,7 +883,7 @@ function FillButton({
         onClick={() =>
           void form.activateWidget(item.key, {
             kind: 'objectNumber',
-            pageObjectNumber: page.pon,
+            page: page.ref,
             annotObjectNumber: item.annotObjectNumber,
           })
         }
@@ -954,10 +954,10 @@ export function FormLayer() {
   const active = useSelector(InteractionToken, (c) => c.activeTool().enables.has('form-fill'));
 
   useEffect(() => {
-    if (active) form.ensureGeom(page.pon);
-  }, [active, form, page.pon]);
+    if (active) form.ensureGeom(page.ref);
+  }, [active, form, page.ref]);
 
-  const items = useSelector(FormToken, (c) => c.fillItems(page.pon), shallowArray);
+  const items = useSelector(FormToken, (c) => c.fillItems(page.ref), shallowArray);
   if (!active) return null;
 
   return (

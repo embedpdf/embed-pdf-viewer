@@ -2,6 +2,7 @@ import type { DocumentEvent } from '../events/DocumentEvent';
 import type { DocumentHandle } from '../engine/DocumentHandle';
 import type { Engine } from '../engine/Engine';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
+import { toPageRef } from '../identity/PageRef';
 import { PageFlattenResultSchema } from '../wire/schemas';
 import type { ConformanceOptions, ConformanceTestRunner } from './runMetadataConformance';
 
@@ -28,16 +29,16 @@ export function runPageFlattenConformance(
       try {
         if (!doc.pages.flatten) return;
         const layoutBefore = await doc.pages.list();
-        const pageObjectNumber = layoutBefore.pages[0].pageObjectNumber;
-        const annotationsBefore = await doc.page(pageObjectNumber).annotations.list();
+        const pageObjectNumber = layoutBefore.pages[0].ref.pageObjectNumber;
+        const annotationsBefore = await doc.page(toPageRef(pageObjectNumber)).annotations.list();
         const events: DocumentEvent[] = [];
         const unsubscribe = doc.events.subscribe((event) => {
           if (event.type === 'pages.flattened') events.push(event);
         });
 
-        const result = await doc.pages.flatten([pageObjectNumber], 'display');
+        const result = await doc.pages.flatten([toPageRef(pageObjectNumber)], 'display');
         expect(PageFlattenResultSchema.safeParse(result).success).toBe(true);
-        expect(result.pageObjectNumbers).toEqual([pageObjectNumber]);
+        expect(result.pages).toEqual([toPageRef(pageObjectNumber)]);
         expect(result.usage).toBe('display');
         expect(result.results.map((item) => item.status)).toEqual(['applied']);
         expect(result.meta === null).toBe(false);
@@ -45,7 +46,7 @@ export function runPageFlattenConformance(
 
         const layoutAfter = await doc.pages.list();
         expect(layoutAfter).toEqual(layoutBefore);
-        const annotationsAfter = await doc.page(pageObjectNumber).annotations.list();
+        const annotationsAfter = await doc.page(toPageRef(pageObjectNumber)).annotations.list();
         expect(annotationsAfter.annotations.length < annotationsBefore.annotations.length).toBe(
           true,
         );
@@ -54,17 +55,17 @@ export function runPageFlattenConformance(
             annotationsBefore.pageState.revision.generation,
         ).toBe(true);
 
-        const noOp = await doc.pages.flatten([pageObjectNumber], 'display');
+        const noOp = await doc.pages.flatten([toPageRef(pageObjectNumber)], 'display');
         expect(noOp.results.map((item) => item.status)).toEqual(['unchanged']);
         expect(noOp.meta).toBeNull();
         expect(events).toHaveLength(1);
         unsubscribe();
 
-        await expect(doc.pages.flatten([pageObjectNumber, pageObjectNumber])).rejects.toMatchObject(
-          {
-            code: EngineErrorCode.InvalidArg,
-          },
-        );
+        await expect(
+          doc.pages.flatten([toPageRef(pageObjectNumber), toPageRef(pageObjectNumber)]),
+        ).rejects.toMatchObject({
+          code: EngineErrorCode.InvalidArg,
+        });
       } finally {
         await doc.close();
       }

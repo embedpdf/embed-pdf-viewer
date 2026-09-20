@@ -6,11 +6,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import { textQuadFromRect } from '@embedpdf/core-geometry';
 import type { Point, TextQuad } from '@embedpdf/core-geometry';
-import {
-  HANDLE_HEAD,
-  createSelectionHandleDrag,
-  selectionHandleGeom,
-} from './handles';
+import { toPageRef, type PageRef } from '@embedpdf/engine-core/runtime';
+import { HANDLE_HEAD, createSelectionHandleDrag, selectionHandleGeom } from './handles';
 import type { SelectionHandleEndpoint, SelectionHandleView } from './handles';
 
 const rotQuad = (q: TextQuad, deg: number, px: number, py: number): TextQuad => {
@@ -31,14 +28,14 @@ const rotQuad = (q: TextQuad, deg: number, px: number, py: number): TextQuad => 
 
 /** Identity projection with a zoom factor — page space IS overlay space × zoom. */
 const view = (zoom = 1): SelectionHandleView => ({
-  toOverlay: (_pon, pt) => ({ x: pt.x * zoom, y: pt.y * zoom }),
+  toOverlay: (_page, pt) => ({ x: pt.x * zoom, y: pt.y * zoom }),
   pageAt: () => null,
   pointOnPage: () => null,
 });
 
 const CELL = textQuadFromRect({ x: 100, y: 200, width: 60, height: 16 });
 const ep = (glyphQuad: TextQuad, advance: 1 | -1 = 1): SelectionHandleEndpoint => ({
-  pon: 7,
+  page: toPageRef(7),
   glyphQuad,
   advance,
 });
@@ -92,7 +89,7 @@ describe('selectionHandleGeom', () => {
 
 describe('createSelectionHandleDrag', () => {
   const target = () => ({
-    beginAt: vi.fn(() => true),
+    beginAt: vi.fn((_page: PageRef, _point: Point) => true),
     extendTo: vi.fn(),
     end: vi.fn(),
   });
@@ -101,23 +98,23 @@ describe('createSelectionHandleDrag', () => {
     const t = target();
     const v: SelectionHandleView = {
       ...view(),
-      pageAt: (o) => ({ pon: 9, point: { x: o.x, y: o.y } }),
+      pageAt: (o) => ({ ref: toPageRef(9), point: { x: o.x, y: o.y } }),
     };
-    const session = createSelectionHandleDrag(t, v, ep(CELL), 7);
+    const session = createSelectionHandleDrag(t, v, ep(CELL), toPageRef(7));
     session.move({ x: 300, y: 400 });
     session.move({ x: 310, y: 410 });
     expect(t.beginAt).toHaveBeenCalledTimes(1);
-    expect(t.beginAt).toHaveBeenCalledWith(7, { x: 130, y: 208 }); // the cell centre
-    expect(t.extendTo).toHaveBeenNthCalledWith(1, 9, { x: 300, y: 400 });
-    expect(t.extendTo).toHaveBeenNthCalledWith(2, 9, { x: 310, y: 410 });
+    expect(t.beginAt).toHaveBeenCalledWith(toPageRef(7), { x: 130, y: 208 }); // the cell centre
+    expect(t.extendTo).toHaveBeenNthCalledWith(1, toPageRef(9), { x: 300, y: 400 });
+    expect(t.extendTo).toHaveBeenNthCalledWith(2, toPageRef(9), { x: 310, y: 410 });
     session.end();
     expect(t.end).toHaveBeenCalledTimes(1);
   });
 
   it('the re-root anchor stays inside a ROTATED opposite glyph (cell centre, not AABB corner)', () => {
     const t = target();
-    const v: SelectionHandleView = { ...view(), pageAt: (o) => ({ pon: 9, point: o }) };
-    const session = createSelectionHandleDrag(t, v, ep(rotQuad(CELL, 45, 100, 200)), 7);
+    const v: SelectionHandleView = { ...view(), pageAt: (o) => ({ ref: toPageRef(9), point: o }) };
+    const session = createSelectionHandleDrag(t, v, ep(rotQuad(CELL, 45, 100, 200)), toPageRef(7));
     session.move({ x: 0, y: 0 });
     const [, anchor] = t.beginAt.mock.calls[0]!;
     // the centre of the rotated cell = the upright centre rotated about the pivot
@@ -133,15 +130,15 @@ describe('createSelectionHandleDrag', () => {
     const v: SelectionHandleView = {
       toOverlay: (_p, pt) => pt,
       pageAt: vi
-        .fn<(o: Point) => { pon: number; point: Point } | null>()
-        .mockReturnValueOnce({ pon: 9, point: { x: 1, y: 2 } })
+        .fn<(o: Point) => { ref: PageRef; point: Point } | null>()
+        .mockReturnValueOnce({ ref: toPageRef(9), point: { x: 1, y: 2 } })
         .mockReturnValue(null),
-      pointOnPage: (pon, o) => ({ x: o.x + pon, y: o.y }),
+      pointOnPage: (page, o) => ({ x: o.x + page.pageObjectNumber, y: o.y }),
     };
-    const session = createSelectionHandleDrag(t, v, ep(CELL), 7);
+    const session = createSelectionHandleDrag(t, v, ep(CELL), toPageRef(7));
     session.move({ x: 10, y: 10 }); // hits page 9
     session.move({ x: 20, y: 20 }); // gap → projects onto page 9's plane
-    expect(t.extendTo).toHaveBeenLastCalledWith(9, { x: 29, y: 20 });
+    expect(t.extendTo).toHaveBeenLastCalledWith(toPageRef(9), { x: 29, y: 20 });
   });
 
   it('before any page hit, the gap fallback uses the DRAGGED endpoint page', () => {
@@ -149,17 +146,21 @@ describe('createSelectionHandleDrag', () => {
     const v: SelectionHandleView = {
       toOverlay: (_p, pt) => pt,
       pageAt: () => null,
-      pointOnPage: (pon, o) => ({ x: o.x + pon, y: o.y }),
+      pointOnPage: (page, o) => ({ x: o.x + page.pageObjectNumber, y: o.y }),
     };
-    const session = createSelectionHandleDrag(t, v, ep(CELL), 7);
+    const session = createSelectionHandleDrag(t, v, ep(CELL), toPageRef(7));
     session.move({ x: 5, y: 5 });
-    expect(t.extendTo).toHaveBeenCalledWith(7, { x: 12, y: 5 });
+    expect(t.extendTo).toHaveBeenCalledWith(toPageRef(7), { x: 12, y: 5 });
   });
 
   it('a refused re-root arms nothing; end() without arming settles nothing', () => {
-    const t = { beginAt: vi.fn(() => false), extendTo: vi.fn(), end: vi.fn() };
-    const v: SelectionHandleView = { ...view(), pageAt: (o) => ({ pon: 9, point: o }) };
-    const session = createSelectionHandleDrag(t, v, ep(CELL), 7);
+    const t = {
+      beginAt: vi.fn((_page: PageRef, _point: Point) => false),
+      extendTo: vi.fn(),
+      end: vi.fn(),
+    };
+    const v: SelectionHandleView = { ...view(), pageAt: (o) => ({ ref: toPageRef(9), point: o }) };
+    const session = createSelectionHandleDrag(t, v, ep(CELL), toPageRef(7));
     session.move({ x: 10, y: 10 });
     expect(t.extendTo).not.toHaveBeenCalled();
     session.end();

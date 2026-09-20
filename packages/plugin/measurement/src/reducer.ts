@@ -10,7 +10,13 @@ export const initialMeasurementState: MeasurementState = {
 export function measurementReducer(s: MeasurementState, a: MeasurementAction): MeasurementState {
   switch (a.type) {
     case 'PAGE_SCALE':
-      return { ...s, pages: { ...s.pages, [a.pon]: { viewports: a.viewports, scale: a.scale } } };
+      return {
+        ...s,
+        pages: {
+          ...s.pages,
+          [a.page.pageObjectNumber]: { viewports: a.viewports, scale: a.scale },
+        },
+      };
     case 'PENDING':
       return { ...s, pending: Math.max(0, s.pending + a.delta) };
     case 'CALIBRATION':

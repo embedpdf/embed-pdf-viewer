@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 
 import { afterEach, beforeAll, describe, expect, test } from 'vitest';
 
+import { toPageRef } from '@embedpdf/engine-core/runtime';
 import { createLocalEngine, type LocalEngine } from '../src/index';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -103,7 +104,7 @@ describe('annotation rotation (local engine) — save + reopen', () => {
     let bytes: Uint8Array;
     {
       const doc = await engine.open({ kind: 'bytes', id: 'rot-box', bytes: annotationsPdf });
-      const created = await doc.page(PAGE).annotations.create({
+      const created = await doc.page(toPageRef(PAGE)).annotations.create({
         subtype: 'square',
         contents: 'rotation: square',
         rect: SQUARE_RECT,
@@ -121,7 +122,7 @@ describe('annotation rotation (local engine) — save + reopen', () => {
     }
 
     const doc = await engine.open({ kind: 'bytes', id: 'rot-box-reopened', bytes });
-    const list = await doc.page(PAGE).annotations.list();
+    const list = await doc.page(toPageRef(PAGE)).annotations.list();
     const square = list.annotations.find(
       (a) => a.subtype === 'square' && a.contents === 'rotation: square',
     );
@@ -152,7 +153,7 @@ describe('annotation rotation (local engine) — save + reopen', () => {
         baseBytes: annotationsPdf,
         layer: { kind: 'fresh' },
       });
-      const page = doc.page(PAGE);
+      const page = doc.page(toPageRef(PAGE));
       const created = await page.annotations.create({
         subtype: 'circle',
         contents: 'rotation: preserved move',
@@ -185,7 +186,7 @@ describe('annotation rotation (local engine) — save + reopen', () => {
       baseBytes: annotationsPdf,
       layer: { kind: 'artifact', bytes: artifact },
     });
-    const rendered = await doc.page(PAGE).annotations.renderAppearances();
+    const rendered = await doc.page(toPageRef(PAGE)).annotations.renderAppearances();
     const appearance = rendered.appearances.find(
       (candidate) => JSON.stringify(candidate.ref) === JSON.stringify(ref),
     );
@@ -203,7 +204,7 @@ describe('annotation rotation (local engine) — save + reopen', () => {
     let bytes: Uint8Array;
     {
       const doc = await engine.open({ kind: 'bytes', id: 'rot-reset', bytes: annotationsPdf });
-      const created = await doc.page(PAGE).annotations.create({
+      const created = await doc.page(toPageRef(PAGE)).annotations.create({
         subtype: 'square',
         contents: 'rotation: reset',
         rect: SQUARE_RECT,
@@ -217,7 +218,7 @@ describe('annotation rotation (local engine) — save + reopen', () => {
       });
       // Reset: state the clear explicitly (tri-state — omission would
       // PRESERVE the rotation; `null` removes the EMBD keys).
-      await doc.page(PAGE).annotations.update(created.created.ref, {
+      await doc.page(toPageRef(PAGE)).annotations.update(created.created.ref, {
         subtype: 'square',
         rect: SQUARE_RECT,
         rotation: null,
@@ -228,7 +229,7 @@ describe('annotation rotation (local engine) — save + reopen', () => {
     }
 
     const doc = await engine.open({ kind: 'bytes', id: 'rot-reset-reopened', bytes });
-    const list = await doc.page(PAGE).annotations.list();
+    const list = await doc.page(toPageRef(PAGE)).annotations.list();
     const square = list.annotations.find(
       (a) => a.subtype === 'square' && a.contents === 'rotation: reset',
     );
@@ -246,7 +247,7 @@ describe('annotation rotation (local engine) — save + reopen', () => {
     let bytes: Uint8Array;
     {
       const doc = await engine.open({ kind: 'bytes', id: 'rot-vertex', bytes: annotationsPdf });
-      const page = doc.page(PAGE);
+      const page = doc.page(toPageRef(PAGE));
 
       await page.annotations.create({
         subtype: 'polyline',
@@ -293,7 +294,7 @@ describe('annotation rotation (local engine) — save + reopen', () => {
     }
 
     const doc = await engine.open({ kind: 'bytes', id: 'rot-vertex-reopened', bytes });
-    const list = await doc.page(PAGE).annotations.list();
+    const list = await doc.page(toPageRef(PAGE)).annotations.list();
 
     const polyline = list.annotations.find(
       (a) => a.subtype === 'polyline' && a.contents === 'rotation: polyline',
@@ -324,7 +325,7 @@ describe('annotation rotation (local engine) — save + reopen', () => {
     // rotation is baked into the vertices (advisory /Rotation only), so the
     // entry's rect is the annotation's own /Rect — never remapped to an
     // unrotated box — and the raster contains the drawn strokes.
-    const rendered = await doc.page(PAGE).annotations.renderAppearances();
+    const rendered = await doc.page(toPageRef(PAGE)).annotations.renderAppearances();
     for (const dto of [polyline!, line!, ink!]) {
       const ap = rendered.appearances.find(
         (a) =>
@@ -356,7 +357,7 @@ describe('annotation rotation (local engine) — save + reopen', () => {
     let bytes: Uint8Array;
     {
       const doc = await engine.open({ kind: 'bytes', id: 'rot-caret', bytes: annotationsPdf });
-      const created = await doc.page(PAGE).annotations.create({
+      const created = await doc.page(toPageRef(PAGE)).annotations.create({
         subtype: 'caret',
         contents: 'rotation: caret',
         rect: ROTATED_AABB,
@@ -371,7 +372,7 @@ describe('annotation rotation (local engine) — save + reopen', () => {
     }
 
     const doc = await engine.open({ kind: 'bytes', id: 'rot-caret-reopened', bytes });
-    const list = await doc.page(PAGE).annotations.list();
+    const list = await doc.page(toPageRef(PAGE)).annotations.list();
     const caret = list.annotations.find(
       (a) => a.subtype === 'caret' && a.contents === 'rotation: caret',
     );
@@ -389,7 +390,7 @@ describe('annotation rotation (local engine) — save + reopen', () => {
       // /Rect. (Before caret joined BOX_FAMILY_SUBTYPES this returned the
       // rotated AABB and the consumer's re-applied `rotation` doubled the
       // tilt on reload.)
-      const rendered = await doc.page(PAGE).annotations.renderAppearances();
+      const rendered = await doc.page(toPageRef(PAGE)).annotations.renderAppearances();
       const ap = rendered.appearances.find(
         (a) =>
           a.ref.kind === 'objectNumber' &&

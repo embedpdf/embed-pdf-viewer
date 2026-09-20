@@ -199,9 +199,11 @@ function utf8Length(value: string): number {
 }
 
 function pageNumberFor(meta: DocumentMeta | null, field: FormFieldDTO): number {
-  const pon = field.widgets.find((widget) => widget.pageObjectNumber > 0)?.pageObjectNumber;
-  if (!meta || pon === undefined) return 0;
-  const index = meta.pages.findIndex((page) => page.pageObjectNumber === pon);
+  const placed = field.widgets.find((widget) => widget.page !== null)?.page;
+  if (!meta || !placed) return 0;
+  const index = meta.pages.findIndex(
+    (page) => page.ref.pageObjectNumber === placed.pageObjectNumber,
+  );
   return Math.max(0, index);
 }
 

@@ -28,14 +28,14 @@ const RADIO: FormFieldDTO = {
   widgets: [
     {
       annotObjectNumber: 8,
-      pageObjectNumber: 3,
+      page: { kind: 'objectNumber', pageObjectNumber: 3 },
       onState: 'male',
       exportValue: 'male',
       checked: true,
     },
     {
       annotObjectNumber: 9,
-      pageObjectNumber: 3,
+      page: { kind: 'objectNumber', pageObjectNumber: 3 },
       onState: 'female',
       exportValue: 'female',
       checked: false,
@@ -58,7 +58,7 @@ const LISTBOX: FormFieldDTO = {
     { label: 'Banana', value: 'Banana', selected: false },
     { label: 'Cherry', value: 'Cherry', selected: true },
   ],
-  widgets: [{ annotObjectNumber: 9, pageObjectNumber: 3 }],
+  widgets: [{ annotObjectNumber: 9, page: { kind: 'objectNumber', pageObjectNumber: 3 } }],
 };
 
 describe('form schemas', () => {

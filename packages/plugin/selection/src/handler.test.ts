@@ -10,6 +10,7 @@ import type {
   PlatformFeedback,
   PointerSample,
 } from '@embedpdf/plugin-interaction';
+import { toPageRef } from '@embedpdf/engine-core/runtime';
 import { createTextSelectHandler } from './handler';
 import type { SelectionHostCapability } from './types';
 
@@ -47,7 +48,7 @@ const makeFeedback = () => {
 const down = (over: Partial<PointerSample> = {}): PointerSample => ({
   phase: 'down',
   viewport: { x: 10, y: 10 },
-  page: { pon: 1, point: { x: 100, y: 200 } },
+  page: { ref: toPageRef(1), point: { x: 100, y: 200 } },
   modifiers: { shift: false, alt: false, ctrl: false, meta: false },
   ...over,
 });

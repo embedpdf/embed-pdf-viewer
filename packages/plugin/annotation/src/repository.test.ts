@@ -25,6 +25,7 @@ import {
   toPatch,
   toScopedPatch,
 } from './repository';
+import { toPageRef } from '@embedpdf/engine-core/runtime';
 
 const CROP: PdfRect = { left: 0, bottom: 0, right: 600, top: 800 };
 
@@ -46,10 +47,10 @@ function squareDTO(
   annotObjectNumber: number,
   rel?: { inReplyTo: AnnotationRef | null; replyType: 'reply' | 'group' | null },
 ): AnnotationDTO {
-  const ref: AnnotationRef = { kind: 'objectNumber', pageObjectNumber: 1, annotObjectNumber };
+  const ref: AnnotationRef = { kind: 'objectNumber', page: toPageRef(1), annotObjectNumber };
   return {
     ref,
-    pageObjectNumber: 1,
+    page: toPageRef(1),
     index: 0,
     identityQuality: 'durable',
     nm: null,
@@ -81,7 +82,7 @@ describe('repository.fromDTO — group/relationship mapping', () => {
   it('maps a `/RT /Group` subordinate to both irt and group (the primary key)', () => {
     const primary: AnnotationRef = {
       kind: 'objectNumber',
-      pageObjectNumber: 1,
+      page: toPageRef(1),
       annotObjectNumber: 10,
     };
     const sub = fromDTO(squareDTO(11, { inReplyTo: primary, replyType: 'group' }), CROP);
@@ -92,7 +93,7 @@ describe('repository.fromDTO — group/relationship mapping', () => {
   it('maps a `/RT /R` comment reply to irt only, NOT group (not a visual group)', () => {
     const parent: AnnotationRef = {
       kind: 'objectNumber',
-      pageObjectNumber: 1,
+      page: toPageRef(1),
       annotObjectNumber: 10,
     };
     const reply = fromDTO(squareDTO(12, { inReplyTo: parent, replyType: 'reply' }), CROP);
@@ -103,8 +104,8 @@ describe('repository.fromDTO — group/relationship mapping', () => {
 
 describe('repository — Ink Highlight intent and blend', () => {
   const dto = (): AnnotationDTO => ({
-    ref: { kind: 'objectNumber', pageObjectNumber: 1, annotObjectNumber: 20 },
-    pageObjectNumber: 1,
+    ref: { kind: 'objectNumber', page: toPageRef(1), annotObjectNumber: 20 },
+    page: toPageRef(1),
     index: 0,
     identityQuality: 'durable',
     nm: null,
@@ -163,7 +164,7 @@ describe('repository — Replace Text authoring', () => {
     const caret: Annot = {
       id: 'tmp:1',
       ref: null,
-      pon: 1,
+      page: toPageRef(1),
       subtype: 'caret',
       intent: 'replace',
       geom: { t: 'caret', rect: { x: 90, y: 40, width: 10, height: 10 } },
@@ -174,7 +175,7 @@ describe('repository — Replace Text authoring', () => {
     const strikeout: Annot = {
       id: 'tmp:2',
       ref: null,
-      pon: 1,
+      page: toPageRef(1),
       subtype: 'strikeout',
       intent: 'strikeout-text-edit',
       geom: {
@@ -205,7 +206,7 @@ describe('repository — Replace Text authoring', () => {
     const caret: Annot = {
       id: 'tmp:3',
       ref: null,
-      pon: 1,
+      page: toPageRef(1),
       subtype: 'caret',
       geom: { t: 'caret', rect: { x: 94, y: 53, width: 6, height: 6 }, rot: 270 },
       style,
@@ -247,10 +248,10 @@ const CL: CalloutLine = [
 ];
 
 function calloutDTO(annotObjectNumber = 20): AnnotationDTO {
-  const ref: AnnotationRef = { kind: 'objectNumber', pageObjectNumber: 1, annotObjectNumber };
+  const ref: AnnotationRef = { kind: 'objectNumber', page: toPageRef(1), annotObjectNumber };
   return {
     ref,
-    pageObjectNumber: 1,
+    page: toPageRef(1),
     index: 0,
     identityQuality: 'durable',
     nm: null,
@@ -314,10 +315,10 @@ function rotatedSquareDTO(rotationPdf: number, annotObjectNumber = 30): Annotati
 }
 
 function rotatedPolylineDTO(rotationPdf: number, annotObjectNumber = 31): AnnotationDTO {
-  const ref: AnnotationRef = { kind: 'objectNumber', pageObjectNumber: 1, annotObjectNumber };
+  const ref: AnnotationRef = { kind: 'objectNumber', page: toPageRef(1), annotObjectNumber };
   return {
     ref,
-    pageObjectNumber: 1,
+    page: toPageRef(1),
     index: 0,
     identityQuality: 'durable',
     nm: null,
@@ -534,10 +535,10 @@ describe('repository — free-text style + font round-trip', () => {
  * the engine round-trip snapped the border back to solid.
  */
 function polygonDTO(cloudyIntensity: number | undefined, annotObjectNumber = 40): AnnotationDTO {
-  const ref: AnnotationRef = { kind: 'objectNumber', pageObjectNumber: 1, annotObjectNumber };
+  const ref: AnnotationRef = { kind: 'objectNumber', page: toPageRef(1), annotObjectNumber };
   return {
     ref,
-    pageObjectNumber: 1,
+    page: toPageRef(1),
     index: 0,
     identityQuality: 'durable',
     nm: null,
@@ -700,8 +701,8 @@ describe('repository — toScopedPatch (sparse emission)', () => {
 describe('repository — /Rect derives from line endings (the clipped-arrowhead class)', () => {
   const lineDTO = (lineEndings: { start: string; end: string }): AnnotationDTO =>
     ({
-      ref: { kind: 'objectNumber', pageObjectNumber: 1, annotObjectNumber: 77 },
-      pageObjectNumber: 1,
+      ref: { kind: 'objectNumber', page: toPageRef(1), annotObjectNumber: 77 },
+      page: toPageRef(1),
       index: 0,
       identityQuality: 'durable',
       nm: null,
@@ -826,7 +827,7 @@ describe('repository — attached links (fold + desired state + link kind mappin
   const URI = { kind: 'uri', uri: 'https://www.embedpdf.com/' } as const;
   const parentRef: AnnotationRef = {
     kind: 'objectNumber',
-    pageObjectNumber: 1,
+    page: toPageRef(1),
     annotObjectNumber: 10,
   };
 
@@ -858,7 +859,7 @@ describe('repository — attached links (fold + desired state + link kind mappin
   it('an orphan grouped link derives nothing for strangers and keeps its own target', () => {
     const orphan = fromDTO(
       linkDTO(12, URI, {
-        inReplyTo: { kind: 'objectNumber', pageObjectNumber: 1, annotObjectNumber: 99 },
+        inReplyTo: { kind: 'objectNumber', page: toPageRef(1), annotObjectNumber: 99 },
         replyType: 'group',
       }),
       CROP,

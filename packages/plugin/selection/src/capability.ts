@@ -8,6 +8,7 @@ import {
   textGlyphAt,
   textGlyphQuad,
   textSegmentsForRange,
+  toPageRef,
   type PageGeometrySnapshot,
   type PageTextSnapshot,
 } from '@embedpdf/engine-core/runtime';
@@ -29,7 +30,6 @@ import type {
   SelectionRangeInput,
   SelectionSnapshot,
   SelectionState,
-  TextRange,
 } from './types';
 
 const EMPTY_SEGMENTS: SelectionSegment[] = [];
@@ -91,11 +91,11 @@ export function createSelectionCapability(
   const canCopy = (): boolean => ctx.doc?.security.allows('doc.text.copy') ?? false;
 
   const layoutOf = (pon: PageObjectNumber) =>
-    ctx.document()?.pages.find((p) => p.pageObjectNumber === pon);
+    ctx.document()?.pages.find((p) => p.ref.pageObjectNumber === pon);
   const pageIndexOf = (pon: PageObjectNumber): number =>
-    ctx.document()?.pages.findIndex((p) => p.pageObjectNumber === pon) ?? -1;
+    ctx.document()?.pages.findIndex((p) => p.ref.pageObjectNumber === pon) ?? -1;
   const ponAtIndex = (i: number): PageObjectNumber | undefined =>
-    ctx.document()?.pages[i]?.pageObjectNumber;
+    ctx.document()?.pages[i]?.ref.pageObjectNumber;
 
   /**
    * The content-space geometry for a page, derived on demand from the raw
@@ -125,8 +125,8 @@ export function createSelectionCapability(
     end: GlyphPointer;
     direction: 'forward' | 'backward';
   } {
-    const ai = pageIndexOf(sel.anchor.pon);
-    const fi = pageIndexOf(sel.focus.pon);
+    const ai = pageIndexOf(sel.anchor.page.pageObjectNumber);
+    const fi = pageIndexOf(sel.focus.page.pageObjectNumber);
     const anchorFirst = ai < fi || (ai === fi && sel.anchor.glyph <= sel.focus.glyph);
     return anchorFirst
       ? { start: sel.anchor, end: sel.focus, direction: 'forward' }
@@ -134,25 +134,30 @@ export function createSelectionCapability(
   }
 
   function endpointFor(ptr: GlyphPointer, which: 'start' | 'end'): SelectionEndpoint | null {
-    const segments = ctx.getState().segments[ptr.pon] ?? EMPTY_SEGMENTS;
+    const segments = ctx.getState().segments[ptr.page.pageObjectNumber] ?? EMPTY_SEGMENTS;
     if (!segments.length) return null;
     const segment = which === 'start' ? segments[0] : segments[segments.length - 1];
 
     // Anchor the endpoint to the boundary GLYPH's own oriented cell so caret
     // placement lands on the exact character edge; fall back to the segment
     // when the glyph is degenerate (e.g. a generated space).
-    const geom = geometryFor(ptr.pon);
+    const geom = geometryFor(ptr.page.pageObjectNumber);
     const cell = geom ? textGlyphQuad(geom.layout, ptr.glyph) : null;
     if (geom && cell) {
       const glyphQuad = toContentTextQuad(geom, cell);
       return {
-        pon: ptr.pon,
+        page: ptr.page,
         glyphQuad,
         advance: segment.advance,
         rect: textQuadBounds(glyphQuad),
       };
     }
-    return { pon: ptr.pon, glyphQuad: segment.quad, advance: segment.advance, rect: segment.rect };
+    return {
+      page: ptr.page,
+      glyphQuad: segment.quad,
+      advance: segment.advance,
+      rect: segment.rect,
+    };
   }
 
   /** Union box of a page's segments, or null when none have materialized. */
@@ -179,13 +184,13 @@ export function createSelectionCapability(
     // Prefer the gesture's end page; while its geometry is still loading,
     // fall back to the LAST page (document order) with materialized segments
     // so the anchor never teleports backwards mid-drag.
-    let bounds = pageBounds(end.pon);
-    if (bounds) return { pon: end.pon, bounds };
+    let bounds = pageBounds(end.page.pageObjectNumber);
+    if (bounds) return { page: end.page, bounds };
     const pages = ctx.document()?.pages ?? [];
     for (let i = pages.length - 1; i >= 0; i--) {
-      const pon = pages[i].pageObjectNumber;
+      const pon = pages[i].ref.pageObjectNumber;
       bounds = pageBounds(pon);
-      if (bounds) return { pon, bounds };
+      if (bounds) return { page: toPageRef(pon), bounds };
     }
     return null;
   }
@@ -195,7 +200,7 @@ export function createSelectionCapability(
     const pages = Object.keys(segments)
       .map(Number)
       .filter((pon) => (segments[pon]?.length ?? 0) > 0)
-      .map((pon) => ({ pon: pon as PageObjectNumber, segments: segments[pon] }));
+      .map((pon) => ({ page: toPageRef(pon), segments: segments[pon] }));
     if (!selection) return { pages, start: null, end: null, direction: 'forward', range: null };
     const { start, end, direction } = orderedEnds(selection);
     return {
@@ -204,13 +209,15 @@ export function createSelectionCapability(
       end: endpointFor(end, 'end'),
       direction,
       range: {
-        start: { pon: start.pon, index: start.glyph },
-        end: { pon: end.pon, index: end.glyph + 1 },
+        start: { page: start.page, index: start.glyph },
+        end: { page: end.page, index: end.glyph + 1 },
       },
     };
   }
 
-  function ensurePage(pon: PageObjectNumber): void {
+  /** Warm a page's raw geometry by object number — the internal form of the
+   *  host's `ensurePage` (addresses convert once, at the capability boundary). */
+  function warmPage(pon: PageObjectNumber): void {
     if (rawGeometry.has(pon) || pending.has(pon)) return;
     // Authorized-only warming: without doc.text.select the read is
     // guaranteed to be rejected — don't issue it. The engine guard stays
@@ -221,14 +228,14 @@ export function createSelectionCapability(
     pending.add(pon);
     const at = epoch;
     doc
-      .page(pon)
+      .page(toPageRef(pon))
       .geometry.read()
       .then(
         (snapshot) => {
           pending.delete(pon);
           if (at !== epoch) return; // content changed while in flight — stale
           rawGeometry.set(pon, snapshot);
-          ctx.dispatch({ type: 'PAGE_LOADED', pon });
+          ctx.dispatch({ type: 'PAGE_LOADED', page: toPageRef(pon) });
           if (ctx.getState().selection) recompute(); // a mid-span page arrived → fill its segments
         },
         () => {
@@ -240,11 +247,11 @@ export function createSelectionCapability(
   /** Clamp a pointer into its page's real character range once geometry is
    *  known — how `selectAll`'s open-ended focus settles. */
   function clampPointer(ptr: GlyphPointer): GlyphPointer {
-    const geom = geometryFor(ptr.pon);
+    const geom = geometryFor(ptr.page.pageObjectNumber);
     if (!geom) return ptr;
     const max = Math.max(geom.layout.glyphs.length - 1, 0);
     const glyph = Math.max(0, Math.min(ptr.glyph, max));
-    return glyph === ptr.glyph ? ptr : { pon: ptr.pon, glyph };
+    return glyph === ptr.glyph ? ptr : { page: ptr.page, glyph };
   }
 
   // Rebuild merged line segments for every loaded page in the span; warm the
@@ -257,8 +264,8 @@ export function createSelectionCapability(
       focus: clampPointer(sel.focus),
     };
     const { start, end } = orderedEnds(clamped);
-    const si = pageIndexOf(start.pon);
-    const ei = pageIndexOf(end.pon);
+    const si = pageIndexOf(start.page.pageObjectNumber);
+    const ei = pageIndexOf(end.page.pageObjectNumber);
     if (si < 0 || ei < 0) {
       clearSelection();
       return;
@@ -269,7 +276,7 @@ export function createSelectionCapability(
       if (pon == null) continue;
       const geom = geometryFor(pon);
       if (!geom) {
-        ensurePage(pon); // not loaded yet — it'll recompute when ready
+        warmPage(pon); // not loaded yet — it'll recompute when ready
         continue;
       }
       const from = i === si ? start.glyph : 0;
@@ -311,7 +318,8 @@ export function createSelectionCapability(
         ? expandTextRangeToWord(geom.layout, i)
         : expandTextRangeToLine(geom.layout, i);
     setSelecting(true);
-    recompute({ anchor: { pon, glyph: from }, focus: { pon, glyph: to } });
+    const page = toPageRef(pon);
+    recompute({ anchor: { page, glyph: from }, focus: { page, glyph: to } });
     return true;
   }
 
@@ -322,18 +330,22 @@ export function createSelectionCapability(
   /** The public programmatic entry: a half-open character range in. */
   function select(input: SelectionRangeInput): void {
     assertCanSelect('selection.select');
-    const range: TextRange =
-      'pon' in input
+    // The public page addresses convert to object numbers once, here.
+    const range =
+      'page' in input
         ? {
-            start: { pon: input.pon, index: input.start },
-            end: { pon: input.pon, index: input.start + input.count },
+            start: { page: input.page, index: input.start },
+            end: { page: input.page, index: input.start + input.count },
           }
-        : input;
-    const si = pageIndexOf(range.start.pon);
-    let ei = pageIndexOf(range.end.pon);
+        : {
+            start: { page: input.start.page, index: input.start.index },
+            end: { page: input.end.page, index: input.end.index },
+          };
+    const si = pageIndexOf(range.start.page.pageObjectNumber);
+    let ei = pageIndexOf(range.end.page.pageObjectNumber);
     if (si < 0 || ei < 0) {
       throw new Error(
-        `select: unknown page object ${si < 0 ? range.start.pon : range.end.pon}`,
+        `select: unknown page object ${si < 0 ? range.start.page.pageObjectNumber : range.end.page.pageObjectNumber}`,
       );
     }
     let endIndex = range.end.index;
@@ -356,8 +368,8 @@ export function createSelectionCapability(
     if (focusPon == null) throw new Error(`select: unknown page at index ${ei}`);
     setSelecting(false); // programmatic selections are born settled
     recompute({
-      anchor: { pon: range.start.pon, glyph: Math.max(0, range.start.index) },
-      focus: { pon: focusPon, glyph: endIndex - 1 },
+      anchor: { page: range.start.page, glyph: Math.max(0, range.start.index) },
+      focus: { page: toPageRef(focusPon), glyph: endIndex - 1 },
     });
   }
 
@@ -367,9 +379,9 @@ export function createSelectionCapability(
     if (pages.length === 0) return;
     setSelecting(false); // programmatic selections are born settled
     recompute({
-      anchor: { pon: pages[0].pageObjectNumber, glyph: 0 },
+      anchor: { page: pages[0].ref, glyph: 0 },
       focus: {
-        pon: pages[pages.length - 1].pageObjectNumber,
+        page: pages[pages.length - 1].ref,
         glyph: Number.MAX_SAFE_INTEGER, // settles to the real last character on load
       },
     });
@@ -383,7 +395,7 @@ export function createSelectionCapability(
     if (!p) {
       const doc = ctx.doc;
       if (!doc) return Promise.reject(new Error('readText: document is not open'));
-      p = Promise.resolve(doc.page(pon).text.read());
+      p = Promise.resolve(doc.page(toPageRef(pon)).text.read());
       p.catch(() => textSnapshots.delete(pon));
       textSnapshots.set(pon, p);
     }
@@ -395,8 +407,8 @@ export function createSelectionCapability(
     if (!sel) return '';
     if (!canCopy()) throw new PermissionDenied('doc.text.copy', 'selection.readText');
     const { start, end } = orderedEnds(sel);
-    const si = pageIndexOf(start.pon);
-    const ei = pageIndexOf(end.pon);
+    const si = pageIndexOf(start.page.pageObjectNumber);
+    const ei = pageIndexOf(end.page.pageObjectNumber);
     if (si < 0 || ei < 0) return '';
     // Per-page half-open character spans. Geometry is NOT needed here —
     // boundary offsets come from the range, interior pages span their whole
@@ -428,7 +440,7 @@ export function createSelectionCapability(
    *  clears via recompute's registry check. Raw snapshots are NEVER
    *  refetched here — they are rotation-independent. */
   function onPagesUpdated(): void {
-    const alive = new Set((ctx.document()?.pages ?? []).map((p) => p.pageObjectNumber));
+    const alive = new Set((ctx.document()?.pages ?? []).map((p) => p.ref.pageObjectNumber));
     for (const pon of [...rawGeometry.keys()]) {
       if (!alive.has(pon)) {
         rawGeometry.delete(pon);
@@ -482,11 +494,12 @@ export function createSelectionCapability(
       const { segments } = ctx.getState();
       return Object.keys(segments)
         .map(Number)
-        .filter((pon) => (segments[pon]?.length ?? 0) > 0) as PageObjectNumber[];
+        .filter((pon) => (segments[pon]?.length ?? 0) > 0)
+        .map((pon) => toPageRef(pon));
     },
-    segmentsForPage: (pon) => ctx.getState().segments[pon] ?? EMPTY_SEGMENTS,
-    rectsForPage: (pon) =>
-      (ctx.getState().segments[pon] ?? EMPTY_SEGMENTS).map((s) => s.rect),
+    segmentsForPage: (page) => ctx.getState().segments[page.pageObjectNumber] ?? EMPTY_SEGMENTS,
+    rectsForPage: (page) =>
+      (ctx.getState().segments[page.pageObjectNumber] ?? EMPTY_SEGMENTS).map((s) => s.rect),
     readText,
     onChange: (cb) => {
       changeCbs.add(cb);
@@ -498,34 +511,36 @@ export function createSelectionCapability(
     },
 
     // ── host lens ──
-    ensurePage,
-    isLoaded: (pon) => !!ctx.getState().loaded[pon],
-    isOverText: (pon, point: Point) => {
-      const geom = geometryFor(pon);
+    ensurePage: (page) => warmPage(page.pageObjectNumber),
+    isLoaded: (page) => !!ctx.getState().loaded[page.pageObjectNumber],
+    isOverText: (page, point: Point) => {
+      const geom = geometryFor(page.pageObjectNumber);
       return geom ? glyphAt(geom, point) != null : false;
     },
-    beginAt: (pon, point: Point) => {
+    beginAt: (page, point: Point) => {
+      const pon = page.pageObjectNumber;
       const geom = geometryFor(pon);
       if (!geom) return false;
       const i = glyphAt(geom, point);
       if (i == null) return false; // not near text — caller deselects, doesn't capture
       setSelecting(true); // the gesture opened
-      recompute({ anchor: { pon, glyph: i }, focus: { pon, glyph: i } });
+      recompute({ anchor: { page, glyph: i }, focus: { page, glyph: i } });
       return true;
     },
-    selectWordAt: (pon, point: Point) => selectSpanAt(pon, point, 'word'),
-    selectLineAt: (pon, point: Point) => selectSpanAt(pon, point, 'line'),
-    extendTo: (pon, point: Point) => {
+    selectWordAt: (page, point: Point) => selectSpanAt(page.pageObjectNumber, point, 'word'),
+    selectLineAt: (page, point: Point) => selectSpanAt(page.pageObjectNumber, point, 'line'),
+    extendTo: (page, point: Point) => {
+      const pon = page.pageObjectNumber;
       const cur = ctx.getState().selection;
       if (!cur) return;
       const geom = geometryFor(pon);
       if (!geom) {
-        ensurePage(pon); // dragged onto a not-yet-loaded page — warm it, recompute on load
+        warmPage(pon); // dragged onto a not-yet-loaded page — warm it, recompute on load
         return;
       }
       const i = glyphAt(geom, point);
       if (i == null) return; // off-text — keep the last focus
-      recompute({ anchor: cur.anchor, focus: { pon, glyph: i } });
+      recompute({ anchor: cur.anchor, focus: { page, glyph: i } });
     },
     end: () => {
       // The gesture ended (pointer-up): settle FIRST, so commit listeners

@@ -14,6 +14,7 @@ import type {
   FormEffect,
   FormEffectsResult,
   FormSnapshot,
+  PageRef,
   PdfActionTargetRef,
   WidgetAppearance,
 } from '@embedpdf/engine-core/runtime';
@@ -75,7 +76,7 @@ export type FormUiEffect = ScriptUiEffect & {
 /** Input for {@link FormCapability.placeField}. */
 export interface PlaceFieldInput {
   family: AuthorableFormFamily;
-  pageObjectNumber: number;
+  page: PageRef;
   /** Content-space LOGICAL field box (no visual padding semantics). */
   box: Box;
   /** Widget styling in the engine vocabulary (`WidgetAppearance`). Convert a
@@ -106,7 +107,7 @@ export interface FormCapability {
   refresh(): Promise<void>;
 
   /** Fill controls for one page — content-space, framework-agnostic. */
-  fillItems(pageObjectNumber: number): FillItem[];
+  fillItems(page: PageRef): FillItem[];
   /**
    * The fill control for ONE widget, by annotation object number — the join
    * the annotation-plane render layer uses (its RenderItem carries the live
@@ -115,7 +116,7 @@ export interface FormCapability {
    */
   fillItem(annotObjectNumber: number): FillItem | null;
   /** Make sure a page's widget geometry is loaded (idempotent, lazy). */
-  ensureGeom(pageObjectNumber: number): void;
+  ensureGeom(page: PageRef): void;
 
   field(key: FieldKey): FormFieldDTO | null;
   fieldForWidget(annotObjectNumber: number): FormFieldDTO | null;
@@ -127,7 +128,7 @@ export interface FormCapability {
    * the annotation plane's live boxes do, so the first click on a page
    * already resolves. The smallest containing widget wins.
    */
-  widgetAt(pageObjectNumber: number, point: { x: number; y: number }): WidgetHit | null;
+  widgetAt(page: PageRef, point: { x: number; y: number }): WidgetHit | null;
 
   /** Commit a text value (call on blur/Enter — keystrokes stay local). */
   setText(key: FieldKey, value: string): Promise<void>;
@@ -173,7 +174,7 @@ export interface FormCapability {
    */
   placeField(input: PlaceFieldInput): Promise<PlacedField>;
   /** The page's content box (`{0,0,w,h}`) — page-bound placement math. */
-  pageBox(pageObjectNumber: number): Box | null;
+  pageBox(page: PageRef): Box | null;
   /** Field-plane properties: name, required, options, default value. */
   updateField(key: FieldKey, patch: FormFieldPatch): Promise<void>;
   /** Delete the field and every widget of it (cascades on the page). */

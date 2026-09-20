@@ -9,7 +9,11 @@ import type { AnnotationReplyType } from '../../src/annotation/primitives';
 const PAGE = 1;
 
 function objRef(objNum: number): AnnotationRef {
-  return { kind: 'objectNumber', pageObjectNumber: PAGE, annotObjectNumber: objNum };
+  return {
+    kind: 'objectNumber',
+    page: { kind: 'objectNumber', pageObjectNumber: PAGE },
+    annotObjectNumber: objNum,
+  };
 }
 
 /**
@@ -27,7 +31,7 @@ function annot(
 ): AnnotationDTO {
   return {
     ref: objRef(objNum),
-    pageObjectNumber: PAGE,
+    page: { kind: 'objectNumber', pageObjectNumber: PAGE },
     index: 0,
     identityQuality: 'durable',
     nm: rel.nm ?? null,
@@ -69,7 +73,9 @@ describe('classifyRelation', () => {
 describe('refKey', () => {
   it('is stable and distinct per ref kind', () => {
     expect(refKey(objRef(7))).toBe('obj:1:7');
-    expect(refKey({ kind: 'nm', pageObjectNumber: PAGE, nm: 'abc' })).toBe('nm:1:abc');
+    expect(
+      refKey({ kind: 'nm', page: { kind: 'objectNumber', pageObjectNumber: PAGE }, nm: 'abc' }),
+    ).toBe('nm:1:abc');
   });
 });
 
@@ -117,7 +123,11 @@ describe('buildThreads', () => {
   it('matches a child that points at the parent by /NM', () => {
     const primary = annot(1, { nm: 'parent-nm' });
     const reply = annot(2, {
-      inReplyTo: { kind: 'nm', pageObjectNumber: PAGE, nm: 'parent-nm' },
+      inReplyTo: {
+        kind: 'nm',
+        page: { kind: 'objectNumber', pageObjectNumber: PAGE },
+        nm: 'parent-nm',
+      },
       replyType: 'reply',
     });
     const threads = buildThreads([primary, reply]);

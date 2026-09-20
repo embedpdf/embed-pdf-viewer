@@ -6,6 +6,7 @@ import type {
   FreeTextAnnotationDTO,
   FreeTextPatch,
 } from '@embedpdf/engine-core/runtime';
+import { toPageRef } from '@embedpdf/engine-core/runtime';
 import { createLocalEngine } from '../src/index';
 
 const TEXT = 'Keep this text';
@@ -37,7 +38,7 @@ function fixture(legacy: boolean, callout: boolean): Uint8Array {
 }
 
 async function annotation(doc: DocumentHandle): Promise<FreeTextAnnotationDTO> {
-  return (await doc.page(3).annotations.list()).annotations[0] as FreeTextAnnotationDTO;
+  return (await doc.page(toPageRef(3)).annotations.list()).annotations[0] as FreeTextAnnotationDTO;
 }
 
 function expectText(dto: FreeTextAnnotationDTO): void {
@@ -63,7 +64,7 @@ describe('FreeText and Callout partial updates preserve text (wasm)', () => {
         let doc = await open(fixture(source === 'legacy', callout));
         try {
           if (source !== 'legacy') {
-            await doc.page(3).annotations.create({
+            await doc.page(toPageRef(3)).annotations.create({
               subtype: 'free-text',
               intent: callout ? 'free-text-callout' : 'free-text',
               rect: RECT,
@@ -125,31 +126,31 @@ describe('FreeText and Callout partial updates preserve text (wasm)', () => {
             ];
             for (const patch of patches) {
               // Deliberately never re-attach contents or richText to these patches.
-              const result = await doc.page(3).annotations.update(ref, patch);
+              const result = await doc.page(toPageRef(3)).annotations.update(ref, patch);
               expectText(result.updated as FreeTextAnnotationDTO);
               expectText(await annotation(doc));
             }
 
-            const before = (await doc.page(3).annotations.renderAppearances()).appearances[0]!
-              .raster;
+            const before = (await doc.page(toPageRef(3)).annotations.renderAppearances())
+              .appearances[0]!.raster;
             const saved = await doc.download();
             await doc.close();
             doc = await open(saved);
             expectText(await annotation(doc));
-            const after = (await doc.page(3).annotations.renderAppearances()).appearances[0]!
-              .raster;
+            const after = (await doc.page(toPageRef(3)).annotations.renderAppearances())
+              .appearances[0]!.raster;
             expect([after.width, after.height]).toEqual([before.width, before.height]);
             expect(new Uint8Array(after.data)).toEqual(new Uint8Array(before.data));
 
             // Read text from the persisted appearance's actual drawing commands,
             // not just /Contents: the downloaded PDF must visibly contain it.
-            const bytes = await doc.page(3).annotations.exportAppearance!([
+            const bytes = await doc.page(toPageRef(3)).annotations.exportAppearance!([
               (await annotation(doc)).ref,
             ]);
             const appearance = await engine.open({ kind: 'bytes', id: 'text-appearance', bytes });
             try {
               const page = (await appearance.pages.list()).pages[0]!;
-              const text = await appearance.page(page.pageObjectNumber).text.read();
+              const text = await appearance.page(page.ref).text.read();
               expect(text.text).toContain(TEXT);
             } finally {
               await appearance.close();
@@ -168,10 +169,12 @@ describe('FreeText and Callout partial updates preserve text (wasm)', () => {
         bytes: fixture(true, callout),
       });
       try {
-        const result = await doc.page(3).annotations.update((await annotation(doc)).ref, {
-          subtype: 'free-text',
-          contents: '',
-        });
+        const result = await doc
+          .page(toPageRef(3))
+          .annotations.update((await annotation(doc)).ref, {
+            subtype: 'free-text',
+            contents: '',
+          });
         expect(result.updated.contents).toBe('');
         const bytes = await doc.download();
         await doc.close();

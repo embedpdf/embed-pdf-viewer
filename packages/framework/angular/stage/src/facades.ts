@@ -84,7 +84,10 @@ export function injectPageList(token: StageTokenProp = StageToken) {
       token,
       (c) => c.pages(),
       (a, b) =>
-        a.length === b.length && a.every((p, i) => p.pon === b[i].pon && p.label === b[i].label),
+        a.length === b.length &&
+        a.every(
+          (p, i) => p.ref.pageObjectNumber === b[i].ref.pageObjectNumber && p.label === b[i].label,
+        ),
     ),
     currentItemPages: injectSelector(token, (c) => c.currentItemPages(), shallowArray),
   };

@@ -6,6 +6,7 @@ import { EngineError } from '../errors/EngineError';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
 import type { DocumentEvent } from '../events/DocumentEvent';
 import type { AnnotationRef } from '../identity/AnnotationRef';
+import { toPageRef } from '../identity/PageRef';
 import { AnnotationFlattenResultSchema } from '../wire/schemas';
 
 const square = (left: number, bottom: number): SquareDraft => ({
@@ -47,8 +48,8 @@ export function runAnnotationFlattenConformance(
       const doc = await openFixture(engine, opts);
       try {
         const layoutBefore = await doc.pages.list();
-        const pon = layoutBefore.pages[0].pageObjectNumber;
-        const page = doc.page(pon);
+        const pon = layoutBefore.pages[0].ref.pageObjectNumber;
+        const page = doc.page(toPageRef(pon));
         if (!page.annotations.flatten) return;
 
         const a = (await page.annotations.create(square(20, 20))).created.ref;
@@ -66,7 +67,7 @@ export function runAnnotationFlattenConformance(
         unsubscribe();
 
         expect(AnnotationFlattenResultSchema.safeParse(result).success).toBe(true);
-        expect(result.pageObjectNumber).toBe(pon);
+        expect(result.page.pageObjectNumber).toBe(pon);
         expect(result.usage).toBe('display');
         expect(result.results.map((item) => item.status)).toEqual(['applied', 'skipped']);
         expect(result.meta === null).toBe(false);
@@ -92,8 +93,8 @@ export function runAnnotationFlattenConformance(
       try {
         const layout = await doc.pages.list();
         if (layout.pages.length < 2) return;
-        const page0 = doc.page(layout.pages[0].pageObjectNumber);
-        const page1 = doc.page(layout.pages[1].pageObjectNumber);
+        const page0 = doc.page(layout.pages[0].ref);
+        const page1 = doc.page(layout.pages[1].ref);
         if (!page0.annotations.flatten) return;
         const own = (await page0.annotations.create(square(20, 100))).created.ref;
         const foreign = (await page1.annotations.create(square(20, 100))).created.ref;
@@ -111,8 +112,8 @@ export function runAnnotationFlattenConformance(
     test('an empty ref list rejects InvalidArg; an unknown ref rejects', async () => {
       const doc = await openFixture(engine, opts);
       try {
-        const pon = (await doc.pages.list()).pages[0].pageObjectNumber;
-        const page = doc.page(pon);
+        const pon = (await doc.pages.list()).pages[0].ref.pageObjectNumber;
+        const page = doc.page(toPageRef(pon));
         if (!page.annotations.flatten) return;
         await expect(page.annotations.flatten([])).rejects.toMatchObject({
           code: EngineErrorCode.InvalidArg,
@@ -120,7 +121,7 @@ export function runAnnotationFlattenConformance(
         let unknown: unknown = null;
         try {
           await page.annotations.flatten([
-            { kind: 'objectNumber', pageObjectNumber: pon, annotObjectNumber: 987654321 },
+            { kind: 'objectNumber', page: toPageRef(pon), annotObjectNumber: 987654321 },
           ]);
         } catch (error) {
           unknown = error;

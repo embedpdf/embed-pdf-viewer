@@ -37,6 +37,7 @@ import type { PdfSize, PdfRect } from '../geometry/primitives';
 import type { AnnotationRef } from '../identity/AnnotationRef';
 import type { FormFieldRef, FormWidgetRef } from '../identity/FormFieldRef';
 import type { PageObjectNumber } from '../identity/PageObjectNumber';
+import type { PageRef } from '../identity/PageRef';
 import type {
   AnnotationCreateResult,
   AnnotationDeleteResult,
@@ -299,7 +300,7 @@ export interface AnnotationsListRawPageWorkerRequest {
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
-  pageObjectNumber: PageObjectNumber;
+  page: PageRef;
 }
 
 export interface AnnotationsListFullPageWorkerRequest {
@@ -307,7 +308,7 @@ export interface AnnotationsListFullPageWorkerRequest {
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
-  pageObjectNumber: PageObjectNumber;
+  page: PageRef;
 }
 
 /**
@@ -321,7 +322,7 @@ export interface AnnotationsRenderAppearancesWorkerRequest {
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
-  pageObjectNumber: PageObjectNumber;
+  page: PageRef;
   options?: AnnotationAppearanceRenderOptions;
 }
 
@@ -330,7 +331,7 @@ export interface AnnotationsCreateWorkerRequest {
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
-  pageObjectNumber: PageObjectNumber;
+  page: PageRef;
   /** WIRE form — binary fields hold `{ resource }` refs into {@link resources}. */
   draft: WireAnnotationDraft;
   /**
@@ -386,7 +387,7 @@ export interface AnnotationsFlattenWorkerRequest {
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
-  pageObjectNumber: PageObjectNumber;
+  page: PageRef;
   refs: AnnotationRef[];
   usage: PageFlattenUsage;
   artifactPath?: string;
@@ -399,7 +400,7 @@ export interface AnnotationsExportAppearanceWorkerRequest {
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
-  pageObjectNumber: PageObjectNumber;
+  page: PageRef;
   refs: AnnotationRef[];
 }
 
@@ -413,7 +414,7 @@ export interface AnnotationsMoveWorkerRequest {
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
-  pageObjectNumber: PageObjectNumber;
+  page: PageRef;
   refs: AnnotationRef[];
   toIndex: number;
   artifactPath?: string;
@@ -567,7 +568,7 @@ export interface PagesTextWorkerRequest {
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
-  pageObjectNumber: PageObjectNumber;
+  page: PageRef;
 }
 
 export interface PagesGeometryWorkerRequest {
@@ -575,7 +576,7 @@ export interface PagesGeometryWorkerRequest {
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
-  pageObjectNumber: PageObjectNumber;
+  page: PageRef;
 }
 
 /**
@@ -596,7 +597,7 @@ export interface PagesRenderWorkerRequest {
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
-  pageObjectNumber: PageObjectNumber;
+  page: PageRef;
   options?: PageRenderOptions;
 }
 
@@ -650,7 +651,7 @@ export interface PagesRenderEncodedWorkerRequest {
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
-  pageObjectNumber: PageObjectNumber;
+  page: PageRef;
   options?: PageRenderOptions;
   encode: RenderEncode;
 }
@@ -673,7 +674,7 @@ export interface AnnotationsRenderAppearancesEncodedWorkerRequest {
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
-  pageObjectNumber: PageObjectNumber;
+  page: PageRef;
   options?: AnnotationAppearanceRenderOptions;
   encode: RenderEncode;
 }
@@ -697,7 +698,7 @@ export interface PagesMoveWorkerRequest {
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
-  pageObjectNumbers: PageObjectNumber[];
+  pages: PageRef[];
   destIndex: number;
   artifactPath?: string;
 }
@@ -707,7 +708,7 @@ export interface PagesRotateWorkerRequest {
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
-  pageObjectNumbers: PageObjectNumber[];
+  pages: PageRef[];
   /** Absolute rotation in degrees clockwise — see `PageRotateInput`. */
   rotation: PageRotation;
   artifactPath?: string;
@@ -718,7 +719,7 @@ export interface PagesDeleteWorkerRequest {
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
-  pageObjectNumbers: PageObjectNumber[];
+  pages: PageRef[];
   artifactPath?: string;
 }
 
@@ -729,7 +730,7 @@ export interface PagesSetNameWorkerRequest {
   docId: string;
   layerName?: string;
   name: string;
-  pageObjectNumber: PageObjectNumber;
+  page: PageRef;
   replace?: string;
   artifactPath?: string;
 }
@@ -749,7 +750,7 @@ export interface PagesFlattenWorkerRequest {
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
-  pageObjectNumbers: PageObjectNumber[];
+  pages: PageRef[];
   usage: PageFlattenUsage;
   artifactPath?: string;
 }
@@ -770,7 +771,7 @@ export interface PagesExtractWorkerRequest {
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
-  pageObjectNumbers: PageObjectNumber[];
+  pages: PageRef[];
 }
 
 /** List the document catalog's `/EmbeddedFiles` name tree (a read). */
@@ -836,7 +837,7 @@ export interface AnnotationsReadFileWorkerRequest {
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
-  pageObjectNumber: PageObjectNumber;
+  page: PageRef;
   ref: AnnotationRef;
   path?: string;
   /** Decompression-bomb cap forwarded to the runtime. Absent/0 = unlimited. */
@@ -883,14 +884,14 @@ export interface MeasureViewportsWorkerRequest {
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
-  pageObjectNumber: PageObjectNumber;
+  page: PageRef;
 }
 export interface MeasureSetScaleWorkerRequest {
   kind: 'measure.setScale';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
-  pageObjectNumber: PageObjectNumber;
+  page: PageRef;
   measure: PdfMeasure | null;
   artifactPath?: string;
 }
@@ -900,7 +901,7 @@ export interface PieceInfoReadWorkerRequest {
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
-  pageObjectNumber?: PageObjectNumber;
+  page?: PageRef;
   application: string;
 }
 
@@ -909,7 +910,7 @@ export interface PieceInfoUpdateWorkerRequest {
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
-  pageObjectNumber?: PageObjectNumber;
+  page?: PageRef;
   application: string;
   patch: PieceInfoPatch;
   artifactPath?: string;
@@ -920,7 +921,7 @@ export interface PieceInfoApplicationsWorkerRequest {
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
-  pageObjectNumber?: PageObjectNumber;
+  page?: PageRef;
 }
 
 export interface PieceInfoClearWorkerRequest {
@@ -928,7 +929,7 @@ export interface PieceInfoClearWorkerRequest {
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
-  pageObjectNumber?: PageObjectNumber;
+  page?: PageRef;
   application: string;
   artifactPath?: string;
 }
@@ -1426,15 +1427,15 @@ export type WorkerResultPayload =
   | { tag: 'document.probeSecurityFile'; security: DocumentSecurityProbeInfo }
   | {
       tag: 'document.renderPageFile';
-      /** Durable page identity of the rendered index — the artifact key's pon. */
-      pageObjectNumber: PageObjectNumber;
+      /** Durable page identity of the rendered index — the artifact key's page. */
+      page: PageRef;
       pageCount: number;
       raster: PageRaster;
     }
   | {
       tag: 'document.renderPageFileEncoded';
-      /** Durable page identity of the rendered index — the artifact key's pon. */
-      pageObjectNumber: PageObjectNumber;
+      /** Durable page identity of the rendered index — the artifact key's page. */
+      page: PageRef;
       pageCount: number;
       image: EncodedImageWire;
     }

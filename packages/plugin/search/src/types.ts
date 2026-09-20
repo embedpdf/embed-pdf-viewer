@@ -1,4 +1,4 @@
-import { createCapabilityToken, type PageObjectNumber } from '@embedpdf/core';
+import { createCapabilityToken, type PageRef } from '@embedpdf/core';
 import type { Rect, TextQuad } from '@embedpdf/core-geometry';
 import type { RevealAnchor, ScrollBehaviorKind } from '@embedpdf/plugin-stage/contract';
 import type { SearchMode, SearchQuery, SearchSnippet } from '@embedpdf/engine-core/runtime';
@@ -23,7 +23,7 @@ export interface TextSegment {
 }
 
 export interface SearchHit {
-  pon: PageObjectNumber;
+  page: PageRef;
   pageIndex: number;
   charStart: number;
   charCount: number;
@@ -48,7 +48,7 @@ export type SearchStatus = 'idle' | 'searching' | 'complete' | 'error';
  */
 export interface SearchExecOptions {
   /** Scan origin override. Defaults to the Stage's current page (viewport-first). */
-  startPage?: PageObjectNumber;
+  startPage?: PageRef;
 }
 
 /** Options for the session-free `findAll()` service. */
@@ -73,7 +73,7 @@ export interface SearchState {
   query: SearchQuery | null;
   status: SearchStatus;
   hits: SearchHit[];
-  /** pon → indices into `hits` — the per-page layer's read model. */
+  /** page object number → indices into `hits` — the per-page layer's read model. */
   hitsByPage: Record<number, number[]>;
   /** Index into `hits`, -1 = none. */
   activeIndex: number;
@@ -147,7 +147,7 @@ export interface SearchCapability {
   activeIndex(): number;
   activeHit(): SearchHit | null;
   /** Hits on one page — the layer's input. Element identity is stable. */
-  hitsForPage(pon: PageObjectNumber): SearchHit[];
+  hitsForPage(page: PageRef): SearchHit[];
   progress(): { scanned: number; total: number };
   errorMessage(): string | null;
 

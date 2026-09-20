@@ -10,6 +10,7 @@ import { profileFor, verifyForCompletion } from '@embedpdf/core-signature';
 import {
   EngineError,
   EngineErrorCode,
+  toPageRef,
   wirePack,
   type AnnotationActor,
   type AnnotationCreateResult,
@@ -52,6 +53,7 @@ import {
   type PageMoveResult,
   type PageNameResult,
   type PageObjectNumber,
+  type PageRef,
   type PageRotateResult,
   type PageRotation,
   type PageState,
@@ -99,6 +101,24 @@ import { StorageKeys } from '../storage/keys';
 import type { ObjectStore } from '../storage/ObjectStore';
 
 type LayerArtifactInput = { bytes: ArrayBuffer; size: number } | { path: string };
+
+/**
+ * Page addresses arrive on the wire as `PageRef`s (one kind: the canonical
+ * `objectNumber`); everything this service persists — weak-session guards,
+ * `layer_pages` rows, audit rows — is keyed by the number. Unwrap once at
+ * the entry point; the worker request carries the refs as received.
+ */
+function pageObjectNumbersOf(pages: readonly PageRef[]): PageObjectNumber[] {
+  return pages.map((page) => {
+    if (page.kind !== 'objectNumber') {
+      throw new EngineError(
+        EngineErrorCode.InvalidArg,
+        `unsupported page address kind '${String((page as { kind: unknown }).kind)}'`,
+      );
+    }
+    return page.pageObjectNumber;
+  });
+}
 
 /**
  * The commit-time version CAS lost: `layers.current_version` moved between
@@ -356,7 +376,7 @@ export class LayerService {
             jobId,
             docId: input.docId,
             layerName: input.layerName,
-            pageObjectNumber: input.pageObjectNumber,
+            page: toPageRef(input.pageObjectNumber),
             draft: input.draft,
             ...(input.resources ? { resources: input.resources } : {}),
             artifactPath,
@@ -473,7 +493,7 @@ export class LayerService {
         jobId,
         docId,
         layerName,
-        pageObjectNumber,
+        page: toPageRef(pageObjectNumber),
       });
     const payload = await this.requirePool().run(docId, build, signal);
     if (payload.tag !== 'annotations.listRawPage') {
@@ -521,7 +541,7 @@ export class LayerService {
         docId: input.docId,
         layerName: input.layerName,
         layer,
-        pageObjectNumber: input.ref.pageObjectNumber,
+        pageObjectNumber: input.ref.page.pageObjectNumber,
       });
       const ref = await this.rewriteRefForWorker(
         input.docId,
@@ -586,7 +606,7 @@ export class LayerService {
             jobId,
             docId: input.docId,
             layerName: input.layerName,
-            pageObjectNumber: input.pageObjectNumber,
+            page: toPageRef(input.pageObjectNumber),
             refs,
             toIndex: input.toIndex,
             artifactPath,
@@ -611,7 +631,7 @@ export class LayerService {
     input: {
       docId: string;
       layerName: string;
-      pageObjectNumbers: PageObjectNumber[];
+      pages: PageRef[];
       destIndex: number;
     },
     signal?: AbortSignal,
@@ -625,7 +645,7 @@ export class LayerService {
             jobId,
             docId: input.docId,
             layerName: input.layerName,
-            pageObjectNumbers: input.pageObjectNumbers,
+            pages: input.pages,
             destIndex: input.destIndex,
             artifactPath,
           });
@@ -665,7 +685,15 @@ export class LayerService {
         const payload = await this.requirePool().run(
           input.docId,
           (jobId: WorkerJobId) =>
-            wirePack({ kind: 'measure.setScale' as const, jobId, ...input, artifactPath }),
+            wirePack({
+              kind: 'measure.setScale' as const,
+              jobId,
+              docId: input.docId,
+              layerName: input.layerName,
+              page: toPageRef(input.pageObjectNumber),
+              measure: input.measure,
+              artifactPath,
+            }),
           signal,
         );
         if (payload.tag !== 'measure.setScale')
@@ -687,7 +715,7 @@ export class LayerService {
       docId: string;
       layerName: string;
       name: string;
-      pageObjectNumber: PageObjectNumber;
+      page: PageRef;
       replace?: string;
     },
     signal?: AbortSignal,
@@ -703,7 +731,7 @@ export class LayerService {
           docId: input.docId,
           layerName: input.layerName,
           name: input.name,
-          pageObjectNumber: input.pageObjectNumber,
+          page: input.page,
           ...(input.replace !== undefined ? { replace: input.replace } : {}),
           artifactPath,
         }),
@@ -800,7 +828,7 @@ export class LayerService {
               jobId,
               docId: input.docId,
               layerName: input.layerName,
-              pageObjectNumber: input.pageObjectNumber,
+              page: toPageRef(input.pageObjectNumber),
               refs: input.refs,
               usage: input.usage,
               artifactPath,
@@ -827,11 +855,12 @@ export class LayerService {
     input: {
       docId: string;
       layerName: string;
-      pageObjectNumbers: PageObjectNumber[];
+      pages: PageRef[];
       rotation: PageRotation;
     },
     signal?: AbortSignal,
   ): Promise<PageRotateResult> {
+    const pageObjectNumbers = pageObjectNumbersOf(input.pages);
     return this.enqueueLayerWrite(ctx, input.docId, input.layerName, async () => {
       const { layer } = await this.prepareLayerMutation(ctx, input.docId, input.layerName);
       // No weak-session guard: rotation is presentation metadata — it never
@@ -843,7 +872,7 @@ export class LayerService {
             jobId,
             docId: input.docId,
             layerName: input.layerName,
-            pageObjectNumbers: input.pageObjectNumbers,
+            pages: input.pages,
             rotation: input.rotation,
             artifactPath,
           });
@@ -856,7 +885,7 @@ export class LayerService {
         }
         return this.persistPageRotate(ctx, input.docId, input.layerName, layer, {
           result: payload.result,
-          affectedPages: input.pageObjectNumbers,
+          affectedPages: pageObjectNumbers,
           artifact: requireLayerArtifact(payload as unknown),
         });
       });
@@ -868,16 +897,17 @@ export class LayerService {
     input: {
       docId: string;
       layerName: string;
-      pageObjectNumbers: PageObjectNumber[];
+      pages: PageRef[];
     },
     signal?: AbortSignal,
   ): Promise<PageDeleteResult> {
+    const pageObjectNumbers = pageObjectNumbersOf(input.pages);
     return this.enqueueLayerWrite(ctx, input.docId, input.layerName, async () => {
       const { layer } = await this.prepareLayerMutation(ctx, input.docId, input.layerName);
       // Destroying a page someone is mid-edit on is the collaboration
       // conflict the weak-session model exists for: for every target page
       // with weak annotations the caller must be the sole active editor.
-      for (const pageObjectNumber of input.pageObjectNumbers) {
+      for (const pageObjectNumber of pageObjectNumbers) {
         await this.assertWeakAnnotationStructuralEditAllowed(ctx, {
           docId: input.docId,
           layerName: input.layerName,
@@ -892,7 +922,7 @@ export class LayerService {
             jobId,
             docId: input.docId,
             layerName: input.layerName,
-            pageObjectNumbers: input.pageObjectNumbers,
+            pages: input.pages,
             artifactPath,
           });
         const payload = await this.requirePool().run(input.docId, build, signal);
@@ -904,7 +934,7 @@ export class LayerService {
         }
         return this.persistPageDelete(ctx, input.docId, input.layerName, layer, {
           result: payload.result,
-          deletedPages: input.pageObjectNumbers,
+          deletedPages: pageObjectNumbers,
           artifact: requireLayerArtifact(payload as unknown),
         });
       });
@@ -1002,16 +1032,17 @@ export class LayerService {
     input: {
       docId: string;
       layerName: string;
-      pageObjectNumbers: PageObjectNumber[];
+      pages: PageRef[];
       usage: PageFlattenUsage;
     },
     signal?: AbortSignal,
   ): Promise<PageFlattenResult> {
+    const pageObjectNumbers = pageObjectNumbersOf(input.pages);
     return this.enqueueLayerWrite(ctx, input.docId, input.layerName, async () => {
       const { layer } = await this.prepareLayerMutation(ctx, input.docId, input.layerName);
       // Eligible annotations are removed from /Annots. Protect weak index
       // editors before the worker can shift any target page's index space.
-      for (const pageObjectNumber of input.pageObjectNumbers) {
+      for (const pageObjectNumber of pageObjectNumbers) {
         await this.assertWeakAnnotationStructuralEditAllowed(ctx, {
           docId: input.docId,
           layerName: input.layerName,
@@ -1028,7 +1059,7 @@ export class LayerService {
               jobId,
               docId: input.docId,
               layerName: input.layerName,
-              pageObjectNumbers: input.pageObjectNumbers,
+              pages: input.pages,
               usage: input.usage,
               artifactPath,
             }),
@@ -1065,8 +1096,8 @@ export class LayerService {
       // guard flatten takes, over every page the scope can touch.
       const targetPages =
         input.scope.kind === 'pages'
-          ? input.scope.pageObjectNumbers
-          : [...new Set(input.scope.refs.map((ref) => ref.pageObjectNumber))];
+          ? pageObjectNumbersOf(input.scope.pages)
+          : [...new Set(input.scope.refs.map((ref) => ref.page.pageObjectNumber))];
       for (const pageObjectNumber of targetPages) {
         await this.assertWeakAnnotationStructuralEditAllowed(ctx, {
           docId: input.docId,
@@ -1949,7 +1980,8 @@ export class LayerService {
       docId,
       layerName,
       layer,
-      pageObjectNumber: requireSingleAffectedPage(input.result.meta.affectedPages).pageObjectNumber,
+      pageObjectNumber: requireSingleAffectedPage(input.result.meta.affectedPages).page
+        .pageObjectNumber,
       kind,
       artifactKey,
       artifactSha: uploaded.sha256,
@@ -2028,7 +2060,7 @@ export class LayerService {
       kind: 'pages.move',
       layout: input.result.layout,
       // Every page's position is touched by a reorder.
-      affectedPages: input.result.layout.pages.map((page) => page.pageObjectNumber),
+      affectedPages: input.result.layout.pages.map((page) => page.ref.pageObjectNumber),
       artifactKey,
       artifactSha: uploaded.sha256,
       artifactSize: uploaded.size,
@@ -2182,7 +2214,7 @@ export class LayerService {
       layer,
       kind: input.kind,
       layout: input.result.layout,
-      insertedPages: input.result.insertedPageObjectNumbers,
+      insertedPages: input.result.insertedPages.map((page) => page.pageObjectNumber),
       artifactKey,
       artifactSha: uploaded.sha256,
       artifactSize: uploaded.size,
@@ -2281,7 +2313,7 @@ export class LayerService {
   ): Promise<AnnotationRef> {
     if (ref.kind !== 'index') return ref;
 
-    const page = await this.requireLayerPage(layer.id, ref.pageObjectNumber);
+    const page = await this.requireLayerPage(layer.id, ref.page.pageObjectNumber);
     const durablePageState = this.layerState.decorateLayerPageState(docId, layerName, page);
     // Refs minted by SHARED base reads carry the base revision scope;
     // the generation check still gates staleness (see the bridge's doc).
@@ -2291,7 +2323,7 @@ export class LayerService {
     const workerPageState = await this.loadWorkerPageState(
       docId,
       layerName,
-      ref.pageObjectNumber,
+      ref.page.pageObjectNumber,
       signal,
     );
     return this.requireRevisionBridge().rewriteIndexRefForWorker(workerPageState, ref);
@@ -2311,7 +2343,7 @@ export class LayerService {
         jobId,
         docId,
         layerName,
-        pageObjectNumber,
+        page: toPageRef(pageObjectNumber),
       });
     const payload = await this.requirePool().run(docId, build, signal);
     if (payload.tag !== 'annotations.listRawPage') {
@@ -2528,7 +2560,7 @@ export class LayerService {
 
         // The worker's layout IS the new order; validate its page set against
         // the durable rows before trusting it.
-        const pageOrder = input.layout.pages.map((page) => page.pageObjectNumber);
+        const pageOrder = input.layout.pages.map((page) => page.ref.pageObjectNumber);
         const rows = await trx
           .selectFrom('layer_pages')
           .select('page_object_number')
@@ -2626,7 +2658,7 @@ export class LayerService {
           .execute();
         const known = new Set(rows.map((row) => Number(row.page_object_number)));
         const deleted = new Set(input.deletedPages);
-        const survivorOrder = input.layout.pages.map((page) => page.pageObjectNumber);
+        const survivorOrder = input.layout.pages.map((page) => page.ref.pageObjectNumber);
         if (rows.length !== survivorOrder.length + input.deletedPages.length) {
           throw new EngineError(
             EngineErrorCode.WireFormat,
@@ -2763,7 +2795,7 @@ export class LayerService {
           .execute();
         const known = new Set(rows.map((row) => Number(row.page_object_number)));
         const inserted = new Set(input.insertedPages);
-        const pageOrder = input.layout.pages.map((page) => page.pageObjectNumber);
+        const pageOrder = input.layout.pages.map((page) => page.ref.pageObjectNumber);
         if (inserted.size !== input.insertedPages.length) {
           throw new EngineError(
             EngineErrorCode.WireFormat,
@@ -2818,7 +2850,7 @@ export class LayerService {
         // The finalized result — audited and returned IDENTICALLY: what we
         // tell the caller is what we tell history (and remote subscribers).
         const result: PageInsertResult = {
-          insertedPageObjectNumbers: input.insertedPages,
+          insertedPages: input.insertedPages.map(toPageRef),
           layout: input.layout,
           cache: versions,
         };
@@ -2883,7 +2915,7 @@ export class LayerService {
         const currentLayer = await this.readLayerForCommit(trx, input.layer);
         const weakStateByPage = new Map(
           input.raw.meta.affectedPages.map((page) => [
-            page.pageObjectNumber,
+            page.page.pageObjectNumber,
             page.weakAnnotationState,
           ]),
         );
@@ -3010,7 +3042,7 @@ export class LayerService {
         const currentLayer = await this.readLayerForCommit(trx, input.layer);
         const weakStateByPage = new Map(
           input.raw.meta.affectedPages.map((page) => [
-            page.pageObjectNumber,
+            page.page.pageObjectNumber,
             page.weakAnnotationState,
           ]),
         );
@@ -3680,7 +3712,7 @@ export class LayerService {
         const now = Date.now();
         const { signing, finalized, layer } = input;
         const cmsSha = sha256Hex(input.cms);
-        const widgetPage = finalized.signature.widget?.pageObjectNumber ?? null;
+        const widgetPage = finalized.signature.widget?.page?.pageObjectNumber ?? null;
 
         // (1) The signing row first, under its expiry: the single arbiter
         //     across replicas.
@@ -4400,9 +4432,11 @@ function widgetImpacts(
   widgets: ReadonlyArray<FormWidgetRef>,
   kind: MutationImpactKind,
 ): FormPageImpact[] {
-  return widgets
-    .filter((widget) => widget.pageObjectNumber > 0)
-    .map((widget) => ({ pageObjectNumber: widget.pageObjectNumber, kind }));
+  // A widget stored as a direct object has no page to attribute the
+  // impact to (`page === null`) — it cannot be addressed at all.
+  return widgets.flatMap((widget) =>
+    widget.page === null ? [] : [{ pageObjectNumber: widget.page.pageObjectNumber, kind }],
+  );
 }
 
 /** Conservative impact for document-wide form ops (import, repair). */
@@ -4448,7 +4482,7 @@ function requireKnownWeakAnnotationBoolean(page: PageState): boolean {
   if (page.weakAnnotationState.kind !== 'known') {
     throw new EngineError(
       EngineErrorCode.WireFormat,
-      `annotation mutation returned unknown weak annotation state for page ${page.pageObjectNumber}`,
+      `annotation mutation returned unknown weak annotation state for page ${page.page.pageObjectNumber}`,
     );
   }
   return page.weakAnnotationState.hasAnyWeakAnnotations;

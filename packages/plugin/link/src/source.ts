@@ -1,4 +1,4 @@
-import type { DocumentHandle, PageLayout } from '@embedpdf/core';
+import type { DocumentHandle, PageLayout, PageRef } from '@embedpdf/core';
 import { pdfToContentRect } from '@embedpdf/core-annotation';
 import type { LinkAction, LinkNavItem } from './types';
 
@@ -16,12 +16,13 @@ export interface LinkSourceIO {
   dispatch(action: LinkAction): void;
 }
 
-export function loadLinksPage(io: LinkSourceIO, pon: number): void {
+export function loadLinksPage(io: LinkSourceIO, page: PageRef): void {
   const doc = io.doc;
-  const crop = io.document()?.pages.find((p) => p.pageObjectNumber === pon)?.boxes.crop;
+  const pon = page.pageObjectNumber;
+  const crop = io.document()?.pages.find((p) => p.ref.pageObjectNumber === pon)?.boxes.crop;
   if (!doc || !crop) return;
   doc
-    .page(pon)
+    .page(page)
     .annotations.list()
     .then(
       (snap) => {
@@ -52,7 +53,7 @@ export function loadLinksPage(io: LinkSourceIO, pon: number): void {
             attached: dto.replyType === 'group' && dto.inReplyTo != null,
           });
         }
-        io.dispatch({ type: 'SET_PAGE', pon, items });
+        io.dispatch({ type: 'SET_PAGE', page, items });
       },
       () => {},
     );

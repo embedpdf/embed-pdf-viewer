@@ -3,6 +3,7 @@ import type {
   DigestAlgorithm,
   DocumentProtection,
   FormFieldRef,
+  FormWidgetRef,
   SignatureDTO,
   SignatureSnapshot,
 } from '@embedpdf/engine-core/runtime';
@@ -16,6 +17,7 @@ import {
   readContentsAt,
 } from './internal/readSignatureModel';
 import { acquireSignatureModel } from './internal/signatureModelCache';
+import { widgetPageRef } from '../forms/internal/readFormSnapshot';
 import type { DocumentSession } from '../../document-session/DocumentSession';
 import { withScratch, withScratchN } from '../../runtime/memory/scratch';
 import { readUtf16String } from '../../runtime/memory/strings';
@@ -99,7 +101,7 @@ export class SignatureReader {
     index: number;
     fieldObjectNumber: number;
     signed: boolean;
-    widget: { annotObjectNumber: number; pageObjectNumber: number } | null;
+    widget: FormWidgetRef | null;
   } {
     const { fn } = this.runtime;
     const model = acquireSignatureModel(this.runtime, this.session);
@@ -121,7 +123,7 @@ export class SignatureReader {
         widgetObjNum > 0
           ? {
               annotObjectNumber: widgetObjNum,
-              pageObjectNumber: fn.EPDFSig_GetWidgetPageObjNum(model, index),
+              page: widgetPageRef(fn.EPDFSig_GetWidgetPageObjNum(model, index)),
             }
           : null,
     };

@@ -10,6 +10,7 @@ import type {
   AnnotationFlags,
   AnnotationRef,
   InkIntent,
+  PageRef,
   RichTextDocumentInput,
 } from '@embedpdf/engine-core/runtime';
 import {
@@ -261,9 +262,9 @@ function clampMoveDelta(
 }
 
 /** The page an edit draft is anchored to — every edit gesture lives on ONE page. */
-function editDraftPon(m: Model, d: Draft): number | null {
+function editDraftPage(m: Model, d: Draft): PageRef | null {
   const id = 'id' in d ? d.id : 'ids' in d && d.ids.length ? d.ids[0] : null;
-  return id != null ? (m.byId[id]?.pon ?? null) : null;
+  return id != null ? (m.byId[id]?.page ?? null) : null;
 }
 const geomEqual = (a: Geom, b: Geom): boolean => JSON.stringify(a) === JSON.stringify(b);
 const RAD2DEG = 180 / Math.PI;
@@ -334,11 +335,11 @@ export function update(m: Model, msg: Msg): [Model, Effect[]] {
     case 'finishCreationDraft':
       return finishPolyCreate(m);
     case 'createCaret':
-      return createCaret(m, msg.pon, msg.anchor, msg.flags);
+      return createCaret(m, msg.page, msg.anchor, msg.flags);
     case 'createReplaceText':
-      return createReplaceText(m, msg.pon, msg.quads, msg.anchor, msg.preset);
+      return createReplaceText(m, msg.page, msg.quads, msg.anchor, msg.preset);
     case 'createMarkup':
-      return createMarkup(m, msg.subtype, msg.pon, msg.quads, msg.preset, msg.flags);
+      return createMarkup(m, msg.subtype, msg.page, msg.quads, msg.preset, msg.flags);
     case 'setMarkupPreview':
       return setMarkupPreview(m, msg.subtype, msg.quadsByPage, msg.preset);
     case 'clearMarkupPreview':
@@ -470,7 +471,7 @@ function editDown(m: Model, input: PointerInput): [Model, Effect[]] {
   // along so screen-anchored annotations are grabbed where they're PAINTED.
   const hit = hitTest(
     m,
-    input.pon,
+    input.page,
     input.point,
     input.chrome ?? DEFAULT_CHROME_GEOM,
     m.hitMargin,
@@ -576,8 +577,8 @@ function editDown(m: Model, input: PointerInput): [Model, Effect[]] {
 function editMove(m: Model, input: PointerInput): [Model, Effect[]] {
   const d = m.draft!;
   // Foreign coordinate frame (see the page-bound gesture rules above) — ignore.
-  const home = editDraftPon(m, d);
-  if (home != null && input.pon !== home) return [m, []];
+  const home = editDraftPage(m, d);
+  if (home != null && input.page.pageObjectNumber !== home.pageObjectNumber) return [m, []];
   if (d.g === 'move') {
     const view = viewOf(input);
     const raw = clampMoveDelta(m, d.ids, sub(input.point, d.start), input.pageBox, view);
@@ -585,7 +586,7 @@ function editMove(m: Model, input: PointerInput): [Model, Effect[]] {
       return [{ ...m, draft: { ...d, delta: raw, guides: [] } }, []];
     // Snap guides read STORED geometry (an anchored mover aligns by its /Rect
     // box) — a deliberate simplification; the clamp above is view-exact.
-    const snap = computeMoveSnap(m, d.ids, input.pon, raw, m.snap.guideThreshold, input.pageBox);
+    const snap = computeMoveSnap(m, d.ids, input.page, raw, m.snap.guideThreshold, input.pageBox);
     // A snap adjusts by ≤ threshold, but never past the page edge: re-clamp, and
     // drop the guide on an axis the clamp took back (its line would be a lie).
     const delta = clampMoveDelta(m, d.ids, snap.delta, input.pageBox, view);
@@ -755,10 +756,10 @@ function marqueePointer(
   // The marquee lives on one page and pins to its box (same rules as editMove).
   const point = clampPointToBox(input.point, input.pageBox);
   if (phase === 'down') {
-    return [{ ...m, draft: { g: 'marquee', pon: input.pon, from: point, to: point } }, []];
+    return [{ ...m, draft: { g: 'marquee', page: input.page, from: point, to: point } }, []];
   }
   if (m.draft?.g !== 'marquee') return [m, []];
-  if (m.draft.pon !== input.pon) return [m, []]; // foreign frame — ignore
+  if (m.draft.page.pageObjectNumber !== input.page.pageObjectNumber) return [m, []]; // foreign frame — ignore
   if (phase === 'move') {
     return [{ ...m, draft: { ...m.draft, to: point } }, []];
   }
@@ -766,7 +767,7 @@ function marqueePointer(
   // A marquee that touches one member takes the whole group with it.
   const hits = expandGroups(
     m,
-    annotsInBox(m, m.draft.pon, m.draft.from, point, input.inert, viewOf(input)),
+    annotsInBox(m, m.draft.page, m.draft.from, point, input.inert, viewOf(input)),
   );
   const selected = input.shift ? toggleSelection(m.selected, hits) : hits;
   return [{ ...m, selected, draft: null }, []];
@@ -809,7 +810,7 @@ function distancePointer(
           step: 'endpoints',
           subtype: 'line',
           preset,
-          pon: input.pon,
+          page: input.page,
           from: input.point,
           to: input.point,
           measure: {
@@ -824,7 +825,7 @@ function distancePointer(
   }
 
   // Even the final placement click belongs to the draft's original page.
-  if (input.pon !== draft.pon) {
+  if (input.page.pageObjectNumber !== draft.page.pageObjectNumber) {
     return [model, []];
   }
 
@@ -873,7 +874,7 @@ function distancePointer(
   const annotation: Annot = {
     id,
     ref: null,
-    pon: draft.pon,
+    page: draft.page,
     subtype: 'line',
     geom,
     measure: appearance,
@@ -915,7 +916,13 @@ function createPointer(
   // An in-progress creation is anchored to its page: a move/up sample from
   // another page is a foreign frame — ignore it. (A DOWN on another page is a
   // fresh intent: the per-subtype branches below start/restart the draft there.)
-  if (phase !== 'down' && m.draft && 'pon' in m.draft && m.draft.pon !== input.pon) return [m, []];
+  if (
+    phase !== 'down' &&
+    m.draft &&
+    'page' in m.draft &&
+    m.draft.page.pageObjectNumber !== input.page.pageObjectNumber
+  )
+    return [m, []];
   // Shapes can't be drawn past the page edge — the pointer pins to it.
   if (input.pageBox) input = { ...input, point: clampPointToBox(input.point, input.pageBox) };
   if (m.draft?.g === 'create-distance' || (measure?.intent === 'LineDimension' && !capture)) {
@@ -936,7 +943,7 @@ function createPointer(
         m.draft?.g === 'create-poly' &&
         m.draft.subtype === subtype &&
         m.draft.preset === preset &&
-        m.draft.pon === input.pon
+        m.draft.page.pageObjectNumber === input.page.pageObjectNumber
       ) {
         return [
           {
@@ -954,7 +961,7 @@ function createPointer(
             g: 'create-poly',
             subtype,
             preset,
-            pon: input.pon,
+            page: input.page,
             points: [input.point],
             cur: input.point,
             closed: subtype === 'polygon',
@@ -973,7 +980,7 @@ function createPointer(
             capture,
             subtype,
             preset,
-            pon: input.pon,
+            page: input.page,
             from: input.point,
             to: input.point,
             ...(clickCreate !== undefined ? { clickCreate } : {}),
@@ -983,13 +990,13 @@ function createPointer(
           ? m.draft?.g === 'create-ink' &&
             m.draft.subtype === subtype &&
             m.draft.preset === preset &&
-            m.draft.pon === input.pon
+            m.draft.page.pageObjectNumber === input.page.pageObjectNumber
             ? { ...m.draft, strokes: [...m.draft.strokes, [input.point]] }
             : {
                 g: 'create-ink',
                 subtype,
                 preset,
-                pon: input.pon,
+                page: input.page,
                 strokes: [[input.point]],
                 intent,
                 ...(flags ? { flags } : {}),
@@ -1003,7 +1010,7 @@ function createPointer(
                 g: 'create-rect',
                 subtype,
                 preset,
-                pon: input.pon,
+                page: input.page,
                 from: input.point,
                 to: input.point,
                 ellipse: subtype === 'circle',
@@ -1114,13 +1121,13 @@ function createPointer(
   }
   if (!geom) return [{ ...m, draft: null }, []];
   if (d.g === 'create-line' && d.capture)
-    return [{ ...m, draft: null }, [{ fx: 'captured', tool: d.capture, pon: d.pon, geom }]];
+    return [{ ...m, draft: null }, [{ fx: 'captured', tool: d.capture, page: d.page, geom }]];
 
   const id = `tmp:${m.seq + 1}`;
   const annot: Annot = {
     id,
     ref: null,
-    pon: d.pon,
+    page: d.page,
     subtype: d.subtype,
     ...(d.g === 'create-line' && d.measure ? { measure: d.measure } : {}),
     geom,
@@ -1163,7 +1170,7 @@ function finishInkCreate(m: Model): [Model, Effect[]] {
   const annot: Annot = {
     id,
     ref: null,
-    pon: d.pon,
+    page: d.page,
     subtype: d.subtype,
     geom: { t: 'ink', strokes: d.strokes },
     style: styleFromProps(defaultsFor(m, d.preset ?? d.subtype)),
@@ -1243,7 +1250,7 @@ function calloutPointer(
 ): [Model, Effect[]] {
   const d = m.draft;
   if (phase === 'down') {
-    if (d?.g !== 'create-callout' || d.pon !== input.pon) {
+    if (d?.g !== 'create-callout' || d.page.pageObjectNumber !== input.page.pageObjectNumber) {
       return [
         {
           ...m,
@@ -1252,7 +1259,7 @@ function calloutPointer(
             g: 'create-callout',
             subtype: 'free-text-callout',
             preset,
-            pon: input.pon,
+            page: input.page,
             step: 'knee',
             tip: input.point,
             cur: input.point,
@@ -1291,7 +1298,7 @@ function calloutPointer(
   const annot: Annot = {
     id,
     ref: null,
-    pon: d.pon,
+    page: d.page,
     subtype: 'free-text',
     geom: {
       t: 'text',
@@ -1337,7 +1344,7 @@ function finishPolyCreate(m: Model): [Model, Effect[]] {
   const annot: Annot = {
     id,
     ref: null,
-    pon: d.pon,
+    page: d.page,
     subtype: d.subtype,
     geom,
     measure: d.measure,
@@ -1377,7 +1384,7 @@ const usableQuads = (quads: TextQuad[]): TextQuad[] =>
 function createMarkup(
   m: Model,
   subtype: Subtype,
-  pon: Annot['pon'],
+  page: PageRef,
   segmentQuads: TextQuad[],
   preset: string = subtype,
   flags?: Partial<AnnotationFlags>,
@@ -1388,7 +1395,7 @@ function createMarkup(
   const annot: Annot = {
     id,
     ref: null,
-    pon,
+    page,
     subtype,
     geom: { t: 'quads', quads },
     style: styleFromProps(defaultsFor(m, preset)),
@@ -1417,7 +1424,7 @@ function createMarkup(
  */
 function createReplaceText(
   m: Model,
-  pon: Annot['pon'],
+  page: PageRef,
   segmentQuads: TextQuad[],
   anchor: TextEndAnchor,
   preset = 'replace-text',
@@ -1430,7 +1437,7 @@ function createReplaceText(
   const caret: Annot = {
     id: primaryId,
     ref: null,
-    pon,
+    page,
     subtype: 'caret',
     intent: 'replace',
     geom: caretGeomFromAnchor(anchor),
@@ -1441,7 +1448,7 @@ function createReplaceText(
   const strikeout: Annot = {
     id: strikeoutId,
     ref: null,
-    pon,
+    page,
     subtype: 'strikeout',
     intent: 'strikeout-text-edit',
     geom: { t: 'quads', quads },
@@ -1467,7 +1474,7 @@ function createReplaceText(
 
 function createCaret(
   m: Model,
-  pon: Annot['pon'],
+  page: PageRef,
   anchor: TextEndAnchor,
   flags?: Partial<AnnotationFlags>,
 ): [Model, Effect[]] {
@@ -1478,7 +1485,7 @@ function createCaret(
   const annot: Annot = {
     id,
     ref: null,
-    pon,
+    page,
     subtype: 'caret',
     geom: caretGeom,
     style: styleFromProps(def),
@@ -1636,8 +1643,8 @@ function rotateSelection(m: Model, deltaDeg: number): [Model, Effect[]] {
     const a = m.byId[ids[0]];
     pivot = annotationSelectionFrame(a).center;
   } else {
-    const pon = m.byId[ids[0]].pon;
-    const union = groupUnionBounds({ ...m, selected: ids }, pon);
+    const page = m.byId[ids[0]].page;
+    const union = groupUnionBounds({ ...m, selected: ids }, page);
     if (!union) return [m, []];
     pivot = { x: union.x + union.width / 2, y: union.y + union.height / 2 };
   }
@@ -1706,16 +1713,18 @@ function deleteSelection(m: Model): [Model, Effect[]] {
 /* ── marquee helper; exported for tests ───────────────────────────────────── */
 export function annotsInBox(
   m: Model,
-  pon: number,
+  page: PageRef,
   a: Vec,
   b: Vec,
   inert?: ReadonlySet<Id>,
   view?: ViewEnv,
 ): Id[] {
+  const pon = page.pageObjectNumber;
   const box = rectFromPoints(a, b);
   return m.order.filter((id) => {
     const annot = m.byId[id];
-    if (annot?.pon !== pon || inert?.has(id) || !isSelectable(m, id)) return false;
+    if (annot?.page.pageObjectNumber !== pon || inert?.has(id) || !isSelectable(m, id))
+      return false;
     // Conversation-plane annotations (replies, review states) are never on
     // the page — the marquee cannot sweep up what does not paint.
     if (isSubstrateOnly(annot)) return false;

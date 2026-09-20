@@ -1,5 +1,6 @@
+import type { FormWidgetRef } from '@embedpdf/engine-core/runtime';
 import { EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
-import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
+import { NULL_PTR, type PdfRuntimeModule, type Ptr } from '@embedpdf/engine-runtime';
 
 import { CloseStack } from '../../../document-session/lifecycle/PdfDocumentOpener';
 
@@ -21,14 +22,16 @@ const FIT_CONTAIN = 0;
 export function bakeWidgetAppearance(
   runtime: PdfRuntimeModule,
   docPtr: Ptr,
-  widget: { annotObjectNumber: number; pageObjectNumber: number },
+  widget: FormWidgetRef,
   pdf: Uint8Array,
   pageIndex: number,
 ): void {
   const { mem, fn } = runtime;
   const stack = new CloseStack();
   try {
-    const pagePtr = fn.EPDFDoc_LoadPageByObjectNumber(docPtr, widget.pageObjectNumber);
+    const pagePtr = widget.page
+      ? fn.EPDFDoc_LoadPageByObjectNumber(docPtr, widget.page.pageObjectNumber)
+      : NULL_PTR;
     if (!pagePtr) {
       throw new EngineError(EngineErrorCode.NotFound, 'the widget page could not be loaded');
     }

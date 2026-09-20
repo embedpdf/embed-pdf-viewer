@@ -9,6 +9,7 @@ import {
   EngineErrorCode,
   decodePdfBits,
   securityStateFromProbe,
+  toPageRef,
   wirePack,
   type DocumentSecurityState,
   type DocumentMetadata,
@@ -873,7 +874,13 @@ export class DocumentService {
       docId,
       layerName,
       (jobId: WorkerJobId) =>
-        wirePack({ kind: 'measure.viewports' as const, jobId, docId, layerName, pageObjectNumber }),
+        wirePack({
+          kind: 'measure.viewports' as const,
+          jobId,
+          docId,
+          layerName,
+          page: toPageRef(pageObjectNumber),
+        }),
       signal,
     );
     if (result.tag !== 'measure.viewports')
@@ -1441,7 +1448,7 @@ export class DocumentService {
         jobId,
         docId,
         layerName,
-        pageObjectNumbers,
+        pages: pageObjectNumbers.map(toPageRef),
       });
     const result = await this.pool.run(docId, build, signal);
     if (result.tag !== 'pages.extract') {
@@ -1474,7 +1481,7 @@ export class DocumentService {
         jobId,
         docId,
         layerName,
-        pageObjectNumber,
+        page: toPageRef(pageObjectNumber),
         refs,
       });
     const result = await this.pool.run(docId, build, signal);
@@ -1679,7 +1686,7 @@ export class DocumentService {
         jobId,
         docId,
         ...(layerName !== undefined ? { layerName } : {}),
-        pageObjectNumber,
+        page: toPageRef(pageObjectNumber),
         ref,
         path,
         maxDecodedBytes: DocumentService.MAX_DECODED_ATTACHMENT_BYTES,

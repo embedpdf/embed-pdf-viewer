@@ -72,8 +72,8 @@ async function boot(scripting: boolean, scope?: string[]) {
   await form.refresh();
   const snapshot = form.snapshot();
   if (!snapshot) throw new Error('form snapshot did not load');
-  const pon = snapshot.fields[0]!.widgets[0]!.pageObjectNumber;
-  await annotation.reloadPage(pon); // hydrate the annotation plane for paint asserts
+  const page = snapshot.fields[0]!.widgets[0]!.page!;
+  await annotation.reloadPage(page); // hydrate the annotation plane for paint asserts
 
   const fieldOf = (name: string) => {
     const field = form.snapshot()?.fields.find((candidate) => candidate.name === name);
@@ -88,13 +88,13 @@ async function boot(scripting: boolean, scope?: string[]) {
     const widget = fieldOf(name).widgets[0]!;
     return {
       kind: 'objectNumber',
-      pageObjectNumber: widget.pageObjectNumber,
+      page: widget.page!,
       annotObjectNumber: widget.annotObjectNumber,
     };
   };
   const press = (name: string): Promise<WidgetActivationResult> =>
     form.activateWidget(fieldKeyOf(fieldOf(name)), widgetRefOf(name));
-  const paintedIds = () => annotation.pageItems(pon).map((item) => item.id);
+  const paintedIds = () => annotation.pageItems(page).map((item) => item.id);
   const widgetId = (name: string) => `obj:${fieldOf(name).widgets[0]!.annotObjectNumber}`;
   const notify = (name: string, event: PdfAnnotationEventKind) =>
     form.notifyWidgetEvent(fieldKeyOf(fieldOf(name)), widgetRefOf(name), event);
@@ -105,8 +105,8 @@ async function boot(scripting: boolean, scope?: string[]) {
     actions.dispatch({
       scope: 'annotation',
       event: 'cursorEnter',
-      ref: { kind: 'objectNumber', pageObjectNumber: pon, annotObjectNumber: 999_999 },
-      pon,
+      ref: { kind: 'objectNumber', page, annotObjectNumber: 999_999 },
+      page,
     });
 
   return {
@@ -115,7 +115,7 @@ async function boot(scripting: boolean, scope?: string[]) {
     form,
     actions,
     annotation,
-    pon,
+    page,
     fieldOf,
     valueOf,
     widgetRefOf,

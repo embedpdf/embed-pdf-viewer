@@ -1,4 +1,4 @@
-import type { DocumentEvent, EffectContext } from '@embedpdf/core';
+import type { DocumentEvent, EffectContext, PageRef } from '@embedpdf/core';
 import { AnnotationToken as AnnotationHostToken } from '@embedpdf/plugin-annotation/contract/host';
 import { loadLinksPage } from './source';
 import type { LinkAction, LinkState } from './types';
@@ -14,24 +14,24 @@ export function registerLinkEffects(ctx: EffectContext<LinkState, LinkAction>): 
   const doc = ctx.doc;
   if (!doc) return;
 
-  const refetch = (pon: number): void => {
+  const refetch = (page: PageRef): void => {
     if (ctx.tryGet(AnnotationHostToken)) return; // annotation model owns the data
-    if (pon in ctx.getState().pages) loadLinksPage(ctx, pon);
+    if (page.pageObjectNumber in ctx.getState().pages) loadLinksPage(ctx, page);
   };
 
   const unsubscribe = doc.events.subscribe((event: DocumentEvent) => {
     switch (event.type) {
       case 'annotation.created':
-        refetch(event.created.pageObjectNumber);
+        refetch(event.created.page);
         break;
       case 'annotation.updated':
-        refetch(event.updated.pageObjectNumber);
+        refetch(event.updated.page);
         break;
       case 'annotation.moved':
-        if (event.moved.length) refetch(event.moved[0].pageObjectNumber);
+        if (event.moved.length) refetch(event.moved[0].page);
         break;
       case 'annotation.deleted':
-        refetch(event.pageObjectNumber);
+        refetch(event.page);
         break;
       default:
         break;

@@ -37,7 +37,7 @@ import type { AnnotationDTO } from './kinds';
 import type { KnownAnnotationState } from './primitives';
 import { classifyRelation, refKey } from './relationships';
 import type { AnnotationRef } from '../identity/AnnotationRef';
-import type { PageObjectNumber } from '../identity/PageObjectNumber';
+import type { PageRef } from '../identity/PageRef';
 
 /** One reviewer's status, derived from an ISO §12.5.6.3 state annotation. */
 export interface ReviewStatus {
@@ -79,7 +79,7 @@ export interface CommentThreadReview {
 
 export interface CommentThread<T extends AnnotationDTO = AnnotationDTO> {
   root: T;
-  pageObjectNumber: PageObjectNumber;
+  page: PageRef;
   /** Whole-subtree replies, flattened chronologically; states excluded. */
   replies: T[];
   /** Every `/RT /Group` subordinate found in the subtree. */
@@ -132,7 +132,7 @@ export function buildCommentThreads(
     const key = refKey(a.ref);
     if (!byKey.has(key)) byKey.set(key, a);
     if (a.nm) {
-      const aliasKey = refKey({ kind: 'nm', pageObjectNumber: a.pageObjectNumber, nm: a.nm });
+      const aliasKey = refKey({ kind: 'nm', page: a.page, nm: a.nm });
       if (!byKey.has(aliasKey)) byKey.set(aliasKey, a);
     }
   }
@@ -176,7 +176,7 @@ export function buildCommentThreads(
     states.sort(chronological);
     threads.push({
       root,
-      pageObjectNumber: root.pageObjectNumber,
+      page: root.page,
       replies,
       groupedParts,
       review: computeReview(states, opts),

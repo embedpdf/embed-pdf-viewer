@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { textQuadFromRect } from '@embedpdf/core-geometry';
+import { toPageRef } from '@embedpdf/engine-core/runtime';
 import { initialModel, update } from './update';
 import { layoutRedactLabel, scene } from './scene';
 import type { Annot, Model, RenderItem, TextStyle } from './types';
@@ -37,7 +38,12 @@ function redactItem(overrides: Partial<RenderItem> = {}): RenderItem {
 }
 
 describe('hover model state', () => {
-  const annot = { id: 'obj:1', pon: 1, subtype: 'redact', flags: DRAWN_FLAGS } as unknown as Annot;
+  const annot = {
+    id: 'obj:1',
+    page: toPageRef(1),
+    subtype: 'redact',
+    flags: DRAWN_FLAGS,
+  } as unknown as Annot;
   const base: Model = {
     ...initialModel,
     byId: { 'obj:1': annot },

@@ -4,6 +4,7 @@ import {
   type PageImageHandle,
   type PageImageOptions,
   type PageObjectNumber,
+  type PageRef,
   type PageRenderViewport,
 } from '@embedpdf/core';
 
@@ -98,9 +99,9 @@ export type RenderAction =
   | {
       type: 'INVALIDATE';
       scope: InvalidateScope;
-      pons: readonly PageObjectNumber[];
+      pageObjectNumbers: readonly PageObjectNumber[];
     }
-  | { type: 'PAINT_ADVANCED'; pon: PageObjectNumber };
+  | { type: 'PAINT_ADVANCED'; pageObjectNumber: PageObjectNumber };
 
 /**
  * One view's scoped tile surface (see {@link RenderCapability.tilesFor}).
@@ -121,7 +122,7 @@ export interface ViewTiles {
    * A thumbnail-sized demand never engages.
    */
   plan(
-    pon: PageObjectNumber,
+    page: PageRef,
     demand: PageViewDemand,
     opts?: { includeAnnotations?: boolean },
   ): TilePaintPlan;
@@ -131,17 +132,17 @@ export interface ViewTiles {
    * tiles release on this signal — never on fetch completion or image load,
    * which could drop the backdrop before replacement pixels are presented.
    */
-  painted(pon: PageObjectNumber, key: string): void;
+  painted(page: PageRef, key: string): void;
   /**
    * The inverse report: this plan key's <img> left the DOM, so its pixels
    * are no longer compositable. Painted is a statement about the SCREEN and
    * must follow the DOM — a remounting tile re-decodes, and until it
    * reports painted again, retention may not count it as coverage.
    */
-  unpainted(pon: PageObjectNumber, key: string): void;
+  unpainted(page: PageRef, key: string): void;
   /** This view unmounted its tile plane for the page: abort in-flight tile
    *  fetches, drop ITS bookkeeping (resolved bytes stay cached). */
-  release(pon: PageObjectNumber): void;
+  release(page: PageRef): void;
 }
 
 export interface RenderCapability {
@@ -154,7 +155,7 @@ export interface RenderCapability {
    */
   canRender(): boolean;
   /**
-   * Render a page (by its durable pon) to an ENCODED image. Abortable. Encoded
+   * Render a page (by its durable page ref) to an ENCODED image. Abortable. Encoded
    * output is identical for local & cloud and cheap over the wire (vs. raw RGBA).
    *
    * This is the VIEWER door: the desired `scale` conforms through the
@@ -162,9 +163,9 @@ export interface RenderCapability {
    * the pixel budget under `continuous`, the advertised ladder under a
    * lattice — and same-key requests collapse in the plugin's raster store
    * (singleflight + LRU). Scale-precise offline output (export, print)
-   * belongs on the engine door: `doc.page(pon).render.image(...)`.
+   * belongs on the engine door: `doc.page(page).render.image(...)`.
    */
-  renderPage(pon: PageObjectNumber, options: RenderPageOptions): Promise<PageImageHandle>;
+  renderPage(page: PageRef, options: RenderPageOptions): Promise<PageImageHandle>;
   /**
    * The identity of the raster `renderPage` would produce for these options —
    * conformed width + annotations flag + epoch, as one stable string. Layers
@@ -175,16 +176,13 @@ export interface RenderCapability {
    * Always available: the kernel materializes the policy on `DocumentMeta`
    * before the document publishes.
    */
-  renderSourceKey(
-    pon: PageObjectNumber,
-    options: { scale: number; includeAnnotations?: boolean },
-  ): string;
+  renderSourceKey(page: PageRef, options: { scale: number; includeAnnotations?: boolean }): string;
   /**
    * The canonical viewport a desired scale conforms to for this page —
    * always width-kind: the exact demand capped at the budget (exact mode)
    * or the snapped rung (ladder/lattice mode).
    */
-  conformViewport(pon: PageObjectNumber, scale: number): PageRenderViewport;
+  conformViewport(page: PageRef, scale: number): PageRenderViewport;
   /** Resolved layer-facing paint settings (settle, fade, tiles on/off). */
   paintSettings(): PaintSettings;
   /** The document's advertised policy (sugar over `DocumentMeta.renderPolicy`). */
@@ -207,17 +205,17 @@ export interface RenderCapability {
    * CONFIRMED mutations — never optimistically — so a drag invalidates once,
    * at commit.
    */
-  renderEpoch(pon: PageObjectNumber, includeAnnotations?: boolean): number;
+  renderEpoch(page: PageRef, includeAnnotations?: boolean): number;
   /**
    * Declare that page pixels changed — the open door for facts the built-in
    * event map doesn't know (a plugin's own mutation vocabulary: redaction,
    * text edit, anything third-party). Call at CONFIRMATION (after the engine
    * write resolves), never for optimistic previews — those belong in overlay
-   * layers. `pons` omitted = every page; `scope` defaults to 'content'
+   * layers. `pages` omitted = every page; `scope` defaults to 'content'
    * (repaint everything) because a caller who doesn't say is safest repainted
    * fully. Redundant with a mapped engine event? Harmless — one extra refetch.
    */
-  invalidate(opts?: { pons?: readonly PageObjectNumber[]; scope?: InvalidateScope }): void;
+  invalidate(opts?: { pages?: readonly PageRef[]; scope?: InvalidateScope }): void;
 }
 
 export const RenderToken = createCapabilityToken<RenderCapability>('render');

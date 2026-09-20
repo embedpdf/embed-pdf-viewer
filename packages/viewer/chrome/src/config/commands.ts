@@ -48,9 +48,9 @@ const sameTextRange = (a: TextRange | null, b: TextRange | null): boolean =>
   a === b ||
   (!!a &&
     !!b &&
-    a.start.pon === b.start.pon &&
+    a.start.page.pageObjectNumber === b.start.page.pageObjectNumber &&
     a.start.index === b.start.index &&
-    a.end.pon === b.end.pon &&
+    a.end.page.pageObjectNumber === b.end.page.pageObjectNumber &&
     a.end.index === b.end.index);
 
 // ── annotation-selection predicates (drive the floating strip's contents) ────
@@ -561,8 +561,8 @@ export const defaultCommands: CommandDef[] = [
     }),
     enabled: (c) => {
       const s = stage(c);
-      const pon = s?.pages()[s.currentPage()]?.pon;
-      return pon != null && (c.tryGet(MeasurementToken)?.canMeasure(pon) ?? false);
+      const page = s?.pages()[s.currentPage()]?.ref;
+      return page != null && (c.tryGet(MeasurementToken)?.canMeasure(page) ?? false);
     },
   },
   {
@@ -571,8 +571,8 @@ export const defaultCommands: CommandDef[] = [
     }),
     enabled: (c) => {
       const s = stage(c);
-      const pon = s?.pages()[s.currentPage()]?.pon;
-      return pon != null && (c.tryGet(MeasurementToken)?.canMeasure(pon) ?? false);
+      const page = s?.pages()[s.currentPage()]?.ref;
+      return page != null && (c.tryGet(MeasurementToken)?.canMeasure(page) ?? false);
     },
   },
   {
@@ -581,8 +581,8 @@ export const defaultCommands: CommandDef[] = [
     }),
     enabled: (c) => {
       const s = stage(c);
-      const pon = s?.pages()[s.currentPage()]?.pon;
-      return pon != null && (c.tryGet(MeasurementToken)?.canMeasure(pon) ?? false);
+      const page = s?.pages()[s.currentPage()]?.ref;
+      return page != null && (c.tryGet(MeasurementToken)?.canMeasure(page) ?? false);
     },
   },
   {
@@ -682,8 +682,8 @@ export const defaultCommands: CommandDef[] = [
       const documentId = c.documentId;
       if (!a || !stamp || documentId == null) return;
       const dtos = a.getSelected();
-      const pon = dtos[0]?.ref.pageObjectNumber;
-      if (pon === undefined) return;
+      const page = dtos[0]?.ref.page;
+      if (page === undefined) return;
       const i18n = c.tryGet(I18nToken);
       const label = i18n?.t('demo.stampsCustomLabel') ?? 'Custom stamp';
       const libraryName = i18n?.t('demo.stampsCustomLibrary') ?? 'My stamps';
@@ -695,7 +695,7 @@ export const defaultCommands: CommandDef[] = [
         .then((id) =>
           stamp.addAssetFromAnnotations(
             documentId,
-            pon,
+            page,
             dtos.map((d) => d.ref),
             { libraryId: id, label: `${label} ${stamp.assets(id).length + 1}` },
           ),
@@ -719,7 +719,7 @@ export const defaultCommands: CommandDef[] = [
       hasAnnotationSelection(c) &&
       !selectionSubtypes(c).has('widget') &&
       !selectionSubtypes(c).has('redact') &&
-      new Set((anno(c)?.getSelected() ?? []).map((d) => d.ref.pageObjectNumber)).size === 1,
+      new Set((anno(c)?.getSelected() ?? []).map((d) => d.ref.page.pageObjectNumber)).size === 1,
     enabled: (c) => c.tryGet(DocumentsToken)?.allows('doc.download') ?? true,
   },
   {

@@ -9,16 +9,42 @@ export interface DocAnnotationsList200Response {
 
 export namespace DocAnnotationsList200Response {
     export interface PageState {
-        pageObjectNumber: number;
+        page: PageState.Page;
         revision: PageState.Revision;
         weakAnnotationState: CloudPDF.DocAnnotationsList200ResponsePageStateWeakAnnotationState;
     }
 
     export namespace PageState {
+        export interface Page {
+            kind: Page.Kind;
+            pageObjectNumber: number;
+        }
+
+        export namespace Page {
+            export const Kind = {
+                ObjectNumber: "objectNumber",
+            } as const;
+            export type Kind = (typeof Kind)[keyof typeof Kind];
+        }
+
         export interface Revision {
             docSessionId: string;
-            pageObjectNumber: number;
+            page: Revision.Page;
             generation: number;
+        }
+
+        export namespace Revision {
+            export interface Page {
+                kind: Page.Kind;
+                pageObjectNumber: number;
+            }
+
+            export namespace Page {
+                export const Kind = {
+                    ObjectNumber: "objectNumber",
+                } as const;
+                export type Kind = (typeof Kind)[keyof typeof Kind];
+            }
         }
     }
 }

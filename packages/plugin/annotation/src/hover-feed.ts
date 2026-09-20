@@ -38,7 +38,7 @@ export function createAnnotationHoverFeed(
     const enter = Boolean(annot.data?.actions?.cursorEnter?.root);
     const exit = Boolean(annot.data?.actions?.cursorExit?.root);
     if (!enter && !exit) return null;
-    return { ref: annot.ref, pon: annot.pon, events: { enter, exit } };
+    return { ref: annot.ref, page: annot.page, events: { enter, exit } };
   };
 
   return {

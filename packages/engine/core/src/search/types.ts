@@ -1,4 +1,5 @@
 import type { PageObjectNumber } from '../identity/PageObjectNumber';
+import type { PageRef } from '../identity/PageRef';
 import type { PdfTextSegment } from '../text/layout';
 
 /**
@@ -102,7 +103,7 @@ export interface SearchRequest {
    * the document, so the matches the user is looking at arrive in the
    * first slice. Ignored when `cursor` is set (the cursor owns position).
    */
-  startPage?: PageObjectNumber;
+  startPage?: PageRef;
   /**
    * Trusted absolute resume position: pages of the scan order already
    * consumed. For callers that pin content versions EXTERNALLY — the
@@ -144,7 +145,7 @@ export interface SearchSnippet {
  * and the reading `advance`.
  */
 export interface SearchMatch {
-  pageObjectNumber: PageObjectNumber;
+  page: PageRef;
   charStart: number;
   charCount: number;
   segments: PdfTextSegment[];

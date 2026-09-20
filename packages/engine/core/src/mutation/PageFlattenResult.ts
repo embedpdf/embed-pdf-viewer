@@ -1,17 +1,17 @@
 import type { SerializedEngineError } from '../errors/EngineError';
-import type { PageObjectNumber } from '../identity/PageObjectNumber';
+import type { PageRef } from '../identity/PageRef';
 import type { MutationMeta } from './MutationMeta';
 
 export type PageFlattenUsage = 'display' | 'print';
 export type PageFlattenStatus = 'applied' | 'unchanged' | 'failed' | 'skipped';
 
 export interface PageFlattenInput {
-  pageObjectNumbers: PageObjectNumber[];
+  pages: PageRef[];
   usage: PageFlattenUsage;
 }
 
 export interface PageFlattenItemResult {
-  pageObjectNumber: PageObjectNumber;
+  page: PageRef;
   status: PageFlattenStatus;
   error?: SerializedEngineError;
 }
@@ -19,7 +19,7 @@ export interface PageFlattenItemResult {
 /** Flatten is a content + annotation mutation, never a layout mutation. */
 export interface PageFlattenResult {
   /** The original ordered request, retained for audit/event replay. */
-  pageObjectNumbers: PageObjectNumber[];
+  pages: PageRef[];
   usage: PageFlattenUsage;
   results: PageFlattenItemResult[];
   meta: MutationMeta | null;

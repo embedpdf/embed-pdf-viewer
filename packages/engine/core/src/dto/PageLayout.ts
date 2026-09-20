@@ -1,5 +1,5 @@
 import type { PdfRect, PdfRotation, PdfSize } from '../geometry/primitives';
-import type { PageObjectNumber } from '../identity/PageObjectNumber';
+import type { PageRef } from '../identity/PageRef';
 import type { PdfPageActions } from './PdfAction';
 
 /**
@@ -51,9 +51,12 @@ export interface PageBoxes {
 export interface PageLayout {
   /** Display order at read time. Not an identity; shifts on a page move. */
   index: number;
-  /** Durable identity; the only safe key for cross-call correlation and the
-   * key every leaf URL (`/pages/{pon}/...`) is addressed by. */
-  pageObjectNumber: PageObjectNumber;
+  /**
+   * The page's durable identity. The only safe key for cross-call
+   * correlation and what every leaf URL (`/pages/{pageKey}/...`) is
+   * addressed by; `index` is display order.
+   */
+  ref: PageRef;
   /** `/PageLabels` entry, or `null` when the PDF declares no label (the SDK
    * falls back to `index + 1`). */
   label: string | null;

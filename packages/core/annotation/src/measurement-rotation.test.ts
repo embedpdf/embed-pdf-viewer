@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { toPageRef } from '@embedpdf/engine-core/runtime';
 import { DRAWN_FLAGS } from './flags';
 import { DEFAULT_CHROME_GEOM, pointInQuad, rotatePoint, unionRect } from './geometry';
 import { hitTest, groupUnionBounds } from './hit';
@@ -8,6 +9,7 @@ import { initialModel, initialStyle, update, annotsInBox } from './update';
 import { chrome, pageItems } from './view';
 import type { Annot, Model, Quad, Vec } from './types';
 
+const PAGE = toPageRef(1);
 const appearance: DistanceAppearance = {
   intent: 'LineDimension',
   measure: null,
@@ -21,7 +23,7 @@ function measurement(overrides: Partial<Annot> = {}): Annot {
   return {
     id: 'distance',
     ref: null,
-    pon: 1,
+    page: toPageRef(1),
     subtype: 'line',
     geom: {
       t: 'line',
@@ -53,7 +55,7 @@ function expectPoint(actual: Vec, expected: Vec) {
 }
 
 function outlineCorners(model: Model): Quad {
-  const node = chrome(model, 1).find((item) => item.kind === 'outline' || item.kind === 'obb');
+  const node = chrome(model, PAGE).find((item) => item.kind === 'outline' || item.kind === 'obb');
   if (node?.kind === 'obb') return node.corners;
   if (node?.kind !== 'outline') throw new Error('Missing selection outline');
   const { x, y, width, height } = node.rect;
@@ -66,7 +68,11 @@ function outlineCorners(model: Model): Quad {
 }
 
 function pointer(model: Model, phase: 'down' | 'move' | 'up', point: Vec): Model {
-  return update(model, { t: 'editPointer', phase, in: { pon: 1, point, shift: false } })[0];
+  return update(model, {
+    t: 'editPointer',
+    phase,
+    in: { page: toPageRef(1), point, shift: false },
+  })[0];
 }
 
 describe('measurement selection frame and rotation', () => {
@@ -92,13 +98,13 @@ describe('measurement selection frame and rotation', () => {
     const outline = outlineCorners(start);
     const bounds = unionRect(outline);
     const center = { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 };
-    const knob = chrome(start, 1).find((node) => node.kind === 'rotate-knob');
+    const knob = chrome(start, PAGE).find((node) => node.kind === 'rotate-knob');
     if (knob?.kind !== 'rotate-knob') throw new Error('Missing rotation handle');
     expectPoint(knob.from, {
       x: (outline[0].x + outline[1].x) / 2,
       y: (outline[0].y + outline[1].y) / 2,
     });
-    const hit = hitTest(start, 1, knob.at, DEFAULT_CHROME_GEOM, 6);
+    const hit = hitTest(start, PAGE, knob.at, DEFAULT_CHROME_GEOM, 6);
     expect(hit).toMatchObject({ t: 'rotate', pivot: center });
 
     const armed = pointer(start, 'down', knob.at);
@@ -110,7 +116,7 @@ describe('measurement selection frame and rotation', () => {
     for (const angle of [30, 89, 91, 137, 180, 269, 271, 359]) {
       const at = rotatePoint(knob.at, center, angle);
       const moving = pointer(armed, 'move', at);
-      const item = pageItems(moving, 1)[0];
+      const item = pageItems(moving, PAGE)[0];
       const layout = distanceLayout(item.geom, item.measure as DistanceAppearance, 2)!;
       const rotatedOutline = outlineCorners(moving);
       rotatedOutline.forEach((point, index) => {
@@ -120,7 +126,7 @@ describe('measurement selection frame and rotation', () => {
       for (const point of layout.selectionPoints) {
         expect(pointInQuad(point, rotatedOutline)).toBe(true);
       }
-      const guides = chrome(moving, 1).find((node) => node.kind === 'rotate-guides');
+      const guides = chrome(moving, PAGE).find((node) => node.kind === 'rotate-guides');
       expect(guides).toMatchObject({ center });
 
       const committed = pointer(moving, 'up', at);
@@ -164,7 +170,9 @@ describe('measurement selection frame and rotation', () => {
 
   it('uses the full measurement frame for marquee and group rotation', () => {
     const state = selected();
-    expect(annotsInBox(state, 1, { x: 290, y: 340 }, { x: 325, y: 355 })).toEqual(['distance']);
+    expect(annotsInBox(state, toPageRef(1), { x: 290, y: 340 }, { x: 325, y: 355 })).toEqual([
+      'distance',
+    ]);
     const square: Annot = {
       ...measurement(),
       id: 'square',
@@ -175,7 +183,7 @@ describe('measurement selection frame and rotation', () => {
     state.byId.square = square;
     state.order.push(square.id);
     state.selected.push(square.id);
-    const bounds = groupUnionBounds(state, 1)!;
+    const bounds = groupUnionBounds(state, toPageRef(1))!;
     const center = { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 };
     const before = annotationSelectionFrame(state.byId.distance).center;
     const rotated = update(state, { t: 'rotate90' })[0];

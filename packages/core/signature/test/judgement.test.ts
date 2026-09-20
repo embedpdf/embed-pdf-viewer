@@ -12,6 +12,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { createLocalEngine } from '@embedpdf/engine';
+import type { PageRef } from '@embedpdf/engine-core/runtime';
 
 import { createTestSigner, sign, validateSignatures } from '../src/index';
 
@@ -37,7 +38,7 @@ const trust = { anchors: async () => [signer.certificate] };
 
 async function inkOn(doc: Awaited<ReturnType<Engine['open']>>) {
   const page = (await doc.pages.list()).pages[0]!;
-  await doc.page(page.pageObjectNumber).annotations.create({
+  await doc.page(page.ref).annotations.create({
     subtype: 'ink',
     inkList: [
       [
@@ -94,7 +95,11 @@ describe('what a validator concludes', () => {
         expect(analysis.verdict).toBe('permitted');
         const [r] = await validateSignatures(reopened, { trust });
         expect(r.summary).toBe('valid');
-        expect(r.modifications).toEqual({ verdict: 'permitted', basis: 'persisted', laterRevisions: 1 });
+        expect(r.modifications).toEqual({
+          verdict: 'permitted',
+          basis: 'persisted',
+          laterRevisions: 1,
+        });
         // Still possible to annotate: nothing was declared. Only a rewrite is refused.
         expect(reopened.security.allows('doc.annotate.modify')).toBe(true);
         expect(reopened.security.allows('doc.download.flattened')).toBe(false);
@@ -139,7 +144,7 @@ describe('what a validator concludes', () => {
       // The engine bakes /AP at create: the orphaned appearance stream the
       // removal leaves behind is part of this test.
       const page = (await doc.pages.list()).pages[0]!;
-      const created = await doc.page(page.pageObjectNumber).annotations.create({
+      const created = await doc.page(page.ref).annotations.create({
         subtype: 'square',
         rect: { left: 10, bottom: 600, right: 200, top: 700 },
         color: { r: 0, g: 0, b: 0 },
@@ -149,7 +154,7 @@ describe('what a validator concludes', () => {
       expect(v.summary).toBe('valid');
       expect(v.modifications).toMatchObject({ verdict: 'permitted', basis: 'working-copy' });
 
-      await doc.page(page.pageObjectNumber).annotations.delete(created.created.ref);
+      await doc.page(page.ref).annotations.delete(created.created.ref);
       [v] = await validateSignatures(doc, { trust, until: 'working-copy' });
       expect(v.summary).toBe('valid');
       // Nothing to judge: the bytes a save would write ARE the loaded bytes.
@@ -178,17 +183,20 @@ describe('what a validator concludes', () => {
     const twoPage = new Uint8Array(
       await readFile(resolve(here, '../../../engine/main/test/fixtures/two_page_sigfield.pdf')),
     );
-    const doc = await engine.open({ kind: 'bytes', id: 'reopen-a', bytes: twoPage }, { scope: ['*'] });
+    const doc = await engine.open(
+      { kind: 'bytes', id: 'reopen-a', bytes: twoPage },
+      { scope: ['*'] },
+    );
     let signed: ArrayBuffer;
     let artifact: Uint8Array;
-    let pageObjectNumber: number;
+    let pageRef: PageRef;
     let ref: import('@embedpdf/engine-core/runtime').AnnotationRef;
     try {
       await sign(doc, { field: { kind: 'fqn', name: 'sig' }, signer });
       signed = await doc.download();
       const page2 = (await doc.pages.list()).pages[1]!;
-      pageObjectNumber = page2.pageObjectNumber;
-      const created = await doc.page(pageObjectNumber).annotations.create({
+      pageRef = page2.ref;
+      const created = await doc.page(pageRef).annotations.create({
         subtype: 'square',
         rect: { left: 20, bottom: 20, right: 120, top: 60 },
         color: { r: 1, g: 0, b: 0 },
@@ -200,11 +208,16 @@ describe('what a validator concludes', () => {
       await doc.close();
     }
     const reopened = await engine.open(
-      { kind: 'layerBytes', id: 'reopen-b', baseBytes: signed, layer: { kind: 'artifact', bytes: artifact } },
+      {
+        kind: 'layerBytes',
+        id: 'reopen-b',
+        baseBytes: signed,
+        layer: { kind: 'artifact', bytes: artifact },
+      },
       { scope: ['*'] },
     );
     try {
-      await reopened.page(pageObjectNumber).annotations.delete(ref);
+      await reopened.page(pageRef).annotations.delete(ref);
       const again = await reopened.download();
       expect(Buffer.from(again).equals(Buffer.from(signed))).toBe(true);
       const [v] = await validateSignatures(reopened, { trust, until: 'working-copy' });
@@ -228,7 +241,7 @@ describe('what a validator concludes', () => {
         family: 'signature',
         name: 'sig2',
         widget: {
-          pageObjectNumber: page.pageObjectNumber,
+          page: page.ref,
           rect: { left: 300, bottom: 50, right: 500, top: 120 },
         },
       } as never);
@@ -237,7 +250,7 @@ describe('what a validator concludes', () => {
       let verdicts = await validateSignatures(doc, { trust });
       expect(verdicts.map((x) => x.summary)).toEqual(['valid', 'valid']);
 
-      const created = await doc.page(page.pageObjectNumber).annotations.create({
+      const created = await doc.page(page.ref).annotations.create({
         subtype: 'square',
         rect: { left: 10, bottom: 600, right: 200, top: 700 },
         color: { r: 0, g: 0, b: 0 },
@@ -247,7 +260,7 @@ describe('what a validator concludes', () => {
       expect(verdicts.map((x) => x.summary)).toEqual(['valid', 'valid']);
       expect(verdicts.map((x) => x.modifications.verdict)).toEqual(['permitted', 'permitted']);
 
-      await doc.page(page.pageObjectNumber).annotations.delete(created.created.ref);
+      await doc.page(page.ref).annotations.delete(created.created.ref);
       verdicts = await validateSignatures(doc, { trust, until: 'working-copy' });
       expect(verdicts.map((x) => x.summary)).toEqual(['valid', 'valid']);
       expect(verdicts.map((x) => x.modifications.basis)).toEqual(['persisted', 'persisted']);
