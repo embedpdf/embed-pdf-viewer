@@ -8,7 +8,13 @@
     },
     "@embedpdf/engine#build": {
       "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/packages/engine/runtime/npm/wasm32/lib/embedpdf.browser.js"],
       "outputs": ["dist/**", "workers/**", "src/generated/**"]
+    },
+    "@embedpdf/engine-runtime#build": {
+      "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$", "npm/wasm32/lib/embedpdf.wasm"],
+      "outputs": ["dist/**", "npm/wasm32/lib/wasm-inline.js"]
     },
     "@embedpdf/website#build:demos": {
       "dependsOn": ["^build"],
