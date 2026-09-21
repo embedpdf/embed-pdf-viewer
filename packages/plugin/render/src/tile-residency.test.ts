@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { PageImageHandle, PdfRect } from '@embedpdf/core';
+import type { PageImageHandle } from '@embedpdf/core';
 
 import { resolveRenderOptions, type TilesOptions } from './paint-plan';
 import { RasterStore } from './raster-store';
@@ -16,11 +16,7 @@ import { TileManager } from './tile-manager';
 
 const PAGE = { width: 612, height: 792 };
 
-function harness(opts?: {
-  tiling?: TilesOptions;
-  storeBudget?: number;
-  handleBytes?: number;
-}) {
+function harness(opts?: { tiling?: TilesOptions; storeBudget?: number; handleBytes?: number }) {
   const store = new RasterStore(opts?.storeBudget ?? 1024 * 1024 * 1024);
   const pending: Array<{
     key: string;
@@ -37,12 +33,12 @@ function harness(opts?: {
     getPolicy: () => ({ kind: 'continuous' }) as never,
     getPageSize: () => PAGE,
     getEpoch: () => 0,
-    fetchTile: (_pon, rect: PdfRect, scale: number, _a, signal) =>
+    fetchTile: (_pon, rect, scale: number, _a, signal) =>
       new Promise<PageImageHandle>((resolve, reject) => {
         liveFetches += 1;
         maxLiveFetches = Math.max(maxLiveFetches, liveFetches);
         const record = {
-          key: `${rect.left.toFixed(2)}@${scale.toFixed(2)}`,
+          key: `${rect.x.toFixed(2)}@${scale.toFixed(2)}`,
           settled: false,
           resolve: () => {
             if (record.settled) return;

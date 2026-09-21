@@ -9,6 +9,7 @@
  */
 import type { PageSpace } from '@embedpdf/core-geometry';
 import type { EventHook } from './event-hook';
+import type { PluginErrorInfo } from './errors';
 import type {
   DocumentHandle,
   Engine,
@@ -71,6 +72,17 @@ export interface OperationOptions {
 export type ResourceStatus = 'idle' | 'loading' | 'ready' | 'forbidden' | 'error';
 
 /**
+ * The outcome of a best-effort batch (`renderPages`, `createMany`, …): what
+ * was applied, what was skipped with a reason, and what failed with its
+ * error summary. `R` is the input's identity (a `PageRef`, an `AnnotationRef`).
+ */
+export interface BatchResult<T, R = unknown> {
+  readonly applied: readonly T[];
+  readonly skipped: readonly { readonly ref: R; readonly reason: string }[];
+  readonly failed: readonly { readonly ref: R; readonly error: PluginErrorInfo }[];
+}
+
+/**
  * Where a confirmed change came from, on every plugin event that reports one.
  * `locality` is whether THIS engine instance caused it; `trigger` is the
  * user-visible cause when known. Remote changes arrive with `trigger: 'unknown'`
@@ -125,6 +137,8 @@ export const CORE_DOCUMENT_OPENING = '@@core/document-opening';
 export const CORE_DOCUMENT_LOCKED = '@@core/document-locked';
 /** The open failed; the tab stays with `status: 'error'` until closed. */
 export const CORE_DOCUMENT_OPEN_FAILED = '@@core/document-open-failed';
+/** A tab was renamed (`documents.rename`). */
+export const CORE_DOCUMENT_RENAMED = '@@core/document-renamed';
 
 /** A typed handle to a capability — typed resolution, no string casts. */
 export interface CapabilityToken<T> {
@@ -340,6 +354,8 @@ export interface DocInfo {
   pageCount: number;
   /** `locked` only: a supplied password was rejected (show "incorrect"). */
   passwordProvided?: boolean;
+  /** `error` only: why the open failed, in the plugin error vocabulary. */
+  error?: PluginErrorInfo;
 }
 
 /** Field-wise DocInfo equality — the ONE definition every adapter's reactive
@@ -350,7 +366,9 @@ export const docInfoEquals = (a: DocInfo, b: DocInfo): boolean =>
   a.name === b.name &&
   a.status === b.status &&
   a.pageCount === b.pageCount &&
-  a.passwordProvided === b.passwordProvided;
+  a.passwordProvided === b.passwordProvided &&
+  a.error?.code === b.error?.code &&
+  a.error?.message === b.error?.message;
 
 export const docInfoListEquals = (a: readonly DocInfo[], b: readonly DocInfo[]): boolean =>
   a === b || (a.length === b.length && a.every((d, i) => docInfoEquals(d, b[i])));
@@ -382,8 +400,39 @@ export type InitialDocument = { source: OpenSource; active?: boolean } & Omit<
   'activate'
 >;
 
+// ── document lifecycle events ─────────────────────────────────────────────
+export interface DocumentOpenedEvent {
+  readonly documentId: string;
+  readonly info: DocInfo;
+}
+export interface DocumentOpenFailedEvent {
+  readonly documentId: string;
+  readonly error: PluginErrorInfo;
+}
+export interface DocumentLockedEvent {
+  readonly documentId: string;
+  readonly passwordProvided: boolean;
+}
+export interface DocumentClosedEvent {
+  readonly documentId: string;
+}
+export interface ActiveDocumentChangedEvent {
+  readonly documentId: string | null;
+  readonly previousDocumentId: string | null;
+}
+export interface DocumentPagesChangedEvent {
+  readonly documentId: string;
+  readonly revision: number;
+  readonly pages: readonly PageInfo[];
+}
+
 export interface DocumentsCapability {
+  /** Open a document; the tab exists synchronously, content arrives on resolve. */
   open(input: OpenSource, options?: OpenDocumentOptions): Promise<string>;
+  /** Re-run a failed open (`status: 'error'`) with the same source and options. */
+  retry(id: string): Promise<string>;
+  /** Change the tab name. */
+  rename(id: string, name: string): void;
   /**
    * Boot-open a batch: fires every `open()` WITHOUT awaiting, so each tab
    * slot is reserved synchronously — all tabs exist immediately, in array
@@ -393,7 +442,7 @@ export interface DocumentsCapability {
    * unhandled rejections. This is kernel-owned POLICY: adapters call this
    * one line instead of each re-implementing activation and error handling.
    */
-  openAll(docs: readonly InitialDocument[]): void;
+  openAll(docs: readonly InitialDocument[]): readonly string[];
   /**
    * Unlock a `locked` document with a password and promote it to `ready`.
    * Rejects with the engine's DocPasswordIncorrect on a wrong password —
@@ -405,29 +454,36 @@ export interface DocumentsCapability {
   close(id: string): Promise<void>;
   closeAll(): Promise<void>;
   setActive(id: string): void;
-  activeId(): string | null;
-  list(): DocInfo[];
+  /** The selected tab's id. */
+  getActiveId(): string | null;
+  /** The selected tab's info. */
+  getActive(): DocInfo | null;
+  /** Every tab in order (ready documents and pending slots), reference-stable until it changes. */
+  list(): readonly DocInfo[];
   get(id: string): DocInfo | null;
   has(id: string): boolean;
-  count(): number;
-  order(): string[];
+  getCount(): number;
+  getOrder(): readonly string[];
+  /** Reorder every tab at once; `ids` must be a permutation of the current order. */
+  setOrder(ids: readonly string[]): void;
   /** Move a document (tab) to a new position in the order. */
   move(id: string, toIndex: number): void;
   /** Swap two documents (tabs) in the order. */
   swap(a: string, b: string): void;
   /**
-   * Save the COMPLETE document (base + layer) to PDF bytes. `mode` is
+   * The COMPLETE document (base + layer) as PDF bytes. `mode` is
    * `'incremental'` (append changes, original bytes preserved) or `'rewrite'`
-   * (flatten to a fresh PDF). Defaults to the active document.
+   * (flatten to a fresh PDF). Defaults to the active document. Saving to
+   * disk is a web adapter verb (`saveAs`), not a kernel one.
    */
-  download(id?: string, opts?: { mode?: PdfSaveMode }): Promise<Uint8Array>;
+  save(id?: string, options?: { mode?: PdfSaveMode } & OperationOptions): Promise<Uint8Array>;
   /**
    * Export JUST the document's LAYER artifact (re-openable via `OpenInputLayerBytes`).
    * Rejects when the document was opened without a layer, or the engine can't
    * export one (cloud manages layers server-side — `DocumentHandle.downloadLayer`
    * is absent there). Defaults to the active document.
    */
-  downloadLayer(id?: string): Promise<Uint8Array>;
+  saveLayer(id?: string, options?: OperationOptions): Promise<Uint8Array>;
   /**
    * The page registry of a document (the active one by default), in display
    * order. Reference-stable per registry revision: the array only changes
@@ -451,6 +507,19 @@ export interface DocumentsCapability {
    * to the active document; `false` with no (ready) document.
    */
   allows(cap: DocCapability, id?: string): boolean;
+
+  /** A document became `ready`. */
+  readonly onOpened: EventHook<DocumentOpenedEvent>;
+  /** An open failed; the tab shows `error`. */
+  readonly onOpenFailed: EventHook<DocumentOpenFailedEvent>;
+  /** A document parked on a password. */
+  readonly onLocked: EventHook<DocumentLockedEvent>;
+  /** A document was closed, after its resources were released. */
+  readonly onClosed: EventHook<DocumentClosedEvent>;
+  /** The selected tab changed. */
+  readonly onActiveChanged: EventHook<ActiveDocumentChangedEvent>;
+  /** The page registry was replaced (rotate, move, delete, insert). */
+  readonly onPagesChanged: EventHook<DocumentPagesChangedEvent>;
 }
 
 /** Built-in token for the document registry capability (provided by the kernel). */

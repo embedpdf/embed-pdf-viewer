@@ -9,14 +9,14 @@ import { toPageRef, type AnnotationRef } from '@embedpdf/engine-core/runtime';
 
 import { actionsPlugin } from '../src/actions.plugin';
 import { ActionsToken } from '../src/internal';
-import type { ActionsHostCapability, ActionsPluginConfig } from '../src/types';
+import type { ActionsHostCapability, ActionsConfig } from '../src/types';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const fixture = (name: string) =>
   resolve(here, '..', '..', '..', 'engine', 'main', 'test', 'fixtures', name);
 
 /** Kernel + real engine + recording seams over one fixture. */
-async function boot(file: string, opts?: { config?: ActionsPluginConfig }) {
+async function boot(file: string, opts?: { config?: ActionsConfig }) {
   const engine = await createLocalEngine({ runtime: { prefer: 'wasm' } });
   const kernel = createKernel({
     engine,

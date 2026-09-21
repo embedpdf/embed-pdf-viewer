@@ -18,8 +18,8 @@ export { widgetAppearanceFromProps } from './authoring';
 // The comments lens's thread shapes (composed in engine-core, ISO 32000
 // §12.5.6.3) + the annotation identity type its verbs take — re-exported
 // so consumers type against this package alone.
-export { DEFAULT_CHROME } from './reducer';
-export { DEFAULT_TOOLS } from './tools';
+export { DEFAULT_CHROME } from './model';
+export { DEFAULT_TOOLS } from './tools/definitions';
 export type {
   AnnotationToolDef,
   AnnotationToolInput,
@@ -31,7 +31,7 @@ export type {
   StampSourceSpec,
   ToolAuthoringKind,
   ToolDefaultsFor,
-} from './tools';
+} from './tools/definitions';
 // The property vocabulary + schema (defined in the portable core; re-exported so
 // app code building property UIs needs only this package).
 export { propsFor } from '@embedpdf/core-annotation';

@@ -64,7 +64,7 @@ export function useKernelValue<R>(
 }
 
 export function useActiveDocumentId(): string | null {
-  return useKernelValue((k) => k.documents.activeId());
+  return useKernelValue((k) => k.documents.getActiveId());
 }
 
 /** The document id for this subtree: the nearest <DocumentScope>, else the active doc. */
@@ -196,7 +196,7 @@ export function useOptionalSelector<C, R>(
 
 /**
  * Subscribe to a capability's {@link EventHook} for the mounted lifetime —
- * `useCapabilityEvent(ActionsToken, (c) => c.onAction, handler)`. Events
+ * `useCapabilityEvent(ActionsToken, (c) => c.onExecuted, handler)`. Events
  * carry occurrences, never state (a late subscriber that needs the current
  * value uses `useSelector`). The handler rides a ref, so a fresh closure per
  * render never resubscribes. Null-safe: no plugin/document → no subscription.
@@ -226,14 +226,28 @@ export function useDocuments() {
     docs,
     activeId,
     open: kernel.documents.open,
+    retry: kernel.documents.retry,
     unlock: kernel.documents.unlock,
     close: kernel.documents.close,
+    rename: kernel.documents.rename,
     setActive: kernel.documents.setActive,
     move: kernel.documents.move,
     swap: kernel.documents.swap,
-    download: kernel.documents.download,
-    downloadLayer: kernel.documents.downloadLayer,
+    setOrder: kernel.documents.setOrder,
+    save: kernel.documents.save,
+    saveLayer: kernel.documents.saveLayer,
   };
+}
+
+/** Subscribe to one document lifecycle event for the mounted lifetime: `useDocumentEvent((d) => d.onOpened, handler)`. */
+export function useDocumentEvent<T>(
+  select: (documents: Kernel['documents']) => EventHook<T>,
+  handler: (event: T) => void,
+): void {
+  const kernel = useKernel();
+  const handlerRef = useRef(handler);
+  handlerRef.current = handler;
+  useEffect(() => select(kernel.documents)((event) => handlerRef.current(event)), [kernel, select]);
 }
 
 // `InitialDocument` is the KERNEL's type (re-exported via `export * from
@@ -435,7 +449,7 @@ export interface PageContextValue {
    */
   getViewDemand?: () => PageViewDemand;
   /**
-   * The hosting VIEW's identity — the stage lens id (`stage.lensId()`) or a
+   * The hosting VIEW's identity — the stage lens id (`stage.getLensId()`) or a
    * per-instance PageView id. IDENTITY, not an option: per-view raster
    * planning (tiles) keys its state by this, so two views showing the SAME
    * page never fight over one plan (a thumbnail rail's never-engaging demand

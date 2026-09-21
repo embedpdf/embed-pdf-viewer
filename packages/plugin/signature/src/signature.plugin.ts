@@ -1,6 +1,6 @@
 import { definePlugin } from '@embedpdf/core';
 import { FormToken } from '@embedpdf/plugin-form/contract';
-import { InteractionToken } from '@embedpdf/plugin-interaction/contract';
+import { InteractionToken } from '@embedpdf/plugin-interaction/contract/host';
 import { StampToken } from '@embedpdf/plugin-stamp/contract';
 import { AnnotationToken } from '@embedpdf/plugin-annotation/contract';
 

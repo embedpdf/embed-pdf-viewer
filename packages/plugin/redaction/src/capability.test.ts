@@ -19,7 +19,7 @@ describe('redaction selection geometry', () => {
     const annotation = { createMarkup, canCreate: () => true };
     const selection = {
       hasSelection: () => true,
-      snapshot: () => ({
+      getSnapshot: () => ({
         pages: [
           {
             page: toPageRef(7),

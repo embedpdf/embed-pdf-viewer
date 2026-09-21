@@ -1,4 +1,3 @@
-import type { PdfRect } from '@embedpdf/core';
 import type { Rect } from '@embedpdf/core-geometry';
 
 // One owner for space math: rect intersection lives in core-geometry
@@ -80,22 +79,6 @@ export function tilePaintRect(grid: TileGrid, page: PageSizePt, c: TileCoord): R
     width: Math.min(span, page.width - x),
     height: Math.min(span, page.height - y),
   };
-}
-
-/** Engine target rect (y-UP PDF user space, top > bottom) for an arbitrary
- *  y-down page-point rect. */
-export function toEngineRect(page: PageSizePt, rect: Rect): PdfRect {
-  return {
-    left: rect.x,
-    right: rect.x + rect.width,
-    top: page.height - rect.y,
-    bottom: page.height - (rect.y + rect.height),
-  };
-}
-
-/** Engine target rect: y-UP PDF user space (top > bottom). */
-export function tileEngineRect(grid: TileGrid, page: PageSizePt, c: TileCoord): PdfRect {
-  return toEngineRect(page, tilePaintRect(grid, page, c));
 }
 
 /**

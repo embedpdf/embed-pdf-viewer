@@ -3,6 +3,7 @@ import {
   pageRefsEqual,
   type AnnotationRef,
   type FormDataFormat,
+  type FormFieldDTO,
   type FormFieldDraft,
   type FormFieldPatch,
   type FormFieldRef,
@@ -13,7 +14,19 @@ import {
   type PdfActionTree,
   type PdfRect,
 } from '@embedpdf/engine-core/runtime';
-import { DocumentsToken, type PluginContext } from '@embedpdf/core';
+import {
+  DocumentsToken,
+  PluginError,
+  createEventHook,
+  originOf,
+  toPluginError,
+  toPluginErrorInfo,
+  type BatchResult,
+  type ChangeOrigin,
+  type DocumentEvent,
+  type PluginContext,
+  type ResourceStatus,
+} from '@embedpdf/core';
 import { ActionsToken, createHoverPump } from '@embedpdf/plugin-actions/contract';
 import { ActionsToken as ActionsHostToken } from '@embedpdf/plugin-actions/contract/host';
 import type {
@@ -48,15 +61,23 @@ import { createSerialMutationQueue } from './mutationQueue';
 import { createFormScriptingController } from './scripting';
 import type { FormEffectsResult } from '@embedpdf/engine-core/runtime';
 import type {
+  CreatedField,
+  CreateFieldInput,
   FormAction,
   FormCommitResult,
+  FormConfig,
+  FormFieldChangedEvent,
+  FormFilter,
   FormHostCapability,
-  FormPluginOptions,
+  FormResyncedEvent,
   FormState,
-  PlacedField,
-  PlaceFieldInput,
+  FormValidationRejectedEvent,
+  FormValueChangedEvent,
+  SetValueResult,
   WidgetActivationResult,
+  WidgetAddress,
 } from './types';
+import { update as updateModel } from './core/model';
 
 /** PDF user-space rect (y-up) → content-space box (y-down, crop-relative). */
 const toBox = (rect: PdfRect, crop: PdfRect): Box => ({
@@ -85,11 +106,50 @@ const sameAnnotationRef = (left: AnnotationRef, right: AnnotationRef): boolean =
  * to the store; engine calls happen around it. Every read the frameworks do
  * goes through memoized projections keyed on `model.seq`.
  */
+/** The capability alone, connected at once — the shape the unit tests build. */
 export function createFormCapability(
   ctx: PluginContext<FormState, FormAction>,
-  options: FormPluginOptions = {},
+  config: FormConfig = {},
 ): FormHostCapability {
+  const { api, connect } = createFormController(ctx, config);
+  connect();
+  return api;
+}
+
+/**
+ * The form controller. The model holds the reconciled field tree, the
+ * per-page widget geometry and the in-flight writes; every engine read lands
+ * through `readSnapshot`, every confirmed field change is announced from the
+ * document event stream in `connect` (own, script and remote writes alike).
+ */
+export function createFormController(
+  ctx: PluginContext<FormState, FormAction>,
+  config: FormConfig = {},
+) {
   const model = (): Model => ctx.getState().model;
+  const keyOf = (ref: FormFieldRef): FieldKey =>
+    ref.kind === 'objectNumber' ? `obj:${ref.fieldObjectNumber}` : `fqn:${ref.name}`;
+  const reportListener = (error: unknown) => console.error('[form] event listener failed:', error);
+  const valueChanged = createEventHook<FormValueChangedEvent>(reportListener);
+  const fieldCreated = createEventHook<FormFieldChangedEvent>(reportListener);
+  const fieldUpdated = createEventHook<FormFieldChangedEvent>(reportListener);
+  const fieldDeleted = createEventHook<FormFieldChangedEvent>(reportListener);
+  const validationRejected = createEventHook<FormValidationRejectedEvent>(reportListener);
+  const resynced = createEventHook<FormResyncedEvent>(reportListener);
+  ctx.cleanup(() => {
+    for (const hook of [
+      valueChanged,
+      fieldCreated,
+      fieldUpdated,
+      fieldDeleted,
+      validationRejected,
+      resynced,
+    ])
+      hook.dispose();
+  });
+  const setStatus = (status: ResourceStatus): void => {
+    if (ctx.getState().status !== status) ctx.dispatch({ type: 'SET_STATUS', status });
+  };
   const apply = (msg: Msg): void => {
     ctx.dispatch({ type: 'SET_MODEL', model: update(model(), msg) });
   };
@@ -108,7 +168,7 @@ export function createFormCapability(
   const actionsHost = ctx.tryGet(ActionsHostToken);
   const realm = actionsHost?.scriptRealm ?? null;
   const scripting =
-    realm && ctx.doc
+    realm && ctx.doc && config.validation !== 'none'
       ? createFormScriptingController({
           doc: ctx.doc,
           document: () => ctx.document(),
@@ -130,30 +190,47 @@ export function createFormCapability(
     ctx.doc?.security.allows(cap) ?? false;
 
   // ── snapshot loading ────────────────────────────────────────────────────
-  let refreshPromise: Promise<void> | null = null;
-  const refresh = async (force = false): Promise<void> => {
+  const readSnapshot = async (): Promise<void> => {
     const doc = ctx.doc;
     if (!doc) return;
     // No read authority → don't fire a doomed list (a reviewer-shaped token
     // without `doc.forms.read` is the COMMON narrowed scope); the model stays
     // empty and `canRead()` tells chrome why. The engine enforces regardless.
-    if (!can('doc.forms.read')) return;
-    if (refreshPromise) {
-      await refreshPromise;
-      if (!force) return;
+    if (!can('doc.forms.read')) {
+      setStatus('forbidden');
+      return;
     }
-    refreshPromise = doc.forms
-      .list()
-      .then((snapshot) => apply({ t: 'snapshot', snapshot }))
-      .catch((err) => {
-        // A race with an access change 403s here; anything else is a real
-        // load failure. Either way: surfaced, never an unhandled rejection.
-        console.warn('[form] form snapshot failed to load', err);
-      })
-      .finally(() => {
-        refreshPromise = null;
-      });
-    return refreshPromise;
+    if (!model().snapshot) setStatus('loading');
+    try {
+      const snapshot = await doc.forms.list();
+      apply({ t: 'snapshot', snapshot });
+      setStatus('ready');
+      resynced.emit({ snapshot });
+    } catch (err) {
+      // A race with an access change 403s here; anything else is a real
+      // load failure. Either way: surfaced, never an unhandled rejection.
+      console.warn('[form] form snapshot failed to load', err);
+      setStatus('error');
+    }
+  };
+  // An invalidation that lands while a read is in flight queues one more
+  // read after it — the snapshot can never settle stale (G5).
+  let refreshRun: Promise<void> | null = null;
+  let refreshAgain = false;
+  const refresh = (): Promise<void> => {
+    if (refreshRun) {
+      refreshAgain = true;
+      return refreshRun;
+    }
+    refreshRun = (async () => {
+      do {
+        refreshAgain = false;
+        await readSnapshot();
+      } while (refreshAgain);
+    })().finally(() => {
+      refreshRun = null;
+    });
+    return refreshRun;
   };
 
   // ── widget geometry (from the WIDGET plane: one annotations read/page) ──
@@ -193,7 +270,7 @@ export function createFormCapability(
     if (m.geom[pon]) return coreWidgetAt(m, pon, point);
     if (!annotationHost) return null;
     let best: WidgetHit | null = null;
-    for (const item of annotationHost.pageItems(page)) {
+    for (const item of annotationHost.listPageItems(page)) {
       if (!item.subtype.startsWith('widget') || item.ref?.kind !== 'objectNumber') continue;
       const box = item.box;
       const inside =
@@ -258,12 +335,12 @@ export function createFormCapability(
       const result = await scripting.commit(ref, value);
       surfaceViaActions(result, 'user');
       // A native partial/failed effects result can still have mutated state.
-      if (result.effectsResult !== null) await refresh(true);
+      if (result.effectsResult !== null) await refresh();
       return result;
     }
 
     const result = await doc.forms.setValue(ref, value);
-    await refresh(true);
+    await refresh();
     return {
       status: result.changedWidgets.length > 0 ? 'applied' : 'unchanged',
       scripted: false,
@@ -273,30 +350,66 @@ export function createFormCapability(
     };
   };
 
-  const write = (key: FieldKey, value: FormFieldValue): Promise<void> => {
+  const assertFill = (operation: string): void => {
     // The optimistic gate: no fill authority → refuse BEFORE the spinner and
-    // the queued engine call, with the refusal shape the engine would send.
-    // (The fused projection renders such widgets inert; this covers the
-    // imperative door.)
-    if (!can('doc.forms.fill'))
-      return Promise.reject(new PermissionDenied('doc.forms.fill', 'form.fill'));
+    // the queued engine call. (The fused projection renders such widgets
+    // inert; this covers the imperative door.)
+    if (!can('doc.forms.fill')) {
+      throw new PluginError('permission-denied', 'form', `${operation} requires doc.forms.fill`, {
+        details: { required: 'doc.forms.fill' },
+      });
+    }
+  };
+  const write = async (ref: FormFieldRef, value: FormFieldValue): Promise<SetValueResult> => {
+    assertFill('form.setValue');
+    const key = keyOf(ref);
     return enqueueMutation(async () => {
       const doc = ctx.doc;
-      if (!doc) return;
+      if (!doc) throw new PluginError('not-ready', 'form', 'no document');
       apply({ t: 'writeStart', key });
       try {
-        const result = await commitValueNow(refKeyOf(key), value);
+        const result = await commitValueNow(ref, value);
         if (result.status === 'rejected' || result.status === 'failed') {
           apply({ t: 'writeFailed', key });
         } else if (result.effectsResult === null && result.scripted) {
           // A scripted no-op has no engine read-back to clear the spinner.
           apply({ t: 'writeFailed', key });
         }
+        if (result.status === 'rejected') {
+          validationRejected.emit({ ref, issues: result.diagnostics });
+        }
+        return result;
       } catch (err) {
         apply({ t: 'writeFailed', key });
-        throw err;
+        throw toPluginError('form', err);
       }
     });
+  };
+  const writeBatch = async <R>(
+    entries: readonly R[],
+    run: (entry: R) => Promise<SetValueResult>,
+    refOf: (entry: R) => FormFieldRef,
+  ): Promise<BatchResult<FormFieldRef, R>> => {
+    const applied: FormFieldRef[] = [];
+    const failed: { ref: R; error: ReturnType<typeof toPluginErrorInfo> }[] = [];
+    for (const entry of entries) {
+      try {
+        const result = await run(entry);
+        if (result.status === 'rejected' || result.status === 'failed') {
+          failed.push({
+            ref: entry,
+            error: {
+              code: result.status === 'rejected' ? 'invalid-input' : 'operation-failed',
+              message: result.error?.message ?? result.diagnostics[0]?.message ?? result.status,
+              capability: 'form',
+            },
+          });
+        } else applied.push(refOf(entry));
+      } catch (error) {
+        failed.push({ ref: entry, error: toPluginErrorInfo(toPluginError('form', error)) });
+      }
+    }
+    return { applied, skipped: [], failed };
   };
 
   // ── design mode ──────────────────────────────────────────────────────────
@@ -308,7 +421,7 @@ export function createFormCapability(
   const annotationActivation = async (ref: AnnotationRef) => {
     const doc = ctx.doc;
     if (!doc) return null;
-    const loaded = annotationHost?.get(ref);
+    const loaded = annotationHost?.getRaw(ref);
     if (loaded?.subtype === 'widget') return loaded.actions?.activate ?? null;
     const { annotations } = await doc.page(ref.page).annotations.list();
     const annotation = annotations.find((candidate) => sameAnnotationRef(candidate.ref, ref));
@@ -316,7 +429,7 @@ export function createFormCapability(
   };
 
   const activateWidgetNow = async (
-    key: FieldKey,
+    ref: FormFieldRef,
     annotationRef: AnnotationRef,
   ): Promise<FormCommitResult> => {
     const doc = ctx.doc;
@@ -340,9 +453,9 @@ export function createFormCapability(
         diagnostics: [],
       };
     }
-    const result = await scripting.activate(refKeyOf(key), action);
+    const result = await scripting.activate(ref, action);
     surfaceViaActions(result, 'user');
-    if (result.effectsResult !== null) await refresh(true);
+    if (result.effectsResult !== null) await refresh();
     return result;
   };
 
@@ -395,7 +508,7 @@ export function createFormCapability(
     const resetFailed = effectsResult.results.some(
       (entry) => entry.status === 'failed' || entry.status === 'rejected',
     );
-    await refresh(true);
+    await refresh();
     if (resetFailed) {
       return {
         status: 'failed',
@@ -410,7 +523,7 @@ export function createFormCapability(
     if (scripting) {
       recalc = await scripting.recalculate();
       surfaceViaActions(recalc, origin);
-      if (recalc.effectsResult !== null) await refresh(true);
+      if (recalc.effectsResult !== null) await refresh();
     }
     return {
       status: 'applied',
@@ -474,9 +587,9 @@ export function createFormCapability(
   };
 
   // ── widget DOM-event feed helpers ───────────────────────────────────────
-  const widgetSource = (key: FieldKey, annotationRef: AnnotationRef): ActionSource => ({
+  const widgetSource = (field: FormFieldRef, annotationRef: AnnotationRef): ActionSource => ({
     kind: 'widget',
-    field: refKeyOf(key),
+    field,
     annotation: annotationRef,
     page: annotationRef.page,
   });
@@ -494,7 +607,7 @@ export function createFormCapability(
   const widgetHoverFlags = (
     annotationRef: AnnotationRef,
   ): { enter: boolean; exit: boolean } | null => {
-    const loaded = annotationHost?.get(annotationRef);
+    const loaded = annotationHost?.getRaw(annotationRef);
     if (loaded?.subtype !== 'widget') return null;
     return {
       enter: Boolean(loaded.actions?.cursorEnter?.root),
@@ -541,29 +654,35 @@ export function createFormCapability(
     return `${family}_${n}`;
   };
 
-  const placeFieldNow = async (input: PlaceFieldInput): Promise<PlacedField> => {
+  const createFieldNow = async (input: CreateFieldInput): Promise<CreatedField> => {
     const doc = ctx.doc;
     const page = input.page;
     const pon = page.pageObjectNumber;
     const crop = ctx.document()?.pages.find((p) => p.ref.pageObjectNumber === pon)?.boxes.crop;
-    if (!doc || !crop) throw new Error('[form] placeField: document/page not ready');
+    if (!doc || !crop) {
+      throw new PluginError('not-ready', 'form', 'createField: document/page not ready');
+    }
     // Placement is page-bound: intersect a (possibly overshooting) drag box
     // with the page. Sizing policy is the CALLER's job (the place handler's
     // click policy / drag rect) — a degenerate result is a caller bug.
     const bounds = pageBox(page)!;
-    const x = Math.max(bounds.x, Math.min(input.box.x, bounds.width));
-    const y = Math.max(bounds.y, Math.min(input.box.y, bounds.height));
+    const x = Math.max(bounds.x, Math.min(input.bounds.x, bounds.width));
+    const y = Math.max(bounds.y, Math.min(input.bounds.y, bounds.height));
     const box: Box = {
       x,
       y,
-      width: Math.max(0, Math.min(input.box.x + input.box.width, bounds.width) - x),
-      height: Math.max(0, Math.min(input.box.y + input.box.height, bounds.height) - y),
+      width: Math.max(0, Math.min(input.bounds.x + input.bounds.width, bounds.width) - x),
+      height: Math.max(0, Math.min(input.bounds.y + input.bounds.height, bounds.height) - y),
     };
     if (box.width < 1 || box.height < 1) {
-      throw new Error('[form] placeField: degenerate box (size the box before placing)');
+      throw new PluginError(
+        'invalid-input',
+        'form',
+        'createField: degenerate bounds (size the box before placing)',
+      );
     }
     const { family, appearance } = input;
-    const name = autoName(family);
+    const name = input.name ?? autoName(family);
     const placement = {
       page,
       rect: toPdfRect(box, crop),
@@ -577,14 +696,16 @@ export function createFormCapability(
               family,
               name,
               widget: placement,
-              options: [
-                { label: 'Option 1', value: 'Option 1' },
-                { label: 'Option 2', value: 'Option 2' },
-              ],
+              options: input.options
+                ? input.options.map((o) => ({ ...o }))
+                : [
+                    { label: 'Option 1', value: 'Option 1' },
+                    { label: 'Option 2', value: 'Option 2' },
+                  ],
             }
           : { family, name, widget: placement };
     const result = await doc.forms.createField(draft);
-    await refresh(true);
+    await refresh();
     apply({ t: 'clearGeom', pageObjectNumber: pon });
     // AWAIT the annotation-plane reload so the returned widget ref is already
     // selectable — the caller's auto-select needs the model to know it.
@@ -593,72 +714,204 @@ export function createFormCapability(
     return { field: result.field, widget };
   };
 
-  const updateFieldNow = async (key: FieldKey, patch: FormFieldPatch): Promise<void> => {
+  const updateFieldNow = async (ref: FormFieldRef, patch: FormFieldPatch): Promise<void> => {
     const doc = ctx.doc;
     if (!doc) return;
-    await doc.forms.updateField(refKeyOf(key), patch);
-    await refresh(true);
+    await doc.forms.updateField(ref, patch);
+    await refresh();
   };
 
-  const deleteFieldNow = async (key: FieldKey): Promise<void> => {
+  const deleteFieldNow = async (ref: FormFieldRef): Promise<void> => {
     const doc = ctx.doc;
     if (!doc) return;
-    const field = fieldByKey(model(), key);
+    const field = fieldByKey(model(), keyOf(ref));
     const pages = field?.widgets.flatMap((w) => (w.page ? [w.page] : [])) ?? [];
-    await doc.forms.deleteField(refKeyOf(key));
-    await refresh(true);
+    await doc.forms.deleteField(ref);
+    await refresh();
     for (const pon of new Set(pages.map((p) => p.pageObjectNumber))) {
       apply({ t: 'clearGeom', pageObjectNumber: pon });
     }
     nudgeAnnotations(pages);
   };
 
-  const detachWidgetNow = async (key: FieldKey, annotObjectNumber: number): Promise<void> => {
+  const detachWidgetNow = async (ref: FormFieldRef, widget: AnnotationRef): Promise<void> => {
     const doc = ctx.doc;
     if (!doc) return;
-    const field = fieldByKey(model(), key);
-    const widget = field?.widgets.find((w) => w.annotObjectNumber === annotObjectNumber);
-    if (!widget?.ref)
-      throw new Error(`[form] widget ${annotObjectNumber} has no annotation address`);
-    await doc.forms.detachWidget(refKeyOf(key), widget.ref);
-    await refresh(true);
-    if (widget?.page) {
-      apply({ t: 'clearGeom', pageObjectNumber: widget.page.pageObjectNumber });
-      nudgeAnnotations([widget.page]);
-    }
+    await doc.forms.detachWidget(ref, widget);
+    await refresh();
+    apply({ t: 'clearGeom', pageObjectNumber: widget.page.pageObjectNumber });
+    nudgeAnnotations([widget.page]);
+  };
+  const attachWidgetNow = async (ref: FormFieldRef, widget: AnnotationRef): Promise<void> => {
+    const doc = ctx.doc;
+    if (!doc) return;
+    await doc.forms.attachWidget(ref, widget);
+    await refresh();
+    apply({ t: 'clearGeom', pageObjectNumber: widget.page.pageObjectNumber });
+    nudgeAnnotations([widget.page]);
   };
 
-  void refresh();
+  // ── reads over the snapshot ──
+  const widgetObjectOf = (widget: WidgetAddress): number =>
+    'kind' in widget
+      ? widget.kind === 'objectNumber'
+        ? widget.annotObjectNumber
+        : 0
+      : widget.annotObjectNumber;
+  const listFields = (filter?: FormFilter): readonly FormFieldDTO[] => {
+    const fields = model().snapshot?.fields ?? [];
+    if (!filter) return fields;
+    const page = filter.page;
+    return fields.filter(
+      (f) =>
+        (!filter.family || f.family === filter.family) &&
+        (filter.name === undefined || f.name === filter.name) &&
+        (!page || f.widgets.some((w) => w.page && pageRefsEqual(w.page, page))),
+    );
+  };
+  const valueOf = (field: FormFieldDTO): FormFieldValue | null => {
+    const entry = field.valueEntry;
+    if (entry.kind === 'none' || entry.kind === 'unsupported') return null;
+    if (field.family === 'checkbox' || field.family === 'radio') {
+      return {
+        type: 'toggle',
+        state: entry.kind === 'scalar' ? entry.value : (entry.values[0] ?? null),
+      };
+    }
+    if (field.family === 'combobox' || field.family === 'listbox') {
+      return {
+        type: 'choice',
+        values: entry.kind === 'scalar' ? [entry.value] : [...entry.values],
+      };
+    }
+    return {
+      type: 'text',
+      value: entry.kind === 'scalar' ? entry.value : entry.values.join('\n'),
+    };
+  };
+  const exportValues = (): Readonly<Record<string, FormFieldValue>> => {
+    const out: Record<string, FormFieldValue> = {};
+    for (const field of model().snapshot?.fields ?? []) {
+      const value = valueOf(field);
+      if (value) out[field.name] = value;
+    }
+    return out;
+  };
+  const resetAll = async (
+    options: { fields?: readonly FormFieldRef[]; exclude?: boolean } = {},
+  ): Promise<BatchResult<FormFieldRef, FormFieldRef>> => {
+    assertFill('form.resetAll');
+    const targets =
+      options.fields?.map(
+        (ref): PdfActionTargetRef =>
+          ref.kind === 'objectNumber'
+            ? { kind: 'objectNumber', objectNumber: ref.fieldObjectNumber }
+            : { kind: 'name', name: ref.name },
+      ) ?? null;
+    const snapshot = model().snapshot ?? (await ctx.doc!.forms.list());
+    const { selected } = resolveFieldSelection(snapshot.fields, targets, options.exclude ?? false);
+    const refs = selected
+      .filter((f) => f.family !== 'pushbutton' && f.family !== 'signature')
+      .map((f) => f.ref);
+    const result = await resetFormAction(targets, options.exclude ?? false, 'user');
+    if (result.status === 'failed') {
+      const failed = (result.effectsResult?.results ?? [])
+        .filter((entry) => entry.status === 'failed' || entry.status === 'rejected')
+        .flatMap((entry) => entry.fields.map((f) => f.ref));
+      const failedKeys = new Set(failed.map(keyOf));
+      return {
+        applied: refs.filter((r) => !failedKeys.has(keyOf(r))),
+        skipped: [],
+        failed: failed.map((ref) => ({
+          ref,
+          error: { code: 'operation-failed' as const, message: 'reset failed', capability: 'form' },
+        })),
+      };
+    }
+    return { applied: refs, skipped: [], failed: [] };
+  };
 
-  return {
-    snapshot: () => model().snapshot,
+  // ── confirmed document facts: announce, then reconcile ──
+  const STRUCTURAL = new Set<DocumentEvent['type']>([
+    'form.fieldCreated',
+    'form.fieldUpdated',
+    'form.fieldDeleted',
+    'form.widgetAttached',
+    'form.widgetDetached',
+    'form.repaired',
+  ]);
+  const clearGeom = (): void => {
+    ctx.dispatch({ type: 'SET_MODEL', model: updateModel(model(), { t: 'clearGeom' }) });
+  };
+  const announce = (event: DocumentEvent): void => {
+    if (!('origin' in event)) return;
+    const origin: ChangeOrigin = originOf(event);
+    switch (event.type) {
+      case 'form.valueChanged':
+        valueChanged.emit({ ref: event.field.ref, field: event.field, origin });
+        break;
+      case 'form.fieldCreated':
+        fieldCreated.emit({ ref: event.field.ref, field: event.field, origin });
+        break;
+      case 'form.fieldUpdated':
+      case 'form.widgetAttached':
+      case 'form.widgetDetached':
+        fieldUpdated.emit({ ref: event.field.ref, field: event.field, origin });
+        break;
+      case 'form.fieldDeleted':
+        fieldDeleted.emit({
+          ref: { kind: 'objectNumber', fieldObjectNumber: event.deletedFieldObjectNumber },
+          field: null,
+          origin,
+        });
+        break;
+      default:
+        break;
+    }
+  };
+  const onDocumentEvent = (event: DocumentEvent): void => {
+    announce(event);
+    if (event.type === 'stream.desynced') {
+      void refresh();
+      return;
+    }
+    if (event.type === 'document.versioned' || event.type === 'signature.completed') {
+      void refresh();
+      return;
+    }
+    if (!event.type.startsWith('form.') || !('origin' in event)) return;
+    const structural = STRUCTURAL.has(event.type);
+    if (event.origin.kind !== 'remote' && !structural) return; // own writes refreshed already
+    if (structural) clearGeom();
+    void refresh();
+  };
+
+  const api: FormHostCapability = {
+    getSnapshot: () => model().snapshot,
     refresh,
-    fillItems,
-    fillItem,
-    ensureGeom,
-    field: (key) => fieldByKey(model(), key),
-    fieldForWidget: (annotObjectNumber) => coreFieldForWidget(model(), annotObjectNumber),
-    widgetAt,
-    setText: (key, value) => write(key, { type: 'text', value }),
-    toggle: (key, onState) => write(key, { type: 'toggle', state: onState }),
-    choose: (key, values) => write(key, { type: 'choice', values }),
-    reset: (key) => {
-      // Reset writes a value (the default) — same optimistic gate as write().
-      if (!can('doc.forms.fill'))
-        return Promise.reject(new PermissionDenied('doc.forms.fill', 'form.reset'));
+    listFillItems: fillItems,
+    getFillItem: fillItem,
+    ensureLoaded: ensureGeom,
+    getField: (ref) => fieldByKey(model(), keyOf(ref)),
+    getFieldForWidget: (widget) => coreFieldForWidget(model(), widgetObjectOf(widget)),
+    getWidgetAt: widgetAt,
+    setText: (ref, text) => write(ref, { type: 'text', value: text }),
+    setChecked: (ref, onState) => write(ref, { type: 'toggle', state: onState }),
+    setChoice: (ref, values) => write(ref, { type: 'choice', values: [...values] }),
+    reset: async (ref) => {
+      assertFill('form.reset');
+      const key = keyOf(ref);
       return enqueueMutation(async () => {
         const doc = ctx.doc;
         if (!doc) return;
         apply({ t: 'writeStart', key });
         try {
           if (doc.forms.applyEffects) {
-            // The reset() SYMMETRY fix: this door now rides the SAME core a
-            // /ResetForm action does — one reset effect, then V/C/F
-            // recalculation — so a dependent /C total can never go stale
-            // through the public API while staying fresh through the action.
-            const result = await applyResetBatch([refKeyOf(key)], 'user');
+            const result = await applyResetBatch([ref], 'user');
             if (result.status === 'failed') {
-              throw new Error(
+              throw new PluginError(
+                'operation-failed',
+                'form',
                 result.effectsResult?.results.find(
                   (entry) => entry.status === 'failed' || entry.status === 'rejected',
                 )?.error?.message ?? 'reset failed',
@@ -668,49 +921,40 @@ export function createFormCapability(
             if (field) apply({ t: 'writeDone', key, field });
             else apply({ t: 'writeFailed', key });
           } else {
-            // Batch-less engines keep the direct single-field door.
-            const result = await doc.forms.reset(refKeyOf(key));
+            const result = await doc.forms.reset(ref);
             apply({ t: 'writeDone', key, field: result.field });
           }
         } catch (err) {
           apply({ t: 'writeFailed', key });
-          throw err;
+          throw toPluginError('form', err);
         }
       });
     },
-    commitValue: (ref, value) => enqueueMutation(() => commitValueNow(ref, value)),
-    activateWidget: async (key, annotationRef): Promise<WidgetActivationResult> => {
-      // Delegated path: the ACTIONS queue is the serializer — entering the
-      // form queue here would deadlock the executors it calls back into
-      // (queue-direction law: actions → form, never form → actions → form).
-      // No scripting gate on purpose: Hide/ResetForm buttons must work with
-      // JS off — per-type policy lives in the dispatcher now. Submission is
-      // SYNCHRONOUS (no pre-resolution await): a mouseUp notified just
-      // before this takes the earlier queue slot, always.
+    setValue: write,
+    activateWidget: async (annotationRef): Promise<WidgetActivationResult> => {
+      const field = coreFieldForWidget(model(), widgetObjectOf(annotationRef));
+      if (!field) throw new PluginError('not-found', 'form', 'no form field owns this widget');
       const actions = ctx.tryGet(ActionsToken);
       if (actions) {
         const result = await actions.dispatch({
           scope: 'activate',
           ref: annotationRef,
           page: annotationRef.page,
-          source: widgetSource(key, annotationRef),
+          source: widgetSource(field.ref, annotationRef),
         });
-        // inert + zero steps + zero diagnostics = no /A tree at all — only
-        // then does the legacy form path apply (byte-for-byte no-actions
-        // behavior); anything else IS the dispatch outcome, refusals included.
         const noTree =
           result.status === 'inert' && result.steps.length === 0 && result.diagnostics.length === 0;
         if (!noTree) return { kind: 'dispatched', result };
       }
       return {
         kind: 'form',
-        result: await enqueueMutation(() => activateWidgetNow(key, annotationRef)),
+        result: await enqueueMutation(() => activateWidgetNow(field.ref, annotationRef)),
       };
     },
-    notifyWidgetEvent: (key, annotationRef, event) => {
+    notifyWidgetEvent: (fieldRef, annotationRef, event) => {
       const actions = ctx.tryGet(ActionsToken);
       if (!actions) return;
-      const source = widgetSource(key, annotationRef);
+      const source = widgetSource(fieldRef, annotationRef);
       if (event === 'cursorEnter' || event === 'cursorExit') {
         if (event === 'cursorExit') {
           widgetHoverPump(actions).hover(null);
@@ -783,7 +1027,7 @@ export function createFormCapability(
       // listener deliberately ignores local events) — and the ANNOTATION
       // plane's view of any changed widgets (setDisplay flips widget /F
       // bits, and widget pixels live on that plane).
-      await refresh(true);
+      await refresh();
       if (annotationHost) {
         const seen = new Set<number>();
         for (const widget of result.changedWidgets) {
@@ -794,12 +1038,12 @@ export function createFormCapability(
       }
       return result;
     },
-    setValue: (ref, value) =>
+    setValueRaw: (ref, value) =>
       enqueueMutation(async () => {
         const doc = ctx.doc;
-        if (!doc) throw new Error('no document');
+        if (!doc) throw new PluginError('not-ready', 'form', 'no document');
         const result = await doc.forms.setValue(ref, value);
-        await refresh(true);
+        await refresh();
         return result;
       }),
     exportData: async (format: FormDataFormat = 'xfdf') => {
@@ -820,20 +1064,61 @@ export function createFormCapability(
         const doc = ctx.doc;
         if (!doc) throw new Error('no document');
         const result = await doc.forms.repair(repairOptions);
-        await refresh(true);
+        await refresh();
         return result;
       }),
-    placeField: (input) => enqueueMutation(() => placeFieldNow(input)),
-    pageBox,
-    updateField: (key, patch) => enqueueMutation(() => updateFieldNow(key, patch)),
-    deleteField: (key) => enqueueMutation(() => deleteFieldNow(key)),
-    detachWidget: (key, annotObjectNumber) =>
-      enqueueMutation(() => detachWidgetNow(key, annotObjectNumber)),
-    // The twins (permissions.md). `canRead` mirrors the hydration gate above
-    // — false means the model stays empty by RIGHT, not by loading. Fill and
-    // design are independent grants: a filler is not a designer.
+    createField: (input) => enqueueMutation(() => createFieldNow(input)),
+    getPageBox: pageBox,
+    updateField: (ref, patch) => enqueueMutation(() => updateFieldNow(ref, patch)),
+    deleteField: (ref) => enqueueMutation(() => deleteFieldNow(ref)),
+    detachWidget: (ref, widget) => enqueueMutation(() => detachWidgetNow(ref, widget)),
+    attachWidget: (ref, widget) => enqueueMutation(() => attachWidgetNow(ref, widget)),
+    getStatus: () => ctx.getState().status,
+    listFields,
+    getValue: (ref) => {
+      const field = fieldByKey(model(), keyOf(ref));
+      return field ? valueOf(field) : null;
+    },
+    listWidgets: fillItems,
+    setValues: async (entries) => {
+      const result = await writeBatch(
+        entries,
+        (entry) => write(entry.ref, entry.value),
+        (entry) => entry.ref,
+      );
+      const out: BatchResult<FormFieldRef, FormFieldRef> = {
+        applied: result.applied,
+        skipped: [],
+        failed: result.failed.map((f) => ({ ref: f.ref.ref, error: f.error })),
+      };
+      return out;
+    },
+    resetAll,
+    exportValues,
+    importValues: (values) =>
+      writeBatch(
+        Object.keys(values),
+        (name) => write({ kind: 'fqn', name }, values[name]!),
+        (name) => ({ kind: 'fqn', name }),
+      ),
+    onValueChanged: valueChanged.on,
+    onFieldCreated: fieldCreated.on,
+    onFieldUpdated: fieldUpdated.on,
+    onFieldDeleted: fieldDeleted.on,
+    onValidationRejected: validationRejected.on,
+    onResynced: resynced.on,
     canRead: () => can('doc.forms.read'),
     canFill: () => can('doc.forms.fill'),
     canDesign: () => can('doc.forms.modify'),
+  };
+
+  return {
+    api,
+    connect() {
+      const doc = ctx.doc;
+      const off = doc?.events?.subscribe(onDocumentEvent);
+      if (off) ctx.cleanup(off);
+      void refresh();
+    },
   };
 }

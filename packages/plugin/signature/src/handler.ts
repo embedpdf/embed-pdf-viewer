@@ -2,7 +2,7 @@ import type { InteractionHandler } from '@embedpdf/plugin-interaction/contract';
 import {
   ANNOTATION_EDIT_PRIORITY,
   ARMED_STAMP_TOOL_ID,
-} from '@embedpdf/plugin-annotation/contract';
+} from '@embedpdf/plugin-annotation/contract/host';
 import type { FormCapability } from '@embedpdf/plugin-form/contract';
 import type { StampCapability } from '@embedpdf/plugin-stamp/contract';
 
@@ -31,9 +31,10 @@ export function createArmedMarkHandler(
     enabledFor: (tool) => tool.id === ARMED_STAMP_TOOL_ID,
     onDown: (sample) => {
       if (!sample.page) return false;
-      const armed = stamp.armedAsset(documentId);
-      if (!armed || stamp.library(armed.libraryId)?.kind !== SIGNATURES_LIBRARY_KIND) return false;
-      const hit = form.widgetAt(sample.page.ref, sample.page.point);
+      const armed = stamp.getArmedAsset(documentId);
+      if (!armed || stamp.getLibrary(armed.libraryId)?.kind !== SIGNATURES_LIBRARY_KIND)
+        return false;
+      const hit = form.getWidgetAt(sample.page.ref, sample.page.point);
       if (!hit || hit.field.family !== 'signature') return false;
       // A signed field is final: consume the click (no stamp lands on it) and do nothing.
       if (signature.signatureOf(hit.field.ref)?.signed || hit.field.valueEntry.kind !== 'none') {

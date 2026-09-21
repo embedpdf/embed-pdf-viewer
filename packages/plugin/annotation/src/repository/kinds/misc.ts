@@ -5,8 +5,8 @@
  * patches here but are NOT createable through the repository (stamps carry a
  * binary source through their own create path; widgets are form-plane).
  */
-import type { AnnotationDTO, PdfRect } from '@embedpdf/engine-core/runtime';
 import type { Annot, TextStyle } from '@embedpdf/core-annotation';
+import type { AnnotationDTO, PdfRect } from '@embedpdf/engine-core/runtime';
 
 import { boxEmit, type KindProjection } from '../projection';
 import {

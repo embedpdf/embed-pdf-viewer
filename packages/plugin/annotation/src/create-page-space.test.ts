@@ -1,11 +1,11 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
 import { isPluginError, toPageRef, type PluginContext } from '@embedpdf/core';
 import type { AnnotationDTO, AnnotationFlags, AnnotationRef } from '@embedpdf/engine-core/runtime';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { createAnnotationCapability } from './capability';
+import { createAnnotationController } from './controller';
+import { annotationReducer, initialAnnotationState } from './model';
+import type { AnnotationAction, AnnotationState } from './model';
 import { annotationKey } from './repository';
-import { annotationReducer, initialAnnotationState } from './reducer';
-import type { AnnotationAction, AnnotationState } from './types';
 
 /**
  * Pilot C of the road-to-3.0 plan: the public page-space `create()` enters the
@@ -79,7 +79,7 @@ function harness() {
     tryGet: () => null,
   } as unknown as PluginContext<AnnotationState, AnnotationAction>;
   return {
-    capability: createAnnotationCapability(ctx),
+    capability: createAnnotationController(ctx),
     create,
     update,
     remove,
@@ -94,7 +94,9 @@ describe('create() in page space', () => {
     const h = harness();
     h.create.mockResolvedValueOnce({ created: squareDTO(42) });
     const order: string[] = [];
-    h.capability.onCreated((e) => order.push(`created:${annotationKey(e.ref)}:${e.origin.trigger}`));
+    h.capability.onCreated((e) =>
+      order.push(`created:${annotationKey(e.ref)}:${e.origin.trigger}`),
+    );
 
     const pending = h.capability.create({
       subtype: 'square',
@@ -245,7 +247,7 @@ describe('create() in page space', () => {
     h.capability.onDeleted((e) => log.push(`deleted:${annotationKey(e.ref)}:${e.origin.locality}`));
 
     h.update.mockResolvedValueOnce({ updated: squareDTO(5), appearance: { changed: false } });
-    await h.capability.update(ref, { subtype: 'square', opacity: 0.5 });
+    await h.capability.updateRaw(ref, { subtype: 'square', opacity: 0.5 });
     await h.capability.delete(ref);
     expect(log).toEqual(['updated:local', 'deleted:obj:5:local']);
   });

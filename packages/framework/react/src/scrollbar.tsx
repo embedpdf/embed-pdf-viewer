@@ -1,5 +1,5 @@
 /**
- * Headless scrollbar for a Stage lens — a pure view of `stage.scrollMetrics()`.
+ * Headless scrollbar for a Stage lens — a pure view of `stage.getScrollMetrics()`.
  *
  * The Stage exposes the native scroller contract (scrollTop/scrollHeight/
  * clientHeight, in screen px — see plugin-stage's README); this component turns
@@ -26,19 +26,25 @@
 import * as React from 'react';
 import { useEffect, useRef, useState } from 'react';
 import { StageToken } from '@embedpdf/plugin-stage/contract';
-import type { ScrollMetrics, StageCapability } from '@embedpdf/plugin-stage/contract';
+import type { StageCapability } from '@embedpdf/plugin-stage/contract';
+import type { ScrollMetrics, StageHostCapability } from '@embedpdf/plugin-stage/contract/host';
 import type { CapabilityToken } from '@embedpdf/core';
 import { useCapability, useSelector } from './runtime';
 
 export type ScrollbarAxis = 'x' | 'y';
 
 /** Live scroll metrics for a stage lens (reference-stable; see
- *  `StageCapability.scrollMetrics`). The raw material for custom scroll UI. */
+ *  `StageHostCapability.getScrollMetrics`). The raw material for custom scroll UI. */
 export function useScrollMetrics(
   token: CapabilityToken<StageCapability> = StageToken,
 ): ScrollMetrics {
-  return useSelector(token, (c) => c.scrollMetrics());
+  return useSelector(asHost(token), (c) => c.getScrollMetrics());
 }
+
+// Scroll metrics live on the host lens (the same runtime token, typed wider):
+// a scrollbar is chrome that drives the camera, not a document-level consumer.
+const asHost = (token: CapabilityToken<StageCapability>) =>
+  token as unknown as CapabilityToken<StageHostCapability>;
 
 export interface ScrollbarProps {
   axis: ScrollbarAxis;
@@ -111,7 +117,7 @@ export function Scrollbar({
   thumbClassName,
   thumbStyle,
 }: ScrollbarProps) {
-  const stage = useCapability(token);
+  const stage = useCapability(asHost(token));
   const m = useScrollMetrics(token);
   const vertical = axis === 'y';
   const scrollable = vertical ? m.scrollableY : m.scrollableX;
@@ -160,7 +166,7 @@ export function Scrollbar({
     return vertical ? e.clientY - r.top : e.clientX - r.left;
   };
   /** Fresh geometry for paging steps — read from the capability, never a stale render. */
-  const liveGeometry = () => geometry(stage.scrollMetrics(), vertical, trackPx, minThumbSize);
+  const liveGeometry = () => geometry(stage.getScrollMetrics(), vertical, trackPx, minThumbSize);
 
   const stopPaging = () => {
     if (pageRef.current) {

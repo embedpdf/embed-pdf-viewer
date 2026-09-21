@@ -815,10 +815,10 @@ export function AnnotationStylePanel() {
   const selected = useAnnotationSelected();
 
   const hasSel = sel.specs.length > 0;
-  const specs = hasSel ? sel.specs : annotation.propsForTool(activeToolId);
+  const specs = hasSel ? sel.specs : annotation.listPropSpecs(activeToolId);
   const values = hasSel ? sel.values : defaults;
   const write = (patch: AnnotationPropsPatch) =>
-    hasSel ? annotation.updateSelection(patch) : annotation.setDefaults(activeToolId, patch);
+    hasSel ? annotation.updateSelection(patch) : annotation.setToolDefaults(activeToolId, patch);
 
   // A selection with no editable props (e.g. a stamp, or a LOCKED annotation —
   // its style is frozen) still shows its flags: that's how you unlock it.
@@ -874,7 +874,7 @@ function RedactionLabelSection() {
   useEffect(() => setDraft(null), [mark?.ref && annotationKey(mark.ref)]);
   if (!redaction || !mark || mark.subtype !== 'redact') return null;
 
-  const value = draft ?? mark.overlayText ?? '';
+  const value = draft ?? (mark.raw?.subtype === 'redact' ? mark.raw.overlayText : null) ?? '';
   const commit = () => {
     if (draft === null) return;
     void redaction.setLabel(mark.ref, { overlayText: draft.length > 0 ? draft : null });
@@ -898,7 +898,7 @@ function RedactionLabelSection() {
       <label className="text-fg mt-2 flex items-center gap-2 text-sm">
         <input
           type="checkbox"
-          checked={mark.repeat}
+          checked={mark.raw?.subtype === 'redact' ? mark.raw.repeat : false}
           onChange={(e) => void redaction.setLabel(mark.ref, { repeat: e.target.checked })}
         />
         {t('demo.redactLabelRepeat')}

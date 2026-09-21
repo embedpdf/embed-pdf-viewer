@@ -1,34 +1,26 @@
-/** Stamp-library capability protocol without import/render/plugin wiring. */
-export { StampToken } from './types';
+/** @embedpdf/plugin-stamp/contract — the PUBLIC stamp vocabulary. */
+import type { CapabilityToken } from '@embedpdf/core';
+import { StampToken as StampHostToken } from './types';
+import type { StampCapability } from './types';
+
+export const StampToken = StampHostToken as unknown as CapabilityToken<StampCapability>;
 export type {
   AddAssetInput,
   ImportLibraryOptions,
   MarkSource,
+  StampArmChangedEvent,
   StampAsset,
+  StampAssetEvent,
+  StampAssetFilter,
   StampAssetKind,
   StampAssetPreview,
   StampCapability,
   StampConfig,
   StampLibrary,
   StampLibraryChange,
+  StampLibraryEvent,
+  StampLibraryFilter,
   StampLibraryKind,
-  StampLibraryQuery,
-  StampState,
 } from './types';
-export {
-  parseStampKey,
-  stampKey,
-  customStampName,
-  assetIdFor,
-  stampLibraryPieceInfo,
-  stampPieceInfo,
-  stampKindToPdfName,
-  libraryKindToPdfName,
-  libraryKindFromPdfName,
-  DEFAULT_LIBRARY_KIND,
-  STAMP_LIBRARY_PIECEINFO_APP,
-  STAMP_PIECEINFO_APP,
-  STAMP_PIECEINFO_VERSION,
-} from './convention';
-export type { StampKey } from './convention';
+export { DEFAULT_LIBRARY_KIND } from './convention';
 export type { StampLibraryStore } from './persistence';

@@ -4,7 +4,7 @@ import type { PluginContext } from '@embedpdf/core';
 
 import { createFormCapability } from '../src/capability';
 import { formReducer, initialFormState } from '../src/reducer';
-import type { FormAction, FormState } from '../src/types';
+import { fieldRef, type FormAction, type FormState } from '../src/types';
 
 const field = (): FormFieldDTO => ({
   ref: { kind: 'objectNumber', fieldObjectNumber: 5 },
@@ -64,33 +64,32 @@ describe('the twin law (permissions.md) — form', () => {
     const h = harness(['doc.forms.fill']);
     await h.capability.refresh();
     expect(h.list).not.toHaveBeenCalled();
-    expect(h.capability.snapshot()).toBeNull();
+    expect(h.capability.getSnapshot()).toBeNull();
   });
 
   it('fill authority fuses into FillItem.disabled — inert pixels, not a late 403', async () => {
     const h = harness(['doc.forms.read']);
     await h.capability.refresh();
-    await vi.waitFor(() => expect(h.capability.snapshot()).not.toBeNull());
-    expect(h.capability.fillItem(9)?.disabled).toBe(true);
+    await vi.waitFor(() => expect(h.capability.getSnapshot()).not.toBeNull());
+    expect(h.capability.getFillItem(9)?.disabled).toBe(true);
   });
 
   it('a fillable session leaves the flag gate in charge', async () => {
     const h = harness(ALL);
     await h.capability.refresh();
-    await vi.waitFor(() => expect(h.capability.snapshot()).not.toBeNull());
-    expect(h.capability.fillItem(9)?.disabled).toBe(false);
+    await vi.waitFor(() => expect(h.capability.getSnapshot()).not.toBeNull());
+    expect(h.capability.getFillItem(9)?.disabled).toBe(false);
   });
 
   it('the write gate refuses with the engine refusal shape, before any call', async () => {
     const h = harness(['doc.forms.read']);
     await h.capability.refresh();
-    await vi.waitFor(() => expect(h.capability.snapshot()).not.toBeNull());
-    await expect(h.capability.setText('obj:5', 'x')).rejects.toMatchObject({
-      name: 'PermissionDenied',
-      required: 'doc.forms.fill',
+    await vi.waitFor(() => expect(h.capability.getSnapshot()).not.toBeNull());
+    await expect(h.capability.setText(fieldRef.byObjectNumber(5), 'x')).rejects.toMatchObject({
+      code: 'permission-denied',
     });
-    await expect(h.capability.reset('obj:5')).rejects.toMatchObject({
-      name: 'PermissionDenied',
+    await expect(h.capability.reset(fieldRef.byObjectNumber(5))).rejects.toMatchObject({
+      code: 'permission-denied',
     });
     expect(h.setValue).not.toHaveBeenCalled();
   });

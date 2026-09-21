@@ -1,5 +1,5 @@
 import { createCapabilityToken } from '@embedpdf/core';
-import type { PageRef } from '@embedpdf/core';
+import type { EventHook, PageInfo, PageRef } from '@embedpdf/core';
 import type { PageRotation, PageTransform, Rect } from '@embedpdf/core-geometry';
 import type {
   Alignment,
@@ -348,7 +348,7 @@ export interface Scheduler {
 /**
  * Options for the scroller writes — `Element.scrollTo` semantics: absolute
  * offsets (screen px) into the current scroll range (see
- * {@link StageCapability.scrollMetrics}); an omitted axis does not move.
+ * {@link StageHostCapability.getScrollMetrics}); an omitted axis does not move.
  * `behavior` defaults to 'instant' (the DOM's 'auto'), NOT the stage's
  * `scrollBehavior` setting — that setting governs navigation verbs, and a
  * scrollbar thumb must track the pointer exactly.
@@ -424,233 +424,173 @@ export interface RevealOptions {
   anchor?: RevealAnchor;
 }
 
-/** The Stage's public contract: selectors (reads) + intents (the only writers). */
+// ── events ────────────────────────────────────────────────────────────────
+export interface StagePageChangedEvent {
+  readonly page: PageInfo | null;
+  readonly pageIndex: number;
+  readonly previousPageIndex: number;
+}
+export interface StageZoomChangedEvent {
+  readonly level: number;
+  readonly previousLevel: number;
+  readonly mode: ZoomModeValue | 'custom';
+}
+export interface StageCameraChangedEvent {
+  readonly camera: Camera;
+}
+export interface StageMotionEndedEvent {
+  readonly camera: Camera;
+}
+export interface StageSettingsChangedEvent {
+  readonly settings: StageSettings;
+  readonly changed: readonly (keyof StageSettings)[];
+}
+export interface StageViewportChangedEvent {
+  readonly size: Size;
+}
+
+/** A viewport-space point or rect: this Stage's container px, top-left origin. */
+export type ViewportPoint = Point;
+export type ViewportRect = Rect;
+
+export interface ZoomToOptions {
+  /** Hold this viewport point fixed while the level changes (default: the `zoomAlign` point). */
+  readonly around?: ViewportPoint;
+}
+
+/**
+ * The Stage's public contract: the camera, layout, zoom and navigation of one
+ * presentation of a document. Pointer and surface plumbing (viewport size,
+ * gesture brackets, fling, world space, initial placement) live on the HOST
+ * contract (`@embedpdf/plugin-stage/contract/host`).
+ */
 export interface StageCapability {
-  // ── selectors ──
-  camera(): Camera;
-  viewport(): Size;
+  // ── reading the view ──
+  /** Camera origin (world units) and zoom. */
+  getCamera(): Camera;
+  /** Write the camera directly; marks the cause as user motion. */
+  setCamera(camera: Camera): void;
+  /** The container size the stage was told about. */
+  getViewportSize(): Size;
+  /** Resolved zoom factor. */
+  getZoomLevel(): number;
+  /** The active zoom intent: a fit mode, or 'custom' for a fixed level. */
+  getZoomMode(): ZoomModeValue | 'custom';
+  /** The lens's view rotation — see {@link StageSettings.viewRotation}. */
+  getViewRotation(): PageRotation;
+  /** The cursor page, or null before the document has pages. */
+  getCurrentPage(): PageInfo | null;
+  /** The cursor page's display index. */
+  getCurrentPageIndex(): number;
+  /** Pages of the current item (one page, or a spread / grid row). */
+  listCurrentItemPages(): readonly PageInfo[];
+  /** Pages on screen, with their viewport rects and visible page-space rect. Reference-stable. */
+  listVisiblePages(): readonly VisiblePage[];
+  /** Is any part of the page on screen. */
+  isPageVisible(page: PageRef): boolean;
+  /** What the viewer is looking at plus the zoom intent, for per-page view memory. */
+  getViewpoint(): Viewpoint;
+  /** Serialisable view state — the unit of session persistence. */
+  getViewState(): StageViewState;
+  applyViewState(view: StageViewState): void;
+  /** A tween or fling is running. */
+  isMoving(): boolean;
+  /** Halt any running tween or fling where it is. */
+  stopMotion(): void;
+
+  // ── zoom ──
+  /** Set a fixed level (a bare number) or a fit mode. */
+  zoomTo(zoom: number | ZoomSpec, options?: ZoomToOptions): void;
+  /** Multiply the zoom, holding a viewport point fixed (default: the `zoomAlign` point). */
+  zoomBy(factor: number, options?: ZoomToOptions): void;
+  zoomIn(): void;
+  zoomOut(): void;
+  fitWidth(): void;
+  fitPage(): void;
+  /** Fit the whole scene (every page) in view. */
+  fitAll(): void;
+  /** Fit width but never upscale past 100% (Adobe's "Automatic"). */
+  fitAutomatic(): void;
+
+  // ── navigation ──
+  /** Navigate to a page by identity. Fresh arrival places by the unit rule; pass `viewpoint` to restore. */
+  goToPage(page: PageRef, options?: GoToOptions): void;
+  /** Navigate by zero-based display index. */
+  goToPageIndex(index: number, options?: GoToOptions): void;
+  goToFirstPage(options?: GoToOptions): void;
+  goToLastPage(options?: GoToOptions): void;
+  /** Step forward / backward by the navigation unit (the item if it fits the viewport, else the page). */
+  nextPage(options?: GoToOptions): void;
+  previousPage(options?: GoToOptions): void;
+  canGoNext(): boolean;
+  canGoPrevious(): boolean;
   /**
-   * The camera as a NATIVE SCROLLER — the DOM scroll vocabulary in screen px:
-   * `scrollTop`/`scrollHeight`/`clientHeight` (and the x twins) mean exactly
-   * what they mean on a DOM element; `scrollableX/Y` false ⇔ nothing to scroll
-   * on that axis (native: no bar). Derived from the SAME travel range the pan
-   * clamp uses — paged flow reads the one-item slice — so a scrollbar built on
-   * it can never disagree with where panning stops. On an UNBOUNDED stage the
-   * range is the union of the padded content and the current window (the Figma
-   * bar): pan away and it grows, the thumb shrinking toward the edge but always
-   * remaining a road back. Reference-stable until a field actually changes.
+   * Bring a page, or a page-space rect on it, into view. Bare: minimal movement,
+   * cursor untouched. Positioned (`rect`/`zoom`/`anchor`): the target lands at
+   * the anchor and the cursor follows.
    */
-  scrollMetrics(): ScrollMetrics;
-  pageCount(): number;
-  visiblePages(): VisiblePage[];
-  /** The current page (the cursor) — valid in both flows. */
-  currentPage(): number;
-  /** The display indices of the current item's pages (1 page, or a spread's pages). */
-  currentItemPages(): number[];
-  /** The full page list with PDF labels — for page thumbnails / worksheet tabs. */
-  pages(): Array<{ index: number; ref: PageRef; label: string | null }>;
-  /** The laid-out box for a page by its durable page ref. */
-  pageRect(page: PageRef): VisiblePage | null;
-  /**
-   * Screen point (this Stage's container px) → the page under it + its content
-   * point, or null over a gap. The viewport-level hit-test the interaction hub
-   * needs so a single pointer source can drive page-aware features (text
-   * selection, annotations) AND cross-page drags.
-   */
-  pageAt(screen: Point): {
+  reveal(page: PageRef, options?: RevealOptions): void;
+  /** `reveal` by display index. */
+  revealIndex(index: number, options?: RevealOptions): void;
+  /** Sugar: a positioned reveal of a page-space rect. */
+  revealRect(page: PageRef, rect: Rect, options?: Omit<RevealOptions, 'rect'>): void;
+  /** `Element.scrollTo` / `scrollBy` for the camera, in viewport px. */
+  scrollTo(options: StageScrollToOptions): void;
+  scrollBy(options: StageScrollToOptions): void;
+  /** Pan by a viewport delta. */
+  panBy(dxViewport: number, dyViewport: number): void;
+  /** Back to the first page at the current zoom intent. */
+  resetView(): void;
+
+  // ── rotation ──
+  setViewRotation(rotation: PageRotation): void;
+  rotateViewBy(delta: 90 | -90): void;
+
+  // ── settings ──
+  /** Every live setting (build or save a preset). */
+  getSettings(): StageSettings;
+  /** Patch any subset in ONE anchor-preserving update. Writes the responsive base. */
+  updateSettings(patch: Partial<StageSettings>): void;
+  /** Back to the constructed config. */
+  resetSettings(): void;
+  setFlow(flow: FlowMode): void;
+  setLayout(layout: LayoutKind): void;
+  setSpread(spread: SpreadMode): void;
+  setSizing(sizing: SizingMode): void;
+  /** Replace the container-query rules (see {@link ResponsiveRule}). */
+  setResponsiveRules(rules: readonly ResponsiveRule[]): void;
+  listActiveRules(): readonly string[];
+  matchesRule(name: string): boolean;
+
+  // ── geometry ──
+  /** The page under a viewport point and the page-space point on it; null over a gap. */
+  getPageAt(point: ViewportPoint): {
     ref: PageRef;
     point: Point;
     scale: number;
     /** The hit page's TOTAL display rotation (document /Rotate + view rotation). */
     rotation: PageRotation;
-    /** The hit page's zoom relative to its 100% baseline (`transform.zoom`). */
+    /** The hit page's zoom relative to its 100% baseline. */
     zoom: number;
   } | null;
-  /**
-   * Screen point → `page`'s content space, UNCLAMPED — valid even when the point
-   * is outside the page's bounds (coordinates then fall outside `[0, size]`).
-   * The frame-stable projection a page-anchored gesture (annotation move/resize)
-   * tracks with, where `pageAt` would re-resolve to whatever page is under the
-   * cursor (what a cross-page drag like text selection wants). Null when the
-   * page isn't currently laid out.
-   */
-  pointOnPage(page: PageRef, screen: Point): Point | null;
-  /**
-   * Page space (intrinsic PDF points) → world space. Applies the page's placed
-   * origin and contentScale — the transform sizing policies introduce. Compose
-   * with toScreen for viewport-space overlays anchored to page content.
-   */
-  pageToWorld(page: PageRef, pt: Point): Point | null;
-  /**
-   * Content rect on a page → this Stage viewport's screen-space AABB. Applies page
-   * rotation/contentScale and the current camera. Use for upright viewport overlays
-   * that need to frame a selected page region.
-   */
-  pageRectToScreen(page: PageRef, rect: Rect): Rect | null;
-  toScreen(world: Point): Point;
-  toWorld(screen: Point): Point;
-  flow(): FlowMode;
-  layout(): LayoutKind;
-  spread(): SpreadMode;
-  sizing(): SizingMode;
-  columns(): GridColumns;
-  bounded(): boolean;
-  padding(): number;
-  gap(): Gap;
-  pageFrame(): PageFrame;
-  fitAlign(): Alignment;
-  arrivalAlign(): ArrivalAlignment;
-  zoomAlign(): AlignmentValue;
-  anchorAlign(): AlignmentValue;
-  direction(): Direction;
-  scrollBehavior(): ScrollBehaviorKind;
-  /** The lens's view rotation — see {@link StageSettings.viewRotation}. */
-  viewRotation(): PageRotation;
-  zoomLevel(): number;
-  /** The active zoom intent: a fit-mode, or 'custom' for a fixed level. */
-  zoomMode(): ZoomModeValue | 'custom';
-  /** What I'm looking at + zoom intent — capture for per-page view memory. */
-  viewpoint(): Viewpoint;
-  /** A snapshot of all settings (handy for building/saving a customer preset). */
-  settings(): StageSettings;
-  viewState(): StageViewState;
+  /** Project a viewport point onto ONE page's frame, unclamped; null when the page is not laid out. */
+  viewportToPage(page: PageRef, point: ViewportPoint): Point | null;
+  /** A page-space point → this Stage's viewport. */
+  pageToViewport(page: PageRef, point: Point): ViewportPoint | null;
+  /** A page-space rect → its viewport-space bounding box. */
+  pageRectToViewport(page: PageRef, rect: Rect): ViewportRect | null;
+  /** The laid-out box for a page, or null before placement. */
+  getPageFrame(page: PageRef): VisiblePage | null;
 
-  // ── intents ──
-  setViewport(vp: Size): void;
-  /** Report the device pixel ratio (web: `devicePixelRatio`). The shell calls
-   *  this once on mount and whenever it changes (e.g. dragging between monitors)
-   *  so page transforms render crisp. */
-  setDevicePixelRatio(dpr: number): void;
-  setCamera(c: Camera): void;
-  panBy(dxScreen: number, dyScreen: number): void;
-  /** `Element.scrollTo` for the camera: absolute offsets into the scroll range
-   *  (see {@link StageScrollToOptions}) — clamped into it, cursor-synced, zoom
-   *  untouched (scrolling is a pan in scroller clothing). */
-  scrollTo(opts: StageScrollToOptions): void;
-  /** `Element.scrollBy`: relative offsets — sugar over `scrollTo`. */
-  scrollBy(opts: StageScrollToOptions): void;
-  zoomAround(screenPt: Point, factor: number): void;
-  /**
-   * Bracket a continuous direct-manipulation gesture (touch pan / pinch).
-   * While a gesture is open the camera writes stay cheap and visually calm:
-   * `zoomAround` defers its zoom-intent PATCH (one per gesture instead of one
-   * per event), and the camera-rest detector holds un-rested — device
-   * snapping and settle-gated rendering wait for the END of the gesture, not
-   * for a 150 ms hesitation inside it. Re-entrant (nesting counts). Opening a
-   * gesture cancels any running tween or fling — that is how a finger
-   * "catches" a moving page.
-   *
-   * `elastic` opts the gesture into RUBBER-BAND overscroll: pans past the
-   * clamp stretch on the iOS resistance curve instead of stopping dead, and
-   * ending the gesture (or a fling reaching an edge) springs the camera home
-   * on a critically-damped curve. The clamp itself stays the untouched law of
-   * REST — elasticity is a transient the gesture is allowed to hold, never a
-   * state the camera can settle in. Touch contacts pass it; mouse drags and
-   * wheel pans stay rigid (the desktop convention). Default false.
-   */
-  beginGesture(options?: { elastic?: boolean }): void;
-  endGesture(): void;
-  /**
-   * Momentum scroll: keep panning from a release velocity (screen px/s, the
-   * same sign convention as `panBy` deltas), decelerating on UIScrollView's
-   * curve. Every other camera verb — including `beginGesture` from the next
-   * touch — cancels it. No-op without host frames (SSR/tests without a
-   * scheduler jump nowhere: momentum is presentation, not state).
-   */
-  fling(velocityX: number, velocityY: number): void;
-  /** True while the camera is animating (navigation tween or fling) — the
-   *  input layer reads it to tell a "catch" from a tap. */
-  cameraInMotion(): boolean;
-  /**
-   * The touch double-tap toggle: zoomed out → animate to ~2.5× the automatic
-   * fit around `screenPt`; already zoomed past that → animate back to the fit
-   * level, same focal point. Lands as a fixed zoom level either way.
-   */
-  doubleTapZoom(screenPt: Point): void;
-  zoomIn(): void;
-  zoomOut(): void;
-  zoomTo(spec: ZoomSpec): void;
-  fitWidth(): void;
-  fitPage(): void;
-  /** Fit the whole scene (every page) in view — the construction overview. */
-  fitAll(): void;
-  /** Fit width but never upscale past 100% (Adobe's "Automatic"). */
-  automatic(): void;
-  /**
-   * Re-resolve the active zoom intent and re-place against the CURRENT scene,
-   * preserving the anchored page-point. Call after the page geometry changes
-   * underneath the lens — rotate/move/delete — so fit/pixel zoom modes
-   * (`fitPage`, `pageWidth`, …) recompute against the new footprint. A no-op
-   * before the first placement; for a fixed `{ level }` zoom it just re-anchors.
-   * Wired automatically to the document's page-registry revision; exposed for
-   * any external geometry change a host wants to react to.
-   */
-  refit(): void;
-  /** Go to a page. Fresh arrival places by the unit rule; pass `viewpoint` to restore. */
-  goToPage(pageIndex: number, opts?: GoToOptions): void;
-  /**
-   * The follower-UI arrival verb (thumbnail sidebars, search hits, outline
-   * clicks, PDF destinations). Bare: make the page visible with minimal
-   * movement — zero if it already is, cursor untouched (scrollIntoView
-   * semantics; paged flow delegates to navigation since the page isn't in
-   * the slice). POSITIONED (rect/zoom/anchor set — see {@link RevealOptions}):
-   * place the target at the anchor, optionally re-zooming; the cursor
-   * follows the camera.
-   */
-  reveal(pageIndex: number, opts?: RevealOptions): void;
-  /** Step forward by the navigation unit (the item if it fits the viewport, else the page). */
-  next(opts?: GoToOptions): void;
-  /** Step backward by the navigation unit. */
-  prev(opts?: GoToOptions): void;
-  /**
-   * This lens's identity — the stage plugin id it was registered under
-   * ('stage' for the main lens; a custom id per additional lens). The surface
-   * binding stamps it on every pointer sample (`PointerSample.source`) and
-   * lens-scoped interaction handlers register under it, so two stages on one
-   * document can never capture each other's input.
-   */
-  lensId(): string;
-  /** Set any subset of settings at once — ONE anchor-preserving update. The way to
-   *  apply a customer preset: `update(myPreset)`. Writes the responsive BASE:
-   *  a matching rule's key wins until its rule stops matching. */
-  update(patch: Partial<StageSettings>): void;
-  /** Replace the responsive rules (see {@link ResponsiveRule}); re-resolves
-   *  immediately with the usual anchor-preserving reactions. */
-  setResponsive(rules: readonly ResponsiveRule[]): void;
-  /** Is the named responsive rule currently matching? Reactive: recomputed
-   *  whenever the box crosses a rule boundary. */
-  matches(name: string): boolean;
-  /** Names of all currently-matching rules, in source order. */
-  activeRules(): readonly string[];
-  setFlow(flow: FlowMode): void;
-  setLayout(layout: LayoutKind): void;
-  setSpread(spread: SpreadMode): void;
-  setSizing(sizing: SizingMode): void;
-  setColumns(columns: GridColumns): void;
-  setBounded(bounded: boolean): void;
-  setPadding(padding: number): void;
-  setGap(gap: Gap): void;
-  setPageFrame(pageFrame: PageFrame): void;
-  setFitAlign(fitAlign: Alignment): void;
-  setArrivalAlign(arrivalAlign: ArrivalAlignment): void;
-  setZoomAlign(zoomAlign: AlignmentValue): void;
-  setAnchorAlign(anchorAlign: AlignmentValue): void;
-  setDirection(direction: Direction): void;
-  /** Set the lens's view rotation to an absolute quarter-turn — see
-   *  {@link StageSettings.viewRotation}. An anchor-preserving reframe, like a
-   *  page rotation: the spot you were looking at stays put (`anchorAlign`). */
-  setViewRotation(viewRotation: PageRotation): void;
-  /** Rotate the view a quarter-turn from where it is (the toolbar verb) —
-   *  relative sugar over {@link setViewRotation}, mirroring page-edit's `rotateBy`. */
-  rotateView(delta: 90 | -90): void;
-  setScrollBehavior(behavior: ScrollBehaviorKind): void;
-  applyViewState(view: StageViewState): void;
-  /** Offer a candidate initial view; the highest-priority non-null wins at placement. */
-  provideInitialView(priority: number, provider: () => StageViewState | null): void;
-  /** Resolve the registered providers once (else reset). Called when the viewport is ready. */
-  placeInitial(): void;
-  /** Back to the start: page 0, placed by the unit rule at the current zoom intent. */
-  resetView(): void;
+  // ── events ──
+  readonly onPageChanged: EventHook<StagePageChangedEvent>;
+  readonly onZoomChanged: EventHook<StageZoomChangedEvent>;
+  /** Coalesced per camera write, not per frame. */
+  readonly onCameraChanged: EventHook<StageCameraChangedEvent>;
+  /** A tween or fling settled, or was stopped. */
+  readonly onMotionEnded: EventHook<StageMotionEndedEvent>;
+  readonly onSettingsChanged: EventHook<StageSettingsChangedEvent>;
+  readonly onViewportChanged: EventHook<StageViewportChangedEvent>;
 }
 
 export interface StageConfig extends Partial<StageSettings> {

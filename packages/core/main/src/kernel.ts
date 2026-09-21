@@ -8,6 +8,8 @@ import {
 } from './context';
 import type { SliceLease } from './store';
 import { createControllerContext } from './controller';
+import { createEventHook } from './event-hook';
+import { toPluginError, toPluginErrorInfo } from './errors';
 import { planPlugins } from './order';
 import { createScope, CancelledError, isCancelled, type Scope } from './scope';
 import {
@@ -18,6 +20,7 @@ import {
   CORE_DOCUMENT_OPEN_FAILED,
   CORE_DOCUMENT_PAGES_UPDATED,
   CORE_DOCUMENT_REMOVED,
+  CORE_DOCUMENT_RENAMED,
   CORE_ORDER_CHANGED,
   DocumentsToken,
   type Action,
@@ -33,6 +36,12 @@ import {
   type OpenDocumentOptions,
   type OpenInput,
   type OpenSource,
+  type DocumentOpenedEvent,
+  type DocumentOpenFailedEvent,
+  type DocumentLockedEvent,
+  type DocumentClosedEvent,
+  type ActiveDocumentChangedEvent,
+  type DocumentPagesChangedEvent,
   type PendingMeta,
   type PluginScope,
   type Unsubscribe,
@@ -122,6 +131,9 @@ const pendingToDocInfo = (meta: PendingMeta): DocInfo => ({
   status: meta.status,
   pageCount: 0,
   passwordProvided: meta.passwordProvided,
+  ...(meta.status === 'error' && meta.error !== undefined
+    ? { error: toPluginErrorInfo(toPluginError('documents', meta.error)) }
+    : {}),
 });
 
 /** The stable id an input implies, if it carries one ('bytes'/'layerBytes'/'id'). */
@@ -146,6 +158,9 @@ const passwordOfInput = (input: OpenInput): string | null | undefined =>
  */
 interface DocumentSession extends SessionRef {
   name?: string;
+  /** What `open()` was called with, so a failed tab can `retry()`. */
+  source: OpenSource | null;
+  openOptions: OpenDocumentOptions | undefined;
   phase: 'opening' | 'locked' | 'bringup' | 'ready' | 'error' | 'closing';
   /** In-flight open/unlock — close() cancels, then JOINS this before disposing,
    *  so "close resolved" means "no producer is still acquiring resources". */
@@ -196,6 +211,25 @@ export function createKernel(opts: {
   const workspaceConnectors = new Map<AnyPlugin, () => void>();
   const workspaceCancel = new AbortController();
   const workspaceScope = createScope(report);
+
+  // ── lifecycle events (the kernel primitive; disposed at destroy) ──────────
+  const opened = createEventHook<DocumentOpenedEvent>(report);
+  const openFailed = createEventHook<DocumentOpenFailedEvent>(report);
+  const locked = createEventHook<DocumentLockedEvent>(report);
+  const closed = createEventHook<DocumentClosedEvent>(report);
+  const activeChanged = createEventHook<ActiveDocumentChangedEvent>(report);
+  const pagesChanged = createEventHook<DocumentPagesChangedEvent>(report);
+  workspaceScope.defer(() => {
+    for (const hook of [opened, openFailed, locked, closed, activeChanged, pagesChanged])
+      hook.dispose();
+  });
+  /** Every core write goes through here so an active-tab change is observed exactly once. */
+  const setCore = (patch: Partial<CoreState>, action: Action): void => {
+    const before = store.getCore().activeId;
+    store.setCore(patch, action);
+    const after = store.getCore().activeId;
+    if (before !== after) activeChanged.emit({ documentId: after, previousDocumentId: before });
+  };
   const sessions = new Map<string, DocumentSession>();
 
   let status: KernelStatus = 'created';
@@ -266,6 +300,8 @@ export function createKernel(opts: {
       id,
       instanceId: `${id}#${++instanceCounter}`,
       name,
+      source: null,
+      openOptions: undefined,
       phase: 'opening',
       handle: null,
       stagedMeta: null,
@@ -309,7 +345,7 @@ export function createKernel(opts: {
     const slot = core.pending[previousId];
     if (slot) {
       const { [previousId]: _moved, ...pending } = core.pending;
-      store.setCore(
+      setCore(
         {
           pending: { ...pending, [nextId]: { ...slot, id: nextId } },
           order: core.order.map((id) => (id === previousId ? nextId : id)),
@@ -339,6 +375,7 @@ export function createKernel(opts: {
       });
       await session.scope.dispose();
       if (sessions.get(session.id) === session) sessions.delete(session.id);
+      closed.emit({ documentId: session.id });
     })();
     closingSessions.set(session, closing);
     return closing;
@@ -355,7 +392,7 @@ export function createKernel(opts: {
 
   function publishPendingSlot(session: DocumentSession, activate: boolean): void {
     const core = store.getCore();
-    store.setCore(
+    setCore(
       {
         pending: {
           ...core.pending,
@@ -370,7 +407,7 @@ export function createKernel(opts: {
 
   function publishLocked(session: DocumentSession, passwordProvided: boolean): void {
     const core = store.getCore();
-    store.setCore(
+    setCore(
       {
         pending: {
           ...core.pending,
@@ -379,11 +416,12 @@ export function createKernel(opts: {
       },
       { type: CORE_DOCUMENT_LOCKED },
     );
+    locked.emit({ documentId: session.id, passwordProvided });
   }
 
   function publishError(session: DocumentSession, error: unknown): void {
     const core = store.getCore();
-    store.setCore(
+    setCore(
       {
         pending: {
           ...core.pending,
@@ -392,6 +430,10 @@ export function createKernel(opts: {
       },
       { type: CORE_DOCUMENT_OPEN_FAILED },
     );
+    openFailed.emit({
+      documentId: session.id,
+      error: toPluginErrorInfo(toPluginError('documents', error)),
+    });
   }
 
   function unpublishSlot(id: string): void {
@@ -399,7 +441,7 @@ export function createKernel(opts: {
     if (!core.pending[id] && !core.documents[id]) return;
     const { [id]: _pending, ...pending } = core.pending;
     const { [id]: _document, ...documents } = core.documents;
-    store.setCore(
+    setCore(
       {
         pending,
         documents,
@@ -418,10 +460,11 @@ export function createKernel(opts: {
     const meta = session.stagedMeta!;
     const core = store.getCore();
     const { [session.id]: _resolved, ...pending } = core.pending;
-    store.setCore(
+    setCore(
       { documents: { ...core.documents, [session.id]: meta }, pending },
       { type: CORE_DOCUMENT_ADDED },
     );
+    opened.emit({ documentId: session.id, info: toDocInfo(meta) });
   }
 
   // ── capability resolution ────────────────────────────────────────────────────
@@ -574,10 +617,15 @@ export function createKernel(opts: {
         pages: layout.pages,
         revision: existing.revision + 1,
       };
-      store.setCore(
+      setCore(
         { documents: { ...now.documents, [session.id]: updated } },
         { type: CORE_DOCUMENT_PAGES_UPDATED },
       );
+      pagesChanged.emit({
+        documentId: session.id,
+        revision: updated.revision,
+        pages: updated.pages,
+      });
     });
     session.scope.defer(unsubscribeEvents);
 
@@ -610,7 +658,17 @@ export function createKernel(opts: {
     checkpoint(session);
   }
 
+  // `async` on purpose: a refused reservation (duplicate id, destroyed kernel)
+  // is a rejection, never a synchronous throw, like every other open failure.
   async function openDocument(input: OpenSource, options?: OpenDocumentOptions): Promise<string> {
+    return reserveAndOpen(input, options).done;
+  }
+
+  /** Reserve the tab slot synchronously and start the open; returns the slot id at once. */
+  function reserveAndOpen(
+    input: OpenSource,
+    options?: OpenDocumentOptions,
+  ): { id: string; done: Promise<string> } {
     guardUsable('documents.open()');
     const { activate, name, ...engineOptions } = options ?? {};
 
@@ -624,10 +682,12 @@ export function createKernel(opts: {
       throw new Error(`[documents] document already open: ${requestedId}`);
     }
     const session = createSession(requestedId, name);
+    session.source = input;
+    session.openOptions = options;
     sessions.set(session.id, session);
     publishPendingSlot(session, activate ?? true);
 
-    return beginOperation(session, async () => {
+    const done = beginOperation(session, async () => {
       try {
         const source =
           typeof input === 'function'
@@ -680,6 +740,7 @@ export function createKernel(opts: {
         throw error;
       }
     });
+    return { id: session.id, done };
   }
 
   async function unlockDocument(id: string, input: { password: string }): Promise<void> {
@@ -729,7 +790,7 @@ export function createKernel(opts: {
   }
 
   function reorder(next: string[]) {
-    store.setCore({ order: next }, { type: CORE_ORDER_CHANGED });
+    setCore({ order: next }, { type: CORE_ORDER_CHANGED });
   }
 
   const metaOf = (documentId?: string): DocumentMeta | null => {
@@ -738,8 +799,48 @@ export function createKernel(opts: {
     return id ? (core.documents[id] ?? null) : null;
   };
 
+  /** Memoised tab list: the same array until the registry or a slot changes. */
+  let listMemo: { core: CoreState; value: readonly DocInfo[] } | null = null;
+  const listDocuments = (): readonly DocInfo[] => {
+    const core = store.getCore();
+    if (listMemo?.core === core) return listMemo.value;
+    const value = Object.freeze(
+      core.order.map((id) => {
+        const meta = core.documents[id];
+        return meta ? toDocInfo(meta) : pendingToDocInfo(core.pending[id]);
+      }),
+    );
+    listMemo = { core, value };
+    return value;
+  };
+
   const documents: DocumentsCapability = {
     open: openDocument,
+    retry: async (id) => {
+      const session = sessions.get(id);
+      if (!session || session.phase !== 'error' || session.source === null) {
+        throw new Error(`[documents] "${id}" is not a failed open; nothing to retry`);
+      }
+      const { source, openOptions } = session;
+      await session.close();
+      return openDocument(source, openOptions);
+    },
+    rename: (id, name) => {
+      const core = store.getCore();
+      if (core.documents[id]) {
+        setCore(
+          { documents: { ...core.documents, [id]: { ...core.documents[id], name } } },
+          { type: CORE_DOCUMENT_RENAMED },
+        );
+      } else if (core.pending[id]) {
+        setCore(
+          { pending: { ...core.pending, [id]: { ...core.pending[id], name } } },
+          { type: CORE_DOCUMENT_RENAMED },
+        );
+      }
+      const session = sessions.get(id);
+      if (session) session.name = name;
+    },
     openAll: (docs) => {
       guardUsable('documents.openAll()');
       // Fire-and-forget on purpose: each open() reserves its tab slot
@@ -750,8 +851,21 @@ export function createKernel(opts: {
         0,
         docs.findIndex((d) => d.active),
       );
-      docs.forEach(({ source, active: _active, ...options }, index) => {
-        void openDocument(source, { ...options, activate: index === activeIndex }).catch(() => {});
+      // The returned ids are the reserved slots: a thunk source's ticket is
+      // rekeyed to the real id on resolve (`onOpened` carries the final id).
+      return docs.map(({ source, active: _active, ...options }, index) => {
+        try {
+          const { id, done } = reserveAndOpen(source, {
+            ...options,
+            activate: index === activeIndex,
+          });
+          void done.catch(() => {});
+          return id;
+        } catch {
+          // A refused reservation (an id already open) is not a boot failure:
+          // the existing tab stands; report the id the caller asked for.
+          return typeof source === 'function' ? '' : (idOfInput(source) ?? '');
+        }
       });
     },
     unlock: unlockDocument,
@@ -763,15 +877,14 @@ export function createKernel(opts: {
       const core = store.getCore();
       // Pending tabs are selectable — a loading or locked tab is a real tab.
       if (core.documents[id] || core.pending[id])
-        store.setCore({ activeId: id }, { type: CORE_ACTIVE_CHANGED });
+        setCore({ activeId: id }, { type: CORE_ACTIVE_CHANGED });
     },
-    activeId: () => store.getCore().activeId,
-    list: (): DocInfo[] =>
-      store.getCore().order.map((id) => {
-        const core = store.getCore();
-        const meta = core.documents[id];
-        return meta ? toDocInfo(meta) : pendingToDocInfo(core.pending[id]);
-      }),
+    getActiveId: () => store.getCore().activeId,
+    getActive: () => {
+      const id = store.getCore().activeId;
+      return id ? documents.get(id) : null;
+    },
+    list: listDocuments,
     get: (id) => {
       const core = store.getCore();
       const meta = core.documents[id];
@@ -783,8 +896,16 @@ export function createKernel(opts: {
       const core = store.getCore();
       return core.documents[id] !== undefined || core.pending[id] !== undefined;
     },
-    count: () => store.getCore().order.length,
-    order: () => [...store.getCore().order],
+    getCount: () => store.getCore().order.length,
+    getOrder: () => store.getCore().order,
+    setOrder: (ids) => {
+      const current = store.getCore().order;
+      const same =
+        ids.length === current.length &&
+        [...ids].sort().join('\0') === [...current].sort().join('\0');
+      if (!same) throw new Error('[documents] setOrder() needs a permutation of the current order');
+      reorder([...ids]);
+    },
     move: (id, toIndex) => {
       const core = store.getCore();
       if (!core.documents[id] && !core.pending[id]) return;
@@ -804,12 +925,12 @@ export function createKernel(opts: {
       reorder(next);
     },
     // Document IO — siblings of open/close, straight to the live engine handle.
-    download: (id, opts) => {
+    save: (id, options) => {
       const handle = documentHandle(id);
-      if (!handle) return Promise.reject(new Error('[documents] no document to download'));
-      return handle.download(opts);
+      if (!handle) return Promise.reject(new Error('[documents] no document to save'));
+      return handle.download(options?.mode !== undefined ? { mode: options.mode } : undefined);
     },
-    downloadLayer: (id) => {
+    saveLayer: (id) => {
       const handle = documentHandle(id);
       if (!handle) return Promise.reject(new Error('[documents] no document to download'));
       if (!handle.downloadLayer) {
@@ -830,6 +951,12 @@ export function createKernel(opts: {
     // The permissions.md chrome exception: print/download are kernel verbs
     // with 1:1 capabilities, so their authority question is answered here.
     allows: (cap, id) => documentHandle(id)?.security.allows(cap) ?? false,
+    onOpened: opened.on,
+    onOpenFailed: openFailed.on,
+    onLocked: locked.on,
+    onClosed: closed.on,
+    onActiveChanged: activeChanged.on,
+    onPagesChanged: pagesChanged.on,
   };
   workspaceCapabilities.set(DocumentsToken, documents);
 

@@ -1,4 +1,3 @@
-import { describe, expect, it } from 'vitest';
 import {
   initialModel,
   update,
@@ -6,9 +5,10 @@ import {
   type AnnotationFlags,
   type Geom,
 } from '@embedpdf/core-annotation';
+import { toPageRef } from '@embedpdf/engine-core/runtime';
+import { describe, expect, it } from 'vitest';
 
 import { buildTextItems } from './text-item';
-import { toPageRef } from '@embedpdf/engine-core/runtime';
 
 /** The DOM text plate must sit exactly where the engine's AP generator lays
  *  the baked text, so the baked↔live swap is pixel-invisible: the box

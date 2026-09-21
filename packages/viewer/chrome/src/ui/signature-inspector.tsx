@@ -9,7 +9,8 @@
 import { useEffect, useState } from 'react';
 import { Anchored } from '@embedpdf/react/anchored';
 import { useSelector } from '@embedpdf/react/runtime';
-import { FormToken } from '@embedpdf/react/form';
+// The inspector reads the fill feed (a host projection); same runtime token, wider type.
+import { FormHostToken } from '@embedpdf/react/form';
 import { useSurface } from '@embedpdf/react/shell';
 import { useT } from '@embedpdf/react/i18n';
 import {
@@ -67,9 +68,9 @@ export function SignatureInspector() {
   const dto = field ? signature.signatureOf(field) : null;
   const verdict = field ? signature.verdictOf(field) : null;
   const widget = dto?.widget ?? null;
-  const box = useSelector(FormToken, (c) =>
+  const box = useSelector(FormHostToken, (c) =>
     widget && widget.annotObjectNumber > 0
-      ? (c.fillItem(widget.annotObjectNumber)?.box ?? null)
+      ? (c.getFillItem(widget.annotObjectNumber)?.box ?? null)
       : null,
   );
 

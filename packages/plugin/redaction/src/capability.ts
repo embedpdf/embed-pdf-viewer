@@ -80,7 +80,7 @@ export function createRedactionCapability(
     ctx.document()?.pages.find((p) => p.ref.pageObjectNumber === pon)?.index ?? -1;
 
   const pendingOn = (pon: number): RedactDTO[] =>
-    anno.list(toPageRef(pon)).filter((a): a is RedactDTO => a.subtype === 'redact');
+    anno.listRaw({ page: toPageRef(pon) }).filter((a): a is RedactDTO => a.subtype === 'redact');
 
   const collectPending = (): RedactionPendingItem[] => {
     const items: RedactionPendingItem[] = [];
@@ -159,9 +159,9 @@ export function createRedactionCapability(
     toggleRedact: () => {
       const interaction = ctx.tryGet(InteractionToken);
       if (!interaction) return;
-      interaction.activateTool(interaction.activeToolId() === 'redact' ? 'pointer' : 'redact');
+      interaction.activateTool(interaction.getActiveToolId() === 'redact' ? 'pointer' : 'redact');
     },
-    isRedactActive: () => ctx.tryGet(InteractionToken)?.activeToolId() === 'redact',
+    isRedactActive: () => ctx.tryGet(InteractionToken)?.getActiveToolId() === 'redact',
 
     queueCurrentSelection: async () => {
       // Marks are optimistic annotation creates — the same gate the pointer
@@ -169,7 +169,7 @@ export function createRedactionCapability(
       if (!anno.canCreate()) return false;
       const selection = ctx.tryGet(SelectionToken);
       if (!selection || !selection.hasSelection()) return false;
-      const snapshot = selection.snapshot();
+      const snapshot = selection.getSnapshot();
       for (const page of snapshot.pages) {
         if (page.segments.length === 0) continue;
         // Preserve the selected text frame all the way into `/QuadPoints`.
@@ -187,7 +187,7 @@ export function createRedactionCapability(
     },
 
     preparePending: async () => {
-      await Promise.all(pons().map((pon) => anno.ensurePage(toPageRef(pon))));
+      // Every page's annotations are hydrated with the document; nothing to warm.
     },
     getPending: collectPending,
     pendingCount: () => collectPending().length,
@@ -196,7 +196,7 @@ export function createRedactionCapability(
       const wanted = ids ? new Set(ids) : null;
       let count = 0;
       for (const pon of pons()) {
-        const all = anno.list(toPageRef(pon));
+        const all = anno.listRaw({ page: toPageRef(pon) });
         const marks = all.filter(
           (a): a is RedactDTO => a.subtype === 'redact' && (!wanted || wanted.has(idOf(a.ref))),
         );
@@ -211,14 +211,14 @@ export function createRedactionCapability(
     },
 
     setLabel: async (ref, patch: RedactionLabelPatch) => {
-      const current = anno.get(ref);
+      const current = anno.getRaw(ref);
       if (!current || current.subtype !== 'redact') {
         throw new Error('[redaction] setLabel target is not a redact annotation');
       }
       // Always carry the current /DA styling: the engine rewrites /DA whenever
       // a label field rides a patch, so a text-only edit must not let the
       // styling fall back to defaults.
-      await anno.update(ref, {
+      await anno.updateRaw(ref, {
         subtype: 'redact',
         ...(patch.overlayText !== undefined ? { overlayText: patch.overlayText } : {}),
         ...(patch.repeat !== undefined ? { repeat: patch.repeat } : {}),

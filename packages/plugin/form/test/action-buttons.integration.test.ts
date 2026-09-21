@@ -70,13 +70,13 @@ async function boot(scripting: boolean, scope?: string[]) {
   const form = kernel.capability(FormToken);
   const annotation = kernel.capability(AnnotationHostToken);
   await form.refresh();
-  const snapshot = form.snapshot();
+  const snapshot = form.getSnapshot();
   if (!snapshot) throw new Error('form snapshot did not load');
   const page = snapshot.fields[0]!.widgets[0]!.page!;
   await annotation.reloadPage(page); // hydrate the annotation plane for paint asserts
 
   const fieldOf = (name: string) => {
-    const field = form.snapshot()?.fields.find((candidate) => candidate.name === name);
+    const field = form.getSnapshot()?.fields.find((candidate) => candidate.name === name);
     if (!field) throw new Error(`field '${name}' is missing`);
     return field;
   };
@@ -93,11 +93,11 @@ async function boot(scripting: boolean, scope?: string[]) {
     };
   };
   const press = (name: string): Promise<WidgetActivationResult> =>
-    form.activateWidget(fieldKeyOf(fieldOf(name)), widgetRefOf(name));
-  const paintedIds = () => annotation.pageItems(page).map((item) => item.id);
+    form.activateWidget(widgetRefOf(name));
+  const paintedIds = () => annotation.listPageItems(page).map((item) => item.id);
   const widgetId = (name: string) => `obj:${fieldOf(name).widgets[0]!.annotObjectNumber}`;
   const notify = (name: string, event: PdfAnnotationEventKind) =>
-    form.notifyWidgetEvent(fieldKeyOf(fieldOf(name)), widgetRefOf(name), event);
+    form.notifyWidgetEvent(fieldOf(name).ref, widgetRefOf(name), event);
   // notifyWidgetEvent is fire-and-forget; a bogus hover dispatch drains the
   // actions queue behind everything already submitted.
   const actions = kernel.capability(ActionsToken);
@@ -226,7 +226,7 @@ describe('action buttons e2e (scripting ON)', () => {
     // the ACTIONS queue and its executors enter the form queue; the write
     // enters the form queue directly. form → actions → form would hang here.
     const dispatched = t.press('btn-chain');
-    const committed = t.form.setText(fieldKeyOf(t.fieldOf('beta')), 'raced');
+    const committed = t.form.setText(t.fieldOf('beta').ref, 'raced');
     const [chain] = await Promise.all([dispatched, committed]);
     expect(chain.kind).toBe('dispatched');
     expect(t.valueOf('log')).toBe('AB');

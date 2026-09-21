@@ -11,7 +11,8 @@
     ".": "./src/index.ts",
     "./contract": "./src/contract.ts",
     "./destination": "./src/destination.ts",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./contract/host": "./src/host-contract.ts"
   },
   "publishConfig": {
     "main": "./dist/index.js",
@@ -30,7 +31,11 @@
         "import": "./dist/destination.js",
         "require": "./dist/destination.cjs"
       },
-      "./package.json": "./package.json"
+      "./package.json": "./package.json",
+      "./contract/host": {
+        "import": "./dist/host-contract.js",
+        "require": "./dist/host-contract.cjs"
+      }
     }
   },
   "files": [

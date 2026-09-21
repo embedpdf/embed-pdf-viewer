@@ -1,60 +1,54 @@
 import type { DocumentHandle, PageLayout, PageRef } from '@embedpdf/core';
 import { pdfToContentRect } from '@embedpdf/core-annotation';
-import type { LinkAction, LinkNavItem } from './types';
+import type { Link, LinkAction } from './types';
 
-/**
- * The ENGINE-BACKED link source, for viewer-only deployments (no annotation
- * plugin): read a page's annotation list and keep just the navigable links —
- * standalone AND attached children alike (both are raw link DTOs here).
- * Shared by the capability's lazy `ensurePage` and the effects module's
- * event-driven refetch; both PluginContext and EffectContext satisfy the
- * structural `io` slice.
- */
+/** What the loader needs from the context (the controller context satisfies it). */
 export interface LinkSourceIO {
   doc: DocumentHandle | null;
   document(): { pages: readonly PageLayout[] } | null;
   dispatch(action: LinkAction): void;
 }
 
-export function loadLinksPage(io: LinkSourceIO, page: PageRef): void {
+/**
+ * The stand-alone source (no annotation plugin): one annotations read per
+ * page, folded to the clickable areas. Resolves with the items it stored
+ * (empty when the page is unknown or the read failed).
+ */
+export async function loadLinksPage(io: LinkSourceIO, page: PageRef): Promise<readonly Link[]> {
   const doc = io.doc;
   const pon = page.pageObjectNumber;
   const crop = io.document()?.pages.find((p) => p.ref.pageObjectNumber === pon)?.boxes.crop;
-  if (!doc || !crop) return;
-  doc
-    .page(page)
-    .annotations.list()
-    .then(
-      (snap) => {
-        const items: LinkNavItem[] = [];
-        for (const dto of snap.annotations) {
-          if (dto.subtype !== 'link' || dto.target == null) continue;
-          if (dto.flags.hidden || dto.flags.noView) continue;
-          items.push({
-            id:
-              dto.ref.kind === 'objectNumber'
-                ? `obj:${dto.ref.annotObjectNumber}`
-                : `idx:${pon}:${dto.index}`,
-            rect: pdfToContentRect(dto.rect, crop),
-            target: dto.target,
-            ...(dto.actions?.activate ? { activate: dto.actions.activate } : {}),
-            ...(dto.actions?.cursorEnter?.root || dto.actions?.cursorExit?.root
-              ? {
-                  hoverEvents: {
-                    enter: Boolean(dto.actions?.cursorEnter?.root),
-                    exit: Boolean(dto.actions?.cursorExit?.root),
-                  },
-                }
-              : {}),
-            ref: dto.ref,
-            // A `/RT /Group` child riding another annotation — labeled so the
-            // nav layer can defer to editing (moot in viewer-only deployments,
-            // but the item contract stays truthful either way).
-            attached: dto.replyType === 'group' && dto.inReplyTo != null,
-          });
-        }
-        io.dispatch({ type: 'SET_PAGE', page, items });
-      },
-      () => {},
-    );
+  if (!doc || !crop) return [];
+  let snap;
+  try {
+    snap = await doc.page(page).annotations.list();
+  } catch {
+    return [];
+  }
+  const items: Link[] = [];
+  for (const dto of snap.annotations) {
+    if (dto.subtype !== 'link' || dto.target == null) continue;
+    if (dto.flags.hidden || dto.flags.noView) continue;
+    items.push({
+      id:
+        dto.ref.kind === 'objectNumber'
+          ? `obj:${dto.ref.annotObjectNumber}`
+          : `idx:${pon}:${dto.index}`,
+      bounds: pdfToContentRect(dto.rect, crop),
+      target: dto.target,
+      ...(dto.actions?.activate ? { activate: dto.actions.activate } : {}),
+      ...(dto.actions?.cursorEnter?.root || dto.actions?.cursorExit?.root
+        ? {
+            hoverEvents: {
+              enter: Boolean(dto.actions?.cursorEnter?.root),
+              exit: Boolean(dto.actions?.cursorExit?.root),
+            },
+          }
+        : {}),
+      ref: dto.ref,
+      attached: dto.replyType === 'group' && dto.inReplyTo != null,
+    });
+  }
+  io.dispatch({ type: 'setPage', page, items });
+  return items;
 }

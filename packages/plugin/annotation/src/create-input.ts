@@ -1,6 +1,4 @@
 import { PluginError } from '@embedpdf/core';
-import type { Point, Rect, TextQuad } from '@embedpdf/core-geometry';
-import type { AnnotationRef, PageRef } from '@embedpdf/engine-core/runtime';
 import type {
   AnnotationFlags,
   AnnotationPropsPatch,
@@ -8,6 +6,8 @@ import type {
   Geom,
   Subtype,
 } from '@embedpdf/core-annotation';
+import type { Point, Rect, TextQuad } from '@embedpdf/core-geometry';
+import type { AnnotationRef, PageRef } from '@embedpdf/engine-core/runtime';
 
 /**
  * Page-space creation input — the data API's vocabulary. Geometry is in the

@@ -129,7 +129,7 @@ function ZoomControls() {
   const stage = useOptionalCapability(StageToken);
   // Null-safe: the zoom strip is main-toolbar chrome, mounted before any
   // document exists — it reads 100% until a Stage is there to ask.
-  const level = useOptionalSelector(StageToken, (c) => c.zoomLevel(), 1);
+  const level = useOptionalSelector(StageToken, (c) => c.getZoomLevel(), 1);
   const pct = Math.round((level ?? 1) * 100);
   const [inputValue, setInputValue] = useState(String(pct));
   useEffect(() => setInputValue(String(pct)), [pct]);

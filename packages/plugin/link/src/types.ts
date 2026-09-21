@@ -1,4 +1,11 @@
-import { createCapabilityToken, type PageRef } from '@embedpdf/core';
+import {
+  createCapabilityToken,
+  type ChangeOrigin,
+  type EventHook,
+  type OperationOptions,
+  type PageRef,
+} from '@embedpdf/core';
+import type { Point } from '@embedpdf/core-geometry';
 import type {
   AnnotationRef,
   PdfActionTree,
@@ -7,82 +14,89 @@ import type {
 } from '@embedpdf/engine-core/runtime';
 import type { ActionDispatchResult } from '@embedpdf/plugin-actions/contract';
 import type { LinkNavItem } from '@embedpdf/plugin-annotation/contract';
+import type { RevealOptions } from '@embedpdf/plugin-stage/contract';
 
-export type { LinkNavItem };
-// The wire target vocabulary, re-exported so app code building link editors
-// needs only this package (the annotation-props precedent).
+/** A clickable link area: page-space `bounds`, its target, and its annotation (when it is one). */
+export type Link = LinkNavItem;
 export type { PdfDestination, PdfLinkTarget };
 
-/**
- * What one activation did. `revealed` = the stage moved the camera;
- * `destination` = no stage plugin — the embedder gets the explicit
- * destination to handle; `uri` = opening is the FRAMEWORK layer's job (the
- * plugin is DOM-free); `named` = a viewer verb (NextPage…) reported until
- * stage verbs land; `reported` = read-only/executable-shaped targets
- * (javascript / goto-remote / launch / unsupported) — surfaced, NEVER
- * executed here (javascript belongs to the scripting orchestrator).
- */
+/** What activation did, or hands to the host to do (a `uri`/`named` outcome is the host's). */
 export type LinkActivation =
   | { outcome: 'revealed' }
   | { outcome: 'destination'; destination: PdfDestination }
   | { outcome: 'uri'; uri: string }
   | { outcome: 'named'; name: string }
   | { outcome: 'reported'; target: PdfLinkTarget }
-  /** The action engine took the activation (full payload tree, mixed /Next
-   *  chains included). `dispatch` is the in-flight result; the framework
-   *  opener must do NOTHING for this outcome — the actions UI adapter owns
-   *  any URI open (the no-double-open rule). */
   | { outcome: 'dispatched'; dispatch: Promise<ActionDispatchResult> }
   | { outcome: 'none' };
 
-/** Optional activation context: the payload-carrying /A tree (and its
- *  annotation identity) from the LinkNavItem, enabling action-engine
- *  delegation. Without it — or without the actions plugin — activation
- *  follows the classic root-projection path. */
+/** What activating a target WOULD do — no side effect. */
+export type LinkResolution =
+  | { kind: 'reveal'; page: PageRef; pageIndex: number; options: RevealOptions }
+  | { kind: 'destination'; destination: PdfDestination }
+  | { kind: 'uri'; uri: string }
+  | { kind: 'named'; name: string }
+  | { kind: 'reported'; target: PdfLinkTarget };
+
 export interface LinkActivateContext {
+  /** The link's `/A` tree when it has one; the actions plugin runs it instead of the target. */
   activate?: PdfActionTree;
   ref?: AnnotationRef;
   page?: PageRef;
 }
 
-export interface LinkActivateEvent {
-  target: PdfLinkTarget;
-  activation: LinkActivation;
+export interface LinkActivatedEvent {
+  readonly target: PdfLinkTarget;
+  readonly activation: LinkActivation;
+  readonly origin: ChangeOrigin;
+}
+export interface LinkLoadedEvent {
+  readonly page: PageRef;
 }
 
-export interface LinkPluginConfig {
-  /** Every activation (navigations AND reported targets) — analytics /
-   *  custom handling. Called after the built-in handling ran. */
-  onActivate?: (event: LinkActivateEvent) => void;
-}
-
-/**
- * The navigation plane of link annotations. Data comes from ONE of two
- * sources, picked at init: the annotation plugin's folded model when that
- * plugin is present (zero extra engine reads — it already lists every
- * page), or the plugin's own engine reads in viewer-only deployments.
- */
 export interface LinkCapability {
-  /** The clickable link areas of a page (content space, y-down). */
-  linksOn(page: PageRef): LinkNavItem[];
-  /** Lazy-load a page's links (no-op when the annotation plugin owns the data). */
-  ensurePage(page: PageRef): void;
-  /** Whether the navigation plane currently owns links: the active tool
-   *  enables `link-nav` (pointer/pan/form-fill by default). While false —
-   *  the link tool or any authoring tool is active — the annotation plane
-   *  owns them and the LinkLayer stands down. */
-  engaged(): boolean;
-  /** THE one activation entry point (framework layers call it on click). */
-  activate(target: PdfLinkTarget, context?: LinkActivateContext): LinkActivation;
+  /** Clickable areas on a page, page space. Reference-stable per page while unchanged. */
+  listLinks(page: PageRef): readonly Link[];
+  /** One link by its stable id. */
+  getLink(page: PageRef, linkId: string): Link | null;
+  /** The topmost (smallest) link under a page point. */
+  getLinkAt(page: PageRef, point: Point): Link | null;
+  /** Every link in the document; loads pages as needed. */
+  listAllLinks(options?: OperationOptions): Promise<readonly Link[]>;
+  /** Load a page's links. Resolves at once when the annotation plugin owns them. */
+  ensureLoaded(page: PageRef, options?: OperationOptions): Promise<void>;
+  isLoaded(page: PageRef): boolean;
+  /** What activation would do, with no side effect. */
+  resolve(target: PdfLinkTarget): LinkResolution;
+  /**
+   * Perform the activation. A `goto` reveals through the stage; `uri` and
+   * `named` are reported for the host to perform synchronously (a user
+   * gesture is preserved); a link with an `/A` tree dispatches through the
+   * actions plugin.
+   */
+  activate(target: PdfLinkTarget | Link, context?: LinkActivateContext): LinkActivation;
+  /** Hit test, then activate. Null when nothing is there. */
+  activateAt(page: PageRef, point: Point, context?: LinkActivateContext): LinkActivation | null;
+  /** A human label for tooltips. */
+  getLabel(link: Link | PdfLinkTarget): string;
+  /** After the built-in handling of any activation. */
+  readonly onActivated: EventHook<LinkActivatedEvent>;
+  /** A page's links arrived. */
+  readonly onLoaded: EventHook<LinkLoadedEvent>;
 }
 
-/** Engine-backed page cache (viewer-only deployments). */
+export interface LinkHostCapability extends LinkCapability {
+  /** Does the active tool navigate links (the layer paints anchors only then)? */
+  isNavigationEngaged(): boolean;
+}
+
 export interface LinkState {
-  pages: Record<number, LinkNavItem[]>;
+  pages: Record<number, readonly Link[]>;
 }
-
 export type LinkAction =
-  | { type: 'SET_PAGE'; page: PageRef; items: LinkNavItem[] }
-  | { type: 'DROP_PAGE'; page: PageRef };
+  | { type: 'setPage'; page: PageRef; items: readonly Link[] }
+  | { type: 'dropPage'; page: PageRef };
 
-export const LinkToken = createCapabilityToken<LinkCapability>('link');
+export const LinkToken = createCapabilityToken<LinkHostCapability>('link', {
+  hint: `add linkPlugin() from '@embedpdf/plugin-link' to your plugins list`,
+});

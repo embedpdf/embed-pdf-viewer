@@ -66,11 +66,11 @@ export function ensureDefaultLibrary(
   if (current?.locale === locale) return current.promise;
   const run = async () => {
     await current?.promise.catch(() => undefined);
-    const loaded = stamp.library(DEFAULT_LIBRARY_ID);
+    const loaded = stamp.getLibrary(DEFAULT_LIBRARY_ID);
     if (loaded?.locale === locale) return;
     if (current && !loaded) return; // removed by the user this session
-    if (loaded) await stamp.removeLibrary(DEFAULT_LIBRARY_ID);
-    await stamp.importLibraryPdf(await defaultLibraryBytes(locale, source));
+    if (loaded) await stamp.deleteLibrary(DEFAULT_LIBRARY_ID);
+    await stamp.importLibrary(await defaultLibraryBytes(locale, source));
   };
   const promise = run();
   loads.set(stamp, { locale, promise });

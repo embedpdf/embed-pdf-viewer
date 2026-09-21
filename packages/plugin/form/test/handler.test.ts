@@ -8,33 +8,36 @@ import { formWidget } from '@embedpdf/engine-core/runtime';
  * moved on.
  */
 import { describe, expect, it, vi } from 'vitest';
-import type { InteractionCapability, PointerSample } from '@embedpdf/plugin-interaction';
+import type {
+  InteractionHostCapability,
+  PointerSample,
+} from '@embedpdf/plugin-interaction/contract/host';
 import type { AnnotationHostCapability } from '@embedpdf/plugin-annotation/internal';
 import { toPageRef, type PageRef } from '@embedpdf/engine-core/runtime';
 
 import { createPlaceHandler } from '../src/handler';
-import type { FormCapability, PlacedField, PlaceFieldInput } from '../src/types';
+import type { CreatedField, CreateFieldInput, FormHostCapability } from '../src/types';
 
 const PON = 3;
 const PAGE_REF = toPageRef(PON);
 const PAGE = { x: 0, y: 0, width: 300, height: 400 };
 
-function makeForm(over: Partial<FormCapability> = {}) {
-  const placed: PlaceFieldInput[] = [];
-  let resolveNext: PlacedField = {
-    field: { name: 'text_1' } as PlacedField['field'],
-    widget: formWidget(42, PAGE_REF) as PlacedField['widget'],
+function makeForm(over: Partial<FormHostCapability> = {}) {
+  const placed: CreateFieldInput[] = [];
+  let resolveNext: CreatedField = {
+    field: { name: 'text_1' } as CreatedField['field'],
+    widget: formWidget(42, PAGE_REF) as CreatedField['widget'],
   };
   const form = {
     canDesign: () => true,
-    pageBox: () => PAGE,
-    placeField: vi.fn(async (input: PlaceFieldInput) => {
+    getPageBox: () => PAGE,
+    createField: vi.fn(async (input: CreateFieldInput) => {
       placed.push(input);
       return resolveNext;
     }),
     ...over,
-  } as unknown as FormCapability;
-  return { form, placed, setResult: (r: PlacedField) => (resolveNext = r) };
+  } as unknown as FormHostCapability;
+  return { form, placed, setResult: (r: CreatedField) => (resolveNext = r) };
 }
 
 function makeAnnotation() {
@@ -48,13 +51,13 @@ function makeAnnotation() {
       clears++;
     },
     select: (ref: unknown) => selects.push(ref),
-    currentDefaults: () => ({ interiorColor: '#ffffff', color: '#6b7280', strokeWidth: 1 }),
+    getToolDefaults: () => ({ interiorColor: '#ffffff', color: '#6b7280', strokeWidth: 1 }),
   } as unknown as AnnotationHostCapability;
   return { annotation, previews, selects, clears: () => clears };
 }
 
-const interactionFor = (toolId: string): InteractionCapability =>
-  ({ activeToolId: () => toolId }) as unknown as InteractionCapability;
+const interactionFor = (toolId: string): InteractionHostCapability =>
+  ({ getActiveToolId: () => toolId }) as unknown as InteractionHostCapability;
 
 const sample = (over: Partial<PointerSample>): PointerSample => ({
   phase: 'move',
@@ -80,7 +83,7 @@ describe('form place handler', () => {
       family: 'text',
       page: PAGE_REF,
       // 160×24 centred on the DOWN point (the core's `d.from` rule).
-      box: { x: 20, y: 88, width: 160, height: 24 },
+      bounds: { x: 20, y: 88, width: 160, height: 24 },
     });
     expect(placed[0]!.appearance).toMatchObject({ strokeWidth: 1 });
   });
@@ -91,7 +94,7 @@ describe('form place handler', () => {
     h.onDown(at('down', 50, 50));
     h.onUp?.(at('up', 150, 52)); // 100×2 — one axis under threshold
     await flush();
-    expect(placed[0]!.box).toEqual({ x: 50, y: 50, width: 100, height: 2 });
+    expect(placed[0]!.bounds).toEqual({ x: 50, y: 50, width: 100, height: 2 });
   });
 
   it('tracks the HOME page through the projection; the UP sample is final', async () => {
@@ -112,11 +115,11 @@ describe('form place handler', () => {
       }),
     );
     await flush();
-    expect(placed[0]!.box).toEqual({ x: 10, y: 10, width: 100, height: 50 });
+    expect(placed[0]!.bounds).toEqual({ x: 10, y: 10, width: 100, height: 50 });
   });
 
   it('declines the gesture without write permission (edit/pan still route)', () => {
-    const { form } = makeForm({ canDesign: () => false } as Partial<FormCapability>);
+    const { form } = makeForm({ canDesign: () => false } as Partial<FormHostCapability>);
     const h = createPlaceHandler(form, interactionFor('form-text'), null);
     expect(h.onDown(at('down', 10, 10))).toBe(false);
   });
@@ -151,7 +154,7 @@ describe('form place handler', () => {
 
     // Tool changes while the engine write runs → stale, no selection.
     let live = 'form-text';
-    const interaction = { activeToolId: () => live } as unknown as InteractionCapability;
+    const interaction = { getActiveToolId: () => live } as unknown as InteractionHostCapability;
     const second = makeAnnotation();
     const h2 = createPlaceHandler(form, interaction, second.annotation);
     h2.onDown(at('down', 100, 100));
@@ -165,10 +168,10 @@ describe('form place handler', () => {
     const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
     try {
       const { form } = makeForm({
-        placeField: vi.fn(async () => {
+        createField: vi.fn(async () => {
           throw new Error('nope');
         }),
-      } as Partial<FormCapability>);
+      } as Partial<FormHostCapability>);
       const h = createPlaceHandler(form, interactionFor('form-text'), null);
       h.onDown(at('down', 100, 100));
       h.onUp?.(at('up', 100, 100));

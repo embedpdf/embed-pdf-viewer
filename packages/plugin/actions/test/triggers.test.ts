@@ -12,12 +12,12 @@ import type {
 } from '@embedpdf/engine-core/runtime';
 
 import { createActionsCapability } from '../src/capability';
-import { originOf } from '../src/types';
+import { triggerOriginOf } from '../src/types';
 import type {
   ActionDiagnostic,
   ActionDispatchEvent,
   ActionsAction,
-  ActionsPluginConfig,
+  ActionsConfig,
   ActionsState,
   ActionTrigger,
 } from '../src/types';
@@ -66,7 +66,7 @@ interface FakePage {
 /** A trigger-grade harness: controllable read timing, injectable document
  *  events, recording seams. */
 function harness(opts?: {
-  config?: ActionsPluginConfig;
+  config?: ActionsConfig;
   pages?: FakePage[];
   docActions?: {
     openAction?: PdfActionTree | null;
@@ -143,7 +143,7 @@ function harness(opts?: {
   });
 
   const events: ActionDispatchEvent[] = [];
-  capability.onAction((event) => events.push(event));
+  capability.onExecuted((event) => events.push(event));
   const diagnostics: ActionDiagnostic[] = [];
   capability.onDiagnostic((diagnostic) => diagnostics.push(diagnostic));
 
@@ -167,9 +167,9 @@ function harness(opts?: {
   };
 }
 
-describe('originOf', () => {
+describe('triggerOriginOf', () => {
   it('derives the one true mapping', () => {
-    const at = (trigger: ActionTrigger) => originOf(trigger);
+    const at = (trigger: ActionTrigger) => triggerOriginOf(trigger);
     expect(at({ scope: 'activate', ref: ref(1, 1), page: toPageRef(1) })).toBe('user');
     for (const event of ['mouseDown', 'mouseUp', 'focus', 'blur'] as const) {
       expect(at({ scope: 'annotation', event, ref: ref(1, 1), page: toPageRef(1) })).toBe('user');
@@ -312,7 +312,7 @@ describe('page fan-out (ISO Table 197/198 order)', () => {
     expect(h.seam).toEqual(['named:PC-11', 'named:pageC']);
   });
 
-  it('visible/invisible fan only their sets; onAction fires per step with the true tree', async () => {
+  it('visible/invisible fan only their sets; onExecuted fires per step with the true tree', async () => {
     const h = harness({ pages: fanPages, config: { openSequence: 'off' } });
     await h.capability.dispatch({ scope: 'page', event: 'visible', page: toPageRef(5) });
     await h.capability.dispatch({ scope: 'page', event: 'invisible', page: toPageRef(5) });

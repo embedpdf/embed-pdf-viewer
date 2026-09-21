@@ -13,11 +13,11 @@ export function registerViewManagerEffects(
 ): void {
   const documents = ctx.get(DocumentsToken);
   ctx.watch(
-    () => documents.order().join('|'),
+    () => documents.getOrder().join('|'),
     () => {
       ctx.dispatch({
         type: 'RECONCILE',
-        open: documents.order(),
+        open: documents.getOrder(),
         preferViewId: ctx.getState().focusedViewId,
       });
     },

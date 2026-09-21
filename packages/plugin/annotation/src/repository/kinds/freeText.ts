@@ -4,13 +4,6 @@
  * and the `/DA` text-slice ingest. Font/size/colour lowerings are the GENERIC
  * 1:1 keys (safe as singles since the engine's `/DA` read-modify-write).
  */
-import type {
-  AnnotationDTO,
-  CalloutLine,
-  LineEnding,
-  PdfRect,
-  PdfRectDifferences,
-} from '@embedpdf/engine-core/runtime';
 import {
   calloutLinePoints,
   geomPdfBounds,
@@ -19,6 +12,13 @@ import {
   type Annot,
   type TextStyle,
 } from '@embedpdf/core-annotation';
+import type {
+  AnnotationDTO,
+  CalloutLine,
+  LineEnding,
+  PdfRect,
+  PdfRectDifferences,
+} from '@embedpdf/engine-core/runtime';
 
 import { richDocOf } from '../../rich-text';
 import { boxEmit, type KindProjection, type Wire } from '../projection';

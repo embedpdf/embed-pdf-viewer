@@ -1,10 +1,13 @@
 import type { PageRef } from '@embedpdf/core';
 import type { CreationDraftAnchor, Rect, Vec } from '@embedpdf/core-annotation';
 
-/** The selection's menu anchor on its primary page, in content space. */
-export type SelectionAnchor = { page: PageRef; bounds: Rect; knob?: Vec };
+/** The annotation selection's menu anchor on its primary page, in page space. */
+export type AnnotationSelectionAnchor = { page: PageRef; bounds: Rect; knob?: Vec };
 
-export function sameAnchor(a: SelectionAnchor | null, b: SelectionAnchor | null): boolean {
+export function sameAnchor(
+  a: AnnotationSelectionAnchor | null,
+  b: AnnotationSelectionAnchor | null,
+): boolean {
   if (a === b) return true;
   if (!a || !b) return false;
   return (

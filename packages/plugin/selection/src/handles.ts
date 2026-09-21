@@ -9,7 +9,7 @@
  *
  * Everything here is DOM-free and framework-free: geometry is pure given a
  * projector, and the drag session speaks the selection's own gesture verbs
- * (`beginAt`/`extendTo`/`end` — the same ones the pointer handler uses; a
+ * (`beginGestureAt`/`extendTo`/`endGesture` — the same ones the pointer handler uses; a
  * handle drag IS a selection gesture, re-anchored). The framework adapters
  * keep only subscriptions and markup; the DOM listener mechanics live in
  * `@embedpdf/web`'s `attachSelectionHandle`.
@@ -45,9 +45,9 @@ export interface SelectionHandleEndpoint {
 
 /** The gesture verbs a handle drag drives — `SelectionHostCapability` satisfies it. */
 export interface SelectionHandleTarget {
-  beginAt(page: PageRef, point: Point): boolean;
+  beginGestureAt(page: PageRef, point: Point): boolean;
   extendTo(page: PageRef, point: Point): void;
-  end(): void;
+  endGesture(): void;
 }
 
 // The iOS caret-handle design, one source for every adapter: a thin BAR that
@@ -144,7 +144,7 @@ export function createSelectionHandleDrag(
   return {
     move: (overlay) => {
       if (!begun) {
-        if (!selection.beginAt(opposite.page, anchorPoint)) return;
+        if (!selection.beginGestureAt(opposite.page, anchorPoint)) return;
         begun = true;
       }
       const hit = view.pageAt(overlay);
@@ -157,7 +157,7 @@ export function createSelectionHandleDrag(
       }
     },
     end: () => {
-      if (begun) selection.end(); // settle → menu reappears, onCommit fires
+      if (begun) selection.endGesture(); // settle → menu reappears, onCommitted fires
     },
   };
 }

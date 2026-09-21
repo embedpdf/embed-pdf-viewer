@@ -13,10 +13,10 @@
 export * from '@embedpdf/plugin-annotation';
 import * as React from 'react';
 import { useEffect, useState } from 'react';
+import type { ResourceStatus } from '@embedpdf/core';
 import {
   AnnotationToken,
   annotationKey,
-  type AnnotationHydration,
   type AnnotationRef,
   type Behavior,
   type CommentsApi,
@@ -25,7 +25,6 @@ import {
   type SelectionProps,
   type FilePickerProvider,
   type TextItem,
-  previewBucket,
 } from '@embedpdf/plugin-annotation';
 import {
   attachRichTextEditor,
@@ -36,7 +35,10 @@ import {
 // The render layer is framework code, so it resolves the FULL host lens
 // (pageItems/chrome/appearances/…). Same runtime token as the public one — only
 // the type differs. App code never imports this.
-import { AnnotationToken as AnnotationHostToken } from '@embedpdf/plugin-annotation/internal';
+import {
+  AnnotationToken as AnnotationHostToken,
+  previewBucket,
+} from '@embedpdf/plugin-annotation/contract/host';
 import {
   scene,
   MITER_LIMIT,
@@ -75,7 +77,11 @@ import {
 } from './runtime';
 import type { PageContextValue, PageLayout } from './runtime';
 
-export { sameAnchor, sameCreationDraftAnchor, type SelectionAnchor } from './annotation-anchors';
+export {
+  sameAnchor,
+  sameCreationDraftAnchor,
+  type AnnotationSelectionAnchor,
+} from './annotation-anchors';
 export { useAnnotationSelected } from './annotation-hooks';
 
 /** `#rrggbb` → `rgba(...)` — the marquee's translucent fill derives from the
@@ -308,8 +314,8 @@ function BakedImage({
  */
 function ToolGhostImage({ page }: { page: PageContextValue }) {
   const anno = useCapability(AnnotationHostToken);
-  const ghost = useSelector(AnnotationHostToken, (c) => c.toolGhost(page.ref));
-  const epoch = useSelector(AnnotationHostToken, (c) => c.stampArmEpoch());
+  const ghost = useSelector(AnnotationHostToken, (c) => c.getToolGhost(page.ref));
+  const epoch = useSelector(AnnotationHostToken, (c) => c.getStampArmEpoch());
   const [url, setUrl] = useState<string | null>(null);
   // The ghost is a bitmap of vector artwork, right at ONE size: ask for the
   // bucket that covers the box's DEVICE width (points × device px per point),
@@ -324,7 +330,7 @@ function ToolGhostImage({ page }: { page: PageContextValue }) {
     }
     let cancelled = false;
     let obj: string | null = null;
-    void anno.armedStampPreview(bucket).then((preview) => {
+    void anno.getArmedStampPreview(bucket).then((preview) => {
       if (cancelled || !preview) return;
       // Copy into an EXACT ArrayBuffer (the engine idiom): a Uint8Array view
       // may sit on a larger or shared buffer, which Blob won't accept.
@@ -377,10 +383,10 @@ function Chrome({ page }: { page: PageContextValue }) {
   const zoom = page.transform.zoom;
   const nodes = useSelector(
     AnnotationHostToken,
-    (c) => c.chrome(page.ref, scale, rotation, zoom),
+    (c) => c.listChromeNodes(page.ref, scale, rotation, zoom),
     shallowArray,
   );
-  const cs = useSelector(AnnotationHostToken, (c) => c.chromeSettings());
+  const cs = useSelector(AnnotationHostToken, (c) => c.getChromeSettings());
   // The accent cascade: each piece's color falls back to the one accent.
   const outlineStroke = cs.outline.color ?? cs.accent;
   const handleStroke = cs.handles.stroke ?? cs.accent;
@@ -606,7 +612,7 @@ function FreeText({ item, page }: { item: TextItem; page: PageContextValue }) {
         if (it.ref) anno.setTextSelection(it.ref, range);
       },
       onCommand: (command) => anno.toggleTextFormat(command),
-      cssFontFamily: (family) => anno.cssFontFamily(family),
+      cssFontFamily: (family) => anno.getCssFontFamily(family),
     };
     const b = attachRichTextEditor(el, host, {
       document: latest.current.item.richText,
@@ -684,7 +690,7 @@ function FreeText({ item, page }: { item: TextItem; page: PageContextValue }) {
         if (
           e.relatedTarget == null &&
           ref.current?.isConnected &&
-          anno.currentEditing() === item.id
+          anno.getEditingId() === item.id
         ) {
           ref.current.focus();
         }
@@ -793,20 +799,16 @@ export function AnnotationLayer({ renderers }: AnnotationLayerProps = {}) {
   const viewRotation = page.transform.rotation;
   const items = useSelector(
     AnnotationHostToken,
-    (c) => c.pageItems(page.ref, { zoom: viewZoom, rotation: viewRotation }),
+    (c) => c.listPageItems(page.ref, { zoom: viewZoom, rotation: viewRotation }),
     shallowArray,
   );
   const texts = useSelector(
     AnnotationHostToken,
-    (c) => c.textItems(page.ref, { zoom: viewZoom, rotation: viewRotation }),
+    (c) => c.listTextItems(page.ref, { zoom: viewZoom, rotation: viewRotation }),
     shallowArray,
   );
   const [urls, setUrls] = useState<Record<string, { url: string; box: Rect }>>({});
   useAutoBehaviors(anno, renderers);
-
-  useEffect(() => {
-    anno.ensurePage(page.ref);
-  }, [anno, page.ref]);
 
   // Baked annotations render from engine rasters — refetch when the page's
   // baked set or an /AP content version changes (a freshly placed stamp, a
@@ -814,13 +816,13 @@ export function AnnotationLayer({ renderers }: AnnotationLayerProps = {}) {
   // or a rotate leaves the epoch untouched (the blit repositions the same
   // pixels), and live gesture previews don't touch it either — so no mid-drag
   // spam.
-  const bakedKey = useSelector(AnnotationHostToken, (c) => c.appearanceEpoch(page.ref));
+  const bakedKey = useSelector(AnnotationHostToken, (c) => c.getAppearanceEpoch(page.ref));
   // The bake scale conforms to the document's render policy — the plugin's
   // OWN capability over the kernel-materialized fact (no foreign tokens):
   // zoom ticks inside an appearance-lattice rung re-bake NOTHING; crossing
   // 1→2 re-bakes once; continuous is the identity.
   const bakeScale = useSelector(AnnotationHostToken, (c) =>
-    c.bakeScale(page.transform.renderScale),
+    c.getBakeScale(page.transform.renderScale),
   );
 
   useEffect(() => {
@@ -828,12 +830,12 @@ export function AnnotationLayer({ renderers }: AnnotationLayerProps = {}) {
     const revokers: Array<() => void> = [];
     (async () => {
       try {
-        const imgs = await anno.appearances(page.ref, bakeScale, controller.signal);
+        const imgs = await anno.renderAppearances(page.ref, bakeScale, controller.signal);
         const map: Record<string, { url: string; box: Rect }> = {};
         for (const ap of imgs) {
           // Place the baked bitmap by its OWN /Rect (the box it was rendered into),
           // converted to content space by the plugin — never a recomputed bound.
-          const box = anno.toContentBox(page.ref, ap.rect);
+          const box = anno.pdfToPageRect(page.ref, ap.rect);
           if (!box) continue;
           const obj = await ap.image.objectUrl(controller.signal);
           if (controller.signal.aborted) {
@@ -879,7 +881,7 @@ export function AnnotationLayer({ renderers }: AnnotationLayerProps = {}) {
         // (form fill controls own their DOM); `for` rules apply only to
         // plane-owned annotations and render pointer-locked — a skin can change
         // pixels, never steal input.
-        const behavior = anno.behaviorFor({ subtype: item.subtype, ref: item.ref });
+        const behavior = anno.getBehaviorFor({ subtype: item.subtype, ref: item.ref });
         let out: React.ReactNode;
         if (behavior) {
           const entry = renderers?.find((r) => rendererBehaviorId(anno, r) === behavior.id);
@@ -957,8 +959,7 @@ export function useFilePickerProvider(
   const anno = useOptionalCapability(AnnotationToken);
   useEffect(() => {
     if (!anno) return;
-    anno.setFilePickerProvider(provider);
-    return () => anno.setFilePickerProvider(null);
+    return anno.setFilePickerProvider(provider);
   }, [anno, provider]);
 }
 
@@ -966,9 +967,13 @@ export function useAnnotation() {
   return useCapability(AnnotationToken);
 }
 
+/** The selected annotation refs (group-expanded), reference-stable while unchanged. */
 export function useAnnotationSelection() {
-  return useSelector(AnnotationToken, (c) => c.selection(), shallowArray);
+  return useSelector(AnnotationToken, (c) => c.getSelection(), sameRefs);
 }
+const sameRefs = (a: readonly AnnotationRef[], b: readonly AnnotationRef[]): boolean =>
+  a === b ||
+  (a.length === b.length && a.every((r, i) => annotationKey(r) === annotationKey(b[i]!)));
 
 /** Structural equality for a resolved props bag — keeps the subscription from
  *  re-rendering on unrelated dispatches, since `currentDefaults` returns a fresh
@@ -979,12 +984,12 @@ const sameProps = (a: AnnotationProps, b: AnnotationProps): boolean =>
 /**
  * A tool's RESOLVED defaults (base + per-tool override) as a full flat props
  * bag, subscribed so a `setDefaults` re-renders the consumer. Use this — not the
- * imperative `useAnnotation().currentDefaults(id)` — to drive default-editing
+ * imperative `useAnnotation().getToolDefaults(id)` — to drive default-editing
  * controls, so they reflect changes live. Pair with `propsForTool(id)` for the
  * specs to render.
  */
 export function useAnnotationDefaults(toolId: string): AnnotationProps {
-  return useSelector(AnnotationToken, (c) => c.currentDefaults(toolId), sameProps);
+  return useSelector(AnnotationToken, (c) => c.getToolDefaults(toolId), sameProps);
 }
 
 /**
@@ -1068,7 +1073,7 @@ const EMPTY_PAGES: readonly PageLayout[] = [];
  */
 export function useCommentThreads(): CommentThreadView[] {
   const docId = useDocumentId();
-  const threads = useSelector(AnnotationToken, (c) => c.comments.threads());
+  const threads = useSelector(AnnotationToken, (c) => c.comments.listThreads());
   const pages = useKernelValue((k) =>
     docId ? (k.getState().core.documents[docId]?.pages ?? EMPTY_PAGES) : EMPTY_PAGES,
   );
@@ -1081,13 +1086,13 @@ export function useCommentThread(ref: AnnotationRef | null): CommentThreadView |
   const views = useCommentThreads();
   const api = useComments();
   if (ref == null) return null;
-  const t = api.thread(ref);
+  const t = api.getThread(ref);
   if (!t) return null;
   return views.find((v) => annotationKey(v.root.ref) === annotationKey(t.root.ref)) ?? null;
 }
 
 /** Whole-document hydration status — the comments sidebar's honest loading
- *  state (`loading` until `listRawAll` lands, then `complete`/`error`). */
-export function useCommentsHydration(): AnnotationHydration {
-  return useSelector(AnnotationToken, (c) => c.comments.hydration());
+ *  state (`loading` until every annotation is in, then `ready`, `forbidden` or `error`). */
+export function useAnnotationStatus(): ResourceStatus {
+  return useSelector(AnnotationToken, (c) => c.getStatus());
 }

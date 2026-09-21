@@ -11,7 +11,13 @@ import {
   type PageRef,
   type PieceInfoEntry,
 } from '@embedpdf/engine-core/runtime';
-import { createEventHook, type PluginContext } from '@embedpdf/core';
+import {
+  createEventHook,
+  PluginError,
+  toPluginError,
+  toPluginErrorInfo,
+  type PluginContext,
+} from '@embedpdf/core';
 import { javaScriptProgramFromActionTree } from '@embedpdf/core-acrojs';
 import { ActionsToken as ActionsHostToken } from '@embedpdf/plugin-actions/contract/host';
 import {
@@ -46,7 +52,11 @@ import type {
   StampConfig,
   StampLibrary,
   StampLibraryChange,
-  StampLibraryQuery,
+  StampLibraryFilter,
+  StampAssetFilter,
+  StampArmChangedEvent,
+  StampAssetEvent,
+  StampLibraryEvent,
   StampAssetKind,
   StampState,
 } from './types';
@@ -197,6 +207,7 @@ export function createStampCapability(
       // A cloud kernel engine rejects 'bytes' with InvalidArg — turn the
       // generic contract error into the configuration fix.
       if (!config.assetEngine && EngineError.is(err, EngineErrorCode.InvalidArg)) {
+        importSupported = false;
         throw new EngineError(
           EngineErrorCode.NotImplemented,
           "[stamp] importing a library PDF needs an engine that can open local bytes, and this viewer's engine cannot (cloud). Pass stampPlugin({ assetEngine: () => import('@embedpdf/engine').then((m) => m.createLocalEngine()) }) — it loads lazily, on first import.",
@@ -232,9 +243,31 @@ export function createStampCapability(
     return id;
   };
 
-  const libraryChanged = createEventHook<StampLibraryChange>((error) =>
-    globalThis.console?.error('[stamp] onLibraryChanged observer failed:', error),
-  );
+  const reportListener = (error: unknown) =>
+    globalThis.console?.error('[stamp] event listener failed:', error);
+  const libraryChanged = createEventHook<StampLibraryChange>(reportListener);
+  const libraryCreated = createEventHook<StampLibraryEvent>(reportListener);
+  const libraryUpdated = createEventHook<StampLibraryEvent>(reportListener);
+  const libraryDeleted = createEventHook<StampLibraryEvent>(reportListener);
+  const assetCreated = createEventHook<StampAssetEvent>(reportListener);
+  const assetUpdated = createEventHook<StampAssetEvent>(reportListener);
+  const assetDeleted = createEventHook<StampAssetEvent>(reportListener);
+  const armChanged = createEventHook<StampArmChangedEvent>(reportListener);
+  ctx.cleanup(() => {
+    for (const hook of [
+      libraryChanged,
+      libraryCreated,
+      libraryUpdated,
+      libraryDeleted,
+      assetCreated,
+      assetUpdated,
+      assetDeleted,
+      armChanged,
+    ])
+      hook.dispose();
+  });
+  /** Set once an import proves the engine cannot open local bytes (cloud). */
+  let importSupported: boolean | null = null;
 
   /** Thumbnail render of one library page (the small picker image). */
   const renderThumbnail = async (
@@ -281,6 +314,7 @@ export function createStampCapability(
       },
     });
     libraryChanged.emit({ libraryId: id, reason: 'created' });
+    libraryCreated.emit({ libraryId: id, library: ctx.getState().libraries[id] ?? null });
     return id;
   };
 
@@ -476,6 +510,10 @@ export function createStampCapability(
       ctx.dispatch({ type: 'ASSET_ADDED', asset });
     }
     libraryChanged.emit({ libraryId: imported.library.id, reason: 'imported' });
+    libraryCreated.emit({ libraryId: imported.library.id, library: imported.library });
+    for (const { asset } of imported.assets) {
+      assetCreated.emit({ assetId: asset.id, libraryId: imported.library.id, asset });
+    }
     return imported.library.id;
   };
 
@@ -726,6 +764,11 @@ export function createStampCapability(
       binaries.set(appended.asset.id, { bytes: appended.bytes, preview: appended.preview });
       ctx.dispatch({ type: 'ASSET_ADDED', asset: appended.asset });
       libraryChanged.emit({ libraryId: liveLibrary.id, reason: 'asset-added' });
+      assetCreated.emit({
+        assetId: appended.asset.id,
+        libraryId: liveLibrary.id,
+        asset: appended.asset,
+      });
       return appended.asset.id;
     });
   };
@@ -799,6 +842,7 @@ export function createStampCapability(
       ghostRenders.delete(id);
       ctx.dispatch({ type: 'ASSET_REMOVED', assetId: id });
       libraryChanged.emit({ libraryId: library.id, reason: 'asset-removed' });
+      assetDeleted.emit({ assetId: id, libraryId: library.id, asset: null });
     });
   };
 
@@ -806,7 +850,10 @@ export function createStampCapability(
     mutateLibrary(id, async () => {
       const existed = ctx.getState().libraries[id] !== undefined;
       dropLibrary(id);
-      if (existed) libraryChanged.emit({ libraryId: id, reason: 'removed' });
+      if (existed) {
+        libraryChanged.emit({ libraryId: id, reason: 'removed' });
+        libraryDeleted.emit({ libraryId: id, library: null });
+      }
     });
 
   const updateAsset = async (
@@ -860,6 +907,7 @@ export function createStampCapability(
       libraryBinaries.set(library.id, rewritten);
       ctx.dispatch({ type: 'ASSET_UPDATED', asset: next });
       libraryChanged.emit({ libraryId: library.id, reason: 'asset-updated' });
+      assetUpdated.emit({ assetId: next.id, libraryId: library.id, asset: next });
     });
   };
 
@@ -908,6 +956,7 @@ export function createStampCapability(
       libraryBinaries.set(id, rewritten);
       ctx.dispatch({ type: 'LIBRARY_UPDATED', library: next });
       libraryChanged.emit({ libraryId: id, reason: 'updated' });
+      libraryUpdated.emit({ libraryId: id, library: next });
     });
   };
 
@@ -1054,6 +1103,7 @@ export function createStampCapability(
       targetWidth: opts?.targetWidth,
     });
     armedByDocument.set(documentId, assetId);
+    armChanged.emit({ documentId, assetId });
   };
 
   /** Which asset this plugin armed per document. The annotation plugin owns
@@ -1063,11 +1113,10 @@ export function createStampCapability(
   const armedAsset = (documentId: string): StampAsset | null => {
     const assetId = armedByDocument.get(documentId);
     if (assetId === undefined) return null;
+    // Pure: a stale entry (the annotation plugin dropped the payload on a tool
+    // change) reads as nothing armed and is overwritten by the next arm.
     const annotation = ctx.tryForDocument(AnnotationHostToken, documentId);
-    if (!annotation?.hasArmedStamp()) {
-      armedByDocument.delete(documentId);
-      return null;
-    }
+    if (!annotation?.hasArmedStamp()) return null;
     return ctx.getState().assets[assetId] ?? null;
   };
 
@@ -1167,47 +1216,136 @@ export function createStampCapability(
     }
   });
 
-  return {
-    libraries: (query?: StampLibraryQuery) => {
+  const listAssets = (filter?: StampAssetFilter): readonly StampAsset[] => {
+    const s = ctx.getState();
+    const scope = filter?.libraryId ? [filter.libraryId] : s.libraryOrder;
+    return scope
+      .flatMap((lid) => (s.libraries[lid]?.assetIds ?? []).map((id) => s.assets[id]))
+      .filter(
+        (a): a is StampAsset =>
+          a != null &&
+          (!filter?.kind || a.kind === filter.kind) &&
+          (!filter?.category || (a.categories ?? []).includes(filter.category)),
+      );
+  };
+  const notFound = (what: string, id: string) =>
+    new PluginError('not-found', 'stamp', `unknown ${what} '${id}'`);
+  const canPlace = (documentId?: string): boolean => {
+    const id = documentId ?? ctx.core().activeId;
+    if (!id) return false;
+    return ctx.tryForDocument(AnnotationToken, id)?.canCreate() ?? false;
+  };
+
+  const api: StampCapability = {
+    listLibraries: (filter?: StampLibraryFilter) => {
       const s = ctx.getState();
       const kinds =
-        query?.kind === undefined
+        filter?.kind === undefined
           ? null
-          : new Set(typeof query.kind === 'string' ? [query.kind] : query.kind);
+          : new Set(typeof filter.kind === 'string' ? [filter.kind] : filter.kind);
       return s.libraryOrder
         .map((id) => s.libraries[id])
         .filter((l): l is StampLibrary => l != null && (kinds === null || kinds.has(l.kind)));
     },
-    library: (id) => ctx.getState().libraries[id] ?? null,
-    assets: (libraryId) => {
-      const s = ctx.getState();
-      if (libraryId) {
-        const library = s.libraries[libraryId];
-        return library ? library.assetIds.map((id) => s.assets[id]).filter((a) => a != null) : [];
-      }
-      return s.libraryOrder.flatMap((lid) =>
-        (s.libraries[lid]?.assetIds ?? []).map((id) => s.assets[id]).filter((a) => a != null),
+    getLibrary: (id) => ctx.getState().libraries[id] ?? null,
+    listAssets,
+    getAsset: (id) => ctx.getState().assets[id] ?? null,
+    getAssetPreview: (id) => binaries.get(id)?.preview ?? null,
+    renderAssetPreview: (id, { width }) => {
+      const bin = binaries.get(id);
+      if (!bin) return Promise.reject(notFound('asset', id));
+      return ghostProvider(
+        bin.bytes,
+        bin.preview,
+        id,
+      )(width).then((preview) =>
+        preview ? { bytes: preview.bytes, mimeType: preview.mimeType ?? 'image/png' } : null,
       );
     },
-    asset: (id) => ctx.getState().assets[id] ?? null,
-    assetPreview: (id) => binaries.get(id)?.preview ?? null,
-    assetBytes: (id) => binaries.get(id)?.bytes ?? null,
-    exportLibrary: (id) => libraryBinaries.get(id) ?? null,
+    readAssetBytes: (id) => {
+      const bytes = binaries.get(id)?.bytes;
+      return bytes ? new Uint8Array(bytes) : null;
+    },
+    exportLibrary: async (id) => {
+      const bytes = libraryBinaries.get(id);
+      if (!bytes) throw notFound('library', id);
+      return new Uint8Array(bytes);
+    },
     onLibraryChanged: libraryChanged.on,
+    onLibraryCreated: libraryCreated.on,
+    onLibraryUpdated: libraryUpdated.on,
+    onLibraryDeleted: libraryDeleted.on,
+    onAssetCreated: assetCreated.on,
+    onAssetUpdated: assetUpdated.on,
+    onAssetDeleted: assetDeleted.on,
+    onArmChanged: armChanged.on,
     createLibrary,
     updateLibrary,
-    importLibraryPdf,
-    addAsset,
-    addAssetFromAnnotations,
+    importLibrary: importLibraryPdf,
+    createAsset: addAsset,
+    createAssetFromAnnotations: (documentId, page, refs, input) =>
+      addAssetFromAnnotations(documentId, page, [...refs], input),
     updateAsset,
-    removeAsset,
-    removeLibrary,
+    deleteAsset: removeAsset,
+    deleteLibrary: removeLibrary,
+    moveAsset: async (id, to) => {
+      const asset = ctx.getState().assets[id];
+      const bin = binaries.get(id);
+      if (!asset || !bin) throw notFound('asset', id);
+      if (to.libraryId === asset.libraryId) return id;
+      const copy = await addAsset({
+        libraryId: to.libraryId,
+        source: new Uint8Array(bin.bytes),
+        kind: asset.kind,
+        label: asset.label,
+        ...(asset.subject !== undefined ? { subject: asset.subject } : {}),
+        ...(asset.categories ? { categories: [...asset.categories] } : {}),
+        ...(bin.preview ? { preview: bin.preview.bytes } : {}),
+      });
+      await removeAsset(id);
+      return copy;
+    },
+    duplicateAsset: async (id, options) => {
+      const asset = ctx.getState().assets[id];
+      const bin = binaries.get(id);
+      if (!asset || !bin) throw notFound('asset', id);
+      return addAsset({
+        libraryId: asset.libraryId,
+        source: new Uint8Array(bin.bytes),
+        kind: asset.kind,
+        label: options?.label ?? `${asset.label} copy`,
+        ...(asset.subject !== undefined ? { subject: asset.subject } : {}),
+        ...(asset.categories ? { categories: [...asset.categories] } : {}),
+        ...(bin.preview ? { preview: bin.preview.bytes } : {}),
+      });
+    },
     armAsset,
     placeAsset,
+    placeAssetOnPages: async (documentId, assetId, pages, placement) => {
+      const targets =
+        pages === 'all'
+          ? (ctx.core().documents[documentId]?.pages ?? []).map((p) => p.ref)
+          : [...pages];
+      const applied: AnnotationRef[] = [];
+      const failed: { ref: PageRef; error: ReturnType<typeof toPluginErrorInfo> }[] = [];
+      for (const page of targets) {
+        try {
+          applied.push(await placeAsset(documentId, assetId, { ...placement, page }));
+        } catch (error) {
+          failed.push({ ref: page, error: toPluginErrorInfo(toPluginError('stamp', error)) });
+        }
+      }
+      return { applied, skipped: [], failed };
+    },
     disarm: (documentId) => {
+      const was = armedByDocument.get(documentId) ?? null;
       armedByDocument.delete(documentId);
       ctx.forDocument(AnnotationToken, documentId).disarmStamp();
+      if (was !== null) armChanged.emit({ documentId, assetId: null });
     },
-    armedAsset,
+    getArmedAsset: armedAsset,
+    canPlace,
+    canImport: () => importSupported !== false,
   };
+  return api;
 }

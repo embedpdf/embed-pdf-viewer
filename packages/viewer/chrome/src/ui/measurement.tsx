@@ -21,8 +21,7 @@ const button =
   'border-border text-fg hover:bg-hover rounded-md border px-3 py-1.5 text-sm disabled:opacity-50';
 
 /** The current page's address, or null with no page (empty document). */
-const useCurrentPage = () =>
-  useSelector(StageToken, (c) => c.pages()[c.currentPage()]?.ref ?? null);
+const useCurrentPage = () => useSelector(StageToken, (c) => c.getCurrentPage()?.ref ?? null);
 
 export function MeasurementScaleButton() {
   const t = useT();
@@ -57,16 +56,18 @@ export function MeasurementSection() {
 
   const scale = usePageScale(page);
   const anno = useCapability(AnnotationToken);
-  const selected = useSelector(AnnotationToken, (c) => c.selection());
+  const selected = useSelector(AnnotationToken, (c) => c.getSelection());
   const resettable = useSelector(
     AnnotationToken,
     (c) =>
       c
-        .getSelected()
+        .listSelected()
         .filter(
           (annotation) =>
             (annotation.subtype === 'polygon' || annotation.subtype === 'polyline') &&
-            annotation.caption?.center &&
+            annotation.raw &&
+            (annotation.raw.subtype === 'polygon' || annotation.raw.subtype === 'polyline') &&
+            annotation.raw.caption?.center &&
             c.canEdit(annotation.ref) &&
             !annotation.flags.lockedContents,
         ),
@@ -76,7 +77,7 @@ export function MeasurementSection() {
     MeasurementToken,
     (c) =>
       anno
-        .getSelected()
+        .listSelected()
         .map((d) => c.readout(d.ref))
         .filter((r): r is MeasurementReadout => !('unavailable' in r)),
     (a, b) => JSON.stringify(a) === JSON.stringify(b),
@@ -250,9 +251,10 @@ export function MeasurementSection() {
               onClick={() =>
                 void run(async () => {
                   for (const annotation of resettable) {
-                    if (annotation.subtype === 'polygon' || annotation.subtype === 'polyline') {
-                      await anno.update(annotation.ref, {
-                        subtype: annotation.subtype,
+                    const raw = annotation.raw;
+                    if (raw && (raw.subtype === 'polygon' || raw.subtype === 'polyline')) {
+                      await anno.updateRaw(annotation.ref, {
+                        subtype: raw.subtype,
                         caption: { center: null },
                       });
                     }

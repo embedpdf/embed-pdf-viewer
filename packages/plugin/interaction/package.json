@@ -10,7 +10,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./contract": "./src/contract.ts",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./contract/host": "./src/host-contract.ts"
   },
   "publishConfig": {
     "main": "./dist/index.js",
@@ -25,7 +26,11 @@
         "import": "./dist/contract.js",
         "require": "./dist/contract.cjs"
       },
-      "./package.json": "./package.json"
+      "./package.json": "./package.json",
+      "./contract/host": {
+        "import": "./dist/host-contract.js",
+        "require": "./dist/host-contract.cjs"
+      }
     }
   },
   "files": [

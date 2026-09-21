@@ -177,7 +177,7 @@ describe('kernel: document events → page registry', () => {
 
     // A late event (e.g. a slow worker) must be a no-op, not a crash.
     expect(() => events.emit(rotatedEvent([1], 90, [page(1, 0, 90), page(2, 1)]))).not.toThrow();
-    expect(kernel.documents.activeId()).toBeNull();
+    expect(kernel.documents.getActiveId()).toBeNull();
   });
 
   it('runs cleanup registered by a document capability when its document closes', async () => {

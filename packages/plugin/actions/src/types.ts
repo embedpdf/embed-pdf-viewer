@@ -50,7 +50,7 @@ export type ActionSource =
   | { kind: 'document' }
   | { kind: 'api' };
 
-/** Trigger provenance, derived centrally beside {@link originOf} — the
+/** Trigger provenance, derived centrally beside {@link triggerOriginOf} — the
  *  executor-visible "which event fired" (cursorEnter vs cursorExit are both
  *  `origin: 'hover'`; this carries the difference). */
 /** The document lifecycle vocabulary: `open` (§3.9's sequence) plus the
@@ -71,6 +71,40 @@ export type ActionTriggerEvent =
   | { scope: 'page'; name: 'open' | 'close' | 'visible' | 'invisible' }
   | { scope: 'document'; name: DocumentTriggerEvent };
 
+/** The four field-level /AA scripts (ISO Table 198: K F V C). */
+export type PdfFieldEventKind = 'keystroke' | 'format' | 'validate' | 'calculate';
+
+/** The Named verbs the viewer interprets (ISO Table 215's four page verbs
+ *  plus Adobe's `Print`); any other name is accepted and reported inert. */
+export type PdfNamedAction =
+  | 'NextPage'
+  | 'PrevPage'
+  | 'FirstPage'
+  | 'LastPage'
+  | 'Print'
+  | (string & {});
+
+/**
+ * Where an action tree lives, for {@link ActionsCapability.getActionTree}.
+ * Each arm names its own event vocabulary; the annotation arm defaults to
+ * the /A click tree, the page and document arms to their open trees.
+ */
+export type ActionTreeSource =
+  | {
+      kind: 'annotation';
+      annotation: AnnotationRef;
+      page: PageRef;
+      event?: 'activate' | PdfAnnotationEventKind;
+    }
+  | { kind: 'field'; field: FormFieldRef; event: PdfFieldEventKind }
+  | { kind: 'page'; page: PageRef; event?: 'open' | 'close' }
+  | { kind: 'document'; event?: DocumentTriggerEvent };
+
+/** The document-open sequence has run (once per document). */
+export interface OpenSequenceCompletedEvent {
+  readonly result: ActionTriggerResult;
+}
+
 export interface ActionContext {
   origin: ActionOrigin;
   source: ActionSource;
@@ -90,7 +124,7 @@ export type PdfAnnotationEventKind =
 
 /**
  * Trigger vocabulary — what a feed reports; the dispatcher resolves trees,
- * derives the origin ({@link originOf}), and fans out. `source` on the
+ * derives the origin ({@link triggerOriginOf}), and fans out. `source` on the
  * annotation-addressed arms is an optional PROVENANCE hint from first-party
  * feeds (a widget feed passes its field ref so the interim JS executor can
  * anchor `event.target`); policy never reads it and it cannot change origin.
@@ -123,7 +157,7 @@ export const eventOf = (trigger: ActionTrigger): ActionTriggerEvent => {
 
 /** The one origin mapping — derived by the dispatcher, never claimed by a
  *  caller: a feed cannot launder a hover into a user gesture. */
-export const originOf = (trigger: ActionTrigger): ActionOrigin => {
+export const triggerOriginOf = (trigger: ActionTrigger): ActionOrigin => {
   switch (trigger.scope) {
     case 'activate':
       return 'user';
@@ -197,7 +231,7 @@ export interface ActionDispatchEvent {
 
 /**
  * One tree's execution inside a trigger: its true source, its true tree, its
- * own node results — `path`s are REAL walk paths, never prefixed. `onAction`
+ * own node results — `path`s are REAL walk paths, never prefixed. `onExecuted`
  * fires once per step with exactly this tree and a ctx built from this
  * source, so the Phase-1 event contract is untouched by fan-out.
  */
@@ -265,9 +299,12 @@ export interface ActionPolicy {
   'submit-form': ActionPolicyRow;
 }
 
-export interface ActionsPluginConfig {
-  /** Declarative overrides merged over the defaults (umbrella §3.5). */
-  policy?: Partial<ActionPolicy>;
+/** Row-wise policy overrides: name only the origins you change. */
+export type ActionPolicyPatch = { readonly [K in keyof ActionPolicy]?: Partial<ActionPolicyRow> };
+
+export interface ActionsConfig {
+  /** Declarative overrides merged row-wise over the defaults (umbrella §3.5). */
+  policy?: ActionPolicyPatch;
   /** Trigger-family gates, default all true. `activate` (the /A click) is
    *  the Phase-1 core door and is never gated. */
   triggers?: { document?: boolean; page?: boolean; annotation?: boolean };
@@ -505,6 +542,31 @@ export interface ActionsCapability {
   execute(tree: PdfActionTree, ctx: ActionContext): Promise<ActionDispatchResult>;
   canExecute(tree: PdfActionTree, ctx: ActionContext): boolean;
   /**
+   * Run one Named verb (`NextPage`, `Print`, …) as a user-origin action
+   * without building a tree — the programmatic twin of a Named link click.
+   * `context` overrides the default `{ origin: 'user', source: { kind: 'api' } }`.
+   */
+  executeNamed(
+    name: PdfNamedAction,
+    context?: Partial<ActionContext>,
+  ): Promise<ActionDispatchResult>;
+  /**
+   * Read the /A or /AA tree behind a source straight from the document
+   * (`null` when absent or when the document is gone). This is the raw
+   * tree: dispatch-time rules such as ISO Table 197's "/A shadows /AA U"
+   * are not applied here.
+   */
+  getActionTree(source: ActionTreeSource): Promise<PdfActionTree | null>;
+  /** The effective policy — a reference-stable snapshot until
+   *  {@link updatePolicy} replaces it. */
+  getPolicy(): ActionPolicy;
+  /** Live policy change: rows merge over the current policy, and later
+   *  dispatches decide with the new one. */
+  updatePolicy(patch: ActionPolicyPatch): void;
+  /** Did `javascript.enabled` take effect — a script realm exists for this
+   *  document. */
+  isScriptingEnabled(): boolean;
+  /**
    * Report a trigger. Submission is SYNCHRONOUS — the queue slot is taken
    * before this returns, so two dispatch calls execute in call order even
    * when their resolutions race; all reads happen inside the queued
@@ -545,21 +607,28 @@ export interface ActionsCapability {
    * `no-submit-sink` diagnostic.
    */
   setSubmitHandler(handler: ActionSubmitHandler | null): Unsubscribe;
-  onAction: EventHook<ActionDispatchEvent>;
+  /**
+   * Interpret (or override) one action type from application code — the
+   * same door the stage and form plugins use for GoTo, Named, Hide and
+   * ResetForm. Deterministic LAST-WINS on duplicates (a `duplicate-executor`
+   * diagnostic is emitted); the disposer removes the entry only while it is
+   * still the current one.
+   */
+  registerExecutor(type: PdfActionType, executor: ActionExecutor): Unsubscribe;
+  /** Every executed tree — dispatch-driven, verb-driven and lifecycle-driven. */
+  onExecuted: EventHook<ActionDispatchEvent>;
   onDiagnostic: EventHook<ActionDiagnostic>;
   /** Script-plane observability (dispatch-driven AND K/V/C/F-driven — the
    *  form pipeline surfaces through the same doors). */
   onScriptDiagnostic: EventHook<ScriptDiagnostic>;
   onScriptError: EventHook<ScriptExecutionError>;
+  /** The document-open sequence ran (OpenAction / open destination). */
+  onOpenSequenceCompleted: EventHook<OpenSequenceCompletedEvent>;
 }
 
 /** HOST lens — plugin-to-plugin only; import the token from
  *  `@embedpdf/plugin-actions/contract/host`, never from application code. */
 export interface ActionsHostCapability extends ActionsCapability {
-  /** Deterministic LAST-WINS on duplicates (a `duplicate-executor`
-   *  diagnostic is emitted); the disposer removes the entry only while it is
-   *  still the current one. */
-  registerExecutor(type: PdfActionType, executor: ActionExecutor): Unsubscribe;
   registerAnnotCommitSink(sink: AnnotCommitSink): Unsubscribe;
   registerFormCommitSink(sink: FormCommitSink): Unsubscribe;
   /**
@@ -599,9 +668,11 @@ export interface ActionsHostCapability extends ActionsCapability {
 export interface ActionsState {
   /** Monotonic dispatch counter — store-visible observability. */
   seq: number;
+  /** Bumped by `updatePolicy`, so store selectors re-read `getPolicy()`. */
+  policyRevision: number;
 }
 
-export type ActionsAction = { type: 'ACTIONS_DISPATCHED' };
+export type ActionsAction = { type: 'ACTIONS_DISPATCHED' } | { type: 'ACTIONS_POLICY_CHANGED' };
 
 export const ActionsToken = createCapabilityToken<ActionsCapability>('actions', {
   hint: `add actionsPlugin() from '@embedpdf/plugin-actions' to your plugins list`,

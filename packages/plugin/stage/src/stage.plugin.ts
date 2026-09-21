@@ -8,6 +8,7 @@ import { registerStageEffects } from './effects';
 import { initialStageState, stageReducer } from './reducer';
 import { StageToken } from './types';
 import type { StageAction, StageCapability, StageConfig, StageState } from './types';
+import type { StageHostCapability } from './host-contract';
 
 /**
  * Options for registering a stage instance. The Stage is a LENS, not a singleton:
@@ -37,9 +38,9 @@ export interface StagePluginOptions extends StageConfig {
  */
 export const stagePlugin = (options: StagePluginOptions = {}) => {
   const { id = 'stage', token = StageToken, ...config } = options;
-  return definePlugin<StageState, StageAction, StageCapability>({
+  return definePlugin<StageState, StageAction, StageHostCapability>({
     id,
-    token,
+    token: token as never,
     scope: 'document', // one instance of THIS lens per open document
     optional: [PublicActionsToken],
     initialState: () => initialStageState(config),
@@ -55,7 +56,7 @@ export const stagePlugin = (options: StagePluginOptions = {}) => {
     // *offer* initial views via provideInitialView; placeInitial resolves them
     // by priority. The one effect below is STEADY-STATE — it re-fits when the
     // page registry mutates (rotate/move/delete) and so has no such race.
-    effects: (ctx) => registerStageEffects(ctx, token, id === 'stage'),
+    effects: (ctx) => registerStageEffects(ctx, token as never, id === 'stage'),
     init: (ctx) => {
       // Navigation executors for the action engine — registered by the
       // DEFAULT lens only (a thumbnail lens must never win the last-wins
@@ -68,7 +69,7 @@ export const stagePlugin = (options: StagePluginOptions = {}) => {
       ctx.cleanup(
         actions.registerExecutor('goto', (node) => {
           if (node.type !== 'goto') return { status: 'inert', reason: 'not a goto node' };
-          const stage = ctx.tryGet(token);
+          const stage = ctx.tryGet(token as never) as StageHostCapability | null;
           const layout = ctx
             .document()
             ?.pages.find((p) => p.ref.pageObjectNumber === node.destination.page.pageObjectNumber);
@@ -76,28 +77,28 @@ export const stagePlugin = (options: StagePluginOptions = {}) => {
             return { status: 'failed', error: 'no stage or destination page available' };
           }
           const { pageIndex, options: reveal } = destinationToReveal(node.destination, layout);
-          stage.reveal(pageIndex, { ...reveal, behavior: 'smooth' });
+          stage.revealIndex(pageIndex, { ...reveal, behavior: 'smooth' });
           return { status: 'executed' };
         }),
       );
       ctx.cleanup(
         actions.registerExecutor('named', (node) => {
           if (node.type !== 'named') return { status: 'inert', reason: 'not a named node' };
-          const stage = ctx.tryGet(token);
+          const stage = ctx.tryGet(token as never) as StageHostCapability | null;
           if (!stage) return { status: 'failed', error: 'no stage available' };
           // Page verbs only — the dispatcher owns /N Print (policy + adapter).
           switch (node.name) {
             case 'NextPage':
-              stage.next({ behavior: 'smooth' });
+              stage.nextPage({ behavior: 'smooth' });
               return { status: 'executed' };
             case 'PrevPage':
-              stage.prev({ behavior: 'smooth' });
+              stage.previousPage({ behavior: 'smooth' });
               return { status: 'executed' };
             case 'FirstPage':
-              stage.goToPage(0, { behavior: 'smooth' });
+              stage.goToFirstPage({ behavior: 'smooth' });
               return { status: 'executed' };
             case 'LastPage':
-              stage.goToPage(Math.max(0, stage.pageCount() - 1), { behavior: 'smooth' });
+              stage.goToLastPage({ behavior: 'smooth' });
               return { status: 'executed' };
             default:
               return { status: 'inert', reason: `unknown named action '${node.name}'` };

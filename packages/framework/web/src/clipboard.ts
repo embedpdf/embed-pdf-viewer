@@ -13,8 +13,8 @@ export interface ClipboardSelectionSource {
   hasSelection(): boolean;
   canCopy(): boolean;
   readText(): Promise<string>;
-  onChange(cb: () => void): () => void;
-  onCommit(cb: () => void): () => void;
+  onChanged(listener: () => void): () => void;
+  onCommitted(listener: () => void): () => void;
 }
 
 export interface SelectionClipboardOptions {
@@ -71,12 +71,12 @@ export function wireSelectionClipboard(
 
   // Commit (gesture end) refreshes immediately; change (drag, programmatic
   // select) debounces so a drag doesn't fetch per pointer move.
-  const offCommit = selection.onCommit(() => {
+  const offCommit = selection.onCommitted(() => {
     if (timer) clearTimeout(timer);
     timer = null;
     refresh();
   });
-  const offChange = selection.onChange(() => {
+  const offChange = selection.onChanged(() => {
     generation++;
     cached = null;
     if (timer) clearTimeout(timer);

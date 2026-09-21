@@ -39,7 +39,7 @@ export function useActionsUiAdapter(handlers?: ActionsUiHandlers): void {
     if (!actions) return;
     const adapter: ActionUiAdapter = createDefaultActionsUiAdapter({
       overrides: () => handlersRef.current,
-      goToPage: (page) => stage?.goToPage(page),
+      goToPage: (page) => stage?.goToPageIndex(page),
     });
     return actions.setUiAdapter(adapter);
   }, [actions, stage]);

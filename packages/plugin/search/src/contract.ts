@@ -1,5 +1,4 @@
 import {
-  createCapabilityToken,
   type EventHook,
   type OperationOptions,
   type PageRef,
@@ -188,6 +187,4 @@ export interface SearchCapability {
   readonly onCleared: EventHook<SearchClearedEvent>;
 }
 
-export const SearchToken = createCapabilityToken<SearchCapability>('search', {
-  hint: "add searchPlugin() from '@embedpdf/plugin-search' to your plugins list",
-});
+export { SearchToken } from './token';

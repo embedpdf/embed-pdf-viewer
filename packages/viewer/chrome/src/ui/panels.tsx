@@ -214,8 +214,8 @@ export function RightSidebar() {
 export function PageControls() {
   const t = useT();
   // the Stage cursor is a 0-based display index; people count from 1
-  const current = useSelector(StageToken, (c) => c.currentPage() + 1);
-  const total = useSelector(StageToken, (c) => c.pageCount());
+  const current = useSelector(StageToken, (c) => c.getCurrentPageIndex() + 1);
+  const { pageCount: total } = usePages();
   if (!total) return null;
   return (
     <div className="pointer-events-none absolute inset-x-0 bottom-5 flex justify-center">

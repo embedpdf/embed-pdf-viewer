@@ -89,9 +89,9 @@ describe('selectionHandleGeom', () => {
 
 describe('createSelectionHandleDrag', () => {
   const target = () => ({
-    beginAt: vi.fn((_page: PageRef, _point: Point) => true),
+    beginGestureAt: vi.fn((_page: PageRef, _point: Point) => true),
     extendTo: vi.fn(),
-    end: vi.fn(),
+    endGesture: vi.fn(),
   });
 
   it('re-roots ONCE at the opposite cell centre, then extends toward the pointer', () => {
@@ -103,12 +103,12 @@ describe('createSelectionHandleDrag', () => {
     const session = createSelectionHandleDrag(t, v, ep(CELL), toPageRef(7));
     session.move({ x: 300, y: 400 });
     session.move({ x: 310, y: 410 });
-    expect(t.beginAt).toHaveBeenCalledTimes(1);
-    expect(t.beginAt).toHaveBeenCalledWith(toPageRef(7), { x: 130, y: 208 }); // the cell centre
+    expect(t.beginGestureAt).toHaveBeenCalledTimes(1);
+    expect(t.beginGestureAt).toHaveBeenCalledWith(toPageRef(7), { x: 130, y: 208 }); // the cell centre
     expect(t.extendTo).toHaveBeenNthCalledWith(1, toPageRef(9), { x: 300, y: 400 });
     expect(t.extendTo).toHaveBeenNthCalledWith(2, toPageRef(9), { x: 310, y: 410 });
     session.end();
-    expect(t.end).toHaveBeenCalledTimes(1);
+    expect(t.endGesture).toHaveBeenCalledTimes(1);
   });
 
   it('the re-root anchor stays inside a ROTATED opposite glyph (cell centre, not AABB corner)', () => {
@@ -116,7 +116,7 @@ describe('createSelectionHandleDrag', () => {
     const v: SelectionHandleView = { ...view(), pageAt: (o) => ({ ref: toPageRef(9), point: o }) };
     const session = createSelectionHandleDrag(t, v, ep(rotQuad(CELL, 45, 100, 200)), toPageRef(7));
     session.move({ x: 0, y: 0 });
-    const [, anchor] = t.beginAt.mock.calls[0]!;
+    const [, anchor] = t.beginGestureAt.mock.calls[0]!;
     // the centre of the rotated cell = the upright centre rotated about the pivot
     const r = Math.PI / 4;
     const cx = 100 + (130 - 100) * Math.cos(r) - (208 - 200) * Math.sin(r);
@@ -155,15 +155,15 @@ describe('createSelectionHandleDrag', () => {
 
   it('a refused re-root arms nothing; end() without arming settles nothing', () => {
     const t = {
-      beginAt: vi.fn((_page: PageRef, _point: Point) => false),
+      beginGestureAt: vi.fn((_page: PageRef, _point: Point) => false),
       extendTo: vi.fn(),
-      end: vi.fn(),
+      endGesture: vi.fn(),
     };
     const v: SelectionHandleView = { ...view(), pageAt: (o) => ({ ref: toPageRef(9), point: o }) };
     const session = createSelectionHandleDrag(t, v, ep(CELL), toPageRef(7));
     session.move({ x: 10, y: 10 });
     expect(t.extendTo).not.toHaveBeenCalled();
     session.end();
-    expect(t.end).not.toHaveBeenCalled(); // an untouched press commits nothing
+    expect(t.endGesture).not.toHaveBeenCalled(); // an untouched press commits nothing
   });
 });

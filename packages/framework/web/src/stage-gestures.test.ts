@@ -71,7 +71,14 @@ function controllerHarness(opts: HarnessOptions = {}) {
   const el = {
     addEventListener: (t: string, fn: (e: unknown) => void) => elListeners.set(t, fn),
     removeEventListener: (t: string) => elListeners.delete(t),
-    getBoundingClientRect: () => ({ left: 0, top: 0, right: 800, bottom: 600, width: 800, height: 600 }),
+    getBoundingClientRect: () => ({
+      left: 0,
+      top: 0,
+      right: 800,
+      bottom: 600,
+      width: 800,
+      height: 600,
+    }),
   } as unknown as HTMLElement;
   const win = {
     addEventListener: (t: string, fn: (e: unknown) => void) => winListeners.set(t, fn),
@@ -96,7 +103,7 @@ function controllerHarness(opts: HarnessOptions = {}) {
     endGesture: vi.fn(),
     fling: vi.fn(),
     doubleTapZoom: vi.fn(),
-    cameraInMotion: vi.fn(() => opts.inMotion ?? false),
+    isMoving: vi.fn(() => opts.inMotion ?? false),
   };
   const sink =
     opts.sink === false

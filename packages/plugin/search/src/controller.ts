@@ -173,7 +173,7 @@ export function createSearchController(
 
   const viewportFirstPage = (): PageRef | undefined => {
     const stage = ctx.tryGet(StageToken);
-    return stage ? ctx.document()?.pages[stage.currentPage()]?.ref : undefined;
+    return stage ? (stage.getCurrentPage()?.ref ?? undefined) : undefined;
   };
 
   function search(
@@ -262,7 +262,7 @@ export function createSearchController(
     // Positioned reveal: the HIT (not just its page) arrives at the anchor —
     // per-call override > plugin config > find-bar default. Zoom never changes.
     const arrival = { ...DEFAULT_REVEAL, ...config.reveal, ...options };
-    ctx.tryGet(StageToken)?.reveal(hit.pageIndex, {
+    ctx.tryGet(StageToken)?.reveal(hit.page, {
       rect: hit.bounds,
       anchor: arrival.anchor,
       behavior: arrival.behavior,

@@ -16,7 +16,7 @@ export { vibrationFeedback, wkFeedback } from '@embedpdf/web';
 import * as React from 'react';
 import { useEffect, useRef } from 'react';
 import { pageRefsEqual } from '@embedpdf/core';
-import { InteractionToken } from '@embedpdf/plugin-interaction';
+import { InteractionToken } from '@embedpdf/plugin-interaction/contract/host';
 import type { Modifiers, PointerSample } from '@embedpdf/plugin-interaction';
 import { svgCursor } from '@embedpdf/web';
 import type { SvgCursorOptions } from '@embedpdf/web';
@@ -51,7 +51,7 @@ export function createClickCounter(maxGapMs = 400, maxDistPx = 6) {
 export function PagePointerSource() {
   const page = usePage();
   const interaction = useCapability(InteractionToken);
-  const cursor = useSelector(InteractionToken, (c) => c.cursor());
+  const cursor = useSelector(InteractionToken, (c) => c.getCursor());
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -92,22 +92,22 @@ export function PagePointerSource() {
     const down = (e: PointerEvent) => {
       if (e.button !== 0) return;
       dragging = true;
-      interaction.dispatch(sample('down', e, clicks(Date.now(), e.clientX, e.clientY)));
+      interaction.dispatchPointer(sample('down', e, clicks(Date.now(), e.clientX, e.clientY)));
     };
     // hover (no gesture): drive cursor feedback only — fires from the element
     const hover = (e: PointerEvent) => {
       if (dragging) return;
-      interaction.dispatch(sample('move', e));
+      interaction.dispatchPointer(sample('move', e));
     };
     // active drag: track on window so it survives leaving the page bounds
     const drag = (e: PointerEvent) => {
       if (!dragging) return;
-      interaction.dispatch(sample('move', e));
+      interaction.dispatchPointer(sample('move', e));
     };
     const up = (e: PointerEvent) => {
       if (!dragging) return;
       dragging = false;
-      interaction.dispatch(sample('up', e));
+      interaction.dispatchPointer(sample('up', e));
     };
 
     el.addEventListener('pointerdown', down);
@@ -129,11 +129,11 @@ export function PagePointerSource() {
 /** Read + switch the active tool (for a toolbar). */
 export function useTool() {
   const interaction = useCapability(InteractionToken);
-  const activeToolId = useSelector(InteractionToken, (c) => c.activeToolId());
+  const activeToolId = useSelector(InteractionToken, (c) => c.getActiveToolId());
   return {
     activeToolId,
     activate: interaction.activateTool,
-    tools: interaction.tools(),
+    tools: interaction.listTools(),
   };
 }
 

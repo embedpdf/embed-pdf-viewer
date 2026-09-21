@@ -7,7 +7,7 @@ import { createActionsCapability } from '../src/capability';
 import type {
   ActionContext,
   ActionsAction,
-  ActionsPluginConfig,
+  ActionsConfig,
   ActionsState,
   ActionUiAdapter,
 } from '../src/types';
@@ -60,10 +60,7 @@ const hide = (
   hidden = true,
 ): PdfActionNode => ({ type: 'hide', subtype: 'Hide', targets, hide: hidden, next: [] });
 
-function harness(
-  config?: ActionsPluginConfig,
-  fields: Array<{ name: string; widgets: number[] }> = [],
-) {
+function harness(config?: ActionsConfig, fields: Array<{ name: string; widgets: number[] }> = []) {
   const dispatch = vi.fn();
   const cleanups: Array<() => void> = [];
   const ctx = {
@@ -362,10 +359,10 @@ describe('actions dispatcher', () => {
     expect(first.openUri).not.toHaveBeenCalled();
   });
 
-  it('emits onAction with the inline result and reports javascript-without-executor as inert', async () => {
+  it('emits onExecuted with the inline result and reports javascript-without-executor as inert', async () => {
     const { capability } = harness();
     const events: string[] = [];
-    capability.onAction(({ result }) => events.push(result.status));
+    capability.onExecuted(({ result }) => events.push(result.status));
     const result = await capability.execute(tree(js('orphan()')), USER);
     expect(result.status).toBe('inert');
     expect(result.nodes[0].status).toBe('inert');

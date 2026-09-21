@@ -1,5 +1,12 @@
+import {
+  DRAWN_FLAGS,
+  isAttachedLink,
+  linkChildrenOf,
+  linkOf,
+  type Annot,
+  type Model,
+} from '@embedpdf/core-annotation';
 import { textQuadFromRect } from '@embedpdf/core-geometry';
-import { describe, expect, it } from 'vitest';
 import type {
   AnnotationDraft,
   AnnotationDTO,
@@ -9,14 +16,9 @@ import type {
   CalloutLine,
   PdfRect,
 } from '@embedpdf/engine-core/runtime';
-import {
-  DRAWN_FLAGS,
-  isAttachedLink,
-  linkChildrenOf,
-  linkOf,
-  type Annot,
-  type Model,
-} from '@embedpdf/core-annotation';
+import { toPageRef } from '@embedpdf/engine-core/runtime';
+import { describe, expect, it } from 'vitest';
+
 import {
   fromDTO,
   linkChildRects,
@@ -25,7 +27,6 @@ import {
   toPatch,
   toScopedPatch,
 } from './repository';
-import { toPageRef } from '@embedpdf/engine-core/runtime';
 
 const CROP: PdfRect = { left: 0, bottom: 0, right: 600, top: 800 };
 

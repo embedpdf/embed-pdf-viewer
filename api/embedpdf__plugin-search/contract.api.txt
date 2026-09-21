@@ -23,7 +23,7 @@ SearchRevealOptions [InterfaceDeclaration]: export interface SearchRevealOptions
 SearchSnippet [InterfaceDeclaration] (from packages/engine/core/dist/AnnotationListSnapshot-De-oo34u.d.ts): interface SearchSnippet{ text: string; matchStart: number; matchLength: number; }
 SearchStartedEvent [InterfaceDeclaration]: export interface SearchStartedEvent{ readonly query: SearchQuery; readonly operationId: string; }
 SearchStatus [TypeAliasDeclaration]: export type SearchStatus = 'idle' | 'searching' | 'complete' | 'cancelled' | 'error';
-SearchToken [VariableDeclaration]: SearchToken = createCapabilityToken<SearchCapability>('search', { hint: "add searchPlugin() from '@embedpdf/plugin-search' to your plugins list", } )
+SearchToken [VariableDeclaration] (from packages/plugin/search/src/token.ts): SearchToken = createCapabilityToken<SearchCapability>('search', { hint: "add searchPlugin() from '@embedpdf/plugin-search' to your plugins list", } )
 TextSegment [InterfaceDeclaration]: export interface TextSegment{ readonly quad: TextQuad; readonly rect: Rect; readonly advance: 1 | -1; }
 validateSearchQuery [FunctionDeclaration] (from packages/engine/core/dist/AnnotationListSnapshot-De-oo34u.d.ts): declare function validateSearchQuery(query: SearchQuery): SearchQueryValidation;
 validateSearchRegex [FunctionDeclaration] (from packages/engine/core/dist/AnnotationListSnapshot-De-oo34u.d.ts): declare function validateSearchRegex(pattern: string): SearchRegexValidation;

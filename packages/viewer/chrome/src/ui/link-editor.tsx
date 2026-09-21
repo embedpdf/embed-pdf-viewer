@@ -65,7 +65,7 @@ export function LinkEditorCard({ onClose }: { onClose: () => void }) {
       return;
     }
     // Page number (1-based) → the page's OBJECT NUMBER (stable across moves).
-    const activeId = kernel.documents.activeId();
+    const activeId = kernel.documents.getActiveId();
     const meta = activeId ? kernel.getState().core.documents[activeId] : null;
     const layout = meta?.pages[Math.max(0, Number(pageNo) - 1)];
     if (!layout) return;

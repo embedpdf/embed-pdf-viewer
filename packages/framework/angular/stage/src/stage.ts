@@ -28,7 +28,8 @@ import {
 } from '@angular/core';
 import { StageToken, createScrollHandler } from '@embedpdf/plugin-stage';
 import type { StageCapability, VisiblePage } from '@embedpdf/plugin-stage';
-import { InteractionToken } from '@embedpdf/plugin-interaction/contract';
+import type { StageHostCapability } from '@embedpdf/plugin-stage/contract/host';
+import { InteractionToken } from '@embedpdf/plugin-interaction/contract/host';
 import {
   injectDocumentId,
   injectKernelHost,
@@ -109,11 +110,15 @@ export class EpdfStage {
   readonly token = input<StageTokenProp>(StageToken);
 
   private readonly host = injectKernelHost();
-  private readonly stage = injectOptionalCapabilityFor(() => this.token());
+  // The surface is a HOST of the lens: it reports viewport size, drives gestures
+  // and reads the lens id. The host contract is the same runtime token, typed wider.
+  private readonly stage = injectOptionalCapabilityFor(
+    () => this.token() as unknown as CapabilityToken<StageHostCapability>,
+  );
   private readonly ix = injectOptionalCapability(InteractionToken);
   private readonly useHub = computed(() => this.interaction() && this.ix() !== null);
   // The hub's resolved cursor (text/grab/…), applied to the viewport when driving.
-  private readonly hubCursor = this.host.value(() => this.ix()?.cursor() ?? 'default');
+  private readonly hubCursor = this.host.value(() => this.ix()?.getCursor() ?? 'default');
   protected readonly cursor = computed(() => (this.useHub() ? this.hubCursor() : null));
 
   protected readonly documentId = injectDocumentId();
@@ -123,14 +128,14 @@ export class EpdfStage {
   // memoizes, so Object.is equality suffices.
   protected readonly pages = injectOptionalSelectorFor(
     () => this.token(),
-    (c) => c.visiblePages(),
+    (c) => c.listVisiblePages(),
     EMPTY_PAGES,
   );
   // Reserved chrome bands (screen px), uniform across pages — the frame the
   // outer box reserves and the chrome template paints into.
   protected readonly frame = injectOptionalSelectorFor(
     () => this.token(),
-    (c) => c.pageFrame(),
+    (c) => c.getSettings().pageFrame,
     NO_FRAME,
     frameEqual,
   );
@@ -165,7 +170,7 @@ export class EpdfStage {
         cleanups.push(
           createStageSurface(el, stage, {
             hub: useHub ? ix : null,
-            source: stage.lensId(),
+            source: stage.getLensId(),
             zoomGestures,
           }),
         );
@@ -175,7 +180,7 @@ export class EpdfStage {
         if (useHub && ix) {
           cleanups.push(
             ix.registerHandler(createScrollHandler(stage, ix, { panFallback }), {
-              source: stage.lensId(),
+              source: stage.getLensId(),
             }),
           );
         }

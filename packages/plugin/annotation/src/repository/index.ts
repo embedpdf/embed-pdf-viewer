@@ -16,20 +16,16 @@
  * it can never change in the model. Any key a kind cannot lower degrades to
  * the FULL patch — verbose, never a dropped write.
  */
+import { propsFor, type Annot, type PatchScope, type PropKey } from '@embedpdf/core-annotation';
+import { geomRotation } from '@embedpdf/core-annotation';
 import type {
   AnnotationDraft,
   AnnotationDTO,
   AnnotationPatch,
   PdfRect,
 } from '@embedpdf/engine-core/runtime';
-import { propsFor, type Annot, type PatchScope, type PropKey } from '@embedpdf/core-annotation';
 
-import { boxEmit, type KindProjection, type Wire } from './projection';
-import { GENERIC_PROPS } from './props';
-import { circle, square } from './kinds/shape';
-import { ink, line, polygon, polyline } from './kinds/stroke';
 import { freeText } from './kinds/freeText';
-import { caret, highlight, redact, squiggly, strikeout, underline } from './kinds/quads';
 import {
   fileAttachment,
   link,
@@ -39,8 +35,12 @@ import {
   widget,
   widgetKindOf,
 } from './kinds/misc';
+import { caret, highlight, redact, squiggly, strikeout, underline } from './kinds/quads';
+import { circle, square } from './kinds/shape';
+import { ink, line, polygon, polyline } from './kinds/stroke';
+import { boxEmit, type KindProjection, type Wire } from './projection';
+import { GENERIC_PROPS } from './props';
 import { pdfToContentRect, annotationKey, styleFromDTO } from './seam';
-import { geomRotation } from '@embedpdf/core-annotation';
 
 export {
   boxGeomFields,

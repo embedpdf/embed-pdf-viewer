@@ -41,10 +41,10 @@ export function AnnotationMenu({ children, gap = 15, placement = 'top' }: Annota
   const anchor = useSelector(
     AnnotationHostToken,
     (c) => {
-      const a = c.selectionAnchor();
+      const a = c.getSelectionAnchor();
       if (!a) return null;
       const env = projector.viewEnv(a.page);
-      return env ? c.selectionAnchor(env.scale, env.rotation, env.zoom) : a;
+      return env ? c.getSelectionAnchor(env) : a;
     },
     sameAnchor,
   );
@@ -83,7 +83,7 @@ export function AnnotationDraftMenu({
 }: AnnotationDraftMenuProps) {
   const anchor = useSelector(
     AnnotationHostToken,
-    (c) => c.creationDraftAnchor(),
+    (c) => c.getCreationDraft(),
     sameCreationDraftAnchor,
   );
   if (!anchor) return null;

@@ -1,5 +1,10 @@
 import type { BinarySource, Engine } from '@embedpdf/engine-core/runtime';
-import { createCapabilityToken, type EventHook } from '@embedpdf/core';
+import {
+  createCapabilityToken,
+  type BatchResult,
+  type EventHook,
+  type OperationOptions,
+} from '@embedpdf/core';
 import type { AnnotationRef, PageRef } from '@embedpdf/engine-core/runtime';
 import type { StampPlacement } from '@embedpdf/plugin-annotation/contract';
 
@@ -207,105 +212,124 @@ export interface StampAssetPreview {
   mimeType: string;
 }
 
+export interface StampLibraryFilter {
+  readonly kind?: StampLibraryKind | readonly StampLibraryKind[];
+}
+export interface StampAssetFilter {
+  readonly libraryId?: string;
+  readonly kind?: StampAssetKind;
+  readonly category?: string;
+}
+
+// ── events ──
+export interface StampLibraryEvent {
+  readonly libraryId: string;
+  /** The library after the change; null once deleted. */
+  readonly library: StampLibrary | null;
+}
+export interface StampAssetEvent {
+  readonly assetId: string;
+  readonly libraryId: string;
+  /** The asset after the change; null once deleted. */
+  readonly asset: StampAsset | null;
+}
+export interface StampArmChangedEvent {
+  readonly documentId: string;
+  readonly assetId: string | null;
+}
+
+/**
+ * Stamp libraries and their assets (workspace-scoped); placement targets a
+ * document. A library IS a PDF (one page per asset) — `exportLibrary` returns
+ * the persistence format, `importLibrary` reads it back.
+ */
 export interface StampCapability {
-  // ── selectors (pure reads over serializable state) ──
-  libraries(query?: StampLibraryQuery): StampLibrary[];
-  library(id: string): StampLibrary | null;
-  /** Assets of one library, in library order — or every asset when omitted. */
-  assets(libraryId?: string): StampAsset[];
-  asset(id: string): StampAsset | null;
-  // ── binary reads (capability-held, never store state) ──
-  /** The asset's paintable preview, or null while none is cached. */
-  assetPreview(id: string): StampAssetPreview | null;
-  /** Placement bytes; derived from the canonical page for PDF-backed libraries. */
-  assetBytes(id: string): Uint8Array | null;
-  // ── library intents ──
-  /**
-   * A new, empty library: a PDF with the given title and no registered
-   * stamps yet (like Acrobat, it carries one unregistered blank page so it
-   * is a valid file from the start). Resolves to the library id; feed it to
-   * `addAsset({ libraryId })` to fill it.
-   */
+  // ── reading ──
+  listLibraries(filter?: StampLibraryFilter): readonly StampLibrary[];
+  getLibrary(id: string): StampLibrary | null;
+  listAssets(filter?: StampAssetFilter): readonly StampAsset[];
+  getAsset(id: string): StampAsset | null;
+  /** The cached thumbnail (the configured preview width), or null. */
+  getAssetPreview(id: string): StampAssetPreview | null;
+  /** A preview at any width, rendered by the asset engine and cached per width. */
+  renderAssetPreview(
+    id: string,
+    options: { width: number } & OperationOptions,
+  ): Promise<StampAssetPreview | null>;
+  /** A copy of the asset's placement bytes (a one-page PDF), or null. */
+  readAssetBytes(id: string): Uint8Array | null;
+
+  // ── libraries ──
   createLibrary(
     name: string,
-    opts?: { id?: string; kind?: StampLibraryKind; categories?: string[] },
+    options?: { id?: string; kind?: StampLibraryKind; categories?: string[] },
   ): Promise<string>;
-  /** Rename (the PDF's `/Title`) or re-categorise a library. */
   updateLibrary(id: string, patch: { name?: string; categories?: string[] }): Promise<void>;
-  /**
-   * Import a PDF as a stamp library: every page becomes one vector asset
-   * (single-page PDF bytes + a cached preview render). Uses the asset
-   * engine; in a cloud deployment without one configured this rejects with
-   * an actionable error. Resolves to the new library id.
-   */
-  importLibraryPdf(source: BinarySource, opts?: ImportLibraryOptions): Promise<string>;
-  /**
-   * Add a single asset as a page of its library (a raster is flattened into
-   * a fresh page first) and register it under `identifier=label`. Without
-   * `libraryId`, a new library named after the label is created for it.
-   */
-  addAsset(input: AddAssetInput): Promise<string>;
-  /**
-   * Turn selected annotations of an open document into an asset: their
-   * appearances are exported by the engine as ONE single-page PDF sized to
-   * their union rect (vector, positions preserved — exactly what the page
-   * shows) and added like any PDF asset. The identifier defaults to an
-   * Acrobat-style `#…` one so the stamp keeps its identity in Acrobat.
-   * Rejects when any ref is not on `page`, is hidden, or has no
-   * appearance (all-or-nothing: a stamp missing a part is worse than an error).
-   */
-  addAssetFromAnnotations(
+  /** Delete a library with its assets. */
+  deleteLibrary(id: string): Promise<void>;
+  /** A PDF becomes a library (one asset per page). */
+  importLibrary(source: BinarySource, options?: ImportLibraryOptions): Promise<string>;
+  /** The library as the PDF it is. Rejects `not-found`. */
+  exportLibrary(id: string): Promise<Uint8Array>;
+
+  // ── assets ──
+  createAsset(input: AddAssetInput): Promise<string>;
+  /** Annotations on a page become an asset (their appearance exported as one page). */
+  createAssetFromAnnotations(
     documentId: string,
     page: PageRef,
-    refs: AnnotationRef[],
+    refs: readonly AnnotationRef[],
     input: Omit<AddAssetInput, 'source' | 'size'>,
   ): Promise<string>;
-  /** Remove an asset, deleting its canonical page before state changes when PDF-backed. */
-  removeAsset(id: string): Promise<void>;
-  /** Remove a library and every asset in it, ordered with in-flight library mutations. */
-  removeLibrary(id: string): Promise<void>;
-  /**
-   * Relabel an asset (the registry key is renamed in one job), set or clear
-   * its `/Subj` override, or replace its categories. The identifier never
-   * changes — it is the asset's identity and every placed stamp's `/Name`.
-   */
   updateAsset(
     id: string,
     patch: { label?: string; subject?: string | null; categories?: string[] },
   ): Promise<void>;
-  /**
-   * The library as a PDF — its title, its named pages, its artwork: the
-   * complete, Acrobat-readable file. This IS the persistence format: store
-   * these bytes wherever you like and `importLibraryPdf` them back.
-   */
-  exportLibrary(id: string): Uint8Array | null;
-  /** Fires after every change to a library's canonical bytes — subscribe to persist. */
-  onLibraryChanged: EventHook<StampLibraryChange>;
-  // ── placement (delegates to the annotation plugin of the named document) ──
-  /**
-   * Arm an asset on a document: the next click on that document's pages
-   * places it (and the hover ghost previews the exact placement). With
-   * scripting on (the actions plugin's `javascript` switch), form-backed
-   * PDFs are evaluated against that target document in a detached realm and
-   * flattened first. Rides `annotation.armStamp` — bytes,
-   * preview, and intrinsic size all travel along, so vector stamps keep
-   * their true aspect.
-   */
-  armAsset(documentId: string, assetId: string, opts?: { targetWidth?: number }): Promise<void>;
-  /**
-   * Place an asset WITHOUT the pointer: the same materialization, name,
-   * subject, fit, and page clamp a click after `armAsset` would produce —
-   * one placement law, two entry points. Resolves to the new annotation.
-   */
+  deleteAsset(id: string): Promise<void>;
+  /** Move an asset to another library (a copy there, then the original is deleted). */
+  moveAsset(id: string, to: { libraryId: string }): Promise<string>;
+  /** Copy an asset within its library. */
+  duplicateAsset(id: string, options?: { label?: string }): Promise<string>;
+
+  // ── placement ──
+  /** Arm on a document; the next click places. */
+  armAsset(documentId: string, assetId: string, options?: { targetWidth?: number }): Promise<void>;
+  disarm(documentId: string): void;
+  /** What is armed on a document. Pure. */
+  getArmedAsset(documentId: string): StampAsset | null;
+  /** Place without the pointer. */
   placeAsset(
     documentId: string,
     assetId: string,
     placement: StampPlacement,
   ): Promise<AnnotationRef>;
-  /** Disarm the stamp tool on a document. */
-  disarm(documentId: string): void;
-  /** The asset armed on a document through {@link armAsset}, while the annotation plugin still holds it. */
-  armedAsset(documentId: string): StampAsset | null;
+  /** Stamp many pages with one asset at the same page-relative placement. */
+  placeAssetOnPages(
+    documentId: string,
+    assetId: string,
+    pages: readonly PageRef[] | 'all',
+    placement: Omit<StampPlacement, 'page'>,
+    options?: OperationOptions,
+  ): Promise<BatchResult<AnnotationRef, PageRef>>;
+  /** Would placing on this document succeed (annotation create authority)? */
+  canPlace(documentId?: string): boolean;
+  /** Can this deployment import library PDFs (an engine that opens local bytes)? */
+  canImport(): boolean;
+
+  // ── events ──
+  readonly onLibraryCreated: EventHook<StampLibraryEvent>;
+  readonly onLibraryUpdated: EventHook<StampLibraryEvent>;
+  readonly onLibraryDeleted: EventHook<StampLibraryEvent>;
+  readonly onAssetCreated: EventHook<StampAssetEvent>;
+  readonly onAssetUpdated: EventHook<StampAssetEvent>;
+  readonly onAssetDeleted: EventHook<StampAssetEvent>;
+  readonly onArmChanged: EventHook<StampArmChangedEvent>;
+  /** A library's bytes changed (subscribe to persist). */
+  readonly onLibraryChanged: EventHook<StampLibraryChange>;
 }
 
-export const StampToken = createCapabilityToken<StampCapability>('stamp');
+export type StampHostCapability = StampCapability;
+
+export const StampToken = createCapabilityToken<StampHostCapability>('stamp', {
+  hint: `add stampPlugin() from '@embedpdf/plugin-stamp' to your plugins list`,
+});

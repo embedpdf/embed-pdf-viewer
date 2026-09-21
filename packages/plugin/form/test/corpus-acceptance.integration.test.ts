@@ -83,7 +83,7 @@ describe('corpus acceptance (skips without the local JS tests folder)', () => {
         });
         await settle();
         await form.refresh();
-        const docStatus = form.snapshot()?.fields.find((f) => f.name === 'docStatus');
+        const docStatus = form.getSnapshot()?.fields.find((f) => f.name === 'docStatus');
         // The script wrote through the ScriptHost executor + the form
         // commit sink (lifecycle origin).
         expect(docStatus?.valueEntry.kind === 'scalar' ? docStatus.valueEntry.value : '').toContain(
@@ -129,12 +129,12 @@ describe('corpus acceptance (skips without the local JS tests folder)', () => {
         const annotation = kernel.capability(AnnotationHostToken);
         const actions = kernel.capability(ActionsHostToken);
         await form.refresh();
-        const trigger = form.snapshot()?.fields.find((f) => f.widgets.length > 0);
+        const trigger = form.getSnapshot()?.fields.find((f) => f.widgets.length > 0);
         if (!trigger) throw new Error('no widget field in 02');
         const page = trigger.widgets[0]!.page!;
         await annotation.reloadPage(page);
         const hoverSquare = () =>
-          annotation.pageItems(page).find((item) => item.subtype === 'square');
+          annotation.listPageItems(page).find((item) => item.subtype === 'square');
         const before = hoverSquare()?.style.color;
         const drain = () =>
           actions.dispatch({
@@ -145,7 +145,7 @@ describe('corpus acceptance (skips without the local JS tests folder)', () => {
           });
         // The first field in 02 is `hoverTarget`'s trigger (obj:5, /AA E/X JS).
         form.notifyWidgetEvent(
-          `obj:${trigger.fieldObjectNumber}`,
+          trigger.ref,
           {
             kind: 'objectNumber',
             page,
@@ -185,7 +185,7 @@ describe('corpus acceptance (skips without the local JS tests folder)', () => {
         const actions = kernel.capability(ActionsHostToken);
         await form.refresh();
         const field = (name: string) => {
-          const f = form.snapshot()?.fields.find((c) => c.name === name);
+          const f = form.getSnapshot()?.fields.find((c) => c.name === name);
           if (!f) throw new Error(`missing field ${name}`);
           return f;
         };
@@ -194,7 +194,7 @@ describe('corpus acceptance (skips without the local JS tests folder)', () => {
         const page = trigger.widgets[0]!.page!;
         await annotation.reloadPage(page);
         const targetId = `obj:${target.widgets[0]!.annotObjectNumber}`;
-        const painted = () => annotation.pageItems(page).map((i) => i.id);
+        const painted = () => annotation.listPageItems(page).map((i) => i.id);
         const drain = () =>
           actions.dispatch({
             scope: 'annotation',
@@ -204,7 +204,7 @@ describe('corpus acceptance (skips without the local JS tests folder)', () => {
           });
         const notify = (event: 'cursorEnter' | 'cursorExit') =>
           form.notifyWidgetEvent(
-            `obj:${trigger.fieldObjectNumber}`,
+            trigger.ref,
             {
               kind: 'objectNumber',
               page,

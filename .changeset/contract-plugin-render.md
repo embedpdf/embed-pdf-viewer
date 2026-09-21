@@ -1,0 +1,7 @@
+---
+'@embedpdf/plugin-render': minor
+---
+
+Rewritten on the kernel's `create()` controller hook with a public contract (`/contract`) and a host lens (`/contract/host`). Public: `canRender`; `renderPage(page, { width? | scale?, includeAnnotations?, format?, quality?, signal? })` renders at the requested size exactly (no snapping) and shares the raster cache with the view layers; new `renderThumbnail(page, { maxWidth })` and `renderPages(pages, { concurrency? })` (a `BatchResult<PageRender, PageRef>`, reported in input order); `getRenderPolicy` (was `renderPolicy`), `getRenderEpoch` (was `renderEpoch`), `invalidate({ pages?, scope? })`, and the `onInvalidated` event hook (`{ pages, scope, origin }`) for every confirmed pixel change, own or remote. Refusals are `PluginError`s (`permission-denied`, `not-found`, `operation-cancelled`, `operation-failed`). `RenderConfig` replaces `RenderPluginOptions`.
+
+Host (`RenderHostCapability`): `renderSource` (the conforming viewer door, was `renderPage`), `getSourceKey` (was `renderSourceKey`), `conformViewport`, `getPaintSettings` (reference-stable; was `paintSettings`), `createViewDemand(viewId)` (was `tilesFor`) returning a `ViewDemand` whose reads are pure — `setDemand` schedules, `getPlan` reads the plan it produced, `markPainted`/`markUnpainted`/`release`/`dispose` — and `onRenderCompleted` / `onRenderFailed`. Tile regions are converted to PDF space by the kernel's page space (crop offsets included); `toEngineRect`/`tileEngineRect` are gone.

@@ -1,6 +1,7 @@
 import type { CapabilityToken, EffectContext } from '@embedpdf/core';
 import { ActionsToken as ActionsHostToken } from '@embedpdf/plugin-actions/contract/host';
-import type { StageAction, StageCapability, StageState } from './types';
+import type { StageAction, StageState } from './types';
+import type { StageHostCapability } from './host-contract';
 
 /**
  * Stage lens effects.
@@ -22,7 +23,7 @@ import type { StageAction, StageCapability, StageState } from './types';
  */
 export function registerStageEffects(
   ctx: EffectContext<StageState, StageAction>,
-  token: CapabilityToken<StageCapability>,
+  token: CapabilityToken<StageHostCapability>,
   feedActions = false,
 ): void {
   ctx.watch(
@@ -39,8 +40,8 @@ export function registerStageEffects(
     if (!state.placed) return null;
     const stage = ctx.get(token);
     return {
-      currentPage: stage.pages()[state.cursor]?.ref ?? null,
-      visiblePages: stage.visiblePages().map((page) => page.ref),
+      currentPage: stage.getCurrentPage()?.ref ?? null,
+      visiblePages: stage.listVisiblePages().map((page) => page.ref),
       cause: state.motionCause,
     };
   };

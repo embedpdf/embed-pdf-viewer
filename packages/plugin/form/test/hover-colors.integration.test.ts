@@ -65,7 +65,7 @@ async function boot(scope?: string[]) {
   const annotation = kernel.capability(AnnotationHostToken);
   const actions = kernel.capability(ActionsHostToken);
   await form.refresh();
-  const trigger = form.snapshot()?.fields.find((f) => f.name === 'hoverTrigger');
+  const trigger = form.getSnapshot()?.fields.find((f) => f.name === 'hoverTrigger');
   if (!trigger) throw new Error('hoverTrigger missing');
   const page = trigger.widgets[0]!.page!;
   await annotation.reloadPage(page);
@@ -73,7 +73,7 @@ async function boot(scope?: string[]) {
   const squareStyle = () => {
     // hoverSquare sits at x≈300; the bystander square at x≈450.
     const squares = annotation
-      .pageItems(page)
+      .listPageItems(page)
       .filter((item) => item.subtype === 'square')
       .sort((a, b) => a.geom.rect.x - b.geom.rect.x);
     return {
@@ -87,7 +87,7 @@ async function boot(scope?: string[]) {
     annotObjectNumber: trigger.widgets[0]!.annotObjectNumber,
   };
   const notify = (event: 'cursorEnter' | 'cursorExit') =>
-    form.notifyWidgetEvent(`obj:${trigger.fieldObjectNumber}`, triggerRef, event);
+    form.notifyWidgetEvent(trigger.ref, triggerRef, event);
   const drain = () =>
     actions.dispatch({
       scope: 'annotation',
@@ -96,7 +96,7 @@ async function boot(scope?: string[]) {
       page: toPageRef(999),
     });
   const statusValue = () => {
-    const field = form.snapshot()?.fields.find((f) => f.name === 'eventStatus');
+    const field = form.getSnapshot()?.fields.find((f) => f.name === 'eventStatus');
     return field?.valueEntry.kind === 'scalar' ? field.valueEntry.value : '';
   };
 

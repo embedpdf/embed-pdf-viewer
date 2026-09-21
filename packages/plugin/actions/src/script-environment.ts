@@ -8,9 +8,9 @@ import {
 } from '@embedpdf/core-acrojs';
 import type { DocumentHandle } from '@embedpdf/engine-core/runtime';
 
-import type { ActionsPluginConfig, ScriptRealmTarget } from './types';
+import type { ActionsConfig, ScriptRealmTarget } from './types';
 
-export type JavaScriptConfig = NonNullable<ActionsPluginConfig['javascript']>;
+export type JavaScriptConfig = NonNullable<ActionsConfig['javascript']>;
 
 /**
  * The scripting ENVIRONMENT — the session-level half of the JavaScript

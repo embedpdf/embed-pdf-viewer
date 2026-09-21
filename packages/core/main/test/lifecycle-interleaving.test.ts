@@ -296,7 +296,7 @@ describe('interleaving: transactional open (publish-last)', () => {
     const errorSlot = kernel.documents.list().find((d) => d.status === 'error');
     expect(errorSlot).toBeDefined();
     await kernel.documents.close(errorSlot!.id);
-    expect(kernel.documents.count()).toBe(1);
+    expect(kernel.documents.getCount()).toBe(1);
   });
 });
 

@@ -1,13 +1,18 @@
 import type {
-  InteractionCapability,
+  InteractionHostCapability,
   InteractionHandler,
   PlatformFeedback,
-} from '@embedpdf/plugin-interaction/contract';
+} from '@embedpdf/plugin-interaction/contract/host';
 import type { PageRef } from '@embedpdf/engine-core/runtime';
-import type { SelectionHostCapability } from './types';
+import type { SelectionHostCapability } from './host-contract';
 
 const CURSOR_TOKEN = 'selection-text';
-const DRAG_THRESHOLD_PX = 4; // viewport px the pointer must move before a drag-select begins
+/** Viewport px the pointer must move before a drag-select begins. */
+const DEFAULT_DRAG_THRESHOLD = 4;
+
+export interface TextSelectHandlerOptions {
+  dragThreshold?: number;
+}
 
 /**
  * The text-selection pointer handler. It is live only under tools that enable the
@@ -24,9 +29,11 @@ const DRAG_THRESHOLD_PX = 4; // viewport px the pointer must move before a drag-
  */
 export function createTextSelectHandler(
   selection: SelectionHostCapability,
-  interaction: InteractionCapability,
+  interaction: InteractionHostCapability,
   feedback?: PlatformFeedback,
+  options: TextSelectHandlerOptions = {},
 ): InteractionHandler {
+  const dragThreshold = options.dragThreshold ?? DEFAULT_DRAG_THRESHOLD;
   // Per-gesture drag-threshold state (one active gesture at a time — the hub owner).
   let anchor: { page: PageRef; point: { x: number; y: number }; vx: number; vy: number } | null =
     null;
@@ -40,8 +47,12 @@ export function createTextSelectHandler(
       anchor = null;
       dragging = false;
       if (!s.page) return false; // over a gap — let a lower handler (e.g. scroll) try
+      if (!selection.canSelect()) return false; // nothing here can engage — stay out of the way
       const { ref: page, point } = s.page;
       const clicks = s.clickCount ?? 1;
+      // The pointer is down: until it lifts, every change is the user's and
+      // selection-scoped UI stays out of the way.
+      selection.beginGesture();
       if (clicks >= 3) {
         selection.selectLineAt(page, point);
         return true;
@@ -58,44 +69,47 @@ export function createTextSelectHandler(
       // Single click: clear immediately (clicking deselects), then record an anchor
       // ONLY if over text — but begin no selection until the drag threshold is met.
       selection.clear();
-      if (!selection.isOverText(page, point)) return false; // empty space → don't capture
+      if (!selection.isOverText(page, point)) {
+        selection.endGesture(); // empty space → nothing to drive, don't capture
+        return false;
+      }
       anchor = { page, point, vx: s.viewport.x, vy: s.viewport.y };
       return true;
     },
     onMove: (s) => {
       if (!s.page || !anchor) return;
       if (!dragging) {
-        if (Math.hypot(s.viewport.x - anchor.vx, s.viewport.y - anchor.vy) < DRAG_THRESHOLD_PX) {
+        if (Math.hypot(s.viewport.x - anchor.vx, s.viewport.y - anchor.vy) < dragThreshold) {
           return; // still a click, not a drag — select nothing yet
         }
         dragging = true;
-        selection.beginAt(anchor.page, anchor.point); // open the selection at the anchor
+        selection.beginGestureAt(anchor.page, anchor.point); // open the selection at the anchor
       }
       selection.extendTo(s.page.ref, s.page.point);
     },
     onUp: () => {
       anchor = null;
       dragging = false;
-      selection.end();
+      selection.endGesture();
     },
     onCancel: () => {
       // Aborted (second finger → pinch, or a system cancel): drop the
-      // in-flight selection instead of committing a sliver of it. end() after
-      // clear() settles the `selecting` flag without anything to commit.
+      // in-flight selection instead of committing a sliver of it. endGesture()
+      // after clear() settles the gesture with nothing to commit.
       anchor = null;
       dragging = false;
       selection.clear();
-      selection.end();
+      selection.endGesture();
     },
     onHover: (s) => {
       if (!s.page) {
-        interaction.setCursor(CURSOR_TOKEN, null); // off the page → pointer
+        interaction.claimCursor(CURSOR_TOKEN, null); // off the page → pointer
         return;
       }
       // Warm geometry on first hover; show the I-beam ONLY when actually over text.
-      selection.ensurePage(s.page.ref);
+      void selection.ensureLoaded(s.page.ref);
       const overText = selection.isOverText(s.page.ref, s.page.point);
-      interaction.setCursor(CURSOR_TOKEN, overText ? 'text' : null, 10);
+      interaction.claimCursor(CURSOR_TOKEN, overText ? 'text' : null, 10);
     },
   };
 }

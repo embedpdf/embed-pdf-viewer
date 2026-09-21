@@ -9,7 +9,13 @@
  * feeds content-space boxes into the model via `pageGeom`. The field plane
  * (this snapshot) contributes identity, value, and behavior.
  */
-import type { FormFieldDTO, FormFieldOption, FormSnapshot } from '@embedpdf/engine-core/runtime';
+import type {
+  AnnotationRef,
+  FormFieldDTO,
+  FormFieldOption,
+  FormFieldRef,
+  FormSnapshot,
+} from '@embedpdf/engine-core/runtime';
 
 import { fieldForWidget, fieldKeyOf, type Box, type FieldKey, type Model } from './model';
 
@@ -17,8 +23,12 @@ export type { Box } from './model';
 
 interface FillItemBase {
   key: FieldKey;
+  /** The field this widget belongs to — what the public write verbs take. */
+  fieldRef: FormFieldRef;
   /** Widget identity — joins to the annotation plane. */
   annotObjectNumber: number;
+  /** The widget's annotation address (null until the engine has placed it). */
+  annotationRef: AnnotationRef | null;
   box: Box;
   /** Read-only field or write in flight: render, don't accept input. */
   disabled: boolean;
@@ -73,7 +83,10 @@ export function projectWidget(
   const key = fieldKeyOf(field);
   const base: FillItemBase = {
     key,
+    fieldRef: field.ref,
     annotObjectNumber,
+    annotationRef:
+      field.widgets.find((w) => w.annotObjectNumber === annotObjectNumber)?.ref ?? null,
     box,
     disabled: field.flags.readOnly || model.writing[key] === true,
     label: field.alternateName ?? field.name,

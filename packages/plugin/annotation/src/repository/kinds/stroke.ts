@@ -6,7 +6,6 @@
  * `/EMBD_Metadata/Rotation` is an advisory scalar (the points are already
  * rotated; shape measurement captions use it to orient their text).
  */
-import type { AnnotationDTO, PdfRect } from '@embedpdf/engine-core/runtime';
 import {
   distanceLabel,
   measurementLayout,
@@ -16,6 +15,7 @@ import {
   pdfToContentPoint,
   type Annot,
 } from '@embedpdf/core-annotation';
+import type { AnnotationDTO, PdfRect } from '@embedpdf/engine-core/runtime';
 
 import type { KindProjection, Wire } from '../projection';
 import { borderSlice } from '../props';

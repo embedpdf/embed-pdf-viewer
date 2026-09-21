@@ -92,14 +92,14 @@ describe('the stage → actions trigger feed (real engine)', () => {
     t.actions.setUiAdapter({ openUri: () => {}, print: () => {} });
     await t.drain();
     expect(t.seam).toEqual([]); // no stage report yet, no fallback in auto
-    stage.setViewport({ width: 800, height: 600 }); // placement → report
+    stage.setViewportSize({ width: 800, height: 600 }); // placement → report
     await t.drain();
     await t.drain();
     // Canonical coordinator order: the visible set (/PV shows 12) precedes
     // the open fan-out (page /O shows 7, then the /PO set shows 9).
     expect(t.seam).toEqual(['show:12', 'show:7', 'show:9']);
     t.seam.length = 0;
-    stage.goToPage(1); // programmatic navigation to page 2 (no /AA there)
+    stage.goToPageIndex(1); // programmatic navigation to page 2 (no /AA there)
     await t.drain();
     await t.drain();
     // Leaving page 3: close fires (/PC set then /C — ISO order). The /PI

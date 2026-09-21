@@ -4,17 +4,6 @@
  * two worlds lives here — kind modules speak through these helpers and never
  * hand-roll a convention flip.
  */
-import type {
-  AnnotationDTO,
-  AnnotationRef,
-  Color,
-  PdfLinkTarget,
-  PdfLinkTargetWritable,
-  PdfRect,
-  PdfRectDifferences,
-  StandardFont,
-  WidgetAppearance,
-} from '@embedpdf/engine-core/runtime';
 import {
   contentToPdfRect,
   normalizeDeg,
@@ -26,6 +15,17 @@ import {
   type Rect,
   type Style,
 } from '@embedpdf/core-annotation';
+import type {
+  AnnotationDTO,
+  AnnotationRef,
+  Color,
+  PdfLinkTarget,
+  PdfLinkTargetWritable,
+  PdfRect,
+  PdfRectDifferences,
+  StandardFont,
+  WidgetAppearance,
+} from '@embedpdf/engine-core/runtime';
 
 // The content↔PDF bridge, re-exported so kind modules cross the seam through
 // ONE import point and never reach into the core's geometry directly.

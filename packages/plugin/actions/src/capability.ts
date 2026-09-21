@@ -32,7 +32,7 @@ import type {
 } from '@embedpdf/engine-core/runtime';
 
 import { createScriptRealmFactory } from './script-environment';
-import { eventOf, originOf } from './types';
+import { eventOf, triggerOriginOf } from './types';
 import type {
   ActionContext,
   ActionDiagnostic,
@@ -43,21 +43,25 @@ import type {
   ActionOrigin,
   ActionPolicy,
   ActionPolicyDecision,
+  ActionPolicyPatch,
   ActionPolicyRow,
   ActionsAction,
   ActionsCapability,
   ActionsHostCapability,
-  ActionsPluginConfig,
+  ActionsConfig,
   ActionsState,
   ActionSource,
   ActionStepResult,
   ActionSubmitHandler,
   ActionSubmitRequest,
   ActionTrigger,
+  ActionTreeSource,
   ActionTriggerResult,
   ActionUiAdapter,
   AnnotCommitEntry,
   AnnotCommitSink,
+  OpenSequenceCompletedEvent,
+  PdfNamedAction,
   DocumentTriggerEvent,
   FormCommitSink,
   PageStateReport,
@@ -124,11 +128,22 @@ const sameRef = (left: AnnotationRef, right: AnnotationRef): boolean => {
 const isPrintVerb = (node: PdfActionNode): boolean =>
   node.type === 'named' && node.name === 'Print';
 
+/** Row-wise merge: a patch names only the origins it changes. */
+function mergePolicy(base: ActionPolicy, patch: ActionPolicyPatch | undefined): ActionPolicy {
+  if (!patch) return base;
+  const next = { ...base };
+  for (const key of Object.keys(patch) as (keyof ActionPolicy)[]) {
+    const row = patch[key];
+    if (row) next[key] = { ...base[key], ...row };
+  }
+  return next;
+}
+
 export function createActionsCapability(
   ctx: PluginContext<ActionsState, ActionsAction>,
-  config: ActionsPluginConfig = {},
+  config: ActionsConfig = {},
 ): ActionsHostCapability {
-  const policy: ActionPolicy = { ...DEFAULT_POLICY, ...config.policy };
+  let policy: ActionPolicy = mergePolicy(DEFAULT_POLICY, config.policy);
   const enqueue = createSerialQueue();
   const executors = new Map<PdfActionType, ActionExecutor>();
   let annotCommitSink: AnnotCommitSink | null = null;
@@ -146,7 +161,10 @@ export function createActionsCapability(
   let jsNodesThisDispatch = 0;
 
   const actionHook = createEventHook<import('./types').ActionDispatchEvent>((error) =>
-    globalThis.console?.error('[actions] onAction observer failed:', error),
+    globalThis.console?.error('[actions] onExecuted observer failed:', error),
+  );
+  const openSequenceHook = createEventHook<OpenSequenceCompletedEvent>((error) =>
+    console.error('[actions] onOpenSequenceCompleted listener threw', error),
   );
   const diagnosticHook = createEventHook<ActionDiagnostic>((error) =>
     globalThis.console?.error('[actions] onDiagnostic observer failed:', error),
@@ -1195,7 +1213,7 @@ export function createActionsCapability(
         });
         return { status: 'inert', steps: [], diagnostics };
       }
-      const origin = originOf(trigger);
+      const origin = triggerOriginOf(trigger);
       switch (trigger.scope) {
         case 'activate':
         case 'annotation': {
@@ -1251,7 +1269,7 @@ export function createActionsCapability(
   const dispatch = (trigger: ActionTrigger): Promise<ActionTriggerResult> => {
     // A user-origin trigger is user activity (latch + cascade reset) — noted
     // BEFORE taking the queue slot, so an armed open sequence runs first.
-    if (originOf(trigger) === 'user') noteUserActivity();
+    if (triggerOriginOf(trigger) === 'user') noteUserActivity();
     return enqueue(() => {
       jsNodesThisDispatch = 0; // D11: one aggregate per dispatch
       return resolveAndRun(trigger);
@@ -1404,7 +1422,9 @@ export function createActionsCapability(
       // queue self-deadlocks).
       releaseBarrier(true);
     }
-    return foldSteps(steps, diagnostics);
+    const result = foldSteps(steps, diagnostics);
+    openSequenceHook.emit({ result });
+    return result;
   };
 
   // ── document lifecycle events (Phase 4: WC/WS/DS/WP/DP) ─────────────────
@@ -1532,9 +1552,69 @@ export function createActionsCapability(
   // barrier for 'off', waits for an adapter or user activity for 'auto'.
   maybeFireOpenSequence();
 
+  const executeNamed = (
+    name: PdfNamedAction,
+    context?: Partial<ActionContext>,
+  ): Promise<ActionDispatchResult> =>
+    execute(
+      {
+        root: { type: 'named', subtype: 'Named', name, next: [] },
+        incomplete: false,
+        warningFlags: 0,
+        warnings: [],
+      },
+      { origin: 'user', source: { kind: 'api' }, event: { scope: 'activate' }, ...context },
+    );
+
+  /** The raw tree behind a source, read from the document — no dispatch
+   *  rules applied (the /A-shadows-U rule lives in `resolveAndRun`). */
+  const getActionTree = async (source: ActionTreeSource): Promise<PdfActionTree | null> => {
+    const doc = ctx.doc;
+    if (!doc) return null;
+    switch (source.kind) {
+      case 'annotation': {
+        const { annotations } = await doc.page(source.page).annotations.list();
+        const annotation = annotations.find((candidate) =>
+          sameRef(candidate.ref, source.annotation),
+        );
+        return annotation?.actions?.[source.event ?? 'activate'] ?? null;
+      }
+      case 'field': {
+        const { fields } = await doc.forms.list();
+        const target = source.field;
+        const field = fields.find((candidate) =>
+          target.kind === 'objectNumber'
+            ? candidate.ref.kind === 'objectNumber' &&
+              candidate.ref.fieldObjectNumber === target.fieldObjectNumber
+            : candidate.name === target.name,
+        );
+        return field?.actions?.[source.event] ?? null;
+      }
+      case 'page': {
+        const pon = source.page.pageObjectNumber;
+        const layout = ctx.document()?.pages.find((page) => page.ref.pageObjectNumber === pon);
+        return layout?.actions?.[source.event ?? 'open'] ?? null;
+      }
+      case 'document': {
+        const snapshot = await readDocumentActions();
+        if (!snapshot) return null;
+        const event = source.event ?? 'open';
+        return (event === 'open' ? snapshot.openAction : snapshot[DOC_EVENT_TREES[event]]) ?? null;
+      }
+    }
+  };
+
   return {
     execute,
     canExecute,
+    executeNamed,
+    getActionTree,
+    getPolicy: () => policy,
+    updatePolicy: (patch) => {
+      policy = mergePolicy(policy, patch);
+      ctx.dispatch({ type: 'ACTIONS_POLICY_CHANGED' });
+    },
+    isScriptingEnabled: () => scriptHost !== null,
     dispatch,
     // Sync twin: family enabled ∧ document present (per-tree truth stays
     // per-step in results — resolution is async and never previewed here).
@@ -1585,10 +1665,11 @@ export function createActionsCapability(
         if (submitHandler === handler) submitHandler = null;
       };
     },
-    onAction: actionHook.on,
+    onExecuted: actionHook.on,
     onDiagnostic: diagnosticHook.on,
     onScriptDiagnostic: scriptDiagnosticHook.on,
     onScriptError: scriptErrorHook.on,
+    onOpenSequenceCompleted: openSequenceHook.on,
 
     registerExecutor: (type, executor): Unsubscribe => {
       if (executors.has(type)) {

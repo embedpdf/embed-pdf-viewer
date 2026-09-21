@@ -62,7 +62,7 @@ async function boot() {
   const actions = kernel.capability(ActionsToken);
   await form.refresh();
   const fieldOf = (name: string) => {
-    const field = form.snapshot()?.fields.find((candidate) => candidate.name === name);
+    const field = form.getSnapshot()?.fields.find((candidate) => candidate.name === name);
     if (!field) throw new Error(`field '${name}' is missing`);
     return field;
   };
@@ -74,7 +74,7 @@ async function boot() {
       annotObjectNumber: widget.annotObjectNumber,
     };
   };
-  const press = (name: string) => form.activateWidget(fieldKeyOf(fieldOf(name)), widgetRefOf(name));
+  const press = (name: string) => form.activateWidget(widgetRefOf(name));
   const requests: ActionSubmitRequest[] = [];
   const diagnostics: ActionDiagnostic[] = [];
   actions.onDiagnostic((diagnostic) => diagnostics.push(diagnostic));

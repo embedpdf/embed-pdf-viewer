@@ -28,18 +28,35 @@ import type {
   SubmitIntent,
 } from '@embedpdf/plugin-actions/contract';
 import type { ScriptDiagnostic, ScriptExecutionError, ScriptUiEffect } from '@embedpdf/core-acrojs';
-import { createCapabilityToken } from '@embedpdf/core';
+import {
+  createCapabilityToken,
+  type BatchResult,
+  type ChangeOrigin,
+  type EventHook,
+  type OperationOptions,
+  type ResourceStatus,
+} from '@embedpdf/core';
 
 import type { FillItem } from './core/fill-items';
-import type { Box, FieldKey, Model, WidgetHit } from './core/model';
+import type { Box, Model, WidgetHit } from './core/model';
 import type { AuthorableFormFamily } from './tools';
 
 export interface FormState {
   model: Model;
+  /** Hydration: `loading` until the field tree is in, then `ready`; `forbidden` without `doc.forms.read`. */
+  status: ResourceStatus;
 }
 
 /** The scripting switch moved to `actionsPlugin({ javascript })` (D8). */
-export interface FormPluginOptions {}
+/** `formPlugin(config)`. */
+export interface FormConfig {
+  /**
+   * Whether `setValue` runs the document's keystroke, validate, calculate and
+   * format scripts (needs `actionsPlugin({ javascript })`). `'none'` writes
+   * values straight to the engine. Default `'scripts'`.
+   */
+  validation?: 'scripts' | 'none';
+}
 
 export type FormCommitStatus = 'applied' | 'unchanged' | 'rejected' | 'failed';
 
@@ -74,125 +91,185 @@ export type FormUiEffect = ScriptUiEffect & {
 };
 
 /** Input for {@link FormCapability.placeField}. */
-export interface PlaceFieldInput {
+export interface CreateFieldInput {
   family: AuthorableFormFamily;
   page: PageRef;
-  /** Content-space LOGICAL field box (no visual padding semantics). */
-  box: Box;
-  /** Widget styling in the engine vocabulary (`WidgetAppearance`). Convert a
-   *  tool's flat CSS defaults with `widgetAppearanceFromProps` from
-   *  `@embedpdf/plugin-annotation`. Omitted → the engine's bare defaults. */
+  /** The widget's page-space box. */
+  bounds: Box;
+  /** A fully qualified name; auto-numbered from the family when omitted. */
+  name?: string;
   appearance?: WidgetAppearance;
+  /** Choice fields: the options to start with. */
+  options?: readonly { label: string; value: string }[];
 }
 
 /** What {@link FormCapability.placeField} created. */
-export interface PlacedField {
+export interface CreatedField {
   field: FormFieldDTO;
-  /** The widget placed on the requested page (join key to the annotation
-   *  plane for auto-selection), or null when the engine reported none. */
+  /** The widget on the requested page. */
   widget: FormFieldDTO['widgets'][number] | null;
 }
 
-export type FormAction = { type: 'SET_MODEL'; model: Model };
+export type FormAction =
+  | { type: 'SET_MODEL'; model: Model }
+  | { type: 'SET_STATUS'; status: ResourceStatus };
 
 /**
  * The form plugin's public capability: the FIELD plane. Widgets stay
  * annotations (geometry/appearance live there); this surface owns values,
  * interchange, and the fill-mode projection.
  */
+/** The outcome of a value write through the validated path. */
+export type SetValueResult = FormCommitResult;
+
+/** A widget as a fill surface paints it: page-space box, field, control, value. */
+export type FormWidgetItem = FillItem;
+
+/** A widget address for lookups: its annotation ref, or its object number alone. */
+export type WidgetAddress = AnnotationRef | { annotObjectNumber: number };
+
+export interface FormFilter {
+  readonly family?: FormFieldFamily;
+  /** Fields with a widget on this page. */
+  readonly page?: PageRef;
+  /** Exact fully qualified name. */
+  readonly name?: string;
+}
+
+// ── events ──
+export interface FormValueChangedEvent {
+  readonly ref: FormFieldRef;
+  readonly field: FormFieldDTO;
+  readonly origin: ChangeOrigin;
+}
+export interface FormFieldChangedEvent {
+  readonly ref: FormFieldRef;
+  /** The field after the change; null once deleted. */
+  readonly field: FormFieldDTO | null;
+  readonly origin: ChangeOrigin;
+}
+export interface FormValidationRejectedEvent {
+  readonly ref: FormFieldRef;
+  readonly issues: readonly ScriptDiagnostic[];
+}
+export interface FormResyncedEvent {
+  readonly snapshot: FormSnapshot;
+}
+
+/** Build a `FormFieldRef` without spelling the discriminator. */
+export const fieldRef = {
+  byName: (name: string): FormFieldRef => ({ kind: 'fqn', name }),
+  byObjectNumber: (fieldObjectNumber: number): FormFieldRef => ({
+    kind: 'objectNumber',
+    fieldObjectNumber,
+  }),
+};
+
 export interface FormCapability {
-  /** The current reconciled form state (null until the first load lands). */
-  snapshot(): FormSnapshot | null;
-  /** Re-read the form from the engine (imports/repair/remote bursts). */
-  refresh(): Promise<void>;
+  // ── reading ──
+  /** The reconciled field tree. Reference-stable until it changes. */
+  getSnapshot(): FormSnapshot | null;
+  getStatus(): ResourceStatus;
+  listFields(filter?: FormFilter): readonly FormFieldDTO[];
+  getField(ref: FormFieldRef): FormFieldDTO | null;
+  /** The field a widget belongs to. */
+  getFieldForWidget(widget: WidgetAddress): FormFieldDTO | null;
+  /** The current value in the write vocabulary, or null for a valueless / unsupported entry. */
+  getValue(ref: FormFieldRef): FormFieldValue | null;
+  /** Widgets on a page with their page-space boxes, values and fill state. Reference-stable. */
+  listWidgets(page: PageRef): readonly FormWidgetItem[];
+  /** The widget under a page point. */
+  getWidgetAt(page: PageRef, point: { x: number; y: number }): WidgetHit | null;
 
-  /** Fill controls for one page — content-space, framework-agnostic. */
-  fillItems(page: PageRef): FillItem[];
+  // ── filling ──
   /**
-   * The fill control for ONE widget, by annotation object number — the join
-   * the annotation-plane render layer uses (its RenderItem carries the live
-   * box, so this item's `box` is advisory). Reference-stable per model change.
-   * Null until the snapshot lands, or for families with no fill control.
+   * Commit a value through the validated path (keystroke / validate /
+   * calculate / format scripts when enabled). Rejects `permission-denied`
+   * without `doc.forms.fill`.
    */
-  fillItem(annotObjectNumber: number): FillItem | null;
-  /** Make sure a page's widget geometry is loaded (idempotent, lazy). */
-  ensureGeom(page: PageRef): void;
+  setValue(
+    ref: FormFieldRef,
+    value: FormFieldValue,
+    options?: OperationOptions,
+  ): Promise<SetValueResult>;
+  /** Engine passthrough — no scripts. */
+  setValueRaw(
+    ref: FormFieldRef,
+    value: FormFieldValue,
+    options?: OperationOptions,
+  ): Promise<FormSetValueResult>;
+  /** Several values, queued in order; best-effort per field. */
+  setValues(
+    entries: readonly { ref: FormFieldRef; value: FormFieldValue }[],
+    options?: OperationOptions,
+  ): Promise<BatchResult<FormFieldRef, FormFieldRef>>;
+  setText(ref: FormFieldRef, text: string, options?: OperationOptions): Promise<SetValueResult>;
+  /** Check (`onState`) or clear (`null`) a checkbox or radio group. */
+  setChecked(
+    ref: FormFieldRef,
+    onState: string | null,
+    options?: OperationOptions,
+  ): Promise<SetValueResult>;
+  setChoice(
+    ref: FormFieldRef,
+    values: readonly string[],
+    options?: OperationOptions,
+  ): Promise<SetValueResult>;
+  /** Restore one field's default value. */
+  reset(ref: FormFieldRef, options?: OperationOptions): Promise<void>;
+  /** Reset the form, a set of fields, or everything but a set of fields. */
+  resetAll(
+    options?: { fields?: readonly FormFieldRef[]; exclude?: boolean } & OperationOptions,
+  ): Promise<BatchResult<FormFieldRef, FormFieldRef>>;
+  /** Run a widget's `/A` action as a click would. */
+  activateWidget(
+    widget: AnnotationRef,
+    options?: OperationOptions,
+  ): Promise<WidgetActivationResult>;
 
-  field(key: FieldKey): FormFieldDTO | null;
-  fieldForWidget(annotObjectNumber: number): FormFieldDTO | null;
-  /**
-   * The widget under a content-space point on a page (any family), with
-   * its field — the hit test a sibling plugin runs on a pointer sample
-   * before deciding what a click means (a mark dropped over a signature
-   * field). The model's own geometry answers when it is loaded; until then
-   * the annotation plane's live boxes do, so the first click on a page
-   * already resolves. The smallest containing widget wins.
-   */
-  widgetAt(page: PageRef, point: { x: number; y: number }): WidgetHit | null;
+  // ── interchange ──
+  exportData(format?: FormDataFormat, options?: OperationOptions): Promise<FormDataExport>;
+  importData(
+    data: Uint8Array | ArrayBuffer,
+    format?: FormDataFormat,
+    options?: OperationOptions,
+  ): Promise<FormImportResult>;
+  /** Values keyed by fully qualified name (valueless and unsupported entries omitted). */
+  exportValues(): Readonly<Record<string, FormFieldValue>>;
+  /** Set values from a plain object keyed by fully qualified name. */
+  importValues(
+    values: Readonly<Record<string, FormFieldValue>>,
+    options?: OperationOptions,
+  ): Promise<BatchResult<FormFieldRef, string>>;
+  repair(options?: FormRepairOptions & OperationOptions): Promise<FormRepairResult>;
+  /** Re-read the field tree from the engine. */
+  refresh(options?: OperationOptions): Promise<void>;
 
-  /** Commit a text value (call on blur/Enter — keystrokes stay local). */
-  setText(key: FieldKey, value: string): Promise<void>;
-  /** Toggle a checkbox/radio widget by its on-state; null clears the group. */
-  toggle(key: FieldKey, onState: string | null): Promise<void>;
-  /** Select choice options by export value. */
-  choose(key: FieldKey, values: string[]): Promise<void>;
-  /** Commit one originating-client value transaction, including K/V/C/F scripts when enabled. */
-  commitValue(ref: FormFieldRef, value: FormFieldValue): Promise<FormCommitResult>;
-  /**
-   * Execute one widget's `/A` activation. With the actions plugin installed
-   * the FULL tree is delegated to its dispatcher (Hide/ResetForm buttons work
-   * even with scripting off) — `kind: 'dispatched'`; without it, today's
-   * scripting-transaction path runs — `kind: 'form'`.
-   */
-  activateWidget(key: FieldKey, annotationRef: AnnotationRef): Promise<WidgetActivationResult>;
-  /**
-   * Report one widget DOM event (pointer enter/leave, down/up, focus/blur).
-   * With the actions plugin present the matching `/AA` tree dispatches
-   * (hover rides the shared coalescing pump; `/A` shadows `/AA U` per ISO
-   * Table 197); without it — or without a tree — this is a cheap no-op.
-   * Fire-and-forget by design: results surface via the actions events.
-   */
-  notifyWidgetEvent(key: FieldKey, ref: AnnotationRef, event: PdfAnnotationEventKind): void;
-  /** Restore a field to its /DV default. */
-  reset(key: FieldKey): Promise<void>;
-  /** Raw engine passthrough for anything the sugar above doesn't cover. */
-  setValue(ref: FormFieldRef, value: FormFieldValue): Promise<FormSetValueResult>;
+  // ── designing ──
+  /** A field with one widget. */
+  createField(input: CreateFieldInput, options?: OperationOptions): Promise<CreatedField>;
+  updateField(ref: FormFieldRef, patch: FormFieldPatch, options?: OperationOptions): Promise<void>;
+  /** The field and its widgets. */
+  deleteField(ref: FormFieldRef, options?: OperationOptions): Promise<void>;
+  /** Link an inert widget annotation to a field. */
+  attachWidget(ref: FormFieldRef, widget: AnnotationRef, options?: OperationOptions): Promise<void>;
+  detachWidget(ref: FormFieldRef, widget: AnnotationRef, options?: OperationOptions): Promise<void>;
 
-  exportData(format?: FormDataFormat): Promise<FormDataExport>;
-  importData(data: Uint8Array | ArrayBuffer, format?: FormDataFormat): Promise<FormImportResult>;
-  repair(options?: FormRepairOptions): Promise<FormRepairResult>;
-
-  // ── design mode (doc.forms.modify) ─────────────────────────────────────
-  /**
-   * Create a field of `family` with one styled widget at a content-space box
-   * — the palette tools' commit, and the programmatic authoring entry (works
-   * with NO annotation plugin: a pure `doc.forms` call). The box is clamped
-   * to the page; sizing policy (click default vs drag rect) is the caller's.
-   * The field gets a deterministic auto-name (`text_1`, …; rename in the
-   * field panel). Resolves AFTER the annotation plane (when present) has
-   * re-read the page, so the returned widget is immediately selectable.
-   */
-  placeField(input: PlaceFieldInput): Promise<PlacedField>;
-  /** The page's content box (`{0,0,w,h}`) — page-bound placement math. */
-  pageBox(page: PageRef): Box | null;
-  /** Field-plane properties: name, required, options, default value. */
-  updateField(key: FieldKey, patch: FormFieldPatch): Promise<void>;
-  /** Delete the field and every widget of it (cascades on the page). */
-  deleteField(key: FieldKey): Promise<void>;
-  /** Unlink one widget: it stays as an inert annotation, the field survives. */
-  detachWidget(key: FieldKey, annotObjectNumber: number): Promise<void>;
-
-  /**
-   * The twins (permissions.md): would the family's verbs succeed now for
-   * this session? `canRead` — the form model hydrates at all (false = the
-   * hydration gate left it empty by right); `canFill` — value writes
-   * (`setText`/`toggle`/`choose`/`reset`; also fused into every
-   * `FillItem.disabled`); `canDesign` — the field-design family
-   * (`placeField`/`updateField`/`deleteField`/`detachWidget`).
-   */
+  // ── twins ──
   canRead(): boolean;
   canFill(): boolean;
   canDesign(): boolean;
+
+  // ── events ──
+  /** A confirmed value change — programmatic, script and remote writes alike. */
+  readonly onValueChanged: EventHook<FormValueChangedEvent>;
+  readonly onFieldCreated: EventHook<FormFieldChangedEvent>;
+  readonly onFieldUpdated: EventHook<FormFieldChangedEvent>;
+  readonly onFieldDeleted: EventHook<FormFieldChangedEvent>;
+  /** A validated write was refused by the document's scripts. */
+  readonly onValidationRejected: EventHook<FormValidationRejectedEvent>;
+  /** The snapshot was replaced wholesale (a refresh landed). */
+  readonly onResynced: EventHook<FormResyncedEvent>;
 }
 
 /** What one widget activation did — which world handled it (see
@@ -208,33 +285,29 @@ export type WidgetActivationResult =
  * `@embedpdf/plugin-form/contract/host`, never from application code.
  */
 export interface FormHostCapability extends FormCapability {
-  /**
-   * Execute one ResetForm action: resolve targets against the live snapshot
-   * with the shared ISO selection (`null` = every field; a parent NAME
-   * selects its descendants too; `exclude` = complement; a resolution
-   * yielding zero refs never reaches the engine), reset as ONE engine
-   * batch, refresh, then recalculate when scripting is enabled (Acrobat's
-   * behaviour). `origin` (default `'user'`) is preserved through
-   * recalculation surfacing — a lifecycle ResetForm's alerts stay lifecycle.
-   */
+  /** The render feed: widgets on a page with their page-space boxes. Reference-stable. */
+  listFillItems(page: PageRef): FillItem[];
+  getFillItem(annotObjectNumber: number): FillItem | null;
+  /** Warm a page's widget geometry (one annotations read per page). */
+  ensureLoaded(page: PageRef): void;
+  /** The page box in page space (for placement clamping). */
+  getPageBox(page: PageRef): Box | null;
+  /** The widget DOM-event feed into the actions plane. */
+  notifyWidgetEvent(
+    field: FormFieldRef,
+    widget: AnnotationRef,
+    event: PdfAnnotationEventKind,
+  ): void;
   resetFormAction(
     fields: PdfActionTargetRef[] | null,
     exclude: boolean,
     origin?: ActionOrigin,
   ): Promise<FormCommitResult>;
-  /**
-   * The submit dataset resolver (Phase 4, D7): fresh engine read + the pure
-   * ISO builder (`field-selection.ts`). Registered with the actions plugin
-   * as THE resolver for both action-node and script submits.
-   */
   resolveSubmitDataset(
     intent: SubmitIntent,
     ctx: ActionContext,
     diagnose: (diagnostic: ActionDiagnostic) => void,
   ): Promise<ActionSubmitRequest>;
-  /** The form DOCUMENT-commit sink (D3): engine `applyEffects` + snapshot
-   *  reconciliation. Sink contract: never throws, never enqueues, never
-   *  touches the script host — callable under a held host transaction. */
   commitScriptFormEffects(effects: FormEffect[]): Promise<FormEffectsResult>;
 }
 
@@ -243,7 +316,9 @@ export interface FormHostCapability extends FormCapability {
  * here (the package internals + the `/internal` entry use this view). The
  * package root re-exports the SAME token narrowed to {@link FormCapability}.
  */
-export const FormToken = createCapabilityToken<FormHostCapability>('form');
+export const FormToken = createCapabilityToken<FormHostCapability>('form', {
+  hint: `add formPlugin() from '@embedpdf/plugin-form' to your plugins list`,
+});
 
 export type { FillItem } from './core/fill-items';
 export type { Box, FieldKey, WidgetHit } from './core/model';

@@ -82,7 +82,7 @@ function makeCtx(
 ) {
   let state: SignatureState = initialSignatureState();
   const cleanups: Array<() => void | Promise<void>> = [];
-  const form = { refresh: vi.fn(async () => {}), fieldForWidget: () => null, ...opts.form };
+  const form = { refresh: vi.fn(async () => {}), getFieldForWidget: () => null, ...opts.form };
   const ctx = {
     id: 'signature',
     engine,
@@ -109,9 +109,9 @@ async function openDoc() {
 }
 
 const stampStub = (bytes: Uint8Array) => ({
-  assetBytes: (id: string) => (id === 'people:signature' ? bytes : null),
-  library: (id: string) => (id === 'people' ? { id, kind: 'signatures', name: 'Bob' } : null),
-  armedAsset: vi.fn(() => ({ id: 'people:signature', libraryId: 'people', name: 'signature' })),
+  readAssetBytes: (id: string) => (id === 'people:signature' ? bytes : null),
+  getLibrary: (id: string) => (id === 'people' ? { id, kind: 'signatures', name: 'Bob' } : null),
+  getArmedAsset: vi.fn(() => ({ id: 'people:signature', libraryId: 'people', name: 'signature' })),
   disarm: vi.fn(),
   placeAsset: vi.fn(async () => ({
     kind: 'objectNumber',
@@ -336,7 +336,7 @@ describe('the armed mark over a field', () => {
     };
     let where: keyof typeof hits | 'nothing' = 'sig';
     const form = {
-      widgetAt: () =>
+      getWidgetAt: () =>
         where === 'nothing'
           ? null
           : { annotObjectNumber: 9, field: hits[where], box: { x: 0, y: 0, width: 1, height: 1 } },
@@ -364,10 +364,10 @@ describe('the armed mark over a field', () => {
     expect(placeMark).toHaveBeenCalledTimes(1);
 
     // A plain stamp (any other library) never captures.
-    stamp.armedAsset.mockReturnValue({ id: 'std:Approved', libraryId: 'std', name: 'Approved' });
+    stamp.getArmedAsset.mockReturnValue({ id: 'std:Approved', libraryId: 'std', name: 'Approved' });
     where = 'sig';
     expect(handler.onDown(sample(3, { x: 0.5, y: 0.5 }))).toBe(false);
-    stamp.armedAsset.mockReturnValue(null as never);
+    stamp.getArmedAsset.mockReturnValue(null as never);
     expect(handler.onDown(sample(3, { x: 0.5, y: 0.5 }))).toBe(false);
   });
 });

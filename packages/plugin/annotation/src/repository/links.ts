@@ -4,7 +4,6 @@
  * parent's `link` prop, and the reconciler derives the children it should
  * have from the parent's committed geometry.
  */
-import { textQuadBounds } from '@embedpdf/core-geometry';
 import {
   propsFor,
   selectionQuad,
@@ -13,6 +12,7 @@ import {
   type Quad,
   type Rect,
 } from '@embedpdf/core-annotation';
+import { textQuadBounds } from '@embedpdf/core-geometry';
 
 import { annotationKey } from './seam';
 

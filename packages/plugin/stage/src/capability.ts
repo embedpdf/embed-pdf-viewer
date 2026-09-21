@@ -10,7 +10,8 @@ import {
   snapToDevice,
 } from '@embedpdf/core-geometry';
 import type { Rect } from '@embedpdf/core-geometry';
-import { toPageRef, type PluginContext } from '@embedpdf/core';
+import { createEventHook, toPageRef, type PageRef, type PluginContext } from '@embedpdf/core';
+import type { StageHostCapability } from './host-contract';
 import {
   FLING_STOP,
   easeOutCubic,
@@ -37,6 +38,12 @@ import type {
   StageViewState,
   Viewpoint,
   VisiblePage,
+  StagePageChangedEvent,
+  StageZoomChangedEvent,
+  StageCameraChangedEvent,
+  StageMotionEndedEvent,
+  StageSettingsChangedEvent,
+  StageViewportChangedEvent,
 } from './types';
 
 /**
@@ -71,9 +78,62 @@ import type {
  * scrolling syncs it from the camera; paged panning never moves it.
  */
 export function createStageCapability(
-  ctx: PluginContext<StageState, StageAction>,
+  rawCtx: PluginContext<StageState, StageAction>,
   config: StageConfig = {},
-): StageCapability {
+): StageHostCapability {
+  // ── events ───────────────────────────────────────────────────────────────
+  // Every state write goes through `ctx.dispatch`; diffing before/after there
+  // is the one place page, zoom, camera, settings and viewport changes are
+  // observed, so an event can never be forgotten by a new verb.
+  const pageChanged = createEventHook<StagePageChangedEvent>();
+  const zoomChanged = createEventHook<StageZoomChangedEvent>();
+  const cameraChanged = createEventHook<StageCameraChangedEvent>();
+  const motionEnded = createEventHook<StageMotionEndedEvent>();
+  const settingsChanged = createEventHook<StageSettingsChangedEvent>();
+  const viewportChanged = createEventHook<StageViewportChangedEvent>();
+  rawCtx.cleanup?.(() => {
+    for (const hook of [
+      pageChanged,
+      zoomChanged,
+      cameraChanged,
+      motionEnded,
+      settingsChanged,
+      viewportChanged,
+    ]) {
+      hook.dispose();
+    }
+  });
+  const emitDiffs = (before: StageState, after: StageState): void => {
+    if (before === after) return;
+    if (before.camera !== after.camera) {
+      cameraChanged.emit({ camera: after.camera });
+      if (before.camera.zoom !== after.camera.zoom) {
+        zoomChanged.emit({
+          level: after.camera.zoom,
+          previousLevel: before.camera.zoom,
+          mode: 'mode' in after.zoom ? after.zoom.mode : 'custom',
+        });
+      }
+    }
+    if (before.cursor !== after.cursor) {
+      pageChanged.emit({
+        page: rawCtx.document()?.pages[after.cursor] ?? null,
+        pageIndex: after.cursor,
+        previousPageIndex: before.cursor,
+      });
+    }
+    if (before.vp !== after.vp) viewportChanged.emit({ size: after.vp });
+    const changed = SETTING_KEYS.filter((key) => !eqSetting(before[key], after[key]));
+    if (changed.length) settingsChanged.emit({ settings: pickSettings(after), changed });
+  };
+  const ctx: PluginContext<StageState, StageAction> = {
+    ...rawCtx,
+    dispatch: (action) => {
+      const before = rawCtx.getState();
+      rawCtx.dispatch(action);
+      emitDiffs(before, rawCtx.getState());
+    },
+  };
   // ── host timing seam ─────────────────────────────────────────────────────────
   // Frame timing enters through the Scheduler seam. By DEFAULT the seam binds
   // to the host's own frame clock (globalThis.requestAnimationFrame) when one
@@ -539,6 +599,11 @@ export function createStageCapability(
       raf = 0;
     }
   };
+  /** A tween or fling reached its natural end. */
+  const endMotion = () => {
+    raf = 0;
+    motionEnded.emit({ camera: cam() });
+  };
   const lerp = (a: number, b: number, k: number) => a + (b - a) * k;
   // The tween clamps to an EXPLICIT bounds rect every frame (never a re-derived
   // current item), so animating toward a different item isn't clamped back.
@@ -571,7 +636,7 @@ export function createStageCapability(
       if (k < 1) {
         raf = scheduler.raf(tick);
       } else {
-        raf = 0;
+        endMotion();
         then?.();
       }
     };
@@ -620,7 +685,7 @@ export function createStageCapability(
       if (k < 1) {
         raf = scheduler.raf(tick);
       } else {
-        raf = 0;
+        endMotion();
         then?.();
       }
     };
@@ -718,6 +783,7 @@ export function createStageCapability(
       syncCursorFromCamera();
       if (ax.done && ay.done) {
         setCam(cam()); // exact landing: clamped, snapped, settled
+        motionEnded.emit({ camera: cam() });
         return;
       }
       raf = scheduler.raf(tick);
@@ -1054,6 +1120,9 @@ export function createStageCapability(
   // the state (a pinch-zoomed level survives a resize unless a rule actually
   // flips), and keys the rules don't touch never get re-asserted.
   let base = snapshotSettings();
+  const initialBase = base;
+  const indexOfPage = (page: PageRef): number =>
+    ctx.document()?.pages.findIndex((p) => p.ref.pageObjectNumber === page.pageObjectNumber) ?? -1;
   let rules: readonly ResponsiveRule[] = config.responsive ?? DEFAULT_RESPONSIVE;
   let lastEffective = base; // rules first assert when a real box arrives
   const publishActive = (active: readonly string[]) => {
@@ -1105,25 +1174,22 @@ export function createStageCapability(
   // (`placementStarted` is declared above the camera-rest detector, which reads it.)
   const initialViewProviders: Array<{ priority: number; fn: () => StageViewState | null }> = [];
 
-  const api: StageCapability = {
+  const api: StageHostCapability = {
     // ── selectors ──
-    camera: cam,
-    viewport: vp,
-    scrollMetrics: scrollMetricsNow,
-    pageCount: () => ctx.document()?.pageCount ?? 0,
-    visiblePages,
-    currentPage: () => ctx.getState().cursor,
-    currentItemPages: () => {
+    getCamera: cam,
+    getViewportSize: vp,
+    getScrollMetrics: scrollMetricsNow,
+    listVisiblePages: visiblePages,
+    isPageVisible: (page) =>
+      visiblePages().some((p) => p.ref.pageObjectNumber === page.pageObjectNumber),
+    getCurrentPageIndex: () => ctx.getState().cursor,
+    getCurrentPage: () => ctx.document()?.pages[ctx.getState().cursor] ?? null,
+    listCurrentItemPages: () => {
       const item = cursorItem();
-      return item ? [...item.pageIndexes] : [];
+      const pages = ctx.document()?.pages ?? [];
+      return item ? item.pageIndexes.map((i) => pages[i]).filter((p) => p !== undefined) : [];
     },
-    pages: () =>
-      (ctx.document()?.pages ?? []).map((p) => ({
-        index: p.index,
-        ref: p.ref,
-        label: p.label ?? null,
-      })),
-    pageRect: (page) => {
+    getPageFrame: (page) => {
       if (!ctx.getState().placed) return null;
       const meta = ctx.document();
       const pon = page.pageObjectNumber;
@@ -1134,7 +1200,7 @@ export function createStageCapability(
       const box = sc.items[sc.itemOfPage(index)].pages.find((p) => p.pageIndex === index);
       return box ? withTransform(box) : null;
     },
-    pageAt: (screen) => {
+    getPageAt: (screen) => {
       // Find the visible page whose device-snapped display box contains the
       // point, then invert that page's transform — same `viewToContent` the
       // per-page PageContext.toContentPoint uses, so the two never drift.
@@ -1153,7 +1219,7 @@ export function createStageCapability(
       }
       return null;
     },
-    pointOnPage: (page, screen) => {
+    viewportToPage: (page, screen) => {
       // `pageAt` minus the containment check: project onto ONE page's plane,
       // valid outside its bounds — the same inverse transform, so no drift.
       const p = visiblePages().find((v) => v.ref.pageObjectNumber === page.pageObjectNumber);
@@ -1161,7 +1227,7 @@ export function createStageCapability(
       return p.transform.viewToContent({ x: screen.x - p.screenX, y: screen.y - p.screenY });
     },
     pageToWorld: (page, pt) => {
-      const pr = api.pageRect(page);
+      const pr = api.getPageFrame(page);
       if (!pr) return null;
       // Place the content point into the page's display box via the SAME
       // quarter-turn matrix the layout/renderer use (`rotateScaleMatrix`) — so
@@ -1173,8 +1239,8 @@ export function createStageCapability(
       const offset = applyPoint(m, pt);
       return { x: pr.x + offset.x, y: pr.y + offset.y };
     },
-    pageRectToScreen: (page, rect) => {
-      const pr = api.pageRect(page);
+    pageRectToViewport: (page, rect) => {
+      const pr = api.getPageFrame(page);
       if (!pr) return null;
       const content = displaySize({ width: pr.width, height: pr.height }, pr.rotation);
       const m = rotateScaleMatrix(pr.contentScale, content.width, content.height, pr.rotation);
@@ -1183,39 +1249,32 @@ export function createStageCapability(
       const tl = S.toScreen(c, { x: pr.x + wr.x, y: pr.y + wr.y });
       return { x: tl.x, y: tl.y, width: wr.width * c.zoom, height: wr.height * c.zoom };
     },
-    toScreen: (w) => S.toScreen(cam(), w),
-    toWorld: (s) => S.toWorld(cam(), s),
-    flow: () => ctx.getState().flow,
-    layout: () => ctx.getState().layout,
-    spread: () => ctx.getState().spread,
-    sizing: () => ctx.getState().sizing,
-    columns: () => ctx.getState().columns,
-    bounded: () => ctx.getState().bounded,
-    padding: () => ctx.getState().padding,
-    gap: () => ctx.getState().gap,
-    pageFrame: () => ctx.getState().pageFrame,
-    fitAlign: () => ctx.getState().fitAlign,
-    arrivalAlign: () => ctx.getState().arrivalAlign,
-    zoomAlign: () => ctx.getState().zoomAlign,
-    anchorAlign: () => ctx.getState().anchorAlign,
-    direction: () => ctx.getState().direction,
-    scrollBehavior: () => ctx.getState().scrollBehavior,
-    viewRotation: () => ctx.getState().viewRotation,
-    zoomLevel: () => cam().zoom,
-    zoomMode: () => {
+    worldToViewport: (w) => S.toScreen(cam(), w),
+    viewportToWorld: (s) => S.toWorld(cam(), s),
+    pageToViewport: (page, pt) => {
+      const world = api.pageToWorld(page, pt);
+      return world ? S.toScreen(cam(), world) : null;
+    },
+    getViewRotation: () => ctx.getState().viewRotation,
+    getZoomLevel: () => cam().zoom,
+    getZoomMode: () => {
       const z = ctx.getState().zoom;
       return 'mode' in z ? z.mode : 'custom';
     },
-    viewpoint: (): Viewpoint => ({ anchor: currentAnchor(), zoom: ctx.getState().zoom }),
-    settings: snapshotSettings,
-    viewState: (): StageViewState => ({
+    getViewpoint: (): Viewpoint => ({ anchor: currentAnchor(), zoom: ctx.getState().zoom }),
+    getSettings: snapshotSettings,
+    resetSettings: () => {
+      base = mergeSettings(initialBase, {});
+      syncResponsive(true);
+    },
+    getViewState: (): StageViewState => ({
       ...snapshotSettings(),
       cursor: ctx.getState().cursor,
       anchor: currentAnchor(),
     }),
 
     // ── intents ──
-    setViewport: (v) => {
+    setViewportSize: (v) => {
       // Initial placement is LEVEL-triggered, owned here: the moment the stage
       // first learns a real size (both axes) and the document has pages, resolve
       // the initial view (storage/deep-link providers, else reset). Every report
@@ -1351,7 +1410,12 @@ export function createStageCapability(
       }
     },
     fling: (vx, vy) => startCameraPhysics(vx, vy),
-    cameraInMotion: () => raf !== 0,
+    isMoving: () => raf !== 0,
+    stopMotion: () => {
+      if (!raf) return;
+      cancelAnim();
+      motionEnded.emit({ camera: cam() });
+    },
     doubleTapZoom: (pt) => {
       cancelAnim();
       const sc0 = buildScene();
@@ -1395,11 +1459,20 @@ export function createStageCapability(
     // wheel pass their own pointer to zoomAround — physics beats policy).
     zoomIn: () => api.zoomAround(alignPoint(ctx.getState().zoomAlign, vp()), 1.2),
     zoomOut: () => api.zoomAround(alignPoint(ctx.getState().zoomAlign, vp()), 1 / 1.2),
-    zoomTo: (spec) => api.update({ zoom: spec }),
-    fitWidth: () => api.update({ zoom: { mode: S.ZoomMode.FitWidth } }),
-    fitPage: () => api.update({ zoom: { mode: S.ZoomMode.FitPage } }),
-    fitAll: () => api.update({ zoom: { mode: S.ZoomMode.FitAll } }),
-    automatic: () => api.update({ zoom: { mode: S.ZoomMode.Automatic } }),
+    zoomTo: (zoom, options) => {
+      if (typeof zoom === 'number') {
+        if (options?.around) api.zoomAround(options.around, zoom / cam().zoom);
+        else api.updateSettings({ zoom: { level: zoom } });
+        return;
+      }
+      api.updateSettings({ zoom });
+    },
+    zoomBy: (factor, options) =>
+      api.zoomAround(options?.around ?? alignPoint(ctx.getState().zoomAlign, vp()), factor),
+    fitWidth: () => api.updateSettings({ zoom: { mode: S.ZoomMode.FitWidth } }),
+    fitPage: () => api.updateSettings({ zoom: { mode: S.ZoomMode.FitPage } }),
+    fitAll: () => api.updateSettings({ zoom: { mode: S.ZoomMode.FitAll } }),
+    fitAutomatic: () => api.updateSettings({ zoom: { mode: S.ZoomMode.Automatic } }),
     refit: () => {
       // The page geometry changed underneath us (rotate/move/delete). Treat it
       // exactly like a viewport resize: re-resolve the active zoom intent and
@@ -1410,8 +1483,21 @@ export function createStageCapability(
       cancelAnim();
       reapply(currentAnchor());
     },
-    goToPage: (pageIndex, opts) => goToTarget(pageIndex, opts),
-    reveal: (pageIndex, opts) => {
+    goToPageIndex: (pageIndex, opts) => goToTarget(pageIndex, opts),
+    goToPage: (page, opts) => {
+      const index = indexOfPage(page);
+      if (index >= 0) goToTarget(index, opts);
+    },
+    goToFirstPage: (opts) => goToTarget(0, opts),
+    goToLastPage: (opts) => goToTarget(Math.max(0, (ctx.document()?.pageCount ?? 1) - 1), opts),
+    canGoNext: () => ctx.getState().cursor < (ctx.document()?.pageCount ?? 0) - 1,
+    canGoPrevious: () => ctx.getState().cursor > 0,
+    reveal: (page, opts) => {
+      const index = indexOfPage(page);
+      if (index >= 0) api.revealIndex(index, opts);
+    },
+    revealRect: (page, rect, opts) => api.reveal(page, { ...opts, rect }),
+    revealIndex: (pageIndex, opts) => {
       markCause('programmatic');
       const doc = ctx.document();
       if (!doc || doc.pageCount === 0) return;
@@ -1518,40 +1604,29 @@ export function createStageCapability(
         });
       }
     },
-    next: (opts) => step(1, opts),
-    prev: (opts) => step(-1, opts),
-    lensId: () => ctx.id,
-    update: (patch) => {
+    nextPage: (opts) => step(1, opts),
+    previousPage: (opts) => step(-1, opts),
+    getLensId: () => ctx.id,
+    updateSettings: (patch) => {
       // Writes the responsive BASE; the resolver decides what actually lands
       // (a matching rule's key wins until its rule stops matching). With no
       // rules in play this degenerates to exactly the old direct update.
       base = mergeSettings(base, patch);
       syncResponsive(true);
     },
-    setResponsive: (next) => {
+    setResponsiveRules: (next) => {
       rules = next;
       syncResponsive(true);
     },
-    matches: (name) => ctx.getState().activeRules.includes(name),
-    activeRules: () => ctx.getState().activeRules,
-    setFlow: (flow) => api.update({ flow }),
-    setLayout: (layout) => api.update({ layout }),
-    setSpread: (spread) => api.update({ spread }),
-    setSizing: (sizing) => api.update({ sizing }),
-    setColumns: (columns) => api.update({ columns }),
-    setBounded: (bounded) => api.update({ bounded }),
-    setPadding: (padding) => api.update({ padding }),
-    setGap: (gap) => api.update({ gap }),
-    setPageFrame: (pageFrame) => api.update({ pageFrame }),
-    setFitAlign: (fitAlign) => api.update({ fitAlign }),
-    setArrivalAlign: (arrivalAlign) => api.update({ arrivalAlign }),
-    setZoomAlign: (zoomAlign) => api.update({ zoomAlign }),
-    setAnchorAlign: (anchorAlign) => api.update({ anchorAlign }),
-    setDirection: (direction) => api.update({ direction }),
-    setViewRotation: (viewRotation) => api.update({ viewRotation }),
-    rotateView: (delta) =>
+    matchesRule: (name) => ctx.getState().activeRules.includes(name),
+    listActiveRules: () => ctx.getState().activeRules,
+    setFlow: (flow) => api.updateSettings({ flow }),
+    setLayout: (layout) => api.updateSettings({ layout }),
+    setSpread: (spread) => api.updateSettings({ spread }),
+    setSizing: (sizing) => api.updateSettings({ sizing }),
+    setViewRotation: (viewRotation) => api.updateSettings({ viewRotation }),
+    rotateViewBy: (delta) =>
       api.setViewRotation(addRotations(ctx.getState().viewRotation, delta === 90 ? 90 : 270)),
-    setScrollBehavior: (behavior) => api.update({ scrollBehavior: behavior }),
     applyViewState: (view) => {
       cancelAnim();
       // A restored view is app-level state: it writes the BASE, and the rules
@@ -1567,7 +1642,12 @@ export function createStageCapability(
       applyAnchor(view.anchor);
     },
     provideInitialView: (priority, fn) => {
-      initialViewProviders.push({ priority, fn });
+      const entry = { priority, fn };
+      initialViewProviders.push(entry);
+      return () => {
+        const i = initialViewProviders.indexOf(entry);
+        if (i >= 0) initialViewProviders.splice(i, 1);
+      };
     },
     placeInitial: () => {
       placementStarted = true;
@@ -1589,6 +1669,12 @@ export function createStageCapability(
     // Home = page 0, a fresh arrival at arrivalAlign (the clamp collapses any
     // fitting axis to its fitAlign rest point).
     resetView: () => goToTarget(0, { behavior: 'instant' }),
+    onPageChanged: pageChanged.on,
+    onZoomChanged: zoomChanged.on,
+    onCameraChanged: cameraChanged.on,
+    onMotionEnded: motionEnded.on,
+    onSettingsChanged: settingsChanged.on,
+    onViewportChanged: viewportChanged.on,
   };
   return api;
 }

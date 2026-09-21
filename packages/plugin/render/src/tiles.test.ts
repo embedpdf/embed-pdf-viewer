@@ -4,7 +4,6 @@ import {
   inflateRect,
   regionCovered,
   snapToPyramid,
-  tileEngineRect,
   tileGrid,
   tilePaintRect,
   tilesInRect,
@@ -49,13 +48,6 @@ describe('tile grid math (aligned ×2 pyramid)', () => {
     expect(tilePaintRect(grid, PAGE, { ix: 9, iy: 0 }).width).toBeCloseTo(36);
     // Bottom-edge row: 792 - 12×64 = 24pt tall.
     expect(tilePaintRect(grid, PAGE, { ix: 0, iy: 12 }).height).toBeCloseTo(24);
-  });
-
-  it('engine rects are the same tiles flipped to PDF y-up (top > bottom)', () => {
-    const grid = tileGrid(PAGE, 8, 512);
-    const rect = tileEngineRect(grid, PAGE, { ix: 0, iy: 0 });
-    expect(rect).toEqual({ left: 0, right: 64, top: 792, bottom: 792 - 64 });
-    expect(rect.top).toBeGreaterThan(rect.bottom);
   });
 
   it('regionCovered is index arithmetic over the want grid', () => {

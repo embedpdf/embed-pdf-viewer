@@ -6,19 +6,23 @@
  */
 import { describe, expect, it, vi } from 'vitest';
 import type {
-  InteractionCapability,
+  InteractionHostCapability,
   PlatformFeedback,
   PointerSample,
-} from '@embedpdf/plugin-interaction';
+} from '@embedpdf/plugin-interaction/contract/host';
 import { toPageRef } from '@embedpdf/engine-core/runtime';
 import { createTextSelectHandler } from './handler';
-import type { SelectionHostCapability } from './types';
+import type { SelectionHostCapability } from './host-contract';
 
-const interaction = { setCursor: () => {} } as unknown as InteractionCapability;
+const interaction = { claimCursor: () => {} } as unknown as InteractionHostCapability;
 
 function makeSelection(overText = true) {
   const calls: string[] = [];
   const selection = {
+    canSelect: () => true,
+    beginGesture: () => calls.push('begin'),
+    endGesture: () => calls.push('end'),
+    ensureLoaded: () => Promise.resolve(),
     clear: () => calls.push('clear'),
     isOverText: () => overText,
     selectWordAt: () => {
@@ -29,9 +33,8 @@ function makeSelection(overText = true) {
       calls.push('line');
       return overText;
     },
-    beginAt: () => true,
+    beginGestureAt: () => true,
     extendTo: () => calls.push('extend'),
-    end: () => calls.push('end'),
   } as unknown as SelectionHostCapability;
   return { selection, calls };
 }

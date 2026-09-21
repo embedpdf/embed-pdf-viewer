@@ -75,7 +75,7 @@ export interface SignerRow {
  */
 export function useSignerRows(): SignerRow[] {
   const libraries = useStampLibraries({ kind: SIGNATURES_LIBRARY_KIND });
-  const assets = useSelector(StampToken, (c) => c.assets(), shallowArray);
+  const assets = useSelector(StampToken, (c) => c.listAssets(), shallowArray);
   return useMemo(
     () =>
       libraries.map((library) => {

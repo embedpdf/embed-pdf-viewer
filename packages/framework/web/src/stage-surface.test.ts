@@ -16,7 +16,14 @@ function surfaceHarness(opts: { hub?: boolean; source?: string } = {}) {
     clientHeight: 600,
     addEventListener: (t: string, fn: (e: unknown) => void) => elListeners.set(t, fn),
     removeEventListener: (t: string) => elListeners.delete(t),
-    getBoundingClientRect: () => ({ left: 10, top: 20, right: 810, bottom: 620, width: 800, height: 600 }),
+    getBoundingClientRect: () => ({
+      left: 10,
+      top: 20,
+      right: 810,
+      bottom: 620,
+      width: 800,
+      height: 600,
+    }),
   } as unknown as HTMLElement;
 
   const observed: unknown[] = [];
@@ -60,26 +67,36 @@ function surfaceHarness(opts: { hub?: boolean; source?: string } = {}) {
     beginGesture: vi.fn(),
     endGesture: vi.fn(),
     fling: vi.fn(),
-    cameraInMotion: vi.fn(() => false),
+    isMoving: vi.fn(() => false),
     doubleTapZoom: vi.fn(),
-    setViewport: vi.fn(),
+    setViewportSize: vi.fn(),
     setDevicePixelRatio: vi.fn(),
-    pageAt: vi.fn((pt: { x: number; y: number }) => ({ ref: PAGE_7, point: pt, scale: 1.5 })),
-    pointOnPage: vi.fn(() => ({ x: 1, y: 2 })),
+    getPageAt: vi.fn((pt: { x: number; y: number }) => ({ ref: PAGE_7, point: pt, scale: 1.5 })),
+    viewportToPage: vi.fn(() => ({ x: 1, y: 2 })),
   } satisfies StageSurfaceHost & Record<string, unknown>;
 
   const dispatched: StageSurfaceSample[] = [];
   const hub: StageSurfaceHub | null = opts.hub
     ? {
-        dispatch: (s) => dispatched.push(s),
-        activeTool: () => ({}),
+        dispatchPointer: (s: StageSurfaceSample) => dispatched.push(s),
+        getActiveTool: () => ({}),
         wouldClaimTouch: () => false,
       }
     : null;
 
   const detach = createStageSurface(el, host, { hub, source: opts.source });
-  return { el, elListeners, win, host, hub, dispatched, detach, mqListeners,
-    roCallback: () => roCallback?.(), roDisconnectedRef: () => roDisconnected };
+  return {
+    el,
+    elListeners,
+    win,
+    host,
+    hub,
+    dispatched,
+    detach,
+    mqListeners,
+    roCallback: () => roCallback?.(),
+    roDisconnectedRef: () => roDisconnected,
+  };
 }
 
 afterEach(() => vi.unstubAllGlobals());
@@ -87,10 +104,10 @@ afterEach(() => vi.unstubAllGlobals());
 describe('createStageSurface', () => {
   it('reports the viewport immediately and again on every resize', () => {
     const h = surfaceHarness();
-    expect(h.host.setViewport).toHaveBeenCalledWith({ width: 800, height: 600 });
+    expect(h.host.setViewportSize).toHaveBeenCalledWith({ width: 800, height: 600 });
     (h.el as unknown as { clientWidth: number }).clientWidth = 500;
     h.roCallback();
-    expect(h.host.setViewport).toHaveBeenLastCalledWith({ width: 500, height: 600 });
+    expect(h.host.setViewportSize).toHaveBeenLastCalledWith({ width: 500, height: 600 });
   });
 
   it('reports the device pixel ratio and re-subscribes when dppx moves', () => {
@@ -104,9 +121,17 @@ describe('createStageSurface', () => {
   it('normalizes pointer events into page-resolved, source-stamped samples', () => {
     const h = surfaceHarness({ hub: true, source: 'stage-main' });
     h.elListeners.get('pointerdown')!({
-      pointerId: 1, pointerType: 'mouse', button: 0, buttons: 1,
-      clientX: 110, clientY: 220, detail: 1,
-      shiftKey: false, altKey: false, ctrlKey: false, metaKey: false,
+      pointerId: 1,
+      pointerType: 'mouse',
+      button: 0,
+      buttons: 1,
+      clientX: 110,
+      clientY: 220,
+      detail: 1,
+      shiftKey: false,
+      altKey: false,
+      ctrlKey: false,
+      metaKey: false,
       preventDefault() {},
     });
     expect(h.dispatched).toHaveLength(1);
@@ -122,9 +147,17 @@ describe('createStageSurface', () => {
   it('omits the source when none is configured (single-lens embeds)', () => {
     const h = surfaceHarness({ hub: true });
     h.elListeners.get('pointerdown')!({
-      pointerId: 1, pointerType: 'mouse', button: 0, buttons: 1,
-      clientX: 50, clientY: 50, detail: 1,
-      shiftKey: false, altKey: false, ctrlKey: false, metaKey: false,
+      pointerId: 1,
+      pointerType: 'mouse',
+      button: 0,
+      buttons: 1,
+      clientX: 50,
+      clientY: 50,
+      detail: 1,
+      shiftKey: false,
+      altKey: false,
+      ctrlKey: false,
+      metaKey: false,
       preventDefault() {},
     });
     expect(h.dispatched[0].source).toBeUndefined();

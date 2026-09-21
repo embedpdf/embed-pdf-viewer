@@ -18,7 +18,7 @@ import { annotationPlugin } from '@embedpdf/plugin-annotation';
 import { renderPlugin } from '@embedpdf/plugin-render';
 import { pageEditPlugin } from '@embedpdf/plugin-page-edit';
 import { metadataPlugin } from '@embedpdf/plugin-metadata';
-import { formPlugin, fieldKeyOf } from '@embedpdf/plugin-form';
+import { formPlugin } from '@embedpdf/plugin-form';
 import type { FormFieldPatch } from '@embedpdf/plugin-form';
 import { searchPlugin, validateSearchRegex, SearchToken } from '@embedpdf/plugin-search';
 import { stampPlugin } from '@embedpdf/plugin-stamp';
@@ -210,10 +210,10 @@ function AnnotationMenuBar() {
       {(canGroup || canUngroup) && (
         <span style={{ width: 1, height: 18, background: 'rgba(255,255,255,.18)' }} />
       )}
-      <button onClick={anno.deleteSelection} style={MENU_BTN}>
+      <button onClick={() => void anno.deleteSelection()} style={MENU_BTN}>
         Delete{selected.length > 1 ? ` (${selected.length})` : ''}
       </button>
-      <button onClick={anno.deselect} style={MENU_BTN}>
+      <button onClick={anno.clearSelection} style={MENU_BTN}>
         Done
       </button>
     </div>
@@ -526,7 +526,7 @@ function StampLibraryBar() {
   const importPdf = (source: Blob, name: string) => {
     setBusy(true);
     stamp
-      .importLibraryPdf(source, { name })
+      .importLibrary(source, { name })
       .catch((err) => console.error('[demo] library import failed:', err))
       .finally(() => setBusy(false));
   };
@@ -629,7 +629,7 @@ function AnnotationBar({
   // default makes a CLOSED ending (closed arrow / circle / square) solid out of the
   // box; stroke and fill stay independently editable.
   useEffect(() => {
-    annotation.setDefaults('line', {
+    annotation.setToolDefaults('line', {
       interiorColor: '#e5484d',
       lineEndings: { start: 'none', end: 'open-arrow' },
     });
@@ -923,9 +923,8 @@ function FieldPanel() {
   const form = useForm();
   const field = useFormField();
   if (!field) return null;
-  const key = fieldKeyOf(field);
   const patch = (p: Record<string, unknown>) =>
-    void form.updateField(key, { family: field.family, ...p } as FormFieldPatch);
+    void form.updateField(field.ref, { family: field.family, ...p } as FormFieldPatch);
   return (
     <div
       style={{
@@ -961,7 +960,7 @@ function FieldPanel() {
       {(field.family === 'combobox' || field.family === 'listbox') && (
         <SideField label="Options (one per line)">
           <textarea
-            key={key}
+            key={field.fieldObjectNumber}
             defaultValue={field.options.map((o) => o.label).join('\n')}
             rows={4}
             onBlur={(e) => {
@@ -981,7 +980,7 @@ function FieldPanel() {
           <button
             style={tbBtn}
             title="unlink this widget; the field keeps its other widgets"
-            onClick={() => void form.detachWidget(key, field.widgets[0]!.annotObjectNumber)}
+            onClick={() => void form.detachWidget(field.ref, field.widgets[0]!.ref!)}
           >
             ⛓ Detach widget
           </button>
@@ -989,7 +988,7 @@ function FieldPanel() {
         <button
           style={{ ...tbBtn, color: '#c0322b', borderColor: '#e3b3b0' }}
           title="delete the field and all of its widgets"
-          onClick={() => void form.deleteField(key)}
+          onClick={() => void form.deleteField(field.ref)}
         >
           🗑 Delete field
         </button>
@@ -1014,10 +1013,10 @@ function AnnotationSidebar({ onClose }: { onClose: () => void }) {
   const selCount = useAnnotationSelection().length;
 
   const hasSel = sel.specs.length > 0;
-  const specs = hasSel ? sel.specs : annotation.propsForTool(activeToolId);
+  const specs = hasSel ? sel.specs : annotation.listPropSpecs(activeToolId);
   const values: Partial<AnnotationProps> = hasSel ? sel.values : defaults;
   const write = (patch: AnnotationPropsPatch) =>
-    hasSel ? annotation.updateSelection(patch) : annotation.setDefaults(activeToolId, patch);
+    hasSel ? annotation.updateSelection(patch) : annotation.setToolDefaults(activeToolId, patch);
 
   return (
     <aside style={annoSidebar}>
@@ -1160,7 +1159,11 @@ function SearchControls() {
         title="regular expression (RE2-portable dialect)"
         onClick={() => setRegex((v) => !v)}
       />
-      <button onClick={() => search.previousHit()} title="previous match (shift+Enter)" style={tbBtn}>
+      <button
+        onClick={() => search.previousHit()}
+        title="previous match (shift+Enter)"
+        style={tbBtn}
+      >
         ↑
       </button>
       <button onClick={() => search.nextHit()} title="next match (Enter)" style={tbBtn}>
@@ -1509,7 +1512,7 @@ function ThumbnailSidebar() {
   const { currentPage, goToPage } = usePages(); // the MAIN lens
   const editor = usePageEditor(); // PERSISTED page edits (document-scoped, shared by lenses)
   const canEdit = editor.canEdit();
-  const pageCount = useSelector(ThumbsStageToken, (c) => c.pageCount()); // gates move/delete edges
+  const { pageCount } = usePages(ThumbsStageToken); // gates move/delete edges
   const [menuPage, setMenuPage] = useState<number | null>(null); // which thumb's action menu is open
   const thumbs = useStageSettings(ThumbsStageToken); // the SIDEBAR lens
   const thumbPx = 'pageWidth' in thumbs.settings.zoom ? thumbs.settings.zoom.pageWidth : 110;
@@ -1951,7 +1954,7 @@ const pickFile = (accept: string): Promise<File | null> =>
   });
 
 function FileMenu() {
-  const { open, download, downloadLayer } = useDocuments();
+  const { open, save, saveLayer } = useDocuments();
   const { views, focusedViewId } = useViews();
   const focused = views.find((v) => v.id === focusedViewId) ?? views[0];
   const targetId = focused?.activeDocumentId ?? null;
@@ -2018,7 +2021,7 @@ function FileMenu() {
     setMenu(false);
     if (!targetId) return;
     try {
-      const bytes = await downloadLayer(targetId);
+      const bytes = await saveLayer(targetId);
       saveToDisk(bytes, `${sample().id}.layer`);
       setStatus(`Saved layer (${bytes.byteLength.toLocaleString()} bytes).`);
     } catch (e) {
@@ -2029,7 +2032,7 @@ function FileMenu() {
     setMenu(false);
     if (!targetId) return;
     try {
-      const bytes = await download(targetId, { mode });
+      const bytes = await save(targetId, { mode });
       saveToDisk(bytes, `${sample().id}-${mode}.pdf`);
       setStatus(`Saved ${mode} PDF (${bytes.byteLength.toLocaleString()} bytes).`);
     } catch (e) {

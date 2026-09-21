@@ -158,7 +158,7 @@ export function createSignatureCapability(
         (s) => s.widget?.annotObjectNumber === field.annotObjectNumber,
       );
       if (byWidget) return byWidget;
-      const owner = form.fieldForWidget(field.annotObjectNumber);
+      const owner = form.getFieldForWidget({ annotObjectNumber: field.annotObjectNumber });
       return owner ? signatureOf(owner.ref) : null;
     }
     return (
@@ -180,7 +180,7 @@ export function createSignatureCapability(
     new Uint8Array((await resolveBinarySource(source)).bytes);
   const markBytes = async (mark: Mark): Promise<Uint8Array> => {
     if ('assetId' in mark) {
-      const bytes = stamp()?.assetBytes(mark.assetId);
+      const bytes = stamp()?.readAssetBytes(mark.assetId);
       if (!bytes) throw new Error(`[signature] unknown mark '${mark.assetId}'`);
       return bytes;
     }

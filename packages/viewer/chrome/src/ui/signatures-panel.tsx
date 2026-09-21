@@ -178,8 +178,8 @@ function SignerRowView({
   const stamp = useStamp();
   const [renaming, setRenaming] = useState<string | null>(null);
 
-  const exportPdf = () => {
-    const bytes = stamp.exportLibrary(row.libraryId);
+  const exportPdf = async () => {
+    const bytes = await stamp.exportLibrary(row.libraryId).catch(() => null);
     if (!bytes) return;
     const blob = new Blob([bytes as BlobPart], { type: 'application/pdf' });
     const url = URL.createObjectURL(blob);
@@ -232,7 +232,7 @@ function SignerRowView({
         </button>
         <button
           type="button"
-          onClick={() => void stamp.removeLibrary(row.libraryId)}
+          onClick={() => void stamp.deleteLibrary(row.libraryId)}
           title={t('demo.signaturesRemove')}
           className={iconButton}
         >

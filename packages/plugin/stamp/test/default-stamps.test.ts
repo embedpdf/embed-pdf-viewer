@@ -351,12 +351,12 @@ describe('@embedpdf/default-stamps', () => {
     it(`${locale}: re-imports with no overrides as the manifest described it`, async () => {
       const ctx = makeCtx(engine);
       const stamp = createStampCapability(ctx, { assetEngine: engine });
-      const libraryId = await stamp.importLibraryPdf(await libraryPdf(locale));
+      const libraryId = await stamp.importLibrary(await libraryPdf(locale));
       expect(libraryId).toBe(LIBRARY_ID);
-      const library = stamp.library(libraryId)!;
+      const library = stamp.getLibrary(libraryId)!;
       expect(library.name).toBe(EXPECTED[locale].name);
       expect(library.categories).toBeUndefined();
-      const assets = stamp.assets(libraryId);
+      const assets = stamp.listAssets({ libraryId: libraryId });
       expect(assets.map((asset) => `${asset.name}=${asset.label}`)).toEqual(EXPECTED[locale].keys);
       expect(assets.every((asset) => asset.kind === 'stamp' && asset.subject === undefined)).toBe(
         true,
@@ -367,7 +367,7 @@ describe('@embedpdf/default-stamps', () => {
       for (const asset of assets) {
         expect(asset.size.width).toBeGreaterThan(0);
         expect(asset.size.height).toBeGreaterThan(0);
-        expect(stamp.assetBytes(asset.id)?.length ?? 0).toBeGreaterThan(0);
+        expect(stamp.readAssetBytes(asset.id)?.length ?? 0).toBeGreaterThan(0);
       }
     });
   }
@@ -384,26 +384,30 @@ describe('@embedpdf/default-stamps', () => {
   it('exports what it imported: a second import of the export is identical', async () => {
     const ctx = makeCtx(engine);
     const stamp = createStampCapability(ctx, { assetEngine: engine });
-    const id = await stamp.importLibraryPdf(await libraryPdf('nl'));
-    const exported = stamp.exportLibrary(id)!;
+    const id = await stamp.importLibrary(await libraryPdf('nl'));
+    const exported = await await stamp.exportLibrary(id);
     const again = createStampCapability(makeCtx(engine), { assetEngine: engine });
-    const id2 = await again.importLibraryPdf(exported);
+    const id2 = await again.importLibrary(exported);
     expect(id2).toBe(id);
-    expect(again.library(id2)!.name).toBe(EXPECTED.nl.name);
-    expect(again.assets(id2).map((a) => `${a.name}=${a.label}`)).toEqual(EXPECTED.nl.keys);
+    expect(again.getLibrary(id2)!.name).toBe(EXPECTED.nl.name);
+    expect(again.listAssets({ libraryId: id2 }).map((a) => `${a.name}=${a.label}`)).toEqual(
+      EXPECTED.nl.keys,
+    );
   });
 
   it('two locales import side by side: one identity, two libraries', async () => {
     const ctx = makeCtx(engine);
     const stamp = createStampCapability(ctx, { assetEngine: engine });
-    const en = await stamp.importLibraryPdf(await libraryPdf('en'));
-    const nl = await stamp.importLibraryPdf(await libraryPdf('nl'));
+    const en = await stamp.importLibrary(await libraryPdf('en'));
+    const nl = await stamp.importLibrary(await libraryPdf('nl'));
     expect(en).toBe(LIBRARY_ID);
     expect(nl).not.toBe(en);
-    expect(stamp.library(nl)!.name).toBe(EXPECTED.nl.name);
-    expect(stamp.assets(en)).toHaveLength(17);
-    expect(stamp.assets(nl)).toHaveLength(17);
+    expect(stamp.getLibrary(nl)!.name).toBe(EXPECTED.nl.name);
+    expect(stamp.listAssets({ libraryId: en })).toHaveLength(17);
+    expect(stamp.listAssets({ libraryId: nl })).toHaveLength(17);
     // Same identifiers, different labels — the locale is the only difference.
-    expect(stamp.assets(nl).map((a) => a.name)).toEqual(stamp.assets(en).map((a) => a.name));
+    expect(stamp.listAssets({ libraryId: nl }).map((a) => a.name)).toEqual(
+      stamp.listAssets({ libraryId: en }).map((a) => a.name),
+    );
   });
 });

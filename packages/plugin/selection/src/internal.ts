@@ -11,9 +11,10 @@
  * the one cached capability instance with every method visible.
  */
 export * from './host-contract';
-export { createSelectionCapability } from './capability';
+export { createSelectionController } from './controller';
 export { createTextSelectHandler } from './handler';
-export { initialSelectionState, selectionReducer } from './reducer';
+export { initialSelectionState, reduceSelection } from './model';
+export type { GlyphPointer, SelectionAction, SelectionRange, SelectionState } from './model';
 export {
   buildSelectionPageGeometry,
   contentPointToPdf,

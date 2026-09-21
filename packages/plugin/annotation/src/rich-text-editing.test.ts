@@ -3,14 +3,14 @@
  * document, selection and the property surface do to the model and the
  * engine — the same for every framework's glue.
  */
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { AnnotationDTO, AnnotationFlags, AnnotationRef } from '@embedpdf/engine-core/runtime';
 import type { PluginContext } from '@embedpdf/core';
-
-import { createAnnotationCapability } from './capability';
-import { annotationReducer, initialAnnotationState } from './reducer';
-import type { AnnotationAction, AnnotationState } from './types';
+import type { AnnotationDTO, AnnotationFlags, AnnotationRef } from '@embedpdf/engine-core/runtime';
 import { toPageRef } from '@embedpdf/engine-core/runtime';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { createAnnotationController } from './controller';
+import { annotationReducer, initialAnnotationState } from './model';
+import type { AnnotationAction, AnnotationState } from './model';
 
 const PON = 1;
 const PAGE = toPageRef(PON);
@@ -102,7 +102,7 @@ function harness() {
     engine: { fonts: { list: () => [] } },
     tryGet: () => null,
   } as unknown as PluginContext<AnnotationState, AnnotationAction>;
-  return { capability: createAnnotationCapability(ctx), update, list, state: () => state };
+  return { capability: createAnnotationController(ctx), update, list, state: () => state };
 }
 
 async function loaded(dto: AnnotationDTO) {
@@ -129,9 +129,9 @@ describe('the editor document', () => {
   it('applies rich paragraphs optimistically and commits them, debounced', async () => {
     const h = await loaded(freeTextDTO('hello'));
     h.capability.beginTextEdit(REF);
-    h.capability.setRichText(REF, { paragraphs: [{ runs: [{ text: 'hello world' }] }] });
+    h.capability.draftRichText(REF, { paragraphs: [{ runs: [{ text: 'hello world' }] }] });
     expect(h.data().contents).toBe('hello world');
-    expect(h.capability.textItems(PAGE)[0]!.richText.paragraphs).toEqual([
+    expect(h.capability.listTextItems(PAGE)[0]!.richText.paragraphs).toEqual([
       { runs: [{ text: 'hello world' }] },
     ]);
     expect(h.update).not.toHaveBeenCalled(); // debounced
@@ -143,7 +143,7 @@ describe('the editor document', () => {
     });
     // The editor's metrics are the rich engine's from the start: line
     // advance 1.2 × size, text inset 2 × the border width.
-    const item = h.capability.textItems(PAGE)[0]!;
+    const item = h.capability.listTextItems(PAGE)[0]!;
     expect(item.css.padding).toBe(2);
   });
 
@@ -152,7 +152,7 @@ describe('the editor document', () => {
     h.update.mockResolvedValue({ updated: freeTextDTO('stale'), appearance: { changed: true } });
     h.capability.beginTextEdit(REF);
     const paragraphs = [{ runs: [{ text: 'hel', style: { weight: 700 } }, { text: 'lo' }] }];
-    h.capability.setRichText(REF, { paragraphs });
+    h.capability.draftRichText(REF, { paragraphs });
     vi.advanceTimersByTime(300);
     expect(h.update).toHaveBeenCalledWith(REF, { subtype: 'free-text', richText: { paragraphs } });
     await vi.waitFor(() => expect(h.update).toHaveBeenCalledTimes(1));
@@ -164,7 +164,7 @@ describe('the editor document', () => {
     h.capability.beginTextEdit(REF);
     h.capability.setTextSelection(REF, { start: 1, end: 3 });
     expect(h.state().textSelection).toEqual({ id: h.id, start: 1, end: 3 });
-    h.capability.setRichText(REF, { paragraphs: [{ runs: [{ text: 'bye' }] }] });
+    h.capability.draftRichText(REF, { paragraphs: [{ runs: [{ text: 'bye' }] }] });
     h.capability.endTextEdit();
     expect(h.update).toHaveBeenCalledTimes(1);
     expect(h.update).toHaveBeenCalledWith(REF, {
@@ -223,7 +223,7 @@ describe('the property surface while editing', () => {
     h.capability.toggleTextFormat('bold');
     expect(h.state().model.byId[h.id]!.text!.bold).toBe(true);
     expect(h.capability.getSelectionProps().values.bold).toBe(true);
-    expect(h.capability.textItems(PAGE)[0]!.css.fontWeight).toBe(700);
+    expect(h.capability.listTextItems(PAGE)[0]!.css.fontWeight).toBe(700);
     const bodyWrite = h.update.mock.calls.find((c) => c[1].richText?.body);
     // The COMPLETE body rides along: a partial one would mean engine
     // defaults and reset the size, face and colour.
@@ -238,7 +238,7 @@ describe('the property surface while editing', () => {
   it('keeps non-text keys on the annotation and lands the text before them', async () => {
     const h = await loaded(freeTextDTO('hello'));
     h.capability.beginTextEdit(REF);
-    h.capability.setRichText(REF, { paragraphs: [{ runs: [{ text: 'typed' }] }] });
+    h.capability.draftRichText(REF, { paragraphs: [{ runs: [{ text: 'typed' }] }] });
     h.capability.setTextSelection(REF, { start: 0, end: 5 });
     h.capability.updateSelection({ opacity: 0.5, underline: true });
     expect(h.state().model.byId[h.id]!.style.opacity).toBe(0.5);

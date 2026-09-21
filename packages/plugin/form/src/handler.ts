@@ -13,7 +13,7 @@ import {
 
 import type { Box } from './core/model';
 import { FORM_TOOL_BY_ID } from './tools';
-import type { FormCapability } from './types';
+import type { FormHostCapability } from './types';
 
 type Vec = { x: number; y: number };
 
@@ -38,7 +38,7 @@ const rectFrom = (a: Vec, b: Vec): Box => ({
  * width AND height under the shared threshold — a thin 100×2 drag is a drag.
  */
 export function createPlaceHandler(
-  form: FormCapability,
+  form: FormHostCapability,
   interaction: InteractionCapability,
   annotation: AnnotationHostCapability | null,
 ): InteractionHandler {
@@ -52,7 +52,7 @@ export function createPlaceHandler(
     onDown: (s) => {
       // No capture without a page, a known palette tool, or write permission —
       // declining lets edit/pan/text-selection act on the gesture instead.
-      if (!s.page || !FORM_TOOL_BY_ID.has(interaction.activeToolId())) return false;
+      if (!s.page || !FORM_TOOL_BY_ID.has(interaction.getActiveToolId())) return false;
       if (!form.canDesign()) return false;
       origin = { page: s.page.ref, start: s.page.point, last: s.page.point };
       return true;
@@ -68,7 +68,7 @@ export function createPlaceHandler(
       // into the annotation store directly; this is its typed seam.
       if (annotation) {
         if (Math.max(box.width, box.height) >= MIN_DRAG) {
-          annotation.setPlacementPreview(interaction.activeToolId(), origin.page, box);
+          annotation.setPlacementPreview(interaction.getActiveToolId(), origin.page, box);
         } else {
           annotation.clearPlacementPreview();
         }
@@ -79,7 +79,7 @@ export function createPlaceHandler(
       const o = origin;
       origin = null;
       annotation?.clearPlacementPreview();
-      const toolId = interaction.activeToolId();
+      const toolId = interaction.getActiveToolId();
       const tool = FORM_TOOL_BY_ID.get(toolId);
       if (!tool) return;
       // The UP sample is the final point (projection first, like every
@@ -88,32 +88,32 @@ export function createPlaceHandler(
       const end = samplePointOn(s, o.page) ?? o.last;
       const dragged = rectFrom(o.start, end);
       const isClick = dragged.width < MIN_DRAG && dragged.height < MIN_DRAG;
-      const pageBox = form.pageBox(o.page);
-      const box = isClick ? boxOfClick(o.start, tool.clickCreate, pageBox) : dragged; // placeField clamps a drag to the page
+      const pageBox = form.getPageBox(o.page);
+      const box = isClick ? boxOfClick(o.start, tool.clickCreate, pageBox) : dragged; // createField clamps a drag to the page
       form
-        .placeField({
+        .createField({
           family: tool.family,
           page: o.page,
-          box,
+          bounds: box,
           // Style from the tool's LIVE defaults when the annotation plane is
           // here to hold them (the user restyled the tool in the panel);
           // annotation-less placement uses the table's static seed — a field
           // is never invisible. One conversion, the exported boundary util.
           appearance: widgetAppearanceFromProps(
-            annotation ? annotation.currentDefaults(toolId) : tool.defaults,
+            annotation ? annotation.getToolDefaults(toolId) : tool.defaults,
           ),
         })
         .then((placed) => {
-          // Auto-select the fresh widget — placeField resolves AFTER the
+          // Auto-select the fresh widget — createField resolves AFTER the
           // annotation page reload, so the ref is selectable. Skip when the
           // world moved on (tool changed) while the engine write ran.
-          if (!annotation || interaction.activeToolId() !== toolId) return;
+          if (!annotation || interaction.getActiveToolId() !== toolId) return;
           const ref = placed.widget?.ref;
           if (!ref) return;
           annotation.select(ref);
         })
         .catch((err) => {
-          globalThis.console?.error('[form] placeField failed:', err);
+          globalThis.console?.error('[form] createField failed:', err);
         });
     },
   };

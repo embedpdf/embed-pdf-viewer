@@ -12,6 +12,7 @@ import * as React from 'react';
 import { useLayoutEffect, useMemo, useRef } from 'react';
 import { StageToken, createScrollHandler, settingsEqual } from '@embedpdf/plugin-stage';
 import type { StageCapability, VisiblePage } from '@embedpdf/plugin-stage';
+import type { StageHostCapability } from '@embedpdf/plugin-stage/contract/host';
 import { toPageRef } from '@embedpdf/core';
 import type { CapabilityToken } from '@embedpdf/core';
 
@@ -19,7 +20,7 @@ import type { CapabilityToken } from '@embedpdf/core';
  *  token to drive an additional lens (e.g. a wrapped thumbnail sidebar). */
 export type StageTokenProp = CapabilityToken<StageCapability>;
 import type { PageFrame } from '@embedpdf/core-geometry';
-import { InteractionToken } from '@embedpdf/plugin-interaction/contract';
+import { InteractionToken } from '@embedpdf/plugin-interaction/contract/host';
 import { createStageSurface } from '@embedpdf/web';
 import { ProjectorProvider, type ProjectorBinding, type ViewProjector } from './anchored';
 import {
@@ -47,7 +48,7 @@ function PageSurface({
    *  matching space, so the outer box tiles into it. */
   frame: PageFrame;
   /** The stage capability — the demand getter reads visibility LIVE off it. */
-  stage: StageCapability;
+  stage: StageHostCapability;
   render: (page: PageContextValue) => React.ReactNode;
   chrome?: (page: PageContextValue) => React.ReactNode;
 }) {
@@ -85,14 +86,14 @@ function PageSurface({
         documentId,
         // the hosting lens — per-view raster planning keys tile state by it,
         // so a thumbnail rail and the main view never fight over one plan
-        stage.lensId(),
+        stage.getLensId(),
         pageRef,
         page.pageIndex,
         frame,
         t,
         () => ref.current!.getBoundingClientRect(),
         () => {
-          const live = stage.visiblePages().find((p) => p.ref.pageObjectNumber === pon);
+          const live = stage.listVisiblePages().find((p) => p.ref.pageObjectNumber === pon);
           return live
             ? { desiredDeviceWidth: live.transform.deviceWidth, visibleRect: live.visibleRect }
             : {
@@ -214,22 +215,24 @@ export function Stage({
   className,
   style,
 }: StageProps) {
-  const stage = useCapability(token);
+  // The surface is a HOST of the lens: it reports viewport size, drives gestures and
+  // reads the lens id. The host contract is the same runtime token, typed wider.
+  const stage = useCapability(token as unknown as CapabilityToken<StageHostCapability>);
   const ix = useOptionalCapability(InteractionToken);
   const useHub = interaction && !!ix;
   // The hub's resolved cursor (text/grab/…), applied to the viewport when driving.
-  const hubCursor = useKernelValue(() => ix?.cursor() ?? 'default');
+  const hubCursor = useKernelValue(() => ix?.getCursor() ?? 'default');
   const ref = useRef<HTMLDivElement>(null);
   const docId = useDocumentId();
   // visiblePages already folds in the camera (each page carries its device-snapped
   // screenX/screenY + transform), so panning re-emits the list — no separate
   // camera subscription needed for positioning.
-  const pages = useSelector(token, (c) => c.visiblePages()); // memoized -> stable ref
+  const pages = useSelector(token, (c) => c.listVisiblePages()); // memoized -> stable ref
   // Reserved chrome bands (screen px), uniform across pages — the frame the
   // outer box reserves and `pageChrome` paints into.
   const frame = useSelector(
     token,
-    (c) => c.pageFrame(),
+    (c) => c.getSettings().pageFrame,
     (a, b) => a.top === b.top && a.right === b.right && a.bottom === b.bottom && a.left === b.left,
   );
 
@@ -241,13 +244,13 @@ export function Stage({
   const projector = useMemo<ViewProjector>(
     () => ({
       space: 'overlay',
-      toScreen: (page, rect) => stage.pageRectToScreen(page, rect),
+      toScreen: (page, rect) => stage.pageRectToViewport(page, rect),
       toScreenPoint: (page, at) => {
-        const r = stage.pageRectToScreen(page, { x: at.x, y: at.y, width: 0, height: 0 });
+        const r = stage.pageRectToViewport(page, { x: at.x, y: at.y, width: 0, height: 0 });
         return r ? { x: r.x, y: r.y } : null;
       },
       viewEnv: (page) => {
-        const t = stage.pageRect(page)?.transform;
+        const t = stage.getPageFrame(page)?.transform;
         return t ? { scale: t.viewScale, rotation: t.rotation, zoom: t.zoom } : null;
       },
     }),
@@ -265,7 +268,7 @@ export function Stage({
     // framework adapter has one feel. This component keeps only React glue.
     const detachSurface = createStageSurface(el, stage, {
       hub: useHub ? ix : null,
-      source: stage.lensId(),
+      source: stage.getLensId(),
       zoomGestures,
     });
     // Interaction opt-in lives WITH the sample source: the same knob that
@@ -274,7 +277,7 @@ export function Stage({
     const offScroll =
       useHub && ix
         ? ix.registerHandler(createScrollHandler(stage, ix, { panFallback }), {
-            source: stage.lensId(),
+            source: stage.getLensId(),
           })
         : null;
 
@@ -320,8 +323,8 @@ export function useStage(token: StageTokenProp = StageToken) {
 }
 export function useZoom(token: StageTokenProp = StageToken) {
   const s = useCapability(token);
-  const zoom = useSelector(token, (c) => c.zoomLevel());
-  const mode = useSelector(token, (c) => c.zoomMode());
+  const zoom = useSelector(token, (c) => c.getZoomLevel());
+  const mode = useSelector(token, (c) => c.getZoomMode());
   return {
     zoom,
     /** Active zoom intent: 'automatic' | 'fit-page' | 'fit-width' | 'fit-all' | 'custom'. */
@@ -331,30 +334,31 @@ export function useZoom(token: StageTokenProp = StageToken) {
     fitWidth: s.fitWidth,
     fitPage: s.fitPage,
     fitAll: s.fitAll,
-    automatic: s.automatic,
+    automatic: s.fitAutomatic,
     zoomTo: s.zoomTo,
   };
 }
 export function usePages(token: StageTokenProp = StageToken) {
   const s = useCapability(token);
-  const currentPage = useSelector(token, (c) => c.currentPage());
-  const pageCount = useSelector(token, (c) => c.pageCount());
+  const currentPage = useSelector(token, (c) => c.getCurrentPageIndex());
+  const documentId = useDocumentId();
+  const pageCount = useKernelValue((k) => k.documents.listPages(documentId ?? undefined).length);
   return {
     currentPage,
     pageCount,
-    goToPage: s.goToPage,
-    next: s.next,
-    prev: s.prev,
-    reveal: s.reveal,
+    goToPage: s.goToPageIndex,
+    next: s.nextPage,
+    prev: s.previousPage,
+    reveal: s.revealIndex,
   };
 }
 export function useLayout(token: StageTokenProp = StageToken) {
   const s = useCapability(token);
-  const flow = useSelector(token, (c) => c.flow());
-  const layout = useSelector(token, (c) => c.layout());
-  const spread = useSelector(token, (c) => c.spread());
-  const sizing = useSelector(token, (c) => c.sizing());
-  const bounded = useSelector(token, (c) => c.bounded());
+  const flow = useSelector(token, (c) => c.getSettings().flow);
+  const layout = useSelector(token, (c) => c.getSettings().layout);
+  const spread = useSelector(token, (c) => c.getSettings().spread);
+  const sizing = useSelector(token, (c) => c.getSettings().sizing);
+  const bounded = useSelector(token, (c) => c.getSettings().bounded);
   return {
     flow,
     layout,
@@ -365,16 +369,18 @@ export function useLayout(token: StageTokenProp = StageToken) {
     setLayout: s.setLayout,
     setSpread: s.setSpread,
     setSizing: s.setSizing,
-    setBounded: s.setBounded,
+    setBounded: (bounded: boolean) => s.updateSettings({ bounded }),
   };
 }
 
 /** The document's page list (with PDF labels) + the current item's pages — the
  *  data for page thumbnails / worksheet-style page tabs. */
 export function usePageList(token: StageTokenProp = StageToken) {
-  const pages = useSelector(
-    token,
-    (c) => c.pages(),
+  const documentId = useDocumentId();
+  // The page list is document truth (order, labels, sizes), so it comes from the
+  // kernel's page registry; Stage only knows which of those pages it is showing.
+  const pages = useKernelValue(
+    (k) => k.documents.listPages(documentId ?? undefined),
     (a, b) =>
       a.length === b.length &&
       a.every(
@@ -383,7 +389,7 @@ export function usePageList(token: StageTokenProp = StageToken) {
   );
   const current = useSelector(
     token,
-    (c) => c.currentItemPages(),
+    (c) => c.listCurrentItemPages().map((p) => p.index),
     (a, b) => a.length === b.length && a.every((x, i) => x === b[i]),
   );
   return { pages, currentItemPages: current };
@@ -398,6 +404,6 @@ export function useStageSettings(token: StageTokenProp = StageToken) {
   const s = useCapability(token);
   // settingsEqual derives from the plugin's settings registry — a new setting is
   // covered here automatically, without this package spelling out the shape.
-  const settings = useSelector(token, (c) => c.settings(), settingsEqual);
-  return { settings, update: s.update, reset: s.resetView };
+  const settings = useSelector(token, (c) => c.getSettings(), settingsEqual);
+  return { settings, update: s.updateSettings, reset: s.resetSettings };
 }

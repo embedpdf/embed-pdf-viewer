@@ -42,7 +42,7 @@ export function injectKernelValue<R>(
 }
 
 export function injectActiveDocumentId(): Signal<string | null> {
-  return injectKernelValue((k) => k.documents.activeId());
+  return injectKernelValue((k) => k.documents.getActiveId());
 }
 
 /** The document id for this injector subtree: the nearest `[epdfDocumentScope]`,
@@ -148,7 +148,7 @@ export function injectOptionalSelector<C, R>(
 /** The document registry (open/close/active/list), reactive — `useDocuments`.
  *  Methods late-bind the kernel, so this is construction-safe. */
 export interface EpdfDocuments {
-  docs: Signal<DocInfo[]>;
+  docs: Signal<readonly DocInfo[]>;
   activeId: Signal<string | null>;
   open: Kernel['documents']['open'];
   unlock: Kernel['documents']['unlock'];
@@ -156,22 +156,28 @@ export interface EpdfDocuments {
   setActive: Kernel['documents']['setActive'];
   move: Kernel['documents']['move'];
   swap: Kernel['documents']['swap'];
-  download: Kernel['documents']['download'];
-  downloadLayer: Kernel['documents']['downloadLayer'];
+  setOrder: Kernel['documents']['setOrder'];
+  retry: Kernel['documents']['retry'];
+  rename: Kernel['documents']['rename'];
+  save: Kernel['documents']['save'];
+  saveLayer: Kernel['documents']['saveLayer'];
 }
 
 export function injectDocuments(): EpdfDocuments {
   const host = injectKernelHost();
   return {
     docs: host.value((k) => k.documents.list(), docInfoListEquals),
-    activeId: host.value((k) => k.documents.activeId()),
+    activeId: host.value((k) => k.documents.getActiveId()),
     open: (input, options) => host.kernel.documents.open(input, options),
     unlock: (id, input) => host.kernel.documents.unlock(id, input),
     close: (id) => host.kernel.documents.close(id),
     setActive: (id) => host.kernel.documents.setActive(id),
     move: (id, toIndex) => host.kernel.documents.move(id, toIndex),
     swap: (a, b) => host.kernel.documents.swap(a, b),
-    download: (id, opts) => host.kernel.documents.download(id, opts),
-    downloadLayer: (id) => host.kernel.documents.downloadLayer(id),
+    setOrder: (ids) => host.kernel.documents.setOrder(ids),
+    retry: (id) => host.kernel.documents.retry(id),
+    rename: (id, name) => host.kernel.documents.rename(id, name),
+    save: (id, options) => host.kernel.documents.save(id, options),
+    saveLayer: (id, options) => host.kernel.documents.saveLayer(id, options),
   };
 }

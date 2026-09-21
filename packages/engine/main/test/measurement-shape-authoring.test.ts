@@ -7,11 +7,11 @@ import { measureFromKnownLength, toPageRef } from '@embedpdf/engine-core/runtime
 import { annotationSelectionFrame, shapeMeasurementLayout } from '../../../core/annotation/src';
 import { rotatePoint } from '../../../core/annotation/src/geometry';
 import { createLocalEngine } from '../src/index';
-import { createAnnotationCapability } from '../../../plugin/annotation/src/capability';
-import { annotationReducer, initialAnnotationState } from '../../../plugin/annotation/src/reducer';
+import { createAnnotationController } from '../../../plugin/annotation/src/controller';
+import { annotationReducer, initialAnnotationState } from '../../../plugin/annotation/src/model';
 import { fromDTO } from '../../../plugin/annotation/src/repository';
 import { annotationKey } from '@embedpdf/engine-core/runtime';
-import type { AnnotationAction, AnnotationState } from '../../../plugin/annotation/src/types';
+import type { AnnotationAction, AnnotationState } from '../../../plugin/annotation/src/model';
 
 describe.each(['wasm', 'native'] as const)('shape authoring integration (%s)', (prefer) => {
   test.each(['area', 'perimeter'])(
@@ -48,7 +48,7 @@ describe.each(['wasm', 'native'] as const)('shape authoring integration (%s)', (
           cleanup: (cb: () => void) => cleanups.push(cb),
           tryGet: () => null,
         } as unknown as PluginContext<AnnotationState, AnnotationAction>;
-        const annotation = createAnnotationCapability(ctx);
+        const annotation = createAnnotationController(ctx);
         const scale = measureFromKnownLength(100, { value: 5, unit: 'm' });
         await doc.page(toPageRef(pon)).measure!.setScale(scale);
         annotation.setPageViewports(
@@ -56,8 +56,8 @@ describe.each(['wasm', 'native'] as const)('shape authoring integration (%s)', (
           await doc.page(toPageRef(pon)).measure!.viewports(),
           scale,
         );
-        for (const preset of annotation.tools()) {
-          if (preset.defaults) annotation.setDefaults(preset.preset, preset.defaults);
+        for (const preset of annotation.listResolvedTools()) {
+          if (preset.defaults) annotation.setToolDefaults(preset.id, preset.defaults);
         }
         for (const point of [
           { x: 100, y: 300 },
@@ -67,23 +67,24 @@ describe.each(['wasm', 'native'] as const)('shape authoring integration (%s)', (
         ]) {
           annotation.createPointer(tool, 'down', page.ref, point);
         }
-        annotation.finishCreationDraft();
-        await vi.waitFor(() => expect(annotation.getSelected()).toHaveLength(1));
-        const created = annotation.getSelected()[0];
+        void annotation.finishCreationDraft();
+        await vi.waitFor(() => expect(annotation.listSelected()).toHaveLength(1));
+        const created = annotation.listSelected()[0].raw!;
         if (created.subtype !== 'polygon' && created.subtype !== 'polyline')
           throw new Error('Expected shape');
         const current = () => {
-          const dto = annotation.get(created.ref)!;
+          const dto = annotation.getRaw(created.ref)!;
           if (dto.subtype !== 'polygon' && dto.subtype !== 'polyline')
             throw new Error('Expected shape');
           return dto;
         };
         const expectVector = () => {
           expect(
-            annotation.pageItems(page.ref).find((item) => item.id === annotationKey(created.ref))
-              ?.source,
+            annotation
+              .listPageItems(page.ref)
+              .find((item) => item.id === annotationKey(created.ref))?.source,
           ).toBe('vector');
-          expect(annotation.appearanceEpoch(page.ref)).toBe('');
+          expect(annotation.getAppearanceEpoch(page.ref)).toBe('');
         };
         expect(created.contents).toBe(tool === 'area' ? '50 m²' : '25 m');
         expect(created.caption).toEqual({ enabled: true });
@@ -119,7 +120,7 @@ describe.each(['wasm', 'native'] as const)('shape authoring integration (%s)', (
         const before = current();
         const frame = annotationSelectionFrame(fromDTO(before, crop));
         const rotatedCaption = rotatePoint(target, frame.center, 90);
-        annotation.rotateSelection90();
+        await annotation.rotateSelectionBy(90);
         await vi.waitFor(() => {
           expect(current().rotation).toBe(270);
           expect(current().caption?.center?.x).toBeCloseTo(crop.left + rotatedCaption.x, 3);
@@ -130,7 +131,7 @@ describe.each(['wasm', 'native'] as const)('shape authoring integration (%s)', (
         });
         expectVector();
         const displacedRect = current().rect;
-        await annotation.update(created.ref, {
+        await annotation.updateRaw(created.ref, {
           subtype: created.subtype,
           caption: { center: null },
         });

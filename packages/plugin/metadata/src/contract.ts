@@ -1,5 +1,4 @@
 import {
-  createCapabilityToken,
   type ChangeOrigin,
   type DocumentMetadata,
   type EventHook,
@@ -49,6 +48,4 @@ export interface MetadataCapability {
   readonly onUpdated: EventHook<MetadataUpdatedEvent>;
 }
 
-export const MetadataToken = createCapabilityToken<MetadataCapability>('metadata', {
-  hint: "add metadataPlugin() from '@embedpdf/plugin-metadata' to your plugins list",
-});
+export { MetadataToken } from './token';

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { PageImageHandle, PdfRect } from '@embedpdf/core';
+import type { PageImageHandle } from '@embedpdf/core';
+import type { Rect } from '@embedpdf/core-geometry';
 
 import { resolveRenderOptions, type TilesOptions } from './paint-plan';
 import { RasterStore } from './raster-store';
@@ -25,7 +26,7 @@ function harness(opts?: { policy?: unknown; tiling?: TilesOptions }) {
   const store = new RasterStore(256);
   const pending: Array<{
     key: string;
-    rect: PdfRect;
+    rect: Rect;
     scale: number;
     resolve: () => void;
     fail: (err?: Error) => void;
@@ -44,7 +45,7 @@ function harness(opts?: { policy?: unknown; tiling?: TilesOptions }) {
     fetchTile: (_pon, rect, scale, _annotations, signal) =>
       new Promise<PageImageHandle>((resolve, reject) => {
         const record = {
-          key: `${rect.left},${PAGE.height - rect.top}@${scale}`,
+          key: `${rect.x},${rect.y}@${scale}`,
           rect,
           scale,
           resolve: () => resolve({ fake: record.key } as unknown as PageImageHandle),
@@ -326,8 +327,8 @@ describe('TileManager', () => {
     const h = harness({ tiling: { bleed: 1, prefetch: { margin: 0 } } });
     h.manager.plan(1, DEEP, true); // level 8 — bleed is 1/8 pt per side
     // The FETCHED region is bled: interior tiles ask for span + 2×(1/8) pt.
-    const interior = h.pending.find((p) => p.rect.left > 0)!;
-    expect(interior.rect.right - interior.rect.left).toBeCloseTo(64 + 2 / 8, 5);
+    const interior = h.pending.find((p) => p.rect.x > 0)!;
+    expect(interior.rect.width).toBeCloseTo(64 + 2 / 8, 5);
     await h.resolveAll();
     const plan = h.manager.plan(1, DEEP, true);
     // Placement rects are bled the same way — neighbors overlap …

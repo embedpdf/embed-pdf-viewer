@@ -1,7 +1,7 @@
-import { describe, expect, it } from 'vitest';
 import type { Annot, TextStyle } from '@embedpdf/core-annotation';
 import type { FontHandle, RichTextDocument } from '@embedpdf/engine-core/runtime';
 import { toPageRef } from '@embedpdf/engine-core/runtime';
+import { describe, expect, it } from 'vitest';
 
 import {
   bodyFromTextStyle,
