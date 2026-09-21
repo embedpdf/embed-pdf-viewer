@@ -27,6 +27,14 @@
         "import": "./dist/contract.js",
         "require": "./dist/contract.cjs"
       },
+      "./contract/host": {
+        "import": "./dist/contract/host.js",
+        "require": "./dist/contract/host.cjs"
+      },
+      "./internal": {
+        "import": "./dist/internal.js",
+        "require": "./dist/internal.cjs"
+      },
       "./package.json": "./package.json"
     }
   },
