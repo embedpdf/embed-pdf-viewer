@@ -3,6 +3,7 @@ export * from './kernel';
 export * from './event-hook';
 export * from './serial-queue';
 export * from './errors';
+export { composeApi } from './compose';
 export type { LatestCancellation, LatestLane, LatestRun } from './lanes';
 export { createLatestLane } from './lanes';
 export { guardHandle } from './guarded-handle';

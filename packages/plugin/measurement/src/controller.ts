@@ -4,6 +4,7 @@
  * assembles the capability from the areas' API slices. No behavior lives
  * here — every verb and read has a home in `read/`, `write/` or `sync/`.
  */
+import { composeApi } from '@embedpdf/core';
 import type { MeasurementConfig } from './contract';
 import type { MeasurementHostCapability } from './host-contract';
 import { createScaleReads } from './read/scale';
@@ -12,17 +13,6 @@ import { createViewportSync } from './sync/viewports';
 import { createCalibration } from './write/calibration';
 import { createMeasuring } from './write/create';
 import { createScaleWrites } from './write/scale';
-
-/** Every API member is defined by exactly one area — a duplicate is a wiring bug. */
-function assertDisjoint(slices: readonly object[]): void {
-  const seen = new Set<string>();
-  for (const slice of slices) {
-    for (const key of Object.keys(slice)) {
-      if (seen.has(key)) throw new Error(`[measurement] api member '${key}' is defined twice`);
-      seen.add(key);
-    }
-  }
-}
 
 export function createMeasurementController(
   ctx: MeasurementContext,
@@ -37,21 +27,20 @@ export function createMeasurementController(
   const calibration = createCalibration(ctx, services);
   const measuring = createMeasuring(services);
 
-  const slices = [reads.api, scale.api, calibration.api, measuring.api] as const;
-  assertDisjoint(slices);
-
-  const api = {
-    ...reads.api,
-    ...scale.api,
-    ...calibration.api,
-    ...measuring.api,
-    canCalibrate: store.canCalibrate,
-    ensureLoaded: viewports.ensureLoaded,
-    onScaleChanged: events.scaleChanged.on,
-    onCalibrationRequested: events.calibrationRequested.on,
-    onCalibrationCompleted: events.calibrationCompleted.on,
-    onCalibrationDismissed: events.calibrationDismissed.on,
-  } satisfies MeasurementHostCapability;
+  const api = composeApi('measurement', [
+    reads.api,
+    scale.api,
+    calibration.api,
+    measuring.api,
+    {
+      canCalibrate: store.canCalibrate,
+      ensureLoaded: viewports.ensureLoaded,
+      onScaleChanged: events.scaleChanged.on,
+      onCalibrationRequested: events.calibrationRequested.on,
+      onCalibrationCompleted: events.calibrationCompleted.on,
+      onCalibrationDismissed: events.calibrationDismissed.on,
+    },
+  ]) satisfies MeasurementHostCapability;
 
   return {
     api,

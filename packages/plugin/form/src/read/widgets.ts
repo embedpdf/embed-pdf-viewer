@@ -19,14 +19,6 @@ import {
 import type { FormHostCapability } from '../host-contract';
 import type { FormContext, FormServices } from '../services';
 
-/** PDF user-space rect (y-up) → content-space box (y-down, crop-relative). */
-const toBox = (rect: PdfRect, crop: PdfRect): Box => ({
-  x: rect.left - crop.left,
-  y: crop.top - rect.top,
-  width: rect.right - rect.left,
-  height: rect.top - rect.bottom,
-});
-
 export function createWidgetReads(
   ctx: FormContext,
   { store, authority, siblings }: Pick<FormServices, 'store' | 'authority' | 'siblings'>,
@@ -41,8 +33,9 @@ export function createWidgetReads(
     const doc = ctx.doc;
     const pon = page.pageObjectNumber;
     if (!doc || geomLoading.has(pon) || model().geom[pon]) return;
-    const crop = ctx.document()?.pages.find((p) => p.ref.pageObjectNumber === pon)?.boxes.crop;
-    if (!crop) return;
+    // The kernel's page geometry: the one PDF ↔ page conversion.
+    const space = ctx.geometry.tryForPage(page);
+    if (!space) return;
     geomLoading.add(pon);
     void doc
       .page(page)
@@ -52,7 +45,7 @@ export function createWidgetReads(
         for (const dto of annotations) {
           if (dto.subtype !== 'widget') continue;
           const objectNumber = dto.ref.kind === 'objectNumber' ? dto.ref.annotObjectNumber : 0;
-          if (objectNumber > 0) boxes[objectNumber] = toBox(dto.rect, crop);
+          if (objectNumber > 0) boxes[objectNumber] = space.pdfRectToPage(dto.rect);
         }
         apply({ t: 'pageGeom', pageObjectNumber: pon, boxes });
       })
@@ -128,11 +121,8 @@ export function createWidgetReads(
 
   /** The page's content box (`{0,0,w,h}`), for page-bound placement math. */
   const pageBox = (page: PageRef): Box | null => {
-    const pon = page.pageObjectNumber;
-    const crop = ctx.document()?.pages.find((p) => p.ref.pageObjectNumber === pon)?.boxes.crop;
-    return crop
-      ? { x: 0, y: 0, width: crop.right - crop.left, height: crop.top - crop.bottom }
-      : null;
+    const space = ctx.geometry.tryForPage(page);
+    return space ? { x: 0, y: 0, width: space.width, height: space.height } : null;
   };
 
   return {

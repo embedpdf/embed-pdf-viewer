@@ -10,6 +10,7 @@
  * Scheduler seam. See `docs/plans` for the camera model (every move is
  * defined by what it holds fixed).
  */
+import { composeApi } from '@embedpdf/core';
 import { createAnimation } from './camera/animation';
 import { createGestures } from './camera/gestures';
 import { createCameraWrite } from './camera/write';
@@ -22,17 +23,6 @@ import { createPageReads } from './read/pages';
 import { createServices, type StageContext } from './services';
 import { createSettings } from './settings/settings';
 import { createViewLifecycle } from './view/lifecycle';
-
-/** Every API member is defined by exactly one area — a duplicate is a wiring bug. */
-function assertDisjoint(slices: readonly object[]): void {
-  const seen = new Set<string>();
-  for (const slice of slices) {
-    for (const key of Object.keys(slice)) {
-      if (seen.has(key)) throw new Error(`[stage] api member '${key}' is defined twice`);
-      seen.add(key);
-    }
-  }
-}
 
 export function createStageController(
   rawCtx: StageContext,
@@ -56,7 +46,7 @@ export function createStageController(
   const zoom = createZoom(ctx, services, write, animation, gestures.api, settings);
   const view = createViewLifecycle(ctx, services, animation, arrive, settings);
 
-  const slices = [
+  const api = composeApi('stage', [
     reads.api,
     animation.api,
     gestures.api,
@@ -65,25 +55,15 @@ export function createStageController(
     settings.api,
     zoom.api,
     view.api,
-  ] as const;
-  assertDisjoint(slices);
-
-  const api = {
-    ...reads.api,
-    ...animation.api,
-    ...gestures.api,
-    ...arrive.api,
-    ...reveal.api,
-    ...settings.api,
-    ...zoom.api,
-    ...view.api,
-    // The change hooks are services, not areas.
-    onPageChanged: events.pageChanged.on,
-    onZoomChanged: events.zoomChanged.on,
-    onCameraChanged: events.cameraChanged.on,
-    onMotionEnded: events.motionEnded.on,
-    onSettingsChanged: events.settingsChanged.on,
-    onViewportChanged: events.viewportChanged.on,
-  } satisfies StageHostCapability;
+    {
+      // The change hooks are services, not areas.
+      onPageChanged: events.pageChanged.on,
+      onZoomChanged: events.zoomChanged.on,
+      onCameraChanged: events.cameraChanged.on,
+      onMotionEnded: events.motionEnded.on,
+      onSettingsChanged: events.settingsChanged.on,
+      onViewportChanged: events.viewportChanged.on,
+    },
+  ]) satisfies StageHostCapability;
   return api;
 }

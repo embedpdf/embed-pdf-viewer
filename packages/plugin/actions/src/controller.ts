@@ -5,6 +5,7 @@
  * lives here — every verb and read has a home in `submit/`, `scripting/`,
  * `dispatch/` or `lifecycle/`.
  */
+import { composeApi } from '@embedpdf/core';
 import type { ActionsConfig } from './contract';
 import type { DispatchCore } from './dispatch/core';
 import { createDispatcher } from './dispatch/dispatcher';
@@ -19,17 +20,6 @@ import { createRealm } from './scripting/realm';
 import { createScriptSurface } from './scripting/surface';
 import { createServices, type ActionsContext } from './services';
 import { createSubmit } from './submit/perform';
-
-/** Every API member is defined by exactly one area — a duplicate is a wiring bug. */
-function assertDisjoint(slices: readonly object[]): void {
-  const seen = new Set<string>();
-  for (const slice of slices) {
-    for (const key of Object.keys(slice)) {
-      if (seen.has(key)) throw new Error(`[actions] api member '${key}' is defined twice`);
-      seen.add(key);
-    }
-  }
-}
 
 export function createActionsController(
   ctx: ActionsContext,
@@ -64,7 +54,7 @@ export function createActionsController(
   registerScriptExecutor(ctx, services, config, realm, submit, surface, documentEvents);
   openSequence.arm();
 
-  const slices = [
+  const api = composeApi('actions', [
     policy.api,
     ports.api,
     realm.api,
@@ -73,24 +63,14 @@ export function createActionsController(
     openSequence.api,
     documentEvents.api,
     dispatcher.api,
-  ] as const;
-  assertDisjoint(slices);
-
-  const api = {
-    ...policy.api,
-    ...ports.api,
-    ...realm.api,
-    ...surface.api,
-    ...pageLifecycle.api,
-    ...openSequence.api,
-    ...documentEvents.api,
-    ...dispatcher.api,
-    // The observability hooks are services, not areas.
-    onExecuted: events.actionHook.on,
-    onDiagnostic: events.diagnosticHook.on,
-    onScriptDiagnostic: events.scriptDiagnosticHook.on,
-    onScriptError: events.scriptErrorHook.on,
-    onOpenSequenceCompleted: events.openSequenceHook.on,
-  } satisfies ActionsHostCapability;
+    {
+      // The observability hooks are services, not areas.
+      onExecuted: events.actionHook.on,
+      onDiagnostic: events.diagnosticHook.on,
+      onScriptDiagnostic: events.scriptDiagnosticHook.on,
+      onScriptError: events.scriptErrorHook.on,
+      onOpenSequenceCompleted: events.openSequenceHook.on,
+    },
+  ]) satisfies ActionsHostCapability;
   return api;
 }

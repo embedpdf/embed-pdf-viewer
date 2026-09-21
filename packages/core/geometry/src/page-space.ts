@@ -76,3 +76,24 @@ export function pageSpace(crop: PdfEdges): PageSpace {
     pageQuadToPdf: (quad) => applyQuad(toPdf, quad as QuadIn<'content'>),
   };
 }
+
+/** Positive-area overlap of two PDF rects given by their edges — the engine's
+ *  collateral rule (a redaction touches what it overlaps, not what it abuts). */
+export function edgesOverlap(a: PdfEdges, b: PdfEdges): boolean {
+  return (
+    Math.min(a.right, b.right) > Math.max(a.left, b.left) &&
+    Math.min(a.top, b.top) > Math.max(a.bottom, b.bottom)
+  );
+}
+
+/** The axis-aligned PDF edges enclosing a quad — the box a quad's text cell occupies. */
+export function edgesOfQuad(quad: Quad): PdfEdges {
+  const xs = [quad.p1.x, quad.p2.x, quad.p3.x, quad.p4.x];
+  const ys = [quad.p1.y, quad.p2.y, quad.p3.y, quad.p4.y];
+  return {
+    left: Math.min(...xs),
+    right: Math.max(...xs),
+    bottom: Math.min(...ys),
+    top: Math.max(...ys),
+  };
+}

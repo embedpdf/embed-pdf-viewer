@@ -4,6 +4,7 @@
  * assembles the capability from the areas' API slices. No behavior lives
  * here — every verb and read has a home in `read/`, `write/` or `sync/`.
  */
+import { composeApi } from '@embedpdf/core';
 import type { SignatureConfig } from './contract';
 import type { SignatureHostCapability } from './host-contract';
 import { createSignatureReads } from './read/signatures';
@@ -13,17 +14,6 @@ import { createHydration } from './sync/hydration';
 import { createFills } from './write/fill';
 import { createPlacement, createTarget } from './write/place';
 import { createSigning } from './write/sign';
-
-/** Every API member is defined by exactly one area — a duplicate is a wiring bug. */
-function assertDisjoint(slices: readonly object[]): void {
-  const seen = new Set<string>();
-  for (const slice of slices) {
-    for (const key of Object.keys(slice)) {
-      if (seen.has(key)) throw new Error(`[signature] api member '${key}' is defined twice`);
-      seen.add(key);
-    }
-  }
-}
 
 function build(ctx: SignatureContext, config: SignatureConfig) {
   const services = createServices(ctx, config);
@@ -41,37 +31,29 @@ function build(ctx: SignatureContext, config: SignatureConfig) {
   const fills = createFills(ctx, services, reads, target);
   const placement = createPlacement(services, config, signing, fills);
 
-  const slices = [
+  const api = composeApi('signature', [
     reads.api,
     hydration.api,
     target.api,
     signing.api,
     fills.api,
     placement.api,
-  ] as const;
-  assertDisjoint(slices);
-
-  const api = {
-    ...reads.api,
-    ...hydration.api,
-    ...target.api,
-    ...signing.api,
-    ...fills.api,
-    ...placement.api,
-    // Authority twins and the change hooks are services, not areas.
-    canSign: authority.canSign,
-    canFill: authority.canFill,
-    canCertify: authority.canCertify,
-    onSigned: events.signed.on,
-    onFilled: events.filled.on,
-    onCleared: events.cleared.on,
-    onValidated: events.validated.on,
-    onProtectionChanged: events.protectionChanged.on,
-    onInvalidating: events.invalidating.on,
-    onTargetChanged: events.targetChanged.on,
-    onSignRequested: events.signRequested.on,
-    onInspectionRequested: events.inspectionRequested.on,
-  } satisfies SignatureHostCapability;
+    {
+      // Authority twins and the change hooks are services, not areas.
+      canSign: authority.canSign,
+      canFill: authority.canFill,
+      canCertify: authority.canCertify,
+      onSigned: events.signed.on,
+      onFilled: events.filled.on,
+      onCleared: events.cleared.on,
+      onValidated: events.validated.on,
+      onProtectionChanged: events.protectionChanged.on,
+      onInvalidating: events.invalidating.on,
+      onTargetChanged: events.targetChanged.on,
+      onSignRequested: events.signRequested.on,
+      onInspectionRequested: events.inspectionRequested.on,
+    },
+  ]) satisfies SignatureHostCapability;
   return { api, hydration };
 }
 

@@ -3,6 +3,7 @@
  * memoized on the annotation plane's own reference-stable lists, plus the
  * client-side collateral estimate.
  */
+import { edgesOfQuad, edgesOverlap } from '@embedpdf/core-geometry';
 import { annotationKey } from '@embedpdf/core';
 import type { AnnotationDTO, AnnotationRef, PageRef, PdfRect } from '@embedpdf/engine-core';
 
@@ -17,24 +18,8 @@ import type { RedactionServices } from '../services';
 type RedactDTO = Extract<AnnotationDTO, { subtype: 'redact' }>;
 
 /** The PDF-space regions a redact mark targets: its quads' boxes, else `/Rect`. */
-function regionsOf(dto: RedactDTO): PdfRect[] {
-  if (dto.quadPoints.length === 0) return [dto.rect];
-  return dto.quadPoints.map((q) => {
-    const xs = [q.p1.x, q.p2.x, q.p3.x, q.p4.x];
-    const ys = [q.p1.y, q.p2.y, q.p3.y, q.p4.y];
-    return {
-      left: Math.min(...xs),
-      right: Math.max(...xs),
-      bottom: Math.min(...ys),
-      top: Math.max(...ys),
-    };
-  });
-}
-
-/** Positive-area intersection — the engine's collateral rule. */
-const intersects = (a: PdfRect, b: PdfRect): boolean =>
-  Math.min(a.right, b.right) > Math.max(a.left, b.left) &&
-  Math.min(a.top, b.top) > Math.max(a.bottom, b.bottom);
+const regionsOf = (dto: RedactDTO): readonly PdfRect[] =>
+  dto.quadPoints.length === 0 ? [dto.rect] : dto.quadPoints.map(edgesOfQuad);
 
 const EMPTY: readonly RedactionMark[] = [];
 
@@ -103,7 +88,7 @@ export function createPendingReads({
       const regions = marks.flatMap(regionsOf);
       for (const other of all) {
         if (other.subtype === 'redact') continue;
-        if (regions.some((r) => intersects(r, other.rect))) hits.push(other.ref);
+        if (regions.some((r) => edgesOverlap(r, other.rect))) hits.push(other.ref);
       }
     }
     return { count: hits.length, refs: hits };

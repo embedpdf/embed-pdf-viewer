@@ -1,13 +1,14 @@
+import { pageSpace } from '@embedpdf/core-geometry';
 import type { Rect, ViewEnv } from '@embedpdf/core-annotation';
 import type { PdfRect } from '@embedpdf/engine-core/runtime';
 
 import type { AnnotationContext } from './context';
 
 /** A page's size in page (content) units, from its crop box. */
-export const pageSizeOf = (crop: PdfRect): { width: number; height: number } => ({
-  width: crop.right - crop.left,
-  height: crop.top - crop.bottom,
-});
+export const pageSizeOf = (crop: PdfRect): { width: number; height: number } => {
+  const { width, height } = pageSpace(crop);
+  return { width, height };
+};
 
 /** Fold `zoom`/`rotation` host args into the core's ViewEnv (or none).
  *  `zoom` is the page's RELATIVE zoom (`transform.zoom`) — never the
@@ -17,9 +18,9 @@ export const viewEnv = (zoom?: number, rotation?: number): ViewEnv | undefined =
     ? { zoom: zoom ?? 1, rotation: (rotation ?? 0) as ViewEnv['rotation'] }
     : undefined;
 
-/** Page geometry as the document registry reports it: the crop box every
- *  PDF ⇄ page conversion in this plugin goes through. */
-export function createPageGeometry(ctx: Pick<AnnotationContext, 'document'>) {
+/** The crop box per page, as the document registry reports it — the input to
+ *  `pageSpace` wherever this plugin converts outside the kernel's `ctx.geometry`. */
+export function createCropLookup(ctx: Pick<AnnotationContext, 'document'>) {
   const cropOf = (pon: number): PdfRect | null =>
     ctx.document()?.pages.find((p) => p.ref.pageObjectNumber === pon)?.boxes.crop ?? null;
   /** The page's box in content space (origin at the crop top-left) — the box
@@ -31,4 +32,4 @@ export function createPageGeometry(ctx: Pick<AnnotationContext, 'document'>) {
   return { cropOf, pageBoxOf };
 }
 
-export type PageGeometry = ReturnType<typeof createPageGeometry>;
+export type CropLookup = ReturnType<typeof createCropLookup>;

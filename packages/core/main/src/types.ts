@@ -294,7 +294,13 @@ export interface ControllerContext<S, A extends Action = Action> extends PluginC
     source<T>(): { readonly on: EventHook<T>; emit(event: T): void; dispose(): void };
   };
   /** The one owner of page ↔ PDF conversion for a page of THIS document. */
-  readonly geometry: { forPage(ref: PageRef): PageSpace };
+  /** Page ↔ PDF conversion for a page of this document, cached per registry
+   *  revision. `forPage` throws `not-found` for a foreign ref; `tryForPage`
+   *  answers null (reads that tolerate a page not laid out yet). */
+  readonly geometry: {
+    forPage(ref: PageRef): PageSpace;
+    tryForPage(ref: PageRef): PageSpace | null;
+  };
   /** Subscribe for the instance lifetime; the unsubscribe is owned by the kernel. */
   listen<T>(source: Subscribable<T>, listener: (event: T) => void): void;
   /** Resolve when the predicate holds (checked on every store change); rejects on cancel or close. */

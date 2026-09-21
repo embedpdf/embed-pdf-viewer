@@ -4,7 +4,7 @@ import { createAuthority, type Authority } from './authority';
 import type { AnnotationContext } from './context';
 import { createAnnotationEvents, type AnnotationEvents } from './events';
 import { createFilePickerPort, type FilePickerPort } from './file-picker';
-import { createPageGeometry, type PageGeometry } from './geometry';
+import { createCropLookup, type CropLookup } from './geometry';
 import { createRecords, type Records } from './records';
 import { createStore, type AnnotationStore } from './store';
 import { createWriteSink, type WriteSink } from './write-sink';
@@ -22,7 +22,7 @@ export type { AnnotationContext } from './context';
 export interface AnnotationServices {
   readonly events: AnnotationEvents;
   readonly store: AnnotationStore;
-  readonly geometry: PageGeometry;
+  readonly geometry: CropLookup;
   readonly authority: Authority;
   readonly records: Records;
   readonly writes: WriteSink;
@@ -40,7 +40,7 @@ export function createServices(
 ): AnnotationServices {
   const events = createAnnotationEvents(ctx);
   const store = createStore(ctx, events);
-  const geometry = createPageGeometry(ctx);
+  const geometry = createCropLookup(ctx);
   return {
     events,
     store,

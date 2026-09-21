@@ -38,17 +38,6 @@ export function createFieldWrites(
     }
   };
 
-  /** Content-space box → PDF rect (inverse of `toBox`). */
-  const toPdfRect = (
-    box: { x: number; y: number; width: number; height: number },
-    crop: PdfRect,
-  ): PdfRect => ({
-    left: box.x + crop.left,
-    top: crop.top - box.y,
-    right: box.x + crop.left + box.width,
-    bottom: crop.top - box.y - box.height,
-  });
-
   /** Deterministic, collision-free auto-name: `text_1`, `text_2`, … counted
    *  against the CURRENT snapshot (rename in the field panel). */
   const autoName = (family: string): string => {
@@ -62,8 +51,8 @@ export function createFieldWrites(
     const doc = ctx.doc;
     const page = input.page;
     const pon = page.pageObjectNumber;
-    const crop = ctx.document()?.pages.find((p) => p.ref.pageObjectNumber === pon)?.boxes.crop;
-    if (!doc || !crop) {
+    const space = ctx.geometry.tryForPage(page);
+    if (!doc || !space) {
       throw new PluginError('not-ready', 'form', 'createField: document/page not ready');
     }
     // Placement is page-bound: intersect a (possibly overshooting) drag box
@@ -89,7 +78,7 @@ export function createFieldWrites(
     const name = input.name ?? autoName(family);
     const placement = {
       page,
-      rect: toPdfRect(box, crop),
+      rect: space.pageRectToPdf(box),
       ...(appearance ? { appearance } : {}),
     };
     const draft: FormFieldDraft =

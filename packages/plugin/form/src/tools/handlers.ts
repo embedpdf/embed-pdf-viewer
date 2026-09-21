@@ -1,3 +1,4 @@
+import { rectFromCorners } from '@embedpdf/core-geometry';
 import {
   MIN_DRAG,
   resolveClickPlacement,
@@ -16,13 +17,6 @@ import { FORM_TOOL_BY_ID } from './definitions';
 import type { FormHostCapability } from '../host-contract';
 
 type Vec = { x: number; y: number };
-
-const rectFrom = (a: Vec, b: Vec): Box => ({
-  x: Math.min(a.x, b.x),
-  y: Math.min(a.y, b.y),
-  width: Math.abs(b.x - a.x),
-  height: Math.abs(b.y - a.y),
-});
 
 /**
  * Draw-to-place: drag a box (live placement preview through the annotation
@@ -62,7 +56,7 @@ export function createPlaceHandler(
       const point = samplePointOn(s, origin.page);
       if (!point) return;
       origin.last = point;
-      const box = rectFrom(origin.start, point);
+      const box = rectFromCorners(origin.start, point);
       // Live preview once the gesture reads as a drag — the WYSIWYG white box
       // (tool defaults) through the annotation ghost pipeline. Never dispatch
       // into the annotation store directly; this is its typed seam.
@@ -86,7 +80,7 @@ export function createPlaceHandler(
       // page-anchored gesture); a release over the gap falls back to the
       // last resolved point.
       const end = samplePointOn(s, o.page) ?? o.last;
-      const dragged = rectFrom(o.start, end);
+      const dragged = rectFromCorners(o.start, end);
       const isClick = dragged.width < MIN_DRAG && dragged.height < MIN_DRAG;
       const pageBox = form.getPageBox(o.page);
       const box = isClick ? boxOfClick(o.start, tool.clickCreate, pageBox) : dragged; // createField clamps a drag to the page

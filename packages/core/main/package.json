@@ -9,6 +9,7 @@
   "types": "./dist/index.d.cts",
   "exports": {
     ".": "./src/index.ts",
+    "./testing": "./src/testing.ts",
     "./package.json": "./package.json"
   },
   "publishConfig": {

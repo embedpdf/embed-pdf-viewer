@@ -5,6 +5,7 @@
  * lives here — every verb and read has a home in `read/`, `write/`,
  * `sync/`, `comments/` or `tools/`.
  */
+import { composeApi } from '@embedpdf/core';
 import { createComments } from './comments/comments';
 import { createThreadIndex } from './comments/threads';
 import type { AnnotationConfig } from './contract';
@@ -30,17 +31,6 @@ import { createSelectionWrites } from './write/selection';
 import { createSettings } from './write/settings';
 import { createStamps } from './write/stamps';
 import { createTextEditing } from './write/text-editing';
-
-/** Every API member is defined by exactly one area — a duplicate is a wiring bug. */
-function assertDisjoint(slices: readonly object[]): void {
-  const seen = new Set<string>();
-  for (const slice of slices) {
-    for (const key of Object.keys(slice)) {
-      if (seen.has(key)) throw new Error(`[annotation] api member '${key}' is defined twice`);
-      seen.add(key);
-    }
-  }
-}
 
 export function createAnnotationController(
   ctx: AnnotationContext,
@@ -79,7 +69,7 @@ export function createAnnotationController(
   const threads = createThreadIndex(ctx, services);
   const comments = createComments(ctx, services, threads, crud);
 
-  const slices = [
+  const api = composeApi('annotation', [
     annotations.api,
     chrome.api,
     render.api,
@@ -101,42 +91,19 @@ export function createAnnotationController(
     scripts.api,
     settings.api,
     comments.api,
-  ] as const;
-  assertDisjoint(slices);
-
-  const api = {
-    ...annotations.api,
-    ...chrome.api,
-    ...render.api,
-    ...selectionProps.api,
-    ...tools.api,
-    ...behaviors.api,
-    ...hydration.api,
-    ...text.api,
-    ...links.api,
-    ...crud.api,
-    ...stamps.api,
-    ...ghost.api,
-    ...icons.api,
-    ...selection.api,
-    ...measurement.api,
-    ...pointer.api,
-    ...drafts.api,
-    ...markup.api,
-    ...scripts.api,
-    ...settings.api,
-    ...comments.api,
-    // Authority twins and the confirmed-change events are services, not areas.
-    canRead: authority.canRead,
-    canCreate: authority.canCreate,
-    canEdit: authority.canEdit,
-    canDelete: authority.canDelete,
-    onCreated: events.created.on,
-    onUpdated: events.updated.on,
-    onDeleted: events.deleted.on,
-    onSelectionChanged: events.selectionChanged.on,
-    onDraftChanged: events.draftChanged.on,
-    onEditingChanged: events.editingChanged.on,
-  } satisfies AnnotationHostCapability;
+    {
+      // Authority twins and the confirmed-change events are services, not areas.
+      canRead: authority.canRead,
+      canCreate: authority.canCreate,
+      canEdit: authority.canEdit,
+      canDelete: authority.canDelete,
+      onCreated: events.created.on,
+      onUpdated: events.updated.on,
+      onDeleted: events.deleted.on,
+      onSelectionChanged: events.selectionChanged.on,
+      onDraftChanged: events.draftChanged.on,
+      onEditingChanged: events.editingChanged.on,
+    },
+  ]) satisfies AnnotationHostCapability;
   return api;
 }

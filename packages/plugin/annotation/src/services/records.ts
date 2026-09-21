@@ -3,7 +3,7 @@ import { annotationKey, type AnnotationRef, type PdfRect } from '@embedpdf/engin
 
 import { fromDTO } from '../repository';
 import type { AnnotationContext } from './context';
-import type { PageGeometry } from './geometry';
+import type { CropLookup } from './geometry';
 import type { AnnotationStore } from './store';
 
 export type EngineRecord = Parameters<typeof fromDTO>[0];
@@ -17,7 +17,7 @@ export type RenderSource = NonNullable<Parameters<typeof fromDTO>[2]>;
 export function createRecords(
   ctx: Pick<AnnotationContext, 'doc'>,
   store: AnnotationStore,
-  geometry: PageGeometry,
+  geometry: CropLookup,
 ) {
   /**
    * Ingest an engine DTO with this session's per-record AUTHORITY projected

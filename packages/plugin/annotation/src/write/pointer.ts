@@ -1,5 +1,5 @@
 import type { MeasurementAppearance, Subtype, Vec } from '@embedpdf/core-annotation';
-import type { PageRotation } from '@embedpdf/core-geometry';
+import { pageSpace, type PageRotation } from '@embedpdf/core-geometry';
 import {
   isDimension,
   isReadout,
@@ -128,7 +128,7 @@ export function createPointer(
       }
       const viewport =
         crop && cache?.viewports
-          ? viewportForPoint(cache.viewports, { x: point.x + crop.left, y: crop.top - point.y })
+          ? viewportForPoint(cache.viewports, pageSpace(crop).pageToPdf(point))
           : undefined;
       const measure: MeasurementAppearance | undefined =
         dimension && crop && cache

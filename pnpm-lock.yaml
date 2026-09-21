@@ -1435,6 +1435,9 @@ importers:
       '@embedpdf/core-acrojs':
         specifier: workspace:*
         version: link:../../core/acrojs
+      '@embedpdf/core-geometry':
+        specifier: workspace:*
+        version: link:../../core/geometry
       '@embedpdf/core-js-sandbox':
         specifier: workspace:*
         version: link:../../core/js-sandbox

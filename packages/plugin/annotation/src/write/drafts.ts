@@ -1,3 +1,4 @@
+import { pageSpace } from '@embedpdf/core-geometry';
 import {
   creationDraftAnchor,
   type CreationDraftAnchor,
@@ -36,7 +37,7 @@ export function createDrafts(
     if (!ctx.doc) return;
     const crop = geometry.cropOf(fx.page.pageObjectNumber);
     if (crop && fx.geom.t === 'line') {
-      const pdf = (p: Vec) => ({ x: p.x + crop.left, y: crop.top - p.y });
+      const pdf = (p: Vec) => pageSpace(crop).pageToPdf(p);
       events.draftCaptured.emit({
         tool: fx.tool,
         page: fx.page,

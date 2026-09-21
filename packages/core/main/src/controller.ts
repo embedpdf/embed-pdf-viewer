@@ -55,22 +55,27 @@ export function createControllerContext(
     session ? (services.store.getCore().documents[session.id] ?? session.stagedMeta) : null;
 
   const spaces = new Map<string, PageSpace>();
-  const forPage = (ref: PageRef): PageSpace => {
+  const tryForPage = (ref: PageRef): PageSpace | null => {
     const meta = metaOf();
     const page = meta?.pages.find((p) => pageRefsEqual(p.ref, ref));
-    if (!meta || !page) {
-      throw new PluginError(
-        'not-found',
-        capability,
-        `page ${ref.pageObjectNumber} is not in this document`,
-      );
-    }
+    if (!meta || !page) return null;
     const key = `${meta.revision}:${ref.pageObjectNumber}`;
     let space = spaces.get(key);
     if (!space) {
       if (spaces.size > 4096) spaces.clear();
       space = pageSpace(page.boxes.crop);
       spaces.set(key, space);
+    }
+    return space;
+  };
+  const forPage = (ref: PageRef): PageSpace => {
+    const space = tryForPage(ref);
+    if (!space) {
+      throw new PluginError(
+        'not-found',
+        capability,
+        `page ${ref.pageObjectNumber} is not in this document`,
+      );
     }
     return space;
   };
@@ -91,7 +96,7 @@ export function createControllerContext(
         return hook;
       },
     },
-    geometry: { forPage },
+    geometry: { forPage, tryForPage },
     listen(source, listener) {
       const off = typeof source === 'function' ? source(listener) : source.subscribe(listener);
       scope.defer(off);

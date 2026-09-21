@@ -4,6 +4,7 @@
  * assembles the capability from the areas' API slices. No behavior lives
  * here — every verb and read has a home in `read/` or `write/`.
  */
+import { composeApi } from '@embedpdf/core';
 import type { StampConfig } from './contract';
 import type { StampHostCapability } from './host-contract';
 import { createCatalog } from './read/catalog';
@@ -12,17 +13,6 @@ import { createAssetWrites } from './write/assets';
 import { createLibraryWrites } from './write/libraries';
 import { createMarks } from './write/marks';
 import { createPlacement } from './write/placement';
-
-/** Every API member is defined by exactly one area — a duplicate is a wiring bug. */
-function assertDisjoint(slices: readonly object[]): void {
-  const seen = new Set<string>();
-  for (const slice of slices) {
-    for (const key of Object.keys(slice)) {
-      if (seen.has(key)) throw new Error(`[stamp] api member '${key}' is defined twice`);
-      seen.add(key);
-    }
-  }
-}
 
 export function createStampController(
   ctx: StampContext,
@@ -40,23 +30,22 @@ export function createStampController(
   const assets = createAssetWrites(ctx, services, marks, libraries);
   const placement = createPlacement(ctx, services, config);
 
-  const slices = [catalog.api, libraries.api, assets.api, placement.api] as const;
-  assertDisjoint(slices);
-
-  const api = {
-    ...catalog.api,
-    ...libraries.api,
-    ...assets.api,
-    ...placement.api,
-    // The change hooks are services, not areas.
-    onLibraryChanged: events.libraryChanged.on,
-    onLibraryCreated: events.libraryCreated.on,
-    onLibraryUpdated: events.libraryUpdated.on,
-    onLibraryDeleted: events.libraryDeleted.on,
-    onAssetCreated: events.assetCreated.on,
-    onAssetUpdated: events.assetUpdated.on,
-    onAssetDeleted: events.assetDeleted.on,
-    onArmChanged: events.armChanged.on,
-  } satisfies StampHostCapability;
+  const api = composeApi('stamp', [
+    catalog.api,
+    libraries.api,
+    assets.api,
+    placement.api,
+    {
+      // The change hooks are services, not areas.
+      onLibraryChanged: events.libraryChanged.on,
+      onLibraryCreated: events.libraryCreated.on,
+      onLibraryUpdated: events.libraryUpdated.on,
+      onLibraryDeleted: events.libraryDeleted.on,
+      onAssetCreated: events.assetCreated.on,
+      onAssetUpdated: events.assetUpdated.on,
+      onAssetDeleted: events.assetDeleted.on,
+      onArmChanged: events.armChanged.on,
+    },
+  ]) satisfies StampHostCapability;
   return api;
 }

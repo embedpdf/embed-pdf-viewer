@@ -50,15 +50,11 @@ export function createStore(ctx: MeasurementContext) {
       : Array.isArray(pages)
         ? (pages as readonly PageRef[])
         : [pages as PageRef];
-  /** Unrotated page space (origin at the CropBox top-left, y down) → PDF user space. */
-  const toPdf = (page: PageRef, point: Point): PdfPoint => {
-    const crop = requireMeta(page).boxes.crop;
-    return { x: crop.left + point.x, y: crop.top - point.y };
-  };
-  const toPage = (page: PageRef, point: PdfPoint): Point => {
-    const crop = requireMeta(page).boxes.crop;
-    return { x: point.x - crop.left, y: crop.top - point.y };
-  };
+  /** Page space ↔ PDF user space — the kernel's page geometry, never re-derived here. */
+  const toPdf = (page: PageRef, point: Point): PdfPoint =>
+    ctx.geometry.forPage(page).pageToPdf(point);
+  const toPage = (page: PageRef, point: PdfPoint): Point =>
+    ctx.geometry.forPage(page).pdfToPage(point);
   const scaleOf = (page: PageRef): PageScale =>
     state().pages[page.pageObjectNumber]?.scale ?? LOADING;
   return {
