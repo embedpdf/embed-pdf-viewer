@@ -5,7 +5,10 @@
 # Turbo does the scoping: with the cache restored (local cache dir below,
 # remote cache when TURBO_TOKEN/TURBO_TEAM are configured), an unchanged
 # package is a cache hit and only what a PR touched — plus its dependents —
-# actually runs.
+# actually runs. `typecheck` and `test` depend on `^build` (turbo.json), so a
+# package's dependencies are built first — boundary packages publish dist
+# types, the Angular adapter is ng-packagr output, some tests read generated
+# artifacts — and those builds are cached like everything else.
 #
 # cloudpdf/** is deliberately outside this gate: the server matrix, the
 # engine conformance suite and SDK generation cover it with the runtimes
@@ -32,11 +35,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v5
         with:
           run_install: false
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 22
           cache: pnpm
@@ -49,18 +52,14 @@ jobs:
           key: turbo-typecheck-${{ runner.os }}-${{ github.sha }}
           restore-keys: |
             turbo-typecheck-${{ runner.os }}-
-      # The Angular build pulls its workspace dependency closure through
-      # turbo, and the engine packages in that closure inline the wasm32
-      # runtime at build time: hydrate it from the content-addressed shelf.
+      # The engine packages in the build closure inline the wasm32 runtime at
+      # build time: hydrate it from the content-addressed shelf. A PR that
+      # changes runtime sources races its own Build PDF Runtime workflow,
+      # hence the wait.
       - name: Fetch engine runtime payload
         run: pnpm --filter @embedpdf/engine-runtime fetch:payload
         env:
           EPDF_PAYLOAD_WAIT_MINUTES: '30'
-      # The Angular example and the website's Angular samples compile
-      # @embedpdf/angular from its dist (ng-packagr output), so it is built
-      # first; every other package is consumed source-first.
-      - name: Build the Angular adapter
-        run: pnpm turbo run build --filter=@embedpdf/angular
       - name: Typecheck
         run: pnpm turbo run typecheck --continue
 
@@ -69,11 +68,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v5
         with:
           run_install: false
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 22
           cache: pnpm
@@ -95,8 +94,6 @@ jobs:
         run: pnpm --filter @embedpdf/engine-runtime fetch:payload wasm32 linux-x64
         env:
           EPDF_PAYLOAD_WAIT_MINUTES: '30'
-      - name: Build the Angular adapter
-        run: pnpm turbo run build --filter=@embedpdf/angular
       - name: Test
         run: >-
           pnpm turbo run test --continue
@@ -110,11 +107,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v5
         with:
           run_install: false
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 22
           cache: pnpm

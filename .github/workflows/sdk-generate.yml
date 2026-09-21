@@ -63,10 +63,10 @@ jobs:
   version-policy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ref: ${{ inputs.source_ref || github.sha }}
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 22
       - run: node --test fern/scripts/*.test.mjs
@@ -79,11 +79,11 @@ jobs:
       matrix:
         language: [typescript, python, php, csharp, go, java, ruby]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ref: ${{ inputs.source_ref || github.sha }}
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 22
 
@@ -266,11 +266,11 @@ jobs:
     if: ${{ (inputs.languages || 'typescript,python,php,csharp,go,java,ruby') == 'typescript,python,php,csharp,go,java,ruby' }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ref: ${{ inputs.source_ref || github.sha }}
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 22
 

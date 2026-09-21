@@ -14,8 +14,9 @@
 # starts. Branch protection requires `ci-ok` alone; the matrix cells stay
 # visible for debugging but are not the contract.
 #
-# Build PDF Runtime keeps its own push trigger (it publishes content-addressed
-# payloads for every branch); on pull requests it runs only here, once.
+# Build PDF Runtime keeps its own push trigger for every branch but main (it
+# publishes content-addressed payloads for feature branches); pull requests
+# and pushes to main run it only here, once — the main run publishes.
 name: CI
 
 on:
@@ -29,7 +30,9 @@ permissions:
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  # Superseded pull-request pushes are cancelled; a main run never is — it may
+  # be the one publishing the runtime payload for its hash.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   changes:
@@ -46,7 +49,7 @@ jobs:
       sdk: ${{ steps.filter.outputs.sdk }}
       manifests: ${{ steps.filter.outputs.manifests }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - id: filter
         uses: dorny/paths-filter@v3
         with:

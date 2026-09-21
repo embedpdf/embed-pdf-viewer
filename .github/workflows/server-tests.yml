@@ -54,11 +54,11 @@ jobs:
           - { name: host, env: 'CLOUDPDF_TEST_ISOLATION=host' }
           - { name: 'host K=2', env: 'CLOUDPDF_TEST_ISOLATION=host CLOUDPDF_TEST_SHARDS=2' }
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - uses: pnpm/action-setup@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 22
           cache: pnpm
