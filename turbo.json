@@ -32,7 +32,9 @@
     "typecheck": {
       "dependsOn": ["^build"]
     },
-    "test": {},
+    "test": {
+      "dependsOn": ["^build"]
+    },
     "dev": {
       "persistent": true,
       "cache": false
@@ -42,6 +44,9 @@
     },
     "@embedpdf/default-stamps#build": {
       "outputs": ["locales/**"]
+    },
+    "@embedpdf/viewer#test": {
+      "dependsOn": ["build"]
     }
   }
 }
