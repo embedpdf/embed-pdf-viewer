@@ -35,6 +35,11 @@ const PENDING = new Set([
   // with Phase 4's actions port; lands with the annotation vertical it
   // serves.
   'anchored',
+  // The measurement and signature verticals (React, Sep 2026) — deferred
+  // consciously with the 3.0 contract work; they ride the annotation and form
+  // verticals, which are pending too.
+  'measurement',
+  'signature',
 ]);
 
 const reactPkg = JSON.parse(

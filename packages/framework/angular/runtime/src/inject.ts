@@ -7,9 +7,9 @@
  * construction — they return signals or lazy methods, so they are safe in
  * component-hosted mode where the kernel materializes after construction.
  */
-import { computed, inject, type Signal } from '@angular/core';
+import { computed, effect, inject, type Signal } from '@angular/core';
 import { docInfoListEquals } from '@embedpdf/core';
-import type { CapabilityToken, DocInfo, Kernel } from '@embedpdf/core';
+import type { CapabilityToken, DocInfo, EventHook, Kernel } from '@embedpdf/core';
 import { EpdfKernelHost } from './kernel-host';
 import { EPDF_DOCUMENT_SCOPE } from './tokens';
 
@@ -143,6 +143,41 @@ export function injectOptionalSelector<C, R>(
   equal?: (a: R, b: R) => boolean,
 ): Signal<R> {
   return injectOptionalSelectorFor(() => token, select, fallback, equal);
+}
+
+/**
+ * Subscribe to a capability's {@link EventHook} for the injector's lifetime —
+ * `injectCapabilityEvent(ActionsToken, (c) => c.onExecuted, handler)`; React's
+ * `useCapabilityEvent`. Events carry occurrences, never state (a late
+ * subscriber that needs the current value reads a selector). Null-safe: no
+ * plugin/document → no subscription; the subscription follows the resolved
+ * capability across document switches.
+ */
+export function injectCapabilityEvent<C, T>(
+  token: CapabilityToken<C>,
+  select: (cap: C) => EventHook<T>,
+  handler: (event: T) => void,
+): void {
+  const cap = injectOptionalCapability(token);
+  effect((onCleanup) => {
+    const current = cap();
+    if (!current) return;
+    onCleanup(select(current)(handler));
+  });
+}
+
+/** Subscribe to one document lifecycle event for the injector's lifetime:
+ *  `injectDocumentEvent((d) => d.onOpened, handler)` — React's `useDocumentEvent`. */
+export function injectDocumentEvent<T>(
+  select: (documents: Kernel['documents']) => EventHook<T>,
+  handler: (event: T) => void,
+): void {
+  const host = injectKernelHost();
+  // Runs after construction (an effect), so reading the kernel here honours
+  // the construction rule in kernel-host.ts.
+  effect((onCleanup) => {
+    onCleanup(select(host.kernel.documents)(handler));
+  });
 }
 
 /** The document registry (open/close/active/list), reactive — `useDocuments`.

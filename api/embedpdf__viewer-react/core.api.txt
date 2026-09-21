@@ -33,7 +33,7 @@ MenuSection [InterfaceDeclaration] (from packages/core/ui/src/schema.ts): export
 MetadataToken [VariableDeclaration] (from packages/plugin/metadata/src/token.ts): MetadataToken = createCapabilityToken<MetadataCapability>('metadata', { hint: "add metadataPlugin() from '@embedpdf/plugin-metadata' to your plugins list", } )
 MountTarget [InterfaceDeclaration] (from packages/viewer/main/dist/kernel/init.d.ts): export interface MountTarget{ target: HTMLElement | string; }
 PDFViewer [VariableDeclaration]: PDFViewer: (props: PDFViewerProps) => ReturnType<typeof PDFViewerImpl> = PDFViewerImpl
-PDFViewerExtras [InterfaceDeclaration] (from packages/viewer/react/src/component.ts): export interface PDFViewerExtras{ className?: string; style?: CSSProperties; children?: ReactNode; elementRef?: Ref<EmbedPdfViewerElement>; onReady?: (viewer: ViewerHandle) => void; }
+PDFViewerExtras [InterfaceDeclaration] (from packages/viewer/react/src/component.ts): export interface PDFViewerExtras{ className?: string; style?: CSSProperties; children?: ReactNode; elementRef?: Ref<EmbedPdfViewerElement>; onReady?: (viewer: ViewerHandle) => void; onDocumentChange?: (documentId: string | null) => void; }
 PDFViewerProps [TypeAliasDeclaration]: export type PDFViewerProps = ViewerConfig & PDFViewerExtras;
 PathSpec [TypeAliasDeclaration] (from packages/viewer/chrome/dist/index.d.ts): type PathSpec = string |{ d: string; fill?: boolean | 'primary' | 'secondary'; stroke?: 'primary' | 'secondary'; } ;
 RedactionToken [VariableDeclaration] (from packages/plugin/redaction/src/token.ts): RedactionToken = createCapabilityToken<RedactionCapability>('redaction', { hint: `add redactionPlugin() from '@embedpdf/plugin-redaction' to your plugins list`, } )

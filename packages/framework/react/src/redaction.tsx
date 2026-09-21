@@ -45,7 +45,6 @@ export function useRedactionEvent<T>(
 /** The pending marks (optionally of one page), reactive against the annotation plane. */
 export function usePendingRedactions(filter?: RedactionMarkFilter): readonly RedactionMark[] {
   const pon = filter?.page?.pageObjectNumber;
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed by value
   const stable = useMemo(() => filter, [pon]);
   return useSelector(RedactionToken, (c) => c.listPending(stable), pendingEqual);
 }

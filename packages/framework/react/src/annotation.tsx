@@ -1023,7 +1023,6 @@ export function useAnnotationList(filter?: AnnotationFilter): readonly Annotatio
       }`
     : '';
   // Keyed by VALUE so an inline filter object never resubscribes.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const stable = React.useMemo(() => filter, [key]);
   return useSelector(AnnotationToken, (c) => c.list(stable), shallowArray);
 }

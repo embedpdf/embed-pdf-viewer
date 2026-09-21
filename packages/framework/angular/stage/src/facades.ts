@@ -13,16 +13,27 @@
  * at CALL time, never a stale one.
  */
 import type { Signal } from '@angular/core';
-import { StageToken, settingsEqual } from '@embedpdf/plugin-stage';
+import { settingsEqual } from '@embedpdf/plugin-stage';
 import type { StageCapability } from '@embedpdf/plugin-stage';
+import type { EventHook } from '@embedpdf/core';
 import {
-  injectCapability,
+  injectCapabilityEvent,
+  injectCapabilityFor,
   injectDocumentId,
   injectKernelValue,
-  injectSelector,
+  injectSelectorFor,
   shallowArray,
 } from '@embedpdf/angular/runtime';
-import type { StageTokenProp } from './stage';
+import { injectStageToken, type StageTokenProp } from './scope';
+
+// Every facade takes an OPTIONAL token; without one it binds to the nearest
+// `<epdf-stage>` / `[epdfStageScope]`, else the main lens.
+const injectCapability = (token: Signal<StageTokenProp>) => injectCapabilityFor(() => token());
+const injectSelector = <R>(
+  token: Signal<StageTokenProp>,
+  select: (cap: StageCapability) => R,
+  equal?: (a: R, b: R) => boolean,
+) => injectSelectorFor(() => token(), select, equal);
 
 type AnyFn = (...args: never[]) => unknown;
 /** Late-binding method passthrough: exact capability signature, current doc. */
@@ -34,11 +45,23 @@ const lazy = <K extends keyof StageCapability>(
     (cap()[key] as unknown as (...a: unknown[]) => unknown)(...args)) as StageCapability[K] &
     AnyFn as StageCapability[K];
 
-export function injectStage(token: StageTokenProp = StageToken): Signal<StageCapability> {
-  return injectCapability(token);
+export function injectStage(explicit?: StageTokenProp): Signal<StageCapability> {
+  return injectCapability(injectStageToken(explicit));
 }
 
-export function injectZoom(token: StageTokenProp = StageToken) {
+/** Subscribe to one stage event for the injector's lifetime:
+ *  `injectStageEvent((c) => c.onZoomChanged, handler)` — React's `useStageEvent`. */
+export function injectStageEvent<T>(
+  select: (cap: StageCapability) => EventHook<T>,
+  handler: (event: T) => void,
+  explicit?: StageTokenProp,
+): void {
+  // The token is read once at injection: a facade is bound to its lens for life.
+  injectCapabilityEvent(injectStageToken(explicit)(), select, handler);
+}
+
+export function injectZoom(explicit?: StageTokenProp) {
+  const token = injectStageToken(explicit);
   const s = injectCapability(token);
   return {
     zoom: injectSelector(token, (c) => c.getZoomLevel()),
@@ -54,7 +77,8 @@ export function injectZoom(token: StageTokenProp = StageToken) {
   };
 }
 
-export function injectPages(token: StageTokenProp = StageToken) {
+export function injectPages(explicit?: StageTokenProp) {
+  const token = injectStageToken(explicit);
   const s = injectCapability(token);
   const documentId = injectDocumentId();
   return {
@@ -67,7 +91,8 @@ export function injectPages(token: StageTokenProp = StageToken) {
   };
 }
 
-export function injectLayout(token: StageTokenProp = StageToken) {
+export function injectLayout(explicit?: StageTokenProp) {
+  const token = injectStageToken(explicit);
   const s = injectCapability(token);
   return {
     flow: injectSelector(token, (c) => c.getSettings().flow),
@@ -85,7 +110,8 @@ export function injectLayout(token: StageTokenProp = StageToken) {
 
 /** The document's page list (with PDF labels) + the current item's pages — the
  *  data for page thumbnails / worksheet-style page tabs. */
-export function injectPageList(token: StageTokenProp = StageToken) {
+export function injectPageList(explicit?: StageTokenProp) {
+  const token = injectStageToken(explicit);
   const documentId = injectDocumentId();
   return {
     // The page list is document truth (order, labels, sizes) from the kernel's
@@ -111,7 +137,8 @@ export function injectPageList(token: StageTokenProp = StageToken) {
  * concern": keep your own `Partial<StageSettings>` objects and apply them with
  * `update(preset)` (one anchor-preserving change).
  */
-export function injectStageSettings(token: StageTokenProp = StageToken) {
+export function injectStageSettings(explicit?: StageTokenProp) {
+  const token = injectStageToken(explicit);
   const s = injectCapability(token);
   return {
     // settingsEqual derives from the plugin's settings registry — a new setting

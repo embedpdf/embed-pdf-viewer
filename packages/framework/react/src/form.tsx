@@ -346,7 +346,6 @@ function TextWidget({ fill, item, page, appearance }: WidgetProps<'text'>) {
   // Adopt engine truth whenever it changes under us — but never mid-edit.
   useEffect(() => {
     if (!focused) setDraft(fill.value);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fill.value, focused]);
 
   const b = viewBox(item.box, page);
@@ -1018,7 +1017,6 @@ export function useFormSnapshot() {
 /** One field's current value, subscribed (null for an unknown field). */
 export function useFormValue(ref: FormFieldRef): FormFieldValue | null {
   const key = ref.kind === 'fqn' ? `n:${ref.name}` : `o:${ref.fieldObjectNumber}`;
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed by value
   const stable = useMemo(() => ref, [key]);
   return useSelector(FormPublicToken, (c) => c.getValue(stable));
 }
