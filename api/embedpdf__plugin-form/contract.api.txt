@@ -8,21 +8,21 @@ FormCapability [InterfaceDeclaration]: export interface FormCapability{ getSnaps
 FormCommitResult [InterfaceDeclaration]: export interface FormCommitResult{ status: FormCommitStatus; scripted: boolean; effectsResult: FormEffectsResult | null; uiEffects: FormUiEffect[]; diagnostics: ScriptDiagnostic[]; error?: ScriptExecutionError; }
 FormCommitStatus [TypeAliasDeclaration]: export type FormCommitStatus = 'applied' | 'unchanged' | 'rejected' | 'failed';
 FormConfig [InterfaceDeclaration]: export interface FormConfig{ validation?: 'scripts' | 'none'; }
-FormDataExport [InterfaceDeclaration] (from packages/engine/core/dist/AnnotationListSnapshot-De-oo34u.d.ts): interface FormDataExport{ format: 'fdf' | 'xfdf'; bytes: Uint8Array; }
-FormDataFormat [TypeAliasDeclaration] (from packages/engine/core/dist/AnnotationListSnapshot-De-oo34u.d.ts): type FormDataFormat = 'fdf' | 'xfdf';
+FormDataExport [InterfaceDeclaration] (from packages/engine/core/src/mutation/FormMutationResults.ts): export interface FormDataExport{ format: 'fdf' | 'xfdf'; bytes: Uint8Array; }
+FormDataFormat [TypeAliasDeclaration] (from packages/engine/core/src/forms/value.ts): export type FormDataFormat = 'fdf' | 'xfdf';
 FormFieldChangedEvent [InterfaceDeclaration]: export interface FormFieldChangedEvent{ readonly ref: FormFieldRef; readonly field: FormFieldDTO | null; readonly origin: ChangeOrigin; }
-FormFieldDTO [TypeAliasDeclaration] (from packages/engine/core/dist/AnnotationListSnapshot-De-oo34u.d.ts): type FormFieldDTO = TextFieldDTO | CheckboxFieldDTO | RadioFieldDTO | ComboBoxFieldDTO | ListBoxFieldDTO | PushButtonFieldDTO | SignatureFieldDTO | UnknownFieldDTO;
-FormFieldFamily [TypeAliasDeclaration] (from packages/engine/core/dist/AnnotationListSnapshot-De-oo34u.d.ts): type FormFieldFamily = 'text' | 'checkbox' | 'radio' | 'combobox' | 'listbox' | 'pushbutton' | 'signature' | 'unknown';
-FormFieldPatch [TypeAliasDeclaration] (from packages/engine/core/dist/AnnotationListSnapshot-De-oo34u.d.ts): type FormFieldPatch = TextFieldPatch | CheckboxFieldPatch | RadioFieldPatch | ComboBoxFieldPatch | ListBoxFieldPatch;
-FormFieldRef [TypeAliasDeclaration] (from packages/engine/core/dist/AnnotationListSnapshot-De-oo34u.d.ts): type FormFieldRef ={ kind: 'objectNumber'; fieldObjectNumber: number; } |{ kind: 'fqn'; name: string; } ;
-FormFieldValue [TypeAliasDeclaration] (from packages/engine/core/dist/AnnotationListSnapshot-De-oo34u.d.ts): type FormFieldValue ={ type: 'text'; value: string; } |{ type: 'toggle'; state: string | null; } |{ type: 'choice'; values: string[]; } ;
+FormFieldDTO [TypeAliasDeclaration] (from packages/engine/core/src/forms/field.ts): export type FormFieldDTO = | TextFieldDTO | CheckboxFieldDTO | RadioFieldDTO | ComboBoxFieldDTO | ListBoxFieldDTO | PushButtonFieldDTO | SignatureFieldDTO | UnknownFieldDTO;
+FormFieldFamily [TypeAliasDeclaration] (from packages/engine/core/src/forms/field.ts): export type FormFieldFamily = | 'text' | 'checkbox' | 'radio' | 'combobox' | 'listbox' | 'pushbutton' | 'signature' | 'unknown';
+FormFieldPatch [TypeAliasDeclaration] (from packages/engine/core/src/forms/patch.ts): export type FormFieldPatch = | TextFieldPatch | CheckboxFieldPatch | RadioFieldPatch | ComboBoxFieldPatch | ListBoxFieldPatch;
+FormFieldRef [TypeAliasDeclaration] (from packages/engine/core/src/identity/FormFieldRef.ts): export type FormFieldRef = |{ kind: 'objectNumber'; fieldObjectNumber: number} |{ kind: 'fqn'; name: string} ;
+FormFieldValue [TypeAliasDeclaration] (from packages/engine/core/src/forms/value.ts): export type FormFieldValue = |{ type: 'text'; value: string} |{ type: 'toggle'; state: string | null} |{ type: 'choice'; values: string[]} ;
 FormFilter [InterfaceDeclaration]: export interface FormFilter{ readonly family?: FormFieldFamily; readonly page?: PageRef; readonly name?: string; }
-FormImportResult [InterfaceDeclaration] (from packages/engine/core/dist/AnnotationListSnapshot-De-oo34u.d.ts): interface FormImportResult{ fieldsTotal: number; fieldsApplied: number; fieldsSkipped: number; widgetsChanged: number; snapshot: FormSnapshot; meta: MutationMeta; }
-FormRepairOptions [InterfaceDeclaration] (from packages/engine/core/dist/Engine-CEO1av8x.d.ts): interface FormRepairOptions{ bakeAppearances?: boolean; }
-FormRepairResult [InterfaceDeclaration] (from packages/engine/core/dist/AnnotationListSnapshot-De-oo34u.d.ts): interface FormRepairResult{ acroformCreated: boolean; fieldsLinked: number; widgetsLinked: number; fieldsUnrepairable: number; appearancesBaked: number; needAppearancesCleared: boolean; meta: MutationMeta; }
+FormImportResult [InterfaceDeclaration] (from packages/engine/core/src/mutation/FormMutationResults.ts): export interface FormImportResult{ fieldsTotal: number; fieldsApplied: number; fieldsSkipped: number; widgetsChanged: number; snapshot: FormSnapshot; meta: MutationMeta; }
+FormRepairOptions [InterfaceDeclaration] (from packages/engine/core/src/engine/DocumentFormsService.ts): export interface FormRepairOptions{ bakeAppearances?: boolean; }
+FormRepairResult [InterfaceDeclaration] (from packages/engine/core/src/mutation/FormMutationResults.ts): export interface FormRepairResult{ acroformCreated: boolean; fieldsLinked: number; widgetsLinked: number; fieldsUnrepairable: number; appearancesBaked: number; needAppearancesCleared: boolean; meta: MutationMeta; }
 FormResyncedEvent [InterfaceDeclaration]: export interface FormResyncedEvent{ readonly snapshot: FormSnapshot; }
-FormSetValueResult [InterfaceDeclaration] (from packages/engine/core/dist/AnnotationListSnapshot-De-oo34u.d.ts): interface FormSetValueResult{ field: FormFieldDTO; changedWidgets: FormWidget[]; meta: MutationMeta; }
-FormSnapshot [InterfaceDeclaration] (from packages/engine/core/dist/AnnotationListSnapshot-De-oo34u.d.ts): interface FormSnapshot{ formKind: FormKind; needsAppearances: boolean; fields: FormFieldDTO[]; calculationOrder: Array<FormFieldRef | null>; }
+FormSetValueResult [InterfaceDeclaration] (from packages/engine/core/src/mutation/FormMutationResults.ts): export interface FormSetValueResult{ field: FormFieldDTO; changedWidgets: FormWidget[]; meta: MutationMeta; }
+FormSnapshot [InterfaceDeclaration] (from packages/engine/core/src/forms/snapshot.ts): export interface FormSnapshot{ formKind: FormKind; needsAppearances: boolean; fields: FormFieldDTO[]; calculationOrder: Array<FormFieldRef | null>; }
 FormToken [VariableDeclaration] (from packages/plugin/form/src/token.ts): FormToken = createCapabilityToken<FormCapability>('form', { hint: `add formPlugin() from '@embedpdf/plugin-form' to your plugins list`, } )
 FormUiEffect [TypeAliasDeclaration]: export type FormUiEffect = ScriptUiEffect &{ phase: 'boot' | 'user'; origin?: ActionOrigin; } ;
 FormValidationRejectedEvent [InterfaceDeclaration]: export interface FormValidationRejectedEvent{ readonly ref: FormFieldRef; readonly issues: readonly ScriptDiagnostic[]; }
@@ -31,6 +31,6 @@ FormWidgetItem [TypeAliasDeclaration]: export type FormWidgetItem = FillItem;
 SetValueResult [TypeAliasDeclaration]: export type SetValueResult = FormCommitResult;
 WidgetActivationResult [TypeAliasDeclaration]: export type WidgetActivationResult = |{ kind: 'form'; result: FormCommitResult} |{ kind: 'dispatched'; result: ActionTriggerResult} ;
 WidgetAddress [TypeAliasDeclaration]: export type WidgetAddress = AnnotationRef |{ annotObjectNumber: number} ;
-WidgetAppearance [TypeAliasDeclaration] (from packages/engine/core/dist/AnnotationListSnapshot-De-oo34u.d.ts): type WidgetAppearance = WidgetStyleDraftFields;
+WidgetAppearance [TypeAliasDeclaration] (from packages/engine/core/src/annotation/kinds/widget.shared.ts): export type WidgetAppearance = WidgetStyleDraftFields;
 WidgetHit [InterfaceDeclaration] (from packages/plugin/form/src/core/model.ts): export interface WidgetHit{ annotObjectNumber: number; field: FormFieldDTO; box: Box; }
 fieldRef [VariableDeclaration]: fieldRef ={ byName: (name: string): FormFieldRef => ({ kind: 'fqn', name} ), byObjectNumber: (fieldObjectNumber: number): FormFieldRef => ({ kind: 'objectNumber', fieldObjectNumber, } ), }

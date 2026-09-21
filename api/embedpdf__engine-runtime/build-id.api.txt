@@ -1,0 +1,5 @@
+# @embedpdf/engine-runtime — ./build-id
+
+ENGINE_RUNTIME_VERSION [VariableDeclaration]: ENGINE_RUNTIME_VERSION: string = ( require('../package.json') as{ version: string} ).version
+engineRuntimeBuildId [FunctionDeclaration]: export function engineRuntimeBuildId(): string{ return `${ ENGINE_RUNTIME_VERSION} :${ resolveRuntimeTarget() ?? 'unknown'} `; }
+engineRuntimeTarget [FunctionDeclaration]: export function engineRuntimeTarget(): RuntimeTarget | null{ return resolveRuntimeTarget(); }
