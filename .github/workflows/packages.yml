@@ -87,11 +87,12 @@ jobs:
           restore-keys: |
             turbo-test-${{ runner.os }}-
       # Suites that boot a local engine (form, annotation, signature, …) run
-      # the wasm32 runtime in Node; hydrate it from the content-addressed
+      # the wasm32 runtime in Node, and the engine's `(native)` variants the
+      # host's addon (linux-x64 here); hydrate both from the content-addressed
       # shelf like build-hygiene and Vercel do. A PR that changes runtime
       # sources races its own Build PDF Runtime workflow, hence the wait.
-      - name: Fetch engine runtime payload
-        run: pnpm --filter @embedpdf/engine-runtime fetch:payload
+      - name: Fetch engine runtime payloads
+        run: pnpm --filter @embedpdf/engine-runtime fetch:payload wasm32 linux-x64
         env:
           EPDF_PAYLOAD_WAIT_MINUTES: '30'
       - name: Build the Angular adapter
