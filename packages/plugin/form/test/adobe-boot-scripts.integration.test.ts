@@ -12,10 +12,12 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
+import { createQuickJsSandbox } from '@embedpdf/core-js-sandbox';
 import { createLocalEngine } from '@embedpdf/engine';
 import type { DocumentHandle, Engine } from '@embedpdf/engine-core/runtime';
-import { createQuickJsSandbox } from '../src';
-import { createFormScriptingController } from '../../../plugin/form/src/scripting/controller';
+
+import { createFormScriptingController } from '../src/scripting/controller';
+import { standaloneRealm } from './helpers/standalone-realm';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const fixturePath = resolve(here, 'fixtures', 'i-140.pdf');
@@ -31,10 +33,15 @@ describe('Adobe boot-script boilerplate (i-140, hybrid-XFA AcroForm)', () => {
       expect(snapshot.formKind).toBe('xfa'); // hybrid: filled via its AcroForm plane
       const text = snapshot.fields.find((f) => f.family === 'text' && !f.flags.readOnly)!;
 
+      // The scripting controller runs inside a realm (sandbox + budget +
+      // transaction): the same standalone realm the other integration suites use.
+      const document = () => null;
+      const realm = standaloneRealm(doc, document, { sandboxFactory: createQuickJsSandbox });
       const controller = createFormScriptingController({
         doc,
-        document: () => null,
-        config: { sandboxFactory: async () => createQuickJsSandbox() },
+        document,
+        transaction: realm.transaction,
+        budget: realm.budget,
       });
       const result = await controller.commit(text.ref, {
         type: 'text',

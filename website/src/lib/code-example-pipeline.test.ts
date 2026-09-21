@@ -29,5 +29,6 @@ describe('code example pipeline', () => {
       'svelte',
       'angular',
     ]);
-  });
+    // Highlighting every sample is real work (~4s); the default 5s budget flakes under a loaded matrix.
+  }, 30_000);
 });

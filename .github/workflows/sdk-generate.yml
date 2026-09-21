@@ -49,29 +49,8 @@ on:
         required: false
         type: boolean
         default: false
-  pull_request:
-    paths:
-      - 'cloudpdf/contract/**'
-      - 'cloudpdf/sdk/**'
-      - 'cloudpdf/website/scripts/**api-reference*'
-      - 'cloudpdf/website/scripts/extract-sdk-snippets.mjs'
-      - 'cloudpdf/website/scripts/sdk-snippets*'
-      - 'cloudpdf/website/src/generated/sdk-snippets.json'
-      - 'cloudpdf/website/src/content/docs/api-reference/**'
-      - 'fern/**'
-      - '.github/workflows/sdk-generate.yml'
-  push:
-    branches: [main]
-    paths:
-      - 'cloudpdf/contract/**'
-      - 'cloudpdf/sdk/**'
-      - 'cloudpdf/website/scripts/**api-reference*'
-      - 'cloudpdf/website/scripts/extract-sdk-snippets.mjs'
-      - 'cloudpdf/website/scripts/sdk-snippets*'
-      - 'cloudpdf/website/src/generated/sdk-snippets.json'
-      - 'cloudpdf/website/src/content/docs/api-reference/**'
-      - 'fern/**'
-      - '.github/workflows/sdk-generate.yml'
+  # Pull requests and pushes to main reach this workflow through ci.yml,
+  # which calls it when the contract, the SDK or fern/** changed.
 
 permissions:
   contents: read

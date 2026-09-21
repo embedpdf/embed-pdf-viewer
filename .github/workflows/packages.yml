@@ -1,0 +1,134 @@
+# The TypeScript packages gate: typecheck, tests and the contract checks for
+# packages/**, examples/**, website and tooling/**. Called by ci.yml (the
+# umbrella that owns the PR gate); never triggered on its own.
+#
+# Turbo does the scoping: with the cache restored (local cache dir below,
+# remote cache when TURBO_TOKEN/TURBO_TEAM are configured), an unchanged
+# package is a cache hit and only what a PR touched — plus its dependents —
+# actually runs.
+#
+# cloudpdf/** is deliberately outside this gate: the server matrix, the
+# engine conformance suite and SDK generation cover it with the runtimes
+# they need (see ci.yml).
+name: packages
+
+on:
+  workflow_call: {}
+
+permissions:
+  contents: read
+
+env:
+  CI: true
+  # .npmrc interpolates it; empty beats a WARN on public installs.
+  NPM_TOKEN: ''
+  # Remote cache, when the repository configures it (no-ops otherwise).
+  TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+  TURBO_TEAM: ${{ vars.TURBO_TEAM }}
+
+jobs:
+  typecheck:
+    name: typecheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v5
+        with:
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install deps
+        run: pnpm install --frozen-lockfile
+      - name: Restore turbo cache
+        uses: actions/cache@v4
+        with:
+          path: .turbo/cache
+          key: turbo-typecheck-${{ runner.os }}-${{ github.sha }}
+          restore-keys: |
+            turbo-typecheck-${{ runner.os }}-
+      # The Angular build pulls its workspace dependency closure through
+      # turbo, and the engine packages in that closure inline the wasm32
+      # runtime at build time: hydrate it from the content-addressed shelf.
+      - name: Fetch engine runtime payload
+        run: pnpm --filter @embedpdf/engine-runtime fetch:payload
+        env:
+          EPDF_PAYLOAD_WAIT_MINUTES: '30'
+      # The Angular example and the website's Angular samples compile
+      # @embedpdf/angular from its dist (ng-packagr output), so it is built
+      # first; every other package is consumed source-first.
+      - name: Build the Angular adapter
+        run: pnpm turbo run build --filter=@embedpdf/angular
+      - name: Typecheck
+        run: pnpm turbo run typecheck --continue
+
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v5
+        with:
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install deps
+        run: pnpm install --frozen-lockfile
+      - name: Restore turbo cache
+        uses: actions/cache@v4
+        with:
+          path: .turbo/cache
+          key: turbo-test-${{ runner.os }}-${{ github.sha }}
+          restore-keys: |
+            turbo-test-${{ runner.os }}-
+      # Suites that boot a local engine (form, annotation, signature, …) run
+      # the wasm32 runtime in Node; hydrate it from the content-addressed
+      # shelf like build-hygiene and Vercel do. A PR that changes runtime
+      # sources races its own Build PDF Runtime workflow, hence the wait.
+      - name: Fetch engine runtime payload
+        run: pnpm --filter @embedpdf/engine-runtime fetch:payload
+        env:
+          EPDF_PAYLOAD_WAIT_MINUTES: '30'
+      - name: Build the Angular adapter
+        run: pnpm turbo run build --filter=@embedpdf/angular
+      - name: Test
+        run: >-
+          pnpm turbo run test --continue
+          --filter='./packages/**'
+          --filter='./examples/**'
+          --filter='./website'
+          --filter='./tooling/**'
+
+  contract:
+    name: contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v5
+        with:
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install deps
+        run: pnpm install --frozen-lockfile
+      - name: Test the boundary checker
+        run: pnpm --filter @embedpdf/tooling-build test
+      - name: Plugin boundaries
+        run: pnpm check:plugin-boundaries
+      # No public-CDN or other off-origin URL literal ships in viewer or engine
+      # source — the code half of docs/viewer/self-hosting's guarantee.
+      - name: No off-origin URL literals in shipped source
+        run: pnpm check:network-literals
+      # The public API of every published entry is snapshotted in api/; a PR
+      # that changes a surface regenerates the snapshot (`pnpm api:snapshot`)
+      # so the review sees the diff, and a drift here is a PR that forgot.
+      - name: API snapshot is current
+        run: pnpm api:check

@@ -9,16 +9,14 @@
 # Triggers are deliberately narrow: the rewrite is a function of the
 # manifest and the build preset, never of source code, so only changes to
 # a package.json, the tooling, or the lockfile (which can move tooling
-# dependencies) can introduce drift. Source-only PRs never run this.
+# dependencies) can introduce drift. Source-only PRs never run this —
+# ci.yml's `changes` job decides.
 name: build-hygiene
 
 on:
-  pull_request:
-    paths:
-      - '**/package.json'
-      - 'tooling/**'
-      - 'pnpm-lock.yaml'
-      - '.github/workflows/build-hygiene.yml'
+  # Called from ci.yml when a package.json, the tooling or the lockfile
+  # changed (the umbrella owns the path decision), or run by hand.
+  workflow_call: {}
   workflow_dispatch: {}
 
 permissions:

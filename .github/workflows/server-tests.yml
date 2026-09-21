@@ -10,18 +10,10 @@ name: Server Test Matrix
 # suites exercise real PDFium + sharp), so it reuses the same
 # build-runtime artifacts as engine-conformance.
 
+# Runs from ci.yml when packages/engine/** or cloudpdf/server/** changed
+# (the umbrella owns the path decision), or by hand.
 on:
-  pull_request:
-    paths:
-      - 'packages/engine/**'
-      - 'cloudpdf/server/**'
-      - '.github/workflows/server-tests.yml'
-  push:
-    branches: [main]
-    paths:
-      - 'packages/engine/**'
-      - 'cloudpdf/server/**'
-      - '.github/workflows/server-tests.yml'
+  workflow_call: {}
   workflow_dispatch: {}
 
 permissions:
