@@ -1,19 +1,16 @@
 import { definePlugin } from '@embedpdf/core';
+import { AnnotationToken } from '@embedpdf/plugin-annotation/contract';
 import { FormToken } from '@embedpdf/plugin-form/contract';
 import { InteractionToken } from '@embedpdf/plugin-interaction/contract/host';
 import { StampToken } from '@embedpdf/plugin-stamp/contract';
-import { AnnotationToken } from '@embedpdf/plugin-annotation/contract';
 
-import { createSignatureCapability } from './capability';
-import { createArmedMarkHandler } from './handler';
-import { initialSignatureState, signatureReducer } from './reducer';
-import { SignatureToken } from './types';
-import type {
-  SignatureAction,
-  SignatureCapability,
-  SignatureConfig,
-  SignatureState,
-} from './types';
+import type { SignatureConfig } from './contract';
+import { createSignatureController } from './controller';
+import { SignatureToken } from './host-contract';
+import type { SignatureHostCapability } from './host-contract';
+import { initialSignatureState, signatureReducer } from './model';
+import type { SignatureAction, SignatureState } from './model';
+import { createArmedMarkHandler } from './tools/armed-mark';
 
 /**
  * The signature plugin — the ACT of signing, document-scoped. It owns no
@@ -27,7 +24,7 @@ import type {
  * the field (sign / visual fill / ask, by mode) instead of onto the page.
  */
 export const signaturePlugin = (config: SignatureConfig = {}) =>
-  definePlugin<SignatureState, SignatureAction, SignatureCapability>({
+  definePlugin<SignatureState, SignatureAction, SignatureHostCapability>({
     id: 'signature',
     token: SignatureToken,
     scope: 'document',
@@ -35,23 +32,22 @@ export const signaturePlugin = (config: SignatureConfig = {}) =>
     optional: [InteractionToken, StampToken, AnnotationToken],
     initialState: initialSignatureState,
     reduce: signatureReducer,
-    capability: (ctx) => createSignatureCapability(ctx, config),
-    init: (ctx) => {
-      const signature = ctx.get(SignatureToken);
-      void signature
-        .refresh()
-        .then((snapshot) =>
-          snapshot?.signatures.some((s) => s.signed) ? signature.validate() : null,
-        )
-        .catch((error) => globalThis.console?.error('[signature] initial read failed:', error));
-      const interaction = ctx.tryGet(InteractionToken);
-      const stamp = ctx.tryGet(StampToken);
-      if (interaction && stamp && ctx.documentId) {
-        ctx.cleanup(
-          interaction.registerHandler(
-            createArmedMarkHandler(ctx.documentId, signature, ctx.get(FormToken), stamp),
-          ),
-        );
-      }
+    create: (ctx) => {
+      const { api, connect } = createSignatureController(ctx, config);
+      return {
+        api,
+        connect() {
+          connect();
+          const interaction = ctx.tryGet(InteractionToken);
+          const stamp = ctx.tryGet(StampToken);
+          if (interaction && stamp && ctx.documentId) {
+            ctx.cleanup(
+              interaction.registerHandler(
+                createArmedMarkHandler(ctx.documentId, api, ctx.get(FormToken), stamp),
+              ),
+            );
+          }
+        },
+      };
     },
   });

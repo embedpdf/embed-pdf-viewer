@@ -20,7 +20,7 @@ import {
 } from '@embedpdf/engine-core/runtime';
 
 import { createSerialMutationQueue } from '../src/mutationQueue';
-import { createFormScriptingController } from '../src/scripting';
+import { createFormScriptingController } from '../src/scripting/controller';
 import { standaloneRealm } from './helpers/standalone-realm';
 
 const ref = (fieldObjectNumber: number) => ({ kind: 'objectNumber' as const, fieldObjectNumber });

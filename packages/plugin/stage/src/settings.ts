@@ -1,5 +1,5 @@
 import { ZoomMode } from '@embedpdf/core-stage';
-import type { ResponsiveRule, StageSettings } from './types';
+import type { ResponsiveRule, StageSettings } from './contract';
 
 /**
  * Out-of-the-box defaults — a sensible document-reading feel. They are JUST
@@ -105,3 +105,11 @@ const valueEq = (a: unknown, b: unknown): boolean => {
  *  covered automatically. (The React `useStageSettings` selector equality.) */
 export const settingsEqual = (a: StageSettings, b: StageSettings): boolean =>
   SETTING_KEYS.every((k) => valueEq(a[k], b[k]));
+
+/** The settings slice of a larger object (state, or a saved view) — derived
+ *  from the registry, so the shape is never spelled out by hand again. */
+export const pickSettings = (src: StageSettings): StageSettings => {
+  const out: Partial<Record<keyof StageSettings, unknown>> = {};
+  for (const k of SETTING_KEYS) out[k] = src[k];
+  return out as StageSettings;
+};

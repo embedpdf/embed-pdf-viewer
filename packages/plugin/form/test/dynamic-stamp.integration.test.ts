@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 
 import { createQuickJsSandbox } from '@embedpdf/core-js-sandbox';
 import { createLocalEngine } from '@embedpdf/engine';
-import { createFormScriptingController } from '../src/scripting';
+import { createFormScriptingController } from '../src/scripting/controller';
 import { standaloneRealm } from './helpers/standalone-realm';
 
 const here = dirname(fileURLToPath(import.meta.url));

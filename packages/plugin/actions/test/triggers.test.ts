@@ -11,8 +11,8 @@ import type {
   PdfPageActions,
 } from '@embedpdf/engine-core/runtime';
 
-import { createActionsCapability } from '../src/capability';
-import { triggerOriginOf } from '../src/types';
+import { createActionsController } from '../src/controller';
+import { triggerOriginOf } from '../src/host-contract';
 import type {
   ActionDiagnostic,
   ActionDispatchEvent,
@@ -20,7 +20,7 @@ import type {
   ActionsConfig,
   ActionsState,
   ActionTrigger,
-} from '../src/types';
+} from '../src/host-contract';
 
 const tree = (root: PdfActionNode | null, incomplete = false): PdfActionTree => ({
   root,
@@ -128,7 +128,7 @@ function harness(opts?: {
     cleanup: (fn: () => void) => cleanups.push(fn),
   } as unknown as PluginContext<ActionsState, ActionsAction>;
 
-  const capability = createActionsCapability(ctx, opts?.config);
+  const capability = createActionsController(ctx, opts?.config);
 
   const seam: string[] = [];
   capability.registerExecutor('named', (node) => {

@@ -15,8 +15,8 @@ import type {
 import type { AnnotationHostCapability } from '@embedpdf/plugin-annotation/internal';
 import { toPageRef, type PageRef } from '@embedpdf/engine-core/runtime';
 
-import { createPlaceHandler } from '../src/handler';
-import type { CreatedField, CreateFieldInput, FormHostCapability } from '../src/types';
+import { createPlaceHandler } from '../src/tools/handlers';
+import type { CreatedField, CreateFieldInput, FormHostCapability } from '../src/host-contract';
 
 const PON = 3;
 const PAGE_REF = toPageRef(PON);

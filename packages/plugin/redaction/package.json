@@ -10,6 +10,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./contract": "./src/contract.ts",
+    "./contract/host": "./src/host-contract.ts",
+    "./internal": "./src/internal.ts",
     "./package.json": "./package.json"
   },
   "publishConfig": {
@@ -40,9 +42,10 @@
   "dependencies": {
     "@embedpdf/core": "workspace:*",
     "@embedpdf/plugin-annotation": "workspace:*",
-    "@embedpdf/plugin-interaction": "workspace:*",
     "@embedpdf/plugin-selection": "workspace:*",
-    "@embedpdf/engine-core": "workspace:*"
+    "@embedpdf/engine-core": "workspace:*",
+    "@embedpdf/plugin-search": "workspace:*",
+    "@embedpdf/core-geometry": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.0.0",

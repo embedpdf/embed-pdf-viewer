@@ -10,3 +10,4 @@ The actions plugin now follows the 3.0 public contract.
 - `registerExecutor` is public (application code can interpret or override an action type); `ActionExecutor` / `ActionExecutorResult` are exported from `/contract`, as are `ActionTriggerEvent`, `eventOf`, `ActionTreeSource`, `ActionPolicyPatch`, `PdfFieldEventKind`, `PdfNamedAction` and `OpenSequenceCompletedEvent`.
 - `originOf(trigger)` is `triggerOriginOf` so it no longer shadows the kernel's `originOf(event)` through the framework barrels.
 - The plugin is defined on `create()`.
+- Internal layout: `contract` / `host-contract` / `model` / `controller` with `services`, `submit`, `scripting`, `dispatch` and `lifecycle` areas; `/internal` no longer exports `createActionsCapability` (the controller is `createActionsController`).

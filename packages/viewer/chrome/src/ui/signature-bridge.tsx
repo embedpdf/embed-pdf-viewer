@@ -13,27 +13,28 @@ import { useShell } from '@embedpdf/react/shell';
 
 export function SignatureBridge() {
   const shell = useShell();
-  useSignatureEvent((event) => {
-    switch (event.type) {
-      case 'target':
-        if (event.field) shell.open('signatures', { exclusive: 'right' });
-        return;
-      case 'ask':
-        shell.open('signature-sign', {
-          exclusive: 'modal',
-          props: { field: event.field, mark: event.mark },
-        });
-        return;
-      case 'inspect':
-        shell.open('signature-inspector', { props: { field: event.field } });
-        return;
-      case 'invalidating':
-        // The notice lives in the signatures panel; make sure it is seen.
-        shell.open('signatures', { exclusive: 'right' });
-        return;
-      default:
-        return;
-    }
-  });
+  useSignatureEvent(
+    (c) => c.onTargetChanged,
+    (event) => {
+      if (event.field) shell.open('signatures', { exclusive: 'right' });
+    },
+  );
+  useSignatureEvent(
+    (c) => c.onSignRequested,
+    (event) =>
+      shell.open('signature-sign', {
+        exclusive: 'modal',
+        props: { field: event.field, mark: event.mark },
+      }),
+  );
+  useSignatureEvent(
+    (c) => c.onInspectionRequested,
+    (event) => shell.open('signature-inspector', { props: { field: event.field } }),
+  );
+  // The notice lives in the signatures panel; make sure it is seen.
+  useSignatureEvent(
+    (c) => c.onInvalidating,
+    () => shell.open('signatures', { exclusive: 'right' }),
+  );
   return null;
 }

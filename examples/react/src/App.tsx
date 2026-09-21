@@ -25,7 +25,7 @@ import { stampPlugin } from '@embedpdf/plugin-stamp';
 import type { StampAsset } from '@embedpdf/plugin-stamp';
 import { i18nPlugin, negotiateLocale } from '@embedpdf/plugin-i18n';
 import { viewManagerPlugin } from '@embedpdf/plugin-view-manager';
-import type { ViewInfo } from '@embedpdf/plugin-view-manager';
+import type { PaneInfo } from '@embedpdf/plugin-view-manager';
 import {
   Viewer,
   Stage,
@@ -49,7 +49,7 @@ import {
   useLayout,
   useStageSettings,
   useDocuments,
-  useViews,
+  usePanes,
   usePageEditor,
   useMetadata,
   useSelector,
@@ -1667,7 +1667,7 @@ function ThumbnailSidebar() {
                   >
                     <button
                       style={itemStyle}
-                      onClick={(e) => act(e, () => editor.rotateBy(page.ref, 90))}
+                      onClick={(e) => act(e, () => editor.rotateBy([page.ref], 90))}
                     >
                       ↻ Rotate
                     </button>
@@ -1675,7 +1675,9 @@ function ThumbnailSidebar() {
                     {page.pageIndex > 0 && (
                       <button
                         style={itemStyle}
-                        onClick={(e) => act(e, () => editor.move([page.ref], page.pageIndex - 1))}
+                        onClick={(e) =>
+                          act(e, () => editor.move([page.ref], { index: page.pageIndex - 1 }))
+                        }
                       >
                         ↑ Move page up
                       </button>
@@ -1683,7 +1685,9 @@ function ThumbnailSidebar() {
                     {page.pageIndex < pageCount - 1 && (
                       <button
                         style={itemStyle}
-                        onClick={(e) => act(e, () => editor.move([page.ref], page.pageIndex + 1))}
+                        onClick={(e) =>
+                          act(e, () => editor.move([page.ref], { index: page.pageIndex + 1 }))
+                        }
                       >
                         ↓ Move page down
                       </button>
@@ -1736,13 +1740,13 @@ function Pane({
   names,
   canRemove,
 }: {
-  view: ViewInfo;
+  view: PaneInfo;
   names: Record<string, string>;
   canRemove: boolean;
 }) {
   const { open, close } = useDocuments();
-  const v = useViews();
-  const focused = view.id === v.focusedViewId;
+  const v = usePanes();
+  const focused = view.id === v.focusedPaneId;
 
   const dropDoc = (e: React.DragEvent, index: number) => {
     const payload = readPayload(e);
@@ -1754,15 +1758,15 @@ function Pane({
   const dropPane = (e: React.DragEvent) => {
     const payload = readPayload(e);
     if (!payload || payload.kind !== 'view' || payload.viewId === view.id) return;
-    v.moveView(
+    v.movePane(
       payload.viewId,
-      v.views.findIndex((x) => x.id === view.id),
+      v.panes.findIndex((x) => x.id === view.id),
     );
   };
 
   return (
     <div
-      onMouseDown={() => v.setFocused(view.id)}
+      onMouseDown={() => v.setFocusedPane(view.id)}
       onDragOver={(e) => e.preventDefault()}
       onDrop={dropPane}
       style={{
@@ -1810,7 +1814,7 @@ function Pane({
               onDragOver={(e) => e.preventDefault()}
               onDrop={(e) => dropDoc(e, i)}
               onClick={() => {
-                v.setFocused(view.id);
+                v.setFocusedPane(view.id);
                 v.setActiveDocument(view.id, docId);
               }}
               style={{
@@ -1849,7 +1853,7 @@ function Pane({
         })}
         <button
           onClick={() => {
-            v.setFocused(view.id);
+            v.setFocusedPane(view.id);
             void newDocument().then((doc) => open(doc.source, { name: doc.name }));
           }}
           title="open a new document in this pane"
@@ -1866,7 +1870,7 @@ function Pane({
         </button>
         {canRemove && (
           <button
-            onClick={() => v.removeView(view.id)}
+            onClick={() => v.removePane(view.id)}
             title="close this pane (documents stay open)"
             style={{
               marginLeft: 'auto',
@@ -1904,7 +1908,7 @@ function Pane({
 function Workspace() {
   const { docs } = useDocuments();
   const t = useT();
-  const { views, createView } = useViews();
+  const { panes: views, createPane: createView } = usePanes();
   const names = useMemo(() => Object.fromEntries(docs.map((d) => [d.id, d.name ?? d.id])), [docs]);
   return (
     <div
@@ -1955,7 +1959,7 @@ const pickFile = (accept: string): Promise<File | null> =>
 
 function FileMenu() {
   const { open, save, saveLayer } = useDocuments();
-  const { views, focusedViewId } = useViews();
+  const { panes: views, focusedPaneId: focusedViewId } = usePanes();
   const focused = views.find((v) => v.id === focusedViewId) ?? views[0];
   const targetId = focused?.activeDocumentId ?? null;
   const [sampleId, setSampleId] = useState(SAMPLES[0].id);

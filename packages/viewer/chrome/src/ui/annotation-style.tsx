@@ -851,7 +851,7 @@ export function AnnotationStylePanel() {
         ),
       )}
       {/* Redaction label (`/OverlayText` + `/Repeat`) — kind content, not a
-          style prop, so it writes through the redaction plugin's setLabel. */}
+          style prop, so it writes through the redaction plugin's updateLabel. */}
       <RedactionLabelSection />
       {/* `/F` flags for whatever is selected — the live flags test surface. */}
       <AnnotationFlagsSection />
@@ -877,7 +877,7 @@ function RedactionLabelSection() {
   const value = draft ?? (mark.raw?.subtype === 'redact' ? mark.raw.overlayText : null) ?? '';
   const commit = () => {
     if (draft === null) return;
-    void redaction.setLabel(mark.ref, { overlayText: draft.length > 0 ? draft : null });
+    void redaction.updateLabel(mark.ref, { overlayText: draft.length > 0 ? draft : null });
     setDraft(null);
   };
 
@@ -899,7 +899,7 @@ function RedactionLabelSection() {
         <input
           type="checkbox"
           checked={mark.raw?.subtype === 'redact' ? mark.raw.repeat : false}
-          onChange={(e) => void redaction.setLabel(mark.ref, { repeat: e.target.checked })}
+          onChange={(e) => void redaction.updateLabel(mark.ref, { repeat: e.target.checked })}
         />
         {t('demo.redactLabelRepeat')}
       </label>

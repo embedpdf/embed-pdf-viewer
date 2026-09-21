@@ -36,7 +36,7 @@ export interface SurfaceHandle {
 export function useSurface(id: string): SurfaceHandle {
   const shell = useOptionalCapability(ShellToken);
   const isOpen = useOptionalSelector(ShellToken, (s) => s.isOpen(id), false);
-  const props = useOptionalSelector(ShellToken, (s) => s.surfaceProps(id), undefined);
+  const props = useOptionalSelector(ShellToken, (s) => s.getSurface(id)?.props, undefined);
   return useMemo(
     () => ({
       isOpen,
@@ -64,7 +64,12 @@ const stringArrayEqual = (a: readonly string[], b: readonly string[]) =>
 /** The dropdown-menu stack for this subtree's document (empty without one). */
 export function useMenus(): MenusHandle {
   const shell = useOptionalCapability(ShellToken);
-  const open = useOptionalSelector(ShellToken, (s) => s.openMenus(), NO_MENUS, stringArrayEqual);
+  const open = useOptionalSelector(
+    ShellToken,
+    (s) => s.listOpenMenus(),
+    NO_MENUS,
+    stringArrayEqual,
+  );
   return useMemo(
     () => ({
       open,

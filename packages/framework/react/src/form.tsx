@@ -240,7 +240,7 @@ function SignatureWidget({ fill, item, page, appearance }: WidgetProps<'signatur
   // re-reads on every new version); the field plane's /V is the fallback.
   const signed = useOptionalSelector(
     SignatureToken,
-    (c) => c.signatureOf(ref)?.signed ?? fill.signed,
+    (c) => c.getSignature(ref)?.signed ?? fill.signed,
     fill.signed,
   );
   const actionable = signature != null && (signed || !fill.disabled);
@@ -256,7 +256,7 @@ function SignatureWidget({ fill, item, page, appearance }: WidgetProps<'signatur
           type="button"
           aria-label={fill.label}
           data-signed={signed ? '' : undefined}
-          onClick={() => (signed ? signature.inspect(ref) : signature.setTarget(ref))}
+          onClick={() => (signed ? signature.requestInspection(ref) : signature.setTarget(ref))}
           style={{
             ...fillControl,
             padding: 0,
@@ -919,7 +919,7 @@ function FillSignature({
   const ref = item.fieldRef;
   const signed = useOptionalSelector(
     SignatureToken,
-    (c) => c.signatureOf(ref)?.signed ?? item.signed,
+    (c) => c.getSignature(ref)?.signed ?? item.signed,
     item.signed,
   );
   const actionable = signature != null && (signed || !item.disabled);
@@ -930,7 +930,7 @@ function FillSignature({
           type="button"
           aria-label={item.label}
           data-signed={signed ? '' : undefined}
-          onClick={() => (signed ? signature.inspect(ref) : signature.setTarget(ref))}
+          onClick={() => (signed ? signature.requestInspection(ref) : signature.setTarget(ref))}
           style={{
             ...fillControl,
             padding: 0,

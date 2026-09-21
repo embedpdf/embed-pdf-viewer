@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { negotiateLocale } from './negotiate';
-import { i18nReducer, initialI18nState } from './reducer';
+import { i18nReducer, initialI18nState, type I18nState } from './model';
 import { interpolate, translate } from './translate';
-import type { I18nState, Locale } from './types';
+import type { Locale } from './contract';
 
 const en: Locale = {
   code: 'en',

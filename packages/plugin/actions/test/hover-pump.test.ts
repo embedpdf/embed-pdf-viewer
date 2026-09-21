@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { toPageRef, type AnnotationRef } from '@embedpdf/engine-core/runtime';
 
 import { createHoverPump, type HoverTarget } from '../src/hover-pump';
-import type { ActionTrigger, ActionTriggerResult } from '../src/types';
+import type { ActionTrigger, ActionTriggerResult } from '../src/host-contract';
 
 const ref = (objectNumber: number): AnnotationRef => ({
   kind: 'objectNumber',

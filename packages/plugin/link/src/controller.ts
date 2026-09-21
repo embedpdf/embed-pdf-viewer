@@ -16,15 +16,14 @@ import { destinationToReveal } from '@embedpdf/plugin-stage/destination';
 import { loadLinksPage } from './source';
 import type {
   Link,
-  LinkAction,
   LinkActivateContext,
   LinkActivatedEvent,
   LinkActivation,
-  LinkHostCapability,
   LinkLoadedEvent,
   LinkResolution,
-  LinkState,
-} from './types';
+} from './contract';
+import type { LinkHostCapability } from './host-contract';
+import type { LinkAction, LinkState } from './model';
 
 const EMPTY: readonly Link[] = Object.freeze([]);
 const USER_ORIGIN: ChangeOrigin = {

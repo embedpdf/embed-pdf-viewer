@@ -10,7 +10,7 @@
  * calls once. These helpers are the proof that the two capability calls are
  * all a store needs.
  */
-import type { StampCapability } from './types';
+import type { StampCapability } from './contract';
 
 /** The persistence port: bytes by library id. */
 export interface StampLibraryStore {

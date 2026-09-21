@@ -16,7 +16,7 @@ import { I18nToken } from '@embedpdf/plugin-i18n';
 import type { LocaleInfo, TranslateOptions } from '@embedpdf/plugin-i18n';
 import { useCapability, useKernelValue, useSelector } from './runtime';
 
-/** The raw i18n capability (t / setLocale / locales / dir / …). */
+/** The raw i18n capability (t / setLocale / listLocales / getDirection / …). */
 export const useI18n = () => useCapability(I18nToken);
 
 /**
@@ -33,7 +33,7 @@ export function useT(): (key: string, options?: TranslateOptions) => string {
   return useMemo(() => (key, options) => i18n.t(key, options), [i18n, slice]);
 }
 
-const localeListEqual = (a: LocaleInfo[], b: LocaleInfo[]): boolean =>
+const localeListEqual = (a: readonly LocaleInfo[], b: readonly LocaleInfo[]): boolean =>
   a.length === b.length &&
   a.every((x, i) => x.code === b[i].code && x.name === b[i].name && x.loaded === b[i].loaded);
 
@@ -45,15 +45,16 @@ const localeListEqual = (a: LocaleInfo[], b: LocaleInfo[]): boolean =>
 export function useLocale(): {
   locale: string;
   dir: 'ltr' | 'rtl';
-  locales: LocaleInfo[];
+  locales: readonly LocaleInfo[];
   /** Code of a lazy pack being fetched, if any — show a spinner on it. */
   loading: string | null;
-  setLocale: (code: string) => void;
+  /** Resolves once the locale is usable (a lazy pack is fetched first). */
+  setLocale: (code: string) => Promise<void>;
 } {
   const i18n = useCapability(I18nToken);
-  const locale = useSelector(I18nToken, (c) => c.locale());
-  const dir = useSelector(I18nToken, (c) => c.dir());
-  const loading = useSelector(I18nToken, (c) => c.loading());
-  const locales = useSelector(I18nToken, (c) => c.locales(), localeListEqual);
+  const locale = useSelector(I18nToken, (c) => c.getLocale());
+  const dir = useSelector(I18nToken, (c) => c.getDirection());
+  const loading = useSelector(I18nToken, (c) => c.getLoadingLocale());
+  const locales = useSelector(I18nToken, (c) => c.listLocales(), localeListEqual);
   return { locale, dir, locales, loading, setLocale: i18n.setLocale };
 }

@@ -9,7 +9,7 @@ import { toPageRef, type AnnotationRef } from '@embedpdf/engine-core/runtime';
 
 import { actionsPlugin } from '../src/actions.plugin';
 import { ActionsToken } from '../src/internal';
-import type { ActionsHostCapability, ActionsConfig } from '../src/types';
+import type { ActionsHostCapability, ActionsConfig } from '../src/host-contract';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const fixture = (name: string) =>

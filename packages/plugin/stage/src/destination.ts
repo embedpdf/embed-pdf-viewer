@@ -19,7 +19,7 @@
 import { applyPoint, pageGeometry } from '@embedpdf/core-geometry';
 import type { Rect } from '@embedpdf/core-geometry';
 import type { PageLayout, PdfDestination } from '@embedpdf/core';
-import type { RevealOptions } from './types';
+import type { RevealOptions } from './contract';
 
 export interface DestinationReveal {
   /** Display index for `reveal()` — from the layout row. */

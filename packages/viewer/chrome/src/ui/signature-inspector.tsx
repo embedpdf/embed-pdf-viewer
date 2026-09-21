@@ -65,8 +65,8 @@ export function SignatureInspector() {
   const verdicts = useSignatureVerdicts();
   const [validating, setValidating] = useState(false);
   const field = surface.props?.field as FormFieldRef | undefined;
-  const dto = field ? signature.signatureOf(field) : null;
-  const verdict = field ? signature.verdictOf(field) : null;
+  const dto = field ? signature.getSignature(field) : null;
+  const verdict = field ? signature.getVerdict(field) : null;
   const widget = dto?.widget ?? null;
   const box = useSelector(FormHostToken, (c) =>
     widget && widget.annotObjectNumber > 0
@@ -180,14 +180,14 @@ export function SignatureInspector() {
 function DownloadRevision({ field }: { field: FormFieldRef }) {
   const t = useT();
   const signature = useSignature();
-  const dto = signature.signatureOf(field);
+  const dto = signature.getSignature(field);
   const [busy, setBusy] = useState(false);
   if (!dto || dto.revisionIndex === null) return null;
   const revisionIndex = dto.revisionIndex;
   const run = async () => {
     setBusy(true);
     try {
-      const bytes = await signature.revisionBytes(revisionIndex);
+      const bytes = await signature.readRevision({ revisionIndex });
       const blob = new Blob([bytes as BlobPart], { type: 'application/pdf' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');

@@ -1,8 +1,9 @@
+import { annotationKey } from '@embedpdf/core';
 import { RedactionToken } from '@embedpdf/plugin-redaction';
 import type {
   RedactionApplyResult,
   RedactionCapability,
-  RedactionPendingItem,
+  RedactionMark,
 } from '@embedpdf/plugin-redaction';
 import { useCapability, useSelector } from './runtime';
 
@@ -12,7 +13,7 @@ import { useCapability, useSelector } from './runtime';
  * `redact` tool); `useRedaction` surfaces the workflow around it.
  *
  *   const redaction = useRedaction();
- *   redaction.toggleRedact();
+ *   await redaction.markSelection();
  *   await redaction.applyAll();          // irreversible — confirm first
  */
 
@@ -25,17 +26,19 @@ export function useRedaction(): RedactionCapability & {
 } {
   const cap = useCapability(RedactionToken);
   const applying = useSelector(RedactionToken, (c) => c.isApplying());
-  const lastApplyResult = useSelector(RedactionToken, (c) => c.lastResult());
+  const lastApplyResult = useSelector(RedactionToken, (c) => c.getLastResult());
   return { ...cap, applying, lastApplyResult };
 }
 
-/** The pending marks, reactive against the annotation plane. Note the view
- *  covers LOADED pages — call `preparePending()` (e.g. on panel open) to load
- *  the whole document. */
-export function usePendingRedactions(): RedactionPendingItem[] {
-  return useSelector(RedactionToken, (c) => c.getPending(), pendingEqual);
+/** The pending marks, reactive against the annotation plane. */
+export function usePendingRedactions(): readonly RedactionMark[] {
+  return useSelector(RedactionToken, (c) => c.listPending(), pendingEqual);
 }
 
-const pendingEqual = (a: RedactionPendingItem[], b: RedactionPendingItem[]): boolean =>
+const pendingEqual = (a: readonly RedactionMark[], b: readonly RedactionMark[]): boolean =>
   a.length === b.length &&
-  a.every((item, i) => item.id === b[i]!.id && item.overlayText === b[i]!.overlayText);
+  a.every(
+    (item, i) =>
+      annotationKey(item.ref) === annotationKey(b[i]!.ref) &&
+      item.overlayText === b[i]!.overlayText,
+  );

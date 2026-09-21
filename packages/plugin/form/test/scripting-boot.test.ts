@@ -15,7 +15,7 @@ import {
 import type { ScriptSandbox } from '@embedpdf/core-js-sandbox';
 import type { ScriptInput, ScriptOutput } from '@embedpdf/core-acrojs';
 
-import { createFormScriptingController } from '../src/scripting';
+import { createFormScriptingController } from '../src/scripting/controller';
 import { standaloneRealm } from './helpers/standalone-realm';
 
 const okEvent = (value: unknown = '') => ({

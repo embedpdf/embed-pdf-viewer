@@ -12,7 +12,7 @@
     "./contract": "./src/contract.ts",
     "./contract/host": "./src/host-contract.ts",
     "./internal": "./src/internal.ts",
-    "./scripting": "./src/scripting.ts",
+    "./scripting": "./src/scripting/controller.ts",
     "./package.json": "./package.json"
   },
   "publishConfig": {

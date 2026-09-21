@@ -10,7 +10,7 @@ import { toPageRef, type PdfActionNode, type PdfActionTree } from '@embedpdf/eng
 
 import { actionsPlugin } from '../src/actions.plugin';
 import { ActionsToken } from '../src/internal';
-import type { ActionsHostCapability, AnnotCommitEntry } from '../src/types';
+import type { ActionsHostCapability, AnnotCommitEntry } from '../src/host-contract';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const fixturePath = resolve(

@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { toPageRef, type PluginContext } from '@embedpdf/core';
-import { createStageCapability } from '../src/capability';
-import { initialStageState, stageReducer } from '../src/reducer';
+import { createStageController } from '../src/controller';
+import { initialStageState, stageReducer } from '../src/model';
 import { DEFAULT_SETTINGS, settingsEqual } from '../src/settings';
 import { stagePlugin } from '../src/stage.plugin';
-import type { StageAction, StageCapability, StageConfig, StageState } from '../src/types';
+import type { StageAction, StageCapability, StageConfig, StageState } from '../src/host-contract';
 
 /**
  * Kernel-free harness: drive the real capability against the real reducer + real
@@ -56,7 +56,7 @@ function harness(
     document: () => meta,
   } as unknown as PluginContext<StageState, StageAction>;
 
-  stage = createStageCapability(ctx, config);
+  stage = createStageController(ctx, config);
   // Mirror the real lifecycle: the shell reports the viewport — initial placement
   // is level-triggered inside setViewport (no manual placeInitial; that's the fix
   // for the "page stuck at top-left until the first scroll" race).

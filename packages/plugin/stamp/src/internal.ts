@@ -1,7 +1,7 @@
 /** @embedpdf/plugin-stamp/internal — the PDF conventions a library file follows; not for application code. */
 export * from './host-contract';
-export { createStampCapability } from './capability';
-export { initialStampState, stampReducer } from './reducer';
+export { createStampController } from './controller';
+export { initialStampState, stampReducer } from './model';
 export {
   parseStampKey,
   stampKey,

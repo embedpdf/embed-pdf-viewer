@@ -12,7 +12,7 @@ import { annotationPlugin } from '@embedpdf/plugin-annotation';
 import { interactionPlugin } from '@embedpdf/plugin-interaction';
 
 import { formPlugin } from '../src/form.plugin';
-import { FormToken } from '../src/types';
+import { FormToken } from '../src/host-contract';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const fixturePath = resolve(

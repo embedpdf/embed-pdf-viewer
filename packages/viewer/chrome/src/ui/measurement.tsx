@@ -78,18 +78,19 @@ export function MeasurementSection() {
     (c) =>
       anno
         .listSelected()
-        .map((d) => c.readout(d.ref))
+        .map((d) => c.getReadout(d.ref))
         .filter((r): r is MeasurementReadout => !('unavailable' in r)),
     (a, b) => JSON.stringify(a) === JSON.stringify(b),
   );
-  const reports = useSelector(MeasurementToken, (c) => c.lastReports());
+  const reports = useSelector(MeasurementToken, (c) => c.listLastReports());
   const [allPages, setAllPages] = useState(false);
 
   const [recalculate, setRecalculate] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const disabled = !page || measurement.busy || !measurement.canCalibratePage || !scale?.ready;
   const rectilinear = scale?.measure?.subtype === 'RL' ? scale.measure : null;
-  const options = { allPages, recalculate };
+  const target = allPages ? 'all' : page!;
+  const options = { recalculate };
   const run = async (work: () => Promise<unknown>) => {
     setError(null);
     try {
@@ -139,12 +140,12 @@ export function MeasurementSection() {
           className={control}
           value=""
           disabled={disabled}
-          onChange={(e) => void run(() => measurement.setPreset(page!, e.target.value, options))}
+          onChange={(e) => void run(() => measurement.setPreset(target, e.target.value, options))}
         >
           <option value="" disabled>
             {t('measurement.choosePreset')}
           </option>
-          {measurement.presets().map((p) => (
+          {measurement.listPresets().map((p) => (
             <option key={p.id} value={p.id}>
               {p.label}
             </option>
@@ -159,17 +160,17 @@ export function MeasurementSection() {
           value={rectilinear?.distance[0]?.unit.trim() ?? ''}
           disabled={disabled || !rectilinear}
           onChange={(e) =>
-            void run(() =>
-              measurement.setUnit(page!, e.target.value as LengthUnit, undefined, options),
-            )
+            void run(() => measurement.setUnit(target, e.target.value as LengthUnit, options))
           }
         >
-          {!measurement.units().includes(rectilinear?.distance[0]?.unit.trim() as LengthUnit) && (
+          {!measurement
+            .listUnits()
+            .includes(rectilinear?.distance[0]?.unit.trim() as LengthUnit) && (
             <option value={rectilinear?.distance[0]?.unit.trim() ?? ''}>
               {t('measurement.custom')}
             </option>
           )}
-          {measurement.units().map((u) => (
+          {measurement.listUnits().map((u) => (
             <option key={u} value={u}>
               {u}
             </option>
@@ -184,17 +185,17 @@ export function MeasurementSection() {
           value={rectilinear?.area[0]?.unit.trim().replace('²', '2') ?? ''}
           disabled={disabled || !rectilinear}
           onChange={(e) =>
-            void run(() => measurement.setAreaUnit(page!, e.target.value as AreaUnit, options))
+            void run(() => measurement.setAreaUnit(target, e.target.value as AreaUnit, options))
           }
         >
           {!measurement
-            .areaUnits()
+            .listAreaUnits()
             .includes(rectilinear?.area[0]?.unit.trim().replace('²', '2') as AreaUnit) && (
             <option value={rectilinear?.area[0]?.unit.trim().replace('²', '2') ?? ''}>
               {t('measurement.custom')}
             </option>
           )}
-          {measurement.areaUnits().map((unit) => (
+          {measurement.listAreaUnits().map((unit) => (
             <option key={unit} value={unit}>
               {unit.replace('2', '²')}
             </option>
@@ -209,7 +210,7 @@ export function MeasurementSection() {
           value={precision}
           disabled={disabled || !rectilinear}
           onChange={(e) =>
-            void run(() => measurement.setPrecision(page!, Number(e.target.value), options))
+            void run(() => measurement.setPrecision(target, Number(e.target.value), options))
           }
         >
           {![1, 10, 100, 1000, 10000].includes(precision) && (
@@ -294,7 +295,7 @@ export function CalibrationDialog() {
   const t = useT();
 
   const measurement = useMeasurement();
-  const request = useSelector(MeasurementToken, (c) => c.calibrationRequest());
+  const request = useSelector(MeasurementToken, (c) => c.getCalibrationRequest());
   const input = useRef<HTMLInputElement>(null);
   const [value, setValue] = useState('');
 
@@ -313,11 +314,13 @@ export function CalibrationDialog() {
     setError(null);
     try {
       await measurement.calibrate(
-        request.page,
-        request.from,
-        request.to,
-        { value: Number(value), unit },
-        { allPages, recalculate },
+        {
+          page: request.page,
+          from: request.from,
+          to: request.to,
+          distance: { value: Number(value), unit },
+        },
+        { recalculate, applyTo: allPages ? 'all' : undefined },
       );
       measurement.dismissCalibration();
     } catch (e) {
@@ -366,7 +369,7 @@ export function CalibrationDialog() {
             value={unit}
             onChange={(e) => setUnit(e.target.value as LengthUnit)}
           >
-            {measurement.units().map((u) => (
+            {measurement.listUnits().map((u) => (
               <option key={u}>{u}</option>
             ))}
           </select>

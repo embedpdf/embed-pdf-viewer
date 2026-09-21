@@ -12,5 +12,5 @@
     "lib": ["ES2020"]
   },
   "include": ["src"],
-  "exclude": ["node_modules", "dist", "**/*.test.ts"]
+  "exclude": ["node_modules", "dist", "test"]
 }

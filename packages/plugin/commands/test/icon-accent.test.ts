@@ -1,9 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { PluginContext } from '@embedpdf/core';
-import { createCommandsCapability } from '../src/capability';
-import type { CommandRegistry } from '../src/capability';
-import { registerCommand } from '../src/capability';
-import type { CommandDef, CommandsAction, CommandsState } from '../src/types';
+import type { CommandDef } from '../src/contract';
+import { createCommandsController } from '../src/controller';
+import type { CommandsAction, CommandsState } from '../src/model';
 
 /**
  * The iconAccent derivation is transport: resolve() evaluates it like the
@@ -13,6 +12,7 @@ import type { CommandDef, CommandsAction, CommandsState } from '../src/types';
 const ctx = {
   getState: () => ({ disabledCategories: [] }),
   core: () => ({ activeId: null }),
+  cleanup: () => {},
   get: () => {
     throw new Error('no provider');
   },
@@ -21,11 +21,7 @@ const ctx = {
   },
 } as unknown as PluginContext<CommandsState, CommandsAction>;
 
-const capabilityWith = (def: CommandDef) => {
-  const registry: CommandRegistry = new Map();
-  registerCommand(registry, def);
-  return createCommandsCapability(ctx, registry);
-};
+const capabilityWith = (def: CommandDef) => createCommandsController(ctx, { commands: [def] });
 
 describe('resolve() carries iconAccent', () => {
   it('a derived accent lands on the resolved command', () => {
@@ -35,7 +31,7 @@ describe('resolve() carries iconAccent', () => {
       icon: 'square',
       iconAccent: () => ({ primary: '#e5484d', secondary: '#ffffff' }),
     });
-    expect(commands.resolve('tool:square')?.iconAccent).toEqual({
+    expect(commands.resolveCommand('tool:square')?.iconAccent).toEqual({
       primary: '#e5484d',
       secondary: '#ffffff',
     });
@@ -43,9 +39,9 @@ describe('resolve() carries iconAccent', () => {
 
   it('null and absent derivations resolve to undefined (plain icon)', () => {
     const none = capabilityWith({ id: 'a', labelKey: 'a', iconAccent: () => null });
-    expect(none.resolve('a')?.iconAccent).toBeUndefined();
+    expect(none.resolveCommand('a')?.iconAccent).toBeUndefined();
     const absent = capabilityWith({ id: 'b', labelKey: 'b' });
-    expect(absent.resolve('b')?.iconAccent).toBeUndefined();
+    expect(absent.resolveCommand('b')?.iconAccent).toBeUndefined();
   });
 
   it('a throwing derivation falls back to no accent, like the other derivations', () => {
@@ -54,7 +50,7 @@ describe('resolve() carries iconAccent', () => {
       labelKey: 'ink',
       iconAccent: (c) => ({ primary: (c.get as () => never)() }),
     });
-    const resolved = commands.resolve('tool:ink');
+    const resolved = commands.resolveCommand('tool:ink');
     expect(resolved).not.toBeNull(); // the button still renders…
     expect(resolved?.iconAccent).toBeUndefined(); // …just untinted
   });

@@ -14,7 +14,7 @@ import {
 
 import { actionsPlugin } from '../src/actions.plugin';
 import { ActionsToken } from '../src/internal';
-import type { ActionsHostCapability } from '../src/types';
+import type { ActionsHostCapability } from '../src/host-contract';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const fixturePath = resolve(

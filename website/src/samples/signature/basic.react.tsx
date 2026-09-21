@@ -136,7 +136,7 @@ function SignBar() {
   };
 
   if (!person) return <Readout>Creating a signature…</Readout>;
-  const verdict = field && signature.verdictOf(field.field);
+  const verdict = field && signature.getVerdict(field.field);
   return (
     <Toolbar>
       <Readout>{person.name}</Readout>

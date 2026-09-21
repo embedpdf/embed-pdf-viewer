@@ -1,6 +1,5 @@
 export { signaturePlugin } from './signature.plugin';
 export * from './contract';
-export { createArmedMarkHandler } from './handler';
 // The signer ports, re-exported so a viewer configures signing from one import.
 export {
   createTestSigner,

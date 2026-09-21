@@ -9,7 +9,7 @@ import { actionsPlugin } from '@embedpdf/plugin-actions';
 import { ActionsToken as ActionsHostToken } from '@embedpdf/plugin-actions/contract/host';
 
 import { stagePlugin } from '../src/stage.plugin';
-import { StageToken } from '../src/types';
+import { StageToken } from '../src/host-contract';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const fixturePath = resolve(

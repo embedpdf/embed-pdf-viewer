@@ -83,9 +83,9 @@ export function createViewerHandle(kernel: Kernel): ViewerHandle {
       tryGet: (token) => kernel.tryCapability(token, documentId),
     }),
     watch,
-    execute: (id, documentId) => commands().execute(id, documentId),
-    resolve: (id, documentId) => commands().resolve(id, documentId) ?? null,
+    execute: (id, documentId) => void commands().execute(id, { documentId }),
+    resolve: (id, documentId) => commands().resolveCommand(id, documentId) ?? null,
     watchCommand: (id, cb) =>
-      watch(() => commands().resolve(id) ?? null, cb, resolvedCommandsEqual),
+      watch(() => commands().resolveCommand(id) ?? null, cb, resolvedCommandsEqual),
   };
 }

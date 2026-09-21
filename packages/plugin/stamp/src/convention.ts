@@ -13,7 +13,7 @@
  * `=` is its own label. `#` is never stripped — it is part of the identity.
  */
 import type { PieceInfoPatch } from '@embedpdf/engine-core/runtime';
-import type { StampAssetKind } from './types';
+import type { StampAssetKind } from './contract';
 
 export interface StampKey {
   name: string;

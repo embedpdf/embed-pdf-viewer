@@ -8,6 +8,7 @@
  *   await signature.placeMark({ assetId }, { field: target });   // sign / fill / ask, by mode
  */
 import { useMemo } from 'react';
+import type { EventHook } from '@embedpdf/core';
 import {
   markRoleOf,
   SIGNATURES_LIBRARY_KIND,
@@ -15,7 +16,6 @@ import {
   type DocumentProtection,
   type FormFieldRef,
   type SignatureCapability,
-  type SignatureChange,
   type SignatureSnapshot,
   type SignatureVerdict,
 } from '@embedpdf/plugin-signature';
@@ -34,29 +34,32 @@ export function useSignature(): SignatureCapability {
 
 /** The last signature snapshot (null until the first read lands). */
 export function useSignatureSnapshot(): SignatureSnapshot | null {
-  return useSelector(SignatureToken, (c) => c.snapshot());
+  return useSelector(SignatureToken, (c) => c.getSnapshot());
 }
 
 /** The last validation (null until one ran). */
-export function useSignatureVerdicts(): SignatureVerdict[] | null {
-  return useSelector(SignatureToken, (c) => c.verdicts());
+export function useSignatureVerdicts(): readonly SignatureVerdict[] | null {
+  return useSelector(SignatureToken, (c) => c.listVerdicts());
 }
 
 /** What the document's signatures forbid (null when nothing is signed or not yet read). */
 export function useDocumentProtection(): DocumentProtection | null {
-  return useSelector(SignatureToken, (c) => c.protection());
+  return useSelector(SignatureToken, (c) => c.getProtection());
 }
 
 /** The field the next picked mark goes to, and whether a sign/fill is in flight. */
 export function useSignatureTarget(): { target: FormFieldRef | null; busy: boolean } {
-  const target = useSelector(SignatureToken, (c) => c.target());
-  const busy = useSelector(SignatureToken, (c) => c.busy());
+  const target = useSelector(SignatureToken, (c) => c.getTarget());
+  const busy = useSelector(SignatureToken, (c) => c.isBusy());
   return { target, busy };
 }
 
-/** Subscribe to the plugin's change events (signed / filled / ask / inspect / target / validated …). */
-export function useSignatureEvent(handler: (event: SignatureChange) => void): void {
-  useCapabilityEvent(SignatureToken, (c) => c.onChanged, handler);
+/** Subscribe to one of the plugin's events for the mounted lifetime: `useSignatureEvent((c) => c.onSigned, handler)`. */
+export function useSignatureEvent<T>(
+  select: (signature: SignatureCapability) => EventHook<T>,
+  handler: (event: T) => void,
+): void {
+  useCapabilityEvent(SignatureToken, select, handler);
 }
 
 /** One person: a library of kind `signatures` with its marks split by role. */

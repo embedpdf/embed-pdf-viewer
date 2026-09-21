@@ -8,14 +8,14 @@ import type {
   SubmitFormPayload,
 } from '@embedpdf/engine-core/runtime';
 
-import { createActionsCapability } from '../src/capability';
+import { createActionsController } from '../src/controller';
 import type {
   ActionContext,
   ActionDiagnostic,
   ActionsAction,
   ActionsConfig,
   ActionsState,
-} from '../src/types';
+} from '../src/host-contract';
 
 const USER: ActionContext = {
   origin: 'user',
@@ -114,7 +114,7 @@ function docHarness(options: {
     tryGet: () => null,
     cleanup: () => undefined,
   } as unknown as PluginContext<ActionsState, ActionsAction>;
-  const capability = createActionsCapability(ctx, { openSequence: 'off', ...options.config });
+  const capability = createActionsController(ctx, { openSequence: 'off', ...options.config });
   const log: string[] = [];
   capability.registerExecutor('javascript', (node) => {
     if (node.type === 'javascript') log.push(node.script);

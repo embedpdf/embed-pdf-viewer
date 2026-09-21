@@ -1,10 +1,12 @@
 import type { CapabilityToken, PageRef, Unsubscribe } from '@embedpdf/core';
 import type { Point, Rect } from '@embedpdf/core-geometry';
 import type { Camera, ScrollMetrics, Size } from '@embedpdf/core-stage';
-import { StageToken as PublicStageToken } from './types';
-import type { StageCapability, StageViewState, ViewportPoint } from './types';
+
+import type { StageCapability, StageViewState, ViewportPoint } from './contract';
+import { StageToken as PublicStageToken } from './token';
 
 export * from './contract';
+export type { StageAction, StageState } from './model';
 
 /**
  * The host lens: what the surface binding, gesture controller and sibling

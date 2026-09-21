@@ -19,7 +19,7 @@ import {
   type PdfActionTree,
 } from '@embedpdf/engine-core/runtime';
 
-import { createFormScriptingController } from '../src/scripting';
+import { createFormScriptingController } from '../src/scripting/controller';
 import { standaloneRealm } from './helpers/standalone-realm';
 
 const ref = (fieldObjectNumber: number) => ({ kind: 'objectNumber' as const, fieldObjectNumber });

@@ -2,7 +2,7 @@ import type {
   InteractionHostCapability,
   InteractionHandler,
 } from '@embedpdf/plugin-interaction/contract/host';
-import type { StageCapability } from './types';
+import type { StageCapability } from './contract';
 
 export interface ScrollHandlerOptions {
   /**

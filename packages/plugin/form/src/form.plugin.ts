@@ -9,12 +9,14 @@ import { AnnotationToken } from '@embedpdf/plugin-annotation/contract';
 import { AnnotationToken as AnnotationHostToken } from '@embedpdf/plugin-annotation/contract/host';
 import { InteractionToken } from '@embedpdf/plugin-interaction/contract/host';
 
-import { createFormController } from './capability';
-import { createPlaceHandler } from './handler';
-import { formReducer, initialFormState } from './reducer';
-import { FORM_TOOLS, PLACE_TAGS } from './tools';
-import { FormToken } from './types';
-import type { FormAction, FormConfig, FormHostCapability, FormState } from './types';
+import type { FormConfig } from './contract';
+import { createFormController } from './controller';
+import { FormToken } from './host-contract';
+import type { FormHostCapability } from './host-contract';
+import { formReducer, initialFormState } from './model';
+import type { FormAction, FormState } from './model';
+import { FORM_TOOLS, PLACE_TAGS } from './tools/definitions';
+import { createPlaceHandler } from './tools/handlers';
 
 /**
  * The form plugin: the FIELD plane. Document-scoped; requires the

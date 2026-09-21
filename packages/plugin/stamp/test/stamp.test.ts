@@ -15,10 +15,10 @@ import type { DocumentMeta, PluginContext } from '@embedpdf/core';
 import { createLocalEngine } from '@embedpdf/engine';
 import type { ScriptRealmTarget } from '@embedpdf/plugin-actions/contract/host';
 
-import { createScriptRealmFactory } from '../../actions/src/script-environment';
-import { createStampCapability } from '../src/capability';
-import { initialStampState, stampReducer } from '../src/reducer';
-import type { StampAction, StampState } from '../src/types';
+import { createScriptRealmFactory } from '../../actions/src/scripting/environment';
+import { createStampController } from '../src/controller';
+import { initialStampState, stampReducer } from '../src/model';
+import type { StampAction, StampState } from '../src/host-contract';
 
 /** Minimal PDF bytes — enough for the magic-byte sniff. */
 const pdfBytes = () => new TextEncoder().encode('%PDF-1.7\n%fake fixture\n');
@@ -270,7 +270,7 @@ function makeAssetEngine(
 describe('stamp plugin — library import', () => {
   it('imports a PDF: one vector asset per page, previews cached, doc closed', async () => {
     const { engine, close, extract, names, title } = makeAssetEngine(2);
-    const cap = createStampCapability(makeCtx(engine));
+    const cap = createStampController(makeCtx(engine));
 
     const libraryId = await cap.importLibrary(pdfBytes(), { name: 'Approvals' });
 
@@ -322,7 +322,7 @@ describe('stamp plugin — library import', () => {
         },
       },
     });
-    const cap = createStampCapability(makeCtx(engine));
+    const cap = createStampController(makeCtx(engine));
 
     const libraryId = await cap.importLibrary(pdfBytes());
 
@@ -359,7 +359,7 @@ describe('stamp plugin — library import', () => {
       names: { 'Approved=Goedgekeurd': 101, '#alpha=Alpha': 100, 'Draft=Concept': 102 },
       templates: { 'Tpl=Hidden': 900 },
     });
-    const cap = createStampCapability(makeCtx(engine));
+    const cap = createStampController(makeCtx(engine));
 
     const libraryId = await cap.importLibrary(pdfBytes(), { name: 'ignored fallback' });
 
@@ -381,7 +381,7 @@ describe('stamp plugin — library import', () => {
     const { engine } = makeAssetEngine(2, {
       names: { 'Approved=One': 100, 'Approved=Two': 101 },
     });
-    const cap = createStampCapability(makeCtx(engine));
+    const cap = createStampController(makeCtx(engine));
     await expect(cap.importLibrary(pdfBytes())).rejects.toMatchObject({
       code: EngineErrorCode.InvalidArg,
       message: expect.stringContaining("duplicate stamp identifier 'Approved'"),
@@ -390,7 +390,7 @@ describe('stamp plugin — library import', () => {
 
   it('rejects non-PDF bytes with InvalidArg', async () => {
     const { engine } = makeAssetEngine(1);
-    const cap = createStampCapability(makeCtx(engine));
+    const cap = createStampController(makeCtx(engine));
     await expect(cap.importLibrary(pngBytes())).rejects.toMatchObject({
       code: EngineErrorCode.InvalidArg,
     });
@@ -405,7 +405,7 @@ describe('stamp plugin — library import', () => {
         );
       },
     } as unknown as Engine;
-    const cap = createStampCapability(makeCtx(cloudish));
+    const cap = createStampController(makeCtx(cloudish));
     await expect(cap.importLibrary(pdfBytes())).rejects.toMatchObject({
       code: EngineErrorCode.NotImplemented,
       message: expect.stringContaining('assetEngine'),
@@ -416,7 +416,7 @@ describe('stamp plugin — library import', () => {
 describe('stamp plugin — assets', () => {
   it('a raster asset becomes a PAGE: blank page its size, image flattened in, registered', async () => {
     const { engine, insertBlank, createAnnotation, flatten, names, title } = makeAssetEngine(0);
-    const cap = createStampCapability(makeCtx(engine));
+    const cap = createStampController(makeCtx(engine));
     const id = await cap.createAsset({ name: 'Logo', label: 'Company logo', source: pngBytes() });
 
     // No library named → one of its own, a real PDF titled after the label.
@@ -441,7 +441,7 @@ describe('stamp plugin — assets', () => {
 
   it('a PDF asset needs no size — its page has one; a supplied preview wins', async () => {
     const { engine } = makeAssetEngine(0);
-    const cap = createStampCapability(makeCtx(engine));
+    const cap = createStampController(makeCtx(engine));
     const id = await cap.createAsset({ name: 'Sig', source: pdfBytes(), preview: pngBytes() });
     expect(cap.getAsset(id)).toMatchObject({
       size: { width: 300, height: 120 },
@@ -452,7 +452,7 @@ describe('stamp plugin — assets', () => {
 
   it('createLibrary makes an empty PDF library; removing the last asset keeps it', async () => {
     const { engine, deletePages } = makeAssetEngine(0);
-    const cap = createStampCapability(makeCtx(engine));
+    const cap = createStampController(makeCtx(engine));
     const seen: string[] = [];
     cap.onLibraryChanged((c) => seen.push(c.reason));
     const libraryId = await cap.createLibrary('Mine', { id: 'mine', categories: ['custom'] });
@@ -474,7 +474,7 @@ describe('stamp plugin — assets', () => {
 
   it('appends a PDF page to a canonical library and writes its PieceInfo', async () => {
     const { engine, insert, pageEntries, names } = makeAssetEngine(1);
-    const cap = createStampCapability(makeCtx(engine));
+    const cap = createStampController(makeCtx(engine));
     const libraryId = await cap.importLibrary(pdfBytes());
 
     const id = await cap.createAsset({
@@ -512,7 +512,7 @@ describe('stamp plugin — assets', () => {
 
   it('rejects a duplicate identifier within a library', async () => {
     const { engine, insert } = makeAssetEngine(1);
-    const cap = createStampCapability(makeCtx(engine));
+    const cap = createStampController(makeCtx(engine));
     const libraryId = await cap.importLibrary(pdfBytes());
 
     await expect(
@@ -523,7 +523,7 @@ describe('stamp plugin — assets', () => {
 
   it('deletes a canonical page before removing its asset descriptor', async () => {
     const { engine, deletePages } = makeAssetEngine(2);
-    const cap = createStampCapability(makeCtx(engine));
+    const cap = createStampController(makeCtx(engine));
     const libraryId = await cap.importLibrary(pdfBytes());
     const [asset] = cap.listAssets({ libraryId: libraryId });
 
@@ -539,7 +539,7 @@ describe('stamp plugin — assets', () => {
 
   it('serializes concurrent removals: each rewrite starts from the previous bytes', async () => {
     const { engine, deletePages } = makeAssetEngine(2);
-    const cap = createStampCapability(makeCtx(engine));
+    const cap = createStampController(makeCtx(engine));
     const libraryId = await cap.importLibrary(pdfBytes());
     const [first, second] = cap.listAssets({ libraryId: libraryId });
 
@@ -555,7 +555,7 @@ describe('stamp plugin — assets', () => {
 
   it('keeps state and canonical bytes unchanged when an append cannot be saved', async () => {
     const { engine, download } = makeAssetEngine(1);
-    const cap = createStampCapability(makeCtx(engine));
+    const cap = createStampController(makeCtx(engine));
     const libraryId = await cap.importLibrary(pdfBytes());
     const beforeBytes = await cap.exportLibrary(libraryId);
     download.mockRejectedValueOnce(new Error('save failed'));
@@ -573,7 +573,7 @@ describe('stamp plugin — assets', () => {
       catalog: { Id: { type: 'string', value: 'shared-library-id' } },
       pages: { 100: { Id: { type: 'string', value: 'shared-asset-id' } } },
     });
-    const cap = createStampCapability(makeCtx(engine));
+    const cap = createStampController(makeCtx(engine));
 
     const firstLibraryId = await cap.importLibrary(pdfBytes());
     const secondLibraryId = await cap.importLibrary(pdfBytes());
@@ -586,7 +586,7 @@ describe('stamp plugin — assets', () => {
 
   it('removeLibrary drops the library, its assets, and their binaries', async () => {
     const { engine } = makeAssetEngine(2);
-    const cap = createStampCapability(makeCtx(engine));
+    const cap = createStampController(makeCtx(engine));
     const libraryId = await cap.importLibrary(pdfBytes());
     const [a] = cap.listAssets({ libraryId: libraryId });
     await cap.deleteLibrary(libraryId);
@@ -602,7 +602,7 @@ describe('stamp plugin — authoring', () => {
     const { engine, setName, names, pageEntries } = makeAssetEngine(1, {
       names: { 'Approved=Approved': 100 },
     });
-    const cap = createStampCapability(makeCtx(engine));
+    const cap = createStampController(makeCtx(engine));
     const libraryId = await cap.importLibrary(pdfBytes());
     const [asset] = cap.listAssets({ libraryId: libraryId });
 
@@ -631,7 +631,7 @@ describe('stamp plugin — authoring', () => {
 
   it('onLibraryChanged fires for every canonical change with its reason', async () => {
     const { engine } = makeAssetEngine(2);
-    const cap = createStampCapability(makeCtx(engine));
+    const cap = createStampController(makeCtx(engine));
     const seen: string[] = [];
     const off = cap.onLibraryChanged((change) => seen.push(`${change.libraryId}:${change.reason}`));
 
@@ -667,7 +667,7 @@ describe('stamp plugin — from a selection', () => {
       pages: [],
       revision: 0,
     };
-    const cap = createStampCapability(
+    const cap = createStampController(
       makeCtx(engine, undefined, { id: 'doc-1', handle: target, meta }),
     );
     const libraryId = await cap.importLibrary(pdfBytes());
@@ -697,7 +697,7 @@ describe('stamp plugin — from a selection', () => {
       pages: [],
       revision: 0,
     };
-    const cap = createStampCapability(
+    const cap = createStampController(
       makeCtx(engine, undefined, { id: 'doc-1', handle: target, meta }),
     );
     await expect(
@@ -710,7 +710,7 @@ describe('stamp plugin — placement', () => {
   it('armAsset delegates to the document annotation plugin with bytes + preview + intrinsic size', async () => {
     const { engine } = makeAssetEngine(1);
     const armStamp = vi.fn(async () => {});
-    const cap = createStampCapability(makeCtx(engine, { armStamp }));
+    const cap = createStampController(makeCtx(engine, { armStamp }));
     const libraryId = await cap.importLibrary(pdfBytes());
     const [asset] = cap.listAssets({ libraryId: libraryId });
 
@@ -738,7 +738,7 @@ describe('stamp plugin — placement', () => {
     const { engine } = makeAssetEngine(1, { names: { 'Approved=Goedgekeurd': 100 } });
     const ref = { kind: 'objectNumber', page: toPageRef(7), annotObjectNumber: 42 };
     const placeStamp = vi.fn(async () => ref);
-    const cap = createStampCapability(makeCtx(engine, { placeStamp }));
+    const cap = createStampController(makeCtx(engine, { placeStamp }));
     const libraryId = await cap.importLibrary(pdfBytes());
     const [asset] = cap.listAssets({ libraryId: libraryId });
 
@@ -764,7 +764,7 @@ describe('stamp plugin — placement', () => {
 
   it('arming an unknown asset rejects with NotFound', async () => {
     const { engine } = makeAssetEngine(0);
-    const cap = createStampCapability(makeCtx(engine, { armStamp: vi.fn() }));
+    const cap = createStampController(makeCtx(engine, { armStamp: vi.fn() }));
     await expect(cap.armAsset('doc-1', 'nope')).rejects.toMatchObject({
       code: EngineErrorCode.NotFound,
     });
@@ -860,7 +860,7 @@ describe('stamp plugin — placement', () => {
         surfaced.push({ commit, context });
       },
     };
-    const cap = createStampCapability(
+    const cap = createStampController(
       makeCtx(
         engine,
         { armStamp },
@@ -914,7 +914,7 @@ describe('stamp plugin — placement', () => {
 describe('stamp plugin — library kinds', () => {
   it('a library is created for a kind, written to the file, and filtered by it', async () => {
     const { engine, catalogEntries } = makeAssetEngine(0);
-    const cap = createStampCapability(makeCtx(engine));
+    const cap = createStampController(makeCtx(engine));
     const stamps = await cap.createLibrary('Mine');
     const signer = await cap.createLibrary('Bob Singor', { kind: 'signatures' });
     const custom = await cap.createLibrary('Review marks', { kind: 'toolbar' });
@@ -938,17 +938,17 @@ describe('stamp plugin — library kinds', () => {
       catalog: { Kind: { type: 'name', value: 'SignatureLibrary' } },
       title: 'Alice',
     });
-    const cap = createStampCapability(makeCtx(signatures.engine));
+    const cap = createStampController(makeCtx(signatures.engine));
     const aliceId = await cap.importLibrary(pdfBytes());
     expect(cap.getLibrary(aliceId)).toMatchObject({ kind: 'signatures', name: 'Alice' });
     expect(signatures.catalogEntries.Kind).toEqual({ type: 'name', value: 'SignatureLibrary' });
 
     const v2 = makeAssetEngine(1, { catalog: { Kind: { type: 'name', value: 'StampLibrary' } } });
-    const cap2 = createStampCapability(makeCtx(v2.engine));
+    const cap2 = createStampController(makeCtx(v2.engine));
     expect(cap2.getLibrary(await cap2.importLibrary(pdfBytes()))).toMatchObject({ kind: 'stamps' });
 
     const overridden = makeAssetEngine(1);
-    const cap3 = createStampCapability(makeCtx(overridden.engine));
+    const cap3 = createStampController(makeCtx(overridden.engine));
     const id = await cap3.importLibrary(pdfBytes(), { libraryKind: 'toolbar' });
     expect(cap3.getLibrary(id)).toMatchObject({ kind: 'toolbar' });
     expect(overridden.catalogEntries.Kind).toEqual({ type: 'name', value: 'toolbar' });
@@ -956,7 +956,7 @@ describe('stamp plugin — library kinds', () => {
 
   it('updateLibrary renames through the document title and keeps the kind', async () => {
     const { engine, metadata, catalogEntries } = makeAssetEngine(0);
-    const cap = createStampCapability(makeCtx(engine));
+    const cap = createStampController(makeCtx(engine));
     const seen: string[] = [];
     cap.onLibraryChanged((c) => seen.push(c.reason));
     const id = await cap.createLibrary('Bob', { kind: 'signatures' });
@@ -977,7 +977,7 @@ describe('stamp plugin — library kinds', () => {
 
   it('addAsset takes exactly one of source / mark', async () => {
     const { engine } = makeAssetEngine(0);
-    const cap = createStampCapability(makeCtx(engine));
+    const cap = createStampController(makeCtx(engine));
     const id = await cap.createLibrary('Mine');
     await expect(cap.createAsset({ libraryId: id, name: 'A' })).rejects.toMatchObject({
       code: EngineErrorCode.InvalidArg,
@@ -1037,7 +1037,7 @@ function withFakeRenders(engine: Engine): Engine {
 describe('stamp plugin — authoring marks (real engine)', () => {
   it('renders a drawn mark and a typed mark into vector pages the size of the mark', async () => {
     const engine = await createLocalEngine({ runtime: { prefer: 'wasm' } });
-    const cap = createStampCapability(makeCtx(withFakeRenders(engine)));
+    const cap = createStampController(makeCtx(withFakeRenders(engine)));
     try {
       const libraryId = await cap.createLibrary('Bob Singor', { kind: 'signatures' });
       const drawn = await cap.createAsset({

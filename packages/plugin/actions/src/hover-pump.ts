@@ -1,6 +1,6 @@
 import type { AnnotationRef, PageRef } from '@embedpdf/engine-core/runtime';
 
-import type { ActionSource, ActionTrigger, ActionTriggerResult } from './types';
+import type { ActionSource, ActionTrigger, ActionTriggerResult } from './contract';
 
 /** One hoverable target, as a feed sees it. `events` lets a feed that KNOWS
  *  tree presence (folded model, fill item) skip the inert half of a pair —

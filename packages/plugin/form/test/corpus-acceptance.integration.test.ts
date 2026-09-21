@@ -14,8 +14,8 @@ import { AnnotationToken as AnnotationHostToken } from '@embedpdf/plugin-annotat
 import { interactionPlugin } from '@embedpdf/plugin-interaction';
 
 import { formPlugin } from '../src/form.plugin';
-import { FormToken } from '../src/types';
-import type { FormUiEffect } from '../src/types';
+import { FormToken } from '../src/host-contract';
+import type { FormUiEffect } from '../src/host-contract';
 
 /**
  * SUPPLEMENTARY real-world acceptance over the local `JS tests/` corpus —

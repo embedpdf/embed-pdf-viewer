@@ -12,7 +12,7 @@ import type {
   PdfActionTree,
 } from '@embedpdf/engine-core/runtime';
 
-import { createFormScriptingController } from '../src/scripting';
+import { createFormScriptingController } from '../src/scripting/controller';
 import { standaloneRealm } from './helpers/standalone-realm';
 
 const here = dirname(fileURLToPath(import.meta.url));

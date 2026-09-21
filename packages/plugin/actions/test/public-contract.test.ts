@@ -3,8 +3,8 @@ import { describe, expect, it, vi } from 'vitest';
 import type { PluginContext } from '@embedpdf/core';
 import { toPageRef, type PdfActionNode, type PdfActionTree } from '@embedpdf/engine-core/runtime';
 
-import { createActionsCapability } from '../src/capability';
-import type { ActionsAction, ActionsConfig, ActionsState } from '../src/types';
+import { createActionsController } from '../src/controller';
+import type { ActionsAction, ActionsConfig, ActionsState } from '../src/host-contract';
 
 /**
  * The public-contract additions of the 3.0 migration: `executeNamed`,
@@ -71,7 +71,7 @@ function harness(config?: ActionsConfig) {
     tryGet: () => null,
     cleanup: () => {},
   } as unknown as PluginContext<ActionsState, ActionsAction>;
-  return { capability: createActionsCapability(ctx, config), dispatch };
+  return { capability: createActionsController(ctx, config), dispatch };
 }
 
 describe('actions public contract', () => {

@@ -13,9 +13,9 @@ import type { PluginContext } from '@embedpdf/core';
 import { createLocalEngine } from '@embedpdf/engine';
 import { LOCALES as SHIPPED, loadDefaultLibrary } from '@embedpdf/default-stamps/library';
 
-import { createStampCapability } from '../src/capability';
-import { initialStampState, stampReducer } from '../src/reducer';
-import type { StampAction, StampState } from '../src/types';
+import { createStampController } from '../src/controller';
+import { initialStampState, stampReducer } from '../src/model';
+import type { StampAction, StampState } from '../src/host-contract';
 
 const here = dirname(fileURLToPath(import.meta.url));
 // The release consume gate supplies the extracted npm tarball, so missing
@@ -350,7 +350,7 @@ describe('@embedpdf/default-stamps', () => {
 
     it(`${locale}: re-imports with no overrides as the manifest described it`, async () => {
       const ctx = makeCtx(engine);
-      const stamp = createStampCapability(ctx, { assetEngine: engine });
+      const stamp = createStampController(ctx, { assetEngine: engine });
       const libraryId = await stamp.importLibrary(await libraryPdf(locale));
       expect(libraryId).toBe(LIBRARY_ID);
       const library = stamp.getLibrary(libraryId)!;
@@ -383,10 +383,10 @@ describe('@embedpdf/default-stamps', () => {
 
   it('exports what it imported: a second import of the export is identical', async () => {
     const ctx = makeCtx(engine);
-    const stamp = createStampCapability(ctx, { assetEngine: engine });
+    const stamp = createStampController(ctx, { assetEngine: engine });
     const id = await stamp.importLibrary(await libraryPdf('nl'));
     const exported = await await stamp.exportLibrary(id);
-    const again = createStampCapability(makeCtx(engine), { assetEngine: engine });
+    const again = createStampController(makeCtx(engine), { assetEngine: engine });
     const id2 = await again.importLibrary(exported);
     expect(id2).toBe(id);
     expect(again.getLibrary(id2)!.name).toBe(EXPECTED.nl.name);
@@ -397,7 +397,7 @@ describe('@embedpdf/default-stamps', () => {
 
   it('two locales import side by side: one identity, two libraries', async () => {
     const ctx = makeCtx(engine);
-    const stamp = createStampCapability(ctx, { assetEngine: engine });
+    const stamp = createStampController(ctx, { assetEngine: engine });
     const en = await stamp.importLibrary(await libraryPdf('en'));
     const nl = await stamp.importLibrary(await libraryPdf('nl'));
     expect(en).toBe(LIBRARY_ID);

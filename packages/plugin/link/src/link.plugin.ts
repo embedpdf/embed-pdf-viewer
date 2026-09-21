@@ -5,9 +5,10 @@ import { AnnotationToken as AnnotationHostToken } from '@embedpdf/plugin-annotat
 import { InteractionToken } from '@embedpdf/plugin-interaction/contract';
 import { StageToken } from '@embedpdf/plugin-stage/contract';
 import { createLinkController } from './controller';
-import { initialLinkState, linkReducer } from './reducer';
-import { LinkToken } from './types';
-import type { LinkAction, LinkHostCapability, LinkState } from './types';
+import { initialLinkState, linkReducer } from './model';
+import { LinkToken } from './host-contract';
+import type { LinkHostCapability } from './host-contract';
+import type { LinkAction, LinkState } from './model';
 
 /**
  * Clickable link regions and their activation. Document-scoped; needs the

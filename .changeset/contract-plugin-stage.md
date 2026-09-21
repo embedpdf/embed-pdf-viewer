@@ -9,3 +9,6 @@ Reads: `getCamera`, `getViewpoint`, `getViewportSize`, `getZoomLevel`, `getZoomM
 Host (`StageHostCapability`, same runtime token): `setViewportSize`, `setDevicePixelRatio`, `beginGesture`/`endGesture`, `fling`, `doubleTapZoom`, `zoomAround`, `getScrollMetrics`, `worldToViewport`/`viewportToWorld`/`pageToWorld`, `provideInitialView`, `placeInitial`, `refit`, `getLensId`.
 
 Removed: the per-setting getters, `pages()` and `pageCount()` (the page list is document truth: `documents.listPages`), `visiblePages`, `currentPage`, `currentItemPages`, `pageRect`, `pageAt`, `pointOnPage`, `pageRectToScreen`, `toScreen`/`toWorld`, `setViewport`, `cameraInMotion`, `automatic`, `next`/`prev`, index-taking `goToPage`/`reveal`, `lensId`, `update`, `setResponsive`, `matches`, `activeRules`.
+
+- Internal layout: `contract` / `host-contract` / `model` / `controller` with `services`, `read`, `camera`, `navigation`, `settings`, `view` and `sync` areas; the plugin is defined on `create()`.
+- `StageState` / `StageAction` are host-lens types now (`@embedpdf/plugin-stage/contract/host`), no longer exported from `/contract` or the package root.

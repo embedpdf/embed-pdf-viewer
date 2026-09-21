@@ -36,6 +36,8 @@ export type CreateAnnotationGeometry =
       readonly subtype: 'highlight' | 'underline' | 'strikeout' | 'squiggly' | 'redact';
       readonly quads: readonly TextQuad[];
     }
+  /** An AREA redaction: `/Rect` IS the removal region (ISO 32000-2), so it moves and resizes like a shape. */
+  | { readonly subtype: 'redact'; readonly bounds: Rect }
   | { readonly subtype: 'free-text'; readonly bounds: Rect; readonly callout?: Callout };
 
 const finite = (value: number): boolean => Number.isFinite(value);
@@ -97,12 +99,27 @@ export function geometryFromInput(input: CreateAnnotationInput): { subtype: Subt
     case 'underline':
     case 'strikeout':
     case 'squiggly':
-    case 'redact':
+    case 'redact': {
+      if (!('quads' in input)) {
+        const r = input.bounds;
+        if (![r.x, r.y, r.width, r.height].every(finite) || r.width <= 0 || r.height <= 0) {
+          throw invalid('bounds must be a finite rectangle with positive size');
+        }
+        return {
+          subtype: 'redact',
+          geom: {
+            t: 'rect',
+            rect: { x: r.x, y: r.y, width: r.width, height: r.height },
+            ellipse: false,
+          },
+        };
+      }
       if (input.quads.length === 0) throw invalid(`${input.subtype} needs at least one quad`);
       return {
         subtype: input.subtype,
         geom: { t: 'quads', quads: input.quads.map((q) => ({ ...q })) },
       };
+    }
     case 'free-text': {
       const r = input.bounds;
       if (![r.x, r.y, r.width, r.height].every(finite) || r.width <= 0 || r.height <= 0) {

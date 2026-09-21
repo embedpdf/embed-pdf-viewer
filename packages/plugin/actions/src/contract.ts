@@ -1,41 +1,514 @@
 /**
- * The dependency surface for code that can speak to the actions capability
- * without opting into the dispatcher implementation.
+ * @embedpdf/plugin-actions/contract — the PUBLIC action vocabulary: triggers,
+ * contexts, results, policy, the UI adapter and submit handler ports, and
+ * the capability itself. Sibling-plugin registration (commit sinks, script
+ * realms, the page-state report) is the host lens (`/contract/host`).
  */
-export { ActionsToken, eventOf, triggerOriginOf } from './types';
+import type { EventHook, Unsubscribe } from '@embedpdf/core';
+import type {
+  ScriptBudget,
+  ScriptDiagnostic,
+  ScriptExecutionError,
+  ScriptIdentity,
+  ScriptSandboxFactory,
+} from '@embedpdf/core-acrojs';
+import type {
+  AnnotationRef,
+  FormFieldRef,
+  FormSubmissionEntry,
+  FormSubmissionReceipt,
+  PageRef,
+  PdfActionNode,
+  PdfActionTargetRef,
+  PdfActionTree,
+  PdfActionType,
+} from '@embedpdf/engine-core/runtime';
+
+export { ActionsToken } from './token';
 export { createHoverPump } from './hover-pump';
 export type { HoverPump, HoverTarget } from './hover-pump';
 export { submitEntriesToUrlEncoded } from './submit-encoding';
-export type {
-  ActionContext,
-  ActionDiagnostic,
-  ActionDispatchEvent,
-  ActionDispatchResult,
-  ActionExecutor,
-  ActionExecutorResult,
-  ActionNodeResult,
-  ActionNodeStatus,
-  ActionOrigin,
-  ActionPolicy,
-  ActionPolicyDecision,
-  ActionPolicyPatch,
-  ActionPolicyRow,
-  ActionsCapability,
-  ActionsConfig,
-  ActionSource,
-  ActionStepResult,
-  ActionSubmitHandler,
-  ActionSubmitRequest,
-  ActionTreeSource,
-  ActionTrigger,
-  ActionTriggerEvent,
-  ActionTriggerResult,
-  ActionUiAdapter,
-  ActionUiContext,
-  DocumentTriggerEvent,
-  OpenSequenceCompletedEvent,
-  PdfAnnotationEventKind,
-  PdfFieldEventKind,
-  PdfNamedAction,
-  SubmitIntent,
-} from './types';
+
+// ── the when/who axes ──────────────────────────────────────────────────────
+
+/** Why a dispatch happened. Phase 1 dispatches are all `'user'` (a real
+ *  activation gesture); `'hover'` and `'lifecycle'` arrive with Phase 2's
+ *  trigger sources — the policy axis ships full-shape now. */
+export type ActionOrigin = 'user' | 'hover' | 'lifecycle';
+
+/** Who initiated the dispatch. Fields are REQUIRED where an executor needs
+ *  them: the interim JavaScript executor builds `event.target` from the
+ *  widget source's `field`. Provenance only — policy never reads it. */
+export type ActionSource =
+  | { kind: 'widget'; field: FormFieldRef; annotation: AnnotationRef; page: PageRef }
+  | { kind: 'link'; annotation?: AnnotationRef; page?: PageRef }
+  /** A non-widget annotation's own /AA event (E/X on squares, stamps, …). */
+  | { kind: 'annotation'; annotation: AnnotationRef; page: PageRef }
+  /** A page /AA tree (O/C) inside a page-trigger fan-out. */
+  | { kind: 'page'; page: PageRef }
+  /** The document-open sequence (openDestination / OpenAction). */
+  | { kind: 'document' }
+  | { kind: 'api' };
+
+/** Trigger provenance, derived centrally beside {@link triggerOriginOf} — the
+ *  executor-visible "which event fired" (cursorEnter vs cursorExit are both
+ *  `origin: 'hover'`; this carries the difference). */
+/** The document lifecycle vocabulary: `open` (§3.9's sequence) plus the
+ *  five catalog `/AA` verbs (ISO 32000-2 Table 200 — WC/WS/DS/WP/DP).
+ *  Whoever owns the verb dispatches them; `runDocumentVerb` is the
+ *  serialized door for save/print, `prepareClose` for close. */
+export type DocumentTriggerEvent =
+  | 'open'
+  | 'will-save'
+  | 'did-save'
+  | 'will-print'
+  | 'did-print'
+  | 'will-close';
+
+export type ActionTriggerEvent =
+  | { scope: 'activate' }
+  | { scope: 'annotation'; name: PdfAnnotationEventKind }
+  | { scope: 'page'; name: 'open' | 'close' | 'visible' | 'invisible' }
+  | { scope: 'document'; name: DocumentTriggerEvent };
+
+/** The four field-level /AA scripts (ISO Table 198: K F V C). */
+export type PdfFieldEventKind = 'keystroke' | 'format' | 'validate' | 'calculate';
+
+/** The Named verbs the viewer interprets (ISO Table 215's four page verbs
+ *  plus Adobe's `Print`); any other name is accepted and reported inert. */
+export type PdfNamedAction =
+  | 'NextPage'
+  | 'PrevPage'
+  | 'FirstPage'
+  | 'LastPage'
+  | 'Print'
+  | (string & {});
+
+/**
+ * Where an action tree lives, for {@link ActionsCapability.getActionTree}.
+ * Each arm names its own event vocabulary; the annotation arm defaults to
+ * the /A click tree, the page and document arms to their open trees.
+ */
+export type ActionTreeSource =
+  | {
+      kind: 'annotation';
+      annotation: AnnotationRef;
+      page: PageRef;
+      event?: 'activate' | PdfAnnotationEventKind;
+    }
+  | { kind: 'field'; field: FormFieldRef; event: PdfFieldEventKind }
+  | { kind: 'page'; page: PageRef; event?: 'open' | 'close' }
+  | { kind: 'document'; event?: DocumentTriggerEvent };
+
+/** The document-open sequence has run (once per document). */
+export interface OpenSequenceCompletedEvent {
+  readonly result: ActionTriggerResult;
+}
+
+export interface ActionContext {
+  origin: ActionOrigin;
+  source: ActionSource;
+  event: ActionTriggerEvent;
+}
+
+/** The six annotation /AA pointer/focus events (ISO Table 197: E X D U Fo Bl).
+ *  Page-lifecycle events (PO/PC/PV/PI) are NOT here — they fan out from page
+ *  triggers, never from per-annotation dispatch. */
+export type PdfAnnotationEventKind =
+  | 'cursorEnter'
+  | 'cursorExit'
+  | 'mouseDown'
+  | 'mouseUp'
+  | 'focus'
+  | 'blur';
+
+/**
+ * Trigger vocabulary — what a feed reports; the dispatcher resolves trees,
+ * derives the origin ({@link triggerOriginOf}), and fans out. `source` on the
+ * annotation-addressed arms is an optional PROVENANCE hint from first-party
+ * feeds (a widget feed passes its field ref so the interim JS executor can
+ * anchor `event.target`); policy never reads it and it cannot change origin.
+ */
+export type ActionTrigger =
+  | { scope: 'activate'; ref: AnnotationRef; page: PageRef; source?: ActionSource }
+  | {
+      scope: 'annotation';
+      event: PdfAnnotationEventKind;
+      ref: AnnotationRef;
+      page: PageRef;
+      source?: ActionSource;
+    }
+  | { scope: 'page'; event: 'open' | 'close' | 'visible' | 'invisible'; page: PageRef }
+  | { scope: 'document'; event: DocumentTriggerEvent };
+
+/** Trigger → provenance descriptor (the {@link ActionContext.event} axis). */
+export const eventOf = (trigger: ActionTrigger): ActionTriggerEvent => {
+  switch (trigger.scope) {
+    case 'activate':
+      return { scope: 'activate' };
+    case 'annotation':
+      return { scope: 'annotation', name: trigger.event };
+    case 'page':
+      return { scope: 'page', name: trigger.event };
+    case 'document':
+      return { scope: 'document', name: trigger.event };
+  }
+};
+
+/** The one origin mapping — derived by the dispatcher, never claimed by a
+ *  caller: a feed cannot launder a hover into a user gesture. */
+export const triggerOriginOf = (trigger: ActionTrigger): ActionOrigin => {
+  switch (trigger.scope) {
+    case 'activate':
+      return 'user';
+    case 'annotation':
+      return trigger.event === 'cursorEnter' || trigger.event === 'cursorExit' ? 'hover' : 'user';
+    case 'page':
+    case 'document':
+      return 'lifecycle';
+  }
+};
+
+// ── results ────────────────────────────────────────────────────────────────
+
+export type ActionNodeStatus =
+  | 'executed' // the registered executor / built-in interpreter ran
+  | 'blocked' // policy said no (submit-form, origin-gated uri, …)
+  | 'no-executor' // nothing registered/installed for this type
+  | 'inert' // an executor was present but declined (scripting off, unknown verb)
+  | 'failed' // the executor threw or reported failure
+  | 'skipped'; // an earlier document-lifetime failure stopped this node
+
+export interface ActionNodeResult {
+  /** Node address as child indexes from the root ([] = root, [0] = root.next[0]…). */
+  path: number[];
+  type: PdfActionType;
+  status: ActionNodeStatus;
+  detail?: string;
+}
+
+export interface ActionDiagnostic {
+  code:
+    | 'incomplete-tree'
+    | 'blocked'
+    | 'no-executor'
+    | 'no-adapter'
+    | 'no-session-sink'
+    | 'unresolved-target'
+    | 'duplicate-executor'
+    | 'executor-inert'
+    | 'executor-failed'
+    | 'trigger-disabled' // config.triggers gated this family off
+    | 'no-commit-sink' // a document effect had no registered owner sink
+    | 'trigger-failed' // resolution threw — dispatch() never rejects
+    | 'cascade-budget' // programmatic page-lifecycle rounds exceeded the cap
+    | 'open-sequence-replayed' // a second document-open trigger arrived
+    | 'no-submit-sink' // no handler installed and the document has no home
+    | 'no-submit-resolver' // no form plugin registered a dataset resolver
+    | 'submit-payload-unavailable' // older-runtime extraction: node stays inert
+    | 'submit-entry-unsupported' // an explicitly included entry has no representable value
+    | 'reentrant-print'; // a print request during a document print event — suppressed
+  message: string;
+}
+
+/**
+ * One logical dispatch transaction's outcome. Document-lifetime work is
+ * NON-ROLLBACK-ATOMIC: an earlier successful reset/script write survives a
+ * later failure — `status: 'partial'` says so, and `nodes` carries the
+ * per-node truth.
+ */
+export interface ActionDispatchResult {
+  status: 'executed' | 'partial' | 'inert' | 'refused';
+  nodes: ActionNodeResult[];
+  diagnostics: ActionDiagnostic[];
+}
+
+export interface ActionDispatchEvent {
+  ctx: ActionContext;
+  tree: PdfActionTree;
+  result: ActionDispatchResult;
+}
+
+/**
+ * One tree's execution inside a trigger: its true source, its true tree, its
+ * own node results — `path`s are REAL walk paths, never prefixed. `onExecuted`
+ * fires once per step with exactly this tree and a ctx built from this
+ * source, so the Phase-1 event contract is untouched by fan-out.
+ */
+export interface ActionStepResult {
+  source: ActionSource;
+  tree: PdfActionTree;
+  result: ActionDispatchResult;
+}
+
+/**
+ * What `dispatch(trigger)` returns: the aggregate plus per-step truth. A
+ * step failure NEVER skips sibling steps (a broken annotation /PC must not
+ * cancel the page's /C — degrade, never brick); deferred navigation/external
+ * effects flush per step, not per trigger.
+ */
+export interface ActionTriggerResult {
+  status: 'executed' | 'partial' | 'inert' | 'refused';
+  steps: ActionStepResult[];
+  /** Trigger-level diagnostics (disabled family, resolution failure);
+   *  per-node diagnostics live inside each step's `result`. */
+  diagnostics: ActionDiagnostic[];
+}
+
+// ── policy ─────────────────────────────────────────────────────────────────
+
+/** Per-(type × origin) decision. `allow` executes; `adapter` routes through
+ *  the type's port (the UI adapter; for `submit-form`, the sink chain —
+ *  embedder handler → the document's home → blocked); `report` records a
+ *  blocked node without executing; `block` refuses.
+ *  `launch`/`goto-remote`/`goto-embedded`/media arms are fixed `'never'`
+ *  and not configurable. */
+export type ActionPolicyDecision = 'allow' | 'adapter' | 'report' | 'block';
+export type ActionPolicyRow = Record<ActionOrigin, ActionPolicyDecision>;
+
+export interface ActionPolicy {
+  goto: ActionPolicyRow;
+  named: ActionPolicyRow;
+  hide: ActionPolicyRow;
+  'reset-form': ActionPolicyRow;
+  javascript: ActionPolicyRow;
+  uri: ActionPolicyRow;
+  /** The Named `Print` verb — owned by policy + the UI adapter, never stage.
+   *  (An Adobe-compat extension: ISO Table 215 defines only the four page
+   *  verbs; an unrecognized name "shall take no action".) */
+  print: ActionPolicyRow;
+  /** SubmitForm — `'adapter'` routes through the sink chain. Default: user
+   *  origin only; hover/lifecycle submits stay blocked. */
+  'submit-form': ActionPolicyRow;
+}
+
+/** Row-wise policy overrides: name only the origins you change. */
+export type ActionPolicyPatch = { readonly [K in keyof ActionPolicy]?: Partial<ActionPolicyRow> };
+
+export interface ActionsConfig {
+  /** Declarative overrides merged row-wise over the defaults (umbrella §3.5). */
+  policy?: ActionPolicyPatch;
+  /** Trigger-family gates, default all true. `activate` (the /A click) is
+   *  the Phase-1 core door and is never gated. */
+  triggers?: { document?: boolean; page?: boolean; annotation?: boolean };
+  /**
+   * The document-open sequence (§3.9): `'auto'` (default) fires once at the
+   * earliest of a UI adapter installing or the first user-origin dispatch —
+   * the initial page-open then comes from the stage's page-state report
+   * (a stage-less embedder drives page triggers itself, or declares
+   * headless); `'headless'` fires at bringup and falls back to the first
+   * page for the initial open (no stage will ever report); `'off'` never
+   * fires it — but still releases the page-lifecycle barrier.
+   */
+  openSequence?: 'auto' | 'headless' | 'off';
+  /**
+   * THE JavaScript switch (relocated from `formPlugin({ scripting })`).
+   * Default off — no VM ever loads. When enabled, the plugin owns the ONE
+   * per-document ScriptHost realm, registers the real `javascript` executor,
+   * and exposes the transaction port on the host lens (form's K/V/C/F
+   * pipeline rides it).
+   */
+  javascript?: {
+    enabled: boolean;
+    /** Override the lazy QuickJS factory (tests or another isolated VM). */
+    sandboxFactory?: ScriptSandboxFactory;
+    /** Embedder identity fields layered over engine/JWT identity. */
+    identity?: Partial<ScriptIdentity> | (() => Partial<ScriptIdentity>);
+    fileName?: () => string;
+    /** Injected deterministic transaction environment. */
+    now?: () => number;
+    utcOffsetMinutes?: () => number;
+    randomSeed?: () => number;
+    budget?: ScriptBudget;
+    /**
+     * D11's deterministic aggregate: the max JS nodes ONE dispatch may run
+     * (a /Next chain shares this instead of multiplying the per-run time
+     * budget; a wall-clock aggregate would be the flake class we banned).
+     * Exhausted → remaining JS nodes report inert with a budget reason.
+     */
+    maxScriptNodesPerDispatch?: number;
+  };
+}
+
+// ── registration surfaces (host lens) ──────────────────────────────────────
+
+export type ActionExecutorResult =
+  | { status: 'executed' }
+  | { status: 'inert'; reason: string }
+  | { status: 'failed'; error: string };
+
+/** One node of one registered type, executed in dispatch order. Executors
+ *  never see the tree or the capability — the anti-cascade law. */
+export type ActionExecutor = (
+  node: PdfActionNode,
+  ctx: ActionContext,
+) => Promise<ActionExecutorResult> | ActionExecutorResult;
+
+/** Origin/phase context every script-produced UI request carries — the
+ *  DEFAULT adapter's visibility matrix keys on it; embedder adapters receive
+ *  everything and decide for themselves. */
+export interface ActionUiContext {
+  origin: ActionOrigin;
+  /** Script-model axis: `'boot'` = name-tree/document-open boot scripts. */
+  phase: 'boot' | 'user';
+}
+
+export interface ActionUiAdapter {
+  openUri(uri: string, opts: { isMap: boolean; origin: ActionOrigin }): void;
+  /** The Named `Print` verb AND script `print()` requests (authority-gated
+   *  upstream — `doc.print` refusals never reach the adapter). */
+  print(opts?: ActionUiContext): void;
+  /** Script `app.alert` — the ONE alert port for every script origin. */
+  alert?(message: string, opts: ActionUiContext & { icon: number; title?: string }): void;
+  /** Script `this.pageNum = n` navigation requests. */
+  gotoPage?(page: number, opts: ActionUiContext): void;
+}
+
+// ── the submit pipeline (D7: one intent, one resolver, one sink chain) ─────
+
+/**
+ * A normalized submit INTENT — one shape for both sources: a SubmitForm
+ * action node's extracted payload, or a script `doc.submitForm()` effect
+ * (include-mode names, `exclude` false). Resolution into a dataset is the
+ * FORM plugin's job (it owns the field plane) via the registered resolver.
+ */
+export interface SubmitIntent {
+  url: string | null;
+  /** Table-239 targets (mixed names/object numbers); `null` = the whole
+   *  eligible form. */
+  fields: PdfActionTargetRef[] | null;
+  exclude: boolean;
+  includeNoValueFields: boolean;
+  format: 'fdf' | 'html' | 'xfdf' | 'pdf';
+  method: 'post' | 'get';
+  /** Raw ISO Table 240 word (0 for scripted submits without one). */
+  flagsRaw: number;
+  charSet?: string;
+}
+
+/**
+ * The resolved dataset a sink receives. Entries carry the ISO semantics
+ * already applied (descendants, the unconditional NoExport veto,
+ * push-button/unsupported exclusion — diagnosed, never silent); the
+ * document's declared routing survives as METADATA. The stack never
+ * fetches `url` — an embedder handler that chooses to must validate it
+ * (protocol + destination allowlists) before any network call.
+ */
+export interface ActionSubmitRequest {
+  url: string | null;
+  method: 'post' | 'get';
+  format: 'fdf' | 'html' | 'xfdf' | 'pdf';
+  flagsRaw: number;
+  charSet?: string;
+  entries: FormSubmissionEntry[];
+  origin: ActionOrigin;
+  event: ActionTriggerEvent;
+}
+
+/**
+ * Sink 1 of the chain: the embedder's application. Consent = installation
+ * (it receives nothing the embedder couldn't already compute from
+ * `forms.list()` under `doc.forms.read`, so no submit scope gates it).
+ * Contract: synchronous acceptance marks the node `executed` — "handed to
+ * the embedder", NOT "delivered"; a synchronous throw marks it `failed`; a
+ * returned promise is DETACHED and a later rejection emits a diagnostic
+ * only. `submitToDocumentHome` lets a handler COMPOSE with sink 2 (present
+ * only when the document has a submit-capable home).
+ */
+export type ActionSubmitHandler = (
+  request: ActionSubmitRequest,
+  ctx: { submitToDocumentHome: (() => Promise<FormSubmissionReceipt>) | null },
+) => void | Promise<void>;
+
+// ── capabilities ───────────────────────────────────────────────────────────
+
+/** PUBLIC — embedders and chrome. Twins follow permissions.md: same name,
+ *  same arguments, boolean, answering "would the dispatcher accept this and
+ *  attempt execution" (per-node truth lives in the result's `nodes`). */
+export interface ActionsCapability {
+  execute(tree: PdfActionTree, ctx: ActionContext): Promise<ActionDispatchResult>;
+  canExecute(tree: PdfActionTree, ctx: ActionContext): boolean;
+  /**
+   * Run one Named verb (`NextPage`, `Print`, …) as a user-origin action
+   * without building a tree — the programmatic twin of a Named link click.
+   * `context` overrides the default `{ origin: 'user', source: { kind: 'api' } }`.
+   */
+  executeNamed(
+    name: PdfNamedAction,
+    context?: Partial<ActionContext>,
+  ): Promise<ActionDispatchResult>;
+  /**
+   * Read the /A or /AA tree behind a source straight from the document
+   * (`null` when absent or when the document is gone). This is the raw
+   * tree: dispatch-time rules such as ISO Table 197's "/A shadows /AA U"
+   * are not applied here.
+   */
+  getActionTree(source: ActionTreeSource): Promise<PdfActionTree | null>;
+  /** The effective policy — a reference-stable snapshot until
+   *  {@link updatePolicy} replaces it. */
+  getPolicy(): ActionPolicy;
+  /** Live policy change: rows merge over the current policy, and later
+   *  dispatches decide with the new one. */
+  updatePolicy(patch: ActionPolicyPatch): void;
+  /** Did `javascript.enabled` take effect — a script realm exists for this
+   *  document. */
+  isScriptingEnabled(): boolean;
+  /**
+   * Report a trigger. Submission is SYNCHRONOUS — the queue slot is taken
+   * before this returns, so two dispatch calls execute in call order even
+   * when their resolutions race; all reads happen inside the queued
+   * operation. Never rejects: resolution failures come back as `refused`
+   * with a `trigger-failed` diagnostic, so `void dispatch(...)` is safe.
+   */
+  dispatch(trigger: ActionTrigger): Promise<ActionTriggerResult>;
+  canDispatch(trigger: ActionTrigger): boolean;
+  /** Identity-safe port install: the returned disposer clears the slot only
+   *  while THIS adapter is still current; `null` force-clears. */
+  setUiAdapter(adapter: ActionUiAdapter | null): Unsubscribe;
+  /**
+   * Run one embedder-owned document verb as ONE serialized queue operation:
+   * open-ordering guard → before-event tree (WS/WP) → `operation()` →
+   * after-event tree (DS/DP). Two concurrent calls can never interleave
+   * their phases. Laws: a before-event failure never cancels the operation;
+   * `operation()` throwing skips the after-event and rethrows; the whole
+   * body honors `triggers.document: false` (trees skipped, operation still
+   * runs); print verbs hold the document-print latch, so nested
+   * `doc.print()` calls are suppressed with a `reentrant-print` diagnostic.
+   * The queue is deliberately held for the operation's duration — that IS
+   * the serialization (WS mutations are in the bytes a save operation
+   * pulls).
+   */
+  runDocumentVerb<T>(verb: 'save' | 'print', operation: () => Promise<T> | T): Promise<T>;
+  /**
+   * The cooperative WC door (D4): runs the catalog will-close tree (open
+   * ordering guaranteed) and resolves when its effects are committed. Call
+   * `documents.close()` AFTER this resolves. Scripts never run inside
+   * teardown — closing without this call is a named Acrobat-parity
+   * deviation, not an error.
+   */
+  prepareClose(): Promise<ActionTriggerResult>;
+  /**
+   * Sink 1 of the submit chain (identity-safe slot, like the UI adapter —
+   * but installing it does NOT arm the open-sequence latch). With no
+   * handler and no submit-capable document home, submits block with a
+   * `no-submit-sink` diagnostic.
+   */
+  setSubmitHandler(handler: ActionSubmitHandler | null): Unsubscribe;
+  /**
+   * Interpret (or override) one action type from application code — the
+   * same door the stage and form plugins use for GoTo, Named, Hide and
+   * ResetForm. Deterministic LAST-WINS on duplicates (a `duplicate-executor`
+   * diagnostic is emitted); the disposer removes the entry only while it is
+   * still the current one.
+   */
+  registerExecutor(type: PdfActionType, executor: ActionExecutor): Unsubscribe;
+  /** Every executed tree — dispatch-driven, verb-driven and lifecycle-driven. */
+  onExecuted: EventHook<ActionDispatchEvent>;
+  onDiagnostic: EventHook<ActionDiagnostic>;
+  /** Script-plane observability (dispatch-driven AND K/V/C/F-driven — the
+   *  form pipeline surfaces through the same doors). */
+  onScriptDiagnostic: EventHook<ScriptDiagnostic>;
+  onScriptError: EventHook<ScriptExecutionError>;
+  /** The document-open sequence ran (OpenAction / open destination). */
+  onOpenSequenceCompleted: EventHook<OpenSequenceCompletedEvent>;
+}

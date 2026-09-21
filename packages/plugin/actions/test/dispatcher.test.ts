@@ -3,14 +3,14 @@ import { describe, expect, it, vi } from 'vitest';
 import type { PluginContext } from '@embedpdf/core';
 import { toPageRef, type PdfActionNode, type PdfActionTree } from '@embedpdf/engine-core/runtime';
 
-import { createActionsCapability } from '../src/capability';
+import { createActionsController } from '../src/controller';
 import type {
   ActionContext,
   ActionsAction,
   ActionsConfig,
   ActionsState,
   ActionUiAdapter,
-} from '../src/types';
+} from '../src/host-contract';
 
 const USER: ActionContext = {
   origin: 'user',
@@ -83,7 +83,7 @@ function harness(config?: ActionsConfig, fields: Array<{ name: string; widgets: 
     tryGet: () => null,
     cleanup: (fn: () => void) => cleanups.push(fn),
   } as unknown as PluginContext<ActionsState, ActionsAction>;
-  const capability = createActionsCapability(ctx, config);
+  const capability = createActionsController(ctx, config);
   return { capability, dispatch, cleanups };
 }
 

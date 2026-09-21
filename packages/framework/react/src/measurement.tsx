@@ -22,12 +22,12 @@ export function useMeasurement(): MeasurementCapability & {
 export function usePageScale(page: PageRef): PageScale;
 export function usePageScale(page: PageRef | null): PageScale | null;
 export function usePageScale(page: PageRef | null): PageScale | null {
-  return useSelector(MeasurementToken, (c) => (page ? c.pageScale(page) : null));
+  return useSelector(MeasurementToken, (c) => (page ? c.getPageScale(page) : null));
 }
 
 export const useMeasurementReadout = (ref: AnnotationRef) =>
   useSelector(
     MeasurementToken,
-    (c) => c.readout(ref),
+    (c) => c.getReadout(ref),
     (a, b) => JSON.stringify(a) === JSON.stringify(b),
   );

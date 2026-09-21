@@ -1,10 +1,11 @@
 # @embedpdf/plugin-i18n — ./contract
 
-I18nCapability [InterfaceDeclaration] (from packages/plugin/i18n/src/types.ts): export interface I18nCapability{ t(key: string, options?: TranslateOptions): string; locale(): string; dir(): 'ltr' | 'rtl'; locales(): LocaleInfo[]; loading(): string | null; setLocale(code: string): void; registerLocale(locale: Locale): void; }
-I18nConfig [InterfaceDeclaration] (from packages/plugin/i18n/src/types.ts): export interface I18nConfig{ locale?: string; fallbackLocale?: string; locales?: Locale[]; loaders?: Record<string, () => Promise<Locale>>; }
-I18nState [InterfaceDeclaration] (from packages/plugin/i18n/src/types.ts): export interface I18nState{ readonly locale: string; readonly fallbackLocale: string; readonly locales: Readonly<Record<string, Locale>>; readonly loading: string | null; }
-I18nToken [VariableDeclaration] (from packages/plugin/i18n/src/types.ts): I18nToken = createCapabilityToken<I18nCapability>('i18n')
-Locale [InterfaceDeclaration] (from packages/plugin/i18n/src/types.ts): export interface Locale{ readonly code: string; readonly name: string; readonly dir?: 'ltr' | 'rtl'; readonly translations: TranslationDictionary; }
-LocaleInfo [InterfaceDeclaration] (from packages/plugin/i18n/src/types.ts): export interface LocaleInfo{ readonly code: string; readonly name: string; readonly dir: 'ltr' | 'rtl'; readonly loaded: boolean; }
-TranslateOptions [InterfaceDeclaration] (from packages/plugin/i18n/src/types.ts): export interface TranslateOptions{ params?: Record<string, string | number>; fallback?: string; }
-TranslationDictionary [InterfaceDeclaration] (from packages/plugin/i18n/src/types.ts): export interface TranslationDictionary{ readonly [key: string]: string | TranslationDictionary; }
+I18nCapability [InterfaceDeclaration]: export interface I18nCapability{ t(key: string, options?: TranslateOptions): string; hasKey(key: string): boolean; getLocale(): string; getDirection(): 'ltr' | 'rtl'; listLocales(): readonly LocaleInfo[]; getLoadingLocale(): string | null; setLocale(code: string, options?: OperationOptions): Promise<void>; registerLocale(locale: Locale): Unsubscribe; addTranslations(code: string, dictionary: TranslationDictionary): void; readonly onLocaleChanged: EventHook<LocaleChangedEvent>; readonly onLocaleLoadFailed: EventHook<LocaleLoadFailedEvent>; }
+I18nConfig [InterfaceDeclaration]: export interface I18nConfig{ locale?: string; fallbackLocale?: string; locales?: Locale[]; loaders?: Record<string, () => Promise<Locale>>; }
+I18nToken [VariableDeclaration] (from packages/plugin/i18n/src/token.ts): I18nToken = createCapabilityToken<I18nCapability>('i18n', { hint: `add i18nPlugin() from '@embedpdf/plugin-i18n' to your plugins list`, } )
+Locale [InterfaceDeclaration]: export interface Locale{ readonly code: string; readonly name: string; readonly dir?: 'ltr' | 'rtl'; readonly translations: TranslationDictionary; }
+LocaleChangedEvent [InterfaceDeclaration]: export interface LocaleChangedEvent{ readonly locale: string; readonly previousLocale: string; }
+LocaleInfo [InterfaceDeclaration]: export interface LocaleInfo{ readonly code: string; readonly name: string; readonly dir: 'ltr' | 'rtl'; readonly loaded: boolean; }
+LocaleLoadFailedEvent [InterfaceDeclaration]: export interface LocaleLoadFailedEvent{ readonly locale: string; readonly error: PluginErrorInfo; }
+TranslateOptions [InterfaceDeclaration]: export interface TranslateOptions{ params?: Record<string, string | number>; fallback?: string; }
+TranslationDictionary [InterfaceDeclaration]: export interface TranslationDictionary{ readonly [key: string]: string | TranslationDictionary; }

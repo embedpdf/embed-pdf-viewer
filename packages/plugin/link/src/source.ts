@@ -1,6 +1,7 @@
 import type { DocumentHandle, PageLayout, PageRef } from '@embedpdf/core';
 import { pdfToContentRect } from '@embedpdf/core-annotation';
-import type { Link, LinkAction } from './types';
+import type { Link } from './contract';
+import type { LinkAction } from './model';
 
 /** What the loader needs from the context (the controller context satisfies it). */
 export interface LinkSourceIO {

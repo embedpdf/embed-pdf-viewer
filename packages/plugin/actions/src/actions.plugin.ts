@@ -1,9 +1,11 @@
 import { definePlugin } from '@embedpdf/core';
 
-import { createActionsCapability } from './capability';
-import { actionsReducer, initialActionsState } from './reducer';
-import { ActionsToken } from './types';
-import type { ActionsAction, ActionsCapability, ActionsConfig, ActionsState } from './types';
+import type { ActionsConfig } from './contract';
+import { createActionsController } from './controller';
+import { ActionsToken } from './host-contract';
+import type { ActionsHostCapability } from './host-contract';
+import { actionsReducer, initialActionsState } from './model';
+import type { ActionsAction, ActionsState } from './model';
 
 /**
  * The action engine: the DEPENDENCY ROOT of the action architecture. It
@@ -11,15 +13,15 @@ import type { ActionsAction, ActionsCapability, ActionsConfig, ActionsState } fr
  * imports another plugin's token — stage, annotation, link, and form
  * optionally depend on ActionsToken and register their executors and sinks
  * at connect time (the kernel's topological order guarantees this plugin
- * initializes first). JavaScript is one registered interpreter among many: Hide,
- * ResetForm, GoTo, and Named work with scripting off.
+ * initializes first). JavaScript is one registered interpreter among many:
+ * Hide, ResetForm, GoTo, and Named work with scripting off.
  */
 export const actionsPlugin = (config?: ActionsConfig) =>
-  definePlugin<ActionsState, ActionsAction, ActionsCapability>({
+  definePlugin<ActionsState, ActionsAction, ActionsHostCapability>({
     id: 'actions',
     token: ActionsToken,
     scope: 'document',
     initialState: initialActionsState,
     reduce: actionsReducer,
-    create: (ctx) => ({ api: createActionsCapability(ctx, config) }),
+    create: (ctx) => ({ api: createActionsController(ctx, config) }),
   });

@@ -15,7 +15,7 @@ import { describe, expect, it } from 'vitest';
 import { createLocalEngine } from '@embedpdf/engine';
 import type { DocumentHandle, Engine } from '@embedpdf/engine-core/runtime';
 import { createQuickJsSandbox } from '../src';
-import { createFormScriptingController } from '../../../plugin/form/src/scripting';
+import { createFormScriptingController } from '../../../plugin/form/src/scripting/controller';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const fixturePath = resolve(here, 'fixtures', 'i-140.pdf');

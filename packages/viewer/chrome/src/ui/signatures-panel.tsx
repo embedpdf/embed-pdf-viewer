@@ -57,17 +57,22 @@ export function SignaturesPanel() {
   // Acrobat's warning: an unsaved edit just turned a signature that held into
   // one a save would invalidate. Shown until the next verdicts land.
   const [invalidating, setInvalidating] = useState<string | null>(null);
-  useSignatureEvent((event) => {
-    if (event.type === 'invalidating')
-      setInvalidating(signature.signatureOf(event.field)?.fieldName ?? fieldLabel(event.field));
-    else if (
-      event.type === 'validated' &&
-      !event.verdicts.some(
-        (v) => v.summary === 'invalid' && v.modifications.basis === 'working-copy',
+  useSignatureEvent(
+    (c) => c.onInvalidating,
+    (event) =>
+      setInvalidating(signature.getSignature(event.field)?.fieldName ?? fieldLabel(event.field)),
+  );
+  useSignatureEvent(
+    (c) => c.onValidated,
+    (event) => {
+      if (
+        !event.verdicts.some(
+          (v) => v.summary === 'invalid' && v.modifications.basis === 'working-copy',
+        )
       )
-    )
-      setInvalidating(null);
-  });
+        setInvalidating(null);
+    },
+  );
 
   // The people live in the same store as the stamps: bring them back on
   // first open (a no-op when the store component already did).
@@ -380,7 +385,9 @@ function DocumentSignatures() {
                 <button
                   type="button"
                   onClick={() =>
-                    dto.signed ? signature.inspect(dto.field) : signature.setTarget(dto.field)
+                    dto.signed
+                      ? signature.requestInspection(dto.field)
+                      : signature.setTarget(dto.field)
                   }
                   className={`hover:bg-hover flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm ${
                     isTarget(dto) ? 'bg-accent-light' : ''

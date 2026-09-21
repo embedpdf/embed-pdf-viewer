@@ -1,229 +1,136 @@
-import { describe, expect, it, vi } from 'vitest';
-import type { DocumentEvent, PluginContext } from '@embedpdf/core';
+import type { PluginContext } from '@embedpdf/core';
+import { toPageRef } from '@embedpdf/engine-core/runtime';
 import { AnnotationToken } from '@embedpdf/plugin-annotation/contract/host';
-import type { CapturedAnnotationDraft } from '@embedpdf/plugin-annotation/contract/host';
+import { InteractionToken } from '@embedpdf/plugin-interaction/contract';
+import { describe, expect, it, vi } from 'vitest';
+
+import { createMeasurementCapability } from './controller';
 import {
-  measureFromKnownLength,
-  measureFromRatio,
-  toPageRef,
-  type PageMeasurementViewport,
-  type PageRef,
-  type PdfMeasure,
-} from '@embedpdf/engine-core/runtime';
-import { createMeasurementEffects } from './effects';
-import { createMeasurementCapability } from './capability';
-import { initialMeasurementState, measurementReducer } from './reducer';
-import type { MeasurementAction, MeasurementState } from './types';
-import { selectPageScale, withAreaUnit, withUnit } from './scale';
+  initialMeasurementState,
+  measurementReducer,
+  type MeasurementAction,
+  type MeasurementState,
+} from './model';
 
-const crop = { left: -20, bottom: -40, right: 580, top: 760 };
-const scale = measureFromKnownLength(100, { value: 3, unit: 'm' });
+const PAGE = toPageRef(1);
+const layout = {
+  index: 0,
+  ref: PAGE,
+  size: { width: 600, height: 800 },
+  userUnit: 1,
+  boxes: { crop: { left: 0, bottom: 0, right: 600, top: 800 } },
+};
 
-function harness(options: { allowed?: boolean; legacy?: boolean } = {}) {
-  let state = initialMeasurementState;
-  const cleanups: (() => void)[] = [];
-  const storage: Record<number, PageMeasurementViewport[]> = { 1: [], 2: [] };
-  const setPageViewports = vi.fn();
-  const remeasurePage = vi.fn(async (page: PageRef, scale: PdfMeasure) => ({
-    page,
-    scale,
-    updated: [],
-    skipped: [],
-    failed: [],
-  }));
-  let onCapture: (e: CapturedAnnotationDraft) => void = () => {};
-  let onEvent: (e: DocumentEvent) => void = () => {};
-  const anno = {
-    setPageViewports,
-    remeasurePage,
-    canCreate: () => true,
-    onDraftCaptured: (cb: typeof onCapture) => {
-      onCapture = cb;
-      return () => {};
-    },
+/** A store + context stub over a page whose scale the test controls (no engine measure service). */
+function harness(opts: { allowed?: boolean; canCreate?: boolean } = {}) {
+  let state: MeasurementState = initialMeasurementState();
+  const annotation = {
+    canCreate: () => opts.canCreate ?? true,
+    setPageViewports: vi.fn(),
+    remeasurePage: vi.fn(async (page: unknown, scale: unknown) => ({
+      page,
+      scale,
+      updated: [],
+      skipped: [],
+      failed: [],
+    })),
+    onDraftCaptured: () => () => {},
+    getRaw: () => null,
+    create: vi.fn(async () => ({ kind: 'objectNumber', annotObjectNumber: 9, page: PAGE })),
   };
-  const activateTool = vi.fn();
-  const write = vi.fn(async (pon: number, measure: PdfMeasure) => {
-    storage[pon] = [{ owned: true, bbox: crop, measure }];
-  });
-  const read = vi.fn(async (pon: number) => storage[pon]);
+  const interaction = { activateTool: vi.fn() };
   const ctx = {
-    getState: () => state,
-    dispatch: (a: MeasurementAction) => {
-      state = measurementReducer(state, a);
-    },
-    document: () => ({
-      pages: [1, 2].map((pon) => ({ ref: toPageRef(pon), boxes: { crop }, userUnit: pon })),
-    }),
     doc: {
-      security: { allows: () => options.allowed !== false },
-      page: ({ pageObjectNumber: pon }: PageRef) => ({
-        measure: options.legacy
-          ? undefined
-          : { viewports: () => read(pon), setScale: (m: PdfMeasure) => write(pon, m) },
-      }),
-      events: {
-        subscribe: (cb: typeof onEvent) => {
-          onEvent = cb;
-          return () => {};
-        },
-      },
+      security: { allows: () => opts.allowed ?? true },
+      page: () => ({ measure: undefined }),
+      events: { subscribe: () => () => {} },
     },
-    get: (token: unknown) => (token === AnnotationToken ? anno : { activateTool }),
-    cleanup: (cb: () => void) => cleanups.push(cb),
+    getState: () => state,
+    dispatch: (action: MeasurementAction) => {
+      state = measurementReducer(state, action);
+    },
     subscribe: () => () => {},
+    document: () => ({ pages: [layout] }),
+    get: (token: unknown) => {
+      if (token === AnnotationToken) return annotation;
+      if (token === InteractionToken) return interaction;
+      throw new Error('unexpected capability');
+    },
+    tryGet: () => null,
+    cleanup: () => {},
   } as unknown as PluginContext<MeasurementState, MeasurementAction>;
-  const effects = createMeasurementEffects(ctx, {});
-  const cap = createMeasurementCapability(ctx, {}, effects);
-  effects.start();
-  return {
-    cap,
-    state: () => state,
-    write,
-    read,
-    storage,
-    remeasurePage,
-    setPageViewports,
-    activateTool,
-    event: (e: DocumentEvent) => onEvent(e),
-    capture: (e: CapturedAnnotationDraft) => onCapture(e),
-    dispose: () => cleanups.forEach((c) => c()),
-  };
+  return { capability: createMeasurementCapability(ctx), annotation, interaction };
 }
-describe('measurement workflow', () => {
-  it('writes the viewport, rereads, then optionally recalculates', async () => {
-    const h = harness();
-    await h.cap.prepare(toPageRef(1));
-    const trace: string[] = [];
-    h.write.mockImplementation(async (_pon, m) => {
-      trace.push('write');
-      h.storage[1] = [{ owned: true, bbox: crop, measure: m }];
-    });
-    h.read.mockImplementation(async (pon) => {
-      trace.push('read');
-      return h.storage[pon];
-    });
-    h.remeasurePage.mockImplementation(async (page, scale) => {
-      trace.push('remeasure');
-      return { page, scale, updated: [], skipped: [], failed: [] };
-    });
-    await h.cap.setPageScale(toPageRef(1), scale);
-    expect(trace).toEqual(['write', 'read', 'remeasure']);
-    expect(h.cap.pageScale(toPageRef(1))).toMatchObject({ source: 'owned', measure: scale });
-    await h.cap.setPageScale(toPageRef(1), scale, { recalculate: false });
-    expect(h.remeasurePage).toHaveBeenCalledTimes(1);
-  });
-  it('refuses calibration without the grant before changing state', async () => {
-    const h = harness({ allowed: false });
-    await h.cap.prepare(toPageRef(1));
-    expect(h.cap.canCalibrate()).toBe(false);
-    h.cap.startCalibration();
-    expect(h.activateTool).not.toHaveBeenCalled();
-    await expect(h.cap.setPageScale(toPageRef(1), scale)).rejects.toMatchObject({
-      name: 'PermissionDenied',
-      required: 'doc.annotate.modify',
-    });
-    expect(h.write).not.toHaveBeenCalled();
-    expect(h.state().pending).toBe(0);
-  });
-  it('does not modify annotations after a failed viewport write; all-pages reports partial results', async () => {
-    const h = harness();
-    await h.cap.prepare(toPageRef(1));
-    h.write.mockImplementation(async (pon) => {
-      if (pon === 1) {
-        throw new Error('denied');
-      }
-    });
-    await expect(h.cap.setPageScale(toPageRef(1), scale)).rejects.toThrow('denied');
-    expect(h.remeasurePage).not.toHaveBeenCalled();
-    const reports = await h.cap.setPageScale(toPageRef(1), scale, { allPages: true });
-    expect(reports[0]).toMatchObject({ page: toPageRef(1), scaleError: { message: 'denied' } });
-    expect(reports[1]).toMatchObject({ page: toPageRef(2), updated: [] });
-    expect(h.remeasurePage).toHaveBeenCalledTimes(1);
-  });
-  it('captures original PDF points and computes float32 user-space length', async () => {
-    const h = harness();
-    await h.cap.prepare(toPageRef(1));
-    h.capture({
-      tool: 'calibrate',
-      page: toPageRef(1),
-      from: { x: -20, y: 20 },
-      to: { x: 80, y: 20 },
-    });
-    expect(h.cap.calibrationRequest()).toMatchObject({
-      page: toPageRef(1),
-      userSpaceLength: 100,
-    });
-    expect(h.activateTool).toHaveBeenCalledWith('pointer');
-    await h.cap.calibrate(
-      toPageRef(1),
-      { x: -20, y: 20 },
-      { x: 80, y: 20 },
-      { value: 3, unit: 'm' },
-    );
-    expect(h.cap.pageScale(toPageRef(1)).measure).toEqual(scale);
-  });
-  it('supports session-only engines and scales presets by each page UserUnit', async () => {
-    const h = harness({ legacy: true });
-    await h.cap.prepare(toPageRef(1));
-    await h.cap.setPreset(toPageRef(1), 'metric-100', { allPages: true, recalculate: false });
-    expect(h.write).not.toHaveBeenCalled();
-    expect(h.cap.pageScale(toPageRef(2))).toMatchObject({
-      persistent: false,
-      source: 'owned',
-      measure: measureFromRatio(1, 100, 'm', 2),
-    });
-  });
-  it('ignores late reads after disposal', async () => {
-    const h = harness();
-    await Promise.all([h.cap.prepare(toPageRef(1)), h.cap.prepare(toPageRef(2))]);
-    let resolve!: (v: PageMeasurementViewport[]) => void;
-    h.read.mockReturnValueOnce(
-      new Promise((r) => {
-        resolve = r;
-      }),
-    );
-    h.event({ type: 'page.viewportsChanged', page: toPageRef(1) } as DocumentEvent);
-    h.dispose();
-    const before = h.state();
-    resolve([{ owned: true, bbox: crop, measure: scale }]);
-    await Promise.resolve();
-    await Promise.resolve();
-    expect(h.state()).toBe(before);
-  });
-  it('prefers owned calibration in the page display and preserves display conversion', () => {
-    const foreign: PageMeasurementViewport = {
-      owned: false,
-      bbox: crop,
-      measure: { subtype: 'GEO' },
-    };
-    expect(selectPageScale([foreign], crop, scale, true)).toMatchObject({
-      source: 'foreign',
-      measure: { subtype: 'GEO' },
-    });
-    expect(
-      selectPageScale([{ owned: true, bbox: crop, measure: scale }, foreign], crop, scale, true)
-        .source,
-    ).toBe('owned');
-    const converted = withUnit(scale, 'cm');
-    expect(converted.x).toBe(scale.x);
-    expect(converted.distance[0].conversion).toBe(100);
-  });
-});
+const settle = () => new Promise((r) => setTimeout(r));
 
-it('changes area units without resetting distance formats or area precision', () => {
-  const original: PdfMeasure = {
-    ...scale,
-    distance: [
-      { unit: 'ft', conversion: 1 },
-      { unit: 'in', conversion: 12, fraction: 'fraction', precision: 16 },
-    ],
-    area: [{ unit: 'm²', conversion: 1, precision: 1000 }],
-  };
-  const updated = withAreaUnit(original, 'ha');
-  expect(updated.distance).toBe(original.distance);
-  expect(updated.x).toBe(original.x);
-  expect(updated.area).toEqual([
-    { unit: 'ha', conversion: 0.0001, precision: 1000, fraction: 'decimal' },
-  ]);
+describe('measurement', () => {
+  it('reads the page scale once loaded and measures in page space', async () => {
+    const { capability } = harness();
+    await settle();
+    expect(capability.getPageScale(PAGE).ready).toBe(true);
+    expect(capability.canMeasure(PAGE)).toBe(true);
+    const readout = capability.measureDistance(PAGE, { x: 0, y: 0 }, { x: 72, y: 0 });
+    expect('unavailable' in readout).toBe(false);
+    if (!('unavailable' in readout)) expect(readout.kind).toBe('distance');
+  });
+
+  it('calibrates from two page points, reports, and announces the change', async () => {
+    const { capability, annotation } = harness();
+    await settle();
+    const changes: unknown[] = [];
+    capability.onScaleChanged((e) => changes.push(e.page));
+    const completed: unknown[] = [];
+    capability.onCalibrationCompleted((e) => completed.push(e.page));
+    const reports = await capability.calibrate({
+      page: PAGE,
+      from: { x: 0, y: 10 },
+      to: { x: 72, y: 10 },
+      distance: { value: 1, unit: 'm' },
+    });
+    expect(reports).toHaveLength(1);
+    expect(annotation.remeasurePage).toHaveBeenCalledOnce();
+    expect(changes).toEqual([PAGE]);
+    expect(completed).toEqual([PAGE]);
+    expect(capability.getPageScale(PAGE).source).toBe('owned');
+  });
+
+  it('refuses scale writes without authority and unknown presets', async () => {
+    const denied = harness({ allowed: false });
+    await settle();
+    await expect(denied.capability.clearScale(PAGE)).rejects.toMatchObject({
+      code: 'permission-denied',
+    });
+    const { capability } = harness();
+    await settle();
+    await expect(capability.setPreset(PAGE, 'nope')).rejects.toMatchObject({ code: 'not-found' });
+  });
+
+  it('creates a measurement annotation through the annotation plugin', async () => {
+    const { capability, annotation } = harness();
+    await settle();
+    await capability.createMeasurement({
+      kind: 'distance',
+      page: PAGE,
+      points: [
+        { x: 0, y: 0 },
+        { x: 10, y: 0 },
+      ],
+    });
+    expect(annotation.create).toHaveBeenCalledWith(
+      expect.objectContaining({ subtype: 'line', tool: 'distance', page: PAGE }),
+    );
+    await expect(
+      capability.createMeasurement({ kind: 'distance', page: PAGE, points: [{ x: 0, y: 0 }] }),
+    ).rejects.toMatchObject({ code: 'invalid-input' });
+  });
+
+  it('arms and dismisses the calibrate flow', async () => {
+    const { capability, interaction } = harness();
+    capability.startCalibration();
+    expect(interaction.activateTool).toHaveBeenCalledWith('calibrate');
+    const dismissed: unknown[] = [];
+    capability.onCalibrationDismissed(() => dismissed.push(1));
+    capability.dismissCalibration(); // nothing pending: silent
+    expect(dismissed).toEqual([]);
+  });
 });

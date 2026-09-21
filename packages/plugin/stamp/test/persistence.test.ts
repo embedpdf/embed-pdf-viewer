@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { memoryStampStore, persistStampLibraries, restoreStampLibraries } from '../src/persistence';
-import type { StampCapability, StampLibraryChange } from '../src/types';
+import type { StampCapability, StampLibraryChange } from '../src/host-contract';
 
 function fakeStamp() {
   const listeners = new Set<(change: StampLibraryChange) => void>();

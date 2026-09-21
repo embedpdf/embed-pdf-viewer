@@ -29,7 +29,9 @@ import type {
   NormalizedUnit,
   OverflowSection,
 } from '@embedpdf/core-ui';
-import { CommandsToken, resolvedCommandsEqual } from '@embedpdf/plugin-commands/contract';
+import { resolvedCommandsEqual } from '@embedpdf/plugin-commands/contract';
+// The overflow projection asks a host fact (the menu target), so the host lens is bound here.
+import { CommandsToken } from '@embedpdf/plugin-commands/contract/host';
 import type { ResolvedCommand } from '@embedpdf/plugin-commands/contract';
 import { useCapability, useDocumentId, useKernel, useKernelValue } from './runtime';
 
@@ -111,7 +113,7 @@ export function useStripView(bar: BarSchema | undefined): StripView | null {
     if (!normalized) return NO_STRIP_GROUPS;
     const resolved = new Map<string, ResolvedCommand>();
     const visible = (id: string) => {
-      const cmd = commands.resolve(id, documentId ?? undefined);
+      const cmd = commands.resolveCommand(id, documentId ?? undefined);
       if (cmd) resolved.set(id, cmd);
       return cmd?.visible === true;
     };
@@ -125,7 +127,11 @@ export function useStripView(bar: BarSchema | undefined): StripView | null {
     () =>
       groups.length === 0
         ? null
-        : { groups, execute: (id: string) => commands.execute(id, documentId ?? undefined) },
+        : {
+            groups,
+            execute: (id: string) =>
+              void commands.execute(id, { documentId: documentId ?? undefined }),
+          },
     [groups, commands, documentId],
   );
 }
@@ -529,8 +535,9 @@ export function Toolbar({
   );
 
   const resolveCmd = (id: string): ResolvedCommand | null =>
-    commands.resolve(id, documentId ?? undefined);
-  const executeCmd = (id: string) => commands.execute(id, documentId ?? undefined);
+    commands.resolveCommand(id, documentId ?? undefined);
+  const executeCmd = (id: string) =>
+    void commands.execute(id, { documentId: documentId ?? undefined });
   const commandOf = (u: NormalizedUnit) => (u.kind === 'command' ? u.command : u.terminal);
 
   // Structure → visible structure → fit. Cheap enough to run per render; all
@@ -551,7 +558,7 @@ export function Toolbar({
     separator: separatorWidth + gap,
   };
   const fit = solve(visibleBar, metrics, containerWidth);
-  const overflowSections = projectOverflow(visibleBar, fit, (id) => commands.menuTarget(id));
+  const overflowSections = projectOverflow(visibleBar, fit, (id) => commands.getMenuTarget(id));
 
   const [overflowOpen, setOverflowOpen] = useState(false);
   useEffect(() => {

@@ -2,9 +2,9 @@ import { describe, expect, it, vi } from 'vitest';
 import { toPageRef, type FormFieldDTO, type FormSnapshot } from '@embedpdf/engine-core/runtime';
 import type { PluginContext } from '@embedpdf/core';
 
-import { createFormCapability } from '../src/capability';
-import { formReducer, initialFormState } from '../src/reducer';
-import { fieldRef, type FormAction, type FormState } from '../src/types';
+import { createFormCapability } from '../src/controller';
+import { formReducer, initialFormState } from '../src/model';
+import { fieldRef, type FormAction, type FormState } from '../src/host-contract';
 
 const field = (): FormFieldDTO => ({
   ref: { kind: 'objectNumber', fieldObjectNumber: 5 },
