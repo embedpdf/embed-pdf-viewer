@@ -1,10 +1,12 @@
 # The pull-request gate. One workflow owns what "green" means:
 #
-#   - packages   always            typecheck + tests + contract checks
-#   - server     server or engine  the @cloudpdf/server matrix (needs the native runtime)
-#   - sdk        contract or fern  SDK generation + API reference
-#   - hygiene    manifests/tooling build:release leaves the worktree clean
-#   - ci-ok      always            the ONE required check: fails if any of the above failed
+#   - packages       always            typecheck + tests + contract checks
+#   - build-runtime  engine or server  the nine-target engine runtime, ONCE per run
+#   - engine         engine paths      Engine v3 Conformance (local + cloud parity, CDN snippet)
+#   - server         server or engine  the @cloudpdf/server matrix
+#   - sdk            contract or fern  SDK generation + API reference
+#   - hygiene        manifests/tooling build:release leaves the worktree clean
+#   - ci-ok          always            the ONE required check: fails if any of the above failed
 #
 # Path detection happens INSIDE the run (the `changes` job), never as a
 # workflow-level `paths:` filter, so every PR gets a ci-ok verdict — a
@@ -12,8 +14,8 @@
 # starts. Branch protection requires `ci-ok` alone; the matrix cells stay
 # visible for debugging but are not the contract.
 #
-# Still standalone (their own triggers): Engine v3 Conformance and Build PDF
-# Runtime — see docs/plans/2026-09-21-ci-gate.md for folding them in.
+# Build PDF Runtime keeps its own push trigger (it publishes content-addressed
+# payloads for every branch); on pull requests it runs only here, once.
 name: CI
 
 on:
@@ -39,6 +41,7 @@ jobs:
       # paths-filter lists a pull request's files through the API.
       pull-requests: read
     outputs:
+      engine: ${{ steps.filter.outputs.engine }}
       server: ${{ steps.filter.outputs.server }}
       sdk: ${{ steps.filter.outputs.sdk }}
       manifests: ${{ steps.filter.outputs.manifests }}
@@ -48,6 +51,17 @@ jobs:
         uses: dorny/paths-filter@v3
         with:
           filters: |
+            engine:
+              - 'packages/engine-core/**'
+              - 'packages/engine-services/**'
+              - 'packages/engine/**'
+              - 'packages/core/signature/**'
+              - 'cloudpdf/engine/**'
+              - 'cloudpdf/server/**'
+              - 'packages/viewer/**'
+              - 'packages/default-stamps/**'
+              - '.github/workflows/engine-conformance.yml'
+              - '.github/workflows/build-engine-runtime.yml'
             server:
               - 'packages/engine/**'
               - 'cloudpdf/server/**'
@@ -73,11 +87,30 @@ jobs:
     uses: ./.github/workflows/packages.yml
     secrets: inherit
 
+  # One runtime build feeds engine and server through this run's artifacts.
+  build-runtime:
+    name: build-runtime
+    needs: changes
+    if: needs.changes.outputs.engine == 'true' || needs.changes.outputs.server == 'true'
+    uses: ./.github/workflows/build-engine-runtime.yml
+    secrets: inherit
+
+  engine:
+    name: engine
+    needs: [changes, build-runtime]
+    if: ${{ !cancelled() && needs.changes.outputs.engine == 'true' && needs.build-runtime.result == 'success' }}
+    uses: ./.github/workflows/engine-conformance.yml
+    with:
+      runtime_artifacts: true
+    secrets: inherit
+
   server:
     name: server
-    needs: changes
-    if: needs.changes.outputs.server == 'true'
+    needs: [changes, build-runtime]
+    if: ${{ !cancelled() && needs.changes.outputs.server == 'true' && needs.build-runtime.result == 'success' }}
     uses: ./.github/workflows/server-tests.yml
+    with:
+      runtime_artifacts: true
     secrets: inherit
 
   sdk:
@@ -96,7 +129,7 @@ jobs:
 
   ci-ok:
     name: ci-ok
-    needs: [changes, packages, server, sdk, hygiene]
+    needs: [changes, packages, build-runtime, engine, server, sdk, hygiene]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5

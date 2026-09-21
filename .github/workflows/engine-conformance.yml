@@ -4,28 +4,17 @@ name: Engine v3 Conformance
 # against both engine-local (WASM) and the cloud engine (HTTP -> native PDFium).
 # Any divergence between the two implementations fails the job.
 
+# Runs from ci.yml when engine, server, viewer or stamp sources changed (the
+# umbrella owns the path decision and builds the runtime once for every job
+# that needs it), or by hand — a manual run builds its own runtime.
 on:
-  pull_request:
-    paths:
-      - 'packages/engine-core/**'
-      - 'packages/engine-services/**'
-      - 'packages/engine/**'
-      - 'cloudpdf/engine/**'
-      - 'cloudpdf/server/**'
-      - 'packages/viewer/**'
-      - 'packages/default-stamps/**'
-      - '.github/workflows/engine-conformance.yml'
-  push:
-    branches: [main]
-    paths:
-      - 'packages/engine-core/**'
-      - 'packages/engine-services/**'
-      - 'packages/engine/**'
-      - 'cloudpdf/engine/**'
-      - 'cloudpdf/server/**'
-      - 'packages/viewer/**'
-      - 'packages/default-stamps/**'
-      - '.github/workflows/engine-conformance.yml'
+  workflow_call:
+    inputs:
+      runtime_artifacts:
+        description: 'The caller uploaded engine-runtime-* artifacts in this run'
+        required: false
+        type: boolean
+        default: true
   workflow_dispatch: {}
 
 permissions:
@@ -39,13 +28,17 @@ env:
   CI: true
 
 jobs:
+  # Only a manual run builds here; under ci.yml the artifacts already exist.
   build-runtime:
+    if: ${{ !inputs.runtime_artifacts }}
     uses: ./.github/workflows/build-engine-runtime.yml
     secrets: inherit
 
   conformance:
     name: local + cloud parity
     needs: build-runtime
+    # A skipped build (artifacts from the caller) must not skip us.
+    if: ${{ !cancelled() && needs.build-runtime.result != 'failure' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -102,6 +95,7 @@ jobs:
   snippet:
     name: CDN snippet from a foreign origin
     needs: build-runtime
+    if: ${{ !cancelled() && needs.build-runtime.result != 'failure' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
