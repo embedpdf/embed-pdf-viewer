@@ -46,7 +46,7 @@ function PlaceByCode() {
   useEffect(() => {
     if (assets.length > 0) return;
     loadDefaultLibrary('en')
-      .then((bytes) => stamp.importLibrary(bytes))
+      .then((bytes) => stamp.importLibraryPdf(bytes))
       .catch((err) => setStatus(err instanceof Error ? err.message : String(err)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stamp]);

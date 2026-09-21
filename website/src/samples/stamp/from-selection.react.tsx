@@ -60,18 +60,17 @@ function MakeStamp() {
   const stamp = useStamp();
   const documentId = useDocumentId();
   const annotation = useAnnotation();
-  // Subscribed to the selection (refs) so this re-renders as it changes; the
-  // page-space records carry each annotation's page.
-  const selectedRefs = useAnnotationSelection();
-  const selected = selectedRefs.length > 0 ? annotation.listSelected() : [];
-  const selection = selected.map((a) => a.ref);
+  // Subscribed to the selection (ids) so this re-renders as it changes; the
+  // refs come from the selected DTOs.
+  const selectedIds = useAnnotationSelection();
+  const selection = selectedIds.length > 0 ? annotation.getSelected().map((dto) => dto.ref) : [];
   const mine = useStampAssets(MY_STAMPS);
   const { armAsset } = useArmStampAsset();
   const { activeToolId, activate } = useTool();
   const [status, setStatus] = useState('draw a shape, select it, make a stamp');
 
   // One page at a time: a stamp is one page of artwork.
-  const pages = new Set(selected.map((a) => a.page.pageObjectNumber));
+  const pages = new Set(selection.map((ref) => ref.page.pageObjectNumber));
   const canMake = selection.length > 0 && pages.size === 1 && documentId !== null;
 
   const make = async () => {
@@ -79,10 +78,10 @@ function MakeStamp() {
     const [pageObjectNumber] = pages;
     // The library is created on first use; the identifier is minted in
     // Acrobat's `#…` form so the stamp keeps its identity there too.
-    const libraryId = stamp.getLibrary(MY_STAMPS)
+    const libraryId = stamp.library(MY_STAMPS)
       ? MY_STAMPS
       : await stamp.createLibrary('My stamps', { id: MY_STAMPS });
-    const assetId = await stamp.createAssetFromAnnotations(
+    const assetId = await stamp.addAssetFromAnnotations(
       documentId,
       toPageRef(pageObjectNumber),
       [...selection],
@@ -91,7 +90,7 @@ function MakeStamp() {
         label: `Custom stamp ${mine.length + 1}`,
       },
     );
-    setStatus(`added ${stamp.getAsset(assetId)?.label ?? assetId}`);
+    setStatus(`added ${stamp.asset(assetId)?.label ?? assetId}`);
   };
 
   return (

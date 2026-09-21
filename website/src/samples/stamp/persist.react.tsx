@@ -62,10 +62,11 @@ function Libraries() {
 
   const importPdf = (file: File) =>
     // The file name is a fallback: a library names itself through its /Title.
-    void stamp.importLibrary(file, { name: file.name.replace(/\.pdf$/i, '') });
+    void stamp.importLibraryPdf(file, { name: file.name.replace(/\.pdf$/i, '') });
 
-  const exportPdf = async (libraryId: string, name: string) => {
-    const bytes = await stamp.exportLibrary(libraryId);
+  const exportPdf = (libraryId: string, name: string) => {
+    const bytes = stamp.exportLibrary(libraryId);
+    if (!bytes) return;
     const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: 'application/pdf' }));
     Object.assign(document.createElement('a'), { href: url, download: `${name}.pdf` }).click();
     URL.revokeObjectURL(url);

@@ -18,8 +18,8 @@ function RotateButtons() {
   const stage = useStage();
   return (
     <Toolbar>
-      <Button onClick={() => stage.rotateViewBy(-90)}>⟲ Rotate left</Button>
-      <Button onClick={() => stage.rotateViewBy(90)}>⟳ Rotate right</Button>
+      <Button onClick={() => stage.rotateView(-90)}>⟲ Rotate left</Button>
+      <Button onClick={() => stage.rotateView(90)}>⟳ Rotate right</Button>
     </Toolbar>
   );
 }
