@@ -12,8 +12,10 @@ export * from '@embedpdf/core';
 import * as React from 'react';
 import {
   createContext,
+  forwardRef,
   useContext,
   useEffect,
+  useImperativeHandle,
   useRef,
   useState,
   useSyncExternalStore,
@@ -280,6 +282,10 @@ export interface ViewerProps {
   /** Rendered when kernel construction or `start()` fails. Without it a boot
    *  failure renders nothing — but never a silent forever-fallback. */
   renderError?: (error: unknown) => React.ReactNode;
+  /** Called once the kernel has started — before `children` mount and before
+   *  `initialDocuments` open. The imperative door for code outside React
+   *  (register commands, subscribe events). The `ref` carries the same kernel. */
+  onReady?: (kernel: Kernel) => void;
   children: React.ReactNode;
 }
 
@@ -316,14 +322,10 @@ type BootState =
  * leak-detection contract StrictMode exists to exercise; production mounts
  * once and boots once.
  */
-export function Viewer({
-  engine,
-  plugins,
-  initialDocuments,
-  fallback,
-  renderError,
-  children,
-}: ViewerProps) {
+export const Viewer = forwardRef<Kernel | null, ViewerProps>(function Viewer(
+  { engine, plugins, initialDocuments, fallback, renderError, onReady, children }: ViewerProps,
+  ref,
+) {
   // Init-only inputs: the kernel's lifetime is the component's lifetime, so a
   // changed engine/plugins identity cannot mean "rebuild the workspace" —
   // that would silently drop every open document. Capture once, warn in dev.
@@ -341,6 +343,14 @@ export function Viewer({
   }
 
   const [boot, setBoot] = useState<BootState>({ phase: 'booting', kernel: null });
+  const onReadyRef = useRef(onReady);
+  onReadyRef.current = onReady;
+  // The ref is the started kernel (null before boot and after an error).
+  useImperativeHandle<Kernel | null, Kernel | null>(
+    ref,
+    () => (boot.phase === 'ready' ? boot.kernel : null),
+    [boot],
+  );
   useEffect(() => {
     const captured = initial.current;
     // A thunk is viewer-owned: call it now, destroy on unmount. An instance is
@@ -365,6 +375,7 @@ export function Viewer({
     kernel.start().then(
       () => {
         if (!alive) return; // unmounted mid-boot — don't open anything
+        onReadyRef.current?.(kernel);
         setBoot({ phase: 'ready', kernel });
         // Kernel-owned boot policy: all tabs appear immediately in array
         // order; the `active` entry (else the first) is selected; failures
@@ -396,7 +407,7 @@ export function Viewer({
       {boot.phase === 'ready' ? children : (fallback ?? null)}
     </KernelCtx.Provider>
   );
-}
+});
 export const EmbedPDF = Viewer;
 
 /**

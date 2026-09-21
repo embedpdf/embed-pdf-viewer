@@ -28,12 +28,15 @@ export interface SearchLayerProps {
    * dark/scanned documents where multiply-on-dark would vanish.
    */
   blendMode?: React.CSSProperties['mixBlendMode'];
+  /** Make hits clickable: called with the hit under the pointer (e.g. to activate it). */
+  onHitClick?: (hit: SearchHit) => void;
 }
 
 export function SearchLayer({
   color = '#ffd500',
   activeColor = '#ff9632',
   blendMode = 'multiply',
+  onHitClick,
 }: SearchLayerProps) {
   const page = usePage();
   // Per-page hit arrays are reference-stable in the plugin, so plain Object.is works.
@@ -47,6 +50,11 @@ export function SearchLayer({
       {hits.map((hit: SearchHit) =>
         hit.segments.map(({ quad: q }, i) => {
           const fill = hit === active ? activeColor : color;
+          // Only a clickable hit takes the pointer; a plain highlight stays inert.
+          const clickable = onHitClick
+            ? { pointerEvents: 'auto' as const, cursor: 'pointer' }
+            : null;
+          const onClick = onHitClick ? () => onHitClick(hit) : undefined;
           // Upright hits keep the classic rounded div (pixel-identical to the
           // pre-orientation layer); rotated hits draw their true oriented cell.
           const upright =
@@ -59,6 +67,7 @@ export function SearchLayer({
             return (
               <div
                 key={`${hit.charStart}:${i}`}
+                onClick={onClick}
                 style={{
                   position: 'absolute',
                   left: tl.x,
@@ -68,6 +77,7 @@ export function SearchLayer({
                   background: fill,
                   mixBlendMode: blendMode,
                   borderRadius: 2,
+                  ...clickable,
                 }}
               />
             );
@@ -87,7 +97,12 @@ export function SearchLayer({
                 mixBlendMode: blendMode,
               }}
             >
-              <polygon points={ring.map((p) => `${p.x},${p.y}`).join(' ')} fill={fill} />
+              <polygon
+                points={ring.map((p) => `${p.x},${p.y}`).join(' ')}
+                fill={fill}
+                onClick={onClick}
+                style={clickable ?? undefined}
+              />
             </svg>
           );
         }),

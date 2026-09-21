@@ -9,17 +9,14 @@
 // One-line-per-feature: registration travels with the UI.
 export * from '@embedpdf/plugin-stage';
 import * as React from 'react';
-import { useLayoutEffect, useMemo, useRef } from 'react';
-import { StageToken, createScrollHandler, settingsEqual } from '@embedpdf/plugin-stage';
+import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
+import { createScrollHandler, settingsEqual } from '@embedpdf/plugin-stage';
 import type { StageCapability, VisiblePage } from '@embedpdf/plugin-stage';
 import type { StageHostCapability } from '@embedpdf/plugin-stage/contract/host';
 import { toPageRef } from '@embedpdf/core';
-import type { CapabilityToken } from '@embedpdf/core';
-
-/** Which stage lens to bind to. Defaults to the main StageToken — pass a custom
- *  token to drive an additional lens (e.g. a wrapped thumbnail sidebar). */
-export type StageTokenProp = CapabilityToken<StageCapability>;
+import type { CapabilityToken, EventHook } from '@embedpdf/core';
 import type { PageFrame } from '@embedpdf/core-geometry';
+import { InteractionToken as InteractionPublicToken } from '@embedpdf/plugin-interaction/contract';
 import { InteractionToken } from '@embedpdf/plugin-interaction/contract/host';
 import { createStageSurface } from '@embedpdf/web';
 import { ProjectorProvider, type ProjectorBinding, type ViewProjector } from './anchored';
@@ -27,12 +24,18 @@ import {
   makePageContext,
   PageProvider,
   useCapability,
+  useCapabilityEvent,
   useDocumentId,
   useKernelValue,
   useOptionalCapability,
   useSelector,
 } from './runtime';
 import type { PageContextValue } from './runtime';
+import { StageScope, useStageToken } from './stage-scope';
+import type { StageTokenProp } from './stage-scope';
+
+export { StageScope, useStageToken } from './stage-scope';
+export type { StageScopeProps, StageTokenProp } from './stage-scope';
 
 function PageSurface({
   documentId,
@@ -198,7 +201,16 @@ export interface StageProps {
    * pan, and pinches are still swallowed (they never page-zoom the browser).
    */
   zoomGestures?: boolean;
-  /** The stage lens to drive (default: the main StageToken). */
+  /**
+   * The CONTROLLED form of the active tool: while set, the interaction hub's
+   * active tool follows this value (re-applied when the document changes),
+   * and `onToolChange` reports every change so the owner can update it. Omit
+   * both for the uncontrolled default (`useTool().activate`).
+   */
+  tool?: string;
+  /** Fires on every tool change of this stage's document (controlled or not). */
+  onToolChange?: (toolId: string) => void;
+  /** The stage lens to drive (default: the nearest `<StageScope>`, else the main StageToken). */
   token?: StageTokenProp;
   className?: string;
   style?: React.CSSProperties;
@@ -211,14 +223,27 @@ export function Stage({
   interaction = true,
   panFallback = true,
   zoomGestures = true,
-  token = StageToken,
+  tool,
+  onToolChange,
+  token: explicitToken,
   className,
   style,
 }: StageProps) {
+  const token = useStageToken(explicitToken);
   // The surface is a HOST of the lens: it reports viewport size, drives gestures and
   // reads the lens id. The host contract is the same runtime token, typed wider.
   const stage = useCapability(token as unknown as CapabilityToken<StageHostCapability>);
   const ix = useOptionalCapability(InteractionToken);
+  // Controlled tool: the prop is the source of truth whenever it is set.
+  useEffect(() => {
+    if (tool === undefined || !ix) return;
+    if (ix.getActiveToolId() !== tool) ix.activateTool(tool);
+  }, [tool, ix]);
+  useCapabilityEvent(
+    InteractionPublicToken,
+    (c) => c.onToolChanged,
+    (event) => onToolChange?.(event.toolId),
+  );
   const useHub = interaction && !!ix;
   // The hub's resolved cursor (text/grab/…), applied to the viewport when driving.
   const hubCursor = useKernelValue(() => ix?.getCursor() ?? 'default');
@@ -299,29 +324,44 @@ export function Stage({
         ...style,
       }}
     >
-      {pages.map((p) => (
-        <PageSurface
-          key={p.ref.pageObjectNumber} // durable page identity — survives move/delete (matches Angular's `track p.ref.pageObjectNumber`)
-          documentId={docId ?? ''}
-          page={p}
-          frame={frame}
-          stage={stage}
-          render={children}
-          chrome={pageChrome}
-        />
-      ))}
-      {/* Anchored UI mounts in the overlay: absolute coords here are the
-          projector's overlay space (the stage container). */}
-      <ProjectorProvider value={projectorBinding}>{overlay}</ProjectorProvider>
+      {/* Everything inside binds to THIS lens by default: a `useZoom()` in a
+          page's chrome or a `<SelectionHandles>` in the overlay needs no token. */}
+      <StageScope token={token}>
+        {pages.map((p) => (
+          <PageSurface
+            key={p.ref.pageObjectNumber} // durable page identity — survives move/delete (matches Angular's `track p.ref.pageObjectNumber`)
+            documentId={docId ?? ''}
+            page={p}
+            frame={frame}
+            stage={stage}
+            render={children}
+            chrome={pageChrome}
+          />
+        ))}
+        {/* Anchored UI mounts in the overlay: absolute coords here are the
+            projector's overlay space (the stage container). */}
+        <ProjectorProvider value={projectorBinding}>{overlay}</ProjectorProvider>
+      </StageScope>
     </div>
   );
 }
 
 // ── Facade hooks — thin sugar over the capability + generic binding ───────────
-export function useStage(token: StageTokenProp = StageToken) {
-  return useCapability(token);
+// Every hook takes an OPTIONAL token; without one it binds to the nearest
+// `<StageScope>` / `<Stage>`, else the main lens.
+export function useStage(token?: StageTokenProp) {
+  return useCapability(useStageToken(token));
 }
-export function useZoom(token: StageTokenProp = StageToken) {
+/** Subscribe to one stage event for the mounted lifetime: `useStageEvent((c) => c.onZoomChanged, handler)`. */
+export function useStageEvent<T>(
+  select: (cap: StageCapability) => EventHook<T>,
+  handler: (event: T) => void,
+  token?: StageTokenProp,
+): void {
+  useCapabilityEvent(useStageToken(token), select, handler);
+}
+export function useZoom(explicitToken?: StageTokenProp) {
+  const token = useStageToken(explicitToken);
   const s = useCapability(token);
   const zoom = useSelector(token, (c) => c.getZoomLevel());
   const mode = useSelector(token, (c) => c.getZoomMode());
@@ -338,7 +378,8 @@ export function useZoom(token: StageTokenProp = StageToken) {
     zoomTo: s.zoomTo,
   };
 }
-export function usePages(token: StageTokenProp = StageToken) {
+export function usePages(explicitToken?: StageTokenProp) {
+  const token = useStageToken(explicitToken);
   const s = useCapability(token);
   const currentPage = useSelector(token, (c) => c.getCurrentPageIndex());
   const documentId = useDocumentId();
@@ -352,7 +393,8 @@ export function usePages(token: StageTokenProp = StageToken) {
     reveal: s.revealIndex,
   };
 }
-export function useLayout(token: StageTokenProp = StageToken) {
+export function useLayout(explicitToken?: StageTokenProp) {
+  const token = useStageToken(explicitToken);
   const s = useCapability(token);
   const flow = useSelector(token, (c) => c.getSettings().flow);
   const layout = useSelector(token, (c) => c.getSettings().layout);
@@ -375,7 +417,8 @@ export function useLayout(token: StageTokenProp = StageToken) {
 
 /** The document's page list (with PDF labels) + the current item's pages — the
  *  data for page thumbnails / worksheet-style page tabs. */
-export function usePageList(token: StageTokenProp = StageToken) {
+export function usePageList(explicitToken?: StageTokenProp) {
+  const token = useStageToken(explicitToken);
   const documentId = useDocumentId();
   // The page list is document truth (order, labels, sizes), so it comes from the
   // kernel's page registry; Stage only knows which of those pages it is showing.
@@ -400,7 +443,8 @@ export function usePageList(token: StageTokenProp = StageToken) {
  * customer concern": keep your own `Partial<StageSettings>` objects and apply them
  * with `update(preset)` (one anchor-preserving change).
  */
-export function useStageSettings(token: StageTokenProp = StageToken) {
+export function useStageSettings(explicitToken?: StageTokenProp) {
+  const token = useStageToken(explicitToken);
   const s = useCapability(token);
   // settingsEqual derives from the plugin's settings registry — a new setting is
   // covered here automatically, without this package spelling out the shape.

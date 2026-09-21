@@ -17,11 +17,20 @@ import { CommandsToken, resolvedCommandsEqual } from '@embedpdf/plugin-commands'
 import type { CommandsCapability, ResolvedCommand } from '@embedpdf/plugin-commands';
 // The keystroke matcher is a host fact.
 import { CommandsToken as CommandsHostToken } from '@embedpdf/plugin-commands/contract/host';
-import { useCapability, useDocumentId, useKernelValue } from './runtime';
+import type { EventHook } from '@embedpdf/core';
+import { useCapability, useCapabilityEvent, useDocumentId, useKernelValue } from './runtime';
 
 /** The commands capability (registerCommand / execute / searchCommands / categories). */
 export function useCommands(): CommandsCapability {
   return useCapability(CommandsToken);
+}
+
+/** Subscribe to one commands event for the mounted lifetime: `useCommandsEvent((c) => c.onExecuted, handler)`. */
+export function useCommandsEvent<T>(
+  select: (cap: CommandsCapability) => EventHook<T>,
+  handler: (event: T) => void,
+): void {
+  useCapabilityEvent(CommandsToken, select, handler);
 }
 
 /** A command resolved against this subtree's document, reactively. */

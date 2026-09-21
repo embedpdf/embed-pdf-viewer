@@ -18,14 +18,30 @@ import { useEffect, useState } from 'react';
 import {
   StampToken,
   type StampAsset,
+  type StampCapability,
   type StampLibrary,
   type StampLibraryFilter,
 } from '@embedpdf/plugin-stamp';
-import { shallowArray, useCapability, useDocumentId, useSelector } from './runtime';
+import type { EventHook } from '@embedpdf/core';
+import {
+  shallowArray,
+  useCapability,
+  useCapabilityEvent,
+  useDocumentId,
+  useSelector,
+} from './runtime';
 
 /** The stamp capability (workspace-scoped: one library set for every document). */
 export function useStamp() {
   return useCapability(StampToken);
+}
+
+/** Subscribe to one stamp event for the mounted lifetime: `useStampEvent((c) => c.onAssetCreated, handler)`. */
+export function useStampEvent<T>(
+  select: (cap: StampCapability) => EventHook<T>,
+  handler: (event: T) => void,
+): void {
+  useCapabilityEvent(StampToken, select, handler);
 }
 
 /** Libraries, optionally of one kind or several (`{ kind: 'stamps' }`, `{ kind: ['stamps', 'toolbar'] }`). */

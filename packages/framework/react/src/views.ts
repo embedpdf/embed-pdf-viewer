@@ -11,7 +11,21 @@
 export * from '@embedpdf/plugin-view-manager';
 import { ViewManagerToken } from '@embedpdf/plugin-view-manager';
 import type { PaneId, PaneInfo, ViewManagerCapability } from '@embedpdf/plugin-view-manager';
-import { useKernel, useKernelValue } from './runtime';
+import type { EventHook } from '@embedpdf/core';
+import { useCapability, useCapabilityEvent, useKernel, useKernelValue } from './runtime';
+
+/** The view-manager capability (panes and tabs) for app code. */
+export function useViewManager(): ViewManagerCapability {
+  return useCapability(ViewManagerToken);
+}
+
+/** Subscribe to one view-manager event for the mounted lifetime: `useViewManagerEvent((c) => c.onDocumentMoved, handler)`. */
+export function useViewManagerEvent<T>(
+  select: (cap: ViewManagerCapability) => EventHook<T>,
+  handler: (event: T) => void,
+): void {
+  useCapabilityEvent(ViewManagerToken, select, handler);
+}
 
 export interface UsePanes extends Pick<
   ViewManagerCapability,

@@ -19,7 +19,7 @@ export { copySelection } from '@embedpdf/web';
 import * as React from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { textQuadEquals } from '@embedpdf/core-geometry';
-import type { CapabilityToken } from '@embedpdf/core';
+import type { CapabilityToken, EventHook, PageRef } from '@embedpdf/core';
 import {
   HANDLE_BAR,
   HANDLE_HEAD,
@@ -30,18 +30,23 @@ import {
   type SelectionHandleEndpoint,
   type SelectionHandleView,
   type SelectionAnchor,
+  type SelectionCapability,
+  type TextRange,
 } from '@embedpdf/plugin-selection';
 import { SelectionToken as SelectionHostToken } from '@embedpdf/plugin-selection/contract/host';
-import { StageToken, type StageCapability } from '@embedpdf/plugin-stage/contract';
+import type { StageCapability } from '@embedpdf/plugin-stage/contract';
 import {
   attachSelectionHandle,
   wireSelectionClipboard,
   type SelectionClipboardOptions,
 } from '@embedpdf/web';
-import { Anchored, type AnchoredPlacement } from './anchored';
+import { Anchored, useOptionalProjectorBinding, type AnchoredPlacement } from './anchored';
+import { devWarn } from './dev';
+import { useStageToken } from './stage-scope';
 import {
   shallowArray,
   useCapability,
+  useCapabilityEvent,
   useKernelValue,
   useOptionalCapability,
   usePage,
@@ -98,6 +103,39 @@ export function SelectionLayer({ color = 'rgba(33, 150, 243, 0.35)' }: Selection
  *  app chrome — toolbars, context menus, automation. */
 export function useSelection() {
   return useCapability(SelectionToken);
+}
+
+/** Subscribe to one selection event for the mounted lifetime: `useSelectionEvent((c) => c.onCommitted, handler)`. */
+export function useSelectionEvent<T>(
+  select: (cap: SelectionCapability) => EventHook<T>,
+  handler: (event: T) => void,
+): void {
+  useCapabilityEvent(SelectionToken, select, handler);
+}
+
+const sameRange = (a: TextRange | null, b: TextRange | null): boolean =>
+  a === b ||
+  (!!a &&
+    !!b &&
+    a.start.page.pageObjectNumber === b.start.page.pageObjectNumber &&
+    a.start.index === b.start.index &&
+    a.end.page.pageObjectNumber === b.end.page.pageObjectNumber &&
+    a.end.index === b.end.index);
+const samePages = (a: readonly PageRef[], b: readonly PageRef[]): boolean =>
+  a === b ||
+  (a.length === b.length && a.every((p, i) => p.pageObjectNumber === b[i]!.pageObjectNumber));
+
+/** The selection's reactive read-model for chrome: whether anything is
+ *  selected, the character range (persist/restore), and the pages it spans. */
+export function useSelectionState(): {
+  hasSelection: boolean;
+  range: TextRange | null;
+  pageRefs: readonly PageRef[];
+} {
+  const hasSelection = useSelector(SelectionToken, (c) => c.hasSelection());
+  const range = useSelector(SelectionToken, (c) => c.getRange(), sameRange);
+  const pageRefs = useSelector(SelectionToken, (c) => c.listSelectedPages(), samePages);
+  return { hasSelection, range, pageRefs };
 }
 
 /** Structural equality for the selection's menu anchor — keeps the menu from
@@ -188,7 +226,7 @@ const handleView = (stage: StageCapability): SelectionHandleView => ({
 export interface SelectionHandlesProps {
   /** Handle colour (default: the selection blue). */
   color?: string;
-  /** The stage lens hosting this overlay (default: the main StageToken). */
+  /** The stage lens hosting this overlay (default: the enclosing `<Stage>`'s lens). */
   token?: CapabilityToken<StageCapability>;
 }
 
@@ -208,9 +246,23 @@ export interface SelectionHandlesProps {
  * outside a Stage it renders nothing (a `PageView` has no camera to project
  * through). Pointer-isolated, so grabbing a handle never pans the stage.
  */
-export function SelectionHandles({ color = '#2196f3', token = StageToken }: SelectionHandlesProps) {
+export function SelectionHandles({
+  color = '#2196f3',
+  token: explicitToken,
+}: SelectionHandlesProps) {
+  const token = useStageToken(explicitToken);
   const host = useCapability(SelectionHostToken);
   const stage = useOptionalCapability(token);
+  // Outside a Stage there is no camera to project through: say so instead of
+  // rendering nothing silently.
+  const surface = useOptionalProjectorBinding();
+  if (!surface || surface.projector.space !== 'overlay') {
+    devWarn(
+      'selection-handles-outside-stage',
+      '<SelectionHandles> renders nothing here: mount it in the <Stage> overlay slot ' +
+        '(a <PageView> has no camera to project the handles through).',
+    );
+  }
   const selecting = useSelector(SelectionHostToken, (c) => c.isGestureActive());
   const visible = useSelector(SelectionHostToken, (c) => c.isHighlightVisible());
   const endpoints = useSelector(

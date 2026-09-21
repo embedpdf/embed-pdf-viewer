@@ -10,9 +10,6 @@
  */
 import * as React from 'react';
 import { useEffect, useState } from 'react';
-import { interactionPlugin } from '@embedpdf/plugin-interaction';
-import { selectionPlugin } from '@embedpdf/plugin-selection';
-import { renderPlugin } from '@embedpdf/plugin-render';
 import {
   PageView,
   PagePointerSource,
@@ -21,6 +18,9 @@ import {
   Viewer,
   useSelection,
   useTool,
+  interactionPlugin,
+  selectionPlugin,
+  renderPlugin,
 } from '@embedpdf/react';
 import { bootstrap } from './engine';
 import type { Boot } from './engine';
@@ -86,7 +86,7 @@ function Shell() {
       <div style={{ flex: 1, overflow: 'auto', background: '#f3f4f6', padding: 24 }}>
         {PAGES.map((i) => (
           <div key={i} style={{ display: 'flex', justifyContent: 'center', marginBottom: 24 }}>
-            <PageView page={i} width={WIDTH}>
+            <PageView pageIndex={i} width={WIDTH}>
               <RenderLayer />
               <SelectionLayer />
               <PagePointerSource />

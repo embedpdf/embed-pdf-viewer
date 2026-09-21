@@ -27,10 +27,12 @@ import {
 // The layer paints anchors only while a navigation tool is active — a host fact.
 import { LinkToken as LinkHostToken } from '@embedpdf/plugin-link/contract/host';
 import { sanitizeExternalUri } from '@embedpdf/web';
+import type { EventHook } from '@embedpdf/core';
 
 import {
   shallowArray,
   useCapability,
+  useCapabilityEvent,
   useOptionalCapability,
   useOptionalSelector,
   usePage,
@@ -209,4 +211,12 @@ export function LinkLayer({ renderLink }: LinkLayerProps = {}) {
 
 export function useLink() {
   return useCapability(LinkToken);
+}
+
+/** Subscribe to one link event for the mounted lifetime: `useLinkEvent((c) => c.onActivated, handler)`. */
+export function useLinkEvent<T>(
+  select: (cap: LinkCapability) => EventHook<T>,
+  handler: (event: T) => void,
+): void {
+  useCapabilityEvent(LinkToken, select, handler);
 }

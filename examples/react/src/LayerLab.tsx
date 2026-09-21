@@ -12,9 +12,6 @@
  */
 import * as React from 'react';
 import { useEffect, useState } from 'react';
-import { stagePlugin } from '@embedpdf/plugin-stage';
-import { renderPlugin } from '@embedpdf/plugin-render';
-import { pageEditPlugin } from '@embedpdf/plugin-page-edit';
 import {
   Viewer,
   Stage,
@@ -22,6 +19,9 @@ import {
   RenderLayer,
   usePageEditor,
   type PageContextValue,
+  stagePlugin,
+  renderPlugin,
+  pageEditPlugin,
 } from '@embedpdf/react';
 import { useDocuments } from '@embedpdf/react';
 import type { Engine, OpenInput, PdfSaveMode } from '@embedpdf/core';

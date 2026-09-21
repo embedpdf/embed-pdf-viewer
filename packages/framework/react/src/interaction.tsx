@@ -16,11 +16,18 @@ export { vibrationFeedback, wkFeedback } from '@embedpdf/web';
 import * as React from 'react';
 import { useEffect, useRef } from 'react';
 import { pageRefsEqual } from '@embedpdf/core';
-import { InteractionToken } from '@embedpdf/plugin-interaction/contract/host';
-import type { Modifiers, PointerSample } from '@embedpdf/plugin-interaction';
+import { InteractionToken as InteractionHostToken } from '@embedpdf/plugin-interaction/contract/host';
+import { InteractionToken } from '@embedpdf/plugin-interaction';
+import type {
+  InteractionCapability,
+  Modifiers,
+  PointerSample,
+  ToolChangedEvent,
+} from '@embedpdf/plugin-interaction';
+import type { EventHook } from '@embedpdf/core';
 import { svgCursor } from '@embedpdf/web';
 import type { SvgCursorOptions } from '@embedpdf/web';
-import { useCapability, usePage, useSelector } from './runtime';
+import { shallowArray, useCapability, useCapabilityEvent, usePage, useSelector } from './runtime';
 
 const mods = (e: PointerEvent): Modifiers => ({
   shift: e.shiftKey,
@@ -50,8 +57,9 @@ export function createClickCounter(maxGapMs = 400, maxDistPx = 6) {
 
 export function PagePointerSource() {
   const page = usePage();
-  const interaction = useCapability(InteractionToken);
-  const cursor = useSelector(InteractionToken, (c) => c.getCursor());
+  // The pointer source is a HOST of the hub (it dispatches samples).
+  const interaction = useCapability(InteractionHostToken);
+  const cursor = useSelector(InteractionHostToken, (c) => c.getCursor());
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -126,15 +134,37 @@ export function PagePointerSource() {
   return <div ref={ref} style={{ position: 'absolute', inset: 0, cursor, touchAction: 'none' }} />;
 }
 
-/** Read + switch the active tool (for a toolbar). */
+/** The interaction capability (tools, cursor, handlers) for app chrome. */
+export function useInteraction(): InteractionCapability {
+  return useCapability(InteractionToken);
+}
+
+/** Subscribe to one interaction event for the mounted lifetime: `useInteractionEvent((c) => c.onGestureStarted, handler)`. */
+export function useInteractionEvent<T>(
+  select: (cap: InteractionCapability) => EventHook<T>,
+  handler: (event: T) => void,
+): void {
+  useCapabilityEvent(InteractionToken, select, handler);
+}
+
+/** Read + switch the active tool (for a toolbar). `push`/`pop` arm a tool
+ *  temporarily (hold space to pan) and restore the previous one. */
 export function useTool() {
   const interaction = useCapability(InteractionToken);
   const activeToolId = useSelector(InteractionToken, (c) => c.getActiveToolId());
+  const tools = useSelector(InteractionToken, (c) => c.listTools(), shallowArray);
   return {
     activeToolId,
     activate: interaction.activateTool,
-    tools: interaction.listTools(),
+    tools,
+    push: interaction.pushTool,
+    pop: interaction.popTool,
   };
+}
+
+/** Run `handler` on every tool change of this subtree's document. */
+export function useToolChanged(handler: (event: ToolChangedEvent) => void): void {
+  useCapabilityEvent(InteractionToken, (c) => c.onToolChanged, handler);
 }
 
 /** One cursor slot: an SVG image ({@link SvgCursorOptions}) or a plain CSS
@@ -171,7 +201,7 @@ const toCursor = (img: ToolCursorImage, fallback?: string): string =>
  * declared cursors.
  */
 export function useToolCursor(spec: ToolCursorSpec | null): void {
-  const interaction = useCapability(InteractionToken);
+  const interaction = useCapability(InteractionHostToken);
   // Key the effect by VALUE: specs are built inline in render, and a
   // fresh-but-identical object must not thrash the skin.
   const key = spec && JSON.stringify(spec);

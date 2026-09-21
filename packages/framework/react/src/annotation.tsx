@@ -12,11 +12,14 @@
 // One-line-per-feature: registration travels with the UI.
 export * from '@embedpdf/plugin-annotation';
 import * as React from 'react';
-import { useEffect, useState } from 'react';
-import type { ResourceStatus } from '@embedpdf/core';
+import { useEffect, useRef, useState } from 'react';
+import type { EventHook, ResourceStatus } from '@embedpdf/core';
 import {
   AnnotationToken,
   annotationKey,
+  type Annotation,
+  type AnnotationCapability,
+  type AnnotationFilter,
   type AnnotationRef,
   type Behavior,
   type CommentsApi,
@@ -69,12 +72,15 @@ export type { SelectionFlags, SelectionProps } from '@embedpdf/plugin-annotation
 import {
   shallowArray,
   useCapability,
+  useCapabilityEvent,
   useDocumentId,
   useKernelValue,
   useOptionalCapability,
   usePage,
   useSelector,
 } from './runtime';
+import { devWarn } from './dev';
+import { usePageLayerFact } from './dev-registry';
 import type { PageContextValue, PageLayout } from './runtime';
 
 export {
@@ -809,6 +815,24 @@ export function AnnotationLayer({ renderers }: AnnotationLayerProps = {}) {
   );
   const [urls, setUrls] = useState<Record<string, { url: string; box: Rect }>>({});
   useAutoBehaviors(anno, renderers);
+  usePageLayerFact(page, 'annotationRenderers', renderers ?? null);
+  // Entry identity keys the behavior registration, so an inline `renderers`
+  // array re-registers every render. Detect it once: a fresh array whose
+  // entries are the previous ones.
+  const previousRenderers = useRef(renderers);
+  if (
+    renderers &&
+    previousRenderers.current &&
+    renderers !== previousRenderers.current &&
+    shallowArray(renderers, previousRenderers.current)
+  ) {
+    devWarn(
+      'annotation-renderers-inline',
+      '<AnnotationLayer renderers> was given a new array with the same entries — define it ' +
+        'outside render (module scope or useMemo), because entry identity keys the behavior registration.',
+    );
+  }
+  previousRenderers.current = renderers;
 
   // Baked annotations render from engine rasters — refetch when the page's
   // baked set or an /AP content version changes (a freshly placed stamp, a
@@ -959,12 +983,49 @@ export function useFilePickerProvider(
   const anno = useOptionalCapability(AnnotationToken);
   useEffect(() => {
     if (!anno) return;
-    return anno.setFilePickerProvider(provider);
+    // ONE port per document: a second caller silently replaces the first.
+    const installed = (filePickerInstalls.get(anno) ?? 0) + 1;
+    filePickerInstalls.set(anno, installed);
+    if (installed > 1) {
+      devWarn(
+        'file-picker-provider-twice',
+        'useFilePickerProvider() is called from two mounted components for the same document — ' +
+          'the later one wins. Call it once, at a document-scoped spot.',
+      );
+    }
+    const remove = anno.setFilePickerProvider(provider);
+    return () => {
+      filePickerInstalls.set(anno, (filePickerInstalls.get(anno) ?? 1) - 1);
+      remove();
+    };
   }, [anno, provider]);
 }
+const filePickerInstalls = new WeakMap<object, number>();
 
 export function useAnnotation() {
   return useCapability(AnnotationToken);
+}
+
+/** Subscribe to one annotation event for the mounted lifetime: `useAnnotationEvent((c) => c.onCreated, handler)`. */
+export function useAnnotationEvent<T>(
+  select: (cap: AnnotationCapability) => EventHook<T>,
+  handler: (event: T) => void,
+): void {
+  useCapabilityEvent(AnnotationToken, select, handler);
+}
+
+/** Page-space annotation records matching `filter` (a page, a subtype, an
+ *  author, a group), reference-stable while the matching set is unchanged. */
+export function useAnnotationList(filter?: AnnotationFilter): readonly Annotation[] {
+  const key = filter
+    ? `${filter.page?.pageObjectNumber ?? ''}|${filter.subtype ?? ''}|${filter.author ?? ''}|${
+        filter.group ? annotationKey(filter.group) : ''
+      }`
+    : '';
+  // Keyed by VALUE so an inline filter object never resubscribes.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const stable = React.useMemo(() => filter, [key]);
+  return useSelector(AnnotationToken, (c) => c.list(stable), shallowArray);
 }
 
 /** The selected annotation refs (group-expanded), reference-stable while unchanged. */

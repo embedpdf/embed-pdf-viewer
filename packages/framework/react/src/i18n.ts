@@ -13,11 +13,20 @@
 export * from '@embedpdf/plugin-i18n';
 import { useMemo } from 'react';
 import { I18nToken } from '@embedpdf/plugin-i18n';
-import type { LocaleInfo, TranslateOptions } from '@embedpdf/plugin-i18n';
-import { useCapability, useKernelValue, useSelector } from './runtime';
+import type { I18nCapability, LocaleInfo, TranslateOptions } from '@embedpdf/plugin-i18n';
+import type { EventHook } from '@embedpdf/core';
+import { useCapability, useCapabilityEvent, useKernelValue, useSelector } from './runtime';
 
 /** The raw i18n capability (t / setLocale / listLocales / getDirection / …). */
 export const useI18n = () => useCapability(I18nToken);
+
+/** Subscribe to one i18n event for the mounted lifetime: `useI18nEvent((c) => c.onLocaleChanged, handler)`. */
+export function useI18nEvent<T>(
+  select: (cap: I18nCapability) => EventHook<T>,
+  handler: (event: T) => void,
+): void {
+  useCapabilityEvent(I18nToken, select, handler);
+}
 
 /**
  * A reactive translate function. New identity whenever i18n state changes

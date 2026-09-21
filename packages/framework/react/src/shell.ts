@@ -16,11 +16,25 @@ export * from '@embedpdf/plugin-shell';
 import { useMemo } from 'react';
 import { ShellToken } from '@embedpdf/plugin-shell';
 import type { OpenSurfaceOptions, ShellCapability } from '@embedpdf/plugin-shell';
-import { useCapability, useOptionalCapability, useOptionalSelector } from './runtime';
+import type { EventHook } from '@embedpdf/core';
+import {
+  useCapability,
+  useCapabilityEvent,
+  useOptionalCapability,
+  useOptionalSelector,
+} from './runtime';
 
 /** The raw capability — throws without a document; for gated subtrees. */
 export function useShell(): ShellCapability {
   return useCapability(ShellToken);
+}
+
+/** Subscribe to one shell event for the mounted lifetime: `useShellEvent((c) => c.onSurfaceOpened, handler)`. */
+export function useShellEvent<T>(
+  select: (cap: ShellCapability) => EventHook<T>,
+  handler: (event: T) => void,
+): void {
+  useCapabilityEvent(ShellToken, select, handler);
 }
 
 export interface SurfaceHandle {

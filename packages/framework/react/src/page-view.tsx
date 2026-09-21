@@ -12,6 +12,7 @@
 import * as React from 'react';
 import { useId, useMemo, useRef } from 'react';
 import { pageRefsEqual, toPageRef } from '@embedpdf/core';
+import type { PageRef } from '@embedpdf/core';
 import { NO_FRAME, pageTransform, type PageFrame } from '@embedpdf/core-geometry';
 import { observeClientGeometry } from '@embedpdf/web';
 import { ProjectorProvider, type ProjectorBinding, type ViewProjector } from './anchored';
@@ -20,13 +21,14 @@ import {
   makePageContext,
   PageProvider,
   useActiveDocumentId,
-  useKernel,
+  useKernelValue,
 } from './runtime';
 
-export interface PageViewProps {
-  page: number;
+export type PageViewProps = {
   /** Which document to show. Defaults to the active document. */
   documentId?: string;
+  /** Shown while the document or the page is not available yet (default: nothing). */
+  fallback?: React.ReactNode;
   /** Target width for the page CONTENT; the display box is the rotated footprint. */
   width?: number;
   /** Reserved chrome bands around the page (screen px) — same model as `<Stage>`. */
@@ -36,31 +38,56 @@ export interface PageViewProps {
   /** Box-space chrome (label, border, …) — never rotated. Mirrors `<Stage pageChrome>`. */
   pageChrome?: React.ReactNode;
   style?: React.CSSProperties;
-}
+} & (
+  | {
+      /** The page by its durable address. */
+      pageRef: PageRef;
+      pageIndex?: never;
+    }
+  | {
+      /** The page by display index (0-based). */
+      pageIndex: number;
+      pageRef?: never;
+    }
+);
 
 /** A single page surface with NO Stage — same layers + rotation + chrome frame,
  *  no camera/scroll/zoom. */
-export function PageView({
-  page,
-  documentId,
-  width = 240,
-  pageFrame = NO_FRAME,
-  children,
-  pageChrome,
-  style,
-}: PageViewProps) {
-  const kernel = useKernel();
+export function PageView(props: PageViewProps) {
+  const {
+    documentId,
+    fallback = null,
+    width = 240,
+    pageFrame = NO_FRAME,
+    children,
+    pageChrome,
+    style,
+  } = props;
+  const wantedRef = props.pageRef ?? null;
+  const wantedIndex = props.pageIndex ?? null;
   const active = useActiveDocumentId();
   const ref = useRef<HTMLDivElement>(null);
   const docId = documentId ?? active;
-  const meta = docId ? kernel.getState().core.documents[docId] : undefined;
-  const base = meta?.pages[page];
+  // The page-registry entry, subscribed: a rotate or a reorder re-renders
+  // this surface like it re-renders a Stage page. Entries are reference-
+  // stable per page in the registry, so identity is the right equality.
+  const wantedPon = wantedRef?.pageObjectNumber ?? null;
+  const base = useKernelValue((k) => {
+    if (!docId) return null;
+    const pages = k.documents.listPages(docId);
+    const found =
+      wantedPon !== null
+        ? pages.find((p) => p.ref.pageObjectNumber === wantedPon)
+        : pages[wantedIndex ?? 0];
+    return found ?? null;
+  });
+  const page = base?.index ?? wantedIndex ?? 0;
   // The page's address is the kernel's (`PageLayout.ref`); a placeholder
   // (object number = 1-based index) only until the layout is known — the
-  // surface renders nothing before that anyway. Memoized by the number so the
-  // context's `ref` stays identity-stable across re-renders (layers key
+  // surface renders the fallback before that anyway. Memoized by the number so
+  // the context's `ref` stays identity-stable across re-renders (layers key
   // effects on it).
-  const pon = base?.ref.pageObjectNumber ?? page + 1;
+  const pon = base?.ref.pageObjectNumber ?? wantedPon ?? page + 1;
   const pageRef = useMemo(() => toPageRef(pon), [pon]);
   const rotation = base?.rotation ?? 0;
   const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
@@ -87,14 +114,8 @@ export function PageView({
   const viewId = useId();
   const ctx = useMemo(
     () =>
-      makePageContext(
-        docId ?? '',
-        `page-view:${viewId}`,
-        pageRef,
-        page,
-        pageFrame,
-        transform,
-        () => ref.current!.getBoundingClientRect(),
+      makePageContext(docId ?? '', `page-view:${viewId}`, pageRef, page, pageFrame, transform, () =>
+        ref.current!.getBoundingClientRect(),
       ),
     [docId, pageRef, page, pageFrame, transform, viewId],
   );
@@ -128,7 +149,7 @@ export function PageView({
     () => ({ projector, revision: ctx, subscribe: observeClientGeometry }),
     [projector, ctx],
   );
-  if (!docId || !meta || !base) return null;
+  if (!docId || !base) return <>{fallback}</>;
   const t = transform;
   const outerW = t.viewWidth + pageFrame.left + pageFrame.right;
   const outerH = t.viewHeight + pageFrame.top + pageFrame.bottom;
@@ -137,39 +158,39 @@ export function PageView({
   return (
     <DocumentScope id={docId}>
       <ProjectorProvider value={projectorBinding}>
-      <div style={{ position: 'relative', width: outerW, height: outerH, ...style }}>
-        <PageProvider value={ctx}>
-          {/* drop shadow ONLY — transparent, axis-aligned, can't leak behind the bitmap */}
-          <div
-            style={{
-              position: 'absolute',
-              left: pageFrame.left,
-              top: pageFrame.top,
-              width: t.viewWidth,
-              height: t.viewHeight,
-              boxShadow: 'var(--epdf-page-shadow, 0 6px 18px rgba(0,0,0,.18))',
-            }}
-          />
-          {/* white backing + content as ONE box; rotation 0 carries no transform */}
-          <div
-            ref={ref}
-            style={{
-              position: 'absolute',
-              left: contentLeft,
-              top: contentTop,
-              width: t.contentWidth,
-              height: t.contentHeight,
-              background: '#fff',
-              transform: rotation ? `rotate(${rotation}deg)` : undefined,
-              userSelect: 'none',
-              WebkitUserSelect: 'none',
-            }}
-          >
-            {children}
-          </div>
-          {pageChrome}
-        </PageProvider>
-      </div>
+        <div style={{ position: 'relative', width: outerW, height: outerH, ...style }}>
+          <PageProvider value={ctx}>
+            {/* drop shadow ONLY — transparent, axis-aligned, can't leak behind the bitmap */}
+            <div
+              style={{
+                position: 'absolute',
+                left: pageFrame.left,
+                top: pageFrame.top,
+                width: t.viewWidth,
+                height: t.viewHeight,
+                boxShadow: 'var(--epdf-page-shadow, 0 6px 18px rgba(0,0,0,.18))',
+              }}
+            />
+            {/* white backing + content as ONE box; rotation 0 carries no transform */}
+            <div
+              ref={ref}
+              style={{
+                position: 'absolute',
+                left: contentLeft,
+                top: contentTop,
+                width: t.contentWidth,
+                height: t.contentHeight,
+                background: '#fff',
+                transform: rotation ? `rotate(${rotation}deg)` : undefined,
+                userSelect: 'none',
+                WebkitUserSelect: 'none',
+              }}
+            >
+              {children}
+            </div>
+            {pageChrome}
+          </PageProvider>
+        </div>
       </ProjectorProvider>
     </DocumentScope>
   );

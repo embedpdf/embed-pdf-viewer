@@ -67,10 +67,10 @@ function useSignatureField() {
   useEffect(() => {
     if (!fields || firstPage === null || fields.some((f) => f.family === 'signature')) return;
     form
-      .placeField({
+      .createField({
         family: 'signature',
         page: firstPage,
-        box: { x: 60, y: 620, width: 220, height: 64 },
+        bounds: { x: 60, y: 620, width: 220, height: 64 },
       })
       .catch((err) => console.error(err));
     // Once the snapshot is known; the field appearing is the outcome.
@@ -87,7 +87,7 @@ function usePerson(): SignerRow | null {
     stamp
       .createLibrary('Ada Lovelace', { kind: 'signatures' })
       .then((libraryId) =>
-        stamp.addAsset({
+        stamp.createAsset({
           libraryId,
           name: 'signature',
           label: 'Signature',
@@ -138,7 +138,7 @@ function SignBar() {
   };
 
   if (!person) return <Readout>Creating a signature…</Readout>;
-  const verdict = field && signature.verdictOf(field.field);
+  const verdict = field && signature.getVerdict(field.field);
   return (
     <Toolbar>
       <Readout>{person.name}</Readout>

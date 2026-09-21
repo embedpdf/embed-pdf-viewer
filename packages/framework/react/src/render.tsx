@@ -26,8 +26,25 @@ import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 // drives a view's tile demand. The host lens is the same runtime token.
 import { RenderToken } from '@embedpdf/plugin-render/contract/host';
 import type { PageViewDemand, TilePaintSource } from '@embedpdf/plugin-render/contract/host';
+import { RenderToken as RenderPublicToken } from '@embedpdf/plugin-render';
+import type { RenderCapability } from '@embedpdf/plugin-render';
+import type { EventHook } from '@embedpdf/core';
 import { bindPaintedImage } from '@embedpdf/web';
-import { useCapability, usePage, useSelector } from './runtime';
+import { useCapability, useCapabilityEvent, usePage, useSelector } from './runtime';
+import { usePageLayerFact } from './dev-registry';
+
+/** The render capability (renderPage / renderThumbnail / invalidation) for app code. */
+export function useRender(): RenderCapability {
+  return useCapability(RenderPublicToken);
+}
+
+/** Subscribe to one render event for the mounted lifetime: `useRenderEvent((c) => c.onInvalidated, handler)`. */
+export function useRenderEvent<T>(
+  select: (cap: RenderCapability) => EventHook<T>,
+  handler: (event: T) => void,
+): void {
+  useCapabilityEvent(RenderPublicToken, select, handler);
+}
 
 export interface RenderLayerProps {
   /**
@@ -50,6 +67,7 @@ export function RenderLayer({ annotations = true, tiles = true }: RenderLayerPro
   const render = useCapability(RenderToken);
   const settings = render.getPaintSettings();
   const ref = useRef<HTMLImageElement>(null);
+  usePageLayerFact(page, 'renderBakesAnnotations', annotations);
 
   // ONE dependency: the raster's canonical identity — conformed width +
   // annotations flag + epoch. Under a lattice it moves only at rung

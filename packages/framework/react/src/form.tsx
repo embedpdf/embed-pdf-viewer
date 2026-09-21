@@ -45,7 +45,15 @@ import type { AnnotationRef } from '@embedpdf/plugin-annotation/contract';
 import { FormToken } from '@embedpdf/plugin-form/contract/host';
 export { FormToken as FormHostToken } from '@embedpdf/plugin-form/contract/host';
 import { SignatureToken } from '@embedpdf/plugin-signature/contract';
-import type { FormFieldRef, FillItem, FormFieldDTO } from '@embedpdf/plugin-form';
+import { FormToken as FormPublicToken } from '@embedpdf/plugin-form';
+import type {
+  FormCapability,
+  FormFieldRef,
+  FormFieldValue,
+  FillItem,
+  FormFieldDTO,
+} from '@embedpdf/plugin-form';
+import type { EventHook } from '@embedpdf/core';
 import { InteractionToken } from '@embedpdf/plugin-interaction/contract';
 import { StageToken } from '@embedpdf/plugin-stage/contract';
 import type { Rect } from '@embedpdf/core-annotation';
@@ -55,11 +63,13 @@ import type { AnnotationRenderer, AnnotationRendererProps } from './annotation';
 import {
   shallowArray,
   useCapability,
+  useCapabilityEvent,
   useOptionalCapability,
   useOptionalSelector,
   usePage,
   useSelector,
 } from './runtime';
+import { usePageLayerFact } from './dev-registry';
 import type { PageContextValue } from './runtime';
 import { FormFocusRing } from './form-focus-ring';
 import { NativeListBox } from './form-listbox';
@@ -955,6 +965,7 @@ function FillSignature({
 export function FormLayer() {
   const page = usePage();
   const form = useCapability(FormToken);
+  usePageLayerFact(page, 'formLayer', true);
   const active = useSelector(InteractionToken, (c) => c.getActiveTool().enables.has('form-fill'));
 
   useEffect(() => {
@@ -990,10 +1001,26 @@ export function useForm() {
   return useCapability(FormToken);
 }
 
+/** Subscribe to one form event for the mounted lifetime: `useFormEvent((c) => c.onValueChanged, handler)`. */
+export function useFormEvent<T>(
+  select: (cap: FormCapability) => EventHook<T>,
+  handler: (event: T) => void,
+): void {
+  useCapabilityEvent(FormPublicToken, select, handler);
+}
+
 /** The reconciled form snapshot (null until the first load lands),
  *  re-rendering on every form model change. */
 export function useFormSnapshot() {
   return useSelector(FormToken, (c) => c.getSnapshot());
+}
+
+/** One field's current value, subscribed (null for an unknown field). */
+export function useFormValue(ref: FormFieldRef): FormFieldValue | null {
+  const key = ref.kind === 'fqn' ? `n:${ref.name}` : `o:${ref.fieldObjectNumber}`;
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed by value
+  const stable = useMemo(() => ref, [key]);
+  return useSelector(FormPublicToken, (c) => c.getValue(stable));
 }
 
 /**

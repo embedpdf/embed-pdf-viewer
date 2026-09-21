@@ -1,31 +1,6 @@
 import * as React from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createCapabilityToken } from '@embedpdf/core';
-import { stagePlugin } from '@embedpdf/plugin-stage';
-import type {
-  Direction,
-  FlowMode,
-  GridColumns,
-  LayoutKind,
-  SpreadMode,
-  SizingMode,
-  StageCapability,
-  StageSettings,
-} from '@embedpdf/plugin-stage';
-import { interactionPlugin } from '@embedpdf/plugin-interaction';
-import { selectionPlugin } from '@embedpdf/plugin-selection';
-import { annotationPlugin } from '@embedpdf/plugin-annotation';
-import { renderPlugin } from '@embedpdf/plugin-render';
-import { pageEditPlugin } from '@embedpdf/plugin-page-edit';
-import { metadataPlugin } from '@embedpdf/plugin-metadata';
-import { formPlugin } from '@embedpdf/plugin-form';
-import type { FormFieldPatch } from '@embedpdf/plugin-form';
-import { searchPlugin, validateSearchRegex, SearchToken } from '@embedpdf/plugin-search';
-import { stampPlugin } from '@embedpdf/plugin-stamp';
-import type { StampAsset } from '@embedpdf/plugin-stamp';
-import { i18nPlugin, negotiateLocale } from '@embedpdf/plugin-i18n';
-import { viewManagerPlugin } from '@embedpdf/plugin-view-manager';
-import type { PaneInfo } from '@embedpdf/plugin-view-manager';
 import {
   Viewer,
   Stage,
@@ -65,6 +40,32 @@ import {
   useArmStampAsset,
   useT,
   useLocale,
+  stagePlugin,
+  interactionPlugin,
+  selectionPlugin,
+  annotationPlugin,
+  renderPlugin,
+  pageEditPlugin,
+  metadataPlugin,
+  formPlugin,
+  searchPlugin,
+  validateSearchRegex,
+  SearchToken,
+  stampPlugin,
+  i18nPlugin,
+  negotiateLocale,
+  viewManagerPlugin,
+  type Direction,
+  type FlowMode,
+  type GridColumns,
+  type LayoutKind,
+  type SpreadMode,
+  type SizingMode,
+  type StageCapability,
+  type StageSettings,
+  type FormFieldPatch,
+  type StampAsset,
+  type PaneInfo,
 } from '@embedpdf/react';
 import type {
   AnnotationProps,
