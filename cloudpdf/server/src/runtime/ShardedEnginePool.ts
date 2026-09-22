@@ -9,9 +9,9 @@ import type { BuildPack, EnginePool, RunAdHocOptions } from './EnginePool';
  * Engine sharding: K supervised engine hosts behind a routing
  * veneer.
  *
- * THE LAW: this composite adds routing, never lifecycle. It has exactly
- * three responsibilities — PICK (rendezvous route), REMEMBER (sticky
- * docId → shard), FORGET PRECISELY (scope a dead shard's residents into
+ * The law: this composite adds routing, never lifecycle. It has exactly
+ * three responsibilities — pick (rendezvous route), remember (sticky
+ * docId → shard), forget precisely (scope a dead shard's residents into
  * the restart hook). Respawn, backoff, drain, recycle, heartbeat,
  * journal attribution all stay per-host in `EngineHostClient`; any diff
  * that teaches this class about them is wrong by construction.
@@ -24,14 +24,14 @@ import type { BuildPack, EnginePool, RunAdHocOptions } from './EnginePool';
  *    coalesces.
  *  - `runAdHoc(baseSha)` routes by `baseSha` separately (stateless
  *    one-shot work clusters by content); sha-less ad-hoc round-robins
- *    among READY shards.
+ *    among ready shards.
  *  - Scores are SHA-256-derived (first 8 bytes as a BigUint):
  *    FNV-1a-with-suffix rendezvous is materially biased (reproduced:
  *    K=3 ≈ 25/25/50 — one-byte-suffix candidates keep near-constant
  *    score offsets).
  *
  * A `run()` against a doc with no sticky entry throws `DocNotOpen`
- * LOCALLY (no dispatch): sticky and residency are updated together, so
+ * locally (no dispatch): sticky and residency are updated together, so
  * a miss means "not open anywhere" — `readOnPool`'s reopen-retry
  * re-routes and re-sticks.
  */
@@ -65,10 +65,10 @@ export interface ShardedEnginePoolOptions {
   count: number;
   /** buildApp owns boot config; the composite owns hook interception. */
   spawn: (shard: number, hooks: ShardHooks) => Promise<EngineHostClient>;
-  /** Upstream reactions, called ONCE per event with shard context. */
+  /** Upstream reactions, called once per event with shard context. */
   onEvict?: (evt: { docId: string; baseSha: string; slot: number; shard: number }) => void;
   onHostCrash?: (evt: HostCrashEvent & { shard: number }) => void;
-  /** Fired per shard restart with THAT shard's residents (the scope). */
+  /** Fired per shard restart with that shard's residents (the scope). */
   onHostRestart?: (scope: { docIds: ReadonlySet<string> }, shard: number) => void;
 }
 
@@ -100,7 +100,7 @@ export class ShardedEnginePool implements EnginePool {
     );
     const failures = settled.filter((s): s is PromiseRejectedResult => s.status === 'rejected');
     if (failures.length > 0) {
-      // allSettled, not all: a sibling that SUCCEEDS after the first
+      // allSettled, not all: a sibling that succeeds after the first
       // failure would otherwise become an orphan supervisor respawning
       // forever. Every fulfilled client gets reaped here.
       await Promise.allSettled(clients.filter((c) => c !== null).map((c) => c!.destroy()));
@@ -123,8 +123,8 @@ export class ShardedEnginePool implements EnginePool {
         this.opts.onHostCrash?.({ ...evt, shard });
       },
       onHostRestart: () => {
-        // Snapshot THIS shard's residents BEFORE clearing them (the
-        // suspects pattern) — that snapshot IS the forget scope.
+        // Snapshot this shard's residents before clearing them (the
+        // suspects pattern) — that snapshot is the forget scope.
         const docIds = new Set<string>();
         for (const [docId, s] of this.shardOf) {
           if (s === shard) docIds.add(docId);
@@ -158,7 +158,7 @@ export class ShardedEnginePool implements EnginePool {
       typeof a === 'string'
         ? await target.runOpen(docId, a, b as BuildPack, c)
         : await target.runOpen(docId, a, b as AbortSignal | undefined);
-    this.shardOf.set(docId, shard); // stick on SUCCESS only
+    this.shardOf.set(docId, shard); // stick on success only
     return result;
   }
 
@@ -185,7 +185,7 @@ export class ShardedEnginePool implements EnginePool {
     return this.client(shard).runAdHoc(baseSha, build, signal, opts);
   }
 
-  /** Sha-less ad-hoc: round-robin among READY shards (no affinity reason
+  /** Sha-less ad-hoc: round-robin among ready shards (no affinity reason
    *  to park stateless work on a known-down host); all down → shard 0
    *  (its parked-dispatch machinery gives the honest wait/timeout). */
   private nextReadyRR(): number {
@@ -249,9 +249,9 @@ export class ShardedEnginePool implements EnginePool {
   }
 
   health(): { state: 'ready' | 'starting' | 'backoff'; downSinceMs: number | null } {
-    // ANY shard persistently down → unready: deterministic routing with
+    // Any shard persistently down → unready: deterministic routing with
     // no failover makes one dead shard a deterministic partial outage.
-    // downSinceMs is an ELAPSED duration → aggregate with max (the
+    // downSinceMs is an elapsed duration → aggregate with max (the
     // longest-down shard drives the persistence threshold).
     let worst: 'ready' | 'starting' | 'backoff' = 'ready';
     let downMs: number | null = null;
@@ -264,8 +264,8 @@ export class ShardedEnginePool implements EnginePool {
     return { state: worst, downSinceMs: downMs };
   }
 
-  /** Aggregate heartbeat: SUM, but only when EVERY shard has a reading —
-   *  a partial sum silently under-reports. Age = the OLDEST beat. */
+  /** Aggregate heartbeat: Sum, but only when every shard has a reading —
+   *  a partial sum silently under-reports. Age = the oldest beat. */
   memory(): { rssBytes: number; heapUsedBytes: number; ageMs: number } | null {
     let rss = 0;
     let heap = 0;

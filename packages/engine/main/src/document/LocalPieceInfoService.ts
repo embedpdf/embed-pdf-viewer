@@ -20,7 +20,7 @@ interface DocClosedView {
 }
 
 /**
- * `/PieceInfo` access for the local engine. ONE class serves both levels —
+ * `/PieceInfo` access for the local engine. One class serves both levels —
  * `page` undefined targets the document catalog, set targets a
  * page — mirroring the wire protocol's single job family.
  *

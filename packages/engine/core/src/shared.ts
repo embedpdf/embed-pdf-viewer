@@ -140,6 +140,7 @@ export { isValidPageObjectNumber } from './identity/PageObjectNumber';
 export type { PageObjectNumber } from './identity/PageObjectNumber';
 export type { PageRef } from './identity/PageRef';
 export { toPageRef, pageRefsEqual, encodePageKey, decodePageKey } from './identity/PageRef';
+export { generateUuid } from './identity/uuid';
 export type { AnnotationStableId } from './identity/AnnotationStableId';
 export { encodeStableIdKey, decodeStableIdKey } from './identity/AnnotationStableId';
 export type { AnnotationRef } from './identity/AnnotationRef';
@@ -506,7 +507,7 @@ export type {
 } from './mutation/FormMutationResults';
 // Search: contract types + the pure match/anchor stages. The matcher and
 // line-merge are exported (not just types) because the local worker, the
-// server, and the conformance suite all run the SAME code — parity between
+// server, and the conformance suite all run the same code — parity between
 // engines is a design invariant, not a test hope.
 export type {
   SearchQuery,
@@ -622,12 +623,11 @@ export {
 } from './auth/scope';
 export { caps, collab, materializePdfPermissions, pdfPermissions } from './auth/scope';
 
-// NOTE: CDN-shaped surface (DOC_RESOURCES, cdnCoverageForScope, applyCdnAccess,
-// CdnCoverageEntry, etc.) is deliberately NOT re-exported here. It lives under
+// Note: CDN-shaped surface (DOC_RESOURCES, cdnCoverageForScope, applyCdnAccess,
+// CdnCoverageEntry, etc.) is deliberately not re-exported here. It lives under
 // `@embedpdf/engine-core/wire` only, because it is HTTP-wire territory: server
 // route guards and the cloud SDK consume it, and engine-local must not pull it
-// into its bundle. See ENGINE_CORE_BOUNDARIES.md (or wire/cdn/README.md) for
-// the rationale and where to import from.
+// into its bundle.
 
 export * from './dto/Measure';
 export * from './measure';

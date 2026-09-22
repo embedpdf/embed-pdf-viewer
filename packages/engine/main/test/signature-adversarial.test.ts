@@ -1,6 +1,6 @@
 /**
  * Adversarial probes for the revision analysis, through the public API.
- * Every expectation is the CORRECT verdict (ISO 32000-2 12.8.4 and the
+ * Every expectation is the correct verdict (ISO 32000-2 12.8.4 and the
  * edge-claim law), not the current behaviour: a probe that fails names a
  * defect. The first four are the external review's reproductions
  * (2026-09-11), with their expectations corrected.
@@ -19,7 +19,7 @@ type Engine = Awaited<ReturnType<typeof createLocalEngine>>;
 type Doc = Awaited<ReturnType<Engine['open']>>;
 type Analysis = Awaited<ReturnType<NonNullable<Doc['signatures']>['analyze']>>;
 
-/** A DER SEQUENCE; the analysis never verifies cryptography. */
+/** A DER sequence; the analysis never verifies cryptography. */
 const FAKE_CMS = new Uint8Array([0x30, 3, 2, 1, 1]);
 const MIB = 1024 * 1024;
 
@@ -257,7 +257,7 @@ describe('analysis: legitimate changes must not fail closed', () => {
       30: SIG_FIELD,
     }, ' /OpenAction 24 0 R');
     const signed = await sign(base, { permission: 2 });
-    // 24 hangs off the widget's /AP/D but is ALSO the catalog's /OpenAction: the second edge is nobody's.
+    // 24 hangs off the widget's /AP/D but is also the catalog's /OpenAction: the second edge is nobody's.
     const analysis = await analyze(append(signed, { 24: formStream('q 1 0 0 rg Q') }));
     expect(analysis.verdict).toBe('forbidden');
   });

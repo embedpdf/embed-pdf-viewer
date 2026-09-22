@@ -455,7 +455,7 @@ describe("makePassthroughRequest", () => {
             const [, calledOptions] = mockFetch.mock.calls[0];
             expect(calledOptions.method).toBe("PUT");
             expect(calledOptions.headers["x-from-init"]).toBe("init-value");
-            // Request headers should NOT be present since explicit init was provided
+            // Request headers should not be present since explicit init was provided
             expect(calledOptions.headers["x-from-request"]).toBeUndefined();
         });
     });

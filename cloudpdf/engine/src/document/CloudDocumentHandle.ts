@@ -72,12 +72,12 @@ export interface ManifestAccessor {
    */
   apply(meta: MutationMeta, owns: readonly LayerScopePlane[]): void;
   /** Advance the cached manifest's docVersion + layoutVersion after a page
-   *  STRUCTURE op that keeps the page set intact (move, rotate). */
+   *  Structure op that keeps the page set intact (move, rotate). */
   applyPageStructure(cache: PageStructureCache): void;
   /** Same advance for a page delete, additionally dropping the deleted
    *  pages' manifest rows so per-page leaf URLs stop resolving locally. */
   applyPageDelete(cache: PageStructureCache, deletedPages: readonly PageRef[]): void;
-  /** Page insert: the cached manifest has no rows for the fresh PONs (the
+  /** Page insert: the cached manifest has no rows for the fresh page object numbers (the
    *  result carries only their object numbers), so the absorb drops the
    *  cache for a lazy refetch instead of patching. */
   applyPageInsert(cache: PageStructureCache): void;
@@ -185,10 +185,10 @@ export class CloudDocumentHandle implements DocumentHandle {
     const hub = new EventHub();
     this.hub = hub;
     this.sessionId = sessionId;
-    // Your OWN mutations publish here at POST-confirmation time (kind:
+    // Your own mutations publish here at POST-confirmation time (kind:
     // 'local'); the remote channel (SSE) publishes everyone else's into the
     // same hub. Exactly one event per mutation, either way. The SSE stream
-    // is LAZY: it opens on the first subscriber and closes on the last —
+    // is lazy: it opens on the first subscriber and closes on the last —
     // non-collaborative usage never holds a connection (browsers cap ~6
     // per origin on HTTP/1.1).
     this.events = {
@@ -358,9 +358,9 @@ export class CloudDocumentHandle implements DocumentHandle {
   }
 
   /**
-   * Monotone plane-scope flip: mark the planes a mutation OWNS as layer-scoped in
+   * Monotone plane-scope flip: mark the planes a mutation owns as layer-scoped in
    * the cached manifest. Scopes only ever move base → layer (no revert op
-   * exists), so flipping is safe under ANY event ordering — a duplicate or
+   * exists), so flipping is safe under any event ordering — a duplicate or
    * out-of-order event still proves the plane diverged at some point — and
    * the manifest fetch stays the authoritative source (the 404 → refresh
    * rail heals any miss, e.g. a future mutation kind this client doesn't
@@ -431,7 +431,7 @@ export class CloudDocumentHandle implements DocumentHandle {
       ...(delta?.working !== undefined ? { working: delta.working } : {}),
       // The manifest is a per-page registry keyed by pageObjectNumber, not a
       // display-order list — geometry/order now lives in `pages.list()`
-      // (/layout). Keep a deterministic order by PON so cache merges are
+      // (/layout). Keep a deterministic order by page object number so cache merges are
       // stable; display order is the SDK's concern via PageLayout.index.
       pages: Array.from(byPageObjectNumber.values()).sort(
         (a, b) => a.state.page.pageObjectNumber - b.state.page.pageObjectNumber,
@@ -443,13 +443,13 @@ export class CloudDocumentHandle implements DocumentHandle {
    * Patch the cached manifest after a set-preserving page-structure op (move,
    * rotate). Both are purely structural: they advance `docVersion` (so leaf
    * URLs re-resolve) and `layoutVersion` (so the /layout leaf re-fetches),
-   * but leave every per-page pin untouched — a rotate renders the SAME
+   * but leave every per-page pin untouched — a rotate renders the same
    * normalized bitmaps, a move the same pages. We raise the floor
    * unconditionally and, when our cache is exactly one version behind,
    * advance it in place; otherwise we drop it and refetch lazily.
    */
   private absorbPageStructure(cache: PageStructureCache): void {
-    // Move/rotate own the LAYOUT plane only: normalized render/text/
+    // Move/rotate own the layout plane only: normalized render/text/
     // geometry artifacts survive structural ops, so content keeps sharing.
     this.flipScopes(['layout']);
     this.manifestFloorVersion = Math.max(this.manifestFloorVersion, cache.docVersion);
@@ -471,12 +471,12 @@ export class CloudDocumentHandle implements DocumentHandle {
   /**
    * Patch the cached manifest after a page delete: the shared structural
    * advance plus dropping the deleted pages' manifest rows, so no leaf URL
-   * for a retired PON can be built from the cache (a stale request would
+   * for a retired page object number can be built from the cache (a stale request would
    * 404 anyway — this keeps the failure local and instant).
    */
   private absorbPageDelete(cache: PageStructureCache, deletedPages: readonly PageRef[]): void {
-    // Delete changes the page SET: a view that removed content must never
-    // resolve base artifacts again, so content AND annotations flip with
+    // Delete changes the page set: a view that removed content must never
+    // resolve base artifacts again, so content and annotations flip with
     // layout.
     this.flipScopes(['layout', 'content', 'annotations']);
     this.manifestFloorVersion = Math.max(this.manifestFloorVersion, cache.docVersion);
@@ -502,11 +502,11 @@ export class CloudDocumentHandle implements DocumentHandle {
   /**
    * Patch bookkeeping after a page insert — the mirror of
    * {@link absorbPageDelete}, with one asymmetry: delete can patch the
-   * cached manifest losslessly (it only REMOVES rows), but an insert needs
-   * manifest rows for the fresh PONs and the result doesn't carry them. So
-   * this absorb flips the planes (insert changes the page SET, so like
+   * cached manifest losslessly (it only removes rows), but an insert needs
+   * manifest rows for the fresh page object numbers and the result doesn't carry them. So
+   * this absorb flips the planes (insert changes the page set, so like
    * delete it owns content + annotations alongside layout), raises the
-   * version floor, and DROPS the cache — the next read refetches a manifest
+   * version floor, and drops the cache — the next read refetches a manifest
    * that includes the new pages' rows. The UI never waits on that refetch:
    * the mutation result / event already carries the full new layout.
    */
@@ -668,7 +668,7 @@ export class CloudDocumentHandle implements DocumentHandle {
         }
         const event = auditRowToEvent(row, this.sessionId);
         if (!event) return; // own echo or unknown kind
-        // Absorb BEFORE publish: a listener reading the manifest in its
+        // Absorb before publish: a listener reading the manifest in its
         // callback must see post-mutation state (same order as local).
         this.absorbRemoteEvent(event);
         this.hub.publish(event);
@@ -699,7 +699,7 @@ export class CloudDocumentHandle implements DocumentHandle {
     }
   }
 
-  /** Patch the cached manifest from a REMOTE event's coherence pins — the
+  /** Patch the cached manifest from a remote event's coherence pins — the
    *  same absorb rails local mutations use, so reads stay warm no matter
    *  whose hand caused the change. */
   private absorbRemoteEvent(event: DocumentEvent): void {
@@ -740,7 +740,7 @@ export class CloudDocumentHandle implements DocumentHandle {
       case 'form.widgetDetached':
         // Form mutations ship the same MutationMeta rails as annotations:
         // affected pages are the ones whose widget appearances changed.
-        // Widgets ARE annotations, so they own the same plane.
+        // Widgets are annotations, so they own the same plane.
         this.absorbMutation(event.meta, ['annotations']);
         return;
       case 'form.effectsApplied':

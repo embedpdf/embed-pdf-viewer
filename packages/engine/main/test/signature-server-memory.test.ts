@@ -117,12 +117,12 @@ describe('server memory contract', () => {
     if (!engine) return;
     const doc = await engine.open({ kind: 'layerFile', id: 'memory', basePath }, { scope: ['*'] });
     try {
-      // A 16 MiB embedded file: the edit IS the payload. Random bytes, so no
+      // A 16 MiB embedded file: the edit is the payload. Random bytes, so no
       // filter shrinks it.
       const payload = new Uint8Array(PAYLOAD);
       for (let i = 0; i < payload.length; i += 4096) payload[i] = (i * 7919) & 0xff;
       for (let i = 1; i < payload.length; i++) payload[i] = (payload[i - 1]! * 1103515245 + 12345 + i) & 0xff;
-      await doc.attachments.create!({ data: payload, name: 'blob.bin', mimeType: 'application/octet-stream' });
+      await doc.attachments!.create!({ data: payload, name: 'blob.bin', mimeType: 'application/octet-stream' });
 
       // Preparing a signature: the candidate's layer is a scratch file beside
       // the base while the candidate is open, and gone when prepare returns.

@@ -172,7 +172,7 @@ describe('evaluateStep: the edge-claim law', () => {
     expect(step.verdict).toBe('indeterminate');
     expect(step.findings.map((f) => f.rule)).not.toContain('identical-rewrite');
     expect(step.findings.some((f) => f.verdict === 'incomplete')).toBe(true);
-    // A real null object rewritten as null, both sides read: that IS an identical rewrite.
+    // A real null object rewritten as null, both sides read: that is an identical rewrite.
     const realNull = change(
       20,
       { old: 'null', new: 'null' },

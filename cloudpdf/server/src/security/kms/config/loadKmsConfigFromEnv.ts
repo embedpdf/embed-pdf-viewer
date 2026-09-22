@@ -24,7 +24,7 @@
  *
  * For `CLOUDPDF_KMS_STATIC_KEK`, the value is parsed as a
  * `secret://<provider>/<name>?jsonKey=&encoding=` URI into a SecretRef.
- * Plain strings are NOT accepted for the KEK — it must point at a
+ * Plain strings are not accepted for the KEK — it must point at a
  * secrets-provider entry.
  */
 

@@ -24,7 +24,7 @@ export interface PageHandle {
   readonly geometry: PageGeometryService;
   readonly render: PageRenderService;
   /**
-   * PAGE-level `/PieceInfo` private application data (ISO 32000 §14.5) —
+   * Page-level `/PieceInfo` private application data (ISO 32000 §14.5) —
    * e.g. a stamp page's name/subject. Optional: local implements it; cloud
    * omits it until a cloud consumer ships (the `downloadLayer?` pattern).
    */

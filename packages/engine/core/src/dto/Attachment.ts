@@ -52,7 +52,7 @@ export interface AttachmentFileInfo extends AttachmentFileBase {
 }
 
 /**
- * Durable address of a document-level embedded file: its name-tree KEY.
+ * Durable address of a document-level embedded file: its name-tree key.
  * Keys are unique within the tree by construction (ISO 32000 §7.9.6), so
  * — unlike annotations — no weak/index tier and no revision validation is
  * needed. A discriminated union so future ref kinds can be added without
@@ -69,7 +69,7 @@ export interface EmbeddedFileItem extends AttachmentFileInfo {
   /** The name-tree key — the durable address for download/remove. */
   key: string;
   /**
-   * Position in name-tree (sorted) order — display metadata, NOT an
+   * Position in name-tree (sorted) order — display metadata, not an
    * address: both create and delete shift indices. Address by `key`.
    */
   index: number;

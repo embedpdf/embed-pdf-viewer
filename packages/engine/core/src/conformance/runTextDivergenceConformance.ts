@@ -10,11 +10,11 @@ import { toPageRef } from '../identity/PageRef';
 import { PageTextSnapshotSchema } from '../wire/schemas';
 
 /**
- * Index-space divergence conformance: the cases where a page's CHARACTER
+ * Index-space divergence conformance: the cases where a page's character
  * space (what geometry tiles and selection/search ranges address) and its
- * extracted TEXT differ — and the `charMap` contract that bridges them.
+ * extracted text differ — and the `charMap` contract that bridges them.
  *
- * Fixtures pin EXACT values (text, charCount, anchors) verified against the
+ * Fixtures pin exact values (text, charCount, anchors) verified against the
  * wasm runtime, so both engines must produce byte-identical snapshots:
  *
  *   - a non-printing character occupying a character slot with no text unit
@@ -23,17 +23,17 @@ import { PageTextSnapshotSchema } from '../wire/schemas';
  *     characters in lockstep with the text, identity map, real segments);
  *   - supplementary-plane text via a ToUnicode surrogate pair
  *     (`embedpdf_astral_tounicode.pdf` — two lockstep surrogate entries,
- *     identity map, astral content SURVIVES extraction).
+ *     identity map, astral content survives extraction).
  *
  * The search probe closes the loop: a hit's `charStart`/`charCount` must be
- * CHARACTER-space (segments join geometry), and slicing the snapshot by the
+ * character-space (segments join geometry), and slicing the snapshot by the
  * hit's range must reproduce the matched text exactly — the law that makes
  * select-this-match and copy compose.
  */
 export interface TextDivergenceConformanceFixture extends ConformanceFixture {
   /** PDF indirect object number of the probed page. */
   pageObjectNumber: number;
-  /** The EXACT extracted text (UTF-16 faithful). */
+  /** The exact extracted text (UTF-16 faithful). */
   exactText: string;
   /** The character-space size (may differ from `exactText.length`). */
   expectedCharCount: number;
@@ -41,7 +41,7 @@ export interface TextDivergenceConformanceFixture extends ConformanceFixture {
   expectedCharMap: ReadonlyArray<CharMapAnchor> | null;
   /** Char-space slice expectations (half-open). */
   slices?: ReadonlyArray<{ from: number; to: number; text: string }>;
-  /** Literal search probe with expected CHARACTER-space hit range. */
+  /** Literal search probe with expected character-space hit range. */
   search?: { query: string; charStart: number; charCount: number; matchedText: string };
 }
 
@@ -145,13 +145,13 @@ export type TextDivergenceCase = Omit<TextDivergenceConformanceFixture, 'id' | '
 };
 
 /**
- * THE pinned divergence cases — one table, consumed by both engines' suites
+ * The pinned divergence cases — one table, consumed by both engines' suites
  * so expected values cannot drift. Values verified against the wasm runtime
  * (see each case). All fixtures are single-page; the page's indirect object
  * number is 3 in each.
  */
 export const TEXT_DIVERGENCE_CASES: Readonly<Record<string, TextDivergenceCase>> = {
-  /** Leading NON-PRINTING character: 31 character slots, 30 text units —
+  /** Leading non-printing character: 31 character slots, 30 text units —
    *  every text offset shifts by one, encoded by the single anchor [1, 0].
    *  The searchex embeddertest for this fixture pins the same +1 shift. */
   bug1139: {
@@ -167,7 +167,7 @@ export const TEXT_DIVERGENCE_CASES: Readonly<Record<string, TextDivergenceCase>>
     ],
     search: { query: 'Goodbye', charStart: 16, charCount: 7, matchedText: 'Goodbye' },
   },
-  /** `/ActualText` replacement: the span's real glyphs are REPLACED by one
+  /** `/ActualText` replacement: the span's real glyphs are replaced by one
    *  synthetic kPiece character per ActualText character, lockstep with the
    *  text (identity map), with synthesized evenly-divided boxes — so search
    *  segments exist and extraction yields the ActualText, not the glyphs. */
@@ -181,9 +181,9 @@ export const TEXT_DIVERGENCE_CASES: Readonly<Record<string, TextDivergenceCase>>
     search: { query: 'favorite', charStart: 11, charCount: 8, matchedText: 'favorite' },
   },
   /** Supplementary-plane text via a ToUnicode surrogate pair: PDFium stores
-   *  one character-list entry PER SURROGATE HALF in lockstep with the text
+   *  one character-list entry per surrogate half in lockstep with the text
    *  (identity map, no divergence in this representation) — and the emoji
-   *  SURVIVES extraction end to end. The combined-astral representation
+   *  survives extraction end to end. The combined-astral representation
    *  (font-cmap path, one entry per code point → a [+2] anchor) is covered
    *  by the charmap unit tests and the reader's divergent walk. */
   astralToUnicode: {

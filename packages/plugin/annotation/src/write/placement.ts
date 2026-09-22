@@ -11,8 +11,8 @@ import type {
 import { cssToColor } from '../repository';
 
 /**
- * Per-kind CODE for the click-to-place ICON kinds (note / file attachment)
- * — the `props.ts`/`repository.ts` pattern: all tool CONFIG stays in the
+ * Per-kind code for the click-to-place icon kinds (note / file attachment)
+ * — the `props.ts`/`repository.ts` pattern: all tool config stays in the
  * tool table; this module only interprets it. The stamp keeps its own
  * sizing/sniffing path in the capability; everything funnels through the
  * one `placeAt` entry there.
@@ -39,13 +39,13 @@ export const isIconPlaceKind = (subtype: Subtype): subtype is IconPlaceKind =>
  */
 export function iconPlacementDraft(
   subtype: IconPlaceKind,
-  geom: { rect: PdfRect; rotation?: number | null; unrotatedRect?: PdfRect | null },
+  geometry: { rect: PdfRect; rotation?: number | null; unrotatedRect?: PdfRect | null },
   defaults: AnnotationProps,
   flags: Partial<AnnotationFlags> | undefined,
   file: AttachmentFileSource | null,
 ): AnnotationDraft {
   const shared = {
-    ...geom,
+    ...geometry,
     color: cssToColor(defaults.color),
     opacity: defaults.opacity,
     // A fresh placement carries print (Acrobat parity) plus the tool's seed

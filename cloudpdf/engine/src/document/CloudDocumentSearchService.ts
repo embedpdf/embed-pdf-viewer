@@ -25,14 +25,14 @@ import type { HttpClient } from '../transport/HttpClient';
  *
  * Every slice URL is a canonical cache key — the search token pins the
  * layer's content epoch (computed from the cached manifest), the
- * CANONICAL query (default-fold literals collapse case/diacritic
+ * canonical query (default-fold literals collapse case/diacritic
  * variants into one entry), and the resume position. Identical searches
  * from any reader of the document hit the same CDN entry; matches are
  * all that ever crosses the trust boundary, and the rects/full endpoint
  * split keeps permission tiers in disjoint cache namespaces.
  *
  * Staleness rides the standard versioned-read signal: a first slice
- * answered `NotFound` means OUR manifest is stale → refresh and retry
+ * answered `NotFound` means our manifest is stale → refresh and retry
  * once; a continuation answered `NotFound` means the document changed
  * mid-search → `InvalidArg`, same contract as the local engine's cursor.
  */

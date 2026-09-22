@@ -21,6 +21,10 @@ export function createWriteSink() {
     Id,
     { resolve(ref: AnnotationRef): void; reject(error: unknown): void }
   >();
+  /** Optimistic creates in flight, by the /NM their draft carries → temporary id. */
+  const createsByName = new Map<string, Id>();
+  /** Text writes in flight per annotation key: while one runs, the typed text is newer than its echo. */
+  const textWrites = new Map<Id, number>();
 
   const note = (ref: AnnotationRef | null, promise: Promise<unknown>): void => {
     sink?.push({ ref, promise });
@@ -39,21 +43,27 @@ export function createWriteSink() {
     refs: readonly AnnotationRef[],
     writes: readonly WriteRecord[],
   ): Promise<BatchResult<AnnotationRef, AnnotationRef>> => {
-    const settled = await Promise.allSettled(writes.map((w) => w.promise));
+    const settled = await Promise.allSettled(writes.map((write) => write.promise));
     const failed: { ref: AnnotationRef; error: ReturnType<typeof toPluginErrorInfo> }[] = [];
     const failedKeys = new Set<string>();
-    settled.forEach((r, i) => {
+    settled.forEach((outcome, i) => {
       const ref = writes[i]?.ref;
-      if (r.status === 'rejected' && ref && !failedKeys.has(annotationKey(ref))) {
+      if (outcome.status === 'rejected' && ref && !failedKeys.has(annotationKey(ref))) {
         failedKeys.add(annotationKey(ref));
-        failed.push({ ref, error: toPluginErrorInfo(toPluginError('annotation', r.reason)) });
+        failed.push({ ref, error: toPluginErrorInfo(toPluginError('annotation', outcome.reason)) });
       }
     });
-    return { applied: refs.filter((r) => !failedKeys.has(annotationKey(r))), skipped: [], failed };
+    return {
+      applied: refs.filter((ref) => !failedKeys.has(annotationKey(ref))),
+      skipped: [],
+      failed,
+    };
   };
   const awaitAll = async (writes: readonly WriteRecord[]): Promise<void> => {
-    const settled = await Promise.allSettled(writes.map((w) => w.promise));
-    const first = settled.find((r): r is PromiseRejectedResult => r.status === 'rejected');
+    const settled = await Promise.allSettled(writes.map((write) => write.promise));
+    const first = settled.find(
+      (outcome): outcome is PromiseRejectedResult => outcome.status === 'rejected',
+    );
     if (first) throw toPluginError('annotation', first.reason);
   };
 
@@ -71,7 +81,28 @@ export function createWriteSink() {
         reject: (error) => reject(toPluginError('annotation', error)),
       });
     });
-  const isCreateAwaited = (id: Id): boolean => pendingCreates.has(id);
+  /** Track a text write for `key` until `write` settles. */
+  const trackTextWrite = (key: Id, write: Promise<unknown>): void => {
+    textWrites.set(key, (textWrites.get(key) ?? 0) + 1);
+    const settle = () => {
+      const remaining = (textWrites.get(key) ?? 1) - 1;
+      if (remaining > 0) textWrites.set(key, remaining);
+      else textWrites.delete(key);
+    };
+    write.then(settle, settle);
+  };
+  const hasTextWrite = (key: Id): boolean => textWrites.has(key);
+
+  /** Remember that the create carrying `nm` stages the temporary record `tempId`. */
+  const expectCreate = (nm: string, tempId: Id): void => {
+    createsByName.set(nm, tempId);
+  };
+  /** The temporary record a confirmed create with this /NM replaces, once. */
+  const claimCreate = (nm: string): Id | undefined => {
+    const tempId = createsByName.get(nm);
+    createsByName.delete(nm);
+    return tempId;
+  };
   const confirmCreate = (id: Id, ref: AnnotationRef): void => {
     pendingCreates.get(id)?.resolve(ref);
     pendingCreates.delete(id);
@@ -82,9 +113,13 @@ export function createWriteSink() {
   };
 
   const createEffectsOf = (effects: readonly Effect[]) =>
-    effects.filter((e): e is Extract<Effect, { fx: 'create' }> => e.fx === 'create');
+    effects.filter(
+      (effect): effect is Extract<Effect, { type: 'create' }> => effect.type === 'create',
+    );
   const groupEffectsOf = (effects: readonly Effect[]) =>
-    effects.filter((e): e is Extract<Effect, { fx: 'createGroup' }> => e.fx === 'createGroup');
+    effects.filter(
+      (effect): effect is Extract<Effect, { type: 'createGroup' }> => effect.type === 'createGroup',
+    );
 
   /** Run a verb per ref, in order, folding refusals into a BatchResult. */
   const batchOver = async <R>(
@@ -97,8 +132,8 @@ export function createWriteSink() {
     for (const ref of refs) {
       try {
         const out = await run(ref);
-        const r = refOf(ref, out);
-        if (r) applied.push(r);
+        const resolved = refOf(ref, out);
+        if (resolved) applied.push(resolved);
       } catch (error) {
         failed.push({ ref, error: toPluginErrorInfo(toPluginError('annotation', error)) });
       }
@@ -112,7 +147,10 @@ export function createWriteSink() {
     settle,
     awaitAll,
     awaitCreate,
-    isCreateAwaited,
+    trackTextWrite,
+    hasTextWrite,
+    expectCreate,
+    claimCreate,
     confirmCreate,
     failCreate,
     createEffectsOf,

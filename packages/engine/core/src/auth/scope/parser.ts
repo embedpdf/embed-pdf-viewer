@@ -4,7 +4,7 @@ import type { CollabAction, CollabFilter, DocCapability, ParsedScope } from './t
 /**
  * Closed set of recognized capability strings. Membership is the
  * authoritative source of truth — adding a new capability requires
- * extending the `DocCapability` union AND adding it here. The parser
+ * extending the `DocCapability` union and adding it here. The parser
  * rejects anything outside this set.
  *
  * Removed legacy names (e.g., `doc.read`, `doc.edit-pages`, `doc.save`)
@@ -68,7 +68,7 @@ export function validateScopeArray(raw: ReadonlyArray<string>): void {
 }
 
 function parseCollab(raw: string): ParsedScope {
-  // Split on the FIRST two colons only. Filter values may contain
+  // Split on the first two colons only. Filter values may contain
   // colons (UUIDs with `urn:uuid:...`, subject ids like `auth0|user:1`).
   const idx1 = raw.indexOf(':');
   const idx2 = raw.indexOf(':', idx1 + 1);

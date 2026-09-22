@@ -1,6 +1,6 @@
 /**
  * Text folding for literal search: the deterministic normalization applied
- * to BOTH the page text and the needle so that "Café" finds "cafe" and a
+ * to both the page text and the needle so that "Café" finds "cafe" and a
  * line-wrapped "hello\n  world" finds "hello world".
  *
  * Fold version 1:
@@ -19,7 +19,7 @@
  * original-text ranges — the property the whole anchor stage rests on.
  *
  * Pre-folded corpus artifacts store this fold's output; bump
- * `SEARCH_FOLD_VERSION` on ANY semantic change so stored corpora are
+ * `SEARCH_FOLD_VERSION` on any semantic change so stored corpora are
  * rebuilt instead of silently mismatching fresh needles.
  */
 
@@ -42,7 +42,7 @@ export interface FoldedText {
   original: string;
 }
 
-/** A half-open match range in ORIGINAL code-unit space. */
+/** A half-open match range in original code-unit space. */
 export interface SearchMatchRange {
   start: number;
   length: number;

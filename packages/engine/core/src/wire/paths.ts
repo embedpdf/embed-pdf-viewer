@@ -6,7 +6,7 @@ import type { AnalysisToken } from './tokens';
  * Single source of truth for cloud HTTP paths. Both @cloudpdf/engine and
  * @cloudpdf/server import these so they cannot drift.
  *
- * **URL layout convention (paths v2)**
+ * **URL layout convention**
  *
  * Each resource type lives at its own distinct path prefix. This
  * lets prefix-matching CDNs (Bunny, Cloud CDN, Azure FD) enforce
@@ -75,7 +75,7 @@ export const wirePaths = {
    * against the token like every layer route — the grant is
    * layer-scoped in substance: CDN coverage, scopes, and the client's
    * binding all carry the layer). Path-addressed so the affinity tier —
-   * the `X-CloudPDF-Doc` header derivation AND the chart's uri-mode
+   * the `X-CloudPDF-Doc` header derivation and the chart's uri-mode
    * regex — pins the session bootstrap to the document's pod from the
    * very first request. Default-layer callers spell `layers/default/`,
    * same as every other layer route.
@@ -83,7 +83,7 @@ export const wirePaths = {
   access: (docId: string, layerName: string) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/access`,
 
-  /** Deprecated alias (docId in the BODY) — served for one prerelease
+  /** Deprecated alias (docId in the body) — served for one prerelease
    *  cycle so pre-rename clients keep working; remove after. */
   accessLegacy: '/v1/access',
 
@@ -134,9 +134,9 @@ export const wirePaths = {
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/layout@${encodeLayoutToken(layoutVersion)}`,
 
   /**
-   * Immutable BASE page-geometry list (plane-scope model): the shared-URL
+   * Immutable base page-geometry list (plane-scope model): the shared-URL
    * variant a layout-inheriting layer resolves at — every visitor's page
-   * list is ONE CDN object served from the base worker session.
+   * list is one CDN object served from the base worker session.
    */
   docLayout: (docId: string, layoutVersion: number) =>
     `/v1/docs/${encodeURIComponent(docId)}/layout@${encodeLayoutToken(layoutVersion)}`,
@@ -158,7 +158,7 @@ export const wirePaths = {
   layerMetadataCurrent: (docId: string, layerName: string) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/metadata`,
 
-  /** Immutable BASE metadata (plane-scope model): the shared-URL variant a
+  /** Immutable base metadata (plane-scope model): the shared-URL variant a
    *  metadata-inheriting layer resolves at. */
   docMetadata: (docId: string, metadataVersion: number) =>
     `/v1/docs/${encodeURIComponent(docId)}/metadata@${encodeMetadataToken(metadataVersion)}`,
@@ -167,7 +167,7 @@ export const wirePaths = {
   layerActions: (docId: string, layerName: string, actionsVersion: number) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/actions@${encodeActionsToken(actionsVersion)}`,
 
-  /** Immutable BASE catalog actions (plane-scope model): the shared-URL
+  /** Immutable base catalog actions (plane-scope model): the shared-URL
    *  variant an actions-inheriting layer resolves at. */
   docActions: (docId: string, actionsVersion: number) =>
     `/v1/docs/${encodeURIComponent(docId)}/actions@${encodeActionsToken(actionsVersion)}`,
@@ -175,7 +175,7 @@ export const wirePaths = {
   // ---------------------------------------------------------------------
   // Digital signatures. Layer reads pin `docVersion` (a signature is a
   // layer state change like any other edit); version-scoped reads are
-  // content-addressed by the base sha and immutable forever. The RESOURCE
+  // content-addressed by the base sha and immutable forever. The resource
   // comes before the sha so each family keeps its own CDN prefix.
   // ---------------------------------------------------------------------
 
@@ -234,14 +234,14 @@ export const wirePaths = {
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/metadata`,
 
   /**
-   * Immutable BASE /EmbeddedFiles listing: the shared-URL variant an
+   * Immutable base /EmbeddedFiles listing: the shared-URL variant an
    * attachments-undiverged layer resolves at — every visitor's sidebar list
-   * is ONE CDN object served from the base worker session.
+   * is one CDN object served from the base worker session.
    */
   docAttachments: (docId: string, attachmentsVersion: number) =>
     `/v1/docs/${encodeURIComponent(docId)}/attachments@${encodeAttachmentsToken(attachmentsVersion)}`,
 
-  /** Immutable BASE decoded bytes of one embedded file (twin of
+  /** Immutable base decoded bytes of one embedded file (twin of
    *  `layerAttachmentFile` — same capability tier split). */
   docAttachmentFile: (docId: string, key: string, attachmentsVersion: number) =>
     `/v1/docs/${encodeURIComponent(docId)}/attachment-files/${encodeTokenText(key)}/data@${encodeAttachmentsToken(attachmentsVersion)}`,
@@ -283,9 +283,9 @@ export const wirePaths = {
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/attachment-files/pages/${encodeURIComponent(encodePageKey(page))}/items/${encodeURIComponent(annotKey)}/data@${encodeAttachmentsToken(attachmentsVersion)}`,
 
   /**
-   * Immutable BASE bytes of a FileAttachment annotation's embedded file
+   * Immutable base bytes of a FileAttachment annotation's embedded file
    * (plane-scope model). Depends on the `annotations` plane (the annotation
-   * exists in this view) AND the `attachments` plane (the pin); the origin
+   * exists in this view) and the `attachments` plane (the pin); the origin
    * guard requires both inherited.
    */
   docAnnotationFile: (docId: string, page: PageRef, annotKey: string, attachmentsVersion: number) =>
@@ -320,12 +320,12 @@ export const wirePaths = {
     `/v1/docs/${encodeURIComponent(docId)}/render/pages/${encodeURIComponent(encodePageKey(page))}/data`,
 
   /**
-   * Immutable BASE annotated render (plane-scope model). Its OWN path family,
+   * Immutable base annotated render (plane-scope model). Its own path family,
    * not a token flag under `/render/pages/`: an annotated render depends on
    * `content + annotations`, an annotation-free one on `content` alone, and
    * edge grants are prefix-scoped — the prefix law says a path's prefix must
    * identify its full plane-dependency set. Annotatedness is therefore
-   * PATH-ONLY (the token/path law): the wire token has no
+   * path-only (the token/path law): the wire token has no
    * `includeAnnotations` key at all; the annotated family's token carries
    * `annotationVersion`, the free family's cannot.
    */
@@ -345,7 +345,7 @@ export const wirePaths = {
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/render/pages/${encodeURIComponent(encodePageKey(page))}/data`,
 
   /** Layer twin of `docPageRenderAnnotated` — the grammar is uniform:
-   *  annotatedness is path-only at BOTH tiers. */
+   *  annotatedness is path-only at both tiers. */
   layerPageRenderAnnotated: (docId: string, layerName: string, page: PageRef, token: TokenInput) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/render/annotated/pages/${encodeURIComponent(encodePageKey(page))}/data@${encodeRenderToken(token)}`,
 
@@ -353,20 +353,20 @@ export const wirePaths = {
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/render/annotated/pages/${encodeURIComponent(encodePageKey(page))}/data`,
 
   /**
-   * Immutable BASE annotation list for a single page (plane-scope model):
+   * Immutable base annotation list for a single page (plane-scope model):
    * the shared-URL variant an annotations-inheriting layer resolves at — a
    * base's own annotations (weak-identity ones included) are simply visible
-   * through every pristine layer, so 1,000 visitors' sidebars are ONE CDN
+   * through every pristine layer, so 1,000 visitors' sidebars are one CDN
    * object served from the base worker session.
    */
   docPageAnnotations: (docId: string, page: PageRef, annotationVersion: number) =>
     `/v1/docs/${encodeURIComponent(docId)}/annotations/pages/${encodeURIComponent(encodePageKey(page))}/items@${encodeAnnotationToken(annotationVersion)}`,
 
-  /** Immutable BASE whole-document annotation listing (bulk hydration). */
+  /** Immutable base whole-document annotation listing (bulk hydration). */
   docAnnotationsAll: (docId: string, annotationsVersion: number) =>
     `/v1/docs/${encodeURIComponent(docId)}/annotations/items@${encodeAnnotationsAllToken(annotationsVersion)}`,
 
-  /** Immutable BASE appearance batch (twin of
+  /** Immutable base appearance batch (twin of
    *  `layerPageAnnotationAppearances` — same `annotations` plane gate). */
   docPageAnnotationAppearances: (docId: string, page: PageRef, token: TokenInput) =>
     `/v1/docs/${encodeURIComponent(docId)}/annotations/pages/${encodeURIComponent(encodePageKey(page))}/appearances@${encodeAnnotationAppearancesRenderToken(token)}`,
@@ -385,7 +385,7 @@ export const wirePaths = {
   ) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/annotations/pages/${encodeURIComponent(encodePageKey(page))}/items@${encodeAnnotationToken(annotationVersion)}`,
 
-  /** Immutable LAYER whole-document annotation listing (bulk hydration). */
+  /** Immutable layer whole-document annotation listing (bulk hydration). */
   layerAnnotationsAll: (docId: string, layerName: string, annotationsVersion: number) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/annotations/items@${encodeAnnotationsAllToken(annotationsVersion)}`,
 
@@ -402,7 +402,7 @@ export const wirePaths = {
    * Content-addressed via the appearance render token (`annotationVersion`
    * plus render options like scale/format); CDN may cache forever. Appearance
    * pixels depend only on the annotation `/AP` stream, so `contentVersion` is
-   * deliberately NOT part of the key.
+   * deliberately not part of the key.
    */
   layerPageAnnotationAppearances: (
     docId: string,
@@ -434,7 +434,7 @@ export const wirePaths = {
 
   /**
    * GET: the reconciled form snapshot (field tree + widget joins) for the
-   * layer's CURRENT state. Forms are document-scoped (one AcroForm per
+   * layer's current state. Forms are document-scoped (one AcroForm per
    * document), so there is no per-page collection and — unlike annotations —
    * no content-addressed `@version` variant: the snapshot is always served
    * `no-store`. Mutation results carry the per-page `cacheDelta` that keeps
@@ -493,7 +493,7 @@ export const wirePaths = {
 
   /**
    * GET: one budgeted search slice, versioned form. The token
-   * (`encodeSearchToken`) IS the cache key: content epoch + query +
+   * (`encodeSearchToken`) is the cache key: content epoch + query +
    * position. Immutable; CDN may cache forever. Mode is the path — rects
    * and full are separate resources so permission tiers never share
    * cache entries (`'rects'` needs `doc.text.search`; `'full'` also
@@ -507,7 +507,7 @@ export const wirePaths = {
 
   /**
    * GET: unversioned form — same fields as flat query params (`q` as
-   * plain text), served from the CURRENT content, always `no-store`.
+   * plain text), served from the current content, always `no-store`.
    * The debug/simple-client variant; the SDK uses the versioned form.
    */
   layerSearchRectsCurrent: (docId: string, layerName: string) =>
@@ -529,7 +529,7 @@ export const wirePaths = {
 
   layerPagesDelete: (docId: string, layerName: string) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/pages/delete`,
-  /** POST: register/rename a `/Names /Pages` entry — a page-STRUCTURE
+  /** POST: register/rename a `/Names /Pages` entry — a page-structure
    *  mutation (docVersion + layoutVersion advance; reads ride `/layout`). */
   layerPagesNames: (docId: string, layerName: string) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/pages/names`,
@@ -553,7 +553,7 @@ export const wirePaths = {
 
   /**
    * POST (plain JSON → `application/pdf` bytes): export the listed pages,
-   * in caller order, as a standalone PDF. A READ over the current layer
+   * in caller order, as a standalone PDF. A read over the current layer
    * state (gated like /download), so it is a POST only for its body —
    * nothing mutates and no event is published.
    */
@@ -573,8 +573,8 @@ export const wirePaths = {
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/download@${encodeDownloadToken(token)}`,
 
   /**
-   * Weak-annotation-sessions: pluralized in v2 so the collection
-   * lives at `/weak-annotation-sessions` and members at
+   * Weak-annotation-sessions: plural, so the collection lives at
+   * `/weak-annotation-sessions` and members at
    * `/weak-annotation-sessions/{sessionId}` — REST-conventional.
    */
   layerWeakAnnotationSession: (docId: string, layerName: string) =>
@@ -597,7 +597,7 @@ export const wirePaths = {
 } as const;
 
 /**
- * Fastify-style templates for the PLAIN (unversioned) doc-plane routes —
+ * Fastify-style templates for the plain (unversioned) doc-plane routes —
  * the backend-callable subset that the `@cloudpdf/contract` contract
  * documents. The immutable `@{version}` variants above remain viewer
  * protocol and are deliberately absent. These templates are the single
@@ -623,7 +623,7 @@ export function analysisQueryString(query: AnalysisQueryInput): string {
   if (query.exploratoryLevel !== undefined) params.set('level', query.exploratoryLevel);
   if (query.detail !== undefined) params.set('detail', query.detail);
   // The judging policy version: a cache key on the immutable version URL, so
-  // a policy bump never serves a verdict judged the old way.
+  // a policy bump never serves a verdict judged under another policy.
   params.set('policy', String(SIGNATURE_POLICY_VERSION));
   return params.toString();
 }

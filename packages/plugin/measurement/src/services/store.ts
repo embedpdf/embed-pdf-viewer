@@ -1,41 +1,19 @@
-/** Slice reads, the page registry, page ⇄ PDF point conversion, the liveness
- *  and authority guards, and the page-target expansion. */
+/** The page registry, page ⇄ PDF point conversion, the authority guards, and the page-target expansion. */
 import { PluginError } from '@embedpdf/core';
 import type { Point } from '@embedpdf/core-geometry';
-import { pageRefsEqual } from '@embedpdf/engine-core/runtime';
 import type { PageRef, PdfPoint } from '@embedpdf/engine-core/runtime';
 
-import type { PageScale, PageTarget } from '../contract';
+import type { PageTarget } from '../contract';
 import type { MeasurementContext } from './context';
 
-export const LOADING: PageScale = {
-  measure: null,
-  source: 'default',
-  ready: false,
-  persistent: false,
-};
-
 export function createStore(ctx: MeasurementContext) {
-  let disposed = false;
-  ctx.cleanup(() => {
-    disposed = true;
-  });
-  const state = () => ctx.getState();
-  const meta = (page: PageRef) => ctx.document()?.pages.find((p) => pageRefsEqual(p.ref, page));
-  const requireMeta = (page: PageRef) => {
-    const layout = meta(page);
+  const requirePage = (page: PageRef) => {
+    const layout = ctx.getPage(page);
     if (!layout) throw new PluginError('not-found', 'measurement', 'no such page');
     return layout;
   };
-  const isDisposed = () => disposed;
-  const live = () => {
-    if (disposed || !ctx.doc)
-      throw new PluginError('not-ready', 'measurement', 'document not open');
-    return ctx.doc;
-  };
-  const canCalibrate = () => ctx.doc?.security.allows('doc.annotate.modify') ?? false;
+  const canCalibrate = () => ctx.doc.security.allows('doc.annotate.modify');
   const assertAllowed = () => {
-    live();
     if (!canCalibrate()) {
       throw new PluginError(
         'permission-denied',
@@ -46,29 +24,15 @@ export function createStore(ctx: MeasurementContext) {
   };
   const targets = (pages: PageTarget): readonly PageRef[] =>
     pages === 'all'
-      ? (ctx.document()?.pages ?? []).map((p) => p.ref)
+      ? (ctx.document()?.pages ?? []).map((layout) => layout.ref)
       : Array.isArray(pages)
         ? (pages as readonly PageRef[])
         : [pages as PageRef];
-  /** Page space ↔ PDF user space — the kernel's page geometry, never re-derived here. */
+  /** Page space ↔ PDF user space: the kernel's page geometry, never re-derived here. */
   const toPdf = (page: PageRef, point: Point): PdfPoint =>
     ctx.geometry.forPage(page).pageToPdf(point);
   const toPage = (page: PageRef, point: PdfPoint): Point =>
     ctx.geometry.forPage(page).pdfToPage(point);
-  const scaleOf = (page: PageRef): PageScale =>
-    state().pages[page.pageObjectNumber]?.scale ?? LOADING;
-  return {
-    state,
-    meta,
-    requireMeta,
-    isDisposed,
-    live,
-    canCalibrate,
-    assertAllowed,
-    targets,
-    toPdf,
-    toPage,
-    scaleOf,
-  };
+  return { requirePage, canCalibrate, assertAllowed, targets, toPdf, toPage };
 }
 export type MeasurementStore = ReturnType<typeof createStore>;

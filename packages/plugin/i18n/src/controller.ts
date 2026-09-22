@@ -1,11 +1,11 @@
 /**
- * The i18n controller — reads over the slice, the locale intents, and the
- * lazy loader wired at `connect`. Built synchronously in `createKernel()`, so
- * `t()` works before the engine exists — including inside the shell's
- * loading UI.
+ * The i18n controller — reads over the state, the locale verbs, the
+ * `onLocaleChanged` derivation, and the lazy loader wired at `connect`. Built
+ * synchronously in `createKernel()`, so `t()` works before the engine
+ * exists — including inside the shell's loading UI.
  */
 import {
-  createEventHook,
+  memo,
   PluginError,
   toPluginError,
   toPluginErrorInfo,
@@ -19,22 +19,33 @@ import type {
   LocaleChangedEvent,
   LocaleInfo,
   LocaleLoadFailedEvent,
+  TranslateOptions,
 } from './contract';
-import type { I18nHostCapability } from './host-contract';
-import type { I18nAction, I18nState } from './model';
+import {
+  addTranslations,
+  registerLocale,
+  setLocale as setCurrentLocale,
+  startLocaleLoad,
+  unregisterLocale,
+  type I18nState,
+} from './model';
 import { createLoaders } from './sync/loaders';
 import { translate } from './translate';
 
-export function createI18nController(
-  ctx: PluginContext<I18nState, I18nAction>,
-  config: I18nConfig = {},
-): { api: I18nHostCapability; connect(): void } {
-  const report = (error: unknown) => globalThis.console?.error('[i18n] listener failed:', error);
-  const localeChanged = createEventHook<LocaleChangedEvent>(report);
-  const localeLoadFailed = createEventHook<LocaleLoadFailedEvent>(report);
-  ctx.cleanup(() => {
-    localeChanged.dispose();
-    localeLoadFailed.dispose();
+export function createI18nController(ctx: PluginContext<I18nState>, config: I18nConfig = {}) {
+  const localeChanged = ctx.events.source<LocaleChangedEvent>();
+  const localeLoadFailed = ctx.events.source<LocaleLoadFailedEvent>();
+
+  const state = () => ctx.state.get();
+
+  // A locale change is announced once it is usable: never while a lazy pack
+  // is still loading, and always against the locale announced last.
+  let announced = state().locale;
+  ctx.state.onChange(({ next }) => {
+    if (next.loading !== null || next.locale === announced) return;
+    const previousLocale = announced;
+    announced = next.locale;
+    localeChanged.emit({ locale: next.locale, previousLocale });
   });
 
   // Dev signal, once per offender — a missing key otherwise fails silently
@@ -46,25 +57,36 @@ export function createI18nController(
     console.warn(message);
   };
 
-  /** The known-locale list, rebuilt only when the packs change. */
-  let listedFor: I18nState['locales'] | null = null;
-  let listed: readonly LocaleInfo[] = [];
-  const listLocales = (): readonly LocaleInfo[] => {
-    const { locales } = ctx.getState();
-    if (listedFor === locales) return listed;
-    const known: LocaleInfo[] = Object.values(locales).map((locale) => ({
-      code: locale.code,
-      name: locale.name,
-      dir: locale.dir ?? 'ltr',
-      loaded: true,
-    }));
-    for (const code of Object.keys(config.loaders ?? {})) {
-      if (!locales[code]) known.push({ code, name: code, dir: 'ltr', loaded: false });
+  const translateKey = (key: string, options?: TranslateOptions): string => {
+    const result = translate(state(), key, options);
+    if (!result.found && options?.fallback === undefined) {
+      warnOnce(`key:${key}`, `[i18n] missing translation "${key}" (locale: ${state().locale})`);
     }
-    listedFor = locales;
-    listed = known;
-    return listed;
+    return result.text;
   };
+
+  /** A new translate function only when the strings it can return may differ. */
+  const getTranslator = memo(
+    () => [state().locale, state().locales],
+    (_locale, _locales) => (key: string, options?: TranslateOptions) => translateKey(key, options),
+  );
+
+  /** The known-locale list, rebuilt only when the packs change. */
+  const listLocales = memo(
+    () => [state().locales],
+    (locales): readonly LocaleInfo[] => {
+      const known: LocaleInfo[] = Object.values(locales).map((locale) => ({
+        code: locale.code,
+        name: locale.name,
+        dir: locale.dir ?? 'ltr',
+        loaded: true,
+      }));
+      for (const code of Object.keys(config.loaders ?? {})) {
+        if (!locales[code]) known.push({ code, name: code, dir: 'ltr', loaded: false });
+      }
+      return known;
+    },
+  );
 
   /** One pending promise per lazy load; a newer request supersedes it. */
   const pending = new Map<string, { resolve(): void; reject(error: unknown): void }>();
@@ -86,29 +108,18 @@ export function createI18nController(
   const loaders = createLoaders(ctx, config, { settle }, (locale, error) =>
     localeLoadFailed.emit({ locale, error: toPluginErrorInfo(toPluginError('i18n', error)) }),
   );
-  // A load completing switches the locale from inside the loader: announce it here.
-  let announced = ctx.getState().locale;
-  const announceIfChanged = () => {
-    const now = ctx.getState().locale;
-    if (now === announced || ctx.getState().loading !== null) return;
-    const previousLocale = announced;
-    announced = now;
-    localeChanged.emit({ locale: now, previousLocale });
-  };
 
   const setLocale = (code: string): Promise<void> => {
-    const state = ctx.getState();
-    if (state.locales[code]) {
+    if (state().locales[code]) {
       supersede();
-      ctx.dispatch({ type: 'I18N/SET_LOCALE', locale: code });
-      announceIfChanged();
+      ctx.state.update(setCurrentLocale, code);
       return Promise.resolve();
     }
     if (config.loaders?.[code]) {
       supersede();
       return new Promise<void>((resolve, reject) => {
         pending.set(code, { resolve, reject });
-        ctx.dispatch({ type: 'I18N/LOAD_STARTED', locale: code });
+        ctx.state.update(startLocaleLoad, code);
       });
     }
     return Promise.reject(
@@ -120,55 +131,36 @@ export function createI18nController(
     );
   };
 
-  const api = {
-    t: (key, options) => {
-      const result = translate(ctx.getState(), key, options);
-      if (!result.found && options?.fallback === undefined) {
-        warnOnce(
-          `key:${key}`,
-          `[i18n] missing translation "${key}" (locale: ${ctx.getState().locale})`,
-        );
-      }
-      return result.text;
-    },
-    hasKey: (key) => translate(ctx.getState(), key).found,
-    getLocale: () => ctx.getState().locale,
+  const api: I18nCapability = {
+    t: translateKey,
+    getTranslator,
+    hasKey: (key) => translate(state(), key).found,
+    getLocale: () => state().locale,
     getDirection: () => {
-      const { locales, locale } = ctx.getState();
+      const { locales, locale } = state();
       return locales[locale]?.dir ?? 'ltr';
     },
     listLocales,
-    getLoadingLocale: () => ctx.getState().loading,
+    getLoadingLocale: () => state().loading,
     setLocale,
     registerLocale: (locale): Unsubscribe => {
-      ctx.dispatch({ type: 'I18N/REGISTER_LOCALE', locale });
-      return () => ctx.dispatch({ type: 'I18N/UNREGISTER_LOCALE', locale: locale.code });
+      ctx.state.update(registerLocale, locale);
+      return () => ctx.state.update(unregisterLocale, locale.code);
     },
     addTranslations: (code, dictionary) => {
-      if (!ctx.getState().locales[code]) {
+      if (!state().locales[code]) {
         throw new PluginError('not-found', 'i18n', `unknown locale '${code}'`);
       }
-      ctx.dispatch({ type: 'I18N/ADD_TRANSLATIONS', locale: code, translations: dictionary });
+      ctx.state.update(addTranslations, code, dictionary);
     },
     onLocaleChanged: localeChanged.on,
     onLocaleLoadFailed: localeLoadFailed.on,
-  } satisfies I18nCapability;
+  };
 
   return {
     api,
     connect() {
       loaders.connect();
-      ctx.cleanup(ctx.subscribe(announceIfChanged));
     },
   };
-}
-
-/** The capability alone, connected at once — the shape unit tests build. */
-export function createI18nCapability(
-  ctx: PluginContext<I18nState, I18nAction>,
-  config: I18nConfig = {},
-): I18nHostCapability {
-  const { api, connect } = createI18nController(ctx, config);
-  connect();
-  return api;
 }

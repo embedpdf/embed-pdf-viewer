@@ -34,14 +34,14 @@ import type { FormFieldRef } from '../identity/FormFieldRef';
 import type { BaseVersionInfo, SignatureCompleteResult } from '../signature/types';
 
 /**
- * Provenance of a `DocumentEvent` — WHOSE HAND caused the mutation, never
+ * Provenance of a `DocumentEvent` — whose hand caused the mutation, never
  * which transport delivered it (transport is invisible by design).
  *
- * `kind: 'local'` means caused by THIS ENGINE INSTANCE — not "this user".
+ * `kind: 'local'` means caused by this engine instance — not "this user".
  * The same user in two tabs is two sessions: tab A's mutation arrives in
  * tab B as `'remote'` (with the same `sub`). Rule of thumb for consumers:
- * "is this MY ACTION" → check `kind` / `sessionId` (undo stacks, optimism
- * reconciliation); "is this MY USER" → check `sub` (attribution).
+ * "is this my action" → check `kind` / `sessionId` (undo stacks, optimism
+ * reconciliation); "is this my user" → check `sub` (attribution).
  */
 export interface EventOrigin {
   /** 'local' = caused by this engine instance; 'remote' = another session. */
@@ -65,18 +65,21 @@ export interface EventOrigin {
  *
  * Invariants (locked — the collaboration design rests on these):
  *
- *   - EXACTLY ONCE: every mutation that touches your document appears in
+ *   - exactly once: every mutation that touches your document appears in
  *     your stream exactly once. The engine that performs a mutation emits
  *     the event itself at confirmation time; the remote channel exists to
- *     tell everyone ELSE (own echoes are dropped by `sessionId`).
- *   - GROUND TRUTH ONLY: events fire after the mutation is confirmed —
+ *     tell everyone else (own echoes are dropped by `sessionId`).
+ *   - ground truth only: events fire after the mutation is confirmed —
  *     never optimistically. Optimism is a plugin concern.
- *   - RESULTS RIDE VERBATIM: each event embeds the mutation result the
+ *   - results ride verbatim: each event embeds the mutation result the
  *     caller received, unmodified — which (cloud) is byte-identical to the
  *     audit-log payload. A handler sees the same fact whether it performed
  *     the mutation, watched it locally, or received it over the wire.
+ *   - published before settlement: the event for a session's own mutation
+ *     reaches subscribers before the mutation's promise settles, so a caller
+ *     awaiting the mutation already sees every state derived from the event.
  *
- * Handlers updating UI/document state should be ORIGIN-AGNOSTIC ("a page
+ * Handlers updating UI/document state should be origin-agnostic ("a page
  * was removed → update the registry"); `origin` is metadata for the few
  * provenance-aware features (undo, attribution toasts, camera etiquette).
  */
@@ -124,7 +127,7 @@ export type DocumentEvent =
     } & PageRotateResult)
   | ({
       type: 'pages.deleted';
-      /** The RETIRED pages — not derivable from the surviving `layout`. */
+      /** The retired pages — not derivable from the surviving `layout`. */
       pages: PageRef[];
       origin: EventOrigin;
     } & PageDeleteResult)
@@ -197,7 +200,7 @@ export type DocumentEvent =
        * Cloud only: the live event stream fell too far behind to replay
        * (the server's SSE `full-refresh`) — state derived from earlier
        * events or snapshots may be stale, and the gap's mutations will
-       * NEVER arrive as events. Consumers must re-read the snapshots they
+       * never arrive as events. Consumers must re-read the snapshots they
        * keep fresh from this stream (`doc.annotations.listRawAll()`,
        * `doc.forms.list()`, …).
        *

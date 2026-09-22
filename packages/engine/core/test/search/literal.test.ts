@@ -35,7 +35,7 @@ describe('matchLiteral', () => {
   });
 
   test('matches across line wraps (whitespace collapse)', () => {
-    // The v2-class case: text reflowed across a newline + indent.
+    // Text reflowed across a newline + indent.
     expect(find('hello\n   world', { text: 'hello world' })).toEqual([{ start: 0, length: 14 }]);
   });
 
@@ -81,7 +81,7 @@ describe('matchLiteral', () => {
     expect(
       find('Ref: i n v o i c e 42', { text: 'invoice', ignoreWhitespace: true, wholeWord: true }),
     ).toEqual([{ start: 5, length: 13 }]);
-    // ...while a hit glued to letters in the ORIGINAL is still rejected.
+    // ...while a hit glued to letters in the original is still rejected.
     expect(
       find('the invoices', { text: 'invoice', ignoreWhitespace: true, wholeWord: true }),
     ).toEqual([]);

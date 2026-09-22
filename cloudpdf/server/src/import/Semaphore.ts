@@ -1,6 +1,6 @@
 /**
  * Tiny FIFO semaphore bounding concurrent server-side pulls. Imports
- * hand the ORIGIN the transfer work (unlike presigned uploads), so a
+ * hand the origin the transfer work (unlike presigned uploads), so a
  * tenant queueing thousands of pulls must not monopolize the event
  * loop's I/O or the egress path.
  *

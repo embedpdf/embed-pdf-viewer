@@ -1,9 +1,9 @@
 import {
   initialModel,
   update,
-  type Annot,
+  type ModelAnnotation,
   type AnnotationFlags,
-  type Geom,
+  type ContentGeometry,
 } from '@embedpdf/core-annotation';
 import { toPageRef } from '@embedpdf/engine-core/runtime';
 import { describe, expect, it } from 'vitest';
@@ -13,8 +13,8 @@ import { buildTextItems } from '../src/text-item';
 /** The DOM text plate must sit exactly where the engine's AP generator lays
  *  the baked text, so the baked↔live swap is pixel-invisible: the box
  *  deflated by twice the border width on every side, plain box and callout
- *  alike (`FreeTextPlate` in cpdf_generateap.cpp — Acrobat's rule, plan
- *  `2026-09-15-free-text-plate-inset.md`). */
+ *  alike (`FreeTextPlate` in cpdf_generateap.cpp — Acrobat's rule; see
+ *  `textPlateInset` in core-annotation). */
 
 const PON = 1;
 const PAGE = toPageRef(PON);
@@ -31,12 +31,16 @@ const FLAGS: AnnotationFlags = {
   lockedContents: false,
 };
 
-const freeText = (id: string, geom: Extract<Geom, { t: 'text' }>, strokeWidth: number): Annot => ({
+const freeText = (
+  id: string,
+  geometry: Extract<ContentGeometry, { kind: 'text' }>,
+  strokeWidth: number,
+): ModelAnnotation => ({
   id,
   ref: null,
   page: PAGE,
   subtype: 'freeText',
-  geom,
+  geometry,
   style: {
     color: '#e07b39',
     interiorColor: null,
@@ -54,38 +58,46 @@ describe('buildTextItems — text plate mirrors the AP generator', () => {
     const callout = freeText(
       'C1',
       {
-        t: 'text',
+        kind: 'text',
         rect: { x: 200, y: 100, width: 120, height: 40 },
         callout: { tip: { x: 40, y: 60 }, knee: { x: 120, y: 120 }, ending: 'open-arrow' },
       },
       6,
     );
-    const plain = freeText('P1', { t: 'text', rect: { x: 10, y: 10, width: 80, height: 30 } }, 3);
-    let m = update(initialModel, { t: 'loaded', annots: [callout, plain] })[0];
-    // textBoxes only emits LIVE text — edit each in turn.
-    m = update(m, { t: 'beginTextEdit', id: 'C1' })[0];
-    const [c] = buildTextItems(m, PAGE);
-    expect(c!.id).toBe('C1');
-    expect(c!.css.padding).toBe(12); // 2 × 6: Acrobat's plate rule
+    const plain = freeText(
+      'P1',
+      { kind: 'text', rect: { x: 10, y: 10, width: 80, height: 30 } },
+      3,
+    );
+    let model = update(initialModel, { type: 'loaded', annots: [callout, plain] })[0];
+    // textBoxes only emits live text — edit each in turn.
+    model = update(model, { type: 'beginTextEdit', id: 'C1' })[0];
+    const [calloutItem] = buildTextItems(model, PAGE);
+    expect(calloutItem!.id).toBe('C1');
+    expect(calloutItem!.css.padding).toBe(12); // 2 × 6: Acrobat's plate rule
 
-    m = update(m, { t: 'endTextEdit' })[0];
-    m = update(m, { t: 'beginTextEdit', id: 'P1' })[0];
-    const [p] = buildTextItems(m, PAGE);
-    expect(p!.id).toBe('P1');
-    expect(p!.css.padding).toBe(6); // 2 × 3
+    model = update(model, { type: 'endTextEdit' })[0];
+    model = update(model, { type: 'beginTextEdit', id: 'P1' })[0];
+    const [plainItem] = buildTextItems(model, PAGE);
+    expect(plainItem!.id).toBe('P1');
+    expect(plainItem!.css.padding).toBe(6); // 2 × 3
   });
 });
 
 describe('buildTextItems — the editor document', () => {
   it('renders paragraph alignment equal to the body as inherited', () => {
-    const a = freeText('A1', { t: 'text', rect: { x: 10, y: 10, width: 80, height: 30 } }, 1);
-    (a as { text?: unknown }).text = {
+    const annotation = freeText(
+      'A1',
+      { kind: 'text', rect: { x: 10, y: 10, width: 80, height: 30 } },
+      1,
+    );
+    (annotation as { text?: unknown }).text = {
       fontFamily: 'helvetica',
       fontSize: 12,
       fontColor: '#000000',
       textAlign: 'center',
     };
-    (a as { data?: unknown }).data = {
+    (annotation as { data?: unknown }).data = {
       subtype: 'free-text',
       contents: 'one\rtwo',
       richText: {
@@ -110,9 +122,9 @@ describe('buildTextItems — the editor document', () => {
         ],
       },
     };
-    let m = update(initialModel, { t: 'loaded', annots: [a] })[0];
-    m = update(m, { t: 'beginTextEdit', id: 'A1' })[0];
-    const [item] = buildTextItems(m, PAGE);
+    let model = update(initialModel, { type: 'loaded', annots: [annotation] })[0];
+    model = update(model, { type: 'beginTextEdit', id: 'A1' })[0];
+    const [item] = buildTextItems(model, PAGE);
     expect(item!.css.align).toBe('center');
     expect(item!.richText.paragraphs).toEqual([
       { runs: [{ text: 'one' }] },

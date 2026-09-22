@@ -81,7 +81,7 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
   const { documentService, layerService, imageEncoder, derivedRenders } = deps;
   const encodeInEngine = deps.encodeInEngine ?? true;
 
-  // Doc-level SHARED routes (plane-scope model): served from the BASE worker
+  // Doc-level shared routes (plane-scope model): served from the base worker
   // session; visible through a layer-pinned token only while every plane the
   // resource depends on is inherited (`requireSharedDocRead` is the one
   // door — auth chain + origin plane guard).
@@ -547,7 +547,7 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
     );
   });
 
-  // Named pages are LAYOUT: registering/renaming/removing a `/Names /Pages`
+  // Named pages are layout: registering/renaming/removing a `/Names /Pages`
   // entry is a page-structure mutation like move/rotate/delete (same gate,
   // same docVersion + layoutVersion bump, read back via /layout).
   app.post('/v1/docs/:docId/layers/:layerName/pages/names', async (req, reply) => {
@@ -603,7 +603,7 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
     const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
     const ctx = requireLayerCapability(req, docId, layerName, 'doc.pages.assemble', pdfBits);
     // Multipart mutation envelope: `body` JSON part + a `resource:source`
-    // part carrying the standalone PDF. Policy 'any', NOT the strict sniff:
+    // part carrying the standalone PDF. Policy 'any', not the strict sniff:
     // the worker's FPDF_LoadMemDocument is the real gate here, and the
     // conformance contract wants malformed source bytes to surface as
     // MalformedPdf (the parser's verdict), never the envelope's InvalidArg.
@@ -678,7 +678,7 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
     const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
     // Extract egresses content bytes (a partial download) — gated by
-    // `doc.download` like /download, NOT `doc.pages.assemble`: it reads,
+    // `doc.download` like /download, not `doc.pages.assemble`: it reads,
     // never restructures. Mirrors the local engine's gate exactly.
     const ctx = requireLayerCapability(req, docId, layerName, 'doc.download', pdfBits);
     const body = parseOrInvalidArg<{ pages: PageRef[] }>(
@@ -747,9 +747,9 @@ async function renderPageImage(input: {
   signal: AbortSignal;
   scope: ReadScope;
   /**
-   * The render FAMILY this route belongs to: `…/render/pages/` is
+   * The render family this route belongs to: `…/render/pages/` is
    * annotation-free, `…/render/annotated/pages/`
-   * annotated — at BOTH the doc and layer tiers. The token carries no
+   * annotated — at both the doc and layer tiers. The token carries no
    * annotatedness at all; each family's query schema enforces its own pin
    * grammar (`annotationVersion` required on versioned annotated requests,
    * unrepresentable on free ones), so contradictory requests fail schema
@@ -824,7 +824,7 @@ async function renderPageImage(input: {
       ? { annotationVersion: requestedAnnotationVersion }
       : {}),
   });
-  // Enforcement is scoped to FULL-PAGE requests: rect targets belong to
+  // Enforcement is scoped to full-page requests: rect targets belong to
   // the tile policy once advertised and stay compute-only until then;
   // otherwise flipping `enforce` would 400 every region render.
   if (
@@ -1033,7 +1033,7 @@ async function readPageText(input: {
   input.requestedVersion === undefined ? setNoStore(input.reply) : setImmutableCache(input.reply);
   // The text body is immutable and keyed by contentVersion. Annotation
   // liveness (revision / weak-state) changes on a different cadence, so it
-  // is intentionally NOT baked in here; it lives on annotation reads.
+  // is intentionally not baked in here; it lives on annotation reads.
   return result.snapshot;
 }
 

@@ -1,6 +1,6 @@
 /**
  * A one-shot file dialog. Opens a throwaway `<input type=file>`, resolves the
- * chosen `File`, or `null` when the dialog is dismissed. MUST be called
+ * chosen `File`, or `null` when the dialog is dismissed. Must be called
  * synchronously from a user gesture (a click) or the browser refuses to open it.
  *
  * A `File` is a `Blob`, which is a `BinarySource` everywhere in the stack, so the
@@ -51,7 +51,7 @@ export function pickImageFile(options: PickFileOptions = {}): Promise<File | nul
   });
 }
 
-/** The same dialog with NO type filter — any file (attachments). */
+/** The same dialog with no type filter — any file (attachments). */
 export const pickFile = (options: PickFileOptions = {}): Promise<File | null> =>
   pickImageFile({ accept: '*/*', ...options });
 
@@ -66,12 +66,12 @@ export function saveFile(bytes: Uint8Array | Blob, name: string, mimeType?: stri
       ? bytes
       : new Blob([bytes as BlobPart], { type: mimeType ?? 'application/octet-stream' });
   const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = name;
-  a.style.display = 'none';
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = name;
+  anchor.style.display = 'none';
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }

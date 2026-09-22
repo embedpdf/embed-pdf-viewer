@@ -39,16 +39,16 @@ export class CloudPageTextService implements PageTextService {
     return AbortablePromise.run<PageTextSnapshot>(async (signal) => {
       const buildPath = async (s: AbortSignal): Promise<string> => {
         const manifest = await this.manifest.get(s);
-        const pon = this.pageRef.pageObjectNumber;
-        const page = manifest.pages.find((p) => p.state.page.pageObjectNumber === pon);
+        const pageObjectNumber = this.pageRef.pageObjectNumber;
+        const page = manifest.pages.find((p) => p.state.page.pageObjectNumber === pageObjectNumber);
         if (!page) {
           throw new EngineError(
             EngineErrorCode.NotFound,
-            `no page with object number ${pon} in document ${this.docId}`,
+            `no page with object number ${pageObjectNumber} in document ${this.docId}`,
           );
         }
         // Plane-scope rule: text depends on the `content` plane — while it
-        // is inherited, every visitor's layer reads ONE doc-level URL (and
+        // is inherited, every visitor's layer reads one doc-level URL (and
         // the base worker session at the origin).
         return planesInherited(manifest, ['content'])
           ? wirePaths.docPageText(this.docId, this.pageRef, page.cache.contentVersion)

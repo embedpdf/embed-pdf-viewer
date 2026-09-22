@@ -5,7 +5,7 @@ import { z } from 'zod';
  * ISO 32000-2 Table 239/240 semantics already applied (Include/Exclude +
  * descendants, the unconditional NoExport veto, push-button and
  * unsupported-value exclusion), so the home never re-derives selection.
- * `value === null` is a NAME-ONLY entry (the IncludeNoValueFields shape);
+ * `value === null` is a name-only entry (the IncludeNoValueFields shape);
  * `string[]` is a multi-select list box.
  */
 export interface FormSubmissionEntry {
@@ -14,14 +14,14 @@ export interface FormSubmissionEntry {
 }
 
 /**
- * What a submit-capable document HOME receives — the resolved dataset plus
- * the document's declared intent as METADATA. The stack never fetches the
+ * What a submit-capable document home receives — the resolved dataset plus
+ * the document's declared intent as metadata. The stack never fetches the
  * declared URL itself (a PDF-controlled URL reaching a server-side fetcher
  * is the SSRF class this contract exists to prevent); the home stores the
  * intent so its consumers can decide what to honor.
  *
- * Deliberately ABSENT: identity. The home derives who submitted from its
- * OWN verified session (the JWT it authenticated) — a client-supplied
+ * Deliberately absent: identity. The home derives who submitted from its
+ * own verified session (the JWT it authenticated) — a client-supplied
  * identity would be a spoofing surface.
  */
 export interface FormSubmissionRequest {

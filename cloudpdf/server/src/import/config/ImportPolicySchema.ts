@@ -4,7 +4,7 @@
  * Defaults are the safe-for-hosted posture: enabled, https-only,
  * public networks only, 128 MiB cap. Self-hosted deployments loosen
  * `allowHttp`/`allowPrivateNetworks` for MinIO / in-VPC object stores.
- * The size cap exists because v1 imports are SYNCHRONOUS — the
+ * The size cap exists because v1 imports are synchronous — the
  * response is held open for the transfer, so the cap must keep the
  * worst-case pull comfortably inside proxy/idle timeouts.
  */
@@ -13,7 +13,7 @@ import { z } from 'zod';
 export const ImportPolicySchema = z.object({
   /** Master switch. Disabled → `documents.importFrom` answers 403. */
   enabled: z.boolean().default(true),
-  /** Hard per-document byte ceiling (declared AND enforced mid-stream). */
+  /** Hard per-document byte ceiling (declared and enforced mid-stream). */
   maxBytes: z
     .number()
     .int()

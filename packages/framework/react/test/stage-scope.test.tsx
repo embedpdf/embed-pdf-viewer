@@ -31,7 +31,7 @@ afterEach(cleanup);
 describe('StageScope', () => {
   it('defaults to the main lens outside any scope', () => {
     let seen: StageTokenProp | null = null;
-    render(<Probe onToken={(t) => (seen = t)} />);
+    render(<Probe onToken={(token) => (seen = token)} />);
     expect(seen).toBe(StageToken);
   });
 
@@ -40,10 +40,10 @@ describe('StageScope', () => {
     render(
       <StageScope token={other}>
         <StageScope token={thumbs}>
-          <Probe onToken={(t) => seen.push(t)} />
-          <Probe explicit={StageToken} onToken={(t) => seen.push(t)} />
+          <Probe onToken={(token) => seen.push(token)} />
+          <Probe explicit={StageToken} onToken={(token) => seen.push(token)} />
         </StageScope>
-        <Probe onToken={(t) => seen.push(t)} />
+        <Probe onToken={(token) => seen.push(token)} />
       </StageScope>,
     );
     expect(seen).toEqual([thumbs, StageToken, other]);

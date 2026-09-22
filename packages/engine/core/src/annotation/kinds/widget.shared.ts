@@ -15,7 +15,7 @@ import {
  * dictionaries: /MK for colors, /BS for the border, /DA for the text
  * defaults, /Q for alignment.
  *
- * These fields are shared VERBATIM with `doc.forms` authoring: a
+ * These fields are shared verbatim with `doc.forms` authoring: a
  * `WidgetPlacement.appearance` in `createField` is exactly
  * {@link WidgetAppearance}, and one writer applies both underneath.
  */

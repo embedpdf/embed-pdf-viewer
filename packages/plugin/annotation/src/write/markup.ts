@@ -24,9 +24,9 @@ export function createMarkupWrites(
     createMarkup: (subtype: Subtype, page: PageRef, quads: TextQuad[], preset?: string) => {
       // Optimistic create — the same self-refusal `createPointer` has.
       if (!authority.canCreate()) return;
-      // A markup tool's `/F` seed rides along (the preset IS the tool id).
+      // A markup tool's `/F` seed rides along (the preset is the tool id).
       store.commit({
-        t: 'createMarkup',
+        type: 'createMarkup',
         subtype,
         page,
         quads,
@@ -36,7 +36,7 @@ export function createMarkupWrites(
     },
     createCaret: (page: PageRef, anchor: TextEndAnchor) => {
       if (!authority.canCreate()) return;
-      store.commit({ t: 'createCaret', page, anchor });
+      store.commit({ type: 'createCaret', page, anchor });
     },
     createReplaceText: (
       page: PageRef,
@@ -45,13 +45,13 @@ export function createMarkupWrites(
       preset?: string,
     ) => {
       if (!authority.canCreate()) return;
-      store.commit({ t: 'createReplaceText', page, quads, anchor, preset });
+      store.commit({ type: 'createReplaceText', page, quads, anchor, preset });
     },
     previewMarkup: (subtype: Subtype, quadsByPage: Record<number, TextQuad[]>, preset?: string) => {
-      store.commit({ t: 'setMarkupPreview', subtype, quadsByPage, preset });
+      store.commit({ type: 'setMarkupPreview', subtype, quadsByPage, preset });
     },
     clearMarkupPreview: () => {
-      store.commit({ t: 'clearMarkupPreview' });
+      store.commit({ type: 'clearMarkupPreview' });
     },
     createFromSelection: async (
       subtype: MarkupSubtype | 'insert-text' | 'replace-text' | 'redact',
@@ -66,7 +66,7 @@ export function createMarkupWrites(
       if (subtype === 'insert-text') {
         if (snapshot.end) {
           const effects = store.commit({
-            t: 'createCaret',
+            type: 'createCaret',
             page: snapshot.end.page,
             anchor: { glyphQuad: snapshot.end.glyphQuad, advance: snapshot.end.advance },
           });
@@ -75,7 +75,7 @@ export function createMarkupWrites(
       } else {
         for (const entry of snapshot.pages) {
           if (!entry.segments.length) continue;
-          const quads = entry.segments.map((s) => s.quad);
+          const quads = entry.segments.map((segment) => segment.quad);
           if (subtype === 'replace-text') {
             const last = entry.segments[entry.segments.length - 1]!;
             const anchor =
@@ -83,7 +83,7 @@ export function createMarkupWrites(
                 ? { glyphQuad: snapshot.end.glyphQuad, advance: snapshot.end.advance }
                 : { glyphQuad: last.quad, advance: last.advance };
             const effects = store.commit({
-              t: 'createReplaceText',
+              type: 'createReplaceText',
               page: entry.page,
               quads,
               anchor,
@@ -92,7 +92,7 @@ export function createMarkupWrites(
             pending.push(writes.awaitCreate(writes.groupEffectsOf(effects)[0]?.primary));
           } else {
             const effects = store.commit({
-              t: 'createMarkup',
+              type: 'createMarkup',
               subtype,
               page: entry.page,
               quads,

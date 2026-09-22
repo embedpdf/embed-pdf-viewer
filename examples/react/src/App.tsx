@@ -1252,7 +1252,7 @@ function SearchControls() {
 
 function Toolbar() {
   const { zoom, mode, zoomIn, zoomOut, fitWidth, fitPage, fitAll, automatic } = useZoom();
-  const { currentPage, pageCount, next, prev } = usePages();
+  const { currentPage, pageCount, next, previous } = usePages();
   const {
     flow,
     setFlow,
@@ -1276,7 +1276,7 @@ function Toolbar() {
     <div style={{ borderBottom: '1px solid #eee', background: '#fafafa' }}>
       {/* Row 1 — navigate, zoom, presets */}
       <div style={{ ...tbRow, borderBottom: '1px solid #f0f0f0' }}>
-        <button onClick={() => prev()} title="previous page/spread" style={tbBtn}>
+        <button onClick={() => previous()} title="previous page/spread" style={tbBtn}>
           ◀
         </button>
         <span>

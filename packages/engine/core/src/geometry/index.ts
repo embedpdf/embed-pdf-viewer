@@ -2,7 +2,7 @@
  * Zod-free barrel for engine PDF-document geometry: primitive types plus
  * PDF-space-internal helpers. Re-exported via `shared.ts` (=> `/runtime`).
  *
- * Zod schemas live in `./schemas` and are exported from `wire.ts` ONLY, so
+ * Zod schemas live in `./schemas` and are exported from `wire.ts` only, so
  * importing geometry into the runtime never pulls in zod.
  */
 

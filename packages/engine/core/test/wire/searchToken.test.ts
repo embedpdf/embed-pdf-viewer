@@ -89,7 +89,7 @@ describe('search token codec', () => {
   });
 
   test('carries the result-format marker and rejects other formats', () => {
-    // ALWAYS encoded (the deliberate exception to omit-defaults): the marker
+    // Always encoded (the deliberate exception to omit-defaults): the marker
     // exists to change the token bytes — and therefore the CDN cache key —
     // whenever the result representation changes.
     const token = encodeSearchToken({ epoch: 'e', query: { text: 'x' }, skip: 0 });

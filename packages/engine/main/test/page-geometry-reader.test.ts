@@ -181,8 +181,10 @@ describe('buildRunsFromRawGlyphs', () => {
       upright(1, box(10, 10, 30, 22), { upright: false, rotation: Math.PI / 2 }),
     ]);
     expect(runs).toHaveLength(1);
-    expect(isRotatedGeometryRun(runs[0])).toBe(false);
-    expect(runs[0].glyphs[0].looseBox).toEqual(box(10, 10, 30, 22));
+    const run = runs[0];
+    expect(isRotatedGeometryRun(run)).toBe(false);
+    if (isRotatedGeometryRun(run)) return; // narrows: only upright glyphs carry a looseBox
+    expect(run.glyphs[0].looseBox).toEqual(box(10, 10, 30, 22));
   });
 });
 

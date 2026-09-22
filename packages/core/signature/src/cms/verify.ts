@@ -7,9 +7,11 @@ import { CmsError, parseCmsInternal, type ParsedCmsInternal } from './parse';
 
 export type CryptographyVerdict = 'valid' | 'invalid' | 'unsupported';
 
-/** The DER of the signed attributes as they are signed: re-tagged as a SET. */
+/** The DER of the signed attributes as they are signed: re-tagged as a set. */
 export function signedAttributesDer(signerInfo: pkijs.SignerInfo): Uint8Array {
-  const set = new asn1js.Set({ value: (signerInfo.signedAttrs?.attributes ?? []).map((a) => a.toSchema()) });
+  const set = new asn1js.Set({
+    value: (signerInfo.signedAttrs?.attributes ?? []).map((attribute) => attribute.toSchema()),
+  });
   return new Uint8Array(set.toBER(false));
 }
 
@@ -26,8 +28,8 @@ export async function verifyCmsSignature(
   let internal: ParsedCmsInternal;
   try {
     internal = cms instanceof Uint8Array ? parseCmsInternal(cms) : cms;
-  } catch (err) {
-    return err instanceof CmsError && err.reason === 'unsupported' ? 'unsupported' : 'invalid';
+  } catch (error) {
+    return error instanceof CmsError && error.reason === 'unsupported' ? 'unsupported' : 'invalid';
   }
   const engine = ensureEngine();
   const { signerInfo, signerCertificate, parsed, essCertHash } = internal;
@@ -48,8 +50,10 @@ export async function verifyCmsSignature(
       WEBCRYPTO_HASH[parsed.digestAlgorithm],
     );
     return ok ? 'valid' : 'invalid';
-  } catch (err) {
-    const message = (err as Error).message ?? '';
-    return /unsupported|unknown|not supported|not implemented/i.test(message) ? 'unsupported' : 'invalid';
+  } catch (error) {
+    const message = (error as Error).message ?? '';
+    return /unsupported|unknown|not supported|not implemented/i.test(message)
+      ? 'unsupported'
+      : 'invalid';
   }
 }

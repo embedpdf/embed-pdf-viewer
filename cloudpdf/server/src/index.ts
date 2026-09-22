@@ -1,5 +1,5 @@
 /**
- * @cloudpdf/server - self-hostable Engine v3 server.
+ * @cloudpdf/server - the self-hostable engine server.
  *
  * Programmatic API used by tests and integrators. The CLI entry point lives
  * at bin/cloudpdf-server.ts.
@@ -10,7 +10,7 @@ export type { BuildAppOptions, AppBundle } from './app/buildApp';
 /**
  * @license FCL-1.0-ALv2
  *
- * WARNING: The exports below provide CloudPDF's required license runtime.
+ * Warning: The exports below provide CloudPDF's required license runtime.
  * Removing or modifying them to disable or circumvent license enforcement,
  * enable protected functionality without a valid license key, or remove
  * protected functionality is a breach of FCL-1.0-ALv2 while this release is
@@ -57,7 +57,7 @@ export type {
 export { loadFallbackFontsFromEnv } from './runtime/loadFallbackFontsFromEnv';
 export * from './security/index';
 
-// Phase 1 cloud platform surfaces.
+// Database drivers, migrations, repositories and object storage.
 export { createSqliteDb } from './db/drivers/sqlite';
 export type { CreateSqliteDbOptions } from './db/drivers/sqlite';
 export { createPostgresDb } from './db/drivers/postgres';
@@ -172,7 +172,6 @@ export {
 export { DocumentImportsRepo, type DocumentImportRow } from './db/repos/document_imports.repo';
 
 // CDN adapter family (signers + factory + config + None adapter).
-// HMAC/CloudFront adapters ship in commit G; purge wiring in commit H.
 export type {
   CdnSigner,
   CdnSignerInfo,
@@ -217,7 +216,7 @@ export type {
   UploadProxyPolicy,
 } from './services/DocumentLifecycleService';
 
-// Phase 3 — document open + worker integration.
+// Document open + worker integration.
 export { BaseFileCache, fileSha256 } from './storage/BaseFileCache';
 export type {
   BaseFileCacheOptions,

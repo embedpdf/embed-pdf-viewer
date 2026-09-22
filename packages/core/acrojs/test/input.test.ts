@@ -4,7 +4,7 @@ import type { FormFieldDTO, FormSnapshot } from '@embedpdf/engine-core/runtime';
 import { scriptFieldsFromSnapshot } from '../src/input';
 
 function snapshotWith(field: FormFieldDTO): FormSnapshot {
-  return { fields: [field], calculationOrder: [] } as FormSnapshot;
+  return { formKind: 'acroform', needsAppearances: false, fields: [field], calculationOrder: [] };
 }
 
 describe('scriptFieldsFromSnapshot', () => {

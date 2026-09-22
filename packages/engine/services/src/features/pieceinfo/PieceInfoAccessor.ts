@@ -22,8 +22,8 @@ const OBJ_NAME = 4;
 const OBJ_ARRAY = 5;
 
 /**
- * `/PieceInfo` reads and writes for one holder — the document CATALOG
- * (`pageObjectNumber` undefined) or one PAGE. Wraps the fork's symmetric
+ * `/PieceInfo` reads and writes for one holder — the document catalog
+ * (`pageObjectNumber` undefined) or one page. Wraps the fork's symmetric
  * `EPDFDoc_*PieceInfo*` / `EPDFDoc_*PagePieceInfo*` families behind one
  * shape, so the worker host has a single code path for both levels.
  *
@@ -49,26 +49,26 @@ export class PieceInfoAccessor {
     requireApplication(application);
     const { fn, mem } = this.runtime;
     const docPtr = this.session.requireDocPtr();
-    const pon = this.pageObjectNumber;
+    const pageObjectNumber = this.pageObjectNumber;
 
     const has =
-      pon === undefined
+      pageObjectNumber === undefined
         ? fn.EPDFDoc_HasPieceInfoEntry(docPtr, application)
-        : fn.EPDFDoc_HasPagePieceInfoEntry(docPtr, pon, application);
+        : fn.EPDFDoc_HasPagePieceInfoEntry(docPtr, pageObjectNumber, application);
     if (!has) return null;
 
     const keyCount =
-      pon === undefined
+      pageObjectNumber === undefined
         ? fn.EPDFDoc_GetPieceInfoKeyCount(docPtr, application)
-        : fn.EPDFDoc_GetPagePieceInfoKeyCount(docPtr, pon, application);
+        : fn.EPDFDoc_GetPagePieceInfoKeyCount(docPtr, pageObjectNumber, application);
 
     const entries: Record<string, PieceInfoEntry> = {};
     for (let i = 0; i < keyCount; i++) {
       throwIfAborted(signal);
       const key = readUtf8String(mem, (buf, cap) =>
-        pon === undefined
+        pageObjectNumber === undefined
           ? fn.EPDFDoc_GetPieceInfoKeyAt(docPtr, application, i, buf, cap)
-          : fn.EPDFDoc_GetPagePieceInfoKeyAt(docPtr, pon, application, i, buf, cap),
+          : fn.EPDFDoc_GetPagePieceInfoKeyAt(docPtr, pageObjectNumber, application, i, buf, cap),
       );
       if (key === null) continue;
       entries[key] = this.readEntry(application, key);
@@ -77,9 +77,15 @@ export class PieceInfoAccessor {
     const lastModifiedPdf = readUtf16String(
       mem,
       (buf, cap) =>
-        pon === undefined
+        pageObjectNumber === undefined
           ? fn.EPDFDoc_GetPieceInfoLastModified(docPtr, application, buf, cap)
-          : fn.EPDFDoc_GetPagePieceInfoLastModified(docPtr, pon, application, buf, cap),
+          : fn.EPDFDoc_GetPagePieceInfoLastModified(
+              docPtr,
+              pageObjectNumber,
+              application,
+              buf,
+              cap,
+            ),
       null,
     );
     return {
@@ -126,17 +132,17 @@ export class PieceInfoAccessor {
     throwIfAborted(signal);
     const { fn, mem } = this.runtime;
     const docPtr = this.session.requireDocPtr();
-    const pon = this.pageObjectNumber;
+    const pageObjectNumber = this.pageObjectNumber;
     const count =
-      pon === undefined
+      pageObjectNumber === undefined
         ? fn.EPDFDoc_GetPieceInfoEntryCount(docPtr)
-        : fn.EPDFDoc_GetPagePieceInfoEntryCount(docPtr, pon);
+        : fn.EPDFDoc_GetPagePieceInfoEntryCount(docPtr, pageObjectNumber);
     const out: string[] = [];
     for (let i = 0; i < count; i++) {
       const name = readUtf8String(mem, (buf, cap) =>
-        pon === undefined
+        pageObjectNumber === undefined
           ? fn.EPDFDoc_GetPieceInfoEntryAt(docPtr, i, buf, cap)
-          : fn.EPDFDoc_GetPagePieceInfoEntryAt(docPtr, pon, i, buf, cap),
+          : fn.EPDFDoc_GetPagePieceInfoEntryAt(docPtr, pageObjectNumber, i, buf, cap),
       );
       if (name !== null) out.push(name);
     }
@@ -148,11 +154,11 @@ export class PieceInfoAccessor {
     requireApplication(application);
     const { fn } = this.runtime;
     const docPtr = this.session.requireDocPtr();
-    const pon = this.pageObjectNumber;
+    const pageObjectNumber = this.pageObjectNumber;
     const ok =
-      pon === undefined
+      pageObjectNumber === undefined
         ? fn.EPDFDoc_ClearPieceInfoEntry(docPtr, application)
-        : fn.EPDFDoc_ClearPagePieceInfoEntry(docPtr, pon, application);
+        : fn.EPDFDoc_ClearPagePieceInfoEntry(docPtr, pageObjectNumber, application);
     if (!ok) {
       throw new EngineError(
         EngineErrorCode.Unknown,
@@ -164,29 +170,36 @@ export class PieceInfoAccessor {
   private readEntry(application: string, key: string): PieceInfoEntry {
     const { fn, mem } = this.runtime;
     const docPtr = this.session.requireDocPtr();
-    const pon = this.pageObjectNumber;
+    const pageObjectNumber = this.pageObjectNumber;
     const type =
-      pon === undefined
+      pageObjectNumber === undefined
         ? fn.EPDFDoc_GetPieceInfoValueType(docPtr, application, key)
-        : fn.EPDFDoc_GetPagePieceInfoValueType(docPtr, pon, application, key);
+        : fn.EPDFDoc_GetPagePieceInfoValueType(docPtr, pageObjectNumber, application, key);
 
     switch (type) {
       case OBJ_STRING: {
         const value = readUtf16String(
           mem,
           (buf, cap) =>
-            pon === undefined
+            pageObjectNumber === undefined
               ? fn.EPDFDoc_GetPieceInfoString(docPtr, application, key, buf, cap)
-              : fn.EPDFDoc_GetPagePieceInfoString(docPtr, pon, application, key, buf, cap),
+              : fn.EPDFDoc_GetPagePieceInfoString(
+                  docPtr,
+                  pageObjectNumber,
+                  application,
+                  key,
+                  buf,
+                  cap,
+                ),
           '',
         );
         return value === null ? { type: 'unknown' } : { type: 'string', value };
       }
       case OBJ_NAME: {
         const value = readUtf8String(mem, (buf, cap) =>
-          pon === undefined
+          pageObjectNumber === undefined
             ? fn.EPDFDoc_GetPieceInfoName(docPtr, application, key, buf, cap)
-            : fn.EPDFDoc_GetPagePieceInfoName(docPtr, pon, application, key, buf, cap),
+            : fn.EPDFDoc_GetPagePieceInfoName(docPtr, pageObjectNumber, application, key, buf, cap),
         );
         return value === null ? { type: 'unknown' } : { type: 'name', value };
       }
@@ -194,9 +207,15 @@ export class PieceInfoAccessor {
         const outPtr = mem.alloc(4);
         try {
           const ok =
-            pon === undefined
+            pageObjectNumber === undefined
               ? fn.EPDFDoc_GetPieceInfoNumber(docPtr, application, key, outPtr)
-              : fn.EPDFDoc_GetPagePieceInfoNumber(docPtr, pon, application, key, outPtr);
+              : fn.EPDFDoc_GetPagePieceInfoNumber(
+                  docPtr,
+                  pageObjectNumber,
+                  application,
+                  key,
+                  outPtr,
+                );
           if (!ok) return { type: 'unknown' };
           return { type: 'number', value: Number(mem.peek(outPtr, 'f32')) };
         } finally {
@@ -207,9 +226,15 @@ export class PieceInfoAccessor {
         const outPtr = mem.alloc(4);
         try {
           const ok =
-            pon === undefined
+            pageObjectNumber === undefined
               ? fn.EPDFDoc_GetPieceInfoBoolean(docPtr, application, key, outPtr)
-              : fn.EPDFDoc_GetPagePieceInfoBoolean(docPtr, pon, application, key, outPtr);
+              : fn.EPDFDoc_GetPagePieceInfoBoolean(
+                  docPtr,
+                  pageObjectNumber,
+                  application,
+                  key,
+                  outPtr,
+                );
           if (!ok) return { type: 'unknown' };
           return { type: 'boolean', value: Number(mem.peek(outPtr, 'i32')) !== 0 };
         } finally {
@@ -218,9 +243,14 @@ export class PieceInfoAccessor {
       }
       case OBJ_ARRAY: {
         const count =
-          pon === undefined
+          pageObjectNumber === undefined
             ? fn.EPDFDoc_GetPieceInfoStringArrayCount(docPtr, application, key)
-            : fn.EPDFDoc_GetPagePieceInfoStringArrayCount(docPtr, pon, application, key);
+            : fn.EPDFDoc_GetPagePieceInfoStringArrayCount(
+                docPtr,
+                pageObjectNumber,
+                application,
+                key,
+              );
         // -1 = not a pure text-string array — preserved, not readable here.
         if (count < 0) return { type: 'unknown' };
         const value: string[] = [];
@@ -228,11 +258,11 @@ export class PieceInfoAccessor {
           const item = readUtf16String(
             mem,
             (buf, cap) =>
-              pon === undefined
+              pageObjectNumber === undefined
                 ? fn.EPDFDoc_GetPieceInfoStringArrayAt(docPtr, application, key, i, buf, cap)
                 : fn.EPDFDoc_GetPagePieceInfoStringArrayAt(
                     docPtr,
-                    pon,
+                    pageObjectNumber,
                     application,
                     key,
                     i,
@@ -259,37 +289,58 @@ export class PieceInfoAccessor {
   ): boolean {
     const { fn, mem } = this.runtime;
     const docPtr = this.session.requireDocPtr();
-    const pon = this.pageObjectNumber;
+    const pageObjectNumber = this.pageObjectNumber;
 
     if (value === null) {
-      return pon === undefined
+      return pageObjectNumber === undefined
         ? fn.EPDFDoc_ClearPieceInfoKey(docPtr, application, key, lmPtr)
-        : fn.EPDFDoc_ClearPagePieceInfoKey(docPtr, pon, application, key, lmPtr);
+        : fn.EPDFDoc_ClearPagePieceInfoKey(docPtr, pageObjectNumber, application, key, lmPtr);
     }
     if (typeof value === 'string') {
       return writeUtf16String(mem, value, (ptr) =>
-        pon === undefined
+        pageObjectNumber === undefined
           ? fn.EPDFDoc_SetPieceInfoString(docPtr, application, key, ptr, lmPtr)
-          : fn.EPDFDoc_SetPagePieceInfoString(docPtr, pon, application, key, ptr, lmPtr),
+          : fn.EPDFDoc_SetPagePieceInfoString(
+              docPtr,
+              pageObjectNumber,
+              application,
+              key,
+              ptr,
+              lmPtr,
+            ),
       );
     }
     if (typeof value === 'number') {
-      return pon === undefined
+      return pageObjectNumber === undefined
         ? fn.EPDFDoc_SetPieceInfoNumber(docPtr, application, key, value, lmPtr)
-        : fn.EPDFDoc_SetPagePieceInfoNumber(docPtr, pon, application, key, value, lmPtr);
+        : fn.EPDFDoc_SetPagePieceInfoNumber(
+            docPtr,
+            pageObjectNumber,
+            application,
+            key,
+            value,
+            lmPtr,
+          );
     }
     if (typeof value === 'boolean') {
-      return pon === undefined
+      return pageObjectNumber === undefined
         ? fn.EPDFDoc_SetPieceInfoBoolean(docPtr, application, key, value, lmPtr)
-        : fn.EPDFDoc_SetPagePieceInfoBoolean(docPtr, pon, application, key, value, lmPtr);
+        : fn.EPDFDoc_SetPagePieceInfoBoolean(
+            docPtr,
+            pageObjectNumber,
+            application,
+            key,
+            value,
+            lmPtr,
+          );
     }
     if (Array.isArray(value)) {
       return withWideStringArray(this.runtime, value, (arrayPtr, count) =>
-        pon === undefined
+        pageObjectNumber === undefined
           ? fn.EPDFDoc_SetPieceInfoStringArray(docPtr, application, key, arrayPtr, count, lmPtr)
           : fn.EPDFDoc_SetPagePieceInfoStringArray(
               docPtr,
-              pon,
+              pageObjectNumber,
               application,
               key,
               arrayPtr,
@@ -299,9 +350,16 @@ export class PieceInfoAccessor {
       );
     }
     if (typeof value === 'object' && value !== null && 'name' in value) {
-      return pon === undefined
+      return pageObjectNumber === undefined
         ? fn.EPDFDoc_SetPieceInfoName(docPtr, application, key, value.name, lmPtr)
-        : fn.EPDFDoc_SetPagePieceInfoName(docPtr, pon, application, key, value.name, lmPtr);
+        : fn.EPDFDoc_SetPagePieceInfoName(
+            docPtr,
+            pageObjectNumber,
+            application,
+            key,
+            value.name,
+            lmPtr,
+          );
     }
     // validatePatch() makes this unreachable. Keep a loud invariant failure
     // rather than silently ignoring a new wire value if the vocabulary grows.

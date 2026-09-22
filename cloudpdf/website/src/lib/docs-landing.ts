@@ -1,9 +1,9 @@
 /**
  * The landing manifest: every reader-facing string of the docs landing, the
- * homepage plan section, and the backend band lives HERE, once. The page
+ * homepage plan section, and the backend band lives here, once. The page
  * components render it; the Markdown projection (docs-landing-markdown.ts)
  * renders it; neither may carry copy of its own — so the surfaces cannot
- * drift (DOCS-PLATFORM-ARCHITECTURE.md: one content source, N renderings).
+ * drift (docs/conventions/docs-architecture.md: one content source, N renderings).
  *
  * Where two surfaces deliberately pitch the same card differently, both
  * variants live side by side under `landing:`/`plan:` — divergence is a

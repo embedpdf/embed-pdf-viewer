@@ -8,7 +8,7 @@ import type {
  * The in-process implementation of `DocumentEventStream`, shared by both
  * engine shells (one hub per open `DocumentHandle`). The engine that
  * performs a mutation publishes here at confirmation time; the cloud
- * engine's remote channel will also publish here for OTHER sessions'
+ * engine's remote channel will also publish here for other sessions'
  * mutations — listeners never learn which transport delivered an event.
  *
  * Delivery contract:
@@ -83,7 +83,7 @@ export class SessionEventPublisher {
     private readonly sub: string | null = null,
   ) {}
 
-  /** Publish a mutation THIS engine instance just confirmed. */
+  /** Publish a mutation this engine instance just confirmed. */
   publishLocal(event: DocumentEventInit): void {
     this.hub.publish({
       ...event,

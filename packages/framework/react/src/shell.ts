@@ -3,7 +3,7 @@
  * surface's DOM; these hooks bind its open/closed state to the kernel so
  * commands can drive it and applications can restore it.
  *
- * These hooks are TOTAL: shell state is document-scoped, and chrome that uses
+ * These hooks are total: shell state is document-scoped, and chrome that uses
  * it (panel buttons, mode bands, menu anchors) stays mounted across the
  * empty-workspace state. With no document, surfaces read as closed, menus as
  * none, and intents no-op — mirroring how command execution `tryGet`s the
@@ -29,9 +29,9 @@ export function useShell(): ShellCapability {
   return useCapability(ShellToken);
 }
 
-/** Subscribe to one shell event for the mounted lifetime: `useShellEvent((c) => c.onSurfaceOpened, handler)`. */
+/** Subscribe to one shell event for the mounted lifetime: `useShellEvent((shell) => shell.onSurfaceOpened, handler)`. */
 export function useShellEvent<T>(
-  select: (cap: ShellCapability) => EventHook<T>,
+  select: (shell: ShellCapability) => EventHook<T>,
   handler: (event: T) => void,
 ): void {
   useCapabilityEvent(ShellToken, select, handler);
@@ -40,24 +40,24 @@ export function useShellEvent<T>(
 export interface SurfaceHandle {
   readonly isOpen: boolean;
   readonly props: Readonly<Record<string, unknown>> | undefined;
-  open(opts?: OpenSurfaceOptions): void;
+  open(options?: OpenSurfaceOptions): void;
   close(): void;
-  toggle(opts?: OpenSurfaceOptions): void;
+  toggle(options?: OpenSurfaceOptions): void;
 }
 
 /** One named surface (panel / modal / overlay), bound to this subtree's
  *  document. Reads as closed — and intents no-op — while no document is open. */
 export function useSurface(id: string): SurfaceHandle {
   const shell = useOptionalCapability(ShellToken);
-  const isOpen = useOptionalSelector(ShellToken, (s) => s.isOpen(id), false);
-  const props = useOptionalSelector(ShellToken, (s) => s.getSurface(id)?.props, undefined);
+  const isOpen = useOptionalSelector(ShellToken, (shell) => shell.isOpen(id), false);
+  const props = useOptionalSelector(ShellToken, (shell) => shell.getSurface(id)?.props, undefined);
   return useMemo(
     () => ({
       isOpen,
       props,
-      open: (opts?: OpenSurfaceOptions) => shell?.open(id, opts),
+      open: (options?: OpenSurfaceOptions) => shell?.open(id, options),
       close: () => shell?.close(id),
-      toggle: (opts?: OpenSurfaceOptions) => shell?.toggle(id, opts),
+      toggle: (options?: OpenSurfaceOptions) => shell?.toggle(id, options),
     }),
     [shell, id, isOpen, props],
   );
@@ -72,15 +72,15 @@ export interface MenusHandle {
 }
 
 const NO_MENUS: readonly string[] = [];
-const stringArrayEqual = (a: readonly string[], b: readonly string[]) =>
-  a === b || (a.length === b.length && a.every((x, i) => x === b[i]));
+const stringArrayEqual = (left: readonly string[], right: readonly string[]) =>
+  left === right || (left.length === right.length && left.every((item, i) => item === right[i]));
 
 /** The dropdown-menu stack for this subtree's document (empty without one). */
 export function useMenus(): MenusHandle {
   const shell = useOptionalCapability(ShellToken);
   const open = useOptionalSelector(
     ShellToken,
-    (s) => s.listOpenMenus(),
+    (shell) => shell.listOpenMenus(),
     NO_MENUS,
     stringArrayEqual,
   );

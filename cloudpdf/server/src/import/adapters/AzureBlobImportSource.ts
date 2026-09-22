@@ -3,15 +3,15 @@
  * registered connection. Read-only, keyless: authority is
  * `DefaultAzureCredential` (managed identity / Workload Identity /
  * az-login), never the request. Reading needs no SAS minting, which
- * is why this adapter is far simpler than the Azure DESTINATION
+ * is why this adapter is far simpler than the Azure destination
  * adapter.
  *
- * `revision` maps to the blob VERSION ID (versioning must be enabled
+ * `revision` maps to the blob version ID (versioning must be enabled
  * on the account); snapshots are a different addressing scheme and
  * are not supported. The served version id is reported back as
  * `resolvedRevision` when the account provides one.
  *
- * Lazy-load per ADAPTERS.md.
+ * Lazy-load per `docs/conventions/server-adapters.md`.
  */
 import type { Readable } from 'node:stream';
 
@@ -24,7 +24,7 @@ import {
   type ImportSourceOpen,
 } from '../ImportSource';
 
-// Type-only — does NOT trigger the runtime import (see ADAPTERS.md).
+// Type-only — does not trigger the runtime import (see `docs/conventions/server-adapters.md`).
 type BlobModule = typeof import('@azure/storage-blob');
 type IdentityModule = typeof import('@azure/identity');
 type BlobClient = InstanceType<BlobModule['BlobClient']>;

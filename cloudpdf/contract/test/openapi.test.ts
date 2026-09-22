@@ -29,7 +29,7 @@ describe('operation registry', () => {
         op.path,
       ).toBe(true);
       if (op.credentials.length === 0) {
-        // The PUBLIC surface is exactly the share-session exchange: the
+        // The public surface is exactly the share-session exchange: the
         // grant row is the authorization, so no bearer credential
         // exists. Any new unauthenticated operation must be added here
         // deliberately — an empty credential list anywhere else is a

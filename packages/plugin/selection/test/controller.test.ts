@@ -17,8 +17,8 @@ import { SelectionToken } from '../src/host-contract';
 
 const crop = { left: 0, bottom: 0, right: 200, top: 100 };
 
-const glyph = (left: number, bottom: number, flags = 0, w = 8, h = 10) => ({
-  looseBox: { left, bottom, right: left + w, top: bottom + h },
+const glyph = (left: number, bottom: number, flags = 0, width = 8, height = 10) => ({
+  looseBox: { left, bottom, right: left + width, top: bottom + height },
   flags,
 });
 
@@ -35,25 +35,25 @@ const simpleGeometry = (count: number, spaceAt?: number): PageGeometrySnapshot =
 });
 
 interface PageFixture {
-  pon: number;
+  pageObjectNumber: number;
   geometry: PageGeometrySnapshot;
   text: PageTextSnapshot;
 }
 
 const pageA: PageFixture = {
-  pon: 101,
+  pageObjectNumber: 101,
   geometry: simpleGeometry(6),
   text: { text: 'Hello!', charCount: 6 },
 };
 // Leading non-printing char: 3 character slots, 2 text units.
 const pageB: PageFixture = {
-  pon: 102,
+  pageObjectNumber: 102,
   geometry: simpleGeometry(3),
   text: { text: 'AB', charCount: 3, charMap: [[1, 0]] },
 };
 // "Hi wo": a space at slot 2 splits two words.
 const pageW: PageFixture = {
-  pon: 103,
+  pageObjectNumber: 103,
   geometry: simpleGeometry(5, 2),
   text: { text: 'Hi wo', charCount: 5 },
 };
@@ -62,27 +62,31 @@ const ALL = new Set(['doc.text.select', 'doc.text.copy']);
 const SELECT_ONLY = new Set(['doc.text.select']);
 const NONE = new Set<string>();
 
-const settle = () => new Promise((r) => setTimeout(r, 0));
+const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 async function boot(fixtures: PageFixture[], allow = ALL) {
   const pages = [...fixtures];
   const listeners = new Set<(event: unknown) => void>();
-  const geometryReads = vi.fn((pon: number) => {
-    const page = pages.find((p) => p.pon === pon);
+  const failing = new Set<number>();
+  const geometryReads = vi.fn((pageObjectNumber: number) => {
+    if (failing.has(pageObjectNumber)) return Promise.reject(new Error('read failed'));
+    const page = pages.find((fixture) => fixture.pageObjectNumber === pageObjectNumber);
     return page
       ? Promise.resolve(page.geometry)
-      : Promise.reject(new Error(`no geometry for ${pon}`));
+      : Promise.reject(new Error(`no geometry for ${pageObjectNumber}`));
   });
-  const textReads = vi.fn((pon: number) => {
-    const page = pages.find((p) => p.pon === pon);
-    return page ? Promise.resolve(page.text) : Promise.reject(new Error(`no text for ${pon}`));
+  const textReads = vi.fn((pageObjectNumber: number) => {
+    const page = pages.find((fixture) => fixture.pageObjectNumber === pageObjectNumber);
+    return page
+      ? Promise.resolve(page.text)
+      : Promise.reject(new Error(`no text for ${pageObjectNumber}`));
   });
   const layout = (rotation = 0) =>
     pages.map(
-      (p, index) =>
+      (fixture, index) =>
         ({
           index,
-          ref: toPageRef(p.pon),
+          ref: toPageRef(fixture.pageObjectNumber),
           label: null,
           size: { width: 200, height: 100 },
           rotation,
@@ -100,7 +104,7 @@ async function boot(fixtures: PageFixture[], allow = ALL) {
       lastServerId: () => null,
     },
     pages: { list: () => Promise.resolve({ pageCount: pages.length, pages: layout() }) },
-    security: { allows: (cap: string) => allow.has(cap) },
+    security: { allows: (scope: string) => allow.has(scope) },
     page: (ref: { pageObjectNumber: number }) => ({
       geometry: { read: () => geometryReads(ref.pageObjectNumber) },
       text: { read: () => textReads(ref.pageObjectNumber) },
@@ -111,7 +115,7 @@ async function boot(fixtures: PageFixture[], allow = ALL) {
     open: () => Promise.resolve(handle),
     destroy: () => Promise.resolve(),
   } as unknown as Engine;
-  const emit = (event: unknown) => listeners.forEach((l) => l(event));
+  const emit = (event: unknown) => listeners.forEach((listener) => listener(event));
 
   const kernel = createKernel({ engine, plugins: [interactionPlugin(), selectionPlugin()] });
   await kernel.start();
@@ -121,14 +125,28 @@ async function boot(fixtures: PageFixture[], allow = ALL) {
     selection: kernel.capability(SelectionToken, 'd'),
     geometryReads,
     textReads,
+    /** Page object numbers whose geometry reads fail. */
+    failing,
     emit,
-    /** A structural edit: the registry swaps and the revision bumps. */
-    removePage: (pon: number) => {
+    /** Replace a page's content, as a redaction or flatten would. */
+    replacePage: (fixture: PageFixture) => {
       pages.splice(
-        pages.findIndex((p) => p.pon === pon),
+        pages.findIndex((page) => page.pageObjectNumber === fixture.pageObjectNumber),
+        1,
+        fixture,
+      );
+    },
+    /** A structural edit: the registry swaps and the revision bumps. */
+    removePage: (pageObjectNumber: number) => {
+      pages.splice(
+        pages.findIndex((page) => page.pageObjectNumber === pageObjectNumber),
         1,
       );
-      emit({ type: 'pages.deleted', layout: { pageCount: pages.length, pages: layout() } });
+      emit({
+        type: 'pages.deleted',
+        pages: [toPageRef(pageObjectNumber)],
+        layout: { pageCount: pages.length, pages: layout() },
+      });
     },
     rotateAll: () =>
       emit({ type: 'pages.rotated', layout: { pageCount: pages.length, pages: layout(90) } }),
@@ -158,20 +176,20 @@ describe('selection — permissions', () => {
   });
 
   it('ensureLoaded is inert without doc.text.select (no guaranteed-to-fail reads)', async () => {
-    const h = await boot([pageA], NONE);
-    await h.selection.ensureLoaded(toPageRef(101));
-    expect(h.geometryReads).not.toHaveBeenCalled();
-    expect(h.selection.isLoaded(toPageRef(101))).toBe(false);
-    await h.kernel.destroy();
+    const fixture = await boot([pageA], NONE);
+    await fixture.selection.ensureLoaded(toPageRef(101));
+    expect(fixture.geometryReads).not.toHaveBeenCalled();
+    expect(fixture.selection.isLoaded(toPageRef(101))).toBe(false);
+    await fixture.kernel.destroy();
   });
 
   it('readText rejects permission-denied without doc.text.copy, before any read', async () => {
-    const h = await boot([pageA], SELECT_ONLY);
-    h.selection.select({ page: toPageRef(101), start: 0, count: 5 });
+    const fixture = await boot([pageA], SELECT_ONLY);
+    fixture.selection.select({ page: toPageRef(101), start: 0, count: 5 });
     await settle();
-    await expect(h.selection.readText()).rejects.toMatchObject({ code: 'permission-denied' });
-    expect(h.textReads).not.toHaveBeenCalled();
-    await h.kernel.destroy();
+    await expect(fixture.selection.readText()).rejects.toMatchObject({ code: 'permission-denied' });
+    expect(fixture.textReads).not.toHaveBeenCalled();
+    await fixture.kernel.destroy();
   });
 });
 
@@ -250,13 +268,13 @@ describe('selection — readText', () => {
   });
 
   it('joins pages with \\n and caches page text across calls', async () => {
-    const h = await boot([pageA, pageB]);
-    h.selection.selectAll();
+    const fixture = await boot([pageA, pageB]);
+    fixture.selection.selectAll();
     await settle();
-    await expect(h.selection.readText()).resolves.toBe('Hello!\nAB');
-    await expect(h.selection.readText()).resolves.toBe('Hello!\nAB');
-    expect(h.textReads).toHaveBeenCalledTimes(2); // once per page, cached after
-    await h.kernel.destroy();
+    await expect(fixture.selection.readText()).resolves.toBe('Hello!\nAB');
+    await expect(fixture.selection.readText()).resolves.toBe('Hello!\nAB');
+    expect(fixture.textReads).toHaveBeenCalledTimes(2); // once per page, cached after
+    await fixture.kernel.destroy();
   });
 
   it('readTextInRange reads any range without touching the selection; readText is empty without one', async () => {
@@ -285,7 +303,7 @@ describe('selection — the gesture fact', () => {
     const { kernel, selection } = await boot([pageA]);
     await selection.ensureLoaded(toPageRef(101));
     const commits: unknown[] = [];
-    selection.onCommitted((e) => commits.push(e.range));
+    selection.onCommitted((event) => commits.push(event.range));
     expect(selection.isGestureActive()).toBe(false);
     expect(selection.beginGestureAt(toPageRef(101), { x: 14, y: 5 })).toBe(true);
     expect(selection.isGestureActive()).toBe(true);
@@ -305,7 +323,7 @@ describe('selection — the gesture fact', () => {
   it('programmatic selections are born settled and never commit', async () => {
     const { kernel, selection } = await boot([pageA]);
     const commits: unknown[] = [];
-    selection.onCommitted((e) => commits.push(e));
+    selection.onCommitted((event) => commits.push(event));
     selection.select({ page: toPageRef(101), start: 0, count: 4 });
     await settle();
     expect(selection.isGestureActive()).toBe(false);
@@ -315,17 +333,17 @@ describe('selection — the gesture fact', () => {
   });
 
   it('derived recomputes never touch the fact mid-gesture; clear leaves it to the gesture owner', async () => {
-    const h = await boot([pageA]);
-    await h.selection.ensureLoaded(toPageRef(101));
-    h.selection.beginGestureAt(toPageRef(101), { x: 14, y: 5 });
-    h.rotateAll(); // registry refresh → recompute
+    const fixture = await boot([pageA]);
+    await fixture.selection.ensureLoaded(toPageRef(101));
+    fixture.selection.beginGestureAt(toPageRef(101), { x: 14, y: 5 });
+    fixture.rotateAll(); // registry refresh → recompute
     await settle();
-    expect(h.selection.isGestureActive()).toBe(true);
-    h.selection.clear();
-    expect(h.selection.isGestureActive()).toBe(true);
-    h.selection.endGesture(); // nothing to commit
-    expect(h.selection.isGestureActive()).toBe(false);
-    await h.kernel.destroy();
+    expect(fixture.selection.isGestureActive()).toBe(true);
+    fixture.selection.clear();
+    expect(fixture.selection.isGestureActive()).toBe(true);
+    fixture.selection.endGesture(); // nothing to commit
+    expect(fixture.selection.isGestureActive()).toBe(false);
+    await fixture.kernel.destroy();
   });
 });
 
@@ -344,7 +362,7 @@ describe('selection — the anchor', () => {
     await kernel.destroy();
   });
 
-  it('anchors a cross-page selection on the END page', async () => {
+  it('anchors a cross-page selection on the end page', async () => {
     const { kernel, selection } = await boot([pageA, pageB]);
     selection.selectAll();
     await settle();
@@ -370,45 +388,55 @@ describe('selection — reads are reference-stable', () => {
 });
 
 describe('selection — events', () => {
-  it('onChanged carries the range, the pages and an origin; onCleared follows a clear', async () => {
+  it('onChanged carries the range and the pages; onCleared follows a clear', async () => {
     const { kernel, selection } = await boot([pageA]);
     await selection.ensureLoaded(toPageRef(101));
     const log: string[] = [];
-    selection.onChanged((e) =>
-      log.push(
-        `changed:${e.origin.trigger}:${e.range ? e.range.end.index : '-'}:${e.pages.length}`,
-      ),
+    selection.onChanged((event) =>
+      log.push(`changed:${event.range ? event.range.end.index : '-'}:${event.pages.length}`),
     );
-    selection.onCleared((e) => log.push(`cleared:${e.origin.trigger}`));
+    selection.onCleared(() => log.push('cleared'));
     selection.select({ page: toPageRef(101), start: 0, count: 2 });
     selection.beginGestureAt(toPageRef(101), { x: 14, y: 5 });
     selection.extendTo(toPageRef(101), { x: 30, y: 5 });
     selection.endGesture();
     selection.clear();
     selection.clear(); // clearing nothing is not a change
-    expect(log).toEqual([
-      'changed:api:2:1',
-      'changed:user:1:1',
-      'changed:user:3:1',
-      'changed:api:-:0',
-      'cleared:api',
-    ]);
+    expect(log).toEqual(['changed:2:1', 'changed:1:1', 'changed:3:1', 'changed:-:0', 'cleared']);
     await kernel.destroy();
   });
 
-  it('a page arriving mid-selection recomputes with a system origin', async () => {
-    const { kernel, selection } = await boot([pageA, pageB]);
-    const origins: string[] = [];
-    selection.onChanged((e) => origins.push(e.origin.trigger));
-    selection.selectAll();
+  it('fires only when the range or its segments change', async () => {
+    const fixture = await boot([pageA]);
+    await fixture.selection.ensureLoaded(toPageRef(101));
+    let changes = 0;
+    fixture.selection.onChanged(() => changes++);
+    fixture.selection.beginGestureAt(toPageRef(101), { x: 14, y: 5 });
+    fixture.selection.extendTo(toPageRef(101), { x: 30, y: 5 });
+    const snapshot = fixture.selection.getSnapshot();
+    fixture.selection.extendTo(toPageRef(101), { x: 31, y: 5 }); // the same glyph
+    fixture.selection.select(fixture.selection.getRange()!); // the same range
+    expect(changes).toBe(2);
+    expect(fixture.selection.getSnapshot()).toBe(snapshot);
+    fixture.rotateAll(); // page space is unrotated: the segments stay the same
     await settle();
-    expect(origins[0]).toBe('api');
-    expect(origins.slice(1).every((o) => o === 'system')).toBe(true);
-    expect(origins.length).toBeGreaterThan(1);
+    expect(changes).toBe(2);
+    await fixture.kernel.destroy();
+  });
+
+  it("a boundary page's geometry arriving mid-selection fills its segments and fires onChanged", async () => {
+    const { kernel, selection } = await boot([pageA, pageB]);
+    const pageCounts: number[] = [];
+    selection.onChanged((event) => pageCounts.push(event.pages.length));
+    selection.selectAll();
+    expect(pageCounts).toEqual([0]); // nothing loaded yet: the range, no segments
+    await settle();
+    expect(pageCounts.length).toBeGreaterThan(1);
+    expect(pageCounts[pageCounts.length - 1]).toBe(2);
     await kernel.destroy();
   });
 
-  it('a throwing listener neither breaks its siblings nor the write (G7)', async () => {
+  it('a throwing listener neither breaks its siblings nor the write', async () => {
     const { kernel, selection } = await boot([pageA]);
     const seen: number[] = [];
     selection.onChanged(() => {
@@ -422,36 +450,101 @@ describe('selection — events', () => {
   });
 });
 
+const origin = { kind: 'local', sessionId: 's1', sub: null, ts: 1 };
+const applied = (pageObjectNumber: number, status = 'applied') => ({
+  page: toPageRef(pageObjectNumber),
+  status,
+});
+
 describe('selection — invalidation', () => {
-  it('content mutation (redaction.applied) clears the selection and refetches geometry', async () => {
-    const h = await boot([pageA]);
-    h.selection.select({ page: toPageRef(101), start: 0, count: 4 });
+  it('an applied redaction clears the selection and re-reads the page geometry', async () => {
+    const fixture = await boot([pageA]);
+    fixture.selection.select({ page: toPageRef(101), start: 0, count: 4 });
     await settle();
-    expect(h.geometryReads).toHaveBeenCalledTimes(1);
-    h.emit({ type: 'redaction.applied' });
-    expect(h.selection.hasSelection()).toBe(false);
-    await h.selection.ensureLoaded(toPageRef(101));
-    expect(h.geometryReads).toHaveBeenCalledTimes(2);
-    await h.kernel.destroy();
+    expect(fixture.geometryReads).toHaveBeenCalledTimes(1);
+    fixture.emit({ type: 'redaction.applied', origin, results: [applied(101)] });
+    expect(fixture.selection.hasSelection()).toBe(false);
+    await settle();
+    expect(fixture.geometryReads).toHaveBeenCalledTimes(2);
+    await fixture.kernel.destroy();
+  });
+
+  it('a redaction that applied nothing leaves the selection and the geometry alone', async () => {
+    const fixture = await boot([pageA]);
+    fixture.selection.select({ page: toPageRef(101), start: 0, count: 4 });
+    await settle();
+    fixture.emit({ type: 'redaction.applied', origin, results: [applied(101, 'skipped')] });
+    await settle();
+    expect(fixture.selection.hasSelection()).toBe(true);
+    expect(fixture.geometryReads).toHaveBeenCalledTimes(1);
+    await fixture.kernel.destroy();
+  });
+
+  it('a flattened page clears the selection and re-reads its geometry and text', async () => {
+    const fixture = await boot([pageA]);
+    fixture.selection.selectAll();
+    await settle();
+    await expect(fixture.selection.readText()).resolves.toBe('Hello!');
+    fixture.emit({ type: 'pages.flattened', origin, pages: [toPageRef(101)], results: [applied(101)] });
+    expect(fixture.selection.hasSelection()).toBe(false);
+    await settle();
+    expect(fixture.geometryReads).toHaveBeenCalledTimes(2);
+    fixture.selection.selectAll();
+    await fixture.selection.readText();
+    expect(fixture.textReads).toHaveBeenCalledTimes(2);
+    await fixture.kernel.destroy();
+  });
+
+  it('isLoaded tracks the geometry actually held across a content change', async () => {
+    // Regression: the loaded flag outlived a content change, so isLoaded(page)
+    // reported true while the page had no geometry to hit-test.
+    const fixture = await boot([pageA]);
+    await fixture.selection.ensureLoaded(toPageRef(101));
+    expect(fixture.selection.isLoaded(toPageRef(101))).toBe(true);
+    expect(fixture.selection.isOverText(toPageRef(101), { x: 46, y: 5 })).toBe(true); // glyph 4
+    // The redaction leaves two glyphs on the page.
+    fixture.replacePage({ ...pageA, geometry: simpleGeometry(2), text: { text: 'He', charCount: 2 } });
+    fixture.emit({ type: 'redaction.applied', origin, results: [applied(101)] });
+    await settle();
+    expect(fixture.selection.isLoaded(toPageRef(101))).toBe(true);
+    expect(fixture.selection.isOverText(toPageRef(101), { x: 14, y: 5 })).toBe(true); // glyph 0
+    expect(fixture.selection.isOverText(toPageRef(101), { x: 46, y: 5 })).toBe(false); // gone
+    await fixture.kernel.destroy();
+  });
+
+  it('a failed re-read leaves the page unloaded with no geometry, and a later warm retries', async () => {
+    const fixture = await boot([pageA]);
+    await fixture.selection.ensureLoaded(toPageRef(101));
+    fixture.failing.add(101);
+    fixture.emit({ type: 'redaction.applied', origin, results: [applied(101)] });
+    await settle();
+    expect(fixture.selection.isLoaded(toPageRef(101))).toBe(false);
+    expect(fixture.selection.isOverText(toPageRef(101), { x: 14, y: 5 })).toBe(false);
+    fixture.failing.delete(101);
+    await fixture.selection.ensureLoaded(toPageRef(101));
+    expect(fixture.selection.isLoaded(toPageRef(101))).toBe(true);
+    expect(fixture.selection.isOverText(toPageRef(101), { x: 14, y: 5 })).toBe(true);
+    await fixture.kernel.destroy();
   });
 
   it('clears when an endpoint page leaves the registry', async () => {
-    const h = await boot([pageA, pageB]);
-    h.selection.selectAll();
+    const fixture = await boot([pageA, pageB]);
+    fixture.selection.selectAll();
     await settle();
-    expect(h.selection.hasSelection()).toBe(true);
-    h.removePage(102);
+    expect(fixture.selection.hasSelection()).toBe(true);
+    fixture.removePage(102);
     await settle();
-    expect(h.selection.hasSelection()).toBe(false);
-    await h.kernel.destroy();
+    expect(fixture.selection.hasSelection()).toBe(false);
+    expect(fixture.selection.isLoaded(toPageRef(102))).toBe(false);
+    await fixture.kernel.destroy();
   });
 
   it('closing the document disposes the instance: a late geometry read is dropped silently', async () => {
-    const h = await boot([pageA]);
-    const pending = h.selection.ensureLoaded(toPageRef(101));
-    await h.kernel.documents.close('d');
+    const fixture = await boot([pageA]);
+    const pending = fixture.selection.ensureLoaded(toPageRef(101));
+    await fixture.kernel.documents.close('d');
     await expect(pending).resolves.toBeUndefined();
     expect(isPluginError(new Error('x'))).toBe(false);
-    await h.kernel.destroy();
+    await fixture.kernel.destroy();
   });
 });

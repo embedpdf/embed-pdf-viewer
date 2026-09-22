@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { toPageRef } from '@embedpdf/engine-core/runtime';
 import { DRAWN_FLAGS } from '../src/flags';
-import { DEFAULT_CHROME_GEOM, pointInQuad, rotatePoint, unionRect } from '../src/geometry';
+import { DEFAULT_CHROME_GEOMETRY, pointInQuad, rotatePoint, unionRect } from '../src/geometry';
 import { hitTest, groupUnionBounds } from '../src/hit';
 import { distanceLayout, type DistanceAppearance } from '../src/measurement';
 import { annotationSelectionFrame } from '../src/selection';
 import { initialModel, initialStyle, update, annotsInBox } from '../src/update';
 import { chrome, pageItems } from '../src/view';
-import type { Annot, Model, Quad, Vec } from '../src/types';
+import type { ModelAnnotation, Model, Quad, Point } from '../src/types';
 
 const PAGE = toPageRef(1);
 const appearance: DistanceAppearance = {
@@ -19,14 +19,14 @@ const appearance: DistanceAppearance = {
   caption: { enabled: true, offset: { along: 70, perpendicular: -50 } },
 };
 
-function measurement(overrides: Partial<Annot> = {}): Annot {
+function measurement(overrides: Partial<ModelAnnotation> = {}): ModelAnnotation {
   return {
     id: 'distance',
     ref: null,
     page: toPageRef(1),
     subtype: 'line',
-    geom: {
-      t: 'line',
+    geometry: {
+      kind: 'line',
       a: { x: 140, y: 180 },
       b: { x: 340, y: 180 },
       ends: { start: 'closed-arrow', end: 'closed-arrow' },
@@ -49,7 +49,7 @@ function selected(annotation = measurement()): Model {
   };
 }
 
-function expectPoint(actual: Vec, expected: Vec) {
+function expectPoint(actual: Point, expected: Point) {
   expect(actual.x).toBeCloseTo(expected.x, 6);
   expect(actual.y).toBeCloseTo(expected.y, 6);
 }
@@ -67,9 +67,9 @@ function outlineCorners(model: Model): Quad {
   ];
 }
 
-function pointer(model: Model, phase: 'down' | 'move' | 'up', point: Vec): Model {
+function pointer(model: Model, phase: 'down' | 'move' | 'up', point: Point): Model {
   return update(model, {
-    t: 'editPointer',
+    type: 'editPointer',
     phase,
     in: { page: toPageRef(1), point, shift: false },
   })[0];
@@ -87,7 +87,7 @@ describe('measurement selection frame and rotation', () => {
     {
       name: 'short dimension with outside arrows',
       annotation: measurement({
-        geom: { t: 'line', a: { x: 140, y: 180 }, b: { x: 170, y: 180 } },
+        geometry: { kind: 'line', a: { x: 140, y: 180 }, b: { x: 170, y: 180 } },
         measure: { ...appearance, caption: { enabled: true } },
       }),
     },
@@ -104,12 +104,12 @@ describe('measurement selection frame and rotation', () => {
       x: (outline[0].x + outline[1].x) / 2,
       y: (outline[0].y + outline[1].y) / 2,
     });
-    const hit = hitTest(start, PAGE, knob.at, DEFAULT_CHROME_GEOM, 6);
-    expect(hit).toMatchObject({ t: 'rotate', pivot: center });
+    const hit = hitTest(start, PAGE, knob.at, DEFAULT_CHROME_GEOMETRY, 6);
+    expect(hit).toMatchObject({ kind: 'rotate', pivot: center });
 
     const armed = pointer(start, 'down', knob.at);
     const initialCaption = distanceLayout(
-      annotation.geom,
+      annotation.geometry,
       annotation.measure as DistanceAppearance,
       2,
     )!.caption!;
@@ -117,7 +117,7 @@ describe('measurement selection frame and rotation', () => {
       const at = rotatePoint(knob.at, center, angle);
       const moving = pointer(armed, 'move', at);
       const item = pageItems(moving, PAGE)[0];
-      const layout = distanceLayout(item.geom, item.measure as DistanceAppearance, 2)!;
+      const layout = distanceLayout(item.geometry, item.measure as DistanceAppearance, 2)!;
       const rotatedOutline = outlineCorners(moving);
       rotatedOutline.forEach((point, index) => {
         expectPoint(point, rotatePoint(outline[index], center, angle));
@@ -132,35 +132,35 @@ describe('measurement selection frame and rotation', () => {
       const committed = pointer(moving, 'up', at);
       expectPoint(annotationSelectionFrame(committed.byId.distance).center, center);
       expect(committed.byId.distance.measure).toEqual(annotation.measure);
-      expect(committed.byId.distance.geom).toEqual(item.geom);
+      expect(committed.byId.distance.geometry).toEqual(item.geometry);
     }
     expect(pointer(armed, 'move', knob.at).draft).toMatchObject({ pivot: center });
-    expect(update(armed, { t: 'cancel' })[0].byId.distance).toBe(annotation);
+    expect(update(armed, { type: 'cancel' })[0].byId.distance).toBe(annotation);
   });
 
   it('uses the same center for quarter turns and reset, without moving the annotation', () => {
     const initial = selected();
     const center = annotationSelectionFrame(initial.byId.distance).center;
-    const once = update(initial, { t: 'rotate90' })[0];
+    const once = update(initial, { type: 'rotate90' })[0];
     expectPoint(annotationSelectionFrame(once.byId.distance).center, center);
-    const reset = update(once, { t: 'resetRotation' })[0];
-    expect(reset.byId.distance.geom).toMatchObject(initial.byId.distance.geom);
+    const reset = update(once, { type: 'resetRotation' })[0];
+    expect(reset.byId.distance.geometry).toMatchObject(initial.byId.distance.geometry);
 
     let state = initial;
     for (let turn = 0; turn < 4; turn++) {
-      state = update(state, { t: 'rotate90' })[0];
+      state = update(state, { type: 'rotate90' })[0];
       expectPoint(annotationSelectionFrame(state.byId.distance).center, center);
     }
-    const geometry = state.byId.distance.geom;
-    if (geometry.t !== 'line') throw new Error('Expected line geometry');
+    const geometry = state.byId.distance.geometry;
+    if (geometry.kind !== 'line') throw new Error('Expected line geometry');
     expectPoint(geometry.a, { x: 140, y: 180 });
     expectPoint(geometry.b, { x: 340, y: 180 });
   });
 
   it('keeps its frame after a native appearance with conservative bounds arrives', () => {
-    const state = update(selected(), { t: 'rotate90' })[0];
+    const state = update(selected(), { type: 'rotate90' })[0];
     const annotation = state.byId.distance;
-    const baked: Annot = {
+    const baked: ModelAnnotation = {
       ...annotation,
       source: 'baked',
       apBox: { x: 40, y: 60, width: 450, height: 400 },
@@ -173,11 +173,11 @@ describe('measurement selection frame and rotation', () => {
     expect(annotsInBox(state, toPageRef(1), { x: 290, y: 340 }, { x: 325, y: 355 })).toEqual([
       'distance',
     ]);
-    const square: Annot = {
+    const square: ModelAnnotation = {
       ...measurement(),
       id: 'square',
       subtype: 'square',
-      geom: { t: 'rect', rect: { x: 400, y: 180, width: 80, height: 80 }, ellipse: false },
+      geometry: { kind: 'rect', rect: { x: 400, y: 180, width: 80, height: 80 }, ellipse: false },
       measure: undefined,
     };
     state.byId.square = square;
@@ -186,7 +186,7 @@ describe('measurement selection frame and rotation', () => {
     const bounds = groupUnionBounds(state, toPageRef(1))!;
     const center = { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 };
     const before = annotationSelectionFrame(state.byId.distance).center;
-    const rotated = update(state, { t: 'rotate90' })[0];
+    const rotated = update(state, { type: 'rotate90' })[0];
     expectPoint(
       annotationSelectionFrame(rotated.byId.distance).center,
       rotatePoint(before, center, 90),

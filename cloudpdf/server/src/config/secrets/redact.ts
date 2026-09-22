@@ -9,13 +9,13 @@
  * `provider` and `name` string fields is treated as a SecretRef and
  * replaced with `<SecretRef ${provider}/${name}>`.
  *
- * The SecretRef itself never contains the secret VALUE — only a
+ * The SecretRef itself never contains the secret value — only a
  * pointer to where the value lives. The placeholder preserves enough
  * info for an operator to identify which secret was referenced
  * (without exposing it as raw config that could accidentally leak
  * downstream).
  *
- * For fields that hold LITERAL secret values (e.g., a Bunny zoneToken
+ * For fields that hold literal secret values (e.g., a Bunny zoneToken
  * passed as a plain string for local-dev), callers pass
  * `additionalSensitiveKeys` to redact those fields by key name
  * regardless of value shape.

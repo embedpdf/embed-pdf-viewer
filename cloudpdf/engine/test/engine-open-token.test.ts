@@ -36,8 +36,8 @@ import { decodeUnverifiedClaims } from '../src/transport/decodeUnverifiedClaims'
  *      token for all subsequent RPCs
  *
  * One engine can open many docs concurrently, each with its own
- * bearer. We seed the doc directly into the DB + storage — Phase 5
- * will replace this with a real upload flow.
+ * bearer. The doc is seeded directly into the DB + storage, so these
+ * tests exercise the open path without the upload flow.
  */
 
 const STUB_ENTRY = fileURLToPath(

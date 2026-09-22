@@ -8,13 +8,13 @@ import type { AnnotationDraftBase } from '../../draft-base';
  * selection editor) — and only `goto`/`uri` targets are writable (see
  * {@link PdfLinkTargetWritable}).
  *
- * To group the link to another annotation (v2's attached links), pass the
+ * To group the link to another annotation (an "attached link"), pass the
  * base draft's `inReplyTo` + `replyType: 'group'` — relationship writing is
  * kind-agnostic.
  */
 export interface LinkDraft extends AnnotationDraftBase {
   subtype: 'link';
-  /** `/Rect` — required; a link IS its hit rectangle. */
+  /** `/Rect` — required; a link is its hit rectangle. */
   rect: PdfRect;
   target: PdfLinkTargetWritable | null;
 }

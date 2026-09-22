@@ -1,10 +1,10 @@
 /**
  * @embedpdf/plugin-view-manager/contract — panes, tabs, and which document
  * each pane shows. A pane owns a set of documents (its tab strip) and one
- * active document. A document belongs to exactly ONE pane — panes PARTITION
- * the open documents. The document's STATE (camera/zoom/layout) lives in the
- * document-scoped stage, so two panes showing different documents get
- * independent cameras for free.
+ * active document. A document belongs to at most one pane: panes partition
+ * the open documents. A document's view state (camera, zoom, layout) lives in
+ * the document-scoped stage, so two panes showing different documents have
+ * independent cameras.
  */
 import type { EventHook } from '@embedpdf/core';
 

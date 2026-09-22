@@ -4,19 +4,24 @@ import { enrichCommentThreads } from '../src/annotation';
 import { toPageRef, type PageLayout } from '../src/runtime';
 
 /** The join is presentation-only: identity stays the page address; pageIndex/pageLabel
- *  come from the CURRENT layout and must track moves/deletes. */
+ *  come from the current layout and must track moves/deletes. */
 
 const CROP = { left: 0, bottom: 0, right: 600, top: 800 };
 
 /** Root rect in PDF space (y-up, crop-relative): a 20pt box near the top. */
-const thread = (pon: number): CommentThread =>
+const thread = (pageObjectNumber: number): CommentThread =>
   ({
-    page: toPageRef(pon),
+    page: toPageRef(pageObjectNumber),
     root: { rect: { left: 100, bottom: 700, right: 120, top: 720 } },
   }) as unknown as CommentThread;
 
-const page = (pon: number, index: number, label: string | null = null): PageLayout =>
-  ({ ref: toPageRef(pon), index, label, boxes: { crop: CROP } }) as unknown as PageLayout;
+const page = (pageObjectNumber: number, index: number, label: string | null = null): PageLayout =>
+  ({
+    ref: toPageRef(pageObjectNumber),
+    index,
+    label,
+    boxes: { crop: CROP },
+  }) as unknown as PageLayout;
 
 describe('enrichCommentThreads', () => {
   it('joins pageIndex + pageLabel from the live layout, falling back to 1-based position', () => {
@@ -24,8 +29,8 @@ describe('enrichCommentThreads', () => {
       [thread(30), thread(10)],
       [page(10, 0, 'iv'), page(30, 1, null)],
     );
-    expect(out.map((v) => v.pageIndex)).toEqual([1, 0]);
-    expect(out.map((v) => v.pageLabel)).toEqual(['2', 'iv']);
+    expect(out.map((view) => view.pageIndex)).toEqual([1, 0]);
+    expect(out.map((view) => view.pageLabel)).toEqual(['2', 'iv']);
   });
 
   it('a page move re-labels without touching thread identity', () => {

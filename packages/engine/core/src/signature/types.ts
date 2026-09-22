@@ -128,7 +128,7 @@ export interface SignatureDTO {
   signer: SignatureSigner;
   /** The DocMDP permission the signature carries (its `/Reference`), whether or not the catalog points at it. */
   docMdp: DocMdpPermission | null;
-  /** `/Root /Perms /DocMDP` names this signature: it is THE certification. */
+  /** `/Root /Perms /DocMDP` names this signature: it is the certification. */
   catalogCertification: boolean;
   /** The FieldMDP transform this signature carries. */
   fieldMdp: FieldLockSpec | null;
@@ -148,7 +148,7 @@ export interface DocumentFieldLock {
  * What the signatures already in a document mean for what comes after, in
  * two separate answers:
  *
- *   - `enforced`: what a signer DECLARED — a certification's /P, a signed
+ *   - `enforced`: what a signer declared — a certification's /P, a signed
  *     field's /Lock /P. The engine refuses what it forbids (mapped onto
  *     capabilities like encryption permission bits). A plain approval
  *     signature declares nothing: `null`.

@@ -9,7 +9,7 @@ import type { AnnotationDTO } from '../annotation/kinds';
  * snapshots. Empty array means parity. Used by `engine-node.ts` to assert
  * that local and cloud emit identical annotations for the same fixture.
  *
- * `RevisionToken.docSessionId` is intentionally NOT compared — sessions
+ * `RevisionToken.docSessionId` is intentionally not compared — sessions
  * are disjoint. We do compare `pageObjectNumber` and `generation` (which
  * should be 0 for fresh reads on both sides). Page order is no longer part
  * of `PageState`; it lives in `PageLayout.index` (see `pages.list()`).

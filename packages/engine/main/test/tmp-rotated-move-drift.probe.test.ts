@@ -1,5 +1,5 @@
 /**
- * TEMPORARY PROBE — reproduces the user-reported "rotated circle shrinks
+ * Temporary probe — reproduces the user-reported "rotated circle shrinks
  * after two move+refresh cycles" bug. Mirrors the client's exact emission
  * (boxEmit): every geometry patch carries rect=AABB + unrotatedRect +
  * rotation. Deleted after diagnosis.

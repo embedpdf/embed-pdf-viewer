@@ -16,7 +16,7 @@ export interface TenantUsageSnapshot {
 }
 
 /**
- * Per-tenant usage FACTS — record and report, no opinions.
+ * Per-tenant usage facts — record and report, no opinions.
  *
  * This is deliberately not `UsageMeters`: that class answers "is this
  * deployment within its license" (deployment-wide counters, hard-limit
@@ -25,7 +25,7 @@ export interface TenantUsageSnapshot {
  * enforcement above the license is the operator's judgment, expressed
  * through tenant suspension, never a number the engine second-guesses.
  *
- * A VIEW is a share exchange or an authorized `/v1/access` grant,
+ * A view is a share exchange or an authorized `/v1/access` grant,
  * deduplicated: exchanged sessions carry `sub = share:<id>`, and
  * `/v1/access` skips those (they were counted at exchange).
  */

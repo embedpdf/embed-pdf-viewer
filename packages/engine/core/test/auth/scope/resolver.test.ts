@@ -155,7 +155,7 @@ describe('pdf.permissions expansion — bit-derived', () => {
 
   it('pdf.permissions never consults bits when not in scope', () => {
     // Token has explicit doc.download but no pdf.permissions; bits are
-    // ALL set but text.copy is NOT granted because pdf.permissions wasn't
+    // all set but text.copy is not granted because pdf.permissions wasn't
     // requested.
     expect(checkCapability('doc.text.copy', ['doc.download'], ALL_BITS)).toBe(false);
   });

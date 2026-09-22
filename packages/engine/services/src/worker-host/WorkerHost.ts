@@ -148,7 +148,7 @@ import { PageTextReader } from '../features/text';
 import { ensureInitialized, destroyLibrary } from '../runtime/lifecycle/bootstrap';
 import { generateUuid } from '../shared/uuid';
 
-/** The image a {@link WorkerImageEncoder} produced. `bytes` must OWN its
+/** The image a {@link WorkerImageEncoder} produced. `bytes` must own its
  *  buffer (a fresh allocation, not a pooled `Buffer` slab view) — it is
  *  placed on the transfer manifest and moved zero-copy. */
 export interface WorkerEncodedImage {
@@ -158,7 +158,7 @@ export interface WorkerEncodedImage {
 
 /**
  * Injected image-encode capability for the `*.renderEncoded` wire kinds.
- * Dependency inversion keeps the native encoder OUT of this shared
+ * Dependency inversion keeps the native encoder out of this shared
  * package: the cloud server's worker entry injects a sharp/libvips
  * implementation; browser/local entries inject nothing (they encode via
  * canvas) and the encoded kinds reject with `NotImplemented`.
@@ -241,8 +241,8 @@ export class WorkerHost {
       return;
     }
 
-    // The encoded render kinds are the protocol's ONLY async ops: their
-    // raster comes from the SAME sync handlers as the raw kinds (all
+    // The encoded render kinds are the protocol's only async ops: their
+    // raster comes from the same sync handlers as the raw kinds (all
     // session/registry use completes before the first await), and only
     // the injected image encode awaits. They run on a parallel async
     // path with identical resolve/reject/abort bookkeeping; everything
@@ -267,7 +267,7 @@ export class WorkerHost {
     let resultPack: WirePack<WorkerResultPayload>;
     try {
       // A parked signing candidate freezes the session: every mutating kind
-      // is refused at DISPATCH, before any native write, until the signing
+      // is refused at dispatch, before any native write, until the signing
       // completes or aborts. Reads keep seeing the live document, which the
       // candidate never changed.
       this.assertNoPendingSigning(msg);
@@ -547,7 +547,7 @@ export class WorkerHost {
       try {
         this.openSignedAware(session, bytes, req.password);
       } catch (error) {
-        // Password failures are a STATE, not an error: park the session with
+        // Password failures are a state, not an error: park the session with
         // the already-transferred bytes and answer with a security probe that
         // says "password required". The client handle comes up locked
         // (`security.passwordPrompt === 'required'`); a later
@@ -609,7 +609,7 @@ export class WorkerHost {
   ): void {
     if (session.sessionKind === 'plain') {
       const plain = openFatMemoryDocument(this.runtime, bytes, password);
-      // A SIGNED signature, not merely a signature field: an unsigned form
+      // A signed signature, not merely a signature field: an unsigned form
       // with empty signature fields is an ordinary document and honours the
       // plain request. (FPDF_GetSignatureCount counts fields.)
       let signed = false;
@@ -625,7 +625,7 @@ export class WorkerHost {
       plain.close();
     }
     // The base registry reports a password failure the way a plain open
-    // does, so a locked document parks and unlocks exactly as before.
+    // does, so a locked document parks and unlocks the same way.
     const base = this.baseDocuments.acquireMemoryBase({
       key: `signed-open:${generateUuid()}`,
       bytes,
@@ -1256,7 +1256,7 @@ export class WorkerHost {
       | DocumentRenderPageFileEncodedWorkerRequest
       | AnnotationsRenderAppearancesEncodedWorkerRequest,
   ): Promise<void> {
-    // Fail-fast BEFORE any native work: a host without an injected
+    // Fail-fast before any native work: a host without an injected
     // encoder (browser/local workers) rejects the job without paying for
     // a raster it could never encode.
     if (!this.options.imageEncoder) {
@@ -1377,7 +1377,7 @@ export class WorkerHost {
       throw new EngineError(EngineErrorCode.WireFormat, `unexpected ${inner.payload.tag}`);
     }
     const { pageState, appearances } = inner.payload.result;
-    // SEQUENTIAL encode, deliberately: the whole raster batch already
+    // Sequential encode, deliberately: the whole raster batch already
     // exists in `inner` (peak memory is set by the render, not by encode
     // order), so fanning every appearance into the process-wide encoder
     // pool at once would only let one big batch monopolize it and starve
@@ -1426,7 +1426,7 @@ export class WorkerHost {
     const session = this.requireSession(req);
     // The no-op save law for files: a session whose document is still the
     // one it was opened with streams its loaded bytes — for a layer, the
-    // base PLUS the loaded delta, never the base file alone — verbatim. The
+    // base plus the loaded delta, never the base file alone — verbatim. The
     // decision is the saver's (see handleDocumentSaveBuffer); when its pass
     // wrote nothing, nothing reached the file yet.
     const unchanged =
@@ -1472,7 +1472,7 @@ export class WorkerHost {
 
   /**
    * One-shot file render (the derived-artifact warmer's producer): open the
-   * base from a file path into a TRANSIENT session — never stored in
+   * base from a file path into a transient session — never stored in
    * `this.sessions`, so it can't collide with (or leak into) live document
    * sessions — resolve the display index to its durable page object number,
    * render, close. Shares the base parse with concurrent ad-hoc opens of
@@ -1524,7 +1524,7 @@ export class WorkerHost {
   private handleDocumentCheckPasswordPermissions(
     req: DocumentCheckPasswordPermissionsWorkerRequest,
   ): WirePack<WorkerResultPayload> {
-    // The one handler that accepts a LOCKED session: on a locked session,
+    // The one handler that accepts a locked session: on a locked session,
     // "check this password" means "load the parked bytes with it". A wrong
     // password throws DocPasswordIncorrect and the session stays parked
     // (bytes retained) for the next attempt.
@@ -1614,7 +1614,7 @@ export class WorkerHost {
   }
 
   /**
-   * Close exactly ONE layer session — the reload seam for layer-session
+   * Close exactly one layer session — the reload seam for layer-session
    * freshness. The base document's refcount releases through the session's
    * close stack, so sibling layer sessions (and the base session) are
    * untouched. Idempotent: closing an absent session is a no-op ack,
@@ -1795,7 +1795,7 @@ export class WorkerHost {
       signal,
     );
     const meta: MutationMeta = {
-      affectedPages: pages.map((pon) => session.pageState(pon)),
+      affectedPages: pages.map((pageObjectNumber) => session.pageState(pageObjectNumber)),
       cacheDelta: null,
     };
     return this.finishMutation(
@@ -1815,7 +1815,7 @@ export class WorkerHost {
 
     // Cascade: the mutator detached the widgets (inert annotations now);
     // deleting them through the annotation feature keeps /Annots
-    // bookkeeping, weak-ref invalidation, and page revisions in ONE place.
+    // bookkeeping, weak-ref invalidation, and page revisions in one place.
     const annotations = new AnnotationMutator(this.runtime, session);
     for (const widget of detachedWidgets) {
       if (!widget.ref) continue; // direct or unplaced: nothing the annotation plane can delete

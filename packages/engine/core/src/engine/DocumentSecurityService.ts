@@ -14,8 +14,8 @@ export type DocumentAccessReason = 'password' | 'cdn' | 'permissions-unknown';
  *
  * Computed from {@link PdfBits} via the strict ISO 32000 rules:
  *   bit 12 only meaningful when bit 3 is also set
- *   form modification requires both bit 6 AND bit 4
- *   form fill is satisfied by bit 6 OR bit 9
+ *   form modification requires both bit 6 and bit 4
+ *   form fill is satisfied by bit 6 or bit 9
  */
 export interface PdfPermissionAdvisory {
   readonly canPrint: boolean;
@@ -146,7 +146,7 @@ export interface DocumentAccessInfo {
    * `viewport.width` points whose renders are durable, CDN-shared
    * artifacts, plus the reserved tile-pyramid block. Local engines report
    * nothing here (continuous rendering); cloud engines surface it so
-   * `snapFullPageViewport` can conform requests EXPLICITLY — the SDK
+   * `snapFullPageViewport` can conform requests explicitly — the SDK
    * never snaps implicitly (engine parity).
    */
   readonly renderPolicy?: {
@@ -195,20 +195,20 @@ export interface DocumentSecurityService {
 
   /**
    * The caller's expanded capability set — raw scope + pdf bits +
-   * implication rules, enumerated for DISPLAY ("here's what you can
+   * implication rules, enumerated for display ("here's what you can
    * do"). Identical shape on local and cloud; cloud uses the
    * server-canonical value when available, else computes locally from
    * JWT scope + /head bits.
    *
-   * NOTE: this is an *enumeration*, not an authorization check. The `*`
-   * admin wildcard and unbounded parametric collab grants are NOT
+   * Note: this is an *enumeration*, not an authorization check. The `*`
+   * admin wildcard and unbounded parametric collab grants are not
    * listed here (they can't be). To gate UI, use {@link allows} — the
    * same wildcard-aware predicate the engine enforces with.
    */
   readonly effectiveScope: ReadonlyArray<string>;
 
   /**
-   * Wildcard-aware authorization check — the SAME predicate the engine
+   * Wildcard-aware authorization check — the same predicate the engine
    * enforces with (`checkCapability`). A shown control gated on this
    * mirrors exactly what the engine will allow: the `*` admin grant and
    * `pdf.permissions`-derived bits are both honored. Use this for edit
@@ -218,24 +218,24 @@ export interface DocumentSecurityService {
   allows(capability: DocCapability): boolean;
 
   /**
-   * Per-record annotation authorization mirrors — the SAME resolver the
+   * Per-record annotation authorization mirrors — the same resolver the
    * engine enforces with (`checkCollab`'s narrowing rule: an applicable
-   * `annotations:<action>:<filter>` grant SHADOWS the coarse
+   * `annotations:<action>:<filter>` grant shadows the coarse
    * `doc.annotate.modify` fallback for that action), over the same
    * inputs (raw scope + identity claims + PDF bits). `allows()` cannot
    * answer these: it enumerates capabilities, and a filtered collab
    * grant is not a capability — whether "update" is allowed depends on
-   * WHOSE annotation you're touching.
+   * whose annotation you're touching.
    *
    * Three surfaces because the questions genuinely differ:
-   *   - create derives its target from the caller's OWN identity
+   *   - create derives its target from the caller's own identity
    *     (`:self` trivially passes; `:group=X` matches the caller's
    *     default group),
-   *   - update/delete are asked about the TARGET record's stamped
+   *   - update/delete are asked about the target record's stamped
    *     owner (`userId`/`groupId` from its EMBD metadata; pass `{}`
    *     when unstamped — matching the engine, which denies unstamped
    *     targets under any narrowed grant),
-   *   - group assignment is asked about the DESTINATION group
+   *   - group assignment is asked about the destination group
    *     (`annotations:set-group:` ladder; the caller's own default
    *     group is always assignable).
    *

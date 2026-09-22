@@ -56,7 +56,7 @@ const fixtures: PageGeometryOrientationFixture[] = [
     expectation: { kind: 'rotated', rotations: [Math.PI], ascentFlip: true },
   },
   {
-    // Vertical CJK writing uses an UPRIGHT matrix — the guard that vertical
+    // Vertical CJK writing uses an upright matrix — the guard that vertical
     // text stays on the unchanged upright path.
     id: 'vertical-text',
     bytes: fixtureBytes('vertical_text.pdf'),

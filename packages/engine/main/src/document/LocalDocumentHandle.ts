@@ -63,7 +63,7 @@ export class LocalDocumentHandle implements DocumentHandle {
   /**
    * The engine's configured render policy, advertised through the same
    * `policy()` every engine exposes (engine parity: plugin code never
-   * branches on engine kind). Local DEFAULTS to `continuous` — rendering
+   * branches on engine kind). Local defaults to `continuous` — rendering
    * is in-process and exact — but an embedder can configure a lattice at
    * `localEngine({ renderPolicy })`, the same way permissions are
    * overridden, and the local engine then budgets/enforces exactly like

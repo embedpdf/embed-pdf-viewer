@@ -1,3 +1,4 @@
+import { toPageRef } from '@embedpdf/engine-core/runtime';
 import { describe, expect, it, vi } from 'vitest';
 import type { DocumentHandle, Engine, PageLayout } from '@embedpdf/engine-core/runtime';
 import { createKernel } from '../src/kernel';
@@ -8,7 +9,7 @@ import type { AnyPlugin } from '../src/types';
  * position, activation) synchronously; content arrives at completion time.
  * These tests pin the guarantees the tab bar is built on:
  *
- *   - tabs exist immediately and keep REQUEST order under any completion order
+ *   - tabs exist immediately and keep request order under any completion order
  *   - activation is decided at request time (no focus stealing by slow docs)
  *   - a closed-while-loading document disposes its handle and leaves nothing
  *   - a failed open parks the tab in `error` (closable), not a vanished tab
@@ -16,10 +17,10 @@ import type { AnyPlugin } from '../src/types';
  */
 
 const box = { left: 0, bottom: 0, right: 600, top: 800 } as const;
-function page(pon: number, index: number): PageLayout {
+function page(pageObjectNumber: number, index: number): PageLayout {
   return {
     index,
-    pageObjectNumber: pon,
+    ref: toPageRef(pageObjectNumber),
     label: null,
     size: { width: 600, height: 800 },
     rotation: 0,
@@ -33,13 +34,13 @@ interface HandleOptions {
   pages?: PageLayout[];
 }
 
-function makeHandle(id: string, opts: HandleOptions = {}): DocumentHandle {
-  const pages = opts.pages ?? [page(1, 0)];
+function makeHandle(id: string, options: HandleOptions = {}): DocumentHandle {
+  const pages = options.pages ?? [page(1, 0)];
   return {
     id,
     events: { subscribe: () => () => {}, lastServerId: () => null },
     pages: { list: () => Promise.resolve({ pageCount: pages.length, pages }) },
-    security: opts.security,
+    security: options.security,
     close: vi.fn(() => Promise.resolve()),
   } as unknown as DocumentHandle;
 }
@@ -73,7 +74,7 @@ function controllableEngine() {
 }
 
 const bytesInput = (id: string) => ({ kind: 'bytes' as const, id, bytes: new Uint8Array() });
-const settle = () => new Promise((r) => setTimeout(r, 0));
+const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 describe('kernel: request-time tab slots', () => {
   it('reserves all tabs synchronously, in request order', () => {
@@ -86,8 +87,12 @@ describe('kernel: request-time tab slots', () => {
 
     // No engine resolution yet — but every tab already exists.
     const docs = kernel.documents.list();
-    expect(docs.map((d) => d.id)).toEqual(['a', 'b', 'c']);
-    expect(docs.map((d) => d.status)).toEqual(['loading', 'loading', 'loading']);
+    expect(docs.map((documentInfo) => documentInfo.id)).toEqual(['a', 'b', 'c']);
+    expect(docs.map((documentInfo) => documentInfo.status)).toEqual([
+      'loading',
+      'loading',
+      'loading',
+    ]);
     expect(kernel.documents.getActiveId()).toBe('a');
   });
 
@@ -106,8 +111,8 @@ describe('kernel: request-time tab slots', () => {
     await Promise.all(opens);
 
     const docs = kernel.documents.list();
-    expect(docs.map((d) => d.id)).toEqual(['a', 'b', 'c']);
-    expect(docs.map((d) => d.status)).toEqual(['ready', 'ready', 'ready']);
+    expect(docs.map((documentInfo) => documentInfo.id)).toEqual(['a', 'b', 'c']);
+    expect(docs.map((documentInfo) => documentInfo.status)).toEqual(['ready', 'ready', 'ready']);
     expect(kernel.documents.getActiveId()).toBe('a');
   });
 
@@ -180,13 +185,13 @@ describe('kernel: request-time tab slots', () => {
     await openB;
 
     const docs = kernel.documents.list();
-    expect(docs.map((d) => [d.id, d.status])).toEqual([
+    expect(docs.map((documentInfo) => [documentInfo.id, documentInfo.status])).toEqual([
       ['a', 'error'],
       ['b', 'ready'],
     ]);
 
     await kernel.documents.close('a');
-    expect(kernel.documents.list().map((d) => d.id)).toEqual(['b']);
+    expect(kernel.documents.list().map((documentInfo) => documentInfo.id)).toEqual(['b']);
   });
 
   it('a thunk source reserves its slot immediately and reconciles the id', async () => {
@@ -194,7 +199,7 @@ describe('kernel: request-time tab slots', () => {
     const kernel = createKernel({ engine, plugins: [] });
 
     let fetchNow!: () => void;
-    const fetched = new Promise<void>((r) => (fetchNow = r));
+    const fetched = new Promise<void>((resolve) => (fetchNow = resolve));
     const open = kernel.documents.open(() => fetched.then(() => bytesInput('real-id')), {
       name: 'Slow fetch',
     });
@@ -209,7 +214,9 @@ describe('kernel: request-time tab slots', () => {
     resolve('real-id');
     const id = await open;
     expect(id).toBe('real-id');
-    expect(kernel.documents.list().map((d) => [d.id, d.status])).toEqual([['real-id', 'ready']]);
+    expect(
+      kernel.documents.list().map((documentInfo) => [documentInfo.id, documentInfo.status]),
+    ).toEqual([['real-id', 'ready']]);
     expect(kernel.documents.getActiveId()).toBe('real-id');
   });
 });
@@ -231,8 +238,12 @@ describe('kernel: locked documents (password)', () => {
 
   it('a password-required open parks the tab as locked; unlock promotes it', async () => {
     const { engine, resolve } = controllableEngine();
-    const initSpy = vi.fn();
-    const docPlugin: AnyPlugin = { id: 'capture', scope: 'document', init: initSpy };
+    const created = vi.fn();
+    const docPlugin: AnyPlugin = {
+      id: 'capture',
+      scope: 'document',
+      create: () => (created(), { api: {} }),
+    };
     const kernel = createKernel({ engine, plugins: [docPlugin] });
 
     const open = kernel.documents.open(bytesInput('a'), { name: 'Protected' });
@@ -240,8 +251,10 @@ describe('kernel: locked documents (password)', () => {
     resolve('a', makeHandle('a', { security }));
     await open;
 
-    expect(kernel.documents.list().map((d) => [d.id, d.status])).toEqual([['a', 'locked']]);
-    expect(initSpy).not.toHaveBeenCalled(); // plugins never see a locked doc
+    expect(
+      kernel.documents.list().map((documentInfo) => [documentInfo.id, documentInfo.status]),
+    ).toEqual([['a', 'locked']]);
+    expect(created).not.toHaveBeenCalled(); // plugins never see a locked doc
 
     // Wrong password: rejects, stays locked, retryable.
     await expect(kernel.documents.unlock('a', { password: 'nope' })).rejects.toThrow(/incorrect/);
@@ -250,7 +263,7 @@ describe('kernel: locked documents (password)', () => {
     await kernel.documents.unlock('a', { password: 'hunter2' });
     expect(kernel.documents.get('a')!.status).toBe('ready');
     expect(kernel.documents.get('a')!.pageCount).toBe(1);
-    expect(initSpy).toHaveBeenCalledTimes(1); // the normal lifecycle, just later
+    expect(created).toHaveBeenCalledTimes(1); // the normal lifecycle, just later
   });
 
   it('flags passwordProvided when a supplied password was rejected at open', async () => {
@@ -271,7 +284,7 @@ describe('kernel: locked documents (password)', () => {
       id: 'stage',
       scope: 'document',
       token,
-      capability: () => ({}),
+      create: () => ({ api: {} }),
     };
     const kernel = createKernel({ engine, plugins: [docPlugin] });
     const open = kernel.documents.open(bytesInput('a'));

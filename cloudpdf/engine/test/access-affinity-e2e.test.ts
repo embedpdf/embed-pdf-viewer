@@ -11,7 +11,7 @@ import {
 } from './_helpers/db-seeded-app';
 
 /**
- * End-to-end against a REAL server: the doc-scoped access bootstrap
+ * End-to-end against a real server: the doc-scoped access bootstrap
  * (`POST /v1/docs/:docId/access`) through the real client flow, with the
  * opt-in affinity header observed on the wire — closing the loop the
  * plan promised (real routes, real handler, real client code path; the
@@ -56,7 +56,7 @@ describe('doc-scoped access + affinity header (real server)', () => {
 
     const accessCall = seen.find((c) => c.url.endsWith('/access'));
     expect(accessCall).toBeDefined();
-    // The NEW grammar: docId in the path, no legacy /v1/access.
+    // The new grammar: docId in the path, no legacy /v1/access.
     expect(accessCall!.url).toContain(`/v1/docs/${DOC_ID}/layers/default/access`);
     // And the affinity key rides it — the session bootstrap pins to the
     // document's pod from the very first request.

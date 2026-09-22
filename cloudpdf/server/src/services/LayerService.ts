@@ -125,7 +125,7 @@ function pageObjectNumbersOf(pages: readonly PageRef[]): PageObjectNumber[] {
  * The commit-time version CAS lost: `layers.current_version` moved between
  * this op's prepare (which aligned the worker session to the row it read)
  * and its commit transaction. Under the per-process write queue that can
- * only mean a REMOTE replica committed in the window — the signal for
+ * only mean a remote replica committed in the window — the signal for
  * {@link LayerService.runWithRebase} to reload the session from the new
  * durable head and re-apply. A distinct class and a distinct code — never
  * a bare `Aborted` — so neither the rebase path nor a client SDK can
@@ -171,7 +171,7 @@ interface FormPageImpact {
 }
 
 /**
- * Form audit kinds that change annotation list BODIES (field/widget
+ * Form audit kinds that change annotation list bodies (field/widget
  * structure) and therefore bump the bulk `annotations_version` pin.
  * Value writes, effects, import and repair only re-bake `/AP` rasters —
  * the per-page `annotationVersion` covers those; the bulk pin stays put
@@ -258,7 +258,7 @@ export class LayerService {
   private readonly signingTtlMs: number;
   private readonly layerWriteQueues = new Map<string, Promise<unknown>>();
   /**
-   * Attempt artifact keys uploaded by the CURRENT write op that no commit
+   * Attempt artifact keys uploaded by the current write op that no commit
    * has claimed yet (layerWriteKey → keys). Registered by
    * {@link nextArtifactKey}, claimed by {@link finishLayerCommit}, and
    * whatever remains is deleted by the write wrapper's cleanup — a lost
@@ -323,7 +323,7 @@ export class LayerService {
     // Seed the row from the HEAD (law 9c): its docVersion is what the
     // unwritten layer's manifest already advertises (the first write then
     // moves to head + 1, never reusing a pin), and its plane pointers are
-    // the head VERSION's, so a layer over a published version compares as
+    // the head version's, so a layer over a published version compares as
     // inherited against the right epochs.
     const base = doc.baseSha
       ? await this.layerState.baseVersionFacts(docId, doc.baseSha, doc.storageSizeBytes)
@@ -409,7 +409,7 @@ export class LayerService {
       resources?: WireResourceMap;
       /**
        * Optional actor override. For UPDATE this is typically built
-       * from the caller's JWT identity (for /UpdatedBy) PLUS any
+       * from the caller's JWT identity (for /UpdatedBy) plus any
        * `patch.groupId` reassignment. Authorization for the groupId
        * change is the route's job (`checkSetGroup`).
        */
@@ -458,12 +458,12 @@ export class LayerService {
   /**
    * Resolve the collab subject (userId / groupId) of the target
    * annotation a PATCH or DELETE is about to act on. Route guards
-   * call this BEFORE the mutation so `requireLayerCollabAction` can
+   * call this before the mutation so `requireLayerCollabAction` can
    * deny with 403 without ever issuing a write.
    *
-   * V1 implementation: page-fetch + filter. Uses the RAW
+   * V1 implementation: page-fetch + filter. Uses the raw
    * `annotations.listRawPage` worker job (docPtr dictionary walk — no
-   * FPDF_LoadPage; wire-identical DTOs, and this runs on EVERY
+   * FPDF_LoadPage; wire-identical DTOs, and this runs on every
    * PATCH/DELETE, so it is the mutation hot path) and finds the row
    * matching the ref. Returns an empty `{}` if the annotation can't be
    * located — the route guard then evaluates the collab filter against
@@ -666,7 +666,7 @@ export class LayerService {
   }
 
   /**
-   * Register/rename a `/Names /Pages` entry. Named pages are LAYOUT, so this
+   * Register/rename a `/Names /Pages` entry. Named pages are layout, so this
    * persists exactly like a page move: a new layer artifact, doc_version +
    * layout_version advance, `layer_pages` rows untouched.
    */
@@ -947,7 +947,7 @@ export class LayerService {
     input: {
       docId: string;
       layerName: string;
-      /** The standalone source PDF whose pages are copied in. NEVER put on
+      /** The standalone source PDF whose pages are copied in. Never put on
        *  a postMessage transfer list — the fence-conflict rebase re-runs
        *  this op, and a transferred (detached) buffer would corrupt the
        *  retry. Structured clone copies it, like annotation resources. */
@@ -1178,7 +1178,7 @@ export class LayerService {
   // the catalog, so mutations touch no page rows — they advance the layer
   // doc version plus the dedicated `attachments_version` pin that keys
   // the immutable /attachments@… and /attachment-files/…@… leaves.
-  // Identity is the name-tree KEY (unique by construction) — no weak
+  // Identity is the name-tree key (unique by construction) — no weak
   // refs, no revision bookkeeping.
 
   /** Create a document-level embedded file (multipart mutation envelope). */
@@ -1263,7 +1263,7 @@ export class LayerService {
   //
   // Forms are document-scoped: one AcroForm per layer document, mutations
   // keyed by field ref rather than page. The worker returns results whose
-  // `meta` is EMPTY (the session has no durable page state); the commit
+  // `meta` is empty (the session has no durable page state); the commit
   // here is what turns per-widget change reports into real per-page
   // version bumps, using the same `mutationBumps` vocabulary as the
   // annotation plane — a widget appearance change invalidates the same
@@ -1762,13 +1762,13 @@ export class LayerService {
         this.finalizeDocumentMutationResult(docId, layerName, input.result, durable),
     });
     this.finishLayerCommit(ctx, docId, layerName, nextVersion, artifactKey, committed.auditId);
-    // The response IS the audited payload — one fact for caller and history.
+    // The response is the audited payload — one fact for caller and history.
     return committed.payload as TResult;
   }
 
   /**
    * Turn the worker's session-relative result (whose `meta` is empty by
-   * construction) into the FINALIZED wire result: decorated per-page states
+   * construction) into the finalized wire result: decorated per-page states
    * and the real cacheDelta from the committed version bumps.
    */
   private finalizeDocumentMutationResult<TResult extends { meta: MutationMeta }>(
@@ -1861,7 +1861,7 @@ export class LayerService {
           previousLayerDocVersion,
           layerDocVersion,
         };
-        // Finalize BEFORE the audit append so the row stores exactly what
+        // Finalize before the audit append so the row stores exactly what
         // the caller will receive.
         const payload = input.finalizePayload(durable);
 
@@ -1935,7 +1935,7 @@ export class LayerService {
         `a signing is pending (${pending.id}); complete or abort it before mutating the layer`,
       );
     }
-    // THE FENCE ALIGNMENT: the worker session must embody exactly the layer
+    // The fence alignment: the worker session must embody exactly the layer
     // row we just read before it may apply this mutation. A session left
     // behind by an earlier open is a stale materialization whenever another
     // replica advanced the layer — applying onto it and saving would emit
@@ -1995,12 +1995,12 @@ export class LayerService {
         this.finalizeAnnotationResult(docId, layerName, input.result, durable),
     });
     this.finishLayerCommit(ctx, docId, layerName, nextVersion, artifactKey, committed.auditId);
-    // The response IS the audited payload — one fact for caller and history.
+    // The response is the audited payload — one fact for caller and history.
     return committed.payload as TResult;
   }
 
   /**
-   * Turn the worker's session-relative result into the FINALIZED wire result:
+   * Turn the worker's session-relative result into the finalized wire result:
    * cloud-stable revision tokens (the bridge's deterministic
    * `cloud:layer:{doc}:{layer}` scope + the durable generation) and the real
    * cacheDelta from the committed version bumps. Pure and synchronous — it
@@ -2072,7 +2072,7 @@ export class LayerService {
   }
 
   /**
-   * Rotate shares the move commit EXACTLY (the corrected model: rotation is
+   * Rotate shares the move commit exactly (the corrected model: rotation is
    * presentation metadata — `doc_version` + `layout_version` bump, no
    * `layer_pages` touch, every per-page cache stays warm). Only the audit
    * kind and the affected-page set differ.
@@ -2316,7 +2316,7 @@ export class LayerService {
 
     const page = await this.requireLayerPage(layer.id, ref.page.pageObjectNumber);
     const durablePageState = this.layerState.decorateLayerPageState(docId, layerName, page);
-    // Refs minted by SHARED base reads carry the base revision scope;
+    // Refs minted by shared base reads carry the base revision scope;
     // the generation check still gates staleness (see the bridge's doc).
     this.requireRevisionBridge().validateClientIndexRef(durablePageState, ref, {
       aliasDocSessionIds: [this.layerState.baseRevisionScopeId(docId)],
@@ -2336,7 +2336,7 @@ export class LayerService {
     pageObjectNumber: PageObjectNumber,
     signal?: AbortSignal,
   ): Promise<PageState> {
-    // RAW read: only `pageState` is consumed here — the cheapest possible
+    // Raw read: only `pageState` is consumed here — the cheapest possible
     // way to learn the worker's revision state for this page.
     const build = (jobId: WorkerJobId) =>
       wirePack({
@@ -2412,9 +2412,9 @@ export class LayerService {
     nextVersion: number;
     hasWeakAnnotations: boolean;
     /**
-     * Builds the FINALIZED result (cloud-stable revision tokens, real
+     * Builds the finalized result (cloud-stable revision tokens, real
      * cacheDelta) from the in-transaction durable state. Its return is what
-     * the audit row stores AND what the caller receives — the invariant is
+     * the audit row stores and what the caller receives — the invariant is
      * that the audited payload is byte-identical to the response: what we
      * tell the caller is what we tell history (and, later, every remote
      * event subscriber).
@@ -2425,7 +2425,7 @@ export class LayerService {
       .transaction()
       .execute(async (trx) => {
         const now = Date.now();
-        // Plain read — values feed the next-version computation. The FENCE
+        // Plain read — values feed the next-version computation. The fence
         // is not here: it is the guarded UPDATE below, the only check that
         // is atomic with the write (a SELECT takes no lock; two overlapping
         // transactions can both pass a read-then-check).
@@ -2479,7 +2479,7 @@ export class LayerService {
           layerDocVersion,
           annotationsVersion,
         };
-        // Finalize BEFORE the audit append so the row stores exactly what the
+        // Finalize before the audit append so the row stores exactly what the
         // caller will receive (cloud-stable tokens + real cacheDelta), never
         // the worker's session-relative draft.
         const payload = input.finalizePayload(durable);
@@ -2530,7 +2530,7 @@ export class LayerService {
   }
 
   /**
-   * Shared commit for the page-structure ops that keep the page SET intact
+   * Shared commit for the page-structure ops that keep the page set intact
    * (move + rotate). Both have the same shape: the layer's `doc_version` and
    * `layout_version` advance, `layer_pages` rows are left entirely untouched
    * (display order and rotation live in the artifact, read back via /layout),
@@ -2559,7 +2559,7 @@ export class LayerService {
         const now = Date.now();
         const currentLayer = await this.readLayerForCommit(trx, input.layer);
 
-        // The worker's layout IS the new order; validate its page set against
+        // The worker's layout is the new order; validate its page set against
         // the durable rows before trusting it.
         const pageOrder = input.layout.pages.map((page) => page.ref.pageObjectNumber);
         const rows = await trx
@@ -2590,7 +2590,7 @@ export class LayerService {
           layoutVersion: Number(currentLayer.layout_version) + 1,
         };
 
-        // The finalized result — audited and returned IDENTICALLY: what we
+        // The finalized result — audited and returned identically: what we
         // tell the caller is what we tell history (and remote subscribers).
         const result = { layout: input.layout, cache: versions };
 
@@ -2624,7 +2624,7 @@ export class LayerService {
   }
 
   /**
-   * Delete commit: the only page-structure op that mutates the page SET. On
+   * Delete commit: the only page-structure op that mutates the page set. On
    * top of the shared version bumps it removes the deleted pages'
    * `layer_pages` rows and any weak-annotation-session claims on them
    * (sessions themselves survive — they may hold other pages). Surviving
@@ -2689,7 +2689,7 @@ export class LayerService {
           .where('page_object_number', 'in', input.deletedPages)
           .execute();
 
-        // Weak-annotation sessions of THIS layer lose their claims on the
+        // Weak-annotation sessions of this layer lose their claims on the
         // deleted pages (the guard ran pre-worker; this is the cleanup).
         const sessions = await trx
           .selectFrom('weak_annotation_sessions')
@@ -2717,7 +2717,7 @@ export class LayerService {
           layoutVersion: Number(currentLayer.layout_version) + 1,
         };
 
-        // The finalized result — audited and returned IDENTICALLY: what we
+        // The finalized result — audited and returned identically: what we
         // tell the caller is what we tell history (and remote subscribers).
         const result = { layout: input.layout, cache: versions };
 
@@ -2744,7 +2744,7 @@ export class LayerService {
           {
             doc_version: versions.docVersion,
             layout_version: versions.layoutVersion,
-            // The page SET shrank — the bulk annotation corpus changed.
+            // The page set shrank — the bulk annotation corpus changed.
             // Clients re-pin via the 404-refresh rail (PageStructureCache
             // carries no annotationsVersion).
             annotations_version: Number(currentLayer.annotations_version ?? 1) + 1,
@@ -2758,9 +2758,9 @@ export class LayerService {
   }
 
   /**
-   * Insert commit: the other page-structure op that mutates the page SET —
+   * Insert commit: the other page-structure op that mutates the page set —
    * the mirror of {@link commitPageDelete}. On top of the shared version
-   * bumps it ADDS `layer_pages` rows for the fresh PONs at the initial
+   * bumps it adds `layer_pages` rows for the fresh page object numbers at the initial
    * epoch (`content_version` 1, `annotation_version` 1, generation 0, no
    * weak annotations — exactly what the base snapshot would have written
    * had the pages always existed). Pre-existing rows are untouched, so
@@ -2848,7 +2848,7 @@ export class LayerService {
           layoutVersion: Number(currentLayer.layout_version) + 1,
         };
 
-        // The finalized result — audited and returned IDENTICALLY: what we
+        // The finalized result — audited and returned identically: what we
         // tell the caller is what we tell history (and remote subscribers).
         const result: PageInsertResult = {
           insertedPages: input.insertedPages.map(toPageRef),
@@ -2879,7 +2879,7 @@ export class LayerService {
           {
             doc_version: versions.docVersion,
             layout_version: versions.layoutVersion,
-            // The page SET grew — the bulk annotation corpus changed.
+            // The page set grew — the bulk annotation corpus changed.
             // Clients re-pin via the 404-refresh rail (PageStructureCache
             // carries no annotationsVersion).
             annotations_version: Number(currentLayer.annotations_version ?? 1) + 1,
@@ -3162,7 +3162,7 @@ export class LayerService {
     layout_version: number | bigint;
     annotations_version: number | bigint;
   }> {
-    // Plain read — values feed the next-version computation. The FENCE is
+    // Plain read — values feed the next-version computation. The fence is
     // the guarded UPDATE (see guardedVersionBump), never a SELECT check.
     const currentLayer = await trx
       .selectFrom('layers')
@@ -3176,16 +3176,16 @@ export class LayerService {
   }
 
   /**
-   * THE commit-time fence: advance the layer row if and only if
+   * The commit-time fence: advance the layer row if and only if
    * `current_version` is still exactly what this operation prepared
    * against — one conditional UPDATE, atomic on every engine.
    *
    * Why this is the only sound shape: a SELECT-then-check takes no lock,
-   * so on Postgres (READ COMMITTED) two overlapping transactions can both
+   * so on Postgres (read committed) two overlapping transactions can both
    * pass the check at version N; the second UPDATE then blocks on the
    * first's row lock and — with only `id` in the predicate — re-evaluates
-   * against the NEW row and applies anyway, silently overwriting the
-   * winner's artifact pointer. Putting the expected version IN the UPDATE
+   * against the new row and applies anyway, silently overwriting the
+   * winner's artifact pointer. Putting the expected version in the UPDATE
    * predicate makes that re-evaluation itself the fence: the loser matches
    * zero rows and surfaces a {@link LayerFenceConflict} (→ rebase).
    *
@@ -3200,8 +3200,8 @@ export class LayerService {
 
   /**
    * Prepare: the worker authors and seals a candidate on disk; only the
-   * bytes past the immutable base (the TAIL) leave this machine, so any
-   * replica can complete. Prepare IS a layer write — its fenced version
+   * bytes past the immutable base (the tail) leave this machine, so any
+   * replica can complete. Prepare is a layer write — its fenced version
    * bump is what makes "a pending signing blocks writes" a guarantee
    * across replicas — but the artifact is untouched: the manifest's
    * `layerVersion` and `working` change, so `docVersion` advances (law 9b).
@@ -3333,7 +3333,7 @@ export class LayerService {
   }
 
   /**
-   * Complete: rebuild the candidate from its durable parts on THIS
+   * Complete: rebuild the candidate from its durable parts on this
    * replica, install the CMS session-less, and publish the sealed bytes as
    * the document's next base version under two fences (the head and the
    * layer version the candidate was prepared on). Idempotent by signing
@@ -3414,7 +3414,7 @@ export class LayerService {
           'signing-complete',
           'candidate.pdf',
           async (candidatePath) => {
-            // 1. The candidate again, as a PRIVATE file for this attempt: the
+            // 1. The candidate again, as a private file for this attempt: the
             //    verified base plus the verified tail.
             await this.materializeCandidate(baseFile, signing, candidatePath);
 
@@ -3447,7 +3447,7 @@ export class LayerService {
             const finalized = finalizedPayload;
 
             // 3. The new immutable version, uploaded before the fences: the key
-            //    IS the content, so a losing attempt leaves only a harmless object.
+            //    is the content, so a losing attempt leaves only a harmless object.
             const versionKey = StorageKeys.baseVersionPdf(
               ctx.tenantId,
               input.docId,
@@ -3626,7 +3626,7 @@ export class LayerService {
   }
 
   /**
-   * The published version's object. The key IS the content, so two
+   * The published version's object. The key is the content, so two
    * completions of one signing racing on two replicas write identical
    * bytes to one key: whichever put lands first is the object, the other
    * finds it there (a store whose atomic write uses one staging path per
@@ -3793,7 +3793,7 @@ export class LayerService {
         //     the layer's plane pointers (law 9). A document committed
         //     before the catalog existed has no row for its upload: this
         //     first publish materializes version 1 for it (the fence above
-        //     proved the sha IS the head).
+        //     proved the sha is the head).
         let parent = await this.layerState.repos.baseVersions.find(
           input.docId,
           signing.expectedBaseSha,
@@ -3952,7 +3952,7 @@ export class LayerService {
   }
 
   /** Advance the layer row: version pointers, artifact epoch, and the
-   *  realtime cursor (`last_audit_id` — written in the SAME transaction as
+   *  realtime cursor (`last_audit_id` — written in the same transaction as
    *  the audit append, so the manifest's `auditHead` is gapless). */
   private async writeLayerAdvance(
     trx: Transaction<Schema>,
@@ -3984,7 +3984,7 @@ export class LayerService {
     });
   }
 
-  /** Ring the cross-replica doorbell — strictly AFTER the commit resolved,
+  /** Ring the cross-replica doorbell — strictly after the commit resolved,
    *  fire-and-forget (the doorbell must never fail or delay a response). */
   private publishMutation(ctx: LayerWriteContext, docId: string, auditId: number): void {
     if (!this.realtime || auditId <= 0) return;
@@ -3996,7 +3996,7 @@ export class LayerService {
   /**
    * Post-commit bookkeeping shared by every layer write: advance the
    * worker session's fence entry to the version the commit just won (the
-   * worker applied the mutation, so its in-memory state IS `nextVersion`),
+   * worker applied the mutation, so its in-memory state is `nextVersion`),
    * then ring the realtime doorbell. Ordering matters — advance first, so
    * a subscriber reacting to the doorbell can never observe a session
    * whose fence entry is behind its own state.
@@ -4017,8 +4017,8 @@ export class LayerService {
   }
 
   /**
-   * Per-ATTEMPT upload key for the artifact a mutation is about to save.
-   * Never a bare version key: uploads happen BEFORE the commit CAS, and
+   * Per-attempt upload key for the artifact a mutation is about to save.
+   * Never a bare version key: uploads happen before the commit CAS, and
    * two replicas racing the same `nextVersion` must not share an upload
    * target — the loser would overwrite the winner's committed bytes and
    * the layer would fail its sha check on the next open. Readers follow
@@ -4082,7 +4082,7 @@ export class LayerService {
         // content/annotation versions stay put (their caches stay warm).
         const metadataVersion = Number(currentLayer.metadata_version) + 1;
 
-        // The finalized result — audited and returned IDENTICALLY: what we
+        // The finalized result — audited and returned identically: what we
         // tell the caller is what we tell history (and remote subscribers).
         const result: MetadataUpdateResult = {
           metadata: input.metadata,
@@ -4160,7 +4160,7 @@ export class LayerService {
         const docVersion = previousDocVersion + 1;
         const attachmentsVersion = Number(currentLayer.attachments_version) + 1;
 
-        // The finalized result — audited and returned IDENTICALLY: what we
+        // The finalized result — audited and returned identically: what we
         // tell the caller is what we tell history (and remote subscribers).
         const result = {
           ...input.result,
@@ -4230,7 +4230,7 @@ export class LayerService {
 
   /**
    * Rebase-and-retry around one queued layer write. A {@link
-   * LayerFenceConflict} means a REMOTE replica committed between this op's
+   * LayerFenceConflict} means a remote replica committed between this op's
    * prepare and commit — the local worker session now holds dirty state
    * derived from a superseded version, and the op's own artifact lost the
    * CAS. Recovery is mechanical because wire ops are semantic: drop the
@@ -4241,7 +4241,7 @@ export class LayerService {
    *
    * Two guarantees beyond the retry itself:
    *
-   * - **No ghost writes.** ANY escaping failure invalidates the session:
+   * - **No ghost writes.** any escaping failure invalidates the session:
    *   the worker may have applied a mutation whose commit never landed,
    *   and a later successful write would otherwise serialize that ghost
    *   into its artifact. Invalidation is cheap (one reload on next touch)
@@ -4264,8 +4264,8 @@ export class LayerService {
       } catch (err) {
         // Two retryable-once shapes, same mechanical recovery (invalidate
         // → re-prepare reloads durable truth → re-apply):
-        //  - LayerFenceConflict: a REMOTE replica committed in our window.
-        //  - DocNotOpen at APPLY: the op parked across an engine respawn
+        //  - LayerFenceConflict: a remote replica committed in our window.
+        //  - DocNotOpen at apply: the op parked across an engine respawn
         //    (crash or recycle) and dispatched into a successor without
         //    the session. Nothing applied — no ghost — so the rerun is
         //    exactly the fence-conflict recovery. (The read-path twin is
@@ -4495,7 +4495,7 @@ function requireKnownWeakAnnotationBoolean(page: PageState): boolean {
  *
  * Returns `undefined` when:
  *   - no JWT identity is attached to the context (tenant tokens, dev
- *     fixtures without identity claims), OR
+ *     fixtures without identity claims), or
  *   - the identity has neither `user_id` nor `group_id` nor
  *     `display_name` (nothing meaningful to stamp)
  *

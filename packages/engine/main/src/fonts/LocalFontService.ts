@@ -64,7 +64,7 @@ export class LocalFontService implements FontService {
     const italic = spec.italic === undefined ? -1 : spec.italic ? 1 : 0;
 
     return AbortablePromise.run<FontHandle>(async (signal) => {
-      // Copy for replay BEFORE the transfer neuters `bytes`.
+      // Copy for replay before the transfer neuters `bytes`.
       const replayCopy = bytes.slice(0);
       const submission = this.queue.enqueue<
         Extract<WorkerResultPayload, { tag: 'fonts.register' }>

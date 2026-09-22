@@ -239,7 +239,7 @@ describe('share sessions (SDK)', () => {
       origins: ['https://acme.com'],
     });
 
-    // The Origin-attaching fetch is configured on the ENGINE, not the
+    // The Origin-attaching fetch is configured on the engine, not the
     // open call — proving the share arm forwards the engine's transport
     // (fetchImpl + baseUrl) into the exchange. No engine-level token:
     // the anonymous-engine embed scenario.

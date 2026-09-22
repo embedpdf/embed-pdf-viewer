@@ -69,7 +69,7 @@ type RunClass = { upright: true } | { upright: false; rotation: number; ascentFl
  *
  * Emits geometry in PDF user space (y-up edges) — the canonical engine
  * geometry. The viewer converts to content/view space via the page geometry
- * matrix; this reader applies NO Y-flip or device transform.
+ * matrix; this reader applies no Y-flip or device transform.
  *
  * One `EPDFText_GetCharGeometry` call per glyph supplies boxes, oriented
  * cells, and flags together; `buildRunsFromRawGlyphs` then groups glyphs
@@ -184,9 +184,9 @@ export class PageGeometryReader {
  *
  * Runs split on text-object change (the legacy rule) and on orientation
  * change between classifiable glyphs (θ drift / mixed orientation). A run's
- * variant is decided by its FIRST classifiable glyph:
+ * variant is decided by its first classifiable glyph:
  *   - empty glyphs never classify (they adopt the run's variant);
- *   - real glyphs WITHOUT an oriented cell (singular matrix, synthesized
+ *   - real glyphs without an oriented cell (singular matrix, synthesized
  *     /ActualText pieces) classify as upright — box-only data degrades to
  *     exactly the legacy behavior;
  *   - real glyphs with a non-upright matrix classify as rotated.
@@ -272,7 +272,7 @@ function materializeRun(
   }
 
   // Upright (and degenerate-only) runs: the legacy materialization verbatim —
-  // native-offered quads are dropped, the rect seeds from the FIRST glyph's
+  // native-offered quads are dropped, the rect seeds from the first glyph's
   // box (zeroed for empty glyphs, quirk included) and expands over non-empty
   // glyphs only.
   const glyphs: PageGeometryGlyph[] = buffer.map((g) => ({

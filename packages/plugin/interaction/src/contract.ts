@@ -18,22 +18,22 @@ export interface Modifiers {
  * The single active arbiter of what the pointer does. `pan` and `pointer` are
  * built in; features add more (`highlight`, `square`, `redact`…) via
  * `registerTool`. A tool carries no behaviour itself — it turns on capability
- * TAGS that handlers opt into (`enables`), so tools compose features without
+ * tags that handlers opt into (`enables`), so tools compose features without
  * coupling to them.
  */
 export interface Tool {
   id: ToolId;
   cursor: Cursor;
   /**
-   * Cursor over the viewport's page GAPS. Most tools act only on pages, so
+   * Cursor over the viewport's page gaps. Most tools act only on pages, so
    * gaps fall back to the neutral arrow (`'default'`); a tool that works
    * anywhere (pan) declares its own (`'grab'`). Hover claims outrank both.
    */
   gapCursor?: Cursor;
   enables: ReadonlySet<string>;
   /**
-   * TOUCH CONSENT, rung 1 — "arming this tool is consent to create with a
-   * finger": while it is active, single-finger touch routes to the hub
+   * Touch consent, first rung — "arming this tool is consent to create with
+   * a finger": while it is active, single-finger touch routes to the hub
    * wholesale and navigation moves to two fingers. Default false.
    */
   touchDirect?: boolean;
@@ -66,18 +66,18 @@ export interface PointerSample {
   clickCount?: number;
   /** Absent when the source can't say — treat as 'mouse'. */
   pointerType?: PointerKind;
-  /** Present when the sample was SYNTHESIZED from a recognized gesture. */
+  /** Present when the sample was synthesized from a recognized gesture. */
   gesture?: 'long-press';
-  /** The LENS this sample came from (the stage plugin id); absent = route everywhere. */
+  /** The lens this sample came from (the stage plugin id); absent = route everywhere. */
   source?: string;
-  /** Project this event onto a SPECIFIC page's frame, unclamped; null when the source cannot. */
+  /** Project this event onto a specific page's frame, unclamped; null when the source cannot. */
   project?(page: PageRef): Point | null;
 }
 
 /**
  * A pointer handler contributed by a feature plugin: it declares which tools
  * it is live under and a priority; the hub routes each gesture to the first
- * handler that captures it. Registered through the HOST contract.
+ * handler that captures it. Registered through the host contract.
  */
 export interface InteractionHandler {
   id: string;
@@ -85,19 +85,19 @@ export interface InteractionHandler {
   priority: number;
   /** Usually `tool.enables.has('my-tag')`. */
   enabledFor(tool: Tool): boolean;
-  /** Return true to CAPTURE: subsequent move/up route here until pointer-up. */
+  /** Return true to capture: subsequent move/up route here until pointer-up. */
   onDown(sample: PointerSample): boolean;
   onMove?(sample: PointerSample): void;
   onUp?(sample: PointerSample): void;
-  /** The gesture was ABORTED, not completed. Falls back to `onUp` when absent. */
+  /** The gesture was aborted, not completed. Falls back to `onUp` when absent. */
   onCancel?(sample: PointerSample): void;
   /** Pointer moved with no active gesture — cursor feedback only. */
   onHover?(sample: PointerSample): void;
-  /** TOUCH CONSENT, rung 2: a pure read asked before a touch contact is classified. */
+  /** Touch consent, second rung: a pure read asked before a touch contact is classified. */
   claimsTouch?(sample: PointerSample): boolean;
 }
 
-/** A tool's runtime cursor skin: "while THIS tool is armed, keyword X looks like Y." */
+/** A tool's runtime cursor skin: "while this tool is armed, keyword X looks like Y." */
 export type ToolCursorSkin = Record<Cursor, Cursor>;
 
 export interface InteractionConfig {
@@ -135,7 +135,7 @@ export interface GestureEvent {
 /**
  * The tool hub: one active tool per document, a tool registry, and the
  * events that report tool and gesture changes. Pointer routing, cursor
- * claims and handler registration live on the HOST contract
+ * claims and handler registration live on the host contract
  * (`@embedpdf/plugin-interaction/contract/host`).
  */
 export interface InteractionCapability {
@@ -144,12 +144,13 @@ export interface InteractionCapability {
   getActiveToolId(): ToolId;
   /** The tool configured for a freshly opened document. */
   getDefaultToolId(): ToolId;
+  /** Registered tools in registration order. Reference-stable until a tool is registered or removed. */
   listTools(): readonly Tool[];
   getTool(id: ToolId): Tool | null;
   hasTool(id: ToolId): boolean;
   /** Does the active tool enable a behaviour tag such as `'text-select'`. */
   activeToolEnables(behavior: string): boolean;
-  /** Arm a tool. Throws `not-found` for an unknown id. */
+  /** Arm a tool and fire `onToolChanged`. Throws `not-found` for an unknown id. */
   activateTool(id: ToolId, options?: ActivateToolOptions): void;
   activateDefaultTool(): void;
   /** Temporarily arm a tool (hold space to pan); `popTool` restores the previous one. */
@@ -157,22 +158,33 @@ export interface InteractionCapability {
   popTool(): void;
   /** Reskin a tool's cursor keywords at runtime; `null` removes the skin. */
   setToolCursor(id: ToolId, skin: ToolCursorSkin | null): void;
-  /** Add a tool. A duplicate id is rejected unless `{ replace: true }`; the remover only removes this registration. */
+  /**
+   * Add a tool and wake readers. A duplicate id throws `conflict` unless
+   * `{ replace: true }`; the remover only removes this registration.
+   */
   registerTool(tool: Tool, options?: RegisterToolOptions): Unsubscribe;
 
+  /**
+   * A tool was armed (`activateTool`, `activateDefaultTool`, `pushTool`,
+   * `popTool`). Fires on every activation, including re-arming the armed
+   * tool, because the payload may be new.
+   */
   readonly onToolChanged: EventHook<ToolChangedEvent>;
+  /** A handler captured a pointer-down. */
   readonly onGestureStarted: EventHook<GestureEvent>;
+  /** The captured gesture completed on pointer-up. */
   readonly onGestureEnded: EventHook<GestureEvent>;
+  /** The captured gesture was aborted. */
   readonly onGestureCancelled: EventHook<GestureEvent>;
 }
 
 export { InteractionToken } from './token';
 
 /**
- * Resolve a sample against a gesture's HOME page: prefer the source's
+ * Resolve a sample against a gesture's home page: prefer the source's
  * unclamped projection, fall back to the page hit only when it is the same
  * page. Null → this sample can't speak for the home page.
  */
-export const samplePointOn = (s: PointerSample, page: PageRef): Point | null =>
-  s.project?.(page) ??
-  (s.page?.ref.pageObjectNumber === page.pageObjectNumber ? s.page.point : null);
+export const samplePointOn = (sample: PointerSample, page: PageRef): Point | null =>
+  sample.project?.(page) ??
+  (sample.page?.ref.pageObjectNumber === page.pageObjectNumber ? sample.page.point : null);

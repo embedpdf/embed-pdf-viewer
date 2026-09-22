@@ -34,7 +34,7 @@ export class SharpImageEncoder {
 
   /**
    * Encode to a materialized buffer — the derived-artifact store persists
-   * bytes, not streams (the same bytes are sent AND stored).
+   * bytes, not streams (the same bytes are sent and stored).
    */
   async encodeToBuffer(
     raster: PageRaster,

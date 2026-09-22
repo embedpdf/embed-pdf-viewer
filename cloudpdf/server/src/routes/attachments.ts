@@ -37,7 +37,7 @@ export interface AttachmentRouteDeps {
  * Document-level attachments (the catalog's `/EmbeddedFiles` name tree)
  * plus the decoded bytes of both attachment homes.
  *
- * Two permission tiers under DISTINCT path prefixes (the
+ * Two permission tiers under distinct path prefixes (the
  * search-rects/search-full rule, encoded in `DOC_RESOURCES`):
  *
  *   /attachments@{v}                       — metadata listing (doc.open)
@@ -62,7 +62,7 @@ export async function registerAttachmentRoutes(
 ): Promise<void> {
   const { documentService, layerService } = deps;
 
-  // ── Plane-scoped doc-level reads: served from the BASE worker session —
+  // ── Plane-scoped doc-level reads: served from the base worker session —
   //    no layer session is created for plane-inheriting visitors. The plane
   //    guard + auth chain live in `requireSharedDocRead` (one door). ──────
 
@@ -128,7 +128,7 @@ export async function registerAttachmentRoutes(
         annotKey: string;
         token: string;
       };
-      // A FileAttachment annotation's bytes depend on BOTH planes: the
+      // A FileAttachment annotation's bytes depend on both planes: the
       // annotation must exist in this view (`annotations`) and the byte pin
       // is `attachmentsVersion` (`attachments`). The edge grant only gates
       // the `attachments` plane (see RESOURCE_PLANES) — this origin check
@@ -267,7 +267,7 @@ export async function registerAttachmentRoutes(
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
     const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
     const ctx = requireLayerCapability(req, docId, layerName, 'doc.attachments.modify', pdfBits);
-    // Attachments accept ANY binary format — that is the point of the
+    // Attachments accept any binary format — that is the point of the
     // kind — so every resource part rides the 'any' policy.
     const { body, resources } = await readMutationEnvelope(req, () => 'any');
     const file = parseOrInvalidArg(WireAttachmentFileSchema, body, 'request body');

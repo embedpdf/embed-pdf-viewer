@@ -6,11 +6,11 @@ import type { DocumentSession } from '../../../document-session/DocumentSession'
 import { PageTextReader } from '../../text/PageTextReader';
 
 export interface PageCorpus {
-  /** Default-fold (`{}`) corpus; `folded.original` IS `snapshot.text`. */
+  /** Default-fold (`{}`) corpus; `folded.original` is `snapshot.text`. */
   folded: FoldedText;
   /**
    * The page text snapshot the corpus was folded from — carried so match
-   * ranges (text space) can be converted to CHARACTER space via the
+   * ranges (text space) can be converted to character space via the
    * engine-core charmap helpers without re-reading the page.
    */
   snapshot: PageTextSnapshot;
@@ -23,12 +23,12 @@ interface PageCorpusEntry extends PageCorpus {
 
 /**
  * Per-session, per-page search corpus: the page's text snapshot plus its
- * DEFAULT fold (the one literal queries with default options search).
+ * default fold (the one literal queries with default options search).
  * This is the local engine's in-memory equivalent of the server's corpus
  * artifacts — same fold version, same shape, built lazily on first search
  * and reused across slices and re-queries.
  *
- * Version-keyed on `DocumentSession.mutationSeq()` per PAGE (not per
+ * Version-keyed on `DocumentSession.mutationSeq()` per page (not per
  * session): a form fill or annotation edit bumps the sequence, and only
  * the pages actually re-read after that pay the re-extraction — untouched
  * cache entries for other pages are refreshed lazily as they're revisited.

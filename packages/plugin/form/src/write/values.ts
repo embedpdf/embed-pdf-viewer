@@ -1,42 +1,36 @@
-/** Value writes: the validated path (scripts when enabled), the raw
- *  passthrough, and the batch doors — every one through the serial queue. */
-import { PluginError, toPluginError, toPluginErrorInfo, type BatchResult } from '@embedpdf/core';
+/**
+ * Value writes: the validated path (through the document's scripts when they
+ * are enabled), the raw passthrough, and the batch verbs, all on the one
+ * write queue. The fields mirror applies each confirmed write; these verbs
+ * only mark the field as in flight while the engine works.
+ */
+import { toPluginError, toPluginErrorInfo, type BatchResult } from '@embedpdf/core';
 import type { FormFieldRef, FormFieldValue } from '@embedpdf/engine-core/runtime';
 
 import type { FormCapability, FormCommitResult, SetValueResult } from '../contract';
+import { beginWrite, endWrite } from '../model';
 import type { FormContext, FormServices } from '../services';
-import type { FormHydration } from '../sync/hydration';
 
 export function createValueWrites(
   ctx: FormContext,
-  services: Pick<FormServices, 'store' | 'events' | 'authority' | 'scripting' | 'enqueue'>,
-  hydration: FormHydration,
+  services: Pick<FormServices, 'events' | 'authority' | 'scripting' | 'enqueue' | 'keyOf'>,
 ) {
-  const { keyOf, apply } = services.store;
   const { validationRejected } = services.events;
   const { assertFill } = services.authority;
+  const { enqueue, keyOf } = services;
   const scripting = services.scripting.controller;
   const surfaceViaActions = services.scripting.surface;
-  const enqueueMutation = services.enqueue;
-  const { refresh } = hydration;
 
-  // ── typed writes: writeStart → engine → writeDone/writeFailed ──────────
   const commitValue = async (
     ref: FormFieldRef,
     value: FormFieldValue,
   ): Promise<FormCommitResult> => {
-    const doc = ctx.doc;
-    if (!doc) throw new Error('no document');
     if (scripting) {
       const result = await scripting.commit(ref, value);
       surfaceViaActions(result, 'user');
-      // A native partial/failed effects result can still have mutated state.
-      if (result.effectsResult !== null) await refresh();
       return result;
     }
-
-    const result = await doc.forms.setValue(ref, value);
-    await refresh();
+    const result = await ctx.doc.forms.setValue(ref, value);
     return {
       status: result.changedWidgets.length > 0 ? 'applied' : 'unchanged',
       scripted: false,
@@ -45,38 +39,33 @@ export function createValueWrites(
       diagnostics: [],
     };
   };
+
   const write = async (ref: FormFieldRef, value: FormFieldValue): Promise<SetValueResult> => {
     assertFill('form.setValue');
     const key = keyOf(ref);
-    return enqueueMutation(async () => {
-      const doc = ctx.doc;
-      if (!doc) throw new PluginError('not-ready', 'form', 'no document');
-      apply({ t: 'writeStart', key });
+    return enqueue(async () => {
+      ctx.state.update(beginWrite, key);
       try {
         const result = await commitValue(ref, value);
-        if (result.status === 'rejected' || result.status === 'failed') {
-          apply({ t: 'writeFailed', key });
-        } else if (result.effectsResult === null && result.scripted) {
-          // A scripted no-op has no engine read-back to clear the spinner.
-          apply({ t: 'writeFailed', key });
-        }
         if (result.status === 'rejected') {
           validationRejected.emit({ ref, issues: result.diagnostics });
         }
         return result;
-      } catch (err) {
-        apply({ t: 'writeFailed', key });
-        throw toPluginError('form', err);
+      } catch (error) {
+        throw toPluginError('form', error);
+      } finally {
+        ctx.state.update(endWrite, key);
       }
     });
   };
-  const writeBatch = async <R>(
-    entries: readonly R[],
-    run: (entry: R) => Promise<SetValueResult>,
-    refOf: (entry: R) => FormFieldRef,
-  ): Promise<BatchResult<FormFieldRef, R>> => {
+
+  const writeBatch = async <Entry>(
+    entries: readonly Entry[],
+    run: (entry: Entry) => Promise<SetValueResult>,
+    refOf: (entry: Entry) => FormFieldRef,
+  ): Promise<BatchResult<FormFieldRef, Entry>> => {
     const applied: FormFieldRef[] = [];
-    const failed: { ref: R; error: ReturnType<typeof toPluginErrorInfo> }[] = [];
+    const failed: { ref: Entry; error: ReturnType<typeof toPluginErrorInfo> }[] = [];
     for (const entry of entries) {
       try {
         const result = await run(entry);
@@ -89,7 +78,9 @@ export function createValueWrites(
               capability: 'form',
             },
           });
-        } else applied.push(refOf(entry));
+        } else {
+          applied.push(refOf(entry));
+        }
       } catch (error) {
         failed.push({ ref: entry, error: toPluginErrorInfo(toPluginError('form', error)) });
       }
@@ -98,32 +89,23 @@ export function createValueWrites(
   };
 
   return {
-    write,
     api: {
       setValue: write,
       setText: (ref, text) => write(ref, { type: 'text', value: text }),
       setChecked: (ref, onState) => write(ref, { type: 'toggle', state: onState }),
       setChoice: (ref, values) => write(ref, { type: 'choice', values: [...values] }),
-      setValueRaw: (ref, value) =>
-        enqueueMutation(async () => {
-          const doc = ctx.doc;
-          if (!doc) throw new PluginError('not-ready', 'form', 'no document');
-          const result = await doc.forms.setValue(ref, value);
-          await refresh();
-          return result;
-        }),
+      setValueRaw: (ref, value) => enqueue(() => ctx.doc.forms.setValue(ref, value)),
       setValues: async (entries) => {
         const result = await writeBatch(
           entries,
           (entry) => write(entry.ref, entry.value),
           (entry) => entry.ref,
         );
-        const out: BatchResult<FormFieldRef, FormFieldRef> = {
+        return {
           applied: result.applied,
           skipped: [],
-          failed: result.failed.map((f) => ({ ref: f.ref.ref, error: f.error })),
+          failed: result.failed.map((failure) => ({ ref: failure.ref.ref, error: failure.error })),
         };
-        return out;
       },
       importValues: (values) =>
         writeBatch(

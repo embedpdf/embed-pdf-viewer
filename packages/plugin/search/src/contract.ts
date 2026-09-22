@@ -122,8 +122,8 @@ export interface SearchActiveHitChangedEvent {
 export type SearchClearedEvent = Record<string, never>;
 
 /**
- * The search plugin is a find SERVICE (`findAll`) plus one user-visible
- * search SESSION per document (`search` and everything below it). The
+ * The search plugin is a find service (`findAll`) plus one user-visible
+ * search session per document (`search` and everything below it). The
  * sidebar, the highlight layer and next/previous render the session.
  */
 export interface SearchCapability {
@@ -172,7 +172,7 @@ export interface SearchCapability {
 
   // ── the service ─────────────────────────────────────────────────────────
   /**
-   * Run a query to completion and return every hit, touching NO session
+   * Run a query to completion and return every hit, touching no session
    * state. Scans in natural page order; concurrent calls are independent.
    * Rejects `operation-cancelled` when `options.signal` aborts.
    */

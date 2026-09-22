@@ -75,11 +75,11 @@ const APPEARANCE_MODE_NORMAL = 0;
  *
  * Identity rules enforced here, locked with the user:
  *   - `create` always uses `EPDFPage_CreateAnnot` (the fork helper that
- *     creates an INDIRECT object) so new annotations are born durable.
+ *     creates an indirect object) so new annotations are born durable.
  *     If the fork helper ever returns a direct object, we throw — never
  *     silently produce a weak annotation.
  *   - `update` is non-structural. /NM is monotonic per annotation:
- *       * already durable (objectNumber > 0 OR /NM present) -> NEVER touched.
+ *       * already durable (objectNumber > 0 or /NM present) -> never touched.
  *       * weak (no objectNumber, no /NM) -> stamp engine-generated UUID v4.
  *     The patch type has no `nm` field, so the writer surface enforces
  *     "callers cannot rename a stable id" at the type level. Updates do
@@ -177,7 +177,7 @@ export class AnnotationMutator {
             { inReplyTo: draft.inReplyTo, replyType: draft.replyType },
           );
         }
-        // Stamp identity + modification metadata AFTER the per-subtype
+        // Stamp identity + modification metadata after the per-subtype
         // writer so a buggy subtype writer can't clobber them:
         //   /T             ← actor.displayName  (when present)
         //   /M             ← now                 (always)
@@ -189,7 +189,7 @@ export class AnnotationMutator {
         applyEmbedMetadataOnCreate(fn, mem, annotPtr, actor);
         // Bake the /AP appearance stream now that every visual field is
         // written, so the new annotation ships with a standard-compliant
-        // appearance (matches the v2 engine).
+        // appearance.
         this.regenerateAppearance(annotPtr, pagePtr, draft.blendMode);
 
         newObjNum = fn.EPDFAnnot_GetObjectNumber(annotPtr);
@@ -337,11 +337,11 @@ export class AnnotationMutator {
       // image stamp) is destroyed only as the explicit consequence of a
       // semantic edit, never as a side effect of writing back values nobody
       // changed. `inert` patches (metadata-only, or all values no-ops) never
-      // touch /AP; a VERIFIED rigid translation preserves an existing /AP
+      // touch /AP; a verified rigid translation preserves an existing /AP
       // byte-for-byte (ISO 32000: BBox→/Rect fitting translates the pixels);
       // everything else re-bakes. With no existing normal /AP there is
-      // nothing to preserve, so any appearance-relevant write bakes one (v2
-      // parity — otherwise the annotation renders as nothing). The verdict is
+      // nothing to preserve, so any appearance-relevant write bakes one
+      // (otherwise the annotation renders as nothing). The verdict is
       // echoed on the result: clients drive raster invalidation off
       // `appearance.changed` instead of guessing from the patch they sent.
       const impact = appearanceImpactOf(currentDto, patch);
@@ -375,8 +375,8 @@ export class AnnotationMutator {
       annotPtr = null;
       annotPtr = resolveAnnotPtr(this.runtime, this.session, pagePtr, ref);
 
-      // Read back. Update is non-structural, so the index does NOT move
-      // and the revision does NOT bump.
+      // Read back. Update is non-structural, so the index does not move
+      // and the revision does not bump.
       const newIndex = fn.FPDFPage_GetAnnotIndex(pagePtr, annotPtr);
       if (newIndex < 0) {
         throw new EngineError(
@@ -511,7 +511,7 @@ export class AnnotationMutator {
                 ? { kind: 'nm', value: probedNm }
                 : null;
           bumpRequested = true;
-          // EPDFPage_RemoveAnnot is the fork helper that ALSO cleans up
+          // EPDFPage_RemoveAnnot is the fork helper that also cleans up
           // the indirect object if the annotation has one. The vanilla
           // FPDFPage_RemoveAnnot would leak the indirect object.
           ok = fn.EPDFPage_RemoveAnnot(pagePtr, ref.index);
@@ -561,16 +561,16 @@ export class AnnotationMutator {
    *         untouched and we throw `InvalidArg` without bumping.
    *   - Identity strengthening: each weak ref in the batch (no
    *     `objectNumber`, no `/NM`) is opportunistically stamped with a
-   *     fresh engine-generated UUID v4 BEFORE the move. So
+   *     fresh engine-generated UUID v4 before the move. So
    *     `meta.changed` always lists durable stable ids, and the moved
    *     DTOs come out durable. Same monotonic `/NM` rule as `update()`.
    *
-   * Validation rules applied here BEFORE calling the helper, so callers
+   * Validation rules applied here before calling the helper, so callers
    * get clean errors instead of an opaque `false` return code:
    *   - `refs.length >= 1`.
    *   - All refs target the page identified by `pageObjectNumber`.
    *   - `toIndex >= 0` and `toIndex <= count - refs.length` (count is
-   *     captured AFTER ref resolution, so the helper sees the same view).
+   *     captured after ref resolution, so the helper sees the same view).
    *   - Resolved indices have no duplicates.
    *
    * The `EPDFPage_MoveAnnots` helper itself enforces the same rules; the
@@ -742,8 +742,7 @@ export class AnnotationMutator {
    * Bake (or re-bake) an annotation's `/AP` normal appearance stream from
    * its current dictionary properties using PDFium's native AP generator,
    * then flush the page content so the result is persisted into the
-   * page/object tree. Same path the v2 engine used after every
-   * create/update; runs for every writable subtype (shapes + text-markup).
+   * page/object tree. Called on create and on every update that re-bakes.
    *
    * Best-effort: `EPDFAnnot_GenerateAppearance` returns false for subtypes
    * PDFium has no generator for (e.g. widgets), in which case the

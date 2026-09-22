@@ -25,7 +25,7 @@ export const FormFieldRefSchema: z.ZodType<FormFieldRef> = z.discriminatedUnion(
 ]);
 
 const FormWidgetShape = {
-  // The annotation address, present exactly when the widget is indirect AND placed.
+  // The annotation address, present exactly when the widget is indirect and placed.
   ref: AnnotationRefSchema.nullable(),
   // 0 = direct (unaddressable) widget; null page = unplaced widget.
   annotObjectNumber: z.number().int().nonnegative(),

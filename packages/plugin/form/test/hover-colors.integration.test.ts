@@ -30,11 +30,11 @@ const fixturePath = resolve(
 );
 
 /**
- * THE PHASE-3 GATE (corpus 02's shape, synthetic bytes): hover a widget and
- * a script recolors a named square through `getAnnots` + writes a status
- * field. Full ISO: both are DOCUMENT mutations — an authorized session
+ * Hover scripts (the shape of corpus document 02, with synthetic bytes):
+ * hovering a widget runs a script that recolors a named square through
+ * `getAnnots` and writes a status field. Both are document mutations: an authorized session
  * persists them (engine `/AP` regeneration, every surface agrees), an
- * unauthorized session runs the script, gets refusals, and changes NOTHING.
+ * unauthorized session runs the script, gets refusals, and changes nothing.
  */
 async function boot(scope?: string[]) {
   const engine = await createLocalEngine({ runtime: { prefer: 'wasm' } });
@@ -65,17 +65,22 @@ async function boot(scope?: string[]) {
   const annotation = kernel.capability(AnnotationHostToken);
   const actions = kernel.capability(ActionsHostToken);
   await form.refresh();
-  const trigger = form.getSnapshot()?.fields.find((f) => f.name === 'hoverTrigger');
+  const trigger = form.getSnapshot()?.fields.find((field) => field.name === 'hoverTrigger');
   if (!trigger) throw new Error('hoverTrigger missing');
   const page = trigger.widgets[0]!.page!;
-  await annotation.reloadPage(page);
+  await annotation.whenSynced();
 
+  // A square's geometry is the `rect` member of the geometry union.
+  const rectX = ({ geometry }: ReturnType<typeof annotation.listPageItems>[number]): number => {
+    if (geometry.kind !== 'rect') throw new Error(`square with ${geometry.kind} geometry`);
+    return geometry.rect.x;
+  };
   const squareStyle = () => {
     // hoverSquare sits at x≈300; the bystander square at x≈450.
     const squares = annotation
       .listPageItems(page)
       .filter((item) => item.subtype === 'square')
-      .sort((a, b) => a.geom.rect.x - b.geom.rect.x);
+      .sort((left, right) => rectX(left) - rectX(right));
     return {
       hoverSquare: squares[0]!.style,
       bystander: squares[1]!.style,
@@ -96,7 +101,7 @@ async function boot(scope?: string[]) {
       page: toPageRef(999),
     });
   const statusValue = () => {
-    const field = form.getSnapshot()?.fields.find((f) => f.name === 'eventStatus');
+    const field = form.getSnapshot()?.fields.find((field) => field.name === 'eventStatus');
     return field?.valueEntry.kind === 'scalar' ? field.valueEntry.value : '';
   };
 
@@ -117,41 +122,46 @@ async function boot(scope?: string[]) {
 
 describe("the Phase-3 gate: 02's hover colors", () => {
   it('authorized: hover recolors the square as a DOCUMENT mutation; exit restores it', async () => {
-    await using t = await boot();
-    const before = t.squareStyle();
+    await using harness = await boot();
+    const before = harness.squareStyle();
 
-    t.notify('cursorEnter');
-    await t.drain();
-    await t.drain();
-    const during = t.squareStyle();
-    // The square is BLUE now — real document truth (the model reconciles
-    // only from engine reads, so this IS the persisted /C + regenerated /AP).
+    harness.notify('cursorEnter');
+    await harness.drain();
+    await harness.drain();
+    const during = harness.squareStyle();
+    // The square is blue now — real document truth (the model reconciles
+    // only from engine reads, so this is the persisted /C + regenerated /AP).
     expect(during.hoverSquare.color).not.toBe(before.hoverSquare.color);
     expect(during.hoverSquare.interiorColor).not.toBe(before.hoverSquare.interiorColor);
     expect(during.bystander.color).toBe(before.bystander.color); // untouched
-    expect(t.statusValue()).toBe('enter'); // the field write persisted too
+    expect(harness.statusValue()).toBe('enter'); // the field write persisted too
 
-    t.notify('cursorExit');
-    await t.drain();
-    await t.drain();
-    const after = t.squareStyle();
-    // The exit script writes the ORIGINAL values — round-trips to equality.
+    harness.notify('cursorExit');
+    await harness.drain();
+    await harness.drain();
+    const after = harness.squareStyle();
+    // The exit script writes the original values — round-trips to equality.
     expect(after.hoverSquare.color).toBe(before.hoverSquare.color);
-    expect(t.statusValue()).toBe('exit');
+    expect(harness.statusValue()).toBe('exit');
   });
 
   it('unauthorized: the script runs, every effect is refused, nothing changes anywhere', async () => {
-    await using t = await boot(['doc.open', 'doc.render', 'doc.forms.read', 'doc.annotate.read']);
-    const before = t.squareStyle();
+    await using harness = await boot([
+      'doc.open',
+      'doc.render',
+      'doc.forms.read',
+      'doc.annotate.read',
+    ]);
+    const before = harness.squareStyle();
     const scriptDiagnostics: string[] = [];
-    t.actions.onDiagnostic((d) => scriptDiagnostics.push(`${d.code}`));
+    harness.actions.onDiagnostic((diagnostic) => scriptDiagnostics.push(`${diagnostic.code}`));
 
-    t.notify('cursorEnter');
-    await t.drain();
-    await t.drain();
-    const after = t.squareStyle();
+    harness.notify('cursorEnter');
+    await harness.drain();
+    await harness.drain();
+    const after = harness.squareStyle();
     expect(after.hoverSquare.color).toBe(before.hoverSquare.color); // byte-stable
-    expect(t.statusValue()).toBe(''); // the field write was refused too
+    expect(harness.statusValue()).toBe(''); // the field write was refused too
     expect(scriptDiagnostics.some((code) => code === 'executor-failed')).toBe(true);
   });
 });

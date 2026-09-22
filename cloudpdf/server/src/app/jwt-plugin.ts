@@ -68,7 +68,7 @@ export interface JwtPluginOptions {
    */
   apiAuthTokens?: ReadonlyArray<string>;
   /**
-   * Throttle on authentication FAILURES per client IP (never on
+   * Throttle on authentication failures per client IP (never on
    * successful traffic — valid tokens are not counted). A source over
    * budget gets `429` + `Retry-After` until its window expires; note this
    * covers every request from that IP for the remainder of the window,
@@ -301,7 +301,7 @@ export type DocAccessMode = 'doc' | 'tenant';
  * authorised to perform at least one of `needed` doc-scopes on the
  * URL's `docId`. Two legal paths:
  *
- *   1. **Doc-scoped token**: `doc_id` claim matches the URL, AND
+ *   1. **Doc-scoped token**: `doc_id` claim matches the URL, and
  *      the token's `DocScope[]` contains one of `needed` (or `*`).
  *   2. **Tenant token**: `scope` contains `docs.read` (or `*`).
  *      The doc-tenant binding is enforced one layer down by
@@ -398,7 +398,7 @@ export function requireLayerDocAccess(
 // Route handlers migrate to them in two stages:
 //   1. Read routes call `requireResource(req, docId, '<id>', pdfBits)` — the
 //      DOC_RESOURCES table is the source of truth for capability checks
-//      AND CDN coverage.
+//      and CDN coverage.
 //   2. Mutation routes that have collab semantics call `requireCollab(...)`
 //      with the target row's userId/groupId.
 //
@@ -408,14 +408,14 @@ export function requireLayerDocAccess(
 // for the tenant branch.
 
 /**
- * Doc-scope-only preHandler that performs NO capability check. Verifies
+ * Doc-scope-only preHandler that performs no capability check. Verifies
  * the JWT is doc-scoped to this `docId` (or that the bearer is a tenant
  * token with `docs.read`). Used by the next-layer capability/collab
  * helpers; the tenant branch they exit through is the same as the legacy
  * `requireDocAccess`.
  *
  * Reading is implicit only in the sense that having a valid doc-scoped
- * token gets you THIS far — the capability/collab/resource helper layered
+ * token gets you this far — the capability/collab/resource helper layered
  * on top then decides whether the actual operation is allowed.
  */
 export function requireDocAccessOnly(
@@ -483,7 +483,7 @@ export function requireCapability(
 }
 
 /**
- * Assert the bearer's scope grants AT LEAST ONE of the listed capabilities.
+ * Assert the bearer's scope grants at least one of the listed capabilities.
  * Currently unused by the resource table (every entry maps to a single cap),
  * but kept available for routes that need the disjunction directly.
  */
@@ -548,9 +548,9 @@ export function requireCollabAction(
 
 /**
  * Layer-scoped equivalent of `requireDocAccessOnly`. Verifies the JWT
- * is doc-scoped to this `docId` AND that its `layer_name` claim (if
+ * is doc-scoped to this `docId` and that its `layer_name` claim (if
  * present, defaulting to 'default') matches the URL layer. Performs
- * NO capability check — used by /access and other endpoints where
+ * no capability check — used by /access and other endpoints where
  * the work itself defines what's authorized.
  */
 export function requireLayerDocAccessOnly(
@@ -648,7 +648,7 @@ export function requireLayerCollabAction(
 
 /**
  * The layer a doc-user token is pinned to (`layer_name`, default
- * `'default'`). THE one reader of the claim: origin plane guards, password
+ * `'default'`). The one reader of the claim: origin plane guards, password
  * bindings, and the `/v1/access` scope computation all route through here so
  * "which layer does this caller claim to be" has exactly one answer.
  * Tenant/admin contexts are not layer-pinned — callers branch on `mode`

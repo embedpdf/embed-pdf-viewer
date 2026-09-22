@@ -1,5 +1,4 @@
-/** The package token — created once here; `contract.ts` re-exports it and
- *  `host-contract.ts` carries it for siblings. */
+/** The package token, created once here and re-exported by `contract.ts`. */
 import { createCapabilityToken } from '@embedpdf/core';
 
 import type { SignatureCapability } from './contract';

@@ -9,36 +9,40 @@ import type { PageRef } from '@embedpdf/engine-core/runtime';
 import { anchorModeOf } from './anchor';
 import { selectionQuad, unionRect } from './geometry';
 import { isSelectable } from './hit';
-import type { Guide, Id, Model, Rect, Vec } from './types';
+import type { Guide, Id, Model, Rect, Point } from './types';
 
 export interface SnapResult {
-  delta: Vec;
+  delta: Point;
   guides: Guide[];
 }
 
 interface Bounds {
-  min: Vec;
-  max: Vec;
+  min: Point;
+  max: Point;
 }
 
 /** Overshoot the shapes a little so the guide reads as a through-line. */
 const GUIDE_PAD = 14;
 
-const toBounds = (r: Rect): Bounds => ({
-  min: { x: r.x, y: r.y },
-  max: { x: r.x + r.width, y: r.y + r.height },
+const toBounds = (rect: Rect): Bounds => ({
+  min: { x: rect.x, y: rect.y },
+  max: { x: rect.x + rect.width, y: rect.y + rect.height },
 });
-const keysX = (b: Bounds) => [b.min.x, (b.min.x + b.max.x) / 2, b.max.x];
-const keysY = (b: Bounds) => [b.min.y, (b.min.y + b.max.y) / 2, b.max.y];
-const shift = (b: Bounds, d: Vec): Bounds => ({
-  min: { x: b.min.x + d.x, y: b.min.y + d.y },
-  max: { x: b.max.x + d.x, y: b.max.y + d.y },
+const keysX = (bounds: Bounds) => [bounds.min.x, (bounds.min.x + bounds.max.x) / 2, bounds.max.x];
+const keysY = (bounds: Bounds) => [bounds.min.y, (bounds.min.y + bounds.max.y) / 2, bounds.max.y];
+const shift = (bounds: Bounds, point: Point): Bounds => ({
+  min: { x: bounds.min.x + point.x, y: bounds.min.y + point.y },
+  max: { x: bounds.max.x + point.x, y: bounds.max.y + point.y },
 });
 
-/** An annotation's visual footprint corners — the ORIENTED quad, so a rotated
+/** An annotation's visual footprint corners — the oriented quad, so a rotated
  *  shape snaps by what's actually drawn, not its unrotated box. */
-const annotQuad = (m: Model, id: Id): Vec[] =>
-  selectionQuad(m.byId[id].geom, m.byId[id].style.strokeWidth, m.byId[id].style.border);
+const annotQuad = (model: Model, id: Id): Point[] =>
+  selectionQuad(
+    model.byId[id].geometry,
+    model.byId[id].style.strokeWidth,
+    model.byId[id].style.border,
+  );
 
 /**
  * Snap a move delta: shift the selection's union bounds by `raw`, compare its
@@ -47,38 +51,38 @@ const annotQuad = (m: Model, id: Id): Vec[] =>
  * (edges + center) and every non-moving annotation on the page.
  */
 export function computeMoveSnap(
-  m: Model,
+  model: Model,
   ids: Id[],
   page: PageRef,
-  raw: Vec,
+  raw: Point,
   threshold: number,
   pageBox: Rect | undefined,
 ): SnapResult {
-  const pon = page.pageObjectNumber;
+  const pageObjectNumber = page.pageObjectNumber;
   const moving = new Set(ids);
-  // Screen-anchored (`noZoom`/`noRotate`) annotations sit OUTSIDE the snapping
+  // Screen-anchored (`noZoom`/`noRotate`) annotations sit outside the snapping
   // system, both ways: their content-space footprint depends on the view, so
   // an alignment made at one zoom is a lie at every other zoom. A selection
   // that contains one doesn't snap; one that's parked on the page is never a
-  // reference edge. (The page-edge CLAMP is unaffected — it uses projected
+  // reference edge. (The page-edge clamp is unaffected — it uses projected
   // bounds per event.)
-  if (ids.some((id) => m.byId[id] && anchorModeOf(m.byId[id]))) {
+  if (ids.some((id) => model.byId[id] && anchorModeOf(model.byId[id]))) {
     return { delta: raw, guides: [] };
   }
-  const base = toBounds(unionRect(ids.flatMap((id) => annotQuad(m, id))));
+  const base = toBounds(unionRect(ids.flatMap((id) => annotQuad(model, id))));
   const movingBox = shift(base, raw);
 
   const targets: Bounds[] = [
     ...(pageBox ? [toBounds(pageBox)] : []),
-    ...m.order
+    ...model.order
       .filter(
         (id) =>
           !moving.has(id) &&
-          m.byId[id].page.pageObjectNumber === pon &&
-          isSelectable(m, id) &&
-          !anchorModeOf(m.byId[id]),
+          model.byId[id].page.pageObjectNumber === pageObjectNumber &&
+          isSelectable(model, id) &&
+          !anchorModeOf(model.byId[id]),
       )
-      .map((id) => toBounds(unionRect(annotQuad(m, id)))),
+      .map((id) => toBounds(unionRect(annotQuad(model, id)))),
   ];
 
   let bx: { adjust: number; at: number; tb: Bounds } | null = null;

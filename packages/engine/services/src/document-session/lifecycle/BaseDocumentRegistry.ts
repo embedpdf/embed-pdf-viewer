@@ -7,7 +7,7 @@ import { CloseStack, setRuntimeOwnerPermissionsIfEncrypted } from './PdfDocument
 const FPDF_ERR_PASSWORD = 4;
 
 /**
- * A password failure is a recoverable STATE the caller can act on (prompt,
+ * A password failure is a recoverable state the caller can act on (prompt,
  * unlock), never a generic open failure — the same distinction
  * `openFatMemoryDocument` draws, so a plain-bytes open that becomes a base
  * parks and unlocks exactly like it always did.

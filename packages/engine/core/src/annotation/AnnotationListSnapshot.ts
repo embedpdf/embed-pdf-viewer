@@ -6,7 +6,7 @@ import type { PageState } from '../revision/PageState';
  * `DocumentAnnotationsService.listRawAll()` and over the wire as the
  * cloud layer annotation reads.
  *
- * One entry per page. ORDER IS UNSPECIFIED — the local engine serves
+ * One entry per page. Order is unspecified — the local engine serves
  * document order while the cloud engine serves manifest (pageObjectNumber
  * registry) order; join `pageState.pageObjectNumber` against
  * `pages.list()` when display order matters.

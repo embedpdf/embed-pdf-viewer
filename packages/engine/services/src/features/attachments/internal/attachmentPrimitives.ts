@@ -22,7 +22,7 @@ import { readUtf16String, writeUtf16String } from '../../../runtime/memory/strin
  * (the annotation reader + `downloadFile`).
  */
 
-/** Read the name-tree KEY at |index| — the durable EmbeddedFileRef address. */
+/** Read the name-tree key at |index| — the durable EmbeddedFileRef address. */
 export function readAttachmentKey(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
@@ -32,7 +32,7 @@ export function readAttachmentKey(
   return readUtf16String(mem, (buf, cap) => fn.EPDFDoc_GetAttachmentKey(docPtr, index, buf, cap));
 }
 
-/** Resolve an EmbeddedFileRef to its CURRENT name-tree index, or -1. */
+/** Resolve an EmbeddedFileRef to its current name-tree index, or -1. */
 export function resolveAttachmentIndex(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
@@ -66,7 +66,7 @@ export function writeAttachmentFilePayload(
 ): void {
   const byteLength = resource.bytes.byteLength;
   if (byteLength === 0) {
-    // Valid zero-byte attachment: PDFium accepts (NULL, 0).
+    // Valid zero-byte attachment: PDFium accepts (null, 0).
     if (!fn.FPDFAttachment_SetFile(attachmentPtr, docPtr, NULL_PTR, 0)) {
       throw new EngineError(EngineErrorCode.Unknown, 'FPDFAttachment_SetFile returned false');
     }

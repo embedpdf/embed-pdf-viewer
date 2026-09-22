@@ -19,12 +19,12 @@ import { applyAnnotationBaseDraft, applyAnnotationBasePatch } from './writeAnnot
 /**
  * Link writer: rect + the `/A` action. Only `goto`/`uri` targets are
  * writable (the draft/patch types enforce it; `goto-remote`/`launch` are
- * read-only by design). Relationship (`/IRT` + `/RT` — v2's grouped links)
+ * read-only by design). Relationship (`/IRT` + `/RT`, for grouped links)
  * is written by the mutator's kind-agnostic relationship pass, never here.
  *
- * A retarget REPLACES `/A`; it cannot remove a pre-existing direct `/Dest`
+ * A retarget replaces `/A`; it cannot remove a pre-existing direct `/Dest`
  * (no dict-entry removal primitive in the runtime), which is why the link
- * READER gives `/A` precedence — see readLinkAnnotation.ts.
+ * reader gives `/A` precedence — see readLinkAnnotation.ts.
  */
 export function applyLinkDraft(
   fn: PdfFunctions,
@@ -54,8 +54,8 @@ export function applyLinkPatch(
 }
 
 /**
- * `target: null` → a dead link. The model treats the target as ONE concept
- * with two spellings, so THIS layer composes the two single-purpose
+ * `target: null` → a dead link. The model treats the target as one concept
+ * with two spellings, so this layer composes the two single-purpose
  * removal primitives — removing only `/A` would resurrect a stale direct
  * `/Dest` as the live target.
  */
@@ -97,7 +97,7 @@ function applyLinkTarget(
 }
 
 /**
- * Build an INDIRECT explicit-destination array for `dest`. The target page
+ * Build an indirect explicit-destination array for `dest`. The target page
  * is loaded just to reference its dictionary and closed immediately —
  * destinations routinely point at pages the mutator's pool never touches.
  */
@@ -144,8 +144,8 @@ function createViewDestination(
   dest: Exclude<PdfDestination, { kind: 'xyz' }>,
 ): Ptr {
   // The runtime pads missing params with 0 up to the fit type's arity —
-  // a null top/left therefore writes as 0 (v2 parity; the array form has
-  // no per-param null encoding through this API).
+  // a null top/left therefore writes as 0 (the array form has no
+  // per-param null encoding through this API).
   const params: number[] = (() => {
     switch (dest.kind) {
       case 'fitH':

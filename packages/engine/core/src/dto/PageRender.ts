@@ -51,11 +51,11 @@ export interface PageRenderOptions {
   includeAnnotations?: boolean;
   /**
    * Output-pixel budget: the renderer rejects (InvalidArg) instead of
-   * allocating when `outputWidth × outputHeight` exceeds it. A WIDTH
+   * allocating when `outputWidth × outputHeight` exceeds it. A width
    * lattice bounds width but not height — a 1×14,400pt page still
    * explodes vertically — so the guard lives where the allocation
-   * happens (the decode-bomb-guard pattern). SERVER requests carry it
-   * from the deployment's render policy; LOCAL engines inject it only
+   * happens (the decode-bomb-guard pattern). Server requests carry it
+   * from the deployment's render policy; local engines inject it only
    * when `localEngine({ renderPolicy })` configured a budget — the
    * default local policy stays continuous and unbudgeted (exactness is
    * the local product promise).

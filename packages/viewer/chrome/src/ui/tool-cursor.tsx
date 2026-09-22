@@ -1,15 +1,15 @@
 /**
- * THIS viewer's armed-tool cursor: the toolbar's own icon riding the pointer
+ * This viewer's armed-tool cursor: the toolbar's own icon riding the pointer
  * as a real CSS cursor (OS-composited — zero lag, unlike any DOM follower).
  * The library owns arbitration (unmapped hover claims win, page gaps fall
  * back to the arrow — see `useToolCursor`); this module only decides what the
- * cursor LOOKS like. It reuses the SAME icon set and the SAME accent
+ * cursor looks like. It reuses the same icon set and the same accent
  * derivation as the toolbar buttons (TOOL_ICONS is recorded by the command
  * definitions), so the cursor is pixel-identical to the button the user just
  * pressed — recolor the tool and both follow. A tool without a command icon
  * keeps its declared keyword cursor.
  *
- * ONE table decides the shape ({@link GLYPHS}): cursor KEYWORDS are the
+ * One table decides the shape ({@link glyphs}): cursor keywords are the
  * affordances — a tool declares its base ('crosshair' to draw, 'copy' to
  * place), the selection handler claims 'text' over text — and each mapped
  * keyword is redrawn as its glyph + the tool's icon. Keywords the table omits
@@ -44,9 +44,9 @@ function iconGlyph(name: string, accent?: IconAccent): string | null {
   if (!paths) return null;
   const halo: string[] = [];
   const draw: string[] = [];
-  for (const p of paths) {
+  for (const path of paths) {
     const spec: Exclude<PathSpec, string> =
-      typeof p === 'string' ? { d: p, fill: undefined, stroke: undefined } : p;
+      typeof path === 'string' ? { d: path, fill: undefined, stroke: undefined } : path;
     // Slot rules, mirrored from <Icon>: a fill slot paints from the accent
     // (nothing without one), a stroke slot falls back to the ink, and a
     // fill-only path never gets an outline.
@@ -67,7 +67,7 @@ function iconGlyph(name: string, accent?: IconAccent): string | null {
   return halo.join('') + draw.join('');
 }
 
-/** The action glyph drawn at the hotspot: what a click DOES here. */
+/** The action glyph drawn at the hotspot: what a click does here. */
 type Glyph = 'crosshair' | 'ibeam' | 'plus';
 
 const haloed = (x1: number, y1: number, x2: number, y2: number): string =>
@@ -95,13 +95,13 @@ function actionGlyph(glyph: Glyph): string {
 }
 
 function cursorSvg(glyph: Glyph, icon: string, accent?: IconAccent): string {
-  const g = iconGlyph(icon, accent);
+  const iconMarkup = iconGlyph(icon, accent);
   return (
     `<svg xmlns="http://www.w3.org/2000/svg" width="${SIZE}" height="${SIZE}" ` +
     `viewBox="0 0 ${SIZE} ${SIZE}" fill="none" stroke-linecap="round" stroke-linejoin="round">` +
     actionGlyph(glyph) +
-    (g
-      ? `<g transform="translate(17 3) scale(${(20 / 24).toFixed(4)})" stroke-width="2">${g}</g>`
+    (iconMarkup
+      ? `<g transform="translate(17 3) scale(${(20 / 24).toFixed(4)})" stroke-width="2">${iconMarkup}</g>`
       : '') +
     `</svg>`
   );
@@ -110,7 +110,7 @@ function cursorSvg(glyph: Glyph, icon: string, accent?: IconAccent): string {
 /** keyword → glyph: how each affordance is drawn when a tool icon rides
  *  along. Draw tools declare 'crosshair', place tools (stamp/signature/image)
  *  declare 'copy', and the selection handler claims 'text' over text — which
- *  keywords ever SHOW is decided by those declarations and claims, never
+ *  keywords ever show is decided by those declarations and claims, never
  *  here. 'default' is deliberately absent: the bare arrow means "no action
  *  here", so it never carries an icon. */
 const GLYPHS: Record<string, Glyph> = {
@@ -124,12 +124,14 @@ const GLYPHS: Record<string, Glyph> = {
 export function ArmedToolCursor() {
   const { activeToolId } = useTool();
   // Live accent: a `setDefaults` recolor re-renders us and rebuilds the cursor.
-  const d = useAnnotationDefaults(activeToolId);
+  const props = useAnnotationDefaults(activeToolId);
   const entry = TOOL_ICONS[activeToolId];
   const accent = entry?.accent
     ? {
-        primary: d[entry.accent.primary] ?? undefined,
-        secondary: entry.accent.secondary ? (d[entry.accent.secondary] ?? undefined) : undefined,
+        primary: props[entry.accent.primary] ?? undefined,
+        secondary: entry.accent.secondary
+          ? (props[entry.accent.secondary] ?? undefined)
+          : undefined,
       }
     : undefined;
   useToolCursor(

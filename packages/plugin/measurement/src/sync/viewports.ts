@@ -1,138 +1,104 @@
 /**
- * The page's viewports into the slice. Calls serialize per page; refresh
- * epochs prevent an old read from replacing a newer scale. `connect` watches
- * the document for viewport changes, version moves and inserted pages.
+ * The pages' viewports: a page mirror re-read whenever a confirmed
+ * `page.viewportsChanged` names a loaded page, from this session or another
+ * (stream gaps and version moves re-read every loaded page). Its `changed`
+ * callback is the one place the annotation plugin learns a page's viewports.
+ * `connect` loads every page in the registry, including pages inserted later.
  */
-import { PluginError } from '@embedpdf/core';
+import { PluginError, memoByKey, toPageRef, type PageInfo } from '@embedpdf/core';
 import { serializeError } from '@embedpdf/engine-core/runtime';
 import type { PageMeasurementViewport, PageRef } from '@embedpdf/engine-core/runtime';
 
-import type { MeasurementConfig } from '../contract';
-import { defaultMeasure, selectPageScale } from '../scale';
+import type { MeasurementConfig, PageScale } from '../contract';
+import { clearLoadError, pageScaleOf, recordLoadError } from '../model';
+import { defaultMeasure } from '../scale';
 import type { MeasurementContext, MeasurementServices } from '../services';
 
 export function createViewportSync(
   ctx: MeasurementContext,
-  { store, siblings }: Pick<MeasurementServices, 'store' | 'siblings'>,
+  { siblings }: Pick<MeasurementServices, 'siblings'>,
   config: MeasurementConfig,
 ) {
-  const { meta, isDisposed, live } = store;
   const { annotation } = siblings;
-  const epochs = new Map<number, number>();
-  const reading = new Map<number, Promise<void>>();
-  ctx.cleanup(() => {
-    epochs.clear();
+  const fallbackOf = (layout: PageInfo | null) => defaultMeasure(config, layout?.userUnit ?? 1);
+
+  const viewports = ctx.pageMirror<readonly PageMeasurementViewport[]>({
+    name: 'viewports',
+    load: async (doc, page) => {
+      ctx.assertPageRef(page);
+      const service = doc.page(page).measure;
+      // Without a page measure service, scales live for the session only.
+      if (!service) return ctx.state.get().localViewports[page.pageObjectNumber] ?? [];
+      try {
+        return await service.viewports();
+      } catch (error) {
+        ctx.state.update(recordLoadError, page.pageObjectNumber, serializeError(error));
+        throw error;
+      }
+    },
+    affected: (event) => (event.type === 'page.viewportsChanged' ? [event.page] : null),
+    changed: ({ page, cause, next }) => {
+      if (cause === 'drop' || next === undefined) return;
+      ctx.state.update(clearLoadError, page.pageObjectNumber);
+      const layout = ctx.getPage(page);
+      if (layout) annotation.setPageViewports(page, [...next], fallbackOf(layout));
+    },
   });
 
-  const publish = (page: PageRef, viewports: PageMeasurementViewport[]) => {
-    if (isDisposed()) return;
-    const layout = meta(page);
-    if (!layout) return;
-    const fallback = defaultMeasure(config, layout.userUnit);
-    annotation.setPageViewports(page, viewports, fallback);
-    ctx.dispatch({
-      type: 'PAGE_SCALE',
-      page,
-      viewports,
-      scale: selectPageScale(viewports, layout.boxes.crop, fallback, !!ctx.doc?.page(page).measure),
-    });
-  };
+  /** The engine can persist a scale into the document. */
+  const isPersistent = (page: PageRef): boolean => ctx.doc.page(page).measure !== undefined;
 
-  const refresh = (page: PageRef): Promise<void> => {
-    const doc = live();
-    const layout = meta(page);
-    if (!layout) {
-      return Promise.reject(new PluginError('not-found', 'measurement', 'no such page'));
-    }
-    const pon = page.pageObjectNumber;
-    const epoch = (epochs.get(pon) ?? 0) + 1;
-    epochs.set(pon, epoch);
-    // Disable creation until calibration is known; never race a default into an imported viewport.
-    annotation.setPageViewports(page, undefined, defaultMeasure(config, layout.userUnit));
-    const previous = ctx.getState().pages[pon];
-    ctx.dispatch({
-      type: 'PAGE_SCALE',
-      page,
-      viewports: previous?.viewports ?? [],
-      scale: {
-        ...(previous?.scale ?? {
-          measure: null,
-          source: 'default',
-          persistent: !!doc.page(page).measure,
-        }),
-        ready: false,
-      },
-    });
-    const service = doc.page(page).measure;
-    const request = (async () => {
-      try {
-        const viewports = service
-          ? await service.viewports()
-          : (ctx.getState().pages[pon]?.viewports ?? []);
-        if (!isDisposed() && epochs.get(pon) === epoch) publish(page, viewports);
-      } catch (error) {
-        if (!isDisposed() && epochs.get(pon) === epoch) {
-          ctx.dispatch({
-            type: 'PAGE_SCALE',
-            page,
-            viewports: [],
-            scale: {
-              measure: null,
-              source: 'default',
-              ready: false,
-              persistent: !!service,
-              error: serializeError(error),
-            },
-          });
-        }
-        throw error;
-      } finally {
-        if (epochs.get(pon) === epoch) reading.delete(pon);
-      }
-    })();
-    reading.set(pon, request);
-    return request;
-  };
+  /** The page's public scale, the same object until its viewports, read state or layout change. */
+  const scaleOfPage = memoByKey(
+    (pageObjectNumber: number) => {
+      const page = toPageRef(pageObjectNumber);
+      const layout = ctx.getPage(page);
+      return [
+        viewports.get(page),
+        viewports.getStatus(page),
+        ctx.state.get().loadErrors[pageObjectNumber],
+        layout,
+        layout ? isPersistent(page) : false,
+      ] as const;
+    },
+    (_pageObjectNumber, pageViewports, status, error, layout, persistent): PageScale =>
+      pageScaleOf({
+        viewports: pageViewports,
+        status,
+        error,
+        crop: layout?.boxes.crop,
+        fallback: fallbackOf(layout),
+        persistent,
+      }),
+  );
+  const scaleOf = (page: PageRef): PageScale => scaleOfPage(page.pageObjectNumber);
 
   const ensureLoaded = (page: PageRef): Promise<void> => {
-    const pon = page.pageObjectNumber;
-    return (
-      reading.get(pon) ??
-      (ctx.getState().pages[pon]?.scale.ready ? Promise.resolve() : refresh(page))
-    );
+    if (!ctx.getPage(page)) {
+      return Promise.reject(new PluginError('not-found', 'measurement', 'no such page'));
+    }
+    return viewports.ensureLoaded(page);
   };
 
   const connect = (): void => {
-    const doc = ctx.doc;
-    if (!doc) return;
-    const hydrate = () => {
-      for (const page of ctx.document()?.pages ?? []) void refresh(page.ref).catch(() => {});
-    };
-    ctx.cleanup(
-      doc.events.subscribe((event) => {
-        if (event.type === 'page.viewportsChanged') {
-          void refresh(event.page).catch(() => {});
-        } else if (event.type === 'stream.desynced' || event.type === 'document.versioned') {
-          hydrate();
-        }
-      }),
-    );
-    // Covers pages inserted after this document-scoped instance was created.
-    let pages = '';
-    const reconcile = () => {
-      const next = (ctx.document()?.pages ?? []).map((p) => p.ref.pageObjectNumber).join(',');
-      if (next === pages) return;
-      pages = next;
-      for (const page of ctx.document()?.pages ?? []) {
-        if (!ctx.getState().pages[page.ref.pageObjectNumber]) {
-          void ensureLoaded(page.ref).catch(() => {});
-        }
+    const hydrate = (layouts: readonly PageInfo[] | undefined) => {
+      for (const layout of layouts ?? []) {
+        if (viewports.getStatus(layout.ref) !== 'idle') continue;
+        void viewports.ensureLoaded(layout.ref).catch(() => {
+          /* reported through getPageScale(page).error */
+        });
       }
     };
-    ctx.cleanup(ctx.subscribe(reconcile));
-    reconcile();
+    hydrate(ctx.document()?.pages);
+    ctx.watch(() => ctx.document()?.pages, hydrate);
   };
 
-  return { publish, refresh, ensureLoaded, connect };
+  return {
+    ensureLoaded,
+    scaleOf,
+    /** Re-read one page; for session-only scales, which no engine event announces. */
+    refresh: (page: PageRef) => viewports.refresh(page),
+    connect,
+  };
 }
 export type MeasurementViewportSync = ReturnType<typeof createViewportSync>;

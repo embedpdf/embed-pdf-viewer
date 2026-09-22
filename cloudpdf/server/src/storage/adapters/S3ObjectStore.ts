@@ -1,6 +1,7 @@
 /**
- * S3 object store. Built around the AWS SDK v3; presigned PUTs / GETs
- * are the default upload/download pathway in production.
+ * S3 object store. Built on the modular AWS SDK for JavaScript
+ * (`@aws-sdk/client-s3`); presigned PUTs / GETs are the default
+ * upload/download pathway in production.
  *
  * Auth: keyless-first via the SDK's default credential chain (IAM role
  * / IRSA on AWS, or `AWS_ACCESS_KEY_ID`/`SECRET` env for keyed setups)
@@ -10,7 +11,8 @@
  * Lazy-load: `@aws-sdk/client-s3` + `@aws-sdk/s3-request-presigner`
  * import on first use via `depsPromise`, never at module load — so
  * they live in `optionalDependencies` and an FS-only install pays
- * nothing for them (matches the GCS/Azure adapters; see ADAPTERS.md).
+ * nothing for them (matches the GCS/Azure adapters; see
+ * `docs/conventions/server-adapters.md`).
  *
  * Notes on `getSha256`: S3 doesn't expose an object's SHA-256 (ETag is
  * MD5 for single-part PUTs, a composite hash for MPU). We compute
@@ -45,7 +47,8 @@ import {
   SHA256_METADATA_KEY,
 } from './_internal';
 
-// Type-only — these do NOT trigger the runtime import (see ADAPTERS.md).
+// Type-only — these do not trigger the runtime import
+// (see `docs/conventions/server-adapters.md`).
 type S3Module = typeof import('@aws-sdk/client-s3');
 type PresignerModule = typeof import('@aws-sdk/s3-request-presigner');
 type S3Client = InstanceType<S3Module['S3Client']>;
@@ -168,9 +171,9 @@ export class S3ObjectStore implements ObjectStore {
   }
 
   /**
-   * Streamed put: ONE streaming PutObject (constant memory — the
+   * Streamed put: One streaming PutObject (constant memory — the
    * counting hasher taps the bytes on their way to the socket), then
-   * ONE same-key server-side CopyObject to attach the SHA-256
+   * one same-key server-side CopyObject to attach the SHA-256
    * metadata. PutObject is atomic: a mid-stream failure (source
    * error, length violation) aborts the request with no visible
    * object, and any prior object at the key survives. Single-PUT

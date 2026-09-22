@@ -302,9 +302,9 @@ function buildStub(initial: ServerState): StubbedFixture {
       /^\/v1\/docs\/([^/]+)\/layers\/([^/]+)\/text\/pages\/obj%3A(\d+)\/data@contentVersion=(\d+)$/,
     );
     if (textMatch && method === 'GET') {
-      const requestedPon = Number(textMatch[3]);
+      const requestedPageObjectNumber = Number(textMatch[3]);
       const requestedVersion = Number(textMatch[4]);
-      if (requestedPon !== PAGE_OBJECT_NUMBER) {
+      if (requestedPageObjectNumber !== PAGE_OBJECT_NUMBER) {
         return new Response(
           JSON.stringify({ error: { code: 'NotFound', message: 'unknown page' } }),
           { status: 404, headers: { 'content-type': 'application/json' } },
@@ -330,9 +330,9 @@ function buildStub(initial: ServerState): StubbedFixture {
       /^\/v1\/docs\/([^/]+)\/layers\/([^/]+)\/annotations\/pages\/obj%3A(\d+)\/items@annotationVersion=(\d+)$/,
     );
     if (annotationsMatch && method === 'GET') {
-      const requestedPon = Number(annotationsMatch[3]);
+      const requestedPageObjectNumber = Number(annotationsMatch[3]);
       const requestedVersion = Number(annotationsMatch[4]);
-      if (requestedPon !== PAGE_OBJECT_NUMBER) {
+      if (requestedPageObjectNumber !== PAGE_OBJECT_NUMBER) {
         return new Response(
           JSON.stringify({ error: { code: 'NotFound', message: 'unknown page' } }),
           { status: 404, headers: { 'content-type': 'application/json' } },
@@ -359,8 +359,8 @@ function buildStub(initial: ServerState): StubbedFixture {
       /^\/v1\/docs\/([^/]+)\/layers\/([^/]+)\/annotations\/pages\/obj%3A(\d+)\/items$/,
     );
     if (annotationCreateMatch && method === 'POST') {
-      const requestedPon = Number(annotationCreateMatch[3]);
-      if (requestedPon !== PAGE_OBJECT_NUMBER) {
+      const requestedPageObjectNumber = Number(annotationCreateMatch[3]);
+      if (requestedPageObjectNumber !== PAGE_OBJECT_NUMBER) {
         return new Response(
           JSON.stringify({ error: { code: 'NotFound', message: 'unknown page' } }),
           { status: 404, headers: { 'content-type': 'application/json' } },
@@ -563,7 +563,7 @@ describe('CloudPageTextService — end-to-end transparent retry', () => {
       const list = await doc.pages.list();
       expect(list.pages.map((page) => page.ref.pageObjectNumber)).toEqual([PAGE_OBJECT_NUMBER]);
       const paths = fx.calls.map((call) => call.path);
-      // Stale seed → manifest ladder refreshes to v2 first, then the /layout
+      // Stale seed → manifest ladder refreshes to docVersion=2 first, then the /layout
       // leaf is fetched at the refreshed layoutVersion.
       expect(paths).toEqual([
         `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/head`,
@@ -637,10 +637,10 @@ describe('CloudPageTextService — end-to-end transparent retry', () => {
       expect(second.text).toBe('after-mutation');
 
       // The retry ladder must be exactly:
-      //   [stale-leaf v1]   → 404
-      //   [/head]           → 200 (docVersion=2)
-      //   [/manifest@docVersion=2]    → 200 (pageContentVersion=2)
-      //   [fresh-leaf v2]   → 200
+      //   [stale leaf, contentVersion=1]  → 404
+      //   [/head]                         → 200 (docVersion=2)
+      //   [/manifest@docVersion=2]        → 200 (pageContentVersion=2)
+      //   [fresh leaf, contentVersion=2]  → 200
       const retryPaths = fx.calls.slice(callsBeforeRetry).map((c) => c.path);
       expect(retryPaths).toEqual([
         `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/text/pages/${PAGE_KEY}/data@contentVersion=1`,
@@ -649,7 +649,7 @@ describe('CloudPageTextService — end-to-end transparent retry', () => {
         `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/text/pages/${PAGE_KEY}/data@contentVersion=2`,
       ]);
 
-      // Cache is now warm with v2; a third read uses the new version
+      // Cache is now warm with docVersion=2; a third read uses it
       // and goes straight to the leaf URL — no second refresh.
       const callsBeforeThird = fx.calls.length;
       const third = await page.text.read();
@@ -820,9 +820,9 @@ describe('CloudPageTextService — end-to-end transparent retry', () => {
       expect(b.text).toBe('initial');
       const headCount = fx.calls.filter((c) => c.path.endsWith('/head')).length;
       const manifestCount = fx.calls.filter((c) => c.path.includes('/manifest@')).length;
-      // Phase 4 contract: cold-cache fetches are singleflighted, so
-      // even two parallel page reads trigger exactly one /head + one
-      // /manifest. Without the inflight dedupe, this would be 2/2.
+      // Cold-cache fetches are singleflighted, so even two parallel page
+      // reads trigger exactly one /head + one /manifest. Without the
+      // inflight dedupe, this would be 2/2.
       expect(headCount).toBe(1);
       expect(manifestCount).toBe(1);
     } finally {
@@ -844,7 +844,7 @@ describe('CloudPageTextService — end-to-end transparent retry', () => {
       const headCalls = fx.calls.filter((c) => c.path.endsWith('/head')).length;
       const manifestCalls = fx.calls.filter((c) => c.path.includes('/manifest@')).length;
       // The SDK fetches the manifest once to resolve the page; the
-      // "page not in manifest" branch throws locally and does NOT
+      // "page not in manifest" branch throws locally and does not
       // trigger the 404→refresh ladder (no leaf call, no refresh).
       expect(headCalls).toBe(1);
       expect(manifestCalls).toBe(1);

@@ -12,14 +12,9 @@ import type { ManifestPage } from '@embedpdf/engine-core/wire';
  * `_` so it's clearly internal to this directory and not meant to be
  * exported from the package).
  *
- * History note: these helpers used to be copy-pasted across
- * `annotations.ts`, `pages.ts`, and `metadata.ts`. The
- * `abortSignalFromRequest` variant in `metadata.ts` was the original,
- * naive version that aborts on every `close` event — which silently
- * fires for body-bearing requests (POST/PATCH) the moment Fastify
- * finishes consuming the JSON body. Consolidating to one
- * implementation here ensures every route file gets the fixed
- * "abort only on actual client disconnect" behaviour.
+ * Route files must use these instead of local copies, so every route
+ * gets the same "abort only on actual client disconnect" behaviour of
+ * {@link abortSignalFromRequest}.
  */
 
 /**
@@ -96,17 +91,17 @@ export function toPageState(page: ManifestPage): PageState {
  * Convert a Fastify request's lifecycle into an `AbortSignal` the
  * worker pool can react to.
  *
- * Locked behaviour (do not loosen without re-reading the abort-on-body
- * debug session in the v3 mutations slice):
+ * Locked behaviour (do not loosen; aborting on every `close` breaks
+ * every mutation):
  *
  *   - For body-bearing requests (POST/PATCH), Fastify finishes
- *     consuming the request stream BEFORE our handler runs. Node
+ *     consuming the request stream before our handler runs. Node
  *     emits `close` on the IncomingMessage immediately after that.
  *     If we abort unconditionally on `close`, every request appears
  *     "aborted" to the worker, even when the client is happily
  *     awaiting the response.
  *
- *   - The fix: only abort when the request stream did NOT finish
+ *   - The fix: only abort when the request stream did not finish
  *     reading (`req.raw.complete === false`). That distinguishes a
  *     real client disconnect from a normal end-of-body signal.
  *

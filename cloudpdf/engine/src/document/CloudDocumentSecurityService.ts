@@ -62,7 +62,7 @@ export class CloudDocumentSecurityService implements DocumentSecurityService {
   /**
    * Expanded capability set. Cloud-canonical post-/access; otherwise
    * computed locally from the JWT scope + /head's pdf bits using the
-   * SAME `expandRawScope` helper engine-local calls — so the value
+   * same `expandRawScope` helper engine-local calls — so the value
    * matches across engines bit-for-bit on the same inputs.
    */
   get effectiveScope(): ReadonlyArray<string> {
@@ -155,7 +155,7 @@ export class CloudDocumentSecurityService implements DocumentSecurityService {
   /**
    * Cloud-internal: call /v1/access with no password to establish
    * a CDN-credentialed session. Used by `CloudEngine.open` when
-   * /head's `access.reasons` includes 'cdn' but NOT 'password' —
+   * /head's `access.reasons` includes 'cdn' but not 'password' —
    * the server accepts an authenticated /access POST without a
    * password and returns the signed-URL block.
    *
@@ -189,7 +189,7 @@ export class CloudDocumentSecurityService implements DocumentSecurityService {
     body: { password?: string; mode: 'any' | 'owner' },
   ): Promise<DocumentUnlockResult> {
     const response = await this.http.postJson(
-      // Identity rides the PATH — doc and layer, like every layer route;
+      // Identity rides the path — doc and layer, like every layer route;
       // the affinity tier pins the session bootstrap to the document's
       // pod from the very first request.
       wirePaths.access(this.docId, this.layerName),
@@ -241,7 +241,7 @@ function safeDecodeClaims(token: string): Record<string, unknown> | null {
 }
 
 /**
- * CREATE's CollabTarget is the caller's own identity — the same
+ * Create's CollabTarget is the caller's own identity — the same
  * derivation as engine-local's `ScopeGuard.targetForSelfCreate`, so
  * `:self` trivially passes and `:group=X` matches the caller's
  * default group.

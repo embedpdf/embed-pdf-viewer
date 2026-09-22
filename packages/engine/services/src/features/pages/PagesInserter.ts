@@ -15,7 +15,7 @@ import { throwIfAborted } from '../../shared/abort';
 
 /**
  * Insert every page of a standalone PDF into the session document. A
- * structural MUTATION (like move/delete): the source bytes are loaded as a
+ * structural mutation (like move/delete): the source bytes are loaded as a
  * throwaway PDFium document, `FPDF_ImportPagesByIndex` deep-copies its
  * pages in at `destIndex`, and the page registry is rebuilt. Pre-existing
  * pages keep their identity and `RevisionToken`s; the inserted copies get
@@ -44,12 +44,12 @@ export class PagesInserter {
       );
     }
 
-    // FPDF_ImportPagesByIndex does NOT fully detach imported objects from
+    // FPDF_ImportPagesByIndex does not fully detach imported objects from
     // their source document (imported streams still read through it), so
     // the source doc and its buffer must outlive every future save of the
     // destination. On failure they are released immediately; on success
-    // they are parked on the session and released at session close.
-    // TODO(fork): a deep-detaching import would let this close eagerly.
+    // they are parked on the session and released at session close; only a
+    // deep-detaching import in the runtime would let them close eagerly.
     const dataPtr = mem.alloc(bytes.byteLength);
     let srcPtr: Ptr | null = null;
     let insertedCount = 0;

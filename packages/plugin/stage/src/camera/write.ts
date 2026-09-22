@@ -1,167 +1,198 @@
 /**
- * The camera write path: the ONE low-level clamped write (`setCam`), the
- * elastic (unclamped) write and its rubber-band curves, the rest detector
- * that gates device snapping, the gesture bracket state, and cursor
- * reconciliation from the camera (manipulation only — navigation sets the
- * cursor as intent).
+ * The camera write path: the one low-level clamped write (`writeCamera`), the
+ * elastic unclamped write and its rubber-band curves, the rest detector that
+ * gates device snapping, the gesture bracket state, and cursor reconciliation
+ * from the camera (manipulation only; navigation sets the cursor as intent).
  */
-import * as S from '@embedpdf/core-stage';
+import {
+  clampCamera,
+  anchorFromCamera,
+  travelRange,
+  type Camera,
+  type Rect,
+} from '@embedpdf/core-stage';
+import type { PluginContext } from '@embedpdf/core';
 
+import { setCamera, setCameraResting, setCursor, setMotionCause, type StageState } from '../model';
 import { rubberIn, rubberOut } from '../motion';
-import type { StageContext, StageServices } from '../services';
+import type { StageServices } from '../services';
+
+/** How long the zoom must hold still before the camera counts as resting. */
+const REST_MS = 150;
 
 export function createCameraWrite(
-  ctx: StageContext,
+  ctx: PluginContext<StageState>,
   { scheduler, placement, scene }: Pick<StageServices, 'scheduler' | 'placement' | 'scene'>,
 ) {
   const { canAnimate, scheduler: frames } = scheduler;
-  const { cam, vp, paged, buildScene, stayBounds, constraint } = scene;
+  const { camera, viewport, paged, buildScene, stayBounds, constraint } = scene;
 
-  // ── gesture transaction (touch pan/pinch) ─────────────────────────────
-  // While open: zoomAround defers its intent PATCH, and the rest countdown is
-  // held — a hesitation inside a pinch is not "at rest". Depth-counted so
-  // nested brackets compose. An ELASTIC gesture may additionally hold the
+  // ── the gesture bracket (touch pan and pinch) ──
+  // While open, zoomAround defers its zoom-intent patch and the rest
+  // countdown is held: a hesitation inside a pinch is not "at rest". Depth-
+  // counted so nested brackets compose. An elastic gesture may also hold the
   // camera past the clamp (rubber-band); `raw` is its unclamped,
-  // finger-integrated camera — the resistance curve maps it to what renders.
-  const gesture = { depth: 0, zoomed: false, elastic: false, raw: null as S.Camera | null };
+  // finger-integrated camera, which the resistance curve maps to what renders.
+  const gesture = { depth: 0, zoomed: false, elastic: false, raw: null as Camera | null };
 
-  // ── camera-rest detector ────────────────────────────────────────────────────
-  // A continuous zoom and a device-snapped origin cannot coexist without the
-  // anchor point jittering (each step rounds differently, ±0.5 device px per
-  // axis). So origin snapping is gated on REST: fractional placement while
-  // the zoom moves, one snap when it settles — when crispness matters. The
-  // window is counted in frames frames (the same timing seam the tween
-  // uses), so tests stay deterministic.
-  const REST_MS = 150;
-  let restRaf = 0;
+  // ── the camera-rest detector ──
+  // Origin snapping is gated on rest (see `StageState.cameraResting`): pages
+  // place fractionally while the zoom moves and snap once it settles. The
+  // window is counted in scheduler frames, the same timing seam the tween
+  // uses, so tests stay deterministic.
+  let restFrame = 0;
   const armRest = () => {
-    // Initial placement snaps immediately (first paint is crisp), and an
-    // environment without real frames keeps snapping always-on — rest-gating
-    // is a live-gesture refinement, not a contract.
+    // Initial placement snaps immediately (the first paint is crisp), and a
+    // host without real frames keeps snapping always on: rest-gating refines
+    // live gestures and is not part of the contract.
     if (!canAnimate || !placement.started) return;
-    if (ctx.getState().cameraResting) ctx.dispatch({ type: 'CAMERA_REST', resting: false });
-    if (restRaf) frames.caf(restRaf);
-    let t0 = 0;
-    const tick = (ts: number) => {
-      restRaf = 0;
-      if (!t0) t0 = ts;
-      if (ts - t0 >= REST_MS) {
-        ctx.dispatch({ type: 'CAMERA_REST', resting: true });
+    ctx.state.update(setCameraResting, false);
+    if (restFrame) frames.caf(restFrame);
+    let startedAt = 0;
+    const tick = (timestamp: number) => {
+      restFrame = 0;
+      if (!startedAt) startedAt = timestamp;
+      if (timestamp - startedAt >= REST_MS) {
+        ctx.state.update(setCameraResting, true);
         return;
       }
-      restRaf = frames.raf(tick);
+      restFrame = frames.raf(tick);
     };
-    restRaf = frames.raf(tick);
+    restFrame = frames.raf(tick);
   };
 
-  // The ONE low-level camera write: clamp to `bounds`, dispatch. MECHANISM only —
-  // it never touches the cursor (see syncCursorFromCamera for the policy).
-  const setCam = (next: S.Camera, bounds: S.Rect = stayBounds()) => {
-    const clamped = S.clampCamera(next, bounds, vp(), constraint());
-    if (clamped.zoom !== cam().zoom) {
+  // The one low-level camera write: clamp to `bounds` and store. It never
+  // touches the cursor (see syncCursorFromCamera for that policy).
+  const writeCamera = (next: Camera, bounds: Rect = stayBounds()) => {
+    const clamped = clampCamera(next, bounds, viewport(), constraint());
+    if (clamped.zoom !== camera().zoom) {
       if (gesture.depth > 0) {
-        // Mid-gesture: un-rest immediately (fractional placement) but hold the
-        // 150 ms countdown — rest is declared at endGesture, not at a pinch
-        // hesitation.
+        // Mid-gesture: un-rest at once (fractional placement) but hold the
+        // countdown; rest is declared at endGesture, not at a pinch hesitation.
         gesture.zoomed = true;
-        if (ctx.getState().cameraResting) ctx.dispatch({ type: 'CAMERA_REST', resting: false });
-        if (restRaf) {
-          frames.caf(restRaf);
-          restRaf = 0;
+        ctx.state.update(setCameraResting, false);
+        if (restFrame) {
+          frames.caf(restFrame);
+          restFrame = 0;
         }
       } else {
         armRest();
       }
     }
-    ctx.dispatch({ type: 'CAMERA', camera: clamped });
+    ctx.state.update(setCamera, clamped);
   };
 
-  // ── rubber-band (elastic overscroll) ────────────────────────────────────────
-  // The curve pair lives in motion.ts; these are its STATE adapters. One rule
-  // governs where the rubber exists at all: it softens only the edges of a
-  // scroll RANGE. An axis whose content FITS the viewport has no travel — the
-  // clamp holds it at its fitAlign rest, and it stays rigid however hard the
-  // finger tugs (the UIScrollView default: bouncing exists only where content
-  // exceeds bounds).
+  // ── rubber-band (elastic overscroll) ──
+  // The curve pair lives in motion.ts; these adapt it to camera state. The
+  // rubber softens only the edges of a scroll range: an axis whose content
+  // fits the viewport has no travel, the clamp holds it at its fitAlign rest,
+  // and it stays rigid however hard the finger tugs (the UIScrollView
+  // default: bouncing exists only where content exceeds the bounds).
   const axisTravels = (origin: number, content: number, view: number, zoom: number): boolean =>
-    !S.travelRange(origin, content, view, zoom, constraint().padding).fits;
-  /** Unclamped finger-integrated camera → the DISPLAYED camera: clamp, then
-   *  re-apply the overshoot through the resistance curve, per travelling axis.
-   *  Inside the bounds this is exactly the clamp (rubber of zero is zero);
-   *  on a fitting axis it is exactly the clamp ALWAYS. */
-  const rubberize = (raw: S.Camera): S.Camera => {
-    const clamped = S.clampCamera(raw, stayBounds(), vp(), constraint());
-    const v = vp();
-    const b = stayBounds();
-    const axis = (rawA: number, clampedA: number, dim: number, travels: boolean): number => {
-      if (!travels) return clampedA;
-      const dWorld = rawA - clampedA;
-      if (dWorld === 0) return clampedA;
-      const out = rubberOut(Math.abs(dWorld) * raw.zoom, Math.max(1, dim));
-      return clampedA + (Math.sign(dWorld) * out) / raw.zoom;
+    !travelRange(origin, content, view, zoom, constraint().padding).fits;
+  /** The unclamped finger-integrated camera → the displayed camera: clamp,
+   *  then re-apply the overshoot through the resistance curve, per travelling
+   *  axis. Inside the bounds this is exactly the clamp, and on a fitting axis
+   *  it is always the clamp. */
+  const rubberize = (raw: Camera): Camera => {
+    const clamped = clampCamera(raw, stayBounds(), viewport(), constraint());
+    const size = viewport();
+    const bounds = stayBounds();
+    const axis = (
+      rawPosition: number,
+      clampedPosition: number,
+      dimension: number,
+      travels: boolean,
+    ): number => {
+      if (!travels) return clampedPosition;
+      const overshootWorld = rawPosition - clampedPosition;
+      if (overshootWorld === 0) return clampedPosition;
+      const stretch = rubberOut(Math.abs(overshootWorld) * raw.zoom, Math.max(1, dimension));
+      return clampedPosition + (Math.sign(overshootWorld) * stretch) / raw.zoom;
     };
     return {
       zoom: raw.zoom,
-      x: axis(raw.x, clamped.x, v.width, axisTravels(b.x, b.width, v.width, raw.zoom)),
-      y: axis(raw.y, clamped.y, v.height, axisTravels(b.y, b.height, v.height, raw.zoom)),
-    };
-  };
-  /** Displayed camera → the raw position `rubberize` would have produced it
-   *  from. Overshoot is capped just under the asymptote so the inverse stays
-   *  finite whatever state a catch finds the camera in. */
-  const unrubberize = (displayed: S.Camera): S.Camera => {
-    const clamped = S.clampCamera(displayed, stayBounds(), vp(), constraint());
-    const v = vp();
-    const b = stayBounds();
-    const axis = (dispA: number, clampedA: number, dim: number, travels: boolean): number => {
-      if (!travels) return clampedA;
-      const dWorld = dispA - clampedA;
-      if (dWorld === 0) return clampedA;
-      const d = Math.max(1, dim);
-      const out = Math.min(Math.abs(dWorld) * displayed.zoom, d - 1);
-      return clampedA + (Math.sign(dWorld) * rubberIn(out, d)) / displayed.zoom;
-    };
-    return {
-      zoom: displayed.zoom,
-      x: axis(displayed.x, clamped.x, v.width, axisTravels(b.x, b.width, v.width, displayed.zoom)),
+      x: axis(
+        raw.x,
+        clamped.x,
+        size.width,
+        axisTravels(bounds.x, bounds.width, size.width, raw.zoom),
+      ),
       y: axis(
-        displayed.y,
+        raw.y,
         clamped.y,
-        v.height,
-        axisTravels(b.y, b.height, v.height, displayed.zoom),
+        size.height,
+        axisTravels(bounds.y, bounds.height, size.height, raw.zoom),
       ),
     };
   };
-  // The elastic write path: NO clamp — used only by the elastic pan and the
-  // edge spring, whose math guarantees every trajectory terminates clamped.
-  const setCamRaw = (c: S.Camera) => ctx.dispatch({ type: 'CAMERA', camera: c });
+  /** The displayed camera → the raw position `rubberize` would have produced
+   *  it from. The overshoot is capped just under the asymptote so the inverse
+   *  stays finite whatever state a catch finds the camera in. */
+  const unrubberize = (displayed: Camera): Camera => {
+    const clamped = clampCamera(displayed, stayBounds(), viewport(), constraint());
+    const size = viewport();
+    const bounds = stayBounds();
+    const axis = (
+      displayedPosition: number,
+      clampedPosition: number,
+      dimension: number,
+      travels: boolean,
+    ): number => {
+      if (!travels) return clampedPosition;
+      const overshootWorld = displayedPosition - clampedPosition;
+      if (overshootWorld === 0) return clampedPosition;
+      const span = Math.max(1, dimension);
+      const stretch = Math.min(Math.abs(overshootWorld) * displayed.zoom, span - 1);
+      return (
+        clampedPosition + (Math.sign(overshootWorld) * rubberIn(stretch, span)) / displayed.zoom
+      );
+    };
+    return {
+      zoom: displayed.zoom,
+      x: axis(
+        displayed.x,
+        clamped.x,
+        size.width,
+        axisTravels(bounds.x, bounds.width, size.width, displayed.zoom),
+      ),
+      y: axis(
+        displayed.y,
+        clamped.y,
+        size.height,
+        axisTravels(bounds.y, bounds.height, size.height, displayed.zoom),
+      ),
+    };
+  };
+  // The elastic write path, with no clamp: used only by the elastic pan and
+  // the edge spring, whose math guarantees every trajectory ends clamped.
+  const writeCameraUnclamped = (next: Camera) => ctx.state.update(setCamera, next);
 
   /**
    * Cursor reconciliation, one direction per interaction:
-   *   navigation  → cursor is INTENT, set explicitly; the camera honors it as far
-   *                 as the clamp allows — and a clamped camera never revokes it.
-   *   manipulation → (pan / drag / pinch) the camera moves freely; the cursor is
-   *                 DERIVED from it. Only those verbs call this. Paged never syncs.
+   *   navigation   → the cursor is intent, set explicitly; the camera honors
+   *                  it as far as the clamp allows, and a clamped camera
+   *                  never revokes it.
+   *   manipulation → (pan, drag, pinch) the camera moves freely and the
+   *                  cursor is derived from it. Only those verbs call this.
+   * Paged flow never syncs.
    */
   const syncCursorFromCamera = () => {
     if (paged()) return;
-    const sc = buildScene();
-    if (!sc.itemCount) return;
-    const page = S.anchorFromCamera(cam(), sc, vp()).pageIndex;
-    if (page !== ctx.getState().cursor) ctx.dispatch({ type: 'CURSOR', cursor: page });
+    const scene = buildScene();
+    if (!scene.itemCount) return;
+    ctx.state.update(setCursor, anchorFromCamera(camera(), scene, viewport()).pageIndex);
   };
 
-  /** Tag what drives the NEXT camera/cursor change — dispatched on flips
-   *  only, read by the page-state feed (see StageState.motionCause). */
-  const markCause = (cause: 'user' | 'programmatic'): void => {
-    if (ctx.getState().motionCause !== cause) ctx.dispatch({ type: 'MOTION_CAUSE', cause });
-  };
+  /** Tag what drives the next camera or cursor change (see `StageState.motionCause`). */
+  const markCause = (cause: StageState['motionCause']): void =>
+    ctx.state.update(setMotionCause, cause);
 
   return {
     gesture,
     armRest,
-    setCam,
-    setCamRaw,
+    writeCamera,
+    writeCameraUnclamped,
     axisTravels,
     rubberize,
     unrubberize,

@@ -1,6 +1,4 @@
-/** The eight change hooks; disposed with the plugin. */
-import { createEventHook } from '@embedpdf/core';
-
+/** The capability's events, minted on the instance so they are disposed with it. */
 import type {
   StampArmChangedEvent,
   StampAssetEvent,
@@ -10,38 +8,15 @@ import type {
 import type { StampContext } from './context';
 
 export function createEvents(ctx: StampContext) {
-  const reportListener = (error: unknown) =>
-    globalThis.console?.error('[stamp] event listener failed:', error);
-  const libraryChanged = createEventHook<StampLibraryChange>(reportListener);
-  const libraryCreated = createEventHook<StampLibraryEvent>(reportListener);
-  const libraryUpdated = createEventHook<StampLibraryEvent>(reportListener);
-  const libraryDeleted = createEventHook<StampLibraryEvent>(reportListener);
-  const assetCreated = createEventHook<StampAssetEvent>(reportListener);
-  const assetUpdated = createEventHook<StampAssetEvent>(reportListener);
-  const assetDeleted = createEventHook<StampAssetEvent>(reportListener);
-  const armChanged = createEventHook<StampArmChangedEvent>(reportListener);
-  ctx.cleanup(() => {
-    for (const hook of [
-      libraryChanged,
-      libraryCreated,
-      libraryUpdated,
-      libraryDeleted,
-      assetCreated,
-      assetUpdated,
-      assetDeleted,
-      armChanged,
-    ])
-      hook.dispose();
-  });
   return {
-    libraryChanged,
-    libraryCreated,
-    libraryUpdated,
-    libraryDeleted,
-    assetCreated,
-    assetUpdated,
-    assetDeleted,
-    armChanged,
+    libraryChanged: ctx.events.source<StampLibraryChange>(),
+    libraryCreated: ctx.events.source<StampLibraryEvent>(),
+    libraryUpdated: ctx.events.source<StampLibraryEvent>(),
+    libraryDeleted: ctx.events.source<StampLibraryEvent>(),
+    assetCreated: ctx.events.source<StampAssetEvent>(),
+    assetUpdated: ctx.events.source<StampAssetEvent>(),
+    assetDeleted: ctx.events.source<StampAssetEvent>(),
+    armChanged: ctx.events.source<StampArmChangedEvent>(),
   };
 }
 export type StampEvents = ReturnType<typeof createEvents>;

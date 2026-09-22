@@ -1,8 +1,8 @@
 import { formWidget } from '@embedpdf/engine-core/runtime';
 /**
  * The form place handler's gesture semantics — the rules it shares with the
- * annotation handlers: page-anchored projection, the UP sample as the final
- * point, a CLICK means width AND height under the shared threshold, no
+ * annotation handlers: page-anchored projection, the up sample as the final
+ * point, a click means width and height under the shared threshold, no
  * capture without write permission, preview driven while dragging and
  * cleared on every completion path, auto-select only while the world hasn't
  * moved on.
@@ -12,7 +12,7 @@ import type {
   InteractionHostCapability,
   PointerSample,
 } from '@embedpdf/plugin-interaction/contract/host';
-import type { AnnotationHostCapability } from '@embedpdf/plugin-annotation/internal';
+import type { AnnotationHostCapability } from '@embedpdf/plugin-annotation/contract/host';
 import { toPageRef, type PageRef } from '@embedpdf/engine-core/runtime';
 
 import { createPlaceHandler } from '../src/tools/handlers';
@@ -37,7 +37,7 @@ function makeForm(over: Partial<FormHostCapability> = {}) {
     }),
     ...over,
   } as unknown as FormHostCapability;
-  return { form, placed, setResult: (r: CreatedField) => (resolveNext = r) };
+  return { form, placed, setResult: (created: CreatedField) => (resolveNext = created) };
 }
 
 function makeAnnotation() {
@@ -68,21 +68,21 @@ const sample = (over: Partial<PointerSample>): PointerSample => ({
 const at = (phase: PointerSample['phase'], x: number, y: number): PointerSample =>
   sample({ phase, page: { ref: PAGE_REF, point: { x, y } } });
 
-const flush = () => new Promise((r) => setTimeout(r, 0));
+const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 describe('form place handler', () => {
   it('a CLICK places the tool default size CENTRED on the point (shared placement)', async () => {
     const { form, placed } = makeForm();
     const { annotation } = makeAnnotation();
-    const h = createPlaceHandler(form, interactionFor('form-text'), annotation);
-    expect(h.onDown(at('down', 100, 100))).toBe(true);
-    h.onUp?.(at('up', 101, 101)); // sub-threshold in BOTH axes
+    const handler = createPlaceHandler(form, interactionFor('form-text'), annotation);
+    expect(handler.onDown(at('down', 100, 100))).toBe(true);
+    handler.onUp?.(at('up', 101, 101)); // sub-threshold in both axes
     await flush();
     expect(placed).toHaveLength(1);
     expect(placed[0]).toMatchObject({
       family: 'text',
       page: PAGE_REF,
-      // 160×24 centred on the DOWN point (the core's `d.from` rule).
+      // 160×24 centred on the down point (the core's `d.from` rule).
       bounds: { x: 20, y: 88, width: 160, height: 24 },
     });
     expect(placed[0]!.appearance).toMatchObject({ strokeWidth: 1 });
@@ -90,25 +90,25 @@ describe('form place handler', () => {
 
   it('a THIN drag is a DRAG, never a click placement (width AND height rule)', async () => {
     const { form, placed } = makeForm();
-    const h = createPlaceHandler(form, interactionFor('form-text'), null);
-    h.onDown(at('down', 50, 50));
-    h.onUp?.(at('up', 150, 52)); // 100×2 — one axis under threshold
+    const handler = createPlaceHandler(form, interactionFor('form-text'), null);
+    handler.onDown(at('down', 50, 50));
+    handler.onUp?.(at('up', 150, 52)); // 100×2 — one axis under threshold
     await flush();
     expect(placed[0]!.bounds).toEqual({ x: 50, y: 50, width: 100, height: 2 });
   });
 
   it('tracks the HOME page through the projection; the UP sample is final', async () => {
     const { form, placed } = makeForm();
-    const h = createPlaceHandler(form, interactionFor('form-text'), null);
-    h.onDown(at('down', 10, 10));
+    const handler = createPlaceHandler(form, interactionFor('form-text'), null);
+    handler.onDown(at('down', 10, 10));
     // Cursor physically over another page; projection speaks for the home page.
-    h.onMove?.(
+    handler.onMove?.(
       sample({
         page: { ref: toPageRef(99), point: { x: 1, y: 1 } },
         project: (page) => (page.pageObjectNumber === PON ? { x: 90, y: 40 } : null),
       }),
     );
-    h.onUp?.(
+    handler.onUp?.(
       sample({
         phase: 'up',
         project: (page) => (page.pageObjectNumber === PON ? { x: 110, y: 60 } : null),
@@ -120,25 +120,25 @@ describe('form place handler', () => {
 
   it('declines the gesture without write permission (edit/pan still route)', () => {
     const { form } = makeForm({ canDesign: () => false } as Partial<FormHostCapability>);
-    const h = createPlaceHandler(form, interactionFor('form-text'), null);
-    expect(h.onDown(at('down', 10, 10))).toBe(false);
+    const handler = createPlaceHandler(form, interactionFor('form-text'), null);
+    expect(handler.onDown(at('down', 10, 10))).toBe(false);
   });
 
   it('drives the placement preview while dragging and clears it on up', async () => {
     const { form } = makeForm();
     const { annotation, previews, clears } = makeAnnotation();
-    const h = createPlaceHandler(form, interactionFor('form-checkbox'), annotation);
-    h.onDown(at('down', 10, 10));
-    h.onMove?.(at('move', 11, 11)); // under threshold → no preview yet
+    const handler = createPlaceHandler(form, interactionFor('form-checkbox'), annotation);
+    handler.onDown(at('down', 10, 10));
+    handler.onMove?.(at('move', 11, 11)); // under threshold → no preview yet
     expect(previews).toHaveLength(0);
-    h.onMove?.(at('move', 60, 40));
+    handler.onMove?.(at('move', 60, 40));
     expect(previews.at(-1)).toMatchObject({
       toolId: 'form-checkbox',
       page: PAGE_REF,
       box: { x: 10, y: 10, width: 50, height: 30 },
     });
     const before = clears();
-    h.onUp?.(at('up', 60, 40));
+    handler.onUp?.(at('up', 60, 40));
     expect(clears()).toBe(before + 1); // every completion path drops the preview
     await flush();
   });
@@ -146,9 +146,9 @@ describe('form place handler', () => {
   it('auto-selects the created widget — unless the tool changed mid-flight', async () => {
     const { form } = makeForm();
     const { annotation, selects } = makeAnnotation();
-    const h = createPlaceHandler(form, interactionFor('form-text'), annotation);
-    h.onDown(at('down', 100, 100));
-    h.onUp?.(at('up', 100, 100));
+    const handler = createPlaceHandler(form, interactionFor('form-text'), annotation);
+    handler.onDown(at('down', 100, 100));
+    handler.onUp?.(at('up', 100, 100));
     await flush();
     expect(selects).toEqual([{ kind: 'objectNumber', annotObjectNumber: 42, page: PAGE_REF }]);
 
@@ -172,9 +172,9 @@ describe('form place handler', () => {
           throw new Error('nope');
         }),
       } as Partial<FormHostCapability>);
-      const h = createPlaceHandler(form, interactionFor('form-text'), null);
-      h.onDown(at('down', 100, 100));
-      h.onUp?.(at('up', 100, 100));
+      const handler = createPlaceHandler(form, interactionFor('form-text'), null);
+      handler.onDown(at('down', 100, 100));
+      handler.onUp?.(at('up', 100, 100));
       await flush();
       expect(spy).toHaveBeenCalled();
     } finally {

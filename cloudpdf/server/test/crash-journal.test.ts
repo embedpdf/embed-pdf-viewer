@@ -20,7 +20,7 @@ import {
 /**
  * The quarantine decision rules. The load-bearing
  * negative tests come straight from the design review: singleton
- * cohort-intersection is DIAGNOSTICS ONLY (the A/B/C counterexample
+ * cohort-intersection is diagnostics only (the A/B/C counterexample
  * must never quarantine innocent B), and one sole-suspect crash proves
  * nothing — two independent events on the full key are required.
  */
@@ -88,7 +88,7 @@ describe('CrashJournal decision rules', () => {
       await journal.recordCrash(crashEvent({ shas: ['B', 'C'] })); // caused by C
       expect(await quarantineRows(db)).toHaveLength(0); // B stays free, forever
 
-      // …but the intersection IS recorded as operator diagnostics.
+      // …but the intersection is recorded as operator diagnostics.
       const crashes = await db
         .selectFrom('engine_crashes')
         .selectAll()
@@ -132,7 +132,7 @@ describe('CrashJournal decision rules', () => {
       await journal.recordCrash(crashEvent({ shas: ['Z'], build: '3.0.0:linux-x64' }));
       await journal.recordCrash(crashEvent({ shas: ['Z'], build: '3.0.0:linux-arm64' }));
       expect(await quarantineRows(db)).toHaveLength(0);
-      // …but DIFFERENT OPS on the same sha+signature DO pair: the same
+      // …but different ops on the same sha+signature do pair: the same
       // poison bytes reaching the same native fault from two entry
       // points is the same crasher, and the raw kinds are kept as
       // forensics rather than promoted into the key.
@@ -183,7 +183,7 @@ describe('CrashJournal decision rules', () => {
       await expect(journal.assertNotQuarantined('X', BUILD)).rejects.toThrow(
         DocumentQuarantinedError,
       );
-      // A DIFFERENT running binary is not blocked (clean-slate law)…
+      // A different running binary is not blocked (clean-slate law)…
       await expect(journal.assertNotQuarantined('X', '3.0.1:linux-x64')).resolves.toBeUndefined();
       // …and an unknown build (host not ready) refuses nothing.
       await expect(journal.assertNotQuarantined('X', null)).resolves.toBeUndefined();
@@ -243,7 +243,7 @@ describe('crash journal — round-2 hardening', () => {
     try {
       // Both record the same sole-suspect at once. With read-before-insert
       // both would see no prior evidence and never pair; insert-then-read
-      // guarantees whichever reads last sees the other in EVERY
+      // guarantees whichever reads last sees the other in every
       // interleaving (and the quarantine upsert is idempotent when both do).
       await Promise.all([
         a.recordCrash(crashEvent({ shas: ['X'] })),
@@ -365,7 +365,7 @@ describe('crash journal end-to-end (host mode, observe-only)', () => {
         /host died|unavailable/i,
       );
 
-      // recordCrash is fire-and-forget BY DESIGN (journaling must never
+      // recordCrash is fire-and-forget by design (journaling must never
       // delay respawn) — poll for the async writes to land.
       const until = async (fn: () => Promise<boolean>) => {
         const deadline = Date.now() + 10_000;
@@ -383,7 +383,7 @@ describe('crash journal end-to-end (host mode, observe-only)', () => {
       const rows = await quarantineRows(db);
       expect(rows.map((r) => r.base_sha)).toEqual(['sha-poison']);
 
-      // Enforcement refuses the sha BEFORE it can crash the fresh host…
+      // Enforcement refuses the sha before it can crash the fresh host…
       await new Promise((r) => setTimeout(r, 600));
       await expect(pool.runAdHoc('sha-poison', rawBuild({ kind: 'die', code: 7 }))).rejects.toThrow(
         DocumentQuarantinedError,
@@ -418,9 +418,9 @@ describe('quarantine over HTTP (host fixture, enforcing)', () => {
         })
         .execute();
 
-      // Resident-run gating (round 2, finding 3): the doc is already
-      // open here — this call rides run(), which the decorator's
-      // residency mirror gates. No cache, no window: immediate 422.
+      // Resident-run gating: the doc is already open here — this call
+      // rides run(), which the decorator's residency mirror gates. No
+      // cache, no window: immediate 422.
       const second = await listAnnotations(fx, 'tenant-q', 'docq00001', 'alice');
       expect(second.status).toBe(422);
       const body = JSON.parse(second.body) as { error: { code: string; message: string } };

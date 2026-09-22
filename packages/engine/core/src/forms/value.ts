@@ -5,7 +5,7 @@
  *
  * - `text` → text-family fields. Values longer than /MaxLen are truncated.
  * - `toggle` → checkbox/radio. `state` is a widget's `onState` token and
- *   selects WHICH widget of the group is checked; `null` clears the group
+ *   selects which widget of the group is checked; `null` clears the group
  *   (rejected for radios with `noToggleToOff`). Sibling widgets update
  *   together (checkboxes and in-unison radios check all widgets sharing
  *   the target's export value).

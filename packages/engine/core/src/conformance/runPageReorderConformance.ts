@@ -20,19 +20,19 @@ import { PageListSnapshotSchema, PageMoveResultSchema } from '../wire/schemas';
  * harness can exercise reorder permutations meaningfully.
  */
 export interface PageReorderConformanceFixture extends ConformanceFixture {
-  /** Stable, durable PONs of (at least) three distinct pages. Order
+  /** Stable, durable page object numbers of (at least) three distinct pages. Order
    *  here is the *intended caller-visible* order, not the on-disk
    *  order; the suite reads `pages.list()` first and works in document
    *  order. */
-  ponsForReorderTest?: number[];
+  pageObjectNumbersForReorderTest?: number[];
   /**
    * Page used for the weak-ref-survival assertion. Defaults to the
-   * first PON in `ponsForReorderTest`. The fixture page must already
+   * first page object number in `ponsForReorderTest`. The fixture page must already
    * have at least one weak annotation (no /NM, direct object) so the
    * harness can capture an `index`-kind ref before the page move and
    * re-use it after.
    */
-  weakRefHostPon?: number;
+  weakRefHostPageObjectNumber?: number;
   /** Quad to use for the `create()` step that produces a stable ref
    *  the suite uses. */
   createQuad?: HighlightDraft['quadPoints'];
@@ -53,7 +53,7 @@ const DEFAULT_QUAD: HighlightDraft['quadPoints'] = [
 
 /**
  * Page reorder conformance suite. Verifies the architectural invariants
- * locked with the user, do NOT loosen these without re-reading
+ * locked with the user, do not loosen these without re-reading
  * `PageMoveResult` and `DocumentPagesMutator`:
  *
  *   1. `pages.list()` returns every page in display order, addressed
@@ -66,7 +66,7 @@ const DEFAULT_QUAD: HighlightDraft['quadPoints'] = [
  *      shuffling pages mid-edit must not lose a pending highlight. (The
  *      "move never bumps a RevisionToken" invariant is asserted directly
  *      in the annotation mutation suite, where revision liveness lives.)
- *   4. Invalid inputs (duplicate PONs, unknown PONs, out-of-range
+ *   4. Invalid inputs (duplicate page object numbers, unknown page object numbers, out-of-range
  *      `destIndex`) reject with `InvalidArg`.
  *   5. Abort propagates as `AbortError`.
  *
@@ -102,11 +102,11 @@ export function runPageReorderConformance(
         for (let i = 0; i < list.pages.length; i++) {
           // Strictly contiguous, 0..N-1.
           expect(list.pages[i].index).toBe(i);
-          // Pages are durable by construction; PON > 0.
+          // Pages are durable by construction; page object number > 0.
           expect(list.pages[i].ref.pageObjectNumber > 0).toBe(true);
         }
 
-        // PONs are unique across the document.
+        // page object numbers are unique across the document.
         const seen = new Set<number>();
         for (const p of list.pages) {
           expect(seen.has(p.ref.pageObjectNumber)).toBe(false);
@@ -122,14 +122,14 @@ export function runPageReorderConformance(
       try {
         const before = await doc.pages.list();
         if (before.pages.length < 3) return;
-        const pons = pickReorderPons(
+        const pageObjectNumbers = pickReorderPageObjectNumbers(
           before.pages.map((p) => p.ref.pageObjectNumber),
           fix,
         );
-        if (!pons) return;
+        if (!pageObjectNumbers) return;
 
-        // Move the LAST of the three to the FRONT.
-        const target = pons[pons.length - 1];
+        // Move the last of the three to the front.
+        const target = pageObjectNumbers[pageObjectNumbers.length - 1];
         const result = await doc.pages.move([toPageRef(target)], 0);
         expect(PageMoveResultSchema.safeParse(result).success).toBe(true);
 
@@ -142,11 +142,12 @@ export function runPageReorderConformance(
           expect(after.pages[i].index).toBe(i);
         }
 
-        // Set of PONs is preserved (no page lost or fabricated).
-        const beforePons = new Set(before.pages.map((p) => p.ref.pageObjectNumber));
-        const afterPons = new Set(after.pages.map((p) => p.ref.pageObjectNumber));
-        expect(beforePons.size).toBe(afterPons.size);
-        for (const pon of beforePons) expect(afterPons.has(pon)).toBe(true);
+        // Set of page object numbers is preserved (no page lost or fabricated).
+        const beforePageObjectNumbers = new Set(before.pages.map((p) => p.ref.pageObjectNumber));
+        const afterPageObjectNumbers = new Set(after.pages.map((p) => p.ref.pageObjectNumber));
+        expect(beforePageObjectNumbers.size).toBe(afterPageObjectNumbers.size);
+        for (const pageObjectNumber of beforePageObjectNumbers)
+          expect(afterPageObjectNumbers.has(pageObjectNumber)).toBe(true);
 
         // A subsequent `pages.list()` agrees with the returned layout
         // (the move result is not a one-off view).
@@ -169,8 +170,9 @@ export function runPageReorderConformance(
         // by index after the move. The created annotation is durable
         // (so we use its index ref via FPDFPage_GetAnnot, which yields
         // a working index-style ref bound to the current revision).
-        const hostPon = fix.weakRefHostPon ?? list.pages[0].ref.pageObjectNumber;
-        const hostPage = doc.page(toPageRef(hostPon));
+        const hostPageObjectNumber =
+          fix.weakRefHostPageObjectNumber ?? list.pages[0].ref.pageObjectNumber;
+        const hostPage = doc.page(toPageRef(hostPageObjectNumber));
         const beforePageList = await hostPage.annotations.list();
 
         const draft: HighlightDraft = {
@@ -197,17 +199,18 @@ export function runPageReorderConformance(
 
         const indexRef: AnnotationRef = {
           kind: 'index',
-          page: toPageRef(hostPon),
+          page: toPageRef(hostPageObjectNumber),
           index: targetIndex,
           revision: afterCreate.pageState.revision,
         };
 
-        // Move some OTHER page (not the host page) to the front. The
+        // Move some other page (not the host page) to the front. The
         // host page's revision must stay put.
-        const otherPon = list.pages.find((p) => p.ref.pageObjectNumber !== hostPon)?.ref
-          .pageObjectNumber;
-        if (otherPon === undefined) return;
-        await doc.pages.move([toPageRef(otherPon)], 0);
+        const otherPageObjectNumber = list.pages.find(
+          (p) => p.ref.pageObjectNumber !== hostPageObjectNumber,
+        )?.ref.pageObjectNumber;
+        if (otherPageObjectNumber === undefined) return;
+        await doc.pages.move([toPageRef(otherPageObjectNumber)], 0);
 
         // Use the captured weak-style ref to update the annotation.
         // This is the locked invariant: per-page RevisionToken survives
@@ -271,7 +274,7 @@ export function runPageReorderConformance(
       const doc = await openFixture(engine, opts);
       try {
         const list = await doc.pages.list();
-        // Pick a PON that is guaranteed to not exist.
+        // Pick a page object number that is guaranteed to not exist.
         let bogus = 0;
         for (const p of list.pages) bogus = Math.max(bogus, p.ref.pageObjectNumber);
         bogus += 9999;
@@ -319,17 +322,17 @@ async function openFixture(
 }
 
 /**
- * Choose three PONs to exercise reorder operations against. Prefers
+ * Choose three page object numbers to exercise reorder operations against. Prefers
  * the fixture-supplied ones, falls back to "first three in document
  * order" otherwise.
  */
-function pickReorderPons(
-  documentPons: number[],
+function pickReorderPageObjectNumbers(
+  documentPageObjectNumbers: number[],
   fix: PageReorderConformanceFixture,
 ): number[] | null {
-  if (fix.ponsForReorderTest && fix.ponsForReorderTest.length >= 3) {
-    return fix.ponsForReorderTest.slice(0, 3);
+  if (fix.pageObjectNumbersForReorderTest && fix.pageObjectNumbersForReorderTest.length >= 3) {
+    return fix.pageObjectNumbersForReorderTest.slice(0, 3);
   }
-  if (documentPons.length < 3) return null;
-  return documentPons.slice(0, 3);
+  if (documentPageObjectNumbers.length < 3) return null;
+  return documentPageObjectNumbers.slice(0, 3);
 }

@@ -2,7 +2,7 @@ import type { PageStructureCache } from './PageStructureCache';
 import type { PageListSnapshot } from '../dto/PageListSnapshot';
 
 /**
- * Result of a `pages.rotate()`. Rotation is PRESENTATION METADATA: pages are
+ * Result of a `pages.rotate()`. Rotation is presentation metadata: pages are
  * always loaded normalized (rotation forced to 0 — see `PagePtrPool`), so
  * render/text/geometry/annotation coordinates are rotation-independent and
  * every cached render stays byte-valid across a rotate. Nothing per-page is

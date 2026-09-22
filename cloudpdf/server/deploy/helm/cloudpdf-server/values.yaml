@@ -103,7 +103,7 @@ pdb:
   enabled: true
   maxUnavailable: 1
 
-# Rule of thumb (.agents/skills/embedpdf-conventions/references/runtime-confinement.md):
+# Rule of thumb (docs/conventions/runtime-confinement.md):
 # ~1 CPU per worker thread;
 # memory = base + workers x font/CMap duplication + resident-document
 # working set. Start with pool 2 / 2Gi and tune with real documents.

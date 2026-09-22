@@ -35,8 +35,8 @@ export async function runAnnotationsDemo(
 
     const fullByPage: Record<number, AnnotationListPageSnapshot> = {};
     for (const page of rawAll.pages) {
-      const pon = page.pageState.pageObjectNumber;
-      fullByPage[pon] = await doc.page(pon).annotations.list();
+      const pageObjectNumber = page.pageState.pageObjectNumber;
+      fullByPage[pageObjectNumber] = await doc.page(pageObjectNumber).annotations.list();
     }
 
     return {

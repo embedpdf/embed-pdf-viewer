@@ -7,7 +7,7 @@ import { createLocalEngine } from '../src/index';
 
 const here = dirname(fileURLToPath(import.meta.url));
 // Authored in-repo by fixtures/generate-letter-spaced-fixture.mjs (see fixtures/README.md).
-// Two pages: letter-spaced "i n v o i c e" (twice, once per page), a tracked-out INVOICE
+// Two pages: letter-spaced "i n v o i c e" (twice, once per page), a tracked-out invoice
 // heading, a mixed-case "I n v o i c e", a plain "Invoice 42", glued "totalamount" next to
 // spaced "total amount", "in" / "voice" split across a line break, and "the invoices".
 const fixturePath = resolve(here, 'fixtures', 'letter_spaced_text.pdf');
@@ -94,7 +94,7 @@ describe('ignoreWhitespace against real page text (engine-local, wasm runtime)',
     const relaxed = await search({ text: 'invoice', ignoreWhitespace: true });
     const whole = await search({ text: 'invoice', ignoreWhitespace: true, wholeWord: true });
 
-    // "the invoices" is the only hit glued to a word character in the ORIGINAL
+    // "the invoices" is the only hit glued to a word character in the original
     // text (the snippet continues with the trailing "s").
     const gluedToWordCharacter = (m: SearchMatch) => {
       const s = m.snippet!;

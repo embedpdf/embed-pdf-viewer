@@ -3,7 +3,7 @@ import type { AnnotationStableId } from './AnnotationStableId';
 import type { PageRef } from './PageRef';
 
 /**
- * THE string key for an annotation address — for maps, sets and React keys.
+ * The string key for an annotation address — for maps, sets and React keys.
  * A ref is an object, and JavaScript keys objects by identity, so two refs
  * that name the same annotation need one canonical value form; this is it.
  * The ref stays the thing you pass to the engine; this is only how you index.
@@ -13,10 +13,10 @@ import type { PageRef } from './PageRef';
  *   objectNumber  →  `obj:42`              an indirect object number is unique
  *                                           across the whole document
  *   nm            →  `nm:<page>:<name>`     ISO 32000 §12.5.2: /NM is unique per
- *                                           PAGE, not per document
+ *                                           page, not per document
  *   index         →  `idx:<page>:<i>`       a weak ref is page-relative by definition
  *
- * For the durable kinds this agrees with the wire: `obj:42` IS the route's
+ * For the durable kinds this agrees with the wire: `obj:42` is the route's
  * `:annotKey` (`encodeStableIdKey`), and an `nm` key is the route's
  * `:pageKey` + `:annotKey` folded into one string because a client-side map
  * has no path segment to keep the page in.

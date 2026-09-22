@@ -3,7 +3,7 @@
  * enriches the payload with build facts only the server knows (framework
  * from the docs path, the engine flavour this site documents, the deployed
  * revision and environment) and forwards it to the control-plane, which
- * validates, rate-limits, and stores it (DOCS-PLATFORM-ARCHITECTURE.md).
+ * validates, rate-limits, and stores it (docs/conventions/docs-architecture.md).
  */
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';

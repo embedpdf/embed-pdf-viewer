@@ -16,11 +16,11 @@ const DRAIN_LIMIT = 200;
 const MAX_BACKFILL = 1000;
 /** Keeps proxies from idling the stream out; also paces exp re-checks. */
 const HEARTBEAT_MS = 25_000;
-/** setTimeout caps at 2^31-1 ms (~24.8 days) and fires IMMEDIATELY beyond
+/** setTimeout caps at 2^31-1 ms (~24.8 days) and fires immediately beyond
  *  it — a 90-day token must re-arm in slices, never one long timer. */
 const MAX_TIMER_MS = 6 * 60 * 60 * 1000;
 /** Cut the stream this long before token expiry so the client can refresh
- *  and reconnect BEFORE its JWT goes stale. */
+ *  and reconnect before its JWT goes stale. */
 const EXP_GRACE_MS = 5_000;
 
 export interface EventsRoutesOptions {
@@ -56,7 +56,7 @@ export interface EventsRoutesOptions {
  *     is revoked (pushed via the bus's revocation channel, any replica),
  *     with a heartbeat revalidation sweep as the fallback for a broken
  *     push subscription. The client treats it as terminal — a revoked
- *     credential must not keep WATCHING a document either.
+ *     credential must not keep watching a document either.
  */
 export async function registerEventsRoutes(
   app: FastifyInstance,
@@ -147,7 +147,7 @@ export async function registerEventsRoutes(
       }
     };
 
-    // Subscribe BEFORE the initial drain: a row committed between the two
+    // Subscribe before the initial drain: a row committed between the two
     // rings the doorbell and coalesces into the drain — no startup gap.
     const unsubscribe = opts.realtimeBus.subscribeMutation(
       { tenantId: ctx.tenantId, docId },
@@ -161,7 +161,7 @@ export async function registerEventsRoutes(
       cleanup();
       raw.end();
     };
-    // Push path: a revocation issued on ANY replica closes this stream in
+    // Push path: a revocation issued on any replica closes this stream in
     // notification latency. Tokens without a jti cannot be individually
     // revoked (consistent with the verifier) — their lifetime is bounded
     // by `exp` like any bearer credential.

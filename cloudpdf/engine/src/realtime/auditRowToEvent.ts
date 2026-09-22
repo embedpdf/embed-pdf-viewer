@@ -44,7 +44,7 @@ export interface AuditEventRow {
  * Translate a remote audit row into a `DocumentEvent` — pure, so the
  * exactly-once and verbatim-payload invariants are unit-testable without a
  * server. Returns `null` for kinds this engine version doesn't know
- * (a NEWER server's events degrade to "ignored", never to a crash).
+ * (a newer server's events degrade to "ignored", never to a crash).
  *
  * Context-field fidelity differs by op, by design of the audit row:
  *   - rotate/delete: `affectedPages` is exactly the op's page set; rotation
@@ -70,7 +70,8 @@ export function auditRowToEvent(row: AuditEventRow, mySessionId: string): Docume
 
   // The row's page: its explicit column, else the first affected page.
   const rowPage = () => toPageRef(row.pageObjectNumber ?? row.affectedPages[0] ?? 0);
-  const affectedPages = () => row.affectedPages.map((pon) => toPageRef(pon));
+  const affectedPages = () =>
+    row.affectedPages.map((pageObjectNumber) => toPageRef(pageObjectNumber));
 
   switch (row.kind) {
     case 'measure.setScale':

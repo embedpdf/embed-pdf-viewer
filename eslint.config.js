@@ -72,11 +72,95 @@ module.exports = [
     },
   },
   {
-    // The two-door invariant, enforced (naming.md + packages/viewer/*/src/component.*).
+    // Names say what a value is (docs/conventions/naming.md): no single
+    // letters beyond loop counters, coordinates, ignored parameters and the
+    // translate function, and none of the abbreviations the glossary retires.
+    files: [
+      'packages/{core,plugin,framework,viewer}/*/src/**/*.{ts,tsx}',
+      'packages/framework/angular/*/src/**/*.ts',
+    ],
+    rules: {
+      'id-length': [
+        'error',
+        {
+          min: 2,
+          properties: 'never',
+          exceptions: ['i', 'j', 'x', 'y', '_', 't'],
+          exceptionPatterns: ['^[TKV]$'],
+        },
+      ],
+      'id-denylist': [
+        'error',
+        'pon',
+        'pons',
+        'opts',
+        'cfg',
+        'err',
+        'evt',
+        'ev',
+        'prev',
+        'cur',
+        'idx',
+        'res',
+        'req',
+        'cb',
+        'tmp',
+        'cap',
+        'def',
+        'sel',
+        'ptr',
+        'pts',
+        'bin',
+        'el',
+        'msg',
+        'annot',
+        'geom',
+        'rawCtx',
+      ],
+    },
+  },
+  {
+    // A PDF transform matrix is `[a b c d e f]` in the specification; the
+    // matrix helpers keep those entry names so the math reads like the spec.
+    files: ['packages/core/geometry/src/index.ts'],
+    rules: {
+      'id-length': [
+        'error',
+        {
+          min: 2,
+          properties: 'never',
+          exceptions: ['i', 'j', 'x', 'y', '_', 't', 'a', 'b', 'c', 'd', 'e', 'f'],
+          exceptionPatterns: ['^[TKV]$'],
+        },
+      ],
+    },
+  },
+  {
+    // Inside a plugin, events and write queues come from the context, so the
+    // kernel owns their lifetime (docs/conventions/plugins.md).
+    files: ['packages/plugin/*/src/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: '@embedpdf/core',
+              importNames: ['createEventHook', 'createSerialQueue'],
+              message: 'Use ctx.events.source() / ctx.serialQueue() inside plugins.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    // The two-door invariant, enforced (docs/conventions/packages.md and
+    // packages/viewer/*/src/component.*).
     //
-    // A framework wrapper's component module must stay ENGINE-BLIND: the local
+    // A framework wrapper's component module must stay engine-blind: the local
     // PDFium engine enters a consumer's bundle through a runtime import of the
-    // `.` door, and if that import sits in the shared component then BOTH doors
+    // `.` door, and if that import sits in the shared component then both doors
     // carry it and the cloud build's "no wasm" promise is silently gone. Types
     // are free — they vanish at compile time — so the boundary is exactly
     // `import type`.
@@ -101,7 +185,7 @@ module.exports = [
   },
   {
     // The CloudPDF tree renders server-side by definition — "no wasm in your
-    // bundle" IS the product — so it must never reach for the local-engine
+    // bundle" is the product — so it must never reach for the local-engine
     // door. `@embedpdf/viewer` and `@embedpdf/viewer-<fw>` bundle PDFium;
     // their `/core` subpaths do not. (A bare `*` glob does not cross `/`, so
     // the `/core` doors stay allowed.)

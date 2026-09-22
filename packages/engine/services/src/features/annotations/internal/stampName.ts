@@ -1,7 +1,7 @@
 /**
  * The PDF standard stamp `/Name` set (ISO 32000-2 table 187 plus the
  * Adobe SB/SH extended names the fork draws). Informational only: the
- * predefined set is a READER's rendering obligation, and `/Name` accepts
+ * predefined set is a reader's rendering obligation, and `/Name` accepts
  * any name — Acrobat library identifiers such as '#LBGiYhk8V_oAfmqAPENiwD'
  * are written verbatim through `EPDFAnnot_SetName`.
  */

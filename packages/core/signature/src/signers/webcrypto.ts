@@ -78,19 +78,19 @@ export interface TestSigner extends RawSigner {
  * `{ anchors: async () => [signer.certificate] }`.
  */
 export async function createTestSigner(
-  opts: {
+  options: {
     commonName?: string;
     algorithm?: 'RSA-PKCS1-v1_5' | 'RSA-PSS' | 'ECDSA';
     hash?: 'sha256' | 'sha384' | 'sha512';
   } = {},
 ): Promise<TestSigner> {
   ensureEngine();
-  const hash = opts.hash ?? 'sha256';
-  const keys = await generateSigningKeyPair(opts.algorithm ?? 'RSA-PKCS1-v1_5', hash, true);
+  const hash = options.hash ?? 'sha256';
+  const keys = await generateSigningKeyPair(options.algorithm ?? 'RSA-PKCS1-v1_5', hash, true);
   const certificate = await selfSignedCertificate({
     publicKey: keys.publicKey,
     privateKey: keys.privateKey,
-    commonName: opts.commonName ?? 'EmbedPDF test signer',
+    commonName: options.commonName ?? 'EmbedPDF test signer',
     hash,
   });
   const signer = webCryptoSigner({

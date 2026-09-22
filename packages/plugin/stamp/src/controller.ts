@@ -2,26 +2,26 @@
  * The stamp controller: the composition root. It builds the plugin's
  * services once, wires each area with the services it declares, and
  * assembles the capability from the areas' API slices. No behavior lives
- * here — every verb and read has a home in `read/` or `write/`.
+ * here: every verb and read has a home in `read/` or `write/`.
  */
-import { composeApi } from '@embedpdf/core';
-import type { StampConfig } from './contract';
-import type { StampHostCapability } from './host-contract';
+import { composeApi, type PluginContext } from '@embedpdf/core';
+import type { StampCapability, StampConfig } from './contract';
+import type { StampState } from './model';
 import { createCatalog } from './read/catalog';
-import { createServices, type StampContext } from './services';
+import { createServices } from './services';
 import { createAssetWrites } from './write/assets';
 import { createLibraryWrites } from './write/libraries';
 import { createMarks } from './write/marks';
 import { createPlacement } from './write/placement';
 
 export function createStampController(
-  ctx: StampContext,
+  ctx: PluginContext<StampState>,
   config: StampConfig = {},
-): StampHostCapability {
+) {
   const services = createServices(ctx, config);
   const { events } = services;
 
-  // Reads: pure projections of the store and the sidecar.
+  // Reads: pure projections of the state and the binaries resource.
   const catalog = createCatalog(ctx, services);
 
   // Writes: every durable change, through the per-library mutation queue.
@@ -30,13 +30,13 @@ export function createStampController(
   const assets = createAssetWrites(ctx, services, marks, libraries);
   const placement = createPlacement(ctx, services, config);
 
-  const api = composeApi('stamp', [
+  const api: StampCapability = composeApi('stamp', [
     catalog.api,
     libraries.api,
     assets.api,
     placement.api,
     {
-      // The change hooks are services, not areas.
+      // The events are services, not areas.
       onLibraryChanged: events.libraryChanged.on,
       onLibraryCreated: events.libraryCreated.on,
       onLibraryUpdated: events.libraryUpdated.on,
@@ -46,6 +46,6 @@ export function createStampController(
       onAssetDeleted: events.assetDeleted.on,
       onArmChanged: events.armChanged.on,
     },
-  ]) satisfies StampHostCapability;
-  return api;
+  ]);
+  return { api };
 }

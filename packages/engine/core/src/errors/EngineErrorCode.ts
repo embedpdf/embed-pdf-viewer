@@ -44,7 +44,7 @@ export const EngineErrorCode = {
    * durable version advanced (another writer — typically another server
    * replica — committed) between the operation's prepare and its commit,
    * and the server exhausted its rebase-and-retry budget. Retryable: the
-   * operation was NOT applied; re-issue it against the new state.
+   * operation was not applied; re-issue it against the new state.
    */
   LayerVersionConflict: 'LayerVersionConflict',
   /**

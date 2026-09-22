@@ -1,12 +1,12 @@
 /**
- * THE form-tool table — the single source of truth for the palette. Every
+ * The form-tool table — the single source of truth for the palette. Every
  * derivation reads this one list: interaction registration (annotation-less),
  * annotation tool/style registration (full viewer), active-tool → field
  * family lookup, click placement, and default appearance.
  *
- * "One tool system, two commit planes": the tools live in the ANNOTATION
+ * "One tool system, two commit planes": the tools live in the annotation
  * registry when that plugin is present (defaults, style panel, click-create —
- * the shared authoring infrastructure), but the COMMIT always goes
+ * the shared authoring infrastructure), but the commit always goes
  * through `doc.forms.createField` via the form place handler. The tags make
  * that structural: these tools enable `form-place`, never `annotation-draw`,
  * so the annotation draw handler can't wake up for them.
@@ -19,14 +19,14 @@ export type AuthorableFormFamily = Exclude<FormFieldFamily, 'pushbutton' | 'unkn
 
 export interface FormToolDef {
   id: string;
-  /** The field family `placeField` commits (the FORM plane's vocabulary). */
+  /** The field family `placeField` commits (the form plane's vocabulary). */
   family: AuthorableFormFamily;
-  /** The client kind the ANNOTATION registry routes on (props panel).
+  /** The client kind the annotation registry routes on (props panel).
    *  Not a PDF subtype — every widget is PDF `widget`; this is the view. */
   visualKind: 'widget-text' | 'widget-choice' | 'widget-toggle' | 'widget-box';
   /** What a bare click places (box policies only — fields are boxes). */
   clickCreate: Extract<ClickCreate, { width: number }>;
-  /** Seed drawing defaults: a placed field is VISIBLE (white box, gray
+  /** Seed drawing defaults: a placed field is visible (white box, gray
    *  border) and restylable per tool through the shared style panel. */
   defaults: AnnotationPropsPatch;
   cursor: string;
@@ -96,5 +96,5 @@ export const FORM_TOOLS: readonly FormToolDef[] = [
 ];
 
 export const FORM_TOOL_BY_ID: ReadonlyMap<string, FormToolDef> = new Map(
-  FORM_TOOLS.map((t) => [t.id, t]),
+  FORM_TOOLS.map((tool) => [tool.id, tool]),
 );

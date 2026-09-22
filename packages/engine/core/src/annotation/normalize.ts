@@ -18,7 +18,7 @@ import { normalizeStampDraft, normalizeStampPatch } from './kinds/stamp/normaliz
  * draft/patch is replaced by `{ resource: key }` and its bytes move into
  * the returned `WireResourceMap` (worker: transfer list; cloud: multipart
  * `resource:{key}` parts). Kinds without binary fields pass through
- * untouched with an empty map — their wire form IS their authoring form.
+ * untouched with an empty map — their wire form is their authoring form.
  *
  * Zod-free by design: schemas validate the returned wire form; the
  * authoring types are TypeScript-only sugar.

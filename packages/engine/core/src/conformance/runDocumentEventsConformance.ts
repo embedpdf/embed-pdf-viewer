@@ -16,18 +16,21 @@ const QUAD: HighlightDraft['quadPoints'] = [
 
 /**
  * Document event stream conformance suite. Verifies the invariants the
- * collaboration design rests on — do NOT loosen these without re-reading
+ * collaboration design rests on — do not loosen these without re-reading
  * `DocumentEvent`:
  *
- *   1. EXACTLY ONCE: every confirmed mutation produces exactly one event,
+ *   1. Exactly once: every confirmed mutation produces exactly one event,
  *      in mutation order, regardless of engine (local worker or cloud HTTP).
- *   2. GROUND TRUTH: a failed mutation publishes nothing; events fire only
+ *   2. Ground truth: a failed mutation publishes nothing; events fire only
  *      after confirmation.
- *   3. RESULTS RIDE VERBATIM: each event embeds the result the caller
+ *   3. Results ride verbatim: each event embeds the result the caller
  *      received, deep-equal field for field.
- *   4. PROVENANCE: own mutations are `origin.kind: 'local'` with a stable
+ *   4. Provenance: own mutations are `origin.kind: 'local'` with a stable
  *      per-engine-instance `sessionId`.
  *   5. Unsubscribe stops delivery.
+ *   6. Published before settlement: the event for a session's own mutation
+ *      reaches subscribers before the mutation's promise settles, so a
+ *      caller that awaits the mutation already sees state derived from it.
  *
  * Both local (worker host + WASM) and cloud (HTTP + @cloudpdf/server)
  * implementations must pass identically.
@@ -57,8 +60,8 @@ export function runDocumentEventsConformance(
 
         const list = await doc.pages.list();
         if (list.pages.length < 3) return;
-        const pon = list.pages[0].ref.pageObjectNumber;
-        const page = doc.page(toPageRef(pon));
+        const pageObjectNumber = list.pages[0].ref.pageObjectNumber;
+        const page = doc.page(toPageRef(pageObjectNumber));
 
         const draft: HighlightDraft = {
           subtype: 'highlight',
@@ -70,7 +73,7 @@ export function runDocumentEventsConformance(
           subtype: 'highlight',
           contents: 'updated',
         });
-        const rotated = await doc.pages.rotate([toPageRef(pon)], 90);
+        const rotated = await doc.pages.rotate([toPageRef(pageObjectNumber)], 90);
         const victim = list.pages[2].ref.pageObjectNumber;
         const deleted = await doc.pages.delete([toPageRef(victim)]);
         const meta = await doc.metadata.update({ title: 'events conformance' });
@@ -86,7 +89,7 @@ export function runDocumentEventsConformance(
         // The embedded results are the returned results, field for field.
         const [evCreated, evUpdated, evRotated, evDeleted, evMeta] = events;
         if (evCreated.type === 'annotation.created') {
-          expect(evCreated.page).toEqual(toPageRef(pon));
+          expect(evCreated.page).toEqual(toPageRef(pageObjectNumber));
           expect(evCreated.created).toEqual(created.created);
           expect(evCreated.meta).toEqual(created.meta);
         }
@@ -94,7 +97,7 @@ export function runDocumentEventsConformance(
           expect(evUpdated.updated).toEqual(updated.updated);
         }
         if (evRotated.type === 'pages.rotated') {
-          expect(evRotated.pages).toEqual([toPageRef(pon)]);
+          expect(evRotated.pages).toEqual([toPageRef(pageObjectNumber)]);
           expect(evRotated.rotation).toBe(90);
           expect(evRotated.layout).toEqual(rotated.layout);
           expect(evRotated.cache).toEqual(rotated.cache);
@@ -167,6 +170,26 @@ export function runDocumentEventsConformance(
         }
         expect(caught !== undefined).toBe(true);
         expect(events.length).toBe(0);
+      } finally {
+        await doc.close();
+      }
+    });
+
+    test('own mutations are published before their promise settles', async () => {
+      const doc = await openFixture(engine, opts);
+      try {
+        const events: DocumentEvent[] = [];
+        doc.events.subscribe((event) => events.push(event));
+        const seenAtSettlement: number[] = [];
+        await doc.metadata
+          .update({ title: 'published before settlement' })
+          .then(() => seenAtSettlement.push(events.length));
+        const list = await doc.pages.list();
+        await doc
+          .page(list.pages[0].ref)
+          .annotations.create({ subtype: 'highlight', contents: 'ordering', quadPoints: QUAD })
+          .then(() => seenAtSettlement.push(events.length));
+        expect(seenAtSettlement).toEqual([1, 2]);
       } finally {
         await doc.close();
       }

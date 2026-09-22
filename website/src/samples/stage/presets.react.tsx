@@ -32,7 +32,7 @@ type Feel = 'reading' | 'presentation';
 
 function FeelSwitcher() {
   const { update } = useStageSettings();
-  const { next, prev } = usePages();
+  const { next, previous } = usePages();
   const [feel, setFeel] = useState<Feel>('reading');
   const pick = (name: Feel) => {
     setFeel(name);
@@ -49,7 +49,7 @@ function FeelSwitcher() {
         ]}
       />
       <Spacer />
-      <Button onClick={() => prev()}>‹ Previous</Button>
+      <Button onClick={() => previous()}>‹ Previous</Button>
       <Button onClick={() => next()}>Next ›</Button>
     </Toolbar>
   );

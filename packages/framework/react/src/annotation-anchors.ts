@@ -1,42 +1,42 @@
 import type { PageRef } from '@embedpdf/core';
-import type { CreationDraftAnchor, Rect, Vec } from '@embedpdf/core-annotation';
+import type { CreationDraftAnchor, Rect, Point } from '@embedpdf/core-annotation';
 
 /** The annotation selection's menu anchor on its primary page, in page space. */
-export type AnnotationSelectionAnchor = { page: PageRef; bounds: Rect; knob?: Vec };
+export type AnnotationSelectionAnchor = { page: PageRef; bounds: Rect; knob?: Point };
 
 export function sameAnchor(
-  a: AnnotationSelectionAnchor | null,
-  b: AnnotationSelectionAnchor | null,
+  left: AnnotationSelectionAnchor | null,
+  right: AnnotationSelectionAnchor | null,
 ): boolean {
-  if (a === b) return true;
-  if (!a || !b) return false;
+  if (left === right) return true;
+  if (!left || !right) return false;
   return (
-    a.page.pageObjectNumber === b.page.pageObjectNumber &&
-    a.bounds.x === b.bounds.x &&
-    a.bounds.y === b.bounds.y &&
-    a.bounds.width === b.bounds.width &&
-    a.bounds.height === b.bounds.height &&
-    a.knob?.x === b.knob?.x &&
-    a.knob?.y === b.knob?.y
+    left.page.pageObjectNumber === right.page.pageObjectNumber &&
+    left.bounds.x === right.bounds.x &&
+    left.bounds.y === right.bounds.y &&
+    left.bounds.width === right.bounds.width &&
+    left.bounds.height === right.bounds.height &&
+    left.knob?.x === right.knob?.x &&
+    left.knob?.y === right.knob?.y
   );
 }
 
 export function sameCreationDraftAnchor(
-  a: CreationDraftAnchor | null,
-  b: CreationDraftAnchor | null,
+  left: CreationDraftAnchor | null,
+  right: CreationDraftAnchor | null,
 ): boolean {
-  if (a === b) return true;
-  if (!a || !b) return false;
+  if (left === right) return true;
+  if (!left || !right) return false;
   return (
-    a.kind === b.kind &&
-    a.subtype === b.subtype &&
-    a.page.pageObjectNumber === b.page.pageObjectNumber &&
-    a.pointCount === b.pointCount &&
-    a.minPoints === b.minPoints &&
-    a.canFinish === b.canFinish &&
-    a.bounds.x === b.bounds.x &&
-    a.bounds.y === b.bounds.y &&
-    a.bounds.width === b.bounds.width &&
-    a.bounds.height === b.bounds.height
+    left.kind === right.kind &&
+    left.subtype === right.subtype &&
+    left.page.pageObjectNumber === right.page.pageObjectNumber &&
+    left.pointCount === right.pointCount &&
+    left.minPoints === right.minPoints &&
+    left.canFinish === right.canFinish &&
+    left.bounds.x === right.bounds.x &&
+    left.bounds.y === right.bounds.y &&
+    left.bounds.width === right.bounds.width &&
+    left.bounds.height === right.bounds.height
   );
 }

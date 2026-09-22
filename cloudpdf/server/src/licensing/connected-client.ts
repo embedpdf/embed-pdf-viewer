@@ -1,7 +1,7 @@
 /**
  * @license FCL-1.0-ALv2
  *
- * WARNING: This file is part of CloudPDF's license-key functionality. Removing
+ * Warning: This file is part of CloudPDF's license-key functionality. Removing
  * or modifying this code to disable or circumvent license enforcement, enable
  * protected functionality without a valid license key, or remove protected
  * functionality is a breach of FCL-1.0-ALv2 while this release is governed by
@@ -213,10 +213,10 @@ function parseValidation(input: {
     throw invalidResponse(`Keygen returned valid=true with the unexpected code ${code}`);
   }
   // Keygen's resource status is informational, not a validation decision.
-  // In particular, a valid license becomes EXPIRING during its final 3 days,
-  // and an INACTIVE license may still validate successfully. Keep requiring a
+  // In particular, a valid license becomes expiring during its final 3 days,
+  // and an inactive license may still validate successfully. Keep requiring a
   // well-formed status attribute, but trust the signed validation decision in
-  // meta.valid/meta.code instead of treating ACTIVE as the only valid status.
+  // meta.valid/meta.code instead of treating active as the only valid status.
   asString(attributes['status'], 'license status');
   if (expiresAt !== null && new Date(expiresAt).getTime() <= input.validatedAt) {
     throw invalidResponse('Keygen returned valid=true for an expired license');

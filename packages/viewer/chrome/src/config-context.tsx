@@ -1,6 +1,6 @@
 /**
  * The resolved customization, as React context. The chrome schema and the
- * user's extra icons are RESOLVED ONCE in <FullViewer> and read here by the
+ * user's extra icons are resolved once in <FullViewer> and read here by the
  * shell, menus, and strips — no component imports the default schema value
  * directly, so "the host replaced the chrome" is invisible below this line.
  *
@@ -46,7 +46,7 @@ export interface SignaturesCustomization {
 
 /** A font for free-text annotations beyond the standard 14. */
 export interface AnnotationFontSpec {
-  /** The stable id a free-text `fontFamily` carries — the engine key AND the
+  /** The stable id a free-text `fontFamily` carries — the engine key and the
    *  CSS family the live editor renders with. Not one of the 14 standard names. */
   readonly key: string;
   /** Where the TTF/OTF bytes come from (same-origin or CORS-enabled). */

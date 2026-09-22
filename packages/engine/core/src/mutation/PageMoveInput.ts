@@ -15,7 +15,7 @@ import type { PageRef } from '../identity/PageRef';
 export interface PageMoveInput {
   /**
    * Pages to move, in the order they should appear after the move.
-   * Duplicates and unknown PONs are rejected with `EngineError(InvalidArg)`.
+   * Duplicates and unknown page object numbers are rejected with `EngineError(InvalidArg)`.
    */
   pages: PageRef[];
   /**

@@ -7,7 +7,7 @@ import { postgresMigrations } from '../src/db/migrations/postgres/index';
 import { runDbConformance } from './_helpers/db-conformance';
 
 /**
- * Phase 2 Postgres conformance suite. Boots a single ephemeral Postgres
+ * Postgres conformance suite. Boots a single ephemeral Postgres
  * container via testcontainers and runs the exact same assertions
  * `db-sqlite.test.ts` runs.
  *
@@ -54,7 +54,7 @@ let schemaCounter = 0;
 beforeAll(async () => {
   if (!RUN_PG) return;
   if (connectionString) return; // caller supplied a managed PG.
-  // postgres:16 — partial indexes + SCRAM-SHA-256, semantics identical
+  // postgres:16 — partial indexes + scram-SHA-256, semantics identical
   // to RDS PG16 / Cloud SQL PG16 / Azure Flexible PG16.
   const { PostgreSqlContainer } = await import('@testcontainers/postgresql');
   container = await new PostgreSqlContainer('postgres:16-alpine').withDatabase('embedpdf').start();

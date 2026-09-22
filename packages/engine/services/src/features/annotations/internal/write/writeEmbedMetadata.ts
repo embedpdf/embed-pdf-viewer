@@ -4,7 +4,7 @@ import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runti
 /**
  * Write the EmbedPDF-namespaced /EMBD_Metadata annotation dictionary.
  *
- * This module owns ONLY the vendor-extension dictionary. Standard PDF
+ * This module owns only the vendor-extension dictionary. Standard PDF
  * base fields (/T, /M, /NM, /Contents) are handled by
  * `writers/annotations/base.ts` — /EMBD_Metadata is a separate
  * dictionary nested under the annotation that carries cloud-side

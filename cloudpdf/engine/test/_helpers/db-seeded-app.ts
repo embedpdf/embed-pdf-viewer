@@ -18,16 +18,14 @@ import { buildAppForTesting } from '../../../server/src/app/buildApp';
 import { createValidTestLicenseGate } from '../../../server/src/licensing/testing';
 
 /**
- * Shared cloud-test scaffolding for the Phase 4 versioned read
- * pipeline. The cloud SDK's `annotations.list()` and `text.read()`
- * now require the doc to be visible to `DocumentService` (which
- * reads from the SQL `documents` table), so cloud tests that used
- * to seed via the legacy `kind: 'bytes'` open path now boot a
- * full DB-backed `buildApp` and seed via direct INSERT.
+ * Shared cloud-test scaffolding for the versioned read pipeline. The
+ * cloud SDK's `annotations.list()` and `text.read()` require the doc to
+ * be visible to `DocumentService` (which reads from the SQL `documents`
+ * table), so these tests boot a full DB-backed `buildApp` and seed the
+ * document via direct insert.
  *
- * `defaultWorkerEntryUrl` keeps the real PDFium worker pool so we
- * preserve the original tests' end-to-end depth — we're only
- * changing the open path, not the engine surface under test.
+ * `defaultWorkerEntryUrl` keeps the real PDFium worker pool, so the
+ * tests exercise the engine end to end; only the open path is seeded.
  */
 export interface DbSeededFixture {
   bundle: AppBundle;

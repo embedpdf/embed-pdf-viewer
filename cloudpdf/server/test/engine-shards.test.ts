@@ -113,7 +113,7 @@ describe('ShardedEnginePool (fake shards)', () => {
     expect(shards[home]!.calls).toContain('open:doc-a');
     await pool.run('doc-a', build);
     expect(shards[home]!.calls).toContain('run:doc-a');
-    // Unknown doc: local rejection, NO client dispatched.
+    // Unknown doc: local rejection, no client dispatched.
     await expect(pool.run('doc-nope', build)).rejects.toMatchObject({ code: 'DocNotOpen' });
     for (const s of shards) expect(s.calls.some((c) => c.includes('doc-nope'))).toBe(false);
     await pool.destroy();
@@ -134,7 +134,7 @@ describe('ShardedEnginePool (fake shards)', () => {
         shardSeen = shard;
       },
     });
-    // Open docs until two land on DIFFERENT shards.
+    // Open docs until two land on different shards.
     const homes = new Map<number, string[]>();
     for (let i = 0; i < 12; i++) {
       const docId = `doc-${i}`;
@@ -211,7 +211,7 @@ describe('ShardedEnginePool (fake shards)', () => {
         count: 3,
         spawn: async (i) => {
           if (i === 1) throw new Error('shard 1 boot failed');
-          // Shard 2 succeeds AFTER the failure has been observed.
+          // Shard 2 succeeds after the failure has been observed.
           if (i === 2) await new Promise((r) => setTimeout(r, 50));
           const s = fakeShard();
           born.push(s);
@@ -224,7 +224,7 @@ describe('ShardedEnginePool (fake shards)', () => {
   });
 
   test('buildApp rejects a shard count the worker total cannot divide — before anything boots', async () => {
-    // Raw buildApp, NOT buildAppForTesting: the test helper deliberately
+    // Raw buildApp, not buildAppForTesting: the test helper deliberately
     // rounds poolSize up for the CLOUDPDF_TEST_SHARDS matrix leg, which
     // would mask exactly this validation.
     const { buildApp } = await import('../src/index');
@@ -280,7 +280,7 @@ describe('sharded fixture (host, K=2) — blast radius for real', () => {
       const stalledRes = await stalled;
       expect(stalledRes.status).toBeGreaterThanOrEqual(500);
 
-      // THE assertion: B is undisturbed AND warm — no reopen storm.
+      // The assertion: B is undisturbed and warm — no reopen storm.
       expect((await listAnnotations(fx, 'tenant-k', docB, 'alice')).status).toBe(200);
       expect(fx.bundle.engineCounters!.docOpens).toBe(opensBefore);
 
@@ -290,7 +290,7 @@ describe('sharded fixture (host, K=2) — blast radius for real', () => {
       expect(fx.bundle.engineCounters!.docOpens).toBeGreaterThan(opensBefore);
 
       // Journal: exactly one crash — persistence is fire-and-forget by
-      // design, so poll the DATABASE CONDITION itself (review round:
+      // design, so poll the database condition itself (review round:
       // `until(() => true)` was a no-op that made this assertion a race).
       const crashCount = async (): Promise<number> => {
         const row = await fx.db
@@ -326,9 +326,9 @@ describe('sharded fixture (host, K=2) — blast radius for real', () => {
       expect((await listAnnotations(fx, 'tenant-k', 'doceq1', 'alice')).status).toBe(200);
       expect(fx.bundle.engineCounters!.docOpens).toBe(warm);
 
-      // Kill BOTH shards: two scoped forgets must compose to "everything
+      // Kill both shards: two scoped forgets must compose to "everything
       // forgotten" — every doc cold-reopens, none is missed. Fence on the
-      // GENERATION bump: SIGKILL delivery and the exit event are async, so
+      // generation bump: SIGKILL delivery and the exit event are async, so
       // "still ready" right after the kill is the un-reaped corpse — wait
       // for each successor (gen > before) to be ready.
       const gensBefore = fx.bundle.engineHosts!.map((h) => h.generation());

@@ -307,7 +307,7 @@ describe('appearanceImpactOf — verified rigid translation', () => {
 
   it('rotated box: translation must carry the transform group unchanged + shifted', () => {
     const rotated = squareDto({ rotation: 90, unrotatedRect: rect(100, 100, 200, 200) });
-    // rect moved with rotation omitted: the tri-state writer PRESERVES the
+    // rect moved with rotation omitted: the tri-state writer preserves the
     // rotation, but the (also preserved) unrotatedRect did not ride the delta
     // — an unproven translation, so the safe path re-bakes.
     expect(

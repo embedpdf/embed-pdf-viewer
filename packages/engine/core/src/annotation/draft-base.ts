@@ -34,7 +34,7 @@ export interface AnnotationDraftBase {
 
   /**
    * Link this new annotation to an existing parent via `/IRT`. The parent
-   * must be on the SAME page as this draft — the engine throws
+   * must be on the same page as this draft — the engine throws
    * `InvalidArg` otherwise (ISO 32000 §12.5.6.2). Resolving + writing the
    * link promotes a weak/direct parent to an indirect object; the
    * parent's strengthened stable id is reported in the create result's

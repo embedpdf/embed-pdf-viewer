@@ -86,7 +86,7 @@ export function readFreeText(
   };
 
   // `TextColor` overrides text only; surface it as `fontColor` solely when it
-  // is present AND differs from the `/DA` colour (otherwise text follows `color`).
+  // is present and differs from the `/DA` colour (otherwise text follows `color`).
   const textColor = readAnnotColor(fn, mem, annotPtr, FPDFANNOT_COLORTYPE.TextColor);
   const fontColor = textColor && !colorsEqual(textColor, color) ? textColor : undefined;
 

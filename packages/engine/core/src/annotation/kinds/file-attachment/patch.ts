@@ -4,7 +4,7 @@ import type { ColorStylePatchFields } from '../style.shared';
 import type { FileAttachmentIcon } from './draft';
 
 /**
- * The attached `file` is deliberately NOT patchable — bytes enter once at
+ * The attached `file` is deliberately not patchable — bytes enter once at
  * create; replacing a file is a new attachment (delete + create). Only
  * the icon presentation and base fields can change.
  */

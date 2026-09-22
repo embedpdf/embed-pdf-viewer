@@ -10,7 +10,7 @@ const WIDGET_SUBTYPE_CODE = 20; // FPDF_ANNOT_WIDGET
 
 /**
  * Birth a widget through the annotation plane (EPDFPage_CreateAnnot -
- * indirect, durable object number), place it, and style it with THE
+ * indirect, durable object number), place it, and style it with the
  * widget-plane writer (`applyWidgetStyle` - the same code the widget
  * annotation kind uses for create/patch). Returns the widget's object
  * number, ready for EPDFForm_AttachWidget adoption.

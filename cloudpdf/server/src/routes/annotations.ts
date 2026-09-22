@@ -101,9 +101,9 @@ export async function registerAnnotationRoutes(
   const encodeInEngine = deps.encodeInEngine ?? true;
 
   // ── Plane-scoped doc-level reads: a base's own annotations —
-  //    weak-identity ones included — are simply VISIBLE through every
+  //    weak-identity ones included — are simply visible through every
   //    annotations-inheriting layer, so the list and appearance batches are
-  //    ONE CDN object served from the BASE worker session. Guarded by the
+  //    one CDN object served from the base worker session. Guarded by the
   //    `annotations` plane (`requireSharedDocRead`); an annotation-writing
   //    layer 404s here into the SDK's manifest-refresh rail and reads its
   //    own layer-scoped view. ─────────────────────────────────────────────
@@ -213,7 +213,7 @@ export async function registerAnnotationRoutes(
     },
   );
 
-  // ── Whole-document BULK listing: one CDN-immutable object per
+  // ── Whole-document bulk listing: one CDN-immutable object per
   //    `annotationsVersion` pin, materialized by a single raw (no
   //    page-load) sweep. The doc-level twin serves annotations-inheriting
   //    layers from the base session; a diverged layer reads its own view.
@@ -520,7 +520,7 @@ export async function registerAnnotationRoutes(
     },
   );
 
-  // Selective flatten: `pages.flatten` for a chosen set of THIS page's
+  // Selective flatten: `pages.flatten` for a chosen set of this page's
   // annotations — the whole-page verb's gates, one page's content and
   // annotation pins bumped, persisted like a page flatten.
   app.post(
@@ -553,7 +553,7 @@ export async function registerAnnotationRoutes(
     },
   );
 
-  // The chosen annotations' appearances as ONE single-page PDF: a derived
+  // The chosen annotations' appearances as one single-page PDF: a derived
   // read that egresses content, gated by `doc.download` like pages/extract.
   app.post(
     '/v1/docs/:docId/layers/:layerName/annotations/pages/:pageKey/items/appearance',
@@ -811,7 +811,7 @@ function actorFromJwt(jwt: RequestJwtContext): AnnotationActor | undefined {
  *   - `displayName` = caller's display_name → carried for the
  *                     modification trail. The worker does not touch /T
  *                     on update; /T is bound at creation.
- *   - `groupId`     = `patch.groupId` ONLY when it reassigns the row
+ *   - `groupId`     = `patch.groupId` only when it reassigns the row
  *                     (differs from current groupId) → stamped as the
  *                     new /EMBD_Metadata/GroupID. Absent means "don't
  *                     touch."
@@ -893,9 +893,9 @@ async function renderAnnotationAppearances(input: {
   }
 
   // Appearance-scale enforcement: the appearance lattice
-  // bounds SCALE — appearances are sized by `rect × scale`, so a page-sized
+  // bounds scale — appearances are sized by `rect × scale`, so a page-sized
   // stamp at a high scale is a full-page memory bomb wearing a different
-  // token. Same scoping as pages: only VERSIONED (token) requests are
+  // token. Same scoping as pages: only versioned (token) requests are
   // enforced; the unversioned alias stays compute-only (no-store), which is
   // the escape hatch for off-canonical needs (rollover/down modes, quality).
   const derived = input.derivedRenders;
@@ -1157,7 +1157,7 @@ async function readAnnotations(input: {
       input.scope.layerName,
     );
   }
-  // RAW read (docPtr dictionary walk, no FPDF_LoadPage): wire-identical to
+  // Raw read (docPtr dictionary walk, no FPDF_LoadPage): wire-identical to
   // the full path today — no dispatched subtype reader uses the pagePtr —
   // and ~1000x cheaper per cold leaf materialization. If a pagePtr-dependent
   // reader ever lands, the local-vs-cloud conformance parity diff fails and
@@ -1188,10 +1188,10 @@ async function readAnnotations(input: {
   }
 
   if (input.requestedVersion !== undefined) {
-    // RE-validate the pin AFTER the worker read. The pre-check ran before
+    // Re-validate the pin after the worker read. The pre-check ran before
     // parking behind any in-flight write; if that write (or any remote
     // commit) landed while we read, the snapshot in hand belongs to a
-    // NEWER version and must not go out under this pin — the response
+    // newer version and must not go out under this pin — the response
     // carries `immutable`, so one slip poisons the CDN for every future
     // reader. Refusing costs the client one manifest refetch.
     const fresh = await resolvePageForRead(input);
@@ -1213,7 +1213,7 @@ async function readAnnotations(input: {
 }
 
 /**
- * Whole-document bulk read: ONE `annotations.listRawAll` worker job per
+ * Whole-document bulk read: One `annotations.listRawAll` worker job per
  * attempt (the raw docPtr sweep — no per-page loads). Version-addressed
  * reads double-check the manifest pin before serving a CDN-immutable body.
  * The public current-version read retries once if a mutation races the
@@ -1277,7 +1277,7 @@ async function readAnnotationsAll(input: {
       );
     }
 
-    // Re-validate the pin AFTER the worker read (see readAnnotations).
+    // Re-validate the pin after the worker read (see readAnnotations).
     const fresh = await getManifest();
     const freshCurrent = fresh.annotationsVersion ?? 1;
     if (pinnedVersion !== freshCurrent) {
@@ -1297,14 +1297,14 @@ async function readAnnotationsAll(input: {
       );
     }
 
-    // Decorate every page with its cloud-stable PageState from the SAME
+    // Decorate every page with its cloud-stable PageState from the same
     // manifest that certified the pin (toManifestPage already scope-stamped
     // the revision tokens).
-    const stateByPon = new Map(
+    const stateByPageObjectNumber = new Map(
       manifest.pages.map((page) => [page.state.page.pageObjectNumber, page.state]),
     );
     const pages = result.snapshot.pages.map((page) => {
-      const state = stateByPon.get(page.pageState.page.pageObjectNumber);
+      const state = stateByPageObjectNumber.get(page.pageState.page.pageObjectNumber);
       return state ? input.revisionBridge.decorateAnnotationSnapshot(state, page) : page;
     });
 

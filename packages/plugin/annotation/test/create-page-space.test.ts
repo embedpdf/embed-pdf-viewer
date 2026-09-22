@@ -1,16 +1,14 @@
-import { isPluginError, toPageRef, type ControllerContext } from '@embedpdf/core';
-import type { AnnotationDTO, AnnotationFlags, AnnotationRef } from '@embedpdf/engine-core/runtime';
+import { isPluginError, toPageRef } from '@embedpdf/core';
+import type { AnnotationDTO, AnnotationFlags } from '@embedpdf/engine-core/runtime';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { createAnnotationController } from '../src/controller';
-import { annotationReducer, initialAnnotationState } from '../src/model';
-import type { AnnotationAction, AnnotationState } from '../src/model';
 import { annotationKey } from '../src/repository';
+import { annotationHarness } from './harness';
 
 /**
- * Pilot C of the road-to-3.0 plan: the public page-space `create()` enters the
- * SAME optimistic commit path the draw tools use, resolves after the confirmed
- * `onCreated`, and the three change events fire once per confirmed fact.
+ * The public page-space `create()` takes the same optimistic path the draw
+ * tools use, resolves after the confirmed `onCreated`, and the change events
+ * fire once per confirmed change.
  */
 
 const PAGE = toPageRef(1);
@@ -50,79 +48,44 @@ const squareDTO = (annotObjectNumber: number): AnnotationDTO =>
     interiorColor: null,
   }) as AnnotationDTO;
 
-function harness() {
-  let state = initialAnnotationState();
-  const create = vi.fn();
-  const update = vi.fn();
-  const remove = vi.fn(async (_ref: AnnotationRef) => ({}));
-  const listeners = new Set<(event: unknown) => void>();
-  const ctx = {
-    cleanup: () => {},
-    getState: () => state,
-    dispatch: (action: AnnotationAction) => {
-      state = annotationReducer(state, action);
-    },
-    document: () => ({ pages: [{ ref: PAGE, index: 0, boxes: { crop: CROP } }] }),
-    doc: {
-      page: () => ({ annotations: { create, update, delete: remove } }),
-      events: {
-        subscribe: (l: (e: unknown) => void) => (listeners.add(l), () => listeners.delete(l)),
-      },
-      security: {
-        allows: () => true,
-        identity: { user_id: 'me' },
-        allowsAnnotationCreate: () => true,
-        allowsAnnotationMutation: () => true,
-        allowsAnnotationGroupAssignment: () => true,
-      },
-    },
-    tryGet: () => null,
-  } as unknown as ControllerContext<AnnotationState, AnnotationAction>;
-  return {
-    capability: createAnnotationController(ctx),
-    create,
-    update,
-    remove,
-    state: () => state,
-  };
-}
+const createHarness = () => annotationHarness({ crop: CROP });
 
 afterEach(() => vi.restoreAllMocks());
 
 describe('create() in page space', () => {
   it('stages optimistically, writes a PDF-space draft with the crop offset applied, and resolves after onCreated', async () => {
-    const h = harness();
-    h.create.mockResolvedValueOnce({ created: squareDTO(42) });
+    const harness = createHarness();
+    harness.create.mockResolvedValueOnce({ created: squareDTO(42) });
     const order: string[] = [];
-    h.capability.onCreated((e) =>
-      order.push(`created:${annotationKey(e.ref)}:${e.origin.trigger}`),
+    harness.capability.onCreated((event) =>
+      order.push(`created:${annotationKey(event.ref)}:${event.origin.locality}`),
     );
 
-    const pending = h.capability.create({
+    const pending = harness.capability.create({
       subtype: 'square',
       page: PAGE,
       bounds: { x: 30, y: 40, width: 20, height: 10 },
       props: { color: '#ff0000' },
     });
     // staged at once, before the engine answers
-    expect(h.state().model.order.some((id) => id.startsWith('tmp:'))).toBe(true);
+    expect(harness.state().model.order.some((id) => id.startsWith('tmp:'))).toBe(true);
 
-    const ref = await pending.then((r) => (order.push('resolved'), r));
+    const ref = await pending.then((ref) => (order.push('resolved'), ref));
     expect(annotationKey(ref)).toBe('obj:42');
-    expect(order).toEqual(['created:obj:42:api', 'resolved']);
+    expect(order).toEqual(['created:obj:42:local', 'resolved']);
     // the draft the engine saw: page → PDF through the crop box, props applied
-    expect(h.create.mock.calls[0]![0]).toMatchObject({
+    expect(harness.create.mock.calls[0]![0]).toMatchObject({
       subtype: 'square',
       rect: { left: 40, bottom: 270, right: 60, top: 280 },
       color: { r: 255, g: 0, b: 0 },
       flags: { print: true },
     });
     // reconciled: the optimistic id is gone, the durable record is in the model
-    expect(h.state().model.order).toEqual(['obj:42']);
+    expect(harness.state().model.order).toEqual(['obj:42']);
   });
 
   it('produces the same draft as the draw tool for the same geometry (one commit path)', async () => {
-    const api = harness();
+    const api = createHarness();
     api.create.mockResolvedValueOnce({ created: squareDTO(1) });
     await api.capability.create({
       subtype: 'square',
@@ -130,7 +93,7 @@ describe('create() in page space', () => {
       bounds: { x: 30, y: 40, width: 100, height: 60 },
     });
 
-    const pointer = harness();
+    const pointer = createHarness();
     pointer.create.mockResolvedValueOnce({ created: squareDTO(2) });
     pointer.capability.createPointer('square', 'down', PAGE, { x: 30, y: 40 });
     pointer.capability.createPointer('square', 'move', PAGE, { x: 130, y: 100 });
@@ -145,40 +108,40 @@ describe('create() in page space', () => {
   });
 
   it('rejects with the plugin vocabulary: unknown page, invalid geometry, unsupported subtype, engine failure', async () => {
-    const h = harness();
+    const harness = createHarness();
     await expect(
-      h.capability.create({
+      harness.capability.create({
         subtype: 'square',
         page: toPageRef(99),
         bounds: { x: 0, y: 0, width: 1, height: 1 },
       }),
-    ).rejects.toSatisfy((e) => isPluginError(e, 'not-found'));
+    ).rejects.toSatisfy((error) => isPluginError(error, 'not-found'));
     await expect(
-      h.capability.create({
+      harness.capability.create({
         subtype: 'square',
         page: PAGE,
         bounds: { x: 0, y: 0, width: -1, height: 1 },
       }),
-    ).rejects.toSatisfy((e) => isPluginError(e, 'invalid-input'));
-    await expect(h.capability.create({ subtype: 'stamp', page: PAGE } as never)).rejects.toSatisfy(
-      (e) => isPluginError(e, 'unsupported'),
-    );
-
-    h.create.mockRejectedValueOnce(new Error('engine refused'));
+    ).rejects.toSatisfy((error) => isPluginError(error, 'invalid-input'));
     await expect(
-      h.capability.create({
+      harness.capability.create({ subtype: 'stamp', page: PAGE } as never),
+    ).rejects.toSatisfy((error) => isPluginError(error, 'unsupported'));
+
+    harness.create.mockRejectedValueOnce(new Error('engine refused'));
+    await expect(
+      harness.capability.create({
         subtype: 'line',
         page: PAGE,
         from: { x: 0, y: 0 },
         to: { x: 50, y: 50 },
       }),
-    ).rejects.toSatisfy((e) => isPluginError(e, 'operation-failed'));
-    expect(h.state().model.order).toEqual([]); // the optimistic record was dropped
+    ).rejects.toSatisfy((error) => isPluginError(error, 'operation-failed'));
+    expect(harness.state().model.order).toEqual([]); // the optimistic record was dropped
   });
 
   it('builds every supported geometry kind', async () => {
-    const h = harness();
-    h.create.mockResolvedValue({ created: squareDTO(7) });
+    const harness = createHarness();
+    harness.create.mockResolvedValue({ created: squareDTO(7) });
     const inputs = [
       { subtype: 'circle', page: PAGE, bounds: { x: 0, y: 0, width: 10, height: 10 } },
       {
@@ -223,32 +186,29 @@ describe('create() in page space', () => {
         ],
       },
     ] as const;
-    for (const input of inputs) await h.capability.create(input as never);
-    expect(h.create.mock.calls.map((c) => (c[0] as { subtype: string }).subtype)).toEqual([
-      'circle',
-      'polygon',
-      'polyline',
-      'ink',
-      'free-text',
-      'highlight',
-    ]);
+    for (const input of inputs) await harness.capability.create(input as never);
+    expect(
+      harness.create.mock.calls.map((call) => (call[0] as { subtype: string }).subtype),
+    ).toEqual(['circle', 'polygon', 'polyline', 'ink', 'free-text', 'highlight']);
   });
 
   it('onUpdated and onDeleted fire once per confirmed change, local and remote', async () => {
-    const h = harness();
-    h.create.mockResolvedValueOnce({ created: squareDTO(5) });
-    const ref = await h.capability.create({
+    const harness = createHarness();
+    harness.create.mockResolvedValueOnce({ created: squareDTO(5) });
+    const ref = await harness.capability.create({
       subtype: 'square',
       page: PAGE,
       bounds: { x: 0, y: 0, width: 10, height: 10 },
     });
     const log: string[] = [];
-    h.capability.onUpdated((e) => log.push(`updated:${e.origin.locality}`));
-    h.capability.onDeleted((e) => log.push(`deleted:${annotationKey(e.ref)}:${e.origin.locality}`));
+    harness.capability.onUpdated((event) => log.push(`updated:${event.origin.locality}`));
+    harness.capability.onDeleted((event) =>
+      log.push(`deleted:${annotationKey(event.ref)}:${event.origin.locality}`),
+    );
 
-    h.update.mockResolvedValueOnce({ updated: squareDTO(5), appearance: { changed: false } });
-    await h.capability.updateRaw(ref, { subtype: 'square', opacity: 0.5 });
-    await h.capability.delete(ref);
+    harness.update.mockResolvedValueOnce({ updated: squareDTO(5), appearance: { changed: false } });
+    await harness.capability.updateRaw(ref, { subtype: 'square', opacity: 0.5 });
+    await harness.capability.delete(ref);
     expect(log).toEqual(['updated:local', 'deleted:obj:5:local']);
   });
 });

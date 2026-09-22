@@ -143,12 +143,12 @@ const DEFAULT_INK_STROKES: InkList = [
  * The locked rules being verified here:
  *   - `create` is append-only: PDFium drops the new annotation at
  *     `index = previousCount`, so no existing index shifts. Treated
- *     as non-invalidating — revisions do NOT bump and weak refs
+ *     as non-invalidating — revisions do not bump and weak refs
  *     captured before the create remain valid.
- *   - `update` is non-structural; revisions do NOT bump.
+ *   - `update` is non-structural; revisions do not bump.
  *   - Opportunistic /NM stamp upgrades a weak annotation's ref to
  *     `kind: 'nm'` on update; an already-durable annotation's /NM is
- *     NEVER touched.
+ *     never touched.
  *   - `delete` and `move` are the only index-shifting ops. They bump
  *     the per-page revision and, on a page that had weak refs before
  *     the mutation, surface `shouldRefetch: 'weakRefsInvalidated'`.
@@ -204,7 +204,7 @@ export function runAnnotationMutationConformance(
         expect(result.created.ref.kind).toBe('objectNumber');
 
         // Locked rule: create is append-only, so the page revision does
-        // NOT bump and no weak refs become stale — regardless of whether
+        // not bump and no weak refs become stale — regardless of whether
         // the page had pre-existing weak annotations.
         expect(result.meta.affectedPages[0].revision.generation).toBe(
           before.pageState.revision.generation,
@@ -213,7 +213,7 @@ export function runAnnotationMutationConformance(
         expect(result.meta.weakRefsInvalidated).toBe(false);
         expect(result.meta.changed.length).toBe(1);
 
-        // The annotation is actually on the page now, at the END of the
+        // The annotation is actually on the page now, at the end of the
         // /Annots array. This is the invariant that justifies the
         // non-invalidating impact: every prior index is preserved.
         const after = await page.annotations.list();
@@ -333,9 +333,9 @@ export function runAnnotationMutationConformance(
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
 
-        // A plain shape reads BOTH optional entries as explicit null — absence
+        // A plain shape reads both optional entries as explicit null — absence
         // is stated, so a read DTO compares structurally against a clearing
-        // patch. The draft ALSO states them as null (exactly what the plugin's
+        // patch. The draft also states them as null (exactly what the plugin's
         // total projection emits for a fresh solid shape): a draft writer must
         // skip null, never dereference it — the stale-worker regression where
         // solid creates vanished while cloudy ones survived.
@@ -546,7 +546,7 @@ export function runAnnotationMutationConformance(
         }
 
         // The whole group riding one delta is a verified translation: the
-        // rotation survives AND the baked /AP is preserved.
+        // rotation survives and the baked /AP is preserved.
         const d = { x: 15, y: -10 };
         const shift = (r: typeof shapeRect) => ({
           left: r.left + d.x,
@@ -565,7 +565,7 @@ export function runAnnotationMutationConformance(
           expect(trioMoved.updated.rotation).toBe(90);
         }
 
-        // A rect-only move PRESERVES the omitted rotation (tri-state law: a
+        // A rect-only move preserves the omitted rotation (tri-state law: a
         // patch touches what it states) — the old writer cleared it.
         const rectOnly = await page.annotations.update(created.created.ref, {
           subtype: 'square',
@@ -575,7 +575,7 @@ export function runAnnotationMutationConformance(
           expect(rectOnly.updated.rotation).toBe(90);
         }
 
-        // Explicit null flattens — the ONLY way to remove the rotation.
+        // Explicit null flattens — the only way to remove the rotation.
         const flattened = await page.annotations.update(created.created.ref, {
           subtype: 'square',
           rotation: null,
@@ -1604,7 +1604,7 @@ export function runAnnotationMutationConformance(
           const weakSession = await beginWeakEditIfRequired(doc, fix.pageObjectNumber, fix);
           const result = await page.annotations.delete(weak.ref);
           try {
-            // The weak annotation MAY have had /NM in some shapes (very
+            // The weak annotation may have had /NM in some shapes (very
             // legacy PDFs), but the locked semantics say a true weak
             // delete returns null. We assert "either null or a stable id"
             // since the fixture controls which side this lands on.
@@ -1658,7 +1658,7 @@ export function runAnnotationMutationConformance(
         // Force the revision out of date by minting an *index-shifting*
         // mutation, then trying to update against the stale ref. We
         // deliberately use a throwaway create+delete pair (delete is
-        // the rev-bumping op now — create is append-only and does NOT
+        // the rev-bumping op now — create is append-only and does not
         // bump revisions, so it can't be used here).
         const throwaway = await page.annotations.create({
           subtype: 'highlight',
@@ -1689,7 +1689,7 @@ export function runAnnotationMutationConformance(
     //    primitive as multi-move.
     //  - One revision bump per batch, regardless of `refs.length`.
     //  - Caller-supplied order is preserved at the destination.
-    //  - Weak refs in the batch are upgraded to durable /NM BEFORE the
+    //  - Weak refs in the batch are upgraded to durable /NM before the
     //    move; the moved DTOs come out durable and `meta.changed` lists
     //    stable ids.
     //  - Stale revision, out-of-range, duplicate, and abort all reject.
@@ -1733,7 +1733,7 @@ export function runAnnotationMutationConformance(
         expect(aIdx < bIdx).toBe(true);
 
         // Move A to B's slot. Post-removal index space: A was removed,
-        // so B's position becomes bIdx - 1. Targeting bIdx puts A AFTER
+        // so B's position becomes bIdx - 1. Targeting bIdx puts A after
         // B's original position. Use `bIdx` as toIndex => A lands right
         // after B in the new order.
         const weakSession = await beginWeakEditIfRequired(doc, fix.pageObjectNumber, fix);
@@ -1827,7 +1827,7 @@ export function runAnnotationMutationConformance(
           const beforeRev = before.pageState.revision.generation;
 
           // Move the weak annotation to position 0 (or somewhere
-          // non-trivial). The engine must stamp a fresh /NM BEFORE the
+          // non-trivial). The engine must stamp a fresh /NM before the
           // move so the result is durable.
           const target = weak.ref.index === 0 ? 1 : 0;
           const weakSession = await beginWeakEditIfRequired(doc, fix.pageObjectNumber, fix);
@@ -1992,7 +1992,7 @@ export function runAnnotationMutationConformance(
         const page = doc.page(toPageRef(fix.pageObjectNumber));
         const beforeGen = (await page.annotations.list()).pageState.revision.generation;
 
-        // Pull some page to the front (prefer one that is NOT the host so
+        // Pull some page to the front (prefer one that is not the host so
         // we exercise the cross-page case; fall back to the host itself for
         // single-page fixtures).
         const mover =
@@ -2110,12 +2110,12 @@ export function runAnnotationMutationConformance(
     // ─────────────────────────────────────────────────────────────────
     //  Link annotations. Locked rules:
     //  - `/Dest` and `/A GoTo` both read as the normalized `goto` arm;
-    //    destinations carry page OBJECT NUMBERS on the wire (never
+    //    destinations carry page object numbers on the wire (never
     //    indices) and raw PDF user-space coordinates.
     //  - `target: null` creates a dead link (create-then-edit flow).
-    //  - A patch RETARGETS by replacing `/A`; the reader gives `/A`
+    //  - A patch retargets by replacing `/A`; the reader gives `/A`
     //    precedence so a retarget wins over any stray direct `/Dest`.
-    //  - Grouped links (v2 "attached links") are plain /IRT + /RT
+    //  - Grouped links ("attached links") are plain /IRT + /RT
     //    /Group — nothing link-specific in the relationship plane.
     // ─────────────────────────────────────────────────────────────────
 
@@ -2321,7 +2321,7 @@ export function runAnnotationMutationConformance(
           );
         }
 
-        // Both the relationship AND the target survive a fresh read.
+        // Both the relationship and the target survive a fresh read.
         const after = await page.annotations.list();
         const readLink = after.annotations.find(
           (a) =>
@@ -2463,11 +2463,11 @@ export function runAnnotationMutationConformance(
     // ─────────────────────────────────────────────────────────────────
     //  /State + /StateModel (review status, ISO 32000 §12.5.6.3) and
     //  /Subj. Locked rules:
-    //  - A status change is a NEW text annotation replying to its target
+    //  - A status change is a new text annotation replying to its target
     //    via /IRT; the target annotation itself is never modified.
     //  - Faithful reads: `state` / `stateModel` / `subject` are null iff
     //    the PDF entry is absent — a null after a null-clear patch proves
-    //    TRUE key removal (EPDFAnnot_RemoveKey), not an empty-string
+    //    true key removal (EPDFAnnot_RemoveKey), not an empty-string
     //    write.
     //  - Known review/marked values are wire-normalized to lowercase;
     //    custom Acrobat state models round-trip verbatim.
@@ -2583,7 +2583,7 @@ export function runAnnotationMutationConformance(
         }
 
         // Faithful read: null distinguishes absent from ''. Null here
-        // proves the entries were REMOVED, not overwritten with an empty
+        // proves the entries were removed, not overwritten with an empty
         // string.
         const after = await page.annotations.list();
         const read = after.annotations.find(

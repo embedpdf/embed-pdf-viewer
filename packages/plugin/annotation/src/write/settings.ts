@@ -2,21 +2,21 @@ import type { SnapSettings } from '@embedpdf/core-annotation';
 
 import type { ChromeSettingsPatch } from '../contract';
 import type { AnnotationContext, AnnotationServices } from '../services';
+import { patchChrome } from '../model';
 
 /** The live-adjustable settings: snapping (a UI toggle) and the selection
  *  chrome (theming). Both are seeded by the registration config. */
 export function createSettings(
-  ctx: Pick<AnnotationContext, 'dispatch' | 'getState'>,
+  ctx: Pick<AnnotationContext, 'state'>,
   { store }: Pick<AnnotationServices, 'store'>,
 ) {
   const api = {
     getSnapSettings: () => store.model().snap,
     updateSnapSettings: (patch: Partial<SnapSettings>) => {
-      store.commit({ t: 'setSnap', patch });
+      store.commit({ type: 'setSnap', patch });
     },
-    getChromeSettings: () => ctx.getState().chrome,
-    updateChromeSettings: (patch: ChromeSettingsPatch) =>
-      ctx.dispatch({ type: 'SET_CHROME', patch }),
+    getChromeSettings: () => ctx.state.get().chrome,
+    updateChromeSettings: (patch: ChromeSettingsPatch) => ctx.state.update(patchChrome, patch),
   };
   return { api };
 }

@@ -27,7 +27,7 @@ import {
  */
 /**
  * Rotation fields shared by the rotatable box families (shapes + free-text).
- * `rotation` is degrees in PDF convention (the v3 plugin converts its
+ * `rotation` is degrees in PDF convention (the annotation plugin converts its
  * content-space clockwise angle at the boundary); `unrotatedRect` is the
  * logical (pre-rotation) box. Together they drive PDFium's `/EMBD_Metadata`
  * AP rotation (`/Matrix` + `/BBox`); `/Rect` stays the rotated visual AABB.

@@ -4,8 +4,8 @@ import type { AnnotationPatchBase } from '../../patch-base';
 
 /**
  * Move (`rect`) and retarget a link. `target` is three-state: `undefined`
- * leaves it, a value REPLACES the `/A` action (any stray direct `/Dest`
- * is stripped — the spec forbids both), and `null` CLEARS the target
+ * leaves it, a value replaces the `/A` action (any stray direct `/Dest`
+ * is stripped — the spec forbids both), and `null` clears the target
  * entirely (`/A` and `/Dest` both removed → a dead link). Only
  * `goto`/`uri` targets are writable.
  */

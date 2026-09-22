@@ -30,7 +30,7 @@ import type { PageRecord } from './pages/PageRecord';
 import { LocalRevisionAuthority, type RevisionAuthority } from './revisions/RevisionAuthority';
 
 /**
- * Owns the lifecycle of a single open PDFium document and the v3
+ * Owns the lifecycle of a single open PDFium document and the
  * identity machinery: page registry (pageObjectNumber <-> pageIndex),
  * `RevisionAuthority` (per-page generation counters), and `PagePtrPool`
  * (refcounted pagePtr access).
@@ -169,7 +169,7 @@ export class DocumentSession {
 
   /**
    * Whether anything was mutated since the current bytes were loaded. When
-   * false, the loaded bytes ARE the document: a save returns them verbatim
+   * false, the loaded bytes are the document: a save returns them verbatim
    * and a signing candidate is built straight on them.
    */
   hasUnsavedEdits(): boolean {
@@ -221,7 +221,7 @@ export class DocumentSession {
     this.recordsByIndex.clear();
     this.recordsByObjectNumber.clear();
     this.fullyEnumerated = false;
-    for (const pon of previousPages) this.requireRevisions().bump(pon);
+    for (const pageObjectNumber of previousPages) this.requireRevisions().bump(pageObjectNumber);
     this.mutationSeqCounter++;
     this.loadedSeq = this.mutationSeqCounter;
     this.pendingSigning = null;
@@ -277,8 +277,8 @@ export class DocumentSession {
     const count = fn.FPDF_GetPageCount(docPtr);
     for (let i = 0; i < count; i++) {
       if (this.recordsByIndex.has(i)) continue;
-      const pon = fn.EPDFDoc_GetPageObjectNumberByIndex(docPtr, i);
-      if (!isValidPageObjectNumber(pon)) {
+      const pageObjectNumber = fn.EPDFDoc_GetPageObjectNumberByIndex(docPtr, i);
+      if (!isValidPageObjectNumber(pageObjectNumber)) {
         // Spec violation: ISO 32000-1 §7.7.3.3 requires every
         // /Page to be referenced indirectly from the /Pages tree.
         // PDFium's loader is permissive enough to surface direct
@@ -290,12 +290,12 @@ export class DocumentSession {
         throw new EngineError(
           EngineErrorCode.MalformedPdf,
           `page at index ${i} is a direct (non-indirect) PDF object; the engine requires every page to have a stable indirect object number`,
-          { details: { pageIndex: i, pon } },
+          { details: { pageIndex: i, pageObjectNumber } },
         );
       }
-      const record: PageRecord = { pageObjectNumber: pon, pageIndex: i };
+      const record: PageRecord = { pageObjectNumber, pageIndex: i };
       this.recordsByIndex.set(i, record);
-      this.recordsByObjectNumber.set(pon, record);
+      this.recordsByObjectNumber.set(pageObjectNumber, record);
     }
     this.fullyEnumerated = true;
   }
@@ -332,7 +332,7 @@ export class DocumentSession {
   }
 
   /**
-   * Resolve a page ADDRESS to its registry record — the one boundary where
+   * Resolve a page address to its registry record — the one boundary where
    * a `PageRef` becomes a page object number. Throws `NotFound` for an
    * unknown page.
    */
@@ -403,7 +403,7 @@ export class DocumentSession {
    * Version key for detached-snapshot caches (e.g. the forms model):
    * a cache entry built at sequence N is exactly valid while the
    * sequence is still N. Coarse on purpose — widgets are annotations
-   * and page ops move widgets, so ANY mutation may affect derived
+   * and page ops move widgets, so any mutation may affect derived
    * form state; per-domain counters are a later optimization.
    */
   mutationSeq(): number {
@@ -418,7 +418,7 @@ export class DocumentSession {
   /**
    * Forget a page's per-session state (revision generation + weak-annotation
    * flag). Called by `pages.delete` after the page object is retired; the
-   * PON is never recycled, so this is hygiene, not correctness.
+   * page object number is never recycled, so this is hygiene, not correctness.
    */
   dropPageState(pageObjectNumber: PageObjectNumber): void {
     this.requireRevisions().drop(pageObjectNumber);
@@ -443,7 +443,7 @@ export class DocumentSession {
   }
 
   /**
-   * Park a disposer to run when THIS session closes. Used by operations
+   * Park a disposer to run when this session closes. Used by operations
    * whose native side leaves the session document referencing another
    * resource — e.g. `pages.insert`: `FPDF_ImportPagesByIndex` does not
    * fully detach imported objects from their source document, so the
@@ -494,7 +494,7 @@ export class DocumentSession {
       this.fullyEnumerated = false;
     }
 
-    // Retained resources go LAST (reverse order): the session doc that
+    // Retained resources go last (reverse order): the session doc that
     // referenced them is closed above, so they are safe to release now.
     for (let i = this.retained.length - 1; i >= 0; i--) {
       try {

@@ -8,7 +8,17 @@ import type {
 import { endingNodes, endingPoints } from './endings';
 import { DISTANCE_CAPTION_SIZE as CAPTION_SIZE, distanceCaptionWidth } from './measurement-font';
 import { geomHit, geomRotation, rotatePoint, selectionQuad, unionRect } from './geometry';
-import type { Geom, Handle, Paint, Quad, Rect, RenderNode, SceneNode, Style, Vec } from './types';
+import type {
+  ContentGeometry,
+  Handle,
+  Paint,
+  Quad,
+  Rect,
+  RenderNode,
+  SceneNode,
+  Style,
+  Point,
+} from './types';
 import type { ShapeMeasurementAppearance } from './measurement-shape';
 
 export type MeasurementAppearance = DistanceAppearance | ShapeMeasurementAppearance;
@@ -27,15 +37,15 @@ export interface DistanceAppearance {
 }
 
 export interface DistanceSegment {
-  from: Vec;
-  to: Vec;
+  from: Point;
+  to: Point;
 }
 
 export interface DistanceCaptionLayout {
   text: string;
-  center: Vec;
-  along: Vec;
-  normal: Vec;
+  center: Point;
+  along: Point;
+  normal: Point;
   width: number;
   height: number;
   bounds: Quad;
@@ -43,20 +53,20 @@ export interface DistanceCaptionLayout {
 
 /** One layout drives the preview, selection, handles, and hit testing. */
 export interface DistanceLayout {
-  along: Vec;
-  normal: Vec;
+  along: Point;
+  normal: Point;
   length: number;
-  measuredStart: Vec;
-  measuredEnd: Vec;
-  dimensionStart: Vec;
-  dimensionEnd: Vec;
+  measuredStart: Point;
+  measuredEnd: Point;
+  dimensionStart: Point;
+  dimensionEnd: Point;
   dimensionSegments: DistanceSegment[];
   leaderSegments: DistanceSegment[];
   captionConnector: DistanceSegment[];
   caption: DistanceCaptionLayout | null;
   arrowPlacement: 'inside' | 'outside';
   endings: RenderNode[];
-  selectionPoints: Vec[];
+  selectionPoints: Point[];
   visualBounds: Rect;
 }
 
@@ -65,18 +75,18 @@ const OUTSIDE_CAPTION_PADDING = 7;
 const ARROW_RESERVE = 24;
 const OUTSIDE_STUB_LENGTH = 20;
 
-function offsetPoint(point: Vec, direction: Vec, distance: number): Vec {
+function offsetPoint(point: Point, direction: Point, distance: number): Point {
   return {
     x: point.x + direction.x * distance,
     y: point.y + direction.y * distance,
   };
 }
 
-function projectDelta(from: Vec, to: Vec, direction: Vec): number {
+function projectDelta(from: Point, to: Point, direction: Point): number {
   return (to.x - from.x) * direction.x + (to.y - from.y) * direction.y;
 }
 
-function lineAxes(start: Vec, end: Vec) {
+function lineAxes(start: Point, end: Point) {
   const length = Math.hypot(end.x - start.x, end.y - start.y);
   const along =
     length > 0 ? { x: (end.x - start.x) / length, y: (end.y - start.y) / length } : { x: 1, y: 0 };
@@ -87,12 +97,12 @@ function lineAxes(start: Vec, end: Vec) {
   return { along, normal, length };
 }
 
-export function distanceLabel(geom: Geom, appearance: DistanceAppearance): string {
-  if (geom.t !== 'line') {
+export function distanceLabel(geometry: ContentGeometry, appearance: DistanceAppearance): string {
+  if (geometry.kind !== 'line') {
     return appearance.text;
   }
 
-  const toPdfPoint = (point: Vec) => ({
+  const toPdfPoint = (point: Point) => ({
     x: point.x + appearance.crop.left,
     y: appearance.crop.top - point.y,
   });
@@ -102,15 +112,21 @@ export function distanceLabel(geom: Geom, appearance: DistanceAppearance): strin
     intent: appearance.intent,
     measure: appearance.measure,
     linePoints: {
-      start: toPdfPoint(geom.a),
-      end: toPdfPoint(geom.b),
+      start: toPdfPoint(geometry.a),
+      end: toPdfPoint(geometry.b),
     },
   });
 
   return isReadout(readout) ? readout.label : appearance.text;
 }
 
-function captionQuad(center: Vec, along: Vec, normal: Vec, width: number, height: number): Quad {
+function captionQuad(
+  center: Point,
+  along: Point,
+  normal: Point,
+  width: number,
+  height: number,
+): Quad {
   const corner = (x: number, y: number) => offsetPoint(offsetPoint(center, along, x), normal, y);
 
   return [
@@ -123,10 +139,10 @@ function captionQuad(center: Vec, along: Vec, normal: Vec, width: number, height
 
 /** A displaced caption connects to the midpoint, stopping clear of its text. */
 function captionConnector(
-  midpoint: Vec,
+  midpoint: Point,
   caption: DistanceCaptionLayout,
-  along: Vec,
-  normal: Vec,
+  along: Point,
+  normal: Point,
   offset: LineDimensionCaption['offset'],
 ): DistanceSegment[] {
   if (!offset || (offset.along === 0 && offset.perpendicular === 0)) {
@@ -157,10 +173,10 @@ function captionConnector(
 }
 
 function dimensionSegments(
-  start: Vec,
-  end: Vec,
-  along: Vec,
-  normal: Vec,
+  start: Point,
+  end: Point,
+  along: Point,
+  normal: Point,
   length: number,
   caption: DistanceCaptionLayout | null,
   position: LineDimensionCaption['position'],
@@ -201,20 +217,20 @@ function dimensionSegments(
 }
 
 export function distanceLayout(
-  geom: Geom,
+  geometry: ContentGeometry,
   appearance: DistanceAppearance,
   strokeWidth: number,
 ): DistanceLayout | null {
-  if (geom.t !== 'line') {
+  if (geometry.kind !== 'line') {
     return null;
   }
 
-  const { along, normal, length } = lineAxes(geom.a, geom.b);
+  const { along, normal, length } = lineAxes(geometry.a, geometry.b);
   const leaderLength = appearance.leader?.length ?? 0;
-  const dimensionStart = offsetPoint(geom.a, normal, leaderLength);
-  const dimensionEnd = offsetPoint(geom.b, normal, leaderLength);
+  const dimensionStart = offsetPoint(geometry.a, normal, leaderLength);
+  const dimensionEnd = offsetPoint(geometry.b, normal, leaderLength);
   const midpoint = offsetPoint(dimensionStart, along, length / 2);
-  const text = distanceLabel(geom, appearance);
+  const text = distanceLabel(geometry, appearance);
   const width = distanceCaptionWidth(text);
   const hasCaption = appearance.caption.enabled && text.length > 0;
   // A documented fit policy, constrained by the Acrobat 1.75 m / 2.01 m cases.
@@ -254,7 +270,7 @@ export function distanceLayout(
     const leaderOffset = side * (appearance.leader?.offset ?? 0);
     const leaderEnd = leaderLength + side * (appearance.leader?.extension ?? 0);
 
-    for (const endpoint of [geom.a, geom.b]) {
+    for (const endpoint of [geometry.a, geometry.b]) {
       leaderSegments.push({
         from: offsetPoint(endpoint, normal, leaderOffset),
         to: offsetPoint(endpoint, normal, leaderEnd),
@@ -281,17 +297,17 @@ export function distanceLayout(
   const startAngle = outside ? angle : angle + Math.PI;
   const endAngle = outside ? angle + Math.PI : angle;
   const endings = [
-    ...endingNodes(dimensionStart, startAngle, geom.ends?.start, strokeWidth),
-    ...endingNodes(dimensionEnd, endAngle, geom.ends?.end, strokeWidth),
+    ...endingNodes(dimensionStart, startAngle, geometry.ends?.start, strokeWidth),
+    ...endingNodes(dimensionEnd, endAngle, geometry.ends?.end, strokeWidth),
   ];
   const boundsPoints = [
-    geom.a,
-    geom.b,
+    geometry.a,
+    geometry.b,
     ...segments.flatMap((segment) => [segment.from, segment.to]),
     ...leaderSegments.flatMap((segment) => [segment.from, segment.to]),
     ...connector.flatMap((segment) => [segment.from, segment.to]),
-    ...endingPoints(dimensionStart, startAngle, geom.ends?.start, strokeWidth),
-    ...endingPoints(dimensionEnd, endAngle, geom.ends?.end, strokeWidth),
+    ...endingPoints(dimensionStart, startAngle, geometry.ends?.start, strokeWidth),
+    ...endingPoints(dimensionEnd, endAngle, geometry.ends?.end, strokeWidth),
     ...(caption?.bounds ?? []),
   ];
 
@@ -299,8 +315,8 @@ export function distanceLayout(
     along,
     normal,
     length,
-    measuredStart: geom.a,
-    measuredEnd: geom.b,
+    measuredStart: geometry.a,
+    measuredEnd: geometry.b,
     dimensionStart,
     dimensionEnd,
     dimensionSegments: segments,
@@ -324,21 +340,21 @@ export function expandDistanceBounds(bounds: Rect, padding: number): Rect {
 }
 
 export function distanceSelectionQuad(
-  geom: Geom,
+  geometry: ContentGeometry,
   appearance: DistanceAppearance,
   strokeWidth: number,
 ): Quad {
-  const layout = distanceLayout(geom, appearance, strokeWidth);
-  if (!layout || geom.t !== 'line') {
-    return selectionQuad(geom, strokeWidth);
+  const layout = distanceLayout(geometry, appearance, strokeWidth);
+  if (!layout || geometry.kind !== 'line') {
+    return selectionQuad(geometry, strokeWidth);
   }
 
   // Vertex annotations recover their local frame using the advisory rotation.
   // Include every measurement component before constructing that frame, then
   // rotate its corners back. Reboxing the page-aligned bounds would grow and
   // shift the selection as the annotation turns.
-  const angle = geomRotation(geom);
-  const origin = geom.a;
+  const angle = geomRotation(geometry);
+  const origin = geometry.a;
   const points = layout.selectionPoints.map((point) => rotatePoint(point, origin, -angle));
   const bounds = expandDistanceBounds(unionRect(points), strokeWidth / 2 + 1);
   const corner = (x: number, y: number) => rotatePoint({ x, y }, origin, angle);
@@ -362,7 +378,7 @@ export function distanceHandles(layout: DistanceLayout): Handle[] {
 
 export function distanceCaptionHit(
   layout: { caption: DistanceCaptionLayout | null },
-  point: Vec,
+  point: Point,
   margin = 0,
 ): boolean {
   const caption = layout.caption;
@@ -381,7 +397,7 @@ export function distanceCaptionHit(
 
 export function distanceHit(
   layout: DistanceLayout,
-  point: Vec,
+  point: Point,
   strokeWidth: number,
   margin: number,
 ): boolean {
@@ -397,12 +413,12 @@ export function distanceHit(
 
   return (
     segments.some((segment) =>
-      geomHit({ t: 'line', a: segment.from, b: segment.to }, point, margin, false, strokeWidth),
+      geomHit({ kind: 'line', a: segment.from, b: segment.to }, point, margin, false, strokeWidth),
     ) ||
     layout.endings.some((ending) => {
       if (ending.kind === 'poly') {
         return geomHit(
-          { t: 'poly', points: ending.points, closed: ending.closed },
+          { kind: 'poly', points: ending.points, closed: ending.closed },
           point,
           margin,
           true,
@@ -411,7 +427,7 @@ export function distanceHit(
       }
       if (ending.kind === 'ellipse') {
         return geomHit(
-          { t: 'rect', rect: ending.rect, ellipse: true },
+          { kind: 'rect', rect: ending.rect, ellipse: true },
           point,
           margin,
           true,
@@ -424,32 +440,32 @@ export function distanceHit(
 }
 
 export function distanceCaptionAt(
-  geom: Geom,
+  geometry: ContentGeometry,
   appearance: DistanceAppearance,
   width: number,
-): Vec | null {
-  return distanceLayout(geom, appearance, width)?.caption?.center ?? null;
+): Point | null {
+  return distanceLayout(geometry, appearance, width)?.caption?.center ?? null;
 }
 
-export function distanceLeaderLength(geom: Geom, point: Vec): number {
-  if (geom.t !== 'line') {
+export function distanceLeaderLength(geometry: ContentGeometry, point: Point): number {
+  if (geometry.kind !== 'line') {
     return 0;
   }
 
-  const { normal } = lineAxes(geom.a, geom.b);
-  return projectDelta(geom.a, point, normal);
+  const { normal } = lineAxes(geometry.a, geometry.b);
+  return projectDelta(geometry.a, point, normal);
 }
 
 export function moveDistanceCaption(
-  geom: Geom,
+  geometry: ContentGeometry,
   appearance: DistanceAppearance,
-  delta: Vec,
+  delta: Point,
 ): DistanceAppearance {
-  if (geom.t !== 'line') {
+  if (geometry.kind !== 'line') {
     return appearance;
   }
 
-  const { along, normal } = lineAxes(geom.a, geom.b);
+  const { along, normal } = lineAxes(geometry.a, geometry.b);
   const previous = appearance.caption.offset;
 
   return {
@@ -465,11 +481,11 @@ export function moveDistanceCaption(
 }
 
 export function distanceScene(
-  geom: Geom,
+  geometry: ContentGeometry,
   appearance: DistanceAppearance,
   style: Style,
 ): SceneNode[] {
-  const layout = distanceLayout(geom, appearance, style.strokeWidth);
+  const layout = distanceLayout(geometry, appearance, style.strokeWidth);
   if (!layout) {
     return [];
   }

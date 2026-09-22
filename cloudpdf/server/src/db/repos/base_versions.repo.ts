@@ -4,8 +4,9 @@
  * completed signature inserts the next row (number = parent's + 1) and
  * moves the head in the same transaction. A version's plane pointers are
  * what the base manifest publishes for it, and what a fresh layer over
- * it is seeded with — version 1 carries the initial epochs, so unsigned
- * documents behave exactly as before the catalog existed.
+ * it is seeded with — version 1 carries the initial epochs, so an
+ * unsigned document (only version 1) reads the same as one without a
+ * catalog row.
  */
 import type { Kysely, Transaction } from 'kysely';
 

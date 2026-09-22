@@ -4,7 +4,7 @@
  * The caller mints a URL that already carries its authority (a
  * presigned S3 / GCS / Azure / R2 / MinIO GET, or any HTTPS endpoint
  * the deployment's import policy allows) and the server pulls the
- * bytes. No credentials ever cross the API boundary; the URL IS the
+ * bytes. No credentials ever cross the API boundary; the URL is the
  * capability, so it is treated like a secret — `info.location` and
  * every error message carry origin + path only, never the query
  * string.
@@ -17,7 +17,7 @@
  *     routable unless `policy.allowPrivateNetworks` — loopback,
  *     RFC1918, CGNAT, link-local (incl. the 169.254.169.254 cloud
  *     metadata endpoint), ULA, NAT64 and multicast are refused;
- *   - the vetted addresses are PINNED for the actual connection via a
+ *   - the vetted addresses are pinned for the actual connection via a
  *     custom `lookup` (and `agent: false` disables socket reuse), so
  *     a DNS rebind between check and connect cannot retarget the
  *     request;
@@ -42,9 +42,9 @@ import {
 } from '../ImportSource';
 
 /**
- * Everything that is not publicly routable. v4-mapped v6 addresses
- * (`::ffff:10.0.0.1`) are unwrapped and checked as v4 so the mapped
- * spelling can't smuggle a private target past the v6 rules.
+ * Everything that is not publicly routable. IPv4-mapped IPv6 addresses
+ * (`::ffff:10.0.0.1`) are unwrapped and checked as IPv4 so the mapped
+ * spelling can't smuggle a private target past the IPv6 rules.
  */
 const nonPublicNets = (() => {
   const b = new BlockList();
@@ -64,7 +64,7 @@ const nonPublicNets = (() => {
   const v6: Array<[string, number]> = [
     ['::', 128], // unspecified
     ['::1', 128], // loopback
-    ['64:ff9b::', 96], // NAT64 (embedded v4 unverifiable here)
+    ['64:ff9b::', 96], // NAT64 (the embedded IPv4 address is unverifiable here)
     ['fc00::', 7], // ULA
     ['fe80::', 10], // link-local
     ['ff00::', 8], // multicast
@@ -245,7 +245,7 @@ export class UrlImportSource implements ImportSource {
   }
 
   /**
-   * Issue the GET against the PINNED addresses. `agent: false` gives
+   * Issue the GET against the pinned addresses. `agent: false` gives
    * the request its own connection (no pooled-socket reuse), and the
    * custom lookup answers with the vetted set no matter what DNS says
    * now — together they close the vet-then-rebind window.

@@ -9,7 +9,7 @@
  *     POST   …/signatures/:signingId/complete     JSON { cms: base64, expectedVersion }
  *     DELETE …/signatures/:signingId
  *   Version-scoped reads (content-addressed by base sha; immutable; the
- *   RESOURCE comes before the sha so each family keeps its own CDN prefix):
+ *   resource comes before the sha so each family keeps its own CDN prefix):
  *     GET  /v1/docs/:docId/versions                                   the catalog (no-store)
  *     GET  /v1/docs/:docId/versions/signatures/:sha
  *     GET  /v1/docs/:docId/versions/signatures/:sha/:fieldKey/contents
@@ -98,7 +98,7 @@ export async function registerSignatureRoutes(
   ) => service.readLayerSignatures(ctx, docId, layerName, signal);
   // The layer session was opened on base + artifact and has applied every
   // later write in memory (each one persisted as a new artifact): the
-  // layer's state IS the session's working copy, so the analysis
+  // layer's state is the session's working copy, so the analysis
   // snapshots it as one more revision over the loaded bytes.
   const analyzeLayer = (
     ctx: OpenContext,

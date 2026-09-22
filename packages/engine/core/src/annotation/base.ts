@@ -25,10 +25,11 @@ export interface AnnotationBase {
   /** /Contents text. */
   contents: string | null;
   /**
-   * `/Subj` — short subject line of a markup annotation (ISO 32000
-   * §12.5.6.2, Table 172). Normalized onto the base like `contents` /
-   * `author`: non-markup subtypes simply read `null`. Faithful read:
-   * `null` iff the key is absent (a present-but-empty `/Subj` reads `''`).
+   * `/Subj` — short subject line of a markup annotation
+   * (ISO 32000 §12.5.6.2, Table 172). Normalized onto the base like
+   * `contents` / `author`: non-markup subtypes simply read `null`.
+   * Faithful read: `null` iff the key is absent (a present-but-empty
+   * `/Subj` reads `''`).
    */
   subject: string | null;
   /** /T author. */
@@ -51,7 +52,7 @@ export interface AnnotationBase {
    * if the parent carries `/NM`). The engine never auto-stamps the parent
    * on read; it only reports the identity PDFium already exposes.
    *
-   * Relationships are NOT nested into the DTO: a reply / group member is
+   * Relationships are not nested into the DTO: a reply / group member is
    * itself a first-class annotation in the flat page list. Use
    * `buildThreads()` to compose this flat edge into primary + replies +
    * groupedParts for a comments sidebar.

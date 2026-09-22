@@ -18,11 +18,11 @@ import { createValidTestLicenseGate } from '../src/licensing/testing';
 /**
  * In-engine encoding.
  *
- * The stub worker implements the `*.renderEncoded` kinds with REAL sharp
+ * The stub worker implements the `*.renderEncoded` kinds with real sharp
  * (the same dependency the API-side `SharpImageEncoder` uses), so these
  * tests can assert the strongest property directly: the escape hatch
  * (`encodeInEngine: false` — raw rasters over the boundary + API-side
- * encode) produces BYTE-IDENTICAL responses to the default in-engine
+ * encode) produces byte-identical responses to the default in-engine
  * path, for both the page-render route and the appearances multipart.
  */
 

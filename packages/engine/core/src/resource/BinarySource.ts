@@ -2,7 +2,7 @@
  * Inline binary payloads for annotation drafts/patches.
  *
  * Public rule (see also `annotation/normalize.ts`): binary data is a call
- * ARGUMENT, never engine state. Callers put bytes directly on the draft
+ * argument, never engine state. Callers put bytes directly on the draft
  * field that names their role (stamp `source`, future file-attachment
  * `file`); normalization replaces each such field with a `ResourceRef`
  * and moves the bytes into a `WireResourceMap` that travels out-of-band
@@ -26,7 +26,7 @@ export interface BinaryPayload {
 }
 
 /**
- * A resolved binary payload in wire form: a PRIVATE COPY of the caller's
+ * A resolved binary payload in wire form: a private copy of the caller's
  * bytes, owned by the call and ready to ship (worker transfer list or
  * multipart part body). Ownership is the whole point: the local engine puts
  * `bytes` on a postMessage transfer list, which detaches the buffer, and a

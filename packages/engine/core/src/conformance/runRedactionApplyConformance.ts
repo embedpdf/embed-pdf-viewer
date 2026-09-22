@@ -9,7 +9,7 @@ import type { ConformanceOptions, ConformanceTestRunner } from './runMetadataCon
 
 /**
  * Transport-neutral coverage for the destructive redaction-apply rail.
- * Runs against a fixture page with NO pre-existing annotations so the
+ * Runs against a fixture page with no pre-existing annotations so the
  * collateral counts are exact. Content-removal fidelity itself is pinned by
  * the native embeddertests; this suite pins the transport contract: scopes,
  * statuses, counts, revision bumps, events, and preflight rejection.
@@ -80,7 +80,7 @@ export function runRedactionApplyConformance(
         expect(result.results).toHaveLength(1);
         expect(result.results[0].page.pageObjectNumber).toBe(pageObjectNumber);
         expect(result.results[0].status).toBe('applied');
-        // Exactly the highlight counts: the consumed REDACT never does.
+        // Exactly the highlight counts: the consumed redact never does.
         expect(result.results[0].removedAnnotationCount).toBe(1);
         expect(result.removedAnnotationCount).toBe(1);
         expect(result.meta === null).toBe(false);
@@ -144,7 +144,7 @@ export function runRedactionApplyConformance(
           }),
         ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg });
 
-        // Preflight rejects a ref that is not a REDACT annotation before
+        // Preflight rejects a ref that is not a redact annotation before
         // anything is written.
         const notRedact = await page.annotations.create({
           subtype: 'highlight',

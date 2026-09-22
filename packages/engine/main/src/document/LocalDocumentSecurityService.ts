@@ -67,7 +67,7 @@ export class LocalDocumentSecurityService implements DocumentSecurityService {
   }
 
   /**
-   * Per-record annotation authorization mirrors — delegate to the SAME
+   * Per-record annotation authorization mirrors — delegate to the same
    * ScopeGuard predicates the annotation service enforces with
    * (`assertCollab`/`assertSetGroup`), so a control gated on these can
    * never disagree with the engine's own deny. False on the legacy

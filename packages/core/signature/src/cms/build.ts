@@ -42,15 +42,21 @@ export interface BuildDetachedCmsInput {
 export async function buildDetachedCms(input: BuildDetachedCmsInput): Promise<Uint8Array> {
   const engine = ensureEngine();
   if (input.digest.byteLength !== DIGEST_LENGTH[input.hash]) {
-    throw new Error(`digest is ${input.digest.byteLength} bytes; ${input.hash} needs ${DIGEST_LENGTH[input.hash]}`);
+    throw new Error(
+      `digest is ${input.digest.byteLength} bytes; ${input.hash} needs ${DIGEST_LENGTH[input.hash]}`,
+    );
   }
   if (input.signer.hash !== input.hash) {
-    throw new Error(`the signer hashes with ${input.signer.hash}, the document was prepared with ${input.hash}`);
+    throw new Error(
+      `the signer hashes with ${input.signer.hash}, the document was prepared with ${input.hash}`,
+    );
   }
   if (input.signer.certificateChain.length === 0) {
     throw new Error('the signer carries no certificate');
   }
-  const chain = input.signer.certificateChain.map((der) => pkijs.Certificate.fromBER(toArrayBuffer(der)));
+  const chain = input.signer.certificateChain.map((der) =>
+    pkijs.Certificate.fromBER(toArrayBuffer(der)),
+  );
   const signerCert = chain[0];
 
   const attributes: pkijs.Attribute[] = [
@@ -72,7 +78,10 @@ export async function buildDetachedCms(input: BuildDetachedCmsInput): Promise<Ui
     );
   }
   if (input.profile === 'cades-b') {
-    const certHash = await engine.digest('SHA-256', toArrayBuffer(input.signer.certificateChain[0]));
+    const certHash = await engine.digest(
+      'SHA-256',
+      toArrayBuffer(input.signer.certificateChain[0]),
+    );
     const issuerSerial = new pkijs.IssuerSerial({
       issuer: new pkijs.GeneralNames({
         names: [new pkijs.GeneralName({ type: 4, value: signerCert.issuer })],
@@ -103,10 +112,14 @@ export async function buildDetachedCms(input: BuildDetachedCmsInput): Promise<Ui
     signatureAlgorithm: signatureAlgorithmFor(input.signer.algorithm, input.hash),
   });
 
-  const toSign = new asn1js.Set({ value: attributes.map((a) => a.toSchema()) }).toBER(false);
+  const toSign = new asn1js.Set({
+    value: attributes.map((attribute) => attribute.toSchema()),
+  }).toBER(false);
   const raw = await input.signer.sign(new Uint8Array(toSign));
   const signature =
-    input.signer.algorithm === 'ECDSA' ? pkijs.createCMSECDSASignature(toArrayBuffer(raw)) : toArrayBuffer(raw);
+    input.signer.algorithm === 'ECDSA'
+      ? pkijs.createCMSECDSASignature(toArrayBuffer(raw))
+      : toArrayBuffer(raw);
   signerInfo.signature = new asn1js.OctetString({ valueHex: signature });
 
   const signedData = new pkijs.SignedData({
@@ -130,12 +143,18 @@ function signatureAlgorithmFor(
   switch (algorithm) {
     case 'RSA-PKCS1-v1_5':
       return new pkijs.AlgorithmIdentifier({
-        algorithmId: { sha256: OID.sha256WithRsa, sha384: OID.sha384WithRsa, sha512: OID.sha512WithRsa }[hash],
+        algorithmId: {
+          sha256: OID.sha256WithRsa,
+          sha384: OID.sha384WithRsa,
+          sha512: OID.sha512WithRsa,
+        }[hash],
         algorithmParams: new asn1js.Null(),
       });
     case 'ECDSA':
       return new pkijs.AlgorithmIdentifier({
-        algorithmId: { sha256: OID.ecdsaSha256, sha384: OID.ecdsaSha384, sha512: OID.ecdsaSha512 }[hash],
+        algorithmId: { sha256: OID.ecdsaSha256, sha384: OID.ecdsaSha384, sha512: OID.ecdsaSha512 }[
+          hash
+        ],
       });
     case 'RSA-PSS': {
       const hashAlgorithm = new pkijs.AlgorithmIdentifier({
@@ -150,7 +169,10 @@ function signatureAlgorithmFor(
         }),
         saltLength: DIGEST_LENGTH[hash],
       });
-      return new pkijs.AlgorithmIdentifier({ algorithmId: OID.rsaPss, algorithmParams: params.toSchema() });
+      return new pkijs.AlgorithmIdentifier({
+        algorithmId: OID.rsaPss,
+        algorithmParams: params.toSchema(),
+      });
     }
   }
 }

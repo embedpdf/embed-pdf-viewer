@@ -6,8 +6,8 @@ import type { SignatureConfig, SignatureMode } from '../contract';
 import type { SignatureContext } from './context';
 
 export function createAuthority(ctx: SignatureContext, config: SignatureConfig) {
-  const allows = (cap: 'doc.sign' | 'doc.sign.certify' | 'doc.forms.fill'): boolean =>
-    ctx.doc?.security.allows(cap) ?? false;
+  const allows = (capability: 'doc.sign' | 'doc.sign.certify' | 'doc.forms.fill'): boolean =>
+    ctx.doc.security.allows(capability);
   const mode = (): SignatureMode => config.mode ?? (config.signer ? 'sign' : 'visual');
   const resolveSigner = async (
     override?: SignerPort | (() => Promise<SignerPort>),
@@ -27,7 +27,7 @@ export function createAuthority(ctx: SignatureContext, config: SignatureConfig) 
     mode,
     resolveSigner,
     canSign: () => allows('doc.sign') && config.signer != null,
-    canFill: () => allows('doc.forms.fill') && ctx.doc?.forms.setSignatureAppearance != null,
+    canFill: () => allows('doc.forms.fill') && ctx.doc.forms.setSignatureAppearance != null,
     canCertify: () => config.allowCertify === true && allows('doc.sign.certify'),
   };
 }

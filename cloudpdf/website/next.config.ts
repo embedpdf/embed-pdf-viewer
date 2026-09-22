@@ -39,10 +39,10 @@ const withNextra = nextra({
       keepBackground: false,
     },
     remarkPlugins: [
-      // Resolve the engine axis FIRST, so every later plugin (and the
+      // Resolve the engine axis first, so every later plugin (and the
       // compiled page) only ever sees this site's flavour.
       [remarkEngineAxis, { engine: DOCS_SITE.engine }],
-      // Stamp the release channel on install commands BEFORE npm2yarn fans
+      // Stamp the release channel on install commands before npm2yarn fans
       // the npm line out, so every package-manager tab inherits the tag.
       remarkInstallChannel,
       [
@@ -64,7 +64,7 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   // The docs kit ships raw TypeScript source (workspace package).
   transpilePackages: ['@embedpdf/docs-kit'],
-  // "/docs/…page.md" is rewritten to the Markdown Route Handler by
+  // "/docs/…/<page>.md" is rewritten to the Markdown Route Handler by
   // middleware.ts, which also owns the fan-out courtesy redirects.
   // The search route reads the per-deploy artifact from the filesystem;
   // tracing must bundle it into the serverless function.

@@ -19,4 +19,4 @@ Tool [InterfaceDeclaration]: export interface Tool{ id: ToolId; cursor: Cursor; 
 ToolChangedEvent [InterfaceDeclaration]: export interface ToolChangedEvent{ readonly toolId: ToolId; readonly previousToolId: ToolId; readonly tool: Tool; readonly payload?: unknown; }
 ToolCursorSkin [TypeAliasDeclaration]: export type ToolCursorSkin = Record<Cursor, Cursor>;
 ToolId [TypeAliasDeclaration]: export type ToolId = string;
-samplePointOn [VariableDeclaration]: samplePointOn = (s: PointerSample, page: PageRef): Point | null => s.project?.(page) ?? (s.page?.ref.pageObjectNumber === page.pageObjectNumber ? s.page.point : null)
+samplePointOn [VariableDeclaration]: samplePointOn = (sample: PointerSample, page: PageRef): Point | null => sample.project?.(page) ?? (sample.page?.ref.pageObjectNumber === page.pageObjectNumber ? sample.page.point : null)

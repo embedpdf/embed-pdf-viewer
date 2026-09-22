@@ -145,7 +145,7 @@ export class LocalDocumentPagesService implements DocumentPagesService {
   }
 
   /**
-   * Named pages are LAYOUT: both verbs are page-structure mutations mapped
+   * Named pages are layout: both verbs are page-structure mutations mapped
    * to the cloud's POST /pages/names and /pages/names/delete (gated by
    * `doc.pages.assemble`, like every page-structure verb) and publish one
    * `pages.named` event carrying the fresh layout.
@@ -424,7 +424,7 @@ export class LocalDocumentPagesService implements DocumentPagesService {
       );
     }
     // pages.extract egresses content bytes (a partial download), so it is
-    // gated by `doc.download` — NOT `doc.pages.assemble`: it reads, never
+    // gated by `doc.download` — not `doc.pages.assemble`: it reads, never
     // restructures. No event is published: nothing about the document changed.
     try {
       this.guard.assertCapability('doc.download');

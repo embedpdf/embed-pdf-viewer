@@ -5,9 +5,9 @@
  *   CLOUDPDF_SECRETS_PROVIDERS=env,file,awsProd,gcpProd,azureKv
  *      (comma-separated list of registry names; case-sensitive)
  *
- *   CLOUDPDF_SECRETS_PROVIDER_<NAME>_KIND=<kind>
- *   CLOUDPDF_SECRETS_PROVIDER_<NAME>_<FIELD>=<value>
- *      (per-provider configuration; <NAME> matches the registry name
+ *   CLOUDPDF_SECRETS_PROVIDER_<name>_KIND=<kind>
+ *   CLOUDPDF_SECRETS_PROVIDER_<name>_<field>=<value>
+ *      (per-provider configuration; <name> matches the registry name
  *      uppercased with non-alphanumeric chars replaced by '_')
  *
  *   CLOUDPDF_SECRETS_CACHE_TTL_SEC=3600
@@ -34,7 +34,7 @@ export function loadSecretsConfigFromEnv(env: NodeJS.ProcessEnv = process.env): 
   const providers: Record<string, SecretProviderConfig> = {};
   for (const name of providersList) {
     // Zero-config default: a single `env` provider needs no per-provider
-    // KIND var (matches this loader's documented contract). Explicitly
+    // kind var (matches this loader's documented contract). Explicitly
     // listed providers stay strict and must declare their kind.
     providers[name] = usingDefault && name === 'env' ? { kind: 'env' } : readProvider(env, name);
   }

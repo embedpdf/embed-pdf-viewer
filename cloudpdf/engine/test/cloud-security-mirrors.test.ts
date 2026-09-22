@@ -8,7 +8,7 @@ import { HttpClient } from '../src/transport/HttpClient';
  * The `security.allowsAnnotation*` mirrors on the cloud SDK's
  * local-fallback path: raw scope + identity decoded (unverified) from
  * the doc JWT, PDF bits from /head. Pure client logic — no server —
- * exercising the SAME `checkCollab`/`checkSetGroup` resolvers the
+ * exercising the same `checkCollab`/`checkSetGroup` resolvers the
  * server's route layer enforces with. The engine-local twin
  * (`packages/engine/main/test/security-collab.test.ts`) runs the same
  * scenarios through a real WASM open; same inputs must answer the same.

@@ -144,7 +144,7 @@ export const DocumentActionsSnapshotSchema: z.ZodType<DocumentActionsSnapshot> =
     didPrint: PdfActionTreeSchema.optional(),
   })
   .superRefine((snapshot, context) => {
-    // `/OpenAction` is ONE catalog entry — a dictionary (action) or an array
+    // `/OpenAction` is one catalog entry — a dictionary (action) or an array
     // (destination). Both non-null cannot come from a correct reader.
     if (snapshot.openAction !== null && (snapshot.openDestination ?? null) !== null) {
       context.addIssue({

@@ -33,12 +33,12 @@ import { throwIfAborted } from '../../shared/abort';
  *     "doc-level shouldRefetch" semantic. Anything that *is* listed
  *     here must remain stable across every reorder permutation.
  *
- *   - Per-page `RevisionToken`s do NOT bump on `move()`. The /Annots
+ *   - Per-page `RevisionToken`s do not bump on `move()`. The /Annots
  *     array of each affected page is untouched (PDFium just rewrites
  *     pointer entries in the doc-level pages tree), so weak
  *     `AnnotationRef.kind === 'index'` references the caller is
  *     holding remain valid across a page reorder. This is the right
- *     semantic for an editing UI: shuffling pages must NOT silently
+ *     semantic for an editing UI: shuffling pages must not silently
  *     break a pending highlight edit.
  *
  *   - Identity strengthening (the opportunistic `/NM` stamping that
@@ -73,7 +73,7 @@ export class PagesMutator {
   move(pages: PageRef[], destIndex: number, signal: AbortSignal): PageMoveResult {
     const pageObjectNumbers = this.session.resolvePageRefs(pages);
     throwIfAborted(signal);
-    this.requireUniquePons('pages.move', pageObjectNumbers);
+    this.requireUniquePageObjectNumbers('pages.move', pageObjectNumbers);
     if (destIndex < 0 || !Number.isInteger(destIndex)) {
       throw new EngineError(
         EngineErrorCode.InvalidArg,
@@ -96,9 +96,9 @@ export class PagesMutator {
     // registry. Bad pons throw `NotFound` from the session, which is
     // exactly what we want — the caller asked to move a page that does
     // not exist.
-    const fromIndices = pageObjectNumbers.map((pon) => {
+    const fromIndices = pageObjectNumbers.map((pageObjectNumber) => {
       throwIfAborted(signal);
-      return this.session.recordByObjectNumber(pon).pageIndex;
+      return this.session.recordByObjectNumber(pageObjectNumber).pageIndex;
     });
 
     // Marshal int[] and call the helper.
@@ -138,23 +138,23 @@ export class PagesMutator {
   }
 
   /**
-   * Set the ABSOLUTE display rotation of the supplied pages. Rotation is
+   * Set the absolute display rotation of the supplied pages. Rotation is
    * presentation metadata over normalized content (pages always load with
    * rotation forced to 0 — see `PagePtrPool`), so:
    *   - no cached render, text run, or geometry coordinate changes;
-   *   - per-page `RevisionToken`s do NOT bump;
+   *   - per-page `RevisionToken`s do not bump;
    *   - page identity and order are untouched — no registry refresh.
    *
-   * Atomicity: every PON is resolved up front (`NotFound` on caller error),
+   * Atomicity: every page object number is resolved up front (`NotFound` on caller error),
    * so the apply loop below operates on validated pages only and each write
    * is absolute + idempotent — a retry after an unexpected mid-loop engine
-   * fault converges to the requested state. Abort is honored BEFORE the
+   * fault converges to the requested state. Abort is honored before the
    * loop, never inside it.
    */
   rotate(pages: PageRef[], rotation: PageRotation, signal: AbortSignal): PageRotateResult {
     const pageObjectNumbers = this.session.resolvePageRefs(pages);
     throwIfAborted(signal);
-    this.requireUniquePons('pages.rotate', pageObjectNumbers);
+    this.requireUniquePageObjectNumbers('pages.rotate', pageObjectNumbers);
     if (rotation !== 0 && rotation !== 90 && rotation !== 180 && rotation !== 270) {
       throw new EngineError(
         EngineErrorCode.InvalidArg,
@@ -164,17 +164,17 @@ export class PagesMutator {
 
     const { fn } = this.runtime;
     const docPtr = this.session.requireDocPtr();
-    for (const pon of pageObjectNumbers) {
-      this.session.recordByObjectNumber(pon); // NotFound on unknown pon
+    for (const pageObjectNumber of pageObjectNumbers) {
+      this.session.recordByObjectNumber(pageObjectNumber); // NotFound on unknown pon
     }
 
     // The EPDF helper takes quarter-turns (0..3); the wire speaks degrees.
     const quarterTurns = rotation / 90;
-    for (const pon of pageObjectNumbers) {
-      if (!fn.EPDFDoc_SetPageRotationByObjectNumber(docPtr, pon, quarterTurns)) {
+    for (const pageObjectNumber of pageObjectNumbers) {
+      if (!fn.EPDFDoc_SetPageRotationByObjectNumber(docPtr, pageObjectNumber, quarterTurns)) {
         throw new EngineError(
           EngineErrorCode.Unknown,
-          `EPDFDoc_SetPageRotationByObjectNumber rejected page ${pon} after validation`,
+          `EPDFDoc_SetPageRotationByObjectNumber rejected page ${pageObjectNumber} after validation`,
         );
       }
     }
@@ -184,26 +184,26 @@ export class PagesMutator {
   }
 
   /**
-   * Delete pages. Deleted object numbers are RETIRED — the engine nulls the
+   * Delete pages. Deleted object numbers are retired — the engine nulls the
    * page object rather than freeing the number — so per-page state keyed by
-   * PON can never silently attach to an unrelated future page; we still drop
+   * page object number can never silently attach to an unrelated future page; we still drop
    * the session's revision/weak entries as hygiene. Surviving pages keep
    * their identity and `RevisionToken`s.
    *
    * Guards:
    *   - a document must keep at least one page (`InvalidArg`);
-   *   - every PON must resolve (`NotFound`);
+   *   - every page object number must resolve (`NotFound`);
    *   - no target page may have a live pooled `pagePtr`. Thread confinement
    *     means no other job can be mid-flight, so a held ptr here is a leaked
    *     `acquire` — an internal bug we surface loudly instead of deleting
    *     under a live handle.
    *
-   * Abort is honored BEFORE the apply loop, never inside it.
+   * Abort is honored before the apply loop, never inside it.
    */
   delete(pages: PageRef[], signal: AbortSignal): PageDeleteResult {
     const pageObjectNumbers = this.session.resolvePageRefs(pages);
     throwIfAborted(signal);
-    this.requireUniquePons('pages.delete', pageObjectNumbers);
+    this.requireUniquePageObjectNumbers('pages.delete', pageObjectNumbers);
 
     const { fn } = this.runtime;
     const docPtr = this.session.requireDocPtr();
@@ -216,24 +216,24 @@ export class PagesMutator {
     }
 
     const pool = this.session.pagePool();
-    for (const pon of pageObjectNumbers) {
-      this.session.recordByObjectNumber(pon); // NotFound on unknown pon
-      if (pool.isHeld(pon)) {
+    for (const pageObjectNumber of pageObjectNumbers) {
+      this.session.recordByObjectNumber(pageObjectNumber); // NotFound on unknown pon
+      if (pool.isHeld(pageObjectNumber)) {
         throw new EngineError(
           EngineErrorCode.Unknown,
-          `internal invariant violation: pagePtr for page ${pon} is still held during pages.delete`,
+          `internal invariant violation: pagePtr for page ${pageObjectNumber} is still held during pages.delete`,
         );
       }
     }
 
-    for (const pon of pageObjectNumbers) {
-      if (!fn.EPDFDoc_DeletePageByObjectNumber(docPtr, pon)) {
+    for (const pageObjectNumber of pageObjectNumbers) {
+      if (!fn.EPDFDoc_DeletePageByObjectNumber(docPtr, pageObjectNumber)) {
         throw new EngineError(
           EngineErrorCode.Unknown,
-          `EPDFDoc_DeletePageByObjectNumber rejected page ${pon} after validation`,
+          `EPDFDoc_DeletePageByObjectNumber rejected page ${pageObjectNumber} after validation`,
         );
       }
-      this.session.dropPageState(pon);
+      this.session.dropPageState(pageObjectNumber);
     }
 
     // Page count and order changed; rebuild the index<->pon map. Surviving
@@ -247,7 +247,7 @@ export class PagesMutator {
   /**
    * Register `name` → page in `/Names /Pages` (create, or replace what the
    * key points at); with `replace`, drop that other key first — a rename as
-   * one job. Named pages are LAYOUT: page identity and order are untouched
+   * one job. Named pages are layout: page identity and order are untouched
    * (no registry refresh, no revision bumps) and the fresh snapshot is
    * returned like `move()`.
    */
@@ -302,20 +302,20 @@ export class PagesMutator {
     return { layout, cache: null };
   }
 
-  /** Shared input check: non-empty, no duplicate PONs. */
-  private requireUniquePons(op: string, pageObjectNumbers: PageObjectNumber[]): void {
+  /** Shared input check: non-empty, no duplicate page object numbers. */
+  private requireUniquePageObjectNumbers(op: string, pageObjectNumbers: PageObjectNumber[]): void {
     if (pageObjectNumbers.length === 0) {
       throw new EngineError(EngineErrorCode.InvalidArg, `${op} requires at least one page`);
     }
     const seen = new Set<PageObjectNumber>();
-    for (const pon of pageObjectNumbers) {
-      if (seen.has(pon)) {
+    for (const pageObjectNumber of pageObjectNumbers) {
+      if (seen.has(pageObjectNumber)) {
         throw new EngineError(
           EngineErrorCode.InvalidArg,
-          `${op} was given duplicate page object number ${pon}`,
+          `${op} was given duplicate page object number ${pageObjectNumber}`,
         );
       }
-      seen.add(pon);
+      seen.add(pageObjectNumber);
     }
   }
 }

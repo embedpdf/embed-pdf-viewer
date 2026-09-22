@@ -6,15 +6,15 @@
  * Authority comes from the SDK's default credential chain (IAM role /
  * env), never from the request — the connection's authorization gates
  * (credential class, tenant binding, prefix scope, self-storage
- * refusal) all fire in `createImportSource` BEFORE this adapter is
+ * refusal) all fire in `createImportSource` before this adapter is
  * constructed.
  *
  * `revision` maps to S3 VersionId; the response's VersionId is
  * reported back as `resolvedRevision` even for unpinned reads, so
  * provenance always records what was actually served.
  *
- * Lazy-load per ADAPTERS.md: `@aws-sdk/client-s3` imports on first
- * use, never at module load.
+ * Lazy-load per `docs/conventions/server-adapters.md`:
+ * `@aws-sdk/client-s3` imports on first use, never at module load.
  */
 import type { Readable } from 'node:stream';
 
@@ -27,7 +27,7 @@ import {
   type ImportSourceOpen,
 } from '../ImportSource';
 
-// Type-only — does NOT trigger the runtime import (see ADAPTERS.md).
+// Type-only — does not trigger the runtime import (see `docs/conventions/server-adapters.md`).
 type S3Module = typeof import('@aws-sdk/client-s3');
 type S3Client = InstanceType<S3Module['S3Client']>;
 
@@ -43,7 +43,7 @@ export class S3ImportSource implements ImportSource {
   /**
    * Unlike destination adapters (constructed once at boot), sources
    * are per-request: construction must stay a pure validation step
-   * with NO side effects, so the lazy SDK import starts on first
+   * with no side effects, so the lazy SDK import starts on first
    * open() — construct-and-discard (async eligibility gates, tests)
    * never leaves a dangling in-flight import behind.
    */

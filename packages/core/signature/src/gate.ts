@@ -13,7 +13,9 @@ export type CompletionRefusal =
   | 'signature-invalid'
   | 'profile-violation';
 
-export type CompletionGate = { ok: true } | { ok: false; reason: CompletionRefusal; detail: string };
+export type CompletionGate =
+  | { ok: true }
+  | { ok: false; reason: CompletionRefusal; detail: string };
 
 /**
  * The gate between a signer's answer and `signatures.complete`: the CMS
@@ -39,8 +41,12 @@ export async function verifyForCompletion(input: {
   let internal;
   try {
     internal = parseCmsInternal(cms);
-  } catch (err) {
-    return { ok: false, reason: 'malformed', detail: err instanceof CmsError ? err.message : String(err) };
+  } catch (error) {
+    return {
+      ok: false,
+      reason: 'malformed',
+      detail: error instanceof CmsError ? error.message : String(error),
+    };
   }
   const parsed = internal.parsed;
   if (parsed.digestAlgorithm !== prepared.algorithm) {
@@ -51,14 +57,26 @@ export async function verifyForCompletion(input: {
     };
   }
   if (!bytesEqual(parsed.messageDigest, prepared.digest)) {
-    return { ok: false, reason: 'digest-mismatch', detail: 'the CMS message digest is not the prepared digest' };
+    return {
+      ok: false,
+      reason: 'digest-mismatch',
+      detail: 'the CMS message digest is not the prepared digest',
+    };
   }
   if (profile === 'cades-b') {
     if (!parsed.signingCertificateV2) {
-      return { ok: false, reason: 'profile-violation', detail: 'CAdES requires the ESS signing-certificate-v2 attribute' };
+      return {
+        ok: false,
+        reason: 'profile-violation',
+        detail: 'CAdES requires the ESS signing-certificate-v2 attribute',
+      };
     }
     if (parsed.signingTime) {
-      return { ok: false, reason: 'profile-violation', detail: 'PAdES forbids the CMS signing-time attribute' };
+      return {
+        ok: false,
+        reason: 'profile-violation',
+        detail: 'PAdES forbids the CMS signing-time attribute',
+      };
     }
   }
   const cryptography = await verifyCmsSignature(internal);
@@ -66,7 +84,10 @@ export async function verifyForCompletion(input: {
     return {
       ok: false,
       reason: 'signature-invalid',
-      detail: cryptography === 'unsupported' ? 'the signature algorithm is not supported' : 'the signature does not verify',
+      detail:
+        cryptography === 'unsupported'
+          ? 'the signature algorithm is not supported'
+          : 'the signature does not verify',
     };
   }
   return { ok: true };

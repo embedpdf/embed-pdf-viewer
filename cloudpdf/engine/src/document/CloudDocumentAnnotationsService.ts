@@ -37,7 +37,7 @@ export class CloudDocumentAnnotationsService implements DocumentAnnotationsServi
   ) {}
 
   /**
-   * One COHERENT whole-document snapshot: a single read of the immutable
+   * One coherent whole-document snapshot: a single read of the immutable
    * `annotations/items@annotationsVersion=N` leaf at the manifest's pin —
    * materialized server-side by one raw (no page-load) sweep, CDN-cacheable
    * because the pin bumps only when annotation list bodies actually change.

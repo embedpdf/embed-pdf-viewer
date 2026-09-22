@@ -87,7 +87,7 @@ export function runMeasurementConformance(
     test('all three kinds derive labels, save, reopen and retain captions', async () => {
       let doc = await open();
       try {
-        const pon = (await doc.pages.list()).pages[0].ref.pageObjectNumber;
+        const pageObjectNumber = (await doc.pages.list()).pages[0].ref.pageObjectNumber;
         const drafts: AnnotationDraft[] = [
           {
             subtype: 'line',
@@ -121,7 +121,7 @@ export function runMeasurementConformance(
         const saved = [];
         for (const draft of drafts) {
           const preview = measurementReadout(draft);
-          const a = (await doc.page(toPageRef(pon)).annotations.create(draft)).created;
+          const a = (await doc.page(toPageRef(pageObjectNumber)).annotations.create(draft)).created;
           expect(a.contents).toBe('label' in preview ? preview.label : undefined);
           saved.push(a);
         }
@@ -152,8 +152,8 @@ export function runMeasurementConformance(
     test('calibration updates only viewports and emits one event per write', async () => {
       const doc = await open();
       try {
-        const pon = (await doc.pages.list()).pages[0].ref.pageObjectNumber;
-        const page = doc.page(toPageRef(pon));
+        const pageObjectNumber = (await doc.pages.list()).pages[0].ref.pageObjectNumber;
+        const page = doc.page(toPageRef(pageObjectNumber));
         if (!page.measure) throw new Error('Measurement service is required');
         const foreign = (await page.measure.viewports()).filter((v) => !v.owned);
         const annotations = (await page.annotations.list()).annotations;
@@ -168,7 +168,10 @@ export function runMeasurementConformance(
           const changes = events.filter((e) => e.type === 'page.viewportsChanged');
           expect(changes).toHaveLength(2);
           for (const event of changes)
-            expect(event).toMatchObject({ page: toPageRef(pon), meta: { affectedPages: [] } });
+            expect(event).toMatchObject({
+              page: toPageRef(pageObjectNumber),
+              meta: { affectedPages: [] },
+            });
         } finally {
           off();
         }

@@ -5,8 +5,8 @@ import type { ColorStyleFields } from '../style.shared';
 
 /**
  * Redaction annotation (`/Redact`, ISO 32000-2 12.5.6.23). The annotation is
- * the non-destructive MARKING stage: it declares what should be removed and
- * what the region must look like afterwards. The destructive APPLY is a
+ * the non-destructive marking stage: it declares what should be removed and
+ * what the region must look like afterwards. The destructive apply is a
  * separate document operation, not an annotation mutation.
  *
  * Color model: `color` is `/C` — the marking-stage outline (the universal

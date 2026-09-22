@@ -87,7 +87,7 @@ beforeAll(async () => {
  * Box kinds (square/circle/free-text) persist `/Rect` = the rotated AABB plus
  * an `/EMBD_Metadata/UnrotatedRect` + `/EMBD_Metadata/Rotation`, so PDFium can
  * bake a correct `/AP /Matrix`. Vertex kinds (line/polyline/ink) bake the angle
- * into the points and persist only an ADVISORY `/EMBD_Metadata/Rotation` (no
+ * into the points and persist only an advisory `/EMBD_Metadata/Rotation` (no
  * unrotatedRect) — PDFium ignores a lone Rotation, so it is inert for AP yet
  * lets EmbedPDF show an oriented selection box and offer reset on reopen.
  */
@@ -217,7 +217,7 @@ describe('annotation rotation (local engine) — save + reopen', () => {
         opacity: 1,
       });
       // Reset: state the clear explicitly (tri-state — omission would
-      // PRESERVE the rotation; `null` removes the EMBD keys).
+      // preserve the rotation; `null` removes the EMBD keys).
       await doc.page(toPageRef(PAGE)).annotations.update(created.created.ref, {
         subtype: 'square',
         rect: SQUARE_RECT,
@@ -321,7 +321,7 @@ describe('annotation rotation (local engine) — save + reopen', () => {
       expect('unrotatedRect' in ink && ink.unrotatedRect).toBeFalsy();
     }
 
-    // Appearances for vertex kinds stay on the CLASSIC render path: their
+    // Appearances for vertex kinds stay on the classic render path: their
     // rotation is baked into the vertices (advisory /Rotation only), so the
     // entry's rect is the annotation's own /Rect — never remapped to an
     // unrotated box — and the raster contains the drawn strokes.
@@ -385,8 +385,8 @@ describe('annotation rotation (local engine) — save + reopen', () => {
       expect(Math.round(caret.unrotatedRect!.right)).toBe(UNROTATED.right);
       expect(Math.round(caret.unrotatedRect!.top)).toBe(UNROTATED.top);
 
-      // Caret is BOX-family in the appearance reader: the raster comes back
-      // rotation-stripped, PLACED BY THE LOGICAL UNROTATED BOX — not by
+      // Caret is box-family in the appearance reader: the raster comes back
+      // rotation-stripped, placed by the logical unrotated box — not by
       // /Rect. (Before caret joined BOX_FAMILY_SUBTYPES this returned the
       // rotated AABB and the consumer's re-applied `rotation` doubled the
       // tilt on reload.)

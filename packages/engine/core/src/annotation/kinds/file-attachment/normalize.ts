@@ -10,7 +10,7 @@ import {
 
 /**
  * Resolve an attachment `file` into its wire halves: metadata into the
- * JSON body, bytes into the resource map. Unlike stamps there is NO
+ * JSON body, bytes into the resource map. Unlike stamps there is no
  * format allowlist — attaching arbitrary files is the point — so the
  * declared mime type wins (attachment formats cannot be reliably sniffed;
  * the writer falls back to `application/octet-stream` when absent).

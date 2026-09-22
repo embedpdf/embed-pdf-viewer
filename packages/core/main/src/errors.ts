@@ -78,7 +78,7 @@ const ENGINE_CODE_MAP: Readonly<Record<string, PluginErrorCode>> = {
 };
 
 /**
- * The ONE boundary mapping from whatever an engine call threw to a
+ * The one boundary mapping from whatever an engine call threw to a
  * `PluginError`. Idempotent: an existing PluginError passes through.
  * Cancellation (the kernel's CancelledError, a DOM AbortError, or an engine
  * abort) is `operation-cancelled`, never `operation-failed`, so callers can

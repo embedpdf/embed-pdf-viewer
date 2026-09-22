@@ -1,4 +1,4 @@
-/** The one normalized submit INTENT, from either source (an action node's
+/** The one normalized submit intent, from either source (an action node's
  *  payload or a script `doc.submitForm()` effect), and the engine request
  *  shape the document's home receives. Pure. */
 import type { ScriptUiEffect } from '@embedpdf/core-acrojs';

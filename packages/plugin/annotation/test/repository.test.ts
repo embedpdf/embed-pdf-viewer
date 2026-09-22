@@ -3,7 +3,7 @@ import {
   isAttachedLink,
   linkChildrenOf,
   linkOf,
-  type Annot,
+  type ModelAnnotation,
   type Model,
 } from '@embedpdf/core-annotation';
 import { textQuadFromRect } from '@embedpdf/core-geometry';
@@ -75,9 +75,9 @@ function squareDTO(
 
 describe('repository.fromDTO — group/relationship mapping', () => {
   it('leaves irt/group undefined for a top-level annotation', () => {
-    const a = fromDTO(squareDTO(10), CROP);
-    expect(a.irt).toBeUndefined();
-    expect(a.group).toBeUndefined();
+    const annotation = fromDTO(squareDTO(10), CROP);
+    expect(annotation.irt).toBeUndefined();
+    expect(annotation.group).toBeUndefined();
   });
 
   it('maps a `/RT /Group` subordinate to both irt and group (the primary key)', () => {
@@ -162,25 +162,25 @@ describe('repository — Replace Text authoring', () => {
   };
 
   it('emits the normalized Caret and StrikeOut intents with print flags', () => {
-    const caret: Annot = {
+    const caret: ModelAnnotation = {
       id: 'tmp:1',
       ref: null,
       page: toPageRef(1),
       subtype: 'caret',
       intent: 'replace',
-      geom: { t: 'caret', rect: { x: 90, y: 40, width: 10, height: 10 } },
+      geometry: { kind: 'caret', rect: { x: 90, y: 40, width: 10, height: 10 } },
       style,
       flags: DRAWN_FLAGS,
       source: 'vector',
     };
-    const strikeout: Annot = {
+    const strikeout: ModelAnnotation = {
       id: 'tmp:2',
       ref: null,
       page: toPageRef(1),
       subtype: 'strikeout',
       intent: 'strikeout-text-edit',
-      geom: {
-        t: 'quads',
+      geometry: {
+        kind: 'quads',
         quads: [textQuadFromRect({ x: 10, y: 20, width: 80, height: 15 })],
       },
       style,
@@ -204,12 +204,12 @@ describe('repository — Replace Text authoring', () => {
   });
 
   it('a rotated caret emits the box-family transform pair', () => {
-    const caret: Annot = {
+    const caret: ModelAnnotation = {
       id: 'tmp:3',
       ref: null,
       page: toPageRef(1),
       subtype: 'caret',
-      geom: { t: 'caret', rect: { x: 94, y: 53, width: 6, height: 6 }, rot: 270 },
+      geometry: { kind: 'caret', rect: { x: 94, y: 53, width: 6, height: 6 }, rot: 270 },
       style,
       flags: DRAWN_FLAGS,
       source: 'vector',
@@ -223,9 +223,12 @@ describe('repository — Replace Text authoring', () => {
       rect: { left: 94, right: 100, bottom: 741, top: 747 },
     });
 
-    if (caret.geom.t !== 'caret') throw new Error('Expected caret projection');
-    const upright: Annot = { ...caret, geom: { t: 'caret', rect: caret.geom.rect } };
-    // Tri-state flatten: upright carets STATE null so a stale pair can't linger.
+    if (caret.geometry.kind !== 'caret') throw new Error('Expected caret projection');
+    const upright: ModelAnnotation = {
+      ...caret,
+      geometry: { kind: 'caret', rect: caret.geometry.rect },
+    };
+    // Tri-state flatten: upright carets state null so a stale pair can't linger.
     expect(toCreateDraft(upright, CROP)).toMatchObject({
       rotation: null,
       unrotatedRect: null,
@@ -234,7 +237,7 @@ describe('repository — Replace Text authoring', () => {
 });
 
 /* ── callout free-text round-trip ─────────────────────────────────────────────
- * Coordinates are PDF user space (y-up). With this CROP, content = (x, 800 - y).
+ * Coordinates are PDF user space (y-up). With this crop, content = (x, 800 - y).
  * The text box PDF rect is {200,600,320,660}; the overall /Rect {30,590,330,745}
  * encloses the box + the leader (tip 40,740; knee 120,700) + the arrow; `/RD`
  * recovers the box from the overall. The 3rd `/CL` point (the connection) is
@@ -299,8 +302,8 @@ function plainFreeTextDTO(annotObjectNumber = 21): AnnotationDTO {
 }
 
 /* ── rotation round-trip (CW content ↔ PDF convention) ────────────────────────
- * The model carries `rot` CLOCKWISE in content space; the engine DTO carries
- * `/EMBD_Metadata/Rotation` in PDF convention. The repository converts ONCE at
+ * The model carries `rot` clockwise in content space; the engine DTO carries
+ * `/EMBD_Metadata/Rotation` in PDF convention. The repository converts once at
  * this seam: `rot_content = -rotation_pdf (mod 360)` and back. Box kinds also
  * split `/Rect` (the rotated AABB) from `unrotatedRect` (the logical box); vertex
  * kinds keep an advisory scalar only (the points are already rotated).
@@ -350,12 +353,12 @@ function rotatedPolylineDTO(rotationPdf: number, annotObjectNumber = 31): Annota
 
 describe('repository — rotation round-trip', () => {
   it('box: fromDTO reads unrotatedRect + converts PDF→CW content rot', () => {
-    const a = fromDTO(rotatedSquareDTO(90), CROP);
-    if (a.geom.t !== 'rect') throw new Error('expected rect geom');
+    const annotation = fromDTO(rotatedSquareDTO(90), CROP);
+    if (annotation.geometry.kind !== 'rect') throw new Error('expected rect geom');
     // unrotatedRect {100,100,200,200} → content {x:100,y:600,w:100,h:100}
-    expect(a.geom.rect).toMatchObject({ x: 100, y: 600, width: 100, height: 100 });
+    expect(annotation.geometry.rect).toMatchObject({ x: 100, y: 600, width: 100, height: 100 });
     // PDF 90° → CW content 270° (negation mod 360, from the y-flip)
-    expect(a.geom.rot).toBe(270);
+    expect(annotation.geometry.rot).toBe(270);
   });
 
   it('box: toPatch emits rect(AABB) + unrotatedRect + rotation (CW→PDF back)', () => {
@@ -378,20 +381,20 @@ describe('repository — rotation round-trip', () => {
       { subtype: 'square' }
     > & { rotation?: number | null; unrotatedRect?: PdfRect | null };
     if (!patch) throw new Error('expected a patch');
-    // Tri-state writes preserve omitted fields, so rotation 0 must be STATED
+    // Tri-state writes preserve omitted fields, so rotation 0 must be stated
     // as null — omission would keep a stale rotation on the document.
     expect(patch.rotation).toBe(null);
     expect(patch.unrotatedRect).toBe(null);
   });
 
   it('vertex: advisory rotation round-trips and the points stay authoritative', () => {
-    const a = fromDTO(rotatedPolylineDTO(30), CROP);
-    if (a.geom.t !== 'poly') throw new Error('expected poly geom');
-    expect(a.geom.rot).toBe(330); // -30 mod 360
+    const annotation = fromDTO(rotatedPolylineDTO(30), CROP);
+    if (annotation.geometry.kind !== 'poly') throw new Error('expected poly geom');
+    expect(annotation.geometry.rot).toBe(330); // -30 mod 360
     // the points are the visual — first vertex maps straight through the y-flip
-    expect(a.geom.points[0]).toEqual({ x: 120, y: 680 });
+    expect(annotation.geometry.points[0]).toEqual({ x: 120, y: 680 });
 
-    const patch = toPatch(a, CROP) as Extract<AnnotationPatch, { subtype: 'polyline' }> & {
+    const patch = toPatch(annotation, CROP) as Extract<AnnotationPatch, { subtype: 'polyline' }> & {
       rotation?: number;
       unrotatedRect?: PdfRect;
     };
@@ -402,9 +405,9 @@ describe('repository — rotation round-trip', () => {
   });
 
   it('vertex: an unrotated polyline states the advisory clear explicitly', () => {
-    const a = fromDTO(rotatedPolylineDTO(0, 33), CROP);
-    expect(a.geom.t === 'poly' && a.geom.rot).toBeFalsy();
-    const patch = toPatch(a, CROP) as Extract<AnnotationPatch, { subtype: 'polyline' }> & {
+    const annotation = fromDTO(rotatedPolylineDTO(0, 33), CROP);
+    expect(annotation.geometry.kind === 'poly' && annotation.geometry.rot).toBeFalsy();
+    const patch = toPatch(annotation, CROP) as Extract<AnnotationPatch, { subtype: 'polyline' }> & {
       rotation?: number | null;
     };
     expect(patch?.rotation).toBe(null);
@@ -413,21 +416,22 @@ describe('repository — rotation round-trip', () => {
 
 describe('repository — free-text callout mapping', () => {
   it('fromDTO: intent + /CL + /RD → a text geom with a leader (box recovered, conn dropped)', () => {
-    const a = fromDTO(calloutDTO(), CROP);
-    expect(a.geom.t).toBe('text');
-    if (a.geom.t !== 'text' || !a.geom.callout) throw new Error('expected callout geom');
+    const annotation = fromDTO(calloutDTO(), CROP);
+    expect(annotation.geometry.kind).toBe('text');
+    if (annotation.geometry.kind !== 'text' || !annotation.geometry.callout)
+      throw new Error('expected callout geom');
     // text box = overall inset by /RD, in content space
-    expect(a.geom.rect).toMatchObject({ x: 200, y: 140, width: 120, height: 60 });
+    expect(annotation.geometry.rect).toMatchObject({ x: 200, y: 140, width: 120, height: 60 });
     // tip / knee map to content space (y flips about the 800-pt crop)
-    expect(a.geom.callout.tip).toEqual({ x: 40, y: 60 });
-    expect(a.geom.callout.knee).toEqual({ x: 120, y: 100 });
-    expect(a.geom.callout.ending).toBe('open-arrow');
+    expect(annotation.geometry.callout.tip).toEqual({ x: 40, y: 60 });
+    expect(annotation.geometry.callout.knee).toEqual({ x: 120, y: 100 });
+    expect(annotation.geometry.callout.ending).toBe('open-arrow');
   });
 
   it('fromDTO: a plain free-text (no /CL) has no callout', () => {
-    const a = fromDTO(plainFreeTextDTO(), CROP);
-    expect(a.geom.t).toBe('text');
-    expect(a.geom.t === 'text' && a.geom.callout).toBeUndefined();
+    const annotation = fromDTO(plainFreeTextDTO(), CROP);
+    expect(annotation.geometry.kind).toBe('text');
+    expect(annotation.geometry.kind === 'text' && annotation.geometry.callout).toBeUndefined();
   });
 
   it('toCreateDraft: a callout geom → intent + overall /Rect + /CL + /RD + /LE', () => {
@@ -481,8 +485,8 @@ describe('repository — free-text callout mapping', () => {
 
 describe('repository — free-text style + font round-trip', () => {
   it('fromDTO projects the /DA font fields into `text` (fontColor falls back to /DA colour)', () => {
-    const a = fromDTO(calloutDTO(), CROP);
-    expect(a.text).toEqual({
+    const annotation = fromDTO(calloutDTO(), CROP);
+    expect(annotation.text).toEqual({
       fontFamily: 'helvetica',
       fontSize: 14,
       fontColor: '#c80000', // no explicit fontColor → the /DA colour {200,0,0}
@@ -491,12 +495,17 @@ describe('repository — free-text style + font round-trip', () => {
   });
 
   it('toPatch carries the FULL style + font set for free-text (a sidebar edit round-trips)', () => {
-    const a = fromDTO(plainFreeTextDTO(), CROP);
+    const annotation = fromDTO(plainFreeTextDTO(), CROP);
     // a props edit: restyle + refont the box (what updateSelection applies)
     const edited = {
-      ...a,
-      style: { ...a.style, color: '#0000ff', interiorColor: '#ffff00', opacity: 0.5 },
-      text: { ...a.text!, fontSize: 22, fontColor: '#00ff00', textAlign: 'center' as const },
+      ...annotation,
+      style: { ...annotation.style, color: '#0000ff', interiorColor: '#ffff00', opacity: 0.5 },
+      text: {
+        ...annotation.text!,
+        fontSize: 22,
+        fontColor: '#00ff00',
+        textAlign: 'center' as const,
+      },
     };
     const patch = toPatch(edited, CROP) as Extract<AnnotationPatch, { subtype: 'free-text' }>;
     expect(patch.color).toEqual({ r: 0, g: 0, b: 255 });
@@ -511,8 +520,8 @@ describe('repository — free-text style + font round-trip', () => {
   });
 
   it('toPatch carries style + font for a callout too, alongside the leader fields', () => {
-    const a = fromDTO(calloutDTO(), CROP);
-    const edited = { ...a, text: { ...a.text!, fontFamily: 'courier' } };
+    const annotation = fromDTO(calloutDTO(), CROP);
+    const edited = { ...annotation, text: { ...annotation.text!, fontFamily: 'courier' } };
     const patch = toPatch(edited, CROP) as Extract<AnnotationPatch, { subtype: 'free-text' }>;
     expect(patch.calloutLine).toHaveLength(3); // geometry still round-trips
     expect(patch.fontFamily).toBe('courier');
@@ -520,8 +529,11 @@ describe('repository — free-text style + font round-trip', () => {
   });
 
   it('toCreateDraft seeds the draft from `text` (the tool font defaults), not hardcoded values', () => {
-    const a = fromDTO(plainFreeTextDTO(), CROP);
-    const seeded = { ...a, text: { ...a.text!, fontSize: 18, textAlign: 'right' as const } };
+    const annotation = fromDTO(plainFreeTextDTO(), CROP);
+    const seeded = {
+      ...annotation,
+      text: { ...annotation.text!, fontSize: 18, textAlign: 'right' as const },
+    };
     const draft = toCreateDraft(seeded, CROP) as Extract<AnnotationDraft, { subtype: 'free-text' }>;
     expect(draft.fontSize).toBe(18);
     expect(draft.textAlign).toBe('right');
@@ -531,8 +543,8 @@ describe('repository — free-text style + font round-trip', () => {
 
 /* ── polygon cloudy border round-trip ─────────────────────────────────────────
  * A polygon's cloud curls are generated from /Vertices + /BE alone (no /RD; the
- * curls reach OUTWARD), so the patch must carry `cloudyIntensity` and a /Rect
- * grown by the cloud extent — the regression here was a patch with NEITHER, so
+ * curls reach outward), so the patch must carry `cloudyIntensity` and a /Rect
+ * grown by the cloud extent — the regression here was a patch with neither, so
  * the engine round-trip snapped the border back to solid.
  */
 function polygonDTO(cloudyIntensity: number | undefined, annotObjectNumber = 40): AnnotationDTO {
@@ -569,13 +581,13 @@ function polygonDTO(cloudyIntensity: number | undefined, annotObjectNumber = 40)
 
 describe('repository — polygon cloudy border', () => {
   it('fromDTO reads /BE intensity into a cloudy border', () => {
-    const a = fromDTO(polygonDTO(2), CROP);
-    expect(a.style.border).toEqual({ kind: 'cloudy', intensity: 2 });
+    const annotation = fromDTO(polygonDTO(2), CROP);
+    expect(annotation.style.border).toEqual({ kind: 'cloudy', intensity: 2 });
   });
 
   it('toPatch carries cloudyIntensity and grows /Rect by the outward cloud extent', () => {
-    const a = fromDTO(polygonDTO(2), CROP);
-    const patch = toPatch(a, CROP) as Extract<AnnotationPatch, { subtype: 'polygon' }>;
+    const annotation = fromDTO(polygonDTO(2), CROP);
+    const patch = toPatch(annotation, CROP) as Extract<AnnotationPatch, { subtype: 'polygon' }>;
     expect(patch.cloudyIntensity).toBe(2);
     // vertex hull is x:[120,280]; the /Rect must reach beyond it by the cloud
     // radius (4·intensity + 0.5·stroke) + stroke/2 = 8 + 1 + 1 = 10
@@ -586,8 +598,11 @@ describe('repository — polygon cloudy border', () => {
   });
 
   it('toPatch clears the effect with cloudyIntensity null when the border is solid again', () => {
-    const a = fromDTO(polygonDTO(2), CROP);
-    const solid = { ...a, style: { ...a.style, border: { kind: 'solid' as const } } };
+    const annotation = fromDTO(polygonDTO(2), CROP);
+    const solid = {
+      ...annotation,
+      style: { ...annotation.style, border: { kind: 'solid' as const } },
+    };
     const patch = toPatch(solid, CROP) as Extract<AnnotationPatch, { subtype: 'polygon' }>;
     expect(patch.cloudyIntensity).toBe(null); // tri-state remove of /BE
     // and the /Rect shrinks back to the stroke-only bounds
@@ -595,10 +610,10 @@ describe('repository — polygon cloudy border', () => {
   });
 
   it('an open polyline never carries cloudy fields', () => {
-    const a = fromDTO(rotatedPolylineDTO(0, 41), CROP);
+    const annotation = fromDTO(rotatedPolylineDTO(0, 41), CROP);
     const cloudyStyled = {
-      ...a,
-      style: { ...a.style, border: { kind: 'cloudy' as const, intensity: 2 } },
+      ...annotation,
+      style: { ...annotation.style, border: { kind: 'cloudy' as const, intensity: 2 } },
     };
     const patch = toPatch(cloudyStyled, CROP) as Extract<AnnotationPatch, { subtype: 'polyline' }>;
     expect(patch).not.toHaveProperty('cloudyIntensity');
@@ -607,8 +622,8 @@ describe('repository — polygon cloudy border', () => {
 
 describe('repository — toScopedPatch (sparse emission)', () => {
   it('geometry scope on a square emits ONLY the box group (no style biography)', () => {
-    const a = fromDTO(squareDTO(60), CROP);
-    const patch = toScopedPatch(a, { kind: 'geometry' }, CROP) as unknown as Record<
+    const annotation = fromDTO(squareDTO(60), CROP);
+    const patch = toScopedPatch(annotation, { kind: 'geometry' }, CROP) as unknown as Record<
       string,
       unknown
     >;
@@ -621,8 +636,8 @@ describe('repository — toScopedPatch (sparse emission)', () => {
   });
 
   it('geometry scope on a link omits target — a foreign /A survives the move', () => {
-    const a = fromDTO({ ...squareDTO(61), subtype: 'link' } as AnnotationDTO, CROP);
-    const patch = toScopedPatch(a, { kind: 'geometry' }, CROP) as unknown as Record<
+    const annotation = fromDTO({ ...squareDTO(61), subtype: 'link' } as AnnotationDTO, CROP);
+    const patch = toScopedPatch(annotation, { kind: 'geometry' }, CROP) as unknown as Record<
       string,
       unknown
     >;
@@ -631,9 +646,9 @@ describe('repository — toScopedPatch (sparse emission)', () => {
   });
 
   it('props scope lowers single keys 1:1 (fontSize alone, engine RMW makes it safe)', () => {
-    const a = fromDTO(calloutDTO(21), CROP);
+    const annotation = fromDTO(calloutDTO(21), CROP);
     const patch = toScopedPatch(
-      a,
+      annotation,
       { kind: 'props', keys: ['fontSize'] },
       CROP,
     ) as unknown as Record<string, unknown>;
@@ -659,9 +674,9 @@ describe('repository — toScopedPatch (sparse emission)', () => {
   });
 
   it('props strokeWidth on a polygon re-emits the VISUAL-bounds /Rect', () => {
-    const a = fromDTO(polygonDTO(undefined), CROP);
+    const annotation = fromDTO(polygonDTO(undefined), CROP);
     const patch = toScopedPatch(
-      a,
+      annotation,
       { kind: 'props', keys: ['strokeWidth'] },
       CROP,
     ) as unknown as Record<string, unknown>;
@@ -670,11 +685,12 @@ describe('repository — toScopedPatch (sparse emission)', () => {
   });
 
   it('props border on a plain square states the tri-state clears', () => {
-    const a = fromDTO(squareDTO(63), CROP);
-    const patch = toScopedPatch(a, { kind: 'props', keys: ['border'] }, CROP) as unknown as Record<
-      string,
-      unknown
-    >;
+    const annotation = fromDTO(squareDTO(63), CROP);
+    const patch = toScopedPatch(
+      annotation,
+      { kind: 'props', keys: ['border'] },
+      CROP,
+    ) as unknown as Record<string, unknown>;
     expect(patch.borderStyle).toBe('solid');
     expect(patch.cloudyIntensity).toBe(null);
     expect(patch.rectDifferences).toBe(null);
@@ -682,15 +698,16 @@ describe('repository — toScopedPatch (sparse emission)', () => {
   });
 
   it('an unlowerable key degrades to the FULL projection, never a dropped write', () => {
-    const a = fromDTO(squareDTO(64), CROP);
-    const sparse = toScopedPatch(a, { kind: 'props', keys: ['color'] }, CROP) as unknown as Record<
-      string,
-      unknown
-    >;
+    const annotation = fromDTO(squareDTO(64), CROP);
+    const sparse = toScopedPatch(
+      annotation,
+      { kind: 'props', keys: ['color'] },
+      CROP,
+    ) as unknown as Record<string, unknown>;
     expect(Object.keys(sparse).sort()).toEqual(['color', 'subtype']);
     // `lineEndings` is not lowerable for a rect geom — full fallback kicks in.
     const fallback = toScopedPatch(
-      a,
+      annotation,
       { kind: 'props', keys: ['color', 'lineEndings'] },
       CROP,
     ) as unknown as Record<string, unknown>;
@@ -729,15 +746,15 @@ describe('repository — /Rect derives from line endings (the clipped-arrowhead 
     }) as unknown as AnnotationDTO;
 
   type RectPatch = { lineEndings?: unknown; rect?: PdfRect };
-  const area = (r: PdfRect) => (r.right - r.left) * (r.top - r.bottom);
+  const area = (rect: PdfRect) => (rect.right - rect.left) * (rect.top - rect.bottom);
 
   it('props lineEndings on a line re-emits the grown VISUAL-bounds /Rect', () => {
     const none = fromDTO(lineDTO({ start: 'none', end: 'none' }), CROP);
     const before = toScopedPatch(none, { kind: 'props', keys: ['lineEndings'] }, CROP) as RectPatch;
-    // The model AFTER the reducer applied the user's gesture: arrows on both ends.
+    // The model after the reducer applied the user's gesture: arrows on both ends.
     const arrows = {
       ...none,
-      geom: { ...none.geom, ends: { start: 'open-arrow', end: 'open-arrow' } },
+      geometry: { ...none.geometry, ends: { start: 'open-arrow', end: 'open-arrow' } },
     } as typeof none;
     const patch = toScopedPatch(
       arrows,
@@ -764,7 +781,7 @@ describe('repository — /Rect derives from line endings (the clipped-arrowhead 
     const base = fromDTO(rotatedPolylineDTO(0, 78), CROP);
     const arrows = {
       ...base,
-      geom: { ...base.geom, ends: { start: 'closed-arrow', end: 'closed-arrow' } },
+      geometry: { ...base.geometry, ends: { start: 'closed-arrow', end: 'closed-arrow' } },
     } as typeof base;
     const patch = toScopedPatch(
       arrows,
@@ -799,12 +816,15 @@ describe('repository — shape cloudy border tri-state', () => {
   });
 
   it('toPatch states BOTH clears when the border is solid again (no stale /RD)', () => {
-    const a = fromDTO(cloudySquare(), CROP);
-    const solid = { ...a, style: { ...a.style, border: { kind: 'solid' as const } } };
+    const annotation = fromDTO(cloudySquare(), CROP);
+    const solid = {
+      ...annotation,
+      style: { ...annotation.style, border: { kind: 'solid' as const } },
+    };
     const patch = toPatch(solid, CROP) as Extract<AnnotationPatch, { subtype: 'square' }>;
     // Tri-state removes: /BE and /RD are stated as null, never omitted — an
-    // omitted rectDifferences preserves the stale inset (the Adobe phantom
-    // padding this projection used to leave behind).
+    // omitted rectDifferences preserves the stale inset (a phantom padding in
+    // Adobe viewers).
     expect(patch.cloudyIntensity).toBe(null);
     expect(patch.rectDifferences).toBe(null);
   });
@@ -833,16 +853,16 @@ describe('repository — attached links (fold + desired state + link kind mappin
   };
 
   // Minimal Model for lens reads (order + byId are all the lens touches).
-  const modelWith = (annots: Annot[]): Model =>
+  const modelWith = (annots: ModelAnnotation[]): Model =>
     ({
-      byId: Object.fromEntries(annots.map((a) => [a.id, a])),
-      order: annots.map((a) => a.id),
+      byId: Object.fromEntries(annots.map((annotation) => [annotation.id, annotation])),
+      order: annots.map((annotation) => annotation.id),
     }) as unknown as Model;
 
   it('fromDTO maps a link DTO target onto the link slot', () => {
-    const a = fromDTO(linkDTO(20, URI), CROP);
-    expect(a.subtype).toBe('link');
-    expect(a.link).toEqual(URI);
+    const annotation = fromDTO(linkDTO(20, URI), CROP);
+    expect(annotation.subtype).toBe('link');
+    expect(annotation.link).toEqual(URI);
   });
 
   it('a grouped link child is SUBSTRATE: classified attached, read via linkOf', () => {
@@ -851,10 +871,10 @@ describe('repository — attached links (fold + desired state + link kind mappin
     // Nothing folds — both are first-class model annotations…
     expect(isAttachedLink(parent)).toBe(false);
     expect(isAttachedLink(child)).toBe(true);
-    const m = modelWith([parent, child]);
-    // …and the parent's value DERIVES from the committed child.
-    expect(linkOf(m, parent.id)).toEqual(URI);
-    expect(linkChildrenOf(m, parent.id).map((c) => c.id)).toEqual([child.id]);
+    const model = modelWith([parent, child]);
+    // …and the parent's value derives from the committed child.
+    expect(linkOf(model, parent.id)).toEqual(URI);
+    expect(linkChildrenOf(model, parent.id).map((annotation) => annotation.id)).toEqual([child.id]);
   });
 
   it('an orphan grouped link derives nothing for strangers and keeps its own target', () => {
@@ -865,8 +885,8 @@ describe('repository — attached links (fold + desired state + link kind mappin
       }),
       CROP,
     );
-    const m = modelWith([orphan]);
-    expect(linkOf(m, 'obj:1')).toBe(null); // no children of that parent
+    const model = modelWith([orphan]);
+    expect(linkOf(model, 'obj:1')).toBe(null); // no children of that parent
     expect(isAttachedLink(orphan)).toBe(true);
   });
 
@@ -874,22 +894,22 @@ describe('repository — attached links (fold + desired state + link kind mappin
     const parent = fromDTO(squareDTO(10), CROP);
     const c1 = fromDTO(linkDTO(11, URI, { inReplyTo: parentRef, replyType: 'group' }), CROP);
     const c2 = fromDTO(linkDTO(12, URI, { inReplyTo: parentRef, replyType: 'group' }), CROP);
-    const m = modelWith([parent, c1, c2]);
-    expect(linkChildrenOf(m, parent.id)).toHaveLength(2);
-    expect(linkOf(m, parent.id)).toEqual(URI);
+    const model = modelWith([parent, c1, c2]);
+    expect(linkChildrenOf(model, parent.id)).toHaveLength(2);
+    expect(linkOf(model, parent.id)).toEqual(URI);
   });
 
   it('linkChildRects: a ROTATED parent gets the AABB of its rotated footprint, not the unrotated box', () => {
     const square = fromDTO(squareDTO(10), CROP);
     // 100×100 box (from the DTO rect) with a 45° tilt: the rotated
     // footprint's AABB is 100·√2 ≈ 141.42 per side, centred on the box
-    // centre — NOT the 100×100 unrotated box. (Stroke handling follows
+    // centre — not the 100×100 unrotated box. (Stroke handling follows
     // `selectionQuad`'s own convention — the same envelope the chrome
     // outlines.)
-    const rotated: Annot = {
+    const rotated: ModelAnnotation = {
       ...square,
-      geom: {
-        t: 'rect',
+      geometry: {
+        kind: 'rect',
         rect: { x: 100, y: 600, width: 100, height: 100 },
         ellipse: false,
         rot: 45,
@@ -906,11 +926,11 @@ describe('repository — attached links (fold + desired state + link kind mappin
   it('linkChildRects: one rect per markup quad, one visual-bounds rect otherwise', () => {
     const square = fromDTO(squareDTO(10), CROP);
     expect(linkChildRects(square)).toHaveLength(1);
-    const markup: Annot = {
+    const markup: ModelAnnotation = {
       ...square,
       subtype: 'highlight',
-      geom: {
-        t: 'quads',
+      geometry: {
+        kind: 'quads',
         quads: [
           textQuadFromRect({ x: 0, y: 0, width: 50, height: 10 }),
           textQuadFromRect({ x: 0, y: 20, width: 30, height: 10 }),

@@ -41,7 +41,8 @@ export const AttachmentsTokenSchema = {
  */
 export const AnalysisTokenSchema = {
   // `policy`: the judging policy version the caller expects — part of the
-  // cache key, so a policy bump never serves a verdict judged the old way.
+  // cache key, so a policy bump never serves a verdict judged under another
+  // policy.
   fields: ['docVersion', 'since.signature', 'since.revision', 'level', 'policy', 'detail'],
 } as const;
 
@@ -57,9 +58,9 @@ export const DownloadTokenSchema = {
  * dotted path here and a matching branch in `PageImageOptionsWireSchema`.
  * No encoder/decoder code changes.
  *
- * `includeAnnotations` is deliberately NOT a token field: annotatedness
+ * `includeAnnotations` is deliberately not a token field: annotatedness
  * changes the artifact's plane-dependency
- * set, so it is expressed by the path FAMILY (`…/render/pages/` vs
+ * set, so it is expressed by the path family (`…/render/pages/` vs
  * `…/render/annotated/pages/`), never inside the token. `annotationVersion`
  * belongs to the annotated family's tokens only — each family's query
  * schema enforces its own pin grammar.
@@ -91,7 +92,7 @@ export const RenderTokenSchema = {
  * charset excludes free text), and the resume position. Canonical by
  * construction: the codec sorts fields and the encoder omits every
  * default, so equal searches produce byte-equal tokens — the property CDN
- * cache hits live on. Mode is NOT a field; it is the endpoint (separate
+ * cache hits live on. Mode is not a field; it is the endpoint (separate
  * permission tiers must never share cache entries).
  */
 export const SearchTokenSchema = {

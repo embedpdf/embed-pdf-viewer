@@ -8,4 +8,4 @@ The widget DOM-event door dispatches widget `/AA` trees, including coalesced hov
 
 Form scripting is fault-tolerant per event: Keystroke, Validate, Calculate, and Format exceptions degrade to diagnostics while explicit `event.rc = false` remains a rejection and resource-budget faults still fail the transaction. Keystroke actions now run Acrobat's typing and commit passes so standard AF validators and custom transforms see the expected event shape.
 
-Publish bundle-safe `/contract` and `/contract/host` entries over the same form token, plus a focused `/scripting` helper entry. `/internal` remains an implementation visibility surface rather than the sibling bundle boundary.
+Publish bundle-safe `/contract` and `/contract/host` entries over the same form token, plus a focused `/scripting` helper entry.

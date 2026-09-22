@@ -11,7 +11,7 @@ import type { DocCapability, PdfBits } from './types';
  *
  * Each leaf is a function returning the literal string (as `const`) so
  * TypeScript catches typos at the call site. Wrappers like `download`
- * and `print` are `Object.assign`'d to be callable AND carry child
+ * and `print` are `Object.assign`'d to be callable and carry child
  * properties for the refinement capabilities.
  */
 export const caps = {
@@ -77,7 +77,7 @@ export const collab = {
     update: makeFilterBuilder('annotations', 'update'),
     delete: makeFilterBuilder('annotations', 'delete'),
     setGroup: makeSetGroupBuilder(),
-    /** Action wildcard — matches create, update, delete, AND set-group with the given filter. */
+    /** Action wildcard — matches create, update, delete, and set-group with the given filter. */
     all: makeFilterBuilder('annotations', '*'),
   },
 } as const;
@@ -138,7 +138,7 @@ export const pdfPermissions = (): 'pdf.permissions' => 'pdf.permissions';
  *     'doc.download',
  *   ];
  *
- * IMPORTANT: this MUST stay in sync with `addPdfPermissions` inside
+ * Important: this must stay in sync with `addPdfPermissions` inside
  * resolver.ts. A test pins them together.
  */
 export function materializePdfPermissions(b: PdfBits): DocCapability[] {

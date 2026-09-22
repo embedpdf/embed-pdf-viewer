@@ -1,6 +1,6 @@
 /**
  * Menu rendering — a MenuSchema (a tree of command ids) rendered as rows.
- * Reused by the toolbar dropdowns (document / zoom / page-settings) AND by the
+ * Reused by the toolbar dropdowns (document / zoom / page-settings) and by the
  * overflow menu's inline submenu expansion, so a command's menu form is
  * identical wherever it surfaces. Rows resolve live through the command
  * registry: label, icon, active tick, enabled state.
@@ -27,9 +27,8 @@ export function MenuRow({ commandId, onRun }: { commandId: string; onRun?: () =>
         commands.execute(commandId);
         onRun?.();
       }}
-      // v2 shows selection as a blue-tinted row (bg-interactive-selected +
-      // text-accent), never a checkmark — the icon column stays the command's
-      // own icon.
+      // An active command shows as a tinted row (bg-selected + text-accent),
+      // never a checkmark — the icon column stays the command's own icon.
       className={`flex w-full items-center gap-3 rounded-md px-2.5 py-1.5 text-left text-sm transition-colors disabled:pointer-events-none disabled:opacity-40 ${
         cmd.active ? 'bg-selected text-accent' : 'text-fg-secondary hover:bg-hover'
       }`}
@@ -104,7 +103,7 @@ export function InlineSubmenu({ menuId, label }: { menuId: string; label: string
     <div>
       <button
         type="button"
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => setOpen((previous) => !previous)}
         className="text-fg-secondary hover:bg-hover flex w-full items-center gap-3 rounded-md px-2.5 py-1.5 text-left text-sm"
       >
         <span className="flex-1 truncate">{label}</span>

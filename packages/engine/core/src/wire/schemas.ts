@@ -158,11 +158,10 @@ export type OpenDocumentResponse = z.infer<typeof OpenDocumentResponseSchema>;
  * fields are accepted and ignored).
  *
  * `docVersion` is the single monotonic integer per doc; it bumps on
- * ANY mutation that could change the manifest's content (page list,
+ * any mutation that could change the manifest's content (page list,
  * per-page content, per-page annotations, per-page weak-flag), which
  * makes `/manifest@docVersion=N` fully content-addressed and cache-friendly.
- * Phase 4 hard-codes it to `1`; Phase 5's mutation handler is what
- * actually bumps it.
+ * The server's layer mutations bump it.
  */
 export const DocumentHeadSchema = z.object({
   id: z.string(),
@@ -191,7 +190,7 @@ export const DocumentHeadSchema = z.object({
 export type DocumentHead = z.infer<typeof DocumentHeadSchema>;
 
 export const AccessRequestSchema = z.object({
-  /** Deprecated: identity now rides the PATH
+  /** Deprecated: identity now rides the path
    *  (`/v1/docs/:docId/layers/:layerName/access`). Kept optional for the
    *  legacy `/v1/access` alias, which requires `docId` in the body. */
   docId: z.string().min(1).optional(),
@@ -325,10 +324,10 @@ export const AccessResponseSchema = z.object({
   expiresAt: z.number().int().positive(),
   /**
    * The deployment's render lattice — the canonical parameter points the
-   * server treats as durable, CDN-shared artifacts. Lives HERE and never in
+   * server treats as durable, CDN-shared artifacts. Lives here and never in
    * the manifest: manifests are version-pinned immutable objects; the
    * lattice is mutable deployment policy. The SDK exposes it (and a pure
-   * `snap` helper) but NEVER conforms requests implicitly — the same render
+   * `snap` helper) but never conforms requests implicitly — the same render
    * call must not return different pixels on local vs cloud. When
    * `enforced` is true the server rejects off-lattice render tokens with
    * 400; when false, off-lattice renders are computed but not persisted.
@@ -338,7 +337,7 @@ export const AccessResponseSchema = z.object({
     .object({
       /**
        * Full-page renders quantize on `viewport.width` — the bounded
-       * quantity is OUTPUT PIXELS, never zoom (PDF page space is
+       * quantity is output pixels, never zoom (PDF page space is
        * effectively unbounded, so a scale lattice bounds artifact count
        * but not size).
        */
@@ -346,7 +345,7 @@ export const AccessResponseSchema = z.object({
         widths: z.array(z.number().int().positive()),
       }),
       /**
-       * RESERVED for deep-zoom tile support: scale-based pyramid ×
+       * Reserved for deep-zoom tile support: scale-based pyramid ×
        * fixed tile size, constant per-job cost. Absent until the tiling
        * plugin ships.
        */
@@ -357,7 +356,7 @@ export const AccessResponseSchema = z.object({
         })
         .optional(),
       /**
-       * Annotation-appearance lattice — SCALE-based (appearances are sized
+       * Annotation-appearance lattice — scale-based (appearances are sized
        * by `rect × scale` and must track the page's effective render scale
        * for crisp composites).
        */
@@ -414,7 +413,7 @@ export const CachePinsSchema: z.ZodType<CachePins> = z.object({
 });
 
 /**
- * Plane scopes are DERIVED from the version counters at every emission
+ * Plane scopes are derived from the version counters at every emission
  * point (layer manifests, mutation cache envelopes, SSE rows), never stored.
  * Additive/optional both ways: old clients ignore it, old servers omit it
  * (consumers treat absence as all-'layer' — never wrong, only unshared).
@@ -442,8 +441,7 @@ export type { LayerScopes, LayerScopePlane } from '../dto/LayerScopes';
  * SDK can decide whether to display a "stale-on-reorder" badge
  * without re-fetching the page.
  *
- * Phase 4 hard-codes all three to (1, 1, false); Phase 5's
- * `layer_pages` table drives the real values.
+ * The server derives all three from its per-layer page state.
  */
 export const ManifestPageSchema: z.ZodType<ManifestPage> = z
   .object({
@@ -499,11 +497,11 @@ export const AnnotationListSnapshotAllPagesSchema: z.ZodType<AnnotationListSnaps
 
 /**
  * Wire shape of `GET …/text/pages/:pon/data@<contentVersion>` and the
- * `pages.text` worker result: the UTF-16-faithful extraction, the CHARACTER
- * space size (`charCount` — the space geometry runs tile; NOT `text.length`),
+ * `pages.text` worker result: the UTF-16-faithful extraction, the character
+ * space size (`charCount` — the space geometry runs tile; not `text.length`),
  * and the optional character→text anchor map. Malformed maps are rejected
  * here with the shared `charMapViolation` invariants — absent/empty map
- * REQUIRES `charCount === text.length` (identity).
+ * requires `charCount === text.length` (identity).
  */
 export const PageTextSnapshotSchema: z.ZodType<PageTextSnapshot> = z
   .object({
@@ -683,15 +681,15 @@ const RenderBackgroundSchema = z.enum(['white', 'transparent']);
 const RenderQualitySchema = z.coerce.number().int().min(1).max(100);
 
 /**
- * Token/path rule: annotatedness is PATH-expressed —
- * the render FAMILY the route belongs to — never token/query-expressed.
+ * Token/path rule: annotatedness is path-expressed —
+ * the render family the route belongs to — never token/query-expressed.
  * Each family therefore gets its own query schema, built from one shared
  * base:
  *
- *   - the annotation-free family (`…/render/pages/`) has NO
+ *   - the annotation-free family (`…/render/pages/`) has no
  *     `annotationVersion` field at all — `.strict()` rejects it as an
  *     unrecognized key, so the illegal combination is unrepresentable;
- *   - the annotated family (`…/render/annotated/pages/`) REQUIRES
+ *   - the annotated family (`…/render/annotated/pages/`) requires
  *     `annotationVersion` on versioned requests — its artifact depends on
  *     the `annotations` plane, so the pin must be in the cache key.
  *
@@ -905,7 +903,7 @@ export const AnnotationDeleteResultSchema: z.ZodType<AnnotationDeleteResult> = z
 /**
  * Batch annotation move (contiguous-block, symmetric with `pages.move`).
  * `moved` is in caller order; each `moved[i]` lives at index `toIndex + i`
- * after the move. ONE structural envelope per batch.
+ * after the move. One structural envelope per batch.
  */
 export const AnnotationMoveResultSchema: z.ZodType<AnnotationMoveResult> = z.object({
   moved: z.array(AnnotationDTOSchema),
@@ -1127,7 +1125,7 @@ export const PageMoveInputSchema: z.ZodType<PageMoveInput> = z.object({
 });
 
 /**
- * Coherence pins shared by every page-STRUCTURE result (move/rotate/delete) —
+ * Coherence pins shared by every page-structure result (move/rotate/delete) —
  * see `PageStructureCache`. Nullable at each use site (local engines).
  */
 export const PageStructureCacheSchema: z.ZodType<PageStructureCache> = z.object({
@@ -1153,7 +1151,7 @@ export const PageNameResultSchema: z.ZodType<PageNameResult> = z.object({
 });
 
 /**
- * Page rotate input. ABSOLUTE rotation (idempotent — see `PageRotateInput`),
+ * Page rotate input. Absolute rotation (idempotent — see `PageRotateInput`),
  * one value applied to every listed page.
  */
 export const PageRotateInputSchema: z.ZodType<PageRotateInput> = z.object({
@@ -1177,7 +1175,7 @@ export const PageDeleteInputSchema: z.ZodType<PageDeleteInput> = z.object({
 });
 
 /**
- * Page delete result. Deleted PONs are retired (never recycled); surviving
+ * Page delete result. Deleted page object numbers are retired (never recycled); surviving
  * pages keep identity + revisions (see `PageDeleteResult`).
  */
 export const PageDeleteResultSchema: z.ZodType<PageDeleteResult> = z.object({
@@ -1220,7 +1218,7 @@ export const PageExtractInputSchema: z.ZodType<{ pages: PageRef[] }> = z.object(
 
 /**
  * Page insert result — shared by bytes-insert and blank-insert: the fresh
- * PONs in insertion order plus the full new layout (see `PageInsertResult`).
+ * page object numbers in insertion order plus the full new layout (see `PageInsertResult`).
  */
 export const PageInsertResultSchema: z.ZodType<PageInsertResult> = z.object({
   insertedPages: z.array(PageRefSchema),
@@ -1281,7 +1279,7 @@ export type WeakAnnotationSessionPagesRequest = z.infer<
 //
 // `SignaturePrepared.digest` and `SignatureCompleteInput.cms` are bytes;
 // `JSON.stringify` turns a typed array into an index-keyed object, which
-// the completion gate then rejects. These codecs are the ONE definition
+// the completion gate then rejects. These codecs are the one definition
 // the HTTP bodies and the server's durable `prepared_json` share.
 // ---------------------------------------------------------------------------
 

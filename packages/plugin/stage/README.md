@@ -15,7 +15,7 @@ move, and each one keeps exactly one thing still:
 | drag, pinch, ctrl+wheel                            | the content under your pointer | nothing — that's physics      |
 | click zoom in/out, `zoomTo`, switch to fit-width   | a focal point in the viewport  | **`zoomAlign`**               |
 | resize the container, rotate a page, change spread | the spot you were looking at   | **`anchorAlign`**             |
-| `goToPage`, next/prev, reset                       | nothing — a fresh landing      | **`arrivalAlign`**            |
+| `goToPage`, `nextPage`/`previousPage`, `resetView` | nothing — a fresh landing      | **`arrivalAlign`**            |
 | click an outline entry, a search hit, a PDF link   | whatever the call specifies    | the call itself, per-`reveal` |
 
 One more setting stands outside the table. When an axis of content **fits** the
@@ -23,7 +23,8 @@ viewport, the camera has no freedom on that axis — there is nowhere to scroll.
 **`fitAlign`** says where content rests in that case (default: centered). It is a
 standing constraint applied to _every_ move above, not a move of its own.
 
-All four settings speak the same per-axis vocabulary, and `x`/`y` are independent:
+All four settings speak the same per-axis vocabulary — `'start' | 'center' | 'end'`,
+plus a viewport fraction for the three move policies — and `x`/`y` are independent:
 
 ```ts
 stagePlugin({
@@ -39,9 +40,9 @@ want, configure nothing.)
 
 ## `arrivalAlign` — where navigation lands
 
-When you _navigate_ (`goToPage`, `next`, `prev`, reset), the target page lands at
-the same place **at every zoom level** — landing is a policy, never a side effect
-of how zoomed in you happen to be. Per axis:
+When you _navigate_ (`goToPage`, `nextPage`, `previousPage`, `resetView`), the
+target page lands at the same place **at every zoom level** — landing is a
+policy, never a side effect of how zoomed in you happen to be. Per axis:
 
 | Value      | Landing                                                                   |
 | ---------- | ------------------------------------------------------------------------- |
@@ -56,13 +57,13 @@ and last pages — exactly like a browser.
 
 One value deserves a second look: **`x: 'keep'`** — page forward without losing
 your horizontal position. Zoomed into the left column of a two-column paper,
-`next()` takes you to the left column of the next page. (It's the PDF
+`nextPage()` takes you to the left column of the next page. (It's the PDF
 `/XYZ null` semantic, as a default.)
 
 Any single navigation can override the setting:
 
 ```ts
-stage.goToPage(12, { arrivalAlign: { y: 'center' } });
+stage.goToPage(page, { arrivalAlign: { y: 'center' } });
 ```
 
 ## `zoomAlign` — what focal-less zoom zooms around
@@ -99,9 +100,9 @@ Adobe's "Rotate View": a quarter-turn applied to how **every page displays in
 this lens**, on top of each page's own `/Rotate`.
 
 ```ts
-stage.rotateView(90); // toolbar verb: one quarter-turn clockwise from here
+stage.rotateViewBy(90); // toolbar verb: one quarter-turn clockwise from here
 stage.setViewRotation(180); // absolute
-stage.viewRotation(); // 0 | 90 | 180 | 270
+stage.getViewRotation(); // 0 | 90 | 180 | 270
 stagePlugin({ viewRotation: 90 }); // or start rotated
 ```
 
@@ -146,25 +147,34 @@ stagePlugin({ arrivalAlign: { x: 'keep', y: 0.35 } });
 ```
 
 A "preset" is just an object you keep and pass — to `stagePlugin()` at setup or
-`stage.update()` at runtime. The plugin ships no named presets; that taxonomy
-belongs to your product.
+`stage.updateSettings()` at runtime. The plugin ships no named presets; that
+taxonomy belongs to your product.
 
 ## The scroller contract — scrollbars, minimaps, "% read"
 
-The Stage doubles as a **virtual scroll element**. `scrollMetrics()` projects
+The Stage doubles as a **virtual scroll element**. `getScrollMetrics()` projects
 the camera into the native DOM vocabulary — every field means exactly what it
-means on a `<div>`, in screen px:
+means on a `<div>`, in screen px. It lives on the host lens
+(`@embedpdf/plugin-stage/contract/host`), the same runtime capability typed
+wider, because a scrollbar is chrome that drives the camera:
 
 ```ts
-const m = stage.scrollMetrics();
-// m.scrollTop / m.scrollLeft       — where you are
-// m.scrollHeight / m.scrollWidth   — how much there is
-// m.clientHeight / m.clientWidth   — how much you see
-// m.scrollableY / m.scrollableX    — false = nothing to scroll (hide the bar)
+import { StageToken } from '@embedpdf/plugin-stage/contract/host';
+
+const stage = kernel.capability(StageToken);
+const metrics = stage.getScrollMetrics();
+// metrics.scrollTop / metrics.scrollLeft       — where you are
+// metrics.scrollHeight / metrics.scrollWidth   — how much there is
+// metrics.clientHeight / metrics.clientWidth   — how much you see
+// metrics.scrollableY / metrics.scrollableX    — false = nothing to scroll (hide the bar)
 
 stage.scrollTo({ top: 0 }); // Element.scrollTo semantics
-stage.scrollBy({ top: m.clientHeight * 0.9 }); // page down
+stage.scrollBy({ top: metrics.clientHeight * 0.9 }); // page down
 ```
+
+In React, `useScrollMetrics()` reads the same numbers reactively and
+`<Scrollbar axis="y" />` draws a native-feeling bar from them (both from
+`@embedpdf/react/scrollbar`).
 
 That is the whole contract. A scrollbar thumb is
 `clientHeight / scrollHeight` of the track, positioned at
@@ -179,8 +189,8 @@ a scrollbar can never disagree with where panning actually stops:
   like a longer document.
 - **Paged flow** scrolls the current item: the bar reflects one page (or
   spread), and hides when it fits.
-- **A fitting axis** reports `scrollable: false` with `scrollWidth ===
-clientWidth` — the native "no bar" condition, for free.
+- **A fitting axis** reports `scrollableX: false` (or `scrollableY`) with
+  `scrollWidth === clientWidth` — the native "no bar" condition, for free.
 - **RTL** stays physical: `scrollLeft` is the offset from the range's left
   edge, deliberately sidestepping the DOM's negative-`scrollLeft` behavior.
 
@@ -192,7 +202,7 @@ is in view, both axes report unscrollable and the bars disappear.
 
 `scrollTo`/`scrollBy` default to `behavior: 'instant'` (the DOM's `'auto'`);
 pass `'smooth'` for the camera tween. The `scrollBehavior` _setting_ is not
-consulted — it governs navigation verbs (`goToPage`, `next`), not scrolling.
+consulted — it governs navigation verbs (`goToPage`, `nextPage`), not scrolling.
 
 ## What these settings never touch
 
@@ -201,5 +211,5 @@ consulted — it governs navigation verbs (`goToPage`, `next`), not scrolling.
   outline clicks, PDF destinations — carries its own anchor and always beats the
   settings. Bare `reveal(page)` stays minimal-movement: it scrolls only as far as
   needed to make the page visible, and not a pixel further.
-- **Saved viewpoints.** `goToPage(i, { viewpoint })` restores exactly what was
+- **Saved viewpoints.** `goToPage(page, { viewpoint })` restores exactly what was
   captured.

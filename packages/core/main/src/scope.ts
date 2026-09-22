@@ -1,13 +1,13 @@
 /**
  * Resource scope — the ownership half of the lifecycle model.
  *
- * Every resource acquisition registers its release into the owning scope AT
+ * Every resource acquisition registers its release into the owning scope at
  * the acquisition site (`scope.defer(release)` on the line after acquiring),
  * so no exit path can forget it. `dispose()` unwinds the stack LIFO, awaits
  * asynchronous teardowns, and is idempotent — every call returns the same
  * promise.
  *
- * THE rule that deletes the silent-leak bug class: a disposed scope never
+ * The rule that deletes the silent-leak bug class: a disposed scope never
  * swallows a teardown. Registering against a scope that is already disposing
  * runs the teardown as soon as the in-flight disposal finishes, instead of
  * dropping it. (Producers are still expected to stop at their next
@@ -19,7 +19,7 @@ export type Teardown = () => void | Promise<void>;
 
 /**
  * A lifecycle operation was cancelled — the tab was closed mid-open, or the
- * kernel was destroyed mid-start. NOT a failure: callers that race `open()`
+ * kernel was destroyed mid-start. Not a failure: callers that race `open()`
  * against `close()` should treat this rejection as "the close won".
  */
 export class CancelledError extends Error {

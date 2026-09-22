@@ -546,7 +546,7 @@ function FieldList({ fields, side, depth = 0 }: { fields: Field[]; side: Side; d
 }
 
 function FieldRow({ field, side, depth }: { field: Field; side: Side; depth: number }) {
-  // A union nests one visual level (the tabs) but not one SCHEMA level: its
+  // A union nests one visual level (the tabs) but not one schema level: its
   // branches describe this field, so they spend the same depth budget its
   // properties would have. Without that, a union inside a union inside a
   // union — annotation, action target, destination — runs out before it

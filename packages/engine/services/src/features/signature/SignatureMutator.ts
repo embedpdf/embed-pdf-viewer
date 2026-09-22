@@ -106,7 +106,7 @@ const PREPARE_LP64: PrepareLayout = {
 /**
  * The two-phase signing protocol on a session, local and native alike.
  *
- * `prepare` never touches the live document: it builds a CANDIDATE — a
+ * `prepare` never touches the live document: it builds a candidate — a
  * fresh layer over the session's own immutable base (see `openCandidate`)
  * — writes the signature there, saves it through a `CandidateStore`
  * (memory locally, a file beside the base on file-backed sessions), seals
@@ -408,7 +408,7 @@ export class SignatureMutator {
   /**
    * File-backed sessions (a file base in the registry: the server) persist
    * the candidate as a file beside the base; everything else keeps it in
-   * memory. The choice follows the SESSION's base, not the candidate's.
+   * memory. The choice follows the session's base, not the candidate's.
    */
   private storeFor(): CandidateStore {
     const base = this.session.source.base;
@@ -456,7 +456,7 @@ export class SignatureMutator {
 
   /**
    * The candidate the signature is authored on. A layer session reopens a
-   * fresh layer over ITS OWN immutable base (a registry retain, no copy of
+   * fresh layer over its own immutable base (a registry retain, no copy of
    * the file), fed the layer it was opened with — or, with unsaved edits,
    * the artifact a save would write, which is cumulative: the edits and
    * the signature then share one revision, as Acrobat saves a
@@ -480,7 +480,7 @@ export class SignatureMutator {
         // With unsaved edits, the artifact a save would write — unless the
         // save pass finds nothing reachable changed since load (an
         // annotation added and removed again): then the layer the session
-        // was opened with IS the document, and the candidate seals it.
+        // was opened with is the document, and the candidate seals it.
         let layer: LayerSource = source.layer ?? { kind: 'fresh' };
         if (this.session.hasUnsavedEdits()) {
           if (scratch) {

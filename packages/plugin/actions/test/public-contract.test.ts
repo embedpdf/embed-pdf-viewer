@@ -1,16 +1,21 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import type { PluginContext } from '@embedpdf/core';
-import { toPageRef, type PdfActionNode, type PdfActionTree } from '@embedpdf/engine-core/runtime';
+import { createTestContext } from '@embedpdf/core/testing';
+import {
+  toPageRef,
+  type AnnotationRef,
+  type DocumentHandle,
+  type PdfActionNode,
+  type PdfActionTree,
+} from '@embedpdf/engine-core/runtime';
 
 import { createActionsController } from '../src/controller';
-import type { ActionsAction, ActionsConfig, ActionsState } from '../src/host-contract';
+import type { ActionExecutor, ActionsConfig } from '../src/host-contract';
 
 /**
- * The public-contract additions of the 3.0 migration: `executeNamed`,
+ * The public reads and verbs beyond dispatch: `executeNamed`,
  * `getActionTree`, `getPolicy` / `updatePolicy`, `isScriptingEnabled`,
- * `onExecuted`, `onOpenSequenceCompleted`. Fake-ctx like the dispatcher
- * suite — the capability only reads `doc` and dispatches.
+ * `onExecuted` and `onOpenSequenceCompleted`, against a test document.
  */
 const tree = (root: PdfActionNode): PdfActionTree => ({
   root,
@@ -33,7 +38,7 @@ const uri = (value: string): PdfActionNode => ({
 });
 
 const PAGE = toPageRef(3);
-const ANNOT = { kind: 'objectNumber' as const, annotObjectNumber: 41 };
+const ANNOT: AnnotationRef = { kind: 'objectNumber', page: PAGE, annotObjectNumber: 41 };
 const activate = tree(named('NextPage'));
 const enter = tree(named('FirstPage'));
 const validate = tree(uri('https://validate.test/'));
@@ -42,8 +47,9 @@ const openAction = tree(named('PrevPage'));
 const willSave = tree(uri('https://save.test/'));
 
 function harness(config?: ActionsConfig) {
-  const dispatch = vi.fn();
-  const ctx = {
+  const ctx = createTestContext<void>({
+    id: 'actions',
+    pages: [{ ref: PAGE }],
     doc: {
       page: () => ({
         annotations: {
@@ -64,24 +70,21 @@ function harness(config?: ActionsConfig) {
         }),
       },
       actions: { read: async () => ({ nameTreeScripts: [], openAction, willSave }) },
-    },
-    document: () => ({ pages: [{ ref: PAGE, actions: { open: pageOpen } }] }),
-    documentId: 'doc-1',
-    dispatch,
-    tryGet: () => null,
-    cleanup: () => {},
-  } as unknown as PluginContext<ActionsState, ActionsAction>;
-  return { capability: createActionsController(ctx, config), dispatch };
+    } as unknown as Partial<DocumentHandle>,
+  });
+  // The page's own /AA tree, as the kernel's page registry carries it.
+  Object.assign(ctx.document()!.pages[0], { actions: { open: pageOpen } });
+  return { ctx, capability: ctx.connect(createActionsController(ctx, config)) };
 }
 
 describe('actions public contract', () => {
   it('executeNamed runs a Named verb as a user-origin api action and reports through onExecuted', async () => {
     const { capability } = harness({ openSequence: 'off' });
-    const executor = vi.fn(async () => ({ status: 'executed' as const }));
+    const executor = vi.fn<ActionExecutor>(async () => ({ status: 'executed' }));
     capability.registerExecutor('named', executor);
     const seen: string[] = [];
-    capability.onExecuted(({ ctx, tree }) =>
-      seen.push(`${ctx.origin}:${ctx.source.kind}:${tree.root?.type}`),
+    capability.onExecuted((event) =>
+      seen.push(`${event.ctx.origin}:${event.ctx.source.kind}:${event.tree.root?.type}`),
     );
     const result = await capability.executeNamed('NextPage');
     expect(result.status).toBe('executed');
@@ -108,7 +111,7 @@ describe('actions public contract', () => {
     await expect(
       capability.getActionTree({
         kind: 'annotation',
-        annotation: { kind: 'objectNumber', annotObjectNumber: 99 },
+        annotation: { kind: 'objectNumber', page: PAGE, annotObjectNumber: 99 },
         page: PAGE,
       }),
     ).resolves.toBeNull();
@@ -140,10 +143,12 @@ describe('actions public contract', () => {
   });
 
   it('getPolicy is reference-stable and updatePolicy merges row-wise into later decisions', () => {
-    const { capability, dispatch } = harness({
+    const { ctx, capability } = harness({
       openSequence: 'off',
       policy: { uri: { hover: 'allow' } },
     });
+    const woken = vi.fn();
+    ctx.subscribe(woken);
     const before = capability.getPolicy();
     expect(before).toBe(capability.getPolicy());
     expect(before.uri).toEqual({ user: 'adapter', hover: 'allow', lifecycle: 'report' });
@@ -153,6 +158,7 @@ describe('actions public contract', () => {
       event: { scope: 'activate' as const },
     };
     expect(capability.canExecute(tree(uri('https://a.test/')), context)).toBe(true);
+    expect(woken).not.toHaveBeenCalled();
 
     capability.updatePolicy({ uri: { user: 'block' } });
     const after = capability.getPolicy();
@@ -160,7 +166,7 @@ describe('actions public contract', () => {
     expect(after.uri).toEqual({ user: 'block', hover: 'allow', lifecycle: 'report' });
     expect(after.named).toBe(before.named); // untouched rows keep identity
     expect(capability.canExecute(tree(uri('https://a.test/')), context)).toBe(false);
-    expect(dispatch).toHaveBeenCalledWith({ type: 'ACTIONS_POLICY_CHANGED' });
+    expect(woken).toHaveBeenCalled(); // readers of getPolicy() re-read
   });
 
   it('isScriptingEnabled reflects the javascript switch', () => {
@@ -169,7 +175,7 @@ describe('actions public contract', () => {
 
   it('onOpenSequenceCompleted fires once with the open result when the sequence runs', async () => {
     const { capability } = harness();
-    const executor = vi.fn(async () => ({ status: 'executed' as const }));
+    const executor = vi.fn<ActionExecutor>(async () => ({ status: 'executed' }));
     capability.registerExecutor('named', executor);
     const completed: string[] = [];
     capability.onOpenSequenceCompleted(({ result }) => completed.push(result.status));

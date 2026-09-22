@@ -5,8 +5,8 @@ import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 import type { DocumentSession } from '../../../../document-session/DocumentSession';
 
 /**
- * Resolve an `AnnotationRef` to a live `annotPtr` on an ALREADY-acquired
- * `pagePtr`. This does NOT acquire/release the page and does NOT close the
+ * Resolve an `AnnotationRef` to a live `annotPtr` on an already-acquired
+ * `pagePtr`. This does not acquire/release the page and does not close the
  * returned annot — the caller owns both lifetimes.
  *
  * Resolution order matches the wire spec:

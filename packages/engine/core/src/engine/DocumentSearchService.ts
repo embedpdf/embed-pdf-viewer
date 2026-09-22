@@ -14,7 +14,7 @@ import type { SearchRequest, SearchSlice } from '../search/types';
  *
  * Reads are gated by `doc.text.search`; `mode: 'full'` (snippets) also
  * requires `doc.text.copy` — see {@link SearchMode}. Results always
- * reflect the CURRENT layer view: text removed by redaction in this
+ * reflect the current layer view: text removed by redaction in this
  * layer is unfindable, and a cursor issued before a content mutation is
  * rejected rather than resumed over stale pages.
  *

@@ -1,9 +1,9 @@
 /**
- * Annotation `/F` flags — the ONE interpretation of ISO 32000-2 Table 167.
+ * Annotation `/F` flags — the one interpretation of ISO 32000-2 Table 167.
  *
- * `Annot.flags` carries the named booleans verbatim from the engine DTO; every
+ * `ModelAnnotation.flags` carries the named booleans verbatim from the engine DTO; every
  * behavioral question (can I see it? click it? move it? edit its text?) is
- * answered HERE and nowhere else, so rendering, hit-testing, chrome, and the
+ * answered here and nowhere else, so rendering, hit-testing, chrome, and the
  * reducer can never disagree about what a flag means.
  *
  * The flag→behavior split, in one line each:
@@ -24,15 +24,15 @@ import { capsFor } from './kinds';
 export type { AnnotationFlags };
 export { NO_ANNOTATION_FLAGS };
 
-/** The `/F` every freshly DRAWN annotation starts with: `print` set (Acrobat
+/** The `/F` every freshly drawn annotation starts with: `print` set (Acrobat
  *  parity — without it the annotation silently disappears when printed). */
 export const DRAWN_FLAGS: AnnotationFlags = { ...NO_ANNOTATION_FLAGS, print: true };
 
 /** All ten flags, for iteration/equality — kept in the primitives' order. */
 export const FLAG_KEYS = Object.keys(NO_ANNOTATION_FLAGS) as ReadonlyArray<keyof AnnotationFlags>;
 
-export const flagsEqual = (a: AnnotationFlags, b: AnnotationFlags): boolean =>
-  FLAG_KEYS.every((k) => a[k] === b[k]);
+export const flagsEqual = (left: AnnotationFlags, right: AnnotationFlags): boolean =>
+  FLAG_KEYS.every((flag) => left[flag] === right[flag]);
 
 /** Merge a partial write over the current flags. */
 export const mergeFlags = (
@@ -45,16 +45,17 @@ export const mergeFlags = (
 
 /**
  * On-screen visibility. `hidden` beats everything; `noView` hides unless
- * `toggleNoView` and the annotation is ENGAGED — the spec says hover/selection,
+ * `toggleNoView` and the annotation is engaged — the spec says hover/selection,
  * and v1 uses selection (the model tracks no hover).
  */
-export const viewable = (f: AnnotationFlags, engaged = false): boolean =>
-  !f.hidden && (!f.noView || (f.toggleNoView && engaged));
+export const viewable = (flags: AnnotationFlags, engaged = false): boolean =>
+  !flags.hidden && (!flags.noView || (flags.toggleNoView && engaged));
 
 /** Any pointer interaction (click-to-select, hover). ReadOnly kills it. */
-export const interactive = (f: AnnotationFlags): boolean => !f.hidden && !f.noView && !f.readOnly;
+export const interactive = (flags: AnnotationFlags): boolean =>
+  !flags.hidden && !flags.noView && !flags.readOnly;
 
-/** The subset of an Annot these predicates read — keeps them testable bare. */
+/** The subset of an ModelAnnotation these predicates read — keeps them testable bare. */
 export interface FlagBearer {
   subtype: string;
   flags: AnnotationFlags;
@@ -66,23 +67,31 @@ export interface FlagBearer {
 /** Interaction gate for a concrete annotation: widget kinds ignore `readOnly`
  *  (ISO 32000 — a ReadOnly form field must still be movable by a form designer;
  *  the form-filling layer enforces field ReadOnly itself). */
-export const annotInteractive = (a: FlagBearer): boolean =>
-  capsFor(a.subtype).ignoresReadOnly ? !a.flags.hidden && !a.flags.noView : interactive(a.flags);
+export const annotInteractive = (annotation: FlagBearer): boolean =>
+  capsFor(annotation.subtype).ignoresReadOnly
+    ? !annotation.flags.hidden && !annotation.flags.noView
+    : interactive(annotation.flags);
 
 /**
- * Geometry/style mutations — `locked` freezes the OBJECT, not its contents
- * (that's `lockedContents`), AND the session must hold update authority over
+ * Geometry/style mutations — `locked` freezes the object, not its contents
+ * (that's `lockedContents`), and the session must hold update authority over
  * the record. One predicate for hit-test, chrome, and props alike, so a
  * record you may not edit renders and behaves exactly like a locked one.
  */
-export const annotTransformable = (a: FlagBearer): boolean =>
-  annotInteractive(a) && !a.flags.locked && (a.authority?.update ?? true);
+export const annotTransformable = (annotation: FlagBearer): boolean =>
+  annotInteractive(annotation) &&
+  !annotation.flags.locked &&
+  (annotation.authority?.update ?? true);
 
 /** Deletion — the delete half of the authority split (a narrowed grant can
  *  allow update but not delete, or vice versa). Flags gate like transforms. */
-export const annotDeletable = (a: FlagBearer): boolean =>
-  annotInteractive(a) && !a.flags.locked && (a.authority?.delete ?? true);
+export const annotDeletable = (annotation: FlagBearer): boolean =>
+  annotInteractive(annotation) &&
+  !annotation.flags.locked &&
+  (annotation.authority?.delete ?? true);
 
 /** `/Contents` text edits — the contents counterpart of `locked`. */
-export const annotContentsEditable = (a: FlagBearer): boolean =>
-  annotInteractive(a) && !a.flags.lockedContents && (a.authority?.update ?? true);
+export const annotContentsEditable = (annotation: FlagBearer): boolean =>
+  annotInteractive(annotation) &&
+  !annotation.flags.lockedContents &&
+  (annotation.authority?.update ?? true);

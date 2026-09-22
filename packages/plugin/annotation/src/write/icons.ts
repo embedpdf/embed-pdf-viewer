@@ -1,5 +1,5 @@
 import { PluginError, toPluginError } from '@embedpdf/core';
-import { defaultsFor, fitStampBox, type Rect, type Vec } from '@embedpdf/core-annotation';
+import { defaultsFor, fitStampBox, type Rect, type Point } from '@embedpdf/core-annotation';
 import {
   annotationKey,
   toPageRef,
@@ -14,14 +14,12 @@ import type { FilePickerProvider } from '../contract';
 import { boxGeomFields } from '../repository';
 import type { AnnotationContext, AnnotationServices } from '../services';
 import type { Stamps } from './stamps';
-import type { Announcer } from '../services/announce';
-import { ORIGIN_API } from '../services/events';
 import { pageSizeOf } from '../services/geometry';
 import type { ResolvedTool } from '../tools/definitions';
 
 /**
  * Icon annotations (sticky notes, file attachments): fixed-size placement at
- * a click, and the ONE click-to-place entry the place handler forwards every
+ * a click, and the one click-to-place entry the place handler forwards every
  * down to.
  */
 export function createIcons(
@@ -37,38 +35,34 @@ export function createIcons(
     AnnotationServices,
     'store' | 'geometry' | 'records' | 'authority' | 'tools' | 'filePicker'
   >,
-  announce: Announcer,
   stamps: Pick<Stamps, 'placeArmedStamp' | 'requestStampAt'>,
 ) {
-  /** Engine create + model sync for an icon draft; selects the result (the
-   *  anchor for its menu / future comment popup). */
+  /** Create an icon annotation and select it (the anchor for its menu and comment popup). */
   const createIcon = (
     doc: NonNullable<AnnotationContext['doc']>,
-    pon: number,
+    pageObjectNumber: number,
     draft: AnnotationDraft,
   ): Promise<AnnotationRef> =>
     doc
-      .page(toPageRef(pon))
+      .page(toPageRef(pageObjectNumber))
       .annotations.create(draft)
-      .then((res) => {
-        records.sync(res.created, 'baked');
-        store.commit({ t: 'select', ids: [annotationKey(res.created.ref)] });
-        announce.created(res.created, ORIGIN_API);
-        return res.created.ref;
+      .then((result) => {
+        store.commit({ type: 'select', ids: [annotationKey(result.created.ref)] });
+        return result.created.ref;
       });
 
-  /** Place a fixed-size ICON annotation (note / file attachment) centred on a
+  /** Place a fixed-size icon annotation (note / file attachment) centred on a
    *  content point — the icon-kind sibling of the stamp placement. The
    *  engine bakes the 20×20 /AP from /C + /Name. */
   const placeIconAt = (
     tool: ResolvedTool,
-    pon: number,
-    point: Vec,
+    pageObjectNumber: number,
+    point: Point,
     rotCW: number,
     file: AttachmentFileSource | null,
   ): boolean => {
     const doc = ctx.doc;
-    const crop = geometry.cropOf(pon);
+    const crop = geometry.cropOf(pageObjectNumber);
     if (!doc || !crop || !isIconPlaceKind(tool.subtype)) return false;
     const box: Rect = fitStampBox(point, ICON_PLACE_SIZE, pageSizeOf(crop), rotCW);
     const draft = iconPlacementDraft(
@@ -78,14 +72,14 @@ export function createIcons(
       tool.flags,
       file,
     );
-    void createIcon(doc, pon, draft).catch((err) =>
-      console.error('[annotation] icon placement failed:', err),
+    void createIcon(doc, pageObjectNumber, draft).catch((error) =>
+      console.error('[annotation] icon placement failed:', error),
     );
     return true;
   };
 
   /**
-   * The ONE click-to-place entry the place handler forwards every down to —
+   * The one click-to-place entry the place handler forwards every down to —
    * armed payload first, then the active tool's kind decides:
    *   - stamp        → the source spec (fixed bytes, or the file-picker port)
    *   - note (text)  → place immediately (no payload)
@@ -95,28 +89,29 @@ export function createIcons(
    *                    changed while the picker was open).
    * Returns whether the click was consumed.
    */
-  const placeAt = (pon: number, point: Vec, displayRotation?: number): boolean => {
-    if (stamps.placeArmedStamp(pon, point, displayRotation)) return true;
+  const placeAt = (pageObjectNumber: number, point: Point, displayRotation?: number): boolean => {
+    if (stamps.placeArmedStamp(pageObjectNumber, point, displayRotation)) return true;
     const tool = tools.activeTool();
     if (!tool) return false;
-    if (tool.subtype === 'stamp') return stamps.requestStampAt(pon, point, displayRotation);
+    if (tool.subtype === 'stamp')
+      return stamps.requestStampAt(pageObjectNumber, point, displayRotation);
     if (!isIconPlaceKind(tool.subtype)) return false;
     const rotCW = tools.uprightRotFor(tool.upright ? displayRotation : undefined);
-    if (tool.subtype === 'text') return placeIconAt(tool, pon, point, rotCW, null);
-    return filePicker.promptAt(tool, pon, point, (picked) =>
-      placeIconAt(tool, pon, point, rotCW, picked),
+    if (tool.subtype === 'text') return placeIconAt(tool, pageObjectNumber, point, rotCW, null);
+    return filePicker.promptAt(tool, pageObjectNumber, point, (picked) =>
+      placeIconAt(tool, pageObjectNumber, point, rotCW, picked),
     );
   };
 
   const api = {
-    placeAt: (page: PageRef, point: Vec, displayRotation?: number) =>
+    placeAt: (page: PageRef, point: Point, displayRotation?: number) =>
       placeAt(page.pageObjectNumber, point, displayRotation),
-    createAttachment: async (page: PageRef, at: Vec, file: AttachmentFileSource) => {
+    createAttachment: async (page: PageRef, at: Point, file: AttachmentFileSource) => {
       authority.assertCreate();
       authority.assertPage(page);
       const doc = ctx.doc;
-      const pon = page.pageObjectNumber;
-      const crop = geometry.cropOf(pon);
+      const pageObjectNumber = page.pageObjectNumber;
+      const crop = geometry.cropOf(pageObjectNumber);
       const tool = tools.get('attachment');
       if (!doc || !crop || !tool || !isIconPlaceKind(tool.subtype)) {
         throw new PluginError('unsupported', 'annotation', 'no attachment tool is registered');
@@ -129,16 +124,16 @@ export function createIcons(
         tool.flags,
         file,
       );
-      return createIcon(doc, pon, draft).catch((error) => {
+      return createIcon(doc, pageObjectNumber, draft).catch((error) => {
         throw toPluginError('annotation', error);
       });
     },
     readAttachment: async (ref: AnnotationRef) => {
       const doc = ctx.doc;
       if (!doc) throw new Error('[annotation] no document bound');
-      const pon = records.pageOf(ref);
-      if (pon == null) throw new Error('[annotation] cannot resolve page for ref');
-      const annotations = doc.page(toPageRef(pon)).annotations;
+      const pageObjectNumber = records.pageOf(ref);
+      if (pageObjectNumber == null) throw new Error('[annotation] cannot resolve page for ref');
+      const annotations = doc.page(toPageRef(pageObjectNumber)).annotations;
       if (!annotations.downloadFile) {
         throw new Error('[annotation] this engine does not support attachment download');
       }

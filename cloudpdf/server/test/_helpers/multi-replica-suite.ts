@@ -47,7 +47,7 @@ export function runMultiReplicaSuite(factory: ReplicaDbFactory): void {
     test('concurrent annotation creates from two replicas keep both annotations', async () => {
       const [a, b] = cluster.replicas;
 
-      // 1. B materializes the layer FIRST (a read is enough): its worker
+      // 1. B materializes the layer first (a read is enough): its worker
       //    session now embodies the fresh/empty layer state.
       const primed = await listAnnotations(b!, { tenantId: TENANT, docId: DOC, layerName: LAYER });
       expect(primed.annotations).toHaveLength(0);
@@ -72,7 +72,7 @@ export function runMultiReplicaSuite(factory: ReplicaDbFactory): void {
       });
       expect(createdY.status).toBe(200);
 
-      // Durable truth must contain BOTH writes. Without the layer-session
+      // Durable truth must contain both writes. Without the layer-session
       // fence, B's artifact is [Y] — X is silently gone while the version
       // counter looks healthy.
       const final = await readCurrentArtifact(cluster, DOC, LAYER);
@@ -100,7 +100,7 @@ export function runMultiReplicaSuite(factory: ReplicaDbFactory): void {
       });
       expect(created.status).toBe(200);
 
-      // B's next read must NOT serve its stale materialization: the
+      // B's next read must not serve its stale materialization: the
       // request-time freshness check (ensureLayerOnPool → layer row version)
       // reloads the session from A's artifact. Without it, B silently
       // returns [] under a current manifest — the read-side mirror of the
@@ -113,7 +113,7 @@ export function runMultiReplicaSuite(factory: ReplicaDbFactory): void {
       const [a, b] = cluster.replicas;
       const PER_REPLICA = 20;
 
-      // Fire everything concurrently through BOTH replicas. Each replica
+      // Fire everything concurrently through both replicas. Each replica
       // serializes its own writes (per-process layer queue); the fence +
       // rebase serialize across them. A client retry on 409 mirrors the
       // real contract when the server's one-rebase budget is exhausted.
@@ -168,8 +168,8 @@ export function runMultiReplicaSuite(factory: ReplicaDbFactory): void {
       const [a, b] = cluster.replicas;
 
       // Deterministic window injection: wrap B's LayerService prepare seam so
-      // that AFTER it reads the layer row (the version its commit CAS will
-      // compare against) but BEFORE the worker applies, replica A commits.
+      // that after it reads the layer row (the version its commit CAS will
+      // compare against) but before the worker applies, replica A commits.
       // This is exactly the race the fence exists for, made reproducible.
       const svc = b!.bundle.layerService as unknown as {
         materializeLayerForWrite: (...args: unknown[]) => Promise<unknown>;
@@ -179,7 +179,7 @@ export function runMultiReplicaSuite(factory: ReplicaDbFactory): void {
       svc.materializeLayerForWrite = async (...args: unknown[]) => {
         const materialized = await original(...args);
         if (armed) {
-          armed = false; // the rebase re-run must NOT re-trigger the remote write
+          armed = false; // the rebase re-run must not re-trigger the remote write
           const remote = await createAnnotation(a!, {
             tenantId: TENANT,
             docId: DOC,
@@ -258,13 +258,13 @@ export function runMultiReplicaSuite(factory: ReplicaDbFactory): void {
     });
 
     /**
-     * P1 (review): the commit-time version check must be ATOMIC with the
-     * update. Both replicas are held INSIDE their commit transactions —
+     * P1 (review): the commit-time version check must be atomic with the
+     * update. Both replicas are held inside their commit transactions —
      * after each has read + checked the layer at version 0, before either
      * has updated (the audit append sits exactly between the two). On
      * release the transactions overlap in the read→update window: with an
      * unconditional `UPDATE … WHERE id`, Postgres re-evaluates only the id
-     * predicate after the row lock clears, so BOTH updates apply and one
+     * predicate after the row lock clears, so both updates apply and one
      * artifact silently vanishes. A guarded UPDATE (`AND current_version`)
      * turns the loser into a LayerFenceConflict → rebase → both survive.
      *
@@ -292,7 +292,7 @@ export function runMultiReplicaSuite(factory: ReplicaDbFactory): void {
           contents: 'B1',
         });
 
-        // Wait until BOTH transactions have passed their version read at 0.
+        // Wait until both transactions have passed their version read at 0.
         // Timeboxed: if a write dies before reaching its audit append, fail
         // loudly instead of hanging; the finally always opens the gates so
         // a failed barrier can't wedge teardown (the held transaction keeps
@@ -339,7 +339,7 @@ export function runMultiReplicaSuite(factory: ReplicaDbFactory): void {
 
     /**
      * P1 (review): a failed write must never become durable. The worker
-     * applies the mutation BEFORE upload+commit; if persistence fails, the
+     * applies the mutation before upload+commit; if persistence fails, the
      * session is dirty while the fence map still reports it clean — and the
      * next successful write would carry the ghost into its artifact.
      */
@@ -365,7 +365,7 @@ export function runMultiReplicaSuite(factory: ReplicaDbFactory): void {
       });
       expect(ghost.status).not.toBe(200);
 
-      // B's next write succeeds — and must NOT resurrect the failed one.
+      // B's next write succeeds — and must not resurrect the failed one.
       const real = await createAnnotation(b!, {
         tenantId: TENANT,
         docId: DOC,
@@ -384,7 +384,7 @@ export function runMultiReplicaSuite(factory: ReplicaDbFactory): void {
     });
 
     /**
-     * P1 (review): a version-PINNED read must never serve uncommitted
+     * P1 (review): a version-pinned read must never serve uncommitted
      * content — the response carries `Cache-Control: immutable`, so one
      * dirty read poisons every future reader of that pin via the CDN.
      * The write is held post-apply/pre-commit; a read at the still-current
@@ -416,7 +416,7 @@ export function runMultiReplicaSuite(factory: ReplicaDbFactory): void {
       });
       await held;
 
-      // Pinned read at the CURRENT (pre-commit) version, issued mid-window.
+      // Pinned read at the current (pre-commit) version, issued mid-window.
       const readPromise = fetch(
         `${b!.baseUrl}/v1/docs/${DOC}/layers/${LAYER}/annotations/pages/obj:1/items@annotationVersion=${pin}`,
         { headers: { Authorization: `Bearer ${docToken(TENANT, DOC, LAYER)}` } },
@@ -432,8 +432,8 @@ export function runMultiReplicaSuite(factory: ReplicaDbFactory): void {
       expect(write.status).toBe(200);
 
       if (res.status === 200) {
-        // If the pin was served, it must contain EXACTLY the committed
-        // state of that version — never the uncommitted DIRTY annotation.
+        // If the pin was served, it must contain exactly the committed
+        // state of that version — never the uncommitted dirty annotation.
         expect(body.annotations.map((an) => an.contents)).toEqual(['BASE']);
       } else {
         // Equally correct: after waiting out the write, the pin is no

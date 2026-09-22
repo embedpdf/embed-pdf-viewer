@@ -40,7 +40,7 @@ const EXPORT_CONTENT_TYPE: Record<FormDataFormat, string> = {
 /**
  * Layer-scoped form routes.
  *
- * Forms are DOCUMENT-scoped (one AcroForm per layer document), so unlike
+ * Forms are document-scoped (one AcroForm per layer document), so unlike
  * annotations there is no per-page collection and no content-addressed
  * `@version` read URL — every response here is `no-store`. Coherence with
  * the page-scoped caches is preserved the other way around: mutation

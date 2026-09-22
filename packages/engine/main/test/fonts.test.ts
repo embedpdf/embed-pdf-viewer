@@ -116,7 +116,7 @@ describe('engine.fonts (local engine)', () => {
     // The registered font reached the embedded appearance...
     expect(text).toContain('FontFile2');
     expect(text).toContain('Roboto');
-    // ...as a SUBSET, not the whole 305 KB face. A full embed would dwarf this.
+    // ...as a subset, not the whole 305 KB face. A full embed would dwarf this.
     expect(saved.byteLength).toBeLessThan(roboto.byteLength / 2);
 
     await doc.close();

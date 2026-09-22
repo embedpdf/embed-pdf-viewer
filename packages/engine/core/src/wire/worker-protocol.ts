@@ -170,10 +170,10 @@ export interface SignaturesListWorkerRequest {
   docId: string;
   layerName?: string;
   /**
-   * Read the session's WORKING COPY (its unsaved state as one more revision
+   * Read the session's working copy (its unsaved state as one more revision
    * over the loaded bytes) instead of the loaded bytes. The cloud server
    * sets it: its layer sessions keep every committed edit in memory, so the
-   * layer's durable state IS the working copy. No-op without unsaved edits.
+   * layer's durable state is the working copy. No-op without unsaved edits.
    */
   workingCopy?: boolean;
 }
@@ -244,7 +244,7 @@ export interface SignaturesAnalyzeWorkerRequest {
 }
 
 /**
- * Session-less: install a CMS into a signing candidate FILE and verify the
+ * Session-less: install a CMS into a signing candidate file and verify the
  * result. The server rebuilds the candidate (base ⊕ durable tail) on
  * whichever replica completes the signing, so this never addresses a
  * session: the file is patched in place, opened into a transient session
@@ -332,7 +332,7 @@ export interface AnnotationsCreateWorkerRequest {
   docId: string;
   layerName?: string;
   page: PageRef;
-  /** WIRE form — binary fields hold `{ resource }` refs into {@link resources}. */
+  /** Wire form — binary fields hold `{ resource }` refs into {@link resources}. */
   draft: WireAnnotationDraft;
   /**
    * Binary payloads referenced by the draft, keyed by resource key. The
@@ -358,7 +358,7 @@ export interface AnnotationsUpdateWorkerRequest {
   docId: string;
   layerName?: string;
   ref: AnnotationRef;
-  /** WIRE form — see {@link AnnotationsCreateWorkerRequest.draft}. */
+  /** Wire form — see {@link AnnotationsCreateWorkerRequest.draft}. */
   patch: WireAnnotationPatch;
   /** Binary payloads referenced by the patch — see the create request. */
   resources?: WireResourceMap;
@@ -393,7 +393,7 @@ export interface AnnotationsFlattenWorkerRequest {
   artifactPath?: string;
 }
 
-/** Flatten a chosen set of one page's annotation appearances into a NEW
+/** Flatten a chosen set of one page's annotation appearances into a new
  *  single-page PDF (bytes). A read: no artifact, no revision. */
 export interface AnnotationsExportAppearanceWorkerRequest {
   kind: 'annotations.exportAppearance';
@@ -405,7 +405,7 @@ export interface AnnotationsExportAppearanceWorkerRequest {
 }
 
 /**
- * Batch annotation reorder. Refs are resolved on the worker BEFORE the
+ * Batch annotation reorder. Refs are resolved on the worker before the
  * move so the impact computation has a single before-state and one
  * revision bump per batch.
  */
@@ -603,7 +603,7 @@ export interface PagesRenderWorkerRequest {
 
 /**
  * One-shot file render — open the base document from a file path, render
- * ONE page by display index, close. No session is bound (the ingestion
+ * one page by display index, close. No session is bound (the ingestion
  * `runAdHoc` pattern, like `document.probeSecurityFile`): this is the
  * derived-artifact warmer's producer, used when no live document session
  * exists yet. The payload reports the page's durable object number so the
@@ -620,10 +620,10 @@ export interface DocumentRenderPageFileWorkerRequest {
 }
 
 /**
- * Encode instruction for the `*.renderEncoded` request family. CLOUD-SERVER
+ * Encode instruction for the `*.renderEncoded` request family. Cloud-server
  * surface (like the file-path ops): the server worker injects an image
- * encoder into its `WorkerHost`, so the raster is encoded WHERE IT IS
- * PRODUCED and only the compressed image crosses the engine boundary —
+ * encoder into its `WorkerHost`, so the raster is encoded where IT is
+ * produced and only the compressed image crosses the engine boundary —
  * kilobytes over the host IPC pipe instead of a megabytes-scale rgba
  * copy. Engines without an injected encoder (browser/local workers, which
  * encode via canvas instead) reject these kinds with `NotImplemented`.
@@ -637,7 +637,7 @@ export interface RenderEncode {
 
 /** An encoded render result. `width`/`height` are the source raster's output
  *  dimensions (they feed the advisory image-dimension headers). `bytes` must
- *  OWN its buffer — it rides the transfer manifest zero-copy, so a pooled
+ *  own its buffer — it rides the transfer manifest zero-copy, so a pooled
  *  view (e.g. a Node `Buffer` slab slice) would detach unrelated data. */
 export interface EncodedImageWire {
   contentType: string;
@@ -803,7 +803,7 @@ export interface AttachmentsReadFileWorkerRequest {
 }
 
 /**
- * Create a document-level embedded file (a MUTATION — layer sessions
+ * Create a document-level embedded file (a mutation — layer sessions
  * persist an artifact). `file` is the same post-normalization wire shape
  * the file-attachment annotation draft uses: metadata in JSON, bytes
  * out-of-band under the referenced resource key. `file.name` becomes the
@@ -820,7 +820,7 @@ export interface AttachmentsCreateWorkerRequest {
   artifactPath?: string;
 }
 
-/** Delete a document-level embedded file by key (a MUTATION). */
+/** Delete a document-level embedded file by key (a mutation). */
 export interface AttachmentsDeleteWorkerRequest {
   kind: 'attachments.delete';
   jobId: WorkerJobId;
@@ -845,7 +845,7 @@ export interface AnnotationsReadFileWorkerRequest {
 }
 
 /** Insert every page of a standalone PDF (transferable `bytes`) at
- *  `destIndex` (omitted → append). A structural MUTATION: layer sessions
+ *  `destIndex` (omitted → append). A structural mutation: layer sessions
  *  persist an artifact like move/rotate/delete. */
 export interface PagesInsertWorkerRequest {
   kind: 'pages.insert';
@@ -858,7 +858,7 @@ export interface PagesInsertWorkerRequest {
 }
 
 /** Create `count` (default 1) blank pages of `size` (PDF points) at
- *  `destIndex` (omitted → append). A structural MUTATION exactly like
+ *  `destIndex` (omitted → append). A structural mutation exactly like
  *  `pages.insert`, minus the bytes: pure parameters, so nothing transfers;
  *  layer sessions persist an artifact identically. */
 export interface PagesInsertBlankWorkerRequest {
@@ -951,7 +951,7 @@ export interface DocumentSaveFileWorkerRequest {
   path: string;
 }
 
-/** Export JUST the layer artifact (the overlay diff) to a transferable buffer.
+/** Export just the layer artifact (the overlay diff) to a transferable buffer.
  *  Layer sessions only; the host rejects a base-only session. */
 export interface DocumentSaveLayerBufferWorkerRequest {
   kind: 'document.saveLayerBuffer';
@@ -1050,7 +1050,7 @@ export interface CloseWorkerRequest {
 }
 
 /**
- * Close exactly ONE layer session, leaving the base document, sibling
+ * Close exactly one layer session, leaving the base document, sibling
  * layer sessions, and the caller's doc↔worker binding intact. Idempotent:
  * closing an absent session is a no-op ack.
  *
@@ -1211,7 +1211,7 @@ export type WorkerResultPayload =
       signature: SignatureDTO;
       /** What the sealed file's signatures forbid from now on. */
       protection: DocumentProtection;
-      /** The version the sealed file IS (hash and length of the whole file). */
+      /** The version the sealed file is (hash and length of the whole file). */
       version: BaseVersionInfo;
     }
   | { tag: 'metadata.read'; metadata: DocumentMetadata }

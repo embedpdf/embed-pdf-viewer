@@ -230,7 +230,7 @@ describe('canonical layout — oriented', () => {
 
   test('mirrored text keeps semantic corners and forward advance', () => {
     // Horizontal mirror: baseline −x, ascent +y. Logical order advances
-    // visually leftward; inside ITS frame that is still +x.
+    // visually leftward; inside its frame that is still +x.
     const mirrored = orientedRun(
       0,
       { x: 90, y: 100 },
@@ -242,7 +242,7 @@ describe('canonical layout — oriented', () => {
     const segments = textSegmentsForRange(layout, 0, 3);
     expect(segments).toHaveLength(1);
     const q = segments[0].quad;
-    // upper-start sits at the VISUAL right — the mirror is part of the frame.
+    // upper-start sits at the visual right — the mirror is part of the frame.
     expect(q.p1.x).toBeCloseTo(90, 6);
     expect(q.p2.x).toBeCloseTo(66, 6);
     expect(q.p1.y).toBeCloseTo(112, 6);

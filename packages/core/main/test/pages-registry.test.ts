@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createKernel } from '../src/kernel';
 import { bytesInput, immediateEngine, makeHandle, page } from './helpers';
 
-/** G8: the kernel is the source of page identity — refs, indexes, and the registry revision. */
+/** The kernel is the source of page identity — refs, indexes, and the registry revision. */
 describe('documents · page registry', () => {
   it('lists pages, resolves by ref and by index, and reports the revision', async () => {
     const pages = [page(11, 0), page(12, 1), page(13, 2)];
@@ -15,7 +15,9 @@ describe('documents · page registry', () => {
     const { documents } = kernel;
 
     expect(documents.listPages('d')).toBe(documents.listPages()); // active by default, same reference
-    expect(documents.listPages().map((p) => p.ref.pageObjectNumber)).toEqual([11, 12, 13]);
+    expect(documents.listPages().map((pageInfo) => pageInfo.ref.pageObjectNumber)).toEqual([
+      11, 12, 13,
+    ]);
     expect(documents.getPage({ kind: 'objectNumber', pageObjectNumber: 12 })?.index).toBe(1);
     expect(documents.getPage({ kind: 'objectNumber', pageObjectNumber: 99 })).toBeNull();
     expect(documents.getPageAt(2)?.ref.pageObjectNumber).toBe(13);

@@ -102,7 +102,7 @@ export class ScopeGuard {
   }
 
   /**
-   * Throws `PermissionDenied` if the scope grants NONE of `caps`. Used
+   * Throws `PermissionDenied` if the scope grants none of `caps`. Used
    * by routes whose underlying endpoint is satisfied by more than one
    * capability (currently unused locally; reserved for future shapes
    * like `/text` which the cloud gates on `doc.text.copy OR doc.text.search`).
@@ -186,7 +186,7 @@ export class ScopeGuard {
   }
 
   /**
-   * Build the CollabTarget for CREATE — the handle's own identity.
+   * Build the CollabTarget for create — the handle's own identity.
    * Fed to `assertCollab('create', target)` so `:self`/`:all` trivially
    * pass and `:group=X` is meaningful (matches when the handle's
    * default group is X).
@@ -200,9 +200,9 @@ export class ScopeGuard {
   }
 
   /**
-   * Build the actor for an annotation UPDATE.
+   * Build the actor for an annotation update.
    *   - userId      → caller's identity (UpdatedBy stamp)
-   *   - groupId     → ONLY when the patch reassigns it (differs from current)
+   *   - groupId     → only when the patch reassigns it (differs from current)
    *   - displayName → caller's display_name (for the modification trail;
    *                   the worker does not touch /T on update)
    *

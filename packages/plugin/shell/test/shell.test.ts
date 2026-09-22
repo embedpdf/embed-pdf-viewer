@@ -2,19 +2,19 @@ import { createTestContext } from '@embedpdf/core/testing';
 import { describe, expect, it } from 'vitest';
 
 import { createShellController } from '../src/controller';
-import { initialShellState, shellReducer } from '../src/model';
+import { initialShellState } from '../src/model';
 
-const harness = () =>
-  createShellController(
-    createTestContext({ id: 'shell', initialState: initialShellState(), reduce: shellReducer }),
-  );
+const harness = () => {
+  const ctx = createTestContext({ id: 'shell', state: initialShellState() });
+  return ctx.connect(createShellController(ctx));
+};
 
 describe('shell', () => {
   it('opens exclusively, reads surfaces with their id, and announces every flip', () => {
     const shell = harness();
     const log: string[] = [];
-    shell.onSurfaceOpened((e) => log.push(`open:${e.id}`));
-    shell.onSurfaceClosed((e) => log.push(`close:${e.id}`));
+    shell.onSurfaceOpened((event) => log.push(`open:${event.id}`));
+    shell.onSurfaceClosed((event) => log.push(`close:${event.id}`));
     shell.open('search', { exclusive: 'right', props: { q: 'a' } });
     shell.open('comments', { exclusive: 'right' });
     expect(shell.isOpen('search')).toBe(false);
@@ -23,7 +23,7 @@ describe('shell', () => {
       open: false,
       props: { q: 'a' },
     });
-    expect(shell.listOpenSurfaces().map((s) => s.id)).toEqual(['comments']);
+    expect(shell.listOpenSurfaces().map((surface) => surface.id)).toEqual(['comments']);
     const list = shell.listOpenSurfaces();
     expect(shell.listOpenSurfaces()).toBe(list); // reference-stable
     shell.updateSurfaceProps('comments', { thread: 1 });
@@ -36,8 +36,8 @@ describe('shell', () => {
   it('keeps a menu stack and round-trips a snapshot', () => {
     const shell = harness();
     const log: string[] = [];
-    shell.onMenuOpened((e) => log.push(`+${e.id}`));
-    shell.onMenuClosed((e) => log.push(`-${e.id}`));
+    shell.onMenuOpened((event) => log.push(`+${event.id}`));
+    shell.onMenuClosed((event) => log.push(`-${event.id}`));
     shell.openMenu('file');
     shell.toggleMenu('edit');
     expect(shell.listOpenMenus()).toEqual(['file', 'edit']);

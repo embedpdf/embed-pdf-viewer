@@ -19,7 +19,7 @@ const identity: PageTextSnapshot = { text: 'ABC', charCount: 3 };
 // bug_1139 shape: leading non-printing char shifts every text index by one.
 const leadingDrop: PageTextSnapshot = { text: 'AB', charCount: 3, charMap: [[1, 0]] };
 
-// [A, ×] — the trailing zero-width char must stay OUTSIDE a range ending at "A".
+// [A, ×] — the trailing zero-width char must stay outside a range ending at "A".
 const trailingDrop: PageTextSnapshot = { text: 'A', charCount: 2, charMap: [[2, 1]] };
 
 // [A, ×, B]
@@ -59,12 +59,12 @@ describe('boundaryTextOffset', () => {
 
 describe('charRangeForTextOffsets', () => {
   test('start is right-biased past leading zero-width characters', () => {
-    // "A" in [×, A, B]: must NOT include the dropped char's geometry slot.
+    // "A" in [×, A, B]: must not include the dropped char's geometry slot.
     expect(charRangeForTextOffsets(leadingDrop, 0, 1)).toEqual({ start: 1, end: 2 });
   });
 
   test('end is left-biased before trailing zero-width characters', () => {
-    // "A" in [A, ×]: must NOT swallow the trailing dropped char.
+    // "A" in [A, ×]: must not swallow the trailing dropped char.
     expect(charRangeForTextOffsets(trailingDrop, 0, 1)).toEqual({ start: 0, end: 1 });
   });
 

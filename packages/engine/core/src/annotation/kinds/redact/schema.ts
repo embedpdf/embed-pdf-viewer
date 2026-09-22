@@ -14,7 +14,7 @@ import {
 } from '../../base.schema';
 import type { FreeTextFont } from '../../primitives';
 
-/** Authoring `fontFamily`: a standard font name OR a registered font `key`.
+/** Authoring `fontFamily`: a standard font name or a registered font `key`.
  *  Any non-empty string is accepted; the writer resolves which it is (and a
  *  key that was never registered fails loud there). The read-back DTO keeps
  *  the narrower {@link StandardFontSchema}. */

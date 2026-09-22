@@ -19,7 +19,7 @@ export function isWidgetSubtype(subtype: AnnotationSubtype): subtype is 'widget'
 }
 
 /**
- * THE widget-plane style writer: /MK colours, /BS, /DA, /Q. Both entry
+ * The widget-plane style writer: /MK colours, /BS, /DA, /Q. Both entry
  * points funnel here — the widget annotation kind (create/patch) and
  * `doc.forms.createField`'s inline placements — so creation-time and
  * edit-time styling can never drift apart.
@@ -76,7 +76,7 @@ export function applyWidgetStyle(
   }
 }
 
-/** Create an INERT widget: placement + style. Adoption is a forms concern. */
+/** Create an inert widget: placement + style. Adoption is a forms concern. */
 export function applyWidgetDraft(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,

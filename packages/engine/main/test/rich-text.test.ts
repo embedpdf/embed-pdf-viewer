@@ -51,13 +51,6 @@ async function rejection(p: PromiseLike<unknown>): Promise<{ code?: string }> {
 const latin1 = (bytes: Uint8Array): string =>
   Array.from(bytes, (b) => String.fromCharCode(b)).join('');
 
-async function readBack(doc: Awaited<ReturnType<LocalEngine['open']>>, id: string) {
-  const snapshot = await doc.page(toPageRef(PAGE)).annotations.list();
-  const dto = snapshot.annotations.find((a) => a.subtype === 'free-text' && a.id === id);
-  if (!dto) throw new Error(`free-text ${id} not found`);
-  return dto as FreeTextAnnotationDTO;
-}
-
 describe('rich text FreeText (local engine)', () => {
   let engine: LocalEngine;
 
@@ -333,7 +326,7 @@ describe('rich text FreeText (local engine)', () => {
       contents: 'Whole',
       rect: RECT,
     });
-    // DEFAULT subsets: five glyphs of Roboto. FULL re-embeds the whole
+    // Default subsets: five glyphs of Roboto. Full re-embeds the whole
     // program on the next regeneration (streams are compressed on save, so
     // the two saves are compared, not the raw font size).
     const subsetSave = await doc.download();
@@ -350,10 +343,10 @@ describe('rich text FreeText (local engine)', () => {
   });
 
   test('Helvetica on a document carrying a cmap-less Helvetica subset stays visible', async () => {
-    // The subset (glyf/loca/hmtx only, renumbered) used to be borrowed for the
-    // family: every glyph became glyph 0 and the appearance ended up naming a
-    // font it did not carry, so the saved box was blank. The standard face is
-    // the answer, and the text draws.
+    // Borrowing the subset (glyf/loca/hmtx only, renumbered) for the family
+    // would turn every glyph into glyph 0 and name a font the appearance does
+    // not carry, leaving the saved box blank. The standard face must be used,
+    // so the text draws.
     engine = await createLocalEngine({ runtime: { prefer: 'wasm' } });
     const bytes = new Uint8Array(await readFile(subsetHelveticaPath));
     const doc = await engine.open({ kind: 'bytes', id: 'rt-subset', bytes });

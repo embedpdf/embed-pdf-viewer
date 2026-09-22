@@ -20,21 +20,21 @@ import { cssFontFamilyForFont, richDocOf, stripBodyDefaults } from './rich-text'
 /** Project the model's free-text boxes into render-ready {@link TextItem}s — the
  *  core geometry (`textBoxes`) joined with the DTO-derived CSS. Pure; memoized by
  *  model identity at the call site so selectors get a stable reference. */
-export function buildTextItems(m: Model, page: PageRef, view?: ViewEnv): TextItem[] {
-  return textBoxes(m, page, view).map((tb) => {
-    const a = m.byId[tb.id];
-    // `text`/`style` are the OPTIMISTIC content projections (a props edit lands
+export function buildTextItems(model: Model, page: PageRef, view?: ViewEnv): TextItem[] {
+  return textBoxes(model, page, view).map((tb) => {
+    const annotation = model.byId[tb.id];
+    // `text`/`style` are the optimistic content projections (a props edit lands
     // here before the engine round-trips), so the editor restyles instantly.
-    const t = a?.text ?? initialTextStyle;
+    const style = annotation?.text ?? initialTextStyle;
     // Match the engine's text plate inset. Browser font metrics and line
     // heights belong to the shared editor binding.
-    const sw = a?.style.strokeWidth ?? 0;
-    const doc = a ? richDocOf(a) : null;
+    const sw = annotation?.style.strokeWidth ?? 0;
+    const doc = annotation ? richDocOf(annotation) : null;
     return {
       id: tb.id,
-      ref: a?.ref ?? null,
+      ref: annotation?.ref ?? null,
       box: tb.box,
-      contents: a?.data?.contents ?? '',
+      contents: annotation?.data?.contents ?? '',
       // Paragraph alignment/direction equal to the body's is inherited, not
       // an override: the element carries the body's (`css.align`), so a
       // block must not pin itself to a resolved value — or the Align
@@ -45,13 +45,13 @@ export function buildTextItems(m: Model, page: PageRef, view?: ViewEnv): TextIte
       editing: tb.editing,
       ...(tb.rot ? { rot: tb.rot } : {}),
       css: {
-        fontFamily: cssFontFamilyForFont(t.fontFamily),
-        fontSize: t.fontSize,
-        color: t.fontColor,
-        fontWeight: t.bold ? 700 : 400,
-        fontStyle: t.italic ? 'italic' : 'normal',
-        textDecoration: t.underline ? 'underline' : 'none',
-        align: t.textAlign,
+        fontFamily: cssFontFamilyForFont(style.fontFamily),
+        fontSize: style.fontSize,
+        color: style.fontColor,
+        fontWeight: style.bold ? 700 : 400,
+        fontStyle: style.italic ? 'italic' : 'normal',
+        textDecoration: style.underline ? 'underline' : 'none',
+        align: style.textAlign,
         padding: textPlateInset(sw),
       },
     };

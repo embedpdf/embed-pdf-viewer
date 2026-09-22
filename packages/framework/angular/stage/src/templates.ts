@@ -7,7 +7,7 @@
  *     <ng-template epdfPage>            page-space content (rotates)
  *     <ng-template epdfPageChrome>      box-space chrome (never rotates)
  *
- * The `$implicit` context is the SAME stable object the per-page injector
+ * The `$implicit` context is the same stable object the per-page injector
  * provides as `EPDF_PAGE` — `let-page` is sugar for inline chrome; components
  * inside the template just call `injectPage()`.
  */
@@ -18,8 +18,8 @@ export interface EpdfPageTemplateContext {
   $implicit: EpdfPageContext;
 }
 
-/** PAGE-SPACE content for each visible page (RenderLayer, annotations,
- *  markers). Rendered inside the page's content frame, so it ROTATES with the
+/** Page-space content for each visible page (RenderLayer, annotations,
+ *  markers). Rendered inside the page's content frame, so it rotates with the
  *  page's display rotation — coordinates are plain PDF points. */
 @Directive({ selector: 'ng-template[epdfPage]', standalone: true })
 export class EpdfPageTemplate {
@@ -32,9 +32,9 @@ export class EpdfPageTemplate {
   }
 }
 
-/** BOX-SPACE chrome for each visible page (page-number label, selection
- *  border, per-page buttons). Rendered into the OUTER box (content + reserved
- *  `pageFrame`), so it does NOT rotate and the reserved bands are plain
+/** Box-space chrome for each visible page (page-number label, selection
+ *  border, per-page buttons). Rendered into the outer box (content + reserved
+ *  `pageFrame`), so it does not rotate and the reserved bands are plain
  *  regions (`bottom: 0; height: page.frame().bottom`). */
 @Directive({ selector: 'ng-template[epdfPageChrome]', standalone: true })
 export class EpdfPageChrome {

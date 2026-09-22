@@ -1,24 +1,25 @@
+import { toPageRef } from '@embedpdf/engine-core/runtime';
 import { describe, expect, it } from 'vitest';
 import type { DocumentHandle, Engine, PageLayout } from '@embedpdf/engine-core/runtime';
 import { createKernel } from '../src/kernel';
 import type { AnyPlugin } from '../src/types';
 
 /**
- * `tryCapability` + `documents.openAll` — the kernel-owned halves of what the
- * framework adapters used to re-derive:
+ * `tryCapability` + `documents.openAll` — resolution and boot policy owned by
+ * the kernel, so framework adapters never re-derive them:
  *
- *   - tryCapability is TOTAL (null, never throws) and reference-stable, so an
+ *   - tryCapability is total (null, never throws) and reference-stable, so an
  *     adapter can expose it as a plain equality-cached reactive read. The
- *     null→instance flip at promote time IS the re-render signal — no adapter
+ *     null→instance flip at promote time is the re-render signal — no adapter
  *     may need to know when resolution changes.
  *   - openAll is the boot policy (order, single activation, failure
  *     containment) stated once, kernel-side.
  */
 
 const box = { left: 0, bottom: 0, right: 600, top: 800 } as const;
-const page = (pon: number, index: number): PageLayout => ({
+const page = (pageObjectNumber: number, index: number): PageLayout => ({
   index,
-  pageObjectNumber: pon,
+  ref: toPageRef(pageObjectNumber),
   label: null,
   size: { width: 600, height: 800 },
   rotation: 0,
@@ -61,17 +62,17 @@ function controllableEngine() {
 }
 
 const bytesInput = (id: string) => ({ kind: 'bytes' as const, id, bytes: new Uint8Array() });
-const settle = () => new Promise((r) => setTimeout(r, 0));
+const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 const docToken = { name: 'stage' };
 const docPlugin: AnyPlugin = {
   id: 'stage',
   scope: 'document',
   token: docToken,
-  capability: () => ({}),
+  create: () => ({ api: {} }),
 };
 const wsToken = { name: 'shell' };
-const wsPlugin: AnyPlugin = { id: 'shell', token: wsToken, capability: () => ({ ws: true }) };
+const wsPlugin: AnyPlugin = { id: 'shell', token: wsToken, create: () => ({ api: { ws: true } }) };
 
 describe('kernel: tryCapability', () => {
   it('is null while pending, reference-stable once ready, null again after close', async () => {
@@ -113,14 +114,18 @@ describe('kernel: documents.openAll', () => {
       { source: bytesInput('b'), active: true },
       { source: bytesInput('c') },
     ]);
-    expect(kernel.documents.list().map((d) => d.id)).toEqual(['a', 'b', 'c']);
+    expect(kernel.documents.list().map((documentInfo) => documentInfo.id)).toEqual(['a', 'b', 'c']);
     expect(kernel.documents.getActiveId()).toBe('b');
 
     resolve('c'); // completion order must change nothing
     resolve('a');
     resolve('b');
     await settle();
-    expect(kernel.documents.list().map((d) => d.status)).toEqual(['ready', 'ready', 'ready']);
+    expect(kernel.documents.list().map((documentInfo) => documentInfo.status)).toEqual([
+      'ready',
+      'ready',
+      'ready',
+    ]);
     expect(kernel.documents.getActiveId()).toBe('b');
   });
 
@@ -134,7 +139,9 @@ describe('kernel: documents.openAll', () => {
     reject('b', new Error('boom')); // contained: openAll never surfaces a rejection
     resolve('a');
     await settle();
-    expect(kernel.documents.list().map((d) => [d.id, d.status])).toEqual([
+    expect(
+      kernel.documents.list().map((documentInfo) => [documentInfo.id, documentInfo.status]),
+    ).toEqual([
       ['a', 'ready'],
       ['b', 'error'],
     ]);

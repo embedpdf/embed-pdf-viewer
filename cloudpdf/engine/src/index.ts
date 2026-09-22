@@ -1,5 +1,5 @@
 /**
- * @cloudpdf/engine - Engine v3 cloud client.
+ * @cloudpdf/engine - the cloud engine client.
  *
  * Implements the same {@link Engine} interface as `@embedpdf/engine` but
  * routes calls to a remote `@cloudpdf/server` over HTTP. Same observable
@@ -45,7 +45,7 @@ export function createCloudEngine(opts: CloudEngineOptions): CloudEngine {
  * to let a `<Viewer>` own the lifetime instead.
  *
  * Note the deliberate asymmetry with `localEngine()`: there is no `fonts`
- * option. Fallback fonts are a SERVER policy on the cloud (`Engine.fonts` is
+ * option. Fallback fonts are a server policy on the cloud (`Engine.fonts` is
  * `undefined` cloud-side), so they cannot be configured from the client. This
  * is the local-vs-cloud split, surfaced in the API.
  *

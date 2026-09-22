@@ -1,4 +1,4 @@
-import type { Annot } from '@embedpdf/core-annotation';
+import type { ModelAnnotation } from '@embedpdf/core-annotation';
 import { annotationKey, type AnnotationRef, type PdfRect } from '@embedpdf/engine-core/runtime';
 
 import { fromDTO } from '../repository';
@@ -20,23 +20,23 @@ export function createRecords(
   geometry: CropLookup,
 ) {
   /**
-   * Ingest an engine DTO with this session's per-record AUTHORITY projected
-   * onto it (permissions.md) — asked of the SAME mirrors the server enforces
+   * Ingest an engine DTO with this session's per-record authority projected
+   * onto it (permissions.md) — asked of the same mirrors the server enforces
    * with, against the record's stamped owner. Fused into
    * `annotTransformable`/`annotDeletable`, so hit-test, chrome, props and
    * delete all agree with the engine by construction. No security context
    * (bare local engines, tests) → unstamped → allowed; the engine enforces.
    */
-  const ingest = (dto: EngineRecord, crop: PdfRect, source?: RenderSource): Annot => {
-    const a = fromDTO(dto, crop, source);
+  const ingest = (dto: EngineRecord, crop: PdfRect, source?: RenderSource): ModelAnnotation => {
+    const annotation = fromDTO(dto, crop, source);
     const sec = ctx.doc?.security;
-    if (!sec) return a;
+    if (!sec) return annotation;
     const target = {
       ...(dto.userId !== undefined ? { userId: dto.userId } : {}),
       ...(dto.groupId !== undefined ? { groupId: dto.groupId } : {}),
     };
     return {
-      ...a,
+      ...annotation,
       authority: {
         update: sec.allowsAnnotationMutation('update', target),
         delete: sec.allowsAnnotationMutation('delete', target),
@@ -46,7 +46,7 @@ export function createRecords(
 
   /**
    * Re-sync one annotation into the model from the authoritative engine DTO,
-   * with the render `source` the caller decides: `'vector'` when WE authored or
+   * with the render `source` the caller decides: `'vector'` when we authored or
    * changed the appearance (create / restyle / resize), `'baked'` when the AP is
    * still authoritative (a move, which preserves it, or a remote edit).
    * `bumpAp` marks the upsert as confirming an engine /AP re-bake with new
@@ -55,7 +55,7 @@ export function createRecords(
    */
   const sync = (dto: EngineRecord, source: RenderSource, bumpAp = false): void => {
     const crop = geometry.cropOf(dto.page.pageObjectNumber);
-    if (crop) store.commit({ t: 'upsert', annots: [ingest(dto, crop, source)], bumpAp });
+    if (crop) store.commit({ type: 'upsert', annots: [ingest(dto, crop, source)], bumpAp });
   };
 
   /** The page a ref lives on: from the loaded model first (the page it was

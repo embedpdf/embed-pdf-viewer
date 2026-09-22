@@ -13,7 +13,7 @@ const FILE_NAME_HEADER = 'X-EmbedPDF-File-Name';
 
 /**
  * Project an attachment-file response into `AttachmentContent`. The body
- * IS the decoded bytes; the metadata rides as headers — `Content-Type`
+ * is the decoded bytes; the metadata rides as headers — `Content-Type`
  * for the declared mime type, `X-EmbedPDF-File-Name` for the file name.
  * Shared by the document-level `attachments.download()` and the
  * annotation-level `annotations.downloadFile()` reads — one wire shape

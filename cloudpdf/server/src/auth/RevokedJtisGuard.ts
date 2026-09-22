@@ -8,14 +8,14 @@ export interface RevokedJtisGuardOptions {
   /** Max entries cached in memory. Defaults to 10_000. */
   lruSize?: number;
   /**
-   * Cache the *negative* answer (jti is NOT revoked) for this many
+   * Cache the *negative* answer (jti is not revoked) for this many
    * ms. Defaults to 60s. Tradeoff: longer values cut DB load further
    * but delay the propagation of new revocations to other replicas.
    */
   negativeTtlMs?: number;
   /**
    * Cross-replica revocation push. When supplied, `revoke()` publishes
-   * after the DB write, AND this guard subscribes so a revocation issued
+   * after the DB write, and this guard subscribes so a revocation issued
    * on any replica fills the local LRU immediately — collapsing the
    * negative-cache propagation window from `negativeTtlMs` to
    * notification latency. The DB stays the source of truth; the push is a
@@ -63,7 +63,7 @@ export class RevokedJtisGuard implements RevocationCheck {
     this.negativeTtlMs = opts.negativeTtlMs ?? 60_000;
     this.realtime = opts.realtime;
     // Remote revocations land in the LRU as positive entries, so the
-    // request path on THIS replica rejects the jti without a DB read.
+    // request path on this replica rejects the jti without a DB read.
     this.realtime?.subscribeRevocation((jti, expiresAt) => {
       this.put(jti, { revoked: true, expiresAt: Math.max(Date.now() + 1_000, expiresAt) });
     });

@@ -1,124 +1,29 @@
-import { definePlugin } from '@embedpdf/core';
-import type { CapabilityToken, PluginContext } from '@embedpdf/core';
-import { ActionsToken as PublicActionsToken } from '@embedpdf/plugin-actions/contract';
-import { ActionsToken as ActionsHostToken } from '@embedpdf/plugin-actions/contract/host';
+import { createHostToken, definePlugin } from '@embedpdf/core';
+import { ActionsToken } from '@embedpdf/plugin-actions/contract';
 
-import type { StageCapability, StageConfig } from './contract';
+import { DEFAULT_LENS_ID } from './connect';
+import type { StagePluginOptions } from './contract';
 import { createStageController } from './controller';
-import { destinationToReveal } from './destination';
-import { StageToken } from './host-contract';
 import type { StageHostCapability } from './host-contract';
-import { initialStageState, stageReducer } from './model';
-import type { StageAction, StageState } from './model';
-import { registerStageWatchers } from './sync/watchers';
+import { initialStageState, type StageState } from './model';
+import { StageToken } from './token';
 
 /**
- * Options for registering a stage instance. The Stage is a LENS, not a singleton:
- * a document may be viewed through several stages at once (the main view, a wrapped
- * thumbnail sidebar, …), each with independent camera/settings. Register additional
- * lenses by giving them their own `id` + `token`:
- *
- *   const ThumbsToken = createCapabilityToken<StageCapability>('stage-thumbs');
- *   plugins = [
- *     stagePlugin(),                                                   // main lens
- *     stagePlugin({ id: 'stage-thumbs', token: ThumbsToken,
- *                   layout: 'grid', columns: 'auto', zoom: { level: 0.2 } }),
- *   ];
- *
- * Everything multiplexes automatically: state slices, capabilities, and teardown
- * are already keyed by plugin-id × document in the kernel.
- */
-export interface StagePluginOptions extends StageConfig {
-  id?: string;
-  token?: CapabilityToken<StageCapability>;
-}
-
-/**
- * Wires the parts into a kernel plugin. This file is the "manifest": it says what
- * the plugin IS (id, token, state, reducer, controller) — the how lives in the
- * sibling folders.
+ * The stage plugin: one lens's camera, layout, zoom and navigation over a
+ * document. Document-scoped. The actions plugin is optional: with it, the
+ * main lens feeds page state to it and interprets GoTo and Named page
+ * actions. Pointer input is opted into by the surface binding
+ * (`<Stage interaction>` / `createStageSurface`), which both forwards pointer
+ * samples and registers this lens's scroll handler.
  */
 export const stagePlugin = (options: StagePluginOptions = {}) => {
-  const { id = 'stage', token = StageToken, ...config } = options;
-  return definePlugin<StageState, StageAction, StageHostCapability>({
+  const { id = DEFAULT_LENS_ID, token = StageToken, ...config } = options;
+  return definePlugin<StageState, StageHostCapability>({
     id,
-    token: token as never,
-    scope: 'document', // one instance of THIS lens per open document
-    optional: [PublicActionsToken],
-    initialState: () => initialStageState(config),
-    reduce: stageReducer,
-    // Interaction opt-in lives with the SAMPLE SOURCE, not here: the surface
-    // binding (`<Stage interaction>` / `createStageSurface`) both forwards
-    // pointer samples AND registers this lens's scroll handler, lens-scoped —
-    // one knob, and a handler can never exist without its input stream.
-    // INITIAL placement is deliberately NOT an effect: it's LEVEL-triggered
-    // inside the controller's setViewportSize (place when the stage first
-    // learns a real size), so it cannot race effect registration. Other
-    // plugins only *offer* initial views via provideInitialView; placeInitial
-    // resolves them by priority. The watchers are STEADY-STATE — they re-fit
-    // when the page registry mutates and feed page state to the action engine.
-    effects: (ctx) => registerStageWatchers(ctx, token as never, id === 'stage'),
-    create: (ctx) => ({
-      api: createStageController(ctx, config),
-      connect() {
-        registerExecutors(ctx, token as never, id);
-      },
-    }),
+    token: createHostToken<StageHostCapability>(token),
+    scope: 'document',
+    optional: [ActionsToken],
+    state: () => initialStageState(config),
+    create: (ctx) => createStageController(ctx, config),
   });
 };
-
-/**
- * Navigation executors for the action engine — registered by the DEFAULT
- * lens only (a thumbnail lens must never win the last-wins registry and
- * start navigating the sidebar). Executor bodies resolve the stage
- * capability at CALL time; the dispatcher invokes them as DEFERRED
- * navigation effects, never mid-walk.
- */
-function registerExecutors(
-  ctx: PluginContext<StageState, StageAction>,
-  token: CapabilityToken<StageHostCapability>,
-  id: string,
-): void {
-  if (id !== 'stage') return;
-  const actions = ctx.tryGet(ActionsHostToken);
-  if (!actions) return;
-  ctx.cleanup(
-    actions.registerExecutor('goto', (node) => {
-      if (node.type !== 'goto') return { status: 'inert', reason: 'not a goto node' };
-      const stage = ctx.tryGet(token as never) as StageHostCapability | null;
-      const layout = ctx
-        .document()
-        ?.pages.find((p) => p.ref.pageObjectNumber === node.destination.page.pageObjectNumber);
-      if (!stage || !layout) {
-        return { status: 'failed', error: 'no stage or destination page available' };
-      }
-      const { pageIndex, options: reveal } = destinationToReveal(node.destination, layout);
-      stage.revealIndex(pageIndex, { ...reveal, behavior: 'smooth' });
-      return { status: 'executed' };
-    }),
-  );
-  ctx.cleanup(
-    actions.registerExecutor('named', (node) => {
-      if (node.type !== 'named') return { status: 'inert', reason: 'not a named node' };
-      const stage = ctx.tryGet(token as never) as StageHostCapability | null;
-      if (!stage) return { status: 'failed', error: 'no stage available' };
-      // Page verbs only — the dispatcher owns /N Print (policy + adapter).
-      switch (node.name) {
-        case 'NextPage':
-          stage.nextPage({ behavior: 'smooth' });
-          return { status: 'executed' };
-        case 'PrevPage':
-          stage.previousPage({ behavior: 'smooth' });
-          return { status: 'executed' };
-        case 'FirstPage':
-          stage.goToFirstPage({ behavior: 'smooth' });
-          return { status: 'executed' };
-        case 'LastPage':
-          stage.goToLastPage({ behavior: 'smooth' });
-          return { status: 'executed' };
-        default:
-          return { status: 'inert', reason: `unknown named action '${node.name}'` };
-      }
-    }),
-  );
-}

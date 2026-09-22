@@ -1,9 +1,9 @@
 /**
  * PDF-space-internal geometry helpers.
  *
- * These operate ENTIRELY within PDF user space (y-up, edges). They never
+ * These operate entirely within PDF user space (y-up, edges). They never
  * produce viewer-local (y-down) geometry — that conversion needs the crop box
- * plus rotation/scale and lives in the v3 viewer layer (the `Mat2D` matrix
+ * plus rotation/scale and lives in the viewer layer (the `Mat2D` matrix
  * model), never here.
  */
 
@@ -20,7 +20,7 @@ export interface PdfOriginSize {
 /**
  * Normalize a `PdfRect` to the y-up invariant (`left <= right`, `bottom <= top`),
  * regardless of how the PDF ordered the corners (a `/Rect` array or `FS_RECTF`
- * may carry them in any order). THE enforcement point for the "PdfRect is always
+ * may carry them in any order). The enforcement point for the "PdfRect is always
  * normalized" rule: every producer that reads a raw box from PDFium passes it
  * through here, so the invariant holds once, centrally — downstream `width =
  * right - left` is never negative.
@@ -83,7 +83,7 @@ export interface PdfQuadCorners {
 /**
  * Axis-aligned named-corner interpretation of a quad.
  *
- * VALID ONLY for upright (non-rotated, non-skewed) quads: it is derived from
+ * Valid only for upright (non-rotated, non-skewed) quads: it is derived from
  * the enclosing bounds, so for rotated/skewed quads it returns the bounding
  * box corners, not the true geometric corners. For arbitrary quads use the
  * positional `p1..p4` or `pdfQuadBounds` directly.

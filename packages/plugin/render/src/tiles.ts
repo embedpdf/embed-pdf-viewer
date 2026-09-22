@@ -7,16 +7,16 @@ export { intersectRects } from '@embedpdf/core-geometry';
 /**
  * Pure tile-grid math.
  *
- * The pyramid is ALIGNED: one origin (the page's top-left), a fixed tile
+ * The pyramid is aligned: one origin (the page's top-left), a fixed tile
  * size in device pixels, and ×2 scale steps. Alignment is what makes the
  * retention bookkeeping index arithmetic instead of rectangle geometry —
  * a level-s tile is covered by exactly the level-2s tiles whose indices
  * fall in its doubled range, so occlusion/release checks are O(1).
  *
- * Spaces: tile COORDS live on the device grid at their level's scale
+ * Spaces: tile coords live on the device grid at their level's scale
  * (tileSize² device px per tile, constant per-job cost by construction);
- * PAINT rects are y-down page points (the viewer convention — the layer
- * multiplies by one container transform); ENGINE rects are y-up PDF user
+ * paint rects are y-down page points (the viewer convention — the layer
+ * multiplies by one container transform); engine rects are y-up PDF user
  * space (the `target: {kind:'rect'}` contract).
  */
 
@@ -57,22 +57,22 @@ const tileSpanPt = (grid: TileGrid): number => grid.tileSize / grid.scale;
  */
 export function tilesInRect(grid: TileGrid, page: PageSizePt, rect: Rect): TileCoord[] {
   const span = tileSpanPt(grid);
-  const x0 = Math.max(0, Math.floor(rect.x / span));
-  const y0 = Math.max(0, Math.floor(rect.y / span));
-  const x1 = Math.min(grid.cols - 1, Math.ceil((rect.x + rect.width) / span) - 1);
-  const y1 = Math.min(grid.rows - 1, Math.ceil((rect.y + rect.height) / span) - 1);
-  const out: TileCoord[] = [];
-  for (let iy = y0; iy <= y1; iy++) {
-    for (let ix = x0; ix <= x1; ix++) out.push({ ix, iy });
+  const firstColumn = Math.max(0, Math.floor(rect.x / span));
+  const firstRow = Math.max(0, Math.floor(rect.y / span));
+  const lastColumn = Math.min(grid.cols - 1, Math.ceil((rect.x + rect.width) / span) - 1);
+  const lastRow = Math.min(grid.rows - 1, Math.ceil((rect.y + rect.height) / span) - 1);
+  const coords: TileCoord[] = [];
+  for (let iy = firstRow; iy <= lastRow; iy++) {
+    for (let ix = firstColumn; ix <= lastColumn; ix++) coords.push({ ix, iy });
   }
-  return out;
+  return coords;
 }
 
 /** Paint rect: y-down page points, clamped to the page edge. */
-export function tilePaintRect(grid: TileGrid, page: PageSizePt, c: TileCoord): Rect {
+export function tilePaintRect(grid: TileGrid, page: PageSizePt, coord: TileCoord): Rect {
   const span = tileSpanPt(grid);
-  const x = c.ix * span;
-  const y = c.iy * span;
+  const x = coord.ix * span;
+  const y = coord.iy * span;
   return {
     x,
     y,
@@ -82,26 +82,26 @@ export function tilePaintRect(grid: TileGrid, page: PageSizePt, c: TileCoord): R
 }
 
 /**
- * Expand a paint rect by `pt` page points per side, clamped to the page —
- * the tile BLEED. Neighboring tiles rendered with bleed overlap by twice
+ * Expand a paint rect by `amountPt` page points per side, clamped to the page —
+ * the tile bleed. Neighboring tiles rendered with bleed overlap by twice
  * this amount, and the overlapping strips contain identical content (same
  * page region, same scale), so every img edge composites over its
  * neighbor's duplicated pixels instead of the backdrop: no AA hairlines,
  * no bilinear edge smear, at any CSS stretch.
  */
-export function bleedRect(rect: Rect, pt: number, page: PageSizePt): Rect {
-  const x = Math.max(0, rect.x - pt);
-  const y = Math.max(0, rect.y - pt);
+export function bleedRect(rect: Rect, amountPt: number, page: PageSizePt): Rect {
+  const x = Math.max(0, rect.x - amountPt);
+  const y = Math.max(0, rect.y - amountPt);
   return {
     x,
     y,
-    width: Math.min(page.width, rect.x + rect.width + pt) - x,
-    height: Math.min(page.height, rect.y + rect.height + pt) - y,
+    width: Math.min(page.width, rect.x + rect.width + amountPt) - x,
+    height: Math.min(page.height, rect.y + rect.height + amountPt) - y,
   };
 }
 
 /**
- * Does a set of PAINTED want-level tiles cover `region` (y-down points)?
+ * Does a set of painted want-level tiles cover `region` (y-down points)?
  * The retention release check: a retained source may leave the paint list
  * once its visible footprint answers true here. Pure index arithmetic on
  * the aligned grid — the whole reason the pyramid is aligned.
@@ -110,11 +110,11 @@ export function regionCovered(
   grid: TileGrid,
   page: PageSizePt,
   region: Rect,
-  isPainted: (c: TileCoord) => boolean,
+  isPainted: (coord: TileCoord) => boolean,
 ): boolean {
   if (region.width <= 0 || region.height <= 0) return true;
-  for (const c of tilesInRect(grid, page, region)) {
-    if (!isPainted(c)) return false;
+  for (const coord of tilesInRect(grid, page, region)) {
+    if (!isPainted(coord)) return false;
   }
   return true;
 }
@@ -130,28 +130,28 @@ export function inflateRect(
   margin: number,
   velocity?: { dx: number; dy: number },
 ): Rect {
-  const mx = rect.width * margin;
-  const my = rect.height * margin;
-  let left = mx;
-  let right = mx;
-  let up = my;
-  let down = my;
+  const marginX = rect.width * margin;
+  const marginY = rect.height * margin;
+  let left = marginX;
+  let right = marginX;
+  let up = marginY;
+  let down = marginY;
   if (velocity) {
     // Direction buckets only — raw magnitudes would make the want set
     // churn with every pointer sample.
     if (velocity.dx > 0) {
-      right = mx * 2;
-      left = mx / 2;
+      right = marginX * 2;
+      left = marginX / 2;
     } else if (velocity.dx < 0) {
-      left = mx * 2;
-      right = mx / 2;
+      left = marginX * 2;
+      right = marginX / 2;
     }
     if (velocity.dy > 0) {
-      down = my * 2;
-      up = my / 2;
+      down = marginY * 2;
+      up = marginY / 2;
     } else if (velocity.dy < 0) {
-      up = my * 2;
-      down = my / 2;
+      up = marginY * 2;
+      down = marginY / 2;
     }
   }
   return {
@@ -162,8 +162,8 @@ export function inflateRect(
   };
 }
 
-/** Snap UP through a pyramid's sorted scales; cap at the top. */
+/** Snap up through a pyramid's sorted scales; cap at the top. */
 export function snapToPyramid(scales: readonly number[], needed: number): number {
-  const sorted = [...scales].sort((a, b) => a - b);
-  return sorted.find((s) => s >= needed) ?? sorted[sorted.length - 1]!;
+  const sorted = [...scales].sort((left, right) => left - right);
+  return sorted.find((scale) => scale >= needed) ?? sorted[sorted.length - 1]!;
 }

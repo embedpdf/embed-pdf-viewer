@@ -1,16 +1,14 @@
 /**
- * The annotation slice: the core-annotation Model plus the selection-chrome
- * settings, the tool ghost, the stamp arm epoch and the editor's text
- * selection. The pure `update` runs in the store service (which also runs
- * effects); the reducer only stores new state — keeping the kernel store a
- * dumb, serializable container.
+ * The annotation plugin's state: the core model plus the selection chrome
+ * settings, the tool ghost and the text editor's selection. The core's pure
+ * `update` runs in the store service (which also runs its effects); the
+ * transitions below only store results.
  */
 import { initialModel } from '@embedpdf/core-annotation';
 import type { Model } from '@embedpdf/core-annotation';
 
 import type {
   AnnotationConfig,
-  AnnotationHydration,
   ChromeSettings,
   ChromeSettingsPatch,
   ToolGhost,
@@ -18,37 +16,25 @@ import type {
 import type { TextSelection } from './rich-text';
 
 export interface AnnotationState {
-  model: Model;
-  hydration: AnnotationHydration;
-  chrome: ChromeSettings;
+  /** The core model: records (confirmed plus optimistic), selection, drafts and settings. */
+  readonly model: Model;
+  readonly chrome: ChromeSettings;
   /**
-   * The armed tool's FOOTPRINT ghost: where (and what) the NEXT click would
-   * place — the stamp's fitted image box, or a click-create tool's default
-   * geometry — computed by the same rules the placement uses (WYSIWYG). In the
-   * store (not the capability closure) because it is RENDERED — vector ghosts
-   * ride `pageItems`, image ghosts (stamp) render via the framework's
-   * `ToolGhost`. The armed bytes stay out of the store.
+   * The armed tool's footprint ghost: where, and what, the next click would
+   * place (a stamp's fitted image box, or a click-create tool's default
+   * geometry), computed by the same rules placement uses. It is state
+   * because it is rendered: vector ghosts ride `pageItems`, image ghosts
+   * render through the framework's `ToolGhost`. The armed bytes stay out of state.
    */
-  toolGhost: ToolGhost | null;
-  /** Bumps on every arm/disarm — the render layer's cue to rebuild (or drop)
-   *  the ghost preview object URL. Never rendered itself. */
-  stampArmEpoch: number;
+  readonly toolGhost: ToolGhost | null;
   /**
    * The text editor's selection inside the annotation being edited (flat
-   * offsets over its plain projection), or null. In the store because it is
-   * READ by the property surface: while a range is held, the range keys
-   * (`getSelectionProps`) report and take the RUNS, not the body.
+   * offsets over its plain text), or null. It is state because the property
+   * surface reads it: while a range is held, the text style keys report and
+   * change the runs, not the whole body.
    */
-  textSelection: TextSelection | null;
+  readonly textSelection: TextSelection | null;
 }
-
-export type AnnotationAction =
-  | { type: 'SET_MODEL'; model: Model }
-  | { type: 'SET_HYDRATION'; hydration: AnnotationHydration }
-  | { type: 'SET_CHROME'; patch: ChromeSettingsPatch }
-  | { type: 'SET_TOOL_GHOST'; ghost: ToolGhost | null }
-  | { type: 'SET_TEXT_SELECTION'; selection: TextSelection | null }
-  | { type: 'STAMP_ARM_CHANGED' };
 
 /**
  * Out-of-the-box selection chrome — a sensible document-annotation feel. Every
@@ -58,12 +44,12 @@ export type AnnotationAction =
  */
 export const DEFAULT_CHROME: ChromeSettings = {
   accent: '#3858e9',
-  // Solid, like the shape's own resting look — one style at rest AND rotated.
+  // Solid, like the shape's own resting look — one style at rest and rotated.
   outline: { style: 'solid', width: 1 },
   // 8px squares to look at, 24px to grab (touch-friendly without visual bulk).
   handles: { size: 8, hitSize: 24, fill: '#ffffff' },
   knob: { size: 10, hitSize: 24, offset: 32, stalk: true, fill: '#ffffff' },
-  // Faint reference cross, prominent live indicator (v2 feel).
+  // A faint reference cross and a prominent live indicator.
   guides: { enabled: true, style: 'solid', width: 1, axisOpacity: 0.35, indicatorOpacity: 0.8 },
 };
 
@@ -77,41 +63,27 @@ export const mergeChrome = (base: ChromeSettings, patch: ChromeSettingsPatch): C
   guides: { ...base.guides, ...patch.guides },
 });
 
-/**
- * The slice holds the annotation-core Model + the selection-chrome settings.
- * The pure `update` runs in the capability (the shell, which also performs
- * effects); the reducer only stores new state — keeping the kernel store a
- * dumb, serializable container. The registration config seeds the model's
- * snap settings and the chrome.
- */
+/** The initial state; the registration config seeds the model's snapping and the chrome. */
 export const initialAnnotationState = (config: AnnotationConfig = {}): AnnotationState => ({
   model: { ...initialModel, snap: { ...initialModel.snap, ...config.snap } },
-  hydration: { status: 'loading' },
   chrome: mergeChrome(DEFAULT_CHROME, config.chrome ?? {}),
   toolGhost: null,
-  stampArmEpoch: 0,
   textSelection: null,
 });
 
-export const annotationReducer = (
+export const setModel = (state: AnnotationState, model: Model): AnnotationState =>
+  state.model === model ? state : { ...state, model };
+
+export const patchChrome = (state: AnnotationState, patch: ChromeSettingsPatch): AnnotationState => ({
+  ...state,
+  chrome: mergeChrome(state.chrome, patch),
+});
+
+export const setToolGhost = (state: AnnotationState, toolGhost: ToolGhost | null): AnnotationState =>
+  state.toolGhost === toolGhost ? state : { ...state, toolGhost };
+
+export const setTextSelection = (
   state: AnnotationState,
-  action: AnnotationAction,
-): AnnotationState => {
-  switch (action.type) {
-    case 'SET_MODEL':
-      return { ...state, model: action.model };
-    case 'SET_HYDRATION':
-      return { ...state, hydration: action.hydration };
-    case 'SET_CHROME':
-      return { ...state, chrome: mergeChrome(state.chrome, action.patch) };
-    case 'SET_TOOL_GHOST':
-      return { ...state, toolGhost: action.ghost };
-    case 'SET_TEXT_SELECTION':
-      return { ...state, textSelection: action.selection };
-    case 'STAMP_ARM_CHANGED':
-      // A new (or dropped) payload invalidates any ghost drawn for the old one.
-      return { ...state, stampArmEpoch: state.stampArmEpoch + 1, toolGhost: null };
-    default:
-      return state;
-  }
-};
+  textSelection: TextSelection | null,
+): AnnotationState =>
+  state.textSelection === textSelection ? state : { ...state, textSelection };

@@ -142,7 +142,7 @@ describe('BaseFileCache', () => {
     const hB = await fx.cache.acquire({ sha: b.sha, key: b.key });
 
     // Both entries refcounted; we are over budget but the LRU
-    // sweeper must NOT evict either of them.
+    // sweeper must not evict either of them.
     expect(fx.events.find((e) => e.kind === 'evict')).toBeUndefined();
     expect(fx.cache.stats().entries).toBe(2);
     expect(fx.cache.stats().refcounted).toBe(2);

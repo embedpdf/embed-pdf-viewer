@@ -33,11 +33,11 @@ import type { HttpClient } from '../transport/HttpClient';
 /**
  * Cloud-side digital signatures. Two kinds of read, two kinds of URL:
  *
- *   - The LAYER view (`list`, and `analyze` of the working copy) is pinned
+ *   - The layer view (`list`, and `analyze` of the working copy) is pinned
  *     by the manifest's `docVersion`, like every other layer read: a
  *     signature is a layer state change, the immutable URL moves with it.
- *   - Signed BYTES (`contents`, `digest`, `revisionBytes`, and `analyze`
- *     of history) belong to a base VERSION and are content-addressed by
+ *   - Signed bytes (`contents`, `digest`, `revisionBytes`, and `analyze`
+ *     of history) belong to a base version and are content-addressed by
  *     the manifest's `baseSha`: immutable forever, shared by every layer
  *     and every caller.
  *

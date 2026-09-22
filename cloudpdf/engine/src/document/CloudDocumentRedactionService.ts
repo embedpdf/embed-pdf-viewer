@@ -17,8 +17,8 @@ import type { HttpClient } from '../transport/HttpClient';
  * HTTP (POST /redactions/apply); the server enforces the capability gate
  * (`doc.pages.modify` + `doc.annotate.modify` + `doc.redact`) and persists
  * the rewritten layer artifact. See `DocumentRedactionService` for the
- * two-stage model and the layer trust boundary — an apply rewrites THIS
- * LAYER's bytes; the immutable base keeps the original.
+ * two-stage model and the layer trust boundary — an apply rewrites this
+ * layer's bytes; the immutable base keeps the original.
  */
 export class CloudDocumentRedactionService implements DocumentRedactionService {
   constructor(

@@ -1,16 +1,15 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import type { PluginContext } from '@embedpdf/core';
-import { toPageRef, type PdfActionNode, type PdfActionTree } from '@embedpdf/engine-core/runtime';
+import { createTestContext } from '@embedpdf/core/testing';
+import {
+  toPageRef,
+  type DocumentHandle,
+  type PdfActionNode,
+  type PdfActionTree,
+} from '@embedpdf/engine-core/runtime';
 
 import { createActionsController } from '../src/controller';
-import type {
-  ActionContext,
-  ActionsAction,
-  ActionsConfig,
-  ActionsState,
-  ActionUiAdapter,
-} from '../src/host-contract';
+import type { ActionContext, ActionsConfig, ActionUiAdapter } from '../src/host-contract';
 
 const USER: ActionContext = {
   origin: 'user',
@@ -30,10 +29,10 @@ const tree = (root: PdfActionNode | null, incomplete = false): PdfActionTree => 
   warnings: incomplete ? ['incomplete'] : [],
 });
 
-const js = (script: string, next: PdfActionNode[] = []): PdfActionNode => ({
+const script = (source: string, next: PdfActionNode[] = []): PdfActionNode => ({
   type: 'javascript',
   subtype: 'JavaScript',
-  script,
+  script: source,
   next,
 });
 const goto = (next: PdfActionNode[] = []): PdfActionNode => ({
@@ -61,9 +60,8 @@ const hide = (
 ): PdfActionNode => ({ type: 'hide', subtype: 'Hide', targets, hide: hidden, next: [] });
 
 function harness(config?: ActionsConfig, fields: Array<{ name: string; widgets: number[] }> = []) {
-  const dispatch = vi.fn();
-  const cleanups: Array<() => void> = [];
-  const ctx = {
+  const ctx = createTestContext<void>({
+    id: 'actions',
     doc: {
       forms: {
         list: async () => ({
@@ -77,14 +75,10 @@ function harness(config?: ActionsConfig, fields: Array<{ name: string; widgets: 
           })),
         }),
       },
-    },
-    documentId: 'doc-1',
-    dispatch,
-    tryGet: () => null,
-    cleanup: (fn: () => void) => cleanups.push(fn),
-  } as unknown as PluginContext<ActionsState, ActionsAction>;
-  const capability = createActionsController(ctx, config);
-  return { capability, dispatch, cleanups };
+    } as unknown as Partial<DocumentHandle>,
+  });
+  const capability = ctx.connect(createActionsController(ctx, config));
+  return { capability };
 }
 
 describe('actions dispatcher', () => {
@@ -92,12 +86,12 @@ describe('actions dispatcher', () => {
     const { capability } = harness();
     const executor = vi.fn(() => ({ status: 'executed' as const }));
     capability.registerExecutor('javascript', executor);
-    const result = await capability.execute(tree(js('boot()'), true), USER);
+    const result = await capability.execute(tree(script('boot()'), true), USER);
     expect(result.status).toBe('refused');
     expect(result.nodes).toEqual([]);
     expect(result.diagnostics[0]).toMatchObject({ code: 'incomplete-tree' });
     expect(executor).not.toHaveBeenCalled();
-    expect(capability.canExecute(tree(js('boot()'), true), USER)).toBe(false);
+    expect(capability.canExecute(tree(script('boot()'), true), USER)).toBe(false);
   });
 
   it('walks /Next in PDF order with path bookkeeping', async () => {
@@ -107,7 +101,10 @@ describe('actions dispatcher', () => {
       seen.push((node as Extract<PdfActionNode, { type: 'javascript' }>).script);
       return { status: 'executed' };
     });
-    const result = await capability.execute(tree(js('a', [js('b', [js('c')]), js('d')])), USER);
+    const result = await capability.execute(
+      tree(script('a', [script('b', [script('c')]), script('d')])),
+      USER,
+    );
     expect(seen).toEqual(['a', 'b', 'c', 'd']);
     expect(result.nodes.map((node) => node.path)).toEqual([[], [0], [0, 0], [1]]);
     expect(result.status).toBe('executed');
@@ -128,8 +125,8 @@ describe('actions dispatcher', () => {
       openUri: () => order.push('uri'),
       print: () => order.push('print'),
     });
-    // PDF order: goto → js → uri. Navigation/external must still fire AFTER js.
-    await capability.execute(tree(goto([js('x', [uri('https://a.test/')])])), USER);
+    // PDF order: goto → js → uri. Navigation/external must still fire after js.
+    await capability.execute(tree(goto([script('x', [uri('https://a.test/')])])), USER);
     expect(order).toEqual(['js', 'goto', 'uri']);
   });
 
@@ -142,11 +139,11 @@ describe('actions dispatcher', () => {
       vi.fn(() => ({ status: 'executed' as const })),
     );
     capability.registerExecutor('javascript', (node) => {
-      const script = (node as Extract<PdfActionNode, { type: 'javascript' }>).script;
-      return script === 'boom' ? { status: 'failed', error: 'exploded' } : { status: 'executed' };
+      const source = (node as Extract<PdfActionNode, { type: 'javascript' }>).script;
+      return source === 'boom' ? { status: 'failed', error: 'exploded' } : { status: 'executed' };
     });
     const result = await capability.execute(
-      tree(goto([js('boom', [js('after'), uri('https://a.test/')])])),
+      tree(goto([script('boom', [script('after'), uri('https://a.test/')])])),
       USER,
     );
     expect(openUri).not.toHaveBeenCalled();
@@ -169,8 +166,8 @@ describe('actions dispatcher', () => {
     expect(capability.canExecute(tree(uri('https://a.test/')), LIFECYCLE)).toBe(false);
     expect(capability.canExecute(tree(uri('https://a.test/')), USER)).toBe(true);
 
-    // A payload-LESS submit node (older-runtime extraction) is exactly the
-    // pre-payload behavior: recognized-inert, honestly diagnosed.
+    // A submit node without a payload (a runtime that does not extract it)
+    // is recognized but inert, and diagnosed.
     const bare = await capability.execute(
       tree({ type: 'submit-form', subtype: 'SubmitForm', next: [] }),
       USER,
@@ -180,7 +177,7 @@ describe('actions dispatcher', () => {
       bare.diagnostics.some((diagnostic) => diagnostic.code === 'submit-payload-unavailable'),
     ).toBe(true);
 
-    // A payloaded submit under HOVER origin never reaches any sink.
+    // A payloaded submit under hover origin never reaches any sink.
     const payloaded = tree({
       type: 'submit-form',
       subtype: 'SubmitForm',
@@ -281,7 +278,7 @@ describe('actions dispatcher', () => {
       USER,
     );
     expect(result.status).toBe('executed');
-    // The field name became FIELD-level display truth (the engine's widget
+    // The field name became field-level display truth (the engine's widget
     // visibility door); the bare object number stayed an annotation flag.
     expect(displays).toEqual([{ fieldObjectNumber: 100, display: 'visible' }]);
     expect(flagged).toEqual([{ annotObjectNumber: 7, hidden: false }]);
@@ -298,9 +295,11 @@ describe('actions dispatcher', () => {
 
     const ghost = await capability.execute(tree(hide([{ kind: 'name', name: 'ghost' }])), USER);
     expect(ghost.nodes[0].status).toBe('executed'); // nothing resolved, nothing failed
-    expect(ghost.diagnostics.some((d) => d.code === 'unresolved-target')).toBe(true);
+    expect(ghost.diagnostics.some((diagnostic) => diagnostic.code === 'unresolved-target')).toBe(
+      true,
+    );
 
-    // An authority refusal is a FAILED document mutation — full ISO.
+    // An authority refusal is a failed document mutation — full ISO.
     capability.registerAnnotCommitSink(async (entries) => ({
       results: entries.map((entry) => ({
         annotObjectNumber: entry.annotObjectNumber,
@@ -313,7 +312,9 @@ describe('actions dispatcher', () => {
       USER,
     );
     expect(refused.nodes[0].status).toBe('failed');
-    expect(refused.diagnostics.some((d) => d.message.includes('PermissionDenied'))).toBe(true);
+    expect(
+      refused.diagnostics.some((diagnostic) => diagnostic.message.includes('PermissionDenied')),
+    ).toBe(true);
   });
 
   it('serializes dispatches on one queue', async () => {
@@ -322,14 +323,14 @@ describe('actions dispatcher', () => {
     let release!: () => void;
     const gate = new Promise<void>((resolve) => (release = resolve));
     capability.registerExecutor('javascript', async (node) => {
-      const script = (node as Extract<PdfActionNode, { type: 'javascript' }>).script;
-      order.push(`${script}-start`);
-      if (script === 'slow') await gate;
-      order.push(`${script}-end`);
+      const source = (node as Extract<PdfActionNode, { type: 'javascript' }>).script;
+      order.push(`${source}-start`);
+      if (source === 'slow') await gate;
+      order.push(`${source}-end`);
       return { status: 'executed' };
     });
-    const first = capability.execute(tree(js('slow')), USER);
-    const second = capability.execute(tree(js('fast')), USER);
+    const first = capability.execute(tree(script('slow')), USER);
+    const second = capability.execute(tree(script('fast')), USER);
     release();
     await Promise.all([first, second]);
     expect(order).toEqual(['slow-start', 'slow-end', 'fast-start', 'fast-end']);
@@ -341,8 +342,8 @@ describe('actions dispatcher', () => {
     const second = vi.fn(() => ({ status: 'executed' as const }));
     const offFirst = capability.registerExecutor('javascript', first);
     capability.registerExecutor('javascript', second);
-    offFirst(); // must NOT remove the current (second) registration
-    await capability.execute(tree(js('x')), USER);
+    offFirst(); // must not remove the current (second) registration
+    await capability.execute(tree(script('x')), USER);
     expect(first).not.toHaveBeenCalled();
     expect(second).toHaveBeenCalledTimes(1);
   });
@@ -363,7 +364,7 @@ describe('actions dispatcher', () => {
     const { capability } = harness();
     const events: string[] = [];
     capability.onExecuted(({ result }) => events.push(result.status));
-    const result = await capability.execute(tree(js('orphan()')), USER);
+    const result = await capability.execute(tree(script('orphan()')), USER);
     expect(result.status).toBe('inert');
     expect(result.nodes[0].status).toBe('inert');
     expect(events).toEqual(['inert']);

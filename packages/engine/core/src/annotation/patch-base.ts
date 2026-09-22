@@ -20,7 +20,7 @@ import type { AnnotationRef } from '../identity/AnnotationRef';
  *     allowing edits would let any caller with update authority
  *     rewrite who appears to have authored the annotation.
  *
- * `groupId` IS patchable — organizational ownership (which team an
+ * `groupId` is patchable — organizational ownership (which team an
  * annotation belongs to) can legitimately change with reorgs /
  * handoffs. Reassignment runs `checkSetGroup` against the caller's
  * scope.

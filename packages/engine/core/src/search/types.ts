@@ -3,7 +3,7 @@ import type { PageRef } from '../identity/PageRef';
 import type { PdfTextSegment } from '../text/layout';
 
 /**
- * What to search for — THE one shape, engine → wire → plugin state →
+ * What to search for — the one shape, engine → wire → plugin state →
  * search box. One flat object; the flags define behavior per mode instead
  * of the mode changing the shape:
  *
@@ -11,11 +11,11 @@ import type { PdfTextSegment } from '../text/layout';
  * |-------------------|------------------|--------------------------------|
  * | `matchCase`       | fold case        | `i` flag                       |
  * | `wholeWord`       | boundary check   | pattern is `\b(?:…)\b`-wrapped |
- * | `matchDiacritics` | mark fold        | REJECTED (`InvalidArg`)        |
- * | `ignoreWhitespace`| whitespace drop  | REJECTED (`InvalidArg`)        |
+ * | `matchDiacritics` | mark fold        | rejected (`InvalidArg`)        |
+ * | `ignoreWhitespace`| whitespace drop  | rejected (`InvalidArg`)        |
  *
- * Literal queries match over FOLDED text; regex queries run the portable
- * dialect against the RAW page text — which is why `matchDiacritics` and
+ * Literal queries match over folded text; regex queries run the portable
+ * dialect against the raw page text — which is why `matchDiacritics` and
  * `ignoreWhitespace` cannot apply to them (diacritic folding and whitespace
  * dropping are properties of the folded text plane; a pattern spells its
  * own `\s*`). Validate with `validateSearchQuery` for early UI feedback;
@@ -24,7 +24,7 @@ import type { PdfTextSegment } from '../text/layout';
 export interface SearchQuery {
   /**
    * The literal text — or, when `regex`, a pattern in the portable
-   * search-regex dialect: JavaScript `u`-mode syntax MINUS backreferences
+   * search-regex dialect: JavaScript `u`-mode syntax minus backreferences
    * and lookaround, so every valid pattern also runs on RE2 (the
    * server-side engine).
    */
@@ -38,7 +38,7 @@ export interface SearchQuery {
   /**
    * Treat diacritics as significant ("café" ≠ "cafe"). Default false —
    * marks are stripped on both sides, which is what viewers ship.
-   * LITERAL ONLY: combined with `regex` the query is rejected.
+   * Literal only: combined with `regex` the query is rejected.
    */
   matchDiacritics?: boolean;
   /**
@@ -48,8 +48,8 @@ export interface SearchQuery {
    * fold collapses whitespace runs to one space, so a needle still has to
    * carry a space wherever the page does. A hit spans the original text
    * including the dropped whitespace; with `wholeWord` the boundaries are
-   * checked on the ORIGINAL text (the folded plane has no word gaps left).
-   * LITERAL ONLY: combined with `regex` the query is rejected.
+   * checked on the original text (the folded plane has no word gaps left).
+   * Literal only: combined with `regex` the query is rejected.
    */
   ignoreWhitespace?: boolean;
 }
@@ -62,7 +62,7 @@ export interface SearchQuery {
  *   text extraction: the user can *find*, but nothing readable crosses
  *   the boundary.
  * - `'full'` — rects plus a context snippet per match. Needs
- *   `doc.text.search` AND `doc.text.copy` (a snippet IS extracted text).
+ *   `doc.text.search` and `doc.text.copy` (a snippet is extracted text).
  *
  * Engines reject a `'full'` request without the copy scope rather than
  * silently downgrading — the caller chooses the mode it renders.
@@ -70,7 +70,7 @@ export interface SearchQuery {
 export type SearchMode = 'rects' | 'full';
 
 /**
- * Per-slice spending caps. A slice ends as soon as EITHER cap is hit (or
+ * Per-slice spending caps. A slice ends as soon as either cap is hit (or
  * the search space is exhausted). Engines clamp requested caps to their
  * own ceilings — the server never lets one request scan 40K pages.
  */
@@ -106,7 +106,7 @@ export interface SearchRequest {
   startPage?: PageRef;
   /**
    * Trusted absolute resume position: pages of the scan order already
-   * consumed. For callers that pin content versions EXTERNALLY — the
+   * consumed. For callers that pin content versions externally — the
    * cloud wire pins the search content epoch in the URL, so its GET
    * routes resume by position alone. Everyone else should use `cursor`,
    * which also guards against mutations between slices; `cursor` takes
@@ -130,15 +130,15 @@ export interface SearchSnippet {
 
 /**
  * One hit. `charStart`/`charCount` are a half-open range in the page's
- * CHARACTER space — the space `PageGeometryRun.charStart` tiles and
- * selection ranges live in, NOT string offsets into `PageTextSnapshot.text`
+ * character space — the space `PageGeometryRun.charStart` tiles and
+ * selection ranges live in, not string offsets into `PageTextSnapshot.text`
  * (engines convert match string-ranges through the snapshot's `charMap`
  * before building the hit; see engine-core `text/charmap.ts`). That is what
  * lets a match join the selection subsystem — select-this-match, markup
  * creation — with no re-mapping, and it means zero-width characters
  * adjacent to the matched text are never inside the range. Snippet offsets
- * are the one exception: they are string offsets INTERNAL to the snippet's
- * own `text`. `segments` are the CANONICAL visual-line segments (the same
+ * are the one exception: they are string offsets internal to the snippet's
+ * own `text`. `segments` are the canonical visual-line segments (the same
  * engine-core text layout selection uses) — a match highlights exactly like
  * a selection of the same characters, one oriented segment per visual line,
  * never per glyph. Each segment carries the exact quad, its AABB `rect`,

@@ -28,7 +28,7 @@ export interface AnnotationUpdateResult {
    *
    * /NM is monotonic per annotation:
    *   - if the annotation is already durable (has /NM or has objectNumber),
-   *     the engine NEVER touches /NM during update;
+   *     the engine never touches /NM during update;
    *   - if the annotation is weak, the engine always stamps a UUID v4.
    *
    * The /NM value is opaque to the engine. Callers that need a specific
@@ -66,7 +66,7 @@ export interface AnnotationDeleteResult {
  * `pages.move`). The single-annotation case is `move([ref], toIndex)`.
  *
  * Note on identity: any weak ref in the batch is opportunistically
- * upgraded to `kind: 'nm'` with an engine-stamped UUID v4 BEFORE the
+ * upgraded to `kind: 'nm'` with an engine-stamped UUID v4 before the
  * move happens, mirroring `update()`. So `moved[i].ref` may be stronger
  * than the corresponding input ref. Each `moved[i].index` reflects the
  * post-move index, which is exactly `toIndex + i`.
@@ -83,7 +83,7 @@ export interface AnnotationMoveResult {
    */
   moved: AnnotationDTO[];
   /**
-   * One structural envelope per batch. ONE revision bump, one impact
+   * One structural envelope per batch. One revision bump, one impact
    * computation, regardless of `refs.length`. `meta.changed` lists the
    * stable IDs of every moved annotation, in caller order.
    */

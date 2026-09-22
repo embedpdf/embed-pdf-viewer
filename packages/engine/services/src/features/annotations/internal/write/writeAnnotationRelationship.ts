@@ -30,7 +30,7 @@ export interface RelationshipWrite {
 /**
  * Apply the `/IRT` + `/RT` relationship to `annotPtr` on an
  * already-acquired `pagePtr`. Returns the parent's (possibly newly
- * strengthened) {@link AnnotationStableId} when a link was SET, so the
+ * strengthened) {@link AnnotationStableId} when a link was set, so the
  * mutator can report the side-effecting promotion in `meta.changed`;
  * `null` for the clear / RT-only / no-op cases.
  *
@@ -39,7 +39,7 @@ export interface RelationshipWrite {
  * non-structural — it assigns the parent an object number in place
  * without shifting any `/Annots` index — so it does not invalidate weak
  * refs or warrant a revision bump. We strengthen the parent with a
- * durable `/NM` BEFORE linking (via {@link captureOrStampStableId}) so its
+ * durable `/NM` before linking (via {@link captureOrStampStableId}) so its
  * identity survives a full save/reload, and report that id upstream.
  *
  * ISO 32000 §12.5.6.2 requires the reply and its parent to share a page;
@@ -73,7 +73,7 @@ export function writeAnnotationRelationship(
     }
     const parentPtr = resolveAnnotPtr(runtime, session, pagePtr, rel.inReplyTo);
     try {
-      // Strengthen BEFORE the link promotes the parent to indirect, so the
+      // Strengthen before the link promotes the parent to indirect, so the
       // reported id is the save-stable /NM rather than a renumberable objNum.
       const parentStableId = captureOrStampStableId(runtime, parentPtr);
       if (!fn.EPDFAnnot_SetLinkedAnnot(annotPtr, 'IRT', parentPtr)) {

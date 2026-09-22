@@ -28,14 +28,14 @@ export interface LocalEngineOptions {
   concurrency?: number;
   imageEncoder?: LocalImageEncoder;
   /**
-   * Deployment render policy for THIS engine instance — the local
+   * Deployment render policy for this engine instance — the local
    * counterpart of the lattice a cloud deployment advertises over
    * `/v1/access`, configured the same way permissions are overridden:
    * by the embedder, at construction. Advertised verbatim via
    * `doc.render.policy()`; a lattice's `maxRenderPixels` budget rides
    * into every worker render, and `enforced: true` rejects off-lattice
    * requests exactly like the enforcing server does. Default:
-   * `continuous` (render anything — v2 parity).
+   * `continuous` (render anything).
    */
   renderPolicy?: EngineRenderPolicy;
   /**
@@ -142,7 +142,7 @@ export class LocalEngine implements Engine {
     );
   }
 
-  /** A layer over a base FILE: PDFium range-reads the base from disk (Node runtimes only). */
+  /** A layer over a base file: PDFium range-reads the base from disk (Node runtimes only). */
   private openLayerFile(
     input: Extract<OpenInput, { kind: 'layerFile' }>,
     options?: OpenOptions,

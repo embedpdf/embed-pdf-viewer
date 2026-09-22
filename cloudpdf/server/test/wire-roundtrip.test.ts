@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 
-// SKIPPED: stale since the engine-core -> engine/core restructure broke the
+// Skipped: stale since the engine-core -> engine/core restructure broke the
 // import path and these stopped collecting; the render wire schema has since
 // drifted (9 assertions fail against current shapes). Revive against the
 // current wire contract in a dedicated pass.

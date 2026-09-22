@@ -1,64 +1,48 @@
-/** Design mode: fields and widgets are created, patched, deleted, attached
- *  and detached through `doc.forms`; the widget plane is nudged to re-read
- *  pages whose widget population changed. */
+/**
+ * Design mode: fields and widgets are created, patched, deleted, attached and
+ * detached through `doc.forms`. The fields and widget-geometry mirrors apply
+ * the confirmed results, and the annotation plugin applies the widget changes
+ * from the same events.
+ */
 import { PluginError } from '@embedpdf/core';
 import type {
   AnnotationRef,
   FormFieldDraft,
-  FormFieldPatch,
   FormFieldRef,
   PageRef,
-  PdfRect,
 } from '@embedpdf/engine-core/runtime';
 
 import type { CreatedField, CreateFieldInput, FormCapability } from '../contract';
-import { fieldByKey, type Box } from '../core/model';
+import type { Box } from '../model';
 import type { FormContext, FormServices } from '../services';
-import type { FormHydration } from '../sync/hydration';
 
 export function createFieldWrites(
   ctx: FormContext,
-  services: Pick<FormServices, 'store' | 'siblings' | 'enqueue'>,
-  hydration: FormHydration,
-  widgets: { pageBox(page: PageRef): Box | null },
+  services: Pick<FormServices, 'fields' | 'siblings' | 'enqueue'>,
+  widgets: { getPageBox(page: PageRef): Box | null },
 ) {
-  const { model, apply, keyOf } = services.store;
+  const { fields, enqueue } = services;
   const annotationHost = services.siblings.annotation;
-  const enqueueMutation = services.enqueue;
-  const { refresh } = hydration;
-  const { pageBox } = widgets;
+  const { getPageBox } = widgets;
 
-  const nudgeAnnotations = (pages: Iterable<PageRef>): void => {
-    if (!annotationHost) return;
-    const seen = new Set<number>();
-    for (const page of pages) {
-      if (seen.has(page.pageObjectNumber)) continue;
-      seen.add(page.pageObjectNumber);
-      void annotationHost.reloadPage(page);
-    }
-  };
-
-  /** Deterministic, collision-free auto-name: `text_1`, `text_2`, … counted
-   *  against the CURRENT snapshot (rename in the field panel). */
+  /** A deterministic, collision-free name: `text_1`, `text_2`, … against the current fields. */
   const autoName = (family: string): string => {
-    const names = new Set((model().snapshot?.fields ?? []).map((f) => f.name));
-    let n = 1;
-    while (names.has(`${family}_${n}`)) n++;
-    return `${family}_${n}`;
+    const names = new Set((fields.get().snapshot?.fields ?? []).map((field) => field.name));
+    let count = 1;
+    while (names.has(`${family}_${count}`)) count++;
+    return `${family}_${count}`;
   };
 
   const placeField = async (input: CreateFieldInput): Promise<CreatedField> => {
-    const doc = ctx.doc;
     const page = input.page;
-    const pon = page.pageObjectNumber;
     const space = ctx.geometry.tryForPage(page);
-    if (!doc || !space) {
-      throw new PluginError('not-ready', 'form', 'createField: document/page not ready');
+    const bounds = getPageBox(page);
+    if (!space || !bounds) {
+      throw new PluginError('not-ready', 'form', 'createField: the page is not laid out');
     }
     // Placement is page-bound: intersect a (possibly overshooting) drag box
-    // with the page. Sizing policy is the CALLER's job (the place handler's
-    // click policy / drag rect) — a degenerate result is a caller bug.
-    const bounds = pageBox(page)!;
+    // with the page. Sizing is the caller's job (the place handler's click
+    // policy or drag rectangle); a degenerate result is a caller bug.
     const x = Math.max(bounds.x, Math.min(input.bounds.x, bounds.width));
     const y = Math.max(bounds.y, Math.min(input.bounds.y, bounds.height));
     const box: Box = {
@@ -90,67 +74,44 @@ export function createFieldWrites(
               name,
               widget: placement,
               options: input.options
-                ? input.options.map((o) => ({ ...o }))
+                ? input.options.map((option) => ({ ...option }))
                 : [
                     { label: 'Option 1', value: 'Option 1' },
                     { label: 'Option 2', value: 'Option 2' },
                   ],
             }
           : { family, name, widget: placement };
-    const result = await doc.forms.createField(draft);
-    await refresh();
-    apply({ t: 'clearGeom', pageObjectNumber: pon });
-    // AWAIT the annotation-plane reload so the returned widget ref is already
-    // selectable — the caller's auto-select needs the model to know it.
-    if (annotationHost) await annotationHost.reloadPage(page);
-    const widget = result.field.widgets.find((w) => w.page?.pageObjectNumber === pon) ?? null;
+    const result = await ctx.doc.forms.createField(draft);
+    // Wait for the annotation plugin to read the new widget, so a caller can
+    // select it right away.
+    if (annotationHost) await annotationHost.whenSynced();
+    const widget =
+      result.field.widgets.find(
+        (candidate) => candidate.page?.pageObjectNumber === page.pageObjectNumber,
+      ) ?? null;
     return { field: result.field, widget };
   };
 
-  const patchField = async (ref: FormFieldRef, patch: FormFieldPatch): Promise<void> => {
-    const doc = ctx.doc;
-    if (!doc) return;
-    await doc.forms.updateField(ref, patch);
-    await refresh();
-  };
-
-  const removeField = async (ref: FormFieldRef): Promise<void> => {
-    const doc = ctx.doc;
-    if (!doc) return;
-    const field = fieldByKey(model(), keyOf(ref));
-    const pages = field?.widgets.flatMap((w) => (w.page ? [w.page] : [])) ?? [];
-    await doc.forms.deleteField(ref);
-    await refresh();
-    for (const pon of new Set(pages.map((p) => p.pageObjectNumber))) {
-      apply({ t: 'clearGeom', pageObjectNumber: pon });
-    }
-    nudgeAnnotations(pages);
-  };
-
-  const detachFromField = async (ref: FormFieldRef, widget: AnnotationRef): Promise<void> => {
-    const doc = ctx.doc;
-    if (!doc) return;
-    await doc.forms.detachWidget(ref, widget);
-    await refresh();
-    apply({ t: 'clearGeom', pageObjectNumber: widget.page.pageObjectNumber });
-    nudgeAnnotations([widget.page]);
-  };
-  const attachToField = async (ref: FormFieldRef, widget: AnnotationRef): Promise<void> => {
-    const doc = ctx.doc;
-    if (!doc) return;
-    await doc.forms.attachWidget(ref, widget);
-    await refresh();
-    apply({ t: 'clearGeom', pageObjectNumber: widget.page.pageObjectNumber });
-    nudgeAnnotations([widget.page]);
-  };
 
   return {
     api: {
-      createField: (input) => enqueueMutation(() => placeField(input)),
-      updateField: (ref, patch) => enqueueMutation(() => patchField(ref, patch)),
-      deleteField: (ref) => enqueueMutation(() => removeField(ref)),
-      detachWidget: (ref, widget) => enqueueMutation(() => detachFromField(ref, widget)),
-      attachWidget: (ref, widget) => enqueueMutation(() => attachToField(ref, widget)),
+      createField: (input) => enqueue(() => placeField(input)),
+      updateField: (ref, patch) =>
+        enqueue(async () => {
+          await ctx.doc.forms.updateField(ref, patch);
+        }),
+      deleteField: (ref) =>
+        enqueue(async () => {
+          await ctx.doc.forms.deleteField(ref);
+        }),
+      detachWidget: (ref, widget) =>
+        enqueue(async () => {
+          await ctx.doc.forms.detachWidget(ref, widget);
+        }),
+      attachWidget: (ref, widget) =>
+        enqueue(async () => {
+          await ctx.doc.forms.attachWidget(ref, widget);
+        }),
     } satisfies Partial<FormCapability>,
   };
 }

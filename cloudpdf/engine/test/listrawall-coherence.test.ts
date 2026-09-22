@@ -6,7 +6,7 @@ import { CloudDocumentHandle } from '../src/document/CloudDocumentHandle';
 /**
  * listRawAll coherence against a stubbed multi-page server:
  *
- *   - ONE bulk read of the immutable `annotations/items@annotationsVersion`
+ *   - one bulk read of the immutable `annotations/items@annotationsVersion`
  *     leaf at the manifest's pin, with the body-stamped `auditHead`;
  *   - a stale pin (concurrent mutation → 404) refreshes the manifest and
  *     retries the fresh leaf; an absorbed cacheDelta re-pins without any
@@ -40,14 +40,18 @@ interface Stub {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-function annotation(pon: number, index: number) {
+function annotation(pageObjectNumber: number, index: number) {
   return {
     subtype: 'unsupported',
-    ref: { kind: 'objectNumber', page: toPageRef(pon), annotObjectNumber: pon * 1000 + index },
-    page: toPageRef(pon),
+    ref: {
+      kind: 'objectNumber',
+      page: toPageRef(pageObjectNumber),
+      annotObjectNumber: pageObjectNumber * 1000 + index,
+    },
+    page: toPageRef(pageObjectNumber),
     index,
     identityQuality: 'durable',
-    nm: `stub-${pon}-${index}`,
+    nm: `stub-${pageObjectNumber}-${index}`,
     flags: {
       invisible: false,
       hidden: false,
@@ -74,10 +78,10 @@ function annotation(pon: number, index: number) {
   };
 }
 
-function pageState(pon: number) {
+function pageState(pageObjectNumber: number) {
   return {
-    page: toPageRef(pon),
-    revision: { docSessionId: 'stub-session', page: toPageRef(pon), generation: 0 },
+    page: toPageRef(pageObjectNumber),
+    revision: { docSessionId: 'stub-session', page: toPageRef(pageObjectNumber), generation: 0 },
     weakAnnotationState: { kind: 'known', hasAnyWeakAnnotations: false },
   };
 }
@@ -106,7 +110,9 @@ function buildStub(overrides: Partial<StubState> = {}): Stub {
   const state: StubState = {
     docVersion: 1,
     auditHead: 40,
-    annotationVersions: new Map(PAGE_OBJECT_NUMBERS.map((pon) => [pon, 1])),
+    annotationVersions: new Map(
+      PAGE_OBJECT_NUMBERS.map((pageObjectNumber) => [pageObjectNumber, 1]),
+    ),
     annotationsVersion: 1,
     ...overrides,
   };
@@ -150,9 +156,12 @@ function buildStub(overrides: Partial<StubState> = {}): Stub {
         annotationsVersion: state.annotationsVersion,
         auditHead: state.auditHead,
         baseSha: 'stub-sha',
-        pages: PAGE_OBJECT_NUMBERS.map((pon) => ({
-          state: pageState(pon),
-          cache: { contentVersion: 1, annotationVersion: state.annotationVersions.get(pon)! },
+        pages: PAGE_OBJECT_NUMBERS.map((pageObjectNumber) => ({
+          state: pageState(pageObjectNumber),
+          cache: {
+            contentVersion: 1,
+            annotationVersion: state.annotationVersions.get(pageObjectNumber)!,
+          },
         })),
       });
     }
@@ -163,9 +172,9 @@ function buildStub(overrides: Partial<StubState> = {}): Stub {
         return notFound('stale annotationsVersion');
       }
       return json({
-        pages: PAGE_OBJECT_NUMBERS.map((pon) => ({
-          pageState: pageState(pon),
-          annotations: [annotation(pon, 0)],
+        pages: PAGE_OBJECT_NUMBERS.map((pageObjectNumber) => ({
+          pageState: pageState(pageObjectNumber),
+          annotations: [annotation(pageObjectNumber, 0)],
         })),
         auditHead: state.auditHead,
       });
@@ -175,13 +184,14 @@ function buildStub(overrides: Partial<StubState> = {}): Stub {
       /\/annotations\/pages\/obj%3A(\d+)\/items@annotationVersion=(\d+)$/,
     );
     if (leafMatch) {
-      const pon = Number(leafMatch[1]);
+      const pageObjectNumber = Number(leafMatch[1]);
       const version = Number(leafMatch[2]);
-      if (!state.annotationVersions.has(pon)) return notFound('unknown page');
-      if (version !== state.annotationVersions.get(pon)) return notFound('stale annotationVersion');
+      if (!state.annotationVersions.has(pageObjectNumber)) return notFound('unknown page');
+      if (version !== state.annotationVersions.get(pageObjectNumber))
+        return notFound('stale annotationVersion');
       return json({
-        pageState: pageState(pon),
-        annotations: [annotation(pon, 0)],
+        pageState: pageState(pageObjectNumber),
+        annotations: [annotation(pageObjectNumber, 0)],
       });
     }
 
@@ -229,7 +239,7 @@ describe('listRawAll — one bulk read at the manifest pin', () => {
       expect(new Set(snap.pages.map((p) => p.pageState.page.pageObjectNumber))).toEqual(
         new Set(PAGE_OBJECT_NUMBERS),
       );
-      // Exactly ONE items request — the versioned bulk leaf; the per-page
+      // Exactly one items request — the versioned bulk leaf; the per-page
       // leaves are never touched.
       const itemCalls = fx.calls.filter((p) => p.includes('/items'));
       expect(itemCalls).toEqual([

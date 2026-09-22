@@ -23,8 +23,8 @@ const STUB_ENTRY = new URL('./stub-worker-entry.cjs', import.meta.url);
 export const REPLICA_SECRET = 'two-replica-secret';
 
 /**
- * The database side of a replica cluster. `setup` prepares ONE shared
- * database (schema + migrations); `connect` opens a NEW connection to it
+ * The database side of a replica cluster. `setup` prepares one shared
+ * database (schema + migrations); `connect` opens a new connection to it
  * for each replica — mirroring production, where every replica has its
  * own pool against the same Postgres.
  */
@@ -64,7 +64,7 @@ export function sqliteReplicaFactory(): ReplicaDbFactory {
 }
 
 /**
- * One "replica": a full AppBundle with its OWN worker pool, its own layer
+ * One "replica": a full AppBundle with its own worker pool, its own layer
  * sessions, and its own cache — sharing the SQLite file and the object
  * store with its siblings. This is exactly the production multi-replica
  * topology (shared Postgres + shared S3, private worker memory), scaled
@@ -91,7 +91,7 @@ export interface ReplicaCluster {
 }
 
 /**
- * Boot N replicas over ONE shared database (via the factory) + one shared
+ * Boot N replicas over one shared database (via the factory) + one shared
  * FsObjectStore — production's multi-replica topology (shared Postgres +
  * shared S3, private worker memory per replica), scaled to a temp dir.
  */
@@ -182,7 +182,7 @@ export async function makeReplicaCluster(
 /* ------------------------------------------------------------------ *
  *  Seams for deterministic failure/interleaving injection.
  *
- *  All three wrap PRIVATE members of a replica's live LayerService —
+ *  All three wrap private members of a replica's live LayerService —
  *  deliberate test pragmatism: the alternative is production-code test
  *  hooks, and these seams sit exactly at the boundaries the multi-replica
  *  invariants are about (worker-apply → artifact upload → commit tx).
@@ -193,7 +193,7 @@ interface UploadPatchable {
 }
 
 /**
- * Trap the replica's NEXT artifact upload: `held` resolves once the
+ * Trap the replica's next artifact upload: `held` resolves once the
  * mutation has been applied in the worker and is about to upload —
  * i.e. inside the dirty window, before any durable commit. `release()`
  * lets the write proceed. Subsequent uploads (e.g. a rebase re-run)
@@ -215,7 +215,7 @@ export function holdNextUpload(replica: Replica): { held: Promise<void>; release
   return { held, release: gateResolve };
 }
 
-/** Make the replica's NEXT artifact upload fail (post-apply, pre-commit). */
+/** Make the replica's next artifact upload fail (post-apply, pre-commit). */
 export function failNextUpload(replica: Replica, message = 'injected upload failure'): void {
   const svc = replica.bundle.layerService as unknown as UploadPatchable;
   const original = svc.uploadLayerArtifact.bind(svc);
@@ -230,7 +230,7 @@ interface AuditAppendPatchable {
 }
 
 /**
- * Trap the replica's NEXT audit append — which runs INSIDE the commit
+ * Trap the replica's next audit append — which runs inside the commit
  * transaction, after the version read and before the layers UPDATE. Two
  * replicas held here have both passed the version check at the same N:
  * releasing them makes the transactions genuinely overlap in the
@@ -259,7 +259,7 @@ export function holdNextAuditAppend(replica: Replica): {
 }
 
 /**
- * The artifact objects currently stored for one layer (committed AND
+ * The artifact objects currently stored for one layer (committed and
  * orphaned attempts) — the probe behind the "no orphan leak" assertions.
  */
 export async function listLayerArtifactObjects(
@@ -315,11 +315,11 @@ export interface AnnotationListBody {
 /** GET the annotation list for page `pon` through one replica's HTTP API. */
 export async function listAnnotations(
   replica: Replica,
-  input: { tenantId: string; docId: string; layerName: string; pon?: number },
+  input: { tenantId: string; docId: string; layerName: string; pageObjectNumber?: number },
 ): Promise<AnnotationListBody> {
-  const pon = input.pon ?? 1;
+  const pageObjectNumber = input.pageObjectNumber ?? 1;
   const res = await fetch(
-    `${replica.baseUrl}/v1/docs/${input.docId}/layers/${input.layerName}/annotations/pages/obj:${pon}/items`,
+    `${replica.baseUrl}/v1/docs/${input.docId}/layers/${input.layerName}/annotations/pages/obj:${pageObjectNumber}/items`,
     {
       headers: {
         Authorization: `Bearer ${docToken(input.tenantId, input.docId, input.layerName)}`,
@@ -335,11 +335,17 @@ export async function listAnnotations(
 /** POST an annotation create through one replica's HTTP API. */
 export async function createAnnotation(
   replica: Replica,
-  input: { tenantId: string; docId: string; layerName: string; pon?: number; contents: string },
+  input: {
+    tenantId: string;
+    docId: string;
+    layerName: string;
+    pageObjectNumber?: number;
+    contents: string;
+  },
 ): Promise<{ status: number; body: unknown }> {
-  const pon = input.pon ?? 1;
+  const pageObjectNumber = input.pageObjectNumber ?? 1;
   const res = await fetch(
-    `${replica.baseUrl}/v1/docs/${input.docId}/layers/${input.layerName}/annotations/pages/obj:${pon}/items`,
+    `${replica.baseUrl}/v1/docs/${input.docId}/layers/${input.layerName}/annotations/pages/obj:${pageObjectNumber}/items`,
     {
       method: 'POST',
       headers: {
@@ -360,14 +366,14 @@ export async function updateAnnotation(
     tenantId: string;
     docId: string;
     layerName: string;
-    pon?: number;
+    pageObjectNumber?: number;
     objectNumber: number;
     contents: string;
   },
 ): Promise<{ status: number; body: unknown }> {
-  const pon = input.pon ?? 1;
+  const pageObjectNumber = input.pageObjectNumber ?? 1;
   const res = await fetch(
-    `${replica.baseUrl}/v1/docs/${input.docId}/layers/${input.layerName}/annotations/pages/obj:${pon}/items/obj:${input.objectNumber}`,
+    `${replica.baseUrl}/v1/docs/${input.docId}/layers/${input.layerName}/annotations/pages/obj:${pageObjectNumber}/items/obj:${input.objectNumber}`,
     {
       method: 'PATCH',
       headers: {
@@ -385,11 +391,17 @@ export async function updateAnnotation(
 /** DELETE one annotation (by durable objectNumber key) through one replica. */
 export async function deleteAnnotation(
   replica: Replica,
-  input: { tenantId: string; docId: string; layerName: string; pon?: number; objectNumber: number },
+  input: {
+    tenantId: string;
+    docId: string;
+    layerName: string;
+    pageObjectNumber?: number;
+    objectNumber: number;
+  },
 ): Promise<{ status: number; body: unknown }> {
-  const pon = input.pon ?? 1;
+  const pageObjectNumber = input.pageObjectNumber ?? 1;
   const res = await fetch(
-    `${replica.baseUrl}/v1/docs/${input.docId}/layers/${input.layerName}/annotations/pages/obj:${pon}/items/obj:${input.objectNumber}`,
+    `${replica.baseUrl}/v1/docs/${input.docId}/layers/${input.layerName}/annotations/pages/obj:${pageObjectNumber}/items/obj:${input.objectNumber}`,
     {
       method: 'DELETE',
       headers: {
@@ -405,11 +417,17 @@ export async function deleteAnnotation(
  * Create with bounded client-side retries on 409 — the contract a real
  * client follows when the server exhausts its rebase budget under write
  * pressure (LayerVersionConflict is retryable by definition: the op was
- * NOT applied).
+ * not applied).
  */
 export async function createAnnotationWithRetry(
   replica: Replica,
-  input: { tenantId: string; docId: string; layerName: string; pon?: number; contents: string },
+  input: {
+    tenantId: string;
+    docId: string;
+    layerName: string;
+    pageObjectNumber?: number;
+    contents: string;
+  },
   maxRetries = 5,
 ): Promise<{ status: number; attempts: number; body: unknown }> {
   for (let attempt = 1; ; attempt++) {
@@ -422,7 +440,7 @@ export async function createAnnotationWithRetry(
 }
 
 /**
- * Parse the stub worker's v2 layer artifact ([0x4c, 0x02, ...utf8 JSON])
+ * Parse the stub worker's layer artifact, format 2 ([0x4c, 0x02, ...utf8 JSON])
  * back into its annotation records — the durable-truth probe used by the
  * lost-update assertions.
  */
@@ -437,7 +455,7 @@ export function parseStubArtifact(
   return parsed.annots;
 }
 
-/** Read the CURRENT layer artifact from shared storage and parse it. */
+/** Read the current layer artifact from shared storage and parse it. */
 export async function readCurrentArtifact(
   cluster: ReplicaCluster,
   docId: string,

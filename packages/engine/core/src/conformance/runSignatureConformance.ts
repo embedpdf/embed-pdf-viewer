@@ -41,12 +41,12 @@ export interface SignatureConformanceOptions {
 }
 
 /**
- * Digital signatures, read side. The service is OPTIONAL on the contract
+ * Digital signatures, read side. The service is optional on the contract
  * (`downloadLayer?` pattern) — the suite runs only where the engine
  * provides it.
  *
  * Invariants:
- *   1. Byte facts describe the LOADED bytes: a revision is a byte prefix,
+ *   1. Byte facts describe the loaded bytes: a revision is a byte prefix,
  *      a whole-revision signature seals exactly one, the digest over its
  *      `/ByteRange` is what the file's bytes hash to, and an unsaved edit
  *      changes none of it.
@@ -284,7 +284,7 @@ export function runSignatureConformance(
           expect(lock.signatureIndex).toBe(0);
           expect(lock.spec).toEqual({ action: 'include', fields: [fixture.lockedField] });
         }
-        // Filling in general is still allowed; THIS field is not.
+        // Filling in general is still allowed; this field is not.
         expect(doc.security.allows('doc.forms.fill')).toBe(true);
         let caught: unknown;
         try {
@@ -512,7 +512,7 @@ function runAnalysisTests(
   });
 }
 
-/** A minimal DER SEQUENCE standing in for a CMS: the engine's job ends at the bytes. */
+/** A minimal DER sequence standing in for a CMS: the engine's job ends at the bytes. */
 const FAKE_CMS = new Uint8Array([0x30, 0x06, 0x02, 0x01, 0x01, 0x02, 0x01, 0x02]);
 
 async function caughtCode(run: () => Promise<unknown>): Promise<string | null> {
@@ -670,7 +670,7 @@ function runSigningTests(
         expectedVersion: prepared.expectedVersion,
       });
       // The candidate is a layer over the session's own base fed the artifact a
-      // save would write: edits and signature land in ONE revision, as Acrobat
+      // save would write: edits and signature land in one revision, as Acrobat
       // saves a fill-and-sign. (A plain session freezes the edits first: two.)
       expect(result.signature.revisionIndex).toBe(1);
       const after = await doc.signatures!.list();

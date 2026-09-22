@@ -1,24 +1,24 @@
 /**
- * Anchored overlays — ONE primitive for every piece of UI that floats over
+ * Anchored overlays — one primitive for every piece of UI that floats over
  * page content (selection menus, draft menus, future popovers).
  *
  * The factoring:
- *   - PLUGINS produce anchors (a content-space rect on a page, plus points
+ *   - plugins produce anchors (a content-space rect on a page, plus points
  *     to dodge) as capability reads.
- *   - The projection SNAPSHOT contract and the placement math are shared,
+ *   - The projection snapshot contract and the placement math are shared,
  *     framework-neutral, in `@embedpdf/web` ({@link ViewProjector},
  *     `projectAnchoredTarget`).
- *   - SURFACES (<Stage>, <PageView>) provide a {@link ProjectorBinding}:
- *     the snapshot plus REACT's way of knowing when it changed.
+ *   - surfaces (<Stage>, <PageView>) provide a {@link ProjectorBinding}:
+ *     the snapshot plus react's way of knowing when it changed.
  *   - <Anchored> renders at the projected position, isolates pointer
  *     events, and portals when the space demands it.
  *
- * THE SCHEDULING LAW (this is what keeps menus glued to the content): a
+ * The scheduling law (this is what keeps menus glued to the content): a
  * state-driven projection change (the Stage camera) reaches consumers as a
- * NEW BINDING IDENTITY through context — surface and overlay re-render in
- * the SAME React commit, so they can never paint a frame apart. No
+ * new binding identity through context — surface and overlay re-render in
+ * the same React commit, so they can never paint a frame apart. No
  * listener sets, no post-commit notifications, no second menu-only render.
- * `subscribe` exists ONLY for genuinely browser-driven invalidation (a
+ * `subscribe` exists only for genuinely browser-driven invalidation (a
  * PageView moving because the document scrolled), where no state change
  * announces the move.
  */
@@ -42,14 +42,14 @@ export interface ProjectorBinding {
   projector: ViewProjector;
   /**
    * Changes identity exactly when projection may have changed for
-   * STATE-driven reasons — the Stage uses its `visiblePages()` value (a
+   * state-driven reasons — the Stage uses its `visiblePages()` value (a
    * stable reference that already folds camera, viewport, scene and DPR).
    * Consumers re-render because the binding's identity changes with it;
    * nothing reads this field, but it is what makes the memoized binding
    * change, so do not "optimize" it away.
    */
   revision: unknown;
-  /** Browser-driven invalidation ONLY (PageView scroll/resize — see
+  /** Browser-driven invalidation only (PageView scroll/resize — see
    *  `observeClientGeometry`). The Stage deliberately provides none. */
   subscribe?: (callback: () => void) => () => void;
 }
@@ -66,7 +66,7 @@ export function useOptionalProjectorBinding(): ProjectorBinding | null {
 }
 
 /** The surface's projector binding. Reading it subscribes the caller to
- *  projection changes (the binding's identity IS the revision). */
+ *  projection changes (the binding's identity is the revision). */
 export function useProjectorBinding(): ProjectorBinding {
   const binding = useContext(ProjectorContext);
   if (!binding) {
@@ -109,11 +109,11 @@ export function Anchored({ anchor, placement = 'top', gap = 8, children }: Ancho
 
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const stop = (e: Event) => e.stopPropagation();
-    el.addEventListener('pointerdown', stop);
-    return () => el.removeEventListener('pointerdown', stop);
+    const element = ref.current;
+    if (!element) return;
+    const stop = (event: Event) => event.stopPropagation();
+    element.addEventListener('pointerdown', stop);
+    return () => element.removeEventListener('pointerdown', stop);
   });
 
   if (!anchor) return null;

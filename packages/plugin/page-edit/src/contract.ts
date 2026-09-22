@@ -44,7 +44,14 @@ export interface PageEditCapability {
    */
   canEdit(): boolean;
 
-  /** Rotate pages by a relative quarter- or half-turn; each page's own rotation is read first. */
+  /**
+   * Rotate pages by a relative quarter- or half-turn; each page's own
+   * rotation is read first. Pages are grouped by their resulting absolute
+   * rotation and each group is one engine call, in order. Resolves with the
+   * last group's result only: its `layout` is the whole page list after every
+   * group, and its `cache` belongs to that last call. Rejects `not-found` for
+   * a page the document does not have and `invalid-input` for no pages.
+   */
   rotateBy(
     pages: readonly PageRef[],
     delta: 90 | -90 | 180,

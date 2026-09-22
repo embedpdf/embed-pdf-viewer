@@ -4,19 +4,19 @@
  * its group's disclosure, part of a collapsed group, or the overflow menu.
  *
  * Deterministic degradation policy, applied while over budget:
- *   1. among all available steps, take the one owned by the LOWEST-importance
+ *   1. among all available steps, take the one owned by the lowest-importance
  *      unit/group; ties prefer variant < shed < group-collapse < overflow;
- *      remaining ties degrade the RIGHTMOST first (end of bar yields first).
+ *      remaining ties degrade the rightmost first (end of bar yields first).
  *   2. a unit's variant steps run out before it may shed or overflow.
- *   3. a `shed` group moves children (at the CHILD's importance) into a
- *      group-local disclosure, but never below ONE visible child — the floor.
+ *   3. a `shed` group moves children (at the child's importance) into a
+ *      group-local disclosure, but never below one visible child — the floor.
  *   4. a group with `collapse` collapses only after every child sits on its
- *      last variant AND shedding (if enabled) has hit its floor; once
- *      collapsed it degrades further as ONE unit (the whole group overflows
- *      together — a select can't half-overflow). A shed group WITHOUT
+ *      last variant and shedding (if enabled) has hit its floor; once
+ *      collapsed it degrades further as one unit (the whole group overflows
+ *      together — a select can't half-overflow). A shed group without
  *      `collapse` overflows whole at the floor instead.
  *   5. pinned (importance 5) units/groups may degrade variants but never
- *      shed, collapse away, or overflow. Everything else can ALWAYS reach the
+ *      shed, collapse away, or overflow. Everything else can always reach the
  *      overflow menu, so any bar fits any width whose pinned floor fits.
  *
  * So the full group ladder mirrors the item ladder:
@@ -25,7 +25,7 @@
  *
  * The overflow trigger occupies space only when something overflowed: solve
  * once without it; if anything overflowed, solve again with the trigger's
- * width reserved (a smaller budget can only overflow MORE, so two passes
+ * width reserved (a smaller budget can only overflow more, so two passes
  * reach the fixpoint). A group's disclosure trigger is budgeted the same way,
  * inside `measure`, whenever that group has shed children.
  *
@@ -117,17 +117,17 @@ function buildState(bar: NormalizedBar): GroupState[] {
   const groups: GroupState[] = [];
   let position = 0;
   for (const section of bar.sections) {
-    for (const g of section.groups) {
+    for (const group of section.groups) {
       const gs: GroupState = {
-        group: g,
+        group: group,
         section: section.name,
         collapsed: false,
         overflowed: false,
         units: [],
       };
-      for (const u of g.units) {
+      for (const unit of group.units) {
         gs.units.push({
-          unit: u,
+          unit: unit,
           group: gs,
           variantIndex: 0,
           shed: false,
@@ -173,7 +173,7 @@ function nextStep(groups: GroupState[]): Step | null {
     }
 
     let childrenExhausted = true;
-    const visibleCount = gs.units.filter((u) => !u.overflowed && !u.shed).length;
+    const visibleCount = gs.units.filter((unit) => !unit.overflowed && !unit.shed).length;
     for (const us of gs.units) {
       if (us.overflowed || us.shed) continue;
       if (us.variantIndex < us.unit.variants.length - 1) {
@@ -195,7 +195,7 @@ function nextStep(groups: GroupState[]): Step | null {
             unit: us,
           });
         } else if (!gs.group.shed && !gs.group.collapse) {
-          // Plain group: children go to the GLOBAL overflow individually.
+          // Plain group: children go to the global overflow individually.
           consider({
             type: 'overflow-unit',
             importance: us.unit.importance,
@@ -207,7 +207,7 @@ function nextStep(groups: GroupState[]): Step | null {
     }
 
     // Stage 2 (terminal for the expanded form): available only once variants
-    // are exhausted AND shedding — if enabled — sits at its floor.
+    // are exhausted and shedding — if enabled — sits at its floor.
     const shedExhausted = !gs.group.shed || visibleCount <= 1;
     if (childrenExhausted && shedExhausted && gs.group.importance < PINNED) {
       if (gs.group.collapse) {
@@ -218,7 +218,7 @@ function nextStep(groups: GroupState[]): Step | null {
           group: gs,
         });
       } else if (gs.group.shed) {
-        // Shed group without a collapsed form: at the floor the WHOLE group
+        // Shed group without a collapsed form: at the floor the whole group
         // (visible + shed children) moves to the global overflow together.
         consider({
           type: 'overflow-group',
@@ -245,12 +245,12 @@ function applyStep(step: Step): void {
       return;
     case 'overflow-unit': {
       step.unit.overflowed = true;
-      if (step.unit.group.units.every((u) => u.overflowed)) step.unit.group.overflowed = true;
+      if (step.unit.group.units.every((unit) => unit.overflowed)) step.unit.group.overflowed = true;
       return;
     }
     case 'overflow-group': {
       step.group.overflowed = true;
-      for (const u of step.group.units) u.overflowed = true;
+      for (const unit of step.group.units) unit.overflowed = true;
       return;
     }
   }
@@ -263,7 +263,7 @@ interface Measured {
 
 /**
  * Visible width of the current assignment: unit widths + gaps + derived
- * separators. Gaps are counted between ALL adjacent visible units, including
+ * separators. Gaps are counted between all adjacent visible units, including
  * across section boundaries — deliberately conservative: the adapter's layout
  * spaces sections with collapsing auto margins, so the cross-section gap
  * allowance (≤ 2×gap) is slack those margins absorb, never an overlap risk.
@@ -279,9 +279,9 @@ function measure(groups: GroupState[], metrics: FitMetrics, hasTrigger: boolean)
   for (const gs of groups) {
     if (gs.overflowed) continue;
     if (gs.collapsed) {
-      const w = metrics.groupCollapsed(gs.group.id);
-      if (w === undefined) complete = false;
-      width += w ?? 0;
+      const collapsedWidth = metrics.groupCollapsed(gs.group.id);
+      if (collapsedWidth === undefined) complete = false;
+      width += collapsedWidth ?? 0;
       visibleUnits += 1;
       visibleBySection.set(gs.section, (visibleBySection.get(gs.section) ?? 0) + 1);
       continue;
@@ -294,17 +294,17 @@ function measure(groups: GroupState[], metrics: FitMetrics, hasTrigger: boolean)
         shedCount += 1;
         continue;
       }
-      const w = metrics.unit(us.unit.key, us.unit.variants[us.variantIndex]);
-      if (w === undefined) complete = false;
-      width += w ?? 0;
+      const unitWidth = metrics.unit(us.unit.key, us.unit.variants[us.variantIndex]);
+      if (unitWidth === undefined) complete = false;
+      width += unitWidth ?? 0;
       visibleUnits += 1;
       groupVisible = true;
     }
     if (shedCount > 0) {
       // The group's disclosure trigger takes real space, like any unit.
-      const w = metrics.groupTrigger(gs.group.id);
-      if (w === undefined) complete = false;
-      width += w ?? 0;
+      const triggerWidth = metrics.groupTrigger(gs.group.id);
+      if (triggerWidth === undefined) complete = false;
+      width += triggerWidth ?? 0;
       visibleUnits += 1;
       groupVisible = true;
     }
@@ -323,7 +323,7 @@ function measure(groups: GroupState[], metrics: FitMetrics, hasTrigger: boolean)
 }
 
 function anyOverflow(groups: GroupState[]): boolean {
-  return groups.some((gs) => gs.units.some((u) => u.overflowed));
+  return groups.some((gs) => gs.units.some((unit) => unit.overflowed));
 }
 
 function solvePass(
@@ -356,9 +356,11 @@ export function solve(bar: NormalizedBar, metrics: FitMetrics, containerWidth: n
   const units = new Map<string, UnitAssignment>();
   const groupAssignments = new Map<string, GroupAssignment>();
   for (const gs of pass.groups) {
-    // Overflow ≻ collapsed ≻ shed: a group that shed a few children and THEN
+    // Overflow ≻ collapsed ≻ shed: a group that shed a few children and then
     // collapsed (or overflowed) subsumes them into the later, stronger state.
-    const shedCount = gs.units.filter((u) => u.shed && !u.overflowed && !gs.collapsed).length;
+    const shedCount = gs.units.filter(
+      (unit) => unit.shed && !unit.overflowed && !gs.collapsed,
+    ).length;
     groupAssignments.set(gs.group.id, {
       shedCount,
       collapsed: gs.collapsed,

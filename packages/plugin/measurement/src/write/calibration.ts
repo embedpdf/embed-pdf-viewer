@@ -4,6 +4,7 @@ import type { Point } from '@embedpdf/core-geometry';
 import { measurementPoint } from '@embedpdf/engine-core/runtime';
 
 import type { MeasurementCapability } from '../contract';
+import { setCalibration } from '../model';
 import type { MeasurementContext, MeasurementServices } from '../services';
 
 export function createCalibration(
@@ -11,45 +12,41 @@ export function createCalibration(
   { events, store, siblings }: Pick<MeasurementServices, 'events' | 'store' | 'siblings'>,
 ) {
   const { calibrationRequested, calibrationDismissed } = events;
-  const { state, canCalibrate, toPage } = store;
+  const { canCalibrate, toPage } = store;
   const { annotation, interaction } = siblings;
 
   const startCalibration = (): void => {
     if (!canCalibrate()) return;
-    ctx.dispatch({ type: 'CALIBRATION', request: null });
+    ctx.state.update(setCalibration, null);
     interaction.activateTool('calibrate');
   };
   const dismissCalibration = (): void => {
-    if (!state().calibration) return;
-    ctx.dispatch({ type: 'CALIBRATION', request: null });
+    if (!ctx.state.get().calibration) return;
+    ctx.state.update(setCalibration, null);
     calibrationDismissed.emit({});
   };
 
   /** A distance draft from the calibrate tool becomes the pending request. */
   const connect = (): void => {
-    const doc = ctx.doc;
-    if (!doc) return;
-    ctx.cleanup(
-      annotation.onDraftCaptured((draft) => {
-        if (draft.tool !== 'calibrate' || !doc.security.allows('doc.annotate.modify')) return;
-        const a = measurementPoint(draft.from);
-        const b = measurementPoint(draft.to);
-        const userSpaceLength = Math.hypot(b.x - a.x, b.y - a.y);
-        if (!(userSpaceLength > 0)) return;
-        let from: Point;
-        let to: Point;
-        try {
-          from = toPage(draft.page, a);
-          to = toPage(draft.page, b);
-        } catch {
-          return; // the page left the registry mid-drag
-        }
-        const request = { page: draft.page, from, to, userSpaceLength };
-        interaction.activateTool('pointer');
-        ctx.dispatch({ type: 'CALIBRATION', request });
-        calibrationRequested.emit({ request });
-      }),
-    );
+    ctx.listen(annotation.onDraftCaptured, (draft) => {
+      if (draft.tool !== 'calibrate' || !canCalibrate()) return;
+      const start = measurementPoint(draft.from);
+      const end = measurementPoint(draft.to);
+      const userSpaceLength = Math.hypot(end.x - start.x, end.y - start.y);
+      if (!(userSpaceLength > 0)) return;
+      let from: Point;
+      let to: Point;
+      try {
+        from = toPage(draft.page, start);
+        to = toPage(draft.page, end);
+      } catch {
+        return; // the page left the registry mid-drag
+      }
+      const request = { page: draft.page, from, to, userSpaceLength };
+      interaction.activateTool('pointer');
+      ctx.state.update(setCalibration, request);
+      calibrationRequested.emit({ request });
+    });
   };
 
   return {

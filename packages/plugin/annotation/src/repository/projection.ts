@@ -1,4 +1,4 @@
-import { geomRotation, type Annot, type PropKey } from '@embedpdf/core-annotation';
+import { geomRotation, type ModelAnnotation, type PropKey } from '@embedpdf/core-annotation';
 import type { AnnotationDTO, PdfRect } from '@embedpdf/engine-core/runtime';
 
 import { boxGeomFields } from './seam';
@@ -9,12 +9,12 @@ export type Wire = Record<string, unknown>;
 
 /** The kind-specific slice a DTO ingest contributes on top of the generic
  *  base (id/ref/flags/relationships) that `fromDTO` builds for every kind. */
-export type IngestSlice = { geom: Annot['geom'] } & Partial<
-  Pick<Annot, 'text' | 'icon' | 'label' | 'link' | 'intent' | 'measure'>
+export type IngestSlice = { geometry: ModelAnnotation['geometry'] } & Partial<
+  Pick<ModelAnnotation, 'text' | 'icon' | 'label' | 'link' | 'intent' | 'measure'>
 >;
 
 /**
- * ONE declaration per kind family; every wire statement shape derives from it
+ * One declaration per kind family; every wire statement shape derives from it
  * (see `repository/index.ts`):
  *
  *   full patch    =  geometry(a)  ∪  props(a, every key the kind declares)
@@ -36,20 +36,23 @@ export interface KindProjection {
    * leader group, advisory rotation). `null` = the kind has no editable
    * geometry (text markup) — geometry statements fall back to the full patch.
    */
-  geometry(a: Annot, crop: PdfRect): Wire | null;
-  /** Kind-specific prop lowerings — ONLY the exceptions; `props.ts` GENERIC
+  geometry(annotation: ModelAnnotation, crop: PdfRect): Wire | null;
+  /** Kind-specific prop lowerings — only the exceptions; `props.ts` generic
    *  covers every 1:1 key. A kind's couplings live here, in its owner's file. */
-  prop?: Partial<Record<PropKey, (a: Annot, crop: PdfRect) => Wire>>;
+  prop?: Partial<Record<PropKey, (annotation: ModelAnnotation, crop: PdfRect) => Wire>>;
   /** Create-only statement extras (intent, quadPoints, contents seeds…). */
-  draftExtras?(a: Annot, crop: PdfRect): Wire | null;
-  /** Kinds whose creates do NOT go through the repository (stamps carry a
+  draftExtras?(annotation: ModelAnnotation, crop: PdfRect): Wire | null;
+  /** Kinds whose creates do not go through the repository (stamps carry a
    *  binary source and use their own create path; widgets are form-plane). */
   createable?: false;
 }
 
 /** Box-kind geometry emission: the model's unrotated `rect` + applied tilt →
  *  `/Rect`(+`unrotatedRect`+`rotation`), total (nulls state the clears). */
-export const boxEmit = (a: Annot, crop: PdfRect): Wire => {
-  const g = a.geom as Extract<Annot['geom'], { t: 'rect' } | { t: 'text' }>;
-  return boxGeomFields(g.rect, geomRotation(a.geom), crop);
+export const boxEmit = (annotation: ModelAnnotation, crop: PdfRect): Wire => {
+  const boxGeometry = annotation.geometry as Extract<
+    ModelAnnotation['geometry'],
+    { kind: 'rect' } | { kind: 'text' }
+  >;
+  return boxGeomFields(boxGeometry.rect, geomRotation(annotation.geometry), crop);
 };

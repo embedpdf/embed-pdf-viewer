@@ -17,7 +17,7 @@ interface RemarkCodeExampleOptions {
 /**
  * Remark plugin that processes <CodeExample> components, reading the referenced
  * source files from disk so they can be highlighted and displayed — and the
- * shared-corpus `<Example name="topic/base">`, resolving EVERY framework's
+ * shared-corpus `<Example name="topic/base">`, resolving every framework's
  * files so the client picks by pathname (the fan-out routes).
  *
  * Usage:

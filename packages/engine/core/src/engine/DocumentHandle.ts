@@ -48,7 +48,7 @@ export interface DocumentHandle {
    */
   readonly fonts?: DocumentFontSettings;
   /**
-   * CATALOG-level `/PieceInfo` private application data (ISO 32000 §14.5)
+   * Catalog-level `/PieceInfo` private application data (ISO 32000 §14.5)
    * — e.g. a stamp library's display name. Optional: the local engine
    * implements it; the cloud engine omits it until a cloud consumer ships
    * (the `downloadLayer?` pattern). Per-page piece data lives on
@@ -58,7 +58,7 @@ export interface DocumentHandle {
   /** Document text search: budgeted, cursor-resumable slices. */
   readonly search: DocumentSearchService;
   /**
-   * Render POLICY surface (`doc.render.policy()`): the engine's render
+   * Render policy surface (`doc.render.policy()`): the engine's render
    * lattice, or `continuous` on engines that render any viewport exactly
    * (the local engine). Pixels stay on `page(pon).render` — this carries
    * policy only. Conformance is explicit via `snapFullPageViewport`; no
@@ -114,7 +114,7 @@ export interface DocumentHandle {
    */
   version?(): AbortablePromise<BaseVersionInfo>;
   /**
-   * Export JUST this document's LAYER as a self-contained artifact (the small
+   * Export just this document's layer as a self-contained artifact (the small
    * overlay diff over the immutable base) — re-openable later via
    * `OpenInputLayerBytes` with `{ kind: 'artifact', bytes }`. Optional: the
    * local engine supports it for every session it opens as a layer (the

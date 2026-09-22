@@ -23,11 +23,11 @@ export interface PageGeometryGlyph {
 
 /**
  * One non-upright glyph's geometry: the exact oriented cells, in PDF user
- * space (page coordinates — NOT a local frame). The corner SLOTS are
+ * space (page coordinates — not a local frame). The corner slots are
  * frame-geometric in the glyph's own upright frame:
  * `p1` = upper-start, `p2` = upper-end, `p3` = lower-start, `p4` = lower-end,
  * where "upper" is the ascent side and "start" is the frame's minimum-x side.
- * Deliberately NOT a bidi/reading-order statement — advance direction is a
+ * Deliberately not a bidi/reading-order statement — advance direction is a
  * glyph-sequence concern, carried separately where consumers need it.
  *
  * Degenerate glyphs carry a zeroed `looseQuad` plus the empty flag (bit 2),
@@ -52,7 +52,7 @@ export interface UprightGeometryRun {
 }
 
 /**
- * A run whose char matrix is NOT upright (rotated, sheared, or mirrored).
+ * A run whose char matrix is not upright (rotated, sheared, or mirrored).
  *
  * `rect` stays a page-space AABB (culling), like every other wire rect.
  * `rotation` is the baseline angle in radians, CCW in PDF y-up space
@@ -73,7 +73,7 @@ export interface RotatedGeometryRun {
 
 /**
  * One text run (contiguous glyphs sharing a text object and orientation).
- * A discriminated union so consumers CANNOT read axis-aligned boxes off
+ * A discriminated union so consumers cannot read axis-aligned boxes off
  * rotated text by accident — handling orientation is a compile-time
  * obligation, not a runtime discovery. Narrow with
  * {@link isRotatedGeometryRun}, or use the uniform {@link glyphLooseQuad} /
@@ -82,10 +82,10 @@ export interface RotatedGeometryRun {
 export type PageGeometryRun = UprightGeometryRun | RotatedGeometryRun;
 
 /**
- * Geometry-only text layout for one page, in PDF user space (y-up). The v3
+ * Geometry-only text layout for one page, in PDF user space (y-up). The
  * viewer converts to content/view space via the page geometry matrix.
  *
- * Pure content, addressed and cached by `contentVersion`. Carries NO
+ * Pure content, addressed and cached by `contentVersion`. Carries no
  * annotation liveness envelope (`PageState`) — see `PageTextSnapshot` for
  * the rationale; liveness lives on annotation reads.
  */
@@ -119,7 +119,7 @@ export function glyphLooseQuad(run: PageGeometryRun, index: number): PdfQuad {
  * enclosing bounds of its oriented cell when the run is rotated. The
  * conservative envelope for consumers that genuinely want a box (culling,
  * scroll targets) — never a substitute for handling orientation in geometry
- * that gets DRAWN.
+ * that gets drawn.
  */
 export function glyphLooseBounds(run: PageGeometryRun, index: number): PdfRect {
   if (isRotatedGeometryRun(run)) return pdfQuadBounds(run.glyphs[index].looseQuad);

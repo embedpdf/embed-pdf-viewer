@@ -27,14 +27,14 @@ export function toArrayBuffer(view: Uint8Array): ArrayBuffer {
   return copy.buffer;
 }
 
-export function bytesEqual(a: Uint8Array, b: Uint8Array): boolean {
-  if (a.byteLength !== b.byteLength) return false;
-  for (let i = 0; i < a.byteLength; i++) if (a[i] !== b[i]) return false;
+export function bytesEqual(left: Uint8Array, right: Uint8Array): boolean {
+  if (left.byteLength !== right.byteLength) return false;
+  for (let i = 0; i < left.byteLength; i++) if (left[i] !== right[i]) return false;
   return true;
 }
 
 export function toHex(bytes: Uint8Array): string {
   let out = '';
-  for (const b of bytes) out += b.toString(16).padStart(2, '0');
+  for (const byte of bytes) out += byte.toString(16).padStart(2, '0');
   return out;
 }

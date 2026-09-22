@@ -197,7 +197,7 @@ export function readRectangleDifferences(
 /**
  * Read the `/Vertices` point list of a polygon/polyline annotation via
  * the two-call `FPDFAnnot_GetVertices` pattern (probe for the count with
- * a NULL buffer, then read into a `count * FS_POINTF` buffer). Returns an
+ * a null buffer, then read into a `count * FS_POINTF` buffer). Returns an
  * empty array when the annotation has no vertices.
  */
 export function readVertices(fn: PdfFunctions, mem: PdfRuntimeMemory, annotPtr: Ptr): PdfPoint[] {
@@ -218,7 +218,7 @@ export function readVertices(fn: PdfFunctions, mem: PdfRuntimeMemory, annotPtr: 
 /**
  * Read the `/InkList` of an ink annotation. `FPDFAnnot_GetInkListCount`
  * gives the number of strokes; each stroke is sized with a probe call to
- * `FPDFAnnot_GetInkListPath` (NULL buffer) and then read into a
+ * `FPDFAnnot_GetInkListPath` (null buffer) and then read into a
  * `count * FS_POINTF` buffer. Empty strokes are skipped; the result is an
  * array of non-empty point paths.
  */
@@ -404,7 +404,7 @@ export function readQuadPoints(fn: PdfFunctions, mem: PdfRuntimeMemory, annotPtr
       if (!fn.FPDFAnnot_GetAttachmentPoints(annotPtr, i, buf)) continue;
       const f = (off: number) => readF32(mem, buf, off);
       // Positional, in PDFium FS_QUADPOINTSF slot order (PDF 32000 12.5.6.10):
-      // { x1,y1, x2,y2, x3,y3, x4,y4 } -> p1 p2 p3 p4. We do NOT relabel these
+      // { x1,y1, x2,y2, x3,y3, x4,y4 } -> p1 p2 p3 p4. We do not relabel these
       // as named corners: PdfQuad asserts no corner semantics (see its docs).
       out.push({
         p1: { x: f(0), y: f(4) },

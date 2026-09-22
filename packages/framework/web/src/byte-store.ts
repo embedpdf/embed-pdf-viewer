@@ -22,9 +22,9 @@ export interface IndexedDbByteStoreOptions {
 /** Open (creating on first use) one IndexedDB object store keyed by id. */
 export function indexedDbByteStore(
   dbName: string,
-  opts: IndexedDbByteStoreOptions = {},
+  options: IndexedDbByteStoreOptions = {},
 ): ByteStore {
-  const storeName = opts.storeName ?? 'bytes';
+  const storeName = options.storeName ?? 'bytes';
   const open = (): Promise<IDBDatabase> =>
     new Promise((resolve, reject) => {
       const request = indexedDB.open(dbName, 1);

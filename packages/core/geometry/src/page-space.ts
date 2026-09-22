@@ -79,10 +79,10 @@ export function pageSpace(crop: PdfEdges): PageSpace {
 
 /** Positive-area overlap of two PDF rects given by their edges — the engine's
  *  collateral rule (a redaction touches what it overlaps, not what it abuts). */
-export function edgesOverlap(a: PdfEdges, b: PdfEdges): boolean {
+export function edgesOverlap(left: PdfEdges, right: PdfEdges): boolean {
   return (
-    Math.min(a.right, b.right) > Math.max(a.left, b.left) &&
-    Math.min(a.top, b.top) > Math.max(a.bottom, b.bottom)
+    Math.min(left.right, right.right) > Math.max(left.left, right.left) &&
+    Math.min(left.top, right.top) > Math.max(left.bottom, right.bottom)
   );
 }
 

@@ -11,7 +11,8 @@ import type {
 /**
  * Bumped whenever the derivation below (or a judgement rule) changes meaning.
  * Rides every protection and every analysis, and keys the cloud's immutable
- * analysis URLs. v4 (the `signature-compat` corpus, 91 Acrobat observations):
+ * analysis URLs. The current policy is calibrated on the 91 Acrobat
+ * observations in `packages/engine/main/test/fixtures/signature-compat`:
  * each signature is judged on the net state of the document against the
  * revision it sealed; an object written again with the sealed value is not
  * a modification; an approval signature permits commenting; field
@@ -25,8 +26,8 @@ export const SIGNATURE_POLICY_VERSION = 4;
  * changes only for certification signatures; Acrobat reads an approval
  * signature as "Form Fill-in, Signing and Commenting are allowed" (its own
  * permission text under every such signature) and keeps it valid through a
- * Square annotation added, deleted or recoloured afterwards (corpus
- * `signature-compat` v3 cases 88, 90, 91: "Annotations Created/Deleted/
+ * Square annotation added, deleted or recoloured afterwards (fixtures
+ * `signature-compat/v3/88`, `/90` and `/91`: "Annotations Created/Deleted/
  * Modified", signature valid). pyHanko judges stricter (fill only); Acrobat
  * is the validator recipients use, so the baseline is `annotate`.
  */
@@ -79,7 +80,7 @@ export function lockCovers(spec: FieldLockSpec, fieldName: string): boolean {
  *              did allow annotations.
  *   fieldLocks = every signed signature's FieldMDP and the /Lock of every
  *              signed field. Unsigned fields' /Lock entries describe a
- *              FUTURE signature and lock nothing yet.
+ *              future signature and lock nothing yet.
  */
 export function deriveProtection(signatures: ReadonlyArray<SignatureDTO>): DocumentProtection {
   let signed = false;
@@ -124,12 +125,12 @@ export function fieldLockFor(
  * The capabilities a protection removes from every caller, admin scope
  * included — document-derived authority, exactly like encryption bits.
  *
- * Only what was DECLARED is refused: a refusal is a promise a signer made,
+ * Only what was declared is refused: a refusal is a promise a signer made,
  * never a guess about a validator. A certification (or a lock with /P)
  * declares what may follow, and everything outside that — page edits,
  * redaction, field authoring, attachments, and below P=3 annotations, below
  * P=2 form fill — is refused. A plain approval signature declares nothing:
- * the same edits stay possible and are then JUDGED, the verdict saying the
+ * the same edits stay possible and are then judged, the verdict saying the
  * signature no longer holds, exactly as Acrobat does. The one exception is a
  * rewrite: it does not invalidate signatures, it erases them, so any signed
  * document refuses it. Per-field locks are enforced by the form mutator.

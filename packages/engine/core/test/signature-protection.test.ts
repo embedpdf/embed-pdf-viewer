@@ -31,8 +31,8 @@ const sig = (over: Partial<SignatureDTO>): SignatureDTO => ({
 });
 
 /**
- * Two answers, not one: what a signer DECLARED (enforced) and what a
- * validator JUDGES later changes against. An approval signature declares
+ * Two answers, not one: what a signer declared (enforced) and what a
+ * validator judges later changes against. An approval signature declares
  * nothing and is judged at the baseline; a declaration governs both.
  */
 describe('deriveProtection: enforced vs judged', () => {

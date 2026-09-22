@@ -1,5 +1,5 @@
 /**
- * Cloud-only coherence pins returned by every page-STRUCTURE mutation (move,
+ * Cloud-only coherence pins returned by every page-structure mutation (move,
  * rotate, delete) so a cached manifest can advance without a refetch. All
  * structure ops share one shape: they bump the manifest `docVersion` and the
  * geometry pointer `layoutVersion`, and touch no per-page content/annotation

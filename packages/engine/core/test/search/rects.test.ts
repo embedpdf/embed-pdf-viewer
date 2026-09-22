@@ -48,9 +48,9 @@ describe('searchRectsForRange', () => {
     expect(rects).toEqual([{ left: 10, bottom: 100, right: 40, top: 110 }]);
   });
 
-  test('adjacent runs on the same line merge into ONE rect (the v2 fix)', () => {
-    // Two text objects, visually one line — per-glyph or per-run boxes are
-    // exactly the v2 highlight bug; the merge must produce a single rect.
+  test('adjacent runs on the same line merge into one rect', () => {
+    // Two text objects, visually one line — per-glyph or per-run boxes would
+    // draw a fragmented highlight; the merge must produce a single rect.
     const rects = searchRectsForRange(snapshot(line(0, 0), line(5, 50)), 2, 6);
     expect(rects).toEqual([{ left: 20, bottom: 100, right: 80, top: 110 }]);
   });

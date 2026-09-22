@@ -45,17 +45,17 @@ const RESOURCE_BY_MODE = {
  *
  *   - `/search/{mode}/data@:token` — versioned. The token
  *     (`encodeSearchToken`) carries the content epoch + query + position
- *     and IS the cache key; the response is immutable and CDN-cacheable.
+ *     and is the cache key; the response is immutable and CDN-cacheable.
  *     A stale epoch answers `NotFound` (the standard versioned-read
  *     refresh signal), never stale results.
  *   - `/search/{mode}/data?…` — unversioned, flat query params (`q` as
- *     plain text), served from the CURRENT content, always `no-store`.
+ *     plain text), served from the current content, always `no-store`.
  *
- * Mode is the PATH, not a parameter: rects and full are separate
+ * Mode is the path, not a parameter: rects and full are separate
  * resources (`layer-search-rects` / `layer-search-full`) with separate
  * capability requirements and separate CDN prefixes, so a credential or
  * cache entry for one tier can never serve the other. `'full'` requires
- * `doc.text.search` AND `doc.text.copy` — a snippet IS extracted text.
+ * `doc.text.search` and `doc.text.copy` — a snippet is extracted text.
  *
  * Continuation: responses carry `nextCursor` = the ready-made token for
  * the next slice (same epoch, advanced `skip`) — deterministic, so the
@@ -144,7 +144,7 @@ async function runSearchSlice(
   return {
     ...slice,
     // The worker's session cursor never crosses the wire — continuation
-    // is a deterministic next TOKEN (same epoch, advanced position).
+    // is a deterministic next token (same epoch, advanced position).
     nextCursor:
       slice.nextCursor === null
         ? null

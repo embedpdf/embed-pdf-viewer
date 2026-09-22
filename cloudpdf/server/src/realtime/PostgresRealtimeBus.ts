@@ -9,27 +9,27 @@ const BASE_CHANNEL = 'cloudpdf_base_v1';
 
 /**
  * Cross-replica doorbell over Postgres LISTEN/NOTIFY — the rendezvous is the
- * database every replica already shares, so realtime adds ZERO new services
+ * database every replica already shares, so realtime adds zero new services
  * to a deployment (the docker-compose / Helm story stays "Postgres + object
  * storage and nothing else").
  *
- * Topology: ONE dedicated `pg.Client` per replica (LISTEN does not work on
+ * Topology: One dedicated `pg.Client` per replica (listen does not work on
  * pooled connections), listening on a single channel. Every replica hears
  * every document's notifications and filters in memory against its own
- * subscriber map — a Map lookup per NOTIFY, fine until many thousands of
+ * subscriber map — a Map lookup per notify, fine until many thousands of
  * events per second.
  *
- * Failure model (the part that keeps this CORRECT, not just fast):
- *   - The NOTIFY payload is tiny (~150B; the 8KB limit is irrelevant) and
+ * Failure model (the part that keeps this correct, not just fast):
+ *   - The notify payload is tiny (~150B; the 8KB limit is irrelevant) and
  *     advisory — subscribers always drain from their own cursor.
- *   - If the LISTEN connection drops, NOTIFYs during the outage are gone
- *     forever. On every successful (re)connect we therefore ring EVERY
+ *   - If the listen connection drops, NOTIFYs during the outage are gone
+ *     forever. On every successful (re)connect we therefore ring every
  *     locally-subscribed doorbell once — the gap signal — so each SSE
  *     handler runs its catch-up query. Lost doorbell ⇒ extra query, never
  *     a lost event.
  *   - Reconnect uses capped exponential backoff and never throws into the
  *     caller; while disconnected, publishes fall back to a fresh one-shot
- *     connection so OTHER replicas still hear local commits.
+ *     connection so other replicas still hear local commits.
  */
 export class PostgresRealtimeBus implements RealtimeBus {
   private readonly listeners = new Map<string, Set<() => void>>();

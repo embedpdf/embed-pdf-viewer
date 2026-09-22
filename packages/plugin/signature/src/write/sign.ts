@@ -1,8 +1,10 @@
 /**
- * The act of sealing. One-shot: `sign` (prepare → the signer → complete,
+ * The act of sealing. One-shot: `sign` (prepare, the signer, complete,
  * through `@embedpdf/core-signature`). Two-phase: `prepareSignature` parks
  * the signing and hands out the digest; `completeSignature` seals it with a
- * detached CMS; `abortPending` cancels.
+ * detached CMS; `abortPending` cancels. The parked signing, the sealed
+ * field's facts and `onSigned` come from the confirmed events the engine
+ * publishes for each step (`sync/signatures.ts`), for every session alike.
  */
 import { PluginError } from '@embedpdf/core';
 import { certificateCommonName, sign as signDocument } from '@embedpdf/core-signature';
@@ -13,24 +15,19 @@ import type {
 } from '@embedpdf/engine-core/runtime';
 
 import type { PrepareSignatureInput, SignatureCapability, SignFieldInput } from '../contract';
+import type { SignatureReads } from '../read/signatures';
 import type { SignatureContext, SignatureServices } from '../services';
-import { ORIGIN_API } from '../services/events';
-import { sameRef } from '../services/store';
-import type { SignatureHydration } from '../sync/hydration';
+import { verb } from '../services/errors';
+import type { SignaturesMirror } from '../sync/signatures';
 
 export function createSigning(
   ctx: SignatureContext,
-  {
-    events,
-    store,
-    authority,
-    marks,
-  }: Pick<SignatureServices, 'events' | 'store' | 'authority' | 'marks'>,
-  { refresh, validate }: Pick<SignatureHydration, 'refresh' | 'validate'>,
+  { store, authority, marks }: Pick<SignatureServices, 'store' | 'authority' | 'marks'>,
+  { api: reads }: Pick<SignatureReads, 'api'>,
   target: { clearIfTarget(field: FormFieldRef): void },
+  signatures: Pick<SignaturesMirror, 'disown'>,
 ) {
-  const { signed } = events;
-  const { state, withBusy, requireSignatures } = store;
+  const { withBusy, requireSignatures } = store;
   const { resolveSigner } = authority;
   const { bytesOf, markBytes } = marks;
 
@@ -46,19 +43,9 @@ export function createSigning(
     return null;
   };
 
-  const settle = async (field: FormFieldRef, result: SignatureCompleteResult) => {
-    target.clearIfTarget(field);
-    await refresh();
-    void validate().catch((error) =>
-      globalThis.console?.error('[signature] validation after signing failed:', error),
-    );
-    signed.emit({ field, result, origin: ORIGIN_API });
-    return result;
-  };
-
   const sign = (input: SignFieldInput): Promise<SignatureCompleteResult> =>
     withBusy(async () => {
-      const { doc } = requireSignatures();
+      requireSignatures();
       const signer = await resolveSigner(input.signer);
       // The certificate's subject is the default /Name; the caller's facts win.
       const subject =
@@ -66,9 +53,9 @@ export function createSigning(
           ? certificateCommonName(signer.certificateChain[0])
           : null;
       const attribution = { ...(subject ? { name: subject } : {}), ...input.attribution };
-      // The appearance IS the mark: its page is drawn into the widget by the engine.
+      // The appearance is the mark: its page is drawn into the widget by the engine.
       const appearance = (await appearanceOf(input))!;
-      const result = await signDocument(doc, {
+      const result = await signDocument(ctx.doc, {
         field: input.field,
         signer,
         attribution,
@@ -76,12 +63,13 @@ export function createSigning(
         lock: input.lock,
         appearance: { pdf: appearance, pageIndex: 0 },
       });
-      return settle(input.field, result);
+      target.clearIfTarget(input.field);
+      return result;
     });
 
   const prepareSignature = (input: PrepareSignatureInput): Promise<SignaturePrepared> =>
     withBusy(async () => {
-      const { signatures } = requireSignatures();
+      const signatures = requireSignatures();
       const appearance = await appearanceOf(input);
       const result = await signatures.prepare({
         field: input.field,
@@ -93,10 +81,6 @@ export function createSigning(
         ...(appearance ? { appearance: { pdf: appearance, pageIndex: 0 } } : {}),
       });
       prepared.set(result.signingId, result);
-      ctx.dispatch({
-        type: 'PENDING',
-        pending: { signingId: result.signingId, field: input.field },
-      });
       return result;
     });
 
@@ -105,7 +89,7 @@ export function createSigning(
     cms: Uint8Array,
   ): Promise<SignatureCompleteResult> =>
     withBusy(async () => {
-      const { signatures } = requireSignatures();
+      const signatures = requireSignatures();
       const parked = prepared.get(signingId);
       if (!parked) {
         throw new PluginError(
@@ -120,31 +104,28 @@ export function createSigning(
         expectedVersion: parked.expectedVersion,
       });
       prepared.delete(signingId);
-      ctx.dispatch({ type: 'PENDING', pending: null });
-      return settle(result.signature.field, result);
+      target.clearIfTarget(result.signature.field);
+      return result;
     });
 
   const abortPending = async (): Promise<void> => {
-    const pending = state().pending;
+    const pending = reads.getPending();
     if (!pending) return;
-    const { signatures } = requireSignatures();
-    await signatures.abort(pending.signingId);
+    const { status } = await requireSignatures().abort(pending.signingId);
     prepared.delete(pending.signingId);
-    ctx.dispatch({ type: 'PENDING', pending: null });
+    // An abort or a completion clears the signing through its event; an
+    // unknown signing has none.
+    if (status === 'unknown') await signatures.disown(pending.signingId);
   };
 
   return {
     sign,
     api: {
-      sign,
-      prepareSignature,
-      completeSignature,
-      abortPending,
+      sign: verb(sign),
+      prepareSignature: verb(prepareSignature),
+      completeSignature: verb(completeSignature),
+      abortPending: verb(abortPending),
     } satisfies Partial<SignatureCapability>,
   };
 }
 export type SignatureSigning = ReturnType<typeof createSigning>;
-
-/** Whether `field` is the sign-here target. */
-export const isTarget = (target: FormFieldRef | null, field: FormFieldRef): boolean =>
-  target !== null && sameRef(target, field);

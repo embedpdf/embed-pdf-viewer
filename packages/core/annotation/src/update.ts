@@ -3,7 +3,7 @@ import { annotationSelectionFrame } from './selection';
  * The pure annotation core: update(model, msg) → [model, effects].
  *
  * Editing is intent-driven (the shell's edit handler sends `editPointer`, the draw
- * handler `createPointer`). Geometry lives in the `Geom` union; all the per-kind
+ * handler `createPointer`). Geometry lives in the `ContentGeometry` union; all the per-kind
  * math is in geometry.ts. Effects (create/patch/delete) are the only impurities.
  */
 import type {
@@ -46,7 +46,7 @@ import {
 import {
   apSizeChanged,
   caretGeomFromAnchor,
-  DEFAULT_CHROME_GEOM,
+  DEFAULT_CHROME_GEOMETRY,
   geomDragHandle,
   geomResetRotation,
   geomRotateAbout,
@@ -80,18 +80,18 @@ import { normalizeRuns, paragraphsFromPlainText, plainTextOf } from './richtext'
 import { computeMoveSnap } from './snap';
 import { straightenInkStroke } from './ink';
 import type {
-  Annot,
+  ModelAnnotation,
   AnnotationProps,
   AnnotationPropsPatch,
   ClickCreate,
   Draft,
   Effect,
-  Geom,
+  ContentGeometry,
   Id,
   InkStraightenOptions,
   LineEndings,
   Model,
-  Msg,
+  Message,
   PointerInput,
   PropKey,
   Quad,
@@ -100,12 +100,12 @@ import type {
   Subtype,
   TextEndAnchor,
   TextQuad,
-  Vec,
+  Point,
 } from './types';
 
-/** The click ↔ drag threshold (content units): a press-release whose width AND
- *  height both stay under it is a CLICK. Exported so every gesture owner (the
- *  draw handler, the form plugin's place handler) shares ONE definition. */
+/** The click ↔ drag threshold (content units): a press-release whose width and
+ *  height both stay under it is a click. Exported so every gesture owner (the
+ *  draw handler, the form plugin's place handler) shares one definition. */
 export const MIN_DRAG = 3;
 const isPolySubtype = (subtype: Subtype): subtype is 'polygon' | 'polyline' =>
   subtype === 'polygon' || subtype === 'polyline';
@@ -143,94 +143,106 @@ export const initialModel: Model = {
 };
 
 /**
- * Resolve a tool's effective defaults as a FULL flat props bag: the base `style`
+ * Resolve a tool's effective defaults as a full flat props bag: the base `style`
  * + the font/endings base, with the per-tool override layered on top. This is
  * what a defaults-editing UI reads, and what creation projects `style`/`text`
  * from (`styleFromProps` / `textStyleFromProps`).
  */
-export function defaultsFor(m: Model, subtype: Subtype): AnnotationProps {
-  const d = m.defaults[subtype];
+export function defaultsFor(model: Model, subtype: Subtype): AnnotationProps {
+  const toolDefaults = model.defaults[subtype];
   return {
-    ...m.style,
+    ...model.style,
     ...initialTextStyle,
-    ...d,
-    lineEndings: { ...NO_ENDINGS, ...d?.lineEndings },
+    ...toolDefaults,
+    lineEndings: { ...NO_ENDINGS, ...toolDefaults?.lineEndings },
   };
 }
 
 /** Flip an annotation to live (vector) rendering — we now own its appearance, so
  *  the engine's baked AP is no longer authoritative. Idempotent. */
-const toVector = (a: Annot): Annot => (a.source === 'vector' ? a : { ...a, source: 'vector' });
+const toVector = (annotation: ModelAnnotation): ModelAnnotation =>
+  annotation.source === 'vector' ? annotation : { ...annotation, source: 'vector' };
 /**
- * Take ownership of the appearance after a GEOMETRY edit. Vector kinds flip to
- * live rendering; `opaqueBody` kinds (stamp images) have NO vector render — they
+ * Take ownership of the appearance after a geometry edit. Vector kinds flip to
+ * live rendering; `opaqueBody` kinds (stamp images) have no vector render — they
  * stay `baked`, with the raster box following the committed geometry (the bitmap
  * shows stretched until the engine's natively re-fit appearance arrives with the
- * DTO sync). Call with the NEW geometry already applied.
+ * DTO sync). Call with the new geometry already applied.
  */
-const ownGeometry = (a: Annot): Annot => {
-  if (!capsFor(a.subtype).opaqueBody) return toVector(a);
-  return 'rect' in a.geom ? { ...a, apBox: a.geom.rect } : a;
+const ownGeometry = (annotation: ModelAnnotation): ModelAnnotation => {
+  if (!capsFor(annotation.subtype).opaqueBody) return toVector(annotation);
+  return 'rect' in annotation.geometry
+    ? { ...annotation, apBox: annotation.geometry.rect }
+    : annotation;
 };
 /**
  * Does this committed edit invalidate an engine-baked raster? Only when the
- * annotation STAYS baked (an opaque-body kind — everything else just flipped to
- * vector via {@link ownGeometry} and renders live from its geometry) AND the
- * edit changed the /AP frame's SIZE, does the engine's re-bake produce new
+ * annotation stays baked (an opaque-body kind — everything else just flipped to
+ * vector via {@link ownGeometry} and renders live from its geometry) and the
+ * edit changed the /AP frame's size, does the engine's re-bake produce new
  * raster content. In practice: a stamp resize. Moves and rotations keep the
  * frame (the blit translates/rotates the same pixels), so they emit false and
- * a committed drag costs zero appearance re-renders. Call with the NEXT
- * (post-{@link ownGeometry}) annot and the geometry it had BEFORE the edit.
+ * a committed drag costs zero appearance re-renders. Call with the next
+ * (post-{@link ownGeometry}) annot and the geometry it had before the edit.
  */
-const apInvalidated = (next: Annot, before: Geom): boolean =>
-  next.source === 'baked' && apSizeChanged(before, next.geom);
-/** The patch effect for a committed geometry edit. `apChanged` is attached ONLY
+const apInvalidated = (next: ModelAnnotation, before: ContentGeometry): boolean =>
+  next.source === 'baked' && apSizeChanged(before, next.geometry);
+/** The patch effect for a committed geometry edit. `apChanged` is attached only
  *  when the edit invalidated a baked raster (a stamp resize) — so every other
  *  edit keeps the bare `{ fx, id }` shape and never triggers an appearance
  *  re-fetch. `next` is the post-{@link ownGeometry} annot, `before` its old geom. */
-const patchFx = (id: Id, next: Annot, before: Geom): Effect =>
+const patchFx = (id: Id, next: ModelAnnotation, before: ContentGeometry): Effect =>
   apInvalidated(next, before)
-    ? { fx: 'patch', id, scope: { kind: 'geometry' }, apChanged: true }
-    : { fx: 'patch', id, scope: { kind: 'geometry' } };
-const sub = (a: Vec, b: Vec): Vec => ({ x: a.x - b.x, y: a.y - b.y });
-const translateRect = (r: Rect, d: Vec): Rect => ({ ...r, x: r.x + d.x, y: r.y + d.y });
+    ? { type: 'patch', id, scope: { kind: 'geometry' }, apChanged: true }
+    : { type: 'patch', id, scope: { kind: 'geometry' } };
+const sub = (from: Point, to: Point): Point => ({ x: from.x - to.x, y: from.y - to.y });
+const translateRect = (rect: Rect, point: Point): Rect => ({
+  ...rect,
+  x: rect.x + point.x,
+  y: rect.y + point.y,
+});
 
 /**
- * Commit a VIEW-space gesture result for one annotation: apply `op` to the
- * PROJECTED geometry (the identity for un-flagged annotations — `op` then
+ * Commit a view-space gesture result for one annotation: apply `op` to the
+ * projected geometry (the identity for un-flagged annotations — `op` then
  * simply runs on the stored geom) and map the result back to stored space
  * through `unanchoredGeom`. The exact composition `effGeom` previewed, so a
  * released gesture commits what it showed — for screen-anchored and plain
- * annotations alike, through ONE code path.
+ * annotations alike, through one code path.
  */
-const commitViewGesture = (a: Annot, view: ViewEnv | undefined, op: (g: Geom) => Geom): Geom => {
-  const mode = anchorModeOf(a);
-  return unanchoredGeom(op(anchoredGeom(a.geom, mode, view)), mode, view);
+const commitViewGesture = (
+  annotation: ModelAnnotation,
+  view: ViewEnv | undefined,
+  op: (geometry: ContentGeometry) => ContentGeometry,
+): ContentGeometry => {
+  const mode = anchorModeOf(annotation);
+  return unanchoredGeom(op(anchoredGeom(annotation.geometry, mode, view)), mode, view);
 };
 
 /* ── page-bound gestures ──────────────────────────────────────────────────────
  * Annotations are page-bound; the pointer isn't. Two rules keep them apart:
- *  1. FRAME: a gesture is anchored to the page it started on. A sample resolved
+ *  1. Frame: a gesture is anchored to the page it started on. A sample resolved
  *     against another page is in a different coordinate frame (each page's
- *     content space has its own origin) — subtracting across frames produced
- *     the teleport-to-page-top bug, so foreign-page samples are ignored.
- *  2. CLAMP: within the home frame, geometry pins to the page box (v2 rule):
+ *     content space has its own origin) — subtracting across frames would
+ *     teleport the shape to the page top, so foreign-page samples are ignored.
+ *  2. Clamp: within the home frame, geometry pins to the page box:
  *     an overshooting pointer slides the shape along the edge; a shape larger
  *     than the page pins to the page's top/left (lo wins when lo > hi).
  */
-const clampAxis = (v: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, v));
+const clampAxis = (value: number, lo: number, hi: number): number =>
+  Math.max(lo, Math.min(hi, value));
 
-const clampPointToBox = (p: Vec, box: Rect | undefined): Vec =>
+const clampPointToBox = (point: Point, box: Rect | undefined): Point =>
   box
     ? {
-        x: clampAxis(p.x, box.x, box.x + box.width),
-        y: clampAxis(p.y, box.y, box.y + box.height),
+        x: clampAxis(point.x, box.x, box.x + box.width),
+        y: clampAxis(point.y, box.y, box.y + box.height),
       }
-    : p;
+    : point;
 
 /** The pointer sample's view environment (relative zoom + display rotation),
  *  when the caller supplied one — screen-anchored annotations hit-test and
- *  page-clamp at their EFFECTIVE geometry with it. Absent → stored geometry
+ *  page-clamp at their effective geometry with it. Absent → stored geometry
  *  (headless). */
 const viewOf = (input: PointerInput): ViewEnv | undefined =>
   input.zoom != null || input.displayRotation != null
@@ -242,14 +254,14 @@ const viewOf = (input: PointerInput): ViewEnv | undefined =>
  *  member counts at its view-projected footprint. A callout's frame is only
  *  the text box, so the clamp uses the visual bounds — box, leader, and
  *  arrowhead — and the arrow cannot leave the page. */
-function moveClampCorners(a: Annot, view?: ViewEnv): Vec[] {
-  const mode = anchorModeOf(a);
-  const geom = anchoredGeom(a.geom, mode, view);
-  if (geom.t === 'text' && geom.callout) {
+function moveClampCorners(annotation: ModelAnnotation, view?: ViewEnv): Point[] {
+  const mode = anchorModeOf(annotation);
+  const geometry = anchoredGeom(annotation.geometry, mode, view);
+  if (geometry.kind === 'text' && geometry.callout) {
     const visual = geomVisualBounds(
-      geom,
-      anchoredStrokeWidth(a.style.strokeWidth, mode, view),
-      a.style.border,
+      geometry,
+      anchoredStrokeWidth(annotation.style.strokeWidth, mode, view),
+      annotation.style.border,
     );
     return [
       { x: visual.x, y: visual.y },
@@ -258,16 +270,16 @@ function moveClampCorners(a: Annot, view?: ViewEnv): Vec[] {
       { x: visual.x, y: visual.y + visual.height },
     ];
   }
-  return [...annotationSelectionFrame(a, view).corners];
+  return [...annotationSelectionFrame(annotation, view).corners];
 }
 
 /** The union of the ids' move-clamp bounds. */
-function unionBoundsOf(m: Model, ids: Id[], view?: ViewEnv): Rect | null {
-  const corners: Vec[] = [];
+function unionBoundsOf(model: Model, ids: Id[], view?: ViewEnv): Rect | null {
+  const corners: Point[] = [];
   for (const id of ids) {
-    const a = m.byId[id];
-    if (!a) continue;
-    corners.push(...moveClampCorners(a, view));
+    const annotation = model.byId[id];
+    if (!annotation) continue;
+    corners.push(...moveClampCorners(annotation, view));
   }
   return corners.length ? unionRect(corners) : null;
 }
@@ -276,533 +288,587 @@ function unionBoundsOf(m: Model, ids: Id[], view?: ViewEnv): Rect | null {
  *  Per-axis, so a pointer past the bottom edge still slides the selection
  *  horizontally along that edge. */
 function clampMoveDelta(
-  m: Model,
+  model: Model,
   ids: Id[],
-  delta: Vec,
+  delta: Point,
   page: Rect | undefined,
   view?: ViewEnv,
-): Vec {
+): Point {
   if (!page) return delta;
-  const b = unionBoundsOf(m, ids, view);
-  if (!b) return delta;
+  const rect = unionBoundsOf(model, ids, view);
+  if (!rect) return delta;
   return {
-    x: clampAxis(delta.x, page.x - b.x, page.x + page.width - (b.x + b.width)),
-    y: clampAxis(delta.y, page.y - b.y, page.y + page.height - (b.y + b.height)),
+    x: clampAxis(delta.x, page.x - rect.x, page.x + page.width - (rect.x + rect.width)),
+    y: clampAxis(delta.y, page.y - rect.y, page.y + page.height - (rect.y + rect.height)),
   };
 }
 
-/** The page an edit draft is anchored to — every edit gesture lives on ONE page. */
-function editDraftPage(m: Model, d: Draft): PageRef | null {
-  const id = 'id' in d ? d.id : 'ids' in d && d.ids.length ? d.ids[0] : null;
-  return id != null ? (m.byId[id]?.page ?? null) : null;
+/** The page an edit draft is anchored to — every edit gesture lives on one page. */
+function editDraftPage(model: Model, draft: Draft): PageRef | null {
+  const id = 'id' in draft ? draft.id : 'ids' in draft && draft.ids.length ? draft.ids[0] : null;
+  return id != null ? (model.byId[id]?.page ?? null) : null;
 }
-const geomEqual = (a: Geom, b: Geom): boolean => JSON.stringify(a) === JSON.stringify(b);
+const geomEqual = (left: ContentGeometry, right: ContentGeometry): boolean =>
+  JSON.stringify(left) === JSON.stringify(right);
 const RAD2DEG = 180 / Math.PI;
 
-/** The signed CW angle (deg) of `p` relative to `pivot`, in content space (y-down). */
-const angleAt = (pivot: Vec, p: Vec): number => Math.atan2(p.y - pivot.y, p.x - pivot.x) * RAD2DEG;
+/** The signed CW angle (deg) of `point` relative to `pivot`, in content space (y-down). */
+const angleAt = (pivot: Point, point: Point): number =>
+  Math.atan2(point.y - pivot.y, point.x - pivot.x) * RAD2DEG;
 
-/** Shortest signed arc from `a` to `b` (deg), in (-180, 180]. */
-const arcTo = (a: number, b: number): number => ((b - a + 540) % 360) - 180;
+/** Shortest signed arc from `from` to `to` (deg), in (-180, 180]. */
+const arcTo = (from: number, to: number): number => ((to - from + 540) % 360) - 180;
 
 /**
- * The live rotation of a rotate draft, snapping applied — the ONE angle rule
+ * The live rotation of a rotate draft, snapping applied — the one angle rule
  * shared by the preview (`effGeom`), the commit (`editUp`) and the angle chip,
- * so they can never disagree. The selection's ABSOLUTE angle (a single member's
+ * so they can never disagree. The selection's absolute angle (a single member's
  * `rot` + the raw pointer delta; a group's raw delta from 0) locks onto the
  * configured angles within the threshold; `free` (shift held) bypasses.
  * `delta` is what `geomRotateAbout` applies; `angle` is what the chip shows.
  */
 export function rotateDraftDelta(
-  m: Model,
-  d: Extract<Draft, { g: 'rotate' }>,
+  model: Model,
+  draft: Extract<Draft, { kind: 'rotate' }>,
 ): { delta: number; angle: number; snapped: boolean } {
-  const raw = angleAt(d.pivot, d.cur) - angleAt(d.pivot, d.start);
-  const one = d.ids.length === 1 ? m.byId[d.ids[0]] : null;
-  // The absolute angle is read off the PROJECTED geometry (identity when
-  // un-flagged): the chip and the snap targets speak about what the user SEES
+  const raw = angleAt(draft.pivot, draft.current) - angleAt(draft.pivot, draft.start);
+  const one = draft.ids.length === 1 ? model.byId[draft.ids[0]] : null;
+  // The absolute angle is read off the projected geometry (identity when
+  // un-flagged): the chip and the snap targets speak about what the user sees
   // — a noRotate shape's on-screen tilt, not its stored one.
-  const base = one ? geomRotation(anchoredGeom(one.geom, anchorModeOf(one), d.view)) : 0;
+  const base = one ? geomRotation(anchoredGeom(one.geometry, anchorModeOf(one), draft.view)) : 0;
   const angle = normalizeDeg(base + raw);
-  if (!m.snap.rotation || d.free) return { delta: raw, angle, snapped: false };
-  for (const target of m.snap.rotationAngles) {
+  if (!model.snap.rotation || draft.free) return { delta: raw, angle, snapped: false };
+  for (const target of model.snap.rotationAngles) {
     const adjust = arcTo(angle, normalizeDeg(target));
-    if (Math.abs(adjust) <= m.snap.rotationThreshold)
+    if (Math.abs(adjust) <= model.snap.rotationThreshold)
       return { delta: raw + adjust, angle: normalizeDeg(target), snapped: true };
   }
   return { delta: raw, angle, snapped: false };
 }
 
-/** A group resize is isotropic (uniform) when ANY selected member is rotated —
+/** A group resize is isotropic (uniform) when any selected member is rotated —
  *  an off-axis scale across a rotated rect+rot is a shear it can't represent. A
  *  vertex member's advisory `rot` counts (preserves obbFromTheta + reset). */
-const selectionHasRotation = (m: Model, ids: Id[]): boolean =>
-  ids.some((id) => geomRotation(m.byId[id]?.geom ?? ({ t: 'caret' } as Geom)) !== 0);
+const selectionHasRotation = (model: Model, ids: Id[]): boolean =>
+  ids.some(
+    (id) => geomRotation(model.byId[id]?.geometry ?? ({ kind: 'caret' } as ContentGeometry)) !== 0,
+  );
 
-export function update(m: Model, msg: Msg): [Model, Effect[]] {
-  switch (msg.t) {
+export function update(model: Model, message: Message): [Model, Effect[]] {
+  switch (message.type) {
     case 'editPointer':
-      return editPointer(m, msg.phase, msg.in);
+      return editPointer(model, message.phase, message.in);
     case 'marqueePointer':
-      return marqueePointer(m, msg.phase, msg.in);
+      return marqueePointer(model, message.phase, message.in);
     case 'createPointer':
       return createPointer(
-        m,
-        msg.phase,
-        msg.subtype,
-        msg.in,
-        msg.preset,
-        msg.intent,
-        msg.deferInkCommit,
-        msg.straightenInk,
-        msg.clickCreate,
-        msg.flags,
-        msg.measure,
-        msg.capture,
+        model,
+        message.phase,
+        message.subtype,
+        message.in,
+        message.preset,
+        message.intent,
+        message.deferInkCommit,
+        message.straightenInk,
+        message.clickCreate,
+        message.flags,
+        message.measure,
+        message.capture,
       );
     case 'finishInkDraft':
-      return finishInkCreate(m);
+      return finishInkCreate(model);
     case 'finishCreationDraft':
-      return finishPolyCreate(m);
+      return finishPolyCreate(model);
     case 'createCaret':
-      return createCaret(m, msg.page, msg.anchor, msg.flags);
+      return createCaret(model, message.page, message.anchor, message.flags);
     case 'createReplaceText':
-      return createReplaceText(m, msg.page, msg.quads, msg.anchor, msg.preset);
+      return createReplaceText(model, message.page, message.quads, message.anchor, message.preset);
     case 'createMarkup':
-      return createMarkup(m, msg.subtype, msg.page, msg.quads, msg.preset, msg.flags);
+      return createMarkup(
+        model,
+        message.subtype,
+        message.page,
+        message.quads,
+        message.preset,
+        message.flags,
+      );
     case 'createAnnot':
-      return createAnnot(m, msg);
+      return createAnnot(model, message);
     case 'setMarkupPreview':
-      return setMarkupPreview(m, msg.subtype, msg.quadsByPage, msg.preset);
+      return setMarkupPreview(model, message.subtype, message.quadsByPage, message.preset);
     case 'clearMarkupPreview':
-      return m.preview ? [{ ...m, preview: null }, []] : [m, []];
+      return model.preview ? [{ ...model, preview: null }, []] : [model, []];
     case 'select': {
       const ids = expandGroups(
-        m,
-        msg.ids.filter((id) => isSelectable(m, id)),
+        model,
+        message.ids.filter((id) => isSelectable(model, id)),
       );
-      if (!ids.length) return [m, []];
-      const selected = msg.add ? [...new Set([...m.selected, ...ids])] : ids;
-      return [{ ...m, selected }, []];
+      if (!ids.length) return [model, []];
+      const selected = message.add ? [...new Set([...model.selected, ...ids])] : ids;
+      return [{ ...model, selected }, []];
     }
     case 'deselect': {
-      if (!m.selected.length) return [m, []];
+      if (!model.selected.length) return [model, []];
       // With `ids`: drop only those (an engaged Behavior retroactively un-selects
       // its annotations — engaged ⇒ not selectable ⇒ not selected). Without: all.
-      if (!msg.ids) return [{ ...m, selected: [] }, []];
-      const drop = new Set(msg.ids);
-      const selected = m.selected.filter((id) => !drop.has(id));
-      return selected.length === m.selected.length ? [m, []] : [{ ...m, selected }, []];
+      if (!message.ids) return [{ ...model, selected: [] }, []];
+      const drop = new Set(message.ids);
+      const selected = model.selected.filter((id) => !drop.has(id));
+      return selected.length === model.selected.length ? [model, []] : [{ ...model, selected }, []];
     }
     case 'setProps':
-      return setProps(m, msg.patch);
+      return setProps(model, message.patch);
     case 'setFlags':
-      return setFlags(m, msg.patch, msg.ids);
+      return setFlags(model, message.patch, message.ids);
     case 'setDefaults':
-      return setDefaults(m, msg.subtype, msg.patch);
+      return setDefaults(model, message.subtype, message.patch);
     case 'setSnap':
-      return [{ ...m, snap: { ...m.snap, ...msg.patch } }, []];
+      return [{ ...model, snap: { ...model.snap, ...message.patch } }, []];
     case 'rotate90':
-      return rotateSelection(m, 90);
+      return rotateSelection(model, 90);
     case 'resetRotation':
-      return resetRotation(m);
+      return resetRotation(model);
     case 'delete':
-      return deleteSelection(m);
+      return deleteSelection(model);
     case 'cancel':
-      return [{ ...m, draft: null }, []];
+      return [{ ...model, draft: null }, []];
     case 'loaded':
-      return [mergeLoaded(m, msg.annots), []];
+      return [mergeLoaded(model, message.annots), []];
     case 'hydrated':
-      return [hydrateAnnots(m, msg.annots, msg.bumpAp ?? false), []];
+      return [hydrateAnnots(model, message.annots, message.bumpAp ?? false), []];
     case 'created':
-      return [reconcile(m, msg.tempId, msg.id, msg.ref), []];
+      return [reconcile(model, message.tempId, message.id, message.ref), []];
     case 'createFailed':
-      return [removeAnnots(m, [msg.tempId]), []];
+      return [removeAnnots(model, [message.tempId]), []];
     case 'upsert':
-      return [upsertAnnots(m, msg.annots, msg.bumpAp), []];
+      return [upsertAnnots(model, message.annots, message.bumpAp), []];
     case 'bumpAp':
-      return [bumpAp(m, msg.ids), []];
+      return [bumpAp(model, message.ids), []];
     case 'hover':
       // Pure view-model state; the capability diffs before dispatching, so
       // this fires at enter/leave cadence only.
-      return m.hovered === msg.id ? [m, []] : [{ ...m, hovered: msg.id }, []];
+      return model.hovered === message.id ? [model, []] : [{ ...model, hovered: message.id }, []];
     case 'remove': {
-      const next = removeAnnots(m, msg.ids);
+      const next = removeAnnots(model, message.ids);
       // A removed annotation can't stay hovered.
       return [next.hovered && !next.byId[next.hovered] ? { ...next, hovered: null } : next, []];
     }
     case 'beginTextEdit':
       // `lockedContents` (or an inert `/F` state) blocks entering text edit —
       // the geometry gates don't apply here: locked-only contents still edit.
-      return m.byId[msg.id] && annotContentsEditable(m.byId[msg.id]!)
-        ? [{ ...m, editing: msg.id, selected: [msg.id], draft: null }, []]
-        : [m, []];
+      return model.byId[message.id] && annotContentsEditable(model.byId[message.id]!)
+        ? [{ ...model, editing: message.id, selected: [message.id], draft: null }, []]
+        : [model, []];
     case 'setText':
-      return setText(m, msg.id, msg.text);
+      return setText(model, message.id, message.text);
     case 'setRichText':
-      return setRichText(m, msg.id, msg.doc);
+      return setRichText(model, message.id, message.doc);
     case 'endTextEdit':
-      return m.editing ? [{ ...m, editing: null }, []] : [m, []];
+      return model.editing ? [{ ...model, editing: null }, []] : [model, []];
   }
 }
 
 /** Apply the editor's plain text optimistically. Updates `contents` on the
  *  DTO-backed model and flips the box to `vector` so the live text shows. Emits
- *  NO effect — the plugin owns the (debounced) engine write while you type, so
+ *  no effect — the plugin owns the (debounced) engine write while you type, so
  *  the model never churns mid-keystroke. */
-function setText(m: Model, id: Id, text: string): [Model, Effect[]] {
-  const a = m.byId[id];
-  if (!a) return [m, []];
+function setText(model: Model, id: Id, text: string): [Model, Effect[]] {
+  const annotation = model.byId[id];
+  if (!annotation) return [model, []];
   // The rich projection follows plain text: body-style paragraphs, one per
   // line break, so an editor rendering `richText` shows what was typed.
   const data =
-    a.data && a.data.subtype === 'free-text'
+    annotation.data && annotation.data.subtype === 'free-text'
       ? {
-          ...a.data,
+          ...annotation.data,
           contents: text,
-          richText: { ...a.data.richText, paragraphs: paragraphsFromPlainText(text) },
+          richText: { ...annotation.data.richText, paragraphs: paragraphsFromPlainText(text) },
         }
-      : a.data
-        ? { ...a.data, contents: text }
-        : a.data;
-  const next = toVector({ ...a, data });
-  return [{ ...m, byId: { ...m.byId, [id]: next } }, []];
+      : annotation.data
+        ? { ...annotation.data, contents: text }
+        : annotation.data;
+  const next = toVector({ ...annotation, data });
+  return [{ ...model, byId: { ...model.byId, [id]: next } }, []];
 }
 
 /** Apply the editor's rich document optimistically. The DTO's body is kept
  *  (a partial input body layers on it); `contents` is the projection. */
-function setRichText(m: Model, id: Id, doc: RichTextDocumentInput): [Model, Effect[]] {
-  const a = m.byId[id];
-  if (!a || !a.data || a.data.subtype !== 'free-text') return [m, []];
+function setRichText(model: Model, id: Id, doc: RichTextDocumentInput): [Model, Effect[]] {
+  const annotation = model.byId[id];
+  if (!annotation || !annotation.data || annotation.data.subtype !== 'free-text')
+    return [model, []];
   const normalized = normalizeRuns(doc);
   const richText = {
-    body: { ...a.data.richText.body, ...(normalized.body ?? {}) },
+    body: { ...annotation.data.richText.body, ...(normalized.body ?? {}) },
     paragraphs: normalized.paragraphs,
   };
   const next = toVector({
-    ...a,
-    data: { ...a.data, richText, contents: plainTextOf(richText) },
+    ...annotation,
+    data: { ...annotation.data, richText, contents: plainTextOf(richText) },
   });
-  return [{ ...m, byId: { ...m.byId, [id]: next } }, []];
+  return [{ ...model, byId: { ...model.byId, [id]: next } }, []];
 }
 
 function editPointer(
-  m: Model,
+  model: Model,
   phase: 'down' | 'move' | 'up',
   input: PointerInput,
 ): [Model, Effect[]] {
-  if (phase === 'down') return editDown(m, input);
-  if (phase === 'move') return m.draft ? editMove(m, input) : [m, []];
-  return m.draft ? editUp(m) : [m, []];
+  if (phase === 'down') return editDown(model, input);
+  if (phase === 'move') return model.draft ? editMove(model, input) : [model, []];
+  return model.draft ? editUp(model) : [model, []];
 }
 
-function editDown(m: Model, input: PointerInput): [Model, Effect[]] {
+function editDown(model: Model, input: PointerInput): [Model, Effect[]] {
   // `pageBox` + `chrome` reach the hit-test so the page-bound rotate knob
   // (flipped / clamped near an edge) is grabbed exactly where the chrome drew
   // it, with the caller's (screen-constant) grab zones. The view env rides
-  // along so screen-anchored annotations are grabbed where they're PAINTED.
+  // along so screen-anchored annotations are grabbed where they're painted.
   const hit = hitTest(
-    m,
+    model,
     input.page,
     input.point,
-    input.chrome ?? DEFAULT_CHROME_GEOM,
-    m.hitMargin,
+    input.chrome ?? DEFAULT_CHROME_GEOMETRY,
+    model.hitMargin,
     input.pageBox,
     input.inert,
     viewOf(input),
   );
-  if (hit.t === 'handle' && hit.handle === 'caption') {
-    return [
-      { ...m, draft: { g: 'caption', id: hit.id, start: input.point, delta: { x: 0, y: 0 } } },
-      [],
-    ];
-  }
-  if (hit.t === 'handle' && (hit.handle === 'leader-start' || hit.handle === 'leader-end')) {
+  if (hit.kind === 'handle' && hit.handle === 'caption') {
     return [
       {
-        ...m,
-        draft: { g: 'leader', id: hit.id, start: input.point, delta: 0 },
+        ...model,
+        draft: { kind: 'caption', id: hit.id, start: input.point, delta: { x: 0, y: 0 } },
       },
       [],
     ];
   }
-  if (hit.t === 'handle') {
-    // The handle gesture runs in VIEW space: `base` is the PROJECTED geometry
-    // the user grabbed (identity for un-flagged annotations), and the commit
-    // maps the result back via `unanchoredGeom` with the SAME captured view.
-    const a = m.byId[hit.id];
-    const view = viewOf(input);
-    const base = anchoredGeom(a.geom, anchorModeOf(a), view);
+  if (hit.kind === 'handle' && (hit.handle === 'leader-start' || hit.handle === 'leader-end')) {
     return [
       {
-        ...m,
+        ...model,
+        draft: { kind: 'leader', id: hit.id, start: input.point, delta: 0 },
+      },
+      [],
+    ];
+  }
+  if (hit.kind === 'handle') {
+    // The handle gesture runs in view space: `base` is the projected geometry
+    // the user grabbed (identity for un-flagged annotations), and the commit
+    // maps the result back via `unanchoredGeom` with the same captured view.
+    const annotation = model.byId[hit.id];
+    const view = viewOf(input);
+    const base = anchoredGeom(annotation.geometry, anchorModeOf(annotation), view);
+    return [
+      {
+        ...model,
         draft: {
-          g: 'handle',
+          kind: 'handle',
           id: hit.id,
           handle: hit.handle,
           base,
-          cur: base,
+          current: base,
           ...(view ? { view } : {}),
         },
       },
       [],
     ];
   }
-  if (hit.t === 'rotate') {
+  if (hit.kind === 'rotate') {
     const view = viewOf(input);
     return [
       {
-        ...m,
+        ...model,
         draft: {
-          g: 'rotate',
+          kind: 'rotate',
           ids: hit.ids,
           pivot: hit.pivot,
           start: input.point,
-          cur: input.point,
+          current: input.point,
           ...(view ? { view } : {}),
         },
       },
       [],
     ];
   }
-  if (hit.t === 'group-handle') {
+  if (hit.kind === 'group-handle') {
     const view = viewOf(input);
     return [
       {
-        ...m,
+        ...model,
         draft: {
-          g: 'group',
+          kind: 'group',
           op: 'resize',
           ids: hit.ids,
           handle: hit.handle,
           anchor: groupResizeAnchor(hit.box, hit.handle),
           base: hit.box,
-          cur: hit.box,
+          current: hit.box,
           ...(view ? { view } : {}),
         },
       },
       [],
     ];
   }
-  if (hit.t === 'annot') {
-    // A hit on any member acts on the WHOLE group — select/toggle/drag as a unit.
-    const grp = groupMembers(m, hit.id);
-    const inSel = m.selected.includes(hit.id);
+  if (hit.kind === 'annot') {
+    // A hit on any member acts on the whole group — select/toggle/drag as a unit.
+    const grp = groupMembers(model, hit.id);
+    const inSel = model.selected.includes(hit.id);
     const selected = input.shift
       ? inSel
-        ? m.selected.filter((x) => !grp.includes(x)) // shift+click a member → drop the group
-        : [...m.selected, ...grp.filter((x) => !m.selected.includes(x))]
+        ? model.selected.filter((selectedId) => !grp.includes(selectedId)) // shift+click a member → drop the group
+        : [...model.selected, ...grp.filter((memberId) => !model.selected.includes(memberId))]
       : inSel
-        ? m.selected
+        ? model.selected
         : grp;
     // Only arm a move gesture if every selected annotation can move; an anchored
     // kind (markup/caret) still selects, it just won't drag.
-    const movable = selected.length > 0 && selected.every((id) => canMove(m, id));
+    const movable = selected.length > 0 && selected.every((id) => canMove(model, id));
     const draft: Draft | null = movable
-      ? { g: 'move', ids: selected, start: input.point, delta: { x: 0, y: 0 }, guides: [] }
+      ? { kind: 'move', ids: selected, start: input.point, delta: { x: 0, y: 0 }, guides: [] }
       : null;
-    return [{ ...m, selected, draft }, []];
+    return [{ ...model, selected, draft }, []];
   }
-  return [{ ...m, selected: [] }, []]; // empty (the handler usually pre-empts via 'deselect')
+  return [{ ...model, selected: [] }, []]; // empty (the handler usually pre-empts via 'deselect')
 }
 
-function editMove(m: Model, input: PointerInput): [Model, Effect[]] {
-  const d = m.draft!;
+function editMove(model: Model, input: PointerInput): [Model, Effect[]] {
+  const draft = model.draft!;
   // Foreign coordinate frame (see the page-bound gesture rules above) — ignore.
-  const home = editDraftPage(m, d);
-  if (home != null && input.page.pageObjectNumber !== home.pageObjectNumber) return [m, []];
-  if (d.g === 'move') {
+  const home = editDraftPage(model, draft);
+  if (home != null && input.page.pageObjectNumber !== home.pageObjectNumber) return [model, []];
+  if (draft.kind === 'move') {
     const view = viewOf(input);
-    const raw = clampMoveDelta(m, d.ids, sub(input.point, d.start), input.pageBox, view);
-    if (!m.snap.guides || input.shift)
-      return [{ ...m, draft: { ...d, delta: raw, guides: [] } }, []];
-    // Snap guides read STORED geometry (an anchored mover aligns by its /Rect
+    const raw = clampMoveDelta(
+      model,
+      draft.ids,
+      sub(input.point, draft.start),
+      input.pageBox,
+      view,
+    );
+    if (!model.snap.guides || input.shift)
+      return [{ ...model, draft: { ...draft, delta: raw, guides: [] } }, []];
+    // Snap guides read stored geometry (an anchored mover aligns by its /Rect
     // box) — a deliberate simplification; the clamp above is view-exact.
-    const snap = computeMoveSnap(m, d.ids, input.page, raw, m.snap.guideThreshold, input.pageBox);
+    const snap = computeMoveSnap(
+      model,
+      draft.ids,
+      input.page,
+      raw,
+      model.snap.guideThreshold,
+      input.pageBox,
+    );
     // A snap adjusts by ≤ threshold, but never past the page edge: re-clamp, and
     // drop the guide on an axis the clamp took back (its line would be a lie).
-    const delta = clampMoveDelta(m, d.ids, snap.delta, input.pageBox, view);
-    const guides = snap.guides.filter((g) =>
-      g.axis === 'x' ? delta.x === snap.delta.x : delta.y === snap.delta.y,
+    const delta = clampMoveDelta(model, draft.ids, snap.delta, input.pageBox, view);
+    const guides = snap.guides.filter((guide) =>
+      guide.axis === 'x' ? delta.x === snap.delta.x : delta.y === snap.delta.y,
     );
-    return [{ ...m, draft: { ...d, delta, guides } }, []];
+    return [{ ...model, draft: { ...draft, delta, guides } }, []];
   }
   const point = clampPointToBox(input.point, input.pageBox);
-  if (d.g === 'leader') {
-    const annotation = m.byId[d.id];
-    const start = distanceLeaderLength(annotation.geom, d.start);
-    const current = distanceLeaderLength(annotation.geom, point);
+  if (draft.kind === 'leader') {
+    const annotation = model.byId[draft.id];
+    const start = distanceLeaderLength(annotation.geometry, draft.start);
+    const current = distanceLeaderLength(annotation.geometry, point);
 
-    return [{ ...m, draft: { ...d, delta: current - start } }, []];
+    return [{ ...model, draft: { ...draft, delta: current - start } }, []];
   }
-  if (d.g === 'caption')
+  if (draft.kind === 'caption')
     return [
-      { ...m, draft: { ...d, delta: { x: point.x - d.start.x, y: point.y - d.start.y } } },
+      {
+        ...model,
+        draft: { ...draft, delta: { x: point.x - draft.start.x, y: point.y - draft.start.y } },
+      },
       [],
     ];
-  if (d.g === 'handle')
-    return [{ ...m, draft: { ...d, cur: geomDragHandle(d.base, d.handle, point) } }, []];
-  // Rotation reads the pointer as an ANGLE about the pivot — the raw point is
+  if (draft.kind === 'handle')
+    return [
+      { ...model, draft: { ...draft, current: geomDragHandle(draft.base, draft.handle, point) } },
+      [],
+    ];
+  // Rotation reads the pointer as an angle about the pivot — the raw point is
   // valid (and better) outside the page; the geometry itself never translates.
   // `free` (shift) records the snap bypass for this sample.
-  if (d.g === 'rotate') return [{ ...m, draft: { ...d, cur: input.point, free: input.shift } }, []];
-  if (d.g === 'group') {
-    const iso = selectionHasRotation(m, d.ids);
-    return [{ ...m, draft: { ...d, cur: groupResizeBox(d.base, d.handle, point, iso) } }, []];
+  if (draft.kind === 'rotate')
+    return [{ ...model, draft: { ...draft, current: input.point, free: input.shift } }, []];
+  if (draft.kind === 'group') {
+    const iso = selectionHasRotation(model, draft.ids);
+    return [
+      {
+        ...model,
+        draft: { ...draft, current: groupResizeBox(draft.base, draft.handle, point, iso) },
+      },
+      [],
+    ];
   }
-  return [m, []];
+  return [model, []];
 }
 
-function editUp(m: Model): [Model, Effect[]] {
-  const d = m.draft!;
-  if (d.g === 'leader') {
-    const annotation = m.byId[d.id];
-    if (annotation?.measure?.intent !== 'LineDimension' || d.delta === 0) {
-      return [{ ...m, draft: null }, []];
+function editUp(model: Model): [Model, Effect[]] {
+  const draft = model.draft!;
+  if (draft.kind === 'leader') {
+    const annotation = model.byId[draft.id];
+    if (annotation?.measure?.intent !== 'LineDimension' || draft.delta === 0) {
+      return [{ ...model, draft: null }, []];
     }
 
     const measure = annotation.measure;
-    const updated: Annot = {
+    const updated: ModelAnnotation = {
       ...annotation,
       source: 'vector',
       measure: {
         ...measure,
         leader: {
           ...measure.leader,
-          length: (measure.leader?.length ?? 0) + d.delta,
+          length: (measure.leader?.length ?? 0) + draft.delta,
         },
       },
     };
 
     return [
-      { ...m, draft: null, byId: { ...m.byId, [updated.id]: updated } },
-      [{ fx: 'patch', id: updated.id, scope: { kind: 'leader' } }],
+      { ...model, draft: null, byId: { ...model.byId, [updated.id]: updated } },
+      [{ type: 'patch', id: updated.id, scope: { kind: 'leader' } }],
     ];
   }
-  if (d.g === 'caption') {
-    const a = m.byId[d.id];
-    if (!a?.measure || (!d.delta.x && !d.delta.y)) return [{ ...m, draft: null }, []];
+  if (draft.kind === 'caption') {
+    const annotation = model.byId[draft.id];
+    if (!annotation?.measure || (!draft.delta.x && !draft.delta.y))
+      return [{ ...model, draft: null }, []];
     return [
       {
-        ...m,
+        ...model,
         draft: null,
         byId: {
-          ...m.byId,
-          [a.id]: {
-            ...a,
+          ...model.byId,
+          [annotation.id]: {
+            ...annotation,
             source: 'vector',
-            measure: moveMeasurementCaption(a.geom, a.measure, d.delta, a.style),
+            measure: moveMeasurementCaption(
+              annotation.geometry,
+              annotation.measure,
+              draft.delta,
+              annotation.style,
+            ),
           },
         },
       },
-      [{ fx: 'patch', id: a.id, scope: { kind: 'caption' } }],
+      [{ type: 'patch', id: annotation.id, scope: { kind: 'caption' } }],
     ];
   }
-  if (d.g === 'handle') {
+  if (draft.kind === 'handle') {
     // A grab that didn't actually resize leaves the appearance untouched → keep
     // it baked, no engine write.
-    if (geomEqual(d.base, d.cur)) return [{ ...m, draft: null }, []];
+    if (geomEqual(draft.base, draft.current)) return [{ ...model, draft: null }, []];
     // A resize changes the appearance: we own it now → live (vector) render
     // (opaque-body kinds stay baked; the engine re-fits their AP natively).
-    // `cur` is VIEW-space (the projected geometry the user dragged); the
+    // `cur` is view-space (the projected geometry the user dragged); the
     // commit maps it back to stored space — the identity when un-flagged.
-    const before = m.byId[d.id];
-    const stored = unanchoredGeom(d.cur, anchorModeOf(before), d.view);
+    const before = model.byId[draft.id];
+    const stored = unanchoredGeom(draft.current, anchorModeOf(before), draft.view);
     if (before.measure?.intent === 'PolygonDimension') {
       const readout = shapeMeasurementReadout(stored, before.measure);
       if ('unavailable' in readout && readout.unavailable === 'invalid-geometry') {
-        return [{ ...m, draft: null }, []];
+        return [{ ...model, draft: null }, []];
       }
     }
-    const a = ownGeometry({ ...before, geom: stored });
-    return [{ ...m, byId: { ...m.byId, [d.id]: a }, draft: null }, [patchFx(d.id, a, before.geom)]];
+    const annotation = ownGeometry({ ...before, geometry: stored });
+    return [
+      { ...model, byId: { ...model.byId, [draft.id]: annotation }, draft: null },
+      [patchFx(draft.id, annotation, before.geometry)],
+    ];
   }
-  if (d.g === 'rotate') {
-    const { delta } = rotateDraftDelta(m, d);
-    if (Math.abs(delta) < 0.01) return [{ ...m, draft: null }, []];
-    const byId = { ...m.byId };
+  if (draft.kind === 'rotate') {
+    const { delta } = rotateDraftDelta(model, draft);
+    if (Math.abs(delta) < 0.01) return [{ ...model, draft: null }, []];
+    const byId = { ...model.byId };
     const fx: Effect[] = [];
-    for (const id of d.ids) {
-      const a = byId[id];
-      if (!a) continue;
+    for (const id of draft.ids) {
+      const annotation = byId[id];
+      if (!annotation) continue;
       // rotation re-bakes the appearance → live (vector) render + patch. The
-      // gesture composed in VIEW space (`effGeom`); the commit replays the
-      // same composition and unprojects — a screen-anchored member's AUTHORED
+      // gesture composed in view space (`effGeom`); the commit replays the
+      // same composition and unprojects — a screen-anchored member's authored
       // tilt turns WYSIWYG, exactly as previewed.
-      const geom = commitViewGesture(a, d.view, (g) => geomRotateAbout(g, d.pivot, delta));
-      const measure = transformMeasurementCaption(a.measure, (point) =>
-        rotatePoint(point, d.pivot, delta),
+      const rotated = commitViewGesture(annotation, draft.view, (geometry) =>
+        geomRotateAbout(geometry, draft.pivot, delta),
       );
-      byId[id] = ownGeometry({ ...a, geom, measure });
-      fx.push(patchFx(id, byId[id], a.geom));
+      const measure = transformMeasurementCaption(annotation.measure, (point) =>
+        rotatePoint(point, draft.pivot, delta),
+      );
+      byId[id] = ownGeometry({ ...annotation, geometry: rotated, measure });
+      fx.push(patchFx(id, byId[id], annotation.geometry));
     }
-    return [{ ...m, byId, draft: null }, fx];
+    return [{ ...model, byId, draft: null }, fx];
   }
-  if (d.g === 'group') {
-    const { sx, sy } = groupResizeFactors(d.base, d.cur);
-    if (Math.abs(sx - 1) < 1e-4 && Math.abs(sy - 1) < 1e-4) return [{ ...m, draft: null }, []];
-    const byId = { ...m.byId };
+  if (draft.kind === 'group') {
+    const { sx, sy } = groupResizeFactors(draft.base, draft.current);
+    if (Math.abs(sx - 1) < 1e-4 && Math.abs(sy - 1) < 1e-4) return [{ ...model, draft: null }, []];
+    const byId = { ...model.byId };
     const fx: Effect[] = [];
-    for (const id of d.ids) {
-      const a = byId[id];
-      if (!a) continue;
-      const geom = commitViewGesture(a, d.view, (g) => geomScaleAbout(g, d.anchor, sx, sy));
-      const measure = transformMeasurementCaption(a.measure, (point) => ({
-        x: d.anchor.x + (point.x - d.anchor.x) * sx,
-        y: d.anchor.y + (point.y - d.anchor.y) * sy,
+    for (const id of draft.ids) {
+      const annotation = byId[id];
+      if (!annotation) continue;
+      const scaled = commitViewGesture(annotation, draft.view, (geometry) =>
+        geomScaleAbout(geometry, draft.anchor, sx, sy),
+      );
+      const measure = transformMeasurementCaption(annotation.measure, (point) => ({
+        x: draft.anchor.x + (point.x - draft.anchor.x) * sx,
+        y: draft.anchor.y + (point.y - draft.anchor.y) * sy,
       }));
-      byId[id] = ownGeometry({ ...a, geom, measure });
-      fx.push(patchFx(id, byId[id], a.geom));
+      byId[id] = ownGeometry({ ...annotation, geometry: scaled, measure });
+      fx.push(patchFx(id, byId[id], annotation.geometry));
     }
-    return [{ ...m, byId, draft: null }, fx];
+    return [{ ...model, byId, draft: null }, fx];
   }
-  if (d.g === 'move') {
-    if (Math.hypot(d.delta.x, d.delta.y) < 0.01) return [{ ...m, draft: null }, []]; // a click
-    const byId = { ...m.byId };
+  if (draft.kind === 'move') {
+    if (Math.hypot(draft.delta.x, draft.delta.y) < 0.01) return [{ ...model, draft: null }, []]; // a click
+    const byId = { ...model.byId };
     const fx: Effect[] = [];
-    for (const id of d.ids) {
-      const a = byId[id];
+    for (const id of draft.ids) {
+      const annotation = byId[id];
       // A move is a rigid translation — the appearance is unchanged, so a baked
-      // annotation STAYS baked and its raster box rides along. Source preserved.
+      // annotation stays baked and its raster box rides along. Source preserved.
       byId[id] = {
-        ...a,
-        geom: geomTranslate(a.geom, d.delta),
-        measure: transformMeasurementCaption(a.measure, (point) => ({
-          x: point.x + d.delta.x,
-          y: point.y + d.delta.y,
+        ...annotation,
+        geometry: geomTranslate(annotation.geometry, draft.delta),
+        measure: transformMeasurementCaption(annotation.measure, (point) => ({
+          x: point.x + draft.delta.x,
+          y: point.y + draft.delta.y,
         })),
-        apBox: a.apBox ? translateRect(a.apBox, d.delta) : undefined,
+        apBox: annotation.apBox ? translateRect(annotation.apBox, draft.delta) : undefined,
       };
-      fx.push({ fx: 'patch', id, scope: { kind: 'geometry' } }); // a move never invalidates the raster
+      fx.push({ type: 'patch', id, scope: { kind: 'geometry' } }); // a move never invalidates the raster
     }
-    return [{ ...m, byId, draft: null }, fx];
+    return [{ ...model, byId, draft: null }, fx];
   }
-  return [{ ...m, draft: null }, []];
+  return [{ ...model, draft: null }, []];
 }
 
 function marqueePointer(
-  m: Model,
+  model: Model,
   phase: 'down' | 'move' | 'up',
   input: PointerInput,
 ): [Model, Effect[]] {
   // The marquee lives on one page and pins to its box (same rules as editMove).
   const point = clampPointToBox(input.point, input.pageBox);
   if (phase === 'down') {
-    return [{ ...m, draft: { g: 'marquee', page: input.page, from: point, to: point } }, []];
+    return [{ ...model, draft: { kind: 'marquee', page: input.page, from: point, to: point } }, []];
   }
-  if (m.draft?.g !== 'marquee') return [m, []];
-  if (m.draft.page.pageObjectNumber !== input.page.pageObjectNumber) return [m, []]; // foreign frame — ignore
+  if (model.draft?.kind !== 'marquee') return [model, []];
+  if (model.draft.page.pageObjectNumber !== input.page.pageObjectNumber) return [model, []]; // foreign frame — ignore
   if (phase === 'move') {
-    return [{ ...m, draft: { ...m.draft, to: point } }, []];
+    return [{ ...model, draft: { ...model.draft, to: point } }, []];
   }
 
   // A marquee that touches one member takes the whole group with it.
   const hits = expandGroups(
-    m,
-    annotsInBox(m, m.draft.page, m.draft.from, point, input.inert, viewOf(input)),
+    model,
+    annotsInBox(model, model.draft.page, model.draft.from, point, input.inert, viewOf(input)),
   );
-  const selected = input.shift ? toggleSelection(m.selected, hits) : hits;
-  return [{ ...m, selected, draft: null }, []];
+  const selected = input.shift ? toggleSelection(model.selected, hits) : hits;
+  return [{ ...model, selected, draft: null }, []];
 }
 
 function toggleSelection(base: Id[], ids: Id[]): Id[] {
@@ -828,7 +894,7 @@ function distancePointer(
 ): [Model, Effect[]] {
   const draft = model.draft;
 
-  if (draft?.g !== 'create-distance') {
+  if (draft?.kind !== 'create-distance') {
     if (phase !== 'down' || !measure) {
       return [model, []];
     }
@@ -838,7 +904,7 @@ function distancePointer(
         ...model,
         selected: [],
         draft: {
-          g: 'create-distance',
+          kind: 'create-distance',
           step: 'endpoints',
           subtype: 'line',
           preset,
@@ -884,8 +950,8 @@ function distancePointer(
   }
 
   const defaults = defaultsFor(model, draft.preset);
-  const geom: Geom = {
-    t: 'line',
+  const geometry: ContentGeometry = {
+    kind: 'line',
     a: draft.from,
     b: draft.to,
     ends: defaults.lineEndings,
@@ -894,7 +960,7 @@ function distancePointer(
     ...draft.measure,
     leader: {
       ...draft.measure.leader,
-      length: distanceLeaderLength(geom, input.point),
+      length: distanceLeaderLength(geometry, input.point),
     },
   };
 
@@ -903,12 +969,12 @@ function distancePointer(
   }
 
   const id = `tmp:${model.seq + 1}`;
-  const annotation: Annot = {
+  const annotation: ModelAnnotation = {
     id,
     ref: null,
     page: draft.page,
     subtype: 'line',
-    geom,
+    geometry,
     measure: appearance,
     style: {
       ...styleFromProps(defaults),
@@ -927,12 +993,12 @@ function distancePointer(
       selected: [id],
       draft: null,
     },
-    [{ fx: 'create', id }],
+    [{ type: 'create', id }],
   ];
 }
 
 function createPointer(
-  m: Model,
+  model: Model,
   phase: 'down' | 'move' | 'up',
   subtype: Subtype,
   input: PointerInput,
@@ -946,20 +1012,23 @@ function createPointer(
   capture?: string,
 ): [Model, Effect[]] {
   // An in-progress creation is anchored to its page: a move/up sample from
-  // another page is a foreign frame — ignore it. (A DOWN on another page is a
+  // another page is a foreign frame — ignore it. (A down on another page is a
   // fresh intent: the per-subtype branches below start/restart the draft there.)
   if (
     phase !== 'down' &&
-    m.draft &&
-    'page' in m.draft &&
-    m.draft.page.pageObjectNumber !== input.page.pageObjectNumber
+    model.draft &&
+    'page' in model.draft &&
+    model.draft.page.pageObjectNumber !== input.page.pageObjectNumber
   )
-    return [m, []];
+    return [model, []];
   // Shapes can't be drawn past the page edge — the pointer pins to it.
   if (input.pageBox) input = { ...input, point: clampPointToBox(input.point, input.pageBox) };
-  if (m.draft?.g === 'create-distance' || (measure?.intent === 'LineDimension' && !capture)) {
+  if (
+    model.draft?.kind === 'create-distance' ||
+    (measure?.intent === 'LineDimension' && !capture)
+  ) {
     return distancePointer(
-      m,
+      model,
       phase,
       input,
       preset,
@@ -967,35 +1036,39 @@ function createPointer(
       flags,
     );
   }
-  if (subtype === 'free-text-callout') return calloutPointer(m, phase, input, preset, flags);
+  if (subtype === 'free-text-callout') return calloutPointer(model, phase, input, preset, flags);
   if (phase === 'down') {
     if (isPolySubtype(subtype)) {
-      if (input.finish) return finishPolyCreate(m);
+      if (input.finish) return finishPolyCreate(model);
       if (
-        m.draft?.g === 'create-poly' &&
-        m.draft.subtype === subtype &&
-        m.draft.preset === preset &&
-        m.draft.page.pageObjectNumber === input.page.pageObjectNumber
+        model.draft?.kind === 'create-poly' &&
+        model.draft.subtype === subtype &&
+        model.draft.preset === preset &&
+        model.draft.page.pageObjectNumber === input.page.pageObjectNumber
       ) {
         return [
           {
-            ...m,
-            draft: { ...m.draft, points: [...m.draft.points, input.point], cur: input.point },
+            ...model,
+            draft: {
+              ...model.draft,
+              points: [...model.draft.points, input.point],
+              current: input.point,
+            },
           },
           [],
         ];
       }
       return [
         {
-          ...m,
+          ...model,
           selected: [],
           draft: {
-            g: 'create-poly',
+            kind: 'create-poly',
             subtype,
             preset,
             page: input.page,
             points: [input.point],
-            cur: input.point,
+            current: input.point,
             closed: subtype === 'polygon',
             ...(measure && measure.intent !== 'LineDimension' ? { measure } : {}),
             ...(flags ? { flags } : {}),
@@ -1007,7 +1080,7 @@ function createPointer(
     const draft: Draft | null =
       subtype === 'line'
         ? {
-            g: 'create-line',
+            kind: 'create-line',
             measure,
             capture,
             subtype,
@@ -1019,13 +1092,13 @@ function createPointer(
             ...(flags ? { flags } : {}),
           }
         : subtype === 'ink'
-          ? m.draft?.g === 'create-ink' &&
-            m.draft.subtype === subtype &&
-            m.draft.preset === preset &&
-            m.draft.page.pageObjectNumber === input.page.pageObjectNumber
-            ? { ...m.draft, strokes: [...m.draft.strokes, [input.point]] }
+          ? model.draft?.kind === 'create-ink' &&
+            model.draft.subtype === subtype &&
+            model.draft.preset === preset &&
+            model.draft.page.pageObjectNumber === input.page.pageObjectNumber
+            ? { ...model.draft, strokes: [...model.draft.strokes, [input.point]] }
             : {
-                g: 'create-ink',
+                kind: 'create-ink',
                 subtype,
                 preset,
                 page: input.page,
@@ -1039,14 +1112,14 @@ function createPointer(
               subtype === 'redact' ||
               subtype === 'link'
             ? {
-                g: 'create-rect',
+                kind: 'create-rect',
                 subtype,
                 preset,
                 page: input.page,
                 from: input.point,
                 to: input.point,
                 ellipse: subtype === 'circle',
-                // Captured at DOWN (the gesture's home page); a rotation of 0
+                // Captured at down (the gesture's home page); a rotation of 0
                 // makes upright a no-op, so the draft stays clean then.
                 ...(input.upright && input.displayRotation
                   ? { displayRotation: input.displayRotation, upright: true }
@@ -1055,219 +1128,238 @@ function createPointer(
                 ...(flags ? { flags } : {}),
               }
             : null;
-    return draft ? [{ ...m, selected: [], draft }, []] : [m, []];
+    return draft ? [{ ...model, selected: [], draft }, []] : [model, []];
   }
   if (phase === 'move') {
-    if (m.draft?.g === 'create-poly') {
-      return [{ ...m, draft: { ...m.draft, cur: input.point } }, []];
+    if (model.draft?.kind === 'create-poly') {
+      return [{ ...model, draft: { ...model.draft, current: input.point } }, []];
     }
-    if (m.draft?.g === 'create-rect' || m.draft?.g === 'create-line') {
-      return [{ ...m, draft: { ...m.draft, to: input.point } }, []];
+    if (model.draft?.kind === 'create-rect' || model.draft?.kind === 'create-line') {
+      return [{ ...model, draft: { ...model.draft, to: input.point } }, []];
     }
-    if (m.draft?.g === 'create-ink') {
+    if (model.draft?.kind === 'create-ink') {
       // append to the active (last) stroke as the pen moves
-      const strokes = m.draft.strokes.slice();
+      const strokes = model.draft.strokes.slice();
       strokes[strokes.length - 1] = [...strokes[strokes.length - 1], input.point];
-      return [{ ...m, draft: { ...m.draft, strokes } }, []];
+      return [{ ...model, draft: { ...model.draft, strokes } }, []];
     }
-    return [m, []];
+    return [model, []];
   }
   // up
-  const d = m.draft;
-  if (d?.g !== 'create-rect' && d?.g !== 'create-line' && d?.g !== 'create-ink') return [m, []];
+  const activeDraft = model.draft;
+  if (
+    activeDraft?.kind !== 'create-rect' &&
+    activeDraft?.kind !== 'create-line' &&
+    activeDraft?.kind !== 'create-ink'
+  )
+    return [model, []];
 
-  if (d.g === 'create-ink') {
-    let next = m;
-    if (straightenInk && d.strokes.length) {
-      const strokes = d.strokes.slice();
+  if (activeDraft.kind === 'create-ink') {
+    let next = model;
+    if (straightenInk && activeDraft.strokes.length) {
+      const strokes = activeDraft.strokes.slice();
       const last = strokes.length - 1;
       strokes[last] = straightenInkStroke(strokes[last], straightenInk);
-      next = { ...m, draft: { ...d, strokes } };
+      next = { ...model, draft: { ...activeDraft, strokes } };
     }
     return deferInkCommit ? [next, []] : finishInkCreate(next);
   }
 
-  const def = defaultsFor(m, d.preset ?? d.subtype);
-  const style = styleFromProps(def);
-  let geom: Geom | null = null;
-  // The upright counter-rotation for a BOX commit (0 when the tool/page don't
-  // ask for one). A DRAGGED box keeps the on-screen footprint the author drew:
-  // for a quarter-turn the unrotated box is the drag rect TRANSPOSED about its
+  const definition = defaultsFor(model, activeDraft.preset ?? activeDraft.subtype);
+  const style = styleFromProps(definition);
+  let geometry: ContentGeometry | null = null;
+  // The upright counter-rotation for a box commit (0 when the tool/page don't
+  // ask for one). A dragged box keeps the on-screen footprint the author drew:
+  // for a quarter-turn the unrotated box is the drag rect transposed about its
   // centre, so spinning it by `rot` lands exactly back on the dragged region.
   const upRot =
-    d.g === 'create-rect' && d.upright && d.displayRotation
-      ? uprightRotation(d.displayRotation)
+    activeDraft.kind === 'create-rect' && activeDraft.upright && activeDraft.displayRotation
+      ? uprightRotation(activeDraft.displayRotation)
       : 0;
   const uprightBox = (dragged: Rect): Rect =>
     upRot === 90 || upRot === 270 ? transposedAboutCenter(dragged) : dragged;
-  // Click commits resolve through the SHARED placement layer (placement.ts) —
+  // Click commits resolve through the shared placement layer (placement.ts) —
   // the same `resolveClickPlacement` the footprint ghost and the form plugin
   // consume, so preview ≡ commit by construction. The core only supplies the
   // kind-level fallback for free text (a click must always yield a typable
-  // box) and converts the placement to a Geom via `clickCreateGeom`.
-  const clickGeom = (policy: ClickCreate): Geom | null =>
+  // box) and converts the placement to a ContentGeometry via `clickCreateGeom`.
+  const clickGeom = (policy: ClickCreate): ContentGeometry | null =>
     clickCreateGeom(
-      d.subtype,
-      resolveClickPlacement(d.from, policy, {
+      activeDraft.subtype,
+      resolveClickPlacement(activeDraft.from, policy, {
         pageBox: input.pageBox,
-        upright: d.g === 'create-rect' ? d.upright : undefined,
-        displayRotation: d.g === 'create-rect' ? d.displayRotation : undefined,
+        upright: activeDraft.kind === 'create-rect' ? activeDraft.upright : undefined,
+        displayRotation:
+          activeDraft.kind === 'create-rect' ? activeDraft.displayRotation : undefined,
       }),
-      def,
+      definition,
     );
-  if (d.g === 'create-rect' && d.subtype === 'free-text') {
+  if (activeDraft.kind === 'create-rect' && activeDraft.subtype === 'free-text') {
     // Free-text: a dragged box, or — on a mere click — a default box you can
     // immediately type into (created unless the tool says `clickCreate: false`;
     // an empty text box is unreachable by drag alone, hence the kind-level
     // fallback: 180×40, top-left anchored so the box hangs where you'll type).
-    const dragged = rectFromPoints(d.from, d.to);
+    const dragged = rectFromPoints(activeDraft.from, activeDraft.to);
     const isClick = dragged.width < MIN_DRAG && dragged.height < MIN_DRAG;
     if (!isClick) {
-      geom = { t: 'text', rect: uprightBox(dragged), ...(upRot ? { rot: upRot } : {}) };
-    } else if (d.clickCreate !== false) {
-      geom = clickGeom(
-        d.clickCreate && 'width' in d.clickCreate
-          ? d.clickCreate
+      geometry = { kind: 'text', rect: uprightBox(dragged), ...(upRot ? { rot: upRot } : {}) };
+    } else if (activeDraft.clickCreate !== false) {
+      geometry = clickGeom(
+        activeDraft.clickCreate && 'width' in activeDraft.clickCreate
+          ? activeDraft.clickCreate
           : { width: 180, height: 40, anchor: 'top-left' },
       );
     }
-  } else if (d.g === 'create-rect') {
-    const dragged = rectFromPoints(d.from, d.to);
+  } else if (activeDraft.kind === 'create-rect') {
+    const dragged = rectFromPoints(activeDraft.from, activeDraft.to);
     if (dragged.width >= MIN_DRAG || dragged.height >= MIN_DRAG) {
-      // cloudy stores the OUTER box (dragged + extent) so the dragged box is its inner edge
-      geom = {
-        t: 'rect',
-        rect: shapeRectFor(uprightBox(dragged), d.ellipse, style),
-        ellipse: d.ellipse,
+      // cloudy stores the outer box (dragged + extent) so the dragged box is its inner edge
+      geometry = {
+        kind: 'rect',
+        rect: shapeRectFor(uprightBox(dragged), activeDraft.ellipse, style),
+        ellipse: activeDraft.ellipse,
         ...(upRot ? { rot: upRot } : {}),
       };
-    } else if (d.clickCreate && 'width' in d.clickCreate) {
-      geom = clickGeom(d.clickCreate);
+    } else if (activeDraft.clickCreate && 'width' in activeDraft.clickCreate) {
+      geometry = clickGeom(activeDraft.clickCreate);
     }
-  } else if (d.g === 'create-line') {
-    if (Math.hypot(d.to.x - d.from.x, d.to.y - d.from.y) >= MIN_DRAG) {
-      geom = { t: 'line', a: d.from, b: d.to, ends: def.lineEndings };
-    } else if (d.clickCreate && 'length' in d.clickCreate) {
-      geom = clickGeom(d.clickCreate);
+  } else if (activeDraft.kind === 'create-line') {
+    if (
+      Math.hypot(activeDraft.to.x - activeDraft.from.x, activeDraft.to.y - activeDraft.from.y) >=
+      MIN_DRAG
+    ) {
+      geometry = {
+        kind: 'line',
+        a: activeDraft.from,
+        b: activeDraft.to,
+        ends: definition.lineEndings,
+      };
+    } else if (activeDraft.clickCreate && 'length' in activeDraft.clickCreate) {
+      geometry = clickGeom(activeDraft.clickCreate);
     }
   }
-  if (!geom) return [{ ...m, draft: null }, []];
-  if (d.g === 'create-line' && d.capture)
-    return [{ ...m, draft: null }, [{ fx: 'captured', tool: d.capture, page: d.page, geom }]];
+  if (!geometry) return [{ ...model, draft: null }, []];
+  if (activeDraft.kind === 'create-line' && activeDraft.capture)
+    return [
+      { ...model, draft: null },
+      [{ type: 'captured', tool: activeDraft.capture, page: activeDraft.page, geometry }],
+    ];
 
-  const id = `tmp:${m.seq + 1}`;
-  const annot: Annot = {
+  const id = `tmp:${model.seq + 1}`;
+  const annotation: ModelAnnotation = {
     id,
     ref: null,
-    page: d.page,
-    subtype: d.subtype,
-    ...(d.g === 'create-line' && d.measure ? { measure: d.measure } : {}),
-    geom,
+    page: activeDraft.page,
+    subtype: activeDraft.subtype,
+    ...(activeDraft.kind === 'create-line' && activeDraft.measure
+      ? { measure: activeDraft.measure }
+      : {}),
+    geometry,
     style,
     // A text kind carries its text styling from birth, so the tool's font
     // defaults actually apply to what you draw.
-    ...(geom.t === 'text' ? { text: textStyleFromProps(def) } : {}),
+    ...(geometry.kind === 'text' ? { text: textStyleFromProps(definition) } : {}),
     // A drawn link starts at the tool preset's target ('docs-link' style
     // presets), or dead (`null` — the create-then-edit flow).
-    ...(d.subtype === 'link' ? { link: def.link ?? null } : {}),
-    flags: { ...DRAWN_FLAGS, ...d.flags },
+    ...(activeDraft.subtype === 'link' ? { link: definition.link ?? null } : {}),
+    flags: { ...DRAWN_FLAGS, ...activeDraft.flags },
     source: 'vector',
   };
   return [
     {
-      ...m,
-      seq: m.seq + 1,
-      byId: { ...m.byId, [id]: annot },
-      order: [...m.order, id],
+      ...model,
+      seq: model.seq + 1,
+      byId: { ...model.byId, [id]: annotation },
+      order: [...model.order, id],
       selected: [id],
       draft: null,
       // A freshly drawn free-text box opens straight into edit (type immediately).
-      editing: geom.t === 'text' ? id : m.editing,
+      editing: geometry.kind === 'text' ? id : model.editing,
     },
-    [{ fx: 'create', id }],
+    [{ type: 'create', id }],
   ];
 }
 
 /** Commit all strokes accumulated by a grouped ink gesture. */
-function finishInkCreate(m: Model): [Model, Effect[]] {
-  const d = m.draft;
-  if (d?.g !== 'create-ink') return [m, []];
-  const points = d.strokes.flat();
-  if (!d.strokes.some((stroke) => stroke.length >= 2) || points.length === 0)
-    return [{ ...m, draft: null }, []];
+function finishInkCreate(model: Model): [Model, Effect[]] {
+  const draft = model.draft;
+  if (draft?.kind !== 'create-ink') return [model, []];
+  const points = draft.strokes.flat();
+  if (!draft.strokes.some((stroke) => stroke.length >= 2) || points.length === 0)
+    return [{ ...model, draft: null }, []];
   const bounds = unionRect(points);
-  if (Math.max(bounds.width, bounds.height) < MIN_DRAG) return [{ ...m, draft: null }, []];
+  if (Math.max(bounds.width, bounds.height) < MIN_DRAG) return [{ ...model, draft: null }, []];
 
-  const id = `tmp:${m.seq + 1}`;
-  const annot: Annot = {
+  const id = `tmp:${model.seq + 1}`;
+  const annotation: ModelAnnotation = {
     id,
     ref: null,
-    page: d.page,
-    subtype: d.subtype,
-    geom: { t: 'ink', strokes: d.strokes },
-    style: styleFromProps(defaultsFor(m, d.preset ?? d.subtype)),
-    ...(d.intent ? { intent: d.intent } : {}),
-    flags: { ...DRAWN_FLAGS, ...d.flags },
+    page: draft.page,
+    subtype: draft.subtype,
+    geometry: { kind: 'ink', strokes: draft.strokes },
+    style: styleFromProps(defaultsFor(model, draft.preset ?? draft.subtype)),
+    ...(draft.intent ? { intent: draft.intent } : {}),
+    flags: { ...DRAWN_FLAGS, ...draft.flags },
     source: 'vector',
   };
   return [
     {
-      ...m,
-      seq: m.seq + 1,
-      byId: { ...m.byId, [id]: annot },
-      order: [...m.order, id],
+      ...model,
+      seq: model.seq + 1,
+      byId: { ...model.byId, [id]: annotation },
+      order: [...model.order, id],
       selected: [id],
       draft: null,
     },
-    [{ fx: 'create', id }],
+    [{ type: 'create', id }],
   ];
 }
 
 /** Default text-box size for a callout placed with a click (no box drag). */
 const CALLOUT_BOX = { width: 150, height: 40 };
 
-/** The callout draft's upright counter-rotation (deg CW; 0 = none) — the SAME
+/** The callout draft's upright counter-rotation (deg CW; 0 = none) — the same
  *  rule the rect commit applies, shared by `calloutBox`, the ghost preview and
  *  the commit so all three agree by construction. */
-export function calloutUprightRot(d: Extract<Draft, { g: 'create-callout' }>): number {
-  return d.upright && d.displayRotation ? uprightRotation(d.displayRotation) : 0;
+export function calloutUprightRot(draft: Extract<Draft, { kind: 'create-callout' }>): number {
+  return draft.upright && draft.displayRotation ? uprightRotation(draft.displayRotation) : 0;
 }
 
 /**
- * The text-box rect for an in-progress callout's `box` step — the ONE rule both
+ * The text-box rect for an in-progress callout's `box` step — the one rule both
  * the live preview and the commit use, so what you see is what you get. Only a
  * drag past `MIN_DRAG` sizes the box; a press-without-drag (a click) keeps the
  * default-size box anchored at the press point, so it never collapses to a sliver
  * while you decide whether you're dragging (the "bounce"). Before the press
  * (hover), the default box tracks the cursor.
  *
- * Under `upright` this returns the UNROTATED logical box (the frame text is laid
- * out in): a DRAGGED box keeps the on-screen footprint the author drew (quarter
+ * Under `upright` this returns the unrotated logical box (the frame text is laid
+ * out in): a dragged box keeps the on-screen footprint the author drew (quarter
  * turns transpose it about its centre — spinning by `rot` lands exactly back on
- * the dragged region), and the default box anchors so its DISPLAYED top-left
+ * the dragged region), and the default box anchors so its displayed top-left
  * hangs at the point, down-right of the cursor as the author sees it — the same
  * two rules the free-text drag/click commits use. The default box then slides
  * so that footprint stays inside the page; a real drag is already bounded by
  * the point clamp and is left exactly where the author drew it.
  */
-export function calloutBox(d: Extract<Draft, { g: 'create-callout' }>): Rect {
-  const rot = calloutUprightRot(d);
+export function calloutBox(draft: Extract<Draft, { kind: 'create-callout' }>): Rect {
+  const rot = calloutUprightRot(draft);
   const quarter = rot === 90 || rot === 270;
-  const defaultBox = (at: Vec): Rect =>
+  const defaultBox = (at: Point): Rect =>
     slideCalloutFootprint(
       rot
-        ? uprightAnchoredRect(at, CALLOUT_BOX.width, CALLOUT_BOX.height, d.displayRotation!)
+        ? uprightAnchoredRect(at, CALLOUT_BOX.width, CALLOUT_BOX.height, draft.displayRotation!)
         : { x: at.x, y: at.y, ...CALLOUT_BOX },
       rot,
-      d.pageBox,
+      draft.pageBox,
     );
-  if (d.boxFrom) {
-    const dragged = d.boxTo ? rectFromPoints(d.boxFrom, d.boxTo) : null;
+  if (draft.boxFrom) {
+    const dragged = draft.boxTo ? rectFromPoints(draft.boxFrom, draft.boxTo) : null;
     if (dragged && (dragged.width >= MIN_DRAG || dragged.height >= MIN_DRAG))
       return quarter ? transposedAboutCenter(dragged) : dragged;
-    return defaultBox(d.boxFrom);
+    return defaultBox(draft.boxFrom);
   }
-  return defaultBox(d.cur);
+  return defaultBox(draft.current);
 }
 
 /** Shift `rect` so its displayed footprint (the box rotated about its centre)
@@ -1284,7 +1376,7 @@ function slideCalloutFootprint(rect: Rect, rot: number, page: Rect | undefined):
 }
 
 /**
- * The free-text callout's multi-step creation, a v2-style 3-click flow:
+ * The free-text callout's multi-step creation, a 3-click flow:
  *   click 1 (down)  → set the leader `tip`, advance to the `knee` step
  *   hover/move      → preview the leader to the cursor
  *   click 2 (down)  → set the `knee`, advance to the `box` step
@@ -1293,28 +1385,31 @@ function slideCalloutFootprint(rect: Rect, rot: number, page: Rect | undefined):
  * editing — the connection point to the box is always derived, never stored.
  */
 function calloutPointer(
-  m: Model,
+  model: Model,
   phase: 'down' | 'move' | 'up',
   input: PointerInput,
   preset: string = 'free-text-callout',
   flags?: Partial<AnnotationFlags>,
 ): [Model, Effect[]] {
-  const d = m.draft;
+  const draft = model.draft;
   if (phase === 'down') {
-    if (d?.g !== 'create-callout' || d.page.pageObjectNumber !== input.page.pageObjectNumber) {
+    if (
+      draft?.kind !== 'create-callout' ||
+      draft.page.pageObjectNumber !== input.page.pageObjectNumber
+    ) {
       return [
         {
-          ...m,
+          ...model,
           selected: [],
           draft: {
-            g: 'create-callout',
+            kind: 'create-callout',
             subtype: 'free-text-callout',
             preset,
             page: input.page,
             step: 'knee',
             tip: input.point,
-            cur: input.point,
-            // Captured at the TIP click (the gesture's home page) — the box
+            current: input.point,
+            // Captured at the tip click (the gesture's home page) — the box
             // step may span later samples that don't carry the rotation. A
             // rotation of 0 makes upright a no-op, so the draft stays clean.
             ...(input.upright && input.displayRotation
@@ -1327,104 +1422,110 @@ function calloutPointer(
         [],
       ];
     }
-    if (d.step === 'knee') {
-      return [{ ...m, draft: { ...d, knee: input.point, step: 'box', cur: input.point } }, []];
+    if (draft.step === 'knee') {
+      return [
+        { ...model, draft: { ...draft, knee: input.point, step: 'box', current: input.point } },
+        [],
+      ];
     }
     // box step: begin the box drag at this point
-    return [{ ...m, draft: { ...d, boxFrom: input.point, boxTo: input.point } }, []];
+    return [{ ...model, draft: { ...draft, boxFrom: input.point, boxTo: input.point } }, []];
   }
   if (phase === 'move') {
-    if (d?.g !== 'create-callout') return [m, []];
-    if (d.step === 'box' && d.boxFrom) return [{ ...m, draft: { ...d, boxTo: input.point } }, []];
-    return [{ ...m, draft: { ...d, cur: input.point } }, []];
+    if (draft?.kind !== 'create-callout') return [model, []];
+    if (draft.step === 'box' && draft.boxFrom)
+      return [{ ...model, draft: { ...draft, boxTo: input.point } }, []];
+    return [{ ...model, draft: { ...draft, current: input.point } }, []];
   }
   // up: only the box step (with a started box) commits; the tip/knee clicks no-op.
-  if (d?.g !== 'create-callout' || d.step !== 'box' || !d.boxFrom) return [m, []];
-  const rect = calloutBox(d); // the SAME box the preview showed
-  // The upright counter-rotation applies to the text BOX only (about its own
+  if (draft?.kind !== 'create-callout' || draft.step !== 'box' || !draft.boxFrom)
+    return [model, []];
+  const rect = calloutBox(draft); // the same box the preview showed
+  // The upright counter-rotation applies to the text box only (about its own
   // centre) — the leader tip/knee are page-space anchors and never turn.
-  const rot = calloutUprightRot(d);
-  const def = defaultsFor(m, d.preset ?? 'free-text-callout');
-  const ending = def.lineEndings.end !== 'none' ? def.lineEndings.end : 'open-arrow';
-  const id = `tmp:${m.seq + 1}`;
-  const annot: Annot = {
+  const rot = calloutUprightRot(draft);
+  const definition = defaultsFor(model, draft.preset ?? 'free-text-callout');
+  const ending = definition.lineEndings.end !== 'none' ? definition.lineEndings.end : 'open-arrow';
+  const id = `tmp:${model.seq + 1}`;
+  const annotation: ModelAnnotation = {
     id,
     ref: null,
-    page: d.page,
+    page: draft.page,
     subtype: 'free-text',
-    geom: {
-      t: 'text',
+    geometry: {
+      kind: 'text',
       rect,
-      callout: { tip: d.tip, knee: d.knee, ending },
+      callout: { tip: draft.tip, knee: draft.knee, ending },
       ...(rot ? { rot } : {}),
     },
-    style: styleFromProps(def),
-    text: textStyleFromProps(def),
-    flags: { ...DRAWN_FLAGS, ...d.flags },
+    style: styleFromProps(definition),
+    text: textStyleFromProps(definition),
+    flags: { ...DRAWN_FLAGS, ...draft.flags },
     source: 'vector',
   };
   return [
     {
-      ...m,
-      seq: m.seq + 1,
-      byId: { ...m.byId, [id]: annot },
-      order: [...m.order, id],
+      ...model,
+      seq: model.seq + 1,
+      byId: { ...model.byId, [id]: annotation },
+      order: [...model.order, id],
       selected: [id],
       draft: null,
       editing: id,
     },
-    [{ fx: 'create', id }],
+    [{ type: 'create', id }],
   ];
 }
 
-function finishPolyCreate(m: Model): [Model, Effect[]] {
-  const d = m.draft;
-  if (d?.g !== 'create-poly') return [m, []];
-  const minPoints = d.closed ? 3 : 2;
-  if (d.points.length < minPoints) return [{ ...m, draft: null }, []];
+function finishPolyCreate(model: Model): [Model, Effect[]] {
+  const draft = model.draft;
+  if (draft?.kind !== 'create-poly') return [model, []];
+  const minPoints = draft.closed ? 3 : 2;
+  if (draft.points.length < minPoints) return [{ ...model, draft: null }, []];
 
-  const def = defaultsFor(m, d.preset ?? d.subtype);
-  const geom: Geom = {
-    t: 'poly',
-    points: d.points,
-    closed: d.closed,
-    ends: d.closed ? undefined : def.lineEndings,
+  const definition = defaultsFor(model, draft.preset ?? draft.subtype);
+  const geometry: ContentGeometry = {
+    kind: 'poly',
+    points: draft.points,
+    closed: draft.closed,
+    ends: draft.closed ? undefined : definition.lineEndings,
   };
-  if (d.measure && 'unavailable' in shapeMeasurementReadout(geom, d.measure)) return [m, []];
+  if (draft.measure && 'unavailable' in shapeMeasurementReadout(geometry, draft.measure))
+    return [model, []];
 
-  const id = `tmp:${m.seq + 1}`;
-  const annot: Annot = {
+  const id = `tmp:${model.seq + 1}`;
+  const annotation: ModelAnnotation = {
     id,
     ref: null,
-    page: d.page,
-    subtype: d.subtype,
-    geom,
-    measure: d.measure,
-    style: styleFromProps(def),
-    flags: { ...DRAWN_FLAGS, ...d.flags },
+    page: draft.page,
+    subtype: draft.subtype,
+    geometry,
+    measure: draft.measure,
+    style: styleFromProps(definition),
+    flags: { ...DRAWN_FLAGS, ...draft.flags },
     source: 'vector',
   };
   return [
     {
-      ...m,
-      seq: m.seq + 1,
-      byId: { ...m.byId, [id]: annot },
-      order: [...m.order, id],
+      ...model,
+      seq: model.seq + 1,
+      byId: { ...model.byId, [id]: annotation },
+      order: [...model.order, id],
       selected: [id],
       draft: null,
     },
-    [{ fx: 'create', id }],
+    [{ type: 'create', id }],
   ];
 }
 
 /** Drop degenerate segment quads (zero-length baseline or ink extent). Area is
  *  the cross product of the two edge vectors — orientation-safe. */
 const usableQuads = (quads: TextQuad[]): TextQuad[] =>
-  quads.filter((q) => {
-    const ux = q.upperEnd.x - q.upperStart.x;
-    const uy = q.upperEnd.y - q.upperStart.y;
-    const sx = q.lowerStart.x - q.upperStart.x;
-    const sy = q.lowerStart.y - q.upperStart.y;
+  quads.filter((quad) => {
+    const ux = quad.upperEnd.x - quad.upperStart.x;
+    const uy = quad.upperEnd.y - quad.upperStart.y;
+    const sx = quad.lowerStart.x - quad.upperStart.x;
+    const sy = quad.lowerStart.y - quad.upperStart.y;
     return Math.abs(ux * sy - uy * sx) > 0;
   });
 
@@ -1434,7 +1535,7 @@ const usableQuads = (quads: TextQuad[]): TextQuad[] =>
  * `createPointer`. One call per page the selection spans. Clears any live preview.
  */
 function createMarkup(
-  m: Model,
+  model: Model,
   subtype: Subtype,
   page: PageRef,
   segmentQuads: TextQuad[],
@@ -1442,29 +1543,29 @@ function createMarkup(
   flags?: Partial<AnnotationFlags>,
 ): [Model, Effect[]] {
   const quads = usableQuads(segmentQuads);
-  if (!quads.length) return [m, []];
-  const id = `tmp:${m.seq + 1}`;
-  const annot: Annot = {
+  if (!quads.length) return [model, []];
+  const id = `tmp:${model.seq + 1}`;
+  const annotation: ModelAnnotation = {
     id,
     ref: null,
     page,
     subtype,
-    geom: { t: 'quads', quads },
-    style: styleFromProps(defaultsFor(m, preset)),
+    geometry: { kind: 'quads', quads },
+    style: styleFromProps(defaultsFor(model, preset)),
     flags: { ...DRAWN_FLAGS, ...flags },
     source: 'vector',
   };
   return [
     {
-      ...m,
-      seq: m.seq + 1,
-      byId: { ...m.byId, [id]: annot },
-      order: [...m.order, id],
+      ...model,
+      seq: model.seq + 1,
+      byId: { ...model.byId, [id]: annotation },
+      order: [...model.order, id],
       selected: [id],
       draft: null,
       preview: null,
     },
-    [{ fx: 'create', id }],
+    [{ type: 'create', id }],
   ];
 }
 
@@ -1475,35 +1576,35 @@ function createMarkup(
  * the two ordered writes and rolls the primary back if the subordinate fails.
  */
 function createReplaceText(
-  m: Model,
+  model: Model,
   page: PageRef,
   segmentQuads: TextQuad[],
   anchor: TextEndAnchor,
   preset = 'replace-text',
 ): [Model, Effect[]] {
   const quads = usableQuads(segmentQuads);
-  if (!quads.length) return [m, []];
-  const primaryId = `tmp:${m.seq + 1}`;
-  const strikeoutId = `tmp:${m.seq + 2}`;
-  const style = styleFromProps(defaultsFor(m, preset));
-  const caret: Annot = {
+  if (!quads.length) return [model, []];
+  const primaryId = `tmp:${model.seq + 1}`;
+  const strikeoutId = `tmp:${model.seq + 2}`;
+  const style = styleFromProps(defaultsFor(model, preset));
+  const caret: ModelAnnotation = {
     id: primaryId,
     ref: null,
     page,
     subtype: 'caret',
     intent: 'replace',
-    geom: caretGeomFromAnchor(anchor),
+    geometry: caretGeomFromAnchor(anchor),
     style,
     flags: DRAWN_FLAGS,
     source: 'vector',
   };
-  const strikeout: Annot = {
+  const strikeout: ModelAnnotation = {
     id: strikeoutId,
     ref: null,
     page,
     subtype: 'strikeout',
     intent: 'strikeout-text-edit',
-    geom: { t: 'quads', quads },
+    geometry: { kind: 'quads', quads },
     style,
     flags: DRAWN_FLAGS,
     source: 'vector',
@@ -1512,163 +1613,167 @@ function createReplaceText(
   };
   return [
     {
-      ...m,
-      seq: m.seq + 2,
-      byId: { ...m.byId, [primaryId]: caret, [strikeoutId]: strikeout },
-      order: [...m.order, primaryId, strikeoutId],
+      ...model,
+      seq: model.seq + 2,
+      byId: { ...model.byId, [primaryId]: caret, [strikeoutId]: strikeout },
+      order: [...model.order, primaryId, strikeoutId],
       selected: [primaryId, strikeoutId],
       draft: null,
       preview: null,
     },
-    [{ fx: 'createGroup', primary: primaryId, members: [strikeoutId] }],
+    [{ type: 'createGroup', primary: primaryId, members: [strikeoutId] }],
   ];
 }
 
 function createCaret(
-  m: Model,
+  model: Model,
   page: PageRef,
   anchor: TextEndAnchor,
   flags?: Partial<AnnotationFlags>,
 ): [Model, Effect[]] {
   const caretGeom = caretGeomFromAnchor(anchor);
-  if (caretGeom.rect.width <= 0 || caretGeom.rect.height <= 0) return [m, []];
-  const id = `tmp:${m.seq + 1}`;
-  const def = defaultsFor(m, 'caret');
-  const annot: Annot = {
+  if (caretGeom.rect.width <= 0 || caretGeom.rect.height <= 0) return [model, []];
+  const id = `tmp:${model.seq + 1}`;
+  const definition = defaultsFor(model, 'caret');
+  const annotation: ModelAnnotation = {
     id,
     ref: null,
     page,
     subtype: 'caret',
-    geom: caretGeom,
-    style: styleFromProps(def),
+    geometry: caretGeom,
+    style: styleFromProps(definition),
     flags: { ...DRAWN_FLAGS, ...flags },
     source: 'vector',
   };
   return [
     {
-      ...m,
-      seq: m.seq + 1,
-      byId: { ...m.byId, [id]: annot },
-      order: [...m.order, id],
+      ...model,
+      seq: model.seq + 1,
+      byId: { ...model.byId, [id]: annotation },
+      order: [...model.order, id],
       selected: [id],
       draft: null,
       preview: null,
     },
-    [{ fx: 'create', id }],
+    [{ type: 'create', id }],
   ];
 }
 
 /** Set / replace the live markup preview from the selection's per-page quads. */
 function setMarkupPreview(
-  m: Model,
+  model: Model,
   subtype: Subtype,
   quadsByPage: Record<number, TextQuad[]>,
   preset: string = subtype,
 ): [Model, Effect[]] {
   const byPage: Record<number, TextQuad[]> = {};
-  for (const k in quadsByPage) {
-    const quads = usableQuads(quadsByPage[k]);
-    if (quads.length) byPage[Number(k)] = quads;
+  for (const key in quadsByPage) {
+    const quads = usableQuads(quadsByPage[key]);
+    if (quads.length) byPage[Number(key)] = quads;
   }
-  return [{ ...m, preview: { subtype, preset, byPage } }, []];
+  return [{ ...model, preview: { subtype, preset, byPage } }, []];
 }
 
 /**
  * Apply a flat property patch to the current selection. Each member takes only
- * the keys its KIND declares (see `applyProps` — routing to `style`, `geom.ends`
+ * the keys its kind declares (see `applyProps` — routing to `style`, `geom.ends`
  * or `text` happens there) and ignores the rest, so one patch restyles a mixed
  * selection. Changed members flip to `vector` (we own the appearance now) and
- * emit one engine patch each. The base style / tool defaults are NEVER touched:
+ * emit one engine patch each. The base style / tool defaults are never touched:
  * editing existing annotations must not change what the next drawn one looks like.
  */
-function setProps(m: Model, patch: AnnotationPropsPatch): [Model, Effect[]] {
-  if (!m.selected.length) return [m, []];
-  const byId = { ...m.byId };
+function setProps(model: Model, patch: AnnotationPropsPatch): [Model, Effect[]] {
+  if (!model.selected.length) return [model, []];
+  const byId = { ...model.byId };
   const fx: Effect[] = [];
-  // The effect carries the user's keys VERBATIM — the shell lowers exactly
-  // this intent to wire fields; the changed-prop set IS the artifact.
-  const keys = (Object.keys(patch) as PropKey[]).filter((k) => patch[k] !== undefined);
-  for (const id of m.selected) {
-    const a = byId[id];
-    if (!a) continue;
-    // The `link` slot is NOT appearance and NOT model state on a non-link
+  // The effect carries the user's keys verbatim — the shell lowers exactly
+  // this intent to wire fields; the changed-prop set is the artifact.
+  const keys = (Object.keys(patch) as PropKey[]).filter((propKey) => patch[propKey] !== undefined);
+  for (const id of model.selected) {
+    const annotation = byId[id];
+    if (!annotation) continue;
+    // The `link` slot is not appearance and not model state on a non-link
     // kind: the value lives in attached child annotations (the `linkOf`
     // lens reads them back), so the intent is read off the PATCH and rides
     // the target-carrying `syncLink` — the shell's reconciler owns the child
     // operations. Locked annotations refuse it like any other prop write.
     const linkIntent =
       patch.link !== undefined &&
-      a.subtype !== 'link' &&
-      kindTakesLink(a.subtype) &&
-      annotTransformable(a);
-    const next = applyProps(a, patch);
+      annotation.subtype !== 'link' &&
+      kindTakesLink(annotation.subtype) &&
+      annotTransformable(annotation);
+    const next = applyProps(annotation, patch);
     if (!next) {
       // Nothing applied to the model (link-only patch on a parent, or an
       // undeclared key) — the link intent still materializes.
-      if (linkIntent) fx.push({ fx: 'syncLink', id, target: patch.link ?? null });
+      if (linkIntent) fx.push({ type: 'syncLink', id, target: patch.link ?? null });
       continue;
     }
-    const linkChanged = next.link !== a.link;
+    const linkChanged = next.link !== annotation.link;
     const otherChanged =
-      next.style !== a.style ||
-      next.geom !== a.geom ||
-      next.text !== a.text ||
-      next.icon !== a.icon;
-    // A restyle flips to vector (we own the appearance now) — EXCEPT
+      next.style !== annotation.style ||
+      next.geometry !== annotation.geometry ||
+      next.text !== annotation.text ||
+      next.icon !== annotation.icon;
+    // A restyle flips to vector (we own the appearance now) — except
     // `opaqueBody` kinds (widgets), which have no vector render: they stay
     // baked and the shell re-fetches the engine's re-baked raster on resolve.
     // Flipping them would also drop them out of `appearanceEpoch`, freezing
     // their raster forever.
-    byId[id] = capsFor(a.subtype).opaqueBody || !otherChanged ? next : toVector(next);
-    // The link KIND's target lives on its own DTO — a plain engine patch.
-    if (otherChanged || (linkChanged && a.subtype === 'link'))
-      fx.push({ fx: 'patch', id, scope: { kind: 'props', keys } });
-    if (linkIntent) fx.push({ fx: 'syncLink', id, target: patch.link ?? null });
+    byId[id] = capsFor(annotation.subtype).opaqueBody || !otherChanged ? next : toVector(next);
+    // The link kind's target lives on its own DTO — a plain engine patch.
+    if (otherChanged || (linkChanged && annotation.subtype === 'link'))
+      fx.push({ type: 'patch', id, scope: { kind: 'props', keys } });
+    if (linkIntent) fx.push({ type: 'syncLink', id, target: patch.link ?? null });
   }
-  return fx.length ? [{ ...m, byId }, fx] : [m, []];
+  return fx.length ? [{ ...model, byId }, fx] : [model, []];
 }
 
 /**
- * Merge a `/F` flags patch into the selection (or explicit ids). NOT the props
+ * Merge a `/F` flags patch into the selection (or explicit ids). Not the props
  * path, on purpose: flags aren't appearance — members keep their render
  * `source` (a baked raster stays valid; nothing re-bakes) — and the write is
- * NOT gated by `locked`, because unlocking a locked annotation is the whole
+ * not gated by `locked`, because unlocking a locked annotation is the whole
  * point (Acrobat's Locked checkbox stays live). One `flags` effect per changed
- * COMMITTED member; uncommitted drafts just merge (their create draft carries
+ * committed member; uncommitted drafts just merge (their create draft carries
  * the flags when it commits).
  */
 /**
  * The actions plane's session-visibility write (Hide actions, script
  * `annot.hidden`): merge per-id hidden overrides into the session overlay.
- * Pure session state — ZERO effects, no engine write, no authority. Hiding
+ * Pure session state — zero effects, no engine write, no authority. Hiding
  * clears transient engagement so no orphaned selection chrome or text editor
  * survives on an invisible annotation. Identity-preserving no-op when nothing
  * changes (plugin memo caches key on model identity).
  */
 
-function setFlags(m: Model, patch: Partial<AnnotationFlags>, ids?: Id[]): [Model, Effect[]] {
-  const targets = ids ?? m.selected;
-  if (!targets.length) return [m, []];
+function setFlags(model: Model, patch: Partial<AnnotationFlags>, ids?: Id[]): [Model, Effect[]] {
+  const targets = ids ?? model.selected;
+  if (!targets.length) return [model, []];
   const fx: Effect[] = [];
   let byId: Model['byId'] | null = null;
   for (const id of targets) {
-    const a = (byId ?? m.byId)[id];
-    if (!a) continue;
-    const flags = mergeFlags(a.flags, patch);
-    if (flagsEqual(flags, a.flags)) continue; // no spurious engine writes
-    byId ??= { ...m.byId };
-    byId[id] = { ...a, flags };
-    if (a.ref) fx.push({ fx: 'flags', id });
+    const annotation = (byId ?? model.byId)[id];
+    if (!annotation) continue;
+    const flags = mergeFlags(annotation.flags, patch);
+    if (flagsEqual(flags, annotation.flags)) continue; // no spurious engine writes
+    byId ??= { ...model.byId };
+    byId[id] = { ...annotation, flags };
+    if (annotation.ref) fx.push({ type: 'flags', id });
   }
-  return byId ? [{ ...m, byId }, fx] : [m, []];
+  return byId ? [{ ...model, byId }, fx] : [model, []];
 }
 
-function setDefaults(m: Model, subtype: Subtype, patch: AnnotationPropsPatch): [Model, Effect[]] {
-  const prev = m.defaults[subtype] ?? {};
-  const next: AnnotationPropsPatch = { ...prev, ...patch };
+function setDefaults(
+  model: Model,
+  subtype: Subtype,
+  patch: AnnotationPropsPatch,
+): [Model, Effect[]] {
+  const previous = model.defaults[subtype] ?? {};
+  const next: AnnotationPropsPatch = { ...previous, ...patch };
   // Endings merge per side, so `{ end: 'open-arrow' }` keeps a configured start.
-  if (patch.lineEndings) next.lineEndings = { ...prev.lineEndings, ...patch.lineEndings };
-  return [{ ...m, defaults: { ...m.defaults, [subtype]: next } }, []];
+  if (patch.lineEndings) next.lineEndings = { ...previous.lineEndings, ...patch.lineEndings };
+  return [{ ...model, defaults: { ...model.defaults, [subtype]: next } }, []];
 }
 
 /**
@@ -1677,131 +1782,140 @@ function setDefaults(m: Model, subtype: Subtype, patch: AnnotationPropsPatch): [
  * multi-target group about the union-box centre (gated by `groupRotatable` for
  * groups, `rotatable` for a single shape). Emits one patch per rotated member.
  */
-function rotateSelection(m: Model, deltaDeg: number): [Model, Effect[]] {
-  const ids = m.selected.filter((id) => {
-    const a = m.byId[id];
-    return a && annotTransformable(a) && capsFor(a.subtype).rotatable;
+function rotateSelection(model: Model, deltaDeg: number): [Model, Effect[]] {
+  const ids = model.selected.filter((id) => {
+    const annotation = model.byId[id];
+    return annotation && annotTransformable(annotation) && capsFor(annotation.subtype).rotatable;
   });
-  if (!ids.length) return [m, []];
+  if (!ids.length) return [model, []];
   // pivot: a single shape's own selection-rect centre (so vertex kinds spin in
   // place, not about their off-centre vertex mean); a group's union-box centre.
-  // Stored space throughout — a screen-anchored member's AUTHORED tilt turns,
+  // Stored space throughout — a screen-anchored member's authored tilt turns,
   // which is exactly its on-screen tilt (the display adds nothing to it); at
   // high zoom the anchor may re-seat by a hair, which the toolbar action
   // accepts (the knob gesture, which is pointer-exact, goes through the
   // view-space commit instead).
-  let pivot: Vec;
+  let pivot: Point;
   if (ids.length === 1) {
-    const a = m.byId[ids[0]];
-    pivot = annotationSelectionFrame(a).center;
+    const annotation = model.byId[ids[0]];
+    pivot = annotationSelectionFrame(annotation).center;
   } else {
-    const page = m.byId[ids[0]].page;
-    const union = groupUnionBounds({ ...m, selected: ids }, page);
-    if (!union) return [m, []];
+    const page = model.byId[ids[0]].page;
+    const union = groupUnionBounds({ ...model, selected: ids }, page);
+    if (!union) return [model, []];
     pivot = { x: union.x + union.width / 2, y: union.y + union.height / 2 };
   }
-  const byId = { ...m.byId };
+  const byId = { ...model.byId };
   const fx: Effect[] = [];
   for (const id of ids) {
-    const a = byId[id];
-    const before = a.geom;
+    const annotation = byId[id];
+    const before = annotation.geometry;
     byId[id] = ownGeometry({
-      ...a,
-      geom: geomRotateAbout(before, pivot, deltaDeg),
-      measure: transformMeasurementCaption(a.measure, (point) =>
+      ...annotation,
+      geometry: geomRotateAbout(before, pivot, deltaDeg),
+      measure: transformMeasurementCaption(annotation.measure, (point) =>
         rotatePoint(point, pivot, deltaDeg),
       ),
     });
     fx.push(patchFx(id, byId[id], before));
   }
-  return [{ ...m, byId }, fx];
+  return [{ ...model, byId }, fx];
 }
 
 /** Reset rotation on the selection to the as-authored orientation. For a
- *  screen-anchored annotation that IS its on-screen orientation, so reset is
+ *  screen-anchored annotation that is its on-screen orientation, so reset is
  *  as meaningful as for anyone else. */
-function resetRotation(m: Model): [Model, Effect[]] {
-  const byId = { ...m.byId };
+function resetRotation(model: Model): [Model, Effect[]] {
+  const byId = { ...model.byId };
   const fx: Effect[] = [];
-  for (const id of m.selected) {
-    const a = byId[id];
-    if (!a || !annotTransformable(a) || geomRotation(a.geom) === 0) continue;
+  for (const id of model.selected) {
+    const annotation = byId[id];
+    if (!annotation || !annotTransformable(annotation) || geomRotation(annotation.geometry) === 0)
+      continue;
     byId[id] = ownGeometry({
-      ...a,
-      geom: geomResetRotation(a.geom, annotationSelectionFrame(a).center),
-      measure: transformMeasurementCaption(a.measure, (point) =>
-        rotatePoint(point, annotationSelectionFrame(a).center, -geomRotation(a.geom)),
+      ...annotation,
+      geometry: geomResetRotation(annotation.geometry, annotationSelectionFrame(annotation).center),
+      measure: transformMeasurementCaption(annotation.measure, (point) =>
+        rotatePoint(
+          point,
+          annotationSelectionFrame(annotation).center,
+          -geomRotation(annotation.geometry),
+        ),
       ),
     });
-    fx.push(patchFx(id, byId[id], a.geom));
+    fx.push(patchFx(id, byId[id], annotation.geometry));
   }
-  return fx.length ? [{ ...m, byId }, fx] : [m, []];
+  return fx.length ? [{ ...model, byId }, fx] : [model, []];
 }
 
-function deleteSelection(m: Model): [Model, Effect[]] {
+function deleteSelection(model: Model): [Model, Effect[]] {
   // `locked` (and inert `/F` states) protect against deletion — only the
   // transformable members go; the rest keep their selection, so a mixed
   // selection deletes what it may and leaves the frozen ones visibly selected.
-  const deletable = m.selected.filter((id) => {
-    const a = m.byId[id];
-    return !!a && annotDeletable(a);
+  const deletable = model.selected.filter((id) => {
+    const annotation = model.byId[id];
+    return !!annotation && annotDeletable(annotation);
   });
-  if (!deletable.length) return [m, []];
-  // Attached link children die with their parent. They ARE model
+  if (!deletable.length) return [model, []];
+  // Attached link children die with their parent. They are model
   // annotations now, so expanding the deletable set makes the one loop
   // below handle parent and children uniformly — no side ledger.
   const withChildren = [
     ...deletable,
-    ...deletable.flatMap((id) => linkChildrenOf(m, id).map((c) => c.id)),
+    ...deletable.flatMap((id) => linkChildrenOf(model, id).map((annotation) => annotation.id)),
   ];
   const fx: Effect[] = [];
   for (const id of withChildren) {
-    const a = m.byId[id];
-    if (a?.ref) fx.push({ fx: 'delete', ref: a.ref });
+    const annotation = model.byId[id];
+    if (annotation?.ref) fx.push({ type: 'delete', ref: annotation.ref });
   }
-  return [removeAnnots(m, withChildren), fx];
+  return [removeAnnots(model, withChildren), fx];
 }
 
 /* ── marquee helper; exported for tests ───────────────────────────────────── */
 export function annotsInBox(
-  m: Model,
+  model: Model,
   page: PageRef,
-  a: Vec,
-  b: Vec,
+  from: Point,
+  to: Point,
   inert?: ReadonlySet<Id>,
   view?: ViewEnv,
 ): Id[] {
-  const pon = page.pageObjectNumber;
-  const box = rectFromPoints(a, b);
-  return m.order.filter((id) => {
-    const annot = m.byId[id];
-    if (annot?.page.pageObjectNumber !== pon || inert?.has(id) || !isSelectable(m, id))
+  const pageObjectNumber = page.pageObjectNumber;
+  const box = rectFromPoints(from, to);
+  return model.order.filter((id) => {
+    const annotation = model.byId[id];
+    if (
+      annotation?.page.pageObjectNumber !== pageObjectNumber ||
+      inert?.has(id) ||
+      !isSelectable(model, id)
+    )
       return false;
     // Conversation-plane annotations (replies, review states) are never on
     // the page — the marquee cannot sweep up what does not paint.
-    if (isSubstrateOnly(annot)) return false;
-    // intersect against what is actually DRAWN: the oriented selection quad
-    // (exact, via SAT) — the SAME quad the chrome outlines and the grab region
+    if (isSubstrateOnly(annotation)) return false;
+    // intersect against what is actually drawn: the oriented selection quad
+    // (exact, via SAT) — the same quad the chrome outlines and the grab region
     // uses (screen-anchored bodies at their view-projected footprint). Its
     // AABB is a coarse superset whose empty corners cover most of a tilted
     // shape's unrotated footprint, so testing the AABB selected shapes the
     // marquee never touched.
-    const frame = annotationSelectionFrame(annot, view);
+    const frame = annotationSelectionFrame(annotation, view);
     return quadIntersectsRect(frame.corners, box);
   });
 }
 
 /* ── store maintenance ───────────────────────────────────────────────────── */
 
-function mergeLoaded(m: Model, annots: Annot[]): Model {
-  const byId = { ...m.byId };
-  const order = [...m.order];
-  for (const a of annots) {
-    if (byId[a.id]) continue;
-    byId[a.id] = a;
-    order.push(a.id);
+function mergeLoaded(model: Model, annots: ModelAnnotation[]): Model {
+  const byId = { ...model.byId };
+  const order = [...model.order];
+  for (const annotation of annots) {
+    if (byId[annotation.id]) continue;
+    byId[annotation.id] = annotation;
+    order.push(annotation.id);
   }
-  return { ...m, byId, order };
+  return { ...model, byId, order };
 }
 
 /**
@@ -1810,29 +1924,29 @@ function mergeLoaded(m: Model, annots: Annot[]): Model {
  * reaps committed entries the snapshot no longer contains — deletions that
  * happened before we subscribed (initial load) or inside a desync gap.
  * Gentler than `removeAnnots`: `tmp:` drafts and gesture-locked ids
- * survive, and an in-progress draft is NOT cancelled — reaped ids can
+ * survive, and an in-progress draft is not cancelled — reaped ids can
  * never be part of it (locked ids are excluded from reaping).
  */
-function hydrateAnnots(m: Model, annots: Annot[], bumpApFlag: boolean): Model {
-  const incoming = new Set(annots.map((a) => a.id));
-  const locked = draftIds(m.draft);
-  const reaped = m.order.filter((id) => {
+function hydrateAnnots(model: Model, annots: ModelAnnotation[], bumpApFlag: boolean): Model {
+  const incoming = new Set(annots.map((annotation) => annotation.id));
+  const locked = draftIds(model.draft);
+  const reaped = model.order.filter((id) => {
     if (incoming.has(id) || locked.has(id)) return false;
-    const a = m.byId[id];
-    return a !== undefined && a.ref !== null; // committed only; tmp: drafts stay
+    const annotation = model.byId[id];
+    return annotation !== undefined && annotation.ref !== null; // committed only; tmp: drafts stay
   });
-  let next = m;
+  let next = model;
   if (reaped.length > 0) {
     const gone = new Set(reaped);
-    const byId = { ...m.byId };
+    const byId = { ...model.byId };
     for (const id of reaped) delete byId[id];
     next = {
-      ...m,
+      ...model,
       byId,
-      order: m.order.filter((id) => !gone.has(id)),
-      selected: m.selected.filter((id) => !gone.has(id)),
-      hovered: m.hovered && gone.has(m.hovered) ? null : m.hovered,
-      editing: m.editing && gone.has(m.editing) ? null : m.editing,
+      order: model.order.filter((id) => !gone.has(id)),
+      selected: model.selected.filter((id) => !gone.has(id)),
+      hovered: model.hovered && gone.has(model.hovered) ? null : model.hovered,
+      editing: model.editing && gone.has(model.editing) ? null : model.editing,
     };
   }
   return upsertAnnots(next, annots, bumpApFlag);
@@ -1840,70 +1954,73 @@ function hydrateAnnots(m: Model, annots: Annot[], bumpApFlag: boolean): Model {
 
 /**
  * Add-or-replace by id. Unlike `mergeLoaded` (which skips ids it already has,
- * for the bulk page read), this OVERWRITES — it's how the data API re-syncs an
+ * for the bulk page read), this overwrites — it's how the data API re-syncs an
  * annotation from the authoritative engine DTO and how a remote edit lands.
  * New ids append to `order`; existing ones keep their position. An annotation
  * currently being dragged (its id is in a `move`/`handle` draft) is left as-is
  * so a remote echo can't yank geometry out from under the local gesture.
  */
-function upsertAnnots(m: Model, annots: Annot[], bumpAp = false): Model {
-  const dragging = draftIds(m.draft);
-  const byId = { ...m.byId };
-  const order = [...m.order];
-  for (const a of annots) {
-    if (dragging.has(a.id)) continue;
-    if (!byId[a.id]) order.push(a.id);
-    const prev = byId[a.id];
+function upsertAnnots(model: Model, annots: ModelAnnotation[], bumpAp = false): Model {
+  const dragging = draftIds(model.draft);
+  const byId = { ...model.byId };
+  const order = [...model.order];
+  for (const annotation of annots) {
+    if (dragging.has(annotation.id)) continue;
+    if (!byId[annotation.id]) order.push(annotation.id);
+    const previous = byId[annotation.id];
     // `apVersion` is model-owned, not DTO-derived: carry it across the replace,
     // +1 when this upsert confirms an engine re-bake with new raster content.
-    byId[a.id] = { ...a, apVersion: (prev?.apVersion ?? 0) + (bumpAp ? 1 : 0) };
+    byId[annotation.id] = {
+      ...annotation,
+      apVersion: (previous?.apVersion ?? 0) + (bumpAp ? 1 : 0),
+    };
   }
-  return { ...m, byId, order };
+  return { ...model, byId, order };
 }
 
 /** Advance `apVersion` for known ids — an engine /AP re-bake that arrived
- *  WITHOUT new model data (a form value write repainting its widgets). */
-function bumpAp(m: Model, ids: Id[]): Model {
+ *  Without new model data (a form value write repainting its widgets). */
+function bumpAp(model: Model, ids: Id[]): Model {
   let byId: Model['byId'] | null = null;
   for (const id of ids) {
-    const a = m.byId[id];
-    if (!a) continue;
-    byId ??= { ...m.byId };
-    byId[id] = { ...a, apVersion: (a.apVersion ?? 0) + 1 };
+    const annotation = model.byId[id];
+    if (!annotation) continue;
+    byId ??= { ...model.byId };
+    byId[id] = { ...annotation, apVersion: (annotation.apVersion ?? 0) + 1 };
   }
-  return byId ? { ...m, byId } : m;
+  return byId ? { ...model, byId } : model;
 }
 
 /** Ids locked by an in-progress local gesture (don't let an upsert clobber them). */
 function draftIds(draft: Draft | null): Set<Id> {
   if (!draft) return new Set();
-  if (draft.g === 'move') return new Set(draft.ids);
-  if (draft.g === 'handle' || draft.g === 'caption' || draft.g === 'leader') {
+  if (draft.kind === 'move') return new Set(draft.ids);
+  if (draft.kind === 'handle' || draft.kind === 'caption' || draft.kind === 'leader') {
     return new Set([draft.id]);
   }
-  if (draft.g === 'rotate' || draft.g === 'group') return new Set(draft.ids);
+  if (draft.kind === 'rotate' || draft.kind === 'group') return new Set(draft.ids);
   return new Set();
 }
 
-function removeAnnots(m: Model, ids: Id[]): Model {
+function removeAnnots(model: Model, ids: Id[]): Model {
   const gone = new Set(ids);
-  const byId = { ...m.byId };
+  const byId = { ...model.byId };
   for (const id of ids) delete byId[id];
   return {
-    ...m,
+    ...model,
     byId,
-    order: m.order.filter((id) => !gone.has(id)),
-    selected: m.selected.filter((id) => !gone.has(id)),
+    order: model.order.filter((id) => !gone.has(id)),
+    selected: model.selected.filter((id) => !gone.has(id)),
     draft: null,
-    editing: m.editing && gone.has(m.editing) ? null : m.editing,
+    editing: model.editing && gone.has(model.editing) ? null : model.editing,
   };
 }
 
-function reconcile(m: Model, tempId: Id, id: Id, ref: AnnotationRef): Model {
-  const a = m.byId[tempId];
-  if (!a) return m;
-  const { [tempId]: _drop, ...rest } = m.byId;
-  const byId: Record<Id, Annot> = { ...rest, [id]: { ...a, id, ref } };
+function reconcile(model: Model, tempId: Id, id: Id, ref: AnnotationRef): Model {
+  const annotation = model.byId[tempId];
+  if (!annotation) return model;
+  const { [tempId]: _drop, ...rest } = model.byId;
+  const byId: Record<Id, ModelAnnotation> = { ...rest, [id]: { ...annotation, id, ref } };
   // Composite creations can relate another optimistic annotation to this temp
   // id. Keep the relationship coherent across the temp→durable id swap.
   for (const key of Object.keys(byId)) {
@@ -1917,50 +2034,55 @@ function reconcile(m: Model, tempId: Id, id: Id, ref: AnnotationRef): Model {
     }
   }
   return {
-    ...m,
+    ...model,
     byId,
-    order: m.order.map((x) => (x === tempId ? id : x)),
-    selected: m.selected.map((x) => (x === tempId ? id : x)),
+    order: model.order.map((annotationId) => (annotationId === tempId ? id : annotationId)),
+    selected: model.selected.map((annotationId) => (annotationId === tempId ? id : annotationId)),
     // keep the just-drawn box in edit mode across the temp→durable id swap
-    editing: m.editing === tempId ? id : m.editing,
+    editing: model.editing === tempId ? id : model.editing,
   };
 }
 
 /**
- * The data API's create: page-space geometry in, the SAME optimistic
+ * The data API's create: page-space geometry in, the same optimistic
  * annotation and `create` effect a draw tool commits out. Defaults come from
  * the preset (a tool id or the bare subtype); `props` override them; line and
  * open-poly kinds take the preset's line endings when the geometry carries none.
  */
-function createAnnot(m: Model, msg: Extract<Msg, { t: 'createAnnot' }>): [Model, Effect[]] {
-  const preset = (msg.preset ?? msg.subtype) as Subtype;
-  const def = defaultsFor(m, preset);
-  const geom: Geom =
-    (msg.geom.t === 'line' || (msg.geom.t === 'poly' && !msg.geom.closed)) && !msg.geom.ends
-      ? { ...msg.geom, ends: def.lineEndings }
-      : msg.geom;
-  const id = `tmp:${m.seq + 1}`;
-  const base: Annot = {
+function createAnnot(
+  model: Model,
+  message: Extract<Message, { type: 'createAnnot' }>,
+): [Model, Effect[]] {
+  const preset = (message.preset ?? message.subtype) as Subtype;
+  const definition = defaultsFor(model, preset);
+  const geometry: ContentGeometry =
+    (message.geometry.kind === 'line' ||
+      (message.geometry.kind === 'poly' && !message.geometry.closed)) &&
+    !message.geometry.ends
+      ? { ...message.geometry, ends: definition.lineEndings }
+      : message.geometry;
+  const id = `tmp:${model.seq + 1}`;
+  const base: ModelAnnotation = {
     id,
     ref: null,
-    page: msg.page,
-    subtype: msg.subtype,
-    geom,
-    style: styleFromProps(def),
-    ...(geom.t === 'text' ? { text: textStyleFromProps(def) } : {}),
-    ...(msg.subtype === 'link' ? { link: def.link ?? null } : {}),
-    flags: { ...DRAWN_FLAGS, ...msg.flags },
+    page: message.page,
+    subtype: message.subtype,
+    geometry,
+    style: styleFromProps(definition),
+    ...(geometry.kind === 'text' ? { text: textStyleFromProps(definition) } : {}),
+    ...(message.subtype === 'link' ? { link: definition.link ?? null } : {}),
+    flags: { ...DRAWN_FLAGS, ...message.flags },
     source: 'vector',
   };
-  const annot = msg.props ? (applyProps(base, msg.props) ?? base) : base;
+  const annotation = message.props ? (applyProps(base, message.props) ?? base) : base;
   return [
     {
-      ...m,
-      seq: m.seq + 1,
-      byId: { ...m.byId, [id]: annot },
-      order: [...m.order, id],
-      ...(msg.select ? { selected: [id] } : {}),
+      ...model,
+      seq: model.seq + 1,
+      byId: { ...model.byId, [id]: annotation },
+      order: [...model.order, id],
+      ...(message.select ? { selected: [id] } : {}),
     },
-    [{ fx: 'create', id }],
+    [{ type: 'create', id }],
   ];
 }

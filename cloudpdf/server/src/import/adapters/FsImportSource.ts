@@ -1,6 +1,6 @@
 /**
  * Filesystem import source — reads one file from an operator-
- * configured root on the SERVER HOST. The bytes are trivial; the
+ * configured root on the server host. The bytes are trivial; the
  * containment is the security-critical surface, because the blast
  * radius of an escape is the server's own disk:
  *
@@ -9,7 +9,7 @@
  *   - after joining, the file's REALPATH must still live under the
  *     root's realpath — this is the symlink-escape defense (a
  *     symlink inside the root pointing outside it is refused);
- *   - fs connections are api-token only, enforced STRUCTURALLY at
+ *   - fs connections are api-token only, enforced structurally at
  *     config parse (schema invariant), not here;
  *   - revisions are not supported — pin content with expected.sha256.
  */
@@ -96,7 +96,7 @@ export class FsImportSource implements ImportSource {
     } catch (err) {
       throw mapFsImportError(err, this.info.location);
     }
-    // The symlink-escape defense: whatever the path RESOLVES to must
+    // The symlink-escape defense: whatever the path resolves to must
     // still live under the resolved root.
     if (fileReal !== rootReal && !fileReal.startsWith(rootReal + sep)) {
       throw new ImportSourceError(

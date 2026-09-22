@@ -1,18 +1,14 @@
 /**
  * Family-local config schema for the CDN adapter family.
  *
- * Variants (six total):
+ * Variants (six total), each constructed by `createCdnSigner`:
  *   - none        : built-in, no CDN in front of origin
- *   - bunny       : BunnyCDN (HMAC-SHA256 zone token) — adapter ships in commit G
- *   - cloud-cdn   : Google Cloud CDN (HMAC-SHA1 prefix policy) — adapter ships in G
- *   - cloudfront  : AWS CloudFront (RSA-SHA1 cookies or URLs) — adapter ships in G
- *   - azure-fd    : Azure Front Door (HMAC-SHA256 via rules engine) — adapter ships in G
+ *   - bunny       : BunnyCDN (HMAC-SHA256 zone token)
+ *   - cloud-cdn   : Google Cloud CDN (HMAC-SHA1 prefix policy)
+ *   - cloudfront  : AWS CloudFront (RSA-SHA1 cookies or URLs)
+ *   - azure-fd    : Azure Front Door (HMAC-SHA256 via rules engine)
  *   - custom-hmac : generic escape hatch (covers Cloudflare-via-Worker
- *                   and any DIY edge) — adapter ships in G
- *
- * Schema accepts all six today; `createCdnSigner` constructs only
- * `none` until commit G ships the remaining adapter classes. Lets
- * deployment templates be written ahead of the implementations.
+ *                   and any DIY edge)
  *
  * Secret-bearing fields use `SecretRefSchema` so they can be resolved
  * through the shared SecretsResolver at construction time.

@@ -1,5 +1,6 @@
 import { createContext, runInContext } from 'node:vm';
 import { describe, expect, it } from 'vitest';
+import { toPageRef } from '@embedpdf/engine-core/runtime';
 
 import {
   ANNOT_WRITABLE_KEYS,
@@ -12,12 +13,12 @@ import {
   type ScriptOutput,
 } from '../src';
 
-const annot = (
+const annotation = (
   name: string,
   objectNumber: number,
   overrides: Partial<ScriptAnnotInput> = {},
 ): ScriptAnnotInput => ({
-  ref: { kind: 'objectNumber', pageObjectNumber: 3, annotObjectNumber: objectNumber },
+  ref: { kind: 'objectNumber', page: toPageRef(3), annotObjectNumber: objectNumber },
   name,
   subtype: 'square',
   page: 0,
@@ -41,10 +42,7 @@ const annot = (
   ...overrides,
 });
 
-const input = (
-  annots: ScriptAnnotInput[],
-  extra: Partial<ScriptInput> = {},
-): ScriptInput => ({
+const input = (annots: ScriptAnnotInput[], extra: Partial<ScriptInput> = {}): ScriptInput => ({
   document: { id: 'doc-1', fileName: 'demo.pdf', pageCount: 2, pageNumber: 0 },
   identity: { name: '', loginName: '', corporation: '', email: '' },
   environment: { nowMs: Date.UTC(2026, 6, 15), utcOffsetMinutes: 0, randomSeed: 7 },
@@ -80,13 +78,13 @@ describe('the annots plane', () => {
            a.strokeColor = ['RGB', 0.14, 0.43, 0.89];
            a.fillColor = ['RGB', 0.86, 0.93, 1];
          }`,
-        input([annot('hoverSquare', 21), annot('other', 22)]),
+        input([annotation('hoverSquare', 21), annotation('other', 22)]),
       ),
     );
     expect(output.error).toBeUndefined();
     expect(output.annotEffects).toEqual([
       {
-        ref: { kind: 'objectNumber', pageObjectNumber: 3, annotObjectNumber: 21 },
+        ref: { kind: 'objectNumber', page: toPageRef(3), annotObjectNumber: 21 },
         patch: {
           strokeColor: ['RGB', 0.14, 0.43, 0.89],
           fillColor: ['RGB', 0.86, 0.93, 1],
@@ -104,14 +102,16 @@ describe('the annots plane', () => {
            this.getAnnots() === null ? 'null' : 'list',
            this.getAnnot(0, 'ghost') === null,
          ];`,
-        input([annot('real', 21)]),
+        input([annotation('real', 21)]),
       ),
     );
     expect(output.error).toBeUndefined();
-    expect(output.diagnostics.some((d) => d.message.includes('page 1'))).toBe(true);
+    expect(output.diagnostics.some((diagnostic) => diagnostic.message.includes('page 1'))).toBe(
+      true,
+    );
     // Omitted nPage over a partial plane also names the deviation.
     expect(
-      output.diagnostics.some((d) => d.message.includes('whole-document')),
+      output.diagnostics.some((diagnostic) => diagnostic.message.includes('whole-document')),
     ).toBe(true);
   });
 
@@ -128,16 +128,16 @@ describe('the annots plane', () => {
          a.width = 1;                // restored to original — collapses out
          var b = this.getAnnot(0, 'b');
          b.contents = 'annotated';`,
-        input([annot('a', 21), annot('b', 22)]),
+        input([annotation('a', 21), annotation('b', 22)]),
       ),
     );
     expect(output.annotEffects).toEqual([
       {
-        ref: { kind: 'objectNumber', pageObjectNumber: 3, annotObjectNumber: 21 },
+        ref: { kind: 'objectNumber', page: toPageRef(3), annotObjectNumber: 21 },
         patch: { opacity: 0.7, flags: { hidden: true, noView: true } },
       },
       {
-        ref: { kind: 'objectNumber', pageObjectNumber: 3, annotObjectNumber: 22 },
+        ref: { kind: 'objectNumber', page: toPageRef(3), annotObjectNumber: 22 },
         patch: { contents: 'annotated' },
       },
     ]);
@@ -154,19 +154,19 @@ describe('the annots plane', () => {
          s.rect = [0, 0, 50, 50];          // opaque body
          s.hidden = true;                  // flags still fine on opaque bodies`,
         input([
-          annot('mark', 21, { subtype: 'highlight' }),
-          annot('logo', 22, { subtype: 'stamp', opaqueBody: true }),
+          annotation('mark', 21, { subtype: 'highlight' }),
+          annotation('logo', 22, { subtype: 'stamp', opaqueBody: true }),
         ]),
       ),
     );
     expect(output.error).toBeUndefined();
     expect(output.annotEffects).toEqual([
       {
-        ref: { kind: 'objectNumber', pageObjectNumber: 3, annotObjectNumber: 22 },
+        ref: { kind: 'objectNumber', page: toPageRef(3), annotObjectNumber: 22 },
         patch: { flags: { hidden: true } },
       },
     ]);
-    const messages = output.diagnostics.map((d) => d.message).join('\n');
+    const messages = output.diagnostics.map((diagnostic) => diagnostic.message).join('\n');
     expect(messages).toContain('not writable');
     expect(messages).toContain('invalid value');
     expect(messages).toContain('opaque appearance');
@@ -179,7 +179,7 @@ describe('the annots plane', () => {
         `var a = this.getAnnot(0, 'a');
          a.setProps({ strokeColor: ['G', 0], width: 4, opacity: 0.5 });
          this.roundTrip = a.getProps().width;`,
-        input([annot('a', 21)]),
+        input([annotation('a', 21)]),
       ),
     );
     expect(output.annotEffects[0]?.patch).toEqual({
@@ -201,12 +201,12 @@ describe('the annots plane', () => {
            color.convert(['CMYK', 0, 1, 0, 0], 'RGB').join(','),
          ];
          if (!this.checks[0] || !this.checks[1]) a.opacity = 0; // fail loudly`,
-        input([annot('a', 21)]),
+        input([annotation('a', 21)]),
       ),
     );
     expect(output.annotEffects).toEqual([
       {
-        ref: { kind: 'objectNumber', pageObjectNumber: 3, annotObjectNumber: 21 },
+        ref: { kind: 'objectNumber', page: toPageRef(3), annotObjectNumber: 21 },
         patch: { strokeColor: ['RGB', 1, 0, 0] },
       },
     ]);
@@ -219,7 +219,7 @@ describe('the annots plane', () => {
         `this.seen = event.type + ':' + event.name;
          var a = this.getAnnot(0, 'a');
          a.contents = event.type + ':' + event.name;`,
-        input([annot('a', 21)], {
+        input([annotation('a', 21)], {
           event: { kind: 'widget-activate', type: 'Field', name: 'Mouse Enter' },
         }),
       ),
@@ -228,7 +228,7 @@ describe('the annots plane', () => {
     const legacy = plain(
       vm.__acrojsRun(
         `var a = this.getAnnot(0, 'a'); a.contents = event.type + ':' + event.name;`,
-        input([annot('a', 21)]),
+        input([annotation('a', 21)]),
       ),
     );
     expect(legacy.annotEffects[0]?.patch.contents).toBe('Field:Mouse Up');
@@ -266,7 +266,7 @@ describe('parity pins (prelude twins of exported tables)', () => {
       const output = plain(
         vm.__acrojsRun(
           `var a = this.getAnnot(0, 'x');\n${program}`,
-          input([annot('x', 21, { subtype })]),
+          input([annotation('x', 21, { subtype })]),
         ),
       );
       const patched = Object.keys(output.annotEffects[0]?.patch ?? {});
@@ -288,7 +288,7 @@ describe('parity pins (prelude twins of exported tables)', () => {
         vm.__acrojsRun(
           `var a = this.getAnnot(0, 'x');
            a.dash = color.convert(${JSON.stringify(sample)}, 'RGB').slice(1);`,
-          input([annot('x', 21)]),
+          input([annotation('x', 21)]),
         ),
       );
       const rgb = scriptColorToRgb(sample)!;

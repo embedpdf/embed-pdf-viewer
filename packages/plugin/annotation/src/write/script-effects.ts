@@ -1,10 +1,9 @@
 import { scriptColorToRgb } from '@embedpdf/core-acrojs';
 import type { ScriptAnnotEffect, ScriptColorArray } from '@embedpdf/core-acrojs';
-import { toPageRef } from '@embedpdf/engine-core/runtime';
+import { toPageRef, type AnnotationPatch } from '@embedpdf/engine-core/runtime';
 import type { AnnotCommitEntry, AnnotCommitResult } from '@embedpdf/plugin-actions/contract/host';
 
 import type { AnnotationContext, AnnotationServices } from '../services';
-import type { Hydration } from '../sync/hydration';
 
 /** Script patch → the engine's per-kind patch vocabulary. Colors cross the
  *  Acrobat-array → engine {r,g,b}/255 boundary here; everything else maps
@@ -12,7 +11,7 @@ import type { Hydration } from '../sync/hydration';
 const engineScriptPatch = (
   subtype: string,
   patch: ScriptAnnotEffect['patch'],
-): Record<string, unknown> | Error => {
+): AnnotationPatch | Error => {
   const out: Record<string, unknown> = { subtype };
   const toEngineColor = (color: ScriptColorArray) => {
     const rgb = scriptColorToRgb(color);
@@ -44,33 +43,24 @@ const engineScriptPatch = (
   }
   if (patch.contents !== undefined) out.contents = patch.contents;
   if (patch.flags) out.flags = patch.flags;
-  return out;
+  // Assembled key by key: the script VM already limited the keys to the ones
+  // this kind accepts, and the engine validates the patch against the subtype.
+  return out as unknown as AnnotationPatch;
 };
 
 /**
- * The actions plane's commit sink: document JavaScript patches annotations
- * through this plugin, which owns the model, so the engine write and the
- * visible model can never diverge.
+ * The actions plugin's commit sink: document JavaScript patches annotations
+ * through this plugin, which owns them. Each confirmed write reaches the model
+ * through the records mirror.
  */
 export function createScriptEffects(
   ctx: Pick<AnnotationContext, 'doc'>,
   { store }: Pick<AnnotationServices, 'store'>,
-  hydration: Pick<Hydration, 'reloadPage'>,
 ) {
   const api = {
     commitScriptEffects: async (entries: AnnotCommitEntry[]): Promise<AnnotCommitResult> => {
       const doc = ctx.doc;
-      if (!doc) {
-        return {
-          results: entries.map((entry) => ({
-            annotObjectNumber: entry.annotObjectNumber,
-            status: 'failed' as const,
-            error: 'no document',
-          })),
-        };
-      }
       const results: AnnotCommitResult['results'] = [];
-      const touchedPons = new Set<number>();
       let failed = false;
       for (const entry of entries) {
         if (failed) {
@@ -78,13 +68,13 @@ export function createScriptEffects(
           continue;
         }
         const loaded = store.model().byId[`obj:${entry.annotObjectNumber}`];
-        const pon = loaded?.page.pageObjectNumber ?? entry.page?.pageObjectNumber;
+        const pageObjectNumber = loaded?.page.pageObjectNumber ?? entry.page?.pageObjectNumber;
         let ref = loaded?.ref ?? null;
         let subtype: string | undefined = loaded?.subtype;
-        if ((!ref || !subtype) && pon !== undefined) {
-          // Engine fallback for pages the model hasn't loaded.
+        if ((!ref || !subtype) && pageObjectNumber !== undefined) {
+          // Read the page from the engine when the model does not have the annotation.
           try {
-            const { annotations } = await doc.page(toPageRef(pon)).annotations.list();
+            const { annotations } = await doc.page(toPageRef(pageObjectNumber)).annotations.list();
             const dto = annotations.find(
               (candidate) =>
                 candidate.ref.kind === 'objectNumber' &&
@@ -98,7 +88,7 @@ export function createScriptEffects(
             /* resolved as a failure below */
           }
         }
-        if (pon === undefined || !ref || !subtype) {
+        if (pageObjectNumber === undefined || !ref || !subtype) {
           results.push({
             annotObjectNumber: entry.annotObjectNumber,
             status: 'failed',
@@ -116,12 +106,11 @@ export function createScriptEffects(
           continue;
         }
         try {
-          await doc.page(toPageRef(pon)).annotations.update(ref, patch as never);
-          touchedPons.add(pon);
+          await doc.page(toPageRef(pageObjectNumber)).annotations.update(ref, patch);
           results.push({ annotObjectNumber: entry.annotObjectNumber, status: 'applied' });
         } catch (error) {
-          // Stop-on-failure: PermissionDenied and friends fail THIS entry and
-          // skip the rest — the declared cross-plane law, per-plane too.
+          // Stop on the first failure: a refused entry (for example a
+          // permission refusal) fails, and every later entry is skipped.
           failed = true;
           results.push({
             annotObjectNumber: entry.annotObjectNumber,
@@ -130,9 +119,6 @@ export function createScriptEffects(
           });
         }
       }
-      // Reconcile OUR model (the engine emitted local events both listeners
-      // deliberately ignore — the owner folds its own writes).
-      for (const touched of touchedPons) await hydration.reloadPage(touched);
       return { results };
     },
   };

@@ -1,12 +1,12 @@
 /**
  * The edit handler's page anchoring: a gesture belongs to the page it started
- * on. Moves resolve through the source's projection onto THAT page (so the
+ * on. Moves resolve through the source's projection onto that page (so the
  * annotation keeps tracking — sliding along the edge — when the cursor leaves
- * it), foreign-page samples are ignored, and `up` ALWAYS closes the gesture
- * (a release over the page gap used to strand the move draft, so the
- * annotation snapped back on the next interaction).
+ * it), foreign-page samples are ignored, and `up` always closes the gesture
+ * (a release over the page gap must not strand the move draft, or the
+ * annotation snaps back on the next interaction).
  */
-import type { Vec } from '@embedpdf/core-annotation';
+import type { Point } from '@embedpdf/core-annotation';
 import { pageRefsEqual, toPageRef, type PageRef } from '@embedpdf/engine-core/runtime';
 import type {
   InteractionHostCapability,
@@ -20,7 +20,7 @@ import type { AnnotationHostCapability } from '../../src/host-contract';
 const PAGE_1 = toPageRef(1);
 const PAGE_2 = toPageRef(2);
 
-type Call = { phase: string; page: PageRef; point: Vec };
+type Call = { phase: string; page: PageRef; point: Point };
 
 function makeAnno(hit: 'annot' | 'empty' = 'annot') {
   const calls: Call[] = [];
@@ -31,7 +31,7 @@ function makeAnno(hit: 'annot' | 'empty' = 'annot') {
     clearSelection: () => {},
     beginTextEditAt: () => {},
     getCursorAt: () => null,
-    editPointer: (phase: string, page: PageRef, point: Vec) => calls.push({ phase, page, point }),
+    editPointer: (phase: string, page: PageRef, point: Point) => calls.push({ phase, page, point }),
   } as unknown as AnnotationHostCapability;
   return { anno, calls };
 }
@@ -50,11 +50,11 @@ const down = () => sample({ phase: 'down', page: { ref: PAGE_1, point: { x: 300,
 describe('annotation edit handler — page anchoring', () => {
   it('tracks the ORIGIN page through the projection, not the page under the cursor', () => {
     const { anno, calls } = makeAnno();
-    const h = createEditHandler(anno, interaction);
-    expect(h.onDown(down())).toBe(true);
+    const handler = createEditHandler(anno, interaction);
+    expect(handler.onDown(down())).toBe(true);
     // The cursor is physically over page 2 (its local y ≈ 18); the projection
     // onto page 1 says y = 810 (past its bottom edge — unclamped, as expected).
-    h.onMove?.(
+    handler.onMove?.(
       sample({
         page: { ref: PAGE_2, point: { x: 300, y: 18 } },
         project: (page) => (pageRefsEqual(page, PAGE_1) ? { x: 300, y: 810 } : null),
@@ -65,41 +65,43 @@ describe('annotation edit handler — page anchoring', () => {
 
   it('ignores a sample that cannot speak for the origin page (foreign per-page source)', () => {
     const { anno, calls } = makeAnno();
-    const h = createEditHandler(anno, interaction);
-    h.onDown(down());
+    const handler = createEditHandler(anno, interaction);
+    handler.onDown(down());
     const before = calls.length;
-    h.onMove?.(sample({ page: { ref: PAGE_2, point: { x: 300, y: 18 } }, project: () => null }));
+    handler.onMove?.(
+      sample({ page: { ref: PAGE_2, point: { x: 300, y: 18 } }, project: () => null }),
+    );
     expect(calls.length).toBe(before);
   });
 
   it('ALWAYS dispatches up — release over the page gap must still commit', () => {
     const { anno, calls } = makeAnno();
-    const h = createEditHandler(anno, interaction);
-    h.onDown(down());
-    h.onMove?.(
+    const handler = createEditHandler(anno, interaction);
+    handler.onDown(down());
+    handler.onMove?.(
       sample({ project: (page) => (pageRefsEqual(page, PAGE_1) ? { x: 300, y: 780 } : null) }),
     );
     // Over the gap: no page hit, and (worst case) no projection either.
-    h.onUp?.(sample({ phase: 'up' }));
+    handler.onUp?.(sample({ phase: 'up' }));
     expect(calls.at(-1)).toEqual({ phase: 'up', page: PAGE_1, point: { x: 300, y: 780 } });
   });
 
   it('a gesture that never armed (empty hit) routes nothing on move/up', () => {
     const { anno, calls } = makeAnno('empty');
-    const h = createEditHandler(anno, interaction);
-    expect(h.onDown(down())).toBe(false);
-    h.onMove?.(sample({ page: { ref: PAGE_1, point: { x: 10, y: 10 } } }));
-    h.onUp?.(sample({ phase: 'up', page: { ref: PAGE_1, point: { x: 10, y: 10 } } }));
+    const handler = createEditHandler(anno, interaction);
+    expect(handler.onDown(down())).toBe(false);
+    handler.onMove?.(sample({ page: { ref: PAGE_1, point: { x: 10, y: 10 } } }));
+    handler.onUp?.(sample({ phase: 'up', page: { ref: PAGE_1, point: { x: 10, y: 10 } } }));
     expect(calls.length).toBe(0);
   });
 });
 
 describe('annotation ghost handler — hover footprint', () => {
   function makeGhostAnno() {
-    const hovers: Array<{ toolId: string; page: PageRef; point: Vec; rotation?: number }> = [];
+    const hovers: Array<{ toolId: string; page: PageRef; point: Point; rotation?: number }> = [];
     let clears = 0;
     const anno = {
-      hoverGhostAt: (toolId: string, page: PageRef, point: Vec, rotation?: number) =>
+      hoverGhostAt: (toolId: string, page: PageRef, point: Point, rotation?: number) =>
         hovers.push({ toolId, page, point, rotation }),
       clearGhost: () => {
         clears++;
@@ -113,8 +115,8 @@ describe('annotation ghost handler — hover footprint', () => {
 
   it('hover over a page routes the ACTIVE tool + rotation to the capability', () => {
     const { anno, hovers } = makeGhostAnno();
-    const h = createGhostHandler(anno, ghostInteraction);
-    h.onHover?.(sample({ page: { ref: PAGE_1, point: { x: 100, y: 200 }, rotation: 90 } }));
+    const handler = createGhostHandler(anno, ghostInteraction);
+    handler.onHover?.(sample({ page: { ref: PAGE_1, point: { x: 100, y: 200 }, rotation: 90 } }));
     expect(hovers).toEqual([
       { toolId: 'stamp', page: PAGE_1, point: { x: 100, y: 200 }, rotation: 90 },
     ]);
@@ -122,16 +124,16 @@ describe('annotation ghost handler — hover footprint', () => {
 
   it('hover over the page gap clears the ghost', () => {
     const { anno, hovers, clears } = makeGhostAnno();
-    const h = createGhostHandler(anno, ghostInteraction);
-    h.onHover?.(sample({}));
+    const handler = createGhostHandler(anno, ghostInteraction);
+    handler.onHover?.(sample({}));
     expect(hovers).toHaveLength(0);
     expect(clears()).toBe(1);
   });
 
   it('a press hides the ghost and NEVER captures (real handlers still route)', () => {
     const { anno, clears } = makeGhostAnno();
-    const h = createGhostHandler(anno, ghostInteraction);
-    expect(h.onDown(down())).toBe(false);
+    const handler = createGhostHandler(anno, ghostInteraction);
+    expect(handler.onDown(down())).toBe(false);
     expect(clears()).toBe(1);
   });
 });
@@ -177,37 +179,39 @@ describe('annotation draw handler — grouped ink', () => {
 
 describe('annotation edit handler — touch consent + cancel', () => {
   it('claimsTouch delegates to the capability predicate, page-gated', () => {
-    const asked: Array<{ page: PageRef; point: Vec }> = [];
+    const asked: Array<{ page: PageRef; point: Point }> = [];
     const anno = {
-      claimsTouchAt: (page: PageRef, point: Vec) => {
+      claimsTouchAt: (page: PageRef, point: Point) => {
         asked.push({ page, point });
         return true;
       },
     } as unknown as AnnotationHostCapability;
-    const h = createEditHandler(anno, interaction);
-    expect(h.claimsTouch?.(sample({ phase: 'down' }))).toBe(false); // no page → never
+    const handler = createEditHandler(anno, interaction);
+    expect(handler.claimsTouch?.(sample({ phase: 'down' }))).toBe(false); // no page → never
     expect(asked.length).toBe(0);
     expect(
-      h.claimsTouch?.(sample({ phase: 'down', page: { ref: PAGE_1, point: { x: 5, y: 6 } } })),
+      handler.claimsTouch?.(
+        sample({ phase: 'down', page: { ref: PAGE_1, point: { x: 5, y: 6 } } }),
+      ),
     ).toBe(true);
     expect(asked).toEqual([{ page: PAGE_1, point: { x: 5, y: 6 } }]);
   });
 
   it('onCancel REVERTS to the down point and closes there (no half-moved commit)', () => {
     const { anno, calls } = makeAnno();
-    const h = createEditHandler(anno, interaction);
-    h.onDown(down()); // down at (300, 730)
-    h.onMove?.(sample({ page: { ref: PAGE_1, point: { x: 350, y: 780 } } }));
-    h.onCancel?.(sample({ phase: 'cancel' }));
+    const handler = createEditHandler(anno, interaction);
+    handler.onDown(down()); // down at (300, 730)
+    handler.onMove?.(sample({ page: { ref: PAGE_1, point: { x: 350, y: 780 } } }));
+    handler.onCancel?.(sample({ phase: 'cancel' }));
     // the replay: move back to the origin, then up at the origin
     expect(calls.slice(-2)).toEqual([
       { phase: 'move', page: PAGE_1, point: { x: 300, y: 730 } },
       { phase: 'up', page: PAGE_1, point: { x: 300, y: 730 } },
     ]);
-    // and the gesture is CLOSED: further moves route nothing
-    const n = calls.length;
-    h.onMove?.(sample({ page: { ref: PAGE_1, point: { x: 1, y: 1 } } }));
-    expect(calls.length).toBe(n);
+    // and the gesture is closed: further moves route nothing
+    const callCount = calls.length;
+    handler.onMove?.(sample({ page: { ref: PAGE_1, point: { x: 1, y: 1 } } }));
+    expect(calls.length).toBe(callCount);
   });
 });
 
@@ -230,18 +234,20 @@ describe('annotation draw handler — cancel discards the draft', () => {
 
   it('onCancel drops the draft — no up, no commit at the cancelling finger', () => {
     const { anno, calls } = makeDrawAnno();
-    const h = createDrawHandler(anno, drawInteraction);
-    expect(h.onDown(down())).toBe(true);
-    h.onMove?.(sample({ page: { ref: PAGE_1, point: { x: 350, y: 780 } } }));
-    // the cancel sample carries the SECOND finger's position — it must never
+    const handler = createDrawHandler(anno, drawInteraction);
+    expect(handler.onDown(down())).toBe(true);
+    handler.onMove?.(sample({ page: { ref: PAGE_1, point: { x: 350, y: 780 } } }));
+    // the cancel sample carries the second finger's position — it must never
     // become the shape's final point
-    h.onCancel?.(sample({ phase: 'cancel', page: { ref: PAGE_1, point: { x: 40, y: 40 } } }));
+    handler.onCancel?.(sample({ phase: 'cancel', page: { ref: PAGE_1, point: { x: 40, y: 40 } } }));
     expect(calls.at(-1)?.fn).toBe('cancelCreationDraft');
-    expect(calls.filter((c) => c.fn === 'createPointer' && c.args[1] === 'up')).toHaveLength(0);
+    expect(
+      calls.filter((call) => call.fn === 'createPointer' && call.args[1] === 'up'),
+    ).toHaveLength(0);
     // gesture is closed: further moves route nothing
-    const n = calls.length;
-    h.onMove?.(sample({ page: { ref: PAGE_1, point: { x: 1, y: 1 } } }));
-    expect(calls.length).toBe(n);
+    const callCount = calls.length;
+    handler.onMove?.(sample({ page: { ref: PAGE_1, point: { x: 1, y: 1 } } }));
+    expect(calls.length).toBe(callCount);
   });
 });
 
@@ -265,9 +271,9 @@ describe('annotation edit handler — double-click / long-press routing', () => 
 
   it('over a FREE-TEXT box: enters text edit, no move armed', () => {
     const { anno, calls } = makeEditAnno(true);
-    const h = createEditHandler(anno, interaction);
+    const handler = createEditHandler(anno, interaction);
     expect(
-      h.onDown(
+      handler.onDown(
         sample({ phase: 'down', clickCount: 2, page: { ref: PAGE_1, point: { x: 1, y: 2 } } }),
       ),
     ).toBe(true);
@@ -276,9 +282,9 @@ describe('annotation edit handler — double-click / long-press routing', () => 
 
   it('over any OTHER annotation: falls through to a normal press (select/move), not a swallowed no-op', () => {
     const { anno, calls } = makeEditAnno(false);
-    const h = createEditHandler(anno, interaction);
+    const handler = createEditHandler(anno, interaction);
     expect(
-      h.onDown(
+      handler.onDown(
         sample({ phase: 'down', clickCount: 2, page: { ref: PAGE_1, point: { x: 1, y: 2 } } }),
       ),
     ).toBe(true);
@@ -294,7 +300,7 @@ describe('distance placement — release, hover, click', () => {
       getToolSubtype: () => 'line',
       getResolvedTool: () => undefined,
       distanceCreationPage: () => placementPage,
-      createPointer: (_tool: string, phase: string, page: PageRef, point: Vec) => {
+      createPointer: (_tool: string, phase: string, page: PageRef, point: Point) => {
         calls.push({ phase, page, point });
         if (phase === 'up') placementPage = page;
         else if (phase === 'down' && placementPage !== null) placementPage = null;
@@ -338,7 +344,7 @@ describe('multi-click placement — hover off the page', () => {
     const anno = {
       getToolSubtype: () => subtype,
       getResolvedTool: () => undefined,
-      createPointer: (_tool: string, phase: string, page: PageRef, point: Vec) => {
+      createPointer: (_tool: string, phase: string, page: PageRef, point: Point) => {
         calls.push({ phase, page, point });
       },
     } as unknown as AnnotationHostCapability;
@@ -378,8 +384,8 @@ describe('multi-click placement — hover off the page', () => {
         page: { ref: PAGE_1, point: { x: 80, y: 80 } },
       }),
     );
-    const n = calls.length;
+    const callCount = calls.length;
     handler.onHover?.(offPage);
-    expect(calls).toHaveLength(n);
+    expect(calls).toHaveLength(callCount);
   });
 });

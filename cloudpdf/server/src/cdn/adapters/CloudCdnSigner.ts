@@ -15,7 +15,7 @@
  * CDN-side setup: register the key on the backend service via
  *   gcloud compute backend-services add-signed-url-key
  *
- * **Per-resource scope enforcement at the edge** (paths v2)
+ * **Per-resource scope enforcement at the edge**
  *
  * We sign each granted cacheable resource's distinct prefix separately
  * — `/v1/docs/{id}/render/pages/`, `/v1/docs/{id}/text/pages/`, etc. —
@@ -28,7 +28,8 @@
  * path-policies (not single-token query params) because the signature
  * is over the prefix itself, not just an opaque token.
  *
- * Purge: stub here; real urlMaps.invalidateCache lands in commit H.
+ * Purge is not implemented: it returns a `no-op` receipt without calling
+ * `urlMaps.invalidateCache`.
  */
 
 import type { CdnAccessInfo } from '@embedpdf/engine-core/runtime';

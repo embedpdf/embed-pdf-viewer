@@ -2,7 +2,9 @@ import { describe, expect, test } from 'vitest';
 import type { DocumentEvent } from '@embedpdf/engine-core/runtime';
 import { EventHub, SessionEventPublisher } from '@embedpdf/engine-services';
 
-function metadataEvent(serverId: number | null = null): DocumentEvent {
+function metadataEvent(
+  serverId: number | null = null,
+): Extract<DocumentEvent, { type: 'metadata.updated' }> {
   return {
     type: 'metadata.updated',
     metadata: {
@@ -59,11 +61,8 @@ describe('EventHub: delivery contract', () => {
     publisher.publishLocal(init);
 
     expect(events).toHaveLength(1);
-    expect(events[0].origin).toMatchObject({
-      kind: 'local',
-      sessionId: 'session-x',
-      sub: 'alice',
-      serverId: null,
+    expect(events[0]).toMatchObject({
+      origin: { kind: 'local', sessionId: 'session-x', sub: 'alice', serverId: null },
     });
   });
 });
