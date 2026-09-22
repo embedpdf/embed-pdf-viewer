@@ -331,3 +331,55 @@ describe('distance placement — release, hover, click', () => {
     expect(calls).toHaveLength(0);
   });
 });
+
+describe('multi-click placement — hover off the page', () => {
+  function draw(subtype: string) {
+    const calls: Call[] = [];
+    const anno = {
+      getToolSubtype: () => subtype,
+      getResolvedTool: () => undefined,
+      createPointer: (_tool: string, phase: string, page: PageRef, point: Vec) => {
+        calls.push({ phase, page, point });
+      },
+    } as unknown as AnnotationHostCapability;
+    const drawInteraction = {
+      getActiveToolId: () => subtype,
+      onToolChanged: () => () => {},
+    } as unknown as InteractionHostCapability;
+    return { handler: createDrawHandler(anno, drawInteraction), calls };
+  }
+
+  // Cursor over another page, or off every page: the projection onto page 1
+  // is what the rubber-band must follow.
+  const offPage = sample({
+    page: { ref: PAGE_2, point: { x: 1, y: 2 } },
+    project: (page) => (pageRefsEqual(page, PAGE_1) ? { x: -30, y: 80 } : null),
+  });
+
+  it.each(['polygon', 'polyline', 'free-text-callout'])(
+    '%s keeps tracking the home page after the first click',
+    (subtype) => {
+      const { handler, calls } = draw(subtype);
+      handler.onDown(sample({ phase: 'down', page: { ref: PAGE_1, point: { x: 40, y: 60 } } }));
+      handler.onUp?.(sample({ phase: 'up', page: { ref: PAGE_1, point: { x: 40, y: 60 } } }));
+      handler.onHover?.(offPage);
+      expect(calls.at(-1)).toEqual({ phase: 'move', page: PAGE_1, point: { x: -30, y: 80 } });
+    },
+  );
+
+  it('a finished polygon stops following', () => {
+    const { handler, calls } = draw('polygon');
+    handler.onDown(sample({ phase: 'down', page: { ref: PAGE_1, point: { x: 40, y: 60 } } }));
+    handler.onUp?.(sample({ phase: 'up' }));
+    handler.onDown(
+      sample({
+        phase: 'down',
+        clickCount: 2,
+        page: { ref: PAGE_1, point: { x: 80, y: 80 } },
+      }),
+    );
+    const n = calls.length;
+    handler.onHover?.(offPage);
+    expect(calls).toHaveLength(n);
+  });
+});

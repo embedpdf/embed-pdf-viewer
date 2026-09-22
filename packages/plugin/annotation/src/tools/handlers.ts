@@ -358,6 +358,11 @@ export function createDrawHandler(
   // A callout is mid-creation between its tip/knee/box clicks; while it is, hover
   // (no button) must still drive the leader/box preview, like a poly's vertices.
   let drawingCallout = false;
+  // Home page of a between-clicks preview (polygon, polyline, callout). The drag
+  // `origin` dies on pointer-up, but the preview does not: hover keeps projecting
+  // onto this page, and the core pins the point, so the rubber-band slides along
+  // the edge when the cursor leaves the page.
+  let followPage: PageRef | null = null;
   // The active drag's home page (down→up): moves/ups resolve against it, so a
   // shape keeps sizing along the page edge when the cursor overshoots.
   let origin: { page: PageRef; point: Vec } | null = null;
@@ -376,6 +381,7 @@ export function createDrawHandler(
     flushPendingInk();
     drawingPoly = false;
     drawingCallout = false;
+    followPage = null;
     origin = null;
   });
   return {
@@ -425,14 +431,21 @@ export function createDrawHandler(
       if (isPolyTool(st)) {
         const finish = (s.clickCount ?? 1) >= 2;
         anno.createPointer(tool, 'down', s.page.ref, s.page.point, finish);
+        // A double-click commits the poly; the rubber-band ends with it.
         drawingPoly = !finish;
+        followPage = finish ? null : s.page.ref;
         return true;
       }
       drawingPoly = false;
       // Each callout click advances the core's tip → knee → box state machine; the
       // final box click/drag commits and clears the draft (so `drawingCallout`
       // resets on the next tool change or simply idles harmlessly).
-      if (isCalloutTool(st)) drawingCallout = true;
+      if (isCalloutTool(st)) {
+        drawingCallout = true;
+        followPage = s.page.ref;
+      } else {
+        followPage = null;
+      }
       // The DOWN sample's display rotation rides along for the tool's `upright`
       // policy; the core captures it on the draft (later phases don't carry it).
       anno.createPointer(tool, 'down', s.page.ref, s.page.point, false, s.page.rotation);
@@ -482,6 +495,7 @@ export function createDrawHandler(
       }
       drawingPoly = false;
       drawingCallout = false;
+      followPage = null;
       origin = null;
       anno.cancelCreationDraft();
     },
@@ -496,10 +510,16 @@ export function createDrawHandler(
         }
         return;
       }
-      // Hover preview for the multi-click tools: poly (while placing vertices) and
-      // callout (while placing the tip/knee/box) follow the cursor between clicks.
-      if (s.page && ((drawingPoly && isPolyTool(st)) || (drawingCallout && isCalloutTool(st)))) {
-        anno.createPointer(tool, 'move', s.page.ref, s.page.point);
+      // Between clicks the button is up, so there is no drag origin. The preview
+      // stays on the page the series started on: project onto it even when the
+      // cursor has left that page. The core pins the point, so the rubber-band
+      // slides along the edge and picks the cursor back up inside the page.
+      if (
+        followPage &&
+        ((drawingPoly && isPolyTool(st)) || (drawingCallout && isCalloutTool(st)))
+      ) {
+        const point = pointOn(s, followPage);
+        if (point) anno.createPointer(tool, 'move', followPage, point);
       }
     },
   };

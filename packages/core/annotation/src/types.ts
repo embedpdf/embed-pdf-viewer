@@ -446,6 +446,9 @@ export type Draft =
       cur: Vec;
       boxFrom?: Vec;
       boxTo?: Vec;
+      /** Home-page box captured at the TIP click. The default text box slides
+       *  fully inside it; a drag is already point-clamped and ignores this. */
+      pageBox?: Rect;
       /** Display rotation + upright policy captured at the TIP click (the
        *  gesture's home page) — the text BOX commits counter-rotated so it
        *  reads upright; the leader (tip/knee) is page-space and never turns.

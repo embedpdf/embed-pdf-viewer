@@ -1812,6 +1812,91 @@ describe('annotation-core callout', () => {
       height: 50,
     });
   });
+
+  it('the default box slides fully inside the page, and a click commits that same rect', () => {
+    const BOX = { x: 0, y: 0, width: 612, height: 792 };
+    const ptr = (phase: 'down' | 'move' | 'up', x: number, y: number): Msg => ({
+      t: 'createPointer',
+      phase,
+      subtype: 'free-text-callout',
+      in: { page: PAGE, point: { x, y }, shift: false, pageBox: BOX },
+    });
+    const placed = run(initialModel, [
+      ptr('down', 80, 200),
+      ptr('up', 80, 200),
+      ptr('down', 140, 200),
+      ptr('up', 140, 200),
+      ptr('move', 600, 780),
+    ]);
+    expect(ghostBox(placed)).toMatchObject({
+      x: BOX.width - 150,
+      y: BOX.height - 40,
+      width: 150,
+      height: 40,
+    });
+    const committed = run(placed, [ptr('down', 600, 780), ptr('up', 600, 780)]);
+    const a = committed.byId[committed.order[0]];
+    expect(a.geom.t === 'text' && a.geom.rect).toEqual(ghostBox(placed));
+  });
+
+  it('a pointer past the page edge still slides the default box; a real drag does not', () => {
+    const BOX = { x: 0, y: 0, width: 612, height: 792 };
+    const ptr = (phase: 'down' | 'move' | 'up', x: number, y: number): Msg => ({
+      t: 'createPointer',
+      phase,
+      subtype: 'free-text-callout',
+      in: { page: PAGE, point: { x, y }, shift: false, pageBox: BOX },
+    });
+    const hovered = run(initialModel, [
+      ptr('down', 80, 200),
+      ptr('up', 80, 200),
+      ptr('down', 140, 200),
+      ptr('up', 140, 200),
+      ptr('move', 900, 400),
+    ]);
+    expect(ghostBox(hovered)).toMatchObject({ x: BOX.width - 150, y: 400, width: 150, height: 40 });
+    const dragged = run(hovered, [
+      ptr('down', 200, 100),
+      ptr('move', 320, 150),
+      ptr('up', 320, 150),
+    ]);
+    const a = dragged.byId[dragged.order[0]];
+    expect(a.geom.t === 'text' && a.geom.rect).toMatchObject({
+      x: 200,
+      y: 100,
+      width: 120,
+      height: 50,
+    });
+  });
+
+  it('a move stops when the arrowhead hits the page edge; the free axis keeps tracking', () => {
+    const BOX = { x: 0, y: 0, width: 612, height: 792 };
+    let m = run(initialModel, [
+      calloutPtr('down', 80, 200),
+      calloutPtr('up', 80, 200),
+      calloutPtr('down', 140, 200),
+      calloutPtr('up', 140, 200),
+      calloutPtr('down', 220, 180),
+      calloutPtr('up', 220, 180),
+    ]);
+    m = { ...m, snap: { ...m.snap, guides: false } };
+    const a0 = m.byId[m.order[0]];
+    if (a0.geom.t !== 'text' || !a0.geom.callout) throw new Error('expected callout');
+    const visual = geomVisualBounds(a0.geom, a0.style.strokeWidth, a0.style.border);
+    const rect = a0.geom.rect;
+    const grab = { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+    const edit = (phase: 'down' | 'move' | 'up', x: number, y: number): Msg => ({
+      t: 'editPointer',
+      phase,
+      in: { page: PAGE, point: { x, y }, shift: false, pageBox: BOX },
+    });
+    m = run(m, [edit('down', grab.x, grab.y), edit('move', -400, grab.y + 30)]);
+    const d = m.draft?.g === 'move' ? m.draft : null;
+    expect(d).toBeTruthy();
+    expect(d!.delta.x).toBeCloseTo(BOX.x - visual.x);
+    expect(d!.delta.x).toBeGreaterThan(BOX.x - rect.x);
+    expect(d!.delta.y).toBe(30);
+  });
 });
 
 describe('annotation-core callout — upright on a rotated page', () => {
@@ -1908,6 +1993,45 @@ describe('annotation-core callout — upright on a rotated page', () => {
     const ghost = pageItems(m, PAGE).find((i) => i.source === 'ghost');
     expect(ghost).toBeDefined();
     expect(ghost!.geom.t === 'text' && ghost!.geom.rot).toBe(270);
+  });
+
+  it('the default box slides by its displayed footprint, not its logical rect', () => {
+    const BOX = { x: 0, y: 0, width: 612, height: 792 };
+    const ptr = (phase: 'down' | 'move' | 'up', x: number, y: number): Msg => ({
+      t: 'createPointer',
+      phase,
+      subtype: 'free-text-callout',
+      in: {
+        page: PAGE,
+        point: { x, y },
+        shift: false,
+        displayRotation: 90,
+        upright: true,
+        pageBox: BOX,
+      },
+    });
+    // At rot 270 the logical rect of a default box at (200, 100) sits on the
+    // page, but its displayed footprint crosses the top edge.
+    const anchor = { x: 200, y: 100 };
+    const raw = uprightAnchoredRect(anchor, 150, 40, 90);
+    const foot = rotatedAabb(raw, uprightRotation(90));
+    expect(foot.y).toBeLessThan(0);
+    const m = run(initialModel, [
+      ptr('down', 40, 200),
+      ptr('up', 40, 200),
+      ptr('down', 80, 200),
+      ptr('up', 80, 200),
+      ptr('move', anchor.x, anchor.y),
+    ]);
+    const ghost = pageItems(m, PAGE).find((i) => i.source === 'ghost');
+    if (!ghost || ghost.geom.t !== 'text') throw new Error('expected text ghost');
+    const placed = rotatedAabb(ghost.geom.rect, ghost.geom.rot ?? 0);
+    expect(placed.y).toBeCloseTo(0);
+    expect(placed.x).toBeCloseTo(foot.x);
+    expect(placed.width).toBeCloseTo(foot.width);
+    expect(placed.height).toBeCloseTo(foot.height);
+    expect(ghost.geom.rect.x).toBeCloseTo(raw.x);
+    expect(ghost.geom.rect.y).toBeCloseTo(raw.y - foot.y);
   });
 
   it('an unrotated display (or a non-upright caller) keeps the classic commit — no rot', () => {

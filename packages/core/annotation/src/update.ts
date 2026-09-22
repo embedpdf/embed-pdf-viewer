@@ -36,7 +36,13 @@ import {
   flagsEqual,
   mergeFlags,
 } from './flags';
-import { anchoredGeom, anchorModeOf, unanchoredGeom, type ViewEnv } from './anchor';
+import {
+  anchoredGeom,
+  anchoredStrokeWidth,
+  anchorModeOf,
+  unanchoredGeom,
+  type ViewEnv,
+} from './anchor';
 import {
   apSizeChanged,
   caretGeomFromAnchor,
@@ -50,9 +56,11 @@ import {
   groupResizeAnchor,
   groupResizeBox,
   groupResizeFactors,
+  geomVisualBounds,
   normalizeDeg,
   quadIntersectsRect,
   rectFromPoints,
+  rotatedAabb,
   rotatePoint,
   shapeRectFor,
   transposedAboutCenter,
@@ -60,7 +68,7 @@ import {
   uprightAnchoredRect,
   uprightRotation,
 } from './geometry';
-import { clickCreateGeom, resolveClickPlacement } from './placement';
+import { clampRectToBox, clickCreateGeom, resolveClickPlacement } from './placement';
 import {
   applyProps,
   initialTextStyle,
@@ -229,20 +237,42 @@ const viewOf = (input: PointerInput): ViewEnv | undefined =>
     ? { zoom: input.zoom ?? 1, rotation: input.displayRotation ?? 0 }
     : undefined;
 
-/** The union of the ids' SELECTION bounds (the outline the user sees) — the box
- *  the page-clamp keeps inside the page during a move. Screen-anchored members
- *  count at their effective (view-projected) footprint. */
+/** Corners of the region a move must keep inside the page. Most annotations
+ *  use the selection frame (the outline the user sees); a screen-anchored
+ *  member counts at its view-projected footprint. A callout's frame is only
+ *  the text box, so the clamp uses the visual bounds — box, leader, and
+ *  arrowhead — and the arrow cannot leave the page. */
+function moveClampCorners(a: Annot, view?: ViewEnv): Vec[] {
+  const mode = anchorModeOf(a);
+  const geom = anchoredGeom(a.geom, mode, view);
+  if (geom.t === 'text' && geom.callout) {
+    const visual = geomVisualBounds(
+      geom,
+      anchoredStrokeWidth(a.style.strokeWidth, mode, view),
+      a.style.border,
+    );
+    return [
+      { x: visual.x, y: visual.y },
+      { x: visual.x + visual.width, y: visual.y },
+      { x: visual.x + visual.width, y: visual.y + visual.height },
+      { x: visual.x, y: visual.y + visual.height },
+    ];
+  }
+  return [...annotationSelectionFrame(a, view).corners];
+}
+
+/** The union of the ids' move-clamp bounds. */
 function unionBoundsOf(m: Model, ids: Id[], view?: ViewEnv): Rect | null {
   const corners: Vec[] = [];
   for (const id of ids) {
     const a = m.byId[id];
     if (!a) continue;
-    corners.push(...annotationSelectionFrame(a, view).corners);
+    corners.push(...moveClampCorners(a, view));
   }
   return corners.length ? unionRect(corners) : null;
 }
 
-/** Clamp a move delta so the selection's union bounds stay inside the page.
+/** Clamp a move delta so the move-clamp bounds stay inside the page.
  *  Per-axis, so a pointer past the bottom edge still slides the selection
  *  horizontally along that edge. */
 function clampMoveDelta(
@@ -1216,15 +1246,21 @@ export function calloutUprightRot(d: Extract<Draft, { g: 'create-callout' }>): n
  * turns transpose it about its centre — spinning by `rot` lands exactly back on
  * the dragged region), and the default box anchors so its DISPLAYED top-left
  * hangs at the point, down-right of the cursor as the author sees it — the same
- * two rules the free-text drag/click commits use.
+ * two rules the free-text drag/click commits use. The default box then slides
+ * so that footprint stays inside the page; a real drag is already bounded by
+ * the point clamp and is left exactly where the author drew it.
  */
 export function calloutBox(d: Extract<Draft, { g: 'create-callout' }>): Rect {
   const rot = calloutUprightRot(d);
   const quarter = rot === 90 || rot === 270;
   const defaultBox = (at: Vec): Rect =>
-    rot
-      ? uprightAnchoredRect(at, CALLOUT_BOX.width, CALLOUT_BOX.height, d.displayRotation!)
-      : { x: at.x, y: at.y, ...CALLOUT_BOX };
+    slideCalloutFootprint(
+      rot
+        ? uprightAnchoredRect(at, CALLOUT_BOX.width, CALLOUT_BOX.height, d.displayRotation!)
+        : { x: at.x, y: at.y, ...CALLOUT_BOX },
+      rot,
+      d.pageBox,
+    );
   if (d.boxFrom) {
     const dragged = d.boxTo ? rectFromPoints(d.boxFrom, d.boxTo) : null;
     if (dragged && (dragged.width >= MIN_DRAG || dragged.height >= MIN_DRAG))
@@ -1232,6 +1268,19 @@ export function calloutBox(d: Extract<Draft, { g: 'create-callout' }>): Rect {
     return defaultBox(d.boxFrom);
   }
   return defaultBox(d.cur);
+}
+
+/** Shift `rect` so its displayed footprint (the box rotated about its centre)
+ *  sits inside `page`. The logical rect may still cross the page under an
+ *  upright quarter-turn; only the footprint the author sees is page-bound. */
+function slideCalloutFootprint(rect: Rect, rot: number, page: Rect | undefined): Rect {
+  if (!page) return rect;
+  const foot = rotatedAabb(rect, rot);
+  const placed = clampRectToBox(foot, page);
+  const dx = placed.x - foot.x;
+  const dy = placed.y - foot.y;
+  if (dx === 0 && dy === 0) return rect;
+  return { ...rect, x: rect.x + dx, y: rect.y + dy };
 }
 
 /**
@@ -1271,6 +1320,7 @@ function calloutPointer(
             ...(input.upright && input.displayRotation
               ? { displayRotation: input.displayRotation, upright: true }
               : {}),
+            ...(input.pageBox ? { pageBox: input.pageBox } : {}),
             ...(flags ? { flags } : {}),
           },
         },
